@@ -447,7 +447,7 @@ describe('the history of the central bank (MOL-137)', () => {
     ])
   })
 
-  function historyHarness(fails: boolean[]) {
+  function historyHarness(fails: (boolean | 'future')[]) {
     let clock = NOW.getTime()
     const asked: [string, string][] = []
     const inserted: CachedRate[][] = []
@@ -470,7 +470,9 @@ describe('the history of the central bank (MOL-137)', () => {
         feed: {
           fetchRange: (from, to) => {
             asked.push([from, to])
-            return fails.shift()
+            const outcome = fails.shift()
+            if (outcome === 'future') return Promise.resolve([day('2026-09-21', 4_312_300n)])
+            return outcome
               ? Promise.reject(new Error('down'))
               : Promise.resolve([day(FRIDAY, 4_312_300n)])
           },
@@ -505,6 +507,19 @@ describe('the history of the central bank (MOL-137)', () => {
     history.pass(1)
     await history.run()
     expect(history.asked).toHaveLength(2)
+  })
+
+  it('refuses an archive with a day past tomorrow, writes none of it, asks again in six hours', async () => {
+    const history = historyHarness(['future', false])
+    await history.run()
+    expect(history.inserted).toEqual([])
+    expect(history.warnings).toEqual(['official history failed'])
+    history.pass(60 * 60 * 1000)
+    await history.run()
+    expect(history.asked).toHaveLength(1)
+    history.pass(HISTORY_RETRY_MS)
+    await history.run()
+    expect(history.inserted).toHaveLength(1)
   })
 
   it('asks again six hours after a failure, not every hour', async () => {

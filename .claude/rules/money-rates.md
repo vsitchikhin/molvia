@@ -68,7 +68,8 @@ snapshot, and an inverse or a cross is rounded there to the snapshot's six digit
   one of the currencies refuses the whole archive — measured on 30.09.2026, the whole of it since
   2022 reads (3 588 rows, 0,8 s). A failure is a line in the log, by its kind unless it is the
   feed's own words, and it is asked again in six hours (`HISTORY_RETRY_MS`), not every hour: a
-  refused archive stays refused, and it is half a megabyte; a hole a failed week leaves closes
+  refused archive stays refused, and it is half a megabyte — a day past tomorrow in it refuses it
+  the same way (review П-4); a hole a failed week leaves closes
   itself within a day.
 
 ## The person's own rate, from exchanges
@@ -204,14 +205,28 @@ rate exactly as before.
   offices, one week at a time about ten days late, each row dated by its own text, the reporting
   period above the table not trusted (on 30.09 it named 20–27 September over rows of 14–20). The
   directory's index answers 401: the names are written in the code.
-- **A file is asked only if it changed** (`If-None-Match`), and its tag is kept only once it is
-  written — a refused file is asked afresh the next hour.
+- **A file is downloaded only if it changed — by its `HEAD`, not by `If-None-Match`.** The bank's
+  server ignores the conditional headers and answers 200 with the whole file (measured 30.09.2026,
+  adversarial review Б): asked by its tag, the daily history came a megabyte and an exceljs parse
+  every hour. Its `HEAD` names the same `ETag` and `Last-Modified` with no body, and the file is
+  asked for only when they moved. The version is kept only once the file is written — a refused
+  file is asked afresh the next hour. **The ceiling of twenty megabytes is held before the body is
+  in memory** (review В): a length past it on the `HEAD` or the answer refuses at once, and a body
+  with no length is read in chunks and cut off at the ceiling.
 - **Strict or nothing, as the official feeds** (Р-7): a header cell not where it was, the sheet
   renamed, a rate zero, missing or a text, a day that is not one, a day after today, days out of
-  order, a currency twice or missing from a day — and **a figure over fifteen percent from the
-  official rate of its day** (`isMarketPlausible`; the widest real spread, the rouble in cash, is
-  five; a column read one place off is a volume, thousands of times away) — refuse the whole file.
-  A day the official history does not reach is vouched for by the header alone. Logged as the feed's
+  order, a currency twice or missing from a day — and **a figure over a factor of two from the
+  official rate of its day** (`isMarketPlausible`, `MARKET_BAND_FACTOR`) — refuse the whole file.
+  **Fifteen percent was the first bound, and the central bank's own file refuted it** (adversarial
+  review А): on 3 March 2022 banks sold roubles 27.5 % above the official rate, and with the history
+  since 2022 in the cache — written by the same hour, just before the market — the daily file was
+  refused every hour for good, and non-cash never had its stand-in (В-2). A market in a crisis stays
+  within a factor of two; what the bound is for does not — a volume or a sum in drams read for a
+  rate is thousands of times away, a rate per ten or a hundred units ten or a hundred. The measure
+  is a rate the bank did not jump on (review А′): held against a comma in the wrong place, the right
+  file of that day was refused, and a day of people in banks has no archive. A day the official
+  history does not reach is vouched for by the header alone. The two files meet in a test of their
+  own (`market-history.integration.test.ts`) — nothing smaller shows it. Logged as the feed's
   own words, which name a cell of a public file; anything else by its kind (`describeFailure`).
 - **Read through exceljs** (owner's decision В-7, against the narrow reader recommended): the price
   is 2,2 MB of bundle, some 185 packages and two moderate advisories through `uuid`, and a load of
@@ -253,9 +268,11 @@ rate exactly as before.
   old weeks, and «will come» over an exchange of 2022 was untrue (review, minor 8).
 - **«Курсы по данным ЦБ РА»** on the screen (В-1): per currency the official rate of today and each
   channel's latest figures to sell and to buy, each dated by its own day — non-cash over a week old
-  gives way to all bank clients fresh today (`marketQuotesToday`); the best is marked among
-  those still fresh today — an exchange office of two weeks ago is shown, not called today's best.
-  The server marks it; the phone compares nothing.
+  gives way to all bank clients fresh today (`marketQuotesToday`). The official rate there is the
+  central bank's own or none: the block's words name it, and an open source standing in would be
+  named the central bank (review П-3). The best is marked among the figures of the latest day still
+  fresh today — an exchange office of last week is shown, not starred beside today's banks, as a card
+  sets it only beside its own day (review П-5). The server marks it; the phone compares nothing.
 - **On the card the market comes first and the central bank under it, a step quieter** (Р-5).
   «Графики» still measure exchanges against the central bank (Р-6) — a task of its own.
 

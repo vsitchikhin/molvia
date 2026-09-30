@@ -50,7 +50,10 @@ function officialOn(
 
 /**
  * Why a file's figures are not to be written, or null (MOL-137, Р-7): a day after today, or a figure
- * over fifteen percent from the official rate of its day — a column that moved.
+ * over a factor of two from the official rate of its day — a column that moved. The measure is a rate
+ * the central bank did not jump on: a jumped one may be a comma in the wrong place, and no exchange is
+ * measured by it either — held against it, the right file of that day was refused, and a day of people
+ * in banks has no archive (adversarial review А′).
  */
 function refusal(
   rates: readonly MarketRate[],
@@ -59,6 +62,7 @@ function refusal(
 ): object | null {
   const byCurrency = new Map<string, CachedRate[]>()
   for (const row of official) {
+    if (row.jump) continue
     const rows = byCurrency.get(row.currency) ?? []
     rows.push(row)
     byCurrency.set(row.currency, rows)
@@ -86,7 +90,7 @@ function refusal(
  * written whole otherwise. A run never throws — the market is only something to compare with, and
  * a file that failed is a line in the log and the old figures kept.
  *
- * The tag of a file is remembered only once it is written: a refused file is asked for again the
+ * The version of a file is remembered only once it is written: a refused file is asked for again the
  * next hour, and a fix at the bank's end is picked up without a restart.
  */
 export function marketRatesRefresh({
@@ -96,13 +100,13 @@ export function marketRatesRefresh({
   log,
   now = () => new Date(),
 }: MarketRefreshDeps): () => Promise<void> {
-  const tags = new Map<string, string | null>()
+  const versions = new Map<string, string | null>()
 
   return async () => {
     const today = yerevanDate(now())
     for (const file of files) {
       try {
-        const answer = await file.fetch(tags.get(file.name) ?? null)
+        const answer = await file.fetch(versions.get(file.name) ?? null)
         if (answer === 'unchanged') continue
         const days = answer.rates.map((rate) => rate.date).sort()
         const [first = today] = days
@@ -117,7 +121,7 @@ export function marketRatesRefresh({
           continue
         }
         await market.upsert(answer.rates)
-        tags.set(file.name, answer.etag)
+        versions.set(file.name, answer.version)
       } catch (error) {
         // A feed's own words name a cell of a public file; anything else is described by its kind
         // only, as every failure is (privacy.md).

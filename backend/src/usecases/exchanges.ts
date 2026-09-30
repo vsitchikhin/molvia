@@ -144,10 +144,12 @@ export function marketComparisonOf(
 }
 
 /**
- * «Курсы по данным ЦБ РА» (MOL-137, В-1): for each currency, the official rate of today and each
- * channel's latest figures, each dated by its own day. The best for the person is marked among the
- * figures still fresh today — an exchange office of two weeks ago is shown with its date, but it is
- * not today's best.
+ * «Курсы по данным ЦБ РА» (MOL-137, В-1): for each currency, the central bank's own rate of today
+ * — never an open source standing in for it, which the block's words would name the central bank
+ * (review П-3) — and each channel's latest figures, each dated by its own day. The best for the
+ * person is marked among the figures of the latest day still fresh today: an exchange office of last
+ * week is shown with its date, but set beside today's banks it is not today's best — a card compares
+ * with it only on its own day (review П-5).
  */
 export function marketTodayOf(
   latest: readonly MarketRate[],
@@ -157,14 +159,22 @@ export function marketTodayOf(
   return FOREIGN.map((currency): MarketToday => {
     const buys = marketQuotesToday(latest, currency, 'bankBuys', today)
     const sells = marketQuotesToday(latest, currency, 'bankSells', today)
-    const fresh = (quotes: readonly MarketQuote[]) =>
-      quotes.filter((quote) => isRateFresh(quote.date, today))
+    const fresh = (quotes: readonly MarketQuote[]) => {
+      const recent = quotes.filter((quote) => isRateFresh(quote.date, today))
+      const newest = recent.reduce((day, quote) => (quote.date > day ? quote.date : day), '')
+      return recent.filter((quote) => quote.date === newest)
+    }
     const bestBuys = bestQuote(fresh(buys), 'bankBuys')
     const bestSells = bestQuote(fresh(sells), 'bankSells')
     const channels = [...new Set([...buys, ...sells].map((quote) => quote.channel))]
     return {
       currency,
-      official: freshOfficialRate(currency, 'AMD', official, today),
+      official: freshOfficialRate(
+        currency,
+        'AMD',
+        official.filter((row) => row.provider === 'cba'),
+        today,
+      ),
       quotes: channels.flatMap((channel) => {
         const buy = buys.find((quote) => quote.channel === channel) ?? null
         const sell = sells.find((quote) => quote.channel === channel) ?? null

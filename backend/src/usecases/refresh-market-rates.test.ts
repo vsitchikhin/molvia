@@ -55,7 +55,7 @@ function harness(files: MarketFile[], { writeFails = false } = {}) {
 
 describe('marketRatesRefresh', () => {
   it('writes a file whole and asks the next time by its tag', async () => {
-    const bybranch = file('FX_bybranch_ENG.xlsx', [{ etag: '"a"', rates: [rouble(4_110_180n)] }])
+    const bybranch = file('FX_bybranch_ENG.xlsx', [{ version: '"a"', rates: [rouble(4_110_180n)] }])
     const { run, written } = harness([bybranch.file])
     await run()
     await run()
@@ -63,9 +63,9 @@ describe('marketRatesRefresh', () => {
     expect(bybranch.asked).toEqual([null, '"a"'])
   })
 
-  it('refuses a file whole when one figure is over fifteen percent from the official rate', async () => {
+  it('refuses a file whole when one figure is over a factor of two from the official rate', async () => {
     const shifted = file('FX_bybranch_ENG.xlsx', [
-      { etag: '"a"', rates: [rouble(4_110_180n), rouble(475_836_214n)] },
+      { version: '"a"', rates: [rouble(4_110_180n), rouble(475_836_214n)] },
     ])
     const { run, written, warnings } = harness([shifted.file])
     await run()
@@ -79,8 +79,40 @@ describe('marketRatesRefresh', () => {
     expect(shifted.asked).toEqual([null, null])
   })
 
+  it('never measures by a rate the central bank jumped on: the one before it is the measure (А′)', async () => {
+    const commaSlip: CachedRate = { ...OFFICIAL[0]!, scaled: 43_187_000n, jump: true }
+    const bybranch = file('FX_bybranch_ENG.xlsx', [{ version: null, rates: [rouble(4_110_180n)] }])
+    const written: MarketRate[][] = []
+    const run = marketRatesRefresh({
+      files: [bybranch.file],
+      market: {
+        upsert: (rates) => {
+          written.push([...rates])
+          return Promise.resolve()
+        },
+      },
+      rates: {
+        between: () =>
+          Promise.resolve([
+            {
+              provider: 'cba',
+              currency: 'RUB',
+              date: '2026-09-28',
+              scaled: 4_302_900n,
+              jump: false,
+            },
+            commaSlip,
+          ]),
+      },
+      log: { warn: () => undefined },
+      now: () => NOW,
+    })
+    await run()
+    expect(written).toEqual([[rouble(4_110_180n)]])
+  })
+
   it('lets through the widest spread there is — the rouble in cash', async () => {
-    const cash = file('FX_bybranch_ENG.xlsx', [{ etag: null, rates: [rouble(4_110_180n)] }])
+    const cash = file('FX_bybranch_ENG.xlsx', [{ version: null, rates: [rouble(4_110_180n)] }])
     const { run, written } = harness([cash.file])
     await run()
     expect(written).toHaveLength(1)
@@ -88,7 +120,7 @@ describe('marketRatesRefresh', () => {
 
   it('holds a day of the history the official cache does not reach by its header alone', async () => {
     const old = file('FOREX ENG_Daily.xlsx', [
-      { etag: null, rates: [rouble(6_391_133n, '2022-01-03')] },
+      { version: null, rates: [rouble(6_391_133n, '2022-01-03')] },
     ])
     const { run, written } = harness([old.file])
     await run()
@@ -97,7 +129,7 @@ describe('marketRatesRefresh', () => {
 
   it('refuses a file dated after today', async () => {
     const future = file('FX_bybranch_ENG.xlsx', [
-      { etag: null, rates: [rouble(4_110_180n, '2026-10-01')] },
+      { version: null, rates: [rouble(4_110_180n, '2026-10-01')] },
     ])
     const { run, written, warnings } = harness([future.file])
     await run()
@@ -109,7 +141,7 @@ describe('marketRatesRefresh', () => {
     const down = file('FX_bybranch_ENG.xlsx', [
       new FeedError('cba', 'FX_bybranch_ENG.xlsx: HTTP 401'),
     ])
-    const daily = file('FOREX ENG_Daily.xlsx', [{ etag: null, rates: [rouble(4_217_687n)] }])
+    const daily = file('FOREX ENG_Daily.xlsx', [{ version: null, rates: [rouble(4_217_687n)] }])
     const { run, written, warnings } = harness([down.file, daily.file])
     await run()
     expect(written).toHaveLength(1)
@@ -120,7 +152,7 @@ describe('marketRatesRefresh', () => {
   })
 
   it('logs a failure of the database by its kind, never by its message', async () => {
-    const bybranch = file('FX_bybranch_ENG.xlsx', [{ etag: null, rates: [rouble(4_110_180n)] }])
+    const bybranch = file('FX_bybranch_ENG.xlsx', [{ version: null, rates: [rouble(4_110_180n)] }])
     const { run, warnings } = harness([bybranch.file], { writeFails: true })
     await run()
     expect(warnings[0]?.details).toMatchObject({ file: 'FX_bybranch_ENG.xlsx', errorName: 'Error' })

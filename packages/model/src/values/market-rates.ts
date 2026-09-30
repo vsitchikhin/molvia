@@ -176,15 +176,18 @@ export function marketRateOf(quote: MarketQuote, currency: ForeignCurrency): Exc
   return exchangeRateSchema.safeParse(rate).success ? rate : null
 }
 
-/** How far a market figure may stand from the official rate of its day before it is misread (Р-7). */
-export const MARKET_BAND_PERCENT = 15n
-
 /**
- * Whether a market figure is where a market figure can be: within fifteen percent of the official
- * rate of its day. The spread of the rouble in cash, the widest there is, is five; a column read
- * one place off gives a volume or a sum in drams, thousands of times away.
+ * How many times away from the official rate of its day a market figure may stand before it is
+ * misread (Р-7, as revised by the adversarial review А). Fifteen percent was the first bound, and
+ * the central bank's own file refuted it: on 3 March 2022 banks sold roubles 27.5 % above the
+ * official rate, and with the history since 2022 in the cache the daily file was refused every hour
+ * for good. A market in a crisis is still within a factor of two; what the bound is for is not —
+ * a volume or a sum in drams read for a rate is thousands of times away, a rate per ten or a hundred
+ * units is ten or a hundred.
  */
+export const MARKET_BAND_FACTOR = 2n
+
+/** Whether a market figure is where a market figure can be: within a factor of two of the official. */
 export function isMarketPlausible(scaled: bigint, official: bigint): boolean {
-  const distance = scaled > official ? scaled - official : official - scaled
-  return distance * 100n <= official * MARKET_BAND_PERCENT
+  return scaled * MARKET_BAND_FACTOR >= official && scaled <= official * MARKET_BAND_FACTOR
 }

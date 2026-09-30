@@ -126,11 +126,9 @@ export function officialRatesRefresh({
     if (historyAt !== null && now().getTime() - historyAt < HISTORY_EVERY_MS) return
     try {
       const archive = await history.feed.fetchRange(OFFICIAL_HISTORY_FROM, today)
+      // A refusal like any other: logged by the catch and asked again in six hours (review П-4).
       const future = archive.find((rate) => rate.date > today)
-      if (future) {
-        log.warn({ provider: 'cba', date: future.date }, 'official history dated in the future')
-        return
-      }
+      if (future) throw new FeedError('cba', `range: ${future.date} is in the future`)
       const kept = await history.rates.between('cba', OFFICIAL_HISTORY_FROM, today)
       const missing = missingDays(archive, kept)
       for (const rate of missing.filter((row) => row.jump)) {

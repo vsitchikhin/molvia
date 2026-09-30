@@ -244,26 +244,76 @@ describe('asking for a file', () => {
     vi.unstubAllGlobals()
   })
 
-  it('asks by the tag of the last file and reads 304 as unchanged', async () => {
-    const fetch = vi.fn((_url: string, init?: RequestInit) =>
-      Promise.resolve(
-        new Headers(init?.headers).get('If-None-Match') === '"t1"'
-          ? new Response(null, { status: 304 })
-          : new Response(bytes(EXCHANGERS), { headers: { etag: '"t1"' } }),
-      ),
-    )
+  /**
+   * A server like the bank's (measured 30.09.2026, adversarial review Б): the same tag and moment on
+   * `HEAD`, and 200 with the whole file on `GET` whatever conditional header it is sent.
+   */
+  function bank(version = { etag: '"{1924EE06},511"', modified: 'Tue, 29 Sep 2026 12:12:08 GMT' }) {
+    const gets: RequestInit[] = []
+    const fetch = vi.fn((_url: string, init?: RequestInit) => {
+      const headers = { etag: version.etag, 'last-modified': version.modified }
+      if (init?.method === 'HEAD') return Promise.resolve(new Response(null, { headers }))
+      gets.push(init ?? {})
+      return Promise.resolve(new Response(bytes(EXCHANGERS), { headers }))
+    })
     vi.stubGlobal('fetch', fetch)
     const [, , exchangers] = marketFiles('https://example.test/')
     if (!exchangers) throw new Error('no file')
+    return { exchangers, fetch, gets, version }
+  }
+
+  it('downloads a file once, and after that asks its HEAD: the bank ignores If-None-Match', async () => {
+    const { exchangers, fetch, gets } = bank()
     const first = await exchangers.fetch(null)
-    expect(first !== 'unchanged' && first.etag).toBe('"t1"')
-    expect(await exchangers.fetch('"t1"')).toBe('unchanged')
+    if (first === 'unchanged') throw new Error('the first read is the file')
+    expect(first.rates).toHaveLength(42)
+    expect(await exchangers.fetch(first.version)).toBe('unchanged')
+    expect(await exchangers.fetch(first.version)).toBe('unchanged')
+    expect(gets).toHaveLength(1)
     expect(fetch.mock.calls[0]?.[0]).toBe('https://example.test/FOREX%20ENG.xlsx')
   })
 
-  it('reads anything but 200 and 304 as the bank being down', async () => {
+  it('downloads it again once the bank changed it', async () => {
+    const { exchangers, gets, version } = bank()
+    const first = await exchangers.fetch(null)
+    if (first === 'unchanged') throw new Error('the first read is the file')
+    version.etag = '"{1924EE06},512"'
+    expect(await exchangers.fetch(first.version)).not.toBe('unchanged')
+    expect(gets).toHaveLength(2)
+  })
+
+  it('reads anything but 200 as the bank being down', async () => {
     vi.stubGlobal('fetch', () => Promise.resolve(new Response('no', { status: 401 })))
     const [bybranch] = marketFiles('https://example.test/')
     await expect(bybranch?.fetch(null)).rejects.toThrow('FX_bybranch_ENG.xlsx: HTTP 401')
+  })
+
+  it('refuses a file its HEAD says is past twenty megabytes without downloading it', async () => {
+    const gets: string[] = []
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+      if (init?.method !== 'HEAD') gets.push(url)
+      return Promise.resolve(
+        new Response(null, { headers: { 'content-length': String(64 * 2 ** 20) } }),
+      )
+    })
+    const [bybranch] = marketFiles('https://example.test/')
+    await expect(bybranch?.fetch(null)).rejects.toThrow('FX_bybranch_ENG.xlsx: too large')
+    expect(gets).toEqual([])
+  })
+
+  it('stops reading a body that runs past twenty megabytes with no length said (В)', async () => {
+    let sent = 0
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        sent += 2 ** 20
+        controller.enqueue(new Uint8Array(2 ** 20))
+      },
+    })
+    vi.stubGlobal('fetch', (_url: string, init?: RequestInit) =>
+      Promise.resolve(init?.method === 'HEAD' ? new Response(null) : new Response(endless)),
+    )
+    const [bybranch] = marketFiles('https://example.test/')
+    await expect(bybranch?.fetch(null)).rejects.toThrow('FX_bybranch_ENG.xlsx: too large')
+    expect(sent).toBeLessThanOrEqual(22 * 2 ** 20)
   })
 })

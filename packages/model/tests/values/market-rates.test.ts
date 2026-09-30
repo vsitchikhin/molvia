@@ -216,13 +216,26 @@ describe('marketRateOf', () => {
 })
 
 describe('isMarketPlausible', () => {
-  it('lets the widest spread there is through: the rouble in cash, five percent off', () => {
+  it('lets the rouble in cash through, five percent off', () => {
     expect(isMarketPlausible(4_110_180n, 4_318_700n)).toBe(true)
   })
 
-  it('refuses a figure over fifteen percent away — a column read one place off', () => {
-    expect(isMarketPlausible((4_318_700n * 115n) / 100n, 4_318_700n)).toBe(true)
-    expect(isMarketPlausible((4_318_700n * 115n) / 100n + 1n, 4_318_700n)).toBe(false)
+  // The central bank's own file against its own archive (adversarial review А): banks sold
+  // roubles 27.5 % above the official rate on 3 March 2022. The market of a crisis is the market.
+  it('lets the market of March 2022 through: banks selling roubles at 5,431169 against 4,26', () => {
+    expect(isMarketPlausible(5_431_169n, 4_260_000n)).toBe(true)
+    expect(isMarketPlausible(5_662_229n, 4_790_000n)).toBe(true)
+  })
+
+  it('holds at a factor of two either way, the bound itself included', () => {
+    expect(isMarketPlausible(8_637_400n, 4_318_700n)).toBe(true)
+    expect(isMarketPlausible(8_637_401n, 4_318_700n)).toBe(false)
+    expect(isMarketPlausible(2_159_350n, 4_318_700n)).toBe(true)
+    expect(isMarketPlausible(2_159_349n, 4_318_700n)).toBe(false)
+  })
+
+  it('refuses what a column read one place off gives: a volume, a rate per ten units', () => {
     expect(isMarketPlausible(3_651_380_510n, 363_180_000n)).toBe(false)
+    expect(isMarketPlausible(43_187_000n, 4_318_700n)).toBe(false)
   })
 })

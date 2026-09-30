@@ -12,17 +12,20 @@ const BASE = 'https://old.cba.am/stat/stat_data_eng/'
 /** A file past this is not a sheet of three currencies: the daily history was 1,2 MB in 2026. */
 const MAX_BYTES = 20 * 1024 * 1024
 
-/** What one file said: its figures and the tag to ask «has it changed» by next time. */
+/**
+ * What one file said: its figures and the version it had — its `ETag` and `Last-Modified` as the
+ * bank sent them — to ask «has it changed» by next time. Null when the bank sent neither.
+ */
 export interface MarketAnswer {
-  readonly etag: string | null
+  readonly version: string | null
   readonly rates: readonly MarketRate[]
 }
 
 /** One file of the market, read on its own: a failure of one never holds the others back. */
 export interface MarketFile {
   readonly name: string
-  /** The file, or `unchanged` when it is the one `etag` names. Throws on anything else. */
-  fetch(etag: string | null): Promise<MarketAnswer | 'unchanged'>
+  /** The file, or `unchanged` when it is the one `version` names. Throws on anything else. */
+  fetch(version: string | null): Promise<MarketAnswer | 'unchanged'>
 }
 
 function refuse(file: string, reason: string): FeedError {
@@ -209,23 +212,73 @@ export async function parseMarketFile(
   return read(await readSheet(bytes, file, sheet))
 }
 
+/** The version a file's headers name: its tag and the moment it changed, or null without either. */
+function versionOf(headers: Headers): string | null {
+  const parts = [headers.get('etag'), headers.get('last-modified')]
+  return parts.some((part) => part !== null) ? parts.map((part) => part ?? '').join(' | ') : null
+}
+
+/** A length the bank says is past the ceiling, before a byte of it is taken. */
+function tooLong(headers: Headers): boolean {
+  const length = Number(headers.get('content-length'))
+  return Number.isFinite(length) && length > MAX_BYTES
+}
+
 /**
- * A file asked for only if it changed since `etag`: the bank sends the tag, and the daily history
- * is a megabyte an hour otherwise.
+ * The body, cut off at the ceiling: the whole of it is never held when it runs past, whatever the
+ * length the headers named (adversarial review В).
+ */
+async function bodyOf(response: Response, file: string): Promise<ArrayBuffer> {
+  if (tooLong(response.headers)) throw refuse(file, 'too large')
+  const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = response.body?.getReader()
+  if (!reader) return new ArrayBuffer(0)
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > MAX_BYTES) {
+      await reader.cancel()
+      throw refuse(file, 'too large')
+    }
+    chunks.push(value)
+  }
+  const bytes = new Uint8Array(size)
+  let at = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, at)
+    at += chunk.byteLength
+  }
+  return bytes.buffer
+}
+
+/**
+ * A file downloaded only if it changed since `version`. The bank's server ignores `If-None-Match`
+ * and `If-Modified-Since` alike and answers 200 with the whole file (measured 30.09.2026, adversarial
+ * review Б), so its `HEAD` is asked first — the same tag and moment, no body — and the file only
+ * when they moved: otherwise the daily history is a megabyte and a parse every hour.
  */
 function marketFile(file: keyof typeof MARKET_SHEETS, base = BASE): MarketFile {
+  const url = `${base}${encodeURIComponent(file)}`
   return {
     name: file,
-    async fetch(etag) {
-      const response = await fetch(`${base}${encodeURIComponent(file)}`, {
-        headers: etag === null ? {} : { 'If-None-Match': etag },
+    async fetch(known) {
+      const head = await fetch(url, {
+        method: 'HEAD',
         signal: AbortSignal.timeout(FEED_TIMEOUT_MS),
       })
-      if (response.status === 304) return 'unchanged'
+      if (!head.ok) throw refuse(file, `HTTP ${String(head.status)}`)
+      const version = versionOf(head.headers)
+      if (version !== null && version === known) return 'unchanged'
+      if (tooLong(head.headers)) throw refuse(file, 'too large')
+      const response = await fetch(url, { signal: AbortSignal.timeout(FEED_TIMEOUT_MS) })
       if (!response.ok) throw refuse(file, `HTTP ${String(response.status)}`)
-      const bytes = await response.arrayBuffer()
-      if (bytes.byteLength > MAX_BYTES) throw refuse(file, 'too large')
-      return { etag: response.headers.get('etag'), rates: await parseMarketFile(file, bytes) }
+      const bytes = await bodyOf(response, file)
+      return {
+        version: versionOf(response.headers) ?? version,
+        rates: await parseMarketFile(file, bytes),
+      }
     },
   }
 }
