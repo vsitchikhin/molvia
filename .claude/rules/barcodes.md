@@ -7,6 +7,11 @@ paths:
   - 'frontend/src/components/BarcodeScannerSheet.*'
   - 'frontend/src/composables/{useCamera,useBarcodeScan,useBarcodeLookup}.*'
   - 'e2e/{scanner.spec,barcode-video}.ts'
+  - 'backend/src/routes/catalogue.ts'
+  - 'backend/tests/catalogue.integration.test.ts'
+  - 'frontend/src/views/{ItemSearchView,TripView}*'
+  - 'frontend/src/components/CatalogueCombobox*'
+  - 'frontend/src/stores/{itemEntry,recentItems}*'
 ---
 
 # Barcodes: the scanner, a code typed by hand, the item by its code
@@ -160,13 +165,34 @@ lies on an iPad (as MOL-132 Р-3).
   and `01234053`); a form that checks as EAN-8 is a twin like any other. **The named price:** a shop's
   own EAN-8 label and a UPC-E product with the same digits find each other — rare on an Armenian
   shelf, and the name on the sheet shows it.
+- **Thirteen digits pair with eight only when one EAN-8 folds into them** (adversarial Г). Two shop
+  labels with different digits may expand to one UPC-A — `00000055` and `00000505` both to
+  `000000000055`, some one in five of the eight digits that check both ways — and thirteen typed
+  from either no longer say which: guessing put the other shop's item on the sheet, silently. So such
+  thirteen are only themselves. **The price:** a label of that kind typed by hand finds nothing,
+  which is the price MOL-98 Р-11 named for it — the scan still finds it. The pairing is symmetric
+  where it holds, and not transitive: eight digits still list their thirteen.
+- **Twelve digits and a GTIN-14 led by `0` are looked up as the thirteen too** (adversarial З): the
+  API is the one write path and keeps the rule, and a client that does not repeat the phone's — the
+  bot repeats none — still finds the package.
+- **No HEAD twin**, as no GET of the API has one (adversarial В): Fastify runs the whole handler for
+  it, and the length of a bodiless answer tells found from not.
 - **The item found goes to the purchase sheet with no query**: a code is not one, so neither a pick
   nor the person's own word (`admits`) is written. The miss held from before is used up all the
   same, as by any sheet opened after it (MOL-45). The sheet waits for the scanner to be put away —
-  its close is a step back through history, as «Предложить товар»'s is.
+  its close is a step back through history, as «Предложить товар»'s is. **A find held for that
+  belongs to its code**: the next code read, or typing, drops it (adversarial А) — a second scan while
+  the first answer is on its way is exactly what a person does when nothing seems to happen, and the
+  first item came up over «Код … не знаком» of the second.
 - **A miss** says «Код … справочнику не знаком» on the screen and out loud, and offers «Предложить
-  товар» — without the code until MOL-100 takes codes there (owner's decision В-1). An error is red
-  with «Повторить»; typing gives the search back and drops a lookup still out.
+  товар» — without the code until MOL-100 takes codes there (owner's decision В-1). **Proposed from
+  there, the item was looked for by the code**: the name starts empty, whatever the field held before
+  the scan, the pick carries no query, and the block goes once the item is proposed (adversarial Д,
+  review С-5). An error is red with «Повторить»; typing gives the search back and drops a lookup
+  still out. **Under the code's answer the search says nothing**: its rows are not shown, and an
+  answer landing then read «найдено два» over «не знаком» (adversarial Б).
+- **Offline and error ask again once the connection is back**, quietly — the block stays until the
+  answer replaces it — as the search does (`useReconnect`, adversarial Ж).
 - **Offline, the device knows the codes it found items by** (owner's decision В-2): an item found by
   a code and added to a record keeps that code beside «Часто берёте», under
   `molvia.recent-codes.<owner>` — beside the list, not in its rows, so a row an older version wrote
@@ -175,6 +201,11 @@ lies on an iPad (as MOL-132 Р-3).
   an item only ever taken by its name is not found by its code without a network.
 - **The reader lives with the screen, not the sheet** (review С-12а): a second scan on the same
   screen is warm, and leaving the screen — which a found item always does — lets it go. So the sheet
-  stays mounted closed, and **a closed scanner draws nothing**: its skeleton kept «Загрузка…» in the
-  app's live region over the search's answer.
+  stays mounted closed, and **a scanner put away draws nothing**: its skeleton kept «Загрузка…» in
+  the app's live region over the search's answer. **Put away means after the slide down**, not at
+  `open: false` and not at `onClosed`, which comes as the dialog closes — when the slide starts:
+  emptied then, every scan and every × slid down as a bare title, 92 px of 249 (adversarial Е,
+  measured frame by frame in Chromium). The refusal it slides down with is the one it showed, not
+  what the stopped camera says. The skeleton alone goes at `open: false`: brought up by the stopped
+  camera, it would say «Загрузка…» for nothing.
 - **Not yet:** a code by its item on «Что брать» (its own search, MOL-128), writing a code — MOL-100.
