@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { barcodeTwins, typedBarcode } from '#model/entities/barcode'
+import {
+  barcodeTwins,
+  hasRepeatedBarcode,
+  typedBarcode,
+  writtenBarcode,
+} from '#model/entities/barcode'
 import { ERROR } from '#model/support/errors'
 
 const code = (input: string) => {
@@ -158,5 +163,54 @@ describe('barcodeTwins', () => {
     for (const input of ['', '1234567', '123456789', 'abcdefgh', '00408295 ', '004082950000000']) {
       expect(barcodeTwins(input), input).toEqual([])
     }
+  })
+})
+
+describe('writtenBarcode', () => {
+  const written = (input: string) => {
+    const result = writtenBarcode(input)
+    return result.ok ? result.code : result.error
+  }
+
+  it('writes a code whose check digit holds, and refuses one digit off (Р-1)', () => {
+    expect(written('4850000000007')).toBe('4850000000007')
+    expect(written('4850000000003')).toBe(ERROR.BARCODE_CHECK_DIGIT)
+  })
+
+  it('writes twelve digits and a GTIN-14 led by 0 as the thirteen the scanner reads', () => {
+    expect(written('012345678905')).toBe('0012345678905')
+    expect(written('012345678906')).toBe(ERROR.BARCODE_CHECK_DIGIT)
+    expect(written('04850000000007')).toBe('4850000000007')
+    expect(written('04850000000003')).toBe(ERROR.BARCODE_CHECK_DIGIT)
+  })
+
+  it('keeps a GTIN-14 of a case as it is', () => {
+    // 1 as the indicator: a case of the package, not the package — a code of its own.
+    expect(written('14850000000004')).toBe('14850000000004')
+  })
+
+  it('keeps eight digits as they came, whichever way they check', () => {
+    expect(written('96385074')).toBe('96385074') // EAN-8 only
+    expect(written('04252614')).toBe('04252614') // UPC-E only — not expanded
+    expect(written('01234565')).toBe('01234565') // both
+    expect(written('96385075')).toBe(ERROR.BARCODE_CHECK_DIGIT)
+    // Led by neither 0 nor 1, eight digits are no UPC-E: only EAN-8 can pass them.
+    expect(written('24252610')).toBe(ERROR.BARCODE_CHECK_DIGIT)
+  })
+
+  it('refuses what is no barcode at all — nine digits, spaces, letters', () => {
+    expect(written('123456789')).toBe(ERROR.BARCODE_SHAPE)
+    expect(written('4850 000000007')).toBe(ERROR.BARCODE_SHAPE)
+    expect(written('')).toBe(ERROR.BARCODE_SHAPE)
+  })
+})
+
+describe('hasRepeatedBarcode', () => {
+  it('finds a code twice and a code beside its twin, and nothing in distinct codes', () => {
+    expect(hasRepeatedBarcode([])).toBe(false)
+    expect(hasRepeatedBarcode(['4850000000007', '96385074'])).toBe(false)
+    expect(hasRepeatedBarcode(['96385074', '96385074'])).toBe(true)
+    expect(hasRepeatedBarcode(['0004082000095', '00408295'])).toBe(true)
+    expect(hasRepeatedBarcode(['04850000000007', '4850000000007'])).toBe(true)
   })
 })

@@ -74,8 +74,13 @@ export const ERROR = {
   MONEY_ACCOUNT_CURRENCY_LOCKED: 'error.money_account_currency_locked',
   /** A code typed by hand not 8, 12 or 13 digits long — the lengths the scanner reads (MOL-98). */
   BARCODE_SHAPE: 'error.barcode_shape',
-  /** A code typed by hand whose last digit does not check: a digit was mistyped (MOL-98). */
+  /**
+   * A code whose last digit does not check: typed by hand, a digit was mistyped (MOL-98); written to
+   * the catalogue, it cannot be a package's (MOL-100).
+   */
   BARCODE_CHECK_DIGIT: 'error.barcode_check_digit',
+  /** A code added to an item that already holds `ITEM_BARCODES_MAX` of them (MOL-100). */
+  BARCODES_FULL: 'error.barcodes_full',
 } as const
 
 export type ErrorCode = (typeof ERROR)[keyof typeof ERROR]

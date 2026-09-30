@@ -164,12 +164,34 @@ describe('proposedItemSchema', () => {
   it('takes a product with a name and a unit, and the quantity from the wire', () => {
     expect(
       proposedItemSchema.parse({ ...cheese, typicalQuantity: { value: '0.3', unit: 'kg' } }),
-    ).toEqual({ ...cheese, typicalQuantity: { milli: 300n, unit: 'kg' } })
+    ).toEqual({ ...cheese, barcodes: [], typicalQuantity: { milli: 300n, unit: 'kg' } })
   })
 
-  it('refuses a dish until 0.3, and barcodes until 0.2', () => {
+  it('refuses a dish until 0.3', () => {
     expect(pathOf({ ...cheese, kind: 'dish' })).toBe('kind')
-    expect(pathOf({ ...cheese, barcodes: ['4850001234567'] })).toBe('unrecognized_keys')
+  })
+
+  it('takes the codes read from the package, up to twenty (MOL-100)', () => {
+    expect(proposedItemSchema.parse({ ...cheese, barcodes: ['4850001234567'] }).barcodes).toEqual([
+      '4850001234567',
+    ])
+    const twenty = Array.from({ length: 20 }, (_, i) => `48500012345${String(i).padStart(2, '0')}`)
+    expect(pathOf({ ...cheese, barcodes: twenty })).toBeNull()
+    expect(pathOf({ ...cheese, barcodes: [...twenty, '4850001234999'] })).toBe('barcodes')
+    expect(pathOf({ ...cheese, barcodes: ['123'] })).toBe('barcodes.0')
+  })
+
+  it('refuses one package twice — a code and its twin as much as a code and itself (Р-7)', () => {
+    const repeated = (barcodes: string[]) => {
+      const parsed = proposedItemSchema.safeParse({ ...cheese, barcodes })
+      return parsed.success ? null : parsed.error.issues[0]?.message
+    }
+    expect(repeated(['4850001234567', '4850001234567'])).toBe(ISSUE.BARCODE_DUPLICATED)
+    // UPC-A as twelve digits and as the thirteen the scanner reads it as.
+    expect(repeated(['012345678905', '0012345678905'])).toBe(ISSUE.BARCODE_DUPLICATED)
+    // A shop's EAN-8 label and the UPC-A it expands to as UPC-E.
+    expect(repeated(['00408295', '0004082000095'])).toBe(ISSUE.BARCODE_DUPLICATED)
+    expect(repeated(['4850001234567', '96385074'])).toBeNull()
   })
 
   it('stays as strict as the input it narrows: no author and no key from the body', () => {

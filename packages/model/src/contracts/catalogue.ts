@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ISSUE } from '#model/support/errors'
-import { itemSchema, newItemSchema } from '#model/entities/item'
+import { hasRepeatedBarcode } from '#model/entities/barcode'
+import { barcodeSchema, itemSchema, newItemSchema } from '#model/entities/item'
 import type { Item } from '#model/entities/item'
 import { quantityCodec } from '#model/values/units'
 
@@ -36,7 +37,8 @@ export type CatalogueSearchQuery = z.infer<typeof catalogueSearchQuerySchema>
  * An allowlist, and the reason is `createdBy`. In 0.1 the device identifier *is* the proof of
  * identity (MOL-8) — whoever reads it is the owner — and `created_by` holds exactly that. An
  * `Item` sent whole would hand every searcher the identity of everyone who added an item.
- * `searchKey` and `createdAt` nobody reads; barcodes belong to 0.2.
+ * `searchKey` and `createdAt` nobody reads; codes stay on the server — a code is looked up by
+ * itself (MOL-99), and a strict entry read by the trip, «Что брать» and the copy is not widened.
  */
 export const catalogueEntrySchema = itemSchema.pick({
   id: true,
@@ -100,18 +102,41 @@ export const catalogueBarcodeResponseSchema = z.strictObject({
 export type CatalogueBarcodeResponse = z.infer<typeof catalogueBarcodeResponseSchema>
 
 /**
- * The body of «Предложить товар» in 0.1: products only, and no barcodes.
+ * The body of «Предложить товар»: products only, and the codes read from the package.
  *
  * Venues and dishes arrive with 0.3, and until then the search records every visit on the
  * product half of the gate — a dish added now would be counted as a product forever, in a
- * log nothing may correct. Barcodes arrive with the scanner in 0.2; until then a barcode sent
- * beside a name the catalogue already holds would be dropped in silence, or turn a 409 into a
- * 200. Both are refused rather than half-handled, and both lift with the release that needs them.
+ * log nothing may correct. So a dish is refused rather than half-handled, and lifts with the
+ * release that needs it.
+ *
+ * Codes arrived with the scanner in 0.2 (MOL-100): written with the item, or, beside a name the
+ * catalogue already holds, written to that item — never dropped in silence. Two codes of one
+ * package — one a twin of the other — are a repeat, as two equal codes are (Р-7). Whether each
+ * checks is `writtenBarcode`'s, called by the server.
  */
-export const proposedItemSchema = newItemSchema.omit({ barcodes: true }).extend({
-  kind: z.literal('product'),
-})
+export const proposedItemSchema = newItemSchema
+  .extend({ kind: z.literal('product') })
+  .refine((input) => !hasRepeatedBarcode(input.barcodes), {
+    error: ISSUE.BARCODE_DUPLICATED,
+    path: ['barcodes'],
+  })
 export type ProposedItem = z.infer<typeof proposedItemSchema>
+
+/**
+ * The body of «привязать код к ней?» (MOL-100): the code in the body, never in the path — the API
+ * logs a request as its path (MOL-58), and a code is what a person bought.
+ */
+export const attachBarcodeBodySchema = z.strictObject({ code: barcodeSchema })
+export type AttachBarcodeBody = z.infer<typeof attachBarcodeBodySchema>
+
+/**
+ * «Этот код у „Молоко Ашхар 1 л“» (MOL-100, Р-3): another item holds the code, or one of its twins,
+ * and nothing was written. Not an error of the request but an answer about the catalogue — it goes
+ * with a `409`, and names the holder whole, so the screen can offer to take it: the person holds the
+ * package, and the catalogue says this is what it is.
+ */
+export const barcodeTakenSchema = z.strictObject({ taken: catalogueEntryCodec })
+export type BarcodeTaken = z.infer<typeof barcodeTakenSchema>
 
 /** The one way an item becomes a catalogue entry — by naming what goes, not what stays. */
 export function catalogueEntryOf(item: Item): CatalogueEntry {

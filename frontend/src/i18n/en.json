@@ -917,7 +917,8 @@
     "money_account_currency": "This account is in another currency",
     "money_account_currency_locked": "This account already has operations, so its currency cannot change. Add a new account for another currency",
     "barcode_shape": "A barcode has 8, 12 or 13 digits",
-    "barcode_check_digit": "The digits don't add up — check the code"
+    "barcode_check_digit": "The digits don't add up — check the code",
+    "barcodes_full": "This item already holds twenty codes — no more can be added"
   },
   "settings": {
     "title": "Settings",

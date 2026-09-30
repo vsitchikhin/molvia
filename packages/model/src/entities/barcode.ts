@@ -91,6 +91,43 @@ export function barcodeTwins(code: string): string[] {
 }
 
 /**
+ * A code as it is written to the shared catalogue (MOL-100, Р-1): its last digit must check —
+ * a code with one that does not cannot be printed on a package, and a code written is written for
+ * everyone for good. Twelve digits (UPC-A) and fourteen led by `0` (GTIN-14 of the same package)
+ * are written as the thirteen the scanner reads them as. Eight digits are written as they came:
+ * whether they are EAN-8 or UPC-E the digits alone do not say (MOL-98 Р-11), so they pass if they
+ * check either way, and `barcodeTwins` finds the other form on the way back.
+ */
+export function writtenBarcode(code: string): TypedBarcode {
+  if (!barcodeSchema.safeParse(code).success) return { ok: false, error: ERROR.BARCODE_SHAPE }
+  if (code.length === 8) {
+    const upcE = /^[01]/.test(code) && checks(expandUpcE(code))
+    return checks(code) || upcE
+      ? { ok: true, code }
+      : { ok: false, error: ERROR.BARCODE_CHECK_DIGIT }
+  }
+  if (!checks(code)) return { ok: false, error: ERROR.BARCODE_CHECK_DIGIT }
+  if (code.length === 12) return { ok: true, code: `0${code}` }
+  if (code.length === 14 && code.startsWith('0')) return { ok: true, code: code.slice(1) }
+  return { ok: true, code }
+}
+
+/**
+ * Whether two codes of one list are the same package (MOL-100, Р-7): one is a twin of the other.
+ * Such a pair is a repeat, as two equal codes are.
+ */
+export function hasRepeatedBarcode(codes: readonly string[]): boolean {
+  const seen = new Set<string>()
+  for (const code of codes) {
+    const forms = barcodeTwins(code)
+    if (forms.some((form) => seen.has(form)) || seen.has(code)) return true
+    for (const form of forms) seen.add(form)
+    seen.add(code)
+  }
+  return false
+}
+
+/**
  * A code typed by hand, in the form the scanner gives the same package (MOL-98): zxing reads
  * UPC-A and UPC-E as thirteen digits, so a code typed from either comes out the same way, and
  * one package is one code whichever way it came in. Spaces and hyphens, as printed under the
