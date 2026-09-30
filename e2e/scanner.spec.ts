@@ -242,6 +242,19 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     })
   })
 
+  test('a shop’s own label is said to be one, and nothing is offered to link (В-4)', async ({
+    page,
+  }) => {
+    await open(page, '/purchases/manual/add')
+
+    await typeCode(page, '20000011')
+
+    await expect(
+      page.locator('.not-found').getByText("Code 20000011 is a shop's own label", { exact: true }),
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Suggest an item' })).toHaveCount(0)
+  })
+
   test('proposed with its item under «unknown», the code finds the item on the next scan', async ({
     page,
   }) => {
@@ -301,6 +314,8 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     await typeCode(page, code)
     const found = await sheetOf(page, name)
     await found.getByRole('button', { name: `Code ${code} — not this item?` }).click()
+    await expect(found.getByText(`Unlink code ${code} from «${name}»?`)).toBeVisible()
+    await found.getByRole('button', { name: 'Unlink', exact: true }).click()
 
     await expect(found).toBeHidden()
     await expect(missingOf(page, code)).toBeVisible()
