@@ -46,8 +46,9 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 
 ## frontend · components
 
-- `frontend/src/components/CategoryBars.vue` — «Куда ушли» card: a bar per category with its sum and share, largest first, each leading to «Графики», and the ways into the charts and the categories.
+- `frontend/src/components/CategoryDonutCard.vue` — «Куда ушли» card on «Деньги»: the month's ring and its three largest sectors with share and sum, «Ещё N», the whole card one way into «Графики».
 - `frontend/src/components/BarChart.vue` — Bars of «Графики»: a reading above, radios for the keyboard, the whole area as the target, a bar not known drawn dashed.
+- `frontend/src/components/DonutRing.vue` — The ring of a donut: d3-shape arcs from the server's levels, clockwise from twelve, a gap between sectors, token colours.
 - `frontend/src/components/CategoryChips.vue` — Category chips of a spending: a radio group in fixed order, nothing preselected, the last chip «+ Своя».
 - `frontend/src/components/ExchangeLosses.vue` — «Обмены против курса ЦБ РА» card: exchangers worst first, a bar from the centre line, the way to «Обмен денег».
 - `frontend/src/components/MoneyEntries.vue` — Rows on «Деньги» leading to «Обмен денег» and «Доходы», with the person's own rate beside exchanges.

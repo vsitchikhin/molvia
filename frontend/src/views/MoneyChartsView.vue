@@ -215,7 +215,7 @@ import { calendarDay, monthOf } from '@/days'
 
 /**
  * The category last chosen, for as long as the app is open (handoff 03, «в памяти вкладки»): the
- * charts opened again from «Графики по месяцам» come back to it.
+ * charts opened again from «Куда ушли» come back to it.
  */
 let lastCategory: string | null = null
 

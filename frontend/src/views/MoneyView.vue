@@ -150,9 +150,9 @@
 
           <MoneyEntries :rate="liveRate" />
 
-          <CategoryBars v-if="month.byCategory.length > 0" :month="month" :name-of="nameOf" />
-          <!-- The way to one's categories is there before anything is spent (review Т-7). -->
-          <AppCard v-else list>
+          <CategoryDonutCard v-if="month.slices.length > 0" :month="month" :name-of="nameOf" />
+          <!-- The way to one's categories, with the ring or before anything is spent (review Т-7). -->
+          <AppCard list>
             <RouterLink class="categories-link" :to="{ name: 'money-categories' }">
               <IconShape class="link-icon" aria-hidden="true" />
               <span class="link-label">{{ t('spending.categories_link') }}</span>
@@ -270,7 +270,7 @@ import AccountsCard from '@/components/AccountsCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
-import CategoryBars from '@/components/CategoryBars.vue'
+import CategoryDonutCard from '@/components/CategoryDonutCard.vue'
 import FloatingDock from '@/components/FloatingDock.vue'
 import MoneyEntries from '@/components/MoneyEntries.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
@@ -308,7 +308,7 @@ export default defineComponent({
     AppButton,
     AppCard,
     AppScreen,
-    CategoryBars,
+    CategoryDonutCard,
     FloatingDock,
     IconChevron,
     IconCloudOff,

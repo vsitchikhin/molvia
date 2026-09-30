@@ -9,7 +9,7 @@ paths:
   - 'backend/tests/{salary-shift,month-rest,money-charts}*.ts'
   - 'backend/drizzle/*spending*.sql'
   - 'frontend/src/views/Money*'
-  - 'frontend/src/components/{Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*,BarChart*,RateLine*,ExchangeLosses*,charts*}'
+  - 'frontend/src/components/{Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*,BarChart*,DonutRing*,RateLine*,ExchangeLosses*,charts*}'
   - 'frontend/src/composables/{useMoneyMonth,useMoneyCharts,useChartPointer}*'
   - 'frontend/src/composables/useSalaryShift*'
   - 'frontend/src/components/SalaryShift*'

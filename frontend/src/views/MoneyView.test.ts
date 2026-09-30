@@ -665,6 +665,14 @@ describe('MoneyView: what the review found (MOL-82)', () => {
     const view = await render()
     expect(view.find('a.categories-link').attributes('href')).toBe('/money/categories')
   })
+
+  it('«Куда ушли» is the ring, one way into «Графики», with the categories still under it (MOL-156)', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    expect(view.find('.donut a').attributes('href')).toMatch(/^\/money\/charts/)
+    expect(view.findAll('.donut .ring path')).toHaveLength(1)
+    expect(view.find('a.categories-link').attributes('href')).toBe('/money/categories')
+  })
 })
 
 describe('MoneyView: the way into the exchanges and incomes (MOL-81)', () => {
