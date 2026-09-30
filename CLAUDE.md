@@ -282,7 +282,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   a code another item holds writes nothing and answers `409` with the holder; `added_by` is erased
   and copied like an item's author; a pick while a code waits asks «привязать?» before the sheet.
   **A shop's own code is never written** (`inStoreBarcode`, В-4), and a name already there takes no
-  code silently — it is asked about (В-5).
+  code silently — it is asked about (В-5). Eight digits typed that check as EAN-8 are EAN-8 (В-7).
 
 ### Identity, sessions, the way in and out — `.claude/rules/auth.md`
 

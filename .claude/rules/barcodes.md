@@ -121,16 +121,15 @@ lies on an iPad (as MOL-132 Р-3).
   `error.barcode_shape`; the check digit, else `error.barcode_check_digit`; 12 digits (UPC-A)
   become 13 with a leading `0`.
 - **Eight digits are EAN-8 or UPC-E, and the digits alone do not say which** (Р-11): about one UPC-E
-  in ten also checks as EAN-8, the sample `01234565` among them. A leading `0` that checks as UPC-E
-  is UPC-E — an EAN-8 starting with `0` is a shop's in-house code, not a product's. **The named
-  price, both ways:** a UPC-E of number system `1` that also checks as EAN-8, typed by hand, gives
-  another code than the one scanned; and so does an EAN-8 led by `0` that also checks as UPC-E —
-  about one in ten of them, `00408295` among them: scanned it is eight digits, typed it is
-  `0004082000095` (adversarial А). Such a code is a shop's own label, and a lookup by a code typed
-  from it (MOL-99) will not find what its scan found. **Except two shops' labels in one UPC-A**
-  (MOL-100, Р-14): eight led by `0` that check both ways and whose UPC-A folds back into more than one
-  EAN-8 (`00000055`, `00000505`) stay eight when typed, as the scanner reads them — expanded, two labels
-  were written as one code. A real UPC-E with such digits, typed, is then found only by its scan.
+  in ten also checks as EAN-8, the sample `01234565` among them. **Eight that check as EAN-8 are read
+  as EAN-8** — as the scanner reads a label printed so — and only eight that check as UPC-E alone are
+  expanded to its thirteen (MOL-100, owner's decision В-7). MOL-98 read a leading `0` as UPC-E: typed
+  so, a shop's own EAN-8 label (`00408295`) became thirteen written for everyone, and another shop's
+  same label, typed, found that shop's item (adversarial Л of MOL-100's second round); read as EAN-8 it
+  is what its scan says — a shop's label, never written. **The named price**: a real UPC-E whose digits
+  also check as EAN-8, typed by hand, gives another code than its scan (eight against thirteen) — led
+  by `0` the screen calls it a shop's label, led by `1` the lookup still finds the scanned thirteen
+  through `barcodeTwins`. UPC-E is American packaging, rare on an Armenian shelf; a shop's labels are not.
 - **`barcodeSchema` was not made stricter** (Р-10): `itemSchema` reads with it, and a dozen fixtures
   carry codes whose check digit does not hold. The write checks the digit instead — `writtenBarcode`
   (MOL-100, below).
@@ -258,9 +257,8 @@ codes too, and a wrong one needs a way out (В-1, below).
   digits in another shop are another item (review Е, adversarial Б). **The screen does not ask**:
   scanned or typed, such a code is «Код … — этикетка магазина», said out loud, with no request and no
   code waiting — «найдите товар по названию». Loose goods are found by name, as they always were.
-  **The named prices**: a packaged item the shop labels with its own code is not found by a scan; and
-  the digits of an EAN-8 label led by `0` typed by hand are read as the UPC-E they also check as
-  (MOL-98 Р-11) — written so, they are found by typing, and the label's scan says «этикетка магазина».
+  **The named price**: a packaged item the shop labels with its own code is not found by a scan. Typed
+  by hand, the digits of such a label are read as the scanner reads them (В-7, above) — a shop's label.
 - **One package, one item — with its twins** (Р-2). The key of `item_barcodes` holds one string, and
   `00408295` at one item beside `0004082000095` at another would find one or the other by whether it was
   scanned or typed. So a write asks every form of every code (`barcodeTwins`) and takes a lock per form
@@ -287,6 +285,8 @@ codes too, and a wrong one needs a way out (В-1, below).
   query as the lookup's; `204` whether it was held or not). **Under the form, and asked first** (Р-9,
   review Ж): «Отвязать код … от „…“? Его перестанут находить все» — «Отвязать» / «Отменить»; in the
   footer under «Записать» a finger took it at the shelf, and it goes for everyone with no «Вернуть».
+  «Отвязать» is `danger-ghost`, as every destructive confirmation of the app, and the focus waits on
+  «Отменить» (Р-15, review Л).
   **In the form a write gives it** (Р-11, review К): `04252614` is written as `0042100005264`, and asked
   by its eight a `204` let go of nothing; a code of no barcode's form is refused. The item lets go of the code and whichever
   twin it holds, never another item's; the device forgets it (`recentItems.forgetCode`) — in the sheet, which an answer still reaches after it was swiped away, when an emit to the screen no longer would (review Г); the sheet goes
@@ -310,7 +310,11 @@ codes too, and a wrong one needs a way out (В-1, below).
   answers**: «Привязать и записать»; «Записать без кода» — the code is let go; «Это другой товар —
   предложить» — the item found by name is not the package, and the code goes with the one proposed,
   whose name starts from what was typed — and if that name is one the catalogue holds, it is asked about
-  that item in turn (В-5). **The question names who will see it** — «все, кто
+  that item in turn (В-5), **saying so**: «„Молоко“ уже есть в справочнике. Привязать код к нему?», and its
+  «другой товар» opens the sheet empty with «„Молоко“ уже есть — назовите товар иначе» (Р-17,
+  adversarial Н) — before that the same name went round the same question. **Asked from the code's own
+  block, the item was looked for by the code** (Р-16, adversarial М): linked or not, it goes on with no
+  query, and «другой товар» starts empty — the word in the field before the scan is nobody's word for it. **The question names who will see it** — «все, кто
   отсканирует этот код, увидят эту позицию» — **and is asked for any item** (В-3), the seed's common
   «Молоко» included: the seed has no mark of its own (`created_by` is null for the erased as well), and
   the person with the package decides, the last answer at hand. Typing drops the question, and the code
