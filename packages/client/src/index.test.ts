@@ -607,6 +607,7 @@ describe('the catalogue', () => {
     const result = await client.proposeItem({
       kind: 'product',
       name: 'Молоко «Ашхар»',
+      barcodes: ['4850001234567'],
       defaultUnit: 'l',
       typicalQuantity: { milli: 900n, unit: 'l' },
     })
@@ -617,6 +618,7 @@ describe('the catalogue', () => {
     expect(calls[0]?.body).toEqual({
       kind: 'product',
       name: 'Молоко «Ашхар»',
+      barcodes: ['4850001234567'],
       defaultUnit: 'l',
       typicalQuantity: { value: '0.900', unit: 'l' },
     })
@@ -632,10 +634,54 @@ describe('the catalogue', () => {
     const result = await client.proposeItem({
       kind: 'product',
       name: 'молоко «ашхар»',
+      barcodes: [],
       defaultUnit: 'l',
     })
 
-    expect(result.created).toBe(false)
+    expect(result).toMatchObject({ created: false })
+  })
+
+  it('reads «этот код у …» with its 409 as an answer naming the holder (MOL-100)', async () => {
+    const { client } = clientReplying(409, { taken: entryWire })
+
+    const result = await client.proposeItem({
+      kind: 'product',
+      name: 'Сметана',
+      barcodes: ['4850001234567'],
+      defaultUnit: 'kg',
+    })
+
+    expect(result).toEqual({ taken: { ...entryWire, typicalQuantity: { milli: 900n, unit: 'l' } } })
+  })
+
+  it('keeps a 409 of the registry a failure — only the holder is an answer', async () => {
+    const { client } = clientReplying(409, { code: 'error.conflict' })
+
+    await expect(client.attachBarcode(entryWire.id, '4850001234567')).rejects.toMatchObject({
+      code: 'error.conflict',
+    })
+  })
+
+  it('writes a code to an item with the code in the body, never the path (MOL-100)', async () => {
+    const { client, calls } = clientReplying(201, entryWire)
+
+    const result = await client.attachBarcode(entryWire.id.toUpperCase(), '4850001234567')
+
+    expect(calls[0]?.method).toBe('POST')
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/catalogue/items/${entryWire.id}/barcodes`)
+    expect(calls[0]?.body).toEqual({ code: '4850001234567' })
+    expect(result).toMatchObject({ created: true })
+  })
+
+  it('lets a code go with the code in the query, and wants a 204', async () => {
+    const { client, calls } = clientReplying(204, undefined)
+
+    await client.detachBarcode(entryWire.id, '4850001234567')
+
+    expect(calls[0]?.method).toBe('DELETE')
+    const url = new URL(calls[0]?.url ?? '')
+    expect(url.pathname).toBe(`/catalogue/items/${entryWire.id}/barcodes`)
+    expect(url.searchParams.get('code')).toBe('4850001234567')
   })
 
   it('refuses a dish before sending it: the catalogue takes products only until 0.3', async () => {

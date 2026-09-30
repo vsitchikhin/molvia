@@ -10,6 +10,7 @@ import {
   CATALOGUE_QUERY_MAX,
   ERROR,
   ISSUE,
+  barcodeTakenSchema,
   catalogueEntryCodec,
   SESSION_COOKIE,
   catalogueBarcodeResponseSchema,
@@ -17,7 +18,7 @@ import {
 } from '@molvia/model'
 import type { CatalogueEntry, NewItem } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { events, items, searchPicks } from '@/db/schema'
+import { events, itemBarcodes, items, searchPicks } from '@/db/schema'
 import { createItemRepository } from '@/db/items-repository'
 import { createSearchPickRepository } from '@/db/search-picks-repository'
 import { SEARCH_LIMIT } from '@/usecases/search-catalogue'
@@ -644,18 +645,14 @@ describe('POST /catalogue/items — «Предложить товар»', () => 
     }
   })
 
-  it('refuses a dish until 0.3 and a barcode until 0.2, and writes nothing', async () => {
-    // A dish would enter the log as a product forever; a barcode beside a known name would be
-    // dropped in silence or turn a 409 into a 200. Both wait for the release that needs them.
+  it('refuses a dish until 0.3, and writes nothing', async () => {
+    // A dish would enter the log as a product forever: it waits for the release that needs it.
     const actor = await insertActor(db)
 
     const dish = await propose(actor, { ...cheese, kind: 'dish', defaultUnit: 'piece' })
-    const barcoded = await propose(actor, { ...cheese, barcodes: ['4850001234567'] })
 
     expect(dish.status).toBe(400)
     expect(dish.body).toMatchObject({ code: ISSUE.BODY_INVALID, details: 'kind' })
-    expect(barcoded.status).toBe(400)
-    expect(barcoded.body).toEqual({ code: ISSUE.BODY_INVALID, details: 'barcodes' })
     expect(await db.select().from(items)).toHaveLength(0)
   })
 
@@ -669,5 +666,341 @@ describe('POST /catalogue/items — «Предложить товар»', () => 
     const theirs = await search(reader, q('чанах'))
     expect(ids(found(theirs))).toContain(entry.id)
     expect(theirs.raw).not.toContain(author)
+  })
+})
+
+async function attach(actor: string | null, itemId: string, body: unknown): Promise<Reply> {
+  const response = await app.inject({
+    method: 'POST',
+    url: `/catalogue/items/${itemId}/barcodes`,
+    headers: actor === null ? {} : { cookie: await signIn(db, actor) },
+    payload: body as Record<string, unknown>,
+  })
+  return {
+    status: response.statusCode,
+    raw: response.body,
+    body: JSON.parse(response.body) as unknown,
+    headers: response.headers,
+  }
+}
+
+async function detach(actor: string | null, itemId: string, query: string) {
+  return app.inject({
+    method: 'DELETE',
+    url: `/catalogue/items/${itemId}/barcodes${query}`,
+    headers: actor === null ? {} : { cookie: await signIn(db, actor) },
+  })
+}
+
+async function codesOf(itemId: string) {
+  return db
+    .select({ code: itemBarcodes.code, addedBy: itemBarcodes.addedBy })
+    .from(itemBarcodes)
+    .where(eq(itemBarcodes.itemId, itemId))
+    .orderBy(itemBarcodes.code)
+}
+
+// Codes whose check digit holds: a write refuses any other (MOL-100, Р-1).
+const SOUR_CREAM = '4850001234562'
+const KEFIR = '4850001234579'
+const MILK = '4850001234586'
+
+describe('POST /catalogue/items — with the codes read from the package (MOL-100)', () => {
+  const sourCream = { kind: 'product', name: 'Сметана Ашхар 20%', defaultUnit: 'kg' }
+
+  it('writes the item and its code together, in the name of who proposed it', async () => {
+    const actor = await insertActor(db)
+    const asker = await insertActor(db)
+
+    const reply = await propose(actor, { ...sourCream, barcodes: [SOUR_CREAM] })
+
+    expect(reply.status).toBe(201)
+    const entry = catalogueEntryCodec.parse(reply.body)
+    expect(reply.raw).not.toContain('barcodes')
+    expect(await codesOf(entry.id)).toEqual([{ code: SOUR_CREAM, addedBy: actor }])
+    expect(held(await byCode(asker, code(SOUR_CREAM)))?.id).toBe(entry.id)
+  })
+
+  it('writes twelve digits as the thirteen the scanner reads, found either way', async () => {
+    const actor = await insertActor(db)
+
+    const entry = catalogueEntryCodec.parse(
+      (await propose(actor, { ...sourCream, barcodes: ['012345678905'] })).body,
+    )
+
+    expect(await codesOf(entry.id)).toEqual([{ code: '0012345678905', addedBy: actor }])
+    expect(held(await byCode(actor, code('012345678905')))?.id).toBe(entry.id)
+  })
+
+  it('refuses a code whose check digit does not hold, and writes no item either', async () => {
+    const actor = await insertActor(db)
+
+    const reply = await propose(actor, { ...sourCream, barcodes: ['4850001234563'] })
+
+    expect(reply.status).toBe(400)
+    expect(reply.body).toEqual({ code: ERROR.BARCODE_CHECK_DIGIT })
+    expect(await db.select().from(items)).toHaveLength(0)
+  })
+
+  it('refuses one package twice in the list — a code beside its twin (Р-7)', async () => {
+    const actor = await insertActor(db)
+
+    const reply = await propose(actor, { ...sourCream, barcodes: ['00408295', '0004082000095'] })
+
+    expect(reply.status).toBe(400)
+    expect(reply.body).toMatchObject({ code: ISSUE.BARCODE_DUPLICATED })
+    expect(await db.select().from(items)).toHaveLength(0)
+  })
+
+  it('writes the code to the item already there under the same name (Р-4)', async () => {
+    const author = await insertActor(db)
+    const scanner = await insertActor(db)
+    const first = catalogueEntryCodec.parse((await propose(author, sourCream)).body)
+
+    const again = await propose(scanner, {
+      ...sourCream,
+      name: 'сметана  ашхар 20%',
+      barcodes: [SOUR_CREAM],
+    })
+
+    expect(again.status).toBe(200)
+    expect(catalogueEntryCodec.parse(again.body).id).toBe(first.id)
+    expect(await codesOf(first.id)).toEqual([{ code: SOUR_CREAM, addedBy: scanner }])
+    expect(await db.select().from(items)).toHaveLength(1)
+  })
+
+  it('answers the same code on the same item as there already — a repeat after a lost answer', async () => {
+    const actor = await insertActor(db)
+    const body = { ...sourCream, barcodes: [SOUR_CREAM] }
+    const first = catalogueEntryCodec.parse((await propose(actor, body)).body)
+
+    const again = await propose(actor, body)
+
+    expect(again.status).toBe(200)
+    expect(await codesOf(first.id)).toEqual([{ code: SOUR_CREAM, addedBy: actor }])
+  })
+
+  it('names the item that holds the code with a 409, and writes nothing (Р-3)', async () => {
+    const author = await insertActor(db)
+    const actor = await insertActor(db)
+    const kefir = await add({ name: 'Кефир 1%', barcodes: [SOUR_CREAM] }, author)
+
+    const reply = await propose(actor, { ...sourCream, barcodes: [SOUR_CREAM] })
+
+    expect(reply.status).toBe(409)
+    expect(reply.headers['cache-control']).toBe('no-store')
+    expect(barcodeTakenSchema.parse(reply.body).taken).toMatchObject({
+      id: kefir.id,
+      name: 'Кефир 1%',
+    })
+    expect(reply.raw).not.toContain(author)
+    expect(await db.select().from(items)).toHaveLength(1)
+  })
+
+  it('holds a code taken by its twin: the label typed as thirteen, held as eight (Р-2)', async () => {
+    const actor = await insertActor(db)
+    const cheese = await add({ name: 'Сыр чечил', defaultUnit: 'kg', barcodes: ['00408295'] })
+
+    const reply = await propose(actor, { ...sourCream, barcodes: ['0004082000095'] })
+
+    expect(reply.status).toBe(409)
+    expect(barcodeTakenSchema.parse(reply.body).taken.id).toBe(cheese.id)
+  })
+
+  it('names the holder even beside a name already there, and writes that item no code', async () => {
+    const actor = await insertActor(db)
+    const first = catalogueEntryCodec.parse((await propose(actor, sourCream)).body)
+    await add({ name: 'Кефир 1%', barcodes: [KEFIR] })
+
+    const reply = await propose(actor, { ...sourCream, barcodes: [MILK, KEFIR] })
+
+    expect(reply.status).toBe(409)
+    expect(await codesOf(first.id)).toEqual([])
+  })
+})
+
+describe('POST /catalogue/items/:itemId/barcodes — «привязать код к ней?» (MOL-100)', () => {
+  it('writes the code to anyone’s item, in the name of who wrote it', async () => {
+    const author = await insertActor(db)
+    const actor = await insertActor(db)
+    const cream = await add({ name: 'Сметана Ашхар 20%', defaultUnit: 'kg' }, author)
+
+    const reply = await attach(actor, cream.id, { code: SOUR_CREAM })
+
+    expect(reply.status).toBe(201)
+    expect(reply.headers['cache-control']).toBe('no-store')
+    expect(catalogueEntryCodec.parse(reply.body).id).toBe(cream.id)
+    expect(await codesOf(cream.id)).toEqual([{ code: SOUR_CREAM, addedBy: actor }])
+    expect(held(await byCode(author, code(SOUR_CREAM)))?.id).toBe(cream.id)
+  })
+
+  it('answers a code the item holds already with 200, and keeps who wrote it first', async () => {
+    const first = await insertActor(db)
+    const second = await insertActor(db)
+    const cream = await add({ name: 'Сметана' })
+    await attach(first, cream.id, { code: SOUR_CREAM })
+
+    const again = await attach(second, cream.id, { code: SOUR_CREAM })
+
+    expect(again.status).toBe(200)
+    expect(await codesOf(cream.id)).toEqual([{ code: SOUR_CREAM, addedBy: first }])
+  })
+
+  it('answers a code the item holds as its twin with 200, and writes no second form', async () => {
+    const actor = await insertActor(db)
+    const cheese = await add({ name: 'Сыр чечил', barcodes: ['00408295'] })
+
+    const reply = await attach(actor, cheese.id, { code: '0004082000095' })
+
+    expect(reply.status).toBe(200)
+    expect((await codesOf(cheese.id)).map((row) => row.code)).toEqual(['00408295'])
+  })
+
+  it('names another item holding the code or its twin with a 409, and writes nothing', async () => {
+    const actor = await insertActor(db)
+    const cream = await add({ name: 'Сметана' })
+    const kefir = await add({ name: 'Кефир 1%', barcodes: [KEFIR] })
+    const cheese = await add({ name: 'Сыр чечил', barcodes: ['00408295'] })
+
+    const direct = await attach(actor, cream.id, { code: KEFIR })
+    const twin = await attach(actor, cream.id, { code: '0004082000095' })
+
+    expect(direct.status).toBe(409)
+    expect(barcodeTakenSchema.parse(direct.body).taken.id).toBe(kefir.id)
+    expect(barcodeTakenSchema.parse(twin.body).taken.id).toBe(cheese.id)
+    expect(await codesOf(cream.id)).toEqual([])
+  })
+
+  it('refuses a code whose digit does not hold, and a body of no code shape', async () => {
+    const actor = await insertActor(db)
+    const cream = await add({ name: 'Сметана' })
+
+    const digit = await attach(actor, cream.id, { code: '4850001234563' })
+    const shape = await attach(actor, cream.id, { code: '48500' })
+    const extra = await attach(actor, cream.id, { code: SOUR_CREAM, itemId: cream.id })
+
+    expect(digit.body).toEqual({ code: ERROR.BARCODE_CHECK_DIGIT })
+    expect([digit.status, shape.status, extra.status]).toEqual([400, 400, 400])
+    expect(await codesOf(cream.id)).toEqual([])
+  })
+
+  it('answers a missing item, a malformed id and nobody signed in as the door answers', async () => {
+    const actor = await insertActor(db)
+    const cream = await add({ name: 'Сметана' })
+
+    const missing = await attach(actor, '0b6f2c4e-8d1a-4f3b-9c7e-5a2d1e0f3b4c', { code: MILK })
+    const malformed = await attach(actor, 'not-an-id', { code: MILK })
+    const nobody = await attach(null, cream.id, { code: MILK })
+
+    expect([missing.status, malformed.status, nobody.status]).toEqual([404, 404, 401])
+    expect(await db.select().from(itemBarcodes)).toEqual([])
+  })
+
+  it('stops at twenty codes an item: 20 written, the 21st refused (boundary)', async () => {
+    const actor = await insertActor(db)
+    const bodies = Array.from({ length: 19 }, (_, i) => `4851000000${String(i).padStart(2, '0')}`)
+    const withDigit = (body: string) => {
+      let sum = 0
+      for (let i = body.length - 1, weight = 3; i >= 0; i--, weight = 4 - weight) {
+        sum += Number(body[i]) * weight
+      }
+      return `${body}${String((10 - (sum % 10)) % 10)}`
+    }
+    const cream = await add({ name: 'Сметана', barcodes: bodies.map(withDigit) })
+
+    const twentieth = await attach(actor, cream.id, { code: SOUR_CREAM })
+    const twentyFirst = await attach(actor, cream.id, { code: KEFIR })
+
+    expect(twentieth.status).toBe(201)
+    expect(twentyFirst.status).toBe(409)
+    expect(twentyFirst.body).toEqual({ code: ERROR.BARCODES_FULL })
+    expect(await codesOf(cream.id)).toHaveLength(20)
+  })
+
+  it('writes one package to one item when two write it at once through its twins (Р-2)', async () => {
+    const actor = await insertActor(db)
+    const cheese = await add({ name: 'Сыр чечил' })
+    const salad = await add({ name: 'Салат' })
+    const other = connectDrizzle()
+    const second = buildServer({ db: other.db })
+    await second.ready()
+    try {
+      const cookie = await signIn(db, actor)
+      const inject = (server: FastifyInstance, itemId: string, code: string) =>
+        server.inject({
+          method: 'POST',
+          url: `/catalogue/items/${itemId}/barcodes`,
+          headers: { cookie },
+          payload: { code },
+        })
+      const replies = await Promise.all([
+        inject(app, cheese.id, '00408295'),
+        inject(second, salad.id, '0004082000095'),
+      ])
+
+      expect(replies.map((reply) => reply.statusCode).sort()).toEqual([201, 409])
+      expect(await db.select().from(itemBarcodes)).toHaveLength(1)
+    } finally {
+      await second.close()
+      await other.close()
+    }
+  })
+
+  it('writes nothing to the event log and no pick', async () => {
+    const actor = await insertActor(db)
+    const cream = await add({ name: 'Сметана' })
+
+    await attach(actor, cream.id, { code: SOUR_CREAM })
+
+    expect(await viewsOf(actor)).toEqual([])
+    expect(await db.select().from(searchPicks)).toEqual([])
+  })
+})
+
+describe('DELETE /catalogue/items/:itemId/barcodes — «не этот товар?» (MOL-100, В-1)', () => {
+  it('lets the code go for anyone, and the next scan finds nothing', async () => {
+    const author = await insertActor(db)
+    const witness = await insertActor(db)
+    const kefir = await add({ name: 'Кефир 1%' })
+    await attach(author, kefir.id, { code: SOUR_CREAM })
+
+    const reply = await detach(witness, kefir.id, code(SOUR_CREAM))
+
+    expect(reply.statusCode).toBe(204)
+    expect(reply.headers['cache-control']).toBe('no-store')
+    expect(await codesOf(kefir.id)).toEqual([])
+    expect(held(await byCode(witness, code(SOUR_CREAM)))).toBeNull()
+  })
+
+  it('lets go of the form the item holds when the code comes as its twin', async () => {
+    const actor = await insertActor(db)
+    const cheese = await add({ name: 'Сыр чечил', barcodes: ['00408295', MILK] })
+
+    await detach(actor, cheese.id, code('0004082000095'))
+
+    expect((await codesOf(cheese.id)).map((row) => row.code)).toEqual([MILK])
+  })
+
+  it('must not let go of a code another item holds', async () => {
+    const actor = await insertActor(db)
+    const cream = await add({ name: 'Сметана' })
+    const kefir = await add({ name: 'Кефир 1%', barcodes: [KEFIR] })
+
+    const reply = await detach(actor, cream.id, code(KEFIR))
+
+    expect(reply.statusCode).toBe(204)
+    expect((await codesOf(kefir.id)).map((row) => row.code)).toEqual([KEFIR])
+  })
+
+  it('answers a missing item with 404, no code with 400, and nobody signed in with 401', async () => {
+    const actor = await insertActor(db)
+    const cream = await add({ name: 'Сметана', barcodes: [SOUR_CREAM] })
+
+    const missing = await detach(actor, '0b6f2c4e-8d1a-4f3b-9c7e-5a2d1e0f3b4c', code(SOUR_CREAM))
+    const bare = await detach(actor, cream.id, '')
+    const nobody = await detach(null, cream.id, code(SOUR_CREAM))
+
+    expect([missing.statusCode, bare.statusCode, nobody.statusCode]).toEqual([404, 400, 401])
+    expect(await codesOf(cream.id)).toHaveLength(1)
   })
 })

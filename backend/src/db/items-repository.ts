@@ -3,8 +3,12 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import {
   ADJECTIVE_WORD,
+  DomainError,
+  ERROR,
+  ITEM_BARCODES_MAX,
   NOUN_WORD,
   WORD_BREAK,
+  barcodeTwins,
   itemSchema,
   nameIdentity,
   synonymDescribes,
@@ -37,10 +41,19 @@ export interface ItemRepository {
    * `createdBy` is null for the seed (MOL-112), which goes through here so that running it again
    * doubles nothing and a name someone already proposed stays theirs.
    */
-  createUnlessNamed(
-    input: NewItem,
-    createdBy: string | null,
-  ): Promise<{ item: Item; created: boolean }>
+  createUnlessNamed(input: NewItem, createdBy: string | null): Promise<Proposal>
+  /**
+   * «Привязать код к ней?» (MOL-100): the code written to this item by this person, or the item
+   * that already holds it or one of its twins — then nothing is written. The code already on this
+   * item is `added: false`. `null` when there is no such item.
+   */
+  attachBarcode(itemId: string, code: string, actorId: string): Promise<Attached | null>
+  /**
+   * «Не этот товар?» (MOL-100, В-1): the code, and whichever of its twins this item holds, let go
+   * of. Anyone may: the one who says so holds the package. `false` when there is no such item; a
+   * code the item does not hold is let go of already.
+   */
+  detachBarcode(itemId: string, code: string): Promise<boolean>
   /**
    * The catalogue lookup behind «что взяли?». The catalogue is shared by everyone, so the
    * owner filters nothing: it only chooses whose remembered picks take part in the order.
@@ -55,6 +68,16 @@ export interface ItemRepository {
    */
   byBarcode(codes: readonly string[]): Promise<Item | null>
 }
+
+/**
+ * What «Предложить товар» came to: the item, new or the one of the same name — with the codes sent,
+ * written — or, when another item holds one of those codes or its twin, that item and nothing
+ * written (MOL-100, Р-3).
+ */
+export type Proposal = { readonly item: Item; readonly created: boolean } | { readonly taken: Item }
+
+/** What «привязать код» came to: written (`added`) or there already, or another item holds it. */
+export type Attached = { readonly item: Item; readonly added: boolean } | { readonly taken: Item }
 
 /**
  * The items found, in their order, and whether any of them is close to what was typed (MOL-46).
@@ -708,6 +731,18 @@ export async function lockItemKey(tx: Conn, kind: ItemKind, key: string): Promis
   )
 }
 
+/**
+ * The lock a write of a code takes, one per form of it (MOL-100, Р-2): two writes of one package —
+ * one scanned as the EAN-8 label, one typed as the thirteen — meet here, where the key of the table
+ * would let both in as two strings. Taken in ascending order, after the item's own lock, so two
+ * writes never wait on each other crosswise.
+ */
+async function lockBarcodes(tx: Conn, forms: readonly string[]): Promise<void> {
+  for (const form of [...forms].sort()) {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('barcode'), hashtext(${form}))`)
+  }
+}
+
 export function createItemRepository(db: Conn): ItemRepository {
   /** One query for the items and one for every barcode of them — never one per item. */
   async function load(ids: readonly string[], conn: Conn = db): Promise<Item[]> {
@@ -765,11 +800,64 @@ export function createItemRepository(db: Conn): ItemRepository {
       .returning()
 
     if (input.barcodes.length > 0) {
-      await tx.insert(itemBarcodes).values(input.barcodes.map((code) => ({ code, itemId: id })))
+      await tx
+        .insert(itemBarcodes)
+        .values(input.barcodes.map((code) => ({ code, itemId: id, addedBy: createdBy })))
     }
 
     // Sorted the way a later read returns them, so create and read agree.
     return toItem(theRow(row, 'items'), [...input.barcodes].sort())
+  }
+
+  /**
+   * Which of these codes are still to be written to the item, under the locks of every form of
+   * them — or the item that holds one of them, when it is another (MOL-100, Р-2). `itemId` is null
+   * for an item not written yet: then every holder is another.
+   */
+  async function claim(
+    tx: Conn,
+    codes: readonly string[],
+    itemId: string | null,
+  ): Promise<{ readonly taken: string } | { readonly free: string[] }> {
+    const formsOf = new Map(codes.map((code) => [code, [code, ...barcodeTwins(code)]]))
+    const forms = [...new Set([...formsOf.values()].flat())]
+    if (forms.length === 0) return { free: [] }
+    await lockBarcodes(tx, forms)
+    const held = await tx
+      .select({ code: itemBarcodes.code, itemId: itemBarcodes.itemId })
+      .from(itemBarcodes)
+      .where(inArray(itemBarcodes.code, forms))
+      .orderBy(asc(itemBarcodes.code))
+    const other = held.find((row) => row.itemId !== itemId)
+    if (other) return { taken: other.itemId }
+    const own = new Set(held.map((row) => row.code))
+    return {
+      free: codes.filter((code) => !(formsOf.get(code) ?? [code]).some((form) => own.has(form))),
+    }
+  }
+
+  /** The codes written to an item that is already there, counted against the most one may hold. */
+  async function bind(
+    tx: Conn,
+    itemId: string,
+    codes: readonly string[],
+    addedBy: string | null,
+  ): Promise<void> {
+    if (codes.length === 0) return
+    const [count] = await tx
+      .select({ n: sql<number>`count(*)::int` })
+      .from(itemBarcodes)
+      .where(eq(itemBarcodes.itemId, itemId))
+    if ((count?.n ?? 0) + codes.length > ITEM_BARCODES_MAX) {
+      throw new DomainError(ERROR.BARCODES_FULL)
+    }
+    await tx.insert(itemBarcodes).values(codes.map((code) => ({ code, itemId, addedBy })))
+  }
+
+  async function holder(tx: Conn, itemId: string): Promise<{ taken: Item }> {
+    const [item] = await load([itemId], tx)
+    if (!item) throw new Error('the item holding a code is gone within its own transaction')
+    return { taken: item }
   }
 
   return {
@@ -831,13 +919,59 @@ export function createItemRepository(db: Conn): ItemRepository {
 
           const same = rows.find((row) => nameIdentity(row.name) === wanted)
           if (same) {
+            // Beside a name the catalogue already holds, the codes go to that item (MOL-100, Р-4):
+            // the name typed is the person's «this is it». Its row is locked first, as «привязать»
+            // locks it, so the two count the codes one after the other.
+            await tx.select({ id: items.id }).from(items).where(eq(items.id, same.id)).for('update')
+            const claimed = await claim(tx, input.barcodes, same.id)
+            if ('taken' in claimed) return holder(tx, claimed.taken)
+            await bind(tx, same.id, claimed.free, createdBy)
             const [item] = await load([same.id], tx)
             if (item) return { item, created: false }
           }
 
+          const claimed = await claim(tx, input.barcodes, null)
+          if ('taken' in claimed) return holder(tx, claimed.taken)
           return { item: await insert(tx, input, createdBy), created: true }
         }),
       )
+    },
+
+    async attachBarcode(itemId, code, actorId) {
+      if (idOrNull(itemId) === null) return null
+      return translateFailures(async () =>
+        db.transaction(async (tx): Promise<Attached | null> => {
+          const [row] = await tx
+            .select({ id: items.id })
+            .from(items)
+            .where(eq(items.id, itemId))
+            .for('update')
+          if (!row) return null
+          const claimed = await claim(tx, [code], itemId)
+          if ('taken' in claimed) return holder(tx, claimed.taken)
+          await bind(tx, itemId, claimed.free, actorId)
+          const [item] = await load([itemId], tx)
+          return item ? { item, added: claimed.free.length > 0 } : null
+        }),
+      )
+    },
+
+    async detachBarcode(itemId, code) {
+      if (idOrNull(itemId) === null) return false
+      const forms = [code, ...barcodeTwins(code)]
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .select({ id: items.id })
+          .from(items)
+          .where(eq(items.id, itemId))
+          .for('update')
+        if (!row) return false
+        await lockBarcodes(tx, [...new Set(forms)])
+        await tx
+          .delete(itemBarcodes)
+          .where(and(eq(itemBarcodes.itemId, itemId), inArray(itemBarcodes.code, forms)))
+        return true
+      })
     },
 
     async search(query, limit, actorId) {

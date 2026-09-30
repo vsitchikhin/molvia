@@ -109,6 +109,12 @@ interface RequestOptions {
   readonly body?: unknown
   /** The caller's own cancellation, on top of the timeout. */
   readonly signal?: AbortSignal
+  /**
+   * Statuses past 2xx that are answers rather than failures, read by `schema` like a 2xx: «этот
+   * код у …» comes with a 409 and the item that holds it (MOL-100, Р-3). A body the schema does not
+   * read is still the failure it was — an error of the registry under the same status included.
+   */
+  readonly answers?: readonly number[]
 }
 
 export interface Transport {
@@ -205,6 +211,11 @@ export function createTransport({
     } finally {
       if (timer !== undefined) clearTimeout(timer)
       options.signal?.removeEventListener('abort', cancel)
+    }
+
+    if (!response.ok && options.answers?.includes(response.status)) {
+      const answer = schema.safeParse(body)
+      if (answer.success) return { status: response.status, data: answer.data }
     }
 
     if (!response.ok) {

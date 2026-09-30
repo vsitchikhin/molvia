@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { itemSchema, proposedItemSchema } from '@molvia/model'
+import { ERROR, itemSchema, proposedItemSchema } from '@molvia/model'
 import type { NewItem } from '@molvia/model'
 import type { ItemRepository } from '@/db/items-repository'
 import { proposeItem } from './propose-item'
@@ -33,6 +33,8 @@ function fakeItems(overrides: Partial<ItemRepository> = {}): ItemRepository {
     createUnlessNamed: () => Promise.reject(new Error('createUnlessNamed was not expected')),
     search: () => Promise.reject(new Error('search was not expected')),
     byBarcode: () => Promise.reject(new Error('byBarcode was not expected')),
+    attachBarcode: () => Promise.reject(new Error('attachBarcode was not expected')),
+    detachBarcode: () => Promise.reject(new Error('detachBarcode was not expected')),
     ...overrides,
   }
 }
@@ -50,7 +52,7 @@ describe('proposeItem', () => {
     const result = await proposeItem(items, ACTOR, input)
 
     expect(asked).toEqual([[{ ...input, barcodes: [] }, ACTOR]])
-    expect(result.created).toBe(true)
+    expect(result).toMatchObject({ created: true })
   })
 
   it('passes on the item already there, and that it was already there', async () => {
@@ -62,5 +64,35 @@ describe('proposeItem', () => {
       item: existing,
       created: false,
     })
+  })
+
+  it('writes the codes in the form the scanner reads them as (MOL-100, Р-1)', async () => {
+    const asked: NewItem[] = []
+    const items = fakeItems({
+      createUnlessNamed: (item) => {
+        asked.push(item)
+        return Promise.resolve({ item: existing, created: true })
+      },
+    })
+
+    await proposeItem(items, ACTOR, { ...input, barcodes: ['012345678905', '96385074'] })
+
+    expect(asked[0]?.barcodes).toEqual(['0012345678905', '96385074'])
+  })
+
+  it('refuses a code whose check digit does not hold, and asks for nothing', async () => {
+    const items = fakeItems()
+
+    await expect(
+      proposeItem(items, ACTOR, { ...input, barcodes: ['4850000000003'] }),
+    ).rejects.toMatchObject({ code: ERROR.BARCODE_CHECK_DIGIT })
+  })
+
+  it('passes on the item that holds a code already, and nothing else', async () => {
+    const items = fakeItems({ createUnlessNamed: () => Promise.resolve({ taken: existing }) })
+
+    await expect(
+      proposeItem(items, ACTOR, { ...input, barcodes: ['4850000000007'] }),
+    ).resolves.toEqual({ taken: existing })
   })
 })
