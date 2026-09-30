@@ -247,9 +247,11 @@ test('offline, a month not read keeps the switcher where it was, at the top of t
   expect(await topOf(previous)).toBe(before)
 })
 
-// Both months kept on the phone: the strip goes with the move and comes back when the read fails a
-// moment later (review С-7, adversarial round 2, Д).
-test('offline, between two months the phone keeps, the switcher stays as the strip comes back', async ({
+// Both months kept on the phone: each is drawn at once, and «Нет связи» stands through the move —
+// under the switcher, where it is checked to be. The strip that does go and come back a moment later,
+// «Сервер не ответил» (review С-7, adversarial round 2, Д2), is held by the same place, not by a test
+// of its own (review С-10).
+test('offline, between two months the phone keeps, the switcher stays over the strip', async ({
   page,
   context,
 }) => {
@@ -277,6 +279,39 @@ test('offline, between two months the phone keeps, the switcher stays as the str
   await next.click()
   await expect(page).not.toHaveURL(/month=/)
   await expect(strip).toBeVisible()
+  expect(await topOf(next)).toBe(120)
+})
+
+// A refusal of the queue is a row of its own month and a card on any other: it belongs to the month
+// shown, and it stands under the switcher (adversarial round 3, Ж).
+test('a refused spending moves nothing as the month changes, card or row', async ({ page }) => {
+  await twelveADay(page, [yerevanDay(), lastMonthDay()])
+  await page.route('**/api/spendings', (route) =>
+    route.request().method() === 'POST'
+      ? route.fulfill({
+          status: 422,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: 'error.invalid_amount' }),
+        })
+      : route.fallback(),
+  )
+  await page.getByRole('button', { name: 'Трата', exact: true }).click()
+  await writeSpending(page, '1500', 'Транспорт', 'Такси')
+  const refusal = page.getByRole('heading', { name: 'Сервер не принял действие' })
+  await expect(page.getByRole('button', { name: /Открыть трату: Такси/ })).toBeVisible()
+  await expect(refusal).toHaveCount(0)
+
+  const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
+  await standAt(previous, 120)
+  await previous.click()
+  await expect(page).toHaveURL(/month=/)
+  await expect(refusal).toBeVisible()
+  expect(await topOf(previous)).toBe(120)
+
+  const next = page.getByRole('button', { name: 'Следующий месяц' })
+  await next.click()
+  await expect(page).not.toHaveURL(/month=/)
+  await expect(refusal).toHaveCount(0)
   expect(await topOf(next)).toBe(120)
 })
 
