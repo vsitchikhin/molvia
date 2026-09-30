@@ -1,5 +1,10 @@
 <template>
-  <BottomSheet :open="open" :on-closed="putAway" @update:open="$emit('update:open', $event)">
+  <BottomSheet
+    ref="sheet"
+    :open="open"
+    :on-closed="putAway"
+    @update:open="$emit('update:open', $event)"
+  >
     <template #title>{{ t('scanner.title') }}</template>
 
     <!-- Nothing once put away: a sheet kept mounted for a warm reader (MOL-99) would otherwise keep
@@ -261,15 +266,29 @@ export default defineComponent({
       else typedError.value = result.error
     }
 
-    // A sheet asked for again while it slid down is still up: its `onClosed` comes all the same.
+    const sheet = ref<{ $el: Element } | null>(null)
+
+    // The content goes once the slide down is over: `onClosed` comes as the dialog closes, which is
+    // when the slide starts (adversarial Е). Looked for a frame later, when the transition runs; an
+    // endless animation is not waited for, as `BottomSheet` does not wait for one. A sheet asked for
+    // again meanwhile is up, and keeps its content.
     function putAway(): void {
-      shown.value = props.open
       props.onClosed?.()
+      const dialog = sheet.value?.$el
+      requestAnimationFrame(() => {
+        const sliding = (dialog?.getAnimations() ?? []).filter(
+          (animation) => animation.effect?.getComputedTiming().endTime !== Infinity,
+        )
+        void Promise.allSettled(sliding.map((animation) => animation.finished)).then(() => {
+          shown.value = props.open
+        })
+      })
     }
 
     return {
       t,
       REFUSALS,
+      sheet,
       shown,
       putAway,
       video,

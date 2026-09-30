@@ -196,3 +196,40 @@ test.describe('on «What did you pick up?»', () => {
     await expect(missing(page)).toBeHidden()
   })
 })
+
+/**
+ * «Scan a barcode» on the record (MOL-99, В-4, review С-4): the search opens with the scanner up
+ * over it, with no tap of its own there — the entry the sheet lays rides on the tap on the record.
+ * «Back» takes the scanner away and leaves the search by name; «back» again is the record.
+ */
+test('«Scan a barcode» on the record: the scanner is up at once, and «back» walks out one step at a time', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = () =>
+      Promise.reject(new DOMException('no camera', 'NotFoundError'))
+  })
+  await open(page, '/')
+  await page.getByRole('button', { name: 'Record purchases' }).click()
+  const where = page.locator('dialog[open]')
+  await expect(where).toContainText('Where are you?')
+  await page.waitForTimeout(400)
+  await where.getByLabel('Another place').fill('Ереван Сити')
+  await where.getByRole('button', { name: 'Start the entry' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page).toHaveURL(/\/purchases\/manual$/)
+
+  await page.getByRole('button', { name: 'Scan a barcode' }).click()
+
+  await expect(page).toHaveURL(/\/purchases\/manual\/add$/)
+  await expect(scanner(page)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'No camera' })).toBeVisible()
+
+  await page.goBack()
+  await expect(scanner(page)).toBeHidden()
+  await expect(page).toHaveURL(/\/purchases\/manual\/add$/)
+  await expect(page.getByRole('combobox', { name: 'What did you pick up?' })).toBeVisible()
+
+  await page.goBack()
+  await expect(page).toHaveURL(/\/purchases\/manual$/)
+})
