@@ -236,7 +236,44 @@ describe('the item a code belongs to (MOL-99)', () => {
       calls[0]?.answer(milk)
       await settle()
 
+      // Found by a retry nobody tapped for: held for a tap, not handed on (adversarial Ж′).
+      expect(found).toEqual([])
+      expect(lookup.phase.value).toBe('found')
+      expect(lookup.item.value).toEqual(milk)
+
+      lookup.take()
+
       expect(found).toEqual([[milk, '4850000000007']])
+      expect(lookup.phase.value).toBe('idle')
+    })
+
+    it('holds a find of the device’s own the same way on a quiet retry', async () => {
+      const { lookup, found } = harness({ '4850000000007': milk })
+      lookup.lookUp('4850000000007')
+      calls[0]?.fail()
+      await settle()
+      expect(found).toHaveLength(1)
+      found.length = 0
+
+      lookup.lookUp('4850000000014')
+      calls[1]?.fail()
+      await settle()
+      expect(lookup.phase.value).toBe('error')
+      window.dispatchEvent(new Event('online'))
+      calls[2]?.answer(kefir)
+      await settle()
+
+      expect(found).toEqual([])
+      expect(lookup.phase.value).toBe('found')
+    })
+
+    it('takes nothing when there is nothing found to take', () => {
+      const { lookup, found } = harness()
+
+      lookup.take()
+
+      expect(found).toEqual([])
+      expect(lookup.phase.value).toBe('idle')
     })
 
     it('asks again after an error, too', async () => {

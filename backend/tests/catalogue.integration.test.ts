@@ -455,6 +455,16 @@ describe('GET /catalogue/barcode — the item a code belongs to (MOL-99)', () =>
     expect(held(await byCode(actor, code('0000000000055')))).toBeNull()
   })
 
+  it('does not find by a scanned label an item taken from the other one (adversarial Г′, С-7)', async () => {
+    const actor = await insertActor(db)
+    // Typed from its label 00000055, the cheese was taken as thirteen digits (typedBarcode).
+    await add({ name: 'Сыр, магазин 1', defaultUnit: 'kg', barcodes: ['0000000000055'] })
+
+    expect(held(await byCode(actor, code('00000505')))).toBeNull()
+    expect(held(await byCode(actor, code('00000055')))).toBeNull()
+    expect(held(await byCode(actor, code('0000000000055')))).not.toBeNull()
+  })
+
   it('has no HEAD twin, as no GET of the API has (adversarial В)', async () => {
     const actor = await insertActor(db)
     await add({ name: 'Кефир', barcodes: ['4850000000007'] })

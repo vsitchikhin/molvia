@@ -239,7 +239,9 @@ export default defineComponent({
           cameraMissing.value = false
           void startCamera()
         } else {
-          camera.stop()
+          // Every track stops now — the indicator goes out — and the last frame stays on the
+          // viewfinder as the sheet slides down, until it is put away (adversarial Е′).
+          camera.stop(true)
         }
       },
       { immediate: true },
@@ -281,6 +283,7 @@ export default defineComponent({
         )
         void Promise.allSettled(sliding.map((animation) => animation.finished)).then(() => {
           shown.value = props.open
+          if (!props.open) camera.letPictureGo()
         })
       })
     }

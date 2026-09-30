@@ -55,11 +55,11 @@ function compressUpcA(upcA: string): string[] {
  * other way in found. The price: a shop's own EAN-8 label and a UPC-E product with the same
  * digits find each other.
  *
- * Thirteen digits are paired with eight only when one EAN-8 folds into them. Two shop labels with
- * different digits may expand to one UPC-A (`00000055` and `00000505`), and a label typed as
- * thirteen digits no longer says which it was: guessing the neighbour put another shop's item on
- * the sheet (adversarial Г), so such thirteen digits are only themselves — a label typed from them
- * finds nothing, the price named in `typedBarcode`.
+ * The pair holds only where one EAN-8 folds into the thirteen. Two shop labels with different
+ * digits may expand to one UPC-A (`00000055` and `00000505`), and the thirteen no longer say which
+ * label they came from: guessing put another shop's item on the sheet, from the thirteen
+ * (adversarial Г) and from the eight alike (Г′, review С-7). So such a label and its thirteen are
+ * each only themselves — scanned and typed, it finds only what was taken in the same form.
  *
  * Twelve digits are UPC-A and fourteen led by `0` are GTIN-14 of the same package: both are also
  * looked up as the thirteen the scanner and `typedBarcode` give (adversarial З) — a client that
@@ -69,7 +69,11 @@ export function barcodeTwins(code: string): string[] {
   if (!barcodeSchema.safeParse(code).success) return []
   if (code.length === 8) {
     const upcA = /^[01]/.test(code) ? expandUpcE(code) : null
-    return upcA !== null && checks(code) && checks(upcA) ? [code, `0${upcA}`] : [code]
+    if (upcA === null || !checks(code) || !checks(upcA)) return [code]
+    // Only where the thirteen lead back to these eight alone — the pair holds both ways or not at
+    // all (review С-7, adversarial Г′).
+    const eights = compressUpcA(upcA).filter(checks)
+    return eights.length === 1 ? [code, `0${upcA}`] : [code]
   }
   const thirteen =
     code.length === 12

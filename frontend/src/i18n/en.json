@@ -237,7 +237,9 @@
       "missing": "The catalogue does not know the code {code}",
       "missing_hint": "Or find it by name",
       "error_body": "Could not check the code {code}. Try again — or find the item by name",
-      "offline_body": "None of your recent items has this code. Find the item by name — or scan it once you are online"
+      "offline_body": "None of your recent items has this code. Find the item by name — or scan it once you are online",
+      "found": "Found by the code {code}",
+      "found_announced": "Found by the code {code}: {name}"
     }
   },
   "sheet": {

@@ -56,6 +56,12 @@
           <p class="not-found-text">{{ t('item.barcode.missing_hint') }}</p>
         </div>
 
+        <!-- Found by a retry nobody tapped for (adversarial Ж′): the sheet opens from this tap. -->
+        <div v-else-if="barcode === 'found' && barcodeItem" class="not-found">
+          <p class="not-found-text">{{ t('item.barcode.found', { code: barcodeCode }) }}</p>
+          <AppButton @click="lookup.take">{{ barcodeItem.name }}</AppButton>
+        </div>
+
         <ScreenState
           v-else-if="barcode === 'error'"
           kind="error"
@@ -378,6 +384,13 @@ export default defineComponent({
       withdraw = undefined
       if (next === 'missing') {
         withdrawCode = announce?.(t('item.barcode.missing', { code: lookup.code.value }))
+      } else if (next === 'found') {
+        withdrawCode = announce?.(
+          t('item.barcode.found_announced', {
+            code: lookup.code.value,
+            name: lookup.item.value?.name ?? '',
+          }),
+        )
       }
     })
 
@@ -396,6 +409,10 @@ export default defineComponent({
     function pick(chosen: CatalogueEntry, learns = true): void {
       opened.value += 1
       pickedByCode = null
+      // Something else taken answers the code's question too: a retry of it must not come over the
+      // sheet now opening (adversarial Ж′).
+      foundByCode = null
+      lookup.clear()
       const found = phase.value === 'ready' || phase.value === 'far'
       const text = found ? answered.value : query.value
       const missed = takeMissed(text)
@@ -493,6 +510,7 @@ export default defineComponent({
       lookup,
       barcode,
       barcodeCode: lookup.code,
+      barcodeItem: lookup.item,
     }
   },
 })

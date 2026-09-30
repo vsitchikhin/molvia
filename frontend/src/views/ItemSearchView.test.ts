@@ -970,10 +970,41 @@ describe('«What did you pick up?»', () => {
         online(true)
         window.dispatchEvent(new Event('online'))
 
+        // Found — and not opened by itself: the sheet comes from a tap on the item (Ж′).
+        const found = en.item.barcode.found.replace('{code}', CODE)
         await vi.waitFor(() => {
-          expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: '' })
+          expect(view.text()).toContain(found)
         })
         expect(catalogueByBarcode).toHaveBeenCalledWith(CODE)
+        expect(useItemEntryStore(pinia).picked).toBeNull()
+        await vi.waitFor(() => {
+          expect(view.get('.live').text()).toContain(found)
+        })
+
+        await button(view, milk.name).trigger('click')
+
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: milk, query: '' })
+      })
+
+      it('lets a sheet opened from the recent items alone when the connection comes back (Ж′)', async () => {
+        remembered(bread)
+        online(false)
+        catalogueByBarcode.mockResolvedValue(milk)
+        const view = await render()
+        await scan(view, CODE)
+        expect(view.text()).toContain(en.item.barcode.offline_body)
+
+        // The block sends the person to the recent items, and they take one.
+        await view.get('[role="option"]').trigger('click')
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: bread, query: '' })
+
+        online(true)
+        window.dispatchEvent(new Event('online'))
+        document.dispatchEvent(new Event('visibilitychange'))
+        await new Promise((resolve) => setTimeout(resolve, 50))
+
+        expect(catalogueByBarcode).not.toHaveBeenCalled()
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: bread, query: '' })
       })
 
       describe('«Suggest an item» under an unknown code (Д)', () => {

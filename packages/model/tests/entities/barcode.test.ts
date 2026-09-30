@@ -116,14 +116,29 @@ describe('barcodeTwins', () => {
   })
 
   it('does not guess between two shop labels that fold into one thirteen (adversarial Г)', () => {
-    // 00000055 and 00000505 both check as EAN-8 and as UPC-E, and both expand to 000000000055.
-    expect(barcodeTwins('00000055')).toEqual(['00000055', '0000000000055'])
-    expect(barcodeTwins('00000505')).toEqual(['00000505', '0000000000055'])
+    // 00000055 and 00000505 both check as EAN-8 and as UPC-E, and both expand to 000000000055:
+    // neither way is the pair told apart, so there is none (adversarial Г, Г′, review С-7).
+    expect(barcodeTwins('00000055')).toEqual(['00000055'])
+    expect(barcodeTwins('00000505')).toEqual(['00000505'])
     expect(barcodeTwins('0000000000055')).toEqual(['0000000000055'])
   })
 
   it('must not pair thirteen digits whose check digit fails', () => {
     expect(barcodeTwins('0004082000096')).toEqual(['0004082000096'])
+  })
+
+  it('is symmetric over a sweep of eight digits led by 0 or 1: a twin always lists the code back', () => {
+    // Every 101st prefix with each last digit — the whole range was swept once by hand (С-7).
+    const broken: string[] = []
+    for (let n = 0; n < 2_000_000; n += 101) {
+      for (let digit = 0; digit < 10; digit++) {
+        const eight = `${String(n).padStart(7, '0')}${String(digit)}`
+        for (const twin of barcodeTwins(eight).slice(1)) {
+          if (!barcodeTwins(twin).includes(eight)) broken.push(`${eight} → ${twin}`)
+        }
+      }
+    }
+    expect(broken).toEqual([])
   })
 
   it('is symmetric: every twin lists the code back', () => {

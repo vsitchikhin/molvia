@@ -1,4 +1,4 @@
-import { onUnmounted, ref } from 'vue'
+import { onUnmounted, ref, shallowRef } from 'vue'
 import type { Ref } from 'vue'
 import type { CatalogueEntry } from '@molvia/model'
 import { api } from '@/api'
@@ -13,14 +13,20 @@ function connected(): boolean {
 /**
  * `idle` — no code looked up, or its answer handed on. `loading` — the code is on its way.
  * `missing` — the catalogue holds no item with it. `offline` — no connection, and the device knows
- * no item by it either. `error` — the server did not answer; «Повторить» asks again.
+ * no item by it either. `error` — the server did not answer; «Повторить» asks again. `found` — an
+ * item found by a retry nobody tapped for, waiting for a tap (`take`) rather than opening a sheet by
+ * itself (adversarial Ж′).
  */
-export type BarcodeLookupPhase = 'idle' | 'loading' | 'missing' | 'offline' | 'error'
+export type BarcodeLookupPhase = 'idle' | 'loading' | 'missing' | 'offline' | 'error' | 'found'
 
 export interface BarcodeLookup {
   readonly phase: Ref<BarcodeLookupPhase>
   /** The code the phase is about — «Код … справочнику не знаком» names it. */
   readonly code: Ref<string | null>
+  /** What `found` found. */
+  readonly item: Ref<CatalogueEntry | null>
+  /** Hands on the item `found` holds, as a lookup the person asked for would have. */
+  readonly take: () => void
   readonly lookUp: (code: string) => void
   readonly retry: () => void
   /** Back to `idle`, an answer still on its way dropped: the person types instead. */
@@ -46,6 +52,7 @@ export interface BarcodeLookupOptions {
 export function useBarcodeLookup(options: BarcodeLookupOptions): BarcodeLookup {
   const phase = ref<BarcodeLookupPhase>('idle')
   const code = ref<string | null>(null)
+  const item = shallowRef<CatalogueEntry | null>(null)
 
   let latest = 0
   let inFlight: AbortController | undefined
@@ -56,15 +63,23 @@ export function useBarcodeLookup(options: BarcodeLookupOptions): BarcodeLookup {
     inFlight = undefined
   }
 
-  function hand(entry: CatalogueEntry, read: string): void {
+  // A retry nobody tapped for does not open a sheet: it may come on a phone just unlocked, over a
+  // sheet the person opened meanwhile, and a sheet laid without a tap is one Chrome skips on «back».
+  function hand(entry: CatalogueEntry, read: string, quiet: boolean): void {
+    if (quiet) {
+      item.value = entry
+      phase.value = 'found'
+      return
+    }
     phase.value = 'idle'
     code.value = null
+    item.value = null
     options.found(entry, read)
   }
 
-  function fromDevice(read: string): boolean {
+  function fromDevice(read: string, quiet: boolean): boolean {
     const entry = options.local(read)
-    if (entry) hand(entry, read)
+    if (entry) hand(entry, read, quiet)
     return entry !== null
   }
 
@@ -73,9 +88,10 @@ export function useBarcodeLookup(options: BarcodeLookupOptions): BarcodeLookup {
     drop()
     const mine = latest
     code.value = read
+    item.value = null
 
     if (!connected()) {
-      if (!fromDevice(read)) phase.value = 'offline'
+      if (!fromDevice(read, quiet)) phase.value = 'offline'
       return
     }
 
@@ -85,11 +101,11 @@ export function useBarcodeLookup(options: BarcodeLookupOptions): BarcodeLookup {
     try {
       const entry = await api.catalogueByBarcode(read, { signal: controller.signal })
       if (mine !== latest) return
-      if (entry) hand(entry, read)
+      if (entry) hand(entry, read, quiet)
       else phase.value = 'missing'
     } catch {
       if (mine !== latest) return
-      if (!fromDevice(read)) phase.value = connected() ? 'error' : 'offline'
+      if (!fromDevice(read, quiet)) phase.value = connected() ? 'error' : 'offline'
     } finally {
       if (inFlight === controller) inFlight = undefined
     }
@@ -103,10 +119,18 @@ export function useBarcodeLookup(options: BarcodeLookupOptions): BarcodeLookup {
     if (code.value !== null) void run(code.value)
   }
 
+  function take(): void {
+    const found = item.value
+    const read = code.value
+    if (phase.value !== 'found' || found === null || read === null) return
+    hand(found, read, false)
+  }
+
   function clear(): void {
     drop()
     phase.value = 'idle'
     code.value = null
+    item.value = null
   }
 
   // The connection may be back, or the app is looked at again — which the search hears too: «Нет
@@ -120,5 +144,5 @@ export function useBarcodeLookup(options: BarcodeLookupOptions): BarcodeLookup {
 
   onUnmounted(drop)
 
-  return { phase, code, lookUp, retry, clear }
+  return { phase, code, item, take, lookUp, retry, clear }
 }
