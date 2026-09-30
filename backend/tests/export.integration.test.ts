@@ -183,6 +183,9 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     debitedMinor: 52_000n,
     debitedCurrency: 'AMD',
     accountSetAt: at(9),
+    receiptMinor: 1_240_000n,
+    receiptCurrency: 'AMD',
+    receiptSetAt: at(11),
     deletedAt: at(10),
   })
   await db.insert(expenses).values({

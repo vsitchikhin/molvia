@@ -62,6 +62,8 @@ const file: ExportFile = {
       accountId: id(6),
       debited: money(520_000n, 'AMD'),
       accountSetAt: at,
+      receipt: money(1_240_000n, 'AMD'),
+      receiptSetAt: at,
       removedAt: at,
     },
   ],
@@ -223,8 +225,9 @@ describe('exportFileCodec', () => {
       rate: '4.700000',
       asOf: '2026-09-20T10:00:00.000Z',
     })
+    expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(2)
+    expect(wire.version).toBe(3)
   })
 
   it('reads its own file back into the same values', () => {
