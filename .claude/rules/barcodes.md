@@ -213,9 +213,11 @@ lies on an iPad (as MOL-132 Р-3).
   `open: false` and not at `onClosed`, which comes as the dialog closes — when the slide starts:
   emptied then, every scan and every × slid down as a bare title, 92 px of 249 (adversarial Е,
   measured frame by frame in Chromium). The refusal it slides down with is the one it showed, not
-  what the stopped camera says, and **the viewfinder slides down with its last frame**: every track
-  stops at the close — the indicator goes out — but the stream leaves the video only once the sheet
-  is put away (`stop(true)`, `letPictureGo`; adversarial Е′), or the scan slid away black. The
-  skeleton alone goes at `open: false`: brought up by the stopped camera, it would say «Загрузка…» for
-  nothing.
+  what the stopped camera says, and **the viewfinder slides down with its last frame, drawn**: the
+  close copies the live frame onto a canvas over the video (`holdStill`), then stops every track —
+  the indicator goes out at once, as it must. Keeping the stream on the video instead held nothing:
+  a stopped track is black in Chromium, stream on it or not (adversarial Е′, Е″, measured on the
+  screen, not on `srcObject` — a test of the stream passed while the eye got black). The frame goes
+  when the sheet is put away. The skeleton alone goes at `open: false`: brought up by the stopped
+  camera, it would say «Загрузка…» for nothing.
 - **Not yet:** a code by its item on «Что брать» (its own search, MOL-128), writing a code — MOL-100.

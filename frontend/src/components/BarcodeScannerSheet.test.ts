@@ -427,6 +427,48 @@ describe('BarcodeScannerSheet', () => {
     expect(sheet.text()).not.toContain(en.scanner.manual)
   })
 
+  // Adversarial Е″: in Chromium a video whose tracks stopped is black, stream on it or not — so the
+  // frame is copied before the camera stops, and slides down in its place.
+  it('slides down with the last frame drawn, the camera already stopped, and lets it go once away', async () => {
+    const { stream, track } = fakeStream()
+    getUserMedia.mockResolvedValue(stream)
+    const drawImage = vi.fn()
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage,
+    } as unknown as CanvasRenderingContext2D)
+    const sheet = await render()
+    const video = sheet.get('video').element as HTMLVideoElement
+    Object.defineProperty(video, 'videoWidth', { value: 1280, configurable: true })
+    Object.defineProperty(video, 'videoHeight', { value: 720, configurable: true })
+    const still = sheet.get<HTMLCanvasElement>('canvas.still')
+    // By `v-show`: happy-dom reads anything in a closed dialog as hidden.
+    expect(still.element.style.display).toBe('none')
+
+    await sheet.setProps({ open: false })
+
+    expect(track.stop).toHaveBeenCalled()
+    expect(drawImage).toHaveBeenCalledWith(video, 0, 0)
+    expect([still.element.width, still.element.height]).toEqual([1280, 720])
+    expect(still.element.style.display).toBe('')
+
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await settle()
+    expect(sheet.find('canvas.still').exists()).toBe(false)
+  })
+
+  it('draws no frame for a camera that never went live', async () => {
+    getUserMedia.mockRejectedValue(named('NotAllowedError'))
+    const drawImage = vi.fn()
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage,
+    } as unknown as CanvasRenderingContext2D)
+    const sheet = await render()
+
+    await sheet.setProps({ open: false })
+
+    expect(drawImage).not.toHaveBeenCalled()
+  })
+
   it('says «Loading…» only while open: a camera stopped by the close brings no skeleton', async () => {
     getUserMedia.mockResolvedValue(fakeStream().stream)
     const sheet = await render()

@@ -130,35 +130,6 @@ describe('useCamera', () => {
     expect(video.value.srcObject).toBeNull()
   })
 
-  it('keeps the last frame on the video when asked, every track stopped (adversarial Е′)', async () => {
-    const { stream, track } = fakeStream()
-    getUserMedia.mockResolvedValue(stream)
-    const { kind, start, stop, letPictureGo, video } = camera()
-    await start()
-
-    stop(true)
-    expect(track.stop).toHaveBeenCalled()
-    expect(kind.value).toBe('idle')
-    expect(video.value.srcObject).toBe(stream)
-
-    letPictureGo()
-    expect(video.value.srcObject).toBeNull()
-  })
-
-  it('must not take away the picture of a camera started again', async () => {
-    const first = fakeStream()
-    const second = fakeStream()
-    getUserMedia.mockResolvedValueOnce(first.stream).mockResolvedValueOnce(second.stream)
-    const { start, stop, letPictureGo, video } = camera()
-    await start()
-    stop(true)
-    await start()
-
-    letPictureGo()
-
-    expect(video.value.srcObject).toBe(second.stream)
-  })
-
   it('stops a stream that arrives after the scanner was closed', async () => {
     const { stream, track } = fakeStream()
     let answer: ((stream: MediaStream) => void) | undefined

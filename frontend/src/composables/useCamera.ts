@@ -46,13 +46,7 @@ export interface Camera {
   /** Whether the torch is on; null while the camera cannot light one. */
   torch: Ref<boolean | null>
   start: () => Promise<void>
-  /**
-   * `keepPicture` stops every track and leaves the last frame on the video: a sheet sliding down
-   * after its code was read shows what it read rather than black (adversarial Е′). The frame goes
-   * with `letPictureGo`, or with the next start.
-   */
-  stop: (keepPicture?: boolean) => void
-  letPictureGo: () => void
+  stop: () => void
   setTorch: (on: boolean) => Promise<void>
 }
 
@@ -74,12 +68,12 @@ export function useCamera(video: Ref<HTMLVideoElement | null>): Camera {
   // let go instead of taking the camera back.
   let attempt = 0
 
-  function release(keepPicture = false): void {
+  function release(): void {
     attempt++
     for (const track of stream?.getTracks() ?? []) track.stop()
     stream = null
     torch.value = null
-    if (video.value && !keepPicture) video.value.srcObject = null
+    if (video.value) video.value.srcObject = null
   }
 
   async function start(): Promise<void> {
@@ -120,16 +114,11 @@ export function useCamera(video: Ref<HTMLVideoElement | null>): Camera {
     }
   }
 
-  function stop(keepPicture = false): void {
+  function stop(): void {
     wanted = false
     paused = false
-    release(keepPicture)
+    release()
     kind.value = 'idle'
-  }
-
-  // Only a picture no stream is behind: a camera started again meanwhile keeps its own.
-  function letPictureGo(): void {
-    if (stream === null && video.value) video.value.srcObject = null
   }
 
   async function setTorch(on: boolean): Promise<void> {
@@ -161,5 +150,5 @@ export function useCamera(video: Ref<HTMLVideoElement | null>): Camera {
     stop()
   })
 
-  return { kind, torch, start, stop, letPictureGo, setTorch }
+  return { kind, torch, start, stop, setTorch }
 }

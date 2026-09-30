@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 // DOM for the init script, which runs in the browser.
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { BARCODE } from './barcode-video'
 import { open } from './session'
 
@@ -232,4 +232,107 @@ test('«Scan a barcode» on the record: the scanner is up at once, and «back» 
 
   await page.goBack()
   await expect(page).toHaveURL(/\/purchases\/manual$/)
+})
+
+/**
+ * What the screen shows inside `target`'s box, darkest to lightest pixel and the mean, 0…255: a
+ * barcode is near 255, a flat colour near 0. A screenshot of the page, not of the element — a
+ * headless screenshot of a `<video>` alone draws nothing — inside the band, clear of its own border.
+ */
+async function onScreen(
+  page: Page,
+  target: Locator,
+): Promise<{ spread: number; mean: number } | null> {
+  const box = await target.boundingBox()
+  const view = page.viewportSize()
+  if (!box || !view) return null
+  const inset = 10
+  const clip = {
+    x: box.x + inset,
+    y: box.y + inset,
+    width: box.width - 2 * inset,
+    height: Math.min(box.height - 2 * inset, view.height - box.y - inset),
+  }
+  if (clip.height < 4) return null
+  const picture = await page.screenshot({ clip, animations: 'allow' })
+  return page.evaluate(async (base64) => {
+    const image = new Image()
+    image.src = `data:image/png;base64,${base64}`
+    await image.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = image.width
+    canvas.height = image.height
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('no 2d context')
+    context.drawImage(image, 0, 0)
+    const { data } = context.getImageData(0, 0, image.width, image.height)
+    let low = 255
+    let high = 0
+    let sum = 0
+    for (let i = 0; i < data.length; i += 4) {
+      const luma = 0.299 * (data[i] ?? 0) + 0.587 * (data[i + 1] ?? 0) + 0.114 * (data[i + 2] ?? 0)
+      low = Math.min(low, luma)
+      high = Math.max(high, luma)
+      sum += luma
+    }
+    return { spread: high - low, mean: sum / (data.length / 4) }
+  }, picture.toString('base64'))
+}
+
+/**
+ * Adversarial Е″ (MOL-99): a stopped track leaves a `<video>` black in Chromium, stream on it or
+ * not — so the last frame is drawn before the camera stops, and the sheet slides down with it. What
+ * the eye gets is measured: the slide slowed to 3 s and held still for the screenshot, the reading
+ * band compared with itself while open.
+ */
+test('slides down with the barcode it read still on the screen, not black', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(READ * 2)
+  await context.grantPermissions(['camera'])
+  // The reader held back until the live picture is measured: warm, it reads before a frame can be.
+  let letReaderIn!: () => void
+  const readerHeld = new Promise<void>((resolve) => (letReaderIn = resolve))
+  await page.route(/zxing_reader.*\.wasm/, async (route) => {
+    await readerHeld
+    await route.continue()
+  })
+  await open(page, '/purchases/manual/add')
+  await page.addStyleTag({ content: ':root { --dur: 3000ms !important; }' })
+  const band = scanner(page).locator('.frame')
+
+  await openScanner(page)
+  await expect
+    .poll(async () => (await onScreen(page, band))?.spread ?? 0, { timeout: READ })
+    .toBeGreaterThan(100)
+  letReaderIn()
+
+  // The code read, the sheet closed and sliding down: held where it is for the screenshot.
+  const video = page.getByRole('dialog', { name: 'Barcode', includeHidden: true }).locator('video')
+  await video.evaluate(
+    (element) =>
+      new Promise<void>((resolve) => {
+        const dialog = element.closest('dialog')
+        const wait = () => {
+          if (dialog?.open !== false) {
+            requestAnimationFrame(wait)
+            return
+          }
+          requestAnimationFrame(() => {
+            for (const animation of dialog.getAnimations()) animation.pause()
+            resolve()
+          })
+        }
+        wait()
+      }),
+    undefined,
+    { timeout: READ },
+  )
+  const leaving = await onScreen(
+    page,
+    page.getByRole('dialog', { name: 'Barcode', includeHidden: true }).locator('.frame'),
+  )
+
+  expect(leaving?.spread).toBeGreaterThan(100)
 })

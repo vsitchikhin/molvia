@@ -33,6 +33,9 @@
         disablepictureinpicture
         aria-hidden="true"
       ></video>
+      <!-- The last frame, drawn as the sheet closes: the camera stops at once, and a stopped track
+           leaves the video black while the sheet still slides down (adversarial Е″). -->
+      <canvas v-show="still" ref="stillFrame" class="video still" aria-hidden="true"></canvas>
       <div class="overlay" aria-hidden="true">
         <div ref="frame" class="frame"></div>
       </div>
@@ -163,6 +166,9 @@ export default defineComponent({
     const typing = ref(false)
     // Up from the opening until the sheet is put away — its slide down included (adversarial Е).
     const shown = ref(props.open)
+    // The last frame over the viewfinder while the sheet slides down (`holdStill`).
+    const stillFrame = ref<HTMLCanvasElement | null>(null)
+    const still = ref(false)
     const typed = ref('')
     const typedError = ref<ErrorCode | null>(null)
     // Once the camera is known to be missing — no secure context, no camera — «Сканировать» is not
@@ -232,6 +238,7 @@ export default defineComponent({
       (open) => {
         if (open) {
           shown.value = true
+          still.value = false
           typing.value = false
           typed.value = ''
           typedError.value = null
@@ -239,9 +246,10 @@ export default defineComponent({
           cameraMissing.value = false
           void startCamera()
         } else {
-          // Every track stops now — the indicator goes out — and the last frame stays on the
-          // viewfinder as the sheet slides down, until it is put away (adversarial Е′).
-          camera.stop(true)
+          // Every track stops now — the indicator goes out — and the last frame, drawn first, stays
+          // on the viewfinder as the sheet slides down, until it is put away (adversarial Е″).
+          holdStill()
+          camera.stop()
         }
       },
       { immediate: true },
@@ -269,6 +277,20 @@ export default defineComponent({
     }
 
     const sheet = ref<{ $el: Element } | null>(null)
+    // A copy of what the camera shows, made before it stops: Chromium draws a video whose tracks
+    // ended as black, whether its stream is still on it or not (adversarial Е″). Only a live
+    // camera's frame — a refusal slides down as it is.
+    function holdStill(): void {
+      const source = video.value
+      const canvas = stillFrame.value
+      if (!source || !canvas || camera.kind.value !== 'live' || source.videoWidth === 0) return
+      const context = canvas.getContext('2d')
+      if (!context) return
+      canvas.width = source.videoWidth
+      canvas.height = source.videoHeight
+      context.drawImage(source, 0, 0)
+      still.value = true
+    }
 
     // The content goes once the slide down is over: `onClosed` comes as the dialog closes, which is
     // when the slide starts (adversarial Е). Looked for a frame later, when the transition runs; an
@@ -283,7 +305,7 @@ export default defineComponent({
         )
         void Promise.allSettled(sliding.map((animation) => animation.finished)).then(() => {
           shown.value = props.open
-          if (!props.open) camera.letPictureGo()
+          if (!props.open) still.value = false
         })
       })
     }
@@ -292,6 +314,8 @@ export default defineComponent({
       t,
       REFUSALS,
       sheet,
+      stillFrame,
+      still,
       shown,
       putAway,
       video,
@@ -329,6 +353,11 @@ export default defineComponent({
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.still {
+  position: absolute;
+  inset: 0;
 }
 
 .overlay {
