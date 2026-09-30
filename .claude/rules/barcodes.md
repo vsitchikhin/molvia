@@ -1,7 +1,7 @@
 ---
 paths:
   - 'packages/model/src/entities/barcode.ts'
-  - 'backend/src/usecases/find-by-barcode.*'
+  - 'backend/src/usecases/{find-by-barcode,attach-barcode,propose-item}.*'
   - 'packages/model/tests/entities/barcode.test.ts'
   - 'frontend/src/scanner/**'
   - 'frontend/src/components/BarcodeScannerSheet.*'
@@ -10,7 +10,7 @@ paths:
   - 'backend/src/routes/catalogue.ts'
   - 'backend/tests/catalogue.integration.test.ts'
   - 'frontend/src/views/{ItemSearchView,TripView}*'
-  - 'frontend/src/components/CatalogueCombobox*'
+  - 'frontend/src/components/{CatalogueCombobox,ProposeItemSheet,ItemDetailsSheet}*'
   - 'frontend/src/stores/{itemEntry,recentItems}*'
 ---
 
@@ -129,8 +129,8 @@ lies on an iPad (as MOL-132 Р-3).
   `0004082000095` (adversarial А). Such a code is a shop's own label, and a lookup by a code typed
   from it (MOL-99) will not find what its scan found.
 - **`barcodeSchema` was not made stricter** (Р-10): `itemSchema` reads with it, and a dozen fixtures
-  carry codes whose check digit does not hold. Whether the write of a code checks its digit is
-  MOL-100's call, the one that writes codes.
+  carry codes whose check digit does not hold. The write checks the digit instead — `writtenBarcode`
+  (MOL-100, below).
 
 ## End-to-end
 
@@ -187,7 +187,7 @@ lies on an iPad (as MOL-132 Р-3).
   the first answer is on its way is exactly what a person does when nothing seems to happen, and the
   first item came up over «Код … не знаком» of the second.
 - **A miss** says «Код … справочнику не знаком» on the screen and out loud, and offers «Предложить
-  товар» — without the code until MOL-100 takes codes there (owner's decision В-1). **Proposed from
+  товар» — with the code since MOL-100 (below). **Proposed from
   there, the item was looked for by the code**: the name starts empty, whatever the field held before
   the scan, the pick carries no query, and the block goes once the item is proposed (adversarial Д,
   review С-5). An error is red with «Повторить»; typing gives the search back and drops a lookup
@@ -220,4 +220,74 @@ lies on an iPad (as MOL-132 Р-3).
   screen, not on `srcObject` — a test of the stream passed while the eye got black). The frame goes
   when the sheet is put away. The skeleton alone goes at `open: false`: brought up by the stopped
   camera, it would say «Загрузка…» for nothing.
-- **Not yet:** a code by its item on «Что брать» (its own search, MOL-128), writing a code — MOL-100.
+- **Not yet:** a code by its item on «Что брать» (its own search, MOL-128), and in the bot.
+
+## Writing a code (MOL-100)
+
+A code the catalogue did not know is written the first time it is met, so the next scan finds the
+item — before MOL-100 every scan on production was a miss. **Anyone may write a code to any item**
+(from the task): a code is a fact from the package, not an opinion. So the catalogue is shared in its
+codes too, and a wrong one needs a way out (В-1, below).
+
+- **Two ways in, one rule.** «Предложить товар» takes the codes read from the package, up to
+  `ITEM_BARCODES_MAX` (`proposedItemSchema`), written with the item or not at all; «привязать код к
+  ней?» writes one to an item found by name (`POST /catalogue/items/:itemId/barcodes`, the code in the
+  body — the API logs paths, MOL-58). **A name the catalogue already holds takes the code** (Р-4): the
+  name typed is the person's «this is it», and a code dropped in silence is what the task forbids.
+- **The code must check** (`writtenBarcode`, Р-1): a code written is written for everyone for good, and
+  one whose last digit does not hold is on no package. Twelve digits and a GTIN-14 led by `0` are
+  written as the thirteen the scanner reads; eight digits as they came — EAN-8 or UPC-E, the digits do
+  not say (Р-11), so they pass if they check either way, and `barcodeTwins` finds the other form.
+- **One package, one item — with its twins** (Р-2). The key of `item_barcodes` holds one string, and
+  `00408295` at one item beside `0004082000095` at another would find one or the other by whether it was
+  scanned or typed. So a write asks every form of every code (`barcodeTwins`) and takes a lock per form
+  (`pg_advisory_xact_lock(hashtext('barcode'), …)`), in ascending order, **after the item's own lock** —
+  `lockItemKey` for a new item, `FOR UPDATE` of the row for one there — so two writes never wait on each
+  other crosswise. Two codes of one list that are twins are a repeat (`hasRepeatedBarcode`, Р-7), refused
+  as two equal codes are.
+- **A code held by another item is an answer, not an error** (Р-3): nothing is written — not the code,
+  not the new item, which is most likely a duplicate of the holder — and a `409` carries the holder
+  whole (`barcodeTakenSchema`), since the registry of errors has no room for an item. The client reads
+  that one body under that status as an answer (`answers: [409]` of the transport); a `409` with a code
+  of the registry is still the failure it was. The screen offers the holder: the package in the hand is
+  what the catalogue knows it as. **The same code on the same item is success** (`200`) — a repeat after
+  a lost answer — and keeps who wrote it first. **Twenty is the ceiling** (`error.barcodes_full`, `409`),
+  counted under the item's lock: the database has no trigger for it.
+- **Who wrote it is kept** (`item_barcodes.added_by`, `added_at`, Р-5): a code written says the person
+  held the package — theirs, as an item's author is. Erasure nulls it and the code stays; the copy of
+  one's data lists the codes one wrote (`addedBarcodes`, version 3), `privacy.md`. The screens show it to
+  nobody.
+- **«Не этот товар?» lets a code go, and anyone may** (owner's decision В-1): a quiet line on the
+  purchase sheet of an item that came by a code — found, linked or proposed with it — whoever holds the
+  package says it is not this one (`DELETE /catalogue/items/:itemId/barcodes?code=`, the code in the
+  query as the lookup's; `204` whether it was held or not). The item lets go of the code and whichever
+  twin it holds, never another item's; the device forgets it (`recentItems.forgetCode`); the sheet goes
+  one step back, and the code is looked up again — nobody holds it, so it waits for its item. **The
+  named price**: whoever wants to spoil a code can unbind it, accepted for 0.2's circle; `added_by` shows
+  who wrote what. **Merging two items is not this** (Р-6): it moves ratings, purchases and picks, and is
+  the nightly merge of MOL-106, where the codes move to the item that stays.
+
+### On «Что взяли?» (owner's decisions В-2, В-3)
+
+- **A code nobody holds waits for its item.** Once the server says «не знаком» the code is kept
+  (`pendingCode`) — only then: a code not asked about for want of a network may well be held. Typing no
+  longer drops it: a strip «Код … ждёт позицию» stands over the search, and × lets it go. Proposed with
+  «Предложить товар» from anywhere on the screen while it waits, the code goes with the item.
+- **A pick while a code waits asks first** — «Привязать код … к „…“?» — in a block where the code's
+  block stood, not in a sheet (В-2): «taken», «no network» or an error is then said where the person
+  is, and the purchase sheet comes only after the answer, one sheet at a time. The rows go while the
+  question stands, the focus goes to its first answer and the question is said out loud. **Three
+  answers**: «Привязать и записать»; «Записать без кода» — the code is let go; «Это другой товар —
+  предложить» — the item found by name is not the package, and the code goes with the one proposed,
+  whose name starts from what was typed. **The question names who will see it** — «все, кто
+  отсканирует этот код, увидят эту позицию» — **and is asked for any item** (В-3), the seed's common
+  «Молоко» included: the seed has no mark of its own (`created_by` is null for the erased as well), and
+  the person with the package decides, the last answer at hand. Typing drops the question, and the code
+  still waits.
+- **Taken** — «Код … уже у „…“»: «Взять „…“» takes the holder as found by the code, with no query;
+  «Записать „…“ без кода» goes on with the row picked. **No network** is an offline state with
+  «Повторить» and «Записать без кода» — the catalogue has no queue, as «Предложить товар» has none; an
+  error is red with «Повторить» and the same way out. A retry of a write waits for a tap: nothing is
+  sent by itself.
+- **A code written is remembered for offline** as one found is: the item it went to goes into «Часто
+  берёте» with it once it is added to a record.

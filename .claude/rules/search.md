@@ -24,8 +24,9 @@ The detail behind the search lines of `CLAUDE.md`: what was measured, what each 
 and why the thresholds stand where they do.
 
 **A code scanned on «Что взяли?» is not a query** (MOL-99): the item found by it is picked with no
-query, and the codes the device found items by are kept beside «Часто берёте», not in its rows. The
-rules are in `.claude/rules/barcodes.md`, «The item by its code».
+query, and the codes the device found items by are kept beside «Часто берёте», not in its rows.
+«Предложить товар» takes the codes read from the package, and a name already there takes the code
+(MOL-100). The rules are in `.claude/rules/barcodes.md`, «The item by its code» and «Writing a code».
 
 ## How catalogue search works, and why
 

@@ -27,8 +27,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   and their checks after every operation that named one (MOL-115), login requests by Telegram id
   — they carry no foreign key, so no cascade reaches them — and the owner, adding one to
   `erasures` for the week they appeared (MOL-91). Catalogue items the
-  person added stay with `created_by` nulled, and **every place stays** (owner's decision
-  24.09.2026). People erase themselves with `/delete` in the bot; the owner's fallback is
+  person added stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
+  nulled (MOL-100), and **every place stays** (owner's decision 24.09.2026). People erase themselves with `/delete` in the bot; the owner's fallback is
   `dist/forget.js` in the API image (`make forget` in a copy — `TG` reaches the script through the
   environment, never pasted into the recipe, where a value could close a quote and bring its own
   `--yes`, П-3; and only a `TG` typed on that command line — one left in the shell erased that
@@ -66,14 +66,16 @@ The detail behind the privacy lines of `CLAUDE.md`.
   it with `information_schema.columns`; a key alone would have let a new note on an exchange miss
   the copy in silence. A table that goes with the person through another — a version of an exchange, a
   purchase of a trip — is found by walking the graph of foreign keys, never across a key that lets
-  go (`ON DELETE SET NULL`: `items.created_by` — the item is the catalogue's, and so are the tables
-  under it; `item_barcodes` is listed by hand). A fully filled life holds each field of the file
+  go (`ON DELETE SET NULL`: `items.created_by` and `item_barcodes.added_by` — the item and the code are
+  the catalogue's, and so are the tables under them; `item_barcodes` is listed by hand). A fully filled life holds each field of the file
   non-empty in some row, so a column mapped to the wrong field shows, and **every `…Id` in the file
   finds its row in the file** — found by walking the fields, not by a list, so a new reference
   without a section or a name in `catalogue` fails by itself (adversarial review 1, 2; review 11,
   15). **A new table or column that is a person's joins erasure and the copy in the
   same commit.** Besides them: the catalogue items the person added (erasure keeps them, their
-  author is still this person), with barcodes, and — as a reference, not their data — the names of
+  author is still this person), with barcodes, the codes the person wrote to any item
+  (`addedBarcodes`, MOL-100 — they say the person held the package; `barcode`, not `code`, since
+  `code` is the key the guard against secrets looks for), and — as a reference, not their data — the names of
   the items and places their rows point at, so the file reads; nobody else's author is in it.
   What was decided (owner's approval 29.09.2026, Р-1…Р-7): **what is stored, never what is
   counted** — no unit price, total, balance or chain rate, since those are our arithmetic over the
@@ -85,7 +87,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   the name. The format is the wire's: English keys, money and quantity as decimal strings beside
   their currency and unit, rates to six digits, days `YYYY-MM-DD`, moments in UTC, and a header
   `format: "molvia-export"`, `version` — a change of what goes in is a new version: 2 since the
-  ladder of rating reminders joined it (MOL-101). Its codec
+  ladder of rating reminders joined it (MOL-101), 3 since the codes a person wrote did (MOL-100). Its codec
   is looser than a screen's on purpose: a copy of what is stored is never refused by a rule a
   stored row predates — an event type since withdrawn, a rate outside today's band. **One
   snapshot:** one transaction, `repeatable read, read only`; it writes nothing, not even the log.

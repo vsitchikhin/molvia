@@ -793,6 +793,17 @@ purchase sheet with no query — a code teaches the search nothing; a miss offer
 offline the device finds the items it once found by code. The catalogue holds no code until MOL-100
 lets «Предложить товар» write one, so until then every scan on production is a miss.
 
+MOL-100 writes the code a scan missed: with the item «Предложить товар» proposes, or to an item found
+by name — the code waits over the search, and a pick asks «Привязать код к „…“?» before the purchase
+sheet (owner's decisions 30.09.2026: В-2 the question on the screen, В-3 for any item, the seed's
+included, naming who will see it). Anyone may write a code to any item and anyone may let it go — «Код
+… — не этот товар?» on the sheet of an item that came by a code (В-1); merging items stays MOL-106's.
+A write checks the digit (`writtenBarcode`), holds one package to one item with its twins under a lock
+per form, and a code another item holds writes nothing and answers `409` naming it. Who wrote a code is
+`item_barcodes.added_by`: erasure nulls it, the copy lists one's own codes (version 3). Requirements
+and plan — `.scratch/tasks/{requirements,plans}/MOL-100.md`; the rules — `.claude/rules/barcodes.md`,
+«Writing a code».
+
 ## Откуда брать работу
 
 Не из головы и не из этого файла — **из Jira, проект MOL**. Релиз 0.1 разложен на семь
