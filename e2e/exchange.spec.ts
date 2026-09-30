@@ -200,3 +200,62 @@ test('the card of an exchange holds long amounts on this phone and on a 320 px o
   await page.setViewportSize({ width: 320, height: 700 })
   expect(await brokenCards(page)).toEqual([])
 })
+
+/**
+ * «Как меняли» (MOL-137, В-1): the channel goes with the exchange, the next one starts from it, and
+ * an amendment keeps or clears it. The market it is measured against is not in an end-to-end run —
+ * the refresh is off here and the cache stays empty — so the card keeps the central bank's line as
+ * it was, not a step quieter; the market lines are held by the integration and component tests.
+ */
+test('how the money was changed goes with the exchange, and the next one starts from it', async ({
+  page,
+}) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Обмен денег' }).click()
+  await expect(page.getByRole('heading', { name: 'Обменов пока нет' })).toBeVisible()
+
+  const sheet = page.locator('dialog[open]')
+  await page.getByRole('button', { name: 'Записать обмен' }).click()
+  await expect(sheet).toContainText('Сколько отдали и сколько получили')
+  await page.waitForTimeout(400)
+  await expect(sheet.getByRole('radio', { name: 'Не указано' })).toBeChecked()
+  await sheet.getByText('Обменник', { exact: true }).click()
+  await sheet.getByLabel('Отдал').fill('20000')
+  await sheet.getByLabel('Получил').fill('83200')
+  await sheet.getByRole('button', { name: 'Сохранить обмен' }).click()
+  await expect(sheet).toBeHidden()
+
+  // No market in this run: nothing is drawn of it, and the central bank's line stands as before.
+  await expect(page.locator('.market')).toHaveCount(0)
+  await expect(page.locator('article .official')).not.toHaveClass(/quiet/)
+
+  // The next exchange starts from the way the last one was made.
+  await page.getByRole('button', { name: 'Записать обмен' }).click()
+  await expect(sheet).toContainText('Сколько отдали и сколько получили')
+  await page.waitForTimeout(400)
+  await expect(sheet.getByRole('radio', { name: 'Обменник' })).toBeChecked()
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+
+  // An amendment opens on the exchange's own channel, and «—» clears it for good.
+  await page
+    .locator('article')
+    .getByRole('button', { name: /^Исправить обмен от/ })
+    .click()
+  await expect(sheet).toContainText('Правка обмена')
+  await page.waitForTimeout(400)
+  await expect(sheet.getByRole('radio', { name: 'Обменник' })).toBeChecked()
+  // The segment is tapped, as a finger does: its radio is hidden under it.
+  await sheet.locator('label', { has: page.getByRole('radio', { name: 'Не указано' }) }).click()
+  await sheet.getByRole('button', { name: 'Сохранить правку' }).click()
+  await expect(sheet).toBeHidden()
+
+  await page.reload()
+  await page
+    .locator('article')
+    .getByRole('button', { name: /^Исправить обмен от/ })
+    .click()
+  await expect(sheet).toContainText('Правка обмена')
+  await expect(sheet.getByRole('radio', { name: 'Не указано' })).toBeChecked()
+})

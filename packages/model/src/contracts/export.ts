@@ -11,6 +11,7 @@ import { ERROR } from '#model/support/errors'
 import { currencySchema, signedMoneyCodec } from '#model/values/money'
 import { RATE_DIGITS, rateProviderSchema, rateSourceSchema } from '#model/values/rates'
 import { baseUnitSchema } from '#model/values/units'
+import { exchangeChannelSchema } from '#model/values/market-rates'
 
 /**
  * «Скачать мои данные» (MOL-93): everything erasure removes of a person, as one file. The codecs
@@ -21,8 +22,9 @@ import { baseUnitSchema } from '#model/values/units'
 export const EXPORT_FORMAT = 'molvia-export'
 // 2: `ratingReminders`, where the person stands on the ladder of rating reminders (MOL-101) — a
 // change of what goes in is a new version (privacy.md). 3: a trip's `receipt` and `receiptSetAt`,
-// the sum typed from the receipt, when it last changed and when it was first typed (MOL-78).
-export const EXPORT_VERSION = 3
+// the sum typed from the receipt, when it last changed and when it was first typed (MOL-78). 4: an
+// exchange's `channel` (MOL-137).
+export const EXPORT_VERSION = 4
 
 const day = z.iso.date()
 
@@ -199,6 +201,7 @@ const exchangeFields = {
   exchangedOn: day,
   heldBefore: signedMoneyCodec.nullable(),
   note: z.string().nullable(),
+  channel: exchangeChannelSchema.nullable(),
 }
 
 const exchangeSchema = z.strictObject({

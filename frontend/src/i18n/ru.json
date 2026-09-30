@@ -714,7 +714,12 @@
       "current": "Сейчас записано: {details}",
       "current_held": "было до обмена {amount}",
       "saving": "Сохраняем обмен…",
-      "bad_day": "Выберите день обмена"
+      "bad_day": "Выберите день обмена",
+      "channel": "Как меняли",
+      "channel_none": "Не указано",
+      "channel_bankCash": "Банк, нал",
+      "channel_bankNoncash": "Безнал",
+      "channel_exchanger": "Обменник"
     },
     "fab": "Обмен",
     "edit_on": "Исправить обмен от {date}:",
@@ -732,7 +737,34 @@
     "card_less_other": "На {amount} меньше, чем по курсу {source}",
     "card_equal_other": "Ровно как по курсу {source}",
     "card_no_official": "Курса ЦБ РА на этот день нет — сравнить не с чем",
-    "card_doubtful": "Курс ЦБ РА в тот день под сомнением — сравнивать не будем"
+    "card_no_official_short": "Курса ЦБ РА на этот день нет",
+    "card_doubtful": "Курс ЦБ РА в тот день под сомнением — сравнивать не будем",
+    "channel": {
+      "bankCash": "Банки, наличные",
+      "bankNoncash": "Банки, безнал",
+      "banksAll": "Банки, все клиенты",
+      "exchanger": "Обменники"
+    },
+    "market": {
+      "title": "Курсы по данным ЦБ РА",
+      "hint": "Средние курсы сделок банков и обменников с людьми за день. Лучший для вас отмечен звёздочкой",
+      "official": "ЦБ РА на {date}: {rate}",
+      "sell": "Продать",
+      "buy": "Купить",
+      "where": "Где меняли",
+      "best_mark": "лучший",
+      "row_date": "на {date}",
+      "best": "Лучший курс {date}: {channel}",
+      "own": "{channel} на {date}",
+      "more": "На {amount} больше, чем {where}",
+      "less": "На {amount} меньше, чем {where}",
+      "equal": "Ровно как {where}",
+      "where_bankCash": "в банках за наличные",
+      "where_bankNoncash": "в банках безналом",
+      "where_banksAll": "в банках (все клиенты)",
+      "where_exchanger": "в обменниках",
+      "pending": "Обменники за этот день ЦБ РА выложит позже — строка пересчитается сама"
+    }
   },
   "income": {
     "title": "Доходы",

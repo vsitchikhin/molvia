@@ -108,6 +108,7 @@ const file: ExportFile = {
       exchangedOn: '2026-09-20',
       heldBefore: money(11_500_000n, 'AMD'),
       note: 'Рате, Абовяна',
+      channel: 'exchanger',
       givenAccountId: null,
       receivedAccountId: id(6),
       accountSetAt: at,
@@ -123,6 +124,7 @@ const file: ExportFile = {
           exchangedOn: '2026-09-19',
           heldBefore: null,
           note: null,
+          channel: null,
           replacedAt: at,
         },
       ],
@@ -228,7 +230,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(3)
+    expect(wire.version).toBe(4)
   })
 
   it('reads its own file back into the same values', () => {

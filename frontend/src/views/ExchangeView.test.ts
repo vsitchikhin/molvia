@@ -54,6 +54,7 @@ function row(patch: Partial<Row> = {}): Row {
     received: { minor: 9_500_000n, currency: 'AMD' },
     heldBefore: null,
     note: null,
+    channel: null,
     givenAccountId: null,
     receivedAccountId: null,
     revision: 1,
@@ -66,6 +67,7 @@ function row(patch: Partial<Row> = {}): Row {
       difference: { minor: 875_400n, currency: 'AMD' },
     },
     officialDoubtful: false,
+    market: null,
     ...patch,
   }
 }
@@ -81,6 +83,7 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
     walletUnknown: null,
     exchanges: [row()],
     receipts: [],
+    marketToday: [],
     ...patch,
   }
 }
@@ -429,7 +432,7 @@ describe('ExchangeView: the rate and the list', () => {
     const text = view.get('article').text()
     // Named instead of the central bank, never beside it (С-6) — in the label and the difference.
     // A name that stands at the head of a line and after «the» alike — no «the the» (adversarial Е).
-    expect(view.get('article .plate .line + .line .label').text()).toMatch(
+    expect(view.get('article .plate .official .label').text()).toMatch(
       new RegExp(`^${en.exchange.card_source_cbr} on `),
     )
     expect(text).toContain(`than the ${en.exchange.card_source_cbr} rate`)
@@ -441,7 +444,8 @@ describe('ExchangeView: the rate and the list', () => {
     exchanges.mockResolvedValue(overview({ pair: null, wallet: null }))
     const view = await render()
     expect(view.text()).toContain(en.settings.same_currencies)
-    expect(view.find('fieldset').exists()).toBe(false)
+    // The sheet's own «Как меняли» is in the page; the preference is what must be absent.
+    expect(view.find('.preference').exists()).toBe(false)
   })
 
   it('switches the preference through the API and shows what the server answered', async () => {
@@ -861,5 +865,149 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     await saveAmendment()
     expect(view.text()).toContain(en.exchange.vanished)
     expect(view.text()).not.toContain(en.exchange.failed)
+  })
+})
+
+describe('ExchangeView: against the market of the day (MOL-137)', () => {
+  const quote = (
+    value: string,
+    minor: bigint,
+    channel: 'bankCash' | 'bankNoncash' | 'exchanger',
+    basis: 'bankCash' | 'bankNoncash' | 'banksAll' | 'exchanger' = channel,
+  ) => ({
+    channel,
+    basis,
+    rate: rate(value, '2026-09-15', 'official'),
+    difference: { minor, currency: 'AMD' as const },
+  })
+
+  it('puts the best of the day first, the own channel under it, the central bank quieter last', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [
+          row({
+            channel: 'bankCash',
+            market: {
+              best: quote('4.221606', -123_212n, 'bankNoncash'),
+              own: quote('4.110180', 99_640n, 'bankCash'),
+              exchangersPending: true,
+            },
+          }),
+        ],
+      }),
+    )
+    const view = await render()
+    const card = view.get('article')
+    const labels = card.findAll('.plate > .line .label').map((label) => label.text())
+    expect(labels).toEqual([
+      en.exchange.card_rate,
+      'Best rate on Sep 15: Banks, non-cash',
+      'Banks, cash on Sep 15',
+    ])
+    expect(card.findAll('.plate > .difference').map((line) => line.text())).toEqual([
+      '֏1,232.12 less than at banks non-cash',
+      '֏996.40 more than at banks for cash',
+    ])
+    expect(card.get('.plate > .missing').text()).toBe(en.exchange.market.pending)
+    // The central bank is still there, a step quieter: nobody changes at its rate (Р-5).
+    expect(card.get('.official').classes()).toContain('quiet')
+    expect(card.get('.official .difference').text()).toBe('֏8,754 more than the central bank')
+  })
+
+  it('names the row of all bank clients where it stood in for non-cash (В-2)', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [
+          row({
+            market: {
+              best: quote('4.2095', -10_000n, 'bankNoncash', 'banksAll'),
+              own: null,
+              exchangersPending: false,
+            },
+          }),
+        ],
+      }),
+    )
+    const view = await render()
+    expect(view.get('article .plate > .line + .line .label').text()).toBe(
+      'Best rate on Sep 15: Banks, all clients',
+    )
+    expect(view.get('article .plate > .difference').text()).toContain('at banks (all clients)')
+    expect(view.find('article .plate > .missing').exists()).toBe(false)
+  })
+
+  it('with a market and no bank rate that day, does not say there is nothing to compare with', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [
+          row({
+            official: null,
+            market: {
+              best: quote('4.110180', 99_640n, 'bankCash'),
+              own: null,
+              exchangersPending: false,
+            },
+          }),
+        ],
+      }),
+    )
+    const view = await render()
+    expect(view.get('article .official .missing').text()).toBe(en.exchange.card_no_official_short)
+  })
+
+  it('without a market the central bank stands as it did', async () => {
+    exchanges.mockResolvedValue(overview())
+    const view = await render()
+    expect(view.get('article .official').classes()).not.toContain('quiet')
+    expect(view.find('.market').exists()).toBe(false)
+  })
+
+  it('shows today’s rates by the central bank, the best starred and said aloud', async () => {
+    const rouble = (value: string, day: string) => ({ ...rate(value, day, 'official') })
+    exchanges.mockResolvedValue(
+      overview({
+        marketToday: [
+          {
+            currency: 'RUB',
+            official: rouble('4.3187', '2026-09-29'),
+            quotes: [
+              {
+                channel: 'bankCash',
+                basis: 'bankCash',
+                buys: rouble('4.110180', '2026-09-29'),
+                sells: rouble('4.347948', '2026-09-29'),
+                bestBuys: false,
+                bestSells: true,
+              },
+              {
+                channel: 'exchanger',
+                basis: 'exchanger',
+                buys: rouble('4.157339', '2026-09-20'),
+                sells: rouble('4.163228', '2026-09-20'),
+                bestBuys: false,
+                bestSells: false,
+              },
+            ],
+          },
+          { currency: 'USD', official: null, quotes: [] },
+        ],
+      }),
+    )
+    const view = await render()
+    const block = view.get('.market')
+    expect(block.get('h2').text()).toBe(en.exchange.market.title)
+    // A currency the bank said nothing of is not drawn at all.
+    expect(block.findAll('table')).toHaveLength(1)
+    expect(block.get('caption').text()).toContain(en.spending.currency_name.RUB)
+    const rows = block.findAll('tbody tr')
+    expect(rows.map((one) => one.get('th').text())).toEqual([
+      'Banks, cash on Sep 29',
+      'Exchange offices on Sep 20',
+    ])
+    const best = rows[0]?.findAll('td')[1]
+    expect(best?.classes()).toContain('best')
+    expect(best?.find('svg').exists()).toBe(true)
+    expect(best?.text()).toContain(en.exchange.market.best_mark)
+    expect(rows[1]?.findAll('.best')).toHaveLength(0)
   })
 })

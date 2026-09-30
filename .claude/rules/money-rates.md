@@ -1,16 +1,16 @@
 ---
 paths:
-  - 'packages/model/src/values/{rates,money}.ts'
+  - 'packages/model/src/values/{rates,money,market-rates}.ts'
   - 'packages/model/src/{entities,contracts}/{exchange,income}.ts'
-  - 'packages/model/tests/{values,entities,contracts}/{rates,money,exchange,income}.test.ts'
+  - 'packages/model/tests/{values,entities,contracts}/{rates,money,market-rates,exchange,income}.test.ts'
   - 'backend/src/rates/**'
-  - 'backend/src/db/{rates,exchanges,incomes}-repository.ts'
-  - 'backend/src/usecases/{exchanges,incomes,refresh-official-rates,choose-trip-rate,money-rates,start-trip}*.ts'
+  - 'backend/src/db/{rates,market-rates,exchanges,incomes}-repository.ts'
+  - 'backend/src/usecases/{exchanges,incomes,refresh-official-rates,refresh-market-rates,choose-trip-rate,money-rates,start-trip}*.ts'
   - 'backend/src/routes/{exchanges,incomes}.ts'
-  - 'backend/tests/{rates,exchanges,incomes}*.ts'
+  - 'backend/tests/{rates,market-rates,exchanges,incomes}*.ts'
   - 'backend/drizzle/*{rate,exchange,income}*.sql'
   - 'frontend/src/views/{ExchangeView,IncomesView}*'
-  - 'frontend/src/components/{Exchange*,Income*,TripRate*,OperationCard*,OperationSkeleton*}'
+  - 'frontend/src/components/{Exchange*,Income*,TripRate*,OperationCard*,OperationSkeleton*,MarketRates*}'
   - 'frontend/src/composables/{useExchanges,useExchangeWords,useIncomes}*'
   - 'e2e/{exchange,incomes}.spec.ts'
 ---
@@ -56,6 +56,21 @@ snapshot, and an inverse or a cross is rounded there to the snapshot's six digit
   `9999-12-31` — is not written at all. A stale rate with its date beats a mixed one.
 - **An empty cache gives a trip no rate, for good** — the snapshot is written once and never
   filled in later (owner's decision, 19.09.2026).
+- **The cache has the central bank's history since 2022 (MOL-137, owner's decision В-5).** Before
+  it, everything dated more than a week before the first hourly refresh — an income in dollars, a
+  month, an account, the losses on exchanges, the whole import of MOL-71 — had no official rate at
+  all, since every reader but a trip's takes only a rate fresh for its day. Once a day the refresh
+  asks `ExchangeRatesByDateRangeByISO` for everything from `OFFICIAL_HISTORY_FROM` — one answer, a
+  fifth of a second for two years, measured — and writes **only the days the cache lacks**: a kept
+  day stays as it is, jump mark included, since trips took from it. A new day is judged for a jump
+  as it would have been had it come on its day, against the central bank's five before it, kept
+  and new together (`missingDays`). The answer is read as strictly as the latest is: a day missing
+  one of the currencies refuses the whole archive — measured on 30.09.2026, the whole of it since
+  2022 reads (3 588 rows, 0,8 s). A failure is a line in the log, by its kind unless it is the
+  feed's own words, and it is asked again in six hours (`HISTORY_RETRY_MS`), not every hour: a
+  refused archive stays refused, and it is half a megabyte — a day past tomorrow in it refuses it
+  the same way (review П-4); a hole a failed week leaves closes
+  itself within a day.
 
 ## The person's own rate, from exchanges
 
@@ -170,6 +185,102 @@ device, private always. The rate is what the two amounts say and is not stored b
   from the record threw away everything bought between the exchange and its entry. Without a remainder named
   at the last exchange it speaks of that exchange's money only. A day's official rate that jumped
   is never an exchange's measure: the rate before the jump is, or no comparison at all.
+
+## The market, from the central bank's statistics (MOL-137)
+
+**The official rate is the middle of the market, and nobody changes at it** — for the rouble it sits
+by the banks' selling side: on 29.09.2026 the bank's rate was 4,3187 while banks bought cash roubles
+from people at 4,110. Set beside it alone, every exchange of roubles read «less than the central
+bank», a good one too. The central bank also publishes what banks and exchange offices actually
+gave their clients — weighted averages of a day's deals, official statistics and not a scraped
+aggregator (rate.am stays rejected). **The market is only what an exchange is set beside, never a
+rate anything counts by**: a trip, a month, the wallet and an account take the official or the own
+rate exactly as before.
+
+- **Three files, each read on its own** (`backend/src/rates/cba-market.ts`), in the hour of the
+  official refresh and after it: `FX_bybranch_ENG.xlsx` — people in banks, cash and non-cash, one
+  day only, overwritten daily, dated D and published the morning of D+1, so the table keeps it or
+  nobody does; `FOREX ENG_Daily.xlsx` — banks with every client, people and companies, every working
+  day since January 2022, the row of D the same day; `FOREX ENG.xlsx`, sheet 6.18 — exchange
+  offices, one week at a time about ten days late, each row dated by its own text, the reporting
+  period above the table not trusted (on 30.09 it named 20–27 September over rows of 14–20). An
+  empty row is passed over, never read as the end of the table: a blank line between two days made
+  the rest of the week vanish in silence (adversarial review, round 3, Г). The directory's index
+  answers 401: the names are written in the code.
+- **A file is downloaded only if it changed — by its `HEAD`, not by `If-None-Match`.** The bank's
+  server ignores the conditional headers and answers 200 with the whole file (measured 30.09.2026,
+  adversarial review Б): asked by its tag, the daily history came a megabyte and an exceljs parse
+  every hour. Its `HEAD` names the same `ETag` and `Last-Modified` with no body, and the file is
+  asked for only when they moved. The version is kept only once the file is written — a refused
+  file is asked afresh the next hour. **The ceiling of twenty megabytes is held before the body is
+  in memory** (review В): a length past it on the `HEAD` or the answer refuses at once, and a body
+  with no length is read in chunks and cut off at the ceiling.
+- **Strict or nothing, as the official feeds** (Р-7): a header cell not where it was, the sheet
+  renamed, a rate zero, missing or a text, a day that is not one, a day after today, days out of
+  order, a currency twice or missing from a day, a row with a currency or a rate and no day — and
+  **a figure over a factor of two from the official rate of its day** (`isMarketPlausible`,
+  `MARKET_BAND_FACTOR`) — refuse the whole file. **Fifteen percent was the first bound, and the
+  central bank's own file refuted it** (adversarial review А): on 3 March 2022 banks sold roubles
+  27.5 % above the official rate, and with the history since 2022 in the cache — written by the same
+  hour, just before the market — the daily file was refused every hour for good, and non-cash never
+  had its stand-in (В-2). A market in a crisis stays within a factor of two; what the bound is for
+  does not — a volume or a sum in drams read for a rate is thousands of times away, a rate per ten
+  or a hundred units ten or a hundred. **What no band catches, this one or fifteen percent, is the
+  column next door** (review П-7): the euro read for the dollar is 13 % off, a side or cash for
+  non-cash one or two — those are held by the header cell over every rate column (`expect`), and the
+  band must never be narrowed on the hope of catching them. The measure is a rate the bank did not
+  jump on (review А′): held against a comma in the wrong place, the right file of that day was
+  refused, and a day of people in banks has no archive. A day the official history does not reach is
+  vouched for by the header alone. The two files meet in a test of their own
+  (`market-history.integration.test.ts`) — nothing smaller shows it. Logged as the feed's own words,
+  which name a cell of a public file; anything else by its kind (`describeFailure`).
+- **Read through exceljs** (owner's decision В-7, against the narrow reader recommended): the price
+  is 2,2 MB of bundle, some 185 packages and two moderate advisories through `uuid`, and a load of
+  one to five seconds — asynchronous, the longest block of the event loop measured at 126 ms. The
+  ESM bundle's `createRequire` banner is what lets its `require('crypto')` run. A sheet is read into
+  its cells once (`readSheet`), and every reader works over those (`sheetOf`), so a test changes a
+  cell of a recorded file instead of writing a workbook back — each write took seconds. A merged cell
+  reads as its first cell everywhere it covers: the files merge a currency down its block, so the row
+  of people is found by the currency **and** the branch, never by the currency alone.
+- **`market_rates` is a mirror of the files**, apart from `official_rates`: «channel + currency +
+  side + day», drams per unit at six digits, rewritten by its file. No owner, so neither erasure nor
+  the copy touches it.
+- **The side is the bank's, in the files' words** (Р-1): `bankBuys` is where the person sells.
+  `marketSideOf` is the one place an exchange becomes a side: given a currency for drams, the bank
+  bought it; given drams for a currency, the bank sold it. **A pair without the dram has no market**
+  (В-4): the files know every currency against the dram only, and roubles into dollars may have been
+  changed in Russia, where the Armenian market says nothing.
+- **An exchange is set beside the best figure of its day for the person** (owner's decision В-1, the
+  comment over the option ticked): the highest when the bank bought, the lowest when it sold, among
+  the channels a person can name — bank in cash, bank non-cash, exchange office — each by its row of
+  that day or the latest within the week (Р-2, the official rule); **the exchange offices by their
+  row of that very day only**: they publish every day, and the week before is exactly what their
+  late file holds — taken as the day's, it became the best over the banks' same-day figures and hid
+  «still to come» (review, major 1). **And beside its own channel, when the person named it and it
+  is not the best.** The channel is optional («Как меняли», `exchanges.channel`, null is «not
+  said»), a fact of the exchange: part of a repeat, kept in the versions, amended like the note;
+  left out by a screen older than it, kept by an amendment and matching anything in a repeat, as an
+  account is. A new exchange starts from the channel of the latest-dated one. The sheet names the
+  channel in the versions and in «Сейчас записано»: changed alone, it read as «nothing changed»
+  (review, major 2, as М2 for the remainder). A channel-only amendment is an amendment like the
+  note's — a version and a thaw from its day — a named price.
+- **Non-cash before its collection is all bank clients; nothing else stands in** (В-2): that row runs
+  within a tenth of a percent of people's non-cash, and two and a half percent off their cash for the
+  rouble — standing in for cash, it would make every cash exchange of roubles look worse than it was.
+- **Exchange offices still to come are said, not guessed** (В-3): until the file reaches the day,
+  the best is among the banks and the card says the offices will come; when they do, the line is
+  counted again by itself. Past the file's reach a day simply has no row. Before the file was ever
+  read, only a day within three weeks of today waits (`EXCHANGERS_LAG_DAYS`): the file never carries
+  old weeks, and «will come» over an exchange of 2022 was untrue (review, minor 8).
+- **«Курсы по данным ЦБ РА»** on the screen (В-1): per currency the official rate of today and each
+  channel's latest figures to sell and to buy, each dated by its own day — non-cash over a week old
+  gives way to all bank clients fresh today (`marketQuotesToday`). The official rate there is the
+  central bank's own or none: the block's words name it, and an open source standing in would be
+  named the central bank (review П-3). The best is marked among the figures of the latest day still
+  fresh today — an exchange office of last week is shown, not starred beside today's banks, as a card
+  sets it only beside its own day (review П-5). The server marks it; the phone compares nothing.
+- **On the card the market comes first and the central bank under it, a step quieter** (Р-5).
+  «Графики» still measure exchanges against the central bank (Р-6) — a task of its own.
 
 ## Incomes
 

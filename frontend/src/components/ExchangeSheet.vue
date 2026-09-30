@@ -45,6 +45,14 @@
         :error-text="dayInvalid ? t('exchange.sheet.bad_day') : null"
       />
 
+      <!-- How the money was changed, optional (MOL-137, В-1): the card then also says how this
+           exchange stood against its own channel, not only against the best of the day. -->
+      <SegmentedControl
+        v-model="channel"
+        :options="channelOptions"
+        :legend="t('exchange.sheet.channel')"
+      />
+
       <div v-if="showsHeld">
         <AppField
           v-model="held"
@@ -127,6 +135,7 @@ import {
   currencySchema,
   currencySign,
   decimalFromMinor,
+  exchangeChannelSchema,
   exchangeNoteSchema,
   formatMoney,
   isPlausibleExchange,
@@ -137,6 +146,7 @@ import type {
   Currency,
   ErrorCode,
   ExchangeAmendBody,
+  ExchangeChannel,
   ExchangeBody,
   ExchangeView,
   ExchangesResponse,
@@ -148,6 +158,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
+import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAccountChoice } from '@/composables/useAccountChoice'
 import { useAccountsStore } from '@/stores/accounts'
 import { shown } from '@/composables/useItemDetails'
@@ -176,6 +187,7 @@ export default defineComponent({
     AppField,
     BottomSheet,
     HeldFromAccounts,
+    SegmentedControl,
   },
   props: {
     open: { type: Boolean, required: true },
@@ -213,6 +225,8 @@ export default defineComponent({
     const held = ref('')
     const note = ref('')
     const noteInvalid = ref(false)
+    // '' is «не указано»: a radio cannot be unchecked, so «not said» is a segment of its own.
+    const channel = ref<ExchangeChannel | ''>('')
     const dayError = ref<ErrorCode | null>(null)
     const dayInvalid = ref(false)
     const heldError = ref<ErrorCode | null>(null)
@@ -262,6 +276,8 @@ export default defineComponent({
         day.value = editing?.exchangedOn ?? today.value
         held.value = editing?.heldBefore ? typed(editing.heldBefore) : ''
         note.value = editing?.note ?? ''
+        // A new exchange starts from the way the last one was made: usually no tap at all.
+        channel.value = (editing ? editing.channel : props.overview.exchanges[0]?.channel) ?? ''
         noteInvalid.value = false
         dayError.value = null
         dayInvalid.value = false
@@ -284,6 +300,14 @@ export default defineComponent({
       value: currency,
       label: `${currencySign(currency, locale.value)} ${currency}`,
     }))
+
+    const channelOptions = computed(() => [
+      { value: '', label: '—', spoken: t('exchange.sheet.channel_none') },
+      ...exchangeChannelSchema.options.map((value) => ({
+        value,
+        label: t(`exchange.sheet.channel_${value}`),
+      })),
+    ])
 
     const sign = (currency: Currency) => currencySign(currency, locale.value)
     const sameCurrency = computed(() => currencies.given === currencies.received)
@@ -370,8 +394,13 @@ export default defineComponent({
         }),
         date: calendarDay(version.exchangedOn, locale.value, { day: 'numeric', month: 'short' }),
       }
-      return version.note
-        ? t('exchange.sheet.version_note', { ...words, note: version.note })
+      // The channel too: changed alone, it made a version that read as the one after it (review).
+      const note = [
+        ...(version.channel ? [t(`exchange.sheet.channel_${version.channel}`)] : []),
+        ...(version.note ? [version.note] : []),
+      ].join(' · ')
+      return note
+        ? t('exchange.sheet.version_note', { ...words, note })
         : t('exchange.sheet.version', words)
     }
 
@@ -394,6 +423,7 @@ export default defineComponent({
               }),
             ]
           : []),
+        ...(exchange.channel ? [t(`exchange.sheet.channel_${exchange.channel}`)] : []),
         ...(exchange.note ? [exchange.note] : []),
       ]
       return t('exchange.sheet.current', { details: details.join(' · ') })
@@ -443,6 +473,7 @@ export default defineComponent({
         exchangedOn: day.value,
         ...(heldBefore ? { heldBefore } : {}),
         ...(typedNote?.success ? { note: typedNote.data } : {}),
+        channel: channel.value === '' ? null : channel.value,
         // Said whenever there are accounts: left out, the server keeps the ones it has (Р-26).
         ...(showsAccounts.value
           ? {
@@ -509,6 +540,8 @@ export default defineComponent({
       note,
       noteInvalid,
       noteMax: EXCHANGE_NOTE_MAX,
+      channel,
+      channelOptions,
       versionOf,
       currentOf,
       asksHeld,

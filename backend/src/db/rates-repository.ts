@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt, lte, max, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, lt, lte, max, sql } from 'drizzle-orm'
 import { RATE_JUMP_HISTORY } from '@molvia/model'
 import type { AmdRate, CachedRate, RateProvider } from '@molvia/model'
 import type { Conn } from './index'
@@ -40,7 +40,19 @@ export interface RateRepository {
 
   /** When any provider's answer was last written — whether the boot refresh can be skipped. */
   lastFetchedAt(): Promise<Date | null>
+
+  /**
+   * The history of the central bank (MOL-137, Р-4): only the days the cache does not have yet — a
+   * day already there is left as it is, jump mark included. Returns how many were written.
+   */
+  insertMissing(rates: readonly CachedRate[]): Promise<number>
+
+  /** Every row of a provider dated from `from` to `to`, oldest first — what a history is judged by. */
+  between(provider: RateProvider, from: string, to: string): Promise<readonly CachedRate[]>
 }
+
+/** Rows per statement: the whole history since 2022 is three thousand of them. */
+const WRITE_CHUNK = 2_000
 
 export function createRateRepository(db: Conn): RateRepository {
   async function latest(
@@ -126,6 +138,50 @@ export function createRateRepository(db: Conn): RateRepository {
         byCurrency.set(row.currency, [...(byCurrency.get(row.currency) ?? []), past])
       }
       return byCurrency
+    },
+
+    async insertMissing(rates) {
+      let written = 0
+      await db.transaction(async (tx) => {
+        for (let start = 0; start < rates.length; start += WRITE_CHUNK) {
+          const inserted = await tx
+            .insert(officialRates)
+            .values(
+              rates.slice(start, start + WRITE_CHUNK).map((rate) => ({
+                provider: rate.provider,
+                currency: rate.currency,
+                rateDate: rate.date,
+                scaled: rate.scaled,
+                jump: rate.jump,
+              })),
+            )
+            .onConflictDoNothing()
+            .returning({ date: officialRates.rateDate })
+          written += inserted.length
+        }
+      })
+      return written
+    },
+
+    async between(provider, from, to) {
+      const rows = await db
+        .select()
+        .from(officialRates)
+        .where(
+          and(
+            eq(officialRates.provider, provider),
+            gte(officialRates.rateDate, from),
+            lte(officialRates.rateDate, to),
+          ),
+        )
+        .orderBy(asc(officialRates.rateDate), asc(officialRates.currency))
+      return rows.map((row) => ({
+        provider: row.provider,
+        currency: row.currency,
+        date: row.rateDate,
+        scaled: row.scaled,
+        jump: row.jump,
+      }))
     },
 
     async lastFetchedAt() {

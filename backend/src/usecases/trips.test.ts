@@ -172,7 +172,15 @@ function fakeRepositories(
       latestOnOrBefore: unexpected('rates.latestOnOrBefore'),
       history: unexpected('rates.history'),
       lastFetchedAt: unexpected('rates.lastFetchedAt'),
+      insertMissing: unexpected('rates.insertMissing'),
+      between: unexpected('rates.between'),
       ...overrides.rates,
+    },
+    marketRates: {
+      upsert: unexpected('marketRates.upsert'),
+      between: unexpected('marketRates.between'),
+      latest: unexpected('marketRates.latest'),
+      through: unexpected('marketRates.through'),
     },
     exchanges: {
       add: unexpected('exchanges.add'),
@@ -507,6 +515,7 @@ describe('startTrip: the person’s own rate (MOL-40)', () => {
     exchangedOn,
     heldBefore: held === null ? null : { minor: held, currency: currencies[1] },
     note: null,
+    channel: null,
     givenAccountId: null,
     receivedAccountId: null,
     revision: 1,
