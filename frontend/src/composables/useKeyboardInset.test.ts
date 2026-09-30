@@ -75,8 +75,19 @@ function rect({ top, bottom }: Box): DOMRect {
   return DOMRect.fromRect({ x: 0, y: top, width: 390, height: bottom - top })
 }
 
+/** `100dvh` as the page lays it out: what the ruler of `useKeyboardInset` reads. */
+function fakeDvh(height: number) {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    // Anything else is not laid out, as in happy-dom itself.
+    return rect({ top: 0, bottom: this.dataset.dvh === '' ? height : 0 })
+  })
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
   document.body.innerHTML = ''
 })
 
@@ -113,6 +124,7 @@ describe('useKeyboardInset', () => {
   // lifted, and the sheet is a share of 395 — of 699 its top went 178px off the screen.
   it('takes what Safari leaves visible when it shrinks the window itself', async () => {
     const viewport = fakeViewport(699)
+    fakeDvh(699)
     vi.stubGlobal('innerHeight', 699)
     const { on, inset, height } = host()
     on.value = true
@@ -124,6 +136,42 @@ describe('useKeyboardInset', () => {
     viewport.fire('resize')
     expect(inset()).toBe('0px')
     expect(height()).toBe('395px')
+  })
+
+  // The installed app on the owner's iPhone (hotfix-bottom-menu): the same keyboard over the same
+  // visual viewport, and the window read 796 once and 720 the next time. Lifted by the window, the
+  // sheet stood 76px lower the second time, its end under the glass bar over the keys.
+  it('lifts by `100dvh`, not by the window Safari moves with the keyboard', async () => {
+    const viewport = fakeViewport(797)
+    fakeDvh(797)
+    vi.stubGlobal('innerHeight', 797)
+    const { on, inset, height } = host()
+    on.value = true
+    await nextTick()
+    expect(inset()).toBe('0px')
+    vi.stubGlobal('innerHeight', 796)
+    viewport.height = 427
+    viewport.offsetTop = 123
+    viewport.fire('resize')
+    expect(inset()).toBe('247px')
+    vi.stubGlobal('innerHeight', 720)
+    viewport.fire('scroll')
+    expect(inset()).toBe('247px')
+    expect(height()).toBe('427px')
+  })
+
+  // Safari with its bar folded, the page scrolled (hotfix-bottom-menu): the window read 535 of a
+  // `100dvh` of 699, and the lift of zero left the sheet's last 100px under the keys.
+  it('lifts in Safari with its bar folded, the window shrunk short of the keys', async () => {
+    const viewport = fakeViewport(739)
+    fakeDvh(699)
+    vi.stubGlobal('innerHeight', 535)
+    viewport.height = 395
+    viewport.offsetTop = 204
+    const { on, inset } = host()
+    on.value = true
+    await nextTick()
+    expect(inset()).toBe('100px')
   })
 
   it('must not fire: with no keyboard the sheet takes its share of the whole screen', async () => {

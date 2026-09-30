@@ -333,6 +333,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
   geometry with the same fault, since a Chromium window cannot shrink without its `dvh`; the numbers
   measured on the iPhone are held by a unit test. On the device the spending sheet was checked; the
   other sheets are held by the shared component and the tests.
+- **The lift is counted from `100dvh`, never from `innerHeight`** (hotfix-bottom-menu): `100dvh` is
+  the box a fixed panel is pinned in, and Safari moves `innerHeight` on its own with the keyboard up.
+  In the installed app the same keyboard over the same visual viewport (427, 123 down) came with a
+  window of 796 once and of 720 the next time, and the sheet stood 76px lower, its end — the
+  categories — under the glass bar over the keys; in Safari with its bar folded the window read 535
+  or 734 of a `100dvh` of 699 or 734. Counted from `100dvh`, every state logged on the phone
+  (`hotfix-bottom-menu-probe.jsonl`, MOL-135's log too) put the sheet's end where the keyboard
+  begins. A script has no reading of `dvh`: a hidden fixed box of `100dvh` is read instead, and
+  where nothing is laid out (the component tests) the window's height stands in.
 - **The sheet goes on below its bottom edge in its own colour** (hotfix-bottom-menu): on iOS 26 and
   later the keys and the bar of «∧ ∨ ✓» over them are glass, with clear room between the bar and
   the keys, and the sheet stands on the top of that frame, not of the keys. What lay under it — the
