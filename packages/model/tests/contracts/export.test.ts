@@ -64,6 +64,7 @@ const file: ExportFile = {
       accountSetAt: at,
       receipt: money(1_240_000n, 'AMD'),
       receiptSetAt: at,
+      receiptFirstAt: at,
       removedAt: at,
     },
   ],

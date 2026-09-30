@@ -34,7 +34,12 @@ async function owner(): Promise<Owner> {
   return { id, cookie: await signIn(db, id) }
 }
 
-function call(me: Owner, method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, body?: unknown) {
+function call(
+  me: Owner,
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  url: string,
+  body?: unknown,
+) {
   return app.inject({
     method,
     url,
@@ -286,6 +291,41 @@ describe('одно правило денег записи — все читат�
     expect(await hint.spentSince(me.id, 'AMD', new Date(Date.now() - 90 * 60 * 1000))).toBe(0n)
   })
 
+  it('поправка суммы после обмена не уносит чек за обмен: считается момент первой суммы (ревью 2)', async () => {
+    const me = await owner()
+    const place = await insertPlace(db, { name: `Typo ${randomUUID()}` })
+    const id = await insertTrip(db, {
+      actorId: me.id,
+      placeId: place,
+      startedAt: new Date(Date.now() - 3 * HOUR),
+    })
+    await receipt(me, id, '1400')
+    // Typed two hours ago, at the till; the exchange was an hour ago.
+    await db
+      .update(trips)
+      .set({
+        receiptFirstAt: sql`clock_timestamp() - interval '2 hours'`,
+        receiptSetAt: sql`clock_timestamp() - interval '2 hours'`,
+      })
+      .where(eq(trips.id, id))
+    const hint = createExchangeRepository(db)
+    const exchange = new Date(Date.now() - HOUR)
+    expect(await hint.spentSince(me.id, 'AMD', exchange)).toBe(0n)
+
+    // At home the typo is fixed: the receipt was still paid before the exchange.
+    await receipt(me, id, '1450')
+    expect(await hint.spentSince(me.id, 'AMD', exchange)).toBe(0n)
+    const [row] = await db.select().from(trips).where(eq(trips.id, id))
+    expect(row?.receiptSetAt?.getTime()).toBeGreaterThan(exchange.getTime())
+
+    // Taken off and typed anew: a new receipt, after the exchange.
+    await receipt(me, id, null)
+    const [cleared] = await db.select().from(trips).where(eq(trips.id, id))
+    expect(cleared?.receiptFirstAt).toBeNull()
+    await receipt(me, id, '1450')
+    expect(await hint.spentSince(me.id, 'AMD', exchange)).toBe(145_000n)
+  })
+
   it('сверка видит смену суммы: момент операции счёта сдвигается', async () => {
     const me = await owner()
     const id = await trip(me)
@@ -335,6 +375,60 @@ describe('сумма по чеку и «списано» (MOL-78, Р-3)', () => 
     })
     const repeated = tripViewCodec.parse((await receipt(me, id, '1400')).json())
     expect(repeated.debited).toEqual({ minor: 3_000n, currency: 'USD' })
+  })
+
+  it('под суммой по чеку цена — не деньги записи: дописать, поправить, удалить — «списано» на месте (ревью 1)', async () => {
+    const me = await owner()
+    const card = await account(me, 'RUB')
+    const id = await trip(me)
+    await receipt(me, id, '1400')
+    const paid = await call(me, 'PUT', `/trips/${id}/payment`, {
+      accountId: card,
+      debited: { amount: '300', currency: 'RUB' },
+    })
+    expect(paid.statusCode, paid.body).toBe(200)
+    const rows = await db.select().from(expenses).where(eq(expenses.tripId, id))
+    const unpriced = rows.find((row) => row.amountMinor === null)
+    const priced = rows.find((row) => row.amountMinor !== null)
+    if (!unpriced || !priced) throw new Error('no purchases')
+    const kept = { minor: 30_000n, currency: 'RUB' }
+    const debited = async () =>
+      tripViewCodec.parse((await call(me, 'GET', `/trips/${id}`)).json()).debited
+
+    // The bread's price typed at home, for «где дешевле».
+    const amended = await call(me, 'PATCH', `/trips/${id}/expenses/${unpriced.id}`, {
+      amount: { amount: '350', currency: 'AMD' },
+    })
+    expect(amended.statusCode, amended.body).toBe(200)
+    expect(await debited()).toEqual(kept)
+    // A purchase forgotten, added with its price.
+    const added = await call(me, 'POST', `/trips/${id}/expenses`, {
+      id: randomUUID(),
+      itemId: await insertItem(db),
+      amount: { amount: '200', currency: 'AMD' },
+    })
+    expect(added.statusCode, added.body).toBe(201)
+    expect(await debited()).toEqual(kept)
+    // A priced one removed.
+    expect((await call(me, 'DELETE', `/trips/${id}/expenses/${priced.id}`)).statusCode).toBe(200)
+    expect(await debited()).toEqual(kept)
+    // The account holds what left it: the card is 300 ₽ lighter.
+    const operation = (await createMoneyAccountRepository(db).operations(me.id)).find(
+      (entry) => entry.id === id,
+    )
+    expect(operation?.debited).toEqual(kept)
+
+    // Control: without the receipt a price is the trip's money again, and «списано» goes.
+    await receipt(me, id, null)
+    await call(me, 'PUT', `/trips/${id}/payment`, {
+      accountId: card,
+      debited: { amount: '300', currency: 'RUB' },
+    })
+    expect(await debited()).toEqual(kept)
+    await call(me, 'PATCH', `/trips/${id}/expenses/${unpriced.id}`, {
+      amount: { amount: '400', currency: 'AMD' },
+    })
+    expect(await debited()).toBeNull()
   })
 
   it('«списано» у записи в драмах на драмовом счёте не нужно, если и сумма в драмах; сумма в долларах — нужно', async () => {

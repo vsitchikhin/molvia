@@ -99,7 +99,11 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
              and t.finished_at is not null
              and t.deleted_at is null
         ),
-        money as (${tripMoneyRows(sql`t.actor_id = ${actorId} and t.finished_at is not null and t.deleted_at is null`)})
+        -- Only the trips of these days: the fragment's union and grouping keep a join from reaching
+        -- inside, and every trip ever finished was summed for one month (review 3).
+        money as (${tripMoneyRows(
+          sql`t.id in (select id from finished where finished_day between ${from}::date and ${to}::date)`,
+        )})
         select f.id as trip_id, f.place_name, f.finished_at,
                to_char(f.finished_day, 'YYYY-MM-DD') as finished_on,
                m.currency, m.minor as amount_minor, m.items

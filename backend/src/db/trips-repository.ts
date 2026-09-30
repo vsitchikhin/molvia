@@ -446,6 +446,10 @@ export function createTripRepository(db: Conn): TripRepository {
           receiptMinor: receipt?.minor ?? null,
           receiptCurrency: receipt?.currency ?? null,
           receiptSetAt: sql`clock_timestamp()`,
+          // Kept by an amendment, cleared with the sum: a new sum after «Убрать» is a new receipt.
+          receiptFirstAt: receipt
+            ? sql`coalesce(${trips.receiptFirstAt}, clock_timestamp())`
+            : null,
         })
         .where(ownedBy(id, actorId))
         .returning()

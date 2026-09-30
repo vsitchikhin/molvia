@@ -54,6 +54,19 @@ async function moneyMoved(
   return { ...trip, debited: null }
 }
 
+/**
+ * A price changed: the trip's money moves with it — unless the trip has a receipt's sum, which is
+ * its money whole (MOL-78, `tripMoney`). Under a receipt a price is an observation for «где
+ * дешевле», typed at home into a trip already paid for, and taking «списано» off for it moved the
+ * account by money that never moved (adversarial А, review 1).
+ */
+async function priceMoved(
+  repositories: Pick<TripRepositories, 'moneyAccounts'>,
+  trip: Trip,
+): Promise<Trip> {
+  return trip.receipt === null ? moneyMoved(repositories, trip) : trip
+}
+
 function sameMoney(a: Money | null, b: Money | null): boolean {
   return a?.minor === b?.minor && a?.currency === b?.currency
 }
@@ -61,7 +74,8 @@ function sameMoney(a: Money | null, b: Money | null): boolean {
 /**
  * «Добавить в поход». Any change of the trip's money — a priced purchase added, a price changed, a
  * priced one removed — takes its «списано» off: that figure was what left the account for the trip
- * as it was (Р-32, adversarial Ж2), and a check names the trip again until it is entered anew. A finished trip takes it too (MOL-21, В-8): the soy sauce found in the bag
+ * as it was (Р-32, adversarial Ж2), and a check names the trip again until it is entered anew —
+ * unless a receipt's sum is the trip's money (MOL-78). A finished trip takes it too (MOL-21, В-8): the soy sauce found in the bag
  * at home belongs to the trip it was bought on.
  *
  * The pick is remembered in the same transaction as the purchase (MOL-11), and only for a
@@ -80,7 +94,7 @@ export async function addExpense(
     const trip = await lockedTrip(repositories.trips, tripId, actorId)
     const { query, missedQuery, ...fields } = body
     const { created } = await repositories.expenses.add(actorId, { ...fields, tripId: trip.id })
-    const now = created && fields.amount !== undefined ? await moneyMoved(repositories, trip) : trip
+    const now = created && fields.amount !== undefined ? await priceMoved(repositories, trip) : trip
     if (created && query !== undefined) {
       await repositories.searchPicks.remember(actorId, query, body.itemId)
     }
@@ -108,7 +122,7 @@ export async function updateExpense(
     const before = await pricedAt(repositories, trip, actorId, expenseId)
     const updated = await repositories.expenses.update(expenseId, trip.id, actorId, patch)
     if (!updated) throw new DomainError(ERROR.NOT_FOUND)
-    const now = sameMoney(before, updated.amount) ? trip : await moneyMoved(repositories, trip)
+    const now = sameMoney(before, updated.amount) ? trip : await priceMoved(repositories, trip)
     return tripViewFor(repositories, now)
   })
 }
@@ -131,7 +145,7 @@ export async function removeExpense(
     const trip = await lockedTrip(repositories.trips, tripId, actorId)
     const before = await pricedAt(repositories, trip, actorId, expenseId)
     const removed = await repositories.expenses.remove(expenseId, trip.id, actorId)
-    const now = removed && before !== null ? await moneyMoved(repositories, trip) : trip
+    const now = removed && before !== null ? await priceMoved(repositories, trip) : trip
     return tripViewFor(repositories, now)
   })
 }

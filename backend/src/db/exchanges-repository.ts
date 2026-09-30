@@ -86,9 +86,9 @@ export interface ExchangeRepository {
    * What the owner spent in `currency` after `since`, in minor units: the priced expenses written
    * after it, in trips that were still open at that moment. The hint of «сколько было до обмена»
    * (Р-7) — purchases without a price and money spent outside a trip are not in it, and the screen
-   * says so. A trip with a receipt's sum counts by the sum alone (MOL-78, Р-6), dated by when the
-   * server took it as a purchase is by when it was written — its purchases too would count the
-   * milk twice.
+   * says so. A trip with a receipt's sum counts by the sum alone (MOL-78, Р-6), dated by when it was
+   * first typed as a purchase is by when it was written — a typo fixed after the exchange moves
+   * neither (review 2); its purchases too would count the milk twice.
    *
    * A purchase added to a trip finished before `since` — the sauce found at home, written into
    * last week's trip — was paid with the money held before; counting it would take it away twice
@@ -378,7 +378,7 @@ export function createExchangeRepository(db: Conn): ExchangeRepository {
           select t.receipt_minor
             from trips t
            where t.actor_id = ${actorId} and t.deleted_at is null
-             and t.receipt_currency = ${currency} and t.receipt_set_at > ${at}::timestamptz
+             and t.receipt_currency = ${currency} and t.receipt_first_at > ${at}::timestamptz
              and (t.finished_at is null or t.finished_at > ${at}::timestamptz)
         ) spent
       `)

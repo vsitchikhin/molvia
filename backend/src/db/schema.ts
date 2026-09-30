@@ -527,6 +527,10 @@ export const trips = pgTable(
     receiptMinor: bigint('receipt_minor', { mode: 'bigint' }),
     receiptCurrency: char('receipt_currency', { length: 3 }).$type<Currency>(),
     receiptSetAt: timestamp('receipt_set_at', { withTimezone: true }),
+    // When this sum was first typed — an amendment keeps it, taking the sum off clears it: what the
+    // hint of «сколько было до обмена» dates the receipt by, as a purchase by the moment it was
+    // written, so a typo fixed after an exchange does not move the whole receipt past it (review 2).
+    receiptFirstAt: timestamp('receipt_first_at', { withTimezone: true }),
     // «Удалить поход» (MOL-76): marked, not deleted, by the money rule — «Вернуть» for ten
     // minutes, then the minute timer, and every reader but erasure and that timer filters it
     // out. A mark also keeps a start sent again from the queue from writing the trip anew.
@@ -629,6 +633,10 @@ export const trips = pgTable(
         and (${table.receiptMinor} is null or (${table.receiptMinor} > 0 and ${table.receiptSetAt} is not null))`,
     ),
     check('trips_receipt_currency_known', currencyKnownOrNull(table.receiptCurrency)),
+    check(
+      'trips_receipt_first_with_sum',
+      sql`(${table.receiptMinor} is null) = (${table.receiptFirstAt} is null)`,
+    ),
     ...paidFrom('trips', table),
   ],
 )
