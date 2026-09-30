@@ -54,6 +54,16 @@ function compressUpcA(upcA: string): string[] {
  * and the other way round for a UPC-E of number system `1`. A lookup by both finds what the
  * other way in found. The price: a shop's own EAN-8 label and a UPC-E product with the same
  * digits find each other.
+ *
+ * Thirteen digits are paired with eight only when one EAN-8 folds into them. Two shop labels with
+ * different digits may expand to one UPC-A (`00000055` and `00000505`), and a label typed as
+ * thirteen digits no longer says which it was: guessing the neighbour put another shop's item on
+ * the sheet (adversarial Г), so such thirteen digits are only themselves — a label typed from them
+ * finds nothing, the price named in `typedBarcode`.
+ *
+ * Twelve digits are UPC-A and fourteen led by `0` are GTIN-14 of the same package: both are also
+ * looked up as the thirteen the scanner and `typedBarcode` give (adversarial З) — a client that
+ * does not repeat the phone's rules still finds the package.
  */
 export function barcodeTwins(code: string): string[] {
   if (!barcodeSchema.safeParse(code).success) return []
@@ -61,10 +71,19 @@ export function barcodeTwins(code: string): string[] {
     const upcA = /^[01]/.test(code) ? expandUpcE(code) : null
     return upcA !== null && checks(code) && checks(upcA) ? [code, `0${upcA}`] : [code]
   }
-  if (code.length === 13 && code.startsWith('0') && checks(code)) {
-    return [code, ...compressUpcA(code.slice(1)).filter(checks)]
-  }
-  return [code]
+  const thirteen =
+    code.length === 12
+      ? `0${code}`
+      : code.length === 14 && code.startsWith('0')
+        ? code.slice(1)
+        : code.length === 13
+          ? code
+          : null
+  if (thirteen === null) return [code]
+  const forms = thirteen === code ? [code] : [code, thirteen]
+  if (!thirteen.startsWith('0') || !checks(thirteen)) return forms
+  const eights = compressUpcA(thirteen.slice(1)).filter(checks)
+  return eights.length === 1 ? [...forms, ...eights] : forms
 }
 
 /**

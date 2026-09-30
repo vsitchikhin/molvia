@@ -437,6 +437,37 @@ describe('GET /catalogue/barcode — the item a code belongs to (MOL-99)', () =>
     expect(held(await byCode(actor, code('0004082000095')))?.id).toBe(upcE.id)
   })
 
+  it('finds the package by the twelve digits of its UPC-A and by its GTIN-14 (adversarial З)', async () => {
+    const actor = await insertActor(db)
+    const tea = await add({ name: 'Tea', defaultUnit: 'piece', barcodes: ['0012345678905'] })
+
+    expect(held(await byCode(actor, code('012345678905')))?.id).toBe(tea.id)
+    expect(held(await byCode(actor, code('00012345678905')))?.id).toBe(tea.id)
+  })
+
+  it('does not guess between two shop labels that fold into one UPC-A (adversarial Г)', async () => {
+    const actor = await insertActor(db)
+    const cheese = await add({ name: 'Сыр, магазин 1', defaultUnit: 'kg', barcodes: ['00000055'] })
+    await add({ name: 'Салат, магазин 2', defaultUnit: 'piece', barcodes: ['00000505'] })
+
+    // Scanned, the label is its own eight digits; typed, it is thirteen that fit either label.
+    expect(held(await byCode(actor, code('00000055')))?.id).toBe(cheese.id)
+    expect(held(await byCode(actor, code('0000000000055')))).toBeNull()
+  })
+
+  it('has no HEAD twin, as no GET of the API has (adversarial В)', async () => {
+    const actor = await insertActor(db)
+    await add({ name: 'Кефир', barcodes: ['4850000000007'] })
+
+    const response = await app.inject({
+      method: 'HEAD',
+      url: `/catalogue/barcode${code('4850000000007')}`,
+      headers: { cookie: await signIn(db, actor) },
+    })
+
+    expect(response.statusCode).toBe(404)
+  })
+
   it('must not find a twin for a code that has one form only', async () => {
     const actor = await insertActor(db)
     // 04252614 is UPC-E alone: its eight digits never stand for an EAN-8, so they are not looked up.

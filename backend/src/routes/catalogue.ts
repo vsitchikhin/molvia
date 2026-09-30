@@ -42,7 +42,9 @@ export function catalogueRoutes(app: FastifyInstance, api: CatalogueApi): void {
    * The item a scanned or typed code belongs to (MOL-99). Behind the door like the search, though
    * nobody's picks take part: the catalogue is shared, and so is who holds a code.
    */
-  app.get('/catalogue/barcode', async (request, reply) => {
+  // No HEAD twin, as every GET of the API: Fastify runs the whole handler for one, and the length
+  // of a bodiless answer would still tell found from not (adversarial В).
+  app.get('/catalogue/barcode', { exposeHeadRoute: false }, async (request, reply) => {
     const { code } = parseQuery(catalogueBarcodeQuerySchema, request.query)
     const item = await api.byBarcode(code)
 

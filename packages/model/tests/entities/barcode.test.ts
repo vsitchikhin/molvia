@@ -104,8 +104,22 @@ describe('barcodeTwins', () => {
     expect(barcodeTwins('04252614')).toEqual(['04252614']) // UPC-E, not an EAN-8
     expect(barcodeTwins('4850000000007')).toEqual(['4850000000007'])
     expect(barcodeTwins('0012345678905')).toEqual(['0012345678905']) // UPC-A with no zeros to leave out
-    expect(barcodeTwins('012345678905')).toEqual(['012345678905'])
-    expect(barcodeTwins('04850000000007')).toEqual(['04850000000007'])
+  })
+
+  it('looks up twelve digits and a GTIN-14 led by 0 as the thirteen the scanner gives (adversarial З)', () => {
+    expect(barcodeTwins('012345678905')).toEqual(['012345678905', '0012345678905'])
+    expect(barcodeTwins('04850000000007')).toEqual(['04850000000007', '4850000000007'])
+    // And on to the eight digits the thirteen pair with.
+    expect(barcodeTwins('004082000095')).toEqual(['004082000095', '0004082000095', '00408295'])
+    // A GTIN-14 of a carton (not led by 0) is a code of its own.
+    expect(barcodeTwins('14850000000004')).toEqual(['14850000000004'])
+  })
+
+  it('does not guess between two shop labels that fold into one thirteen (adversarial Г)', () => {
+    // 00000055 and 00000505 both check as EAN-8 and as UPC-E, and both expand to 000000000055.
+    expect(barcodeTwins('00000055')).toEqual(['00000055', '0000000000055'])
+    expect(barcodeTwins('00000505')).toEqual(['00000505', '0000000000055'])
+    expect(barcodeTwins('0000000000055')).toEqual(['0000000000055'])
   })
 
   it('must not pair thirteen digits whose check digit fails', () => {
