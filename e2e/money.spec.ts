@@ -223,9 +223,9 @@ test('an empty month after a full one keeps the switcher where it was', async ({
   expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
 })
 
-// Offline, the month the phone keeps stands under «Нет связи»; a month it never read has no strip,
-// only the state «Нет связи» below. What went above the arrow is made up by the scroll (adversarial Б1).
-test('offline, a month not read keeps the switcher where the strip over it was', async ({
+// The strip «Нет связи» belongs to the month's answer and comes and goes with it: it stands under
+// the switcher, so neither its going nor its coming back moves the switcher (MOL-138, В-2).
+test('offline, a month not read keeps the switcher where it was, at the top of the page too', async ({
   page,
   context,
 }) => {
@@ -235,15 +235,49 @@ test('offline, a month not read keeps the switcher where the strip over it was',
   const strip = page.getByText(/Нет связи. Новые траты сохраняются/)
   await expect(strip).toBeVisible()
 
+  // Not scrolled at all: where «Деньги» open, and where nothing can be made up by the scroll
+  // (adversarial round 2, Г).
   const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  const before = await topOf(previous)
+  await previous.click()
+  await expect(page).toHaveURL(/month=/)
+  await expect(page.getByRole('heading', { name: 'Нет связи' })).toBeVisible()
+  await expect(strip).toBeHidden()
+  expect(await topOf(previous)).toBe(before)
+})
+
+// Both months kept on the phone: the strip goes with the move and comes back when the read fails a
+// moment later (review С-7, adversarial round 2, Д).
+test('offline, between two months the phone keeps, the switcher stays as the strip comes back', async ({
+  page,
+  context,
+}) => {
+  await twelveADay(page, [yerevanDay(), lastMonthDay()])
+  const rows = page.getByRole('button', { name: /Открыть трату/ })
+  const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
+  const next = page.getByRole('button', { name: 'Следующий месяц' })
+  await previous.click()
+  await expect(rows).toHaveCount(12)
+  await next.click()
+  await expect(page).not.toHaveURL(/month=/)
+
+  await context.setOffline(true)
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')))
+  const strip = page.getByText(/Нет связи. Новые траты сохраняются/)
+  await expect(strip).toBeVisible()
   await standAt(previous, 120)
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
 
   await previous.click()
   await expect(page).toHaveURL(/month=/)
-  await expect(page.getByRole('heading', { name: 'Нет связи' })).toBeVisible()
-  await expect(strip).toBeHidden()
+  await expect(strip).toBeVisible()
+  await expect(rows).toHaveCount(12)
   expect(await topOf(previous)).toBe(120)
+  await next.click()
+  await expect(page).not.toHaveURL(/month=/)
+  await expect(strip).toBeVisible()
+  expect(await topOf(next)).toBe(120)
 })
 
 // The login takes the place of the screen with no move of the router: the page held for the month

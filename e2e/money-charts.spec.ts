@@ -152,10 +152,13 @@ test('a category chosen at the end of the page stays under the thumb, and so doe
   expect(await page.evaluate(() => window.scrollY)).toBe(down)
 })
 
-test('a line gone above the category keeps the choice under the thumb', async ({ page }) => {
+test('a line gone under the category keeps the choice and the page where they were', async ({
+  page,
+}) => {
   await seed(page)
-  // An address that names a category the charts do not have: said on the card, over the choice
-  // (MOL-74). Chosen another, the line goes, and the choice would rise by it (adversarial Б).
+  // An address that names a category the charts do not have: said on the card, under the choice
+  // (MOL-74, MOL-138 В-2). Chosen another, the line goes and the card is shorter at the very end of
+  // the page: held, not brought up.
   await page.goto(`/money/charts?category=${randomUUID()}`)
   const card = page.getByRole('region', { name: 'Категория во времени' })
   const choice = page.getByRole('combobox', { name: 'Категория' })
@@ -167,19 +170,21 @@ test('a line gone above the category keeps the choice under the thumb', async ({
   await expect(card).not.toContainText('Этой категории на графиках нет')
   await expect(card).toContainText(/30\s000\s֏/)
   expect(await topOf(choice)).toBe(before)
-  expect(await page.evaluate(() => window.scrollY)).toBeLessThan(scrolled)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
 })
 
-// Offline, the charts the phone keeps stand under «Нет связи»; twelve months it never read have no
-// strip. What went above the period is made up by the scroll (adversarial Б2).
-test('offline, a period not read keeps the period where the strip over it was', async ({
+// The strip belongs to the charts of the period and stands under the period: neither its going with
+// a period not read nor its coming back over one the phone keeps moves the period (MOL-138, В-2;
+// adversarial Б2, round 2 Д1).
+test('offline, the period stays where it was, whether the phone keeps the period or not', async ({
   page,
   context,
 }) => {
   await seed(page)
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   await page.getByRole('link', { name: 'Графики по месяцам' }).click()
-  await expect(page.locator('fieldset.chart').first()).toContainText(/30\s000\s֏/)
+  const bars = page.locator('fieldset.chart').first().locator('label.bar')
+  await expect(bars).toHaveCount(6)
   await page.goBack()
   await context.setOffline(true)
   await page.getByRole('link', { name: 'Графики по месяцам' }).click()
@@ -192,6 +197,13 @@ test('offline, a period not read keeps the period where the strip over it was', 
   await page.getByText('12 месяцев', { exact: true }).click()
   await expect(page).toHaveURL(/period=12/)
   await expect(strip).toBeHidden()
+  expect(await topOf(periods)).toBe(60)
+
+  // Back to six, kept on the phone: the strip goes with the move and comes back with the failed read.
+  await page.getByText('6 месяцев', { exact: true }).click()
+  await expect(page).not.toHaveURL(/period=/)
+  await expect(bars).toHaveCount(6)
+  await expect(strip).toBeVisible()
   expect(await topOf(periods)).toBe(60)
 })
 
