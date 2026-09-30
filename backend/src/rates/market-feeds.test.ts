@@ -175,7 +175,39 @@ describe('all clients of banks (FOREX ENG_Daily)', () => {
   })
 })
 
+/** The recorded sheet with an empty row put in before `at` — how a sheet laid out anew is made. */
+function withRowBefore(fixture: string, at: number): Sheet {
+  const sheet = recorded(fixture)
+  const cells = new Map<string, CellValue>()
+  for (const [ref, value] of sheet.cells) {
+    const [, column = '', row = '0'] = /^([A-Z]+)(\d+)$/.exec(ref) ?? []
+    const number = Number(row)
+    cells.set(number >= at ? `${column}${String(number + 1)}` : ref, value)
+  }
+  return sheetOf(sheet.file, cells, sheet.rows + 1)
+}
+
 describe('exchange offices (FOREX ENG, 6.18)', () => {
+  it('reads the whole week with an empty row put anywhere in it (adversarial review, round 3, Г)', () => {
+    const whole = readExchangers(recorded(EXCHANGERS))
+    // Rows 11–38 are seven days of four rows; every place between and inside them, and after.
+    for (let at = 12; at <= 39; at += 1) {
+      expect({ at, rates: readExchangers(withRowBefore(EXCHANGERS, at)) }).toEqual({
+        at,
+        rates: whole,
+      })
+    }
+  })
+
+  it('is refused whole when a row says a currency or a rate with no day', () => {
+    expect(() => readExchangers(changed(EXCHANGERS, { B15: null }))).toThrow(
+      'FOREX ENG.xlsx: row 15 has no day',
+    )
+    expect(() => readExchangers(changed(EXCHANGERS, { B40: null, E40: 361.2 }))).toThrow(
+      'row 40 has no day',
+    )
+  })
+
   it('reads each day of the week by the day in its own row, skipping «Other»', () => {
     const rates = readExchangers(recorded(EXCHANGERS))
     expect(rates).toHaveLength(7 * 3 * 2)

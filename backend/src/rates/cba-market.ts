@@ -176,7 +176,23 @@ export function readExchangers(sheet: Sheet): MarketRate[] {
   })
   const byDay = new Map<string, Set<string>>()
   const rates: MarketRate[] = []
-  for (let row = 11; row <= sheet.rows && sheet.value(`B${String(row)}`) !== null; row += 1) {
+  for (let row = 11; row <= sheet.rows; row += 1) {
+    // A row without its day is not the end of the table (adversarial review, round 3, Г): a blank
+    // line between two days made the rest of the week vanish without a word, and the week has no
+    // archive. A blank line or a note under the table is passed over; a row that says a currency or
+    // carries a rate with no day is the sheet rebuilt, and refuses the file.
+    if (sheet.value(`B${String(row)}`) === null) {
+      const said = [`C${String(row)}`, `E${String(row)}`, `H${String(row)}`].map((ref) =>
+        sheet.value(ref),
+      )
+      const currencyLike =
+        typeof said[0] === 'string' &&
+        ['Other', ...FOREIGN].includes(said[0].replace(/\s+/g, ' ').trim())
+      if (currencyLike || said.slice(1).some((cell) => cell !== null)) {
+        throw refuse(EXCHANGERS, `row ${String(row)} has no day`)
+      }
+      continue
+    }
     const date = sheet.day(`B${String(row)}`)
     const name = sheet.text(`C${String(row)}`)
     if (name === 'Other') continue

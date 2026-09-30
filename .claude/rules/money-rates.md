@@ -203,7 +203,7 @@ rate exactly as before.
   nobody does; `FOREX ENG_Daily.xlsx` — banks with every client, people and companies, every working
   day since January 2022, the row of D the same day; `FOREX ENG.xlsx`, sheet 6.18 — exchange
   offices, one week at a time about ten days late, each row dated by its own text, the reporting
-  period above the table not trusted (on 30.09 it named 20–27 September over rows of 14–20). The
+  period above the table not trusted (on 30.09 it named 20–27 September over rows of 14–20). An empty row is passed over, never read as the end of the table: a blank line between two days made the rest of the week vanish in silence (adversarial review, round 3, Г). The
   directory's index answers 401: the names are written in the code.
 - **A file is downloaded only if it changed — by its `HEAD`, not by `If-None-Match`.** The bank's
   server ignores the conditional headers and answers 200 with the whole file (measured 30.09.2026,
@@ -215,7 +215,7 @@ rate exactly as before.
   with no length is read in chunks and cut off at the ceiling.
 - **Strict or nothing, as the official feeds** (Р-7): a header cell not where it was, the sheet
   renamed, a rate zero, missing or a text, a day that is not one, a day after today, days out of
-  order, a currency twice or missing from a day — and **a figure over a factor of two from the
+  order, a currency twice or missing from a day, a row with a currency or a rate and no day — and **a figure over a factor of two from the
   official rate of its day** (`isMarketPlausible`, `MARKET_BAND_FACTOR`) — refuse the whole file.
   **Fifteen percent was the first bound, and the central bank's own file refuted it** (adversarial
   review А): on 3 March 2022 banks sold roubles 27.5 % above the official rate, and with the history
