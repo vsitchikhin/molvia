@@ -66,7 +66,7 @@
         :local="trip === null"
         :receipt-waiting="receiptWaiting"
         :offer-receipt="offerReceipt"
-        :receipt-known="!stale"
+        :receipt-known="receiptKnown"
         @receipt="receiptOpen = true"
     /></template>
     <ReceiptSheet

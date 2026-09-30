@@ -161,8 +161,11 @@ another currency than the receipt's is «списано со счёта», not a
 - **Over a finished record read from the phone's cache the sum is not offered** (review 4): that
   cache does not keep `receipt`, `prices`, `gap` yet — the previous build reads it strictly — so its
   total may be a receipt with nothing saying so, and «+ Сумма по чеку» there opened an empty sheet over
-  a sum that is there. Offered again once the server answers; the fields go into the cache with the
-  next release.
+  a sum that is there. **Decided by the object, not by the request** (`tripHistory.answered`, review
+  Е): the store remembers which trips came as the server's answer, and another window writing the
+  shelf puts a read-back trip on the screen with no request of this window's — a flag of «the server
+  has answered» said it was still the answer. Offered again once the server answers; the fields go
+  into the cache with the next release.
 - **«Закончить» asks «Сколько вышло по чеку?» only while some purchase has no price and no sum is
   there yet** (В-4): with every price in, the total is already known. Empty is fine; a sum that is
   not money is said at the field and nothing is sent. «Закончить и начать новую» asks nothing — the

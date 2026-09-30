@@ -6,7 +6,7 @@
  */
 import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { createPinia, getActivePinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { RouterView, createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -106,6 +106,25 @@ describe('FinishedTripView: «Сумма по чеку» (MOL-78)', () => {
     trip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
     const view = await render()
     expect(view.text()).toContain('Ереван Сити')
+    expect(view.text()).not.toContain(ru.trip.receipt.add)
+    expect(view.text()).not.toContain(ru.trip.receipt.edit)
+  })
+
+  it('соседнее окно записало кэш той же записи — сумма снова неизвестна, ни «+», ни «Изменить» (ревью Е)', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    trip.mockResolvedValue(finished)
+    const view = await render()
+    expect(view.text()).toContain(ru.trip.receipt.edit)
+
+    // Its own pinia, the same phone storage: it read the record and wrote the cache.
+    const here = getActivePinia()
+    setActivePinia(createPinia())
+    useActorStore().id = ME
+    useTripHistoryStore().apply(finished)
+    if (here) setActivePinia(here)
+    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.trip-history.${ME}` }))
+    await flushPromises()
+
     expect(view.text()).not.toContain(ru.trip.receipt.add)
     expect(view.text()).not.toContain(ru.trip.receipt.edit)
   })

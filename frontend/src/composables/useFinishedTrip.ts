@@ -8,6 +8,7 @@ import type { CatalogueEntry, Currency, Money, TripExpenseView } from '@molvia/m
 import type { TripRowView } from '@/components/tripRow'
 import { upTarget, useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
+import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import type { RetryPurchase } from './useItemDetails'
 import { useSelectedTrip } from './useSelectedTrip'
@@ -33,6 +34,11 @@ interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
   offerReceipt: ComputedRef<boolean>
   /** What a new sum starts in: the record's currency, as the purchase sheet takes it. */
   receiptCurrency: ComputedRef<Currency>
+  /**
+   * Whether the trip shown is the server's answer, which knows its receipt's sum — not one read back
+   * from the phone's shelf, here or by another window (MOL-78, reviews 4 and Е).
+   */
+  receiptKnown: ComputedRef<boolean>
   opened: Ref<OpenedPurchase | null>
   pending: ComputedRef<boolean>
   rejected: ComputedRef<boolean>
@@ -73,6 +79,7 @@ export function useFinishedTrip(): FinishedTrip {
     rows,
   )
   const actor = useActorStore()
+  const history = useTripHistoryStore()
   const receiptCurrency = computed<Currency>(
     () =>
       selected.trip.value?.currency ??
@@ -170,6 +177,7 @@ export function useFinishedTrip(): FinishedTrip {
     receiptCurrent,
     offerReceipt,
     receiptCurrency,
+    receiptKnown: computed(() => history.answered(selected.trip.value)),
     opened,
     amend,
     pending,

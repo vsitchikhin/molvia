@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, toRaw, watch } from 'vue'
 import { z } from 'zod'
 import {
   currencySchema,
@@ -132,6 +132,16 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   const actor = useActorStore()
   const page = ref<TripHistory>(empty())
   const selected = ref<TripView | null>(null)
+  /**
+   * The trips as the server answered them, as against those read back from the shelf (MOL-78,
+   * review Е): the shelf does not keep `receipt`, `prices` and `gap` yet, so only an answer knows
+   * whether a finished record has a receipt's sum — and another window writing the shelf puts a
+   * read-back trip in `selected` with no request of this window's own.
+   */
+  const answers = new WeakSet<TripView>()
+  function answered(trip: TripView | null): boolean {
+    return trip !== null && answers.has(toRaw(trip))
+  }
   const local = ref<LocalFinishedTrip[]>([])
   const stale = ref(true)
   /** The server's last first page for this owner was empty (`EMPTY_KEY`). */
@@ -265,6 +275,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
 
   /** Every write updates its own selection; it never chooses the current trip. */
   function apply(trip: TripView): void {
+    answers.add(toRaw(trip))
     syncLocal()
     revisions.set(trip.id, (revisions.get(trip.id) ?? 0) + 1)
     // `generation` cancels a history answer that arrived after this window changed the list
@@ -415,6 +426,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     if (held) selected.value = held
     const answer = await api.trip(id)
     if (owner !== actor.id || token !== selection || revision !== (revisions.get(id) ?? 0)) return
+    answers.add(answer)
     selected.value = answer
     apply(answer)
   }
@@ -446,6 +458,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     drop,
     load,
     known,
+    answered,
     open,
     completed,
   }

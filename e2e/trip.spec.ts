@@ -553,9 +553,10 @@ test.describe('the receipt total (MOL-78)', () => {
 
     // «Деньги» file the record by its receipt, every purchase behind it (Р-4).
     await page.getByRole('link', { name: 'Money', exact: true }).click()
-    const line = page.locator('.row, li, button').filter({ hasText: 'Purchases at “Ереван Сити”' })
-    await expect(line.first()).toContainText('1,400', { timeout: 15_000 })
-    await expect(line.first()).toContainText('2 items')
+    // The row of the journal by its role and name — one element, so the strict mode holds (review 6).
+    const line = page.getByRole('button', { name: /Purchases at “Ереван Сити”/ })
+    await expect(line).toContainText('1,400', { timeout: 15_000 })
+    await expect(line).toContainText('2 items')
     await page.getByRole('link', { name: 'Purchases', exact: true }).click()
     await expect(page).toHaveURL(/\/purchases$/)
 
