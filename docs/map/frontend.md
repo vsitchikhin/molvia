@@ -27,7 +27,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/composables/useAnnouncer.ts` — Composable: the app's one polite live region — provided in `App.vue`, used by blocks to say and take back words.
 - `frontend/src/composables/useBackLabel.ts` — Composable: which back label fits the row (parent's title, «Back», or the chevron alone), measured by a resize observer.
 - `frontend/src/composables/useCollapsed.ts` — Composable: whether the large title has scrolled past the pinned row (sentinel observer), and an element's live height.
-- `frontend/src/composables/useKeyboardInset.ts` — Composable: lifts an open sheet above the iOS on-screen keyboard through `--keyboard-inset`.
+- `frontend/src/composables/useKeyboardInset.ts` — Composable: lifts an open sheet above the iOS on-screen keyboard and sizes it by the visual viewport (`--keyboard-inset`, `--viewport-height`); scrolls the sheet to the field typed in when the sheet moves.
 - `frontend/src/composables/useLocalDay.ts` — Composable: the phone's today as a screen holds it, asked again when the app comes back into view or online (MOL-121).
 - `frontend/src/composables/useReconnect.ts` — Composable: calls a screen's retry when the connection may be back — `online` or the app coming into view.
 - `frontend/src/composables/useSheetDrag.ts` — Composable: a sheet pulled down from the top of its content follows the finger and closes past a quarter or on a flick.
