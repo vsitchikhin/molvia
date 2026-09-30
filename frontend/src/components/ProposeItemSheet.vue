@@ -32,7 +32,7 @@
         <p class="line failed" role="alert">
           {{ t('item.propose.taken', { name: holder.name }) }}
         </p>
-        <AppButton size="large" block @click="$emit('taken', holder)">
+        <AppButton ref="takeButton" size="large" block @click="$emit('taken', holder)">
           {{ t('item.propose.take', { name: holder.name }) }}
         </AppButton>
       </template>
@@ -44,7 +44,16 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import {
+  computed,
+  defineComponent,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  shallowRef,
+  watch,
+} from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -119,6 +128,7 @@ export default defineComponent({
     const failed = ref(false)
     const connected = ref(navigator.onLine)
     const holder = shallowRef<CatalogueEntry | null>(null)
+    const takeButton = ref<{ $el?: HTMLElement } | null>(null)
     /** The item of this name holds as many codes as one may (MOL-100, review В). */
     const full = ref(false)
 
@@ -229,8 +239,13 @@ export default defineComponent({
       try {
         const written = await api.proposeItem(parsed.data)
         if (mine !== opening) return
-        if ('taken' in written) holder.value = written.taken
-        else emit('proposed', written.entry, written.created)
+        if ('taken' in written) {
+          holder.value = written.taken
+          // «Добавить» goes with the answer: the focus goes to what took its place, inside the sheet
+          // — gone with the button, it fell to the body outside the modal dialog (adversarial О′).
+          await nextTick()
+          takeButton.value?.$el?.focus()
+        } else emit('proposed', written.entry, written.created)
       } catch (error) {
         if (mine !== opening) return
         connected.value = navigator.onLine
@@ -263,6 +278,7 @@ export default defineComponent({
       failed,
       full,
       holder,
+      takeButton,
       ready,
       textRefused,
       status,

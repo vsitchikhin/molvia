@@ -53,8 +53,10 @@
            this one. Under the form, not beside «Записать», and asked before it is done (review Ж):
            the code goes for everyone, with no «Вернуть». -->
       <template v-if="code">
-        <div v-if="confirming" class="detach">
-          <p class="detach-question">
+        <!-- A group named by its question: the focus waits on «Отменить», and a screen reader reads
+             the question with it — the app's live region is outside the modal sheet. -->
+        <div v-if="confirming" class="detach" role="group" :aria-labelledby="detachQuestionId">
+          <p :id="detachQuestionId" class="detach-question">
             {{ t('item.barcode.detach_question', { code, name: entry.name }) }}
           </p>
           <p class="caption">{{ t('item.barcode.detach_hint') }}</p>
@@ -101,7 +103,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconMenuDown from '~icons/mdi/menu-down'
@@ -394,6 +396,7 @@ export default defineComponent({
     }
 
     const recent = useRecentItemsStore()
+    const detachQuestionId = `${useId()}-detach`
     const confirming = ref(false)
     const detachCancel = ref<{ $el?: HTMLElement } | null>(null)
     const detaching = ref(false)
@@ -461,6 +464,7 @@ export default defineComponent({
       remove,
       leave,
       confirming,
+      detachQuestionId,
       detachCancel,
       askDetach,
       keepCode,

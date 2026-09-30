@@ -115,6 +115,7 @@
 
         <ScreenState
           v-else-if="bind && bind.phase === 'error'"
+          ref="bindState"
           kind="error"
           inline
           :title="t('item.error.title')"
@@ -130,6 +131,7 @@
 
         <ScreenState
           v-else-if="bind && bind.phase === 'offline'"
+          ref="bindState"
           kind="offline"
           tone="warn"
           inline
@@ -430,15 +432,31 @@ export default defineComponent({
     }
     const bind = ref<Bind | null>(null)
     const bindFirst = ref<{ $el?: HTMLElement } | null>(null)
+    const bindState = ref<{ $el?: HTMLElement } | null>(null)
 
-    // The rows the person tapped are gone under the question: the focus goes to its first answer
-    // rather than to the body, and the keyboard goes down with it — it is a question to tap.
+    /*
+     * Every block of the question replaces the one before under the button that held the focus, so
+     * every change of it hands the focus on (adversarial О, О′) — left alone it fell to the body:
+     *
+     * - the question, «taken», «full» — to their first answer: the rows tapped are gone, and the
+     *   keyboard goes down with the focus, it is a question to tap;
+     * - «Повторить» pressed under an error or offline — to «Привязать», busy while it is on its way;
+     *   the state's own rescue takes it to the screen's title first, this comes after;
+     * - an error or offline come in place of the busy «Привязать» — to their first button, unless the
+     *   person has since put the focus somewhere of their own.
+     */
     watch(
       () => bind.value?.phase,
       async (next, before) => {
-        if (next !== 'ask' && next !== 'taken' && next !== 'full') return
-        if (next === before) return
+        if (next === undefined || next === before) return
+        if (next === 'sending' && before !== 'error' && before !== 'offline') return
         await nextTick()
+        if (next === 'error' || next === 'offline') {
+          const nowhere =
+            document.activeElement === null || document.activeElement === document.body
+          if (nowhere) bindState.value?.$el?.querySelector<HTMLElement>('button')?.focus()
+          return
+        }
         bindFirst.value?.$el?.focus()
       },
     )
@@ -670,6 +688,9 @@ export default defineComponent({
           withdrawBind = announce?.(
             t('item.barcode.taken', { code: asked.code, name: asked.holder.name }),
           )
+        } else if (next === 'full') {
+          // Not a ScreenState: the block says nothing of itself.
+          withdrawBind = announce?.(t('error.barcodes_full'))
         }
       },
     )
@@ -866,6 +887,7 @@ export default defineComponent({
       combobox,
       bind,
       bindFirst,
+      bindState,
       attach,
       withoutCode,
       takeHolder,

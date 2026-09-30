@@ -322,6 +322,191 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     await expect(found).toBeHidden()
     await expect(missingOf(page, code)).toBeVisible()
   })
+
+  /**
+   * Where the focus goes as the code's blocks replace one another (adversarial О, О′): each block
+   * takes away the button that held it, and left alone the focus fell to the body — outside the
+   * modal sheet where there was one. Keyboard and screen reader only; the finger does not see it.
+   */
+  test.describe('the focus through the code’s blocks', () => {
+    const LINKS = '**/api/catalogue/items/*/barcodes'
+
+    const focused = (page: Page) =>
+      page.evaluate(() => ({
+        body: document.activeElement === null || document.activeElement === document.body,
+        inSheet: document.querySelector('dialog[open]')?.contains(document.activeElement) ?? null,
+        text: document.activeElement?.textContent.trim() ?? '',
+        field: document.activeElement?.getAttribute('role') === 'combobox',
+      }))
+
+    async function anItem(page: Page, name: string, barcodes: string[] = []): Promise<string> {
+      const created = await page.request.post('/api/catalogue/items', {
+        headers: await asBrowser(page),
+        data: { kind: 'product', name, defaultUnit: 'l', barcodes },
+      })
+      expect(created.status()).toBe(201)
+      return ((await created.json()) as { id: string }).id
+    }
+
+    /** A miss, the item's name typed, its row tapped: the question, the focus on «Link and record». */
+    async function asked(page: Page, name: string, code: string): Promise<void> {
+      await open(page, '/purchases/manual/add')
+      await anItem(page, name)
+      await typeCode(page, code)
+      await expect(missingOf(page, code)).toBeVisible()
+      await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(name)
+      await page.getByRole('option', { name: new RegExp(name) }).click()
+      await expect(
+        page.locator('.not-found').getByText(`Link code ${code} to «${name}»?`),
+      ).toBeVisible()
+      await expect.poll(async () => (await focused(page)).text).toBe('Link and record')
+    }
+
+    test('a miss, a shop’s label: the scanner hands the focus back, never to the body', async ({
+      page,
+    }) => {
+      await open(page, '/purchases/manual/add')
+      await typeCode(page, freshCode())
+      await expect(page.locator('.not-found')).toBeVisible()
+      await expect.poll(async () => (await focused(page)).body).toBe(false)
+
+      await typeCode(page, '20000011')
+      await expect(page.getByText("Code 20000011 is a shop's own label")).toBeVisible()
+      await expect.poll(async () => (await focused(page)).body).toBe(false)
+    })
+
+    test('✕ of «waiting for its item» gives the focus to the field', async ({ page }) => {
+      const code = freshCode()
+      await open(page, '/purchases/manual/add')
+      await typeCode(page, code)
+      await expect(missingOf(page, code)).toBeVisible()
+      await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(`Кефир ${tag}`)
+
+      await page.getByRole('button', { name: "Don't link the code" }).click()
+
+      await expect.poll(async () => (await focused(page)).field).toBe(true)
+    })
+
+    test('an error and «Try again»: the focus on the error’s button, then on «Link and record» until it lands', async ({
+      page,
+    }) => {
+      const code = freshCode()
+      const name = `Кефир ${tag} ф1`
+      await asked(page, name, code)
+      let calls = 0
+      await page.route(LINKS, async (route) => {
+        calls += 1
+        if (calls === 1) return route.fulfill({ status: 502, body: 'Bad Gateway' })
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+        return route.continue()
+      })
+
+      await page.keyboard.press('Enter')
+      await expect(
+        page.getByText(`Could not link code ${code}. Try again — or record without the code`),
+      ).toBeVisible()
+      await expect.poll(async () => (await focused(page)).text).toBe('Try again')
+
+      await page.keyboard.press('Enter')
+      await expect.poll(async () => (await focused(page)).text).toBe('Link and record')
+      await expect(page.getByRole('dialog', { name })).toBeVisible()
+    })
+
+    test('offline: the focus on the offline block’s «Try again»', async ({ page, context }) => {
+      const code = freshCode()
+      await asked(page, `Кефир ${tag} ф2`, code)
+      await context.setOffline(true)
+
+      await page.keyboard.press('Enter')
+
+      await expect(
+        page.getByText(
+          'The code is not linked. Try again with a connection — or record without the code',
+        ),
+      ).toBeVisible()
+      await expect.poll(async () => (await focused(page)).text).toBe('Try again')
+      await context.setOffline(false)
+    })
+
+    test('an item full of codes: the focus on «Record … without the code»', async ({ page }) => {
+      const code = freshCode()
+      const name = `Кефир ${tag} ф3`
+      await asked(page, name, code)
+      await page.route(LINKS, (route) =>
+        route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({ code: 'error.barcodes_full' }),
+        }),
+      )
+
+      await page.keyboard.press('Enter')
+
+      await expect
+        .poll(async () => (await focused(page)).text)
+        .toBe(`Record «${name}» without the code`)
+    })
+
+    test('«This code already belongs to …» in «Suggest an item»: the focus stays in the sheet, on «Take …»', async ({
+      page,
+    }) => {
+      const code = freshCode()
+      const holder = `Ряженка ${tag}`
+      await open(page, '/purchases/manual/add')
+      await typeCode(page, code)
+      await expect(missingOf(page, code)).toBeVisible()
+      await anItem(page, holder, [code])
+      await page.getByRole('button', { name: 'Suggest an item' }).click()
+      const form = page.getByRole('dialog', { name: 'New item' })
+      await expect(form).toBeVisible()
+      await page.waitForTimeout(400)
+      await form.getByLabel('As the price tag says').fill(`Варенец ${tag}`)
+      const kilo = form.getByRole('radio', { name: 'kg', exact: true })
+      await expect(async () => {
+        await form.getByText('kg', { exact: true }).click()
+        await expect(kilo).toBeChecked({ timeout: 200 })
+      }).toPass({ timeout: 5000 })
+      await form.getByRole('button', { name: 'Add to the catalogue' }).focus()
+
+      await page.keyboard.press('Enter')
+
+      await expect(form.getByText(`This code already belongs to «${holder}»`)).toBeVisible()
+      await expect
+        .poll(async () => focused(page))
+        .toMatchObject({
+          inSheet: true,
+          text: `Take «${holder}»`,
+        })
+    })
+
+    test('«Unlink?»: the focus on «Cancel», back on «not this item?», and after the unlink never the body', async ({
+      page,
+    }) => {
+      const code = freshCode()
+      const name = `Кефир ${tag} ф4`
+      await open(page, '/purchases/manual/add')
+      await anItem(page, name, [code])
+      await typeCode(page, code)
+      const found = await sheetOf(page, name)
+      const notThis = found.getByRole('button', { name: `Code ${code} — not this item?` })
+
+      await notThis.click()
+      await expect.poll(async () => (await focused(page)).text).toBe('Cancel')
+      await page.keyboard.press('Enter')
+      await expect
+        .poll(async () => focused(page))
+        .toMatchObject({
+          inSheet: true,
+          text: `Code ${code} — not this item?`,
+        })
+
+      await notThis.click()
+      await found.getByRole('button', { name: 'Unlink', exact: true }).click()
+      await expect(found).toBeHidden()
+      await expect(missingOf(page, code)).toBeVisible()
+      await expect.poll(async () => (await focused(page)).body).toBe(false)
+    })
+  })
 })
 
 /**

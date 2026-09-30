@@ -286,9 +286,14 @@ codes too, and a wrong one needs a way out (В-1, below).
   review Ж): «Отвязать код … от „…“? Его перестанут находить все» — «Отвязать» / «Отменить»; in the
   footer under «Записать» a finger took it at the shelf, and it goes for everyone with no «Вернуть».
   «Отвязать» is `danger-ghost`, as every destructive confirmation of the app, and the focus waits on
-  «Отменить» (Р-15, review Л). **A block that takes itself away hands the focus back** (adversarial О):
-  «Отменить» to the line «не этот товар?», the ✕ of «Код … ждёт позицию» to the field — gone with its
-  button, the focus fell to the body, outside the modal sheet, in Chromium and WebKit alike.
+  «Отменить» (Р-15, review Л). **A block that takes itself away hands the focus back** (adversarial О,
+  О′): «Отменить» to the line «не этот товар?», the ✕ of «Код … ждёт позицию» to the field, every block
+  of «привязать?» to its first answer — an error or offline to its first button unless the person put
+  the focus somewhere of their own, «Повторить» to the busy «Привязать» — and «Этот код уже у „…“» in
+  «Предложить товар» to «Взять „…“», inside the sheet. Gone with its button, the focus fell to the body,
+  outside the modal sheet, in Chromium and WebKit alike. The question «Отвязать?» is a group named by its
+  words: the focus waits on «Отменить», and the app's live region is outside the modal sheet. e2e holds
+  every change in Chromium («the focus through the code's blocks»).
   **In the form a write gives it** (Р-11, review К): `04252614` is written as `0042100005264`, and asked
   by its eight a `204` let go of nothing; a code of no barcode's form is refused. The item lets go of the code and whichever
   twin it holds, never another item's; the device forgets it (`recentItems.forgetCode`) — in the sheet, which an answer still reaches after it was swiped away, when an emit to the screen no longer would (review Г); the sheet goes
