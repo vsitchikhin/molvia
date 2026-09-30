@@ -6,6 +6,8 @@ import type { IncomeRepository } from './incomes-repository'
 import type { ExpenseRepository } from './expenses-repository'
 import type { Conn, Db } from './index'
 import { createItemRepository } from './items-repository'
+import { createMarketRateRepository } from './market-rates-repository'
+import type { MarketRateRepository } from './market-rates-repository'
 import { createMoneyAccountRepository } from './money-accounts-repository'
 import type { MoneyAccountRepository } from './money-accounts-repository'
 import { createMoneyRepository } from './money-repository'
@@ -33,6 +35,8 @@ export interface TripRepositories {
   readonly searchPicks: SearchPickRepository
   /** Read by «Начать поход» to snapshot the official rate (MOL-39); written by the refresh. */
   readonly rates: RateRepository
+  /** The market of the central bank's statistics (MOL-137): what «Обмен денег» sets an exchange beside. */
+  readonly marketRates: MarketRateRepository
   /**
    * The person's exchanges and which rate they want (MOL-40): read by «Начать поход» for their own
    * rate, and the screen of exchanges is built from these and the rates above.
@@ -57,6 +61,7 @@ export function tripRepositories(conn: Conn): TripRepositories {
     items: createItemRepository(conn),
     searchPicks: createSearchPickRepository(conn),
     rates: createRateRepository(conn),
+    marketRates: createMarketRateRepository(conn),
     exchanges: createExchangeRepository(conn),
     incomes: createIncomeRepository(conn),
     spendings: createSpendingRepository(conn),

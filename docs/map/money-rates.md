@@ -21,6 +21,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 
 - `backend/src/usecases/exchanges.ts` — Use cases of «Обмен денег»: the overview with wallet and official comparison, write/amend/remove/restore, rate preference. Tests: `backend/tests/exchanges.integration.test.ts`.
 - `backend/src/usecases/incomes.ts` — Use cases of «Доходы»: the overview by month, record, amend, remove and restore an income. Tests: `backend/tests/incomes.integration.test.ts`.
+- `backend/src/usecases/refresh-market-rates.ts` — Use case: the hourly refresh of the market (MOL-137) — each central-bank file on its own, asked by its tag, refused whole outside ±15 % of the official rate or dated ahead. Tests beside it.
 - `backend/src/usecases/money-rates.ts` — Use case helper: the rates of one day between two currencies that «Деньги» counts spendings and incomes by.
 - `backend/src/usecases/refresh-official-rates.ts` — Use case: one hourly refresh of the official-rate cache — the CBA first, then the fallbacks — with jump marking.
 
@@ -28,22 +29,27 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 
 - `backend/src/db/exchanges-repository.ts` — Repository of exchanges: add with repeat/conflict, amend with revisions, mark-remove and restore, the held-before hint, rate preference. Tests: `backend/tests/exchanges-repository.integration.test.ts`.
 - `backend/src/db/incomes-repository.ts` — Repository of incomes: add with repeat/conflict, amend with revisions, mark-remove, restore and final erase. Tests: `backend/tests/incomes-repository.integration.test.ts`.
+- `backend/src/db/market-rates-repository.ts` — Repository of the market (MOL-137): a file written whole, each channel's latest within a week before a day, the latest of all, how far a channel reached.
 - `backend/src/db/rates-repository.ts` — Repository of the official-rate cache: whole-answer upsert, latest on or before a day, jump history, last fetch time. Tests: `backend/tests/rates-repository.integration.test.ts`.
 
 ## backend · rates
 
 - `backend/src/rates/cba.ts` — Feed of the Central Bank of Armenia: the SOAP `ExchangeRatesLatest` request and a narrow parser of its envelope.
+- `backend/src/rates/cba-history.ts` — The central bank's archive of the official rate (MOL-137): SOAP `ExchangeRatesByDateRangeByISO` and a strict parser of its rows.
+- `backend/src/rates/cba-market.ts` — Feeds of the market (MOL-137): three central-bank xlsx files — people in cash and not, all bank clients, exchange offices — strict readers of their sheets, a conditional GET by ETag.
 - `backend/src/rates/cbr.ts` — Feed of the Bank of Russia, first fallback: parses the daily XML and turns rouble quotes into drams.
 - `backend/src/rates/erapi.ts` — Feed of open.er-api.com, second fallback: parses its JSON against the dram and inverts it to drams per unit.
 - `backend/src/rates/feed.ts` — Shared feed plumbing: the `RateFeed` interface, the foreign-currency list, timeout, strict `published` check, HTTP request.
 - `backend/src/rates/feeds.test.ts` — Unit test: each provider's recorded answer parses to the right rates, and malformed, zero, dated-wrong or slow answers are refused whole.
+- `backend/src/rates/market-feeds.test.ts` — Unit test: the three recorded xlsx files and the SOAP archive read to the right figures, and a file with one cell moved, zeroed or renamed refused whole.
 - `backend/src/rates/schedule.ts` — The hourly refresh timer and whether the API refreshes at boot, given when the cache was last written.
+- `backend/src/rates/xlsx.ts` — One sheet of a workbook read through exceljs into its cells once, with accessors that refuse what they did not expect (MOL-137).
 
 ## backend · tests
 
 - `backend/tests/exchanges-repository.integration.test.ts` — Integration test: exchanges are written, repeated, refused on conflict, removed, restored within ten minutes and erased with the owner.
 - `backend/tests/exchanges.integration.test.ts` — Integration test: «Обмен денег» over HTTP — the wallet, the official comparison, the chain of costs and the rate a new trip takes.
-- `backend/tests/fixtures/rates/` — Provider answers recorded byte for byte on 19.09.2026 (CBA, Bank of Russia, er-api, a SOAP fault) that the feed parsers are tested on.
+- `backend/tests/fixtures/rates/` — Provider answers recorded byte for byte that the feed parsers are tested on: 19.09.2026 (CBA, Bank of Russia, er-api, a SOAP fault) and 30.09.2026 (the CBA's archive and its three xlsx files of the market, MOL-137).
 - `backend/tests/fixtures/rates/cba-runtime-error.html` — Fixture: the CBA's «Runtime Error» page its GET form returns, which the parser must refuse.
 - `backend/tests/incomes-repository.integration.test.ts` — Integration test: incomes are written, amended with history, refused on conflict, removed, restored and erased with the owner.
 - `backend/tests/incomes.integration.test.ts` — Integration test: «Доходы» over HTTP — months and sums, amend and undo, and how an income prices the wallet and a trip's rate.

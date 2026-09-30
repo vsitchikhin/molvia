@@ -218,6 +218,13 @@
       "when": 1790716113501,
       "tag": "0030_trip_days",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790761572205,
+      "tag": "0031_market_rates",
+      "breakpoints": true
     }
   ]
 }

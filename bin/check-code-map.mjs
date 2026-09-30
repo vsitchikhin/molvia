@@ -34,7 +34,7 @@ const OUT_OF_SCOPE = [
 
 // What a directory entry may stand in for. Anything else — code, config, a Dockerfile, a hook with
 // no extension — is named by its own entry.
-const DIRECTORY_COVERED = /\.(sql|json|svg|png|ico|woff2|xml|txt|webmanifest)$/
+const DIRECTORY_COVERED = /\.(sql|json|svg|png|ico|woff2|xml|xlsx|txt|webmanifest)$/
 
 const ENTRY = /^\s*[-*]\s+`([^`]+)`/
 
