@@ -289,7 +289,17 @@ The detail behind the frontend lines of `CLAUDE.md`.
   carries the moment the finger lifted and one resting across the end of the rise closed the sheet
   or pressed the action that slid under it (adversarial А1); a click from the keyboard, by its
   own time, and it leaves the touch alone (Б1). Open a
-  sheet from a tap only: Chrome skips on «back» an entry laid without a gesture. **The sheet is the one exception to «only the
+  sheet from a tap only: Chrome skips on «back» an entry laid without a gesture. **The dialog is
+  closed at once, and `data-leaving` keeps it drawn while it slides down** (hotfix-bottom-menu):
+  left to the stylesheet, a closed dialog is held in the top layer by a transition of `overlay`,
+  which Safari has not got — on an iPhone the × and the scrim made the sheet vanish on the spot, and
+  only the pull down, which slides it itself, went down. Closed at once, so every reader of
+  `dialog[open]` — «Закончить» going up to «Покупки», `holdsTyping`, the focus, the inert page, e2e —
+  has it shut as ever; played open instead (the first try), «Закончить» stayed on the record, a
+  sheet being up. Out of the top layer it is drawn fixed at the bottom over the tab bar, takes no
+  tap, and the scrim goes at once — the price. Opened again meanwhile («save and next») it comes
+  back up from where it is. The stylesheet's discrete transitions stay for a close the browser
+  makes itself — a second Esc. **The sheet is the one exception to «only the
   page scrolls»**: a panel over the screen has no window of its own, so it scrolls itself and
   the page under it is held still.
 - **Over the iOS keyboard the sheet's height is a share of the visual viewport's own height**
@@ -324,3 +334,36 @@ The detail behind the frontend lines of `CLAUDE.md`.
   geometry with the same fault, since a Chromium window cannot shrink without its `dvh`; the numbers
   measured on the iPhone are held by a unit test. On the device the spending sheet was checked; the
   other sheets are held by the shared component and the tests.
+- **The lift is counted from `100dvh`, never from `innerHeight`** (hotfix-bottom-menu): `100dvh` is
+  the box a fixed panel is pinned in, and Safari moves `innerHeight` on its own with the keyboard up.
+  In the installed app the same keyboard over the same visual viewport (427, 123 down) came with a
+  window of 796 once and of 720 the next time, and the sheet stood 76px lower, its end — the
+  categories — under the glass bar over the keys; in Safari with its bar folded the window read 535
+  or 734 of a `100dvh` of 699 or 734. Counted from `100dvh`, every state logged on the phone
+  (`hotfix-bottom-menu-probe.jsonl`, MOL-135's log too) put the sheet's end where the keyboard
+  begins. A script has no reading of `dvh`: a hidden fixed box of `100dvh` is read instead, and
+  where nothing is laid out (the component tests) the window's height stands in.
+- **Under the keys, nothing of the page shows** (hotfix-bottom-menu). On iOS 26 and later the keys,
+  the bar of «∧ ∨ ✓» over them and Safari's address bar floating above them are glass with clear
+  room between them, and the sheet stands on the top of that frame, not of the keys: what lay under
+  it — the spendings of the month — showed in a band between the sheet and the keys (the owner's
+  screenshots, Safari and the installed app). Two layers close it, since neither closes both:
+  - **The sheet goes on below its edge in its own colour**, a shadow of `--surface`, spread and
+    offset alike so it starts under the rounded corners, first in the list so the sheet's own shadow
+    does not darken it; not a taller box, since the box is what the lift, the height and `reveal`
+    measure. That covers the installed app, where the window goes on below the keyboard's top.
+  - **The page is hidden while the keys are up under a sheet** (`data-under-keys` on the root, set
+    by `useKeyboardInset` once the visible part is `KEYBOARD` = 150px shorter than `100dvh` — less
+    than any keyboard, more than a browser's own bars), and the canvas takes `--surface`. In Safari
+    the window — and everything fixed, the sheet and its scrim with it — ends at the top of the
+    keyboard, and below it only the page itself is drawn: the shadow was not, and the band stayed.
+    `visibility`, so nothing is laid out anew and nothing scrolls; the open sheets and the live
+    region stay. The page under a modal sheet takes nothing anyway; above the sheet the scrim now
+    dims the sheet's colour instead of the screen — the price.
+- **`interactive-widget=resizes-content` is Android's alone** (hotfix-bottom-menu): set by a script
+  in the head of `index.html` for an Android user agent, before the page is laid out. iOS ignored it
+  until Safari 27, which began to honour it: the window shrank to the part left visible under the
+  keyboard (`innerHeight` 699 → 395 with it, 699 kept without it, the same phone and state). The tab
+  bar that stood mid-screen in the installed app on production is taken for the bottom of such a
+  window not given back — a reading, not a measurement: the probe never caught it, and it went away
+  by itself after a relaunch. `useKeyboardInset` lifts the sheet on iOS, as it did before.

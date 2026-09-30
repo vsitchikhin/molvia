@@ -173,6 +173,76 @@ describe('BottomSheet', () => {
     expect(dialog().open).toBe(false)
   })
 
+  /** The sheet's slide down, held until the test lets it finish. */
+  function slide(): { finish: () => Promise<void> } {
+    let finish = (): void => undefined
+    const finished = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    const animation = { finished } as unknown as Animation
+    vi.spyOn(HTMLDialogElement.prototype, 'getAnimations').mockReturnValueOnce([animation])
+    return {
+      finish: async () => {
+        finish()
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      },
+    }
+  }
+
+  // Safari has no `overlay`: a dialog closed at once left the top layer at once, and the × and the
+  // scrim made the sheet vanish instead of sliding down. The dialog is closed at once — every reader
+  // of `dialog[open]` has it shut — and `data-leaving` keeps it drawn until the slide ends.
+  it('closes the dialog at once, and keeps it drawn sliding down until the slide ends', async () => {
+    const { host, open, closed, go, dialog } = await render({ open: true })
+    const sliding = slide()
+    await host.get('.head button').trigger('click')
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+    expect(open.value).toBe(false)
+    await vi.waitFor(() => {
+      expect(closed).toHaveBeenCalledOnce()
+    })
+    expect(dialog().open).toBe(false)
+    expect(dialog().hasAttribute('data-leaving')).toBe(true)
+
+    await sliding.finish()
+    expect(dialog().hasAttribute('data-leaving')).toBe(false)
+  })
+
+  it('must not fire: with no slide to play, nothing is left drawn', async () => {
+    const { host, dialog } = await render({ open: true })
+    await host.get('.head button').trigger('click')
+    expect(dialog().open).toBe(false)
+    expect(dialog().hasAttribute('data-leaving')).toBe(false)
+  })
+
+  it('must not fire: a tap on the scrim while the sheet slides down takes no second step', async () => {
+    const { go, dialog } = await render({ open: true })
+    const sliding = slide()
+    await tapScrim(dialog())
+    await tapScrim(dialog())
+    expect(go).toHaveBeenCalledExactlyOnceWith(-1)
+    await sliding.finish()
+    expect(go).toHaveBeenCalledOnce()
+  })
+
+  // «Save and next» while the last showing still slides down: it comes back up, and the end of the
+  // slide cut short takes nothing off the sheet shown again.
+  it('opened again while it slides down, it comes back up and stays up', async () => {
+    const { host, open, push, dialog } = await render({ open: true })
+    const sliding = slide()
+    await host.get('.head button').trigger('click')
+    landed()
+    open.value = true
+    await nextTick()
+    expect(dialog().open).toBe(true)
+    expect(dialog().hasAttribute('data-leaving')).toBe(false)
+    expect(push).toHaveBeenCalledTimes(2)
+
+    await sliding.finish()
+    expect(dialog().open).toBe(true)
+    expect(dialog().hasAttribute('data-leaving')).toBe(false)
+  })
+
   // A text selection that began in a field and overshot is clicked on the dialog — the common
   // ancestor — and would throw away what was typed (adversarial Б-4).
   // iOS hands a touch to the page only where a listener stands, and the scrim lies outside the
