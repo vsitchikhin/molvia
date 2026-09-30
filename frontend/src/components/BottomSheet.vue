@@ -297,9 +297,12 @@ export default defineComponent({
 
   /* A share of what is visible above the keyboard, not of the window less the keyboard: on iOS
      `dvh` ignores the keyboard, and 82% of the window minus it left the sheet 208px of the 328
-     that were there to use (review Р-2). `dvh`, not `vh`: with the address bar showing, `vh` is
-     taller than the screen and the header would sit under the top edge. */
-  max-height: calc((100dvh - var(--keyboard-inset)) * var(--sheet-height-share));
+     that were there to use (review Р-2). What is visible is the visual viewport's height, set by
+     `useKeyboardInset` while the sheet is open: Safari shrinks the window under the keyboard and
+     not `dvh`, and a share of `dvh` put the sheet's top — and the sum being typed — off the screen
+     (MOL-135). `dvh`, not `vh`, where nothing is set: with the address bar showing, `vh` is taller
+     than the screen and the header would sit under the top edge. */
+  max-height: calc(var(--viewport-height) * var(--sheet-height-share));
 
   /* Lifted over the on-screen keyboard where the browser leaves it covering the page (iOS). */
   margin: auto 0 var(--keyboard-inset);
