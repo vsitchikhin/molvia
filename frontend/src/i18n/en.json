@@ -254,6 +254,15 @@
     "offline": {
       "title": "No connection",
       "body": "Searching your recent items only. The full catalogue is back once you are online"
+    },
+    "barcode": {
+      "scan": "Scan a barcode",
+      "missing": "The catalogue does not know the code {code}",
+      "missing_hint": "Or find it by name",
+      "error_body": "Could not check the code {code}. Try again — or find the item by name",
+      "offline_body": "None of your recent items has this code. Find the item by name — or scan it once you are online",
+      "found": "Found by the code {code}",
+      "found_announced": "Found by the code {code}: {name}"
     }
   },
   "sheet": {
@@ -898,7 +907,6 @@
       "sample_milk": "Milk «Ashkhar»",
       "sample_meta": "UHT, 2.5%",
       "date": "Date",
-      "open_scanner": "Scan a barcode",
       "scanned": "Read: {code}"
     },
     "login_seam": "Sign in for development",

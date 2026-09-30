@@ -36,6 +36,21 @@ it('logs a search as its path, without what was searched for or who asked', asyn
   expect(log).not.toMatch(/remoteAddress|remotePort|hostname"?:"?localhost/)
 })
 
+// MOL-99: the code rides in the query for exactly this — a code is what a person bought.
+it('logs a lookup by code as its path, without the code', async () => {
+  lines.length = 0
+  await app.inject({ method: 'GET', url: '/catalogue/barcode?code=4850000000007' })
+
+  const entries = lines.map((line) => JSON.parse(line) as { msg?: string; req?: unknown })
+  const incoming = entries.find((entry) => entry.msg === 'incoming request')
+  expect(incoming?.req).toEqual({
+    id: expect.any(String) as unknown,
+    method: 'GET',
+    path: '/catalogue/barcode',
+  })
+  expect(lines.join('')).not.toMatch(/4850000000007|code=/)
+})
+
 // Selfreview 4: Fastify's own 404 wrote `Route GET:/path?q=… not found` past the serializer.
 it('an unknown address is not logged with its query, nor echoed back', async () => {
   lines.length = 0

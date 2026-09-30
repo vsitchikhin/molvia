@@ -159,6 +159,7 @@ function fakeRepositories(
       byIds: unexpected('items.byIds'),
       createUnlessNamed: unexpected('items.createUnlessNamed'),
       search: unexpected('items.search'),
+      byBarcode: unexpected('items.byBarcode'),
       ...overrides.items,
     },
     searchPicks: {

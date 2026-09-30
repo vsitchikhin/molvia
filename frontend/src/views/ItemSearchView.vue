@@ -35,8 +35,52 @@
       :hint="t('item.search_hint')"
       @pick="pick"
     >
+      <template #trailing>
+        <AppButton variant="icon" :label="t('item.barcode.scan')" @click="scanning = true">
+          <IconBarcode />
+        </AppButton>
+      </template>
+
       <template #before>
-        <div v-if="phase === 'loading'" class="loading">
+        <!-- A code looked up (MOL-99) stands in for the search until something is typed. -->
+        <div v-if="barcode === 'loading'" class="loading">
+          <ScreenSkeleton :groups="[62]" />
+        </div>
+
+        <div v-else-if="barcode === 'missing'" class="not-found">
+          <p class="not-found-text">{{ t('item.barcode.missing', { code: barcodeCode }) }}</p>
+          <AppButton @click="proposeByCode">
+            <template #icon><IconPlus /></template>
+            {{ t('item.empty.action') }}
+          </AppButton>
+          <p class="not-found-text">{{ t('item.barcode.missing_hint') }}</p>
+        </div>
+
+        <!-- Found by a retry nobody tapped for (adversarial Ж′): the sheet opens from this tap. -->
+        <div v-else-if="barcode === 'found' && barcodeItem" class="not-found">
+          <p class="not-found-text">{{ t('item.barcode.found', { code: barcodeCode }) }}</p>
+          <AppButton @click="lookup.take">{{ barcodeItem.name }}</AppButton>
+        </div>
+
+        <ScreenState
+          v-else-if="barcode === 'error'"
+          kind="error"
+          inline
+          :title="t('item.error.title')"
+          :body="t('item.barcode.error_body', { code: barcodeCode })"
+          @retry="lookup.retry"
+        />
+
+        <ScreenState
+          v-else-if="barcode === 'offline'"
+          kind="offline"
+          tone="warn"
+          inline
+          :title="t('item.offline.title')"
+          :body="t('item.barcode.offline_body')"
+        />
+
+        <div v-else-if="phase === 'loading'" class="loading">
           <ScreenSkeleton :groups="[62, 62, 62]" />
         </div>
 
@@ -78,7 +122,7 @@
       <!-- The answer is not empty, and still not the thing: «сметана» finds the crisps «со
            сметаной», and without this the sour cream could never be added (В-3). Quiet, so it
            does not invite a duplicate of what is listed right above it. -->
-      <template v-if="phase === 'ready'" #after>
+      <template v-if="phase === 'ready' && barcode === 'idle'" #after>
         <AppButton variant="ghost" block @click="proposing = true">
           {{ t('item.not_listed') }}
         </AppButton>
@@ -88,7 +132,7 @@
            so «не нашли» stands here with the button that adds the item. Under the rows, in place
            of the quiet line: the answer flips near and far while a word is typed, and a block
            above would move every row under the finger as it came and went (owner's decision). -->
-      <template v-else-if="phase === 'far'" #after>
+      <template v-else-if="phase === 'far' && barcode === 'idle'" #after>
         <div class="not-found" :class="{ stale }">
           <p class="not-found-text">{{ t('item.empty.body', { query: answered }) }}</p>
           <AppButton @click="proposing = true">
@@ -99,9 +143,11 @@
       </template>
     </CatalogueCombobox>
 
+    <BarcodeScannerSheet v-model:open="scanning" :on-closed="afterScanning" @read="read" />
+
     <ProposeItemSheet
       v-model:open="proposing"
-      :query="query"
+      :query="proposingByCode ? '' : query"
       :on-closed="afterProposing"
       @proposed="proposed"
     />
@@ -131,15 +177,18 @@ import { useSelectedTrip } from '@/composables/useSelectedTrip'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import type { CatalogueEntry } from '@molvia/model'
+import IconBarcode from '~icons/mdi/barcode-scan'
 import IconPlus from '~icons/mdi/plus'
 import AppButton from '@/components/AppButton.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import CatalogueCombobox from '@/components/CatalogueCombobox.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ProposeItemSheet from '@/components/ProposeItemSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useBarcodeLookup } from '@/composables/useBarcodeLookup'
 import { useCatalogueSearch } from '@/composables/useCatalogueSearch'
 import { currentIdentity } from '@/stores/identity'
 import { useItemEntryStore } from '@/stores/itemEntry'
@@ -163,7 +212,9 @@ export default defineComponent({
   components: {
     AppButton,
     AppScreen,
+    BarcodeScannerSheet,
     CatalogueCombobox,
+    IconBarcode,
     IconPlus,
     ItemDetailsSheet,
     ProposeItemSheet,
@@ -202,16 +253,86 @@ export default defineComponent({
       if (next !== 'error') fallback.value = false
     })
 
+    /**
+     * The scanner (MOL-99). A code read looks up its item at once, but the purchase sheet waits for
+     * the scanner to be put away: its close is a step back through history, and a sheet opened
+     * before that step lands would be the one the step took (as «Предложить товар», MOL-24).
+     */
+    const scanning = ref(false)
+    let scannerAway = true
+    let foundByCode: { entry: CatalogueEntry; code: string } | null = null
+    /** The code the item now on the purchase sheet was found by, for the recent items (В-2). */
+    let pickedByCode: { itemId: string; code: string } | null = null
+
+    const lookup = useBarcodeLookup({
+      found: (item, code) => {
+        foundByCode = { entry: item, code }
+        takeFoundByCode()
+      },
+      local: (code) => recent.byCode(code),
+    })
+    const barcode = lookup.phase
+
+    watch(scanning, (open) => {
+      if (open) scannerAway = false
+    })
+
+    // A new code is a new question: a find still held for the scanner to go belongs to the code
+    // before it, and would come up over «Код … не знаком» of this one (adversarial А).
+    function read(code: string): void {
+      foundByCode = null
+      lookup.lookUp(code)
+    }
+
+    function afterScanning(): void {
+      scannerAway = true
+      takeFoundByCode()
+    }
+
+    // Taken without a query: a code is not one, and the search learns nothing from it — neither a
+    // pick nor the person's own word (MOL-99, Р-3). The miss held from before is used up all the
+    // same, as by any sheet opened after it (MOL-45).
+    function takeFoundByCode(): void {
+      if (!scannerAway || foundByCode === null) return
+      const { entry: chosen, code } = foundByCode
+      foundByCode = null
+      pickWithoutQuery(chosen)
+      pickedByCode = { itemId: chosen.id, code }
+    }
+
+    function pickWithoutQuery(chosen: CatalogueEntry): void {
+      opened.value += 1
+      takeMissed('')
+      pickedByCode = null
+      entry.pick({ entry: chosen, query: '' })
+    }
+
+    // Typing is the other way to find it: the answer to the code gives way to the search.
+    watch(query, () => {
+      foundByCode = null
+      lookup.clear()
+    })
+
+    // Arrived by «Сканировать» on the record (В-4): the scanner is up over the screen at once, and
+    // put away it leaves the search by name.
+    onMounted(() => {
+      if (entry.takeScan()) scanning.value = true
+    })
+
+    // Under a code looked up with no network too: those are what the device can still find.
     const showsRecent = computed(
       () =>
-        phase.value === 'idle' ||
-        phase.value === 'offline' ||
-        (phase.value === 'error' && fallback.value),
+        barcode.value === 'offline' ||
+        (barcode.value === 'idle' &&
+          (phase.value === 'idle' ||
+            phase.value === 'offline' ||
+            (phase.value === 'error' && fallback.value))),
     )
 
     // Under an error as offline: the server does not answer either way, and «хлеб» typed before
     // it fell should not show twenty rows instead of one (Р-12).
     const rows = computed<CatalogueEntry[]>(() => {
+      if (barcode.value !== 'idle' && barcode.value !== 'offline') return []
       if (phase.value === 'ready' || phase.value === 'far') return results.value
       if (showsRecent.value) return recent.filter(query.value)
       return []
@@ -238,6 +359,9 @@ export default defineComponent({
       withdraw?.()
       withdraw = undefined
       if ((next !== 'ready' && next !== 'far' && next !== 'empty') || dimmed) return
+      // Under the answer to a code the rows are not shown, so an answer to the search that lands
+      // then is not said either — «found two» over «Код … не знаком» (adversarial Б).
+      if (barcode.value !== 'idle') return
       // A far answer is «не нашли» out loud too: «found one» for «Чай зелёный» on «пельмени»
       // would be the very claim the screen stopped making (MOL-46).
       withdraw = announce?.(
@@ -247,6 +371,27 @@ export default defineComponent({
             ? t('item.far_announced', { query: answered.value, n: found.length }, found.length)
             : t('item.empty.body', { query: answered.value }),
       )
+    })
+
+    // «Код … не знаком» out loud, as an empty answer is: the block says nothing of itself. The
+    // search's words go the moment a code is looked up — they describe what is no longer shown.
+    let withdrawCode: (() => void) | undefined
+    watch(barcode, (next) => {
+      withdrawCode?.()
+      withdrawCode = undefined
+      if (next === 'idle') return
+      withdraw?.()
+      withdraw = undefined
+      if (next === 'missing') {
+        withdrawCode = announce?.(t('item.barcode.missing', { code: lookup.code.value }))
+      } else if (next === 'found') {
+        withdrawCode = announce?.(
+          t('item.barcode.found_announced', {
+            code: lookup.code.value,
+            name: lookup.item.value?.name ?? '',
+          }),
+        )
+      }
     })
 
     const { picked } = storeToRefs(entry)
@@ -263,6 +408,11 @@ export default defineComponent({
     // proposed — neither was found by another word — and every pick uses the miss up.
     function pick(chosen: CatalogueEntry, learns = true): void {
       opened.value += 1
+      pickedByCode = null
+      // Something else taken answers the code's question too: a retry of it must not come over the
+      // sheet now opening (adversarial Ж′).
+      foundByCode = null
+      lookup.clear()
       const found = phase.value === 'ready' || phase.value === 'far'
       const text = found ? answered.value : query.value
       const missed = takeMissed(text)
@@ -273,7 +423,7 @@ export default defineComponent({
     // Into the recent items only once it went into the trip, as the server's memory of picks
     // does (MOL-11): a pick the sheet cancelled is a changed mind.
     function added(item: CatalogueEntry): void {
-      recent.remember(item)
+      recent.remember(item, pickedByCode?.itemId === item.id ? pickedByCode.code : undefined)
     }
 
     function putAway(): void {
@@ -283,6 +433,16 @@ export default defineComponent({
     /** «Предложить товар» — the whole form, the only way the catalogue grows in 0.1. */
     const proposing = ref(false)
     let proposedItem: CatalogueEntry | null = null
+    /**
+     * «Предложить товар» under «Код … не знаком» (adversarial Д): it was looked for by the code, not by
+     * what the field held before the scan — so the name starts empty, and the pick teaches no word.
+     */
+    const proposingByCode = ref(false)
+
+    function proposeByCode(): void {
+      proposingByCode.value = true
+      proposing.value = true
+    }
 
     // Picked like any other, with the query it was looked for by: the next search for it then
     // puts it first (MOL-11). New or already there — the same, the item is the catalogue's.
@@ -295,7 +455,14 @@ export default defineComponent({
     }
 
     function afterProposing(): void {
-      if (proposedItem) pick(proposedItem, false)
+      const byCode = proposingByCode.value
+      proposingByCode.value = false
+      if (proposedItem && byCode) {
+        // Proposed, the code's question is answered: its block goes with it (review С-5). The code
+        // itself is written with the item from MOL-100.
+        lookup.clear()
+        pickWithoutQuery(proposedItem)
+      } else if (proposedItem) pick(proposedItem, false)
       proposedItem = null
     }
 
@@ -304,6 +471,7 @@ export default defineComponent({
     })
     onUnmounted(() => {
       withdraw?.()
+      withdrawCode?.()
       dropSearchDraft(owner)
     })
 
@@ -334,6 +502,15 @@ export default defineComponent({
       proposing,
       proposed,
       afterProposing,
+      scanning,
+      read,
+      afterScanning,
+      proposingByCode,
+      proposeByCode,
+      lookup,
+      barcode,
+      barcodeCode: lookup.code,
+      barcodeItem: lookup.item,
     }
   },
 })

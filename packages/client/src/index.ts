@@ -15,6 +15,7 @@ import {
   addExpenseBodySchema,
   catalogueEntryCodec,
   catalogueSearchResponseSchema,
+  catalogueBarcodeResponseSchema,
   currentTripResponseSchema,
   exchangeAmendBodySchema,
   exchangeBodySchema,
@@ -177,6 +178,14 @@ export interface MolviaClient {
    * kind by the same name — the entry is then that item, and the fields sent were not applied.
    */
   proposeItem(input: ProposedItem): Promise<{ entry: CatalogueEntry; created: boolean }>
+  /**
+   * The item a scanned or typed code belongs to, or `null` (MOL-99). Cancelled through `signal`
+   * once the person types instead.
+   */
+  catalogueByBarcode(
+    code: string,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<CatalogueEntry | null>
   /** The places this person shopped in lately, to tap at the door instead of typing. */
   recentPlaces(geography?: SettingsGeography): Promise<TripPlace[]>
   /**
@@ -480,6 +489,16 @@ export function createClient(options: ClientOptions): MolviaClient {
         catalogueSearchResponseSchema,
         options.signal === undefined ? {} : { signal: options.signal },
       )
+    },
+
+    catalogueByBarcode: async (code, options = {}) => {
+      const search = new URLSearchParams({ code })
+      const { item } = await request(
+        `/catalogue/barcode?${search.toString()}`,
+        catalogueBarcodeResponseSchema,
+        options.signal === undefined ? {} : { signal: options.signal },
+      )
+      return item
     },
 
     // `async` so that an input the schema refuses arrives as a rejection, like everything else.

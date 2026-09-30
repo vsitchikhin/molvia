@@ -1,3 +1,4 @@
+import { barcodeSchema } from '#model/entities/item'
 import { ERROR, type ErrorCode } from '#model/support/errors'
 import { INVISIBLE } from '#model/support/text'
 
@@ -29,6 +30,64 @@ function expandUpcE(code: string): string {
           ? `${data.slice(0, 4)}00000${data.slice(4, 5)}`
           : `${data.slice(0, 5)}0000${last}`
   return `${code.slice(0, 1)}${middle}${code.slice(7)}`
+}
+
+// The way back: the UPC-E forms that `expandUpcE` turns into this UPC-A, one per rule of the four.
+function compressUpcA(upcA: string): string[] {
+  if (!/^[01]/.test(upcA)) return []
+  const data = [
+    `${upcA.slice(1, 3)}${upcA.slice(8, 11)}${upcA.slice(3, 4)}`,
+    `${upcA.slice(1, 4)}${upcA.slice(9, 11)}3`,
+    `${upcA.slice(1, 5)}${upcA.slice(10, 11)}4`,
+    `${upcA.slice(1, 6)}${upcA.slice(10, 11)}`,
+  ]
+  const forms = data.map((middle) => `${upcA.slice(0, 1)}${middle}${upcA.slice(11)}`)
+  return [...new Set(forms)].filter((upcE) => expandUpcE(upcE) === upcA)
+}
+
+/**
+ * Every form the code of one package may have been taken in, the code itself first (MOL-99,
+ * review С-14); nothing for a code of no barcode's shape.
+ *
+ * Eight digits that check both as EAN-8 and as UPC-E are the one case two forms exist: scanned
+ * as EAN-8 they stay eight digits, typed they are the UPC-E expanded to thirteen (`typedBarcode`),
+ * and the other way round for a UPC-E of number system `1`. A lookup by both finds what the
+ * other way in found. The price: a shop's own EAN-8 label and a UPC-E product with the same
+ * digits find each other.
+ *
+ * The pair holds only where one EAN-8 folds into the thirteen. Two shop labels with different
+ * digits may expand to one UPC-A (`00000055` and `00000505`), and the thirteen no longer say which
+ * label they came from: guessing put another shop's item on the sheet, from the thirteen
+ * (adversarial Г) and from the eight alike (Г′, review С-7). So such a label and its thirteen are
+ * each only themselves — scanned and typed, it finds only what was taken in the same form.
+ *
+ * Twelve digits are UPC-A and fourteen led by `0` are GTIN-14 of the same package: both are also
+ * looked up as the thirteen the scanner and `typedBarcode` give (adversarial З) — a client that
+ * does not repeat the phone's rules still finds the package.
+ */
+export function barcodeTwins(code: string): string[] {
+  if (!barcodeSchema.safeParse(code).success) return []
+  if (code.length === 8) {
+    const upcA = /^[01]/.test(code) ? expandUpcE(code) : null
+    if (upcA === null || !checks(code) || !checks(upcA)) return [code]
+    // Only where the thirteen lead back to these eight alone — the pair holds both ways or not at
+    // all (review С-7, adversarial Г′).
+    const eights = compressUpcA(upcA).filter(checks)
+    return eights.length === 1 ? [code, `0${upcA}`] : [code]
+  }
+  const thirteen =
+    code.length === 12
+      ? `0${code}`
+      : code.length === 14 && code.startsWith('0')
+        ? code.slice(1)
+        : code.length === 13
+          ? code
+          : null
+  if (thirteen === null) return [code]
+  const forms = thirteen === code ? [code] : [code, thirteen]
+  if (!thirteen.startsWith('0') || !checks(thirteen)) return forms
+  const eights = compressUpcA(thirteen.slice(1)).filter(checks)
+  return eights.length === 1 ? [...forms, ...eights] : forms
 }
 
 /**

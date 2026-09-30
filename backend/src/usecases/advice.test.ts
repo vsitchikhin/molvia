@@ -361,6 +361,7 @@ describe('поиск «Что брать» (MOL-128)', () => {
       byId: () => Promise.reject(new Error('byId was not expected')),
       byIds: () => Promise.reject(new Error('byIds was not expected')),
       createUnlessNamed: () => Promise.reject(new Error('createUnlessNamed was not expected')),
+      byBarcode: () => Promise.reject(new Error('byBarcode was not expected')),
       search: (...args) => {
         searched.push(args)
         return Promise.resolve({ items: found, near, nearIds: near ? found.map((i) => i.id) : [] })
