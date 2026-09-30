@@ -136,7 +136,9 @@ function lastMonthDay(): string {
 
 // The switcher is under the accounts card: taken to the top, it went down by the card, and the next
 // tap on the arrow missed it (MOL-136). Where it stands on the screen is what the thumb finds.
-test('changing the month keeps the switcher where it was on the screen', async ({ page }) => {
+test('changing the month keeps the switcher where it was on the screen, under the skeleton too', async ({
+  page,
+}) => {
   await signedIn(page)
   const headers = await asBrowser(page)
   const { categories } = (await (
@@ -159,19 +161,33 @@ test('changing the month keeps the switcher where it was on the screen', async (
   const rows = page.getByRole('button', { name: /Открыть трату/ })
   await expect(rows).toHaveCount(12)
 
-  // A month read for the first time on the phone comes under the skeleton, a shorter page, and the
-  // browser brings the scroll up to its end — the height of the page, not the router. Back to this
-  // month, the one the phone keeps is drawn at once.
-  await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
-  await expect(page).toHaveURL(/month=\d{4}-\d{2}/)
-  await expect(rows).toHaveCount(12)
+  // Last month is read for the first time on this phone, and its answer is held back: the screen
+  // stands under the skeleton, a page shorter than the one under the window (MOL-138).
+  let answer: () => void = () => undefined
+  const answered = new Promise<void>((resolve) => (answer = resolve))
+  await page.route(`**/api/money/months/${lastMonthDay().slice(0, 7)}*`, async (route) => {
+    await answered
+    await route.continue()
+  })
 
-  const next = page.getByRole('button', { name: 'Следующий месяц' })
-  await standAt(next, 120)
+  const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
+  await standAt(previous, 120)
   const scrolled = await page.evaluate(() => window.scrollY)
   expect(scrolled).toBeGreaterThan(0)
-  const before = await topOf(next)
+  const before = await topOf(previous)
 
+  await previous.click()
+  await expect(page).toHaveURL(/month=\d{4}-\d{2}/)
+  await expect(page.locator('.skeleton')).toBeVisible()
+  expect(await topOf(previous)).toBe(before)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
+
+  answer()
+  await expect(rows).toHaveCount(12)
+  expect(await topOf(previous)).toBe(before)
+
+  // Back to this month, the one the phone keeps, drawn at once.
+  const next = page.getByRole('button', { name: 'Следующий месяц' })
   await next.click()
   await expect(page).not.toHaveURL(/month=/)
   await expect(rows).toHaveCount(12)
