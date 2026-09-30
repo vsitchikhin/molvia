@@ -4,6 +4,7 @@ import type { Db } from '@/db/index'
 import {
   events,
   exchangeRevisions,
+  itemBarcodes,
   exchanges,
   expenses,
   incomeRevisions,
@@ -37,6 +38,12 @@ export async function aLife(
     name: 'Рынок-сыр',
     searchKey: 'rinok sir',
     createdBy: actorId,
+  })
+  // A code written to an item someone else added (MOL-100): the catalogue keeps it, not its author.
+  await db.insert(itemBarcodes).values({
+    code: `48${String(Math.floor(Math.random() * 1e11)).padStart(11, '0')}`,
+    itemId: shared.itemId,
+    addedBy: actorId,
   })
   const tripId = await insertTrip(db, { actorId, placeId: shared.placeId })
   await db.insert(expenses).values([

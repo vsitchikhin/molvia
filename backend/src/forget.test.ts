@@ -23,6 +23,7 @@ const REPORT: ErasureReport = {
     actors: 1,
   },
   itemsReleased: 1,
+  barcodesReleased: 2,
   counted: true,
 }
 
@@ -86,6 +87,7 @@ describe('forget — стирание вручную', () => {
     await exit
     expect(lines).toContain('  verdicts            3')
     expect(lines).toContain('  items kept          1 (author removed)')
+    expect(lines).toContain('  codes kept          2 (author removed)')
     expect(lines).toContain(
       '  erasures            +1 (a count by week of arrival, no id — the gates read it)',
     )

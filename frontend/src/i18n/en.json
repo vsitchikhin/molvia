@@ -1009,7 +1009,7 @@
   },
   "privacy": {
     "title": "Data and privacy",
-    "revised": "Revised 29 September 2026",
+    "revised": "Revised 30 September 2026",
     "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
@@ -1040,6 +1040,10 @@
       "places": {
         "term": "Shops",
         "text": "The names of the shops you give with your purchases — in the shared catalogue, without your name."
+      },
+      "barcodes": {
+        "term": "Barcodes",
+        "text": "A code you linked to an item, and when. The code itself is in the shared catalogue: everyone finds the item by it, but whose it is is shown to nobody."
       },
       "ratings": {
         "term": "Ratings and reviews",
@@ -1080,11 +1084,11 @@
     },
     "copy": {
       "title": "A copy of your data",
-      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected and the items you added to the shared catalogue. A rating you withdrew is there too: without its review it stays with us, so the count of ratings given stays honest. What you removed and can still bring back is there as well, marked. The file holds no login keys."
+      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue and the barcodes you linked. A rating you withdrew is there too: without its review it stays with us, so the count of ratings given stays honest. What you removed and can still bring back is there as well, marked. The file holds no login keys."
     },
     "erase": {
       "title": "Delete everything",
-      "text": "Send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they and the items you added to the shared catalogue stay, without your name. Saved copies may remain on your phone: to remove them, sign out in Settings, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data. It is there so that whether Molvia gets used is counted honestly."
+      "text": "Send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they, the items you added to the shared catalogue and the barcodes you linked stay, without your name. Saved copies may remain on your phone: to remove them, sign out in Settings, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data. It is there so that whether Molvia gets used is counted honestly."
     }
   },
   "accounts": {

@@ -218,6 +218,13 @@
       "when": 1790716113501,
       "tag": "0030_trip_days",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790771970429,
+      "tag": "0031_barcode_authors",
+      "breakpoints": true
     }
   ]
 }

@@ -35,6 +35,7 @@ const STORED = [
   'spendings',
   'accounts',
   'places',
+  'barcodes',
   'ratings',
   'reminders',
   'search',

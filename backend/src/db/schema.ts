@@ -329,6 +329,13 @@ export const itemBarcodes = pgTable(
     itemId: uuid('item_id')
       .notNull()
       .references(() => items.id, { onDelete: 'cascade' }),
+    /**
+     * Who wrote the code to the item (MOL-100, Р-5): anyone may, and a code written says the person
+     * held the package — theirs, as an item's author is. Null for a code written before, or once the
+     * person is erased: the code is the catalogue's and stays.
+     */
+    addedBy: uuid('added_by').references((): AnyPgColumn => actors.id, { onDelete: 'set null' }),
+    addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('item_barcodes_item_idx').on(table.itemId),
