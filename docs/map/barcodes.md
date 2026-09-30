@@ -5,10 +5,11 @@ Rules: `.claude/rules/barcodes.md`. A test beside its source, or mirroring it un
 
 ## packages/model
 
-- `packages/model/src/entities/barcode.ts` — `typedBarcode`: a code typed by hand checked by its last digit and given in the scanner's form — UPC-A and UPC-E as thirteen digits.
+- `packages/model/src/entities/barcode.ts` — `typedBarcode`: a code typed by hand checked by its last digit and given in the scanner's form — UPC-A and UPC-E as thirteen digits; `barcodeTwins`, the forms of one package; `writtenBarcode`, the form a code is written to the catalogue in (MOL-100).
 
 ## backend · usecases
 
+- `backend/src/usecases/attach-barcode.ts` — Use case: «привязать код к ней?» — a code written to anyone's item in the name of who wrote it, or the item that holds it named; «не этот товар?» lets it go (MOL-100). Routes `POST`/`DELETE /catalogue/items/:itemId/barcodes` in `routes/catalogue.ts`; tests: `backend/tests/catalogue.integration.test.ts`.
 - `backend/src/usecases/find-by-barcode.ts` — Use case: the item a scanned or typed code belongs to, looked up with its twins, the code as read first; writes nothing. Route `GET /catalogue/barcode` in `routes/catalogue.ts`; tests: `backend/tests/catalogue.integration.test.ts`.
 
 ## frontend · components

@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
@@ -18,6 +18,7 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 const offline = vi.hoisted(() => () => Promise.reject(new Error('Failed to fetch')))
 const currentTrip = vi.hoisted(() => vi.fn<() => Promise<unknown>>())
 const readTrip = vi.hoisted(() => vi.fn<(id: string) => Promise<unknown>>())
+const detachBarcode = vi.hoisted(() => vi.fn<(itemId: string, code: string) => Promise<void>>())
 vi.mock('@/api', async () => {
   const { ApiError } = await import('@molvia/client')
   const { ERROR } = await import('@molvia/model')
@@ -30,6 +31,7 @@ vi.mock('@/api', async () => {
       addExpense: fail,
       updateExpense: fail,
       removeExpense: fail,
+      detachBarcode,
       currentTrip,
       trip: (id: string) => readTrip(id),
     },
@@ -109,6 +111,7 @@ interface Options {
   readonly server?: TripView | null | 'down'
   readonly locale?: 'ru' | 'en'
   readonly selected?: TripView
+  readonly code?: string
 }
 
 async function router() {
@@ -137,6 +140,7 @@ async function render(options: Options = {}) {
       query: options.query ?? null,
       expense: options.expense ?? null,
       closeSteps: options.closeSteps ?? 1,
+      code: options.code ?? null,
     },
     attachTo: document.body,
     global: { plugins: [made, pinia, createAppI18n(options.locale ?? 'ru')] },
@@ -496,5 +500,73 @@ describe('ItemDetailsSheet', () => {
     await type(view, 'quantity', '0.9')
     await type(view, 'amount', '520')
     expect(perUnit(view)).toMatch(/577\.78.*\/l$/)
+  })
+})
+
+describe('«не этот товар?» (MOL-100)', () => {
+  it('must not be offered for an item that did not come by a code', async () => {
+    const { view } = await render()
+
+    expect(view.text()).toContain('Молоко «Ашхар»')
+    expect(view.text()).not.toMatch(/не этот товар/)
+  })
+
+  it('keeps the sheet and says so when the code could not be let go', async () => {
+    detachBarcode.mockRejectedValue(new Error('Failed to fetch'))
+    const { view } = await render({ code: '4850001234562' })
+
+    const line = view
+      .findAll('button')
+      .find((button) => button.text() === 'Код 4850001234562 — не этот товар?')
+    await line?.trigger('click')
+    await nextTick()
+    // Asked before it is done (review Ж): the question, then «Отвязать».
+    expect(view.text()).toContain('Отвязать код 4850001234562 от «Молоко «Ашхар»»?')
+    await view
+      .findAll('button')
+      .find((button) => button.text() === 'Отвязать')
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(detachBarcode).toHaveBeenCalledWith(milk.id, '4850001234562')
+    expect(view.text()).toContain('Не получилось отвязать код — проверьте связь')
+    expect(view.get('dialog').element.open).toBe(true)
+    expect(view.emitted('detached')).toBeUndefined()
+  })
+
+  it('lets nothing go on the first tap, and «Отменить» takes the question back', async () => {
+    const { view } = await render({ code: '4850001234562' })
+
+    await view
+      .findAll('button')
+      .find((button) => button.text() === 'Код 4850001234562 — не этот товар?')
+      ?.trigger('click')
+    await nextTick()
+    await view
+      .findAll('button')
+      .find((button) => button.text() === 'Отменить')
+      ?.trigger('click')
+    await nextTick()
+
+    expect(detachBarcode).not.toHaveBeenCalled()
+    expect(view.text()).not.toContain('Отвязать код')
+    expect(view.text()).toContain('Код 4850001234562 — не этот товар?')
+    // Back on the line that asked, inside the sheet — not the body (adversarial О).
+    expect(document.activeElement?.textContent.trim()).toBe('Код 4850001234562 — не этот товар?')
+  })
+
+  it('asks with «Отменить» in focus, and «Отвязать» is not the filled button (review Л)', async () => {
+    const { view } = await render({ code: '4850001234562' })
+
+    await view
+      .findAll('button')
+      .find((button) => button.text() === 'Код 4850001234562 — не этот товар?')
+      ?.trigger('click')
+    await nextTick()
+    await nextTick()
+
+    expect(document.activeElement?.textContent.trim()).toBe('Отменить')
+    const detach = view.findAll('button').find((button) => button.text() === 'Отвязать')
+    expect(detach?.classes()).toContain('danger-ghost')
   })
 })

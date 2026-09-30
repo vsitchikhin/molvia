@@ -374,6 +374,8 @@ describe('/delete — человек удаляет себя сам (MOL-58)', (
     for (const language of ['ru', 'en']) {
       const prompt = t(language, 'erase.prompt')
       expect(prompt).toMatch(language === 'ru' ? /магазин/ : /shops/)
+      // MOL-100: the codes a person wrote stay in the catalogue, without their name.
+      expect(prompt).toMatch(language === 'ru' ? /штрихкоды/ : /barcodes/)
       expect(prompt).toMatch(
         language === 'ru' ? /выбор в поиске.*отметки о визитах/s : /search picks.*visit marks/s,
       )

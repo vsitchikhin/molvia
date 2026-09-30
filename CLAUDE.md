@@ -282,6 +282,12 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A code is looked up in the query, never the path** (`GET /catalogue/barcode?code=`, MOL-99): the
   API logs paths. It is looked up with its twins (`barcodeTwins`), the code as read first; the item
   found goes to the purchase sheet with no query — a code teaches the search nothing.
+- **Anyone writes a code to any item, and anyone lets it go** (MOL-100): it must check
+  (`writtenBarcode`); one package is one item with its twins, under a lock per form after the item's;
+  a code another item holds writes nothing and answers `409` with the holder; `added_by` is erased
+  and copied like an item's author; a pick while a code waits asks «привязать?» before the sheet.
+  **A shop's own code is never written** (`inStoreBarcode`, В-4), and a name already there takes no
+  code silently — it is asked about (В-5). Eight digits typed that check as EAN-8 are EAN-8 (В-7).
 
 ### Identity, sessions, the way in and out — `.claude/rules/auth.md`
 

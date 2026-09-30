@@ -23,8 +23,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // 2: `ratingReminders`, where the person stands on the ladder of rating reminders (MOL-101) — a
 // change of what goes in is a new version (privacy.md). 3: a trip's `receipt` and `receiptSetAt`,
 // the sum typed from the receipt, when it last changed and when it was first typed (MOL-78). 4: an
-// exchange's `channel` (MOL-137).
-export const EXPORT_VERSION = 4
+// exchange's `channel` (MOL-137). 5: `addedBarcodes`, the codes the person wrote to items of the
+// catalogue (MOL-100).
+export const EXPORT_VERSION = 5
 
 const day = z.iso.date()
 
@@ -305,6 +306,18 @@ const proposedItemSchema = z.strictObject({
   createdAt: isoDate,
 })
 
+/**
+ * A code the person wrote to an item, theirs or anyone's (MOL-100): it says they held the package.
+ * The code stays in the catalogue when they are erased — only its author goes.
+ */
+// `barcode`, not `code`: a key named `code` is what the file's guard against secrets looks for — a
+// login's code.
+const addedBarcodeSchema = z.strictObject({
+  barcode: z.string(),
+  itemId: z.uuid(),
+  addedAt: isoDate,
+})
+
 /** Names for the ids the person's rows point at — shared data, given only so the file reads. */
 const catalogueSchema = z.strictObject({
   items: z.array(z.strictObject({ id: z.uuid(), kind: itemKindSchema, name: z.string() })),
@@ -338,6 +351,7 @@ export const exportContentCodec = z.strictObject({
   moneyAccounts: z.array(moneyAccountSchema),
   accountChecks: z.array(accountCheckSchema),
   proposedItems: z.array(proposedItemSchema),
+  addedBarcodes: z.array(addedBarcodeSchema),
   catalogue: catalogueSchema,
 })
 export type ExportContent = z.output<typeof exportContentCodec>

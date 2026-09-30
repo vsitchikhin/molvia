@@ -16,6 +16,8 @@
       :maxlength="noteMax"
       enterkeyhint="done"
     />
+    <p v-if="nameTaken" class="code">{{ t('item.propose.name_taken', { name: nameTaken }) }}</p>
+    <p v-if="code" class="code">{{ t('item.propose.code', { code }) }}</p>
 
     <template #footer>
       <!-- There before its words, with only the text changing: a live region born together with
@@ -24,7 +26,17 @@
       <p v-if="connected && failed" class="line failed" role="alert">
         {{ t('item.propose.failed') }}
       </p>
-      <AppButton size="large" block :disabled="!ready" @click="submit">
+      <!-- Another item holds the code (MOL-100, Р-3): nothing was written, and that item is offered
+           — the package in the hand is what the catalogue already knows it as. -->
+      <template v-if="holder">
+        <p class="line failed" role="alert">
+          {{ t('item.propose.taken', { name: holder.name }) }}
+        </p>
+        <AppButton ref="takeButton" size="large" block @click="$emit('taken', holder)">
+          {{ t('item.propose.take', { name: holder.name }) }}
+        </AppButton>
+      </template>
+      <AppButton v-else size="large" block :disabled="!ready" @click="submit">
         {{ t('item.propose.submit') }}
       </AppButton>
     </template>
@@ -32,7 +44,17 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  computed,
+  defineComponent,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  shallowRef,
+  watch,
+} from 'vue'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   ITEM_NAME_MAX,
@@ -61,6 +83,10 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
  * queue in 0.1, and an item proposed twice from two queues is what the name identity exists to
  * prevent.
  *
+ * Opened from a code the catalogue did not know (MOL-100), the code goes with the item — shown, and
+ * not taken out: to add the item without it, the person closes the sheet and finds it by name. The
+ * code another item already holds writes nothing, and that item is offered instead.
+ *
  * What the server refuses reads as one line, not under a field: its refusals are issue codes,
  * which the dictionary does not translate, and a blank name — the one refusal a person can make
  * here — never leaves, because the button waits for a name.
@@ -75,10 +101,23 @@ export default defineComponent({
     open: { type: Boolean, required: true },
     /** What was typed into the search; the name starts from it. */
     query: { type: String, required: true },
+    /** The code the item is proposed for, read from its package (MOL-100); none from the name. */
+    code: { type: String as PropType<string | null>, default: null },
+    /**
+     * The name of the item just declined as «другой товар» (MOL-100, adversarial Н): the name typed
+     * is that item's, and proposed again it would be asked about again.
+     */
+    nameTaken: { type: String as PropType<string | null>, default: null },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
-    proposed: (entry: CatalogueEntry) => typeof entry.id === 'string',
+    /** `created: false` — the catalogue held the name; codes sent with it were not written (В-5). */
+    proposed: (entry: CatalogueEntry, created: boolean) =>
+      typeof entry.id === 'string' && typeof created === 'boolean',
+    /** The item that holds the code already, chosen instead (MOL-100). */
+    taken: (entry: CatalogueEntry) => typeof entry.id === 'string',
+    /** A new item written with this code after the sheet was put away (adversarial Р6-Б). */
+    writtenLate: (code: string) => typeof code === 'string',
   },
   setup(props, { emit }) {
     const { t } = useI18n()
@@ -88,6 +127,8 @@ export default defineComponent({
     const sending = ref(false)
     const failed = ref(false)
     const connected = ref(navigator.onLine)
+    const holder = shallowRef<CatalogueEntry | null>(null)
+    const takeButton = ref<{ $el?: HTMLElement } | null>(null)
 
     const units = computed(() => [
       { value: 'kg', label: t('item.unit_kg') },
@@ -123,6 +164,7 @@ export default defineComponent({
         unit.value = ''
         note.value = ''
         failed.value = false
+        holder.value = null
       },
       { immediate: true },
     )
@@ -132,6 +174,7 @@ export default defineComponent({
         kind: 'product',
         name: name.value,
         defaultUnit: unit.value,
+        barcodes: props.code === null ? [] : [props.code],
         // Absent when it draws nothing — by the schema's own measure, so a pasted U+200B is left
         // out like spaces rather than refused with the button going grey (A6b).
         ...(drawsNothing(note.value) ? {} : { note: note.value }),
@@ -188,11 +231,26 @@ export default defineComponent({
       const parsed = input.value
       if (!ready.value || !parsed.success) return
       const mine = opening
+      const sentCode = props.code
       sending.value = true
       failed.value = false
       try {
-        const { entry } = await api.proposeItem(parsed.data)
-        if (mine === opening) emit('proposed', entry)
+        const written = await api.proposeItem(parsed.data)
+        if (mine !== opening) {
+          // Put away meanwhile: nothing is picked (A1), but a new item was written with the code, and
+          // the screen must not go on asking about it (adversarial Р6-Б).
+          if (!('taken' in written) && written.created && sentCode !== null) {
+            emit('writtenLate', sentCode)
+          }
+          return
+        }
+        if ('taken' in written) {
+          holder.value = written.taken
+          // «Добавить» goes with the answer: the focus goes to what took its place, inside the sheet
+          // — gone with the button, it fell to the body outside the modal dialog (adversarial О′).
+          await nextTick()
+          takeButton.value?.$el?.focus()
+        } else emit('proposed', written.entry, written.created)
       } catch {
         if (mine !== opening) return
         connected.value = navigator.onLine
@@ -222,6 +280,8 @@ export default defineComponent({
       units,
       connected,
       failed,
+      holder,
+      takeButton,
       ready,
       textRefused,
       status,
@@ -247,5 +307,15 @@ export default defineComponent({
 
 .failed {
   color: var(--bad-ink);
+}
+
+.code {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+  font-variant-numeric: tabular-nums;
 }
 </style>

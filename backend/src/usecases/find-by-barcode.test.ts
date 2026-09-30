@@ -26,6 +26,8 @@ function fakeItems(byBarcode: ItemRepository['byBarcode']): ItemRepository {
     createUnlessNamed: () => Promise.reject(new Error('createUnlessNamed was not expected')),
     search: () => Promise.reject(new Error('search was not expected')),
     byBarcode,
+    attachBarcode: () => Promise.reject(new Error('attachBarcode was not expected')),
+    detachBarcode: () => Promise.reject(new Error('detachBarcode was not expected')),
   }
 }
 

@@ -42,6 +42,7 @@ import type { QuietToday } from '@/usecases/remind-ratings'
 import { amendVerdict } from '@/usecases/amend-verdict'
 import { withdrawVerdict } from '@/usecases/withdraw-verdict'
 import { pendingVerdicts } from '@/usecases/pending-verdicts'
+import { attachBarcode, detachBarcode } from '@/usecases/attach-barcode'
 import { findByBarcode } from '@/usecases/find-by-barcode'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { signIn } from '@/usecases/sign-in'
@@ -133,6 +134,8 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   // The request is well formed; another row already holds what it claims — a barcode that
   // belongs to another item. Not 400: nothing about the request itself is wrong.
   [ERROR.CONFLICT]: 409,
+  // An item that holds as many codes as one item may (MOL-100): the request is well formed.
+  [ERROR.BARCODES_FULL]: 409,
   // A name one of the owner's live categories already has: the same kind of answer as a conflict.
   [ERROR.SPENDING_CATEGORY_TAKEN]: 409,
   // The same for an account's name (MOL-115, Р-21), and for the currency of an account that
@@ -492,6 +495,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         search: (actorId, query) => searchCatalogue({ items }, actorId, query),
         propose: (actorId, input) => proposeItem(items, actorId, input),
         byBarcode: (code) => findByBarcode(items, code),
+        attachBarcode: (actorId, itemId, code) => attachBarcode(items, actorId, itemId, code),
+        detachBarcode: (itemId, code) => detachBarcode(items, itemId, code),
       })
       placeRoutes(guarded, {
         recent: (actorId, geography) => recentPlaces(tripData.places, actorId, geography),

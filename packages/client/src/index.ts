@@ -13,6 +13,8 @@ import {
   adviceResponseSchema,
   adviceSearchResponseSchema,
   addExpenseBodySchema,
+  attachBarcodeBodySchema,
+  barcodeTakenSchema,
   catalogueEntryCodec,
   catalogueSearchResponseSchema,
   catalogueBarcodeResponseSchema,
@@ -123,6 +125,23 @@ export type { ClientOptions } from './transport'
 export { createBotClient } from './bot'
 export type { MolviaBotClient, BotClientOptions } from './bot'
 
+/**
+ * What a write to the catalogue came to (MOL-100): the entry — `created` when the write added
+ * something, an item or a code — or the item that holds a code sent, with nothing written.
+ */
+export type CatalogueWrite =
+  { readonly entry: CatalogueEntry; readonly created: boolean } | { readonly taken: CatalogueEntry }
+
+/** «Занят» comes with a 409 and is read only there; a 2xx is read only as the entry (review И). */
+const TAKEN = { 409: barcodeTakenSchema } as const
+
+function writeOf(
+  status: number,
+  data: CatalogueEntry | z.output<typeof barcodeTakenSchema>,
+): CatalogueWrite {
+  return 'taken' in data ? { taken: data.taken } : { entry: data, created: status === 201 }
+}
+
 export interface MolviaClient {
   /** `again`: this device began a login before and has not come in since (MOL-68). */
   startLogin(options?: {
@@ -175,9 +194,18 @@ export interface MolviaClient {
   ): Promise<CatalogueSearchResponse>
   /**
    * «Предложить товар». `created` is `false` when the catalogue already held an item of this
-   * kind by the same name — the entry is then that item, and the fields sent were not applied.
+   * kind by the same name — the entry is then that item, and neither the fields nor the codes sent
+   * were written (MOL-100, В-5): the screen asks whether the code is its. `taken` when another item
+   * holds a code.
    */
-  proposeItem(input: ProposedItem): Promise<{ entry: CatalogueEntry; created: boolean }>
+  proposeItem(input: ProposedItem): Promise<CatalogueWrite>
+  /**
+   * «Привязать код к ней?» (MOL-100): the code written to the item. `created` is `false` when the
+   * item held it already. Another item holding it is `taken`, and nothing was written.
+   */
+  attachBarcode(itemId: string, code: string): Promise<CatalogueWrite>
+  /** «Код … — не этот товар?» (MOL-100, В-1): the code let go of by the item. Safe to repeat. */
+  detachBarcode(itemId: string, code: string): Promise<void>
   /**
    * The item a scanned or typed code belongs to, or `null` (MOL-99). Cancelled through `signal`
    * once the person types instead.
@@ -508,8 +536,29 @@ export function createClient(options: ClientOptions): MolviaClient {
       const { status, data } = await exchange('/catalogue/items', catalogueEntryCodec, {
         method: 'POST',
         body: encode(proposedItemSchema, input),
+        answers: TAKEN,
       })
-      return { entry: data, created: status === 201 }
+      return writeOf(status, data)
+    },
+
+    attachBarcode: async (itemId, code) => {
+      const { status, data } = await exchange(
+        `/catalogue/items/${segment(itemId.toLowerCase())}/barcodes`,
+        catalogueEntryCodec,
+        { method: 'POST', body: encode(attachBarcodeBodySchema, { code }), answers: TAKEN },
+      )
+      return writeOf(status, data)
+    },
+
+    detachBarcode: async (itemId, code) => {
+      const query = new URLSearchParams({ code }).toString()
+      noContent(
+        await exchange(
+          `/catalogue/items/${segment(itemId.toLowerCase())}/barcodes?${query}`,
+          z.undefined(),
+          { method: 'DELETE' },
+        ),
+      )
     },
 
     recentPlaces: async (geography) =>

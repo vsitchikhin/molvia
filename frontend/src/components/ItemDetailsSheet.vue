@@ -48,6 +48,40 @@
         <span>{{ t('money.converted_package', { amount: converted }) }}</span>
         <span class="note">{{ t('money.converted_note') }}</span>
       </p>
+
+      <!-- The item came by its code (MOL-100, В-1): whoever holds the package may say it is not
+           this one. Under the form, not beside «Записать», and asked before it is done (review Ж):
+           the code goes for everyone, with no «Вернуть». -->
+      <template v-if="code">
+        <!-- A group named by its question: the focus waits on «Отменить», and a screen reader reads
+             the question with it — the app's live region is outside the modal sheet. -->
+        <div v-if="confirming" class="detach" role="group" :aria-labelledby="detachQuestionId">
+          <p :id="detachQuestionId" class="detach-question">
+            {{ t('item.barcode.detach_question', { code, name: entry.name }) }}
+          </p>
+          <p class="caption">{{ t('item.barcode.detach_hint') }}</p>
+          <!-- Destructive for everyone and with no «Вернуть»: not the filled button, and the focus
+               waits on «Отменить» (review Л). -->
+          <AppButton variant="danger-ghost" block :busy="detaching" @click="notThis">
+            {{ t('item.barcode.detach') }}
+          </AppButton>
+          <AppButton
+            ref="detachCancel"
+            variant="ghost"
+            block
+            :inactive="detaching"
+            @click="keepCode"
+          >
+            {{ t('item.cancel') }}
+          </AppButton>
+          <p v-if="detachFailed" class="caption offline" role="alert">
+            {{ t('item.barcode.not_this_failed') }}
+          </p>
+        </div>
+        <AppButton v-else ref="notThisButton" variant="ghost" block @click="askDetach">
+          {{ t('item.barcode.not_this', { code }) }}
+        </AppButton>
+      </template>
     </div>
 
     <template #footer>
@@ -69,7 +103,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconMenuDown from '~icons/mdi/menu-down'
@@ -82,6 +116,7 @@ import type {
   TripExpenseView,
   TripView,
 } from '@molvia/model'
+import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -91,6 +126,7 @@ import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useItemDetails } from '@/composables/useItemDetails'
 import type { DetailsField, RetryPurchase } from '@/composables/useItemDetails'
+import { useRecentItemsStore } from '@/stores/recentItems'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -132,11 +168,15 @@ export default defineComponent({
     tripCurrency: { type: String as PropType<Currency | undefined>, default: undefined },
     closeSteps: { type: Number as PropType<1 | 2>, default: 1 },
     onClosed: { type: Function as PropType<() => void>, default: undefined },
+    /** The code the item was found by or just given on the search (MOL-100); none otherwise. */
+    code: { type: String as PropType<string | null>, default: null },
   },
   emits: {
     added: (entry: CatalogueEntry) => typeof entry === 'object',
     saved: () => true,
     removed: () => true,
+    /** The code was let go of by the item — «не этот товар?» (MOL-100). */
+    detached: (code: string) => typeof code === 'string',
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
@@ -355,6 +395,52 @@ export default defineComponent({
       close(props.closeSteps)
     }
 
+    const recent = useRecentItemsStore()
+    const detachQuestionId = `${useId()}-detach`
+    const confirming = ref(false)
+    const detachCancel = ref<{ $el?: HTMLElement } | null>(null)
+    const detaching = ref(false)
+    const detachFailed = ref(false)
+
+    async function askDetach(): Promise<void> {
+      confirming.value = true
+      detachFailed.value = false
+      await nextTick()
+      detachCancel.value?.$el?.focus()
+    }
+
+    // The question goes with the button that held the focus: it comes back to the line that asked,
+    // or it would fall to the body, outside the modal sheet (adversarial О).
+    const notThisButton = ref<{ $el?: HTMLElement } | null>(null)
+    async function keepCode(): Promise<void> {
+      if (detaching.value) return
+      confirming.value = false
+      detachFailed.value = false
+      await nextTick()
+      notThisButton.value?.$el?.focus()
+    }
+
+    // One step back, to the search under the sheet: the code is to be given to its item there.
+    async function notThis(): Promise<void> {
+      const code = props.code
+      if (done || detaching.value || code === null) return
+      detaching.value = true
+      detachFailed.value = false
+      try {
+        await api.detachBarcode(props.entry.id, code)
+        // Here and not in the screen: a sheet put away while the answer was on its way emits to
+        // nobody, and the device would go on finding the item by a code it no longer holds.
+        recent.forgetCode(code)
+        done = true
+        emit('detached', code)
+        close(1)
+      } catch {
+        detachFailed.value = true
+      } finally {
+        detaching.value = false
+      }
+    }
+
     return {
       t,
       open,
@@ -377,6 +463,15 @@ export default defineComponent({
       submit,
       remove,
       leave,
+      confirming,
+      detachQuestionId,
+      detachCancel,
+      askDetach,
+      keepCode,
+      notThisButton,
+      detaching,
+      detachFailed,
+      notThis,
     }
   },
 })
@@ -464,6 +559,21 @@ export default defineComponent({
   margin: 0;
   text-align: center;
   font-size: var(--text-footnote);
+}
+
+.detach {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.detach-question {
+  margin: 0;
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
 }
 
 .no-trip {

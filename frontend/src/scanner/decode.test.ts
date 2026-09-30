@@ -69,9 +69,12 @@ describe('decodeFrame', () => {
     expect(typedBarcode('06543217')).toEqual({ ok: true, code: upcE })
   })
 
-  it('reads the UPC-E led by 0 that also checks as EAN-8 as the typed code does', async () => {
-    const code = await decodeFrame(await frameOf('01234565', 'UPCE'))
-    expect(typedBarcode('01234565')).toEqual({ ok: true, code })
+  it('reads a UPC-E whose digits also check as EAN-8 by its print — typed, the digits are EAN-8', async () => {
+    // The price of MOL-100 В-7: typed, eight that check as EAN-8 are the shop's label the scanner
+    // reads such a print as; only the scan of the UPC-E print gives its thirteen.
+    expect(await decodeFrame(await frameOf('01234565', 'UPCE'))).toBe('0012345000065')
+    expect(await decodeFrame(await frameOf('01234565', 'EAN8'))).toBe('01234565')
+    expect(typedBarcode('01234565')).toEqual({ ok: true, code: '01234565' })
   })
 
   it('must not read a QR or a Code 128 on the same package', async () => {

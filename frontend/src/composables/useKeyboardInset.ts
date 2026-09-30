@@ -12,6 +12,14 @@ import type { Ref } from 'vue'
  * lifted by it through `--keyboard-inset`. Chrome on Android is told to shrink the layout instead
  * (`interactive-widget` in index.html), and there the gap is zero.
  *
+ * The window is the box a fixed panel is pinned in, and that is `100dvh` — never `innerHeight`,
+ * which Safari moves on its own with the keyboard up. In the installed app on the owner's iPhone it
+ * read 796 and, the next time the same keyboard rose, 720, over the same visual viewport (427, 123
+ * down): the lift came out 76px short, and the sheet's end — the categories — stood under the glass
+ * bar of «∧ ∨ ✓» over the keys. In Safari with its bar folded it read 535 or 734 of a `100dvh` of
+ * 699 or 734. Measured by `100dvh`, every state logged on the phone puts the sheet's end where the
+ * keyboard begins (hotfix-bottom-menu).
+ *
  * The sheet's height is a share of what is visible, and that is the visual viewport's own height
  * (`--viewport-height`), never worked out from the window. Safari on the owner's iPhone shrank the
  * window to the visible part under the keyboard (699 → 395), left `100dvh` at 699 and reported the
@@ -41,12 +49,14 @@ export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<bo
     if (viewport.scale > 1) {
       element.style.setProperty('--keyboard-inset', '0px')
       element.style.removeProperty('--viewport-height')
+      underKeys(false)
       placed = ''
       return
     }
-    // Below zero where Safari has shrunk the window to the visible part and still reports the
-    // viewport scrolled down it (MOL-135): the keys cover nothing of this window, and that is zero.
-    const covered = pixels(window.innerHeight - viewport.height - viewport.offsetTop)
+    const whole = windowHeight()
+    underKeys(whole - viewport.height > KEYBOARD)
+    // Never below zero: a visual viewport past the end of the window is nothing the keys cover.
+    const covered = pixels(whole - viewport.height - viewport.offsetTop)
     const height = pixels(viewport.height)
     element.style.setProperty('--keyboard-inset', covered)
     element.style.setProperty('--viewport-height', height)
@@ -66,6 +76,7 @@ export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<bo
     window.visualViewport?.removeEventListener('scroll', measure)
     target.value?.style.removeProperty('--keyboard-inset')
     target.value?.style.removeProperty('--viewport-height')
+    underKeys(false)
     placed = ''
   }
 
@@ -120,6 +131,45 @@ function reveal(sheet: HTMLElement): void {
   // the edge — and rounded so that the field's top never goes past the sheet's.
   if (above > 0) sheet.scrollTop -= Math.ceil(above)
   else if (below > 0) sheet.scrollTop += Math.min(Math.ceil(below), Math.floor(-above))
+}
+
+/**
+ * Less than any on-screen keyboard and more than a browser's own bars coming and going: the
+ * visible part this much shorter than the window is a keyboard.
+ */
+const KEYBOARD = 150
+
+/**
+ * Tells the page the keys are up under an open sheet (`data-under-keys` on the root; main.scss).
+ * Safari ends everything fixed — the sheet, its scrim — at the top of the keyboard, and on iOS 26
+ * and later its bar of «∧ ∨ ✓», the address bar floating over the keys and the keys themselves are
+ * glass with clear room between them: what shows through is the page itself, and a fixed layer
+ * cannot be drawn there to cover it. The page under a modal sheet takes nothing anyway, so it is
+ * hidden instead, and the canvas takes the sheet's colour (hotfix-bottom-menu, the owner's
+ * screenshots, Safari and the installed app).
+ */
+function underKeys(on: boolean): void {
+  const root = document.documentElement
+  if (on) root.dataset.underKeys = ''
+  else delete root.dataset.underKeys
+}
+
+// A box as tall as `100dvh`, read by its height: a length in `dvh` has no reading of its own in a
+// script. One for the app, put back if the page's body was replaced.
+let ruler: HTMLElement | null = null
+
+function windowHeight(): number {
+  if (!ruler?.isConnected) {
+    ruler = document.createElement('div')
+    ruler.setAttribute('aria-hidden', 'true')
+    ruler.dataset.dvh = ''
+    ruler.style.cssText =
+      'position:fixed;top:0;left:0;width:0;height:100dvh;visibility:hidden;pointer-events:none'
+    document.body.append(ruler)
+  }
+  // Where nothing is laid out — the component tests — the box has no height, and the window's is
+  // the one there is.
+  return ruler.getBoundingClientRect().height || window.innerHeight
 }
 
 function pixels(value: number): string {

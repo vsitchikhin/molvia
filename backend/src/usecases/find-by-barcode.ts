@@ -1,4 +1,4 @@
-import { barcodeTwins } from '@molvia/model'
+import { barcodeTwins, barcodeWriteForm } from '@molvia/model'
 import type { Item } from '@molvia/model'
 import type { ItemRepository } from '@/db/items-repository'
 
@@ -11,6 +11,10 @@ import type { ItemRepository } from '@/db/items-repository'
  * an item taken by its code teaches the search no word for it.
  */
 export async function findByBarcode(items: ItemRepository, code: string): Promise<Item | null> {
-  const codes = barcodeTwins(code)
+  // And in the form a write gives it (MOL-100, adversarial Р5-В): eight that check only as UPC-E
+  // are written as their thirteen, and asked by the eight they were written from, the lookup found
+  // nothing — a client that does not repeat the phone's rules must still find the package.
+  const form = barcodeWriteForm(code)
+  const codes = [...new Set([...barcodeTwins(code), ...(form.ok ? barcodeTwins(form.code) : [])])]
   return codes.length === 0 ? null : items.byBarcode(codes)
 }

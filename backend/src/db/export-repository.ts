@@ -294,7 +294,9 @@ export const EXPORT_COLUMNS: Readonly<
     ],
     omitted: { created_by: OWNER, search_key: 'made from the name, never typed' },
   },
-  item_barcodes: { exported: ['code', 'item_id'] },
+  // Read twice: the codes of the items the person added, whoever wrote them, and every code the
+  // person wrote, to whichever item (MOL-100) — the second is theirs, as an item's author is.
+  item_barcodes: { exported: ['code', 'item_id', 'added_at'], omitted: { added_by: OWNER } },
 }
 
 export interface ExportRepository {
@@ -427,6 +429,15 @@ export function createExportRepository(db: Db): ExportRepository {
             .innerJoin(items, eq(items.id, itemBarcodes.itemId))
             .where(eq(items.createdBy, actorId))
             .orderBy(asc(itemBarcodes.code))
+          const addedCodeRows = await tx
+            .select({
+              barcode: itemBarcodes.code,
+              itemId: itemBarcodes.itemId,
+              addedAt: itemBarcodes.addedAt,
+            })
+            .from(itemBarcodes)
+            .where(eq(itemBarcodes.addedBy, actorId))
+            .orderBy(asc(itemBarcodes.addedAt), asc(itemBarcodes.code))
           const namedItems = await tx
             .select({ id: items.id, kind: items.kind, name: items.name })
             .from(items)
@@ -452,6 +463,13 @@ export function createExportRepository(db: Db): ExportRepository {
                     .select({ id: searchPicks.itemId })
                     .from(searchPicks)
                     .where(eq(searchPicks.actorId, actorId)),
+                ),
+                inArray(
+                  items.id,
+                  tx
+                    .select({ id: itemBarcodes.itemId })
+                    .from(itemBarcodes)
+                    .where(eq(itemBarcodes.addedBy, actorId)),
                 ),
               ),
             )
@@ -736,6 +754,7 @@ export function createExportRepository(db: Db): ExportRepository {
               barcodes: (barcodesOf.get(row.id) ?? []).map((barcode) => barcode.code),
               createdAt: row.createdAt,
             })),
+            addedBarcodes: addedCodeRows,
             catalogue: { items: namedItems, places: namedPlaces },
           }
         },

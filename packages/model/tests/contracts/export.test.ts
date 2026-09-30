@@ -205,6 +205,7 @@ const file: ExportFile = {
       createdAt: at,
     },
   ],
+  addedBarcodes: [{ barcode: '4850001234567', itemId: id(8), addedAt: at }],
   catalogue: {
     items: [{ id: id(8), kind: 'product', name: 'Молоко Ашхар 1 л' }],
     places: [{ id: id(5), kind: 'store', name: 'Ереван Сити', country: 'AM', city: 'Гюмри' }],
@@ -230,7 +231,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(4)
+    expect(wire.version).toBe(5)
   })
 
   it('reads its own file back into the same values', () => {

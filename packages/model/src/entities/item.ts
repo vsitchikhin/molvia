@@ -19,9 +19,15 @@ export const ITEM_NOTE_MAX = 300
 const nameSchema = visibleLine(ITEM_NAME_MAX)
 const noteSchema = visibleLine(ITEM_NOTE_MAX)
 
+/**
+ * The most codes one item holds — one product in its packagings, not a list of anything. The
+ * database has no trigger for it: the writer counts under the item's lock (MOL-100).
+ */
+export const ITEM_BARCODES_MAX = 20
+
 const barcodesSchema = z
   .array(barcodeSchema)
-  .max(20)
+  .max(ITEM_BARCODES_MAX)
   .refine((codes) => new Set(codes).size === codes.length, { error: ISSUE.BARCODE_DUPLICATED })
   .readonly()
 

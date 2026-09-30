@@ -793,6 +793,21 @@ purchase sheet with no query — a code teaches the search nothing; a miss offer
 offline the device finds the items it once found by code. The catalogue holds no code until MOL-100
 lets «Предложить товар» write one, so until then every scan on production is a miss.
 
+MOL-100 writes the code a scan missed: with the item «Предложить товар» proposes, or to an item found
+by name — the code waits over the search, and a pick asks «Привязать код к „…“?» before the purchase
+sheet (owner's decisions 30.09.2026: В-2 the question on the screen, В-3 for any item, the seed's
+included, naming who will see it). Anyone may write a code to any item and anyone may let it go — «Код
+… — не этот товар?» on the sheet of an item that came by a code (В-1); merging items stays MOL-106's.
+A write checks the digit (`writtenBarcode`), holds one package to one item with its twins under a lock
+per form, and a code another item holds writes nothing and answers `409` naming it. The review of the PR
+and an adversarial pass added two owner's decisions: a shop's own code — a scale's label, an in-store
+EAN-8 — is never written and the screen says «этикетка магазина» (В-4), and a name already there takes
+no code silently but is asked about (В-5). A third round turned MOL-98's rule for eight digits typed:
+those that check as EAN-8 are EAN-8, as the scanner reads such a label — a shop's, never written (В-7). Who wrote a code is
+`item_barcodes.added_by`: erasure nulls it, the copy lists one's own codes (version 5). Requirements
+and plan — `.scratch/tasks/{requirements,plans}/MOL-100.md`; the rules — `.claude/rules/barcodes.md`,
+«Writing a code».
+
 ## Откуда брать работу
 
 Не из головы и не из этого файла — **из Jira, проект MOL**. Релиз 0.1 разложен на семь
@@ -1144,3 +1159,17 @@ average 95–223 и полный своп; тест, упавший по тай�
 дерева не проверяет ничего. Очередь работает между копиями, чьи ветки уже содержат хук. Заодно
 остановлены контейнеры vikasa: их clickhouse занимал 250 % из четырёх ядер Docker. Правило —
 `.claude/rules/workspace.md`, замеры — `.scratch/tasks/plans/MOL-139.md`.
+
+## Хотфикс: нижнее меню и шторка над клавиатурой (hotfix-bottom-menu)
+
+Три жалобы владельца с iPhone (Safari 27, iOS 26+). **Шторка исчезала при закрытии крестиком и тапом
+по фону** — уход вниз держался на переходе `overlay … allow-discrete`, которого в Safari нет; теперь
+диалог закрывается сразу, а `data-leaving` рисует его уезжающим вниз. **Между шторкой и клавиатурой просвечивали траты**:
+клавиши, плашка «∧ ∨ ✓» и строка адреса Safari стеклянные, с прозрачным зазором, а Safari обрывает
+всё fixed на верхнем крае клавиатуры; закрыто тремя слоями — подъём считается от `100dvh`, а не от
+`innerHeight`, который Safari двигает сам (в приложении 796 и 720 при одной клавиатуре), шторка
+продолжается своим цветом вниз, страница под шторкой скрыта, пока клавиатура поднята
+(`data-under-keys`). **Нижнее меню вставало посередине экрана в приложении** — зонд этого не поймал,
+на проде прошло само после перезапуска; `interactive-widget=resizes-content` теперь только для
+Android: Safari 27 его выполнял и сжимал окно под клавиатурой, что и считается причиной. Замеры —
+`.scratch/tasks/selftests/hotfix-bottom-menu-probe.jsonl`, правила — `.claude/rules/frontend.md`.

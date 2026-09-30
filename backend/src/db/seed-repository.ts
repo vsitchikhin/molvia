@@ -81,7 +81,10 @@ export function createSeedRepository(db: Conn): SeedRepository {
               continue
             }
 
-            const { item, created } = await repository.createUnlessNamed(line, null)
+            const proposal = await repository.createUnlessNamed(line, null)
+            // The seed writes no codes, so no code of it can be another item's.
+            if ('taken' in proposal) throw new Error('a seed line with no codes met a held code')
+            const { item, created } = proposal
             if (created) added += 1
             else kept.push({ name: item.name, unit: item.defaultUnit, seeded: line.defaultUnit })
           }

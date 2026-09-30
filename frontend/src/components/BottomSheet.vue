@@ -112,6 +112,8 @@ export default defineComponent({
     let touchedAt: number | null = null
     // Which showing the sheet is on: the rise of one that was closed must not settle the next.
     let showing = 0
+    // Which slide down the sheet is on: one cut short by the sheet opened again must not close it.
+    let leaving = 0
 
     // Up, as a tap is (MOL-69): a finger that came down while it rose is the opener's second tap.
     const drag = useSheetDrag(dialog, shown, {
@@ -127,8 +129,9 @@ export default defineComponent({
       closing = false
       const again = reopen
       reopen = false
-      if (dialog.value?.open) dialog.value.close()
+      // Before the slide down: it starts from where a pull left the sheet.
       drag.reset()
+      if (dialog.value?.open) leave(dialog.value)
       if (!again && props.open) emit('update:open', false)
       // Read now: the props of a sheet gone by the next tick are still there, but read once.
       const closed = props.onClosed
@@ -140,6 +143,31 @@ export default defineComponent({
       // that only wrote its false late, after an `await` (adversarial Г-1).
       if (again) void nextTick(show)
     })
+
+    // The dialog is closed at once — the page, the focus and every reader of `dialog[open]` have it
+    // shut, as ever — and `data-leaving` keeps it drawn while it slides down, taken off at the end.
+    // Left to the stylesheet, a closed dialog is held in the top layer by a transition of
+    // `overlay`: Safari has not got it, and there the × and the scrim made the sheet vanish on the
+    // spot — only the pull down, which slides it itself, went down (hotfix-bottom-menu). Played
+    // open instead, the sheet was still `[open]` for the length of the slide, and «Закончить» did
+    // not go up to «Покупки»: a sheet was up.
+    function leave(element: HTMLDialogElement): void {
+      const current = ++leaving
+      element.dataset.leaving = ''
+      element.close()
+      // Read now, so the slide starts this frame and is there to be waited for.
+      getComputedStyle(element).getPropertyValue('transform')
+      const sliding = element
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+      if (sliding.length === 0) {
+        delete element.dataset.leaving
+        return
+      }
+      void Promise.allSettled(sliding.map((animation) => animation.finished)).then(() => {
+        if (current === leaving) delete element.dataset.leaving
+      })
+    }
 
     function show(): void {
       const element = dialog.value
@@ -155,6 +183,10 @@ export default defineComponent({
       const anchor = pageAnchor()
       const from = sheetOpener()
       drag.reset()
+      // Opened again while the last showing still slid down («save and next»): the slide stops
+      // where it is and the sheet comes back up from there.
+      leaving += 1
+      delete element.dataset.leaving
       shown.value = true
       element.showModal()
       settle(element)
@@ -312,11 +344,22 @@ export default defineComponent({
   border: none;
   border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
   background: var(--surface);
-  box-shadow: var(--shadow-lg);
+
+  /* The sheet goes on below its bottom edge, in its own colour: under it lies the keyboard, and on
+     iOS 26 and later the keys and the bar of «∧ ∨ ✓» over them are glass, with clear room between
+     them — the page under the sheet showed through there, the spendings of the month in a band
+     between the sheet and the keys (the owner's screenshot, the installed app). A shadow, not a
+     taller box: the box is what the lift, the height and the field kept in sight are measured by
+     (MOL-135). Spread and offset alike, so it starts under the rounded corners, never beside them;
+     first, so the sheet's own shadow does not darken it. */
+  box-shadow:
+    0 calc(50dvh + var(--radius-sheet)) 0 50dvh var(--surface),
+    var(--shadow-lg);
   color: var(--text);
 
-  /* Out from under the bottom edge and back — the exit too, where the browser can animate
-     `display` and the top layer. Where it cannot, the sheet just disappears. */
+  /* Out from under the bottom edge and back. The way down is `data-leaving` (see `leave`); these
+     discrete transitions only cover a close the browser makes itself, a second Esc, where the
+     browser can animate `display` and the top layer. */
   transform: translateY(100%);
   transition:
     transform var(--dur) var(--ease),
@@ -351,6 +394,19 @@ export default defineComponent({
 
   &.over::backdrop {
     background: transparent;
+  }
+
+  /* Sliding down, closed: out of the top layer, so drawn by hand where the modal sheet stood, over
+     the tab bar, taking no tap. No discrete transition is left to hold it there. */
+  &[data-leaving] {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 2;
+    display: block;
+    margin: 0;
+    transform: translateY(100%);
+    pointer-events: none;
+    transition-property: transform;
   }
 
   /* Under the finger: no transition, or the sheet would trail behind it. */

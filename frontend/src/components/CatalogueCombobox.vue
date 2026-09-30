@@ -19,6 +19,7 @@
         :aria-activedescendant="active < 0 ? undefined : optionId(active)"
         :maxlength="maxLength"
         :placeholder="placeholder"
+        :readonly="readonly"
         :value="modelValue"
         @input="update"
         @keydown="onKeydown"
@@ -103,6 +104,8 @@ export default defineComponent({
     hint: { type: String, required: true },
     /** The rows are the previous answer, and a newer search is out. */
     stale: { type: Boolean, default: false },
+    /** Nothing may be typed now — a code on its way to an item waits for its answer (MOL-100). */
+    readonly: { type: Boolean, default: false },
   },
   emits: {
     'update:modelValue': (value: string) => typeof value === 'string',

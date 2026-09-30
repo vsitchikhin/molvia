@@ -51,6 +51,28 @@ it('logs a lookup by code as its path, without the code', async () => {
   expect(lines.join('')).not.toMatch(/4850000000007|code=/)
 })
 
+// MOL-100: a code written or let go of is logged no more than a code looked up.
+it('logs a write of a code and its letting go as their paths, without the code', async () => {
+  lines.length = 0
+  const item = '0b6f2c4e-8d1a-4f3b-9c7e-5a2d1e0f3b4c'
+  await app.inject({
+    method: 'POST',
+    url: `/catalogue/items/${item}/barcodes`,
+    payload: { code: '4850001234562' },
+  })
+  await app.inject({
+    method: 'DELETE',
+    url: `/catalogue/items/${item}/barcodes?code=4850001234562`,
+  })
+
+  const paths = lines
+    .map((line) => JSON.parse(line) as { msg?: string; req?: { path?: string } })
+    .filter((entry) => entry.msg === 'incoming request')
+    .map((entry) => entry.req?.path)
+  expect(paths).toEqual([`/catalogue/items/${item}/barcodes`, `/catalogue/items/${item}/barcodes`])
+  expect(lines.join('')).not.toMatch(/4850001234562|code=/)
+})
+
 // Selfreview 4: Fastify's own 404 wrote `Route GET:/path?q=… not found` past the serializer.
 it('an unknown address is not logged with its query, nor echoed back', async () => {
   lines.length = 0

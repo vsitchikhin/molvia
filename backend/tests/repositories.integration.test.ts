@@ -195,9 +195,8 @@ describe('справочник', () => {
     const first = await catalogue.createUnlessNamed(input, null)
     const again = await catalogue.createUnlessNamed({ ...input, name: 'кефир  1%' }, null)
 
-    expect(first.created).toBe(true)
-    expect(first.item.createdBy).toBeNull()
-    expect(again).toEqual({ item: first.item, created: false })
+    expect(first).toMatchObject({ created: true, item: { createdBy: null } })
+    expect(again).toEqual({ ...first, created: false })
   })
 })
 

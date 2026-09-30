@@ -14,6 +14,7 @@ export const ACTOR_REFERENCES = [
   'events.actor_id',
   'exchanges.actor_id',
   'incomes.actor_id',
+  'item_barcodes.added_by',
   'items.created_by',
   'money_account_checks.actor_id',
   'money_accounts.actor_id',
@@ -55,6 +56,8 @@ export interface ErasureReport {
   readonly erased: Readonly<Record<ErasedTable, number>>
   /** Catalogue items this person added: they stay, with `created_by` nulled. */
   readonly itemsReleased: number
+  /** Codes this person wrote to items (MOL-100): they stay, with `added_by` nulled. */
+  readonly barcodesReleased: number
   /**
    * Whether the person was added to `erasures`, the count by week of arrival the gates print
    * (MOL-91) — the one thing erasure leaves, and no more than a number.
@@ -138,12 +141,17 @@ export function createErasureRepository(db: Db): ErasureRepository {
             actors: 0,
           }
           let itemsReleased = 0
+          let barcodesReleased = 0
 
           if (actorId !== null) {
             const [released] = await tx.execute<{ n: number }>(
               sql`select count(*)::int as n from items where created_by = ${actorId}`,
             )
             itemsReleased = released?.n ?? 0
+            const [codes] = await tx.execute<{ n: number }>(
+              sql`select count(*)::int as n from item_barcodes where added_by = ${actorId}`,
+            )
+            barcodesReleased = codes?.n ?? 0
             erased.sessions = await count(
               sql`delete from sessions where actor_id = ${actorId} returning 1`,
             )
@@ -219,7 +227,8 @@ export function createErasureRepository(db: Db): ErasureRepository {
                 from actors where id = ${actorId}
                 on conflict (appeared_week) do update set erased = erasures.erased + 1
                 returning 1`)) > 0
-            // `items.created_by` is `ON DELETE SET NULL`: the catalogue keeps what was added.
+            // `items.created_by` and `item_barcodes.added_by` are `ON DELETE SET NULL`: the catalogue
+            // keeps what was added, and the codes written to it.
             erased.actors = await count(sql`delete from actors where id = ${actorId} returning 1`)
           }
 
@@ -227,6 +236,7 @@ export function createErasureRepository(db: Db): ErasureRepository {
             found: actorId !== null,
             erased,
             itemsReleased,
+            barcodesReleased,
             counted,
           }
           if (dryRun) throw new DryRun(report)

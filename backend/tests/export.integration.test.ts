@@ -117,7 +117,7 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     typicalQtyUnit: 'kg',
     createdBy: actorId,
   })
-  await db.insert(itemBarcodes).values({ code: '4850001234567', itemId })
+  await db.insert(itemBarcodes).values({ code: '4850001234567', itemId, addedBy: actorId })
   // Where they stand on the ladder of rating reminders (MOL-101).
   await db.insert(ratingReminders).values({
     actorId,
@@ -606,6 +606,26 @@ describe('экспорт всего своего (MOL-93)', () => {
       { name: 'Кола 0,5', barcodes: ['4870001234567'] },
     ])
     expect(text).not.toContain('createdBy')
+  })
+
+  it('коды, которые человек дописал, — свои; дописанное другим к его позиции — только в ней (MOL-100)', async () => {
+    const anna = await someone()
+    const boris = await someone()
+    const shared = await insertItem(db, { name: 'Молоко Ашхар 1 л' })
+    const hers = await insertItem(db, { name: 'Рынок-сыр', createdBy: anna.actorId })
+    await db.insert(itemBarcodes).values([
+      { code: '4850001234567', itemId: shared, addedBy: anna.actorId },
+      { code: '4870001234567', itemId: hers, addedBy: boris.actorId },
+    ])
+
+    const { wire, text } = await fileOf(anna.actorId)
+
+    expect(wire.addedBarcodes.map(({ barcode, itemId }) => ({ barcode, itemId }))).toEqual([
+      { barcode: '4850001234567', itemId: shared },
+    ])
+    expect(wire.catalogue.items.map((item) => item.name)).toContain('Молоко Ашхар 1 л')
+    expect(wire.proposedItems[0]?.barcodes).toEqual(['4870001234567'])
+    expect(text).not.toContain(boris.actorId)
   })
 
   it('человек без единой строки — файл с пустыми разделами, а не ошибка', async () => {

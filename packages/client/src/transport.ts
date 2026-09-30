@@ -100,7 +100,7 @@ export interface ClientOptions {
   readonly zone?: () => string
 }
 
-interface RequestOptions {
+interface RequestOptions<A = never> {
   readonly method?: string
   readonly headers?: Headers
   /** `null` means «wait as long as it takes» — see `devLogin`. */
@@ -109,15 +109,22 @@ interface RequestOptions {
   readonly body?: unknown
   /** The caller's own cancellation, on top of the timeout. */
   readonly signal?: AbortSignal
+  /**
+   * Statuses past 2xx that are answers rather than failures, each read by its own schema: «этот код
+   * у …» comes with a 409 and the item that holds it (MOL-100, Р-3). A body its schema does not read
+   * is still the failure it was — an error of the registry under the same status included — and a
+   * 2xx is read by `schema` alone, never by an answer's (review И).
+   */
+  readonly answers?: Readonly<Record<number, ZodType<A>>>
 }
 
 export interface Transport {
   readonly request: <T>(path: string, schema: ZodType<T>, options?: RequestOptions) => Promise<T>
-  readonly exchange: <T>(
+  readonly exchange: <T, A = never>(
     path: string,
     schema: ZodType<T>,
-    options?: RequestOptions,
-  ) => Promise<{ status: number; data: T }>
+    options?: RequestOptions<A>,
+  ) => Promise<{ status: number; data: T | A }>
 }
 
 export function createTransport({
@@ -130,11 +137,11 @@ export function createTransport({
   zone,
   botSecret,
 }: ClientOptions & { readonly botSecret?: string }): Transport {
-  async function exchange<T>(
+  async function exchange<T, A = never>(
     path: string,
     schema: ZodType<T>,
-    options: RequestOptions = {},
-  ): Promise<{ status: number; data: T }> {
+    options: RequestOptions<A> = {},
+  ): Promise<{ status: number; data: T | A }> {
     const headers = new Headers(options.headers)
     if (botSecret) headers.set('authorization', `Bearer ${botSecret}`)
     if (today) headers.set(TODAY_HEADER, today())
@@ -205,6 +212,12 @@ export function createTransport({
     } finally {
       if (timer !== undefined) clearTimeout(timer)
       options.signal?.removeEventListener('abort', cancel)
+    }
+
+    const answerSchema = response.ok ? undefined : options.answers?.[response.status]
+    if (answerSchema) {
+      const answer = answerSchema.safeParse(body)
+      if (answer.success) return { status: response.status, data: answer.data }
     }
 
     if (!response.ok) {

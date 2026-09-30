@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { barcodeTwins, typedBarcode } from '#model/entities/barcode'
+import {
+  barcodeTwins,
+  hasRepeatedBarcode,
+  inStoreBarcode,
+  typedBarcode,
+  writtenBarcode,
+} from '#model/entities/barcode'
 import { ERROR } from '#model/support/errors'
 
 const code = (input: string) => {
@@ -32,9 +38,10 @@ describe('typedBarcode', () => {
     expect(code('06543217')).toBe('0065100004327') // 5–9
   })
 
-  it('reads eight digits led by 0 that check both ways as UPC-E', () => {
-    // 01234565 checks as EAN-8 too; zxing reads the printed UPC-E as 0012345000065.
-    expect(code('01234565')).toBe('0012345000065')
+  it('reads eight digits that check both ways as EAN-8, as the scanner reads such a label (В-7)', () => {
+    // 01234565 checks as UPC-E too, but typed it is the shop's label the scanner would read — the
+    // UPC-E print is found by its scan (0012345000065).
+    expect(code('01234565')).toBe('01234565')
   })
 
   it('reads a system-1 code that checks both ways as EAN-8 — the named price', () => {
@@ -158,5 +165,122 @@ describe('barcodeTwins', () => {
     for (const input of ['', '1234567', '123456789', 'abcdefgh', '00408295 ', '004082950000000']) {
       expect(barcodeTwins(input), input).toEqual([])
     }
+  })
+})
+
+describe('writtenBarcode', () => {
+  const written = (input: string) => {
+    const result = writtenBarcode(input)
+    return result.ok ? result.code : result.error
+  }
+
+  it('writes a code whose check digit holds, and refuses one digit off (Р-1)', () => {
+    expect(written('4850000000007')).toBe('4850000000007')
+    expect(written('4850000000003')).toBe(ERROR.BARCODE_CHECK_DIGIT)
+  })
+
+  it('writes twelve digits and a GTIN-14 led by 0 as the thirteen the scanner reads', () => {
+    expect(written('012345678905')).toBe('0012345678905')
+    expect(written('012345678906')).toBe(ERROR.BARCODE_CHECK_DIGIT)
+    expect(written('04850000000007')).toBe('4850000000007')
+    expect(written('04850000000003')).toBe(ERROR.BARCODE_CHECK_DIGIT)
+  })
+
+  it('refuses a GTIN-14 of a case — no scan and no typing gives one (Р-12)', () => {
+    // 1 as the indicator: a case of the package, found by nothing the phone reads.
+    expect(written('14850000000004')).toBe(ERROR.BARCODE_SHAPE)
+  })
+
+  it('keeps eight digits that check as EAN-8 as they came', () => {
+    expect(written('96385074')).toBe('96385074') // EAN-8 only
+    // UPC-E only: no EAN-8 the scanner reads, so written as the thirteen it reads the UPC-E as —
+    // kept as eight, nothing would find it (review А).
+    expect(written('04252614')).toBe('0042100005264')
+    expect(barcodeTwins('0042100005264')).toEqual(['0042100005264'])
+    expect(written('10000076')).toBe('10000076') // both, led by 1
+    expect(written('96385075')).toBe(ERROR.BARCODE_CHECK_DIGIT)
+    // Led by neither 0 nor 1, eight digits are no UPC-E: only EAN-8 can pass them.
+    expect(written('24252610')).toBe(ERROR.BARCODE_CHECK_DIGIT)
+  })
+
+  it('refuses what is no barcode at all — nine digits, spaces, letters', () => {
+    expect(written('123456789')).toBe(ERROR.BARCODE_SHAPE)
+    expect(written('4850 000000007')).toBe(ERROR.BARCODE_SHAPE)
+    expect(written('')).toBe(ERROR.BARCODE_SHAPE)
+  })
+})
+
+describe('hasRepeatedBarcode', () => {
+  it('finds a code twice and a code beside its twin, and nothing in distinct codes', () => {
+    expect(hasRepeatedBarcode([])).toBe(false)
+    expect(hasRepeatedBarcode(['4850000000007', '96385074'])).toBe(false)
+    expect(hasRepeatedBarcode(['96385074', '96385074'])).toBe(true)
+    expect(hasRepeatedBarcode(['0004082000095', '00408295'])).toBe(true)
+    expect(hasRepeatedBarcode(['04850000000007', '4850000000007'])).toBe(true)
+  })
+})
+
+describe('a shop’s own code (MOL-100, В-4)', () => {
+  const written = (input: string) => {
+    const result = writtenBarcode(input)
+    return result.ok ? result.code : result.error
+  }
+
+  it('knows restricted circulation: EAN-13 on 02, 04 and 2, UPC-A on 2 and 4, EAN-8 on 0 and 2', () => {
+    for (const code of [
+      '0200000000007',
+      '0290000000009',
+      '0400000000003',
+      '2000000000008',
+      '2999999999992',
+      '200000000008',
+      '400000000003',
+      '20000011',
+      '00000017',
+    ]) {
+      expect(inStoreBarcode(code), code).toBe(true)
+    }
+  })
+
+  it('must not take a product’s code for one — the boundaries of each range', () => {
+    for (const code of [
+      '0100000000007',
+      '0300000000001',
+      '0500000000005',
+      '1999999999994',
+      '3000000000007',
+      '4850000000007',
+      '10000076',
+      '96385074',
+      '0004082000095',
+    ]) {
+      expect(inStoreBarcode(code), code).toBe(false)
+    }
+  })
+
+  it('refuses to write one, after its check digit and form', () => {
+    expect(written('20000011')).toBe(ERROR.BARCODE_IN_STORE)
+    expect(written('00000017')).toBe(ERROR.BARCODE_IN_STORE)
+    expect(written('01234565')).toBe(ERROR.BARCODE_IN_STORE) // scanned as EAN-8: a label
+    expect(written('200000000004')).toBe(ERROR.BARCODE_IN_STORE) // UPC-A, number system 2
+    expect(written('2000000000001')).toBe(ERROR.BARCODE_CHECK_DIGIT)
+    // A UPC-E led by 0 that checks only so is a product's: written as its thirteen.
+    expect(written('04252614')).toBe('0042100005264')
+  })
+})
+
+describe('typedBarcode — two shops’ labels that fold into one UPC-A (MOL-100, Р-14)', () => {
+  const code = (input: string) => {
+    const typed = typedBarcode(input)
+    return typed.ok ? typed.code : typed.error
+  }
+
+  it('keeps such eight digits eight, as the scanner reads the label', () => {
+    expect(code('00000055')).toBe('00000055')
+    expect(code('00000505')).toBe('00000505')
+  })
+
+  it('keeps the unambiguous both-ways label eight too — the price of MOL-100 В-7', () => {
+    expect(code('00408295')).toBe('00408295')
   })
 })

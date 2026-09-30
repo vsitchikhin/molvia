@@ -244,7 +244,11 @@
       "offline": "Suggesting needs a connection",
       "name_invalid": "The name holds a character the catalogue will not take — type the name again",
       "note_invalid": "The note holds a character the catalogue will not take — type the note again",
-      "failed": "Could not add it. Please try again"
+      "failed": "Could not add it. Please try again",
+      "code": "Code {code} will be saved with the item",
+      "taken": "This code already belongs to «{name}»",
+      "take": "Take «{name}»",
+      "name_taken": "«{name}» is already there — name the item differently, with its brand for instance"
     },
     "error": {
       "title": "The server did not answer",
@@ -262,7 +266,26 @@
       "error_body": "Could not check the code {code}. Try again — or find the item by name",
       "offline_body": "None of your recent items has this code. Find the item by name — or scan it once you are online",
       "found": "Found by the code {code}",
-      "found_announced": "Found by the code {code}: {name}"
+      "found_announced": "Found by the code {code}: {name}",
+      "pending": "Code {code} is waiting for its item — pick it in the list",
+      "pending_drop": "Don't link the code",
+      "bind_question": "Link code {code} to «{name}»?",
+      "bind_hint": "Everyone who scans this code will see this item",
+      "bind": "Link and record",
+      "without_code": "Record without the code",
+      "propose_other": "It's a different item — suggest it",
+      "taken": "Code {code} already belongs to «{name}»",
+      "without_code_named": "Record «{name}» without the code",
+      "bind_offline_body": "The code is not linked. Try again with a connection — or record without the code",
+      "bind_error_body": "Could not link code {code}. Try again — or record without the code",
+      "not_this": "Code {code} — not this item?",
+      "not_this_failed": "Could not unlink the code — check the connection",
+      "in_store": "Code {code} is a shop's own label",
+      "in_store_body": "The scales or the shop print it: another package gets another code. Find the item by its name",
+      "detach_question": "Unlink code {code} from «{name}»?",
+      "detach_hint": "Nobody will find it by this code any more",
+      "detach": "Unlink",
+      "bind_named": "«{name}» is already in the catalogue. Link code {code} to it?"
     }
   },
   "sheet": {
@@ -979,7 +1002,9 @@
     "money_account_currency": "This account is in another currency",
     "money_account_currency_locked": "This account already has operations, so its currency cannot change. Add a new account for another currency",
     "barcode_shape": "A barcode has 8, 12 or 13 digits",
-    "barcode_check_digit": "The digits don't add up — check the code"
+    "barcode_check_digit": "The digits don't add up — check the code",
+    "barcodes_full": "This item already holds twenty codes — no more can be added",
+    "barcode_in_store": "This is a shop's own label — such a code is not saved to the catalogue"
   },
   "settings": {
     "title": "Settings",
@@ -1070,7 +1095,7 @@
   },
   "privacy": {
     "title": "Data and privacy",
-    "revised": "Revised 29 September 2026",
+    "revised": "Revised 30 September 2026",
     "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
@@ -1101,6 +1126,10 @@
       "places": {
         "term": "Shops",
         "text": "The names of the shops you give with your purchases — in the shared catalogue, without your name."
+      },
+      "barcodes": {
+        "term": "Barcodes",
+        "text": "A code you linked to an item, and when. The code itself is in the shared catalogue: everyone finds the item by it, but whose it is is shown to nobody."
       },
       "ratings": {
         "term": "Ratings and reviews",
@@ -1141,11 +1170,11 @@
     },
     "copy": {
       "title": "A copy of your data",
-      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected and the items you added to the shared catalogue. A rating you withdrew is there too: without its review it stays with us, so the count of ratings given stays honest. What you removed and can still bring back is there as well, marked. The file holds no login keys."
+      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue and the barcodes you linked. A rating you withdrew is there too: without its review it stays with us, so the count of ratings given stays honest. What you removed and can still bring back is there as well, marked. The file holds no login keys."
     },
     "erase": {
       "title": "Delete everything",
-      "text": "Send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they and the items you added to the shared catalogue stay, without your name. Saved copies may remain on your phone: to remove them, sign out in Settings, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data. It is there so that whether Molvia gets used is counted honestly."
+      "text": "Send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they, the items you added to the shared catalogue and the barcodes you linked stay, without your name. Saved copies may remain on your phone: to remove them, sign out in Settings, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data. It is there so that whether Molvia gets used is counted honestly."
     }
   },
   "accounts": {

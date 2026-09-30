@@ -13,6 +13,7 @@ import {
   events,
   exchanges,
   incomes,
+  itemBarcodes,
   items,
   loginRequests,
   moneyAccountChecks,
@@ -126,6 +127,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
         actors: 1,
       },
       itemsReleased: 1,
+      barcodesReleased: 1,
       counted: true,
     })
     expect(await rowsMentioning(anna)).toEqual([])
@@ -149,6 +151,19 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const [item] = await db.select().from(items).where(eq(items.id, ownItem))
     expect(item?.createdBy).toBeNull()
     expect(item?.name).toBe('Рынок-сыр')
+  })
+
+  it('код, который человек дописал к позиции, остаётся в справочнике без автора (MOL-100)', async () => {
+    const tg = telegramId()
+    const anna = await insertActor(db, { telegramUserId: tg })
+    const itemId = await insertItem(db)
+    await aLife(db, anna, tg, { itemId, placeId: await insertPlace(db) })
+
+    await erasure.erase(tg, { dryRun: false })
+
+    const codes = await db.select().from(itemBarcodes).where(eq(itemBarcodes.itemId, itemId))
+    expect(codes).toHaveLength(1)
+    expect(codes[0]?.addedBy).toBeNull()
   })
 
   it('места остаются все — и то, где бывал только он (решение Q4)', async () => {
