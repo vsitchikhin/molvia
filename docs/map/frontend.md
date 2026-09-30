@@ -60,7 +60,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/styles/_tokens.scss` — Design tokens: every colour, size, radius and duration as custom properties, light and dark schemes.
 - `frontend/src/styles/main.scss` — Global styles entry: fonts and tokens, body, a page held still under a modal, view-transition animations between screens.
 - `frontend/src/styles/theme-color.test.ts` — Test: the status-bar and manifest colours in `index.html` and `vite.config.ts` match the tokens of each scheme.
-- `frontend/src/transitions.ts` — Screen moves: push, pop or tab direction for view transitions, focus moved to the new screen's heading, and the control a change of the query was made with kept in place — the page held below it, the scroll making up what changed above.
+- `frontend/src/transitions.ts` — Screen moves: push, pop or tab direction for view transitions, focus moved to the new screen's heading, and the page held as tall as the window while only the query changes.
 - `frontend/vite.config.ts` — Vite config: Vue, MDI icons, PWA manifest and precache, mixins injected into SCSS, the copy's ports and the `/api` proxy.
 
 ## repository

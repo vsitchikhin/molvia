@@ -178,33 +178,34 @@ The detail behind the frontend lines of `CLAUDE.md`.
   again; no screen wants the top on a change of its query — one that does scrolls itself after its
   `replace`. Back and forward still return to what was saved, and the same route with other params
   (`/money/accounts/a` → `/b`) is another screen, from the top. **Nor does it move the control it was made
-  with** (`installHeightHold`, MOL-138): the arrow of the month, the period, the category stay
-  under the thumb whatever the screen redraws around them. Below the control, the page is held as
+  with** (MOL-138): the arrow of the month, the period, the category stay under the thumb whatever
+  the screen redraws around them. **Below the control, the page is held** (`installHeightHold`) as
   tall as the bottom of the window: a month or a period read for the first time comes under the
-  skeleton, a category card loses a line at the very end of the page, and the browser brought the
-  scroll up to the new end in the very layout that made it shorter — the switcher left the thumb by
-  116 px, and the answer did not bring it back. Seen after the fact it is too late, a scroll put
+  skeleton, a category card is a line shorter at the very end of the page, and the browser brought
+  the scroll up to the new end in the very layout that made it shorter — the switcher left the thumb
+  by 116 px, and the answer did not bring it back. Seen after the fact it is too late, a scroll put
   back is a jump there and back, so the page is held before the router lets the screen redraw:
   `--page-hold` on `#app`, as far as the bottom of the window and no further — more is empty room to
   scroll into. `#app` is a block, so the hold is room under the screen and never the screen
-  stretched: a state that takes the free height would carry «Повторить» down with it. Above the
-  control, what went or came is made up by the scroll, in the same frame, before it is painted: the
-  strip «Нет связи» over a month the phone kept, the card of a failed refresh over the charts, the
-  line «Этой категории нет» over the choice — each belonged to the answer on screen, and a month read
-  for the first time has none (adversarial Б). The control is the target of the click or the change
-  the move was made in, in the same task — not the focus, which Safari does not give a tapped
-  button; a move made by the code (a spending saved into another month) has none and is only held.
-  The range under the title of «Графики» keeps its line in every state, so that it neither goes
-  under the skeleton nor comes back with the answer. The hold goes once it holds nothing in view —
-  the window within the screen again, at the next scroll — with a move to another screen, after the
-  view transition's picture of the old one, and when the login closes the app (`releaseHeightHold`
-  in `App.vue`): the login takes the router's place without a move, and held, it was drawn scrolled
-  off the window, all of it above it on an iPhone (adversarial А). **The price, named:** «back» to a
-  screen left while held finds the page without its hold, and the position the router saved is
-  brought up by that much — a few pixels under an empty month (adversarial В); holding it again
-  would carry the hold across screens for a cosmetic. e2e holds the answer back (`page.route`) and
-  takes «the page stayed» under the skeleton and after it, by where the control stands on the screen
-  (`e2e/scroll.ts`), with the category card at the very end of the page, offline, and under the login.
+  stretched: a state that takes the free height would carry «Повторить» down with it. **Above the
+  control, nothing that belongs to the answer stands**: the strips «Нет связи» and «Сервер не
+  ответил», the card of a failed refresh, the line «Этой категории на графиках нет» are drawn under
+  the control that chooses the answer — the owner's decision В-2, against handoff 04, which put the
+  strip over the month. Each comes and goes with the answer: over the switcher, its going took the
+  switcher up by 74 px, and a strip of a month the phone keeps went with the move and came back a
+  moment later. Made up by the scroll instead (the first try), it could not be at the top of the page,
+  where «Деньги» open, and the strip that came back pushed the switcher the other way (review С-7,
+  adversarial round 2). The range under the title of «Графики» keeps its line in every state for the
+  same reason. The hold goes once it holds nothing in view — the window within the screen again, at
+  the next scroll — with a move to another screen, after the view transition's picture of the old
+  one, and when the login closes the app (`releaseHeightHold` in `App.vue`): the login takes the
+  router's place without a move, and held, it was drawn scrolled off the window, all of it above it
+  on an iPhone (adversarial А). **The price, named:** «back» to a screen left while held finds the
+  page without its hold, and the position the router saved is brought up by that much — a few pixels
+  under an empty month (adversarial В); holding it again would carry the hold across screens for a
+  cosmetic. e2e holds the answer back (`page.route`) and takes «the page stayed» under the skeleton
+  and after it, by where the control stands on the screen (`e2e/scroll.ts`): at the very end of the
+  page, at its top, offline between months kept and not, and under the login.
 - **A scroll the eye follows is smooth; a scroll that sets a screen in place is instant**
   (owner's remark on MOL-136). Smooth: the tab of the section one is in, back to the top
   (`goTab`), and a spending just saved brought to the middle (`toShow` in «Деньги») — each
