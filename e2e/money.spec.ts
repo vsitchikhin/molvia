@@ -136,15 +136,14 @@ function lastMonthDay(): string {
 
 // The switcher is under the accounts card: taken to the top, it went down by the card, and the next
 // tap on the arrow missed it (MOL-136). Where it stands on the screen is what the thumb finds.
-test('changing the month keeps the switcher where it was on the screen, under the skeleton too', async ({
-  page,
-}) => {
+/** Twelve spendings on each day given, then «Деньги» open on this month's twelve. */
+async function twelveADay(page: Page, days: string[]): Promise<void> {
   await signedIn(page)
   const headers = await asBrowser(page)
   const { categories } = (await (
     await page.request.get('/api/spending-categories', { headers })
   ).json()) as { categories: { id: string }[] }
-  for (const spentOn of [yerevanDay(), lastMonthDay()])
+  for (const spentOn of days)
     for (let n = 1; n <= 12; n += 1) {
       const response = await page.request.post('/api/spendings', {
         headers,
@@ -158,8 +157,14 @@ test('changing the month keeps the switcher where it was on the screen, under th
       expect(response.status(), await response.text()).toBe(201)
     }
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await expect(page.getByRole('button', { name: /Открыть трату/ })).toHaveCount(12)
+}
+
+test('changing the month keeps the switcher where it was on the screen, under the skeleton too', async ({
+  page,
+}) => {
+  await twelveADay(page, [yerevanDay(), lastMonthDay()])
   const rows = page.getByRole('button', { name: /Открыть трату/ })
-  await expect(rows).toHaveCount(12)
 
   // Last month is read for the first time on this phone, and its answer is held back: the screen
   // stands under the skeleton, a page shorter than the one under the window (MOL-138).
@@ -193,6 +198,76 @@ test('changing the month keeps the switcher where it was on the screen, under th
   await expect(rows).toHaveCount(12)
   expect(await topOf(next)).toBe(before)
   expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
+
+  // The room held under the window is not a page to scroll into: scrolled up, it goes.
+  await page.evaluate(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  })
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--page-hold')))
+    .toBe('')
+})
+
+// The answer comes shorter than the page under the window: the empty month is held, and so is the
+// switcher (MOL-138, review С-2).
+test('an empty month after a full one keeps the switcher where it was', async ({ page }) => {
+  await twelveADay(page, [yerevanDay()])
+  const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
+  await standAt(previous, 120)
+  const scrolled = await page.evaluate(() => window.scrollY)
+  expect(scrolled).toBeGreaterThan(0)
+
+  await previous.click()
+  await expect(page.getByText('В этом месяце трат нет')).toBeVisible()
+  expect(await topOf(previous)).toBe(120)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
+})
+
+// Offline, the month the phone keeps stands under «Нет связи»; a month it never read has no strip,
+// only the state «Нет связи» below. What went above the arrow is made up by the scroll (adversarial Б1).
+test('offline, a month not read keeps the switcher where the strip over it was', async ({
+  page,
+  context,
+}) => {
+  await twelveADay(page, [yerevanDay(), lastMonthDay()])
+  await context.setOffline(true)
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')))
+  const strip = page.getByText(/Нет связи. Новые траты сохраняются/)
+  await expect(strip).toBeVisible()
+
+  const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
+  await standAt(previous, 120)
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+
+  await previous.click()
+  await expect(page).toHaveURL(/month=/)
+  await expect(page.getByRole('heading', { name: 'Нет связи' })).toBeVisible()
+  await expect(strip).toBeHidden()
+  expect(await topOf(previous)).toBe(120)
+})
+
+// The login takes the place of the screen with no move of the router: the page held for the month
+// must not hold it scrolled off the window (adversarial А).
+test('the session over under a changed month: the login stands from the top', async ({
+  page,
+  context,
+}) => {
+  await twelveADay(page, [yerevanDay(), lastMonthDay()])
+  const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
+  await standAt(previous, 120)
+  await previous.click()
+  await expect(page).toHaveURL(/month=/)
+  await expect(page.getByRole('button', { name: /Открыть трату/ })).toHaveCount(12)
+
+  await context.clearCookies()
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  const title = page.getByRole('heading', { level: 1 })
+  await expect(title).toHaveText('Вход')
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  expect(await topOf(title)).toBeGreaterThan(0)
+  expect(
+    await page.evaluate(() => document.documentElement.style.getPropertyValue('--page-hold')),
+  ).toBe('')
 })
 
 test('a category of one’s own is made from the sheet, and a preset’s name is refused', async ({
