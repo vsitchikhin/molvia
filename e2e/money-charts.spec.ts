@@ -8,7 +8,7 @@ test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
 /**
  * «Графики» end to end (MOL-74): the months the server counts side by side, reached from «Деньги»
- * by a category or by «Графики по месяцам», a bar chosen by a tap, the period in the address
+ * by the ring of «Куда ушли» (MOL-156), a bar chosen by a tap, the period in the address
  * without an entry in the history, and the last answer kept for a shelf with no connection.
  */
 
@@ -45,18 +45,23 @@ async function seed(page: Page): Promise<void> {
   await spend('30000', yerevanDay(), cafe)
 }
 
-test('a category of «Куда ушли» opens its charts, a bar is chosen by a tap, «назад» is «Деньги»', async ({
+test('the ring of «Куда ушли» opens the charts, a bar is chosen by a tap, «назад» is «Деньги»', async ({
   page,
 }) => {
   await seed(page)
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
-  await page.getByRole('link', { name: /Кафе и рестораны/ }).click()
+  // The ring names this month's one category, and the card is one link (MOL-156).
+  const ring = page.getByRole('link', {
+    name: /^Куда ушли: Кафе и рестораны 100\s%\. Открыть графики$/,
+  })
+  await expect(ring.locator('.ring path')).toHaveCount(1)
+  await ring.click()
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Графики')
-  await expect(page.getByRole('combobox', { name: 'Категория' })).toHaveValue(/.+/)
+  // Opened from the ring, the charts show the largest category of the period (Р-8 of MOL-74).
   await expect(
     page.getByRole('combobox', { name: 'Категория' }).locator('option:checked'),
-  ).toHaveText('Кафе и рестораны')
+  ).toHaveText('Аренда жилья')
 
   // The running month is read first; a tap on the bar before it reads that one.
   const spent = page.locator('fieldset.chart').first()
@@ -76,7 +81,7 @@ test('the period moves by replace: «назад» from twelve months is «Ден
 }) => {
   await seed(page)
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
-  await page.getByRole('link', { name: 'Графики по месяцам' }).click()
+  await page.getByRole('link', { name: /Открыть графики/ }).click()
   await expect(page.locator('fieldset.chart').first().locator('label.bar')).toHaveCount(6)
 
   await page.getByText('12 месяцев', { exact: true }).click()
@@ -94,7 +99,7 @@ test('a category chosen further down keeps the page where it is, and so does the
 }) => {
   await seed(page)
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
-  await page.getByRole('link', { name: 'Графики по месяцам' }).click()
+  await page.getByRole('link', { name: /Открыть графики/ }).click()
   const card = page.getByRole('region', { name: 'Категория во времени' })
   const choice = page.getByRole('combobox', { name: 'Категория' })
   await expect(choice.locator('option:checked')).toHaveText('Аренда жилья')
@@ -138,12 +143,12 @@ test('with no connection the charts are the last ones read, under a strip that i
 }) => {
   await seed(page)
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
-  await page.getByRole('link', { name: 'Графики по месяцам' }).click()
+  await page.getByRole('link', { name: /Открыть графики/ }).click()
   await expect(page.locator('fieldset.chart').first()).toContainText(/30\s000\s֏/)
   await page.goBack()
 
   await context.setOffline(true)
-  await page.getByRole('link', { name: 'Графики по месяцам' }).click()
+  await page.getByRole('link', { name: /Открыть графики/ }).click()
   const strip = page.locator('.strip')
   await expect(strip).toContainText('Нет связи. Графики на')
   await expect(page.locator('fieldset.chart').first()).toContainText(/30\s000\s֏/)
