@@ -64,6 +64,17 @@
         <p class="no-trip">{{ t('item.no_trip.body') }}</p>
         <AppButton size="large" block @click="leave">{{ t('item.no_trip.action') }}</AppButton>
       </template>
+      <!-- The item came by its code (MOL-100, В-1): whoever holds the package may say it is not
+           this one, and the code is let go of for the item it belongs to. Quiet — the sheet is
+           about the purchase. -->
+      <template v-if="code">
+        <AppButton variant="ghost" block :busy="detaching" @click="notThis">
+          {{ t('item.barcode.not_this', { code }) }}
+        </AppButton>
+        <p v-if="detachFailed" class="caption offline" role="alert">
+          {{ t('item.barcode.not_this_failed') }}
+        </p>
+      </template>
     </template>
   </BottomSheet>
 </template>
@@ -82,6 +93,7 @@ import type {
   TripExpenseView,
   TripView,
 } from '@molvia/model'
+import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -132,11 +144,15 @@ export default defineComponent({
     tripCurrency: { type: String as PropType<Currency | undefined>, default: undefined },
     closeSteps: { type: Number as PropType<1 | 2>, default: 1 },
     onClosed: { type: Function as PropType<() => void>, default: undefined },
+    /** The code the item was found by or just given on the search (MOL-100); none otherwise. */
+    code: { type: String as PropType<string | null>, default: null },
   },
   emits: {
     added: (entry: CatalogueEntry) => typeof entry === 'object',
     saved: () => true,
     removed: () => true,
+    /** The code was let go of by the item — «не этот товар?» (MOL-100). */
+    detached: (code: string) => typeof code === 'string',
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
@@ -352,6 +368,27 @@ export default defineComponent({
       close(props.closeSteps)
     }
 
+    const detaching = ref(false)
+    const detachFailed = ref(false)
+
+    // One step back, to the search under the sheet: the code is to be given to its item there.
+    async function notThis(): Promise<void> {
+      const code = props.code
+      if (done || detaching.value || code === null) return
+      detaching.value = true
+      detachFailed.value = false
+      try {
+        await api.detachBarcode(props.entry.id, code)
+        done = true
+        emit('detached', code)
+        close(1)
+      } catch {
+        detachFailed.value = true
+      } finally {
+        detaching.value = false
+      }
+    }
+
     return {
       t,
       open,
@@ -374,6 +411,9 @@ export default defineComponent({
       submit,
       remove,
       leave,
+      detaching,
+      detachFailed,
+      notThis,
     }
   },
 })

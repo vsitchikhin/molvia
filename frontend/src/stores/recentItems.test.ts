@@ -325,6 +325,19 @@ describe('the codes recent items were found by (MOL-99)', () => {
     expect(relaunched().byCode('4850000000007')).toEqual(milk)
   })
 
+  it('forgets a code let go of by its item, in any of its forms — the item stays (MOL-100)', () => {
+    const store = relaunched()
+    store.remember(bread, '00408295')
+    store.remember(milk, '4850000000007')
+
+    store.forgetCode('0004082000095')
+
+    const again = relaunched()
+    expect(again.byCode('00408295')).toBeNull()
+    expect(again.byCode('4850000000007')).toEqual(milk)
+    expect(again.items.map((item) => item.id)).toContain(bread.id)
+  })
+
   it('forgets the code once its item falls off the list', () => {
     const store = relaunched()
     store.remember(milk, '4850000000007')

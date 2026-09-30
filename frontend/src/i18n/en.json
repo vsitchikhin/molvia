@@ -221,7 +221,10 @@
       "offline": "Suggesting needs a connection",
       "name_invalid": "The name holds a character the catalogue will not take — type the name again",
       "note_invalid": "The note holds a character the catalogue will not take — type the note again",
-      "failed": "Could not add it. Please try again"
+      "failed": "Could not add it. Please try again",
+      "code": "Code {code} will be saved with the item",
+      "taken": "This code already belongs to «{name}»",
+      "take": "Take «{name}»"
     },
     "error": {
       "title": "The server did not answer",
@@ -239,7 +242,22 @@
       "error_body": "Could not check the code {code}. Try again — or find the item by name",
       "offline_body": "None of your recent items has this code. Find the item by name — or scan it once you are online",
       "found": "Found by the code {code}",
-      "found_announced": "Found by the code {code}: {name}"
+      "found_announced": "Found by the code {code}: {name}",
+      "pending": "Code {code} is waiting for its item — pick it in the list",
+      "pending_drop": "Don't link the code",
+      "bind_question": "Link code {code} to «{name}»?",
+      "bind_hint": "Everyone who scans this code will see this item",
+      "bind": "Link and record",
+      "without_code": "Record without the code",
+      "propose_other": "It's a different item — suggest it",
+      "taken": "Code {code} already belongs to «{name}»",
+      "take": "Take «{name}»",
+      "without_code_named": "Record «{name}» without the code",
+      "bind_offline_body": "The code is not linked. Try again with a connection — or record without the code",
+      "bind_error_body": "Could not link code {code}. Try again — or record without the code",
+      "retry": "Try again",
+      "not_this": "Code {code} — not this item?",
+      "not_this_failed": "Could not unlink the code — check the connection"
     }
   },
   "sheet": {

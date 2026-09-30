@@ -483,3 +483,12 @@ describe('ItemDetailsSheet', () => {
     expect(perUnit(view)).toMatch(/577\.78.*\/l$/)
   })
 })
+
+describe('«не этот товар?» (MOL-100)', () => {
+  it('must not be offered for an item that did not come by a code', async () => {
+    const { view } = await render()
+
+    expect(view.text()).toContain('Молоко «Ашхар»')
+    expect(view.text()).not.toMatch(/не этот товар/)
+  })
+})

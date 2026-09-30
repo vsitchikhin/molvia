@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount, type VueWrapper } from '@vue/test-utils'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
+import type { CatalogueWrite } from '@molvia/client'
 import { ERROR, ISSUE, ITEM_NAME_MAX, ITEM_NOTE_MAX } from '@molvia/model'
 import type { CatalogueEntry, ProposedItem } from '@molvia/model'
 import en from '@/i18n/en.json'
@@ -9,8 +10,7 @@ import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import ProposeItemSheet from '@/components/ProposeItemSheet.vue'
 
-const proposeItem =
-  vi.fn<(input: ProposedItem) => Promise<{ entry: CatalogueEntry; created: boolean }>>()
+const proposeItem = vi.fn<(input: ProposedItem) => Promise<CatalogueWrite>>()
 vi.mock('@/api', () => ({
   api: { proposeItem: (input: ProposedItem) => proposeItem(input) },
 }))
@@ -37,12 +37,12 @@ const mounted: VueWrapper[] = []
  */
 let clock = 0
 
-async function render(query = '  тан ') {
+async function render(query = '  тан ', code: string | null = null) {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/trip/add')
   const wrapper = mount(ProposeItemSheet, {
     attachTo: document.body,
-    props: { open: true, query },
+    props: { open: true, query, code },
     global: { plugins: [router, createAppI18n('en')] },
   })
   mounted.push(wrapper)
@@ -124,7 +124,12 @@ describe('«Suggest an item»', () => {
 
     await submitButton(sheet).trigger('click')
 
-    expect(proposeItem).toHaveBeenCalledWith({ kind: 'product', name: 'тан', defaultUnit: 'l' })
+    expect(proposeItem).toHaveBeenCalledWith({
+      kind: 'product',
+      name: 'тан',
+      defaultUnit: 'l',
+      barcodes: [],
+    })
   })
 
   it('sends the note when there is one', async () => {
@@ -303,6 +308,7 @@ describe('«Suggest an item»', () => {
         kind: 'product',
         name: 'Молоко Ашхар',
         defaultUnit: 'l',
+        barcodes: [],
         note: 'пастеризованное 3,2%',
       })
     })
@@ -408,7 +414,53 @@ describe('«Suggest an item»', () => {
 
       expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
       await submitButton(sheet).trigger('click')
-      expect(proposeItem).toHaveBeenCalledWith({ kind: 'product', name: 'тан', defaultUnit: 'l' })
+      expect(proposeItem).toHaveBeenCalledWith({
+        kind: 'product',
+        name: 'тан',
+        defaultUnit: 'l',
+        barcodes: [],
+      })
+    })
+  })
+
+  describe('with a code read from the package (MOL-100)', () => {
+    it('shows the code and sends it with the item', async () => {
+      proposeItem.mockResolvedValue({ entry: tan, created: true })
+      const sheet = await render('', '4850001234562')
+      expect(sheet.text()).toContain(en.item.propose.code.replace('{code}', '4850001234562'))
+      await fields(sheet).name.setValue('Тан')
+      await chooseUnit(sheet, en.item.unit_l)
+
+      await submitButton(sheet).trigger('click')
+
+      expect(proposeItem).toHaveBeenCalledWith(
+        expect.objectContaining({ barcodes: ['4850001234562'] }),
+      )
+      expect(sheet.emitted('proposed')).toEqual([[tan]])
+    })
+
+    it('names the item that holds the code and offers it instead of the button', async () => {
+      const kefir = { ...tan, id: '1c7a3d5f-9e2b-4a4c-8d8f-6b3e2f1a4c5d', name: 'Кефир 1%' }
+      proposeItem.mockResolvedValue({ taken: kefir })
+      const sheet = await render('тан', '4850001234562')
+      await chooseUnit(sheet, en.item.unit_l)
+
+      await submitButton(sheet).trigger('click')
+      await flushPromises()
+
+      expect(sheet.text()).toContain(en.item.propose.taken.replace('{name}', 'Кефир 1%'))
+      expect(sheet.emitted('proposed')).toBeUndefined()
+      const take = sheet
+        .findAll('button')
+        .find((button) => button.text() === en.item.propose.take.replace('{name}', 'Кефир 1%'))
+      await take?.trigger('click')
+      expect(sheet.emitted('taken')).toEqual([[kefir]])
+    })
+
+    it('must not show a code line when the item is proposed by its name', async () => {
+      const sheet = await render()
+
+      expect(sheet.text()).not.toContain(en.item.propose.code.split('{code}')[0] ?? '∅')
     })
   })
 })

@@ -6,6 +6,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import type { Pinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
+import type { CatalogueWrite } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import { tripViewCodec } from '@molvia/model'
 import type {
@@ -28,8 +29,9 @@ import { holdsTyping } from '@/pwaUpdate'
 /** Rows alone are a near answer — or an empty one; a far answer is given whole (MOL-46). */
 const searchCatalogue =
   vi.fn<(query: string) => Promise<CatalogueEntry[] | CatalogueSearchResponse>>()
-const proposeItem =
-  vi.fn<(input: ProposedItem) => Promise<{ entry: CatalogueEntry; created: boolean }>>()
+const proposeItem = vi.fn<(input: ProposedItem) => Promise<CatalogueWrite>>()
+const attachBarcode = vi.fn<(itemId: string, code: string) => Promise<CatalogueWrite>>()
+const detachBarcode = vi.fn<(itemId: string, code: string) => Promise<void>>()
 const addExpense = vi.fn<(tripId: string, body: AddExpenseBody) => Promise<unknown>>()
 const currentTrip = vi.fn<() => Promise<unknown>>(() => Promise.resolve(null))
 const catalogueByBarcode = vi.fn<(code: string) => Promise<CatalogueEntry | null>>()
@@ -41,6 +43,8 @@ vi.mock('@/api', () => ({
       return Array.isArray(answer) ? { items: answer, near: answer.length > 0 } : answer
     },
     proposeItem: (input: ProposedItem) => proposeItem(input),
+    attachBarcode: (itemId: string, code: string) => attachBarcode(itemId, code),
+    detachBarcode: (itemId: string, code: string) => detachBarcode(itemId, code),
     addExpense: (tripId: string, body: AddExpenseBody) => addExpense(tripId, body),
     currentTrip: () => currentTrip(),
   },
@@ -144,6 +148,8 @@ beforeEach(() => {
   setActivePinia(pinia)
   searchCatalogue.mockReset()
   proposeItem.mockReset()
+  attachBarcode.mockReset()
+  detachBarcode.mockReset()
   catalogueByBarcode.mockReset()
   online(true)
 })
@@ -1069,6 +1075,211 @@ describe('«What did you pick up?»', () => {
           expect(view.get<HTMLInputElement>('dialog input[type="text"]').element.value).toBe(
             'чечил',
           )
+        })
+      })
+    })
+
+    describe('a code nobody holds waits for its item (MOL-100)', () => {
+      const cream = entry(11, 'Сметана Ашхар 20%')
+      const kefir = entry(12, 'Кефир 1%')
+      const missing = en.item.barcode.missing.replace('{code}', CODE)
+      const pending = en.item.barcode.pending.replace('{code}', CODE)
+      const question = en.item.barcode.bind_question
+        .replace('{code}', CODE)
+        .replace('{name}', cream.name)
+
+      /** A miss, then «сметана» typed and its row tapped. */
+      async function pickAfterMiss(view: VueWrapper): Promise<void> {
+        await scan(view, CODE)
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(missing)
+        })
+        await field(view).setValue('сметана')
+        await vi.waitFor(() => {
+          expect(names(view)).toEqual([cream.name])
+        })
+        await view.get('[role="option"]').trigger('click')
+      }
+
+      beforeEach(() => {
+        catalogueByBarcode.mockResolvedValue(null)
+        searchCatalogue.mockResolvedValue([cream])
+      })
+
+      it('keeps the code over the search once something is typed, and ✕ lets it go', async () => {
+        const view = await render()
+        await scan(view, CODE)
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(missing)
+        })
+
+        await field(view).setValue('сметана')
+
+        expect(view.text()).toContain(pending)
+        await vi.waitFor(() => {
+          expect(names(view)).toEqual([cream.name])
+        })
+        await view.get(`button[aria-label="${en.item.barcode.pending_drop}"]`).trigger('click')
+        expect(view.text()).not.toContain(pending)
+      })
+
+      it('asks before the purchase sheet whether the code is the row’s, and says so out loud', async () => {
+        const view = await render()
+
+        await pickAfterMiss(view)
+
+        expect(view.text()).toContain(question)
+        expect(names(view)).toEqual([])
+        expect(useItemEntryStore(pinia).picked).toBeNull()
+        await vi.waitFor(() => {
+          expect(view.get('.live').text()).toBe(question)
+        })
+        expect(document.activeElement?.textContent.trim()).toBe(en.item.barcode.bind)
+      })
+
+      it('writes the code to the row and then opens its sheet with the query it was found by', async () => {
+        attachBarcode.mockResolvedValue({ entry: cream, created: true })
+        const view = await render()
+        await pickAfterMiss(view)
+
+        await button(view, en.item.barcode.bind).trigger('click')
+
+        expect(attachBarcode).toHaveBeenCalledWith(cream.id, CODE)
+        await vi.waitFor(() => {
+          expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
+        })
+        expect(view.text()).not.toContain(pending)
+      })
+
+      it('records without the code when asked to, and writes nothing', async () => {
+        const view = await render()
+        await pickAfterMiss(view)
+
+        await button(view, en.item.barcode.without_code).trigger('click')
+
+        expect(attachBarcode).not.toHaveBeenCalled()
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
+        expect(view.text()).not.toContain(pending)
+      })
+
+      it('names the item that holds the code, and takes it as found by the code', async () => {
+        attachBarcode.mockResolvedValue({ taken: kefir })
+        const view = await render()
+        await pickAfterMiss(view)
+
+        await button(view, en.item.barcode.bind).trigger('click')
+
+        const taken = en.item.barcode.taken.replace('{code}', CODE).replace('{name}', kefir.name)
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(taken)
+        })
+        await button(view, en.item.barcode.take.replace('{name}', kefir.name)).trigger('click')
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: kefir, query: '' })
+      })
+
+      it('offline, says the code is not linked and offers both ways on', async () => {
+        attachBarcode.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'transport', false))
+        const view = await render()
+        await pickAfterMiss(view)
+        online(false)
+
+        await button(view, en.item.barcode.bind).trigger('click')
+
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(en.item.barcode.bind_offline_body)
+        })
+        expect(button(view, en.item.barcode.retry).exists()).toBe(true)
+        await button(view, en.item.barcode.without_code).trigger('click')
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
+      })
+
+      it('drops the question when typing goes on, and the code still waits', async () => {
+        const view = await render()
+        await pickAfterMiss(view)
+
+        await field(view).setValue('сметана ашх')
+
+        expect(view.text()).not.toContain(question)
+        expect(view.text()).toContain(pending)
+      })
+
+      it('must not ask when no code waits — a row is picked as it always was', async () => {
+        const view = await render()
+        await field(view).setValue('сметана')
+        await vi.waitFor(() => {
+          expect(names(view)).toEqual([cream.name])
+        })
+
+        await view.get('[role="option"]').trigger('click')
+
+        expect(view.text()).not.toContain(question)
+        expect(useItemEntryStore(pinia).picked).toEqual({ entry: cream, query: 'сметана' })
+      })
+
+      it('must not keep a code the server was not asked about — offline is no miss', async () => {
+        online(false)
+        const view = await render()
+        await scan(view, CODE)
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(en.item.barcode.offline_body)
+        })
+        online(true)
+
+        await field(view).setValue('сметана')
+
+        expect(view.text()).not.toContain(pending)
+      })
+
+      it('sends the waiting code with an item proposed from the search', async () => {
+        searchCatalogue.mockResolvedValue([])
+        proposeItem.mockResolvedValue({ entry: cream, created: true })
+        vi.spyOn(performance, 'now').mockReturnValue(0)
+        const view = await render()
+        await scan(view, CODE)
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(missing)
+        })
+        await field(view).setValue('сметана ашхар')
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(en.item.empty.action)
+        })
+
+        await button(view, en.item.empty.action).trigger('click')
+        vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        const litre = view
+          .findAll('dialog label')
+          .find((label) => label.text() === en.item.unit_l)
+          ?.find('input')
+        await litre?.setValue(true)
+        await button(view, en.item.propose.submit).trigger('click')
+
+        expect(proposeItem).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'сметана ашхар', barcodes: [CODE] }),
+        )
+      })
+
+      it('lets a wrong code go from the sheet of the item found by it, and asks the code again', async () => {
+        catalogueByBarcode.mockResolvedValueOnce(kefir).mockResolvedValue(null)
+        detachBarcode.mockResolvedValue()
+        vi.spyOn(performance, 'now').mockReturnValue(0)
+        const view = await render()
+        await scan(view, CODE)
+        await vi.waitFor(() => {
+          expect(useItemEntryStore(pinia).picked).toEqual({ entry: kefir, query: '' })
+        })
+        vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+
+        await button(view, en.item.barcode.not_this.replace('{code}', CODE)).trigger('click')
+
+        expect(detachBarcode).toHaveBeenCalledWith(kefir.id, CODE)
+        window.dispatchEvent(new PopStateEvent('popstate'))
+        await vi.waitFor(() => {
+          expect(catalogueByBarcode).toHaveBeenCalledTimes(2)
+        })
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(missing)
         })
       })
     })

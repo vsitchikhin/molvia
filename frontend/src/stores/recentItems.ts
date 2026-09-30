@@ -162,6 +162,23 @@ export const useRecentItemsStore = defineStore('recentItems', () => {
   }
 
   /**
+   * A code let go of by its item (MOL-100, «не этот товар?»): the device no longer finds that item
+   * by it, in any of its forms.
+   */
+  function forgetCode(code: string): void {
+    sync()
+    const forms = new Set([code, ...barcodeTwins(code)])
+    const kept = new Map([...codes].filter(([form]) => !forms.has(form)))
+    if (kept.size === codes.size) return
+    codes = kept
+    if (owner !== null) {
+      const writtenCodes = JSON.stringify(Object.fromEntries(codes))
+      write(codesKeyOf(owner), writtenCodes)
+      ahead = ahead || read(codesKeyOf(owner)) !== writtenCodes
+    }
+  }
+
+  /**
    * Narrowing twenty rows while offline, not a catalogue search: no transliteration and no
    * typos, which is what the offline text says («только среди недавних»). The one thing taken
    * from the search is its dictionary (MOL-45): at a shelf with no signal «картошка» has to find
@@ -200,5 +217,5 @@ export const useRecentItemsStore = defineStore('recentItems', () => {
     })
   }
 
-  return { items, sync, remember, filter, byCode }
+  return { items, sync, remember, filter, byCode, forgetCode }
 })
