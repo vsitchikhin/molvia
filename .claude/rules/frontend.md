@@ -333,3 +333,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   geometry with the same fault, since a Chromium window cannot shrink without its `dvh`; the numbers
   measured on the iPhone are held by a unit test. On the device the spending sheet was checked; the
   other sheets are held by the shared component and the tests.
+- **The sheet goes on below its bottom edge in its own colour** (hotfix-bottom-menu): on iOS 26 and
+  later the keys and the bar of «∧ ∨ ✓» over them are glass, with clear room between the bar and
+  the keys, and the sheet stands on the top of that frame, not of the keys. What lay under it — the
+  spendings of the month — showed in a band between the sheet and the keys (the owner's screenshot,
+  the installed app). Measuring closer does not help: the room is the keyboard's own. A shadow of
+  `--surface`, spread and offset alike so it starts under the rounded corners, first in the list so
+  the sheet's own shadow does not darken it; not a taller box, since the box is what the lift, the
+  height and `reveal` measure.

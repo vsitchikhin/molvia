@@ -342,7 +342,17 @@ export default defineComponent({
   border: none;
   border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
   background: var(--surface);
-  box-shadow: var(--shadow-lg);
+
+  /* The sheet goes on below its bottom edge, in its own colour: under it lies the keyboard, and on
+     iOS 26 and later the keys and the bar of «∧ ∨ ✓» over them are glass, with clear room between
+     them — the page under the sheet showed through there, the spendings of the month in a band
+     between the sheet and the keys (the owner's screenshot, the installed app). A shadow, not a
+     taller box: the box is what the lift, the height and the field kept in sight are measured by
+     (MOL-135). Spread and offset alike, so it starts under the rounded corners, never beside them;
+     first, so the sheet's own shadow does not darken it. */
+  box-shadow:
+    0 calc(50dvh + var(--radius-sheet)) 0 50dvh var(--surface),
+    var(--shadow-lg);
   color: var(--text);
 
   /* Out from under the bottom edge and back. The way down is played open (`data-leaving`, see
