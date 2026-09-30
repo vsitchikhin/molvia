@@ -57,6 +57,9 @@ export const TRIP_FIELDS = [
   'converted',
   'accountId',
   'debited',
+  'receipt',
+  'prices',
+  'gap',
 ] as const
 
 /**

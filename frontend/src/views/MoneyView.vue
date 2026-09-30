@@ -3,33 +3,36 @@
     <template #subtitle>{{ t('spending.subtitle') }}</template>
 
     <div class="content" :class="{ roomy: phase === 'ready' }">
-      <p v-if="phase === 'ready' && !online" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('spending.offline.strip') }}
-      </p>
-      <p v-else-if="phase === 'ready' && stale === 'error' && fetchedAt" class="strip">
-        {{ t('spending.error_strip', { when: whenOf(fetchedAt) }) }}
-      </p>
-
-      <ScreenState
-        v-for="item in otherRefusals"
-        :key="item.key"
-        kind="attention"
-        inline
-        :title="t('spending.rejected_other.title')"
-        :body="reasonOf(item.code)"
-      >
-        <template #action>
-          <AppButton variant="ghost" @click="queue.dismiss(item)">
-            {{ t('spending.sheet.dismiss') }}
-          </AppButton>
-        </template>
-      </ScreenState>
-
       <template v-if="phase !== 'idle'">
         <!-- Balances are «now», not the month's: above the switcher, and the same on every month
              (MOL-123, handoff 01). -->
         <AccountsCard :online="online" :spend-currency="spendCurrency" />
         <MonthSwitcher :month="selected" :current="currentMonth" @change="goMonth" />
+
+        <!-- Under the switcher, not over it as handoff 04 drew them: they belong to the month's
+             answer and come and go with it, and over the switcher they took it from under the thumb
+             (MOL-138, owner's decision В-2). A refusal of the queue too: it is a card here only
+             while no row of the month on screen carries it (adversarial round 3, Ж). -->
+        <p v-if="phase === 'ready' && !online" class="strip">
+          <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('spending.offline.strip') }}
+        </p>
+        <p v-else-if="phase === 'ready' && stale === 'error' && fetchedAt" class="strip">
+          {{ t('spending.error_strip', { when: whenOf(fetchedAt) }) }}
+        </p>
+        <ScreenState
+          v-for="item in otherRefusals"
+          :key="item.key"
+          kind="attention"
+          inline
+          :title="t('spending.rejected_other.title')"
+          :body="reasonOf(item.code)"
+        >
+          <template #action>
+            <AppButton variant="ghost" @click="queue.dismiss(item)">
+              {{ t('spending.sheet.dismiss') }}
+            </AppButton>
+          </template>
+        </ScreenState>
 
         <ScreenSkeleton v-if="phase === 'loading'" :groups="[44, 70, 34, 60, 80, 48, 66]" />
 
@@ -289,6 +292,8 @@ import { useMoneyMonth } from '@/composables/useMoneyMonth'
 import { calendarDay, localDay, purchaseDay, shiftDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
+import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
+import type { SpendingPrefill } from '@/stores/spendingHandoff'
 import { spendingOf, useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -531,7 +536,10 @@ export default defineComponent({
 
     const whenOf = (at: Date) => `${purchaseDay(at, locale.value)}, ${timeOfDay(at, locale.value)}`
 
-    /** Refusals no row of this month carries — «Вернуть» too late, a category — said above. */
+    /**
+     * Refusals no row of this month carries — «Вернуть» too late, a category — said under the
+     * switcher.
+     */
     const otherRefusals = computed(() =>
       queue.rejected.filter(
         (item) =>
@@ -563,10 +571,14 @@ export default defineComponent({
     const target = ref<SpendingTarget>({ kind: 'add' })
 
     function compose(): void {
+      composeFrom()
+    }
+
+    function composeFrom(prefill?: SpendingPrefill): void {
       lookAtToday()
       toShow.value = null
       made.value = null
-      target.value = { kind: 'add' }
+      target.value = prefill ? { kind: 'add', prefill } : { kind: 'add' }
       sheetOpen.value = true
     }
 
@@ -579,6 +591,21 @@ export default defineComponent({
 
     /** The spending just saved, until its row is on screen and brought into view (review С-2). */
     const toShow = ref<string | null>(null)
+
+    /**
+     * A record with no purchases handed over from «Покупки» (MOL-78, В-1): the sheet opens on it
+     * once, as soon as this screen is there.
+     */
+    const handoff = useSpendingHandoffStore()
+    watch(
+      () => handoff.handed,
+      (handed) => {
+        if (!handed) return
+        const prefill = handoff.take()
+        if (prefill) composeFrom(prefill)
+      },
+      { immediate: true },
+    )
 
     function saved({ id, spentOn }: { id: string; spentOn: string }): void {
       lookAtToday()

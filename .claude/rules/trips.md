@@ -4,13 +4,14 @@ paths:
   - 'packages/model/src/values/{geo,place-identity}.ts'
   - 'packages/model/tests/{entities,contracts,values}/{trip,expense,place,actor,place-identity}.test.ts'
   - 'backend/src/db/{trips,expenses,places,settings}-repository.ts'
+  - 'backend/src/db/trip-money.ts'
   - 'backend/src/usecases/{start-trip,current-trip,trip-*,trips*,remove-trip,recent-places,save-settings,choose-trip-rate}*.ts'
   - 'backend/src/routes/{trips,places,settings}.ts'
   - 'backend/tests/{trip*,place*,settings*}.ts'
   - 'backend/drizzle/*trip*.sql'
   - 'frontend/src/views/{TripView,PurchasesView,FinishedTripView,SettingsView}*'
-  - 'frontend/src/components/{Trip*,tripRow*,StartTripSheet*,ItemDetailsSheet*,SettingsFields*,PurchaseRow*,ManualEntryButton*}'
-  - 'frontend/src/composables/{useCurrentTrip,useSelectedTrip,useFinishedTrip,useTripContext,useTripHistory,useTripRows,useItemDetails,useSettings,usePendingFrom}*'
+  - 'frontend/src/components/{Trip*,tripRow*,StartTripSheet*,ItemDetailsSheet*,SettingsFields*,PurchaseRow*,ManualEntryButton*,Receipt*,receipt*}'
+  - 'frontend/src/composables/{useCurrentTrip,useSelectedTrip,useFinishedTrip,useTripContext,useTripHistory,useTripRows,useTripReceipt,useItemDetails,useSettings,usePendingFrom}*'
   - 'frontend/src/stores/{trip,tripQueue,tripHistory,queueing,recentPlaces,settingsMemory,storage}*'
   - 'e2e/{trip,trip-history,settings,item-details}.spec.ts'
 ---
@@ -114,6 +115,68 @@ The detail behind the trip lines of `CLAUDE.md`.
   no timer; a check does not wait for it — it counts without it and says the trip waits for an
   answer in «Покупки» (adversarial round 3, Н4). **The price, named:** removing a trip dated before a check that
   came out even moves the balance with no reason the check can name, as a removed spending does.
+
+## «Сумма по чеку» — a trip's money whole (MOL-78)
+
+**The receipt's sum is a field of the trip, never a price** (owner's decisions В-1…В-4 of 30.09.2026).
+One sum in one currency (`trips.receipt_minor`, `receipt_currency`), typed whole, and **when there is
+one it is the trip's money in every currency** — a purchase priced in dollars under a receipt in drams
+is inside the receipt, and adding the two would count it twice. The prices stay as they are and
+**nothing is worked out of the sum**: a price per unit is an observation for «где дешевле», and one
+made up by spreading a receipt over the purchases would poison the aggregates of 0.3. A card in
+another currency than the receipt's is «списано со счёта», not a second sum (В-3).
+
+- **One rule, five readers.** `tripMoney` in the domain — the receipt's sum, else the sums of prices
+  per currency — and `tripMoneyRows` in `src/db`, the one SQL fragment «Записаны», the month of
+  «Деньги» and the accounts read — the month hands it only the trips of its days, since a join does
+  not reach inside its union (review 3); the hint of «сколько было до обмена» counts the receipt by
+  `receipt_first_at`, when this sum was first typed, as a purchase by the moment it was written — a
+  typo fixed after the exchange moves neither (review 2) — and the purchases of such a trip not at
+  all.
+  `trip-receipt.integration.test.ts` holds all five saying one thing before, with and after a sum —
+  a sixth reader of a trip's money goes through the rule, never through `expenses` alone.
+- **What the prices say beside it is the server's** (`prices`, `gap`, `receiptGap`): what the
+  purchases without a price came to, or by how much the prices miss the receipt — more than it is a
+  line of warning, never a refusal (the receipt's discount, or a price typed wrong). Two currencies do
+  not subtract, and then nothing is said.
+- **A change of the sum is a change of the trip's money**: it takes «списано» off (Р-32 MOL-115) and
+  moves `receipt_set_at`, taken off included — what a check's window is measured by; the same sum
+  again is a repeat from the queue and moves neither. **Under a sum a price is not the trip's money**
+  (review 1): a price typed at home into a trip already paid for, a purchase added with one or a
+  priced one removed leaves «списано» where it is — the money is the receipt, and taking it off moved
+  the account by money that never moved. `payTrip` decides whether «списано» applies by the currencies of the trip's money — the
+  receipt's alone when there is one.
+- **Through the queue, whole** (`receipt`, `PUT /trips/:id/receipt`, `null` to take it off): last, and
+  the earlier one still waiting leaves, as the account of a trip does — a price changed before it and
+  an account chosen after it reach the server in the order they were made. Mirrored under
+  `molvia.trip-receipts(-rejected)`: the previous build knows the marks and the payments and would
+  write both mirrors back without it. 404 is done. **In the queue it is a line, never a figure**
+  («Сумма по чеку … · отправляется»): the total stays the server's until the answer.
+- **Offered only on a record with purchases** (В-1): money with no purchases is a spending, and
+  «Закончить» on an empty record offers «Записать тратой в «Деньгах»» — the record goes with
+  «Вернуть», «Деньги» open the sheet of a spending on its shop and day in «Продукты»
+  (`stores/spendingHandoff`), a shop's name cut to the 80 characters «Где» holds (review В). The
+  server does not refuse a sum on a trip without purchases: one whose purchases were all removed
+  after it keeps its money, and nothing is said under it about prices it does not have (review 5).
+- **Over a finished record read from the phone's cache the sum is not offered** (review 4): that
+  cache does not keep `receipt`, `prices`, `gap` yet — the previous build reads it strictly — so its
+  total may be a receipt with nothing saying so, and «+ Сумма по чеку» there opened an empty sheet over
+  a sum that is there. **Decided by the object, not by the request** (`tripHistory.answered`, review
+  Е): the store remembers which trips came as the server's answer, and another window writing the
+  shelf puts a read-back trip on the screen with no request of this window's — a flag of «the server
+  has answered» said it was still the answer. **And the answer is not given up for a poorer copy**
+  (review Е2): another window writing the same trip to the shelf, saying nothing more than the answer
+  on screen — the fields the shelf does not keep left out — leaves the answer there with its sum; a
+  copy that says more (another purchase, another total) is fresher and taken as it is. The server is
+  not asked from the listener: two windows on one trip would ask each other in a circle; coming back
+  into view asks anyway. Offered again once the server answers; the fields go into the cache with the
+  next release.
+- **«Закончить» asks «Сколько вышло по чеку?» only while some purchase has no price and no sum is
+  there yet** (В-4): with every price in, the total is already known. Empty is fine; a sum that is
+  not money is said at the field and nothing is sent. «Закончить и начать новую» asks nothing — the
+  sum can be typed later on the finished record.
+- **The receipt of MOL-126 lands in this same field** — «Итог чека» is the trip's receipt's sum; there
+  is no second one.
 
 ## The settings, and the geography a trip names (MOL-65)
 

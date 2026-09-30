@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import {
   INVISIBLE,
+  barcodeTwins,
   catalogueEntryCodec,
   drawsNothing,
   kindKey,
@@ -23,6 +24,27 @@ export const RECENT_LIMIT = 20
  */
 function keyOf(actorId: string): string {
   return `molvia.recent.${actorId}`
+}
+
+/** The codes this identity found its recent items by (MOL-99): code → item id. */
+function codesKeyOf(actorId: string): string {
+  return `molvia.recent-codes.${actorId}`
+}
+
+/** Pair by pair, as the list is read entry by entry; anything else is no codes at all. */
+function loadCodes(actorId: string): Map<string, string> {
+  const raw = read(codesKeyOf(actorId))
+  if (!raw) return new Map()
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return new Map()
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return new Map()
+  return new Map(
+    Object.entries(parsed).filter((pair): pair is [string, string] => typeof pair[1] === 'string'),
+  )
 }
 
 /**
@@ -68,6 +90,12 @@ function comparable(text: string): string {
  */
 export const useRecentItemsStore = defineStore('recentItems', () => {
   const items = ref<CatalogueEntry[]>([])
+  /**
+   * The codes the items were found by, kept beside the list rather than in its rows: a row an
+   * older version wrote stays readable. Only codes of items still in the list — a code is here to
+   * find one of them without a network, and one that fell off the list finds nothing.
+   */
+  let codes = new Map<string, string>()
   /** Whose list `items` holds. */
   let owner: string | null = null
   /**
@@ -87,27 +115,50 @@ export const useRecentItemsStore = defineStore('recentItems', () => {
       owner = actorId
       ahead = false
       items.value = (actorId === null ? null : load(actorId)) ?? []
+      codes = actorId === null ? new Map() : loadCodes(actorId)
       return
     }
     if (actorId === null || ahead) return
     const stored = load(actorId)
     if (stored !== null) items.value = stored
+    codes = loadCodes(actorId)
   }
 
-  function remember(entry: CatalogueEntry): void {
+  /** With the code the item was found by, when it was found by one (MOL-99). */
+  function remember(entry: CatalogueEntry, code?: string): void {
     sync()
     items.value = [entry, ...items.value.filter((kept) => kept.id !== entry.id)].slice(
       0,
       RECENT_LIMIT,
     )
+    const kept = new Set(items.value.map((item) => item.id))
+    codes = new Map([...codes].filter(([, itemId]) => kept.has(itemId)))
+    if (code !== undefined) codes.set(code, entry.id)
     if (owner !== null) {
-      const written = JSON.stringify(items.value.map((kept) => catalogueEntryCodec.encode(kept)))
+      const written = JSON.stringify(items.value.map((item) => catalogueEntryCodec.encode(item)))
+      const writtenCodes = JSON.stringify(Object.fromEntries(codes))
       write(keyOf(owner), written)
+      write(codesKeyOf(owner), writtenCodes)
       // Ahead unless storage reads back what was written. «Some shelf took it» is not enough: a
       // full localStorage keeps its older list and is read first, and the next `sync` would bring
       // that list back over the one just written to sessionStorage (adversarial B5).
-      ahead = read(keyOf(owner)) !== written
+      ahead = read(keyOf(owner)) !== written || read(codesKeyOf(owner)) !== writtenCodes
     }
+  }
+
+  /**
+   * The recent item found by this code before, in any form the package's code may have been
+   * taken in (`barcodeTwins`), as the server looks it up — or none.
+   */
+  function byCode(code: string): CatalogueEntry | null {
+    sync()
+    for (const form of barcodeTwins(code)) {
+      const itemId = codes.get(form)
+      const entry =
+        itemId === undefined ? undefined : items.value.find((item) => item.id === itemId)
+      if (entry) return entry
+    }
+    return null
   }
 
   /**
@@ -149,5 +200,5 @@ export const useRecentItemsStore = defineStore('recentItems', () => {
     })
   }
 
-  return { items, sync, remember, filter }
+  return { items, sync, remember, filter, byCode }
 })

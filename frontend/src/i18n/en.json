@@ -20,6 +20,28 @@
     "add_item": "Add an item",
     "add_price": "Add a price",
     "total": "Total",
+    "receipt": {
+      "total": "Total by receipt",
+      "add": "+ Receipt total",
+      "edit": "Change the receipt total",
+      "priced": "With a price — {n} of {total}",
+      "unpriced": "Without a price — {n}",
+      "over": "The prices are {amount} more than the receipt: a discount or a price typed wrong",
+      "under": "The receipt is {amount} more than the prices",
+      "sending": "Receipt total {amount} · sending",
+      "removing": "Receipt total being removed · sending",
+      "sheet": {
+        "title": "Receipt total",
+        "body": "The prices of the purchases stay as they are",
+        "label": "Amount",
+        "save": "Save",
+        "remove": "Remove the total"
+      },
+      "finish": {
+        "body": "{n} of {total} have no price. Enter what the receipt came to, and “Money” gets the whole of it",
+        "label": "What did the receipt come to?"
+      }
+    },
     "unit_price": "{amount} per {unit}",
     "items_count": "{n} item | {n} items",
     "footnote": "Only the item is required. The price and the amount can be filled in later — the entry is never blocked",
@@ -38,8 +60,9 @@
       },
       "empty": {
         "title": "Nothing in this entry",
-        "body": "Delete it, so no empty row is left in Purchases?",
-        "finish": "Finish anyway"
+        "body": "Delete it, so no empty row is left in Purchases? If all you have is the receipt total, record it as a spending in “Money”",
+        "finish": "Finish anyway",
+        "spending": "Record as a spending in “Money”"
       },
       "removed": "Entry deleted: {name}",
       "removed_announced": "Entry deleted: {name}. Undo — 10 seconds",
@@ -231,6 +254,15 @@
     "offline": {
       "title": "No connection",
       "body": "Searching your recent items only. The full catalogue is back once you are online"
+    },
+    "barcode": {
+      "scan": "Scan a barcode",
+      "missing": "The catalogue does not know the code {code}",
+      "missing_hint": "Or find it by name",
+      "error_body": "Could not check the code {code}. Try again — or find the item by name",
+      "offline_body": "None of your recent items has this code. Find the item by name — or scan it once you are online",
+      "found": "Found by the code {code}",
+      "found_announced": "Found by the code {code}: {name}"
     }
   },
   "sheet": {
@@ -907,7 +939,6 @@
       "sample_milk": "Milk «Ashkhar»",
       "sample_meta": "UHT, 2.5%",
       "date": "Date",
-      "open_scanner": "Scan a barcode",
       "scanned": "Read: {code}"
     },
     "login_seam": "Sign in for development",

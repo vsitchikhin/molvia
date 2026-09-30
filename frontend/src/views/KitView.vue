@@ -84,7 +84,7 @@
     <!-- The scanner, until a screen opens it (MOL-99): for end-to-end and for a real phone. -->
     <section class="group">
       <AppButton block variant="secondary" @click="scannerOpen = true">
-        {{ t('dev.kit.open_scanner') }}
+        {{ t('item.barcode.scan') }}
       </AppButton>
       <p v-if="scanned" class="scanned">{{ t('dev.kit.scanned', { code: scanned }) }}</p>
     </section>

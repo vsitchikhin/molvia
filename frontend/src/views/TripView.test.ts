@@ -16,6 +16,8 @@ import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
+import { useItemEntryStore } from '@/stores/itemEntry'
+import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import TripNotices from '@/components/TripNotices.vue'
@@ -41,6 +43,10 @@ vi.mock('@/api', () => ({
     finishTrip: () => new Promise(() => undefined),
     removeTrip: (tripId: string) => removeTrip(tripId),
     restoreTrip: (...args: unknown[]) => restoreTrip(...args),
+    setTripReceipt: () => new Promise(() => undefined),
+    // «Деньги», where an empty record is handed over as a spending (MOL-78, В-1).
+    moneyMonth: () => new Promise(() => undefined),
+    moneyAccounts: () => new Promise(() => undefined),
   },
 }))
 
@@ -182,7 +188,12 @@ async function render({ memory = null as TripViewModel | null, settings = true }
   await router.push('/purchases')
   await router.push('/purchases/manual')
   const view = mount(App, {
-    global: { plugins: [router, pinia, createAppI18n('ru')] },
+    // The scanner the search opens over itself needs a camera and a worker, which happy-dom has
+    // not; what it does with a code is ItemSearchView's test (MOL-99).
+    global: {
+      plugins: [router, pinia, createAppI18n('ru')],
+      stubs: { BarcodeScannerSheet: true },
+    },
     attachTo: document.body,
   })
   mounted.push(view)
@@ -1006,6 +1017,152 @@ describe('TripView', () => {
 
     expect(router.currentRoute.value.name).toBe('item-search')
   })
+
+  it('«Сканировать штрихкод» ведёт на поиск и просит поднять сканер сразу (MOL-99, В-4)', async () => {
+    currentTrip.mockResolvedValue(trip(handoff()))
+    const { view, router } = await render()
+    const asked = vi.spyOn(useItemEntryStore(), 'askToScan')
+    await button(view, ru.item.barcode.scan).trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('item-search')
+    expect(asked).toHaveBeenCalledOnce()
+  })
+
+  it('«Добавить позицию» сканер не просит', async () => {
+    currentTrip.mockResolvedValue(trip(handoff()))
+    const { view } = await render()
+    const asked = vi.spyOn(useItemEntryStore(), 'askToScan')
+    await button(view, ru.trip.add_item).trigger('click')
+    await flushPromises()
+
+    expect(asked).not.toHaveBeenCalled()
+  })
+
+  describe('сумма по чеку (MOL-78)', () => {
+    const openSheet = () => document.body.querySelector('dialog[open]')
+    /** The handoff's two milks with a price, and bread without one. */
+    const partly = (): Row[] => [...handoff(), { id: BREAD, name: 'Хлеб' }]
+    const field = () => openSheet()?.querySelector<HTMLInputElement>('input[data-field="receipt"]')
+
+    async function askFinish(view: VueWrapper): Promise<void> {
+      await button(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      clock += 1000
+    }
+
+    async function type(value: string): Promise<void> {
+      const input = field()
+      if (!input) throw new Error('нет поля суммы')
+      input.value = value
+      input.dispatchEvent(new Event('input'))
+      await flushPromises()
+    }
+
+    it('у части покупок нет цены — «Закончить» спрашивает сумму, и она уходит перед завершением (В-4)', async () => {
+      currentTrip.mockResolvedValue(trip(partly()))
+      const { view, queue } = await render()
+      await askFinish(view)
+      expect(openSheet()?.textContent).toContain('Без цены 1 из 3')
+      expect(openSheet()?.textContent).toContain(ru.trip.receipt.finish.label)
+
+      await type('12 400')
+      inside(openSheet(), ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(queue.pending.map((write) => write.kind)).toEqual(['receipt', 'finish'])
+      expect(queue.pending[0]).toMatchObject({
+        kind: 'receipt',
+        tripId: TRIP,
+        body: { receipt: parseMoney('12400', 'AMD') },
+      })
+    })
+
+    it('поле пустое — закончить можно и без суммы', async () => {
+      currentTrip.mockResolvedValue(trip(partly()))
+      const { view, queue } = await render()
+      await askFinish(view)
+      inside(openSheet(), ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(queue.pending.map((write) => write.kind)).toEqual(['finish'])
+    })
+
+    it('ноль — не сумма: сказано у поля, и ничего не уходит', async () => {
+      currentTrip.mockResolvedValue(trip(partly()))
+      const { view, queue } = await render()
+      await askFinish(view)
+      await type('0')
+      inside(openSheet(), ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(openSheet()?.textContent).toContain(ru.spending.sheet.bad_amount)
+      expect(queue.pending).toEqual([])
+    })
+
+    it('«не должно сработать»: цены у всех — поля нет; сумма уже есть — поля нет', async () => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      const first = await render()
+      await askFinish(first.view)
+      expect(field()).toBeFalsy()
+      expect(openSheet()?.textContent).toContain(ru.trip.finish_confirm.body)
+      first.view.unmount()
+      mounted.pop()
+      document.body.innerHTML = ''
+
+      currentTrip.mockResolvedValue({ ...trip(partly()), receipt: parseMoney('12400', 'AMD') })
+      const second = await render()
+      await askFinish(second.view)
+      expect(field()).toBeFalsy()
+    })
+
+    it('«+ Сумма по чеку» в итоге открывает шторку, «Сохранить» кладёт сумму в очередь', async () => {
+      currentTrip.mockResolvedValue(trip(partly()))
+      const { view, queue } = await render()
+      await button(view, ru.trip.receipt.add).trigger('click')
+      await flushPromises()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      clock += 1000
+      expect(openSheet()?.textContent).toContain(ru.trip.receipt.sheet.title)
+      await type('9870,50')
+      inside(openSheet(), ru.trip.receipt.sheet.save).click()
+      await flushPromises()
+      expect(queue.pending).toEqual([
+        { kind: 'receipt', tripId: TRIP, body: { receipt: parseMoney('9870.50', 'AMD') } },
+      ])
+      expect(plain(view.get('.dock').text())).toContain('Сумма по чеку 9 870,50 ֏ · отправляется')
+    })
+
+    it('«Изменить сумму по чеку» открывает шторку на сумме, «Убрать сумму» кладёт null', async () => {
+      currentTrip.mockResolvedValue({ ...trip(partly()), receipt: parseMoney('12400', 'AMD') })
+      const { view, queue } = await render()
+      await button(view, ru.trip.receipt.edit).trigger('click')
+      await flushPromises()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      clock += 1000
+      expect(field()?.value).toBe('12400')
+      inside(openSheet(), ru.trip.receipt.sheet.remove).click()
+      await flushPromises()
+      expect(queue.pending).toEqual([{ kind: 'receipt', tripId: TRIP, body: { receipt: null } }])
+      expect(view.get('.dock').text()).toContain(ru.trip.receipt.removing)
+    })
+
+    it('у пустой записи суммы нет: «Закончить» предлагает записать тратой в «Деньгах» (В-1)', async () => {
+      currentTrip.mockResolvedValue(trip())
+      const { view, queue, router } = await render()
+      expect(view.findAll('button').some((b) => b.text() === ru.trip.receipt.add)).toBe(false)
+      await askFinish(view)
+      inside(openSheet(), ru.trip.remove.empty.spending).click()
+      await flushPromises()
+      expect(queue.pending).toEqual([{ kind: 'delete', tripId: TRIP }])
+      for (let step = 0; step < 20 && router.currentRoute.value.name !== 'money'; step += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        await flushPromises()
+      }
+      expect(router.currentRoute.value.name).toBe('money')
+      // «Деньги» took what was handed over and opened the sheet on it.
+      expect(useSpendingHandoffStore().handed).toBeNull()
+    })
+  })
+
   describe('удалить поход (MOL-76)', () => {
     const openSheet = () => document.body.querySelector('dialog[open]')
 

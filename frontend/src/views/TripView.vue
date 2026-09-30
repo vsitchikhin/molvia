@@ -49,6 +49,10 @@
       >
         <template #action>
           <AppButton size="large" block @click="find">{{ t('trip.empty.action') }}</AppButton>
+          <AppButton variant="secondary" block @click="scan">
+            <template #icon><IconBarcode /></template>
+            {{ t('item.barcode.scan') }}
+          </AppButton>
         </template>
       </ScreenState>
 
@@ -58,6 +62,10 @@
           <button class="add" type="button" @click="find">
             <IconPlus class="add-icon" aria-hidden="true" />
             {{ t('trip.add_item') }}
+          </button>
+          <button class="add" type="button" @click="scan">
+            <IconBarcode class="add-icon" aria-hidden="true" />
+            {{ t('item.barcode.scan') }}
           </button>
         </AppCard>
         <p class="footnote">{{ t('trip.footnote') }}</p>
@@ -72,7 +80,14 @@
 
     <!-- The one permanent place money is converted, and it stays put while the list scrolls. -->
     <template v-if="phase === 'going'" #docked>
-      <TripTotal :trip="trip" :pending="waiting" :local="local !== null" />
+      <TripTotal
+        :trip="trip"
+        :pending="waiting"
+        :local="local !== null"
+        :receipt-waiting="receiptWaiting"
+        :offer-receipt="offerReceipt"
+        @receipt="receiptOpen = true"
+      />
     </template>
 
     <!-- Asked before, not undone after: a record cannot be reopened in 0.1, and «Закончить» is one
@@ -84,12 +99,34 @@
         finishingEmpty ? t('trip.remove.empty.title') : t('trip.finish_confirm.title')
       }}</template>
       <p class="confirm">
-        {{ finishingEmpty ? t('trip.remove.empty.body') : t('trip.finish_confirm.body') }}
+        {{
+          finishingEmpty
+            ? t('trip.remove.empty.body')
+            : askingReceipt
+              ? t('trip.receipt.finish.body', finishCounts)
+              : t('trip.finish_confirm.body')
+        }}
       </p>
+      <!-- «Сколько вышло по чеку?» — only while some purchase has no price and no sum is there yet
+           (MOL-78, В-4): with every price in, the total is already known. -->
+      <ReceiptField
+        v-if="!finishingEmpty && askingReceipt"
+        v-model="receiptText"
+        v-model:currency="receiptCurrency"
+        class="receipt-field"
+        :label="t('trip.receipt.finish.label')"
+        optional
+        :bad="receiptBad"
+      />
       <template #footer>
         <template v-if="finishingEmpty">
           <AppButton size="large" block @click="removeEmpty">
             {{ t('trip.remove.action') }}
+          </AppButton>
+          <!-- Money with no purchases is a spending (MOL-78, В-1): the record goes, «Деньги» open
+               the sheet with the shop and the day in place. -->
+          <AppButton variant="ghost" block @click="toSpending">
+            {{ t('trip.remove.empty.spending') }}
           </AppButton>
           <AppButton variant="ghost" block @click="finish">
             {{ t('trip.remove.empty.finish') }}
@@ -115,6 +152,15 @@
       @confirm="remove"
     />
 
+    <ReceiptSheet
+      v-if="tripId"
+      v-model:open="receiptOpen"
+      :trip-id="tripId"
+      :trip-currency="currency"
+      :current="receiptCurrent"
+      :on-closed="leaveIfOver"
+    />
+
     <!-- Mounted on a tap and put away from `onClosed`, as the search does it: one opening, one
          purchase. One step back — the record is the screen under it. -->
     <ItemDetailsSheet
@@ -134,6 +180,7 @@
 import { computed, defineComponent, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import IconBarcode from '~icons/mdi/barcode-scan'
 import IconPlus from '~icons/mdi/plus'
 import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
@@ -141,6 +188,9 @@ import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
+import ReceiptField from '@/components/ReceiptField.vue'
+import ReceiptSheet from '@/components/ReceiptSheet.vue'
+import { typedReceipt } from '@/components/receipt'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import TripNotices from '@/components/TripNotices.vue'
@@ -153,9 +203,12 @@ import { useTripRows } from '@/composables/useTripRows'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import type { RetryPurchase } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
-import { purchaseDay, timeOfDay } from '@/days'
+import { useTripReceipt } from '@/composables/useTripReceipt'
+import { localDay, purchaseDay, timeOfDay } from '@/days'
 import { afterStep, useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
+import { useItemEntryStore } from '@/stores/itemEntry'
+import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -194,8 +247,11 @@ export default defineComponent({
     AppCard,
     AppScreen,
     BottomSheet,
+    IconBarcode,
     IconPlus,
     ItemDetailsSheet,
+    ReceiptField,
+    ReceiptSheet,
     ScreenSkeleton,
     ScreenState,
     TripNotices,
@@ -207,12 +263,13 @@ export default defineComponent({
   setup() {
     const { t, locale } = useI18n()
     const router = useRouter()
-    const { goUp } = useNavigation()
+    const itemEntry = useItemEntryStore()
+    const { goTab, goUp } = useNavigation()
     const actor = useActorStore()
     const trips = useTripStore()
     const queue = useTripQueueStore()
 
-    const { trip, local, tripId } = useCurrentTrip()
+    const { trip, local, tripId, currency } = useCurrentTrip()
 
     /** Asked once at the start; the memory covers every later opening (MOL-24, Н-7). */
     const asked = ref(trips.current !== null)
@@ -266,6 +323,14 @@ export default defineComponent({
     })
 
     const { rows, waiting } = useTripRows(tripId, trip, () => t('trip.queued.unnamed'))
+    const { receiptOpen, receiptWaiting, receiptCurrent, offerReceipt, unpriced } = useTripReceipt(
+      tripId,
+      trip,
+      rows,
+    )
+    const handoff = useSpendingHandoffStore()
+    /** «Записать тратой в «Деньгах»» was chosen: the screen goes there once the record is away. */
+    let toMoney = false
 
     /**
      * Up to «Покупки» once no record is open — but never under a sheet: a sheet that closes calls
@@ -275,7 +340,9 @@ export default defineComponent({
     function leaveIfOver(): void {
       afterStep(() => {
         if (phase.value !== 'none' || document.querySelector('dialog[open]')) return
-        void goUp()
+        // Handed over to «Деньги» (MOL-78, В-1): the sheet of a spending waits there. Kept for
+        // every call, as the way up is: the first may come while the sheet's own step is landing.
+        void (toMoney ? goTab('money') : goUp())
       })
     }
     watch(phase, (now) => {
@@ -331,6 +398,14 @@ export default defineComponent({
      */
     function finish(): void {
       const id = tripId.value
+      // The sum typed into the question goes before the finish, in the queue's order (MOL-78, В-4);
+      // one that is not money is said so, and nothing is sent until it is right or left empty.
+      if (id && !finishingEmpty.value && askingReceipt.value && receiptText.value.trim()) {
+        const receipt = typedReceipt(receiptText.value, receiptCurrency.value)
+        receiptBad.value = receipt === null
+        if (!receipt) return
+        queue.enqueue({ kind: 'receipt', tripId: id, body: { receipt } })
+      }
       if (id) queue.enqueue({ kind: 'finish', tripId: id, finishedOnDeviceAt: new Date() })
       finishing.value = false
     }
@@ -341,8 +416,20 @@ export default defineComponent({
      */
     const kept = computed(() => rows.value.filter((row) => row.mark !== 'removing').length)
 
+    /** Taken when «Закончить» is tapped, like `finishingEmpty`: rows arriving do not reword it. */
+    const askingReceipt = ref(false)
+    const finishCounts = ref({ n: 0, total: 0 })
+    const receiptText = ref('')
+    const receiptCurrency = ref(currency.value)
+    const receiptBad = ref(false)
+
     function askFinish(): void {
       finishingEmpty.value = kept.value === 0
+      askingReceipt.value = unpriced.value > 0 && receiptCurrent.value === null
+      finishCounts.value = { n: unpriced.value, total: kept.value }
+      receiptText.value = ''
+      receiptCurrency.value = currency.value
+      receiptBad.value = false
       finishing.value = true
     }
 
@@ -374,9 +461,26 @@ export default defineComponent({
       finishing.value = false
     }
 
+    /**
+     * «Записать тратой в «Деньгах»» (MOL-78, В-1): the empty record goes — with «Вернуть» — and the
+     * sheet of a spending opens in «Деньги» on the shop and the day of the record, in «Продукты».
+     */
+    function toSpending(): void {
+      const since = trip.value?.startedAt ?? local.value?.startedAt ?? new Date()
+      handoff.hand({ place: place.value, day: localDay(since) })
+      toMoney = true
+      removeEmpty()
+    }
+
     /** A nested screen, so an ordinary push: «back» from it lands on the record (MOL-17). */
     function find(): void {
       void router.push({ name: 'item-search' })
+    }
+
+    /** «Сканировать» (MOL-99, В-4): the same screen, with the scanner up over it at once. */
+    function scan(): void {
+      itemEntry.askToScan()
+      find()
     }
 
     useReconnect(() => {
@@ -418,6 +522,18 @@ export default defineComponent({
       askRemove,
       remove,
       removeEmpty,
+      toSpending,
+      askingReceipt,
+      finishCounts,
+      receiptText,
+      receiptCurrency,
+      receiptBad,
+      receiptOpen,
+      receiptWaiting,
+      receiptCurrent,
+      offerReceipt,
+      tripId,
+      currency,
       leaveIfOver,
       retry: () => void load(),
       amend,
@@ -428,6 +544,7 @@ export default defineComponent({
         leaveIfOver()
       },
       find,
+      scan,
     }
   },
 })
@@ -459,6 +576,10 @@ export default defineComponent({
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
+}
+
+.receipt-field {
+  margin-top: var(--space-4);
 }
 
 .notice {

@@ -239,7 +239,7 @@ import CategoryChips from '@/components/CategoryChips.vue'
 import ChargedField from '@/components/ChargedField.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { defaultAccount, pageOrder } from '@/components/accounts'
-import { asTyped, categoryColour, rateWords } from '@/components/spending'
+import { asTyped, categoryColour, groceriesOf, rateWords } from '@/components/spending'
 import type { JournalRow, Removed, SpendingTarget } from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, localDay, shiftDay } from '@/days'
@@ -422,6 +422,13 @@ export default defineComponent({
         day.value = spending?.spentOn ?? today.value
         note.value = spending?.note ?? ''
         place.value = spending?.place ?? ''
+        // A record with no purchases handed over (MOL-78, В-1): its shop and day, in «Продукты».
+        const prefill = props.target.kind === 'add' ? props.target.prefill : undefined
+        if (prefill) {
+          categoryId.value = groceriesOf(props.categories)
+          day.value = prefill.day
+          place.value = prefill.place
+        }
         amountBad.value = false
         categoryBad.value = false
         noteBad.value = false
@@ -461,6 +468,15 @@ export default defineComponent({
       if (next !== accountId.value) debited.value = ''
       accountId.value = next
     })
+
+    // The categories may come after the sheet has opened on a record handed over.
+    watch(
+      () => props.categories,
+      (categories) => {
+        if (!props.open || props.target.kind !== 'add' || !props.target.prefill) return
+        categoryId.value ??= groceriesOf(categories)
+      },
+    )
 
     watch(
       () => props.made,

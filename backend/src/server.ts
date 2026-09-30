@@ -42,6 +42,7 @@ import type { QuietToday } from '@/usecases/remind-ratings'
 import { amendVerdict } from '@/usecases/amend-verdict'
 import { withdrawVerdict } from '@/usecases/withdraw-verdict'
 import { pendingVerdicts } from '@/usecases/pending-verdicts'
+import { findByBarcode } from '@/usecases/find-by-barcode'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { signIn } from '@/usecases/sign-in'
 import { endSession, listSessions, logout } from '@/usecases/sessions'
@@ -97,7 +98,13 @@ import { settingsRoute } from '@/routes/settings'
 import { startTrip } from '@/usecases/start-trip'
 import { removeTrip, restoreTrip } from '@/usecases/remove-trip'
 import { startLogin } from '@/usecases/start-login'
-import { addExpense, finishTrip, removeExpense, updateExpense } from '@/usecases/trip-expenses'
+import {
+  addExpense,
+  finishTrip,
+  removeExpense,
+  setReceipt,
+  updateExpense,
+} from '@/usecases/trip-expenses'
 import { createActorRepository } from '@/db/actors-repository'
 import { createExchangeRepository } from '@/db/exchanges-repository'
 import { createEventRepository } from '@/db/events-repository'
@@ -484,6 +491,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items }, actorId, query),
         propose: (actorId, input) => proposeItem(items, actorId, input),
+        byBarcode: (code) => findByBarcode(items, code),
       })
       placeRoutes(guarded, {
         recent: (actorId, geography) => recentPlaces(tripData.places, actorId, geography),
@@ -500,6 +508,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         finish: (actorId, tripId, deviceAt, deviceDay) =>
           finishTrip(tripData.trips, actorId, tripId, deviceAt, deviceDay),
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
+        setReceipt: (actorId, tripId, receipt) => setReceipt(transact, actorId, tripId, receipt),
         removeTrip: (actorId, tripId) => removeTrip(tripData.trips, actorId, tripId),
         restoreTrip: (actorId, tripId, body) => restoreTrip(tripData, actorId, tripId, body),
       })

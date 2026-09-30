@@ -23,6 +23,8 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit, theRow } from './rows'
 import { expenses, trips, places } from './schema'
+import { tripMoneyRows } from './trip-money'
+import type { TripMoneyRow } from './trip-money'
 
 /**
  * The rate a trip is started with, as the trip keeps it: who published it, whether it jumped when
@@ -128,6 +130,12 @@ export interface TripRepository {
     manual: ExchangeRate | null,
   ): Promise<Trip | null>
   /**
+   * «Сумма по чеку» (MOL-78): the receipt's sum whole, or none, and the moment it changed — what a
+   * check and the hint of an exchange date it by. Whether it changed at all is the use case's to
+   * decide under `lock`: a repeat must move neither the moment nor «списано».
+   */
+  setReceipt(id: string, actorId: string, receipt: Money | null): Promise<Trip | null>
+  /**
    * «Удалить поход» (MOL-76): marked, and from then on no reader but erasure and the minute timer
    * sees it. `false` when it is not the owner's — a stranger's, a missing one, one already final.
    * Marking a marked one again is `true` and moves nothing: a repeat from the queue.
@@ -171,6 +179,10 @@ function toTrip(row: TripRow): Trip {
       row.debitedMinor === null || row.debitedCurrency === null
         ? null
         : { minor: row.debitedMinor, currency: row.debitedCurrency },
+    receipt:
+      row.receiptMinor === null || row.receiptCurrency === null
+        ? null
+        : { minor: row.receiptMinor, currency: row.receiptCurrency },
   })
 }
 
@@ -194,40 +206,47 @@ function ownerLock(tx: Conn, actorId: string) {
 export function createTripRepository(db: Conn): TripRepository {
   /**
    * «12 позиций · 9 870 ֏» of every row on a page of the history (MOL-128, В-4): how many
-   * purchases, and one sum per currency — the trip's own `total`, by the same rule `tripTotal`
-   * adds it up: a purchase with no price counts as a purchase and adds nothing. One statement for
-   * the page, after it, so the order and the cursor stay the history's own.
+   * purchases, and what the trip came to — by the one rule of a trip's money (`tripMoneyRows`,
+   * MOL-78): the receipt's sum when there is one, else one sum per currency of the priced
+   * purchases, a purchase with no price counting as a purchase and adding nothing. Two statements
+   * for the page, after it, so the order and the cursor stay the history's own.
    */
   async function purchasesOf(
     tripIds: readonly string[],
   ): Promise<Map<string, { itemCount: number; total: Money[] | null }>> {
     const counted = new Map<string, { itemCount: number; total: Money[] | null }>()
     if (tripIds.length === 0) return counted
-    const rows = await db
-      .select({
-        tripId: expenses.tripId,
-        currency: expenses.amountCurrency,
-        // Text: a sum over bigint is a numeric, and the driver would hand it over as a double.
-        minor: sql<string | null>`sum(${expenses.amountMinor})::text`,
-        items: sql<number>`count(*)::int`,
-      })
-      .from(expenses)
-      .where(inArray(expenses.tripId, [...tripIds]))
-      .groupBy(expenses.tripId, expenses.amountCurrency)
-      .orderBy(expenses.tripId, expenses.amountCurrency)
-    for (const row of rows) {
-      const entry = counted.get(row.tripId) ?? { itemCount: 0, total: [] }
-      entry.itemCount += row.items
-      if (row.currency !== null && row.minor !== null) {
-        const minor = BigInt(row.minor)
-        // A sum no amount can carry — only an absurd entry makes one — is unknown rather than a
-        // failure of the whole page: the cursor could never walk past it (review, MOL-128).
-        entry.total =
-          entry.total && minor <= INT8_MAX
-            ? [...entry.total, { minor, currency: row.currency }]
-            : null
-      }
-      counted.set(row.tripId, entry)
+    const chosen = sql`t.id in (${sql.join(
+      tripIds.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    )})`
+    const [counts, sums] = await Promise.all([
+      db
+        .select({ tripId: expenses.tripId, items: sql<number>`count(*)::int` })
+        .from(expenses)
+        .where(inArray(expenses.tripId, [...tripIds]))
+        .groupBy(expenses.tripId),
+      db.execute<TripMoneyRow>(sql`
+        select m.trip_id, m.currency, m.minor
+          from (${tripMoneyRows(chosen)}) m
+         order by m.trip_id, m.currency
+      `),
+    ])
+    const entryOf = (tripId: string) => {
+      const entry = counted.get(tripId) ?? { itemCount: 0, total: [] }
+      counted.set(tripId, entry)
+      return entry
+    }
+    for (const row of counts) entryOf(row.tripId).itemCount = row.items
+    for (const row of sums) {
+      const entry = entryOf(row.trip_id)
+      const minor = BigInt(row.minor)
+      // A sum no amount can carry — only an absurd entry makes one — is unknown rather than a
+      // failure of the whole page: the cursor could never walk past it (review, MOL-128).
+      entry.total =
+        entry.total && minor <= INT8_MAX
+          ? [...entry.total, { minor, currency: row.currency }]
+          : null
     }
     return counted
   }
@@ -413,6 +432,24 @@ export function createTripRepository(db: Conn): TripRepository {
         .set({
           rateChoice: choice,
           ...(manual ? { rateManualScaled: manual.scaled, rateManualAsOf: manual.asOf } : {}),
+        })
+        .where(ownedBy(id, actorId))
+        .returning()
+      return row ? toTrip(row) : null
+    },
+
+    async setReceipt(id, actorId, receipt) {
+      if (idOrNull(id) === null || idOrNull(actorId) === null) return null
+      const [row] = await db
+        .update(trips)
+        .set({
+          receiptMinor: receipt?.minor ?? null,
+          receiptCurrency: receipt?.currency ?? null,
+          receiptSetAt: sql`clock_timestamp()`,
+          // Kept by an amendment, cleared with the sum: a new sum after «Убрать» is a new receipt.
+          receiptFirstAt: receipt
+            ? sql`coalesce(${trips.receiptFirstAt}, clock_timestamp())`
+            : null,
         })
         .where(ownedBy(id, actorId))
         .returning()

@@ -12,11 +12,12 @@ import {
   ISSUE,
   catalogueEntryCodec,
   SESSION_COOKIE,
+  catalogueBarcodeResponseSchema,
   catalogueSearchResponseSchema,
 } from '@molvia/model'
 import type { CatalogueEntry, NewItem } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { events, items } from '@/db/schema'
+import { events, items, searchPicks } from '@/db/schema'
 import { createItemRepository } from '@/db/items-repository'
 import { createSearchPickRepository } from '@/db/search-picks-repository'
 import { SEARCH_LIMIT } from '@/usecases/search-catalogue'
@@ -339,6 +340,178 @@ describe('GET /catalogue/search — the event log', () => {
     for (const text of ['м', 'мо', 'мол', 'молоко']) await search(actor, q(text))
 
     expect(await viewsOf(actor)).toHaveLength(0)
+  })
+})
+
+async function byCode(actor: string | null, query: string): Promise<Reply> {
+  const response = await app.inject({
+    method: 'GET',
+    url: `/catalogue/barcode${query}`,
+    headers: actor === null ? {} : { cookie: await signIn(db, actor) },
+  })
+  return {
+    status: response.statusCode,
+    raw: response.body,
+    body: JSON.parse(response.body) as unknown,
+    headers: response.headers,
+  }
+}
+
+const code = (text: string) => `?code=${encodeURIComponent(text)}`
+
+/** Read through the contract the client parses, as `found` reads the search. */
+function held(reply: Reply): CatalogueEntry | null {
+  expect(reply.status).toBe(200)
+  return catalogueBarcodeResponseSchema.parse(reply.body).item
+}
+
+describe('GET /catalogue/barcode — the item a code belongs to (MOL-99)', () => {
+  it('answers the item holding the code, as the catalogue shows it — never who added it', async () => {
+    const author = await insertActor(db)
+    const asker = await insertActor(db)
+    const milk = await add({ name: 'Молоко «Ашхар» 1 л', barcodes: ['4850000000007'] }, author)
+
+    const reply = await byCode(asker, code('4850000000007'))
+
+    expect(held(reply)).toEqual({
+      id: milk.id,
+      kind: 'product',
+      name: 'Молоко «Ашхар» 1 л',
+      note: null,
+      defaultUnit: 'l',
+      typicalQuantity: null,
+    })
+    // Six fields and nothing else: not the author, and not the codes themselves.
+    expect(reply.raw).not.toContain(author)
+    expect(reply.raw).not.toContain('barcodes')
+  })
+
+  it('answers a code nobody holds with 200 and null, not 404', async () => {
+    const actor = await insertActor(db)
+    await add({ name: 'Кефир', barcodes: ['4850000000007'] })
+
+    expect(held(await byCode(actor, code('4850000000014')))).toBeNull()
+  })
+
+  it('answers a code of no barcode shape exactly as one nobody holds', async () => {
+    const actor = await insertActor(db)
+    await add({ name: 'Кефир', barcodes: ['4850000000007'] })
+    const nobodys = (await byCode(actor, code('4850000000014'))).raw
+
+    for (const text of ['', '485000000000', '4850000000007 ', 'x850000000007', '048500000000071']) {
+      const reply = await byCode(actor, code(text))
+      expect(reply.status, text).toBe(200)
+      expect(reply.raw, text).toBe(nobodys)
+    }
+  })
+
+  it('finds a code typed from a shop label under the eight digits its scan stored (С-14)', async () => {
+    const actor = await insertActor(db)
+    const cheese = await add({ name: 'Сыр чечил', defaultUnit: 'kg', barcodes: ['00408295'] })
+    const imported = await add({
+      name: 'Crackers',
+      defaultUnit: 'piece',
+      barcodes: ['0100000000007'],
+    })
+
+    expect(held(await byCode(actor, code('0004082000095')))?.id).toBe(cheese.id)
+    expect(held(await byCode(actor, code('00408295')))?.id).toBe(cheese.id)
+    // And back: a UPC-E of system 1 scanned is thirteen digits, typed it is eight.
+    expect(held(await byCode(actor, code('10000007')))?.id).toBe(imported.id)
+  })
+
+  it('prefers the code as read over its twin when both are held', async () => {
+    const actor = await insertActor(db)
+    const label = await add({
+      name: 'Салат из магазина',
+      defaultUnit: 'piece',
+      barcodes: ['00408295'],
+    })
+    const upcE = await add({
+      name: 'Imported beans',
+      defaultUnit: 'piece',
+      barcodes: ['0004082000095'],
+    })
+
+    expect(held(await byCode(actor, code('00408295')))?.id).toBe(label.id)
+    expect(held(await byCode(actor, code('0004082000095')))?.id).toBe(upcE.id)
+  })
+
+  it('finds the package by the twelve digits of its UPC-A and by its GTIN-14 (adversarial З)', async () => {
+    const actor = await insertActor(db)
+    const tea = await add({ name: 'Tea', defaultUnit: 'piece', barcodes: ['0012345678905'] })
+
+    expect(held(await byCode(actor, code('012345678905')))?.id).toBe(tea.id)
+    expect(held(await byCode(actor, code('00012345678905')))?.id).toBe(tea.id)
+  })
+
+  it('does not guess between two shop labels that fold into one UPC-A (adversarial Г)', async () => {
+    const actor = await insertActor(db)
+    const cheese = await add({ name: 'Сыр, магазин 1', defaultUnit: 'kg', barcodes: ['00000055'] })
+    await add({ name: 'Салат, магазин 2', defaultUnit: 'piece', barcodes: ['00000505'] })
+
+    // Scanned, the label is its own eight digits; typed, it is thirteen that fit either label.
+    expect(held(await byCode(actor, code('00000055')))?.id).toBe(cheese.id)
+    expect(held(await byCode(actor, code('0000000000055')))).toBeNull()
+  })
+
+  it('does not find by a scanned label an item taken from the other one (adversarial Г′, С-7)', async () => {
+    const actor = await insertActor(db)
+    // Typed from its label 00000055, the cheese was taken as thirteen digits (typedBarcode).
+    await add({ name: 'Сыр, магазин 1', defaultUnit: 'kg', barcodes: ['0000000000055'] })
+
+    expect(held(await byCode(actor, code('00000505')))).toBeNull()
+    expect(held(await byCode(actor, code('00000055')))).toBeNull()
+    expect(held(await byCode(actor, code('0000000000055')))).not.toBeNull()
+  })
+
+  it('has no HEAD twin, as no GET of the API has (adversarial В)', async () => {
+    const actor = await insertActor(db)
+    await add({ name: 'Кефир', barcodes: ['4850000000007'] })
+
+    const response = await app.inject({
+      method: 'HEAD',
+      url: `/catalogue/barcode${code('4850000000007')}`,
+      headers: { cookie: await signIn(db, actor) },
+    })
+
+    expect(response.statusCode).toBe(404)
+  })
+
+  it('must not find a twin for a code that has one form only', async () => {
+    const actor = await insertActor(db)
+    // 04252614 is UPC-E alone: its eight digits never stand for an EAN-8, so they are not looked up.
+    await add({ name: 'Не тот товар', barcodes: ['04252614'] })
+
+    expect(held(await byCode(actor, code('0042100005264')))).toBeNull()
+  })
+
+  it('refuses a missing, repeated or extra parameter and names it', async () => {
+    const actor = await insertActor(db)
+
+    expect((await byCode(actor, '')).status).toBe(400)
+    expect((await byCode(actor, `${code('4850000000007')}&code=4850000000014`)).status).toBe(400)
+    const extra = await byCode(actor, `${code('4850000000007')}&actorId=${actor}`)
+    expect(extra.status).toBe(400)
+    expect(extra.body).toEqual({ code: ISSUE.QUERY_INVALID, details: 'actorId' })
+  })
+
+  it('answers nobody named with the door, as the search does', async () => {
+    const reply = await byCode(null, code('4850000000007'))
+
+    expect(reply.status).toBe(401)
+    expect(reply.body).toEqual({ code: ERROR.NO_ACTOR })
+  })
+
+  it('is never stored by a cache, and writes nothing — no event, no pick', async () => {
+    const actor = await insertActor(db)
+    await add({ name: 'Кефир', barcodes: ['4850000000007'] })
+
+    const reply = await byCode(actor, code('4850000000007'))
+
+    expect(reply.headers['cache-control']).toBe('no-store')
+    expect(await viewsOf(actor)).toHaveLength(0)
+    expect(await db.select().from(searchPicks)).toEqual([])
   })
 })
 

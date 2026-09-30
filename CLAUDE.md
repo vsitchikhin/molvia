@@ -265,8 +265,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **«Покупки» is empty, and «Что брать» greets a newcomer, only for an answer known to be empty**
   (`answeredEmpty`, MOL-77; the memory of `useAdvice`, MOL-128); a phone-side cache is read by both
   versions. **The record typed by hand goes up to «Покупки» once none is open**, never under a sheet.
+- **A trip's money is one rule** (MOL-78): the receipt's sum whole when typed, else the prices —
+  `tripMoney` in the domain, `tripMoneyRows` in SQL, for every reader; **a price is never worked out
+  of the sum**, and a change of the sum takes «списано» off.
 
-### Barcodes: the scanner — `.claude/rules/barcodes.md`
+### Barcodes: the scanner, the item by its code — `.claude/rules/barcodes.md`
 
 - **EAN-13, EAN-8, UPC-A, UPC-E and nothing else**; UPC comes out as thirteen digits, and a code
   typed by hand is brought to that same form by `typedBarcode` — one package, one code (MOL-98).
@@ -275,6 +278,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The wasm comes from the app's own origin and is precached** — never the library's default CDN.
 - **No camera track outlives the scanner**, the reader's error included; every refusal offers the
   digits typed by hand. **A reader is thrown away only when it is the one that failed.**
+- **A code is looked up in the query, never the path** (`GET /catalogue/barcode?code=`, MOL-99): the
+  API logs paths. It is looked up with its twins (`barcodeTwins`), the code as read first; the item
+  found goes to the purchase sheet with no query — a code teaches the search nothing.
 
 ### Identity, sessions, the way in and out — `.claude/rules/auth.md`
 
@@ -335,7 +341,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17); no gesture
   is intercepted but the sheet's own pull down (MOL-80); only the page scrolls, except a sheet.
   **«Что брать» is home** (MOL-128): the `tabMove` of «back»; old addresses of «Поход» redirect for
-  good.
+  good. **A change of a screen's own query is not another screen** (MOL-136): no scroll, no
+  animation, no arrival, and the page is held as tall as the window (MOL-138); **nothing of the
+  answer stands above the control that chooses it** — a strip, a refusal, a note go under it.
 - **A screen is built from the kit** (MOL-18); the sheet is a native `<dialog>` with an entry in the
   history, and puts the page back — and focus, wherever the platform gave it — by what it was
   opened from (MOL-63, MOL-80). **Its press is heard on the document**: iOS hands a tap on the

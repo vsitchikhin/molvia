@@ -222,6 +222,8 @@ describe('какие ключи приложение пишет на устро�
       'molvia.money',
       'molvia.places',
       'molvia.recent',
+      // Коды, по которым найдены недавние позиции, — поиск по коду офлайн (MOL-99).
+      'molvia.recent-codes',
       // Набранный поиск и промах — пережить перезагрузку этого окна (MOL-46).
       'molvia.search-draft',
       'molvia.settings',
@@ -242,6 +244,9 @@ describe('какие ключи приложение пишет на устро�
       'molvia.trip-payments',
       'molvia.trip-payments-rejected',
       'molvia.trip-queue',
+      // «Сумма по чеку», своим ключом по той же причине (MOL-78).
+      'molvia.trip-receipts',
+      'molvia.trip-receipts-rejected',
       'molvia.trip-rejected',
       'molvia.verdict-confirmed',
       'molvia.verdict-drafts',

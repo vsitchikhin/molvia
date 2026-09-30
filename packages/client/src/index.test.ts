@@ -459,6 +459,30 @@ describe('the catalogue', () => {
     expect(await codeOf(client.searchCatalogue('молоко'))).toBe(ERROR.NO_ACTOR)
   })
 
+  it('asks for a code in the query, never in the path (MOL-99)', async () => {
+    const { client, calls } = clientReplying(200, { item: entryWire })
+
+    const entry = await client.catalogueByBarcode('4850000000007')
+
+    const url = new URL(calls[0]?.url ?? '')
+    expect(url.pathname).toBe('/catalogue/barcode')
+    expect(url.searchParams.get('code')).toBe('4850000000007')
+    expect(entry?.id).toBe(entryWire.id)
+    expect(entry?.typicalQuantity).toEqual({ milli: 900n, unit: 'l' })
+  })
+
+  it('hands back null for a code nobody holds', async () => {
+    const { client } = clientReplying(200, { item: null })
+
+    expect(await client.catalogueByBarcode('4850000000007')).toBeNull()
+  })
+
+  it('refuses a lookup answer that carries more than the contract', async () => {
+    const { client } = clientReplying(200, { item: { ...entryWire, barcodes: ['4850000000007'] } })
+
+    expect(await codeOf(client.catalogueByBarcode('4850000000007'))).toBe(ISSUE.RESPONSE_INVALID)
+  })
+
   describe('cancelled by the caller, which the screen does on every keystroke', () => {
     /** A server that answers only when told to, and gives up the way `fetch` does on an abort. */
     function clientHanging(options: { timeoutMs?: number } = {}) {
@@ -962,6 +986,24 @@ describe('the trip', () => {
 
     // @ts-expect-error — an own rate without the rate is refused before it is sent
     expect(await codeOf(client.chooseTripRate(TRIP, { choice: 'manual' }))).toBe(ISSUE.BODY_INVALID)
+    expect(calls).toHaveLength(2)
+  })
+
+  it('кладёт сумму по чеку целиком и снимает её null; ноль не уходит (MOL-78)', async () => {
+    const { client, calls } = clientReplying(200, tripWire)
+
+    await client.setTripReceipt(TRIP, { receipt: { minor: 1_240_000n, currency: 'AMD' } })
+    await client.setTripReceipt(TRIP, { receipt: null })
+    expect(calls[0]).toMatchObject({
+      method: 'PUT',
+      body: { receipt: { amount: '12400.00', currency: 'AMD' } },
+    })
+    expect(calls[1]?.body).toEqual({ receipt: null })
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/trips/${TRIP}/receipt`)
+
+    expect(
+      await codeOf(client.setTripReceipt(TRIP, { receipt: { minor: 0n, currency: 'AMD' } })),
+    ).toBe(ERROR.INVALID_AMOUNT)
     expect(calls).toHaveLength(2)
   })
 

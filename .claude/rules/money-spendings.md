@@ -13,7 +13,7 @@ paths:
   - 'frontend/src/composables/{useMoneyMonth,useMoneyCharts,useChartPointer}*'
   - 'frontend/src/composables/useSalaryShift*'
   - 'frontend/src/components/SalaryShift*'
-  - 'frontend/src/stores/{spendingQueue,queueing}*'
+  - 'frontend/src/stores/{spendingQueue,queueing,spendingHandoff}*'
   - 'frontend/src/days*'
   - 'e2e/money{,-charts}.spec.ts'
 ---
@@ -57,9 +57,11 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   currency and the snapshot's use stay; otherwise it is taken anew. The price, named: on-the-fly
   lines move when an exchange of their period is amended (С-3).
 - **The month is counted by the server** (`GET /money/months/:month`): spendings and **finished**
-  trips — one line per currency, on the device's day of finishing, in «Продукты», read from the
-  purchases every time so an amendment, MOL-78's receipt sum or MOL-76's removal moves it by
-  itself, **each line counting the purchases behind its own sum** (owner's decision В-7) — what came
+  trips — one line per currency of the trip's money, on the device's day of finishing, in
+  «Продукты», read every time by `tripMoneyRows` so an amendment, the receipt's sum (MOL-78) or
+  MOL-76's removal moves it by itself, **each line counting the purchases behind its own sum**
+  (owner's decision В-7) — every purchase of the trip under a receipt, which stands for all of them;
+  a trip with no price and a receipt's sum is a line, one with neither is none — what came
   in, the rest (MOL-134, below), the categories and every day's total; the journal comes forty rows
   a page, and a day cut by the page keeps its whole total. **The next page starts after the key of
   the last row shown** — day, moment, name (`journalCursorCodec`) — never an offset, which moved

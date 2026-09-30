@@ -1,5 +1,5 @@
 {
-  "id": "e585e6b9-53a2-4097-ae09-deb39dff7f73",
+  "id": "0b8e5469-bbb8-4484-b1a0-479f1c6186b1",
   "prevId": "260f2897-8b8b-47a4-ab9b-b3fe6ffc3360",
   "version": "7",
   "dialect": "postgresql",
@@ -341,12 +341,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "channel": {
-          "name": "channel",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "replaced_at": {
           "name": "replaced_at",
           "type": "timestamp with time zone",
@@ -391,10 +385,6 @@
         "exchange_revisions_received_currency_known": {
           "name": "exchange_revisions_received_currency_known",
           "value": "\"exchange_revisions\".\"received_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
-        },
-        "exchange_revisions_channel_known": {
-          "name": "exchange_revisions_channel_known",
-          "value": "\"exchange_revisions\".\"channel\" is null or \"exchange_revisions\".\"channel\" in ('bankCash', 'bankNoncash', 'exchanger')"
         }
       },
       "isRLSEnabled": false
@@ -466,12 +456,6 @@
         },
         "note": {
           "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "channel": {
-          "name": "channel",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -597,10 +581,6 @@
         "exchanges_revision_positive": {
           "name": "exchanges_revision_positive",
           "value": "\"exchanges\".\"revision\" > 0"
-        },
-        "exchanges_channel_known": {
-          "name": "exchanges_channel_known",
-          "value": "\"exchanges\".\"channel\" is null or \"exchanges\".\"channel\" in ('bankCash', 'bankNoncash', 'exchanger')"
         }
       },
       "isRLSEnabled": false
@@ -1370,78 +1350,6 @@
         "login_requests_telegram_user_id_safe": {
           "name": "login_requests_telegram_user_id_safe",
           "value": "\"login_requests\".\"telegram_user_id\" is null or \"login_requests\".\"telegram_user_id\" < 9007199254740992"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.market_rates": {
-      "name": "market_rates",
-      "schema": "",
-      "columns": {
-        "channel": {
-          "name": "channel",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "currency": {
-          "name": "currency",
-          "type": "char(3)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "rate_date": {
-          "name": "rate_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "side": {
-          "name": "side",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "scaled": {
-          "name": "scaled",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "fetched_at": {
-          "name": "fetched_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "market_rates_channel_currency_side_rate_date_pk": {
-          "name": "market_rates_channel_currency_side_rate_date_pk",
-          "columns": ["channel", "currency", "side", "rate_date"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "market_rates_channel_known": {
-          "name": "market_rates_channel_known",
-          "value": "\"market_rates\".\"channel\" in ('bankCash', 'bankNoncash', 'banksAll', 'exchanger')"
-        },
-        "market_rates_side_known": {
-          "name": "market_rates_side_known",
-          "value": "\"market_rates\".\"side\" in ('bankBuys', 'bankSells')"
-        },
-        "market_rates_currency_foreign": {
-          "name": "market_rates_currency_foreign",
-          "value": "\"market_rates\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR') and \"market_rates\".\"currency\" <> 'AMD'"
-        },
-        "market_rates_positive": {
-          "name": "market_rates_positive",
-          "value": "\"market_rates\".\"scaled\" > 0"
         }
       },
       "isRLSEnabled": false
@@ -2753,6 +2661,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "receipt_minor": {
+          "name": "receipt_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "receipt_currency": {
+          "name": "receipt_currency",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "receipt_set_at": {
+          "name": "receipt_set_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
@@ -2939,6 +2865,14 @@
         "trips_finished_after_start": {
           "name": "trips_finished_after_start",
           "value": "\"trips\".\"finished_at\" is null or \"trips\".\"finished_at\" >= \"trips\".\"started_at\""
+        },
+        "trips_receipt_whole": {
+          "name": "trips_receipt_whole",
+          "value": "num_nonnulls(\"trips\".\"receipt_minor\", \"trips\".\"receipt_currency\") in (0, 2)\n        and (\"trips\".\"receipt_minor\" is null or (\"trips\".\"receipt_minor\" > 0 and \"trips\".\"receipt_set_at\" is not null))"
+        },
+        "trips_receipt_currency_known": {
+          "name": "trips_receipt_currency_known",
+          "value": "\"trips\".\"receipt_currency\" is null or \"trips\".\"receipt_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
         },
         "trips_debited_whole": {
           "name": "trips_debited_whole",

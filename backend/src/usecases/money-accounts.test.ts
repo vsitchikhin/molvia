@@ -130,6 +130,7 @@ describe('payTrip (Р-18, Д2)', () => {
     finishedAt: null,
     accountId: null,
     debited: null,
+    receipt: null,
   }
 
   function world(accounts: MoneyAccount[], purchases: Currency[]) {
