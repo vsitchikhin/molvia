@@ -253,7 +253,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   queue on its answer, it no longer hid its row while the month on screen was still the one read
   before, and the day shrank, grew and shrank again (А3) — the flicker was there before, motion made
   it seen. «Before» is when the read **set out** (`askedAt`), not when its answer came: a read sent
-  before the removal and come after it still held the row, which came back for seconds (Б1). **What does not move, on purpose:** a change of the screen's own query beyond its
+  before the removal and come after it still held the row, which came back for seconds (Б1). A
+  record of «Покупки» in the same journal is held the same way by its own queue (`gone` of the trip
+  queue): removed from its screen and come back to «Деньги», it grew back and went (Б4). **What does not move, on purpose:** a change of the screen's own query beyond its
   answer coming in under the control (MOL-136 — an overlay took the second tap, and «Вернуть» and
   the main action in the dock come in without the other going out: a `mode="out-in"` would hold
   back the button the screen gives the focus to once the strip goes — read from the code, not

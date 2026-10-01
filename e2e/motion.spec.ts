@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Page, Route } from '@playwright/test'
+import { actorCodec, settingsOf } from '@molvia/model'
 import { asBrowser, signedIn } from './session'
 
 // Motion as it is (MOL-151): what must not move does not, and what moves does it once. Born of the
-// adversarial review of MOL-151 (А1–А5, Б1–Б3), each turned the other way round. А6 — a sheet's top lower
+// adversarial review of MOL-151 (А1–А5, Б1–Б4), each turned the other way round. А6 — a sheet's top lower
 // before a later keyboard — is not held here: Chromium draws every frame, the iPhone one at most
 // (adversarial round 2, У2), and the rule names the price.
 test.use({ locale: 'ru-RU', reducedMotion: 'no-preference' })
@@ -534,4 +535,102 @@ test('the swipe back from an account opened from the card of «Деньги» pl
   )
   expect(move.marked).toBe(true)
   expect(move.left).toBe(0)
+})
+
+/** A finished record of «Покупки» with only a receipt sum: a trip line of today in «Деньги». */
+async function tripWithReceipt(page: Page, place: string): Promise<string> {
+  const headers = await asBrowser(page)
+  const me = actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json())
+  const id = randomUUID()
+  const started = await page.request.post('/api/trips', {
+    headers,
+    data: { id, context: settingsOf(me), place: { kind: 'store', name: place } },
+  })
+  expect(started.status(), await started.text()).toBe(201)
+  const receipt = await page.request.put(`/api/trips/${id}/receipt`, {
+    headers,
+    data: { receipt: { amount: '5000', currency: 'AMD' } },
+  })
+  expect(receipt.status(), await receipt.text()).toBeLessThan(300)
+  const finished = await page.request.post(`/api/trips/${id}/finish`, {
+    headers,
+    data: { finishedOnDeviceAt: new Date().toISOString() },
+  })
+  expect(finished.status()).toBe(204)
+  return id
+}
+
+test('a record of «Покупки» removed from «Деньги» does not grow back there (Б4)', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const moves: string[] = []
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- called through .call(this)
+    const original = Element.prototype.animate
+    Element.prototype.animate = function (this: Element, frames, options) {
+      const animation = original.call(this, frames, options)
+      const text = (this as HTMLElement).innerText
+      // The record's own line, not the day it shares with a spending.
+      if (text.includes('Ереван Сити') && !text.includes('Сегодня'))
+        moves.push((frames as Keyframe[] | null)?.[0]?.height === '0px' ? 'grows' : 'shrinks')
+      return animation
+    }
+    Object.assign(window, { moves })
+  })
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const { categories } = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string }[] }
+  const spent = await page.request.post('/api/spendings', {
+    headers,
+    data: {
+      id: randomUUID(),
+      spentOn: yerevanDay(),
+      amount: { amount: '1000', currency: 'AMD' },
+      categoryId: categories[0]?.id,
+      note: 'Сегодня',
+    },
+  })
+  expect(spent.status()).toBe(201)
+  await tripWithReceipt(page, 'Ереван Сити')
+
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  const row = page.getByRole('button', { name: /Ереван Сити/ })
+  await expect(row).toBeVisible()
+  await settled(page)
+  await row.click()
+  const sheet = page.locator('dialog[open]')
+  await pressInSheet(
+    () => sheet.getByRole('button', { name: 'Открыть в «Покупках»' }).click(),
+    () => expect(page).toHaveURL(/\/purchases\/[0-9a-f-]+\?from=money/, { timeout: 300 }),
+  )
+  await settled(page)
+  await page.evaluate(() => {
+    ;(window as unknown as { moves: string[] }).moves.length = 0
+  })
+  // A slow network: the server removes at once, its answer comes after the move back to «Деньги»,
+  // and the fresh month after that — until then the month on screen is the one the phone keeps.
+  const slow = (ms: number) => async (route: Route) => {
+    const response = await route.fetch()
+    await new Promise((done) => setTimeout(done, ms))
+    await route.fulfill({ response })
+  }
+  await page.route(
+    (url) => /\/api\/trips\/[0-9a-f-]+$/.test(url.pathname),
+    async (route) => (route.request().method() === 'DELETE' ? slow(500)(route) : route.fallback()),
+  )
+  await page.route('**/api/money/months/*', slow(1500))
+  const fresh = reread(page)
+  await page.getByRole('button', { name: 'Удалить запись' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+  await fresh
+  await settled(page)
+
+  const moves = await page.evaluate(() => (window as unknown as { moves: string[] }).moves)
+  expect(moves).toEqual([])
+  await expect(row).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Открыть трату: Сегодня/ })).toBeVisible()
+  // A read still on its slow way is nothing this test waits for.
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
 })
