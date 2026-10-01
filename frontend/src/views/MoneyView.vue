@@ -26,22 +26,18 @@
           :body="reasonOf(item.code)"
         >
           <template #action>
-            <AppButton v-if="refusalMonth(item)" variant="ghost" @click="openRefusal(item)">
-              {{ t('spending.rejected_other.open', { month: monthIn(refusalMonth(item) ?? '') }) }}
-            </AppButton>
-            <AppButton v-else variant="ghost" @click="queue.dismiss(item)">
+            <AppButton variant="ghost" @click="queue.dismiss(item)">
               {{ t('spending.sheet.dismiss') }}
             </AppButton>
           </template>
         </ScreenState>
-        <!-- A spending of this month the server refused is a row of «Траты», put right there; the
-             summary has no row, so it names them and leads there (adversarial А of MOL-159) —
-             otherwise a spending written here and refused vanished from the screen it was written on. -->
+        <!-- A spending the server refused, of any month, is a row of «Не приняты» on top of «Траты»,
+             put right there; the summary has no rows, so it counts them and leads there (MOL-159). -->
         <ScreenState
-          v-if="rowRefusals.length > 0"
+          v-if="refused.length > 0"
           kind="attention"
           inline
-          :title="t('spending.summary.refused', { n: rowRefusals.length }, rowRefusals.length)"
+          :title="t('spending.summary.refused', { n: refused.length }, refused.length)"
           :body="t('spending.summary.refused_body')"
         >
           <template #action>
@@ -150,11 +146,7 @@
           </AppCard>
 
           <!-- An empty month keeps the card too: the way into «Графики» is there, the year is (Г). -->
-          <CategoryDonutCard
-            :month="month"
-            :name-of="nameOf"
-            :unsent="unsent + rowRefusals.length"
-          />
+          <CategoryDonutCard :month="month" :name-of="nameOf" :unsent="unsent + refusedHere" />
         </template>
 
         <!-- The ways out of the month, each with one figure: they stand by the error and under the
@@ -310,6 +302,12 @@ export default defineComponent({
       )
     })
 
+    /** Refused spendings typed into the month shown: «Куда ушли» does not say «трат нет» over them. */
+    const refusedHere = computed(
+      () =>
+        screen.refused.value.filter((row) => row.spending.spentOn.startsWith(screen.selected.value))
+          .length,
+    )
     const number = (value: number) => new Intl.NumberFormat(locale.value).format(value)
     /** One figure a row, and none until it is known (handoff MOL-157 01). */
     const entries = computed<EntryValues>(() => {
@@ -447,6 +445,7 @@ export default defineComponent({
       t,
       IconWallet,
       newcomer,
+      refusedHere,
       entries,
       whole,
       signed,

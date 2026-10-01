@@ -242,6 +242,8 @@ describe('словарь: повторяющиеся тексты', () => {
       'The server did not answer': ['advice.error.title', 'item.error.title', 'trip.error.title'],
       // Английский не различает отмену диалога и отмену ввода; русский различает.
       Cancel: ['item.cancel', 'trip.finish_confirm.cancel'],
+      // Отметка строки и заголовок «Не приняты» над такими строками: число есть только в русском.
+      'Not accepted': ['spending.list.refused', 'spending.refused'],
       'amended {date}': ['exchange.amended', 'income.amended'],
       'Bring back': ['exchange.restore', 'income.restore'],
       'The server did not answer properly. Try again': [

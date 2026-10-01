@@ -493,7 +493,7 @@
       "donut_uncounted": "Shares appear once the spending has a rate",
       "add": "Add spending",
       "offline_strip": "No connection. Figures as of {when} — new spendings are kept on the phone and sent when you are back online",
-      "refused": "{n} spending of this month not accepted | {n} spendings of this month not accepted",
+      "refused": "{n} spending not accepted | {n} spendings not accepted",
       "refused_body": "The server did not accept it — fix or remove it in Spendings",
       "refused_open": "Open Spendings"
     },
@@ -612,8 +612,7 @@
     "error_strip": "The server did not answer — spending as of {when}",
     "rejected_other": {
       "title": "The server did not accept an action",
-      "unknown": "The server answered: {code}",
-      "open": "Open spendings in {month}"
+      "unknown": "The server answered: {code}"
     },
     "category": {
       "groceries": "Groceries",
@@ -720,6 +719,7 @@
     "rest_on": "On accounts {date}",
     "list": {
       "title": "Spendings",
+      "refused": "Not accepted",
       "count": "{n} spending | {n} spendings",
       "unsent": "{n} spending not counted yet | {n} spendings not counted yet",
       "offline_strip": "No connection. Spendings as of {when}. New ones are kept on the phone and sent when you are back online",

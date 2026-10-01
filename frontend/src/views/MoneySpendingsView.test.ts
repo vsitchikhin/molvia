@@ -542,32 +542,47 @@ describe('MoneySpendingsView: what round 2 of the review of MOL-159 found', () =
     expect(view.text()).not.toContain(en.spending.rejected_other.title)
   })
 
-  it('К of round 4: a refusal of another month moves «Траты» to it, where it is a row', async () => {
+  it('К, М: a refusal of another month, or an amendment moving one across the edge, is a row here', async () => {
     moneyMonth.mockResolvedValue(month())
     const view = await render()
     recordSpending.mockRejectedValue(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
+    amendSpending.mockRejectedValue(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
     const queue = useSpendingQueueStore()
+    const TAXI = 'eeeeeeee-0000-4000-8000-0000000000aa'
+    const MOVED = 'eeeeeeee-0000-4000-8000-0000000000bb'
     queue.record({
-      id: 'eeeeeeee-0000-4000-8000-0000000000aa',
+      id: TAXI,
       spentOn: '2026-08-31',
       amount: amd('1500'),
       categoryId: BEAUTY,
       note: 'Taxi',
     })
+    queue.amend(MOVED, 2, {
+      spentOn: '2026-10-01',
+      amount: amd('900'),
+      categoryId: BEAUTY,
+      note: 'Moved',
+    })
     await vi.waitFor(() => {
-      expect(queue.rejected).toHaveLength(1)
+      expect(queue.rejected).toHaveLength(2)
     })
     await flushPromises()
-    const before = router.options.history.state.position
-    await button(view, 'Open spendings in August').trigger('click')
-    await flushPromises()
-    expect(router.currentRoute.value.fullPath).toBe('/money/spendings?month=2026-08')
-    // By replace, as every move of the month: «back» does not walk through months.
-    expect(router.options.history.state.position).toBe(before)
+    for (const id of [TAXI, MOVED])
+      expect(view.find(`[data-row="${id}"]`).text()).toContain(en.spending.refused)
+    expect(view.text()).toContain(en.spending.list.refused)
+    expect(view.text()).not.toContain(en.spending.rejected_other.title)
   })
 
-  it('Л of round 4: a refused amendment of a spending the server no longer has is no row in a month read whole', async () => {
-    moneyMonth.mockResolvedValue(month())
+  it('Л, Н: an amendment of a spending removed elsewhere is a row that says why, and «Discard» there drops it', async () => {
+    moneyMonth.mockResolvedValue(
+      month({
+        count: 45,
+        cursor: { day: '2026-09-26', moment: 0, id: BARBER },
+        remaining: 44,
+        remainingFrom: '2026-09-01',
+        remainingTo: '2026-09-25',
+      }),
+    )
     const view = await render()
     amendSpending.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
     const queue = useSpendingQueueStore()
@@ -582,10 +597,13 @@ describe('MoneySpendingsView: what round 2 of the review of MOL-159 found', () =
       expect(queue.rejected).toHaveLength(1)
     })
     await flushPromises()
-    expect(view.find(`[data-row="${RENT}"]`).exists()).toBe(false)
-    // The card says why, and «Discard» is the way out of a refusal about nothing left.
-    expect(view.text()).toContain(en.spending.rejected_other.title)
-    expect(button(view, en.spending.sheet.dismiss).exists()).toBe(true)
+    await view.find(`[data-row="${RENT}"] .body`).trigger('click')
+    await risen()
+    expect(document.querySelector('dialog[open]')?.textContent).toContain(en.error.not_found)
+    await pressUntil(en.spending.sheet.dismiss, () => {
+      expect(queue.rejected).toEqual([])
+    })
+    expect(amendSpending).toHaveBeenCalledTimes(1)
   })
 
   it('Ж: «Undo» is the queue’s, not the screen’s — it outlives «Траты» for the step back', async () => {

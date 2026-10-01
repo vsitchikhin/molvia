@@ -654,35 +654,47 @@ describe('MoneyView: what the review of MOL-159 found', () => {
     await flushPromises()
   }
 
-  it('А: a refused spending of this month is named here and leads to «Траты» of the month', async () => {
+  // Every edge the rounds found, at once: wherever its row would be, a refused spending is counted
+  // here and leads to «Траты», whose «Не приняты» holds it — never a card whose one action drops it.
+  const full = () =>
+    month({
+      count: 45,
+      cursor: { day: '2026-09-26', moment: 0, id: BARBER },
+      remaining: 44,
+      remainingFrom: '2026-09-01',
+      remainingTo: '2026-09-25',
+    })
+  it.each([
+    ['this month', () => ({ ...empty(), previousSpent: amd('100') }), '2026-09-27'],
+    ['another month (К)', () => ({ ...empty(), previousSpent: amd('100') }), '2026-08-15'],
+    ['a day no page has reached (Е)', full, '2026-09-01'],
+    ['a month not answered yet', null, '2026-09-27'],
+  ] as const)(
+    'А–Н: a refused spending of %s is counted here and leads to «Траты», never to «Discard»',
+    async (_, answer, day) => {
+      if (answer) moneyMonth.mockResolvedValue(answer())
+      else moneyMonth.mockReturnValue(new Promise(() => undefined))
+      const view = await render()
+      await refused(day)
+      expect(view.text()).toContain('1 spending not accepted')
+      expect(view.text()).not.toContain(en.spending.rejected_other.title)
+      expect(view.findAll('button').some((one) => one.text() === en.spending.sheet.dismiss)).toBe(
+        false,
+      )
+      await button(view, en.spending.summary.refused_open).trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.name).toBe('money-spendings')
+    },
+  )
+
+  it('А: a refused spending of the month keeps «Куда ушли» from saying «no spendings»', async () => {
     moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('100') })
     const view = await render()
     await refused('2026-09-27')
-    expect(view.text()).toContain('1 spending of this month not accepted')
-    // Not «no spendings» while one waits to be put right.
     expect(view.get('.donut').text()).not.toContain(en.spending.month_empty)
-    await button(view, en.spending.summary.refused_open).trigger('click')
-    await flushPromises()
-    expect(router.currentRoute.value.name).toBe('money-spendings')
   })
 
-  it('К of round 4: a refusal of another month is not this month’s, and leads to «Траты» of its own', async () => {
-    moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('100') })
-    const view = await render()
-    await refused('2026-08-15')
-    expect(view.text()).toContain(en.spending.rejected_other.title)
-    expect(view.text()).not.toContain('of this month not accepted')
-    // Not «Discard», which threw the spending away: its row is on «Траты» of August.
-    expect(view.findAll('button').some((one) => one.text() === en.spending.sheet.dismiss)).toBe(
-      false,
-    )
-    await button(view, 'Open spendings in August').trigger('click')
-    await flushPromises()
-    expect(router.currentRoute.value.fullPath).toBe('/money/spendings?month=2026-08')
-  })
-
-  it('Е of round 2: a refused spending of a day the first page has not reached is named all the same', async () => {
-    // A full month: the first page reaches back to the 26th, the 1st–25th wait on the next one.
+  it('И: a refused amendment of a row no page has brought is counted all the same', async () => {
     moneyMonth.mockResolvedValue(
       month({
         count: 45,
@@ -693,17 +705,19 @@ describe('MoneyView: what the review of MOL-159 found', () => {
       }),
     )
     const view = await render()
-    await refused('2026-09-01')
-    expect(view.text()).toContain('1 spending of this month not accepted')
-    // Not the card whose one action is «Discard» — that threw the spending away.
-    expect(view.text()).not.toContain(en.spending.rejected_other.title)
-  })
-
-  it('a refused spending of this month is the month’s before the month has answered', async () => {
-    moneyMonth.mockReturnValue(new Promise(() => undefined))
-    const view = await render()
-    await refused('2026-09-27')
-    expect(view.text()).toContain('1 spending of this month not accepted')
+    amendSpending.mockRejectedValue(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
+    const queue = useSpendingQueueStore()
+    queue.amend('eeeeeeee-0000-4000-8000-000000000009', 1, {
+      spentOn: '2026-09-02',
+      amount: amd('6000'),
+      categoryId: BEAUTY,
+      note: 'Rent',
+    })
+    await vi.waitFor(() => {
+      expect(queue.rejected).toHaveLength(1)
+    })
+    await flushPromises()
+    expect(view.text()).toContain('1 spending not accepted')
     expect(view.text()).not.toContain(en.spending.rejected_other.title)
   })
 
@@ -746,33 +760,6 @@ describe('MoneyView: what the review of MOL-159 found', () => {
     await flushPromises()
     expect(view.get('.undo .count').text()).toBe('9')
     expect(queue.lastRemoved).not.toBeNull()
-  })
-
-  it('И of round 3: a refused amendment of a row the first page has not reached is named all the same', async () => {
-    moneyMonth.mockResolvedValue(
-      month({
-        count: 45,
-        cursor: { day: '2026-09-26', moment: 0, id: BARBER },
-        remaining: 44,
-        remainingFrom: '2026-09-01',
-        remainingTo: '2026-09-25',
-      }),
-    )
-    const view = await render()
-    amendSpending.mockRejectedValue(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
-    const queue = useSpendingQueueStore()
-    queue.amend('eeeeeeee-0000-4000-8000-000000000009', 1, {
-      spentOn: '2026-09-02',
-      amount: amd('6000'),
-      categoryId: BEAUTY,
-      note: 'Rent',
-    })
-    await vi.waitFor(() => {
-      expect(queue.rejected).toHaveLength(1)
-    })
-    await flushPromises()
-    expect(view.text()).toContain('1 spending of this month not accepted')
-    expect(view.text()).not.toContain(en.spending.rejected_other.title)
   })
 
   it('Ж, must not fire: a removal whose ten seconds ran out while no screen showed it is not offered', async () => {

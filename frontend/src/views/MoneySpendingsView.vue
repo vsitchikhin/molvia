@@ -21,14 +21,30 @@
           :body="reasonOf(item.code)"
         >
           <template #action>
-            <AppButton v-if="refusalMonth(item)" variant="ghost" @click="openRefusal(item)">
-              {{ t('spending.rejected_other.open', { month: monthIn(refusalMonth(item) ?? '') }) }}
-            </AppButton>
-            <AppButton v-else variant="ghost" @click="queue.dismiss(item)">
+            <AppButton variant="ghost" @click="queue.dismiss(item)">
               {{ t('spending.sheet.dismiss') }}
             </AppButton>
           </template>
         </ScreenState>
+
+        <!-- Every spending the server refused, of any month, whatever the month shown and its pages:
+             opened, it is what was typed — to fix and save again, or to drop (MOL-159). -->
+        <section v-if="refused.length > 0" class="day">
+          <h2 class="day-head">{{ t('spending.list.refused') }}</h2>
+          <AppCard as="ul" list>
+            <SpendingRow
+              v-for="row in refused"
+              :key="row.key"
+              :row="row"
+              :category="categoryOf(row)"
+              :category-name="categoryNameOf(row)"
+              :spend-currency="spendCurrency"
+              :when="dayTitle(row.spending.spentOn)"
+              :data-row="row.key"
+              @open="open(row, row.spending.spentOn)"
+            />
+          </AppCard>
+        </section>
 
         <ScreenSkeleton v-if="phase === 'loading'" :groups="[46, 64, 38, 52, 30, 60, 44]" />
 

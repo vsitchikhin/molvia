@@ -34,7 +34,6 @@ import type {
   SpendingView,
 } from '@molvia/model'
 import type { RejectedSpendingWrite, SpendingUndo, SpendingWrite } from '@/stores/spendingQueue'
-import { spendingOf } from '@/stores/spendingQueue'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
 
 /**
@@ -237,24 +236,18 @@ function localView(
 /**
  * The month's journal with the queue laid over it (MOL-82, requirements 12–15): a spending still
  * on the phone stands at the top of its day marked «Отправляем…», an amendment not yet sent marks
- * the server's row — whose figures stay the server's until it answers — a removal hides the row,
- * and a refusal marks it «Не принята». A spending of a day the loaded pages have not reached yet
- * waits for them: shown there, it would stand among the wrong neighbours.
+ * the server's row — whose figures stay the server's until it answers — and a removal hides the row.
+ * A spending of a day the loaded pages have not reached yet waits for them: shown there, it would
+ * stand among the wrong neighbours. A refusal is not the journal's: `refusedRows` (MOL-159).
  */
 export function journalOf(
   month: MoneyMonthView,
   pending: readonly SpendingWrite[],
-  rejected: readonly RejectedSpendingWrite[],
   /** Trips whose removal is still on its way (MOL-76): their lines go, the figures stay the server's. */
   removedTrips: ReadonlySet<string> = new Set(),
 ): JournalDay[] {
   const removing = beingRemoved(pending)
   const editing = new Set(pending.flatMap((write) => (write.kind === 'amend' ? [write.id] : [])))
-  const refusals = new Map<string, RejectedSpendingWrite>()
-  for (const item of rejected) {
-    const id = spendingOf(item.write)
-    if (id) refusals.set(id, item)
-  }
 
   const days: JournalDay[] = month.days.map((day) => ({
     day: day.day,
@@ -277,15 +270,14 @@ export function journalOf(
             ]
       const { id } = entry.spending
       if (removing.has(id)) return []
-      const refusal = refusals.get(id) ?? null
       return [
         {
           kind: 'manual',
           key: id,
           spending: entry.spending,
           counted: entry.counted,
-          mark: refusal ? 'refused' : editing.has(id) ? 'editing' : null,
-          refusal,
+          mark: editing.has(id) ? 'editing' : null,
+          refusal: null,
           local: false,
         },
       ]
@@ -294,76 +286,96 @@ export function journalOf(
 
   const known = new Set(days.flatMap((day) => day.rows.map((row) => row.key)))
   const reached = month.cursor === null ? '' : (month.days.at(-1)?.day ?? '')
-  /** A row only the phone knows of, at the top of its day — a day of its own if the month has none. */
-  function place(row: Extract<JournalRow, { kind: 'manual' }>): void {
-    known.add(row.key)
-    const { spentOn } = row.spending
-    const at = days.findIndex((day) => day.day <= spentOn)
-    const same = days[at]
-    if (same?.day === spentOn) same.rows.unshift(row)
-    else {
-      const day: JournalDay = { day: spentOn, total: null, estimated: false, rows: [row] }
-      if (at === -1) days.push(day)
-      else days.splice(at, 0, day)
-    }
-  }
-  const local = [
-    ...pending.flatMap((write) => (write.kind === 'record' ? [{ write, refusal: null }] : [])),
-    ...rejected.flatMap((item) =>
-      item.write.kind === 'record' ? [{ write: item.write, refusal: item }] : [],
-    ),
-  ]
-  for (const { write, refusal } of local) {
+  for (const write of pending) {
+    if (write.kind !== 'record') continue
     const spending = localView(write, pending)
     if (known.has(spending.id) || removing.has(spending.id)) continue
-    if (!spending.spentOn.startsWith(month.month)) continue
-    // A row waiting for its first answer waits for the page of its day; a refused one does not: it
-    // is to be put right, and behind a page never scrolled to it was nowhere (adversarial round 2
-    // of MOL-159, Е) — the summary named it nothing, and «Скрыть» on the card there threw it away.
-    if (!refusal && spending.spentOn < reached) continue
-    place({
+    if (!spending.spentOn.startsWith(month.month) || spending.spentOn < reached) continue
+    known.add(spending.id)
+    const row: JournalRow = {
       kind: 'manual',
       key: spending.id,
       spending,
       counted: null,
-      mark: refusal ? 'refused' : 'waiting',
-      refusal,
+      mark: 'waiting',
+      refusal: null,
       local: true,
-    })
-  }
-  // A refused amendment of a row on a page not loaded yet stands as that row, on the day typed
-  // (adversarial round 3, И): it marks the server's row, and that row was on no screen — the
-  // refusal went to the card whose «Скрыть» threw the typing away. The revision is the one it was
-  // made over; the server's figures come with the page. A month read whole has no such page: a row
-  // not in it is not the server's any more — removed on another device — and stood as a ghost to
-  // put right (adversarial round 4, Л); its refusal stays the card's, with «Скрыть».
-  for (const refusal of rejected) {
-    if (refusal.write.kind !== 'amend' || month.cursor === null) continue
-    const { id, body } = refusal.write
-    if (known.has(id) || removing.has(id) || !body.spentOn.startsWith(month.month)) continue
-    place({
-      kind: 'manual',
-      key: id,
-      spending: {
-        id,
-        spentOn: body.spentOn,
-        amount: body.amount,
-        categoryId: body.categoryId,
-        note: body.note ?? null,
-        place: body.place ?? null,
-        rate: null,
-        accountId: body.accountId ?? null,
-        debited: body.debited ?? null,
-        revision: body.revision,
-        amendedAt: null,
-      },
-      counted: null,
-      mark: 'refused',
-      refusal,
-      local: false,
-    })
+    }
+    const at = days.findIndex((day) => day.day <= spending.spentOn)
+    const same = days[at]
+    if (same?.day === spending.spentOn) same.rows.unshift(row)
+    else {
+      const day: JournalDay = { day: spending.spentOn, total: null, estimated: false, rows: [row] }
+      if (at === -1) days.push(day)
+      else days.splice(at, 0, day)
+    }
   }
   return days.filter((day) => day.rows.length > 0)
+}
+
+/**
+ * Every spending the server refused, as rows of its own — «Не приняты» on top of «Траты», whatever
+ * the month and its pages (MOL-159). Laid into the journal, a refusal stood only where the journal
+ * guessed its row was: a page not loaded, a month not answered, another month, a date moved across
+ * the month's edge, a spending removed elsewhere — each guess was a refusal left on a card whose one
+ * action threw the typing away (adversarial rounds 1–5). Here nothing is guessed: each opens on
+ * what was typed, and an amendment of a row the month has loaded goes again over the server's
+ * revision; one of a row not loaded, over the revision it was made on.
+ */
+export function refusedRows(
+  month: MoneyMonthView | null,
+  rejected: readonly RejectedSpendingWrite[],
+  pending: readonly SpendingWrite[],
+): Extract<JournalRow, { kind: 'manual' }>[] {
+  const loaded = new Map(
+    (month?.days ?? []).flatMap((day) =>
+      day.entries.flatMap((entry) =>
+        entry.kind === 'manual' ? [[entry.spending.id, entry] as const] : [],
+      ),
+    ),
+  )
+  return rejected.flatMap((refusal): Extract<JournalRow, { kind: 'manual' }>[] => {
+    const { write } = refusal
+    if (write.kind === 'record')
+      return [
+        {
+          kind: 'manual',
+          key: write.body.id,
+          spending: localView(write, pending),
+          counted: null,
+          mark: 'refused',
+          refusal,
+          local: true,
+        },
+      ]
+    if (write.kind !== 'amend') return []
+    const { id, body } = write
+    const held = loaded.get(id)?.spending
+    // The row says what was typed and refused; the revision is the server's when the month holds it.
+    return [
+      {
+        kind: 'manual',
+        key: id,
+        spending: {
+          id,
+          spentOn: body.spentOn,
+          amount: body.amount,
+          categoryId: body.categoryId,
+          note: body.note ?? null,
+          place: body.place ?? null,
+          rate: null,
+          accountId: body.accountId === undefined ? (held?.accountId ?? null) : body.accountId,
+          debited: body.debited ?? null,
+          revision: held?.revision ?? body.revision,
+          amendedAt: null,
+        },
+        counted: null,
+        mark: 'refused',
+        refusal,
+        local: false,
+      },
+    ]
+  })
 }
 
 /**
