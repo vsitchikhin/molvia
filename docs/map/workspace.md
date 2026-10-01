@@ -60,7 +60,7 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `bin/green.sh` — Remembers which checks passed on which clean tree, so `make check` and the push do not check one tree twice, nor a tree that differs from it only in documents.
 - `bin/init-env.sh` — Generates this copy's `.env` from its index: ports, databases, compose project; keeps bot settings across `--force`.
 - `bin/link-shared.sh` — Points `.scratch` and `.lavish` at the directory shared by all working copies; idempotent.
-- `bin/one-at-a-time.sh` — Runs a command under the one lock all copies share, so the heavy checks of several copies take turns; gives the command no terminal so vitest never watches, refuses Playwright's UI and debugger, names the waited copy by its root.
+- `bin/one-at-a-time.sh` — Runs a command under the one lock all copies share, so the heavy checks of several copies take turns; gives the command no terminal so vitest does not watch by default, refuses a vitest told to watch and Playwright's UI and debugger, names the waited copy by its root.
 - `docker-compose.yml` — Development stack: this copy's Postgres only, on the loopback, named by the copy's index.
 - `eslint.config.base.js` — Shared lint preset every module opts into: type-aware rules, the alias-or-sibling import shape, the `deny` helper.
 - `eslint.config.js` — Root lint config: only `e2e/` and the repository's own config files; each module lints itself.

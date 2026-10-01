@@ -31,21 +31,35 @@ lock="${XDG_CACHE_HOME:-$HOME/.cache}/molvia/checks.lock"
 mkdir -p "$(dirname "$lock")"
 
 # A run that never ends on its own holds every copy's turn until someone stops it (MOL-162, adversarial
-# Л2–Л4). vitest watches only when its stdin is a terminal, so the command gets none (below) — in any
-# spelling: a path to the binary, a version, `sh -c`. Playwright's UI and debugger wait for a person
-# whatever stdin is, so those are refused with the reason: `--ui`, `--ui-port`, `--ui-host`,
-# `--debug`, `PWDEBUG`. Hidden inside `sh -c`, they still pass — the price of reading words. `make`
-# and the hooks pass none of them.
+# Л2–Л6). vitest watches by default only when its stdin is a terminal, so the command gets none (below):
+# a path to the binary, a version, `sh -c` run once. Told to watch — `--watch`, `-w`, `watch`, `dev` —
+# it watches with no terminal at all, so a vitest with one of those and without `run` is refused, and
+# only a vitest: `-w` of npm is its workspace (Л3). Playwright's UI and debugger wait for a person whatever stdin is:
+# `--ui`, `--ui-port`, `--ui-host`, `--debug` in any spelling, `PWDEBUG`. Hidden inside `sh -c`, a
+# flag still passes — the price of reading words. `make` and the hooks pass none of them.
 endless=""
+vitest=""
+once=""
+for arg in "${@:2}"; do
+  case "$arg" in
+    vitest | vitest@* | */vitest) vitest=1 ;;
+    # With `run` vitest never watches, and a later `watch` is the name of a test to filter by.
+    run | --run) once=1 ;;
+  esac
+done
+[[ -n "$once" ]] && vitest=""
 [[ -n "${PWDEBUG:-}" ]] && endless="PWDEBUG"
 for arg in "${@:2}"; do
   case "$arg" in
-    --ui | --ui=* | --ui-port | --ui-port=* | --ui-host | --ui-host=* | --debug | PWDEBUG=*) endless="$arg" ;;
+    --ui | --ui=* | --ui-port | --ui-port=* | --ui-host | --ui-host=* | --debug | --debug=* | PWDEBUG=*)
+      endless="$arg"
+      ;;
+    --watch | --watch=true | -w | watch | dev) [[ -n "$vitest" ]] && endless="vitest $arg" ;;
   esac
 done
 if [[ -n "$endless" ]]; then
-  echo "one-at-a-time: «${endless}» waits for a person and would hold every copy's turn —" \
-    "run Playwright's UI or debugger outside the lock" >&2
+  echo "one-at-a-time: «${endless}» never ends by itself and would hold every copy's turn —" \
+    "use \`npx vitest run …\`, and run a watch, Playwright's UI or its debugger outside the lock" >&2
   exit 2
 fi
 

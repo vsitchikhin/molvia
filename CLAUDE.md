@@ -456,8 +456,8 @@ differently in every working copy by design.
   push — is not run again (`bin/green.sh`), nor on a tree that differs from it only in documents
   (`*.md`, `docs/`, `.claude/`). **A test run typed by hand takes the same lock**
   (`bin/one-at-a-time.sh <label> npx vitest run …`) unless it is one file of Unit or Use case; the
-  lock gives the command no terminal, so vitest never watches under it, and refuses Playwright's
-  `--ui` and `--debug`, which never give it back. Why, in
+  lock gives the command no terminal, so vitest does not watch by default, and refuses a vitest told
+  to watch and Playwright's `--ui` and `--debug`, which never give it back. Why, in
   `.claude/rules/workspace.md`.
 - **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, in two
   jobs: checks and e2e. CI **checks** formatting rather than fixing it — `make format`

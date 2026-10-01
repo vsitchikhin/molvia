@@ -112,13 +112,15 @@ without the lock; Component, Integration, end-to-end and any run of a whole modu
 **The price:** a single integration file waits for whatever push holds the lock — minutes on each
 round of a fix.
 
-**What does not end by itself never holds the lock** (adversarial Л2–Л4). vitest watches only when its
-stdin is a terminal, so the script gives the command none (`/dev/null`): under the lock vitest runs once
-in any spelling — `npx vitest …` without `run`, a path to the binary, a version, `sh -c`. A list of
-words to refuse was tried first and leaked both ways: it refused `npm run test -w …`, npm's workspace,
-and let `./node_modules/.bin/vitest` through. Playwright's UI and debugger wait for a person whatever
-stdin is, so `--ui`, `--ui-port`, `--ui-host`, `--debug` and `PWDEBUG` are refused with exit 2 and the
-reason; **the price**: hidden in `sh -c` they still pass. **A waiting run names the copy by its root**
+**What does not end by itself never holds the lock** (adversarial Л2–Л6). vitest watches by default
+only when its stdin is a terminal, so the script gives the command none (`/dev/null`): under the lock
+`npx vitest …` without `run`, a path to the binary, a version, `sh -c` run once. **Told to watch** —
+`--watch`, `-w`, `watch`, `dev` — it watches with no terminal at all, so a vitest with one of those and
+without `run` is refused with exit 2 and the reason; only a vitest — `-w` of npm is its workspace, and
+`npm run test -w …` is how a module is tested (Л3, Л5). Playwright's UI and debugger wait for a person
+whatever stdin is: `--ui`, `--ui-port`, `--ui-host`, `--debug` in any spelling and `PWDEBUG` are
+refused. **The price:** hidden in `sh -c`, a flag still passes — the script reads words, not meaning.
+**A waiting run names the copy by its root**
 (`git rev-parse --show-toplevel`), not the folder the run was typed in: a module's tests are typed
 in the module, and «waiting for backend» was every copy (Л1).
 
