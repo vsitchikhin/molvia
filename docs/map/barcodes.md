@@ -9,6 +9,7 @@ Rules: `.claude/rules/barcodes.md`. A test beside its source, or mirroring it un
 
 ## backend · open-food-facts
 
+- `backend/src/open-food-facts/client.ts` — The client of Open Food Facts (MOL-162): one product read by the server with its own User-Agent and a 2.5 s timeout, at most twelve a minute, a minute's pause after a failure, a code asked twice at once asked once; `null` when not asked or not answered.
 - `backend/src/open-food-facts/product.ts` — `parseProduct`: an answer of Open Food Facts read into a hint (MOL-162) — a name per interface language, the brand when the name lacks it, the size of the package in kg or l; found only on `status: 1`, anything not JSON of that shape thrown.
 - `backend/tests/fixtures/open-food-facts/` — Answers of Open Food Facts recorded byte for byte on 01.10.2026 that the parser is tested on: Nutella, Coca-Cola, a code it does not know, a code it calls invalid.
 - `backend/tests/fixtures/open-food-facts/unavailable.html` — Fixture: the base's «Page temporarily unavailable» page, a `503` in HTML, which the parser must take for the base out of reach.

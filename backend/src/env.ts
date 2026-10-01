@@ -29,6 +29,19 @@ const envSchema = z.object({
    * is `dev`. What the deploy compares with to know the new containers are the ones answering.
    */
   APP_VERSION: z.string().min(1).default(UNNAMED_BUILD),
+  /**
+   * The address Open Food Facts may reach us at, sent in every request's User-Agent (MOL-162, В-4):
+   * the base asks for one and may ban a client without it. Without it the hint is off — so copies,
+   * CI and the tests never ask the real base; production sets it in its `.env`. Empty is unset, as
+   * compose passes a variable it was not given. Printable ASCII only: it goes into a header.
+   */
+  OPEN_FOOD_FACTS_CONTACT: z
+    .string()
+    .regex(/^[\x20-\x7e]*$/)
+    .optional()
+    .transform((contact) => (contact === '' ? undefined : contact)),
+  /** Where the base is asked; end-to-end points it at a fake of its own. */
+  OPEN_FOOD_FACTS_URL: z.url({ protocol: /^https?$/ }).optional(),
 })
 
 export const env = envSchema.parse(process.env)
