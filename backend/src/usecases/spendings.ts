@@ -145,6 +145,21 @@ export async function removeSpending(
   await repositories.spendings.remove(owner.id, id)
 }
 
+/**
+ * One spending of the owner's, as it stands now (MOL-159): the phone asks it before an amendment
+ * the person sends again over another device's change, whose revision it has on no page it read.
+ * Missing, removed and someone else's are one answer.
+ */
+export async function spendingOfOwner(
+  repositories: Pick<Repositories, 'spendings'>,
+  owner: Owner,
+  id: string,
+): Promise<SpendingView> {
+  const spending = await repositories.spendings.byId(owner.id, id)
+  if (!spending) throw new DomainError(ERROR.NOT_FOUND)
+  return spendingViewOf(spending)
+}
+
 /** «Вернуть»: the same spending, the same identifier; 404 once it is final or never was the owner's. */
 export async function restoreSpending(
   repositories: Pick<Repositories, 'spendings'>,

@@ -324,6 +324,8 @@ export interface MolviaClient {
   recordSpending(body: SpendingBody): Promise<{ spending: SpendingView; created: boolean }>
   /** The spending whole over the version shown: `error.conflict` when it moved on elsewhere. */
   amendSpending(id: string, body: SpendingAmendBody): Promise<SpendingView>
+  /** One spending as it stands now; `error.not_found` for a missing, removed or other one (MOL-159). */
+  spending(id: string): Promise<SpendingView>
   /** Marked removed for ten minutes; `error.not_found` for anything that is not the owner's. */
   removeSpending(id: string): Promise<void>
   /** «Вернуть»: `error.not_found` once the removal is final. */
@@ -734,6 +736,8 @@ export function createClient(options: ClientOptions): MolviaClient {
 
     restoreSpending: async (id) =>
       request(`/spendings/${segment(id)}/restore`, spendingViewCodec, { method: 'POST' }),
+
+    spending: (id) => request(`/spendings/${segment(id)}`, spendingViewCodec),
 
     moneyAccounts: () => request('/money/accounts', moneyAccountsCodec),
 

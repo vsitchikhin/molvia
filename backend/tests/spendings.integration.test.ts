@@ -260,6 +260,28 @@ describe('трата вне похода (MOL-73)', () => {
     expect((await call(stranger, 'PUT', `/spendings/${view.id}`, body)).statusCode).toBe(404)
   })
 
+  it('одна трата (MOL-159): своя — как стоит сейчас; удалённая, чужая и не id — один ответ 404', async () => {
+    const me = await owner()
+    const stranger = await owner()
+    const view = spendingViewCodec.parse((await spend(me)).json())
+    await call(me, 'PUT', `/spendings/${view.id}`, {
+      revision: 1,
+      spentOn: view.spentOn,
+      amount: { amount: '5500', currency: 'AMD' },
+      categoryId: view.categoryId,
+    })
+    const one = await call(me, 'GET', `/spendings/${view.id}`)
+    expect(one.statusCode).toBe(200)
+    expect(one.headers['cache-control']).toBe('no-store')
+    expect(spendingViewCodec.parse(one.json())).toMatchObject({ id: view.id, revision: 2 })
+    // The identifier in either case, answered in lower case (Р-3).
+    expect((await call(me, 'GET', `/spendings/${view.id.toUpperCase()}`)).statusCode).toBe(200)
+    expect((await call(stranger, 'GET', `/spendings/${view.id}`)).statusCode).toBe(404)
+    expect((await call(me, 'GET', '/spendings/not-an-id')).statusCode).toBe(404)
+    await call(me, 'DELETE', `/spendings/${view.id}`)
+    expect((await call(me, 'GET', `/spendings/${view.id}`)).statusCode).toBe(404)
+  })
+
   it('удаление — 204 и нет в месяце; «Вернуть» — тот же id; через десять минут — 404', async () => {
     const me = await owner()
     const view = spendingViewCodec.parse((await spend(me)).json())
