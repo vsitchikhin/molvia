@@ -888,6 +888,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       sync(id)
       trips.reread()
     }
+    if (id && event.key === `${GONE_KEY}.${id}`) removedLanded.value = recallLanded(event.key)
   })
 
   const retry = doublingRetry(() => void attempt())
@@ -1036,12 +1037,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       }
       if (!refusal && (head.write.kind === 'delete' || head.write.kind === 'restore')) {
         const { kind, tripId } = head.write
-        removedLanded.value = landedAgain(
-          `${GONE_KEY}.${owner}`,
-          removedLanded.value,
-          tripId,
-          kind === 'delete',
-        )
+        removedLanded.value = landedAgain(`${GONE_KEY}.${owner}`, tripId, kind === 'delete')
       }
       if (!refusal && isMirrored(head.write)) {
         landed.value += 1

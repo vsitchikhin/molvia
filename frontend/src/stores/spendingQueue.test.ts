@@ -334,6 +334,23 @@ describe('spending queue', () => {
       expect(fresh().gone.map((item) => item.id)).toEqual([BARBER])
     })
 
+    // Two windows of one phone: each writes the list over what is stored, and hears the other's
+    // (MOL-151, adversarial round 5).
+    it('keeps another window’s landed removal, and hears it', async () => {
+      const queue = fresh()
+      const key = `molvia.spending-gone.${ME}`
+      localStorage.setItem(key, JSON.stringify([{ id: RENT, at: Date.now() }]))
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+      expect(queue.gone.map((item) => item.id)).toEqual([RENT])
+
+      localStorage.setItem(key, '[]')
+      queue.remove(BARBER)
+      localStorage.setItem(key, JSON.stringify([{ id: RENT, at: Date.now() }]))
+      await settled()
+      expect(queue.gone.map((item) => item.id)).toEqual([RENT, BARBER])
+      expect(fresh().gone.map((item) => item.id)).toEqual([RENT, BARBER])
+    })
+
     it('must not fire: a landed removal older than any month kept, or a broken entry', () => {
       const old = Date.now() - 93 * 24 * 60 * 60 * 1000
       localStorage.setItem(

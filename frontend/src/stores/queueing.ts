@@ -107,14 +107,12 @@ export function recallLanded(key: string): Landed[] {
   }
 }
 
-/** The removal of `id` landed (`removed`) or was taken back by a «Вернуть» that landed. */
-export function landedAgain(
-  key: string,
-  list: readonly Landed[],
-  id: string,
-  removed: boolean,
-): Landed[] {
-  const others = list.filter((item) => item.id !== id)
+/**
+ * The removal of `id` landed (`removed`) or was taken back by a «Вернуть» that landed. Written over
+ * what is stored, not over this window's copy: another window's removals stay (round 5).
+ */
+export function landedAgain(key: string, id: string, removed: boolean): Landed[] {
+  const others = recallLanded(key).filter((item) => item.id !== id)
   const next = removed ? [...others, { id, at: Date.now() }] : others
   write(key, JSON.stringify(next))
   return next

@@ -320,6 +320,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
       sync(id)
       landed.value++
     }
+    if (id && event.key === `${GONE_KEY}.${id}`) gone.value = recallLanded(event.key)
   })
 
   const retry = doublingRetry(() => void attempt())
@@ -448,12 +449,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
       }
       if (!refusal && write.kind === 'category-add') arrived.value = [...arrived.value, write]
       if (!refusal && (write.kind === 'remove' || write.kind === 'restore'))
-        gone.value = landedAgain(
-          `${GONE_KEY}.${owner}`,
-          gone.value,
-          write.id,
-          write.kind === 'remove',
-        )
+        gone.value = landedAgain(`${GONE_KEY}.${owner}`, write.id, write.kind === 'remove')
       persist(owner)
       landed.value++
     }

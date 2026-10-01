@@ -52,8 +52,10 @@ interface Remembered {
   readonly answer: MoneyMonthView
   readonly fetchedAt: Date
   /**
-   * When the read set out: what the server knew is as of then, not of when the answer came. A month
-   * recalled from the phone has only its arrival, which is older than anything since anyway.
+   * When the read set out: what the server knew is as of then, not of when the answer came. Kept on
+   * the phone with the answer, or a read that set out before a removal and came after it would
+   * show the removed row again after a restart (MOL-151, Б6); a month kept before it was has only
+   * its arrival, older than any removal remembered since.
    */
   readonly askedAt?: Date
 }
@@ -75,7 +77,10 @@ function recall(owner: string, month: string): Remembered | null {
   const answer = moneyMonthCodec.safeParse(kept.answer)
   const fetchedAt = typeof kept.fetchedAt === 'string' ? new Date(kept.fetchedAt) : null
   if (!answer.success || !fetchedAt || Number.isNaN(fetchedAt.getTime())) return null
-  return { answer: answer.data, fetchedAt }
+  const askedAt = typeof kept.askedAt === 'string' ? new Date(kept.askedAt) : null
+  return askedAt && !Number.isNaN(askedAt.getTime())
+    ? { answer: answer.data, fetchedAt, askedAt }
+    : { answer: answer.data, fetchedAt }
 }
 
 /** The categories of the newest month kept for the owner — any month names all of them. */
@@ -94,11 +99,12 @@ function recallTodayRate(owner: string): MoneyMonthView['rate'] {
   return running?.answer.rateKind === 'live' ? running.answer.rate : null
 }
 
-function remember(owner: string, answer: MoneyMonthView, fetchedAt: Date): void {
+function remember(owner: string, answer: MoneyMonthView, fetchedAt: Date, askedAt: Date): void {
   const all = recallAll(owner)
   all[answer.month] = {
     answer: moneyMonthCodec.encode(answer),
     fetchedAt: fetchedAt.toISOString(),
+    askedAt: askedAt.toISOString(),
   }
   const newest = Object.entries(all)
     .flatMap(([month, value]) =>
@@ -163,7 +169,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       // The first page is what is kept, as a first read answers it: the cursor of a later page
       // is the server's to work out, not the phone's.
       const firstAt = new Date()
-      if (actor.id === id) remember(id, first, firstAt)
+      if (actor.id === id) remember(id, first, firstAt, askedAt)
       let answer = first
       for (let page = 1; page < wanted && answer.cursor; page++) {
         answer = mergePages(answer, await api.moneyMonth(month, answer.cursor))

@@ -1676,6 +1676,24 @@ describe('trip queue', () => {
       expect(fresh().gone.map((item) => item.id)).toEqual([TRIP])
     })
 
+    // Два окна одного телефона: список пишется поверх хранилища и слышен другому окну (раунд 5).
+    it('удаление, ответившее в другом окне, не теряется и слышно', async () => {
+      removeTrip.mockResolvedValue(undefined)
+      const queue = fresh()
+      const key = `molvia.trip-gone.${ME}`
+      const elsewhere = JSON.stringify([{ id: MILK, at: Date.now() }])
+      localStorage.setItem(key, elsewhere)
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+      expect(queue.gone.map((item) => item.id)).toEqual([MILK])
+
+      localStorage.setItem(key, '[]')
+      queue.removeTrip(TRIP, 'Ереван Сити')
+      localStorage.setItem(key, elsewhere)
+      await queue.flush()
+      expect(queue.gone.map((item) => item.id)).toEqual([MILK, TRIP])
+      expect(fresh().gone.map((item) => item.id)).toEqual([MILK, TRIP])
+    })
+
     it('не должно сработать: удаление, которое не дошло, не помнится как ответившее', async () => {
       removeTrip.mockRejectedValue(offline())
       const queue = fresh()
