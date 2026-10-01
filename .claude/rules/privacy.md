@@ -140,7 +140,10 @@ The detail behind the privacy lines of `CLAUDE.md`.
   what was searched for and who asked, a dropped connection the hash of every session token in
   flight. **The frames are what follows the stack's own header, cut off whole** (П-1): picked by
   their shape, a line of a multi-line review written as `    at …` passed as a frame, with the
-  rest of the parameters behind it. `forget` prints the same. An unknown address answers without echoing it and is not
+  rest of the parameters behind it. `forget` prints the same. A migration failing at boot logs its
+  kind and the statement that failed, DDL from our own files (`describeMigrationFailure`, MOL-153):
+  its message is no safer — Postgres writes the value a cast refused into it, a person's note under
+  `USING "note"::numeric`. An unknown address answers without echoing it and is not
   logged with its query. What the privacy page (`/privacy`) says about data is a promise these
   rules keep, and it is read before signing in — the one route with `meta.public`, which
   `App.vue` draws past the login screen (MOL-56), linked from that screen and from the settings: a change to either is a change to both — and it says only what they keep: other

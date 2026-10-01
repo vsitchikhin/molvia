@@ -56,12 +56,14 @@ snapshot, and an inverse or a cross is rounded there to the snapshot's six digit
   `9999-12-31` — is not written at all. A stale rate with its date beats a mixed one.
 - **An empty cache gives a trip no rate, for good** — the snapshot is written once and never
   filled in later (owner's decision, 19.09.2026).
-- **A failure is a line in the log, never the error whole (MOL-153).** A fetch is logged by the
-  feed's own words when it is a `FeedError`, by its kind through `describeFailure` otherwise; a
-  failed write by its kind only — pino writes an `err` whole, and a `DrizzleQueryError` carries the
-  query and its parameters. The cause a deploy needs (MOL-39, С-2: a block by geography against a
-  dead DNS) survives as the code in `cause` — `ENOTFOUND`, `ECONNREFUSED`, `CERT_HAS_EXPIRED`, or
-  `TimeoutError` by name, measured on Node 22; only the host goes, and `provider` names it.
+- **A failure is a line in the log, never the error whole (MOL-153).** A feed throws a `FeedError`
+  for everything it can tell, and that is logged as said — it speaks of a public address, never of
+  a person: a request with no answer in the words of its `cause` (`reach` — a host not found, a
+  `redirect count exceeded`, an expired certificate, a timeout), a page in place of JSON as
+  `not JSON`. Anything else, a failed write above all, is logged by its kind through
+  `describeFailure`: pino writes an `err` whole, and a `DrizzleQueryError` carries the query and
+  its parameters. The cause a deploy needs (MOL-39, С-2: a block by geography against a dead DNS)
+  is in those words; a code alone was not enough — a redirect loop has none (adversarial Б).
 - **The cache has the central bank's history since 2022 (MOL-137, owner's decision В-5).** Before
   it, everything dated more than a week before the first hourly refresh — an income in dollars, a
   month, an account, the losses on exchanges, the whole import of MOL-71 — had no official rate at
