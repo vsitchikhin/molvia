@@ -14,12 +14,12 @@ import {
 import type { CachedRate, MoneyChartMonthView, MoneyMonthView } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
-import { moneyMonthRates } from '@/db/schema'
+import { expenses, moneyMonthRates } from '@/db/schema'
 import { tripRepositories } from '@/db/unit-of-work'
 import { buildServer } from '@/server'
 import { moneyChartMonthOf } from '@/usecases/money-chart-month'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, signIn } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
@@ -269,6 +269,35 @@ describe('«Графики → Месяц» (MOL-158)', () => {
     },
     HEAVY_MS,
   )
+
+  it('поход без цен — не данные, поход с ценой — данные, как на «Деньгах» (адверсариальное Н3)', async () => {
+    const placeId = await insertPlace(db)
+    const trip = async (me: Owner, amountMinor: bigint | null) => {
+      const tripId = await insertTrip(db, {
+        actorId: me.id,
+        placeId,
+        startedAt: new Date(Date.now() - 60_000),
+        finishedAt: new Date(),
+        finishedOn: today,
+      })
+      await db.insert(expenses).values({
+        id: randomUUID(),
+        tripId,
+        itemId: await insertItem(db),
+        amountMinor,
+        amountCurrency: amountMinor === null ? null : 'AMD',
+      })
+    }
+    const rated = await owner()
+    await trip(rated, null)
+    expect((await month(rated, current)).days).toEqual([])
+    expect((await chartMonth(rated, current)).firstMonth).toBeNull()
+
+    const priced = await owner()
+    await trip(priced, 50_000n)
+    expect((await month(priced, current)).spent.minor).toBe(50_000n)
+    expect((await chartMonth(priced, current)).firstMonth).toBe(current)
+  })
 
   it(
     'месяцы обычного — со сдвигом зарплаты, как на «Деньгах» (адверсариальное Е)',

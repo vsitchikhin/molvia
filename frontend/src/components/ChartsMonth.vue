@@ -128,33 +128,54 @@ export default defineComponent({
     const empty = computed(() => charts.value !== null && charts.value.firstMonth === null)
 
     const sector = ref<string | null>(null)
-    const dayAt = ref(0)
-    /** Today in a running month — or the last day drawn, if that is sooner; else the last day. */
+    const arrival = ref(0)
+    /** The day the person chose in this visit of this month; null — none, the day of arrival stands. */
+    const chosenDay = ref<number | null>(null)
+    /**
+     * Today in this phone's month — or the last day drawn, if that is sooner; else the last day
+     * (Р-7). Whether the month runs is the phone's calendar's to say, not the answer's: an answer
+     * kept from when September ran says so on the 1st of October (adversarial round 2, Н2).
+     */
     function dayOnArrival(): number {
       const days = charts.value?.pace.days ?? []
       const last = Math.max(0, days.length - 1)
-      if (!charts.value?.running) return last
-      return Math.min(last, Math.max(0, Number(localDay().slice(8, 10)) - 1))
+      const today = localDay()
+      if (charts.value?.month !== today.slice(0, 7)) return last
+      return Math.min(last, Math.max(0, Number(today.slice(8, 10)) - 1))
     }
+    /**
+     * The day shown: the one the person chose while the line still reaches it (adversarial З), else
+     * the day of arrival of the answer on screen — worked out again for every answer, so the day of
+     * an answer kept from yesterday is never taken for a choice (adversarial round 2, Н1).
+     */
+    const dayAt = computed({
+      get: () => chosenDay.value ?? arrival.value,
+      set: (day: number) => {
+        chosenDay.value = day
+      },
+    })
     // Another month lets the choices go; a new answer of the same month — a write landed — keeps
-    // them (Р-9): the day while the line still reaches it (adversarial З), the sector while the ring
-    // still has it — gone into «Остальные», it dimmed the whole ring with nothing chosen (adversarial А).
+    // them (Р-9): the sector while the ring still has it — gone into «Остальные», it dimmed the whole
+    // ring with nothing chosen (adversarial А).
     watch(
       () => charts.value?.month,
       () => {
         sector.value = null
-        dayAt.value = dayOnArrival()
+        chosenDay.value = null
       },
       { immediate: true },
     )
     watch(
       () => charts.value,
       (shown) => {
+        arrival.value = dayOnArrival()
         if (!shown) return
         const keys = shown.slices.map((slice) => slice.categoryId ?? 'rest')
         if (sector.value !== null && !keys.includes(sector.value)) sector.value = null
-        dayAt.value = Math.min(dayAt.value, Math.max(0, shown.pace.days.length - 1))
+        const last = shown.pace.days.length - 1
+        if (chosenDay.value !== null && chosenDay.value > last) chosenDay.value = null
       },
+      { immediate: true },
     )
 
     const length = computed(() => Number(lastDayOf(props.month).slice(8, 10)))

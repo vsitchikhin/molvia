@@ -728,6 +728,48 @@ describe('MoneyChartsView (MOL-158): «Месяц»', () => {
     expect(plain(view.find('.pace .reading').text())).toContain('By September 3')
   })
 
+  it("the day of arrival is worked out for every answer, never kept from yesterday's (adversarial round 2, Н1, Н2)", async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const october = (days: number) =>
+        monthCharts({
+          month: '2026-10',
+          running: true,
+          pace: {
+            days: monthCharts()
+              .pace.days.slice(0, days)
+              .map((day) => ({ ...day, day: day.day.replace('2026-09', '2026-10') })),
+            usual: null,
+          },
+        })
+      // Yesterday's answer is on the phone; today's comes: the day is today, nobody chose the 11th.
+      vi.setSystemTime(new Date('2026-10-11T09:00:00Z'))
+      moneyChartMonth.mockResolvedValue(october(11))
+      ;(await render('/money/charts')).unmount()
+      vi.setSystemTime(new Date('2026-10-12T09:00:00Z'))
+      moneyChartMonth.mockResolvedValue(october(12))
+      const view = await render('/money/charts')
+      expect(plain(view.find('.pace .reading').text())).toContain('By October 12 · today')
+      view.unmount()
+
+      // September kept from when it ran, opened on the 1st of October: its last day, not the 1st.
+      vi.setSystemTime(new Date('2026-09-29T09:00:00Z'))
+      moneyChartMonth.mockResolvedValue(
+        monthCharts({
+          running: true,
+          pace: { days: monthCharts().pace.days.slice(0, 29), usual: null },
+        }),
+      )
+      ;(await render(SEPTEMBER)).unmount()
+      vi.setSystemTime(new Date('2026-10-01T09:00:00Z'))
+      moneyChartMonth.mockResolvedValue(monthCharts())
+      const closed = await render(SEPTEMBER)
+      expect(plain(closed.find('.pace .reading').text())).toContain('By September 30')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('a month still to come in the address is this month (adversarial В)', async () => {
     moneyChartMonth.mockReturnValue(new Promise(() => undefined))
     await render('/money/charts?month=2099-05')

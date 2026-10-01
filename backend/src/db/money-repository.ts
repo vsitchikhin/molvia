@@ -43,8 +43,9 @@ export interface MoneyRepository {
   salaryShift(actorId: string): Promise<number | null>
 
   /**
-   * The first day the owner spent anything on — a live spending, or a finished trip by the day of its
-   * finishing as «Деньги» file it (MOL-158, adversarial К): a month of «Графики» before it is an empty
+   * The first day the owner spent anything on — a live spending, or a finished trip with money (a
+   * receipt's sum or a price, `tripMoneyRows`) by the day of its finishing as «Деньги» file it
+   * (MOL-158, adversarial К, round 2 Н3): a month of «Графики» before it is an empty
    * month of a person with data, never a newcomer's. Null — nothing spent yet.
    */
   firstSpentDay(actorId: string): Promise<string | null>
@@ -97,11 +98,17 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
             from spendings
            where actor_id = ${actorId} and deleted_at is null
           union all
-          select min(coalesce(finished_on,
-                              (coalesce(finished_on_device_at, finished_at)
+          select min(coalesce(t.finished_on,
+                              (coalesce(t.finished_on_device_at, t.finished_at)
                                  at time zone 'Asia/Yerevan')::date))
-            from trips
-           where actor_id = ${actorId} and finished_at is not null and deleted_at is null
+            from trips t
+           where t.id in (
+             -- Only a trip with money, as «Деньги» file one: a receipt's sum or a price (adversarial
+             -- round 2, Н3) — a trip of ratings alone is no month with anything in it.
+             select trip_id from (${tripMoneyRows(
+               sql`t.actor_id = ${actorId} and t.finished_at is not null and t.deleted_at is null`,
+             )}) money
+           )
         ) firsts
       `)
       return row?.day ?? null

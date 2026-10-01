@@ -437,7 +437,11 @@ does an installed phone of the old version. Requirements and plan in
   — every closed month short — the pace says why, never that it comes (adversarial И).
 - **The offer to a newcomer is for one with nothing at all** (`firstMonth`, the first month spent or
   come in, of the whole history; adversarial К): a month before the first with data is a grey ring of
-  nothing, and its first month with a comparison is counted from that first month.
+  nothing, and its first month with a comparison is counted from that first month. A trip counts only with money — a
+  receipt's sum or a price, `tripMoneyRows`, as «Деньги» file it (adversarial round 2, Н3): a trip of
+  ratings alone made a person with nothing on «Деньгах» no newcomer. **A first month already past is
+  named by no one** (Н4): with data a year and more back and none since, «с апреля» was April two
+  years ago.
 - **The running month is compared to the same day, a closed one to the whole** (owner's decision В-3
   of the review): on the 12th, 20 000 ֏ of groceries against a usual whole month of 60 000 was
   «−67 %», when by the 12th the usual is what was spent by the 12th. **The day is today, or the last
@@ -458,7 +462,9 @@ does an installed phone of the old version. Requirements and plan in
   dot, the usual dashed and the month solid: told apart by more than colour. **The day is a native
   range**, as the weeks of the rate are, not a radio for each of thirty-one days (handoff 03 asked for
   radios); it says the day and both sums. The day on arrival is today in a running month, else the
-  last (Р-7).
+  last (Р-7) — **worked out for every answer, and «running» by the phone's calendar** (adversarial
+  round 2, Н1, Н2): taken as a choice, the day of an answer kept from yesterday stood over today's,
+  and a September kept from when it ran opened on the 1st on the 1st of October.
 - **The ring's sectors carry what they are in the income currency and who is in «Остальные»** (Р-2):
   «25 % · ≈ 15 821 ₽» is a conversion, the server's; the share is the model's `shareOf`. **A second
   tap lets a sector go** (review Р-4 of MOL-157); the chosen one is thicker inwards, the others

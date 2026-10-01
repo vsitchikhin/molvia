@@ -169,6 +169,15 @@ describe('monthCharts — the usual month', () => {
     expect(charts(counted('2026-05'), [], '2026-10-01').firstMonth).toBeNull()
   })
 
+  it('names no first month already past — data two years back and none since (adversarial round 2, Н4)', () => {
+    expect(charts(counted('2026-09'), [], '2026-10-01', [], '2024-01').comparedFrom).toBeNull()
+    // Data again since July: the first month with a comparison is ahead, and named.
+    const july = counted('2026-07', [spending(1_000, '2026-07-03')])
+    expect(charts(counted('2026-09'), [july], '2026-10-01', [], '2024-01').comparedFrom).toBe(
+      '2026-10',
+    )
+  })
+
   it('has no first month past the last a calendar of four digits holds (adversarial Ж)', () => {
     expect(charts(counted('9999-11'), [], '2026-10-01').comparedFrom).toBeNull()
     expect(charts(counted('9999-09'), [], '2026-10-01').comparedFrom).toBe('9999-12')

@@ -330,7 +330,10 @@ export function monthCharts(input: MonthChartsInput): MonthCharts {
       enough && first && last
         ? { from: first.month, to: last.month, months: usedClosed.length }
         : null,
-    comparedFrom: enough || comparedFrom.length > 7 ? null : comparedFrom,
+    // A month already past is no first month with a comparison: data a year and more back, and none
+    // since, counted it from the first month of all (adversarial round 2, Н4).
+    comparedFrom:
+      enough || comparedFrom.length > 7 || comparedFrom <= selected.month ? null : comparedFrom,
     closed: usedClosed.map((one) => one.month),
     firstMonth: input.firstMonth,
     deviations,
