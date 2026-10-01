@@ -474,17 +474,19 @@ French — and the person confirms or corrects it.
   the main name in any language, the other interface language's — the first that is a name: entities
   decoded, a line, a private-use glyph or a lone surrogate dropped (one U+F8FF lost the whole name and
   kept the code unknown for a week — adversarial Ж), cut at 200, with a letter and two characters at
-  least. **The brand** goes after the name unless the name carries it — any word of the first brand
-  four letters or longer **as the brand writes it** (all of it, when every word is shorter) is a word
-  of the name by the search key (Р-3): «Nutella» + «Nutella, Ferrero» is «Nutella», «Coca Cola» +
-  «COCA-COLA SERVICES SA/NV» is «Coca Cola», «Сыр Савушкин 45%» + «Савушкин продукт» stays as it is —
-  the base keeps a mark with its company or country, the package prints the mark — and «Молоко 3,2%» +
-  «Простоквашино» is «Молоко 3,2% Простоквашино». The first word alone took an article for the brand —
-  «La Laitière» was lost on «Yaourt à la vanille» (adversarial В); both of two first words wrote the
-  mark twice (В′); three letters by the key let «для», «des», «for» pass for it, since the key grows a
-  word — «для» is `dlia` (В″). **The price, named:** a brand sharing a word with what the name says of
-  the product is lost — «Сыр Российский» + «Российский сыродел» — and so is one sharing a function word
-  of four letters or more, «pour», «avec». **The size** is
+  least. **The brand** goes after the name unless the name carries it — a word of the first brand that
+  says which mark it is (four letters or more as written, a digit in it, or the first word of three)
+  is a word of the name by the search key, all of it when none says (Р-3): «Nutella» + «Nutella,
+  Ferrero» is «Nutella», «Coca Cola» + «COCA-COLA SERVICES SA/NV» is «Coca Cola», «Сыр Савушкин 45%» +
+  «Савушкин продукт», «Напиток 7Up» + «7Up» and «Конфеты KDV» + «KDV Group» stay as they are — the
+  base keeps a mark with its company or country, the package prints the mark — and «Молоко 3,2%» +
+  «Простоквашино» is «Молоко 3,2% Простоквашино». Each rule before failed one way: the first word took
+  an article for the brand (adversarial В), both of two first words wrote the mark twice (В′), three
+  letters by the key let «для», «des», «for» pass (В″), four letters as written lost a mark with a
+  digit or of three letters (В‴). **The price, named:** a brand sharing a word with what the name
+  says of the product is lost — «Сыр Российский» + «Российский сыродел» — and so is one sharing a
+  function word of four letters or more («pour», «avec») or a first word of three («Les»); a company
+  written into its mark is written after it — «Pepsi Max» + «PepsiCo». **The size** is
   `product_quantity` in g, kg, ml, cl, dl or l, as kg or l, up to fifty (Р-4); pieces, ounces and the
   text of `quantity` («6 x 1,5 l») give none. Only the fields used are asked for: never a photo — its
   licence, the rights on the package, and a picture from the base's CDN would hand it the phone.

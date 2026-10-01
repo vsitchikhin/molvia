@@ -85,30 +85,41 @@ function cleanName(raw: unknown): string | null {
   return name.success ? name.data : null
 }
 
-/** A word of a brand as it is written: letters, with the marks that sit on them. */
-const WRITTEN_WORD = /\p{L}[\p{L}\p{M}]*/gu
+/** A word of a brand as it is written: letters and digits, with the marks that sit on them. */
+const WRITTEN_WORD = /[\p{L}\p{N}][\p{L}\p{M}\p{N}]*/gu
 
 /**
- * The brand goes after the name unless the name carries it already (Р-3): any word of the first brand
- * four letters or longer **as the brand writes it** — all of it, when every word is shorter — is a word
- * of the name by the search key. «Nutella» with «Nutella, Ferrero» stays «Nutella», «Coca Cola» with
- * «COCA-COLA SERVICES SA/NV» stays as it is, «Сыр Савушкин 45%» with «Савушкин продукт» too — the base
- * keeps a mark and its company, the package prints the mark — and «Молоко 3,2%» with «Простоквашино»
- * becomes «Молоко 3,2% Простоквашино». Four letters as written leave out the words that say nothing of
- * a mark — «для», «des», «for», «the», «les» — and the key could not tell them, since it grows a word
- * («для» is `dlia`) (adversarial В″). The first word alone took an article for the brand (В), both of
- * two first words wrote the mark twice (В′). **The price, named:** a brand that shares a word with
- * what the name says of the product is lost — «Сыр Российский» with «Российский сыродел» — and so is
- * one sharing a function word of four letters or more, «pour», «avec», «with». A name the brand would
- * take past the limit stays without it.
+ * Whether a word of a brand says which mark it is: four letters or more, a digit in it — «7Up», «J7»
+ * are marks — or the brand's first word of three letters or more, where the mark stands before its
+ * company: «KDV Group», «Fit Parade». The rest — «la», «для», «des», «for» — say nothing of a mark.
+ */
+function marks(word: string, index: number): boolean {
+  const letters = Array.from(word.replace(/[^\p{L}]/gu, '')).length
+  return letters >= 4 || /\p{N}/u.test(word) || (index === 0 && letters >= 3)
+}
+
+/**
+ * The brand goes after the name unless the name carries it already (Р-3): a word of the first brand
+ * that says which mark it is (`marks`) — all of it, when none does — is a word of the name by the
+ * search key. «Nutella» with «Nutella, Ferrero» stays «Nutella», «Coca Cola» with «COCA-COLA SERVICES
+ * SA/NV» stays as it is, «Сыр Савушкин 45%» with «Савушкин продукт» too — the base keeps a mark and its
+ * company, the package prints the mark — so do «Напиток 7Up» with «7Up» and «Конфеты KDV» with «KDV
+ * Group», and «Молоко 3,2%» with «Простоквашино» becomes «Молоко 3,2% Простоквашино». Each rule before
+ * this one failed one way: the first word took an article for the brand (adversarial В), both of two
+ * wrote the mark twice (В′), three letters by the key let «для», «des», «for» pass (В″), four letters
+ * as written lost a mark with a digit or of three letters (В‴). **The price, named:** a brand that
+ * shares a word with what the name says of the product is lost — «Сыр Российский» with «Российский
+ * сыродел» — and so is one sharing a function word of four letters or more, «pour», «avec», or a
+ * first word of three, «Les»; a company written into its mark is written after it — «Pepsi Max» with
+ * «PepsiCo». A name the brand would take past the limit stays without it.
  */
 function withBrand(name: string, brands: unknown): string {
   if (typeof brands !== 'string') return name
   const brand = cleanName(brands.split(',')[0])
   if (brand === null) return name
   const written = brand.match(WRITTEN_WORD) ?? []
-  const long = written.filter((word) => Array.from(word).length >= 4)
-  const probe = (long.length > 0 ? long : written)
+  const telling = written.filter((word, index) => marks(word, index))
+  const probe = (telling.length > 0 ? telling : written)
     .flatMap((word) => toSearchKey(word).split(' '))
     .filter((word) => word !== '')
   const named = new Set(toSearchKey(name).split(' '))

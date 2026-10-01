@@ -195,6 +195,19 @@ describe('бренд (Р-3)', () => {
     },
   )
 
+  it.each([
+    ['Напиток 7Up', '7Up'],
+    ['Сок J7 апельсин', 'J7'],
+    ['Конфеты KDV', 'KDV Group'],
+    ['Сахарозаменитель Fit', 'Fit Parade'],
+    ['Вода Bon Aqua', 'Bon Aqua'],
+  ])(
+    'марка с цифрой или трёхбуквенная перед юрлицом — в имени, не удваивается (адверсариальный В‴): «%s» + «%s»',
+    (name, brands) => {
+      expect(found(answer({ product_name_ru: name, brands })).names.ru).toBe(name)
+    },
+  )
+
   it('цена правила: бренд, чьё слово совпало с сортом в имени, теряется', () => {
     expect(
       found(answer({ product_name_ru: 'Сыр Российский', brands: 'Российский сыродел' })).names.ru,
