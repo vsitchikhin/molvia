@@ -212,7 +212,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The market is only what an exchange is set beside, never a rate anything counts by** (MOL-137):
   the best of the central bank's figures of its day for the person, and their own channel if named;
   the side is the bank's (`marketSideOf`), a pair without the dram has none; a file is written whole
-  or refused. **The official cache holds the bank's history since 2022**, only missing days written.
+  or refused. **«Обмены против рынка» sums each exchange as its card measures it** (MOL-152): its own
+  channel, else the best; no market — «Без сравнения», never the central bank instead. **The official cache holds the bank's history since 2022**, only missing days written.
 
 ### Money: spendings and «Деньги» — `.claude/rules/money-spendings.md`
 
@@ -236,6 +237,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   (`ZONE_HEADER`), and every «today» of money and every day of a moment the server stamped is
   counted by them; a write is «in the future» only past `latestDay`; a trip keeps
   the phone's day of its taps. The frontend's tests run in UTC.
+- **«Деньги» is the month's summary, «Траты» its journal** (MOL-159): five ways out with one figure
+  each, every figure from an answer the screen already has — the counts are the server's (`count`,
+  `incomeCount`); the tiles are figures, not buttons; a spending of another month moves «Траты»,
+  never the summary.
 - **A bar of «Графики» is the month of «Деньги»** (MOL-74): `countMonth` with `monthRate`, never a
   second count; its third figure is «Разница», since «Остаток» is the money on the accounts.
   **The usual month is the mean of up to twelve closed months before, from three** (MOL-158): the

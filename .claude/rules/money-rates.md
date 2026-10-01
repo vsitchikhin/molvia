@@ -280,7 +280,23 @@ rate exactly as before.
   fresh today — an exchange office of last week is shown, not starred beside today's banks, as a card
   sets it only beside its own day (review П-5). The server marks it; the phone compares nothing.
 - **On the card the market comes first and the central bank under it, a step quieter** (Р-5).
-  «Графики» still measure exchanges against the central bank (Р-6) — a task of its own.
+- **«Обмены против рынка» sums each exchange as its card measures it** (MOL-152, folded into MOL-159,
+  owner's decisions В-1 «в», В-2 «а», В-3 «а»): the twelve months to today by place, worst first, at
+  the top of «Обмен денег» — the card that stood on «Графики» against the official rate, where every
+  rouble exchange read as a loss. **Against its own channel when the person named it, else the best
+  of its day** (`market.own ?? market.best`, В-3): a place is compared with the market of its kind,
+  cash with cash, as the handoff and MOL-161 have it. **One comparison per exchange** (Р-15): the sum
+  is made of the `market` the list already carries (`marketLossesOf`), so the card and the sum never
+  disagree and the market is not read twice. The difference is in the received currency and comes
+  into the spending one by the official rate of that day (`officialAcross`, the one «Деньги» count
+  by); **with no market — a pair without the dram, a day with no figure — or no such rate, the
+  exchange is named under «Без сравнения», never set beside the central bank instead** (handoff 05),
+  in words that do not blame the bank for a pair it never quotes (Р-13). An exchange of a day the
+  exchange offices' file has not reached is measured among the banks, and the sum moves by itself
+  when the file comes (Р-14), as the card does. **`losses` comes with `GET /exchanges` and with every
+  write's answer** (В-2): a written exchange is in the sum at once; defaulted (`null`) for a server
+  before it. No «≈ ₽» under the sum (review Р-7 of MOL-157): past differences at today's rate would
+  creep with the rate.
 
 ## Incomes
 
