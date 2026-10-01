@@ -89,13 +89,56 @@ function cleanName(raw: unknown): string | null {
 const WRITTEN_WORD = /[\p{L}\p{N}][\p{L}\p{M}\p{N}]*/gu
 
 /**
- * Whether a word of a brand says which mark it is: four letters or more, a digit in it — «7Up», «J7»
- * are marks — or the brand's first word of three letters or more, where the mark stands before its
- * company: «KDV Group», «Fit Parade». The rest — «la», «для», «des», «for» — say nothing of a mark.
+ * The legal forms a brand may be written with — «ООО КДВ», «Fit Parade LLC» — by the search key: they
+ * name no mark, and one standing first hid the mark after it (adversarial В⁗). A closed list: the forms
+ * of the markets the base is read in, Russian, Armenian and the European ones.
  */
-function marks(word: string, index: number): boolean {
+const LEGAL_FORMS = new Set(
+  [
+    'ООО',
+    'ОАО',
+    'ЗАО',
+    'ПАО',
+    'АО',
+    'ИП',
+    'ТОО',
+    'ЧП',
+    'ГК',
+    'ՍՊԸ',
+    'ՓԲԸ',
+    'ԲԲԸ',
+    'LLC',
+    'Ltd',
+    'Inc',
+    'Corp',
+    'Co',
+    'PLC',
+    'LLP',
+    'GmbH',
+    'AG',
+    'SA',
+    'SAS',
+    'SARL',
+    'SRL',
+    'SpA',
+    'BV',
+    'NV',
+    'Oy',
+    'AB',
+  ].map((form) => toSearchKey(form)),
+)
+
+/**
+ * Whether a word of a brand says which mark it is: four letters or more; letters with a digit —
+ * «7Up», «J7»; or the brand's first word of three letters or more past its legal form, where the mark
+ * stands before its company — «KDV Group», «ООО КДВ». A number alone is no mark: «Хлебзавод 7» on «Хлеб
+ * 7 злаков» or «Danone 2» on «Йогурт 2,5%» met a size or a fat, as the search does not let a number
+ * ground a match (MOL-10, MOL-48; review 16). The rest — «la», «для», «des», «for» — say nothing.
+ */
+function marks(word: string, first: boolean): boolean {
   const letters = Array.from(word.replace(/[^\p{L}]/gu, '')).length
-  return letters >= 4 || /\p{N}/u.test(word) || (index === 0 && letters >= 3)
+  if (letters === 0) return false
+  return letters >= 4 || /\p{N}/u.test(word) || (first && letters >= 3)
 }
 
 /**
@@ -117,8 +160,10 @@ function withBrand(name: string, brands: unknown): string {
   if (typeof brands !== 'string') return name
   const brand = cleanName(brands.split(',')[0])
   if (brand === null) return name
-  const written = brand.match(WRITTEN_WORD) ?? []
-  const telling = written.filter((word, index) => marks(word, index))
+  const written = (brand.match(WRITTEN_WORD) ?? []).filter(
+    (word) => !LEGAL_FORMS.has(toSearchKey(word)),
+  )
+  const telling = written.filter((word, index) => marks(word, index === 0))
   const probe = (telling.length > 0 ? telling : written)
     .flatMap((word) => toSearchKey(word).split(' '))
     .filter((word) => word !== '')

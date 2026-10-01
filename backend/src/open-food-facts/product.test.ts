@@ -208,6 +208,28 @@ describe('бренд (Р-3)', () => {
     },
   )
 
+  it.each([
+    ['Конфеты КДВ', 'ООО КДВ'],
+    ['Конфеты KDV', 'ООО KDV'],
+    ['Молоко Ясный луг', 'ООО Ясный луг'],
+    ['Сок Fit', 'Fit Parade LLC'],
+  ])(
+    'юрформа — не марка, марка после неё — в имени (адверсариальный В⁗): «%s» + «%s»',
+    (name, brands) => {
+      expect(found(answer({ product_name_ru: name, brands })).names.ru).toBe(name)
+    },
+  )
+
+  it.each([
+    ['Хлеб 7 злаков', 'Хлебзавод 7', 'Хлеб 7 злаков Хлебзавод 7'],
+    ['Йогурт 2,5%', 'Danone 2', 'Йогурт 2,5% Danone 2'],
+  ])(
+    'число без букв — не марка: совпадение с размером или жирностью бренд не прячет (ревью 16): «%s» + «%s»',
+    (name, brands, expected) => {
+      expect(found(answer({ product_name_ru: name, brands })).names.ru).toBe(expected)
+    },
+  )
+
   it('цена правила: бренд, чьё слово совпало с сортом в имени, теряется', () => {
     expect(
       found(answer({ product_name_ru: 'Сыр Российский', brands: 'Российский сыродел' })).names.ru,
