@@ -89,24 +89,20 @@ function cleanName(raw: unknown): string | null {
 const WRITTEN_WORD = /[\p{L}\p{N}][\p{L}\p{M}\p{N}]*/gu
 
 /**
- * The legal forms a brand may be written with — «ООО КДВ», «Fit Parade LLC» — by the search key: they
- * name no mark, and one standing first hid the mark after it (adversarial В⁗). A closed list: the forms
- * of the markets the base is read in, Russian, Armenian and the European ones.
+ * The legal forms a brand may be written with, by the search key, and where each stands: the Russian and
+ * Armenian ones lead — «ООО КДВ», «ՍՊԸ …» — the European ones trail — «Fit Parade LLC», «Nestlé SA». They
+ * name no mark, and one standing first hid the mark after it (adversarial В⁗). By place, since a form
+ * is also a word: «SAS» is Yerevan's supermarket and «Spa» a Belgian water, and taken out wherever they
+ * stood they lost the brand or wrote the mark twice (В⁵). A closed list: the forms of the markets the
+ * base is read in.
  */
-const LEGAL_FORMS = new Set(
+const LEADING_FORMS = new Set(
+  ['ООО', 'ОАО', 'ЗАО', 'ПАО', 'АО', 'ИП', 'ТОО', 'ЧП', 'ГК', 'ՍՊԸ', 'ՓԲԸ', 'ԲԲԸ'].map((form) =>
+    toSearchKey(form),
+  ),
+)
+const TRAILING_FORMS = new Set(
   [
-    'ООО',
-    'ОАО',
-    'ЗАО',
-    'ПАО',
-    'АО',
-    'ИП',
-    'ТОО',
-    'ЧП',
-    'ГК',
-    'ՍՊԸ',
-    'ՓԲԸ',
-    'ԲԲԸ',
     'LLC',
     'Ltd',
     'Inc',
@@ -127,6 +123,18 @@ const LEGAL_FORMS = new Set(
     'AB',
   ].map((form) => toSearchKey(form)),
 )
+
+/**
+ * The words of a brand that are its own, past a leading form and before a trailing one — never all of
+ * them taken: a brand that is nothing but a form's spelling is a mark («SAS»).
+ */
+function ownWords(words: readonly RegExpMatchArray[]): RegExpMatchArray[] {
+  let first = 0
+  let last = words.length
+  while (first < last - 1 && LEADING_FORMS.has(toSearchKey(words[first]?.[0] ?? ''))) first += 1
+  while (last - 1 > first && TRAILING_FORMS.has(toSearchKey(words[last - 1]?.[0] ?? ''))) last -= 1
+  return words.slice(first, last)
+}
 
 /**
  * Whether a word of a brand says which mark it is: four letters or more; letters with a digit —
@@ -160,16 +168,20 @@ function withBrand(name: string, brands: unknown): string {
   if (typeof brands !== 'string') return name
   const brand = cleanName(brands.split(',')[0])
   if (brand === null) return name
-  const written = (brand.match(WRITTEN_WORD) ?? []).filter(
-    (word) => !LEGAL_FORMS.has(toSearchKey(word)),
-  )
+  const own = ownWords([...brand.matchAll(WRITTEN_WORD)])
+  const first = own[0]
+  const last = own[own.length - 1]
+  if (first?.index === undefined || last?.index === undefined) return name
+  const written = own.map((match) => match[0])
   const telling = written.filter((word, index) => marks(word, index === 0))
   const probe = (telling.length > 0 ? telling : written)
     .flatMap((word) => toSearchKey(word).split(' '))
     .filter((word) => word !== '')
   const named = new Set(toSearchKey(name).split(' '))
   if (probe.length === 0 || probe.some((word) => named.has(word))) return name
-  return cleanName(`${name} ${brand}`) === `${name} ${brand}` ? `${name} ${brand}` : name
+  // Written after the name without its legal form: a shelf prints «Красный Октябрь», not «ОАО» (review 18).
+  const mark = brand.slice(first.index, last.index + last[0].length)
+  return cleanName(`${name} ${mark}`) === `${name} ${mark}` ? `${name} ${mark}` : name
 }
 
 /**
