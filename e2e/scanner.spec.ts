@@ -690,3 +690,64 @@ test('slides down with the barcode it read still on the screen, not black', asyn
 
   expect(leaving?.spread).toBeGreaterThan(100)
 })
+
+/**
+ * Safari on an iPhone (MOL-163): Apple's vendor on a touch screen, and a browser that answers it
+ * will ask for the camera — which Safari does once per page load until its setting says «Allow».
+ * Chromium is given the camera all the same; only what the page is told is Safari's.
+ */
+async function asSafariThatAsks(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'vendor', { value: 'Apple Computer, Inc.' })
+    Object.defineProperty(navigator, 'maxTouchPoints', { value: 5 })
+    const query = navigator.permissions.query.bind(navigator.permissions)
+    navigator.permissions.query = (descriptor) =>
+      descriptor.name === 'camera'
+        ? Promise.resolve({ state: 'prompt' } as PermissionStatus)
+        : query(descriptor)
+  })
+}
+const cameraHint = (page: Page) => page.getByRole('dialog', { name: 'Camera without asking' })
+
+test('tells how to stop Safari asking, once the camera is given, and reads after «Got it»', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(READ * 2)
+  await context.grantPermissions(['camera'])
+  await asSafariThatAsks(page)
+  await open(page, '/_kit')
+  await openScanner(page)
+
+  await expect(cameraHint(page)).toBeVisible()
+  await expect(cameraHint(page)).toContainText('aA in the address bar')
+  // Its own rise, as the scanner's: until it has come up a sheet takes no tap (MOL-69).
+  await cameraHint(page).evaluate((dialog) =>
+    Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished)),
+  )
+  await page.waitForTimeout(350)
+  await cameraHint(page).getByRole('button', { name: 'Got it' }).click()
+
+  await expect(cameraHint(page)).toBeHidden()
+  await expect(scanned(page, BARCODE)).toBeVisible({ timeout: READ })
+})
+
+test('seen on this phone, the hint waits behind a quiet line', async ({ page, context }) => {
+  await context.grantPermissions(['camera'])
+  await asSafariThatAsks(page)
+  await page.addInitScript(() => {
+    localStorage.setItem('molvia.camera-hint', '1')
+  })
+  // A reader that never arrives keeps the viewfinder up: the code it films would close it.
+  await page.route(WASM, () => undefined)
+  await open(page, '/_kit')
+  await openScanner(page)
+
+  const quiet = scanner(page).getByRole('button', {
+    name: 'Safari asks every time? How to stop it',
+  })
+  await expect(quiet).toBeVisible()
+  await expect(cameraHint(page)).toBeHidden()
+  await quiet.click()
+  await expect(cameraHint(page)).toBeVisible()
+})
