@@ -1,5 +1,6 @@
 import { onBeforeUnmount, onMounted, watch } from 'vue'
 import type { Ref } from 'vue'
+import { read, write } from '@/stores/storage'
 
 /**
  * Keeps a sheet above the on-screen keyboard. The sheet exists for that: the numeric keyboard is
@@ -12,13 +13,24 @@ import type { Ref } from 'vue'
  * lifted by it through `--keyboard-inset`. Chrome on Android is told to shrink the layout instead
  * (`interactive-widget` in index.html), and there the gap is zero.
  *
- * The window is the box a fixed panel is pinned in, and that is `100dvh` — never `innerHeight`,
- * which Safari moves on its own with the keyboard up. In the installed app on the owner's iPhone it
- * read 796 and, the next time the same keyboard rose, 720, over the same visual viewport (427, 123
- * down): the lift came out 76px short, and the sheet's end — the categories — stood under the glass
- * bar of «∧ ∨ ✓» over the keys. In Safari with its bar folded it read 535 or 734 of a `100dvh` of
- * 699 or 734. Measured by `100dvh`, every state logged on the phone puts the sheet's end where the
- * keyboard begins (hotfix-bottom-menu).
+ * The lift is counted from the box a fixed panel is pinned in, read where it lies (`pinnedBottom`),
+ * less the visible height — never from `innerHeight`, which Safari moves on its own with the keyboard
+ * up: in the installed app on the owner's iPhone it read 796 and, the next time the same keyboard
+ * rose, 720, and the sheet's end stood under the glass bar of «∧ ∨ ✓» over the keys
+ * (hotfix-bottom-menu). Nor from `100dvh` any more, which that hotfix chose: Safari shrinks the box
+ * under the keys a moment before it says how far the visible part moved, and for 300 ms the sheet
+ * was lifted by the keys over a window already above them — off the top of the screen, every time
+ * but the first a sheet was opened (MOL-151, М-2). The box less the visible height gives the lift
+ * `100dvh` gave in every state logged on the phone where that was right, and zero in that one.
+ * The window's own events are heard as well: that shrink comes with no event of the visual viewport.
+ *
+ * The first keyboard of a page comes late on an iPhone — 300 to 800 ms against 50 to 160 after — and
+ * until it is up the page draws nothing: iOS slides the last picture up with the keys, the sheet in
+ * it still the screen's share, its top off the screen until the first new frame (MOL-151, М-1). So
+ * the height the keys left visible is remembered on the device, by the kind of keys and the window,
+ * and a field of the sheet focused before they come takes it at once: the picture iOS slides is
+ * already right. On a touch screen only, and let go if the keys have not come in `KEYBOARD_LATE` or
+ * the focus leaves first. The very first keyboard on a phone has nothing to go by — the price.
  *
  * The sheet's height is a share of what is visible, and that is the visual viewport's own height
  * (`--viewport-height`), never worked out from the window. Safari on the owner's iPhone shrank the
@@ -39,6 +51,10 @@ import type { Ref } from 'vue'
 export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<boolean>): void {
   // What the sheet was last set to: a field is revealed only when this changes.
   let placed = ''
+  // The height the keys left visible last time, set before they come (MOL-151), and the timer that
+  // lets it go if they never do.
+  let foreseen: number | null = null
+  let late: ReturnType<typeof setTimeout> | undefined
 
   function measure(): void {
     const element = target.value
@@ -54,29 +70,86 @@ export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<bo
       return
     }
     const whole = windowHeight()
-    underKeys(whole - viewport.height > KEYBOARD)
-    // Never below zero: a visual viewport past the end of the window is nothing the keys cover.
-    const covered = pixels(whole - viewport.height - viewport.offsetTop)
-    const height = pixels(viewport.height)
-    element.style.setProperty('--keyboard-inset', covered)
-    element.style.setProperty('--viewport-height', height)
-    if (`${covered} ${height}` === placed) return
-    placed = `${covered} ${height}`
+    const keys = whole - viewport.height > KEYBOARD
+    underKeys(keys)
+    if (keys) {
+      forget()
+      const field = typedIn(element)
+      if (field) remember(field, whole, viewport.height)
+    } else if (foreseen !== null) {
+      place(element, 0, foreseen)
+      return
+    }
+    // Never below zero: a visual viewport past the end of the box is nothing the keys cover.
+    place(element, pinnedBottom() - viewport.height, viewport.height)
+  }
+
+  function place(element: HTMLElement, covered: number, height: number): void {
+    const lift = pixels(covered)
+    const tall = pixels(height)
+    element.style.setProperty('--keyboard-inset', lift)
+    element.style.setProperty('--viewport-height', tall)
+    if (`${lift} ${tall}` === placed) return
+    placed = `${lift} ${tall}`
     reveal(element)
+  }
+
+  // A field of the sheet focused with no keys up yet, on a touch screen: the sheet takes the height
+  // they left the last time at once, so the picture iOS slides up with them is already right.
+  function foresee(): void {
+    const element = target.value
+    const viewport = window.visualViewport
+    const field = element && typedIn(element)
+    if (!field || !viewport || viewport.scale > 1 || !touch()) return
+    const whole = windowHeight()
+    if (whole - viewport.height > KEYBOARD) return
+    const height = recall(field, whole)
+    if (height === null) return
+    foreseen = height
+    clearTimeout(late)
+    late = setTimeout(() => {
+      foreseen = null
+      measure()
+    }, KEYBOARD_LATE)
+    measure()
+  }
+
+  // The focus left before the keys came: the sheet is the screen's share again.
+  function letGo(): void {
+    if (foreseen === null) return
+    forget()
+    measure()
+  }
+
+  function forget(): void {
+    foreseen = null
+    clearTimeout(late)
   }
 
   function start(): void {
     window.visualViewport?.addEventListener('resize', measure)
     window.visualViewport?.addEventListener('scroll', measure)
+    // Safari shrinks the window under the keys with no event of the visual viewport, a scroll of
+    // the window alone (MOL-151, М-2).
+    window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, { passive: true })
+    target.value?.addEventListener('focusin', foresee)
+    target.value?.addEventListener('focusout', letGo)
     measure()
+    foresee()
   }
 
   function stop(): void {
     window.visualViewport?.removeEventListener('resize', measure)
     window.visualViewport?.removeEventListener('scroll', measure)
+    window.removeEventListener('resize', measure)
+    window.removeEventListener('scroll', measure)
+    target.value?.removeEventListener('focusin', foresee)
+    target.value?.removeEventListener('focusout', letGo)
     target.value?.style.removeProperty('--keyboard-inset')
     target.value?.style.removeProperty('--viewport-height')
     underKeys(false)
+    forget()
     placed = ''
   }
 
@@ -114,14 +187,22 @@ const TYPED_IN = [
   `input:not(${NOT_TYPED.map((type) => `[type="${type}"]`).join(', ')})`,
 ].join(', ')
 
+/** The field of the sheet being typed in, if any. */
+function typedIn(sheet: HTMLElement): HTMLElement | null {
+  const field = document.activeElement
+  return field instanceof HTMLElement && sheet.contains(field) && field.matches(TYPED_IN)
+    ? field
+    : null
+}
+
 /**
  * Scrolls the sheet — not the window — just far enough for the field typed in to be seen, its top
  * first. A field taller than the sheet is left where it is: the browser keeps its caret in sight.
  * Done once more, it moves nothing (adversarial А3).
  */
 function reveal(sheet: HTMLElement): void {
-  const field = document.activeElement
-  if (!(field instanceof HTMLElement) || !sheet.contains(field) || !field.matches(TYPED_IN)) return
+  const field = typedIn(sheet)
+  if (!field) return
   const box = sheet.getBoundingClientRect()
   const place = field.getBoundingClientRect()
   const above = box.top - place.top
@@ -140,6 +221,50 @@ function reveal(sheet: HTMLElement): void {
 const KEYBOARD = 150
 
 /**
+ * How long a height foreseen for the keys waits for them. The first keyboard of a page came after
+ * 815 ms at worst on the owner's iPhone (MOL-151); a hardware keyboard never comes, and the sheet
+ * must not stay short for it.
+ */
+const KEYBOARD_LATE = 1500
+
+/**
+ * The heights the keys left visible, by the kind of keys and the window: the numeric keyboard is
+ * lower than the letter one, and a turned phone is another window. Says nothing about the person.
+ */
+const MEMORY = 'molvia.keyboard'
+
+function memoryKey(field: HTMLElement, whole: number): string {
+  const kind = field.getAttribute('inputmode') ?? field.getAttribute('type') ?? field.localName
+  return `${kind} ${String(Math.round(whole))}x${String(window.innerWidth)}`
+}
+
+function memory(): Record<string, unknown> {
+  try {
+    const kept: unknown = JSON.parse(read(MEMORY) ?? '{}')
+    return typeof kept === 'object' && kept !== null ? (kept as Record<string, unknown>) : {}
+  } catch {
+    return {}
+  }
+}
+
+function recall(field: HTMLElement, whole: number): number | null {
+  const height = memory()[memoryKey(field, whole)]
+  return typeof height === 'number' && height > 0 && height < whole ? height : null
+}
+
+function remember(field: HTMLElement, whole: number, height: number): void {
+  const kept = memory()
+  const key = memoryKey(field, whole)
+  const rounded = Math.round(height)
+  if (kept[key] === rounded) return
+  write(MEMORY, JSON.stringify({ ...kept, [key]: rounded }))
+}
+
+function touch(): boolean {
+  return window.matchMedia('(pointer: coarse)').matches
+}
+
+/**
  * Tells the page the keys are up under an open sheet (`data-under-keys` on the root; main.scss).
  * Safari ends everything fixed — the sheet, its scrim — at the top of the keyboard, and on iOS 26
  * and later its bar of «∧ ∨ ✓», the address bar floating over the keys and the keys themselves are
@@ -155,7 +280,8 @@ function underKeys(on: boolean): void {
 }
 
 // A box as tall as `100dvh`, read by its height: a length in `dvh` has no reading of its own in a
-// script. One for the app, put back if the page's body was replaced.
+// script. One for the app, put back if the page's body was replaced. It tells the keys are up, and
+// which window a remembered height is of; the lift is the pinned box's (`pinnedBottom`).
 let ruler: HTMLElement | null = null
 
 function windowHeight(): number {
@@ -170,6 +296,26 @@ function windowHeight(): number {
   // Where nothing is laid out — the component tests — the box has no height, and the window's is
   // the one there is.
   return ruler.getBoundingClientRect().height || window.innerHeight
+}
+
+// The bottom of the box a fixed panel is pinned in, read where it lies. Safari shrinks that box under
+// the keys a moment before it says how far the visible part moved (MOL-151, М-2): counted from
+// `100dvh`, the sheet was lifted by the keys over a window already above them and flew off the top
+// for 300 ms. In every state logged on the iPhone — Safari, its bar folded, the installed app —
+// the box less the visible height is the lift `100dvh` gave where it was right.
+let floor: HTMLElement | null = null
+
+function pinnedBottom(): number {
+  if (!floor?.isConnected) {
+    floor = document.createElement('div')
+    floor.setAttribute('aria-hidden', 'true')
+    floor.dataset.floor = ''
+    floor.style.cssText =
+      'position:fixed;bottom:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none'
+    document.body.append(floor)
+  }
+  // Where nothing is laid out — the component tests — the window's height stands in.
+  return floor.getBoundingClientRect().top || window.innerHeight
 }
 
 function pixels(value: number): string {
