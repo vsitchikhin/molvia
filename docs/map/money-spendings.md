@@ -44,17 +44,19 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 ## frontend · views
 
 - `frontend/src/views/MoneyCategoriesView.vue` — «Деньги → Категории» screen: the owner's category list, «Убрать» and «Вернуть», through the queue.
-- `frontend/src/views/MoneyChartsView.vue` — «Графики» screen: five cards of the period, the period and the category in the address, the last answer kept for offline.
+- `frontend/src/views/MoneyChartsView.vue` — «Графики» screen: «Месяц · Год» and the month in the address by `replace`, a bookmark of the old period opening the year.
 - `frontend/src/views/MoneyView.vue` — «Деньги» screen: one month counted by the server — spent, came in, «Куда ушли», the journal by day, queued rows marked.
 
 ## frontend · components
 
-- `frontend/src/components/CategoryDonutCard.vue` — «Куда ушли» card on «Деньги»: the month's ring and its three largest sectors with share and sum, «Ещё N», the whole card one way into «Графики».
+- `frontend/src/components/CategoryDonutCard.vue` — «Куда ушли» card on «Деньги»: the month's ring and its three largest sectors with share and sum, «Ещё N», the whole card one way into «Графики → Месяц» of the same month.
 - `frontend/src/components/BarChart.vue` — Bars of «Графики»: a reading above, radios for the keyboard, the whole area as the target, a bar not known drawn dashed.
 - `frontend/src/components/DonutRing.vue` — The ring of a donut: d3-shape arcs from the server's levels, clockwise from twelve, a gap between sectors, token colours, the chosen sector thicker and the rest dimmed.
 - `frontend/src/components/DonutChart.vue` — «Куда ушло» of «Графики → Месяц»: the full ring, the month in its centre, a legend that is a radio group, a sector chosen by a tap and let go by a second.
 - `frontend/src/components/DeviationBars.vue` — «Против обычного»: the categories furthest from their usual month, a bar and the usual's mark, ±% with an arrow in the text's colour, «новая», the card of too few months.
 - `frontend/src/components/PaceLine.vue` — «Темп месяца»: the month's running total solid against the usual dashed, a day chosen on lifting or sideways and by a native range.
+- `frontend/src/components/ChartsMonth.vue` — «Графики → Месяц»: the month's answer in four states and its three cards; the sector and the day chosen on the screen, not in the address.
+- `frontend/src/components/ChartsYear.vue` — «Графики → Год» until MOL-160: the cards of MOL-74 over twelve months, the category in the address, the rate and the exchanges.
 - `frontend/src/components/CategoryChips.vue` — Category chips of a spending: a radio group in fixed order, nothing preselected, the last chip «+ Своя».
 - `frontend/src/components/ExchangeLosses.vue` — «Обмены против курса ЦБ РА» card: exchangers worst first, a bar from the centre line, the way to «Обмен денег».
 - `frontend/src/components/MoneyEntries.vue` — Rows on «Деньги» leading to «Обмен денег» and «Доходы», with the person's own rate beside exchanges.
@@ -83,4 +85,4 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 ## e2e
 
 - `e2e/money.spec.ts` — End-to-end: a spending lands in the month through the queue, offline too; «Вернуть», own categories, «Остаток» and the salary shift.
-- `e2e/money-charts.spec.ts` — End-to-end: «Графики» from the ring of «Куда ушли», a bar by a tap, the period without history, offline.
+- `e2e/money-charts.spec.ts` — End-to-end: «Графики → Месяц» from the ring of «Куда ушли», the month by `replace`, a sector, the usual from three months, a day of the pace; «Год», a bar by a tap, offline.

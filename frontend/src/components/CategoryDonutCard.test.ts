@@ -111,12 +111,9 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
     expect(card('2026-09').findAll('a')).toHaveLength(1)
   })
 
-  it('opens the charts on the largest category of the ring, twelve months for an older month', () => {
-    // The category seen first, not the period's largest (review 3, owner's choice «а»).
-    expect(card('2026-04').find('a').attributes('href')).toBe(`/money/charts?category=${TELECOM}`)
-    expect(card('2026-03').find('a').attributes('href')).toBe(
-      `/money/charts?period=12&category=${TELECOM}`,
-    )
+  it('opens «Графики → Месяц» of the same month, however old (MOL-158, handoff MOL-157 06)', () => {
+    expect(card('2026-04').find('a').attributes('href')).toBe('/money/charts?month=2026-04')
+    expect(card('2025-03').find('a').attributes('href')).toBe('/money/charts?month=2025-03')
   })
 
   it('counts past the three only the sectors the ring draws (adversarial Б)', () => {
@@ -161,7 +158,7 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
     })
     expect(wrapper.find('.ring').exists()).toBe(false)
     expect(wrapper.find('.why').text()).toBe('Доли появятся, когда месяц обновится')
-    expect(wrapper.find('a').attributes('href')).toBe('/money/charts')
+    expect(wrapper.find('a').attributes('href')).toBe('/money/charts?month=2026-09')
   })
 
   it('says why there is no ring when nothing spent was counted by a rate (round 2, Ж)', () => {
@@ -185,7 +182,7 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
       props: { month: empty, nameOf: () => '' },
       global: { plugins: [router, createAppI18n('ru')] },
     })
-    expect(wrapper.find('a').attributes('href')).toBe('/money/charts')
+    expect(wrapper.find('a').attributes('href')).toBe('/money/charts?month=2026-09')
     expect(wrapper.find('.ring').exists()).toBe(false)
     // «В этом месяце трат нет» is the journal's to say, once, while the journal is on «Деньги».
     expect(wrapper.find('.why').exists()).toBe(false)
