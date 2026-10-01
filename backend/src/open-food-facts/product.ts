@@ -86,13 +86,16 @@ function cleanName(raw: unknown): string | null {
 }
 
 /**
- * The brand goes after the name unless the name carries it already (Р-3). Carrying it is having
- * the first two words of the first brand that are three letters or longer — one, when it has one —
- * among the name's words, by the search key: «Nutella» with «Nutella, Ferrero» stays «Nutella»,
- * «Coca Cola» with «COCA-COLA SERVICES SA/NV» stays as it is, «Молоко 3,2%» with «Простоквашино»
- * becomes «Молоко 3,2% Простоквашино». One word was too little: an article or a sort counted as the
- * brand — «La Laitière» was lost on «Yaourt à la vanille», «Российский сыродел» on «Сыр Российский»
- * (adversarial В). A name the brand would take past the limit stays without it.
+ * The brand goes after the name unless the name carries it already (Р-3): any word of the first brand
+ * three letters or longer — all of it, when every word is shorter — is a word of the name by the
+ * search key. «Nutella» with «Nutella, Ferrero» stays «Nutella», «Coca Cola» with «COCA-COLA SERVICES
+ * SA/NV» stays as it is, «Сыр Савушкин 45%» with «Савушкин продукт» too — the base keeps a mark and
+ * its company, the package prints the mark — and «Молоко 3,2%» with «Простоквашино» becomes «Молоко
+ * 3,2% Простоквашино». The first word alone took an article for the brand («La Laitière» lost on
+ * «Yaourt à la vanille», adversarial В); both of two wrote the mark twice when the name carried only
+ * the mark (adversarial В′). **The price, named:** a brand that shares a word with what the name
+ * says of the product is lost — «Сыр Российский» with «Российский сыродел». A name the brand would
+ * take past the limit stays without it.
  */
 function withBrand(name: string, brands: unknown): string {
   if (typeof brands !== 'string') return name
@@ -102,9 +105,9 @@ function withBrand(name: string, brands: unknown): string {
     .split(' ')
     .filter((word) => word !== '')
   const long = words.filter((word) => Array.from(word).length >= 3)
-  const probe = (long.length > 0 ? long : words).slice(0, 2)
+  const probe = long.length > 0 ? long : words
   const named = new Set(toSearchKey(name).split(' '))
-  if (probe.length === 0 || probe.every((word) => named.has(word))) return name
+  if (probe.length === 0 || probe.some((word) => named.has(word))) return name
   return cleanName(`${name} ${brand}`) === `${name} ${brand}` ? `${name} ${brand}` : name
 }
 

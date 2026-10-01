@@ -46,7 +46,11 @@ const envSchema = z.object({
    * Questions a minute to the base — end-to-end only, whose fake has no limit; production keeps
    * `OFF_PER_MINUTE`, the base's own limit less a reserve, and never sets it.
    */
-  OPEN_FOOD_FACTS_PER_MINUTE: z.coerce.number().int().positive().optional(),
+  OPEN_FOOD_FACTS_PER_MINUTE: z.preprocess(
+    // Empty is unset, as for the contact: `z.coerce` made it 0, and the API would not start.
+    (value) => (value === '' ? undefined : value),
+    z.coerce.number().int().positive().optional(),
+  ),
 })
 
 export const env = envSchema.parse(process.env)
