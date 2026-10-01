@@ -100,14 +100,24 @@ load failed the push — locally there are no retries — and the push was start
 crowd. In turn, the last of four waits for three runs of a few minutes, and none of them fails for
 want of a core.
 
-**A run of tests typed by hand takes the lock too: `bin/one-at-a-time.sh <label> npx vitest …`,
+**A run of tests typed by hand takes the lock too: `bin/one-at-a-time.sh <label> npx vitest run …`,
 `… npx playwright test …`** (owner's decision, 01.10.2026, MOL-162). The lock holds only what goes
 through `make` and the hooks, and a session fixing a review runs single files directly, again and
 again — with a reviewer's worktree beside it doing the same. On 01.10.2026 the load reached 87–131
 while every push was waiting its turn: the pushes took turns, the direct runs did not, and four
-specs of one copy failed on `page.goto` under it and passed in one worker. A direct run of a single
-pure unit file is cheap and may skip it; anything with Postgres, a browser or a whole workspace
-waits its turn.
+specs of one copy failed on `page.goto` under it and passed in one worker. **By the layers of the
+table «Testing» in `CLAUDE.md`:** one file of Unit or Use case — no database, no DOM — may run
+without the lock; Component, Integration, end-to-end and any run of a whole module wait their turn.
+**The price:** a single integration file waits for whatever push holds the lock — minutes on each
+round of a fix.
+
+**What does not end by itself is refused, not queued** (adversarial Л2): vitest without `run` watches
+when it is in a terminal, and Playwright's `--ui` and `--debug` wait for a person — under the lock
+each held every copy's turn until somebody pressed `q`. The script answers them with exit 2 and the
+reason; a watch or a UI runs outside the lock. An agent never trips it — vitest does not watch under
+one — but a person typing the line from this rule would. **A waiting run names the copy by its root**
+(`git rev-parse --show-toplevel`), not the folder the run was typed in: a module's tests are typed
+in the module, and «waiting for backend» was every copy (Л1).
 
 **The lock is `flock` held by the process that runs the command**, so the kernel drops it however
 that process ends: a lock file with a pid in it was the alternative, and breaking a stale one is a

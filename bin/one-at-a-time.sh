@@ -30,8 +30,30 @@ fi
 lock="${XDG_CACHE_HOME:-$HOME/.cache}/molvia/checks.lock"
 mkdir -p "$(dirname "$lock")"
 
-# What a waiting run prints about the one it waits for.
-label="$(basename "$PWD") · $1 · $(git branch --show-current 2>/dev/null || true) · since $(date +%H:%M)"
+# A run that never ends on its own holds every copy's turn until someone stops it: vitest without
+# `run` watches when it is in a terminal, Playwright's `--ui` and `--debug` wait for a person. Refused
+# rather than taken — a person types these, and the wait they cause is somebody else's (MOL-162,
+# adversarial Л2). `make` and the hooks never pass any of them.
+endless=""
+for arg in "${@:2}"; do
+  case "$arg" in
+    --ui | --debug | --watch | -w | watch) endless="$arg" ;;
+  esac
+done
+if [[ -z "$endless" ]] && printf '%s\n' "${@:2}" | grep -qx 'vitest' &&
+  ! printf '%s\n' "${@:2}" | grep -qxE 'run|--run'; then
+  endless="vitest without run"
+fi
+if [[ -n "$endless" ]]; then
+  echo "one-at-a-time: «${endless}» does not end by itself and would hold every copy's turn —" \
+    "use \`npx vitest run …\` and run a watch or a UI outside the lock" >&2
+  exit 2
+fi
+
+# What a waiting run prints about the one it waits for: the copy by its root, not the folder the run
+# was typed in — a module's tests are typed in the module, and «backend» is every copy (Л1).
+copy="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
+label="$copy · $1 · $(git branch --show-current 2>/dev/null || true) · since $(date +%H:%M)"
 shift
 
 export MOLVIA_ONE_AT_A_TIME=1
