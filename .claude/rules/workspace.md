@@ -91,7 +91,8 @@ behaviour passes, and that is left to review.
 ## The heavy checks take turns
 
 **One lock for the whole machine, taken by `pre-push` and by `make format`, `lint`, `typecheck`,
-`test`, `e2e` and `check` (MOL-139).** The copies exist so that several sessions work at once, and
+`test`, `e2e` and `check` (MOL-139).** Since MOL-164 the push no longer runs end-to-end — CI does,
+and gates the merge (`.claude/rules/e2e.md`) — so the line is mostly `make check`. The copies exist so that several sessions work at once, and
 each push ran every check: four at once were four typechecks, four vitest runs and four Playwright
 runs with their browsers on eight cores and 16 GB. Measured on 29.09.2026: a load average of
 95–223, the swap full, a push of 10–20 minutes against about five alone the day before, and
@@ -114,3 +115,24 @@ trusted only when `git status` is empty, untracked files included — vitest wou
 does not know. What is outside the tree — `.env`, `node_modules`, the database — is not in the
 mark; the price is accepted for a mark that lives minutes between a check and its push. The marks
 are per worktree (`git rev-parse --git-path`), since each copy has its own environment.
+
+**A push with nothing to run takes no turn** (MOL-164): when both steps are green on the tree it
+says so and leaves before the lock. The first push of this very task, right after a green `make
+check`, waited seven minutes behind another copy's end-to-end only to skip both.
+
+**A tree that differs from the green one only in documents is green too** (MOL-164): `*.md`,
+`docs/`, `.claude/`. No check that leaves a mark reads them — types, vitest — and a task's last
+commit is often its rules, after `make check` passed on the code; that commit used to run every step
+again. The comparison takes both names of a rename, so code moved into `docs/` is code taken away;
+the code map in `docs/map/` is lint's, which runs at commit and is never skipped. The list is
+written in `bin/green.sh` and is the place to widen it, with a reason: a file a test reads is not a
+document.
+
+**The integration files run in parallel, each worker in a database of its own** (MOL-164). They ran
+in turn because they shared `molvia_<index>_test` and each cleans its rows in `beforeEach`: in
+parallel they deleted each other's. Now the global setup migrates that database as a template and
+drops the last run's copies, and `tests/setup-worker.ts` gives each worker `…_test_w<VITEST_POOL_ID>`,
+copied from it on the worker's first file — the files of one worker still run in turn in one
+database, exactly as all of them did. Measured under the lock on 01.10.2026: 61 s against 164 s
+in turn, all 1686 green. The production bundle, which three files test, is built once in the global
+setup: built by each of them, it was rewritten under a neighbour reading it.

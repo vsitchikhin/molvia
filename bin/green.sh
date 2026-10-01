@@ -11,6 +11,9 @@
 # untracked files included, since vitest would run a test file git does not know. So a step is
 # recorded, and trusted, only when `git status` is empty. The marks live in this worktree's own
 # git directory, never shared with another copy: its `.env` and its database are its own.
+#
+# A tree that differs from the green one only in documents is green too (MOL-164): no check reads a
+# `.md`, `docs/` or `.claude/`, and a task often ends with a commit of its rules after the code.
 
 set -euo pipefail
 
@@ -40,7 +43,14 @@ case "$action" in
     ;;
   has)
     [[ $# -eq 1 && -n $tree && -f "$marks/$1" ]] || exit 1
-    [[ $(<"$marks/$1") == "$tree" ]]
+    green=$(<"$marks/$1")
+    [[ $green == "$tree" ]] && exit 0
+    git cat-file -e "$green^{tree}" 2>/dev/null || exit 1
+    # Both names of a rename, so a file moved into `docs/` is still a file taken away. Read whole
+    # before grep: `grep -q` leaving early would kill `git diff` with SIGPIPE, and under `pipefail`
+    # the negated pipeline would then say green.
+    changed=$(git diff --no-renames --name-only "$green" "$tree")
+    ! grep -qvE '(\.md$|^docs/|^\.claude/)' <<<"$changed"
     ;;
   *) usage ;;
 esac

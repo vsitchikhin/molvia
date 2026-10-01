@@ -40,7 +40,8 @@ what it does not cover.
 | `make ports`    | this copy's index and ports                         |
 
 Checks also run on their own: `pre-commit` refuses dirty formatting or lint, `pre-push`
-refuses failing types or tests, and CI repeats all of it on every push and pull request.
+refuses failing types or vitest, and CI repeats all of it and adds end-to-end on every push and
+pull request; `master` takes a pull request only when CI is green.
 
 ## Layout
 

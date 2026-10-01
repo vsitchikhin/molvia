@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -29,7 +29,6 @@ function forget(...args: string[]) {
 
 describe('dist/forget.js', () => {
   it('is built beside the server and answers from the bundle alone', async () => {
-    execFileSync('node', ['bin/bundle.mjs', 'backend'], { cwd: root, stdio: 'pipe' })
     const tg = telegramId()
     await insertActor(db, { telegramUserId: tg })
 
