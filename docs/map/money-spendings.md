@@ -53,6 +53,8 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/components/BarChart.vue` — Bars of «Графики»: a reading above, radios for the keyboard, the whole area as the target, a bar not known drawn dashed.
 - `frontend/src/components/DonutRing.vue` — The ring of a donut: d3-shape arcs from the server's levels, clockwise from twelve, a gap between sectors, token colours, the chosen sector thicker and the rest dimmed.
 - `frontend/src/components/DonutChart.vue` — «Куда ушло» of «Графики → Месяц»: the full ring, the month in its centre, a legend that is a radio group, a sector chosen by a tap and let go by a second.
+- `frontend/src/components/DeviationBars.vue` — «Против обычного»: the categories furthest from their usual month, a bar and the usual's mark, ±% with an arrow in the text's colour, «новая», the card of too few months.
+- `frontend/src/components/PaceLine.vue` — «Темп месяца»: the month's running total solid against the usual dashed, a day chosen on lifting or sideways and by a native range.
 - `frontend/src/components/CategoryChips.vue` — Category chips of a spending: a radio group in fixed order, nothing preselected, the last chip «+ Своя».
 - `frontend/src/components/ExchangeLosses.vue` — «Обмены против курса ЦБ РА» card: exchangers worst first, a bar from the centre line, the way to «Обмен денег».
 - `frontend/src/components/MoneyEntries.vue` — Rows on «Деньги» leading to «Обмен денег» and «Доходы», with the person's own rate beside exchanges.
@@ -62,7 +64,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/components/SalaryShiftGroup.vue` — Settings group «Зарплата с … числа — в следующий месяц»: a switch and a day select, saved on the tap.
 - `frontend/src/components/SpendingRow.vue` — One row of the month's journal: a spending or a finished trip's purchases in one currency, with what the server counted.
 - `frontend/src/components/SpendingSheet.vue` — Spending sheet: «Новая трата», amending one's own, or reading a trip's line; writes go to the queue and it closes at once.
-- `frontend/src/components/charts.ts` — Words of «Графики»: the month long and in three letters, a signed percent, «−8 % к августу».
+- `frontend/src/components/charts.ts` — Words of «Графики»: the month long, in three letters and by name, «после октября», a span of months, the closed ones named, a signed percent, «−8 % к августу».
 - `frontend/src/components/spending.ts` — Helpers of «Деньги» drawing: category icon and colour, rate words, journal rows from the month and the queue, page merge.
 
 ## frontend · composables

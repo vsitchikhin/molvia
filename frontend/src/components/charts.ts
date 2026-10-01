@@ -51,3 +51,45 @@ export function versusPrevious(
     month: t(`spending.month_to.${previousMonth(month).slice(5)}`),
   })
 }
+
+/** «сентябрь» — the month's name alone, as it stands in a sentence. */
+export function monthName(month: string, locale: string): string {
+  const [year = '', number = ''] = month.split('-')
+  return new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' }).format(
+    new Date(Date.UTC(Number(year), Number(number) - 1, 1)),
+  )
+}
+
+/** «октября» — the month after «после» (MOL-158): Russian wants the genitive, so it is a key. */
+export function monthAfter(
+  month: string,
+  t: (key: string, named?: Record<string, unknown>) => string,
+): string {
+  return t(`spending.month_of.${month.slice(5)}`)
+}
+
+/** «январь — август», or «октябрь 2025 — август 2026» when the two are of different years. */
+export function monthSpan(from: string, to: string, locale: string): { from: string; to: string } {
+  if (from.slice(0, 4) === to.slice(0, 4)) {
+    return { from: monthName(from, locale), to: monthName(to, locale) }
+  }
+  return {
+    from: `${monthName(from, locale)} ${from.slice(0, 4)}`,
+    to: `${monthName(to, locale)} ${to.slice(0, 4)}`,
+  }
+}
+
+/** «Сейчас закрыт только август»: the closed months so far, named, below the three a usual needs. */
+export function closedWords(
+  closed: readonly string[],
+  locale: string,
+  t: (key: string, named?: Record<string, unknown>) => string,
+): string {
+  if (closed.length === 0) return t('spending.charts.few_body_none')
+  const names = new Intl.ListFormat(locale, { type: 'conjunction' }).format(
+    closed.map((month) => monthName(month, locale)),
+  )
+  return t(closed.length === 1 ? 'spending.charts.few_body_one' : 'spending.charts.few_body_many', {
+    closed: names,
+  })
+}
