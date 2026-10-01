@@ -73,7 +73,6 @@ export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<bo
     const keys = whole - viewport.height > KEYBOARD
     underKeys(keys)
     if (keys) {
-      keysSeen = true
       forget()
       const field = typedIn(element)
       if (field && keyed(field)) remember(field, whole, viewport.height)
@@ -97,15 +96,17 @@ export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<bo
   }
 
   // A field of the sheet focused with no keys up yet, on a touch screen: the sheet takes the height
-  // they left the last time at once, so the picture iOS slides up with them is already right. Only
-  // before the first keyboard of the page: it is the one that comes late, while the page draws
-  // nothing. Any later one comes in 50 to 160 ms over a page that is drawn, and a sheet made lower
-  // at the tap dropped its top by hundreds of pixels and then flew up with the keys (adversarial А6).
+  // they left the last time at once, so the picture iOS slides up with them is already right. On
+  // every such focus, not only the page's first: a later keyboard came 128 to 263 ms after the focus
+  // with no frame of the page or with one (MOL-151, adversarial У2). With none, iOS slides what was
+  // drawn before the focus, which nothing here can change; with one, that frame is what it slides —
+  // made lower, it lands in place, while left tall its top went off the screen. The price is that one
+  // frame: the sheet's top lower for the 15–36 ms before the keys (adversarial А6, the round-2 note).
   function foresee(): void {
     const element = target.value
     const viewport = window.visualViewport
     const field = element && typedIn(element)
-    if (!field || !keyed(field) || keysSeen || !viewport || viewport.scale > 1 || !touch()) return
+    if (!field || !keyed(field) || !viewport || viewport.scale > 1 || !touch()) return
     const whole = windowHeight()
     if (whole - viewport.height > KEYBOARD) return
     const height = recall(field, whole)
@@ -132,7 +133,6 @@ export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<bo
   }
 
   function start(): void {
-    watchKeys()
     window.visualViewport?.addEventListener('resize', measure)
     window.visualViewport?.addEventListener('scroll', measure)
     // Safari shrinks the window under the keys with no event of the visual viewport, a scroll of
@@ -239,25 +239,6 @@ const PICKED = [
 function keyed(field: HTMLElement): boolean {
   return !field.matches(PICKED)
 }
-
-/**
- * Whether a keyboard has come up on this page yet, under a sheet or not: only the first one is late
- * (MOL-151, П-1 and the logs of MOL-135). Heard once for the app, from the moment it is loaded.
- */
-let keysSeen = false
-let watching = false
-
-function watchKeys(): void {
-  const viewport = window.visualViewport
-  if (watching || !viewport) return
-  watching = true
-  const heard = (): void => {
-    if (viewport.scale <= 1 && windowHeight() - viewport.height > KEYBOARD) keysSeen = true
-  }
-  viewport.addEventListener('resize', heard)
-}
-
-watchKeys()
 
 /**
  * How long a height foreseen for the keys waits for them. The first keyboard of a page came after

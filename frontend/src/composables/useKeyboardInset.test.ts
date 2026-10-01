@@ -531,9 +531,9 @@ describe('useKeyboardInset takes the height the keys left last time', () => {
     expect(sheet.inset()).toBe('0px')
   })
 
-  // The keys of a page come late only the first time; later ones come in 50–160 ms over a page that
-  // is drawn, and a sheet made lower at the tap dropped by hundreds of pixels first (adversarial А6).
-  it('must not fire: a field tapped once a keyboard has been up on the page', async () => {
+  // A later keyboard came 128–263 ms after the focus with no frame of the page or one, and that frame
+  // is what iOS slides up: made lower it lands in place (adversarial У2). The price is that frame.
+  it('takes the remembered height again for a field tapped after the keys went down', async () => {
     const sheet = await opened()
     sheet.field('[data-amount]').focus()
     keysCome(sheet)
@@ -544,10 +544,8 @@ describe('useKeyboardInset takes the height the keys left last time', () => {
     sheet.viewport.offsetTop = 0
     sheet.viewport.fire('resize')
     expect(sheet.height()).toBe('699px')
-    sheet.field('[data-field]').focus()
-    expect(sheet.height()).toBe('699px')
     sheet.field('[data-amount]').focus()
-    expect(sheet.height()).toBe('699px')
+    expect(sheet.height()).toBe('395px')
   })
 
   // A select and a date bring a picker, not keys: nothing is remembered for them, nothing
