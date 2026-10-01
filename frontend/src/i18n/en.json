@@ -246,6 +246,9 @@
       "note_invalid": "The note holds a character the catalogue will not take — type the note again",
       "failed": "Could not add it. Please try again",
       "code": "Code {code} will be saved with the item",
+      "hint_source": "Data from Open Food Facts ↗",
+      "size": "{amount} {unit} in the pack",
+      "size_drop": "Leave out how much is in the pack",
       "taken": "This code already belongs to «{name}»",
       "take": "Take «{name}»",
       "name_taken": "«{name}» is already there — name the item differently, with its brand for instance"
@@ -263,6 +266,9 @@
       "scan": "Scan a barcode",
       "missing": "The catalogue does not know the code {code}",
       "missing_hint": "Or find it by name",
+      "hint": "Looks like “{name}”",
+      "hint_size": "Looks like “{name}”, {amount} {unit}",
+      "hint_source": "according to Open Food Facts",
       "error_body": "Could not check the code {code}. Try again — or find the item by name",
       "offline_body": "None of your recent items has this code. Find the item by name — or scan it once you are online",
       "found": "Found by the code {code}",
@@ -1166,7 +1172,7 @@
   },
   "privacy": {
     "title": "Data and privacy",
-    "revised": "Revised 30 September 2026",
+    "revised": "Revised 1 October 2026",
     "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
@@ -1234,6 +1240,10 @@
     "backups": {
       "title": "Where the data and its copies are",
       "text": "The server is in Germany, with the host Contabo. Once a day the database is copied, encrypted, to Cloudflare storage in the EU; only the owner of Molvia can decrypt a copy. Copies live 14 days — fourteen days after erasure your data is gone from them too. If the server ever has to be restored from a copy, an erasure made less than a day before the failure may need repeating."
+    },
+    "barcodes": {
+      "title": "An unknown barcode",
+      "text": "If the catalogue does not know a scanned code, the server asks Open Food Facts, an open database of products, about it. Only the code itself and our server's address go there: not you, not your phone and not your sign-in. A shop's own label code never goes there. The name and size from there are only a hint, which you confirm or correct; items suggested with a code Open Food Facts knows are marked. The link «Data from Open Food Facts» opens the product's page there — from your phone, when you tap it. Open Food Facts data is open under the ODbL licence: we will send an export of what the catalogue took from there on request."
     },
     "storage": {
       "title": "Cookies and the phone's memory",

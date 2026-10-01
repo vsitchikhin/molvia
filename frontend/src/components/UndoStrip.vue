@@ -114,6 +114,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .undo {
+  @include appear;
+
   display: flex;
   align-items: center;
   gap: var(--space-3);

@@ -17,6 +17,7 @@ import {
   barcodeTakenSchema,
   catalogueEntryCodec,
   catalogueSearchResponseSchema,
+  catalogueBarcodeHintResponseSchema,
   catalogueBarcodeResponseSchema,
   currentTripResponseSchema,
   exchangeAmendBodySchema,
@@ -74,6 +75,8 @@ import type {
   AdviceResponse,
   AdviceSearchResponse,
   AddExpenseBody,
+  AppLocale,
+  BarcodeHint,
   CatalogueEntry,
   CatalogueSearchResponse,
   ExchangeAmendBody,
@@ -216,6 +219,15 @@ export interface MolviaClient {
     code: string,
     options?: { readonly signal?: AbortSignal },
   ): Promise<CatalogueEntry | null>
+  /**
+   * What Open Food Facts says a package the catalogue missed is (MOL-162), in the language given, or
+   * `null`. Asked beside the miss, never instead of it.
+   */
+  catalogueBarcodeHint(
+    code: string,
+    locale: AppLocale,
+    options?: { readonly signal?: AbortSignal },
+  ): Promise<BarcodeHint | null>
   /** The places this person shopped in lately, to tap at the door instead of typing. */
   recentPlaces(geography?: SettingsGeography): Promise<TripPlace[]>
   /**
@@ -533,6 +545,16 @@ export function createClient(options: ClientOptions): MolviaClient {
         options.signal === undefined ? {} : { signal: options.signal },
       )
       return item
+    },
+
+    catalogueBarcodeHint: async (code, locale, options = {}) => {
+      const search = new URLSearchParams({ code, lang: locale })
+      const { hint } = await request(
+        `/catalogue/barcode/hint?${search.toString()}`,
+        catalogueBarcodeHintResponseSchema,
+        options.signal === undefined ? {} : { signal: options.signal },
+      )
+      return hint
     },
 
     // `async` so that an input the schema refuses arrives as a rejection, like everything else.

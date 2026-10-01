@@ -290,6 +290,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A code is looked up in the query, never the path** (`GET /catalogue/barcode?code=`, MOL-99): the
   API logs paths. It is looked up with its twins (`barcodeTwins`), the code as read first; the item
   found goes to the purchase sheet with no query — a code teaches the search nothing.
+- **A code the catalogue missed is asked of Open Food Facts by the server, never the phone**
+  (MOL-162): only a code `writtenBarcode` takes, a shop's label never; a hint, never an error; at most
+  twelve a minute and four a person, kept a month found and a week missed; under the button and only
+  at the sheet's opening — nothing moves under the thumb; an item proposed with it is marked `origin`
+  (ODbL).
 - **Anyone writes a code to any item, and anyone lets it go** (MOL-100): it must check
   (`writtenBarcode`); one package is one item with its twins, under a lock per form after the item's;
   a code another item holds writes nothing and answers `409` with the holder; `added_by` is erased
@@ -363,7 +368,13 @@ that are easiest to break; the file holds every rule of the area and the reason 
   history, and puts the page back — and focus, wherever the platform gave it — by what it was
   opened from (MOL-63, MOL-80). **Its press is heard on the document**: iOS hands a tap on the
   scrim only to a listener there (MOL-80). **Over the keyboard its height is a share of the visual
-  viewport**, never of the window, and it scrolls itself to the field being typed in (MOL-135).
+  viewport**, never of the window, and it scrolls itself to the field being typed in (MOL-135);
+  **the lift is the pinned box less the visible height**, never `100dvh` or `innerHeight`, and
+  **before the keys come it takes the height they left last time** (MOL-151).
+- **Nothing comes or goes in one frame** (MOL-151): `appear` fades in what is put in the page,
+  `AppReveal` grows and shrinks what pushes its neighbours; never while a screen moves, never under
+  «reduce motion», never for an answer read (more than three rows at once), and never the sheet's
+  own height or a change of a screen's own query beyond its answer.
 
 ### End-to-end — `.claude/rules/e2e.md`
 
@@ -452,7 +463,11 @@ differently in every working copy by design.
   rather than fixing it. `commit-msg` holds the subject. A deliberate bypass is `--no-verify`.
 - **What runs here by hand takes turns** (MOL-139): `make check`, `make e2e` and the other check
   targets run under one lock for the whole machine, `bin/one-at-a-time.sh`, and a waiting run says
-  whose it waits for. Why, in `.claude/rules/workspace.md`.
+  whose it waits for. **A test run typed by hand takes the same lock**
+  (`bin/one-at-a-time.sh <label> npx vitest run …`) unless it is one file of Unit or Use case; the
+  lock gives the command no terminal, so vitest does not watch by default, and refuses a vitest told
+  to watch and Playwright's `--ui` and `--debug`, which never give it back. Why, in
+  `.claude/rules/workspace.md`.
 - **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, in two
   jobs: checks and e2e. CI **checks** formatting rather than fixing it — `make format`
   mutates files, and a diff must fail rather than be silently repaired. It generates its

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { ERROR, itemSchema, proposedItemSchema } from '@molvia/model'
-import type { NewItem } from '@molvia/model'
+import type { ItemOrigin, NewItem } from '@molvia/model'
 import type { ItemRepository } from '@/db/items-repository'
 import { proposeItem } from './propose-item'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+
+/** The cache of Open Food Facts that named none of the codes. */
+const NAMED_NOTHING = { named: () => Promise.resolve(false) }
 
 const input = proposedItemSchema.parse({
   kind: 'product',
@@ -41,17 +44,17 @@ function fakeItems(overrides: Partial<ItemRepository> = {}): ItemRepository {
 
 describe('proposeItem', () => {
   it('asks for the item in the name of the owner it was given, with no barcodes', async () => {
-    const asked: [NewItem, string | null][] = []
+    const asked: [NewItem, string | null, ItemOrigin | null | undefined][] = []
     const items = fakeItems({
-      createUnlessNamed: (item, createdBy) => {
-        asked.push([item, createdBy])
+      createUnlessNamed: (item, createdBy, origin) => {
+        asked.push([item, createdBy, origin])
         return Promise.resolve({ item: { ...existing, createdBy }, created: true })
       },
     })
 
-    const result = await proposeItem(items, ACTOR, input)
+    const result = await proposeItem(items, NAMED_NOTHING, ACTOR, input)
 
-    expect(asked).toEqual([[{ ...input, barcodes: [] }, ACTOR]])
+    expect(asked).toEqual([[{ ...input, barcodes: [] }, ACTOR, null]])
     expect(result).toMatchObject({ created: true })
   })
 
@@ -60,7 +63,7 @@ describe('proposeItem', () => {
       createUnlessNamed: () => Promise.resolve({ item: existing, created: false }),
     })
 
-    await expect(proposeItem(items, ACTOR, input)).resolves.toEqual({
+    await expect(proposeItem(items, NAMED_NOTHING, ACTOR, input)).resolves.toEqual({
       item: existing,
       created: false,
     })
@@ -75,7 +78,10 @@ describe('proposeItem', () => {
       },
     })
 
-    await proposeItem(items, ACTOR, { ...input, barcodes: ['012345678905', '96385074'] })
+    await proposeItem(items, NAMED_NOTHING, ACTOR, {
+      ...input,
+      barcodes: ['012345678905', '96385074'],
+    })
 
     expect(asked[0]?.barcodes).toEqual(['0012345678905', '96385074'])
   })
@@ -84,7 +90,7 @@ describe('proposeItem', () => {
     const items = fakeItems()
 
     await expect(
-      proposeItem(items, ACTOR, { ...input, barcodes: ['4850000000003'] }),
+      proposeItem(items, NAMED_NOTHING, ACTOR, { ...input, barcodes: ['4850000000003'] }),
     ).rejects.toMatchObject({ code: ERROR.BARCODE_CHECK_DIGIT })
   })
 
@@ -92,7 +98,43 @@ describe('proposeItem', () => {
     const items = fakeItems({ createUnlessNamed: () => Promise.resolve({ taken: existing }) })
 
     await expect(
-      proposeItem(items, ACTOR, { ...input, barcodes: ['4850000000007'] }),
+      proposeItem(items, NAMED_NOTHING, ACTOR, { ...input, barcodes: ['4850000000007'] }),
     ).resolves.toEqual({ taken: existing })
+  })
+
+  it('marks a new item proposed with a code Open Food Facts named, asked by the written forms (MOL-162)', async () => {
+    const origins: (ItemOrigin | null | undefined)[] = []
+    const asked: (readonly string[])[] = []
+    const items = fakeItems({
+      createUnlessNamed: (_item, _createdBy, origin) => {
+        origins.push(origin)
+        return Promise.resolve({ item: existing, created: true })
+      },
+    })
+    const hints = {
+      named: (codes: readonly string[]) => {
+        asked.push(codes)
+        return Promise.resolve(true)
+      },
+    }
+
+    await proposeItem(items, hints, ACTOR, { ...input, barcodes: ['012345678905'] })
+
+    expect(asked).toEqual([['0012345678905']])
+    expect(origins).toEqual(['open_food_facts'])
+  })
+
+  it('leaves an item proposed without a code unmarked', async () => {
+    const origins: (ItemOrigin | null | undefined)[] = []
+    const items = fakeItems({
+      createUnlessNamed: (_item, _createdBy, origin) => {
+        origins.push(origin)
+        return Promise.resolve({ item: existing, created: true })
+      },
+    })
+
+    await proposeItem(items, NAMED_NOTHING, ACTOR, input)
+
+    expect(origins).toEqual([null])
   })
 })

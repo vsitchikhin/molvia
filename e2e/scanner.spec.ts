@@ -209,8 +209,9 @@ test.describe('on «What did you pick up?»', () => {
  */
 test.describe('a code written to the catalogue (MOL-100)', () => {
   /** Twelve digits of our own and the check digit a write demands (Р-1). */
-  function freshCode(): string {
-    const body = `48${String(randomInt(10 ** 9)).padStart(10, '0')}`
+  /** A code nobody holds; led by `46`, one the fake of Open Food Facts knows (MOL-162). */
+  function freshCode(lead = '48'): string {
+    const body = `${lead}${String(randomInt(10 ** 9)).padStart(10, '0')}`
     let sum = 0
     for (let i = body.length - 1, weight = 3; i >= 0; i--, weight = 4 - weight) {
       sum += Number(body[i]) * weight
@@ -285,6 +286,107 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
 
     await typeCode(page, code)
     await sheetOf(page, name)
+  })
+
+  test('a code Open Food Facts knows: the hint under «unknown», the form filled, the purchase at the size of the pack (MOL-162)', async ({
+    page,
+  }) => {
+    const code = freshCode('46')
+    const name = `Тушёнка ${code.slice(-6)} Главпродукт`
+    await open(page, '/purchases/manual/add')
+    await typeCode(page, code)
+    await expect(missingOf(page, code)).toBeVisible()
+
+    await expect(
+      page.locator('.not-found').getByText(`Looks like “${name}”, 0.325 kg`),
+    ).toBeVisible()
+    await expect(page.locator('.announcer')).toContainText(`Looks like “${name}”, 0.325 kg`)
+
+    await page.getByRole('button', { name: 'Suggest an item' }).click()
+    const form = page.getByRole('dialog', { name: 'New item' })
+    await expect(form.getByLabel('As the price tag says')).toHaveValue(name)
+    await expect(form.getByRole('radio', { name: 'kg', exact: true })).toBeChecked()
+    await expect(form.getByText('0.325 kg in the pack')).toBeVisible()
+    await expect(form.getByRole('link', { name: 'Data from Open Food Facts ↗' })).toHaveAttribute(
+      'href',
+      `https://world.openfoodfacts.org/product/${code}`,
+    )
+    await page.waitForTimeout(400)
+    await form.getByRole('button', { name: 'Add to the catalogue' }).click()
+
+    const details = await sheetOf(page, name)
+    await expect(details.getByLabel('How much')).toHaveValue('0.325')
+  })
+
+  test('a code Open Food Facts does not know: «unknown» as it was, with no hint (MOL-162)', async ({
+    page,
+  }) => {
+    const code = freshCode()
+    await open(page, '/purchases/manual/add')
+    // Waited for by its answer, not by a clock: under load the hint lands later than any timeout
+    // (review 4).
+    const answered = page.waitForResponse(/\/api\/catalogue\/barcode\/hint\?/)
+    await typeCode(page, code)
+
+    await expect(missingOf(page, code)).toBeVisible()
+    expect(await (await answered).json()).toEqual({ hint: null })
+    await expect(page.locator('.code-hint')).toHaveCount(0)
+  })
+
+  /** Holds every hint until `release()`, then lets each go on to the API; `answered` waits for one. */
+  async function holdHints(page: Page) {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    await page.route('**/api/catalogue/barcode/hint?*', async (route) => {
+      await gate
+      await route.continue()
+    })
+    return { release, answered: () => page.waitForResponse(/\/api\/catalogue\/barcode\/hint\?/) }
+  }
+
+  test('the hint comes under «Suggest an item», which stays where the thumb saw it (MOL-162, В-5, adversarial Г)', async ({
+    page,
+  }) => {
+    const code = freshCode('46')
+    const hints = await holdHints(page)
+    await open(page, '/purchases/manual/add')
+    await typeCode(page, code)
+    await expect(missingOf(page, code)).toBeVisible()
+    const suggest = page.getByRole('button', { name: 'Suggest an item' })
+    await page.waitForTimeout(400)
+    const before = await suggest.boundingBox()
+
+    hints.release()
+    await expect(page.locator('.code-hint')).toBeVisible()
+    await page.waitForTimeout(400)
+
+    expect(await suggest.boundingBox()).toEqual(before)
+  })
+
+  test('a hint that comes after «Suggest an item» opened leaves the form as it opened (MOL-162, adversarial Д)', async ({
+    page,
+  }) => {
+    const code = freshCode('46')
+    const hints = await holdHints(page)
+    await open(page, '/purchases/manual/add')
+    await typeCode(page, code)
+    await expect(missingOf(page, code)).toBeVisible()
+    await page.getByRole('button', { name: 'Suggest an item' }).click()
+    const form = page.getByRole('dialog', { name: 'New item' })
+    const name = form.getByLabel('As the price tag says')
+    await expect(name).toHaveValue('')
+    await page.waitForTimeout(400)
+    const before = await name.boundingBox()
+
+    const answered = hints.answered()
+    hints.release()
+    expect(await (await answered).json()).toMatchObject({ hint: { name: expect.any(String) } })
+    await page.waitForTimeout(400)
+
+    await expect(name).toHaveValue('')
+    expect(await name.boundingBox()).toEqual(before)
+    await expect(form.getByRole('radio', { name: 'kg', exact: true })).not.toBeChecked()
+    await expect(form.getByRole('link', { name: 'Data from Open Food Facts ↗' })).toHaveCount(0)
   })
 
   test('linked to an item found by name, it finds the item — until «not this item?» lets it go', async ({
@@ -428,10 +530,13 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
 
       await page.keyboard.press('Enter')
 
+      // By its block: the live region says the same words (e2e.md, MOL-64).
       await expect(
-        page.getByText(
-          'The code is not linked. Try again with a connection — or record without the code',
-        ),
+        page
+          .locator('.state')
+          .getByText(
+            'The code is not linked. Try again with a connection — or record without the code',
+          ),
       ).toBeVisible()
       await expect.poll(async () => (await focused(page)).text).toBe('Try again')
       await context.setOffline(false)

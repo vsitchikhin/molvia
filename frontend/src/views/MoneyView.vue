@@ -17,35 +17,39 @@
         <p v-else-if="phase === 'ready' && stale === 'error' && fetchedAt" class="strip">
           {{ t('spending.error_strip', { when: whenOf(fetchedAt) }) }}
         </p>
-        <ScreenState
-          v-for="item in otherRefusals"
-          :key="item.key"
-          kind="attention"
-          inline
-          :title="t('spending.rejected_other.title')"
-          :body="reasonOf(item.code)"
-        >
-          <template #action>
-            <AppButton variant="ghost" @click="queue.dismiss(item)">
-              {{ t('spending.sheet.dismiss') }}
-            </AppButton>
-          </template>
-        </ScreenState>
+        <AppReveal group>
+          <ScreenState
+            v-for="item in otherRefusals"
+            :key="item.key"
+            kind="attention"
+            inline
+            :title="t('spending.rejected_other.title')"
+            :body="reasonOf(item.code)"
+          >
+            <template #action>
+              <AppButton variant="ghost" @click="queue.dismiss(item)">
+                {{ t('spending.sheet.dismiss') }}
+              </AppButton>
+            </template>
+          </ScreenState>
+        </AppReveal>
         <!-- A spending the server refused, of any month, is a row of «Не приняты» on top of «Траты»,
              put right there; the summary has no rows, so it counts them and leads there (MOL-159). -->
-        <ScreenState
-          v-if="refusals.length > 0"
-          kind="attention"
-          inline
-          :title="t('spending.summary.refused', { n: refusals.length }, refusals.length)"
-          :body="t('spending.summary.refused_body')"
-        >
-          <template #action>
-            <AppButton variant="ghost" @click="openSpendings">
-              {{ t('spending.summary.refused_open') }}
-            </AppButton>
-          </template>
-        </ScreenState>
+        <AppReveal>
+          <ScreenState
+            v-if="refusals.length > 0"
+            kind="attention"
+            inline
+            :title="t('spending.summary.refused', { n: refusals.length }, refusals.length)"
+            :body="t('spending.summary.refused_body')"
+          >
+            <template #action>
+              <AppButton variant="ghost" @click="openSpendings">
+                {{ t('spending.summary.refused_open') }}
+              </AppButton>
+            </template>
+          </ScreenState>
+        </AppReveal>
 
         <ScreenSkeleton v-if="phase === 'loading'" :groups="[24, 58, 40, 100, 30, 70, 52]" />
 
@@ -224,6 +228,7 @@ import { formatEstimate, formatRate, lastDayOf, percentChange, previousMonth } f
 import type { Money } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CategoryDonutCard from '@/components/CategoryDonutCard.vue'
 import FloatingDock from '@/components/FloatingDock.vue'
@@ -256,6 +261,7 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppReveal,
     AppScreen,
     CategoryDonutCard,
     FloatingDock,
@@ -475,6 +481,8 @@ export default defineComponent({
 }
 
 .strip {
+  @include appear;
+
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
@@ -611,5 +619,11 @@ export default defineComponent({
 
 .float > .undo {
   flex: 1;
+}
+
+/* The answer comes in where the skeleton stood, faded only: the screen keeps it in one block of its
+   own, which `AppScreen` does not see, and nothing under the thumb may move (review №5, MOL-138). */
+.content > * {
+  @include appear(0);
 }
 </style>

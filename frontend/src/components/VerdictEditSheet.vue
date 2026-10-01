@@ -7,7 +7,9 @@
     <!-- The scale has one undo — a second tap on the chosen digit — and clearing it is not a
          change the server can be asked for: a verdict without a score does not exist. Said
          here rather than left to be discovered after saving (А5). -->
-    <p v-if="keepsScore" class="hint">{{ t('advice.edit.keeps_score') }}</p>
+    <AppReveal>
+      <p v-if="keepsScore" class="hint">{{ t('advice.edit.keeps_score') }}</p>
+    </AppReveal>
 
     <AppField
       v-model="review"
@@ -49,6 +51,7 @@ import type { VerdictAmendment, WireCode } from '@molvia/model'
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import RatingScale from '@/components/RatingScale.vue'
 import type { Score } from '@/components/rating'
@@ -97,7 +100,7 @@ const SPOKEN: Partial<Record<WireCode, string>> = {
  */
 export default defineComponent({
   name: 'VerdictEditSheet',
-  components: { AppButton, AppField, BottomSheet, RatingScale },
+  components: { AppButton, AppField, AppReveal, BottomSheet, RatingScale },
   props: {
     itemId: { type: String, required: true },
     name: { type: String, required: true },

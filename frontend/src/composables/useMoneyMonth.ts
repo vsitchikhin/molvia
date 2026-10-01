@@ -23,6 +23,8 @@ export interface MoneyMonth {
   readonly month: ComputedRef<MoneyMonthView | null>
   readonly stale: ComputedRef<MoneyStale | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  /** When the read of the month on screen set out (MOL-151, adversarial Б1). */
+  readonly askedAt: ComputedRef<Date | null>
   /** The owner's categories: this month's answer's, or those of the newest month kept. */
   readonly knownCategories: ComputedRef<MoneyMonthView['categories']>
   /**
@@ -49,6 +51,13 @@ const KEPT_MONTHS = 3
 interface Remembered {
   readonly answer: MoneyMonthView
   readonly fetchedAt: Date
+  /**
+   * When the read set out: what the server knew is as of then, not of when the answer came. Kept on
+   * the phone with the answer, or a read that set out before a removal and came after it would
+   * show the removed row again after a restart (MOL-151, Б6); a month kept before it was has only
+   * its arrival, older than any removal remembered since.
+   */
+  readonly askedAt?: Date
 }
 
 function recallAll(owner: string): Record<string, unknown> {
@@ -68,7 +77,10 @@ function recall(owner: string, month: string): Remembered | null {
   const answer = moneyMonthCodec.safeParse(kept.answer)
   const fetchedAt = typeof kept.fetchedAt === 'string' ? new Date(kept.fetchedAt) : null
   if (!answer.success || !fetchedAt || Number.isNaN(fetchedAt.getTime())) return null
-  return { answer: answer.data, fetchedAt }
+  const askedAt = typeof kept.askedAt === 'string' ? new Date(kept.askedAt) : null
+  return askedAt && !Number.isNaN(askedAt.getTime())
+    ? { answer: answer.data, fetchedAt, askedAt }
+    : { answer: answer.data, fetchedAt }
 }
 
 /** The categories of the newest month kept for the owner — any month names all of them. */
@@ -87,11 +99,12 @@ function recallTodayRate(owner: string): MoneyMonthView['rate'] {
   return running?.answer.rateKind === 'live' ? running.answer.rate : null
 }
 
-function remember(owner: string, answer: MoneyMonthView, fetchedAt: Date): void {
+function remember(owner: string, answer: MoneyMonthView, fetchedAt: Date, askedAt: Date): void {
   const all = recallAll(owner)
   all[answer.month] = {
     answer: moneyMonthCodec.encode(answer),
     fetchedAt: fetchedAt.toISOString(),
+    askedAt: askedAt.toISOString(),
   }
   const newest = Object.entries(all)
     .flatMap(([month, value]) =>
@@ -150,18 +163,19 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
   async function ask(id: string, month: string): Promise<void> {
     const mine = ++latest
     const wanted = pages
+    const askedAt = new Date()
     try {
       const first = await api.moneyMonth(month)
       // The first page is what is kept, as a first read answers it: the cursor of a later page
       // is the server's to work out, not the phone's.
       const firstAt = new Date()
-      if (actor.id === id) remember(id, first, firstAt)
+      if (actor.id === id) remember(id, first, firstAt, askedAt)
       let answer = first
       for (let page = 1; page < wanted && answer.cursor; page++) {
         answer = mergePages(answer, await api.moneyMonth(month, answer.cursor))
       }
       if (actor.id !== id || selected.value !== month || mine !== latest) return
-      shown.value = { answer, fetchedAt: firstAt }
+      shown.value = { answer, fetchedAt: firstAt, askedAt }
       kept.value = answer.categories
       if (answer.rateKind === 'live') keptRate.value = answer.rate
       failure.value = null
@@ -215,7 +229,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
         else void loadMore()
         return
       }
-      shown.value = { answer: mergePages(current.answer, next), fetchedAt: current.fetchedAt }
+      shown.value = { ...current, answer: mergePages(current.answer, next) }
       pages += 1
       more.value = 'idle'
     } catch {
@@ -251,6 +265,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       return failure.value ?? 'loading'
     }),
     fetchedAt: computed(() => shown.value?.fetchedAt ?? null),
+    askedAt: computed(() => shown.value?.askedAt ?? shown.value?.fetchedAt ?? null),
     knownCategories: computed(() => shown.value?.answer.categories ?? kept.value),
     todayRate: computed(() =>
       shown.value?.answer.rateKind === 'live' ? shown.value.answer.rate : keptRate.value,

@@ -122,3 +122,35 @@ html[data-nav='pop'] {
     animation: none;
   }
 }
+
+// ── Things coming in and going ──────────────────────────────────────────────
+// Nothing on a screen pops up or vanishes in one frame (MOL-151, the owner: «многие моменты работают
+// как-то сильно резко»). One grammar for all of it, two ways:
+// - `appear` (the mixin in _mixins.scss): whatever is put in the page fades in with a short rise —
+//   a state, a strip, a notice, the content that replaces a skeleton. An animation, so the
+//   element's own transitions stay its own.
+// - `AppReveal`: what pushes its neighbours — a row of a list, an error under a field, a block in a
+//   sheet — grows from nothing and shrinks back, so the rest slides instead of jumping.
+// None of it plays while a screen moves — the view transition brings the new screen in already, and
+// a block fading inside it played the arrival twice — nor under «reduce motion».
+
+:root {
+  --appear-duration: var(--dur);
+}
+
+html[data-nav] {
+  --appear-duration: 0s;
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+    translate: 0 var(--appear-rise, var(--space-2));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --appear-duration: 0s;
+  }
+}

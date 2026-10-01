@@ -121,6 +121,8 @@ export default defineComponent({
 }
 
 .note {
+  @include appear;
+
   margin: 0;
   padding: var(--space-3);
   border-radius: var(--radius);

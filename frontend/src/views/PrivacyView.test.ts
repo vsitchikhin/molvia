@@ -27,10 +27,20 @@ it('says what is kept, how long the logs live and how to erase everything', asyn
     ru.privacy.stored.title,
     ru.privacy.logs.title,
     ru.privacy.backups.title,
+    ru.privacy.barcodes.title,
     ru.privacy.storage.title,
     ru.privacy.copy.title,
     ru.privacy.erase.title,
   ])
+})
+
+it('says what goes to Open Food Facts and what never does, and offers its data under ODbL (MOL-162)', async () => {
+  const text = (await render()).text()
+  expect(text).toContain(ru.privacy.barcodes.text)
+  expect(ru.privacy.barcodes.text).toMatch(/Open Food Facts/)
+  expect(ru.privacy.barcodes.text).toMatch(/только сам код и адрес нашего сервера/)
+  expect(ru.privacy.barcodes.text).toMatch(/Код этикетки магазина туда не уходит/)
+  expect(ru.privacy.barcodes.text).toMatch(/ODbL.*по запросу/)
 })
 
 it('names the copy by the words of the settings row that makes it (MOL-93)', async () => {

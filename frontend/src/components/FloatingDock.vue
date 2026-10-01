@@ -41,7 +41,10 @@ export default defineComponent({
     bottom: calc(var(--safe-bottom) + var(--dock-height) + var(--space-4));
   }
 
+  // What stands here comes in, «Вернуть» and the main action alike, each in place of the other.
   > :slotted(*) {
+    @include appear;
+
     pointer-events: auto;
   }
 

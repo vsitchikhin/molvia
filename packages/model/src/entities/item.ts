@@ -52,6 +52,15 @@ export const itemSchema = z.object({
 })
 export type Item = z.infer<typeof itemSchema>
 
+/**
+ * Where an item's data may have come from besides the person who proposed it (MOL-162). One value
+ * today: `open_food_facts` — proposed with a code Open Food Facts named, so its name and size may be
+ * that base's, which is ODbL: what is derived from it is shared on request under the same licence,
+ * and the mark is what tells it from the rest of the catalogue. Set by the server, never sent.
+ */
+export const itemOriginSchema = z.enum(['open_food_facts'])
+export type ItemOrigin = z.infer<typeof itemOriginSchema>
+
 export const newItemSchema = z.strictObject({
   kind: itemKindSchema,
   name: nameSchema,

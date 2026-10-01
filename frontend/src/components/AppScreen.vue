@@ -380,6 +380,8 @@ export default defineComponent({
 }
 
 .subtitle {
+  @include appear(0);
+
   margin-top: var(--space-1);
   color: var(--text-muted);
   font-size: var(--text-footnote);
@@ -405,6 +407,12 @@ export default defineComponent({
   flex-direction: column;
   padding: var(--space-4) calc(var(--space-4) + var(--safe-right))
     calc(var(--space-4) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
+
+  /* What the screen puts in comes in — its answer in place of the skeleton above all (MOL-151);
+     not on the screen's own arrival, which the view transition already plays. */
+  > :slotted(*) {
+    @include appear;
+  }
 }
 
 .dock-room {
@@ -415,6 +423,7 @@ export default defineComponent({
    not: the same chrome as the pinned row at the top. */
 .dock {
   @include pinned-bar;
+  @include appear(100%);
 
   position: fixed;
   right: 0;

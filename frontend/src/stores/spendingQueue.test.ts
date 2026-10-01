@@ -386,6 +386,65 @@ describe('spending queue', () => {
       expect(recordSpending.mock.calls[0]?.[0].amount.minor).toBe(600_000n)
     })
 
+    // The month on screen was read before the removal: its row must not come back until it is read
+    // again (MOL-151, adversarial А3), and «Вернуть» landed lets it go.
+    it('notes a removal that landed, and lets it go when «Вернуть» lands', async () => {
+      const queue = fresh()
+      const before = Date.now()
+      const undo = queue.remove(BARBER)
+      await settled()
+      expect(calls).toEqual([`remove ${BARBER}`])
+      expect(queue.gone.map((item) => item.id)).toEqual([BARBER])
+      expect(queue.gone[0]?.at).toBeGreaterThanOrEqual(before)
+      queue.restore(undo)
+      await settled()
+      expect(queue.gone).toEqual([])
+    })
+
+    // The month the phone keeps outlives a reload; so must what hides a removed row in it, or a
+    // read that failed brought the row back for good (adversarial Б5).
+    it('keeps a landed removal across a reload', async () => {
+      const queue = fresh()
+      queue.remove(BARBER)
+      await settled()
+      expect(queue.gone.map((item) => item.id)).toEqual([BARBER])
+      expect(fresh().gone.map((item) => item.id)).toEqual([BARBER])
+    })
+
+    // Two windows of one phone: each writes the list over what is stored, and hears the other's
+    // (MOL-151, adversarial round 5).
+    it('keeps another window’s landed removal, and hears it', async () => {
+      const queue = fresh()
+      const key = `molvia.spending-gone.${ME}`
+      localStorage.setItem(key, JSON.stringify([{ id: RENT, at: Date.now() }]))
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+      expect(queue.gone.map((item) => item.id)).toEqual([RENT])
+
+      localStorage.setItem(key, '[]')
+      queue.remove(BARBER)
+      localStorage.setItem(key, JSON.stringify([{ id: RENT, at: Date.now() }]))
+      await settled()
+      expect(queue.gone.map((item) => item.id)).toEqual([RENT, BARBER])
+      expect(fresh().gone.map((item) => item.id)).toEqual([RENT, BARBER])
+    })
+
+    it('must not fire: a landed removal older than any month kept, or a broken entry', () => {
+      const old = Date.now() - 93 * 24 * 60 * 60 * 1000
+      localStorage.setItem(
+        `molvia.spending-gone.${ME}`,
+        JSON.stringify([{ id: BARBER, at: old }, { id: 7 }, 'junk', { id: RENT, at: Date.now() }]),
+      )
+      expect(fresh().gone.map((item) => item.id)).toEqual([RENT])
+    })
+
+    it('must not fire: a removal refused is not gone', async () => {
+      removeSpending.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'revision'))
+      const queue = fresh()
+      queue.remove(BARBER)
+      await settled()
+      expect(queue.gone).toEqual([])
+    })
+
     it('removing one nobody began to send sends nothing at all (review У-1)', async () => {
       const queue = fresh('idle')
       queue.record({ id: BARBER, ...fields() })

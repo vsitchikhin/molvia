@@ -79,16 +79,29 @@ export function installViewTransitions(router: Router): void {
   const waiting: (() => void)[] = []
   let current: ViewTransition | undefined
 
+  // A move the browser shows itself — the iOS edge swipe, Android's predictive back — is a move
+  // all the same: what the screen puts in meanwhile must not fade in after it (adversarial А5).
+  // Marked for the render alone, since nothing of ours plays.
+  let shownByBrowser: number | null = null
+
   router.beforeResolve((to, from) => {
     const byBrowser = animatedByBrowser
     animatedByBrowser = false
+    const root = document.documentElement
+    // Any move to another screen the browser shows, with a direction of ours or not — the account
+    // opened from the card of «Деньги» has none, and the swipe back from it came in twice (Б3).
+    if (byBrowser && from.matched.length > 0 && !sameScreen(from, to)) {
+      root.dataset.nav = 'browser'
+      shownByBrowser = now()
+      return
+    }
     const move = direction(from, to)
     if (!move || byBrowser) return
     if (typeof document.startViewTransition !== 'function' || reducedMotion()) return
 
-    const root = document.documentElement
     return new Promise<void>((proceed) => {
       root.dataset.nav = move
+      const since = now()
       const transition = document.startViewTransition(
         () =>
           new Promise<void>((done) => {
@@ -106,7 +119,7 @@ export function installViewTransitions(router: Router): void {
         // one that replaced it and is still running.
         if (current !== transition) return
         current = undefined
-        delete root.dataset.nav
+        endMove(root, since)
       })
     })
   })
@@ -115,11 +128,45 @@ export function installViewTransitions(router: Router): void {
   router.afterEach(async () => {
     // Whatever move the flag was raised for is over; it must not reach the next one.
     animatedByBrowser = false
+    if (shownByBrowser !== null) {
+      const since = shownByBrowser
+      shownByBrowser = null
+      await nextTick()
+      if (document.documentElement.dataset.nav === 'browser')
+        endMove(document.documentElement, since)
+    }
     if (waiting.length === 0) return
     const done = waiting.splice(0)
     await nextTick()
     for (const release of done) release()
   })
+}
+
+function now(): number {
+  // `document.timeline` is missing where nothing is laid out, whatever the DOM types say.
+  const timeline = document.timeline as DocumentTimeline | undefined
+  return Number(timeline?.currentTime ?? 0)
+}
+
+/**
+ * The move is over. What the screen put in while it moved ran `appear` in no time (main.scss); with
+ * its length back, a finished animation is half-way through again and played the arrival a second
+ * time — in Chromium it dropped to half its opacity and came in anew (adversarial А4). Those are cut
+ * short; one inserted before the move began plays on.
+ */
+function endMove(root: HTMLElement, since: number): void {
+  delete root.dataset.nav
+  // Where nothing is laid out — the component tests — there is nothing to cut short.
+  if (typeof document.getAnimations !== 'function' || typeof CSSAnimation === 'undefined') return
+  // `getAnimations` brings the styles up to date first: the length is already back.
+  for (const animation of document.getAnimations()) {
+    if (
+      animation instanceof CSSAnimation &&
+      animation.animationName === 'appear' &&
+      Number(animation.startTime ?? since) >= since
+    )
+      animation.cancel()
+  }
 }
 
 /**

@@ -136,9 +136,34 @@ export function useMoneyScreen(): MoneyScreen {
     () => money.month.value?.spendCurrency ?? actor.settings?.spendCurrency ?? 'AMD',
   )
 
+  // A removal landed after the month on screen was read: its row is gone, not back for a moment
+  // until the month is read again (MOL-151, adversarial А3) — unless «Вернуть» is on its way.
+  const gone = computed(() => {
+    // As of when the read set out: one sent before the removal and come after it still holds the
+    // row (adversarial Б1).
+    const read = money.askedAt.value?.getTime() ?? 0
+    const back = new Set(
+      queue.pending.flatMap((write) => (write.kind === 'restore' ? [write.id] : [])),
+    )
+    return new Set(
+      queue.gone.flatMap((item) => (item.at > read && !back.has(item.id) ? [item.id] : [])),
+    )
+  })
+  // The same for a record of «Покупки» (adversarial Б4): waiting, or landed after the read set
+  // out — unless its «Вернуть» is on its way, which `removing` already says.
+  const tripsGone = computed(() => {
+    const read = money.askedAt.value?.getTime() ?? 0
+    const back = new Set(
+      tripQueue.pending.flatMap((write) => (write.kind === 'restore' ? [write.tripId] : [])),
+    )
+    return new Set([
+      ...tripQueue.removing,
+      ...tripQueue.gone.flatMap((item) => (item.at > read && !back.has(item.id) ? [item.id] : [])),
+    ])
+  })
   const journal = computed(() =>
     money.month.value
-      ? journalOf(money.month.value, queue.pending, tripQueue.removing, queue.rejected)
+      ? journalOf(money.month.value, queue.pending, tripsGone.value, gone.value, queue.rejected)
       : [],
   )
   /** «Ещё не учтено»: the spendings of this month still on the phone — a row each, never a sum. */

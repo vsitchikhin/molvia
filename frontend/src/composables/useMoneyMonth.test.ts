@@ -180,6 +180,35 @@ describe('useMoneyMonth', () => {
     expect(offline.month.value?.byCategory).toEqual(byCategory)
   })
 
+  it('Б6: a month recalled after a restart is as of when its read set out, not when it came', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-27T08:00:00Z'))
+    try {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      useActorStore().id = ACTOR
+      let give: (value: MoneyMonthView) => void = () => undefined
+      moneyMonth.mockImplementationOnce(() => new Promise((resolve) => (give = resolve)))
+      host(pinia)
+      // The read set out at 08:00; a removal answered meanwhile; the answer came at 08:00:05.
+      vi.setSystemTime(new Date('2026-09-27T08:00:05Z'))
+      give(page([], null))
+      await flushPromises()
+
+      // A restart with no connection: the month is the phone's.
+      const restarted = createPinia()
+      setActivePinia(restarted)
+      useActorStore().id = ACTOR
+      moneyMonth.mockRejectedValue(new TypeError('network'))
+      const offline = host(restarted)
+      await flushPromises()
+      expect(offline.fetchedAt.value).toEqual(new Date('2026-09-27T08:00:05Z'))
+      expect(offline.askedAt.value).toEqual(new Date('2026-09-27T08:00:00Z'))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('С-5: another month on screen still knows today’s rate, from the running month kept', async () => {
     vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true })
     vi.setSystemTime(new Date('2026-09-27T08:00:00Z'))

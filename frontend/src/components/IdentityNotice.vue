@@ -65,6 +65,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .notice {
+  @include appear;
+
   margin: var(--space-4) var(--space-4) 0;
 }
 </style>

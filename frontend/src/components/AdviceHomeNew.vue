@@ -18,15 +18,17 @@
     <ScreenSkeleton v-else-if="asking" :groups="[70]" />
 
     <!-- (в): purchases recorded and none rated — the one thing left to do, and where. -->
-    <AppCard v-if="pending > 0" class="pending" list>
-      <PurchaseRow
-        :icon="IconStar"
-        accent
-        :title="t('verdict.pending_count', { n: pending }, pending)"
-        :meta="pendingFrom"
-        @open="goTab('verdicts')"
-      />
-    </AppCard>
+    <AppReveal>
+      <AppCard v-if="pending > 0" class="pending" list>
+        <PurchaseRow
+          :icon="IconStar"
+          accent
+          :title="t('verdict.pending_count', { n: pending }, pending)"
+          :meta="pendingFrom"
+          @open="goTab('verdicts')"
+        />
+      </AppCard>
+    </AppReveal>
 
     <p class="caption">{{ t('advice.home.next') }}</p>
     <!-- The cycle explains the tab bar too: every step wears its tab's icon. The steps that lead
@@ -73,6 +75,7 @@ import IconChevronRight from '~icons/mdi/chevron-right'
 import IconLightbulb from '~icons/mdi/lightbulb-on-outline'
 import IconStar from '~icons/mdi/star-outline'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import PurchaseRow from '@/components/PurchaseRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import { usePendingFrom } from '@/composables/usePendingFrom'
@@ -94,6 +97,7 @@ export default defineComponent({
   name: 'AdviceHomeNew',
   components: {
     AppCard,
+    AppReveal,
     IconCart,
     IconChevronRight,
     IconLightbulb,

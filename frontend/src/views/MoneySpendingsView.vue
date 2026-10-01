@@ -12,39 +12,45 @@
         <p v-else-if="phase === 'ready' && stale === 'error' && fetchedAt" class="strip">
           {{ t('spending.error_strip', { when: whenOf(fetchedAt) }) }}
         </p>
-        <ScreenState
-          v-for="item in otherRefusals"
-          :key="item.key"
-          kind="attention"
-          inline
-          :title="t('spending.rejected_other.title')"
-          :body="reasonOf(item.code)"
-        >
-          <template #action>
-            <AppButton variant="ghost" @click="queue.dismiss(item)">
-              {{ t('spending.sheet.dismiss') }}
-            </AppButton>
-          </template>
-        </ScreenState>
+        <AppReveal group>
+          <ScreenState
+            v-for="item in otherRefusals"
+            :key="item.key"
+            kind="attention"
+            inline
+            :title="t('spending.rejected_other.title')"
+            :body="reasonOf(item.code)"
+          >
+            <template #action>
+              <AppButton variant="ghost" @click="queue.dismiss(item)">
+                {{ t('spending.sheet.dismiss') }}
+              </AppButton>
+            </template>
+          </ScreenState>
+        </AppReveal>
 
         <!-- Every spending the server refused, of any month, whatever the month shown and its pages:
              opened, it is what was typed — to fix and save again, or to drop (MOL-159). -->
-        <section v-if="refused.length > 0" class="day">
-          <h2 class="day-head">{{ t('spending.list.refused') }}</h2>
-          <AppCard as="ul" list>
-            <SpendingRow
-              v-for="row in refused"
-              :key="row.key"
-              :row="row"
-              :category="categoryOf(row)"
-              :category-name="categoryNameOf(row)"
-              :spend-currency="spendCurrency"
-              :when="dayTitle(row.spending.spentOn)"
-              :data-row="row.key"
-              @open="open(row, row.spending.spentOn)"
-            />
-          </AppCard>
-        </section>
+        <AppReveal>
+          <section v-if="refused.length > 0" class="day">
+            <h2 class="day-head">{{ t('spending.list.refused') }}</h2>
+            <AppCard as="ul" list>
+              <AppReveal group>
+                <SpendingRow
+                  v-for="row in refused"
+                  :key="row.key"
+                  :row="row"
+                  :category="categoryOf(row)"
+                  :category-name="categoryNameOf(row)"
+                  :spend-currency="spendCurrency"
+                  :when="dayTitle(row.spending.spentOn)"
+                  :data-row="row.key"
+                  @open="open(row, row.spending.spentOn)"
+                />
+              </AppReveal>
+            </AppCard>
+          </section>
+        </AppReveal>
 
         <ScreenSkeleton v-if="phase === 'loading'" :groups="[46, 64, 38, 52, 30, 60, 44]" />
 
@@ -86,26 +92,32 @@
             </span>
           </div>
 
-          <section v-for="day in journal" :key="day.day" class="day">
-            <h2 class="day-head">
-              <span>{{ dayTitle(day.day) }}</span>
-              <span v-if="day.total" class="day-total">
-                {{ day.estimated ? `≈ ${whole(day.total)}` : whole(day.total) }}
-              </span>
-            </h2>
-            <AppCard as="ul" list>
-              <SpendingRow
-                v-for="row in day.rows"
-                :key="row.key"
-                :row="row"
-                :category="categoryOf(row)"
-                :category-name="categoryNameOf(row)"
-                :spend-currency="month.spendCurrency"
-                :data-row="row.key"
-                @open="open(row, day.day)"
-              />
-            </AppCard>
-          </section>
+          <!-- Another month is another answer, not days come and gone: it is just there (MOL-136,
+               MOL-151 adversarial А1). -->
+          <AppReveal :key="month.month" group>
+            <section v-for="day in journal" :key="day.day" class="day">
+              <h2 class="day-head">
+                <span>{{ dayTitle(day.day) }}</span>
+                <span v-if="day.total" class="day-total">
+                  {{ day.estimated ? `≈ ${whole(day.total)}` : whole(day.total) }}
+                </span>
+              </h2>
+              <AppCard as="ul" list>
+                <AppReveal group>
+                  <SpendingRow
+                    v-for="row in day.rows"
+                    :key="row.key"
+                    :row="row"
+                    :category="categoryOf(row)"
+                    :category-name="categoryNameOf(row)"
+                    :spend-currency="month.spendCurrency"
+                    :data-row="row.key"
+                    @open="open(row, day.day)"
+                  />
+                </AppReveal>
+              </AppCard>
+            </section>
+          </AppReveal>
 
           <div v-if="month.remaining > 0" ref="sentinel" class="more">
             <p class="footnote">
@@ -180,6 +192,7 @@ import { formatEstimate, monthOf as monthOfDay } from '@molvia/model'
 import type { Money, MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import FloatingDock from '@/components/FloatingDock.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
@@ -204,6 +217,7 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppReveal,
     AppScreen,
     FloatingDock,
     IconCloudOff,
@@ -359,6 +373,8 @@ export default defineComponent({
 }
 
 .strip {
+  @include appear;
+
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
@@ -446,5 +462,11 @@ export default defineComponent({
 
 .float > .undo {
   flex: 1;
+}
+
+/* The answer comes in where the skeleton stood, faded only: the screen keeps it in one block of its
+   own, which `AppScreen` does not see, and nothing under the thumb may move (review №5, MOL-138). */
+.content > * {
+  @include appear(0);
 }
 </style>

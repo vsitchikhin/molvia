@@ -506,6 +506,8 @@ export default defineComponent({
 }
 
 .strip {
+  @include appear;
+
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
@@ -657,5 +659,12 @@ export default defineComponent({
 .right {
   margin-top: var(--space-2);
   text-align: right;
+}
+
+/* The answer comes in where the skeleton stood, faded only: nothing under the thumb may move
+   (MOL-151, review №5 and №7, MOL-138). Here and not on the screen: a component of several roots
+   takes no scope of the screen's. */
+.card {
+  @include appear(0);
 }
 </style>

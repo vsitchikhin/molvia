@@ -19,21 +19,25 @@
       </p>
       <!-- The account of the trip: chosen here and saved at once, through the trip's queue (handoff
            06, 6h). Drawn once the trip is read — what it is on now is the server's. -->
-      <div v-if="showsAccounts && tripView" class="accounts" @focusout="saveTripCharge">
-        <AccountRow
-          :label="t('accounts.picker.row_trip')"
-          :account="account"
-          @open="pickerOpen = true"
-        />
-        <ChargedField
-          v-if="charged && account"
-          v-model="debited"
-          :account="account"
-          :bad="debitedBad"
-          @update:model-value="debitedBad = false"
-        />
-        <p class="note">{{ t('accounts.trip_hint') }}</p>
-      </div>
+      <AppReveal>
+        <div v-if="showsAccounts && tripView" class="accounts" @focusout="saveTripCharge">
+          <AccountRow
+            :label="t('accounts.picker.row_trip')"
+            :account="account"
+            @open="pickerOpen = true"
+          />
+          <AppReveal>
+            <ChargedField
+              v-if="charged && account"
+              v-model="debited"
+              :account="account"
+              :bad="debitedBad"
+              @update:model-value="debitedBad = false"
+            />
+          </AppReveal>
+          <p class="note">{{ t('accounts.trip_hint') }}</p>
+        </div>
+      </AppReveal>
       <p v-if="items === 'loading'" class="note">{{ t('state.loading') }}</p>
       <p v-else-if="items === 'offline'" class="note">
         {{ t('spending.sheet.trip_items_offline') }}
@@ -86,7 +90,9 @@
           :legend="t('spending.sheet.currency')"
           hide-legend
         />
-        <p v-if="conversion" class="conversion">{{ conversion }}</p>
+        <AppReveal>
+          <p v-if="conversion" class="conversion">{{ conversion }}</p>
+        </AppReveal>
       </div>
 
       <!-- Where the money came from, beside the sum it is about (handoff 06). No account at all —
@@ -97,14 +103,16 @@
           :account="account"
           @open="pickerOpen = true"
         />
-        <ChargedField
-          v-if="charged && account"
-          v-model="debited"
-          :account="account"
-          :estimate="chargedEstimate"
-          :bad="debitedBad"
-          @update:model-value="debitedBad = false"
-        />
+        <AppReveal>
+          <ChargedField
+            v-if="charged && account"
+            v-model="debited"
+            :account="account"
+            :estimate="chargedEstimate"
+            :bad="debitedBad"
+            @update:model-value="debitedBad = false"
+          />
+        </AppReveal>
       </template>
 
       <CategoryChips
@@ -234,6 +242,7 @@ import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
 import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CategoryChips from '@/components/CategoryChips.vue'
 import ChargedField from '@/components/ChargedField.vue'
@@ -273,6 +282,7 @@ export default defineComponent({
     AccountRow,
     AppButton,
     AppField,
+    AppReveal,
     BottomSheet,
     CategoryChips,
     ChargedField,
@@ -876,20 +886,23 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .accounts {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
 }
 
 .form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  /* A column, not a grid: a block of it grows and goes by `AppReveal`, which takes a flex
+     column's gap back with the block — a grid's stays and jumped (MOL-151, adversarial Б2). */
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
   padding: var(--space-4);
 }
 
 .field {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
 }
 
@@ -971,6 +984,8 @@ export default defineComponent({
 }
 
 .strip {
+  @include appear;
+
   margin: 0;
   padding: var(--space-3);
   border-radius: var(--radius);
