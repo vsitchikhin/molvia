@@ -207,8 +207,9 @@ test.describe('on «What did you pick up?»', () => {
  */
 test.describe('a code written to the catalogue (MOL-100)', () => {
   /** Twelve digits of our own and the check digit a write demands (Р-1). */
-  function freshCode(): string {
-    const body = `48${String(randomInt(10 ** 9)).padStart(10, '0')}`
+  /** A code nobody holds; led by `46`, one the fake of Open Food Facts knows (MOL-162). */
+  function freshCode(lead = '48'): string {
+    const body = `${lead}${String(randomInt(10 ** 9)).padStart(10, '0')}`
     let sum = 0
     for (let i = body.length - 1, weight = 3; i >= 0; i--, weight = 4 - weight) {
       sum += Number(body[i]) * weight
@@ -283,6 +284,48 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
 
     await typeCode(page, code)
     await sheetOf(page, name)
+  })
+
+  test('a code Open Food Facts knows: the hint under «unknown», the form filled, the purchase at the size of the pack (MOL-162)', async ({
+    page,
+  }) => {
+    const code = freshCode('46')
+    const name = `Тушёнка ${code.slice(-6)} Главпродукт`
+    await open(page, '/purchases/manual/add')
+    await typeCode(page, code)
+    await expect(missingOf(page, code)).toBeVisible()
+
+    await expect(
+      page.locator('.not-found').getByText(`Looks like “${name}”, 0.325 kg`),
+    ).toBeVisible()
+    await expect(page.locator('.announcer')).toContainText(`Looks like “${name}”, 0.325 kg`)
+
+    await page.getByRole('button', { name: 'Suggest an item' }).click()
+    const form = page.getByRole('dialog', { name: 'New item' })
+    await expect(form.getByLabel('As the price tag says')).toHaveValue(name)
+    await expect(form.getByRole('radio', { name: 'kg', exact: true })).toBeChecked()
+    await expect(form.getByText('0.325 kg in the pack')).toBeVisible()
+    await expect(form.getByRole('link', { name: 'Data from Open Food Facts ↗' })).toHaveAttribute(
+      'href',
+      `https://world.openfoodfacts.org/product/${code}`,
+    )
+    await page.waitForTimeout(400)
+    await form.getByRole('button', { name: 'Add to the catalogue' }).click()
+
+    const details = await sheetOf(page, name)
+    await expect(details.getByLabel('How much')).toHaveValue('0.325')
+  })
+
+  test('a code Open Food Facts does not know: «unknown» as it was, with no hint (MOL-162)', async ({
+    page,
+  }) => {
+    const code = freshCode()
+    await open(page, '/purchases/manual/add')
+    await typeCode(page, code)
+
+    await expect(missingOf(page, code)).toBeVisible()
+    await page.waitForTimeout(500)
+    await expect(page.locator('.code-hint')).toHaveCount(0)
   })
 
   test('linked to an item found by name, it finds the item — until «not this item?» lets it go', async ({
