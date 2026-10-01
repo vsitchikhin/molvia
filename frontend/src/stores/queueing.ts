@@ -1,5 +1,6 @@
 import { ERROR, ISSUE } from '@molvia/model'
 import type { WireCode } from '@molvia/model'
+import { read, write } from '@/stores/storage'
 
 /**
  * What every queue on the device shares (MOL-82, В-6): the trip's, the verdicts' and the
@@ -70,4 +71,51 @@ export function doublingRetry(attempt: () => void): Retry {
       clearTimeout(timer)
     },
   }
+}
+
+/**
+ * A removal the server has answered, and when (MOL-151): a screen hides the row until a read set
+ * out after it. Kept on the device, as the month it hides it from is: kept in memory alone, a
+ * reload after a read that failed brought the removed row back from the phone's month, until some
+ * read got through (adversarial Б5).
+ */
+export interface Landed {
+  readonly id: string
+  readonly at: number
+}
+
+/** Older than any month the phone keeps unread: nothing is left to hide it from. */
+const LANDED_KEPT_MS = 92 * 24 * 60 * 60 * 1000
+
+export function recallLanded(key: string): Landed[] {
+  const raw = read(key)
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    const since = Date.now() - LANDED_KEPT_MS
+    return parsed.flatMap((item: unknown) =>
+      isRecord(item) &&
+      typeof item.id === 'string' &&
+      typeof item.at === 'number' &&
+      item.at > since
+        ? [{ id: item.id, at: item.at }]
+        : [],
+    )
+  } catch {
+    return []
+  }
+}
+
+/** The removal of `id` landed (`removed`) or was taken back by a «Вернуть» that landed. */
+export function landedAgain(
+  key: string,
+  list: readonly Landed[],
+  id: string,
+  removed: boolean,
+): Landed[] {
+  const others = list.filter((item) => item.id !== id)
+  const next = removed ? [...others, { id, at: Date.now() }] : others
+  write(key, JSON.stringify(next))
+  return next
 }

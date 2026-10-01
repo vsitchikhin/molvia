@@ -324,6 +324,25 @@ describe('spending queue', () => {
       expect(queue.gone).toEqual([])
     })
 
+    // The month the phone keeps outlives a reload; so must what hides a removed row in it, or a
+    // read that failed brought the row back for good (adversarial Б5).
+    it('keeps a landed removal across a reload', async () => {
+      const queue = fresh()
+      queue.remove(BARBER)
+      await settled()
+      expect(queue.gone.map((item) => item.id)).toEqual([BARBER])
+      expect(fresh().gone.map((item) => item.id)).toEqual([BARBER])
+    })
+
+    it('must not fire: a landed removal older than any month kept, or a broken entry', () => {
+      const old = Date.now() - 93 * 24 * 60 * 60 * 1000
+      localStorage.setItem(
+        `molvia.spending-gone.${ME}`,
+        JSON.stringify([{ id: BARBER, at: old }, { id: 7 }, 'junk', { id: RENT, at: Date.now() }]),
+      )
+      expect(fresh().gone.map((item) => item.id)).toEqual([RENT])
+    })
+
     it('must not fire: a removal refused is not gone', async () => {
       removeSpending.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'revision'))
       const queue = fresh()

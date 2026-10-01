@@ -1666,6 +1666,16 @@ describe('trip queue', () => {
       expect(queue.gone).toEqual([])
     })
 
+    // Месяц в памяти телефона переживает перезапуск — переживает и то, что прячет в нём удалённое
+    // (адверсариальное Б5).
+    it('ответившее удаление помнится и после перезапуска', async () => {
+      removeTrip.mockResolvedValue(undefined)
+      const queue = fresh()
+      queue.removeTrip(TRIP, 'Ереван Сити')
+      await queue.flush()
+      expect(fresh().gone.map((item) => item.id)).toEqual([TRIP])
+    })
+
     it('не должно сработать: удаление, которое не дошло, не помнится как ответившее', async () => {
       removeTrip.mockRejectedValue(offline())
       const queue = fresh()

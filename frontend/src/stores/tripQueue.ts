@@ -31,7 +31,16 @@ import { localDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
 import { isIdentifier } from '@/stores/identity'
-import { HOLDS, doublingRetry, exclusively, isRecord, newKey } from '@/stores/queueing'
+import {
+  HOLDS,
+  doublingRetry,
+  exclusively,
+  isRecord,
+  landedAgain,
+  newKey,
+  recallLanded,
+} from '@/stores/queueing'
+import type { Landed } from '@/stores/queueing'
 import type { Loose } from '@/stores/queueing'
 import { read, writeEverywhere } from '@/stores/storage'
 import { useTripHistoryStore } from '@/stores/tripHistory'
@@ -158,6 +167,8 @@ interface Kept {
 
 const QUEUE_KEY = 'molvia.trip-queue'
 const REJECTED_KEY = 'molvia.trip-rejected'
+/** The trips whose removal the server has answered, and when (MOL-151, adversarial Б5). */
+const GONE_KEY = 'molvia.trip-gone'
 /**
  * «Удалить поход» and «Вернуть» again, under keys of their own (MOL-76, adversarial round 4, Г1):
  * a window still on the version before them reads the shared queue, drops a kind it does not know
@@ -738,7 +749,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
    * line grew back and went again (MOL-151, adversarial Б4, as А3 for a spending). The screen hides
    * one until a month read after it; a «Вернуть» landed lets go.
    */
-  const removedLanded = ref<{ readonly id: string; readonly at: number }[]>([])
+  const removedLanded = ref<Landed[]>([])
   /**
    * Raised when a removal, a «Вернуть» or the account of a trip has landed: what the server counts
    * has moved.
@@ -842,7 +853,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     needsContext.value = null
     kept = []
     rejected.value = []
-    removedLanded.value = []
+    removedLanded.value = id ? recallLanded(`${GONE_KEY}.${id}`) : []
     sync(id)
     show()
   }
@@ -1025,9 +1036,12 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       }
       if (!refusal && (head.write.kind === 'delete' || head.write.kind === 'restore')) {
         const { kind, tripId } = head.write
-        const others = removedLanded.value.filter((item) => item.id !== tripId)
-        removedLanded.value =
-          kind === 'delete' ? [...others, { id: tripId, at: Date.now() }] : others
+        removedLanded.value = landedAgain(
+          `${GONE_KEY}.${owner}`,
+          removedLanded.value,
+          tripId,
+          kind === 'delete',
+        )
       }
       if (!refusal && isMirrored(head.write)) {
         landed.value += 1

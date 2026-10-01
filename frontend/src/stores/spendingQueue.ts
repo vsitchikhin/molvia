@@ -13,7 +13,16 @@ import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
 import { isIdentifier } from '@/stores/identity'
-import { HOLDS, doublingRetry, exclusively, isRecord, newKey } from '@/stores/queueing'
+import {
+  HOLDS,
+  doublingRetry,
+  exclusively,
+  isRecord,
+  landedAgain,
+  newKey,
+  recallLanded,
+} from '@/stores/queueing'
+import type { Landed } from '@/stores/queueing'
 import type { Loose } from '@/stores/queueing'
 import { read, writeEverywhere } from '@/stores/storage'
 
@@ -61,6 +70,7 @@ interface Kept {
 
 const QUEUE_KEY = 'molvia.spending-queue'
 const REJECTED_KEY = 'molvia.spending-rejected'
+const GONE_KEY = 'molvia.spending-gone'
 
 /** A removal of a spending the server does not have is what was asked for (as in the trip's). */
 const DONE_ENOUGH: Partial<Record<SpendingWrite['kind'], readonly WireCode[]>> = {
@@ -240,7 +250,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
    * came back for a moment, and its day shrank, grew and shrank again (MOL-151, adversarial А3).
    * The screen hides one until a month read after it; a removal taken back by «Вернуть» lets go.
    */
-  const gone = ref<{ readonly id: string; readonly at: number }[]>([])
+  const gone = ref<Landed[]>([])
   let ahead = false
   /** The key of the write a send is carrying right now: it is never folded into. */
   let inFlight: string | null = null
@@ -290,7 +300,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     kept = []
     rejected.value = []
     arrived.value = []
-    gone.value = []
+    gone.value = id ? recallLanded(`${GONE_KEY}.${id}`) : []
     sync(id)
     show()
   }
@@ -437,11 +447,13 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
         ]
       }
       if (!refusal && write.kind === 'category-add') arrived.value = [...arrived.value, write]
-      if (!refusal && (write.kind === 'remove' || write.kind === 'restore')) {
-        const others = gone.value.filter((item) => item.id !== write.id)
-        gone.value =
-          write.kind === 'remove' ? [...others, { id: write.id, at: Date.now() }] : others
-      }
+      if (!refusal && (write.kind === 'remove' || write.kind === 'restore'))
+        gone.value = landedAgain(
+          `${GONE_KEY}.${owner}`,
+          gone.value,
+          write.id,
+          write.kind === 'remove',
+        )
       persist(owner)
       landed.value++
     }
