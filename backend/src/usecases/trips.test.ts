@@ -228,6 +228,7 @@ function fakeRepositories(
       restore: unexpected('spendingCategories.restore'),
     },
     money: {
+      firstSpentDay: unexpected('money.firstSpentDay'),
       tripLines: unexpected('money.tripLines'),
       frozenRate: unexpected('money.frozenRate'),
       freeze: unexpected('money.freeze'),

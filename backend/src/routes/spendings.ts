@@ -2,6 +2,7 @@ import { z } from 'zod'
 import {
   DomainError,
   ERROR,
+  moneyChartMonthCodec,
   moneyChartsCodec,
   moneyChartsQuerySchema,
   moneyMonthCodec,
@@ -17,6 +18,7 @@ import {
 import type {
   ChartPeriod,
   JournalKey,
+  MoneyChartMonthView,
   MoneyChartsView,
   MoneyMonthView,
   SalaryShift,
@@ -44,6 +46,7 @@ export interface SpendingsApi {
   archiveCategory(actor: Asking, id: string, archived: boolean): Promise<SpendingCategoriesResponse>
   month(actor: Asking, month: string, cursor?: JournalKey): Promise<MoneyMonthView>
   charts(actor: Asking, period: ChartPeriod): Promise<MoneyChartsView>
+  chartMonth(actor: Asking, month: string): Promise<MoneyChartMonthView>
   salaryShift(actor: Asking): Promise<SalaryShift>
   setSalaryShift(actor: Asking, body: SalaryShift): Promise<SalaryShift>
 }
@@ -154,6 +157,19 @@ export function spendingRoutes(app: FastifyInstance, api: SpendingsApi): void {
     const view = await api.charts(ownerOf(request), period)
     return privately(reply).send(z.encode(moneyChartsCodec, view))
   })
+
+  /** «Графики → Месяц» (MOL-158): the ring, the categories against the usual, the pace. */
+  app.get<{ Params: { month: string } }>(
+    '/money/months/:month/charts',
+    { exposeHeadRoute: false },
+    async (request, reply) => {
+      const month = monthSchema.safeParse(request.params.month)
+      if (!month.success) throw new DomainError(ERROR.NOT_FOUND)
+      parseQuery(z.strictObject({}), request.query)
+      const view = await api.chartMonth(ownerOf(request), month.data)
+      return privately(reply).send(z.encode(moneyChartMonthCodec, view))
+    },
+  )
 
   /** «Зарплата с … числа — в следующий месяц» (MOL-134, В-3): the month's rule of «Пришло». */
   app.get('/actors/me/salary-shift', { exposeHeadRoute: false }, async (request, reply) =>

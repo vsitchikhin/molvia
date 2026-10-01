@@ -165,12 +165,19 @@ export const routes = [
     component: IncomesView,
     meta: { titleKey: 'income.title', parent: 'money' },
   },
-  // «Графики» (MOL-74): the period (`?period=12`) and the category (`?category=`) move by `replace`.
+  // «Графики» (MOL-74, MOL-158): «Месяц · Год» (`?mode=year`), the month (`?month=`) and the
+  // category (`?category=`) move by `replace`. The period of MOL-74 (`?period=`) is the year now,
+  // so a bookmark of it still opens what it showed (handoff MOL-157 06).
   {
     path: '/money/charts',
     name: 'money-charts',
     component: MoneyChartsView,
     meta: { titleKey: 'spending.charts.title', parent: 'money' },
+    beforeEnter: (to) => {
+      if (to.query.period === undefined) return true
+      const kept = Object.entries(to.query).filter(([name]) => name !== 'period')
+      return { ...to, query: { ...Object.fromEntries(kept), mode: 'year' }, replace: true }
+    },
   },
   {
     path: '/money/categories',

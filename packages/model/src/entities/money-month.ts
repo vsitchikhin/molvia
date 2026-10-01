@@ -78,6 +78,14 @@ export type MonthEntry =
   | { readonly kind: 'manual'; readonly spending: Spending; readonly counted: Money | null }
   | { readonly kind: 'trip'; readonly trip: TripLine; readonly counted: Money | null }
 
+/** The category a line of the month is counted in: its own, or a trip's «Продукты» (handoff 06). */
+export function categoryOfEntry(
+  entry: MonthEntry,
+  groceries: string | undefined,
+): string | undefined {
+  return entry.kind === 'manual' ? entry.spending.categoryId : groceries
+}
+
 export interface MonthDay {
   readonly day: string
   /** The day's spending in the spending currency — what could be counted. */
@@ -366,7 +374,7 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
     const amount = amountOf(entry)
     const value = entry.counted
     const held = foreign.get(amount.currency) ?? { amount: 0n, counted: 0n }
-    const categoryId = entry.kind === 'manual' ? entry.spending.categoryId : groceries?.id
+    const categoryId = categoryOfEntry(entry, groceries?.id)
     if (
       value === null ||
       spentMinor + value.minor > INT8_MAX ||
