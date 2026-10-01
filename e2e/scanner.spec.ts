@@ -321,11 +321,70 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
   }) => {
     const code = freshCode()
     await open(page, '/purchases/manual/add')
+    // Waited for by its answer, not by a clock: under load the hint lands later than any timeout
+    // (review 4).
+    const answered = page.waitForResponse(/\/api\/catalogue\/barcode\/hint\?/)
     await typeCode(page, code)
 
     await expect(missingOf(page, code)).toBeVisible()
-    await page.waitForTimeout(500)
+    expect(await (await answered).json()).toEqual({ hint: null })
     await expect(page.locator('.code-hint')).toHaveCount(0)
+  })
+
+  /** Holds every hint until `release()`, then lets each go on to the API; `answered` waits for one. */
+  async function holdHints(page: Page) {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    await page.route('**/api/catalogue/barcode/hint?*', async (route) => {
+      await gate
+      await route.continue()
+    })
+    return { release, answered: () => page.waitForResponse(/\/api\/catalogue\/barcode\/hint\?/) }
+  }
+
+  test('the hint comes under «Suggest an item», which stays where the thumb saw it (MOL-162, В-5, adversarial Г)', async ({
+    page,
+  }) => {
+    const code = freshCode('46')
+    const hints = await holdHints(page)
+    await open(page, '/purchases/manual/add')
+    await typeCode(page, code)
+    await expect(missingOf(page, code)).toBeVisible()
+    const suggest = page.getByRole('button', { name: 'Suggest an item' })
+    await page.waitForTimeout(400)
+    const before = await suggest.boundingBox()
+
+    hints.release()
+    await expect(page.locator('.code-hint')).toBeVisible()
+    await page.waitForTimeout(400)
+
+    expect(await suggest.boundingBox()).toEqual(before)
+  })
+
+  test('a hint that comes after «Suggest an item» opened leaves the form as it opened (MOL-162, adversarial Д)', async ({
+    page,
+  }) => {
+    const code = freshCode('46')
+    const hints = await holdHints(page)
+    await open(page, '/purchases/manual/add')
+    await typeCode(page, code)
+    await expect(missingOf(page, code)).toBeVisible()
+    await page.getByRole('button', { name: 'Suggest an item' }).click()
+    const form = page.getByRole('dialog', { name: 'New item' })
+    const name = form.getByLabel('As the price tag says')
+    await expect(name).toHaveValue('')
+    await page.waitForTimeout(400)
+    const before = await name.boundingBox()
+
+    const answered = hints.answered()
+    hints.release()
+    expect(await (await answered).json()).toMatchObject({ hint: { name: expect.any(String) } })
+    await page.waitForTimeout(400)
+
+    await expect(name).toHaveValue('')
+    expect(await name.boundingBox()).toEqual(before)
+    await expect(form.getByRole('radio', { name: 'kg', exact: true })).not.toBeChecked()
+    await expect(form.getByRole('link', { name: 'Data from Open Food Facts ↗' })).toHaveCount(0)
   })
 
   test('linked to an item found by name, it finds the item — until «not this item?» lets it go', async ({
