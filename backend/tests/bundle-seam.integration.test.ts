@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -17,15 +16,13 @@ import { describe, expect, it } from 'vitest'
  * it does now. Nothing would be red — the route would simply be there, in production, wide open
  * and writing rows for anyone who found it.
  *
- * Under the integration project rather than the unit one: it runs a real build, which takes
- * seconds a fast loop should not pay.
+ * Under the integration project rather than the unit one: it reads a real build, which takes
+ * seconds a fast loop should not pay. The project's global setup makes it, once a run (MOL-164).
  */
 const root = fileURLToPath(new URL('../..', import.meta.url))
 
 describe('the production bundle', () => {
   it('does not contain the development identity seam', () => {
-    execFileSync('node', ['bin/bundle.mjs', 'backend'], { cwd: root, stdio: 'pipe' })
-
     const bundle = readFileSync(`${root}backend/dist/index.js`, 'utf8')
 
     // The address, and the module's own name for good measure: if either survives, the branch
