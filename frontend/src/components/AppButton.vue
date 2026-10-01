@@ -82,7 +82,10 @@ export default defineComponent({
   cursor: pointer;
   transition:
     filter var(--dur-fast) var(--ease-out),
-    background-color var(--dur-fast) var(--ease-out);
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out);
   -webkit-tap-highlight-color: transparent;
 
   &:focus-visible {

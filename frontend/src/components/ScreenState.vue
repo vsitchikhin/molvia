@@ -194,6 +194,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .state {
+  @include appear;
+
   display: flex;
   flex: 1;
   flex-direction: column;

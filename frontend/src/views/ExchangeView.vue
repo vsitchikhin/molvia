@@ -129,15 +129,17 @@
           <h2 class="caption">{{ t('exchange.list_title') }}</h2>
           <!-- A list, so a screen reader says how many and moves item by item (review Т-5). -->
           <ul class="cards">
-            <li v-for="exchange in overview.exchanges" :key="exchange.id">
-              <ExchangeCard
-                :exchange="exchange"
-                :today="today"
-                :disabled="!online || busy"
-                @edit="edit"
-                @remove="ask"
-              />
-            </li>
+            <AppReveal group>
+              <li v-for="exchange in overview.exchanges" :key="exchange.id">
+                <ExchangeCard
+                  :exchange="exchange"
+                  :today="today"
+                  :disabled="!online || busy"
+                  @edit="edit"
+                  @remove="ask"
+                />
+              </li>
+            </AppReveal>
           </ul>
         </section>
       </template>
@@ -196,6 +198,7 @@ import IconPlus from '~icons/mdi/plus'
 import IconSwap from '~icons/mdi/swap-horizontal'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ExchangeCard from '@/components/ExchangeCard.vue'
 import MarketRatesCard from '@/components/MarketRatesCard.vue'
@@ -224,19 +227,20 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppReveal,
     AppScreen,
     ExchangeCard,
-    MarketRatesCard,
     ExchangeRemoveSheet,
     ExchangeSheet,
     FloatingDock,
+    IconCheck,
+    IconCloud,
+    IconPlus,
+    MarketRatesCard,
     OperationSkeleton,
     ScreenSkeleton,
     ScreenState,
     SegmentedControl,
-    IconCheck,
-    IconCloud,
-    IconPlus,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -427,6 +431,8 @@ export default defineComponent({
 .rate,
 .frozen,
 .strip {
+  @include appear;
+
   margin-bottom: var(--space-4);
 }
 

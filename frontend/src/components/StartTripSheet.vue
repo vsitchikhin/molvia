@@ -10,17 +10,19 @@
       :title="t('settings.offline.title')"
       :body="t('settings.context_missing')"
     />
-    <div v-if="actor.settings && places.places.length > 0" class="recent">
-      <button
-        v-for="place in places.places"
-        :key="place.id"
-        class="place"
-        type="button"
-        @click="start(place.name)"
-      >
-        {{ place.name }}
-      </button>
-    </div>
+    <AppReveal>
+      <div v-if="actor.settings && places.places.length > 0" class="recent">
+        <button
+          v-for="place in places.places"
+          :key="place.id"
+          class="place"
+          type="button"
+          @click="start(place.name)"
+        >
+          {{ place.name }}
+        </button>
+      </div>
+    </AppReveal>
 
     <AppField
       v-model="name"
@@ -45,6 +47,7 @@ import { useI18n } from 'vue-i18n'
 import { drawsNothing, newPlaceSchema, pastedLine } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { newId } from '@/ids'
 import { useActorStore } from '@/stores/actor'
@@ -67,7 +70,7 @@ const NAME_MAX = 200
  */
 export default defineComponent({
   name: 'StartTripSheet',
-  components: { AppButton, AppField, BottomSheet, ScreenState },
+  components: { AppButton, AppField, AppReveal, BottomSheet, ScreenState },
   props: {
     open: { type: Boolean, required: true },
     /**

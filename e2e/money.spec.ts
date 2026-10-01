@@ -515,11 +515,13 @@ for (const reducedMotion of ['reduce', 'no-preference'] as const) {
 /**
  * Stands in for the iOS keyboard, which no Playwright browser has: the visual viewport is replaced
  * before the app loads, and `keyboard(covered, pan)` moves it — the keys cover the bottom `covered`
- * px of the window, and what is visible has been scrolled `pan` px down it. Not what Safari was
- * measured doing (MOL-135): it shrinks the window to the visible part and leaves `dvh` — which a
- * Chromium window cannot, since its `dvh` shrinks along. A scroll down an unshrunk window is
- * another geometry with the same fault: a sheet sized from `dvh` is taller than what is visible.
- * The measured numbers are held by «takes what Safari leaves visible…» in `useKeyboardInset.test`.
+ * px of the window, and the visible part is said to be `pan` px down it, as Safari says it on the
+ * owner's iPhone (304 for keys of 304, MOL-135) while what a page draws stays where it was. Not all
+ * of what Safari was measured doing: it also shrinks the window to the visible part and leaves
+ * `dvh`, which a Chromium window cannot, since its `dvh` shrinks along. The same faults show in
+ * this geometry: a sheet sized from `dvh` is taller than what is visible, and a lift less the
+ * reported scroll leaves it under the keys (MOL-151). The measured numbers are held by
+ * `useKeyboardInset.test`.
  */
 async function fakeKeyboard(page: Page): Promise<(covered: number, pan: number) => Promise<void>> {
   await page.addInitScript(() => {
@@ -527,7 +529,7 @@ async function fakeKeyboard(page: Page): Promise<(covered: number, pan: number) 
     const state = { covered: 0, pan: 0 }
     const viewport = {
       get height() {
-        return window.innerHeight - state.covered - state.pan
+        return window.innerHeight - state.covered
       },
       get width() {
         return window.innerWidth
@@ -565,15 +567,15 @@ async function fakeKeyboard(page: Page): Promise<(covered: number, pan: number) 
 }
 
 /** Where a locator stands against what the fake keyboard leaves visible. */
-async function within(page: Page, selector: string, covered: number, pan: number) {
+async function within(page: Page, selector: string, covered: number) {
   return page.evaluate(
-    ({ css, c, p }) => {
+    ({ css, c }) => {
       const element = document.querySelector(css)
       if (!element) throw new Error(`nothing at ${css}`)
       const box = element.getBoundingClientRect()
-      return { top: box.top >= p, bottom: box.bottom <= innerHeight - c }
+      return { top: box.top >= 0, bottom: box.bottom <= innerHeight - c }
     },
-    { css: selector, c: covered, p: pan },
+    { css: selector, c: covered },
   )
 }
 
@@ -590,9 +592,9 @@ test('the spending sheet stays in what is visible over the keyboard (MOL-135)', 
   await page.waitForTimeout(400)
   await expect(sheet.getByLabel('Сумма')).toBeFocused()
 
-  await keyboard(0, 300)
-  expect(await within(page, 'dialog[open]', 0, 300)).toEqual({ top: true, bottom: true })
-  expect(await within(page, 'dialog[open] input[inputmode="decimal"]', 0, 300)).toEqual({
+  await keyboard(300, 300)
+  expect(await within(page, 'dialog[open]', 300)).toEqual({ top: true, bottom: true })
+  expect(await within(page, 'dialog[open] input[inputmode="decimal"]', 300)).toEqual({
     top: true,
     bottom: true,
   })
@@ -633,9 +635,55 @@ test('the field typed in stays in sight as the keyboard makes the sheet lower (M
   const before = await place()
   expect(before.inside).toBe(true)
 
-  await keyboard(0, 300)
+  await keyboard(300, 300)
   const after = await place()
   expect(after.inside).toBe(true)
   expect(after.scrolled).toBeGreaterThan(before.scrolled)
   expect(await page.evaluate(() => window.scrollY)).toBe(0)
+})
+
+// The first keyboard of a page came 300–800 ms after the focus on the owner's iPhone, once the sheet
+// had risen; the page drew nothing meanwhile, and iOS slid the last picture up with the keys — the
+// sheet in it the screen's share, its top off the screen (MOL-151). With the height the keys left
+// last time remembered, the sheet rises already that high, and the keys coming late change nothing.
+test('the spending sheet rises as high as the keys leave it, before they come (MOL-151)', async ({
+  page,
+}) => {
+  const keyboard = await fakeKeyboard(page)
+  await openMoney(page)
+  const visible = await page.evaluate(() => {
+    const height = Math.round(innerHeight * 0.55)
+    const kept = { [`decimal ${String(innerHeight)}x${String(innerWidth)}`]: height }
+    localStorage.setItem('molvia.keyboard', JSON.stringify(kept))
+    return height
+  })
+  // Every frame from the tap on: how tall the sheet is, and where its top stands.
+  await page.evaluate(() => {
+    const seen: { height: number; top: number }[] = []
+    Object.assign(window, { seen })
+    const look = () => {
+      const dialog = document.querySelector('dialog[open]')
+      if (dialog) {
+        const box = dialog.getBoundingClientRect()
+        seen.push({ height: Math.round(box.height), top: Math.round(box.top) })
+      }
+      requestAnimationFrame(look)
+    }
+    requestAnimationFrame(look)
+  })
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  const sheet = page.locator('dialog[open]')
+  await expect(sheet.getByLabel('Сумма')).toBeFocused()
+  await page.waitForTimeout(400)
+  const covered = (await page.evaluate(() => innerHeight)) - visible
+  await keyboard(covered, covered)
+  await page.waitForTimeout(200)
+
+  const seen = await page.evaluate(
+    () => (window as unknown as { seen: { height: number; top: number }[] }).seen,
+  )
+  expect(seen.length).toBeGreaterThan(10)
+  expect(new Set(seen.map((frame) => frame.height)).size).toBe(1)
+  expect(seen[0]?.height).toBeLessThanOrEqual(Math.ceil(visible * 0.82))
+  expect(await within(page, 'dialog[open]', covered)).toEqual({ top: true, bottom: true })
 })

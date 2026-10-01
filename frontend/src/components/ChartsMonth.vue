@@ -42,8 +42,8 @@
       :body="t('spending.charts.empty.body')"
     />
     <template v-else>
-      <DonutChart v-model="sector" :charts="onScreen ?? charts" :name-of="nameOf" />
-      <DeviationBars :charts="onScreen ?? charts" :name-of="nameOf" />
+      <DonutChart v-model="sector" class="answer" :charts="onScreen ?? charts" :name-of="nameOf" />
+      <DeviationBars class="answer" :charts="onScreen ?? charts" :name-of="nameOf" />
       <AppCard as="section" class="card" :aria-labelledby="`${id}-pace`">
         <div class="head">
           <h2 :id="`${id}-pace`" class="caption">{{ t('spending.charts.pace_title') }}</h2>
@@ -280,6 +280,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .strip {
+  @include appear;
+
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
@@ -368,5 +370,13 @@ export default defineComponent({
 
 .hint {
   margin-top: var(--space-3);
+}
+
+/* The answer comes in where the skeleton stood, faded only: nothing under the thumb may move
+   (MOL-151, review №5 and №7, MOL-138). Here and not on the screen: a component of several roots
+   takes no scope of the screen's. */
+.card,
+.answer {
+  @include appear(0);
 }
 </style>

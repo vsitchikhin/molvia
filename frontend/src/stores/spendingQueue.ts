@@ -13,7 +13,16 @@ import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
 import { isIdentifier } from '@/stores/identity'
-import { HOLDS, doublingRetry, exclusively, isRecord, newKey } from '@/stores/queueing'
+import {
+  HOLDS,
+  doublingRetry,
+  exclusively,
+  isRecord,
+  landedAgain,
+  newKey,
+  recallLanded,
+} from '@/stores/queueing'
+import type { Landed } from '@/stores/queueing'
 import type { Loose } from '@/stores/queueing'
 import { read, writeEverywhere } from '@/stores/storage'
 
@@ -61,6 +70,7 @@ interface Kept {
 
 const QUEUE_KEY = 'molvia.spending-queue'
 const REJECTED_KEY = 'molvia.spending-rejected'
+const GONE_KEY = 'molvia.spending-gone'
 
 /** A removal of a spending the server does not have is what was asked for (as in the trip's). */
 const DONE_ENOUGH: Partial<Record<SpendingWrite['kind'], readonly WireCode[]>> = {
@@ -234,6 +244,13 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
    * these until the server's names them (`categoriesWith` skips one it holds).
    */
   const arrived = ref<Extract<SpendingWrite, { kind: 'category-add' }>[]>([])
+  /**
+   * The spendings whose removal has landed, and when. Out of the queue on its answer, a removal no
+   * longer hides its row, while the month on screen is still the answer read before it: the row
+   * came back for a moment, and its day shrank, grew and shrank again (MOL-151, adversarial А3).
+   * The screen hides one until a month read after it; a removal taken back by «Вернуть» lets go.
+   */
+  const gone = ref<Landed[]>([])
   let ahead = false
   /** The key of the write a send is carrying right now: it is never folded into. */
   let inFlight: string | null = null
@@ -283,6 +300,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     kept = []
     rejected.value = []
     arrived.value = []
+    gone.value = id ? recallLanded(`${GONE_KEY}.${id}`) : []
     sync(id)
     show()
   }
@@ -302,6 +320,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
       sync(id)
       landed.value++
     }
+    if (id && event.key === `${GONE_KEY}.${id}`) gone.value = recallLanded(event.key)
   })
 
   const retry = doublingRetry(() => void attempt())
@@ -429,6 +448,8 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
         ]
       }
       if (!refusal && write.kind === 'category-add') arrived.value = [...arrived.value, write]
+      if (!refusal && (write.kind === 'remove' || write.kind === 'restore'))
+        gone.value = landedAgain(`${GONE_KEY}.${owner}`, write.id, write.kind === 'remove')
       persist(owner)
       landed.value++
     }
@@ -629,6 +650,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     rejected,
     landed,
     arrived,
+    gone,
     flush,
     record,
     amend,

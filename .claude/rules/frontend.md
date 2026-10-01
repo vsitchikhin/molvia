@@ -217,6 +217,64 @@ The detail behind the frontend lines of `CLAUDE.md`.
   all; the arrows in the catalogue list, which a smooth scroll lags behind. **Never
   `scroll-behavior: smooth` in the CSS** — Stylelint refuses it: a scroll with `behavior: 'auto'`
   takes it from the CSS, and the sheet's compensation would slide; a smooth scroll says so itself.
+- **Nothing comes or goes in one frame** (MOL-151, the owner: «многие моменты работают как-то
+  сильно резко», and «все надо делать» over the whole list). Three ways, one grammar, every length a
+  token: **`appear`** (the mixin) fades a thing in with a short rise when it is put in the page — a
+  state of `ScreenState`, a strip, a notice, «Вернуть», the dock, what a screen puts in its
+  content in place of the skeleton (`AppScreen`, `> :slotted(*)`); an animation, so the element's
+  own transitions stay its own. A screen that keeps its answer in one block of its own — «Деньги»,
+  «Счета», «Категории» — fades the block's children in itself, with no rise: the control that chose
+  the answer stands among them (review №5, MOL-138). «Графики» draw the answer inside `ChartsMonth`
+  and `ChartsYear`, components of several roots, which take no scope of the screen's: their cards
+  fade in from there (review №7). **`AppReveal`** grows what pushes its neighbours from nothing and
+  shrinks it back — a row of a list (`group`), an error under a field, a block of a sheet — by its
+  height, padding and margins in the flow, so the rest slides; no row is taken out of the flow, which
+  a slide of the others would need. The gap of a flex column is its parent's and does not shrink with
+  the row, so the margin on the row's side takes it back — otherwise the neighbour jumped by 12 px at
+  the end (adversarial А2). A grid's gap stays whatever its rows do, so a sheet that grows blocks is a
+  flex column, not a grid — the spending, the exchange, the income, the salary day (adversarial Б2). **What is going takes no
+  tap and no focus** (`inert`, review №4). What it grows does not also fade in by `appear`: a day of
+  «Деньги» is a row of the list and a child of the screen's block, and played both. **Colour changes** of a control (a button come active, a chip
+  chosen) and **stale dimming** are transitions of their own. **None of it plays while a screen
+  moves** (`html[data-nav]`): the view transition brings the new screen in already, and a block
+  fading inside it played the arrival twice. **At the end of the move what was put in meanwhile is
+  cut short** (`endMove` in `transitions.ts`): a CSS animation of no length comes back half-way
+  through once its length is back, and in Chromium an answer come at the end of the move dropped to
+  half its opacity and came in anew (adversarial А4). **A move the browser shows itself** — the iOS
+  edge swipe, Android's predictive back — is marked too (`data-nav="browser"`) for its render alone:
+  nothing of ours plays, and without the mark the screen came in again after the gesture (А5). Any
+  move to another screen, with a direction of ours or not: the account opened from the card of
+  «Деньги» has none, and the swipe back from it came in twice (Б3). **None under «reduce motion».** **An answer read is not
+  a row added**: more than `BULK` (3) rows coming or going in one render — a month, a page, a first
+  answer — just appear and are just gone, or a month would shrink out row by row; the first render is
+  never played. **Another month is another list** (`:key` by month on the days of «Деньги»): a month
+  the phone keeps came in place with one to three days, under `BULK`, and its days shrank and grew
+  (adversarial А1). **A removal landed is gone at once** (`gone` in the spending queue): out of the
+  queue on its answer, it no longer hid its row while the month on screen was still the one read
+  before, and the day shrank, grew and shrank again (А3) — the flicker was there before, motion made
+  it seen. «Before» is when the read **set out** (`askedAt`), not when its answer came: a read sent
+  before the removal and come after it still held the row, which came back for seconds (Б1). A
+  record of «Покупки» in the same journal is held the same way by its own queue (`gone` of the trip
+  queue): removed from its screen and come back to «Деньги», it grew back and went (Б4). Both are kept on
+  the device (`molvia.spending-gone`, `molvia.trip-gone`, `recallLanded` in `queueing.ts`), as the
+  month they hide a row from is: kept in memory alone, a reload after a read that failed brought the
+  removed spending back until some read got through (Б5). The month is kept with its `askedAt`, not
+  its arrival alone: recalled after a restart, a read that set out before the removal looked newer
+  than it and brought the row back (Б6). The list is written over what is stored and heard through
+  `storage`, so a second window neither loses nor misses another's removal (round 5). Forgotten after
+  92 days, older than any month the phone keeps unread. Both moments are the phone's clock: set back,
+  a removal may hide a row restored from another device until a «Вернуть» lands here or 92 days
+  pass — a named price, narrow. **What does not move, on purpose:** a change of the screen's own query beyond its
+  answer coming in under the control (MOL-136 — an overlay took the second tap, and «Вернуть» and
+  the main action in the dock come in without the other going out: a `mode="out-in"` would hold
+  back the button the screen gives the focus to once the strip goes — read from the code, not
+  tried); the card of accounts over the month's
+  switcher (a height animated there takes the switcher from under the thumb, MOL-138); the reading
+  and the cursor of a chart under a finger, rows re-ranked by every letter of a search, the countdown
+  of «Вернуть»; and **the height of a sheet as a whole** — the lift over the keyboard and `reveal`
+  measure that box (MOL-135, MOL-151), so only blocks inside it grow. Bars of «Графики» grow to a new
+  answer where they stand: the area keeps its height. Component tests stub transitions (Vue Test
+  Utils), so `AppReveal.test.ts` un-stubs them and fakes `animate`; e2e meets the motion as it is.
 - **A screen is built from the kit, not drawn anew** (MOL-18): `AppButton`, `AppField`,
   `SegmentedControl`, `VerdictBadge`, `AppCard`, `BottomSheet` in `components/`, every state of
   them on the development-only page `/_kit`. `AppCard` carries exactly the differences between
@@ -330,19 +388,55 @@ The detail behind the frontend lines of `CLAUDE.md`.
   Safari does not zoom in on a focus here (no field is under 16px), so it takes a pinch by hand while
   typing. With no keyboard, and on Android where `resizes-content` shrinks the window and `dvh`
   together, the height is what it was. Playwright has no iOS keyboard: e2e replaces `visualViewport`
-  before the app loads (`fakeKeyboard` in `money.spec.ts`) — a scroll down an unshrunk window, another
-  geometry with the same fault, since a Chromium window cannot shrink without its `dvh`; the numbers
-  measured on the iPhone are held by a unit test. On the device the spending sheet was checked; the
+  before the app loads (`fakeKeyboard` in `money.spec.ts`) — keys over an unshrunk window, with the
+  visible part said to be as far down as Safari says it, another geometry with the same faults, since
+  a Chromium window cannot shrink without its `dvh`; the numbers measured on the iPhone are held by a
+  unit test. On the device the spending sheet was checked; the
   other sheets are held by the shared component and the tests.
-- **The lift is counted from `100dvh`, never from `innerHeight`** (hotfix-bottom-menu): `100dvh` is
-  the box a fixed panel is pinned in, and Safari moves `innerHeight` on its own with the keyboard up.
-  In the installed app the same keyboard over the same visual viewport (427, 123 down) came with a
-  window of 796 once and of 720 the next time, and the sheet stood 76px lower, its end — the
-  categories — under the glass bar over the keys; in Safari with its bar folded the window read 535
-  or 734 of a `100dvh` of 699 or 734. Counted from `100dvh`, every state logged on the phone
-  (`hotfix-bottom-menu-probe.jsonl`, MOL-135's log too) put the sheet's end where the keyboard
-  begins. A script has no reading of `dvh`: a hidden fixed box of `100dvh` is read instead, and
-  where nothing is laid out (the component tests) the window's height stands in.
+- **The lift is counted from the box the sheet is pinned in, read where it lies, less the visible
+  height** (`pinnedBottom`, MOL-151) — never from `innerHeight`, and no longer from `100dvh`.
+  `innerHeight` Safari moves on its own with the keyboard up: in the installed app the same keyboard
+  over the same visual viewport (427, 123 down) came with a window of 796 once and of 720 the next
+  time, and the sheet stood 76px lower, its end under the glass bar over the keys (hotfix-bottom-menu,
+  which chose `100dvh` for that). `100dvh` broke the other way (MOL-151, М-2): Safari shrinks the
+  box under the keys a moment before it says how far the visible part moved — on the owner's iPhone,
+  «Где вы?» opened again: the keys over a window of 699 (lift 330, right), then for 300 ms the box
+  369 with the visible part still said to be 0 down, and only then 330 down. A lift of
+  `100dvh` less the visible height less that offset stayed 330 over a box already above the keys,
+  and the sheet flew off the top of the screen — four times of four, on the recording and in the
+  log. That shrink comes with no event of the visual viewport, only a scroll of the window, so the
+  window's own `resize` and `scroll` are heard too while a sheet is open. A hidden fixed box with
+  `bottom: 0` is read for the bottom: in every state logged on the phone — Safari, its bar folded
+  (the box at 495, lift 100), the installed app (674, lift 247), the box shrunk (395 and 369, lift 0) — the box less the visible height gives what the eye saw right. The reported offset is not
+  subtracted: WebKit draws a fixed box in what is visible whatever offset it reports, and in the app
+  subtracting it left the sheet 123px under the keys. Where nothing is laid out (the component tests)
+  the window's height stands in. `100dvh` still tells that the keys are up (`KEYBOARD`) and names
+  the window a remembered height belongs to.
+- **Before the keys come, the sheet takes the height they left last time** (MOL-151, М-1). The
+  first keyboard of a page comes late on an iPhone — 300 to 815 ms after the focus in nine first
+  openings logged, 50 to 160 after — and until it is up the page draws nothing: the main thread was
+  free (a pulse never waited over 16 ms), and still no frame came for 724 ms. On the recording iOS
+  finishes the rise itself, then slides the last picture up with the keys — the sheet in it the
+  screen's share, 573 of 699, its top 178px off the screen, the categories over the keys — and the
+  first new frame is right. Later keyboards came while the sheet still rose, and the slide was lost
+  in the rise. So the visible height under the keys is remembered on the device (`molvia.keyboard`,
+  by the kind of keys — `inputmode` — and the window, `100dvh` and the width: the numeric keys are
+  lower than the letters, a turned phone is another window; it says nothing about the person), and a
+  field of the sheet focused before the keys come takes it at once — the sum is focused before the
+  first frame of the rise, so the sheet rises that high, and the picture iOS slides is already right.
+  Only on a touch screen, and let go if the keys have not come in `KEYBOARD_LATE` (1500 ms: a
+  hardware keyboard never comes) or the focus leaves first; an event of the viewport without the
+  keys does not take it away. **On every such focus**, not only before the page's first keyboard —
+  which the first round of review asked for (adversarial А6) and the log refuted (round 2, У2): a later
+  keyboard came 128 to 263 ms after the focus with no frame of the page between or with one. With
+  none, iOS slides what was drawn before the focus, and nothing here can change it; with one, that
+  frame is what it slides — made lower, the sheet lands in place, left tall its top went off the
+  screen. **The price is that one frame**: the top lower for the 15–36 ms before the keys. In
+  Chromium every frame is drawn, so e2e cannot hold this either way; the unit test holds the rule. **Only a field with keys**: a select and a date bring a picker of their own,
+  and a height remembered for them made the sheet short for 1.5 s and then jumped (У1); they are
+  still kept in sight like any field typed in. **The price:** the very first keyboard on a phone, or
+  after its data was cleared, has nothing to go by and still slides. Neither is the focus put off nor
+  the window held — the rules above stand.
 - **Under the keys, nothing of the page shows** (hotfix-bottom-menu). On iOS 26 and later the keys,
   the bar of «∧ ∨ ✓» over them and Safari's address bar floating above them are glass with clear
   room between them, and the sheet stands on the top of that frame, not of the keys: what lay under

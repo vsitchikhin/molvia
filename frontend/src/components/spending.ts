@@ -247,6 +247,8 @@ export function journalOf(
   rejected: readonly RejectedSpendingWrite[],
   /** Trips whose removal is still on its way (MOL-76): their lines go, the figures stay the server's. */
   removedTrips: ReadonlySet<string> = new Set(),
+  /** Spendings whose removal landed after this month was read (MOL-151): gone, not back for a moment. */
+  gone: ReadonlySet<string> = new Set(),
 ): JournalDay[] {
   const removing = beingRemoved(pending)
   const editing = new Set(pending.flatMap((write) => (write.kind === 'amend' ? [write.id] : [])))
@@ -276,7 +278,7 @@ export function journalOf(
               },
             ]
       const { id } = entry.spending
-      if (removing.has(id)) return []
+      if (removing.has(id) || gone.has(id)) return []
       const refusal = refusals.get(id) ?? null
       return [
         {

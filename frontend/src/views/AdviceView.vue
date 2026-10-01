@@ -74,33 +74,39 @@
 
       <template v-else-if="!searching">
         <AdviceGroup v-if="groups.take.length > 0" level="take">
-          <AdviceTakeCard
-            v-for="row in groups.take"
-            :key="row.itemId"
-            :row="row"
-            :scope="scope ?? 'own'"
-            @edit="edit(row)"
-          />
+          <AppReveal group>
+            <AdviceTakeCard
+              v-for="row in groups.take"
+              :key="row.itemId"
+              :row="row"
+              :scope="scope ?? 'own'"
+              @edit="edit(row)"
+            />
+          </AppReveal>
         </AdviceGroup>
 
         <AdviceGroup v-if="groups.if_cheap.length > 0" level="if_cheap">
-          <AdviceCheapRow
-            v-for="row in groups.if_cheap"
-            :key="row.itemId"
-            :row="row"
-            :scope="scope ?? 'own'"
-            @edit="edit(row)"
-          />
+          <AppReveal group>
+            <AdviceCheapRow
+              v-for="row in groups.if_cheap"
+              :key="row.itemId"
+              :row="row"
+              :scope="scope ?? 'own'"
+              @edit="edit(row)"
+            />
+          </AppReveal>
         </AdviceGroup>
 
         <AdviceGroup v-if="groups.never.length > 0" level="never">
-          <AdviceNeverRow
-            v-for="row in groups.never"
-            :key="row.itemId"
-            :row="row"
-            :scope="scope ?? 'own'"
-            @edit="edit(row)"
-          />
+          <AppReveal group>
+            <AdviceNeverRow
+              v-for="row in groups.never"
+              :key="row.itemId"
+              :row="row"
+              :scope="scope ?? 'own'"
+              @edit="edit(row)"
+            />
+          </AppReveal>
           <p class="tail">{{ t('advice.no_price_shown') }}</p>
         </AdviceGroup>
 
@@ -147,6 +153,7 @@ import AdviceNeverRow from '@/components/AdviceNeverRow.vue'
 import AdviceSearch from '@/components/AdviceSearch.vue'
 import AdviceTakeCard from '@/components/AdviceTakeCard.vue'
 import AppButton from '@/components/AppButton.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
@@ -189,8 +196,6 @@ const STALE = {
 export default defineComponent({
   name: 'AdviceView',
   components: {
-    IconCloud,
-    IconSync,
     AdviceCheapRow,
     AdviceGroup,
     AdviceHomeNew,
@@ -198,7 +203,10 @@ export default defineComponent({
     AdviceSearch,
     AdviceTakeCard,
     AppButton,
+    AppReveal,
     AppScreen,
+    IconCloud,
+    IconSync,
     ManualEntryButton,
     ScreenSkeleton,
     ScreenState,
@@ -333,6 +341,8 @@ export default defineComponent({
 }
 
 .strip {
+  @include appear;
+
   padding: var(--space-3) 0;
 }
 

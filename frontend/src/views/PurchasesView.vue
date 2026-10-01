@@ -5,26 +5,30 @@
     <!-- The record going on comes first, without a caption: it is the one thing on this screen
          that is still being done (handoff `03`, Р-4). From the phone as much as from the server —
          a record started with no signal is open all the same. -->
-    <AppCard v-if="open" class="block open" list>
-      <PurchaseRow
-        :icon="IconPencil"
-        accent
-        :title="open.place"
-        :meta="t('purchases.open_manual_meta', { count: positions(open.count) })"
-        :tag="t('purchases.continue')"
-        @open="goOn"
-      />
-    </AppCard>
+    <AppReveal>
+      <AppCard v-if="open" class="block open" list>
+        <PurchaseRow
+          :icon="IconPencil"
+          accent
+          :title="open.place"
+          :meta="t('purchases.open_manual_meta', { count: positions(open.count) })"
+          :tag="t('purchases.continue')"
+          @open="goOn"
+        />
+      </AppCard>
+    </AppReveal>
 
-    <AppCard v-if="pending > 0" class="block pending" list>
-      <PurchaseRow
-        :icon="IconStar"
-        accent
-        :title="t('verdict.pending_count', { n: pending }, pending)"
-        :meta="pendingFrom"
-        @open="goTab('verdicts')"
-      />
-    </AppCard>
+    <AppReveal>
+      <AppCard v-if="pending > 0" class="block pending" list>
+        <PurchaseRow
+          :icon="IconStar"
+          accent
+          :title="t('verdict.pending_count', { n: pending }, pending)"
+          :meta="pendingFrom"
+          @open="goTab('verdicts')"
+        />
+      </AppCard>
+    </AppReveal>
 
     <ScreenSkeleton v-if="shown === 'loading'" :groups="[34, 70, 56, 74, 62]" />
 
@@ -59,15 +63,17 @@
     <template v-if="rows.length > 0">
       <p class="caption">{{ t('purchases.group_recorded') }}</p>
       <AppCard class="recorded" list>
-        <PurchaseRow
-          v-for="row in rows"
-          :key="row.id"
-          :title="row.name"
-          :meta="recordedMeta(row)"
-          :note="row.pending ? t('trip.history.local_finish') : null"
-          :sum="sum(row)"
-          @open="openRow(row.id)"
-        />
+        <AppReveal group>
+          <PurchaseRow
+            v-for="row in rows"
+            :key="row.id"
+            :title="row.name"
+            :meta="recordedMeta(row)"
+            :note="row.pending ? t('trip.history.local_finish') : null"
+            :sum="sum(row)"
+            @open="openRow(row.id)"
+          />
+        </AppReveal>
       </AppCard>
       <AppButton
         v-if="history.page.nextCursor && trouble !== 'offline'"
@@ -100,6 +106,7 @@ import IconStar from '~icons/mdi/star-outline'
 import { formatMoney } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import PurchaseRow from '@/components/PurchaseRow.vue'
@@ -133,6 +140,7 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppReveal,
     AppScreen,
     ManualEntryButton,
     PurchaseRow,
@@ -266,6 +274,8 @@ export default defineComponent({
 }
 
 .strip {
+  @include appear;
+
   padding: var(--space-3) 0;
 }
 

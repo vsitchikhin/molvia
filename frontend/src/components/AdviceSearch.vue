@@ -333,8 +333,20 @@ export default defineComponent({
   margin: var(--space-4) 0 0;
 }
 
+.found,
+.stale {
+  transition: opacity var(--dur) var(--ease-out);
+}
+
 .stale {
   opacity: var(--opacity-stale);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .found,
+  .stale {
+    transition: none;
+  }
 }
 
 .unrated-row {

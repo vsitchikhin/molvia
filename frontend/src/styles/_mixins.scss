@@ -43,3 +43,12 @@
   outline: 2px solid var(--accent);
   outline-offset: $offset;
 }
+
+/// Comes in rather than pops up (MOL-151): faded in with a short rise the moment it is put in the
+/// page, by `@keyframes appear` in main.scss — which also stills it under «reduce motion» and
+/// while a screen moves. An animation, not a transition: the element's own transitions are untouched.
+@mixin appear($rise: var(--space-2)) {
+  --appear-rise: #{$rise};
+
+  animation: appear var(--appear-duration) var(--ease-out) backwards;
+}

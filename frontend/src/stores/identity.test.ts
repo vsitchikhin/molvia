@@ -205,6 +205,8 @@ describe('какие ключи приложение пишет на устро�
       // не человека, и выход её не меняет (MOL-163).
       'molvia.camera-hint',
       'molvia.invite',
+      // Высота, которую клавиатура оставила видимой, — о телефоне, не о человеке (MOL-151).
+      'molvia.keyboard',
       'molvia.leaving',
       'molvia.login',
       // Пробная запись: пишется и тут же удаляется, чтобы узнать, работает ли общая полка.
@@ -233,10 +235,13 @@ describe('какие ключи приложение пишет на устро�
       'molvia.search-draft',
       'molvia.settings',
       'molvia.settings-draft',
+      // Удаления трат и записей, на которые сервер ответил, — пока месяц не прочитан заново (MOL-151).
+      'molvia.spending-gone',
       // Очередь «Денег» и её отказы (MOL-82).
       'molvia.spending-queue',
       'molvia.spending-rejected',
       'molvia.trip',
+      'molvia.trip-gone',
       'molvia.trip-history',
       // Был ли последний ответ истории пустым — своим ключом, чтобы кэш читался прежней версией
       // (MOL-77).

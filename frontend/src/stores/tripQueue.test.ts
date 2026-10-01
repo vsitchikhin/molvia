@@ -1650,6 +1650,59 @@ describe('trip queue', () => {
       expect(ids).toEqual([MILK, BREAD])
     })
 
+    // Месяц «Денег», прочитанный до удаления, держит строку похода: ответ на удаление вывел его из
+    // очереди, и строка вырастала обратно (MOL-151, адверсариальное Б4).
+    it('удаление, на которое сервер ответил, помнится с моментом ответа; «Вернуть» отпускает', async () => {
+      removeTrip.mockResolvedValue(undefined)
+      restoreTrip.mockResolvedValue(answer('520'))
+      const queue = fresh()
+      const before = Date.now()
+      const undo = queue.removeTrip(TRIP, 'Ереван Сити')
+      await queue.flush()
+      expect(queue.gone.map((item) => item.id)).toEqual([TRIP])
+      expect(queue.gone[0]?.at).toBeGreaterThanOrEqual(before)
+      queue.restoreTrip(undo)
+      await queue.flush()
+      expect(queue.gone).toEqual([])
+    })
+
+    // Месяц в памяти телефона переживает перезапуск — переживает и то, что прячет в нём удалённое
+    // (адверсариальное Б5).
+    it('ответившее удаление помнится и после перезапуска', async () => {
+      removeTrip.mockResolvedValue(undefined)
+      const queue = fresh()
+      queue.removeTrip(TRIP, 'Ереван Сити')
+      await queue.flush()
+      expect(fresh().gone.map((item) => item.id)).toEqual([TRIP])
+    })
+
+    // Два окна одного телефона: список пишется поверх хранилища и слышен другому окну (раунд 5).
+    it('удаление, ответившее в другом окне, не теряется и слышно', async () => {
+      removeTrip.mockResolvedValue(undefined)
+      const queue = fresh()
+      const key = `molvia.trip-gone.${ME}`
+      const elsewhere = JSON.stringify([{ id: MILK, at: Date.now() }])
+      localStorage.setItem(key, elsewhere)
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+      expect(queue.gone.map((item) => item.id)).toEqual([MILK])
+
+      localStorage.setItem(key, '[]')
+      queue.removeTrip(TRIP, 'Ереван Сити')
+      localStorage.setItem(key, elsewhere)
+      await queue.flush()
+      expect(queue.gone.map((item) => item.id)).toEqual([MILK, TRIP])
+      expect(fresh().gone.map((item) => item.id)).toEqual([MILK, TRIP])
+    })
+
+    it('не должно сработать: удаление, которое не дошло, не помнится как ответившее', async () => {
+      removeTrip.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.removeTrip(TRIP, 'Ереван Сити')
+      await queue.flush()
+      expect(queue.gone).toEqual([])
+      expect(queue.removing.has(TRIP)).toBe(true)
+    })
+
     it('поход, начатый без связи: удаление уходит со связью, 404 — сделано', async () => {
       startTrip.mockRejectedValue(offline())
       removeTrip.mockRejectedValue(offline())
