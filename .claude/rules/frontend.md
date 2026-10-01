@@ -330,19 +330,47 @@ The detail behind the frontend lines of `CLAUDE.md`.
   Safari does not zoom in on a focus here (no field is under 16px), so it takes a pinch by hand while
   typing. With no keyboard, and on Android where `resizes-content` shrinks the window and `dvh`
   together, the height is what it was. Playwright has no iOS keyboard: e2e replaces `visualViewport`
-  before the app loads (`fakeKeyboard` in `money.spec.ts`) — a scroll down an unshrunk window, another
-  geometry with the same fault, since a Chromium window cannot shrink without its `dvh`; the numbers
-  measured on the iPhone are held by a unit test. On the device the spending sheet was checked; the
+  before the app loads (`fakeKeyboard` in `money.spec.ts`) — keys over an unshrunk window, with the
+  visible part said to be as far down as Safari says it, another geometry with the same faults, since
+  a Chromium window cannot shrink without its `dvh`; the numbers measured on the iPhone are held by a
+  unit test. On the device the spending sheet was checked; the
   other sheets are held by the shared component and the tests.
-- **The lift is counted from `100dvh`, never from `innerHeight`** (hotfix-bottom-menu): `100dvh` is
-  the box a fixed panel is pinned in, and Safari moves `innerHeight` on its own with the keyboard up.
-  In the installed app the same keyboard over the same visual viewport (427, 123 down) came with a
-  window of 796 once and of 720 the next time, and the sheet stood 76px lower, its end — the
-  categories — under the glass bar over the keys; in Safari with its bar folded the window read 535
-  or 734 of a `100dvh` of 699 or 734. Counted from `100dvh`, every state logged on the phone
-  (`hotfix-bottom-menu-probe.jsonl`, MOL-135's log too) put the sheet's end where the keyboard
-  begins. A script has no reading of `dvh`: a hidden fixed box of `100dvh` is read instead, and
-  where nothing is laid out (the component tests) the window's height stands in.
+- **The lift is counted from the box the sheet is pinned in, read where it lies, less the visible
+  height** (`pinnedBottom`, MOL-151) — never from `innerHeight`, and no longer from `100dvh`.
+  `innerHeight` Safari moves on its own with the keyboard up: in the installed app the same keyboard
+  over the same visual viewport (427, 123 down) came with a window of 796 once and of 720 the next
+  time, and the sheet stood 76px lower, its end under the glass bar over the keys (hotfix-bottom-menu,
+  which chose `100dvh` for that). `100dvh` broke the other way (MOL-151, М-2): Safari shrinks the
+  box under the keys a moment before it says how far the visible part moved — on the owner's iPhone,
+  «Где вы?» opened again: the keys over a window of 699 (lift 330, right), then for 300 ms the box
+  369 with the visible part still said to be 0 down, and only then 330 down. A lift of
+  `100dvh` less the visible height less that offset stayed 330 over a box already above the keys,
+  and the sheet flew off the top of the screen — four times of four, on the recording and in the
+  log. That shrink comes with no event of the visual viewport, only a scroll of the window, so the
+  window's own `resize` and `scroll` are heard too while a sheet is open. A hidden fixed box with
+  `bottom: 0` is read for the bottom: in every state logged on the phone — Safari, its bar folded
+  (the box at 495, lift 100), the installed app (674, lift 247), the box shrunk (395 and 369, lift 0) — the box less the visible height gives what the eye saw right. The reported offset is not
+  subtracted: WebKit draws a fixed box in what is visible whatever offset it reports, and in the app
+  subtracting it left the sheet 123px under the keys. Where nothing is laid out (the component tests)
+  the window's height stands in. `100dvh` still tells that the keys are up (`KEYBOARD`) and names
+  the window a remembered height belongs to.
+- **Before the keys come, the sheet takes the height they left last time** (MOL-151, М-1). The
+  first keyboard of a page comes late on an iPhone — 300 to 815 ms after the focus in nine first
+  openings logged, 50 to 160 after — and until it is up the page draws nothing: the main thread was
+  free (a pulse never waited over 16 ms), and still no frame came for 724 ms. On the recording iOS
+  finishes the rise itself, then slides the last picture up with the keys — the sheet in it the
+  screen's share, 573 of 699, its top 178px off the screen, the categories over the keys — and the
+  first new frame is right. Later keyboards came while the sheet still rose, and the slide was lost
+  in the rise. So the visible height under the keys is remembered on the device (`molvia.keyboard`,
+  by the kind of keys — `inputmode` — and the window, `100dvh` and the width: the numeric keys are
+  lower than the letters, a turned phone is another window; it says nothing about the person), and a
+  field of the sheet focused before the keys come takes it at once — the sum is focused before the
+  first frame of the rise, so the sheet rises that high, and the picture iOS slides is already right.
+  Only on a touch screen, and let go if the keys have not come in `KEYBOARD_LATE` (1500 ms: a
+  hardware keyboard never comes) or the focus leaves first; an event of the viewport without the
+  keys does not take it away. **The price:** the very first keyboard on a phone, or after its data
+  was cleared, has nothing to go by and still slides. Neither is the focus put off nor the window
+  held — the rules above stand.
 - **Under the keys, nothing of the page shows** (hotfix-bottom-menu). On iOS 26 and later the keys,
   the bar of «∧ ∨ ✓» over them and Safari's address bar floating above them are glass with clear
   room between them, and the sheet stands on the top of that frame, not of the keys: what lay under
