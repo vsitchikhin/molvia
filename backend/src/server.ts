@@ -75,6 +75,7 @@ import {
   spendingCategoriesOf,
 } from '@/usecases/spendings'
 import { chooseSalaryShift, moneyMonthOf, salaryShiftOf } from '@/usecases/money-month'
+import { moneyChartMonthOf } from '@/usecases/money-chart-month'
 import { moneyChartsOf } from '@/usecases/money-charts'
 import { spendingRoutes } from '@/routes/spendings'
 import { createSpendingRepository } from '@/db/spendings-repository'
@@ -543,6 +544,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           archiveSpendingCategory(tripData, actor, id, archived),
         month: (actor, month, cursor) => moneyMonthOf(tripData, actor, month, cursor),
         charts: (actor, period) => moneyChartsOf(tripData, actor, period),
+        chartMonth: (actor, month) => moneyChartMonthOf(tripData, actor, month),
         salaryShift: (actor) => salaryShiftOf(tripData, actor),
         setSalaryShift: (actor, body) => chooseSalaryShift(tripData, actor, body),
       })

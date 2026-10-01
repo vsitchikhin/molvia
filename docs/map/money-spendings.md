@@ -6,7 +6,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 ## packages/model
 
 - `packages/model/src/contracts/money.ts` — Wire schemas of the «Деньги» month: the month address, journal page cursor, the month view, the salary-shift setting.
-- `packages/model/src/contracts/money-charts.ts` — Wire schemas of «Графики»: the strict `?period=6|12` and the charts view with every height the server counted.
+- `packages/model/src/contracts/money-charts.ts` — Wire schemas of «Графики»: the strict `?period=6|12` and the charts view with every height the server counted; the month's charts of MOL-158.
 - `packages/model/src/contracts/spending.ts` — Wire schemas of spendings and categories: body and amendment, a spending's view, a category's body and view, the categories answer.
 - `packages/model/src/entities/money-month.ts` — The month of «Деньги» counted whole: months and budget month, journal entries and order, «Пришло», «Остаток», `percentChange`, `shareOf`.
 - `packages/model/src/entities/money-charts.ts` — The months of «Графики» laid out from counted months: levels, «Разница», averages, category series, exchanges by exchanger, the rate line by week.
@@ -16,12 +16,13 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 
 ## backend · routes
 
-- `backend/src/routes/spendings.ts` — HTTP of «Деньги»: `/spendings` and `/spending-categories` writes and undo, `GET /money/months/:month`, `/actors/me/salary-shift`.
+- `backend/src/routes/spendings.ts` — HTTP of «Деньги»: `/spendings` and `/spending-categories` writes and undo, `GET /money/months/:month` and its `/charts`, `/actors/me/salary-shift`.
 
 ## backend · usecases
 
 - `backend/src/usecases/money-month.ts` — Use case: the month of «Деньги» with its rates read first and a closed month frozen, and the salary-shift setting. Tests: `backend/tests/spendings.integration.test.ts`.
 - `backend/src/usecases/money-charts.ts` — Use case: `GET /money/charts` — the period's months by the month's own count and rate, the losses on exchanges, the rate of the pair by week. Tests: `backend/tests/money-charts.integration.test.ts`.
+- `backend/src/usecases/money-chart-month.ts` — Use case: `GET /money/months/:month/charts` — the month as «Деньги» count it, the usual months before it counted with no rate and never frozen. Tests: `backend/tests/money-chart-month.integration.test.ts`.
 - `backend/src/usecases/money.test.ts` — Use-case test: day rates, a spending's rate snapshot on record and amend, and month freezing hold on fake repositories.
 - `backend/src/usecases/today.ts` — `todayOf`: «today» of money for a request — the phone's day it named (`TODAY_HEADER`, MOL-121), or Yerevan's. Tests: `backend/tests/money-accounts.integration.test.ts`.
 - `backend/src/usecases/spendings.ts` — Use cases of spendings and categories: record, amend, remove, restore a spending; list, add and archive a category.
@@ -35,6 +36,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 ## backend · tests
 
 - `backend/tests/month-rest.integration.test.ts` — Integration test: «Остаток» is the accounts' money at the month's end — which accounts and operations count, frozen and uncounted cases.
+- `backend/tests/money-chart-month.integration.test.ts` — Integration test: the month of «Графики → Месяц» equals its month of «Деньги», only it is frozen, the usual from three closed months, a removed category, privacy.
 - `backend/tests/money-charts.integration.test.ts` — Integration test: every bar equals its month of «Деньги», freezing and thawing, exchangers, the rate line, overflow and races.
 - `backend/tests/salary-shift.integration.test.ts` — Integration test: «Зарплата — в следующий месяц» is set and cleared per owner, bounded, and moves a salary into next month's «Пришло».
 - `backend/tests/spendings.integration.test.ts` — Integration test: categories, spendings and the month over HTTP — repeats, undo, rates of the day, freezing and thawing, journal pages.
