@@ -83,12 +83,20 @@
             </p>
           </AppCard>
 
-          <section v-for="group in groups" :key="group.key" class="group">
-            <h2 class="group-caption">{{ group.title }}</h2>
-            <AppCard as="ul" list>
-              <AccountLine v-for="account in group.accounts" :key="account.id" :account="account" />
-            </AppCard>
-          </section>
+          <AppReveal group>
+            <section v-for="group in groups" :key="group.key" class="group">
+              <h2 class="group-caption">{{ group.title }}</h2>
+              <AppCard as="ul" list>
+                <AppReveal group>
+                  <AccountLine
+                    v-for="account in group.accounts"
+                    :key="account.id"
+                    :account="account"
+                  />
+                </AppReveal>
+              </AppCard>
+            </section>
+          </AppReveal>
         </template>
 
         <AppCard v-if="removedAccounts.length > 0" class="removed">
@@ -102,32 +110,35 @@
             <span class="removed-title">
               {{ t('accounts.screen.archived', { n: removedAccounts.length }) }}
             </span>
-            <IconUp v-if="showRemoved" class="removed-icon" aria-hidden="true" />
-            <IconDown v-else class="removed-icon" aria-hidden="true" />
+            <IconDown class="removed-icon turn" :class="{ up: showRemoved }" aria-hidden="true" />
           </button>
-          <template v-if="showRemoved">
-            <ul class="removed-list">
-              <li v-for="account in removedAccounts" :key="account.id" class="removed-row">
-                <RouterLink
-                  class="removed-open"
-                  :to="{ name: 'money-account', params: { accountId: account.id } }"
-                >
-                  <span class="removed-name">{{ account.name }}</span>
-                  <span class="removed-sub">{{ removedLine(account) }}</span>
-                </RouterLink>
-                <AppButton
-                  variant="secondary"
-                  :disabled="!online || restoring === account.id"
-                  :busy="restoring === account.id"
-                  @click="bringBack(account)"
-                >
-                  <template #icon><IconUndo /></template>
-                  {{ t('accounts.screen.restore') }}
-                </AppButton>
-              </li>
-            </ul>
-            <p class="footnote removed-note">{{ t('accounts.screen.archived_note') }}</p>
-          </template>
+          <AppReveal>
+            <div v-if="showRemoved">
+              <ul class="removed-list">
+                <AppReveal group>
+                  <li v-for="account in removedAccounts" :key="account.id" class="removed-row">
+                    <RouterLink
+                      class="removed-open"
+                      :to="{ name: 'money-account', params: { accountId: account.id } }"
+                    >
+                      <span class="removed-name">{{ account.name }}</span>
+                      <span class="removed-sub">{{ removedLine(account) }}</span>
+                    </RouterLink>
+                    <AppButton
+                      variant="secondary"
+                      :disabled="!online || restoring === account.id"
+                      :busy="restoring === account.id"
+                      @click="bringBack(account)"
+                    >
+                      <template #icon><IconUndo /></template>
+                      {{ t('accounts.screen.restore') }}
+                    </AppButton>
+                  </li>
+                </AppReveal>
+              </ul>
+              <p class="footnote removed-note">{{ t('accounts.screen.archived_note') }}</p>
+            </div>
+          </AppReveal>
         </AppCard>
       </template>
     </div>
@@ -166,7 +177,6 @@ import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconDown from '~icons/mdi/chevron-down'
 import IconPlus from '~icons/mdi/plus'
 import IconUndo from '~icons/mdi/undo-variant'
-import IconUp from '~icons/mdi/chevron-up'
 import IconWallet from '~icons/mdi/wallet-outline'
 import type { Currency, ExchangeRate, Money, MoneyAccountView } from '@molvia/model'
 import { ApiError } from '@molvia/client'
@@ -177,6 +187,7 @@ import AccountSheet from '@/components/AccountSheet.vue'
 import type { AccountOutcome } from '@/components/AccountSheet.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import FloatingDock from '@/components/FloatingDock.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
@@ -205,6 +216,7 @@ export default defineComponent({
     AccountSheet,
     AppButton,
     AppCard,
+    AppReveal,
     AppScreen,
     FloatingDock,
     IconArchive,
@@ -212,7 +224,6 @@ export default defineComponent({
     IconDown,
     IconPlus,
     IconUndo,
-    IconUp,
     ScreenSkeleton,
     ScreenState,
     UndoStrip,
@@ -402,6 +413,8 @@ export default defineComponent({
 }
 
 .strip {
+  @include appear;
+
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
@@ -519,6 +532,19 @@ export default defineComponent({
   flex: none;
   width: 1.25rem;
   height: 1.25rem;
+}
+
+/* One chevron turned rather than two swapped: it is seen to open the list (MOL-151). */
+.turn {
+  transition: rotate var(--dur) var(--ease);
+
+  &.up {
+    rotate: 180deg;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 }
 
 .removed-list {

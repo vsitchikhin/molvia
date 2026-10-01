@@ -23,24 +23,26 @@
     <section v-else-if="list" class="list">
       <h2 ref="caption" class="caption" tabindex="-1">{{ t('devices.list_title') }}</h2>
       <AppCard as="ul" list>
-        <li v-for="session in list.sessions" :key="session.id" class="row">
-          <component :is="iconOf(session.deviceName)" class="icon" aria-hidden="true" />
-          <div class="body">
-            <p class="name">
-              {{ nameOf(session) }}
-              <span v-if="session.current" class="this">{{ t('devices.this_device') }}</span>
-            </p>
-            <p class="meta">{{ metaOf(session) }}</p>
-          </div>
-          <AppButton
-            v-if="!session.current"
-            variant="danger-ghost"
-            :aria-label="said('devices.end_label', session.deviceName)"
-            @click="ask(session)"
-          >
-            {{ t('devices.end') }}
-          </AppButton>
-        </li>
+        <AppReveal group>
+          <li v-for="session in list.sessions" :key="session.id" class="row">
+            <component :is="iconOf(session.deviceName)" class="icon" aria-hidden="true" />
+            <div class="body">
+              <p class="name">
+                {{ nameOf(session) }}
+                <span v-if="session.current" class="this">{{ t('devices.this_device') }}</span>
+              </p>
+              <p class="meta">{{ metaOf(session) }}</p>
+            </div>
+            <AppButton
+              v-if="!session.current"
+              variant="danger-ghost"
+              :aria-label="said('devices.end_label', session.deviceName)"
+              @click="ask(session)"
+            >
+              {{ t('devices.end') }}
+            </AppButton>
+          </li>
+        </AppReveal>
       </AppCard>
       <p v-if="list.total > list.sessions.length" class="note">
         {{ t('devices.more', { shown: list.sessions.length, total: list.total }) }}
@@ -69,6 +71,7 @@ import IconLaptop from '~icons/mdi/laptop'
 import IconTablet from '~icons/mdi/tablet'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
@@ -88,7 +91,15 @@ import { dayOfAnyYear } from '@/days'
  */
 export default defineComponent({
   name: 'DevicesView',
-  components: { AppButton, AppCard, AppScreen, ScreenSkeleton, ScreenState, SessionEndSheet },
+  components: {
+    AppButton,
+    AppCard,
+    AppReveal,
+    AppScreen,
+    ScreenSkeleton,
+    ScreenState,
+    SessionEndSheet,
+  },
   setup() {
     const { t, locale } = useI18n()
     const sessions = useSessions()

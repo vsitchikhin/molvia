@@ -58,7 +58,9 @@
 
       <template v-else>
         <AppCard list>
-          <TripRow v-for="row in rows" :key="row.key" :row="row" @open="amend" />
+          <AppReveal group>
+            <TripRow v-for="row in rows" :key="row.key" :row="row" @open="amend" />
+          </AppReveal>
           <button class="add" type="button" @click="find">
             <IconPlus class="add-icon" aria-hidden="true" />
             {{ t('trip.add_item') }}
@@ -185,6 +187,7 @@ import IconPlus from '~icons/mdi/plus'
 import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
@@ -245,6 +248,7 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppReveal,
     AppScreen,
     BottomSheet,
     IconBarcode,

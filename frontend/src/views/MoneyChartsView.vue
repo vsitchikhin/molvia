@@ -557,6 +557,8 @@ export default defineComponent({
 }
 
 .strip {
+  @include appear;
+
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);

@@ -20,20 +20,22 @@
       />
 
       <template v-else-if="phase === 'ready'">
-        <ScreenState
-          v-for="item in refusals"
-          :key="item.key"
-          kind="attention"
-          inline
-          :title="t('spending.rejected_other.title')"
-          :body="reasonOf(item.code)"
-        >
-          <template #action>
-            <AppButton variant="ghost" @click="queue.dismiss(item)">
-              {{ t('spending.sheet.dismiss') }}
-            </AppButton>
-          </template>
-        </ScreenState>
+        <AppReveal group>
+          <ScreenState
+            v-for="item in refusals"
+            :key="item.key"
+            kind="attention"
+            inline
+            :title="t('spending.rejected_other.title')"
+            :body="reasonOf(item.code)"
+          >
+            <template #action>
+              <AppButton variant="ghost" @click="queue.dismiss(item)">
+                {{ t('spending.sheet.dismiss') }}
+              </AppButton>
+            </template>
+          </ScreenState>
+        </AppReveal>
 
         <AppButton block @click="newOpen = true">
           <template #icon><IconPlus /></template>
@@ -42,41 +44,49 @@
 
         <h2 class="caption">{{ t('spending.categories.live') }}</h2>
         <AppCard as="ul" list>
-          <li v-for="category in live" :key="category.id" class="row">
-            <span class="dot" :style="{ background: colourOf(category) }" aria-hidden="true"></span>
-            <span class="name">
-              {{ nameOf(category) }}
-              <span v-if="!category.preset" class="own">{{ t('spending.categories.own') }}</span>
-              <span v-if="waiting(category.id)" class="waiting">{{ t('spending.pending') }}</span>
-            </span>
-            <AppButton
-              variant="danger-ghost"
-              :aria-label="t('spending.categories.remove_label', { name: nameOf(category) })"
-              @click="queue.archiveCategory(category.id, true)"
-            >
-              {{ t('spending.categories.remove') }}
-            </AppButton>
-          </li>
-        </AppCard>
-
-        <template v-if="archived.length > 0">
-          <h2 class="caption">{{ t('spending.categories.archived') }}</h2>
-          <AppCard as="ul" list>
-            <li v-for="category in archived" :key="category.id" class="row">
+          <AppReveal group>
+            <li v-for="category in live" :key="category.id" class="row">
               <span
                 class="dot"
                 :style="{ background: colourOf(category) }"
                 aria-hidden="true"
               ></span>
-              <span class="name">{{ nameOf(category) }}</span>
+              <span class="name">
+                {{ nameOf(category) }}
+                <span v-if="!category.preset" class="own">{{ t('spending.categories.own') }}</span>
+                <span v-if="waiting(category.id)" class="waiting">{{ t('spending.pending') }}</span>
+              </span>
               <AppButton
-                variant="ghost"
-                :aria-label="t('spending.categories.restore_label', { name: nameOf(category) })"
-                @click="queue.archiveCategory(category.id, false)"
+                variant="danger-ghost"
+                :aria-label="t('spending.categories.remove_label', { name: nameOf(category) })"
+                @click="queue.archiveCategory(category.id, true)"
               >
-                {{ t('spending.restore') }}
+                {{ t('spending.categories.remove') }}
               </AppButton>
             </li>
+          </AppReveal>
+        </AppCard>
+
+        <template v-if="archived.length > 0">
+          <h2 class="caption">{{ t('spending.categories.archived') }}</h2>
+          <AppCard as="ul" list>
+            <AppReveal group>
+              <li v-for="category in archived" :key="category.id" class="row">
+                <span
+                  class="dot"
+                  :style="{ background: colourOf(category) }"
+                  aria-hidden="true"
+                ></span>
+                <span class="name">{{ nameOf(category) }}</span>
+                <AppButton
+                  variant="ghost"
+                  :aria-label="t('spending.categories.restore_label', { name: nameOf(category) })"
+                  @click="queue.archiveCategory(category.id, false)"
+                >
+                  {{ t('spending.restore') }}
+                </AppButton>
+              </li>
+            </AppReveal>
           </AppCard>
         </template>
         <p class="note">{{ t('spending.categories.note') }}</p>
@@ -95,6 +105,7 @@ import type { SpendingCategoryView, WireCode } from '@molvia/model'
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
@@ -115,6 +126,7 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppReveal,
     AppScreen,
     IconPlus,
     NewCategorySheet,
