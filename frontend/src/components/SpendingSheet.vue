@@ -798,8 +798,10 @@ export default defineComponent({
     function openTrip(): void {
       if (props.target.kind !== 'trip') return
       const tripId = props.target.row.tripId
-      after = () =>
-        void router.push({ name: 'purchase', params: { tripId }, query: { from: 'money' } })
+      // Back to the screen it was opened from — «Траты» since MOL-159 (`meta.from`, MOL-82 В-3).
+      const from =
+        router.currentRoute.value.name === 'money-spendings' ? 'money-spendings' : 'money'
+      after = () => void router.push({ name: 'purchase', params: { tripId }, query: { from } })
       emit('update:open', false)
     }
 

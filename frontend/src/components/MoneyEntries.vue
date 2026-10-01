@@ -1,15 +1,16 @@
 <template>
   <nav :aria-label="t('spending.entries_label')">
     <AppCard list>
-      <RouterLink class="entry" :to="{ name: 'exchange' }">
-        <IconSwap class="entry-icon" aria-hidden="true" />
-        <span class="entry-label">{{ t('exchange.title') }}</span>
-        <span v-if="shown" class="entry-value">{{ shown }}</span>
-        <IconChevron class="entry-chevron" aria-hidden="true" />
-      </RouterLink>
-      <RouterLink class="entry" :to="{ name: 'incomes' }">
-        <IconCashPlus class="entry-icon" aria-hidden="true" />
-        <span class="entry-label">{{ t('income.title') }}</span>
+      <RouterLink
+        v-for="row in rows"
+        :key="row.key"
+        class="entry"
+        :to="row.to"
+        :aria-label="row.value ? t('spending.entry_value', row) : undefined"
+      >
+        <component :is="row.icon" class="entry-icon" aria-hidden="true" />
+        <span class="entry-label">{{ row.name }}</span>
+        <span v-if="row.value" class="entry-value" aria-hidden="true">{{ row.value }}</span>
         <IconChevron class="entry-chevron" aria-hidden="true" />
       </RouterLink>
     </AppCard>
@@ -17,34 +18,102 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent } from 'vue'
-import type { PropType } from 'vue'
+import { computed, defineComponent, markRaw } from 'vue'
+import type { Component, PropType } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import IconBank from '~icons/mdi/bank-outline'
 import IconCashPlus from '~icons/mdi/cash-plus'
 import IconChevron from '~icons/mdi/chevron-right'
+import IconList from '~icons/mdi/format-list-bulleted'
+import IconShape from '~icons/mdi/shape-outline'
 import IconSwap from '~icons/mdi/swap-horizontal'
-import { formatRate } from '@molvia/model'
-import type { ExchangeRate } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 
+/** The one figure of each row, or null until it is known — the row is a way in either way. */
+export interface EntryValues {
+  readonly spendings: string | null
+  readonly accounts: string | null
+  /** The person's own rate; the central bank's is not «my rate», so none says nothing (MOL-81). */
+  readonly rate: string | null
+  readonly incomes: string | null
+  readonly categories: string | null
+}
+
+const NONE: EntryValues = {
+  spendings: null,
+  accounts: null,
+  rate: null,
+  incomes: null,
+  categories: null,
+}
+
 /**
- * The way into «Обмен денег» and «Доходы» from «Деньги» (MOL-81, handoff 01): they moved here
- * from «Настройки». Not a tile beside «Пришло»: the tiles are the month's, and an exchange and a
- * rate are not. Beside the exchanges, the person's own rate — the one looked for there; the
- * central bank's is not it, so without one of their own the row says nothing (handoff, question 2).
+ * The ways out of «Деньги» (MOL-159, handoff MOL-157 01): «Траты» of the month shown, then what is
+ * «now» and not the month's — «Счета», «Обмен денег», «Доходы», «Категории» — each with one figure,
+ * all of them from answers the screen already has. A newcomer has no «Траты»: nothing to see there.
  */
 export default defineComponent({
   name: 'MoneyEntries',
-  components: { AppCard, IconCashPlus, IconChevron, IconSwap },
+  components: { AppCard, IconChevron },
   props: {
-    rate: { type: Object as PropType<ExchangeRate | null>, default: null },
+    /** The month «Траты» open on, the one on screen; null — the running one. */
+    month: { type: String as PropType<string | null>, default: null },
+    values: { type: Object as PropType<EntryValues>, default: () => NONE },
+    spendings: { type: Boolean, default: true },
   },
   setup(props) {
-    const { t, locale } = useI18n()
-    const shown = computed(() =>
-      props.rate?.source === 'personal' ? formatRate(props.rate, locale.value) : null,
-    )
-    return { t, shown }
+    const { t } = useI18n()
+    const rows = computed(() => {
+      const all: {
+        key: string
+        name: string
+        value: string | null
+        icon: Component
+        to: RouteLocationRaw
+      }[] = [
+        {
+          key: 'spendings',
+          name: t('spending.list.title'),
+          value: props.values.spendings,
+          icon: markRaw(IconList),
+          to: {
+            name: 'money-spendings',
+            query: props.month ? { month: props.month } : {},
+          },
+        },
+        {
+          key: 'accounts',
+          name: t('accounts.title'),
+          value: props.values.accounts,
+          icon: markRaw(IconBank),
+          to: { name: 'money-accounts' },
+        },
+        {
+          key: 'exchange',
+          name: t('exchange.title'),
+          value: props.values.rate,
+          icon: markRaw(IconSwap),
+          to: { name: 'exchange' },
+        },
+        {
+          key: 'incomes',
+          name: t('income.title'),
+          value: props.values.incomes,
+          icon: markRaw(IconCashPlus),
+          to: { name: 'incomes' },
+        },
+        {
+          key: 'categories',
+          name: t('spending.categories_link'),
+          value: props.values.categories,
+          icon: markRaw(IconShape),
+          to: { name: 'money-categories' },
+        },
+      ]
+      return props.spendings ? all : all.filter((row) => row.key !== 'spendings')
+    })
+    return { t, rows }
   },
 })
 </script>

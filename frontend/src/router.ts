@@ -11,6 +11,7 @@ import ExchangeView from '@/views/ExchangeView.vue'
 import IncomesView from '@/views/IncomesView.vue'
 import DevicesView from '@/views/DevicesView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
+import MoneySpendingsView from '@/views/MoneySpendingsView.vue'
 import MoneyView from '@/views/MoneyView.vue'
 import AccountView from '@/views/AccountView.vue'
 import AccountsView from '@/views/AccountsView.vue'
@@ -30,6 +31,7 @@ export type RouteName =
   | 'purchase-manual'
   | 'verdicts'
   | 'money'
+  | 'money-spendings'
   | 'money-categories'
   | 'money-charts'
   | 'money-accounts'
@@ -121,7 +123,11 @@ export const routes = [
     path: '/purchases/:tripId',
     name: 'purchase',
     component: FinishedTripView,
-    meta: { titleKey: 'trip.history.finished_title', parent: 'purchases', from: ['money'] },
+    meta: {
+      titleKey: 'trip.history.finished_title',
+      parent: 'purchases',
+      from: ['money', 'money-spendings'],
+    },
   },
   {
     path: '/purchases/:tripId/add',
@@ -152,6 +158,13 @@ export const routes = [
     name: 'money',
     component: MoneyView,
     meta: { titleKey: 'spending.title', tab: 'money' },
+  },
+  // «Траты» (MOL-159): the journal of the month «Деньги» has open, the month in the same address.
+  {
+    path: '/money/spendings',
+    name: 'money-spendings',
+    component: MoneySpendingsView,
+    meta: { titleKey: 'spending.list.title', parent: 'money' },
   },
   {
     path: '/money/exchange',

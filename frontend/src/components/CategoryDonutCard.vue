@@ -28,6 +28,7 @@
       <span v-else-if="waiting === 'rate'" class="why">
         {{ t('spending.summary.donut_uncounted') }}
       </span>
+      <span v-else-if="empty" class="why">{{ t('spending.month_empty') }}</span>
       <span v-if="hidden > 0" class="rest">
         {{ t('spending.summary.donut_more', { n: hidden }, hidden) }}
       </span>
@@ -52,9 +53,9 @@ const NAMED = 3
 
 /**
  * «Куда ушли» on «Деньги» (MOL-156, handoff MOL-157 01): the month's ring and its three largest
- * sectors, the whole card one way into «Графики» — an empty month's too, with no ring: «В этом месяце
- * трат нет» is said once, by the journal under it, until MOL-159 takes the journal to «Траты». A
- * month spent in with no ring says why in the ring's place. The sectors and their levels are the
+ * sectors, the whole card one way into «Графики» — an empty month's too, with no ring and «В этом
+ * месяце трат нет» in its place (handoff MOL-157 01), unless a spending of it still waits on the
+ * phone. A month spent in with no ring says why in the ring's place. The sectors and their levels are the
  * server's (`slices`) — the phone adds nothing up, not even for a month kept before the ring; the
  * share printed is the model's `shareOf`, as the bars before it printed.
  */
@@ -67,6 +68,8 @@ export default defineComponent({
       type: Function as PropType<(category: SpendingCategoryView) => string>,
       required: true,
     },
+    /** Spendings of the month still on the phone: the month is not «empty» while they wait. */
+    unsent: { type: Number, default: 0 },
   },
   setup(props) {
     const { t, locale } = useI18n()
@@ -127,7 +130,9 @@ export default defineComponent({
       if (props.month.byCategory.length > 0) return 'read'
       return props.month.uncounted.length > 0 ? 'rate' : null
     })
-    return { t, query, sectors, top, hidden, label, waiting }
+    /** Nothing the server knows of, and nothing on its way to it: the journal moved to «Траты». */
+    const empty = computed(() => props.month.days.length === 0 && props.unsent === 0)
+    return { t, query, sectors, top, hidden, label, waiting, empty }
   },
 })
 </script>

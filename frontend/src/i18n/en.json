@@ -469,7 +469,6 @@
     "uncounted": "Not counted: {amounts} — no rate for that day",
     "unsent": "Not counted yet: {n} spending is being sent | Not counted yet: {n} spendings are being sent",
     "income": "Came in",
-    "income_open": "Open incomes:",
     "income_uncounted": "and {amounts} not counted",
     "income_shifted_in": "with the salary of {days}",
     "income_shifted_out": "the salary of {days} counts next month",
@@ -491,7 +490,9 @@
       "donut_more": "{n} more slice in Charts | {n} more slices in Charts",
       "donut_label": "Where it went: {list}. Open charts",
       "donut_later": "Shares appear once the month is refreshed",
-      "donut_uncounted": "Shares appear once the spending has a rate"
+      "donut_uncounted": "Shares appear once the spending has a rate",
+      "add": "Add spending",
+      "offline_strip": "No connection. Figures as of {when} — new spendings are kept on the phone and sent when you are back online"
     },
     "charts": {
       "title": "Charts",
@@ -580,7 +581,6 @@
     },
     "share_tiny": "<1 %",
     "categories_link": "Categories",
-    "days_title": "Spending by day",
     "day_today": "Today · {date}",
     "day_yesterday": "Yesterday · {date}",
     "row_open": "Open spending:",
@@ -591,7 +591,6 @@
     "more": "And {n} more spending over {range} | And {n} more spendings over {range}",
     "more_retry": "Load the rest",
     "month_empty": "Nothing spent this month",
-    "add": "Spending",
     "pending": "Sending…",
     "editing": "Change being sent",
     "refused": "Not accepted",
@@ -602,16 +601,13 @@
     "saved_offline": "Spending saved on the phone, we will send it later",
     "empty": {
       "title": "Add your first spending",
-      "body": "Barber, rent, café, taxi — anything that is not a shop. Recorded purchases land here by themselves",
-      "action": "Add a spending",
-      "trip": "Record purchases at a shop"
+      "body": "Barber, rent, café, taxi — anything that is not a shop. Recorded purchases land here by themselves"
     },
     "load_error": {
       "title": "Could not load spending",
       "body": "The server did not answer. Saved spending is not lost — try again"
     },
     "offline": {
-      "strip": "No connection. New spending is saved on the phone and goes out when the internet is back",
       "title": "No connection",
       "body": "Spending will appear when the internet is back. You can record a new one now"
     },
@@ -707,7 +703,33 @@
       "bad_empty": "Enter a name",
       "bad_taken": "This category already exists"
     },
-    "entries_label": "Exchanges and incomes"
+    "entries_label": "Money sections",
+    "month_in": {
+      "01": "January",
+      "02": "February",
+      "03": "March",
+      "04": "April",
+      "05": "May",
+      "06": "June",
+      "07": "July",
+      "08": "August",
+      "09": "September",
+      "10": "October",
+      "11": "November",
+      "12": "December"
+    },
+    "rest_on": "On accounts {date}",
+    "list": {
+      "title": "Spendings",
+      "count": "{n} spending | {n} spendings",
+      "unsent": "· {n} spending not counted yet | · {n} spendings not counted yet",
+      "offline_strip": "No connection. Spendings as of {when}. New ones are kept on the phone and sent when you are back online",
+      "empty": {
+        "title": "No spendings in {month}",
+        "body": "Add a spending or record purchases in Purchases — they will show up here by themselves"
+      }
+    },
+    "entry_value": "{name}, {value}"
   },
   "exchange": {
     "title": "Money exchange",

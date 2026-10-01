@@ -2,19 +2,17 @@
   <AppScreen :title="t('spending.title')">
     <template #subtitle>{{ t('spending.subtitle') }}</template>
 
-    <div class="content" :class="{ roomy: phase === 'ready' }">
+    <div class="content">
       <template v-if="phase !== 'idle'">
-        <!-- Balances are «now», not the month's: above the switcher, and the same on every month
-             (MOL-123, handoff 01). -->
-        <AccountsCard :online="online" :spend-currency="spendCurrency" />
         <MonthSwitcher :month="selected" :current="currentMonth" @change="goMonth" />
 
-        <!-- Under the switcher, not over it as handoff 04 drew them: they belong to the month's
-             answer and come and go with it, and over the switcher they took it from under the thumb
-             (MOL-138, owner's decision В-2). A refusal of the queue too: it is a card here only
-             while no row of the month on screen carries it (adversarial round 3, Ж). -->
-        <p v-if="phase === 'ready' && !online" class="strip">
-          <IconCloudOff class="strip-icon" aria-hidden="true" />{{ t('spending.offline.strip') }}
+        <!-- Under the switcher, not over it as handoff 04 and MOL-157's 1e drew them: they belong to
+             the month's answer and come and go with it, and over the switcher they took it from
+             under the thumb (MOL-138, owner's decision В-2). A refusal of the queue too: it is a
+             card here only while no row of the month carries it (adversarial round 3, Ж). -->
+        <p v-if="phase === 'ready' && !online && fetchedAt" class="strip">
+          <IconCloudOff class="strip-icon" aria-hidden="true" />
+          {{ t('spending.summary.offline_strip', { when: whenOf(fetchedAt) }) }}
         </p>
         <p v-else-if="phase === 'ready' && stale === 'error' && fetchedAt" class="strip">
           {{ t('spending.error_strip', { when: whenOf(fetchedAt) }) }}
@@ -34,7 +32,7 @@
           </template>
         </ScreenState>
 
-        <ScreenSkeleton v-if="phase === 'loading'" :groups="[44, 70, 34, 60, 80, 48, 66]" />
+        <ScreenSkeleton v-if="phase === 'loading'" :groups="[24, 58, 40, 100, 30, 70, 52]" />
 
         <ScreenState
           v-else-if="phase === 'error'"
@@ -44,19 +42,14 @@
           @retry="retry"
         />
 
+        <!-- «Добавить трату» is the strip under the thumb in every state (handoff MOL-157 01). -->
         <ScreenState
           v-else-if="phase === 'offline'"
           kind="offline"
           tone="warn"
           :title="t('spending.offline.title')"
           :body="t('spending.offline.body')"
-        >
-          <template v-if="canWrite" #action>
-            <AppButton size="large" block @click="compose">
-              {{ t('spending.empty.action') }}
-            </AppButton>
-          </template>
-        </ScreenState>
+        />
 
         <ScreenState
           v-else-if="newcomer"
@@ -65,21 +58,7 @@
           :icon="IconWallet"
           :title="t('spending.empty.title')"
           :body="t('spending.empty.body')"
-        >
-          <template #action>
-            <AppButton size="large" block @click="compose">
-              {{ t('spending.empty.action') }}
-            </AppButton>
-            <AppButton variant="ghost" block @click="goTab('purchases')">
-              {{ t('spending.empty.trip') }}
-            </AppButton>
-            <!-- A newcomer may take a preset out of the choice before the first spending too
-                 (review У-2). -->
-            <RouterLink class="empty-link" :to="{ name: 'money-categories' }">
-              {{ t('spending.categories_link') }}
-            </RouterLink>
-          </template>
-        </ScreenState>
+        />
 
         <template v-else-if="month">
           <AppCard class="spent">
@@ -97,12 +76,11 @@
               {{ t('spending.unsent', { n: unsent }, unsent) }}
             </p>
 
+            <!-- Figures, not ways: «Доходы» and «Счета» are rows below — one way, one button
+                 (handoff MOL-157 01). -->
             <div class="tiles">
-              <button type="button" class="tile income" @click="openIncomes">
-                <span class="tile-label">
-                  <span class="verb">{{ t('spending.income_open') }}</span>
-                  {{ t('spending.income') }}<IconChevron class="tile-chevron" aria-hidden="true" />
-                </span>
+              <div class="tile">
+                <span class="tile-label">{{ t('spending.income') }}</span>
                 <span class="tile-figure">{{ whole(month.income) }}</span>
                 <span v-if="month.incomeUncounted.length > 0" class="tile-note">
                   {{ t('spending.income_uncounted', { amounts: list(month.incomeUncounted) }) }}
@@ -115,11 +93,12 @@
                 <span v-if="month.shiftedOut.length > 0" class="tile-note">
                   {{ t('spending.income_shifted_out', { days: days(month.shiftedOut) }) }}
                 </span>
-              </button>
+              </div>
               <!-- «Остаток» (MOL-134): the accounts at the end of the month, each figure with what
-                   it misses; «—» says why from the answer, never a rate that is not the reason. -->
+                   it misses; «—» says why from the answer, never a rate that is not the reason. A
+                   closed month names its day: «На счетах 31 авг.». -->
               <div class="tile rest">
-                <span class="tile-label">{{ t('spending.rest') }}</span>
+                <span class="tile-label">{{ restLabel }}</span>
                 <template v-if="month.rest">
                   <span class="tile-figure" :class="{ negative: month.rest.total.minor < 0n }">
                     ≈ {{ signed(month.rest.total) }}
@@ -151,83 +130,48 @@
             <p class="footnote rate">{{ rateLine }}</p>
           </AppCard>
 
-          <MoneyEntries :rate="liveRate" />
-
           <!-- An empty month keeps the card too: the way into «Графики» is there, the year is (Г). -->
-          <CategoryDonutCard :month="month" :name-of="nameOf" />
-          <!-- The way to one's categories, with the ring or before anything is spent (review Т-7). -->
-          <AppCard list>
-            <RouterLink class="categories-link" :to="{ name: 'money-categories' }">
-              <IconShape class="link-icon" aria-hidden="true" />
-              <span class="link-label">{{ t('spending.categories_link') }}</span>
-              <IconChevron class="link-chevron" aria-hidden="true" />
-            </RouterLink>
-          </AppCard>
-
-          <h2 class="group-caption">{{ t('spending.days_title') }}</h2>
-          <p v-if="journal.length === 0" class="footnote">{{ t('spending.month_empty') }}</p>
-          <section v-for="day in journal" :key="day.day" class="day">
-            <h3 class="day-head">
-              <span>{{ dayTitle(day.day) }}</span>
-              <span v-if="day.total" class="day-total">
-                {{ day.estimated ? `≈ ${whole(day.total)}` : whole(day.total) }}
-              </span>
-            </h3>
-            <AppCard as="ul" list>
-              <SpendingRow
-                v-for="row in day.rows"
-                :key="row.key"
-                :row="row"
-                :category="categoryOf(row)"
-                :category-name="categoryNameOf(row)"
-                :spend-currency="month.spendCurrency"
-                :data-row="row.key"
-                @open="openRow(row, day.day)"
-              />
-            </AppCard>
-          </section>
-
-          <div v-if="month.remaining > 0" ref="sentinel" class="more">
-            <p class="footnote">
-              {{
-                t('spending.more', { n: month.remaining, range: rangeOf(month) }, month.remaining)
-              }}
-            </p>
-            <AppButton v-if="more === 'failed'" variant="ghost" @click="loadMore">
-              {{ t('spending.more_retry') }}
-            </AppButton>
-          </div>
+          <CategoryDonutCard :month="month" :name-of="nameOf" :unsent="unsent" />
         </template>
-        <!-- The one way left into the exchanges and incomes once they left «Настройки»: a first
-             exchange may come before a first spending, and a month that will not load must not
-             close the way to the income that broke it (MOL-81; review Т-1, as MOL-66 argued). -->
+
+        <!-- The ways out of the month, each with one figure: they stand by the error and under the
+             skeleton too — a month that will not load must not close the way to the income that
+             broke it (MOL-81; review Т-1, as MOL-66 argued) — but not offline with nothing kept,
+             where the screens behind them would show nothing either. -->
         <MoneyEntries
-          v-if="newcomer || phase === 'error' || phase === 'loading'"
-          :rate="liveRate"
+          v-if="phase !== 'offline'"
+          :month="selected === currentMonth ? null : selected"
+          :values="entries"
+          :spendings="!newcomer"
         />
       </template>
     </div>
 
     <!-- «Вернуть» stands whatever the screen became under it — the only spending removed makes a
-         newcomer of the person (adversarial Г); «Трата» stands wherever there is something to
-         write it into, a slow answer and a broken server included (review Т-6). -->
-    <FloatingDock v-if="removed || tripRemoved || showsAdd" class="float">
+         newcomer of the person (adversarial Г) — over the strip of «Добавить трату». -->
+    <FloatingDock v-if="removed || tripRemoved" class="float">
       <UndoStrip
         v-if="removed"
         :key="removed.stamp"
-        :text="t('spending.removed', removed)"
-        :announcement="t('spending.removed_announced', removed)"
+        :text="t('spending.removed', { title: removed.title, amount: removed.amount })"
+        :announcement="
+          t('spending.removed_announced', { title: removed.title, amount: removed.amount })
+        "
         :action="t('spending.restore')"
         @restore="restore"
         @expire="removed = null"
       />
-      <!-- A trip opened from here and removed comes back here, with its «Вернуть» (MOL-76). -->
-      <TripUndoStrip v-else-if="tripRemoved" class="undo" />
-      <AppButton v-else-if="showsAdd" ref="addButton" size="large" class="add" @click="compose">
-        <template #icon><IconPlus /></template>
-        {{ t('spending.add') }}
-      </AppButton>
+      <TripUndoStrip v-else class="undo" />
     </FloatingDock>
+
+    <!-- Wherever there is something to write it into, a slow answer and a broken server included
+         (review Т-6), and offline on a month never read while another month names the categories. -->
+    <template v-if="canWrite && phase !== 'idle'" #docked>
+      <AppButton ref="addButton" size="large" block @click="compose()">
+        <template #icon><IconPlus /></template>
+        {{ t('spending.summary.add') }}
+      </AppButton>
+    </template>
 
     <SpendingSheet
       v-model:open="sheetOpen"
@@ -252,157 +196,79 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import type { ComponentPublicInstance } from 'vue'
+import { computed, defineComponent, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
-import IconChevron from '~icons/mdi/chevron-right'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconPlus from '~icons/mdi/plus'
-import IconShape from '~icons/mdi/shape-outline'
 import IconWallet from '~icons/mdi/wallet-outline'
-import {
-  formatEstimate,
-  lastDayOf,
-  monthOf as monthOfDay,
-  monthSchema,
-  percentChange,
-  previousMonth,
-} from '@molvia/model'
-import type { Money, MoneyMonthView, SpendingCategoryView, WireCode } from '@molvia/model'
-import AccountsCard from '@/components/AccountsCard.vue'
+import { formatEstimate, formatRate, lastDayOf, percentChange, previousMonth } from '@molvia/model'
+import type { Money } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CategoryDonutCard from '@/components/CategoryDonutCard.vue'
 import FloatingDock from '@/components/FloatingDock.vue'
 import MoneyEntries from '@/components/MoneyEntries.vue'
+import type { EntryValues } from '@/components/MoneyEntries.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
-import SpendingRow from '@/components/SpendingRow.vue'
 import SpendingSheet from '@/components/SpendingSheet.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { categoriesWith, journalOf, rateWords, unsentIn } from '@/components/spending'
-import type { JournalRow, Removed, SpendingTarget } from '@/components/spending'
-import { useAnnouncer } from '@/composables/useAnnouncer'
-import { useLocalDay } from '@/composables/useLocalDay'
-import { useMoneyMonth } from '@/composables/useMoneyMonth'
-import { calendarDay, localDay, purchaseDay, shiftDay, timeOfDay } from '@/days'
-import { useNavigation } from '@/navigation'
-import { useActorStore } from '@/stores/actor'
+import { pageOrder } from '@/components/accounts'
+import { rateWords } from '@/components/spending'
+import { useMoneyScreen } from '@/composables/useMoneyScreen'
+import { useReconnect } from '@/composables/useReconnect'
+import { calendarDay } from '@/days'
+import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
-import type { SpendingPrefill } from '@/stores/spendingHandoff'
-import { spendingOf, useSpendingQueueStore } from '@/stores/spendingQueue'
-import { useTripQueueStore } from '@/stores/tripQueue'
 
 /**
- * «Деньги» (MOL-82, handoff 01): one month of one's own spending, counted by the server — what
- * was spent, what came in, where it went and the journal by day. The phone adds nothing up; what
- * waits in the queue is a row with its mark and a line on the card saying it is not counted yet
- * (Р-3). The month is in the address and moves by `replace`: looking at August is not a step the
- * system «back» should walk through.
+ * «Деньги» (MOL-82, MOL-159, handoff MOL-157 01): the summary of one month, counted by the server —
+ * what was spent and how it compares, what came in, what is on the accounts, where it went — and
+ * the ways into everything else, each with one figure. The journal is «Траты»'s; the phone adds
+ * nothing up. The month is in the address and moves by `replace`: looking at August is not a step
+ * the system «back» should walk through.
  */
 export default defineComponent({
   name: 'MoneyView',
   components: {
-    AccountsCard,
     AppButton,
     AppCard,
     AppScreen,
     CategoryDonutCard,
     FloatingDock,
-    IconChevron,
     IconCloudOff,
     IconPlus,
-    IconShape,
     MoneyEntries,
     MonthSwitcher,
     NewCategorySheet,
     ScreenSkeleton,
     ScreenState,
-    SpendingRow,
     SpendingSheet,
     TripUndoStrip,
     UndoStrip,
   },
   setup() {
     const { t, locale } = useI18n()
-    const route = useRoute()
-    const router = useRouter()
-    const { goTab } = useNavigation()
-    const actor = useActorStore()
-    const queue = useSpendingQueueStore()
-    const tripQueue = useTripQueueStore()
-    const tripRemoved = computed(() => tripQueue.lastRemoved !== null)
-    const announce = useAnnouncer()
+    const screen = useMoneyScreen()
+    // «Добавить трату», where the focus goes once «Вернуть» has done its work.
+    const { addButton } = screen
+    const { month, queue, currentMonth } = screen
 
-    /**
-     * This month on the phone (MOL-121), looked at again whenever the app comes back into view: an
-     * installed app frozen over the last night of a month came back to the same page, and the new
-     * month was «the future» — neither the address nor the arrow reached it (adversarial З, review
-     * Т-10). The same today heads the journal, «Сегодня · …» (adversarial Н).
-     */
-    const today = useLocalDay()
-    const currentMonth = computed(() => monthOfDay(today.value))
-    // Asked also on opening the sheet and on a save: the app may have stood open across midnight.
-    function lookAtToday(): void {
-      today.value = localDay()
-    }
-    const selected = computed(() => {
-      const asked = route.query.month
-      return typeof asked === 'string' &&
-        monthSchema.safeParse(asked).success &&
-        asked <= currentMonth.value
-        ? asked
-        : currentMonth.value
-    })
-    const { phase, month, stale, fetchedAt, more, loadMore, retry, knownCategories, todayRate } =
-      useMoneyMonth(selected)
-
-    function goMonth(next: string): void {
-      void router.replace({
-        query: { ...route.query, month: next === currentMonth.value ? undefined : next },
-      })
-    }
-
-    const online = ref(navigator.onLine)
-    const onLine = () => (online.value = true)
-    const offLine = () => (online.value = false)
-    onMounted(() => {
-      window.addEventListener('online', onLine)
-      window.addEventListener('offline', offLine)
-    })
-    onUnmounted(() => {
-      window.removeEventListener('online', onLine)
-      window.removeEventListener('offline', offLine)
-    })
-
-    // Any month the phone keeps names the categories — they are the owner's, not the month's — so
-    // a spending can be written before this month's answer, or offline on the first of the month
-    // (review Т-5).
-    const categories = computed(() =>
-      categoriesWith(knownCategories.value, [...queue.arrived, ...queue.pending]),
-    )
-    /** Whether a spending can be written here at all: a category is required, and known. */
-    const canWrite = computed(() => categories.value.some((category) => !category.archived))
-    const journal = computed(() =>
-      month.value ? journalOf(month.value, queue.pending, queue.rejected, tripQueue.removing) : [],
-    )
-    const unsent = computed(() => (month.value ? unsentIn(month.value, queue.pending) : 0))
-    const spendCurrency = computed(
-      () => month.value?.spendCurrency ?? actor.settings?.spendCurrency ?? 'AMD',
-    )
-    /** «Мой курс на сегодня» for the sheet: only a running month's rate is today's. */
-    const liveRate = computed(() => todayRate.value)
+    // The number of accounts beside «Счета»: «now», not the month's, whatever month is open.
+    const accounts = useAccountsStore()
+    useAccountsOnScreen()
+    onMounted(() => void accounts.refresh())
+    useReconnect(() => void accounts.refresh())
 
     /**
      * «Пусто» is somebody with nothing yet — no spending, no trip, no income (Р-6). The server
      * does not say so; the running month with nothing in it, nothing the month before and
      * nothing waiting is as near as its answer gets. An empty August after a full July is a
-     * month, not a newcomer: «В этом месяце трат нет».
+     * month, not a newcomer.
      */
     const newcomer = computed(() => {
       const value = month.value
@@ -417,12 +283,23 @@ export default defineComponent({
       )
     })
 
-    const showsAdd = computed(
-      () =>
-        canWrite.value &&
-        !newcomer.value &&
-        (phase.value === 'ready' || phase.value === 'loading' || phase.value === 'error'),
-    )
+    const number = (value: number) => new Intl.NumberFormat(locale.value).format(value)
+    /** One figure a row, and none until it is known (handoff MOL-157 01). */
+    const entries = computed<EntryValues>(() => {
+      const value = month.value
+      const live = accounts.overview ? pageOrder(accounts.accounts).length : null
+      const rate = screen.liveRate.value
+      return {
+        spendings: value?.count == null ? null : number(value.count),
+        accounts: live === null ? null : number(live),
+        rate: rate?.source === 'personal' ? formatRate(rate, locale.value) : null,
+        incomes: value?.incomeCount == null ? null : number(value.incomeCount),
+        categories:
+          screen.knownCategories.value.length > 0
+            ? number(screen.knownCategories.value.filter((category) => !category.archived).length)
+            : null,
+      }
+    })
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
     const signed = (value: Money) =>
@@ -433,6 +310,14 @@ export default defineComponent({
     const shortDay = (day: string) =>
       calendarDay(day, locale.value, { day: 'numeric', month: 'short' })
     const days = (values: readonly string[]) => values.map(shortDay).join(', ')
+
+    /** «Остаток на счетах», and of a closed month the day it is of: «На счетах 31 авг.». */
+    const restLabel = computed(() => {
+      const value = month.value
+      return value && value.month < currentMonth.value
+        ? t('spending.rest_on', { date: shortDay(lastDayOf(value.month)) })
+        : t('spending.rest')
+    })
 
     // What each figure of «Остаток» misses, in the server's words (MOL-134, adversarial А, Б, З):
     // «без сбережений» is drawn only where it says something «всего» does not.
@@ -496,103 +381,6 @@ export default defineComponent({
         : t('spending.rate_live_official', { rate })
     })
 
-    function nameOf(category: SpendingCategoryView): string {
-      return category.preset ? t(`spending.category.${category.preset}`) : (category.name ?? '')
-    }
-    const groceries = computed(
-      () => categories.value.find((category) => category.preset === 'groceries') ?? null,
-    )
-    function categoryOf(row: JournalRow): SpendingCategoryView | null {
-      if (row.kind === 'trip') return groceries.value
-      return categories.value.find((category) => category.id === row.spending.categoryId) ?? null
-    }
-    function categoryNameOf(row: JournalRow): string {
-      const category = categoryOf(row)
-      return category ? nameOf(category) : t('spending.category.other')
-    }
-
-    /**
-     * Days of the calendar, printed as such whatever the zone of the phone (review Т-1); «Сегодня»
-     * is the phone's today (MOL-121).
-     */
-    function dayTitle(day: string): string {
-      const date = calendarDay(day, locale.value)
-      if (day === today.value) return t('spending.day_today', { date })
-      if (day === shiftDay(today.value, -1)) return t('spending.day_yesterday', { date })
-      const text = calendarDay(day, locale.value, {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'long',
-      })
-      return text.charAt(0).toLocaleUpperCase(locale.value) + text.slice(1)
-    }
-
-    function rangeOf(value: MoneyMonthView): string {
-      const { remainingFrom: from, remainingTo: to } = value
-      if (!from || !to) return ''
-      const last = calendarDay(to, locale.value)
-      if (from === to) return last
-      return `${String(Number(from.slice(8)))}–${last}`
-    }
-
-    const whenOf = (at: Date) => `${purchaseDay(at, locale.value)}, ${timeOfDay(at, locale.value)}`
-
-    /**
-     * Refusals no row of this month carries — «Вернуть» too late, a category — said under the
-     * switcher.
-     */
-    const otherRefusals = computed(() =>
-      queue.rejected.filter(
-        (item) =>
-          !['record', 'amend'].includes(item.write.kind) ||
-          !journal.value.some((day) =>
-            day.rows.some((row) => row.kind === 'manual' && row.key === spendingOf(item.write)),
-          ),
-      ),
-    )
-    const reasonOf = (code: WireCode) =>
-      code.startsWith('error.') ? t(code) : t('spending.rejected_other.unknown', { code })
-
-    // The next page as the end of the journal comes into view: no «Показать ещё» (handoff 01).
-    const sentinel = ref<HTMLElement | null>(null)
-    let observer: IntersectionObserver | null = null
-    watch(sentinel, (element) => {
-      observer?.disconnect()
-      if (!element || typeof IntersectionObserver === 'undefined') return
-      observer = new IntersectionObserver((entries) => {
-        if (entries.some((entry) => entry.isIntersecting) && more.value === 'idle') void loadMore()
-      })
-      observer.observe(element)
-    })
-    onUnmounted(() => observer?.disconnect())
-
-    const sheetOpen = ref(false)
-    const newCategoryOpen = ref(false)
-    const made = ref<string | null>(null)
-    const target = ref<SpendingTarget>({ kind: 'add' })
-
-    function compose(): void {
-      composeFrom()
-    }
-
-    function composeFrom(prefill?: SpendingPrefill): void {
-      lookAtToday()
-      toShow.value = null
-      made.value = null
-      target.value = prefill ? { kind: 'add', prefill } : { kind: 'add' }
-      sheetOpen.value = true
-    }
-
-    function openRow(row: JournalRow, day: string): void {
-      toShow.value = null
-      made.value = null
-      target.value = row.kind === 'trip' ? { kind: 'trip', row, day } : { kind: 'manual', row }
-      sheetOpen.value = true
-    }
-
-    /** The spending just saved, until its row is on screen and brought into view (review С-2). */
-    const toShow = ref<string | null>(null)
-
     /**
      * A record with no purchases handed over from «Покупки» (MOL-78, В-1): the sheet opens on it
      * once, as soon as this screen is there.
@@ -603,111 +391,38 @@ export default defineComponent({
       (handed) => {
         if (!handed) return
         const prefill = handoff.take()
-        if (prefill) composeFrom(prefill)
+        if (prefill) screen.compose(prefill)
       },
       { immediate: true },
     )
 
-    function saved({ id, spentOn }: { id: string; spentOn: string }): void {
-      lookAtToday()
-      if (!online.value) announce?.(t('spending.saved_offline'))
-      const into = monthOfDay(spentOn)
-      if (into !== selected.value) goMonth(into)
-      toShow.value = id
-    }
-
-    // The row comes with the queue at once, or with the month read again after the server took it,
-    // or not at all on a page not loaded yet — then nothing is scrolled.
-    watch(
-      [toShow, journal],
-      async ([id]) => {
-        if (!id) return
-        await nextTick()
-        const row = document.querySelector(`[data-row="${id}"]`)
-        if (!row) return
-        toShow.value = null
-        const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        row.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' })
-      },
-      { flush: 'post' },
-    )
-
-    const removed = ref<(Removed & { stamp: number }) | null>(null)
-    const addButton = ref<ComponentPublicInstance | null>(null)
-
-    function onRemoved(value: Removed): void {
-      removed.value = { ...value, stamp: Date.now() }
-    }
-
-    async function restore(): Promise<void> {
-      const value = removed.value
-      if (!value) return
-      queue.restore(value.undo)
-      removed.value = null
-      announce?.(t('spending.restored'))
-      await nextTick()
-      ;(addButton.value?.$el as HTMLElement | undefined)?.focus()
-    }
-
-    function openIncomes(): void {
-      void router.push({ name: 'incomes' })
+    /**
+     * The summary stays on its month whatever month the spending went into — there is no row here
+     * to bring into view; «Траты» go to it (handoff MOL-157 06, Р-5).
+     */
+    function saved(): void {
+      screen.lookAtToday()
+      if (!screen.online.value) screen.announce?.(t('spending.saved_offline'))
     }
 
     return {
+      ...screen,
+      addButton,
       t,
       IconWallet,
-      queue,
-      goTab,
-      phase,
-      month,
-      stale,
-      fetchedAt,
-      more,
-      loadMore,
-      retry,
-      selected,
-      currentMonth,
-      goMonth,
-      online,
-      categories,
-      journal,
-      tripRemoved,
-      unsent,
-      spendCurrency,
-      liveRate,
       newcomer,
-      canWrite,
-      showsAdd,
+      entries,
       whole,
       signed,
       list,
       shortDay,
       days,
+      restLabel,
       restNotes,
       change,
       foreign,
       rateLine,
-      nameOf,
-      categoryOf,
-      categoryNameOf,
-      dayTitle,
-      rangeOf,
-      whenOf,
-      otherRefusals,
-      reasonOf,
-      sentinel,
-      sheetOpen,
-      newCategoryOpen,
-      made,
-      target,
-      compose,
-      openRow,
       saved,
-      removed,
-      addButton,
-      onRemoved,
-      restore,
-      openIncomes,
     }
   },
 })
@@ -720,11 +435,6 @@ export default defineComponent({
   flex: 1;
   gap: var(--space-3);
   padding: var(--space-4);
-
-  /* Room for «Трата» under the last rows: it floats over the journal, not in the dock (handoff 01). */
-  &.roomy {
-    padding-bottom: calc(var(--space-8) + var(--space-8) + var(--space-6));
-  }
 }
 
 .strip {
@@ -759,18 +469,12 @@ export default defineComponent({
   margin: 0;
 }
 
-.caption,
-.group-caption {
+.caption {
   color: var(--text-muted);
   font-size: var(--text-caption);
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
-}
-
-.group-caption {
-  margin: 0;
-  padding: var(--space-3) var(--space-1) 0;
 }
 
 .change {
@@ -821,24 +525,8 @@ export default defineComponent({
   gap: var(--space-1);
   min-height: 4rem;
   padding: var(--space-2) var(--space-3);
-  border: 0;
   border-radius: var(--radius);
   background: var(--surface-2);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-}
-
-.income {
-  cursor: pointer;
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
-.verb {
-  @include visually-hidden;
 }
 
 .tile-label {
@@ -846,12 +534,6 @@ export default defineComponent({
   align-items: center;
   color: var(--text-muted);
   font-size: var(--text-footnote);
-}
-
-.tile-chevron {
-  width: 1.125rem;
-  height: 1.125rem;
-  margin-left: auto;
 }
 
 .tile-figure {
@@ -888,82 +570,6 @@ export default defineComponent({
   color: var(--accent-ink);
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
-}
-
-.day {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.day-head {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin: 0;
-  padding: var(--space-1) var(--space-1) 0;
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
-}
-
-.day-total {
-  font-weight: var(--weight-regular);
-  font-variant-numeric: tabular-nums;
-}
-
-.more {
-  display: grid;
-  justify-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
-}
-
-.add {
-  box-shadow: var(--shadow-md);
-}
-
-.empty-link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--touch-target);
-  color: var(--accent-ink);
-  font-weight: var(--weight-medium);
-  text-decoration: none;
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
-.categories-link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--touch-target-lg);
-  padding: 0 var(--space-4);
-  color: var(--text);
-  text-decoration: none;
-
-  &:focus-visible {
-    @include focus-ring(-2px);
-  }
-}
-
-.link-icon {
-  width: 1.375rem;
-  height: 1.375rem;
-  color: var(--text-muted);
-}
-
-.link-label {
-  flex: 1;
-}
-
-.link-chevron {
-  width: 1.25rem;
-  height: 1.25rem;
-  color: var(--text-muted);
 }
 
 .float > .undo {

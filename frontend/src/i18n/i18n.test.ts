@@ -167,11 +167,9 @@ describe('словарь: повторяющиеся тексты', () => {
       'Сохранить правку': ['exchange.sheet.save_amend', 'income.sheet.save_amend'],
       'Сейчас записано: {details}': ['exchange.sheet.current', 'income.sheet.current'],
       // «Деньги» (MOL-82): одно действие над отказом очереди — как у покупки похода; экран и
-      // строка, которая к нему ведёт; кнопка «Трата» и заголовок её шторки; «Прочее» и «Сумма» —
-      // одни слова у дохода и у траты.
+      // строка, которая к нему ведёт; «Прочее» и «Сумма» — одни слова у дохода и у траты.
       Убрать: ['spending.categories.remove', 'spending.sheet.dismiss', 'trip.rejected.drop'],
       Категории: ['spending.categories.title', 'spending.categories_link'],
-      Трата: ['spending.add', 'spending.sheet.title_edit'],
       Прочее: ['income.source.other', 'spending.category.other'],
       Сумма: ['income.sheet.amount', 'spending.sheet.amount', 'trip.receipt.sheet.label'],
       // Название экрана и пункт страницы приватности о том же (MOL-58, MOL-66).
@@ -215,11 +213,16 @@ describe('словарь: повторяющиеся тексты', () => {
       Charts: ['spending.charts.title', 'spending.summary.charts'],
       // «Куда ушли» on «Деньги» and «Куда ушло» on «Графики» (MOL-158): one phrase in English.
       'Where it went': ['spending.categories_title', 'spending.charts.where_title'],
-      // A month after «после» and after «к»: two cases in Russian, one name in English (MOL-158).
+      // A month after «после», after «к» and after «в»: three cases in Russian, one name in
+      // English (MOL-158, MOL-159).
       ...Object.fromEntries(
         Object.entries(en.spending.month_to).map(([number, name]) => [
           name,
-          [`spending.month_of.${number}`, `spending.month_to.${number}`],
+          [
+            `spending.month_in.${number}`,
+            `spending.month_of.${number}`,
+            `spending.month_to.${number}`,
+          ],
         ]),
       ),
       // The strip of a trip removed is the strip of a spending removed (MOL-76).
@@ -253,7 +256,6 @@ describe('словарь: повторяющиеся тексты', () => {
       'Save the amendment': ['exchange.sheet.save_amend', 'income.sheet.save_amend'],
       'Now recorded: {details}': ['exchange.sheet.current', 'income.sheet.current'],
       Categories: ['spending.categories.title', 'spending.categories_link'],
-      Spending: ['spending.add', 'spending.sheet.title_edit'],
       Other: ['income.source.other', 'spending.category.other'],
       Amount: ['income.sheet.amount', 'spending.sheet.amount', 'trip.receipt.sheet.label'],
       // English has one word where Russian says «было до обмена» and «было до поступления».
@@ -322,11 +324,13 @@ describe('словарь: плюральные формы', () => {
       'spending.unsent',
       'spending.rest_operations',
       'spending.summary.donut_more',
-      'spending.charts.fx_count',
-      'spending.charts.fx_uncounted',
       'spending.trip_row_meta',
       'spending.more',
       'spending.sheet.trip_meta',
+      'spending.list.count',
+      'spending.list.unsent',
+      'exchange.vs_market.uncounted',
+      'exchange.vs_market.count',
       'sign_out.unsent',
       'accounts.more',
       'accounts.unassigned',

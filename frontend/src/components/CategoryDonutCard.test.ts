@@ -184,8 +184,8 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
     })
     expect(wrapper.find('a').attributes('href')).toBe('/money/charts?month=2026-09')
     expect(wrapper.find('.ring').exists()).toBe(false)
-    // «В этом месяце трат нет» is the journal's to say, once, while the journal is on «Деньги».
-    expect(wrapper.find('.why').exists()).toBe(false)
+    // With the journal gone to «Траты», the card says it, once (MOL-159, handoff MOL-157 01).
+    expect(wrapper.find('.why').text()).toBe('В этом месяце трат нет')
     expect(wrapper.find('.rest').exists()).toBe(false)
   })
 })
