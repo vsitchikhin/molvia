@@ -13,13 +13,15 @@ import { asBrowser, open } from './session'
  * pick up?», where MOL-99 put it.
  */
 
+const scanButton = (page: Page) => page.getByRole('button', { name: 'Scan a barcode' })
+
 /**
  * Opens the scanner and waits for its sheet to be up: until it has risen it takes no tap at all
  * (MOL-69), and a refusal is drawn at once — on a loaded machine a tap on «Type it in» landed while
  * the sheet still rose and went nowhere. Its rise, then the double-tap floor it never goes under.
  */
 async function openScanner(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Scan a barcode' }).click()
+  await scanButton(page).click()
   await page
     .locator('dialog[open]')
     .evaluate((dialog) =>
@@ -730,7 +732,7 @@ test('tells how to stop Safari asking, once the camera is given, and reads after
   await open(page, '/_kit')
   // Not `openScanner`: the hint may rise before the scanner's sheet is waited for, and then two
   // sheets are open.
-  await page.getByRole('button', { name: 'Scan a barcode' }).click()
+  await scanButton(page).click()
 
   // After the camera is live, which a loaded machine takes its time to give.
   await expect(cameraHint(page)).toBeVisible({ timeout: 15_000 })
@@ -776,7 +778,7 @@ test('says nothing where Safari will not ask — its setting says «Allow»', as
   await open(page, '/_kit')
   // Not `openScanner`: with nothing over it the scanner may read and close before its sheet is
   // waited for.
-  await page.getByRole('button', { name: 'Scan a barcode' }).click()
+  await scanButton(page).click()
 
   await expect(scanned(page, BARCODE)).toBeVisible({ timeout: READ })
   await expect(cameraHint(page)).toBeHidden()
