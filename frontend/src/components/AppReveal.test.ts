@@ -100,6 +100,52 @@ describe('AppReveal', () => {
     expect(items()).toEqual(['a', 'c'])
   })
 
+  // Going, it is no longer there: a second tap meant for the row sliding up under it pressed the
+  // one going (review №4).
+  it('takes no tap and no focus from a row going', async () => {
+    const played = fakeAnimate()
+    const { rows, view } = list(['a', 'b'])
+    rows.value = ['b']
+    await settled()
+    expect(played).toHaveLength(1)
+    expect((view.findAll('li')[0]?.element as HTMLElement).inert).toBe(true)
+    expect((view.findAll('li')[1]?.element as HTMLElement).inert).toBe(false)
+  })
+
+  // The gap of a column is its parent's: taken back by the margin, or the neighbour jumps by it.
+  it('takes back the gap of the column it grows in', async () => {
+    const played = fakeAnimate()
+    const { rows, view } = list(['a', 'b'])
+    const column = view.find('ul').element as HTMLElement
+    column.style.display = 'flex'
+    column.style.flexDirection = 'column'
+    column.style.rowGap = '12px'
+    rows.value = ['a', 'b', 'last']
+    await settled()
+    const first = played.find((move) => move.element.textContent === 'last')
+    expect(first?.frames[0]).toMatchObject({ marginTop: '-12px', marginBottom: '0px' })
+  })
+
+  it('takes back the gap below a row that has one after it', async () => {
+    const played = fakeAnimate()
+    const { rows, view } = list(['a', 'b'])
+    const column = view.find('ul').element as HTMLElement
+    column.style.display = 'flex'
+    column.style.flexDirection = 'column'
+    column.style.rowGap = '12px'
+    rows.value = ['new', 'a', 'b']
+    await settled()
+    expect(played[0]?.frames[0]).toMatchObject({ marginTop: '0px', marginBottom: '-12px' })
+  })
+
+  it('must not fire: a list that is not a column keeps its margins', async () => {
+    const played = fakeAnimate()
+    const { rows } = list(['a', 'b'])
+    rows.value = ['new', 'a', 'b']
+    await settled()
+    expect(played[0]?.frames[0]).toMatchObject({ marginTop: '0px', marginBottom: '0px' })
+  })
+
   it('plays exactly three rows coming at once', async () => {
     const played = fakeAnimate()
     const { rows } = list(['a'])

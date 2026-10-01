@@ -94,17 +94,22 @@ function play(element: HTMLElement, leaving: boolean, done: () => void): void {
     marginBottom: style.marginBottom,
     opacity: '1',
   }
+  const gap = gapOf(element)
   const none = {
     height: '0px',
     paddingTop: '0px',
     paddingBottom: '0px',
-    marginTop: '0px',
-    marginBottom: '0px',
+    // The gap of a column it stands in is its parent's and does not shrink with it: taken back by
+    // the margin on its side, or the neighbour jumped by the whole gap in one frame (adversarial А2).
+    marginTop: gap && !element.nextElementSibling ? `${String(-gap)}px` : '0px',
+    marginBottom: gap && element.nextElementSibling ? `${String(-gap)}px` : '0px',
     opacity: '0',
   }
   const root = getComputedStyle(document.documentElement)
   const overflow = element.style.overflow
   element.style.overflow = 'hidden'
+  // What is going takes no tap and no focus: it is no longer there for the person (review №4).
+  if (leaving) element.inert = true
   const animation = element.animate(leaving ? [whole, none] : [none, whole], {
     duration: Number.parseFloat(root.getPropertyValue('--dur')) || 0,
     easing: root.getPropertyValue('--ease').trim() || 'ease',
@@ -116,5 +121,14 @@ function play(element: HTMLElement, leaving: boolean, done: () => void): void {
     done()
   }
   animation.finished.then(finish, finish)
+}
+
+/** The gap of the column `element` stands in, when it has a neighbour there to keep it from. */
+function gapOf(element: HTMLElement): number {
+  const parent = element.parentElement
+  if (!parent || (!element.previousElementSibling && !element.nextElementSibling)) return 0
+  const style = getComputedStyle(parent)
+  const column = style.display.endsWith('flex') && style.flexDirection.startsWith('column')
+  return column ? Number.parseFloat(style.rowGap) || 0 : 0
 }
 </script>
