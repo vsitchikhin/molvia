@@ -32,10 +32,12 @@ partial="$RCLONE_REMOTE/partial/$name"
 
 # rclone rcat finishes the upload when its input ends, whether or not pg_dump succeeded — so the
 # copy goes up under partial/ and becomes a copy only once the whole pipe has exited cleanly.
+# The cutoff keeps it one PUT: rclone's multipart upload sends a CRC64NVME checksum that R2 answers
+# with 501 — what broke the run once the dump outgrew the default 100 KiB.
 docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres \
   sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' \
   | age --encrypt --recipient "$AGE_RECIPIENT" \
-  | rclone rcat "$partial"
+  | rclone rcat --streaming-upload-cutoff 1G "$partial"
 
 size="$(rclone lsjson "$partial" | sed -n 's/.*"Size":\([0-9]*\).*/\1/p')"
 header="$(rclone cat --count 21 "$partial")"
