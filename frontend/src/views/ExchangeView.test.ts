@@ -1012,3 +1012,50 @@ describe('ExchangeView: against the market of the day (MOL-137)', () => {
     expect(rows[1]?.findAll('.best')).toHaveLength(0)
   })
 })
+
+describe('ExchangeView: «Обмены против рынка» on top (MOL-152, MOL-159)', () => {
+  const losses = {
+    total: { minor: -1_338_100n, currency: 'AMD' as const },
+    uncounted: 1,
+    groups: [
+      {
+        place: 'Zvartnots',
+        count: 1,
+        difference: { minor: -1_460_400n, currency: 'AMD' as const },
+        percent: -721,
+        level: -1000,
+      },
+      {
+        place: null,
+        count: 2,
+        difference: { minor: 122_300n, currency: 'AMD' as const },
+        percent: 149,
+        level: 207,
+      },
+    ],
+  }
+
+  it('stands first, above «my rate»: worst place first, the minus red, no «≈ ₽» and no way out', async () => {
+    exchanges.mockResolvedValue(overview({ losses }))
+    const view = await render()
+    const card = view.get('.losses')
+    const rate = view.get('.rate')
+    expect(
+      card.element.compareDocumentPosition(rate.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    const text = card.text().replace(/\s/g, ' ')
+    expect(text).toContain(en.exchange.vs_market.title)
+    expect(text).toContain('−֏13,381')
+    expect(text).not.toContain('≈')
+    expect(text.indexOf('Zvartnots')).toBeLessThan(text.indexOf(en.exchange.vs_market.no_place))
+    expect(text).toContain('Not compared: 1 exchange')
+    expect(card.get('.total').classes()).toContain('negative')
+    expect(card.find('a').exists()).toBe(false)
+  })
+
+  it('must not fire: nothing of the twelve months measured — no card', async () => {
+    exchanges.mockResolvedValue(overview({ losses: null }))
+    const view = await render()
+    expect(view.find('.losses').exists()).toBe(false)
+  })
+})

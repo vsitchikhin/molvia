@@ -57,9 +57,9 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/components/DeviationBars.vue` — «Против обычного»: the categories furthest from their usual month, a bar and the usual's mark, ±% with an arrow in the text's colour, «новая», the card of too few months.
 - `frontend/src/components/PaceLine.vue` — «Темп месяца»: the month's running total solid against the usual dashed, a day chosen on lifting or sideways and by a native range.
 - `frontend/src/components/ChartsMonth.vue` — «Графики → Месяц»: the month's answer in four states and its three cards; the sector and the day chosen on the screen, not in the address.
-- `frontend/src/components/ChartsYear.vue` — «Графики → Год» until MOL-160: the cards of MOL-74 over twelve months, the category in the address, the rate and the exchanges.
+- `frontend/src/components/ChartsYear.vue` — «Графики → Год» until MOL-160: the cards of MOL-74 over twelve months, the category in the address, the rate of the pair.
 - `frontend/src/components/CategoryChips.vue` — Category chips of a spending: a radio group in fixed order, nothing preselected, the last chip «+ Своя».
-- `frontend/src/components/ExchangeLosses.vue` — «Обмены против курса ЦБ РА» card: exchangers worst first, a bar from the centre line, the way to «Обмен денег».
+- `frontend/src/components/ExchangeLosses.vue` — «Обмены против рынка» card on top of «Обмен денег» (MOL-152, MOL-159): exchangers worst first, a bar from the centre line, no «≈ ₽».
 - `frontend/src/components/MoneyEntries.vue` — The ways out of «Деньги»: «Траты» of the month, «Счета», «Обмен денег», «Доходы», «Категории», each with one figure or none until known.
 - `frontend/src/components/MonthSwitcher.vue` — «‹ Сентябрь 2026 ›» month switcher of «Деньги»: no future months, no lower bound, no swipe.
 - `frontend/src/components/NewCategorySheet.vue` — «Новая категория» sheet over the spending sheet: a name, made through the queue, a preset's name refused.

@@ -528,11 +528,6 @@
       "rate_mine": "My exchange {day}: {rate}",
       "rate_spoken": "Week to {day}: {rate}",
       "rate_hint": "The line is the CBA rate at the end of each week, the dots are your exchanges",
-      "fx_title": "Exchanges against the CBA rate",
-      "fx_note": "Over 12 months, against the CBA rate of the exchange's day. Minus means you gave more than the rate",
-      "fx_count": "{n} exchange | {n} exchanges",
-      "fx_no_place": "No place",
-      "fx_uncounted": "Not compared with the CBA: {n} exchange | Not compared with the CBA: {n} exchanges",
       "empty": {
         "title": "Charts appear with your first spending",
         "body": "At least one month of spending or income is needed. Purchases from a shop come here by themselves"
@@ -859,6 +854,13 @@
       "where_banksAll": "at banks (all clients)",
       "where_exchanger": "at exchange offices",
       "pending": "The central bank publishes exchange offices of this day later — the line will update itself"
+    },
+    "vs_market": {
+      "title": "Exchanges against the market",
+      "note": "Over 12 months, each exchange against the market of its day by the Central Bank of Armenia: its own channel when named, else the best rate. Minus — you gave more than the market",
+      "uncounted": "Not compared: {n} exchange — the Central Bank has no market for that pair or day | Not compared: {n} exchanges — the Central Bank has no market for that pair or those days",
+      "count": "{n} exchange | {n} exchanges",
+      "no_place": "No place"
     }
   },
   "income": {

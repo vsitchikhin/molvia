@@ -290,17 +290,10 @@ describe('MoneyChartsView: the charts', () => {
     expect(router.currentRoute.value.query.category).toBe(CAFE)
   })
 
-  it('draws the exchanges by exchanger, worst first, and leads to «Обмен денег»', async () => {
+  it('the exchanges are «Обмен денег»’s now: no card of them on the year (MOL-159)', async () => {
     moneyCharts.mockResolvedValue(charts())
     const view = await render()
-    const card = plain(view.find('.losses').text())
-    expect(card).toContain('−֏13,381')
-    expect(card).toContain('Airport')
-    expect(card).toContain('−7.21%')
-    expect(card).toContain(en.spending.charts.fx_no_place)
-    expect(card).toContain('+0.27%')
-    expect(card).toContain('Not compared with the CBA: 1 exchange')
-    expect(view.find('.losses a').attributes('href')).toBe('/money/exchange')
+    expect(view.find('.losses').exists()).toBe(false)
   })
 
   it('keeps the bar a person chose when a new answer of the same period comes (review)', async () => {
@@ -352,12 +345,11 @@ describe('MoneyChartsView: the charts', () => {
     )
   })
 
-  it('shows the rate and the exchanges before the first spending (adversarial В)', async () => {
+  it('shows the rate before the first spending (adversarial В)', async () => {
     moneyCharts.mockResolvedValue(charts({ since: null, categories: [] }))
     const view = await render()
     expect(view.text()).toContain(en.spending.charts.empty.title)
     expect(view.find('.rate-line').exists()).toBe(true)
-    expect(view.find('.losses').exists()).toBe(true)
   })
 
   it('must not fire: an answer that lost the race is not what the phone keeps (adversarial Б, d9 Д)', async () => {

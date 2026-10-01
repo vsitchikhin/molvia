@@ -63,6 +63,11 @@
       </ScreenState>
 
       <template v-else-if="overview">
+        <!-- First under the strips (handoff MOL-157 05): what the exchanges of a year gave against
+             the market, by place — moved here from «Графики» (MOL-159, MOL-152). No card when
+             nothing of the twelve months was measured. -->
+        <ExchangeLosses v-if="overview.losses" :losses="overview.losses" />
+
         <AppCard class="rate">
           <p class="caption">{{ t('exchange.my_rate') }}</p>
           <template v-if="overview.wallet">
@@ -198,6 +203,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ExchangeCard from '@/components/ExchangeCard.vue'
+import ExchangeLosses from '@/components/ExchangeLosses.vue'
 import MarketRatesCard from '@/components/MarketRatesCard.vue'
 import ExchangeRemoveSheet from '@/components/ExchangeRemoveSheet.vue'
 import ExchangeSheet from '@/components/ExchangeSheet.vue'
@@ -226,6 +232,7 @@ export default defineComponent({
     AppCard,
     AppScreen,
     ExchangeCard,
+    ExchangeLosses,
     MarketRatesCard,
     ExchangeRemoveSheet,
     ExchangeSheet,

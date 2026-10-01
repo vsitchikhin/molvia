@@ -140,8 +140,8 @@
       </AppCard>
     </template>
 
-    <!-- The rate and the exchanges stand without spendings too: the first thing an emigrant
-         does is change money (adversarial В). -->
+    <!-- The rate stands without spendings too: the first thing an emigrant does is change money
+         (adversarial В). -->
     <AppCard v-if="rate" as="section" class="card" :aria-labelledby="`${id}-rate`">
       <h2 :id="`${id}-rate`" class="caption">{{ rateTitle }}</h2>
       <RateLine
@@ -166,7 +166,6 @@
       </RateLine>
       <p class="hint">{{ t('spending.charts.rate_hint') }}</p>
     </AppCard>
-    <ExchangeLosses v-if="charts.exchanges" :losses="charts.exchanges" />
   </template>
 </template>
 
@@ -182,7 +181,6 @@ import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
 import BarChart from '@/components/BarChart.vue'
 import type { ChartBar } from '@/components/BarChart.vue'
-import ExchangeLosses from '@/components/ExchangeLosses.vue'
 import RateLine from '@/components/RateLine.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
@@ -203,8 +201,8 @@ let lastCategory: string | null = null
 
 /**
  * «Графики → Год» until MOL-160 (MOL-158, owner's decision В-1): the cards of MOL-74 over the last
- * twelve months — spending, what came in and went out, a category over time — the rate of the pair
- * by week, and the exchanges against the central bank. Every figure and every height is the
+ * twelve months — spending, what came in and went out, a category over time — and the rate of the
+ * pair by week; the exchanges went to «Обмен денег» (MOL-159). Every figure and every height is the
  * server's; the screen chooses a bar and words. The category is in the address and moves by
  * `replace`.
  */
@@ -214,7 +212,6 @@ export default defineComponent({
     AppCard,
     AppField,
     BarChart,
-    ExchangeLosses,
     IconCloudOff,
     RateLine,
     ScreenSkeleton,
