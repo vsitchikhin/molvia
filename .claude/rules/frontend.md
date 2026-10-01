@@ -222,16 +222,31 @@ The detail behind the frontend lines of `CLAUDE.md`.
   token: **`appear`** (the mixin) fades a thing in with a short rise when it is put in the page — a
   state of `ScreenState`, a strip, a notice, «Вернуть», the dock, what a screen puts in its
   content in place of the skeleton (`AppScreen`, `> :slotted(*)`); an animation, so the element's
-  own transitions stay its own. **`AppReveal`** grows what pushes its neighbours from nothing and
+  own transitions stay its own. A screen that keeps its answer in one block of its own — «Деньги»,
+  «Счета», «Графики», «Категории» — fades the block's children in itself, with no rise: the control
+  that chose the answer stands among them (review №5, MOL-138). **`AppReveal`** grows what pushes its neighbours from nothing and
   shrinks it back — a row of a list (`group`), an error under a field, a block of a sheet — by its
   height, padding and margins in the flow, so the rest slides; no row is taken out of the flow, which
-  a slide of the others would need. **Colour changes** of a control (a button come active, a chip
+  a slide of the others would need. The gap of a flex column is its parent's and does not shrink with
+  the row, so the margin on the row's side takes it back — otherwise the neighbour jumped by 12 px at
+  the end (adversarial А2); a grid's gap stays, its rows have none of this. **What is going takes no
+  tap and no focus** (`inert`, review №4). **Colour changes** of a control (a button come active, a chip
   chosen) and **stale dimming** are transitions of their own. **None of it plays while a screen
   moves** (`html[data-nav]`): the view transition brings the new screen in already, and a block
-  fading inside it played the arrival twice. **None under «reduce motion».** **An answer read is not
+  fading inside it played the arrival twice. **At the end of the move what was put in meanwhile is
+  cut short** (`endMove` in `transitions.ts`): a CSS animation of no length comes back half-way
+  through once its length is back, and in Chromium an answer come at the end of the move dropped to
+  half its opacity and came in anew (adversarial А4). **A move the browser shows itself** — the iOS
+  edge swipe, Android's predictive back — is marked too (`data-nav="browser"`) for its render alone:
+  nothing of ours plays, and without the mark the screen came in again after the gesture (А5). **None under «reduce motion».** **An answer read is not
   a row added**: more than `BULK` (3) rows coming or going in one render — a month, a page, a first
   answer — just appear and are just gone, or a month would shrink out row by row; the first render is
-  never played. **What does not move, on purpose:** a change of the screen's own query beyond its
+  never played. **Another month is another list** (`:key` by month on the days of «Деньги»): a month
+  the phone keeps came in place with one to three days, under `BULK`, and its days shrank and grew
+  (adversarial А1). **A removal landed is gone at once** (`gone` in the spending queue): out of the
+  queue on its answer, it no longer hid its row while the month on screen was still the one read
+  before, and the day shrank, grew and shrank again (А3) — the flicker was there before, motion made
+  it seen. **What does not move, on purpose:** a change of the screen's own query beyond its
   answer coming in under the control (MOL-136 — an overlay took the second tap, and «Вернуть» and
   the main action in the dock come in without the other going out: a `mode="out-in"` would hold
   back the button the screen gives the focus to once the strip goes — read from the code, not
@@ -393,9 +408,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
   first frame of the rise, so the sheet rises that high, and the picture iOS slides is already right.
   Only on a touch screen, and let go if the keys have not come in `KEYBOARD_LATE` (1500 ms: a
   hardware keyboard never comes) or the focus leaves first; an event of the viewport without the
-  keys does not take it away. **The price:** the very first keyboard on a phone, or after its data
-  was cleared, has nothing to go by and still slides. Neither is the focus put off nor the window
-  held — the rules above stand.
+  keys does not take it away. **Only before the first keyboard of the page** (adversarial А6): it is
+  the one that comes late over a page that draws nothing; any later one comes in 50 to 160 ms over a
+  page that is drawn, and a sheet made lower at a tap in it dropped its top by hundreds of pixels for
+  those frames and then flew up with the keys. Whether one has come is heard from the app's load,
+  under a sheet or not. **Only a field with keys**: a select and a date bring a picker of their own,
+  and a height remembered for them made the sheet short for 1.5 s and then jumped (У1); they are
+  still kept in sight like any field typed in. **The price:** the very first keyboard on a phone, or
+  after its data was cleared, has nothing to go by and still slides. Neither is the focus put off nor
+  the window held — the rules above stand.
 - **Under the keys, nothing of the page shows** (hotfix-bottom-menu). On iOS 26 and later the keys,
   the bar of «∧ ∨ ✓» over them and Safari's address bar floating above them are glass with clear
   room between them, and the sheet stands on the top of that frame, not of the keys: what lay under
