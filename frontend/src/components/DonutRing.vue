@@ -27,7 +27,7 @@ export interface RingSector {
 /** The gap between two sectors, in radians (handoff MOL-157, 03). */
 const GAP = 0.045
 /** How much thicker the chosen sector is, of the hundred (handoff MOL-157, 03). */
-const CHOSEN_THICKER = 5
+export const CHOSEN_THICKER = 5
 /** A sector narrower than this many gaps goes without one: a gap would eat it (handoff 03). */
 const GAPLESS_BELOW = 2.5
 const TURN = Math.PI * 2

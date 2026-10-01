@@ -124,12 +124,12 @@ test('against the usual comes with three closed months, and says when before (ha
     await spend('20000', monthsAgoDay(2), 'cafe')
   })
   await toCharts(page)
-  // Two closed months with data: the card stays and names the month after which it comes.
+  // Two closed months with data: the card stays and names the first month with a comparison.
   const usual = page.getByRole('region', { name: 'Против обычного' })
-  await expect(usual).toContainText('Сравнение появится после')
-  await expect(usual).toContainText('Сейчас закрыты')
+  await expect(usual).toContainText('Сравнение — с')
+  await expect(usual).toContainText('закрыты только')
   const pace = page.getByRole('region', { name: 'Темп месяца' })
-  await expect(pace).toContainText('Обычный месяц появится после')
+  await expect(pace).toContainText('Пунктир обычного месяца — с')
 
   await page.goto('/money')
   const headers = await asBrowser(page)

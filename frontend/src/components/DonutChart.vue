@@ -4,7 +4,7 @@
     <div class="figure">
       <!-- A tap on the ring chooses the sector under it; the legend's radios say the same. -->
       <div ref="ringBox" class="ring-box" @click="tapRing">
-        <DonutRing class="ring" :sectors="sectors" :thickness="12" :chosen="modelValue" />
+        <DonutRing class="ring" :sectors="sectors" :thickness="THICKNESS" :chosen="modelValue" />
       </div>
       <!-- Not a live region (review Р-6): the radio chosen already says it. -->
       <p class="center">
@@ -49,13 +49,15 @@ import { useI18n } from 'vue-i18n'
 import { CHART_LEVEL, formatEstimate, shareOf } from '@molvia/model'
 import type { Money, MoneyChartMonthView, SpendingCategoryView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
-import DonutRing from '@/components/DonutRing.vue'
+import DonutRing, { CHOSEN_THICKER } from '@/components/DonutRing.vue'
 import type { RingSector } from '@/components/DonutRing.vue'
 import { longMonth } from '@/components/charts'
 import { categoryColour } from '@/components/spending'
 
 /** The key of «Остальные» among the sectors: a category's is its id. */
 const REST = 'rest'
+/** The full ring's thickness, of the hundred it is drawn in (handoff MOL-157, 03). */
+const THICKNESS = 12
 
 /**
  * «Куда ушло» of «Графики → Месяц» (MOL-158, handoff MOL-157 03): the month's ring at full size, the
@@ -169,20 +171,26 @@ export default defineComponent({
       emit('update:modelValue', key === props.modelValue ? null : key)
     }
 
-    /** The sector under a tap on the ring: its angle, clockwise from twelve, against the levels. */
+    /**
+     * The sector under a tap on the ring: its angle, clockwise from twelve, against the levels — and
+     * only on the band the sector is drawn as, the chosen one's wider inwards (adversarial Б): the hole
+     * is the centre's words, the corners of the box are not the ring, and a tap on either chose or let
+     * go a sector by the angle of the finger.
+     */
     function tapRing(event: MouseEvent): void {
       const box = ringBox.value?.getBoundingClientRect()
       if (!box || box.width <= 0 || rows.value.length === 0) return
       const x = event.clientX - (box.left + box.width / 2)
       const y = event.clientY - (box.top + box.height / 2)
-      // The hole in the middle is the centre's words, not a sector.
-      if (Math.hypot(x, y) < (box.width / 2) * 0.6) return
+      const reach = (Math.hypot(x, y) * 100) / box.width
+      if (reach > 50) return
       const turn = (Math.atan2(x, -y) / (2 * Math.PI) + 1) % 1
       let start = 0
       for (const row of rows.value) {
         start += row.level / CHART_LEVEL
         if (turn < start && row.level > 0) {
-          toggle(row.key)
+          const inner = 50 - THICKNESS - (row.key === props.modelValue ? CHOSEN_THICKER : 0)
+          if (reach >= inner) toggle(row.key)
           return
         }
       }
@@ -191,6 +199,7 @@ export default defineComponent({
     return {
       t,
       id: useId(),
+      THICKNESS,
       ringBox,
       rows,
       sectors,

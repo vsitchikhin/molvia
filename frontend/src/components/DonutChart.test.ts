@@ -24,8 +24,9 @@ function donut(modelValue: string | null = null) {
       { categoryId: B, amount: amd('100'), income: amd('100'), count: 1, level: 250, members: [] },
     ],
     usual: null,
-    usualFrom: '2026-11',
+    comparedFrom: '2026-12',
     closed: [],
+    firstMonth: '2026-09',
     deviations: [],
     pace: { days: [], usual: null },
     categories: [
@@ -71,6 +72,20 @@ describe('DonutChart (MOL-158)', () => {
     expect(view.emitted('update:modelValue')?.at(-1)).toEqual([B])
     await box.trigger('click', { clientX: 100, clientY: 100 })
     expect(view.emitted('update:modelValue')).toHaveLength(2)
+  })
+
+  it('must not fire: a tap in the hole or past the ring chooses nothing (adversarial Б)', async () => {
+    const view = donut()
+    const box = view.find('.ring-box')
+    // The ring of 200 px runs from 76 to 100 px off the centre: 70 px is the hole, by the figure.
+    await box.trigger('click', { clientX: 170, clientY: 100 })
+    // A corner of the box is past the ring.
+    await box.trigger('click', { clientX: 2, clientY: 2 })
+    expect(view.emitted('update:modelValue')).toBeUndefined()
+    // The chosen sector is drawn wider inwards, and a tap on that band lets it go.
+    const chosen = donut(A)
+    await chosen.find('.ring-box').trigger('click', { clientX: 170, clientY: 100 })
+    expect(chosen.emitted('update:modelValue')?.at(-1)).toEqual([null])
   })
 
   it('draws every sector in a token, never a literal colour', () => {

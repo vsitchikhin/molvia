@@ -60,8 +60,8 @@ export function monthName(month: string, locale: string): string {
   )
 }
 
-/** «октября» — the month after «после» (MOL-158): Russian wants the genitive, so it is a key. */
-export function monthAfter(
+/** «октября» — a month after «с» or «до» (MOL-158): Russian wants the genitive, so it is a key. */
+export function monthGenitive(
   month: string,
   t: (key: string, named?: Record<string, unknown>) => string,
 ): string {
@@ -79,17 +79,24 @@ export function monthSpan(from: string, to: string, locale: string): { from: str
   }
 }
 
-/** «Сейчас закрыт только август»: the closed months so far, named, below the three a usual needs. */
+/**
+ * «До сентября закрыт только август»: the closed months before the month shown, named, below the
+ * three a usual needs — of that month, never of today, so a past month says the truth too
+ * (adversarial Г of MOL-158).
+ */
 export function closedWords(
+  month: string,
   closed: readonly string[],
   locale: string,
   t: (key: string, named?: Record<string, unknown>) => string,
 ): string {
-  if (closed.length === 0) return t('spending.charts.few_body_none')
+  const before = monthGenitive(month, t)
+  if (closed.length === 0) return t('spending.charts.few_body_none', { month: before })
   const names = new Intl.ListFormat(locale, { type: 'conjunction' }).format(
     closed.map((month) => monthName(month, locale)),
   )
   return t(closed.length === 1 ? 'spending.charts.few_body_one' : 'spending.charts.few_body_many', {
     closed: names,
+    month: before,
   })
 }

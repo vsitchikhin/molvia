@@ -46,7 +46,13 @@ import IconWait from '~icons/mdi/calendar-clock-outline'
 import { CHART_LEVEL, currencySign, formatEstimate } from '@molvia/model'
 import type { MoneyChartMonthView, SpendingCategoryView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
-import { closedWords, longMonth, monthAfter, monthSpan, signedPercent } from '@/components/charts'
+import {
+  closedWords,
+  longMonth,
+  monthGenitive,
+  monthSpan,
+  signedPercent,
+} from '@/components/charts'
 import { categoryColour } from '@/components/spending'
 
 /**
@@ -54,8 +60,10 @@ import { categoryColour } from '@/components/spending'
  * furthest from their usual month, as the server ordered them — the sum of the month a bar in the
  * category's colour, the usual a mark across it, the change an arrow and a number in the colour of
  * the text, never red or green: more is not worse here, only different. A category the usual never
- * had is «новая», not «+100 %». With fewer than three closed months the card stays and says when the
- * comparison comes.
+ * had is «новая», not «+100 %»; one whose sum is not whole, in this month or every usual one, is no
+ * row (adversarial Д). With fewer than three closed months the card stays and names the first month
+ * that has a comparison and what was closed before this one — true of a past month as of the
+ * running one (adversarial Г).
  */
 export default defineComponent({
   name: 'DeviationBars',
@@ -121,12 +129,15 @@ export default defineComponent({
       }),
     )
 
-    const few = computed(() => ({
-      title: t('spending.charts.few_title', {
-        month: monthAfter(props.charts.usualFrom ?? props.charts.month, t),
-      }),
-      body: closedWords(props.charts.closed, locale.value, t),
-    }))
+    const few = computed(() => {
+      const from = props.charts.comparedFrom
+      return {
+        title: from
+          ? t('spending.charts.few_title', { month: monthGenitive(from, t) })
+          : t('spending.charts.few_title_none'),
+        body: closedWords(props.charts.month, props.charts.closed, locale.value, t),
+      }
+    })
 
     return { t, id: useId(), note, rows, few }
   },

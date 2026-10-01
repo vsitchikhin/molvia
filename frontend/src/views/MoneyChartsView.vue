@@ -56,10 +56,15 @@ export default defineComponent({
     }
 
     const currentMonth = computed(() => today.value.slice(0, 7))
-    /** A month the address names, else this one; one that is not a month is this one too. */
+    /**
+     * A month the address names, else this one; one that is not a month is this one too, and so is
+     * one still to come — the future is not a month to look at, as on «Деньгах» (adversarial В).
+     */
     const month = computed(() => {
       const asked = route.query.month
-      return typeof asked === 'string' && monthSchema.safeParse(asked).success
+      return typeof asked === 'string' &&
+        monthSchema.safeParse(asked).success &&
+        asked <= currentMonth.value
         ? asked
         : currentMonth.value
     })

@@ -87,7 +87,7 @@ import PaceLine from '@/components/PaceLine.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen } from '@/components/accounts'
-import { longMonth, monthAfter, signedPercent } from '@/components/charts'
+import { longMonth, monthGenitive, signedPercent } from '@/components/charts'
 import { useMoneyChartMonth } from '@/composables/useMoneyCharts'
 import { calendarDay, localDay } from '@/days'
 
@@ -121,16 +121,11 @@ export default defineComponent({
     const nameOf = (category: SpendingCategoryView) =>
       category.preset ? t(`spending.category.${category.preset}`) : (category.name ?? '')
 
-    /** No month with anything in it, before or now: an offer, not an empty ring (handoff 5b). */
-    const empty = computed(() => {
-      const shown = charts.value
-      return (
-        shown !== null &&
-        shown.spent.minor === 0n &&
-        shown.uncounted.length === 0 &&
-        shown.closed.length === 0
-      )
-    })
+    /**
+     * No month with anything in it, ever: an offer, not an empty ring (handoff 5b). A month before
+     * the first with data is a grey ring of a person who has data (adversarial К).
+     */
+    const empty = computed(() => charts.value !== null && charts.value.firstMonth === null)
 
     const sector = ref<string | null>(null)
     const dayAt = ref(0)
@@ -141,15 +136,25 @@ export default defineComponent({
       if (!charts.value?.running) return last
       return Math.min(last, Math.max(0, Number(localDay().slice(8, 10)) - 1))
     }
-    // Sources apart, compared one by one: a new answer of the same month — a write landed — keeps
-    // the choice; another month lets it go (review of MOL-74).
+    // Another month lets the choices go; a new answer of the same month — a write landed — keeps
+    // them (Р-9): the day while the line still reaches it (adversarial З), the sector while the ring
+    // still has it — gone into «Остальные», it dimmed the whole ring with nothing chosen (adversarial А).
     watch(
-      [() => charts.value?.month, () => charts.value?.pace.days.length],
-      ([month], [before]) => {
-        if (month !== before) sector.value = null
+      () => charts.value?.month,
+      () => {
+        sector.value = null
         dayAt.value = dayOnArrival()
       },
       { immediate: true },
+    )
+    watch(
+      () => charts.value,
+      (shown) => {
+        if (!shown) return
+        const keys = shown.slices.map((slice) => slice.categoryId ?? 'rest')
+        if (sector.value !== null && !keys.includes(sector.value)) sector.value = null
+        dayAt.value = Math.min(dayAt.value, Math.max(0, shown.pace.days.length - 1))
+      },
     )
 
     const length = computed(() => Number(lastDayOf(props.month).slice(8, 10)))
@@ -200,13 +205,19 @@ export default defineComponent({
       }
       return { label, figure: whole(day.cumulative), sub }
     })
-    const paceNote = computed(() =>
-      charts.value?.pace.usual
-        ? t('spending.charts.pace_note')
-        : t('spending.charts.pace_few', {
-            month: monthAfter(charts.value?.usualFrom ?? props.month, t),
-          }),
-    )
+    /**
+     * Under the pace: what the dashed line is, or why there is none — too few closed months, named by
+     * the first month that has it, or months enough and none of them whole (adversarial И): never «it
+     * comes» of a usual the card above already compares with.
+     */
+    const paceNote = computed(() => {
+      const shown = charts.value
+      if (shown?.pace.usual) return t('spending.charts.pace_note')
+      if (shown?.usual) return t('spending.charts.pace_uncounted')
+      return shown?.comparedFrom
+        ? t('spending.charts.pace_few', { month: monthGenitive(shown.comparedFrom, t) })
+        : t('spending.charts.pace_few_none')
+    })
 
     return {
       t,

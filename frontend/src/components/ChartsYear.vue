@@ -1,6 +1,6 @@
 <template>
-  <!-- Under the period: they are about the charts of the one chosen, and over it they came
-       and went with its answer and took it from under the thumb (MOL-138, owner's В-2). -->
+  <!-- Under the tabs: they are about the charts of the one chosen, and over them they came
+       and went with its answer and took them from under the thumb (MOL-138, owner's В-2). -->
   <p v-if="stale === 'offline' && fetchedAt" class="strip">
     <IconCloudOff class="strip-icon" aria-hidden="true" />
     {{ t('spending.charts.offline.strip', { when: when(fetchedAt) }) }}
