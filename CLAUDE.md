@@ -282,6 +282,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A code is looked up in the query, never the path** (`GET /catalogue/barcode?code=`, MOL-99): the
   API logs paths. It is looked up with its twins (`barcodeTwins`), the code as read first; the item
   found goes to the purchase sheet with no query — a code teaches the search nothing.
+- **A code the catalogue missed is asked of Open Food Facts by the server, never the phone**
+  (MOL-162): only a code `writtenBarcode` takes, a shop's label never; a hint, never an error; at most
+  twelve a minute, kept a month found and a week missed; an item proposed with it is marked `origin`
+  (ODbL).
 - **Anyone writes a code to any item, and anyone lets it go** (MOL-100): it must check
   (`writtenBarcode`); one package is one item with its twins, under a lock per form after the item's;
   a code another item holds writes nothing and answers `409` with the holder; `added_by` is erased
