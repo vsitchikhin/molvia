@@ -13,7 +13,7 @@ import type { MoneyMonth } from '@/composables/useMoneyMonth'
 import { localDay, purchaseDay, timeOfDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
-import { spendingOf, useSpendingQueueStore } from '@/stores/spendingQueue'
+import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import type { RejectedSpendingWrite } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -141,12 +141,18 @@ export function useMoneyScreen(): MoneyScreen {
   /**
    * Refusals no row of this month carries — «Вернуть» too late, a category — said under the
    * switcher; one a row of the month carries is that row's on «Траты» (adversarial round 3, Ж).
+   * A record is the month's by its day, not by a row on screen: before the month's answer the
+   * journal is empty, and the record went to the card whose one action throws it away (review of
+   * MOL-159, round 2). An amendment is a row's only when the row is loaded — the spending stays on
+   * the server whatever its card does.
    */
-  const carried = (item: RejectedSpendingWrite) =>
-    ['record', 'amend'].includes(item.write.kind) &&
-    journal.value.some((day) =>
-      day.rows.some((row) => row.kind === 'manual' && row.key === spendingOf(item.write)),
-    )
+  const carried = ({ write }: RejectedSpendingWrite) =>
+    write.kind === 'record'
+      ? monthOfDay(write.body.spentOn) === selected.value
+      : write.kind === 'amend' &&
+        journal.value.some((day) =>
+          day.rows.some((row) => row.kind === 'manual' && row.key === write.id),
+        )
   const otherRefusals = computed(() => queue.rejected.filter((item) => !carried(item)))
   const rowRefusals = computed(() => queue.rejected.filter(carried))
   const reasonOf = (code: WireCode) =>

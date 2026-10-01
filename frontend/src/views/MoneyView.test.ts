@@ -692,6 +692,14 @@ describe('MoneyView: what the review of MOL-159 found', () => {
     expect(view.text()).not.toContain(en.spending.rejected_other.title)
   })
 
+  it('a refused spending of this month is the month’s before the month has answered', async () => {
+    moneyMonth.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    await refused('2026-09-27')
+    expect(view.text()).toContain('1 spending of this month not accepted')
+    expect(view.text()).not.toContain(en.spending.rejected_other.title)
+  })
+
   it('Ж of round 2: a spending removed on «Траты» keeps its «Undo» here, with what is left of it', async () => {
     moneyMonth.mockResolvedValue(month())
     const view = await render()
