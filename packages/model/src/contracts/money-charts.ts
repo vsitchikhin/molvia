@@ -4,6 +4,7 @@ import { spendingCategoryViewCodec, spendingCategoryViewOf } from './spending'
 import { exchangeDaySchema } from '#model/entities/exchange'
 import { CHART_LEVEL } from '#model/entities/money-charts'
 import type { ExchangeLosses, MoneyCharts, RateLine } from '#model/entities/money-charts'
+import type { MonthCharts } from '#model/entities/money-chart-month'
 import { categoryOrder } from '#model/entities/spending-category'
 import type { SpendingCategory } from '#model/entities/spending-category'
 import { currencySchema, moneyCodec, signedMoneyCodec } from '#model/values/money'
@@ -145,5 +146,83 @@ export function moneyChartsViewOf(
       points: rate.points.map((point) => ({ ...point })),
       exchanges: rate.exchanges.map((exchange) => ({ ...exchange })),
     },
+  }
+}
+
+/**
+ * `GET /money/months/:month/charts` (MOL-158): «Графики → Месяц» — the ring of the month, the
+ * categories against the usual month and the pace by day, every figure and height the server's. The
+ * month is the month of `GET /money/months/:month`; `categories` name every sector and row, archived
+ * ones included, in the order of the chips.
+ */
+export const moneyChartMonthCodec = z.strictObject({
+  month: monthSchema,
+  running: z.boolean(),
+  spendCurrency: currencySchema,
+  incomeCurrency: currencySchema,
+  spent: moneyCodec,
+  spentIncome: moneyCodec.nullable(),
+  uncounted: z.array(moneyCodec),
+  slices: z.array(
+    z.strictObject({
+      categoryId: z.uuid().nullable(),
+      amount: moneyCodec,
+      income: moneyCodec.nullable(),
+      count: z.int().min(1),
+      level,
+      members: z.array(z.uuid()),
+    }),
+  ),
+  /** Null below three closed months; `comparedFrom` is then the first month that has one. */
+  usual: z.strictObject({ from: monthSchema, to: monthSchema, months: z.int().min(1) }).nullable(),
+  comparedFrom: monthSchema.nullable(),
+  closed: z.array(monthSchema),
+  /** The owner's first month with anything in it; null — a newcomer, offered a start. */
+  firstMonth: monthSchema.nullable(),
+  deviations: z.array(
+    z.strictObject({
+      categoryId: z.uuid(),
+      amount: moneyCodec,
+      average: moneyCodec,
+      /** Whole percent against the usual; null — the usual is nothing, «новая». */
+      change: z.int().nullable(),
+      level,
+      averageLevel: level,
+    }),
+  ),
+  pace: z.strictObject({
+    days: z.array(
+      z.strictObject({
+        day: exchangeDaySchema,
+        cumulative: moneyCodec,
+        income: moneyCodec.nullable(),
+        level,
+      }),
+    ),
+    usual: z
+      .array(z.strictObject({ day: exchangeDaySchema, cumulative: moneyCodec, level }))
+      .nullable(),
+  }),
+  categories: z.array(spendingCategoryViewCodec),
+})
+export type MoneyChartMonthView = z.output<typeof moneyChartMonthCodec>
+
+/** The month's charts as they go on the wire, with the owner's categories to name them. */
+export function moneyChartMonthViewOf(
+  charts: MonthCharts,
+  categories: readonly SpendingCategory[],
+): MoneyChartMonthView {
+  return {
+    ...charts,
+    uncounted: [...charts.uncounted],
+    closed: [...charts.closed],
+    slices: charts.slices.map((slice) => ({ ...slice, members: [...slice.members] })),
+    deviations: charts.deviations.map((row) => ({ ...row })),
+    pace: {
+      days: charts.pace.days.map((day) => ({ ...day })),
+      usual: charts.pace.usual?.map((point) => ({ ...point })) ?? null,
+    },
+    usual: charts.usual && { ...charts.usual },
+    categories: categoryOrder(categories).map(spendingCategoryViewOf),
   }
 }
