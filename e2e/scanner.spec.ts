@@ -696,16 +696,20 @@ test('slides down with the barcode it read still on the screen, not black', asyn
  * will ask for the camera — which Safari does once per page load until its setting says «Allow».
  * Chromium is given the camera all the same; only what the page is told is Safari's.
  */
-async function asSafariThatAsks(page: Page): Promise<void> {
-  await page.addInitScript(() => {
+async function asSafari(page: Page, state: PermissionState = 'prompt'): Promise<void> {
+  await page.addInitScript((answer) => {
     Object.defineProperty(navigator, 'vendor', { value: 'Apple Computer, Inc.' })
     Object.defineProperty(navigator, 'maxTouchPoints', { value: 5 })
+    Object.defineProperty(navigator, 'userAgent', {
+      value:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1',
+    })
     const query = navigator.permissions.query.bind(navigator.permissions)
     navigator.permissions.query = (descriptor) =>
       descriptor.name === 'camera'
-        ? Promise.resolve({ state: 'prompt' } as PermissionStatus)
+        ? Promise.resolve({ state: answer } as PermissionStatus)
         : query(descriptor)
-  })
+  }, state)
 }
 const cameraHint = (page: Page) => page.getByRole('dialog', { name: 'Camera without asking' })
 
@@ -715,13 +719,13 @@ test('tells how to stop Safari asking, once the camera is given, and reads after
 }) => {
   test.setTimeout(READ * 2)
   await context.grantPermissions(['camera'])
-  await asSafariThatAsks(page)
+  await asSafari(page)
   await open(page, '/_kit')
   await openScanner(page)
 
   // After the camera is live, which a loaded machine takes its time to give.
   await expect(cameraHint(page)).toBeVisible({ timeout: 15_000 })
-  await expect(cameraHint(page)).toContainText('aA in the address bar')
+  await expect(cameraHint(page)).toContainText('The page menu by the address bar')
   // Until it has come up a sheet takes no tap (MOL-69), and on a loaded machine its rise starts a
   // frame late — a tap timed by its animations landed before it and was held. Tapped until it goes.
   await expect(async () => {
@@ -735,7 +739,7 @@ test('tells how to stop Safari asking, once the camera is given, and reads after
 
 test('seen on this phone, the hint waits behind a quiet line', async ({ page, context }) => {
   await context.grantPermissions(['camera'])
-  await asSafariThatAsks(page)
+  await asSafari(page)
   await page.addInitScript(() => {
     localStorage.setItem('molvia.camera-hint', '1')
   })
@@ -751,4 +755,18 @@ test('seen on this phone, the hint waits behind a quiet line', async ({ page, co
   await expect(cameraHint(page)).toBeHidden()
   await quiet.click()
   await expect(cameraHint(page)).toBeVisible()
+})
+
+test('says nothing where Safari will not ask — its setting says «Allow»', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(READ * 2)
+  await context.grantPermissions(['camera'])
+  await asSafari(page, 'granted')
+  await open(page, '/_kit')
+  await openScanner(page)
+
+  await expect(scanned(page, BARCODE)).toBeVisible({ timeout: READ })
+  await expect(cameraHint(page)).toBeHidden()
 })
