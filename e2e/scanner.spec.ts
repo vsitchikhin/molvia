@@ -527,10 +527,13 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
 
       await page.keyboard.press('Enter')
 
+      // By its block: the live region says the same words (e2e.md, MOL-64).
       await expect(
-        page.getByText(
-          'The code is not linked. Try again with a connection — or record without the code',
-        ),
+        page
+          .locator('.state')
+          .getByText(
+            'The code is not linked. Try again with a connection — or record without the code',
+          ),
       ).toBeVisible()
       await expect.poll(async () => (await focused(page)).text).toBe('Try again')
       await context.setOffline(false)
