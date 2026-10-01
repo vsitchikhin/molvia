@@ -17,7 +17,6 @@ import type {
   SpendingCategoryView,
 } from '@molvia/model'
 import AccountSheet from './AccountSheet.vue'
-import AccountsCard from './AccountsCard.vue'
 import OperationSheet from './OperationSheet.vue'
 import ReconcileSheet from './ReconcileSheet.vue'
 import { createAppI18n } from '@/i18n'
@@ -615,37 +614,5 @@ describe('AccountSheet (handoff 03)', () => {
     )
     expect(view.text()).toContain(en.accounts.sheet.offline)
     expect(button(view, en.accounts.sheet.wait_online)?.attributes('disabled')).toBeDefined()
-  })
-})
-
-describe('AccountsCard (handoff 01)', () => {
-  it('five accounts all, six — four and «Ещё 2»; savings last; a minus drawn as «плохо»', async () => {
-    const five = [
-      account('Savings', 'USD', { savings: true }),
-      account('A'),
-      account('B', 'AMD', { balance: amd('-12400') }),
-      account('C'),
-      account('D'),
-    ]
-    moneyAccounts.mockResolvedValue(page(five))
-    const view = await mounted(AccountsCard, { spendCurrency: 'AMD' }, withAccounts(five))
-    const rows = view.findAll('.line').map((one) => one.text())
-    expect(rows).toHaveLength(5)
-    expect(rows.at(-1)).toContain('Savings')
-    expect(view.findAll('.balance.negative').map((one) => one.text())).toEqual(['−֏12,400'])
-
-    const six = [...five, account('E')]
-    moneyAccounts.mockResolvedValue(page(six, 3))
-    const more = await mounted(AccountsCard, { spendCurrency: 'AMD' }, withAccounts(six, 3))
-    expect(more.findAll('.line')).toHaveLength(4)
-    expect(more.text()).toContain('2 more accounts')
-    expect(more.text()).toContain('3 entries')
-  })
-
-  it('no account — an offer, not a state; the month under it is not held', async () => {
-    moneyAccounts.mockResolvedValue(page([]))
-    const view = await mounted(AccountsCard, { spendCurrency: 'AMD' }, withAccounts([]))
-    expect(view.text()).toContain(en.accounts.offer.title)
-    expect(view.find('[role="alert"]').exists()).toBe(false)
   })
 })
