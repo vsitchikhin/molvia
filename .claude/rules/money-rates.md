@@ -291,7 +291,9 @@ rate exactly as before.
   into the spending one by the official rate of that day (`officialAcross`, the one «Деньги» count
   by); **with no market — a pair without the dram, a day with no figure — or no such rate, the
   exchange is named under «Без сравнения», never set beside the central bank instead** (handoff 05),
-  in words that do not blame the bank for a pair it never quotes (Р-13). An exchange of a day the
+  in words that name no single cause — «рынка или курса того дня нет» (Р-13, adversarial Д): the
+  bank never quotes a pair without the dram, and a market of the day with no fresh official rate to
+  bring the difference into drams is the other way an exchange goes uncounted. An exchange of a day the
   exchange offices' file has not reached is measured among the banks, and the sum moves by itself
   when the file comes (Р-14), as the card does. **`losses` comes with `GET /exchanges` and with every
   write's answer** (В-2): a written exchange is in the sum at once; defaulted (`null`) for a server

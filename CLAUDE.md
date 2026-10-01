@@ -213,7 +213,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   the best of the central bank's figures of its day for the person, and their own channel if named;
   the side is the bank's (`marketSideOf`), a pair without the dram has none; a file is written whole
   or refused. **«Обмены против рынка» sums each exchange as its card measures it** (MOL-152): its own
-  channel, else the best; no market — «Без сравнения», never the central bank instead. **The official cache holds the bank's history since 2022**, only missing days written.
+  channel, else the best; no market — «Без сравнения», never the central bank instead. **The
+  official cache holds the bank's history since 2022**, only missing days written.
 
 ### Money: spendings and «Деньги» — `.claude/rules/money-spendings.md`
 

@@ -71,8 +71,8 @@ function rememberOverview(owner: string, answer: MoneyAccountsResponse): void {
 export type AccountsPhase = 'idle' | 'loading' | 'ready' | 'error' | 'offline'
 
 /**
- * «Счета» for every screen that shows or picks one (MOL-123): the card of «Деньги», the page, the
- * pickers of four sheets and the cards of exchanges and incomes. The balances are the server's; the
+ * «Счета» for every screen that shows or picks one (MOL-123): the row «Счета» of «Деньги», the page,
+ * the pickers of four sheets and the cards of exchanges and incomes. The balances are the server's; the
  * phone adds nothing up. Read again whenever a queue has had an answer — a spending or a trip that
  * landed has moved a balance — and whenever a write of an account answers with the page whole.
  */
@@ -227,7 +227,7 @@ export const useAccountsStore = defineStore('accounts', () => {
 })
 
 /**
- * The calling screen shows accounts (the card of «Деньги», «Счета», an account, «Обмен денег»):
+ * The calling screen shows accounts («Деньги» with its row «Счета», «Счета», an account, «Обмен денег»):
  * while it is up, a queue's answer reads the page again (adversarial round 2, Н2).
  */
 export function useAccountsOnScreen(): void {

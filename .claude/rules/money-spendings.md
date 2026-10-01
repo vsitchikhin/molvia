@@ -173,7 +173,14 @@ nothing up.
   thumb** (`#docked`, as «Сфотографировать чек», MOL-128) on both, in every state where a category is
   known; «Вернуть» floats over it. **A spending of another month moves «Траты» to it, never the
   summary** (Р-5): there is no row on the summary to bring into view. A newcomer's state has no button
-  inside (Р-6) and no «Траты» under it, nothing to see there. A finished trip opened from «Траты» leads
+  inside (Р-6) and no «Траты» under it, nothing to see there — the price, named (adversarial В of
+  MOL-159): «newcomer» is a guess from the month and the month before, so a person back after a whole
+  empty month is greeted as one and finds «Траты» by flipping a month back. **«Счета», «Обмен денег»
+  and «Категории» keep their figures under the skeleton and the error** (adversarial Г): they are
+  «now», read from answers of their own, and the month that failed is not theirs. **A spending of the
+  month the server refused is named on the summary and leads to «Траты»** («Не принята N трат этого
+  месяца», adversarial А): its row there is where it is put right, and the summary, which has no
+  row, said nothing at all — the ring even said «трат нет». A finished trip opened from «Траты» leads
   back to «Траты» (`?from=money-spendings`, Р-12).
 - **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`), by the rules
   of the trip's (MOL-24): storage is the queue, one at a time under `navigator.locks`, held by a
@@ -282,8 +289,9 @@ nothing up.
 - **A finished trip opened from «Деньги» leads back there** (owner's decision В-3):
   `?from=money` — `?from=money-spendings` since its row is on «Траты» (MOL-159) — and the route
   lists which `from` it takes (`meta.from`): an address must not make any screen the parent of any
-  other. The chevron says «‹ Деньги» and steps back onto the
-  same month; opened cold, «Деньги» is laid underneath.
+  other. The chevron names the screen it came from — «‹ Траты» since MOL-159 — and steps back onto
+  the same month (`backTarget` compares the path, not the query); opened cold, that screen is laid
+  underneath with its own parents — «Траты» of the running month over «Деньги».
 - **One's own category is made from the chips** («+ Своя», a sheet over the sheet, chosen as soon
   as it exists) **and kept on «Деньги → Категории»** (В-1): «Убрать» asks nothing, since it erases
   nothing, and «Вернуть» stands right under it. **A category that landed stays on the chips until the

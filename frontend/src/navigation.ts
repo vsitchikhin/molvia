@@ -54,8 +54,8 @@ export function backTarget(router: Router, route: Routed): BackTarget | null {
  * Onto the parent itself, never past it to an older ancestor: a step back when the parent is the
  * entry underneath, otherwise a replace onto it. For a screen that is gone and whose parent has
  * something to say about it — a deleted account, whose «Вернуть» stands on «Счета» (MOL-123,
- * review 32): opened from a line of the card on «Деньги», the chevron's step went to «Деньги»,
- * where nothing offered it back.
+ * review 32): opened from a line of the card «Деньги» had until MOL-159, the chevron's step went to
+ * «Деньги», where nothing offered it back — and a link from anywhere else would do the same.
  */
 export function upTarget(router: Router, route: Routed): BackTarget | null {
   const parent = parentOf(router, route)

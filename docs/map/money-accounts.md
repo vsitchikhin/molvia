@@ -34,10 +34,10 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 ## frontend · components
 
 - `frontend/src/components/AccountChoice.test.ts` — Component test: the account row and picker in spending, income and trip sheets choose, follow the currency, write «Без счёта» and «Списано».
-- `frontend/src/components/AccountLine.vue` — One account as a row: name, «сбережения» and balance on the «Деньги» card; with currency and last event on «Счета».
+- `frontend/src/components/AccountLine.vue` — One account as a row: name, «сбережения» and balance; with currency and last event on «Счета».
 - `frontend/src/components/AccountPickerSheet.vue` — «Счёт» picker sheet over an operation's sheet: accounts of its currency, others where «списано» covers them, «Без счёта».
 - `frontend/src/components/AccountRow.vue` — «Счёт: Наличные ֏ ›» row in an operation's sheet that opens the picker; absent while the owner has no account.
-- `frontend/src/components/AccountScreens.test.ts` — Component test: «Сверка» asks the fact first and waits for queued writes, «Записать разницу» writes once; account sheet and the «Деньги» card behave.
+- `frontend/src/components/AccountScreens.test.ts` — Component test: «Сверка» asks the fact first and waits for queued writes, «Записать разницу» writes once; the account sheet behaves.
 - `frontend/src/components/AccountSheet.vue` — «Новый счёт» / «Счёт» sheet: name, currency, savings, start; written with a connection only, «Удалить» or «Убрать из выбора».
 - `frontend/src/components/ChargedField.vue` — «Списано со счёта» field under the account row: what left the account in its currency when the operation was in another.
 - `frontend/src/components/HeldFromAccounts.vue` — «По счетам на …: … · Подставить» hint under «сколько было до» of an exchange or income, filled only on tap.
