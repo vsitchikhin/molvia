@@ -98,9 +98,12 @@ by its code is MOL-99, a code in «Предложить товар» and bound t
   Chrome keeps «Allow» for the site.
 - **Only a setting of the phone stops it**, and no page can set it or open it: «Настройки →
   Приложения → Safari → Камера → Разрешить» — for every site in Safari, checked by the owner — or,
-  in a tab, «aA → Настройки веб-сайта → Камера», for this site alone. iOS opens no Settings from a
-  web page (`App-Prefs:` is for native apps), so **the way is written out, never linked**; the
-  refusal «Нет доступа к камере» names the same path.
+  in a tab, «Настройки веб-сайта → Камера» in the page menu by the address bar, for this site alone.
+  That menu is named by no icon: it was «aA» before iOS 18, an icon of its own since, and goes behind
+  «…» in the compact layout of iOS 26 (review 1) — and the tab's sheet adds the way for every site,
+  the one checked on a phone. iOS opens no Settings from a web page (`App-Prefs:` is for native
+  apps), so **the way is written out, never linked**; the refusal «Нет доступа к камере» names the
+  same path.
 - **The scanner says where the setting is, right after Safari asked** (`useCameraHint`,
   `CameraHintSheet`, owner's decision of 01.10.2026). Before the camera starts it asks
   `permissions.query({ name: 'camera' })`: once the camera is given Safari answers `granted` until the
@@ -108,29 +111,48 @@ by its code is MOL-99, a code in «Предложить товар» and bound t
   went live — «Камера без вопросов» rises over the scanner, a sheet over a sheet. `granted` (the
   setting is there), `denied` (the refusal says how already) or no answer at all — nothing: silence
   is better than teaching the wrong thing.
+- **The camera waits for that answer `PERMISSION_WAIT`, 300 ms, and no longer** (adversarial Б): the
+  hint is a courtesy and the camera is the point. An answer that never came kept the scanner on
+  «Загрузка…» for good; Safari answers in milliseconds.
+- **One opening asks for the camera once** (adversarial В): the checks are numbered, and a start
+  whose check a later one overtook — the scanner put away and opened again, the digits and back to
+  «Сканировать», while the browser answered — starts nothing. Guarded by the state alone («open, not
+  typing»), the first start took the second for its own and asked again, while Safari still held its
+  question on the screen.
 - **Once on this phone, then a quiet line** (Р-4): any way the sheet goes counts as seen
   (`molvia.camera-hint`, a key of the phone, not of a person — the setting is the phone's, and a
-  sign-out changes nothing of it); after that, when Safari has asked, «Safari спрашивает каждый раз?
-  Как убрать» over «Ввести вручную» brings it back. A sheet on every launch would be a second
-  interruption on top of the first.
+  sign-out changes nothing of it); after that, when Safari is about to ask, «Safari спрашивает каждый
+  раз? Как убрать» over «Ввести вручную» brings it back. A sheet on every launch would be a second
+  interruption on top of the first. **The line is decided before the camera**, with the answer: added
+  once the picture was live, it grew the footer and pushed the viewfinder up as the person aimed, on
+  the commonest path at the shelf (review 2). The sheet still waits for the camera — it covers it.
 - **Only Safari on a touch screen** (Р-3): Apple's `navigator.vendor` and touch — an iPad calls itself
-  a Mac, a Mac has no touch — and not Chrome, Firefox or Edge for iOS (`CriOS`, `FxiOS`, `EdgiOS`),
-  WebKit as well but with settings of their own. The path is Safari's, and to anyone else it is wrong.
-- **A tab and the app say different things** (Р-7): a tab has «aA» for this site; the app from the
-  home screen has only Safari's own setting, and **the sheet names its price** (Р-6) — it opens the
-  camera to every site in Safari, not only to Molvia. Trust is the asset the product cannot write off.
+  a Mac, a Mac has no touch — **and `Safari/` in the user agent, or the app from the home screen**,
+  whose agent has none. A browser inside another app — a bare WKWebView, a link opened in a messenger
+  — names no `Safari/`, and its camera is the host app's. **Every browser of iOS is WebKit with Apple's
+  vendor**, so the others are named one by one (`NOT_SAFARI`): Chrome, Firefox, Edge, Opera, Yandex —
+  the browser of much of the diaspora — DuckDuckGo and the Google app (adversarial А). Told Safari's
+  way, a person in Yandex would pay the price the sheet names and get nothing for it.
+- **A tab and the app say different things** (Р-7): a tab has a setting for this site in its page
+  menu; the app from the home screen has only Safari's own setting, and **the sheet names its price**
+  (Р-6) — it opens the camera to every site in Safari, not only to Molvia. Trust is the asset the product cannot write off.
 - **Nothing is read under the sheet** (Р-5): the camera stays on behind it, but a code taken there
   would be taken unseen.
 - **A scanner put away or turned to the digits while the browser answered starts no camera.**
 - **The named prices.** The sheet rises with no tap, and Chrome skips on «back» an entry laid
   without a gesture — it is Safari's alone, where this does not happen. A phone that cannot write to
-  storage sees the sheet on every load. A Safari that answered the query untruly would show it or
-  hide it wrongly — what the owner's phone checks once the sheet is out.
+  storage sees the sheet on every load. **Brave and a link opened in `SFSafariViewController`** send
+  Safari's very agent and cannot be told from it; nor can an app put on the home screen from another
+  browser, whose camera setting was not measured. A browser not in `NOT_SAFARI` is taken for Safari.
+  A Safari that answered the query untruly would show it or hide it wrongly — the owner's phone
+  checks it once the sheet is out: «Спрашивать» — the sheet; «Разрешить» — none; the scanner opened
+  again in the same load — neither the sheet nor the line, since Safari answers `granted` by then.
 
 ## One way into the camera (MOL-163)
 
 **`getUserMedia` is called by `useCamera` alone** — `no-restricted-properties` in
-`frontend/eslint.config.js`, tests aside. A second caller would bring a second set of refusals, stops
+`frontend/eslint.config.js` on `getUserMedia` and the prefixed `webkitGetUserMedia`, tests aside. It
+closes carelessness, not intent: a name computed or handed to `Reflect.get` passes (adversarial Г). A second caller would bring a second set of refusals, stops
 and states to keep in step. **The receipt (MOL-127) takes its photo through the system camera**
 (`<input type="file" capture>`, handoff MOL-124): the page is given a file and asks for nothing, so
 there is no question for Safari to repeat. A receipt that one day wants a viewfinder of its own takes
@@ -199,7 +221,10 @@ lies on an iPad (as MOL-132 Р-3).
 - **Without a grant Chromium refuses the camera**, which is the spec of «no permission»; «no camera»
   replaces `getUserMedia` in an init script.
 - **Safari is played by Chromium** for the hint (MOL-163): an init script gives the page Apple's
-  vendor, touch and a `permissions.query` that says `prompt`; the camera itself is Chromium's fake one.
+  vendor, touch, Safari's agent and a `permissions.query` that says `prompt` or `granted`; the camera
+  itself is Chromium's fake one. «Got it» is tapped until the sheet goes: on a loaded machine its rise
+  starts a frame late, and a tap timed by its animations was held — the price is that a first tap
+  swallowed by a sheet already up would pass unseen.
 
 ## The item by its code (MOL-99)
 
