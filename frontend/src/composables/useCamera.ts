@@ -67,6 +67,7 @@ export function useCamera(video: Ref<HTMLVideoElement | null>): Camera {
   // Each start is numbered, so an answer that comes after a stop — or after a later start — is
   // let go instead of taking the camera back.
   let attempt = 0
+  let disposed = false
 
   function release(): void {
     attempt++
@@ -77,6 +78,10 @@ export function useCamera(video: Ref<HTMLVideoElement | null>): Camera {
   }
 
   async function start(): Promise<void> {
+    // Let go with its scope, the camera is nobody's: a start that comes after — the scanner's, which
+    // awaited the browser's answer first and outlived the screen (MOL-163, adversarial Д) — would
+    // light a camera no dispose is left to stop.
+    if (disposed) return
     wanted = true
     release()
     // Checked before asking: outside a secure context the browser has no `mediaDevices` at all,
@@ -146,6 +151,7 @@ export function useCamera(video: Ref<HTMLVideoElement | null>): Camera {
   }
   document.addEventListener('visibilitychange', onVisibility)
   onScopeDispose(() => {
+    disposed = true
     document.removeEventListener('visibilitychange', onVisibility)
     stop()
   })
