@@ -5,6 +5,7 @@ import {
   lastDayOf,
   moneyMonthCodec,
   monthOf,
+  nextMonth,
   parseRate,
   previousMonth,
   spendingCategoriesResponseCodec,
@@ -14,7 +15,9 @@ import type { CachedRate, MoneyChartMonthView, MoneyMonthView } from '@molvia/mo
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
 import { moneyMonthRates } from '@/db/schema'
+import { tripRepositories } from '@/db/unit-of-work'
 import { buildServer } from '@/server'
+import { moneyChartMonthOf } from '@/usecases/money-chart-month'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
 
@@ -56,7 +59,7 @@ async function owner(): Promise<Owner> {
 
 async function call(
   me: Owner | null,
-  method: 'GET' | 'POST' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   url: string,
   body?: unknown,
 ) {
@@ -181,32 +184,112 @@ describe('«Графики → Месяц» (MOL-158)', () => {
   )
 
   it(
-    'обычное — от трёх закрытых месяцев, от первого с данными; меньше — когда появится',
+    'обычное — от трёх закрытых месяцев, от первого с данными; меньше — первый месяц со сравнением',
     async () => {
       const me = await owner()
       await spend(me, '20000', 'AMD', `${m3}-10`, 'groceries')
       await spend(me, '40000', 'AMD', `${m2}-10`, 'groceries')
       const few = await chartMonth(me, m1)
-      // Data from m3: m3, m2, m1 make three, so the comparison comes after m1.
-      expect(few).toMatchObject({ usual: null, usualFrom: m1, deviations: [] })
+      // Data from m3: before m1 only m3 and m2 are closed; the first month with three is this one.
+      expect(few).toMatchObject({ usual: null, comparedFrom: current, closed: [m3, m2] })
+      expect(few.deviations).toEqual([])
       expect(few.pace.usual).toBeNull()
 
       await spend(me, '30000', 'AMD', `${m1}-10`, 'groceries')
-      await spend(me, '60000', 'AMD', `${current}-01`, 'groceries')
-      // Looking at the month after m1 — the running one, or one closed in the window.
       const view = await chartMonth(me, current)
       expect(view.usual).toEqual({ from: m3, to: m1, months: 3 })
-      expect(view.usualFrom).toBeNull()
+      expect(view.comparedFrom).toBeNull()
       expect(view.running).toBe(true)
       expect(view.pace.days).toHaveLength(Number(today.slice(8, 10)))
-      // Spent on the 10th of each: to the first of the month the usual is nothing — «новая».
-      expect(view.deviations[0]).toMatchObject({
-        categoryId: await presetId(me, 'groceries'),
-        amount: amd(60_000),
-        ...(Number(today.slice(8, 10)) >= 10
-          ? { average: amd(30_000), change: 100 }
-          : { change: null }),
+    },
+    HEAVY_MS,
+  )
+
+  it(
+    'идущий месяц — против обычного к тому же дню, закрытый — против целого, в любой день запуска',
+    async () => {
+      const me = await owner()
+      const groceries = await presetId(me, 'groceries')
+      for (const one of [m4, m3, m2]) {
+        await spend(me, '10000', 'AMD', `${one}-10`, 'groceries')
+        await spend(me, '50000', 'AMD', `${one}-20`, 'groceries')
+      }
+      await spend(me, '15000', 'AMD', `${m1}-05`, 'groceries')
+      const asOwner = { id: me.id, incomeCurrency: 'RUB' as const, spendCurrency: 'AMD' as const }
+      // «Today» is the 12th of m1 — noon in Yerevan: the use case is asked as of then.
+      const twelfth = new Date(`${m1}-12T08:00:00Z`)
+      const running = await moneyChartMonthOf(tripRepositories(db), asOwner, m1, twelfth)
+      expect(running.running).toBe(true)
+      // To the 12th: the 10th of each closed month, never its 20th.
+      expect(running.deviations[0]).toMatchObject({
+        categoryId: groceries,
+        amount: amd(15_000),
+        average: amd(10_000),
+        change: 50,
       })
+      // Read whole once m1 is closed: everything of each month.
+      const closed = await chartMonth(me, m1)
+      expect(closed.running).toBe(false)
+      expect(closed.deviations[0]).toMatchObject({ average: amd(60_000), change: -75 })
+    },
+    HEAVY_MS,
+  )
+
+  it(
+    'обычное смотрит не дальше двенадцати месяцев назад (В-2)',
+    async () => {
+      const me = await owner()
+      const back = (months: number) => {
+        let at = current
+        for (let step = 0; step < months; step += 1) at = previousMonth(at)
+        return at
+      }
+      for (const months of [13, 12, 11, 10])
+        await spend(me, '1000', 'AMD', `${back(months)}-05`, 'cafe')
+      const view = await chartMonth(me, current)
+      // Thirteen months back is outside; twelve is the first month of the usual.
+      expect(view.usual).toEqual({ from: back(12), to: m1, months: 12 })
+      expect(view.firstMonth).toBe(back(13))
+    },
+    HEAVY_MS,
+  )
+
+  it(
+    'месяц раньше первых данных — пустой месяц человека с данными, а не приглашение новичку (адверсариальное К)',
+    async () => {
+      const me = await owner()
+      await spend(me, '1000', 'AMD', `${m1}-05`, 'cafe')
+      const view = await chartMonth(me, m3)
+      expect(view).toMatchObject({ firstMonth: m1, closed: [], spent: amd(0) })
+      // The first month with three closed before it is three after m1.
+      let first = m1
+      for (let step = 0; step < 3; step += 1) first = nextMonth(first)
+      expect(view.comparedFrom).toBe(first)
+      expect((await chartMonth(await owner(), m3)).firstMonth).toBeNull()
+    },
+    HEAVY_MS,
+  )
+
+  it(
+    'месяцы обычного — со сдвигом зарплаты, как на «Деньгах» (адверсариальное Е)',
+    async () => {
+      const me = await owner()
+      expect((await call(me, 'PUT', '/actors/me/salary-shift', { day: 25 })).statusCode).toBe(200)
+      // The salary of the 26th of m4 is m3's «Пришло»: m4 holds nothing on «Деньгах».
+      const income = await call(me, 'POST', '/incomes', {
+        id: randomUUID(),
+        amount: { amount: '100000', currency: 'RUB' },
+        receivedOn: `${m4}-26`,
+        source: 'salary',
+      })
+      expect(income.statusCode).toBe(201)
+      for (const one of [m3, m2, m1]) await spend(me, '30000', 'AMD', `${one}-10`, 'groceries')
+      const monthOfIncome = await month(me, m4)
+      expect(monthOfIncome.income.minor).toBe(0n)
+      const view = await chartMonth(me, current)
+      expect(view.closed).toEqual([m3, m2, m1])
+      expect(view.usual).toEqual({ from: m3, to: m1, months: 3 })
+      expect(view.firstMonth).toBe(m3)
     },
     HEAVY_MS,
   )

@@ -96,11 +96,13 @@ function charts(
   before: MoneyMonth[],
   today: string,
   archived: string[] = [],
+  firstMonth: string | null = null,
 ): ReturnType<typeof monthCharts> {
   const input: MonthChartsInput = {
     selected,
     before,
     today,
+    firstMonth,
     groceries: id('groceries'),
     categories: presets.map((category) => ({
       id: category.id,
@@ -128,7 +130,7 @@ const closed = [
 const amd = (major: number) => money(BigInt(major) * 100n, 'AMD')
 
 describe('monthCharts — the usual month', () => {
-  it('needs three closed months, and says after which month it comes', () => {
+  it('needs three closed months, and names the first month that has them', () => {
     const september = counted('2026-09', [spending(1_000, '2026-09-03')])
     for (let count = 0; count < USUAL_MIN_CLOSED; count += 1) {
       const answer = charts(september, closed.slice(USUAL_MIN_CLOSED - count), '2026-09-12')
@@ -136,15 +138,40 @@ describe('monthCharts — the usual month', () => {
       expect(answer.deviations).toEqual([])
       expect(answer.pace.usual).toBeNull()
     }
-    // Data from August: August, September, October make three — «после октября».
+    // Data from August: August, September, October are closed before November — «с ноября».
     const august = charts(september, closed.slice(2), '2026-09-12')
-    expect(august.usualFrom).toBe('2026-10')
+    expect(august.comparedFrom).toBe('2026-11')
     expect(august.closed).toEqual(['2026-08'])
     // The very first month: it is the start.
-    expect(charts(september, [], '2026-09-12').usualFrom).toBe('2026-11')
+    expect(charts(september, [], '2026-09-12').comparedFrom).toBe('2026-12')
     const three = charts(september, closed, '2026-09-12')
     expect(three.usual).toEqual({ from: '2026-06', to: '2026-08', months: 3 })
-    expect(three.usualFrom).toBeNull()
+    expect(three.comparedFrom).toBeNull()
+  })
+
+  it('names of a past month what was closed before it, and a first month that is true (adversarial Г)', () => {
+    // 1 October, data from July: September is closed, and before it only July and August are.
+    const july = counted('2026-07', [spending(1_000, '2026-07-03')])
+    const august = counted('2026-08', [spending(1_000, '2026-08-03')])
+    const september = counted('2026-09', [spending(1_000, '2026-09-03')])
+    const answer = charts(september, [july, august], '2026-10-01')
+    expect(answer.running).toBe(false)
+    expect(answer.closed).toEqual(['2026-07', '2026-08'])
+    // October is the first month with three closed before it — never September, already past.
+    expect(answer.comparedFrom).toBe('2026-10')
+    expect(charts(august, [july], '2026-10-01').comparedFrom).toBe('2026-10')
+  })
+
+  it("of a month before any data, counts from the owner's first month, not from itself (adversarial К)", () => {
+    const answer = charts(counted('2026-05'), [], '2026-10-01', [], '2026-07')
+    expect(answer.firstMonth).toBe('2026-07')
+    expect(answer.comparedFrom).toBe('2026-10')
+    expect(charts(counted('2026-05'), [], '2026-10-01').firstMonth).toBeNull()
+  })
+
+  it('has no first month past the last a calendar of four digits holds (adversarial Ж)', () => {
+    expect(charts(counted('9999-11'), [], '2026-10-01').comparedFrom).toBeNull()
+    expect(charts(counted('9999-09'), [], '2026-10-01').comparedFrom).toBe('9999-12')
   })
 
   it('starts at the first month with anything in it, a half month included', () => {
@@ -270,6 +297,31 @@ describe('monthCharts — against the usual', () => {
     expect(answer.deviations.find((row) => row.categoryId === id('cafe'))?.change).toBeNull()
     // The usual line leaves out the month short in anything spent.
     expect(answer.pace.usual?.at(-1)?.cumulative).toEqual(amd(61_000))
+  })
+
+  it('compares no category short in the month shown, nor one whose every usual month is short (adversarial Д)', () => {
+    // September's groceries are 30 000 ֏ and 100 $ no rate knew: no «−51 %».
+    const september = counted('2026-09', [
+      spending(30_000, '2026-09-02', 'groceries'),
+      spending(100, '2026-09-03', 'groceries', 'USD'),
+      spending(5_000, '2026-09-02', 'cafe'),
+    ])
+    const rows = charts(september, closed, '2026-10-01').deviations
+    expect(rows.map((row) => row.categoryId)).toEqual([id('cafe')])
+    // Pets spent in dollars only, every usual month: nothing to compare with — not «новая».
+    const pets = (month: string) => spending(10, `${month}-05`, 'pets', 'USD')
+    const before = closed.map((month) =>
+      counted(month.month, [
+        ...month.days.flatMap((day) =>
+          day.entries.flatMap((entry) => (entry.kind === 'manual' ? [entry.spending] : [])),
+        ),
+        pets(month.month),
+      ]),
+    )
+    const now = counted('2026-09', [spending(7_000, '2026-09-02', 'pets')])
+    expect(charts(now, before, '2026-10-01').deviations.map((row) => row.categoryId)).not.toContain(
+      id('pets'),
+    )
   })
 })
 

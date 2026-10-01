@@ -1,6 +1,5 @@
 import {
   changeOf,
-  DONUT_SECTORS,
   donutSlices,
   holdsData,
   levelOf,
@@ -78,12 +77,22 @@ export interface MonthCharts {
   readonly slices: readonly MonthSlice[]
   /**
    * The closed months the usual is taken over — the first and the last, and how many; null while
-   * there are fewer than `USUAL_MIN_CLOSED`, and then `usualFrom` says after which month it comes.
+   * there are fewer than `USUAL_MIN_CLOSED` before the month, and then `comparedFrom` says which.
    */
   readonly usual: { readonly from: Month; readonly to: Month; readonly months: number } | null
-  /** The closed months from the first with anything in it, oldest first — «закрыт только август». */
+  /**
+   * The closed months before this one from the first with anything in it, oldest first — «до
+   * сентября закрыт только август»: of the month shown, never of today (adversarial Г).
+   */
   readonly closed: readonly Month[]
-  readonly usualFrom: Month | null
+  /**
+   * The first month that has a usual to be compared with — «Сравнение — с октября» — while this one
+   * has none: true of a past month and of the running one alike (adversarial Г). Null when it has,
+   * and past the last month a calendar of four digits holds (adversarial Ж).
+   */
+  readonly comparedFrom: Month | null
+  /** The owner's first month with anything in it at all; null — a newcomer (adversarial К). */
+  readonly firstMonth: Month | null
   readonly deviations: readonly Deviation[]
   readonly pace: { readonly days: readonly PaceDay[]; readonly usual: readonly PacePoint[] | null }
 }
@@ -147,6 +156,11 @@ export interface MonthChartsInput {
   readonly groceries: string | undefined
   /** The owner's categories, archived ones marked — the order a tie falls back to (Р-11). */
   readonly categories: readonly { readonly id: string; readonly archived: boolean }[]
+  /**
+   * The owner's first month with anything in it, of the whole history: a month before it is an
+   * empty month of a person with data, never a newcomer's (adversarial К).
+   */
+  readonly firstMonth: Month | null
 }
 
 /**
@@ -161,7 +175,7 @@ export interface MonthChartsInput {
  * 12th, never their whole. The day is today, or the last day spent on when it is later — a rent
  * dated the 15th (Р-6). A month short in a category is left out of that category's usual, a month
  * short in anything spent out of the usual line, as on «Графики» of MOL-74; the threshold counts
- * the calendar months all the same, so «после октября» is a date that holds (Р-4).
+ * the calendar months all the same, so «с ноября» is a date that holds (Р-4).
  */
 export function monthCharts(input: MonthChartsInput): MonthCharts {
   const { selected, today, groceries } = input
@@ -181,8 +195,10 @@ export function monthCharts(input: MonthChartsInput): MonthCharts {
   const since = [...closed, selected].find(holdsData)?.month ?? null
   const usedClosed = since === null ? [] : closed.filter((month) => month.month >= since)
   const enough = usedClosed.length >= USUAL_MIN_CLOSED
-  let usualFrom = since ?? selected.month
-  for (let step = 1; step < USUAL_MIN_CLOSED; step += 1) usualFrom = nextMonth(usualFrom)
+  // The first month with three closed before it: three after the first with data — or, for a month
+  // before any data, after the owner's first month with any.
+  let comparedFrom = since ?? input.firstMonth ?? selected.month
+  for (let step = 0; step < USUAL_MIN_CLOSED; step += 1) comparedFrom = nextMonth(comparedFrom)
 
   const mine = runningOf(selected, groceries)
   const lastSpent = selected.days.reduce(
@@ -231,6 +247,7 @@ export function monthCharts(input: MonthChartsInput): MonthCharts {
   const archived = new Set(input.categories.filter((one) => one.archived).map((one) => one.id))
   const amountOf = (categoryId: string): bigint =>
     selected.byCategory.find((row) => row.categoryId === categoryId)?.amount.minor ?? 0n
+  const short = new Set(selected.uncountedIn)
   const averageOf = (categoryId: string): bigint | null => {
     const counted = others.filter(({ month }) => !month.uncountedIn.includes(categoryId))
     if (counted.length === 0) return null
@@ -250,11 +267,13 @@ export function monthCharts(input: MonthChartsInput): MonthCharts {
       ]
     : []
   const rows = candidates
-    .map((categoryId) => ({
-      categoryId,
-      amount: amountOf(categoryId),
-      average: averageOf(categoryId) ?? 0n,
-    }))
+    // A sum not whole compares with nothing (adversarial Д): a category short in this month, or one
+    // whose every usual month is short, is no row — the rule a usual month is held to, both ways.
+    .filter((categoryId) => !short.has(categoryId))
+    .flatMap((categoryId) => {
+      const average = averageOf(categoryId)
+      return average === null ? [] : [{ categoryId, amount: amountOf(categoryId), average }]
+    })
     // Nothing either way says nothing; a category put away and not spent on is not news (Р-5).
     .filter(({ categoryId, amount, average }) =>
       amount === 0n ? average > 0n && !archived.has(categoryId) : true,
@@ -286,13 +305,13 @@ export function monthCharts(input: MonthChartsInput): MonthCharts {
     }
   })
 
-  const rest = selected.byCategory.length > DONUT_SECTORS + 1 ? DONUT_SECTORS : null
+  // «Остальные» are the last `count` of the month's categories — `donutSlices` decides how many.
   const slices = donutSlices(selected.byCategory).map((slice): MonthSlice => ({
     ...slice,
     income: inIncome(slice.amount),
     members:
-      slice.categoryId === null && rest !== null
-        ? selected.byCategory.slice(rest).map((row) => row.categoryId)
+      slice.categoryId === null
+        ? selected.byCategory.slice(-slice.count).map((row) => row.categoryId)
         : [],
   }))
 
@@ -311,8 +330,9 @@ export function monthCharts(input: MonthChartsInput): MonthCharts {
       enough && first && last
         ? { from: first.month, to: last.month, months: usedClosed.length }
         : null,
-    usualFrom: enough ? null : usualFrom,
+    comparedFrom: enough || comparedFrom.length > 7 ? null : comparedFrom,
     closed: usedClosed.map((one) => one.month),
+    firstMonth: input.firstMonth,
     deviations,
     pace,
   }

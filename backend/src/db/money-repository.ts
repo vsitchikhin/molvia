@@ -42,6 +42,13 @@ export interface MoneyRepository {
   /** From which day of a month a salary counts in the next one (MOL-134, В-3); null — off. */
   salaryShift(actorId: string): Promise<number | null>
 
+  /**
+   * The first day the owner spent anything on — a live spending, or a finished trip by the day of its
+   * finishing as «Деньги» file it (MOL-158, adversarial К): a month of «Графики» before it is an empty
+   * month of a person with data, never a newcomer's. Null — nothing spent yet.
+   */
+  firstSpentDay(actorId: string): Promise<string | null>
+
   /** Sets it, whole each time: a repeat after a lost answer is the same write. */
   setSalaryShift(actorId: string, day: number | null): Promise<number | null>
 }
@@ -83,6 +90,23 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
   }
 
   return {
+    async firstSpentDay(actorId) {
+      const [row] = await db.execute<{ day: string | null }>(sql`
+        select to_char(min(day), 'YYYY-MM-DD') as day from (
+          select min(spent_on) as day
+            from spendings
+           where actor_id = ${actorId} and deleted_at is null
+          union all
+          select min(coalesce(finished_on,
+                              (coalesce(finished_on_device_at, finished_at)
+                                 at time zone 'Asia/Yerevan')::date))
+            from trips
+           where actor_id = ${actorId} and finished_at is not null and deleted_at is null
+        ) firsts
+      `)
+      return row?.day ?? null
+    },
+
     async tripLines(actorId, from, to) {
       const rows = await db.execute<TripLineRow>(sql`
         with finished as (

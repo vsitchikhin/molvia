@@ -173,10 +173,12 @@ export const moneyChartMonthCodec = z.strictObject({
       members: z.array(z.uuid()),
     }),
   ),
-  /** Null below three closed months; `usualFrom` is then the month after which it comes. */
+  /** Null below three closed months; `comparedFrom` is then the first month that has one. */
   usual: z.strictObject({ from: monthSchema, to: monthSchema, months: z.int().min(1) }).nullable(),
-  usualFrom: monthSchema.nullable(),
+  comparedFrom: monthSchema.nullable(),
   closed: z.array(monthSchema),
+  /** The owner's first month with anything in it; null — a newcomer, offered a start. */
+  firstMonth: monthSchema.nullable(),
   deviations: z.array(
     z.strictObject({
       categoryId: z.uuid(),

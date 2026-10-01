@@ -1,6 +1,7 @@
 import {
   TRIP_CATEGORY,
   USUAL_MONTHS,
+  budgetMonthOf,
   categoryOrder,
   chartMonths,
   moneyChartMonthViewOf,
@@ -39,11 +40,12 @@ export async function moneyChartMonthOf(
   const current = monthOf(today)
   const window = chartMonths(previousMonth(month), USUAL_MONTHS)
 
-  const [rates, categories, salaryShiftDay, rows] = await Promise.all([
+  const [rates, categories, salaryShiftDay, rows, firstSpent] = await Promise.all([
     dayRates(repositories, owner),
     repositories.spendingCategories.list(owner.id),
     repositories.money.salaryShift(owner.id),
     monthRows(repositories, owner, window[0] ?? month, month),
+    repositories.money.firstSpentDay(owner.id),
   ])
   let frozen: Awaited<ReturnType<typeof monthRate>>
   try {
@@ -63,10 +65,19 @@ export async function moneyChartMonthOf(
     salaryShiftDay,
   )
   const before: MoneyMonth[] = []
-  // One after the other: the rates of the days are read through one cache, a few at a time.
+  // One after the other: the rates of the days are read through one cache, a few at a time. With
+  // the salary moved as «Деньги» move it (adversarial Е): a salary of the 26th is next month's, and
+  // the month it came in is no month with anything in it, here as on «Деньгах» and «Годе».
   for (const one of window.filter((each) => each < current)) {
-    before.push(await countMonth(owner, rates, one, rows, categories, null, 'frozen', null))
+    before.push(
+      await countMonth(owner, rates, one, rows, categories, null, 'frozen', salaryShiftDay),
+    )
   }
+  // The first month of the whole history: what was spent first, or what came in first, as it counts.
+  const firsts = [
+    ...(firstSpent === null ? [] : [monthOf(firstSpent)]),
+    ...rows.incomes.map((income) => budgetMonthOf(income, salaryShiftDay)),
+  ].sort()
 
   return moneyChartMonthViewOf(
     monthCharts({
@@ -78,6 +89,7 @@ export async function moneyChartMonthOf(
         id: category.id,
         archived: category.archivedAt !== null,
       })),
+      firstMonth: firsts[0] ?? null,
     }),
     categories,
   )
