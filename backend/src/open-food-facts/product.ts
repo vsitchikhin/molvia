@@ -85,27 +85,32 @@ function cleanName(raw: unknown): string | null {
   return name.success ? name.data : null
 }
 
+/** A word of a brand as it is written: letters, with the marks that sit on them. */
+const WRITTEN_WORD = /\p{L}[\p{L}\p{M}]*/gu
+
 /**
  * The brand goes after the name unless the name carries it already (Р-3): any word of the first brand
- * three letters or longer — all of it, when every word is shorter — is a word of the name by the
- * search key. «Nutella» with «Nutella, Ferrero» stays «Nutella», «Coca Cola» with «COCA-COLA SERVICES
- * SA/NV» stays as it is, «Сыр Савушкин 45%» with «Савушкин продукт» too — the base keeps a mark and
- * its company, the package prints the mark — and «Молоко 3,2%» with «Простоквашино» becomes «Молоко
- * 3,2% Простоквашино». The first word alone took an article for the brand («La Laitière» lost on
- * «Yaourt à la vanille», adversarial В); both of two wrote the mark twice when the name carried only
- * the mark (adversarial В′). **The price, named:** a brand that shares a word with what the name
- * says of the product is lost — «Сыр Российский» with «Российский сыродел». A name the brand would
+ * four letters or longer **as the brand writes it** — all of it, when every word is shorter — is a word
+ * of the name by the search key. «Nutella» with «Nutella, Ferrero» stays «Nutella», «Coca Cola» with
+ * «COCA-COLA SERVICES SA/NV» stays as it is, «Сыр Савушкин 45%» with «Савушкин продукт» too — the base
+ * keeps a mark and its company, the package prints the mark — and «Молоко 3,2%» with «Простоквашино»
+ * becomes «Молоко 3,2% Простоквашино». Four letters as written leave out the words that say nothing of
+ * a mark — «для», «des», «for», «the», «les» — and the key could not tell them, since it grows a word
+ * («для» is `dlia`) (adversarial В″). The first word alone took an article for the brand (В), both of
+ * two first words wrote the mark twice (В′). **The price, named:** a brand that shares a word with
+ * what the name says of the product is lost — «Сыр Российский» with «Российский сыродел» — and so is
+ * one sharing a function word of four letters or more, «pour», «avec», «with». A name the brand would
  * take past the limit stays without it.
  */
 function withBrand(name: string, brands: unknown): string {
   if (typeof brands !== 'string') return name
   const brand = cleanName(brands.split(',')[0])
   if (brand === null) return name
-  const words = toSearchKey(brand)
-    .split(' ')
+  const written = brand.match(WRITTEN_WORD) ?? []
+  const long = written.filter((word) => Array.from(word).length >= 4)
+  const probe = (long.length > 0 ? long : written)
+    .flatMap((word) => toSearchKey(word).split(' '))
     .filter((word) => word !== '')
-  const long = words.filter((word) => Array.from(word).length >= 3)
-  const probe = long.length > 0 ? long : words
   const named = new Set(toSearchKey(name).split(' '))
   if (probe.length === 0 || probe.some((word) => named.has(word))) return name
   return cleanName(`${name} ${brand}`) === `${name} ${brand}` ? `${name} ${brand}` : name

@@ -184,6 +184,17 @@ describe('бренд (Р-3)', () => {
     },
   )
 
+  it.each([
+    ['Печенье для чая', 'Всё для дома', 'Печенье для чая Всё для дома'],
+    ['Confiture des Vosges', 'Les Délices des Bois', 'Confiture des Vosges Les Délices des Bois'],
+    ['Biscuits for tea', 'Made for You', 'Biscuits for tea Made for You'],
+  ])(
+    'служебное слово короче четырёх букв — не бренд (адверсариальный В″): «%s» + «%s»',
+    (name, brands, expected) => {
+      expect(found(answer({ product_name_ru: name, brands })).names.ru).toBe(expected)
+    },
+  )
+
   it('цена правила: бренд, чьё слово совпало с сортом в имени, теряется', () => {
     expect(
       found(answer({ product_name_ru: 'Сыр Российский', brands: 'Российский сыродел' })).names.ru,
