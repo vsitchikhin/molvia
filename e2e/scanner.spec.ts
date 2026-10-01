@@ -719,16 +719,17 @@ test('tells how to stop Safari asking, once the camera is given, and reads after
   await open(page, '/_kit')
   await openScanner(page)
 
-  await expect(cameraHint(page)).toBeVisible()
+  // After the camera is live, which a loaded machine takes its time to give.
+  await expect(cameraHint(page)).toBeVisible({ timeout: 15_000 })
   await expect(cameraHint(page)).toContainText('aA in the address bar')
-  // Its own rise, as the scanner's: until it has come up a sheet takes no tap (MOL-69).
-  await cameraHint(page).evaluate((dialog) =>
-    Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished)),
-  )
-  await page.waitForTimeout(350)
-  await cameraHint(page).getByRole('button', { name: 'Got it' }).click()
-
-  await expect(cameraHint(page)).toBeHidden()
+  // Until it has come up a sheet takes no tap (MOL-69), and on a loaded machine its rise starts a
+  // frame late — a tap timed by its animations landed before it and was held. Tapped until it goes.
+  await expect(async () => {
+    if (await cameraHint(page).isVisible()) {
+      await cameraHint(page).getByRole('button', { name: 'Got it' }).click({ timeout: 500 })
+    }
+    await expect(cameraHint(page)).toBeHidden({ timeout: 500 })
+  }).toPass({ timeout: 10_000 })
   await expect(scanned(page, BARCODE)).toBeVisible({ timeout: READ })
 })
 
@@ -746,7 +747,7 @@ test('seen on this phone, the hint waits behind a quiet line', async ({ page, co
   const quiet = scanner(page).getByRole('button', {
     name: 'Safari asks every time? How to stop it',
   })
-  await expect(quiet).toBeVisible()
+  await expect(quiet).toBeVisible({ timeout: 15_000 })
   await expect(cameraHint(page)).toBeHidden()
   await quiet.click()
   await expect(cameraHint(page)).toBeVisible()
