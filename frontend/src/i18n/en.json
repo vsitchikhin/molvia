@@ -1172,7 +1172,7 @@
     },
     "barcodes": {
       "title": "An unknown barcode",
-      "text": "If the catalogue does not know a scanned code, the server asks Open Food Facts, an open database of products, about it. Only the code itself and our server's address go there: not you, not your phone and not your sign-in. A shop's own label code never goes there. The name and size from there are only a hint, which you confirm or correct; items suggested from such a hint are marked. Open Food Facts data is open under the ODbL licence: we will send an export of what the catalogue took from there on request."
+      "text": "If the catalogue does not know a scanned code, the server asks Open Food Facts, an open database of products, about it. Only the code itself and our server's address go there: not you, not your phone and not your sign-in. A shop's own label code never goes there. The name and size from there are only a hint, which you confirm or correct; items suggested with a code Open Food Facts knows are marked. The link «Data from Open Food Facts» opens the product's page there — from your phone, when you tap it. Open Food Facts data is open under the ODbL licence: we will send an export of what the catalogue took from there on request."
     },
     "storage": {
       "title": "Cookies and the phone's memory",
