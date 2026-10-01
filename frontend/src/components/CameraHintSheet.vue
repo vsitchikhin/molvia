@@ -7,6 +7,9 @@
       <p class="path">{{ t(TEXT[place].path) }}</p>
       <p v-if="place === 'app'" class="aside">{{ t('scanner.camera_hint_app_search') }}</p>
       <p class="aside">{{ t(TEXT[place].price) }}</p>
+      <!-- The way for every site, checked on the owner's phone; the tab's own is behind a page menu
+           that moved between versions of iOS (review 1). -->
+      <p v-if="place === 'tab'" class="aside">{{ t('scanner.camera_hint_tab_or') }}</p>
       <p class="aside">{{ t(TEXT[place].otherwise) }}</p>
     </div>
 

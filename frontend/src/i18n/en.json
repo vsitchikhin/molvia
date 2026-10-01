@@ -1401,11 +1401,12 @@
     "camera_hint_app_path": "Settings → Apps → Safari → Camera → “Allow”",
     "camera_hint_app_search": "Quicker: search Settings for “Safari”.",
     "camera_hint_app_price": "This allows the camera for every website in Safari, not only Molvia.",
-    "camera_hint_app_otherwise": "If nothing is changed, Safari will ask on every start, and after “Allow” the camera works as it does now.",
+    "camera_hint_app_otherwise": "If nothing is changed, Safari will ask on every start — then just answer it “Allow”.",
     "camera_hint_tab_body": "Safari asks for the camera every time the page loads again. To stop it asking, allow the camera for this website:",
-    "camera_hint_tab_path": "aA in the address bar → Website Settings → Camera → “Allow”",
+    "camera_hint_tab_path": "The page menu by the address bar → Website Settings → Camera → “Allow”",
+    "camera_hint_tab_or": "Or for every website: Settings → Apps → Safari → Camera → “Allow”.",
     "camera_hint_tab_price": "This allows it for Molvia only.",
-    "camera_hint_tab_otherwise": "If nothing is changed, Safari will ask after every reload, and after “Allow” the camera works as it does now.",
+    "camera_hint_tab_otherwise": "If nothing is changed, Safari will ask after every reload — then just answer it “Allow”.",
     "camera_hint_ok": "Got it",
     "camera_hint_offer": "Safari asks every time? How to stop it"
   }
