@@ -76,18 +76,20 @@
             {{ t('accounts.reconcile.causes_title', { date: shortDay(result.since) }) }}
           </h3>
           <AppCard as="ul" list>
-            <OperationRow
-              v-for="reason in reasons"
-              :key="`${reason.kind}-${reason.operation.id}-${reason.operation.side ?? ''}`"
-              :operation="reason.operation"
-              :categories="categories"
-              :name-of="nameOf"
-              :account-name="accountName"
-              :title="reasonTitle(reason)"
-              :meta="reasonMeta(reason)"
-              plain
-              @open="openReason"
-            />
+            <AppReveal group>
+              <OperationRow
+                v-for="reason in reasons"
+                :key="`${reason.kind}-${reason.operation.id}-${reason.operation.side ?? ''}`"
+                :operation="reason.operation"
+                :categories="categories"
+                :name-of="nameOf"
+                :account-name="accountName"
+                :title="reasonTitle(reason)"
+                :meta="reasonMeta(reason)"
+                plain
+                @open="openReason"
+              />
+            </AppReveal>
           </AppCard>
           <p class="hint">{{ t('accounts.reconcile.causes_hint') }}</p>
         </template>
@@ -197,6 +199,7 @@ import type {
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
 import OperationIncomeSheet from '@/components/OperationIncomeSheet.vue'
@@ -235,6 +238,7 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppReveal,
     BottomSheet,
     IconAlert,
     IconCheck,
@@ -716,11 +720,15 @@ export default defineComponent({
 <style scoped lang="scss">
 .form,
 .result {
+  @include appear;
+
   display: grid;
   gap: var(--space-4);
 }
 
 .strip {
+  @include appear;
+
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
@@ -869,9 +877,14 @@ export default defineComponent({
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius);
   background: var(--surface-2);
+  transition: opacity var(--dur) var(--ease-out);
 
   &.stale {
     opacity: var(--opacity-stale);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
   }
 }
 

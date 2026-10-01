@@ -24,9 +24,11 @@
         <IconPlus class="plus" aria-hidden="true" />{{ addLabel }}
       </button>
     </div>
-    <p v-if="error" :id="errorId" class="error">
-      <IconAlert class="alert" aria-hidden="true" />{{ error }}
-    </p>
+    <AppReveal>
+      <p v-if="error" :id="errorId" class="error">
+        <IconAlert class="alert" aria-hidden="true" />{{ error }}
+      </p>
+    </AppReveal>
   </fieldset>
 </template>
 
@@ -36,6 +38,7 @@ import type { PropType } from 'vue'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconPlus from '~icons/mdi/plus'
 import type { SpendingCategoryView } from '@molvia/model'
+import AppReveal from '@/components/AppReveal.vue'
 import { categoryColour } from '@/components/spending'
 
 /**
@@ -47,7 +50,7 @@ import { categoryColour } from '@/components/spending'
  */
 export default defineComponent({
   name: 'CategoryChips',
-  components: { IconAlert, IconPlus },
+  components: { AppReveal, IconAlert, IconPlus },
   props: {
     modelValue: { type: String as PropType<string | null>, default: null },
     categories: { type: Array as PropType<SpendingCategoryView[]>, required: true },
@@ -103,6 +106,9 @@ export default defineComponent({
   font: inherit;
   font-size: var(--text-callout);
   cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
 
   &.on {
     background: var(--accent-tint);
@@ -161,5 +167,11 @@ export default defineComponent({
   flex: none;
   width: 1.125rem;
   height: 1.125rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip {
+    transition: none;
+  }
 }
 </style>

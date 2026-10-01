@@ -51,25 +51,27 @@
         :error-text="dayInvalid ? t('income.sheet.bad_day') : null"
       />
 
-      <div v-if="showsHeld">
-        <AppField
-          v-model="held"
-          :label="t('income.sheet.held', { currency: sign(currency) })"
-          kind="decimal"
-          :error="heldError"
-          :aria-describedby="`${id}-held`"
-        />
-        <p :id="`${id}-held`" class="hint">
-          {{ t('income.sheet.held_hint') }}
-          <template v-if="estimate"> <br />{{ estimate }} </template>
-        </p>
-        <HeldFromAccounts
-          :currency="currency"
-          :day="day"
-          :except="editing?.id ?? null"
-          @fill="held = typed($event)"
-        />
-      </div>
+      <AppReveal>
+        <div v-if="showsHeld">
+          <AppField
+            v-model="held"
+            :label="t('income.sheet.held', { currency: sign(currency) })"
+            kind="decimal"
+            :error="heldError"
+            :aria-describedby="`${id}-held`"
+          />
+          <p :id="`${id}-held`" class="hint">
+            {{ t('income.sheet.held_hint') }}
+            <template v-if="estimate"> <br />{{ estimate }} </template>
+          </p>
+          <HeldFromAccounts
+            :currency="currency"
+            :day="day"
+            :except="editing?.id ?? null"
+            @fill="held = typed($event)"
+          />
+        </div>
+      </AppReveal>
 
       <AppField
         v-model="note"
@@ -147,6 +149,7 @@ import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
 import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
 import { useAccountChoice } from '@/composables/useAccountChoice'
@@ -174,6 +177,7 @@ export default defineComponent({
     AccountRow,
     AppButton,
     AppField,
+    AppReveal,
     BottomSheet,
     HeldFromAccounts,
   },
@@ -455,7 +459,10 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .form {
-  display: grid;
+  /* A column, not a grid: a block of it grows and goes by `AppReveal`, which takes a flex
+     column's gap back with the block — a grid's stays and jumped (MOL-151, adversarial Б2). */
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
 }
 

@@ -698,6 +698,8 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
    * off («хаггис», «лейс»), and a word of the query in another form than the label's («собачий
    * корм», «средство для полов», «таблетки для посудомойки»), each still first in its answer.
    */
+  // The whole corpus, query by query — some 2.8 s alone. Since MOL-164 the integration files run in
+  // parallel, and on a loaded machine the default five seconds failed a push that changed no search.
   it('calls far exactly the answers whose best row only grazes the budget', async () => {
     const queries = [
       ...SHELF_QUERIES.map(([query]) => query),
@@ -730,7 +732,7 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
         'конфеты',
       ].sort(),
     )
-  })
+  }, 20_000)
 })
 
 describe('Armenian labels on the same shelf, reached from Russian and Latin', () => {

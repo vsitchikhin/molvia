@@ -483,6 +483,38 @@ describe('the catalogue', () => {
     expect(await codeOf(client.catalogueByBarcode('4850000000007'))).toBe(ISSUE.RESPONSE_INVALID)
   })
 
+  it('asks for a hint by the code and the language, both in the query (MOL-162)', async () => {
+    const { client, calls } = clientReplying(200, {
+      hint: {
+        name: 'Nutella',
+        quantity: { value: '0.400', unit: 'kg' },
+        url: 'https://world.openfoodfacts.org/product/3017620422003',
+      },
+    })
+
+    const hint = await client.catalogueBarcodeHint('3017620422003', 'en')
+
+    const url = new URL(calls[0]?.url ?? '')
+    expect(url.pathname).toBe('/catalogue/barcode/hint')
+    expect(url.searchParams.get('code')).toBe('3017620422003')
+    expect(url.searchParams.get('lang')).toBe('en')
+    expect(hint).toEqual({
+      name: 'Nutella',
+      quantity: { milli: 400n, unit: 'kg' },
+      url: 'https://world.openfoodfacts.org/product/3017620422003',
+    })
+  })
+
+  it('hands back null for no hint, and refuses a hint linking elsewhere', async () => {
+    expect(await clientReplying(200, { hint: null }).client.catalogueBarcodeHint('1', 'ru')).toBe(
+      null,
+    )
+    const { client } = clientReplying(200, {
+      hint: { name: 'Nutella', quantity: null, url: 'https://evil.example/product/1' },
+    })
+    expect(await codeOf(client.catalogueBarcodeHint('1', 'ru'))).toBe(ISSUE.RESPONSE_INVALID)
+  })
+
   describe('cancelled by the caller, which the screen does on every keystroke', () => {
     /** A server that answers only when told to, and gives up the way `fetch` does on an abort. */
     function clientHanging(options: { timeoutMs?: number } = {}) {

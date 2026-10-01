@@ -63,23 +63,27 @@
       <template v-else-if="overview">
         <!-- A month and what came in, per currency and never converted (В-2): the sums are the
              server's. -->
-        <section v-for="month in overview.months" :key="month.month" class="month">
-          <h2 class="month-head">
-            <span class="caption">{{ monthOf(month.month) }}</span>
-            <span class="sums">{{ sumsOf(month.sums) }}</span>
-          </h2>
-          <ul class="cards">
-            <li v-for="income in month.incomes" :key="income.id">
-              <IncomeCard
-                :income="income"
-                :today="today"
-                :disabled="!online || busy"
-                @edit="edit"
-                @remove="ask"
-              />
-            </li>
-          </ul>
-        </section>
+        <AppReveal group>
+          <section v-for="month in overview.months" :key="month.month" class="month">
+            <h2 class="month-head">
+              <span class="caption">{{ monthOf(month.month) }}</span>
+              <span class="sums">{{ sumsOf(month.sums) }}</span>
+            </h2>
+            <ul class="cards">
+              <AppReveal group>
+                <li v-for="income in month.incomes" :key="income.id">
+                  <IncomeCard
+                    :income="income"
+                    :today="today"
+                    :disabled="!online || busy"
+                    @edit="edit"
+                    @remove="ask"
+                  />
+                </li>
+              </AppReveal>
+            </ul>
+          </section>
+        </AppReveal>
       </template>
     </template>
 
@@ -125,6 +129,7 @@ import IconCashPlus from '~icons/mdi/cash-plus'
 import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconPlus from '~icons/mdi/plus'
 import AppButton from '@/components/AppButton.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import FloatingDock from '@/components/FloatingDock.vue'
 import IncomeCard from '@/components/IncomeCard.vue'
@@ -150,16 +155,17 @@ export default defineComponent({
   name: 'IncomesView',
   components: {
     AppButton,
+    AppReveal,
     AppScreen,
     FloatingDock,
+    IconCloud,
+    IconPlus,
     IncomeCard,
     IncomeRemoveSheet,
     IncomeSheet,
     OperationSkeleton,
     ScreenSkeleton,
     ScreenState,
-    IconCloud,
-    IconPlus,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -276,6 +282,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .strip {
+  @include appear;
+
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);

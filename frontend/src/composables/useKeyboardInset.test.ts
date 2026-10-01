@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref } from 'vue'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
 
@@ -26,15 +26,18 @@ function fakeViewport(height: number, offsetTop = 0, scale = 1) {
   return viewport
 }
 
-function host(active = false) {
+function host(active = false, use = useKeyboardInset) {
   const on = ref(active)
   const target = ref<HTMLElement | null>(null)
   const view = mount(
     defineComponent(() => {
-      useKeyboardInset(target, on)
+      use(target, on)
       return () =>
         h('div', { ref: target }, [
           h('input', { 'data-field': '' }),
+          h('input', { 'data-amount': '', inputmode: 'decimal' }),
+          h('button', { 'data-button': '' }),
+          h('input', { 'data-date': '', type: 'date' }),
           h('div', { 'data-block': '', tabindex: -1 }),
         ])
     }),
@@ -75,21 +78,36 @@ function rect({ top, bottom }: Box): DOMRect {
   return DOMRect.fromRect({ x: 0, y: top, width: 390, height: bottom - top })
 }
 
-/** `100dvh` as the page lays it out: what the ruler of `useKeyboardInset` reads. */
-function fakeDvh(height: number) {
+/**
+ * The page as it lays out the two boxes `useKeyboardInset` reads: the ruler of `100dvh` and the
+ * bottom of the box a fixed panel is pinned in. Changed by hand, the way Safari changes them.
+ */
+function fakeLayout(dvh: number, floor = dvh) {
+  const layout = { dvh, floor }
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
     this: HTMLElement,
   ) {
+    if (this.dataset.dvh === '') return rect({ top: 0, bottom: layout.dvh })
+    if (this.dataset.floor === '') return rect({ top: layout.floor, bottom: layout.floor })
     // Anything else is not laid out, as in happy-dom itself.
-    return rect({ top: 0, bottom: this.dataset.dvh === '' ? height : 0 })
+    return rect({ top: 0, bottom: 0 })
   })
+  return layout
+}
+
+/** `100dvh` as the page lays it out, the pinned box as tall. */
+function fakeDvh(height: number) {
+  return fakeLayout(height)
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
   delete document.documentElement.dataset.underKeys
   document.body.innerHTML = ''
+  localStorage.clear()
+  sessionStorage.clear()
 })
 
 describe('useKeyboardInset', () => {
@@ -105,19 +123,28 @@ describe('useKeyboardInset', () => {
     expect(inset()).toBe('300px')
   })
 
-  // iOS scrolls the visual viewport up to keep the field in sight; what is covered shrinks by it,
-  // and what is visible is the visual viewport, wherever it stands (MOL-135).
-  it('counts the visual viewport scrolled inside the window', async () => {
-    const viewport = fakeViewport(500, 100)
+  // Safari on the owner's iPhone, «Где вы?» opened again (MOL-151, М-2): the keys come over a window
+  // of 699; then the window shrinks to 369 with no event of the visual viewport and its offset still
+  // 0, and only 300 ms later is the visible part reported 330 down. Lifted by `100dvh` the sheet went
+  // over the top of the screen for those 300 ms; lifted from the pinned box, it never moves.
+  it('lifts from the box it is pinned in, through the moment Safari has shrunk it unsaid', async () => {
+    const viewport = fakeViewport(699)
+    const layout = fakeLayout(699)
     const { on, inset, height } = host()
     on.value = true
     await nextTick()
-    expect(inset()).toBe('200px')
-    expect(height()).toBe('500px')
-    viewport.offsetTop = 300
+    viewport.height = 369
+    viewport.fire('resize')
+    expect(inset()).toBe('330px')
+    expect(height()).toBe('369px')
+    layout.floor = 369
+    window.dispatchEvent(new Event('scroll'))
+    expect(inset()).toBe('0px')
+    expect(height()).toBe('369px')
+    viewport.offsetTop = 330
     viewport.fire('scroll')
     expect(inset()).toBe('0px')
-    expect(height()).toBe('500px')
+    expect(height()).toBe('369px')
   })
 
   // Measured on the owner's iPhone, Safari (MOL-135): the window shrinks to the visible part under
@@ -125,13 +152,14 @@ describe('useKeyboardInset', () => {
   // lifted, and the sheet is a share of 395 — of 699 its top went 178px off the screen.
   it('takes what Safari leaves visible when it shrinks the window itself', async () => {
     const viewport = fakeViewport(699)
-    fakeDvh(699)
+    const layout = fakeDvh(699)
     vi.stubGlobal('innerHeight', 699)
     const { on, inset, height } = host()
     on.value = true
     await nextTick()
     expect(height()).toBe('699px')
     vi.stubGlobal('innerHeight', 395)
+    layout.floor = 395
     viewport.height = 395
     viewport.offsetTop = 304
     viewport.fire('resize')
@@ -141,16 +169,18 @@ describe('useKeyboardInset', () => {
 
   // The installed app on the owner's iPhone (hotfix-bottom-menu): the same keyboard over the same
   // visual viewport, and the window read 796 once and 720 the next time. Lifted by the window, the
-  // sheet stood 76px lower the second time, its end under the glass bar over the keys.
-  it('lifts by `100dvh`, not by the window Safari moves with the keyboard', async () => {
+  // sheet stood 76px lower the second time, its end under the glass bar over the keys. The pinned
+  // box lay at 674 in both, as logged (`xx16zh`): the lift `100dvh` gave there, 247.
+  it('lifts from the pinned box, not by the window Safari moves with the keyboard', async () => {
     const viewport = fakeViewport(797)
-    fakeDvh(797)
+    const layout = fakeDvh(797)
     vi.stubGlobal('innerHeight', 797)
     const { on, inset, height } = host()
     on.value = true
     await nextTick()
     expect(inset()).toBe('0px')
     vi.stubGlobal('innerHeight', 796)
+    layout.floor = 674
     viewport.height = 427
     viewport.offsetTop = 123
     viewport.fire('resize')
@@ -162,10 +192,11 @@ describe('useKeyboardInset', () => {
   })
 
   // Safari with its bar folded, the page scrolled (hotfix-bottom-menu): the window read 535 of a
-  // `100dvh` of 699, and the lift of zero left the sheet's last 100px under the keys.
+  // `100dvh` of 699, and the lift of zero left the sheet's last 100px under the keys. The pinned box
+  // lay at 495, as logged (`poa2mh`).
   it('lifts in Safari with its bar folded, the window shrunk short of the keys', async () => {
     const viewport = fakeViewport(739)
-    fakeDvh(699)
+    fakeLayout(699, 495)
     vi.stubGlobal('innerHeight', 535)
     viewport.height = 395
     viewport.offsetTop = 204
@@ -248,7 +279,7 @@ describe('useKeyboardInset', () => {
     const viewport = fakeViewport(500, 100)
     const { on, inset, height } = host(true)
     await nextTick()
-    expect(inset()).toBe('200px')
+    expect(inset()).toBe('300px')
     on.value = false
     await nextTick()
     expect(viewport.count()).toBe(0)
@@ -438,5 +469,226 @@ describe('useKeyboardInset keeps the focused field in sight', () => {
     await nextTick()
     input.focus()
     expect(sheet.scrollTop).toBe(100)
+  })
+})
+
+// The first keyboard of a page came 300–800 ms after the focus on the owner's iPhone, the page drew
+// nothing meanwhile, and iOS slid the last picture up with the keys — the sheet in it still the
+// screen's share, its top off the screen (MOL-151, М-1). The height they left is remembered and
+// taken before they come.
+describe('useKeyboardInset takes the height the keys left last time', () => {
+  const KEY = 'molvia.keyboard'
+  const AMOUNT = 'decimal 699x390'
+
+  // A page of its own for every test: whether a keyboard came up yet is the page's.
+  let fresh: typeof useKeyboardInset
+
+  beforeEach(async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('innerWidth', 390)
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(pointer: coarse)' }))
+    vi.resetModules()
+    ;({ useKeyboardInset: fresh } = await import('@/composables/useKeyboardInset'))
+  })
+
+  async function opened(kept: Record<string, unknown> | string | null = { [AMOUNT]: 395 }) {
+    if (kept !== null)
+      localStorage.setItem(KEY, typeof kept === 'string' ? kept : JSON.stringify(kept))
+    const viewport = fakeViewport(699)
+    vi.stubGlobal('innerHeight', 699)
+    const layout = fakeLayout(699)
+    const view = host(false, fresh)
+    view.on.value = true
+    await nextTick()
+    const field = (which: string) => {
+      const found = (view.view.element as HTMLElement).querySelector<HTMLElement>(which)
+      if (!found) throw new Error(`no ${which}`)
+      return found
+    }
+    return { ...view, viewport, layout, field }
+  }
+
+  // Safari, the first «+ Трата» after a reload (`tbp9pb`): the focus, 724 ms of nothing, then the
+  // keys with the window shrunk to 395 and the visible part said to be 304 down.
+  function keysCome({ viewport, layout }: Awaited<ReturnType<typeof opened>>) {
+    vi.stubGlobal('innerHeight', 395)
+    layout.floor = 395
+    viewport.height = 395
+    viewport.offsetTop = 304
+    viewport.fire('resize')
+  }
+
+  it('takes the remembered height at the focus, before the keys, and keeps it as they come', async () => {
+    const sheet = await opened()
+    expect(sheet.height()).toBe('699px')
+    sheet.field('[data-amount]').focus()
+    expect(sheet.height()).toBe('395px')
+    expect(sheet.inset()).toBe('0px')
+    vi.advanceTimersByTime(724)
+    expect(sheet.height()).toBe('395px')
+    keysCome(sheet)
+    expect(sheet.height()).toBe('395px')
+    expect(sheet.inset()).toBe('0px')
+  })
+
+  // A later keyboard came 128–263 ms after the focus with no frame of the page or one, and that frame
+  // is what iOS slides up: made lower it lands in place (adversarial У2). The price is that frame.
+  it('takes the remembered height again for a field tapped after the keys went down', async () => {
+    const sheet = await opened()
+    sheet.field('[data-amount]').focus()
+    keysCome(sheet)
+    sheet.field('[data-amount]').blur()
+    vi.stubGlobal('innerHeight', 699)
+    sheet.layout.floor = 699
+    sheet.viewport.height = 699
+    sheet.viewport.offsetTop = 0
+    sheet.viewport.fire('resize')
+    expect(sheet.height()).toBe('699px')
+    sheet.field('[data-amount]').focus()
+    expect(sheet.height()).toBe('395px')
+  })
+
+  // A select and a date bring a picker, not keys: nothing is remembered for them, nothing
+  // foreseen (adversarial У1).
+  it('must not fire: a date focused with the keys still up is not remembered', async () => {
+    const sheet = await opened(null)
+    sheet.field('[data-field]').focus()
+    sheet.viewport.height = 369
+    sheet.viewport.fire('resize')
+    sheet.field('[data-date]').focus()
+    window.dispatchEvent(new Event('scroll'))
+    expect(JSON.parse(localStorage.getItem(KEY) ?? '{}')).toEqual({ 'input 699x390': 369 })
+  })
+
+  it('must not fire: a date focused takes no remembered height', async () => {
+    const sheet = await opened({ 'date 699x390': 369 })
+    sheet.field('[data-date]').focus()
+    expect(sheet.height()).toBe('699px')
+  })
+
+  it('remembers what the keys left, by their kind and the window', async () => {
+    const sheet = await opened(null)
+    sheet.field('[data-amount]').focus()
+    expect(sheet.height()).toBe('699px')
+    keysCome(sheet)
+    expect(sheet.height()).toBe('395px')
+    expect(JSON.parse(localStorage.getItem(KEY) ?? '{}')).toEqual({ [AMOUNT]: 395 })
+  })
+
+  it('keeps what other keys and windows left beside it', async () => {
+    const sheet = await opened({ 'text 699x390': 340 })
+    sheet.field('[data-amount]').focus()
+    keysCome(sheet)
+    expect(JSON.parse(localStorage.getItem(KEY) ?? '{}')).toEqual({
+      'text 699x390': 340,
+      [AMOUNT]: 395,
+    })
+  })
+
+  // A hardware keyboard raises nothing: the sheet does not stay short for it.
+  it('lets the height go when the keys have not come in 1500 ms', async () => {
+    const sheet = await opened()
+    sheet.field('[data-amount]').focus()
+    vi.advanceTimersByTime(1499)
+    expect(sheet.height()).toBe('395px')
+    vi.advanceTimersByTime(1)
+    expect(sheet.height()).toBe('699px')
+  })
+
+  it('lets the height go when the focus leaves before the keys come', async () => {
+    const sheet = await opened()
+    sheet.field('[data-amount]').focus()
+    sheet.field('[data-amount]').blur()
+    expect(sheet.height()).toBe('699px')
+  })
+
+  // An event of the viewport with no keys in it — a bar of Safari coming and going — is not them.
+  it('must not fire: an event without the keys takes the foreseen height away', async () => {
+    const sheet = await opened()
+    sheet.field('[data-amount]').focus()
+    sheet.viewport.height = 650
+    sheet.viewport.fire('resize')
+    expect(sheet.height()).toBe('395px')
+  })
+
+  it('must not fire: nothing remembered', async () => {
+    const sheet = await opened(null)
+    sheet.field('[data-amount]').focus()
+    expect(sheet.height()).toBe('699px')
+  })
+
+  it('must not fire: a mouse, not a finger', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const sheet = await opened()
+    sheet.field('[data-amount]').focus()
+    expect(sheet.height()).toBe('699px')
+  })
+
+  it('must not fire: a button focused, not a field', async () => {
+    const sheet = await opened()
+    sheet.field('[data-button]').focus()
+    expect(sheet.height()).toBe('699px')
+  })
+
+  it('must not fire: other keys remembered, not these', async () => {
+    const sheet = await opened({ 'numeric 699x390': 395 })
+    sheet.field('[data-amount]').focus()
+    expect(sheet.height()).toBe('699px')
+  })
+
+  it('must not fire: the phone turned, another window', async () => {
+    const sheet = await opened({ 'decimal 699x844': 395 })
+    sheet.field('[data-amount]').focus()
+    expect(sheet.height()).toBe('699px')
+  })
+
+  it('must not fire: a remembered height not below the window', async () => {
+    const sheet = await opened({ [AMOUNT]: 699 })
+    sheet.field('[data-amount]').focus()
+    expect(sheet.height()).toBe('699px')
+  })
+
+  it('must not fire: what is kept is not a list of heights', async () => {
+    const sheet = await opened('not json')
+    sheet.field('[data-amount]').focus()
+    expect(sheet.height()).toBe('699px')
+  })
+
+  it('must not fire: pinched in', async () => {
+    const sheet = await opened()
+    sheet.viewport.scale = 2
+    sheet.viewport.fire('resize')
+    sheet.field('[data-amount]').focus()
+    expect(sheet.height()).toBe('')
+  })
+
+  // A field tapped with the keys already up is measured as it is, not foreseen.
+  it('must not fire: the keys already up', async () => {
+    const sheet = await opened({ [AMOUNT]: 300 })
+    keysCome(sheet)
+    sheet.field('[data-amount]').focus()
+    expect(sheet.height()).toBe('395px')
+  })
+
+  // Chrome on Android shrinks the window and `dvh` with the keys: they cover nothing, and there is
+  // nothing to remember.
+  it('must not fire: a window that shrank with the keys is not remembered', async () => {
+    const sheet = await opened(null)
+    sheet.field('[data-amount]').focus()
+    sheet.layout.dvh = 400
+    sheet.layout.floor = 400
+    sheet.viewport.height = 400
+    sheet.viewport.fire('resize')
+    expect(localStorage.getItem(KEY)).toBeNull()
+  })
+
+  it('must not fire: the sheet shut lets the foreseen height go', async () => {
+    const sheet = await opened()
+    sheet.field('[data-amount]').focus()
+    sheet.on.value = false
+    await nextTick()
+    expect(sheet.height()).toBe('')
+    vi.advanceTimersByTime(1500)
+    expect(sheet.height()).toBe('')
   })
 })

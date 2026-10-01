@@ -21,13 +21,15 @@
       </button>
     </div>
 
-    <AppField
-      v-if="choice === 'manual'"
-      v-model="own"
-      :label="t('money.rate_label', { currency: sign })"
-      kind="decimal"
-      :error="error"
-    />
+    <AppReveal>
+      <AppField
+        v-if="choice === 'manual'"
+        v-model="own"
+        :label="t('money.rate_label', { currency: sign })"
+        kind="decimal"
+        :error="error"
+      />
+    </AppReveal>
 
     <template #footer>
       <p v-if="failed" class="failed" role="alert">{{ t('trip.rate.failed') }}</p>
@@ -58,6 +60,7 @@ import type { ErrorCode, RateChoice, RateChoiceBody, TripView } from '@molvia/mo
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { useTripStore } from '@/stores/trip'
 
@@ -72,7 +75,7 @@ import { useTripStore } from '@/stores/trip'
  */
 export default defineComponent({
   name: 'TripRateSheet',
-  components: { AppButton, AppField, BottomSheet },
+  components: { AppButton, AppField, AppReveal, BottomSheet },
   props: {
     open: { type: Boolean, required: true },
     trip: { type: Object as PropType<TripView>, required: true },
@@ -219,9 +222,19 @@ export default defineComponent({
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 
   &:focus-visible {
     @include focus-ring;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .choice {
+    transition: none;
   }
 }
 

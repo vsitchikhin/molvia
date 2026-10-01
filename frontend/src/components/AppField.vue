@@ -60,7 +60,9 @@
       </span>
     </div>
 
-    <p v-if="failed" :id="`${id}-error`" class="error">{{ errorText ?? t(error ?? '') }}</p>
+    <AppReveal>
+      <p v-if="failed" :id="`${id}-error`" class="error">{{ errorText ?? t(error ?? '') }}</p>
+    </AppReveal>
   </div>
 </template>
 
@@ -71,6 +73,7 @@ import { useI18n } from 'vue-i18n'
 import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import IconChevronDown from '~icons/mdi/chevron-down'
 import type { ErrorCode } from '@molvia/model'
+import AppReveal from '@/components/AppReveal.vue'
 
 export type FieldKind = 'text' | 'decimal' | 'digits' | 'multiline' | 'date' | 'select'
 
@@ -99,7 +102,7 @@ export type FieldKind = 'text' | 'decimal' | 'digits' | 'multiline' | 'date' | '
  */
 export default defineComponent({
   name: 'AppField',
-  components: { IconCalendar, IconChevronDown },
+  components: { AppReveal, IconCalendar, IconChevronDown },
   inheritAttrs: false,
   props: {
     modelValue: { type: String, required: true },

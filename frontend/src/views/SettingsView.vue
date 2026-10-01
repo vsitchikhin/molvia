@@ -27,19 +27,21 @@
       <p v-if="!online" class="offline">
         <IconCloud aria-hidden="true" />{{ t('settings.offline.strip') }}
       </p>
-      <AppCard
-        v-if="form.dirty && !form.unknown && (form.returned || form.conflict || !form.stored)"
-        class="draft"
-      >
-        <IconPencil class="pencil" aria-hidden="true" />
-        <div>
-          <p class="draft-title">{{ t('settings.draft.title') }}</p>
-          <p v-if="!form.stored" class="note">{{ t('settings.draft.volatile') }}</p>
-          <AppButton variant="ghost" :inactive="form.saving" @click="form.cancel">{{
-            t('settings.cancel')
-          }}</AppButton>
-        </div>
-      </AppCard>
+      <AppReveal>
+        <AppCard
+          v-if="form.dirty && !form.unknown && (form.returned || form.conflict || !form.stored)"
+          class="draft"
+        >
+          <IconPencil class="pencil" aria-hidden="true" />
+          <div>
+            <p class="draft-title">{{ t('settings.draft.title') }}</p>
+            <p v-if="!form.stored" class="note">{{ t('settings.draft.volatile') }}</p>
+            <AppButton variant="ghost" :inactive="form.saving" @click="form.cancel">{{
+              t('settings.cancel')
+            }}</AppButton>
+          </div>
+        </AppCard>
+      </AppReveal>
       <ScreenState
         v-if="form.conflict && form.current && !form.unknown"
         kind="attention"
@@ -149,6 +151,7 @@ import IconRefresh from '~icons/mdi/refresh'
 import IconChevron from '~icons/mdi/chevron-right'
 import IconDevices from '~icons/mdi/devices'
 import IconLogout from '~icons/mdi/logout'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
@@ -166,23 +169,24 @@ import { useSpendingQueueStore } from '@/stores/spendingQueue'
 export default defineComponent({
   name: 'SettingsView',
   components: {
-    AppScreen,
-    AppCard,
     AppButton,
-    SalaryShiftGroup,
-    SettingsFields,
-    ScreenSkeleton,
-    ScreenState,
-    SignOutSheet,
-    YourDataGroup,
-    IconCloud,
-    IconPencil,
-    IconCheck,
+    AppCard,
+    AppReveal,
+    AppScreen,
     IconAlert,
-    IconRefresh,
+    IconCheck,
     IconChevron,
+    IconCloud,
     IconDevices,
     IconLogout,
+    IconPencil,
+    IconRefresh,
+    SalaryShiftGroup,
+    ScreenSkeleton,
+    ScreenState,
+    SettingsFields,
+    SignOutSheet,
+    YourDataGroup,
   },
   setup() {
     const { t } = useI18n()

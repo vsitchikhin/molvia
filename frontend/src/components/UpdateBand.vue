@@ -87,6 +87,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .band {
+  @include appear;
+
   display: flex;
   flex-wrap: wrap;
   align-items: center;

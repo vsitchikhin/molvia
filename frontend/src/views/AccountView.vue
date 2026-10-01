@@ -72,21 +72,25 @@
           <p class="empty-title">{{ t('accounts.no_operations') }}</p>
           <p class="footnote">{{ t('accounts.account.empty.body') }}</p>
         </AppCard>
-        <section v-for="day in days" :key="day.day" class="day">
-          <h3 class="day-head">{{ dayTitle(day.day) }}</h3>
-          <AppCard as="ul" list>
-            <OperationRow
-              v-for="row in day.rows"
-              :key="`${row.id}-${row.side ?? ''}`"
-              :operation="row"
-              :categories="categories"
-              :name-of="nameOf"
-              :account-name="accountName"
-              in-account
-              @open="openRow"
-            />
-          </AppCard>
-        </section>
+        <AppReveal group>
+          <section v-for="day in days" :key="day.day" class="day">
+            <h3 class="day-head">{{ dayTitle(day.day) }}</h3>
+            <AppCard as="ul" list>
+              <AppReveal group>
+                <OperationRow
+                  v-for="row in day.rows"
+                  :key="`${row.id}-${row.side ?? ''}`"
+                  :operation="row"
+                  :categories="categories"
+                  :name-of="nameOf"
+                  :account-name="accountName"
+                  in-account
+                  @open="openRow"
+                />
+              </AppReveal>
+            </AppCard>
+          </section>
+        </AppReveal>
         <div v-if="journal.cursor" ref="sentinel" class="more">
           <p v-if="more === 'loading'" class="footnote">{{ t('state.loading') }}</p>
           <AppButton v-else-if="more === 'failed'" variant="ghost" @click="loadMore">
@@ -161,6 +165,7 @@ import AccountSheet from '@/components/AccountSheet.vue'
 import type { AccountOutcome } from '@/components/AccountSheet.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import FloatingDock from '@/components/FloatingDock.vue'
 import OperationRow from '@/components/OperationRow.vue'
@@ -194,6 +199,7 @@ export default defineComponent({
     AccountSheet,
     AppButton,
     AppCard,
+    AppReveal,
     AppScreen,
     FloatingDock,
     IconArchive,
@@ -446,6 +452,8 @@ export default defineComponent({
 }
 
 .strip {
+  @include appear;
+
   background: var(--warn-tint);
   color: var(--warn-ink);
 }

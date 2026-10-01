@@ -19,20 +19,22 @@
         <p v-else-if="phase === 'ready' && stale === 'error' && fetchedAt" class="strip">
           {{ t('spending.error_strip', { when: whenOf(fetchedAt) }) }}
         </p>
-        <ScreenState
-          v-for="item in otherRefusals"
-          :key="item.key"
-          kind="attention"
-          inline
-          :title="t('spending.rejected_other.title')"
-          :body="reasonOf(item.code)"
-        >
-          <template #action>
-            <AppButton variant="ghost" @click="queue.dismiss(item)">
-              {{ t('spending.sheet.dismiss') }}
-            </AppButton>
-          </template>
-        </ScreenState>
+        <AppReveal group>
+          <ScreenState
+            v-for="item in otherRefusals"
+            :key="item.key"
+            kind="attention"
+            inline
+            :title="t('spending.rejected_other.title')"
+            :body="reasonOf(item.code)"
+          >
+            <template #action>
+              <AppButton variant="ghost" @click="queue.dismiss(item)">
+                {{ t('spending.sheet.dismiss') }}
+              </AppButton>
+            </template>
+          </ScreenState>
+        </AppReveal>
 
         <ScreenSkeleton v-if="phase === 'loading'" :groups="[44, 70, 34, 60, 80, 48, 66]" />
 
@@ -166,26 +168,32 @@
 
           <h2 class="group-caption">{{ t('spending.days_title') }}</h2>
           <p v-if="journal.length === 0" class="footnote">{{ t('spending.month_empty') }}</p>
-          <section v-for="day in journal" :key="day.day" class="day">
-            <h3 class="day-head">
-              <span>{{ dayTitle(day.day) }}</span>
-              <span v-if="day.total" class="day-total">
-                {{ day.estimated ? `≈ ${whole(day.total)}` : whole(day.total) }}
-              </span>
-            </h3>
-            <AppCard as="ul" list>
-              <SpendingRow
-                v-for="row in day.rows"
-                :key="row.key"
-                :row="row"
-                :category="categoryOf(row)"
-                :category-name="categoryNameOf(row)"
-                :spend-currency="month.spendCurrency"
-                :data-row="row.key"
-                @open="openRow(row, day.day)"
-              />
-            </AppCard>
-          </section>
+          <!-- Another month is another answer, not days come and gone: it is just there (MOL-136,
+               adversarial А1). -->
+          <AppReveal :key="month.month" group>
+            <section v-for="day in journal" :key="day.day" class="day">
+              <h3 class="day-head">
+                <span>{{ dayTitle(day.day) }}</span>
+                <span v-if="day.total" class="day-total">
+                  {{ day.estimated ? `≈ ${whole(day.total)}` : whole(day.total) }}
+                </span>
+              </h3>
+              <AppCard as="ul" list>
+                <AppReveal group>
+                  <SpendingRow
+                    v-for="row in day.rows"
+                    :key="row.key"
+                    :row="row"
+                    :category="categoryOf(row)"
+                    :category-name="categoryNameOf(row)"
+                    :spend-currency="month.spendCurrency"
+                    :data-row="row.key"
+                    @open="openRow(row, day.day)"
+                  />
+                </AppReveal>
+              </AppCard>
+            </section>
+          </AppReveal>
 
           <div v-if="month.remaining > 0" ref="sentinel" class="more">
             <p class="footnote">
@@ -273,6 +281,7 @@ import type { Money, MoneyMonthView, SpendingCategoryView, WireCode } from '@mol
 import AccountsCard from '@/components/AccountsCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CategoryDonutCard from '@/components/CategoryDonutCard.vue'
 import FloatingDock from '@/components/FloatingDock.vue'
@@ -311,6 +320,7 @@ export default defineComponent({
     AccountsCard,
     AppButton,
     AppCard,
+    AppReveal,
     AppScreen,
     CategoryDonutCard,
     FloatingDock,
@@ -359,8 +369,18 @@ export default defineComponent({
         ? asked
         : currentMonth.value
     })
-    const { phase, month, stale, fetchedAt, more, loadMore, retry, knownCategories, todayRate } =
-      useMoneyMonth(selected)
+    const {
+      phase,
+      month,
+      stale,
+      fetchedAt,
+      askedAt,
+      more,
+      loadMore,
+      retry,
+      knownCategories,
+      todayRate,
+    } = useMoneyMonth(selected)
 
     function goMonth(next: string): void {
       void router.replace({
@@ -388,8 +408,37 @@ export default defineComponent({
     )
     /** Whether a spending can be written here at all: a category is required, and known. */
     const canWrite = computed(() => categories.value.some((category) => !category.archived))
+    // A removal landed after the month on screen was read: its row is gone, not back for a moment
+    // until the month is read again (adversarial А3) — unless «Вернуть» is on its way.
+    const gone = computed(() => {
+      // As of when the read set out: one sent before the removal and come after it still holds the
+      // row (adversarial Б1).
+      const read = askedAt.value?.getTime() ?? 0
+      const back = new Set(
+        queue.pending.flatMap((write) => (write.kind === 'restore' ? [write.id] : [])),
+      )
+      return new Set(
+        queue.gone.flatMap((item) => (item.at > read && !back.has(item.id) ? [item.id] : [])),
+      )
+    })
+    // The same for a record of «Покупки» (adversarial Б4): waiting, or landed after the read set
+    // out — unless its «Вернуть» is on its way, which `removing` already says.
+    const tripsGone = computed(() => {
+      const read = askedAt.value?.getTime() ?? 0
+      const back = new Set(
+        tripQueue.pending.flatMap((write) => (write.kind === 'restore' ? [write.tripId] : [])),
+      )
+      return new Set([
+        ...tripQueue.removing,
+        ...tripQueue.gone.flatMap((item) =>
+          item.at > read && !back.has(item.id) ? [item.id] : [],
+        ),
+      ])
+    })
     const journal = computed(() =>
-      month.value ? journalOf(month.value, queue.pending, queue.rejected, tripQueue.removing) : [],
+      month.value
+        ? journalOf(month.value, queue.pending, queue.rejected, tripsGone.value, gone.value)
+        : [],
     )
     const unsent = computed(() => (month.value ? unsentIn(month.value, queue.pending) : 0))
     const spendCurrency = computed(
@@ -728,6 +777,8 @@ export default defineComponent({
 }
 
 .strip {
+  @include appear;
+
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
@@ -968,5 +1019,11 @@ export default defineComponent({
 
 .float > .undo {
   flex: 1;
+}
+
+/* The answer comes in where the skeleton stood, faded only: the screen keeps it in one block of its
+   own, which `AppScreen` does not see, and nothing under the thumb may move (review №5, MOL-138). */
+.content > * {
+  @include appear(0);
 }
 </style>

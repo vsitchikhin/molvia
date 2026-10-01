@@ -31,12 +31,14 @@
         <p v-else-if="failure === 'offline'" class="quiet">
           <IconCloud aria-hidden="true" />{{ t('settings.export.lost') }}
         </p>
-        <div v-if="ready" class="ready">
-          <p class="ready-title">{{ t('settings.export.ready') }}</p>
-          <AppButton block @click="handOverFromCard">{{
-            t('settings.export.hand_over')
-          }}</AppButton>
-        </div>
+        <AppReveal>
+          <div v-if="ready" class="ready">
+            <p class="ready-title">{{ t('settings.export.ready') }}</p>
+            <AppButton block @click="handOverFromCard">{{
+              t('settings.export.hand_over')
+            }}</AppButton>
+          </div>
+        </AppReveal>
       </li>
       <li>
         <RouterLink class="entry" :to="{ name: 'privacy' }">
@@ -59,6 +61,7 @@ import IconDownload from '~icons/mdi/tray-arrow-down'
 import IconShield from '~icons/mdi/shield-account-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExport } from '@/composables/useExport'
 
@@ -71,6 +74,7 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppReveal,
     IconAlert,
     IconChevron,
     IconCloud,

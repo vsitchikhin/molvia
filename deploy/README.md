@@ -147,6 +147,10 @@ The API supports Telegram login and the bot confirms it. The PWA login screen (M
 needs to be connected before people can use the complete flow.
 `POST /dev/login` remains a development seam and is absent from the production bundle.
 
+`OPEN_FOOD_FACTS_CONTACT` is the address Open Food Facts may reach us at, sent in the User-Agent of
+every question the API asks it about a code the catalogue missed (MOL-162). Empty or absent, the
+name hint is off; nothing else depends on it.
+
 Set `TELEGRAM_BOT_USERNAME` without `@` and generate `BOT_API_SECRET` using the command in
 `.env.prod.example`. This secret belongs to the internal API channel and is **not** the
 Telegram bot token. The backend and bot receive the same internal secret; only the bot

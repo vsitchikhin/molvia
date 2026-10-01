@@ -3,26 +3,28 @@
     <!-- A purchase the server refused: what it was, why, and a way to correct it. For every trip,
          not only the one going on — a purchase that was never recorded does not stop mattering
          when its trip is finished (MOL-22, В-3, review 2). -->
-    <ScreenState
-      v-for="item in rejected"
-      :key="item.key"
-      class="notice"
-      kind="attention"
-      inline
-      :title="refusalTitle(item)"
-      :body="refusalReason(item)"
-    >
-      <template #action>
-        <div class="refusal-actions">
-          <AppButton v-if="correctable(item)" variant="ghost" @click="correct(item)">
-            {{ t('trip.rejected.fix') }}
-          </AppButton>
-          <AppButton variant="ghost" @click="queue.dismiss(item)">
-            {{ heldBack(item) > 0 ? t('trip.rejected.drop_trip') : t('trip.rejected.drop') }}
-          </AppButton>
-        </div>
-      </template>
-    </ScreenState>
+    <AppReveal group>
+      <ScreenState
+        v-for="item in rejected"
+        :key="item.key"
+        class="notice"
+        kind="attention"
+        inline
+        :title="refusalTitle(item)"
+        :body="refusalReason(item)"
+      >
+        <template #action>
+          <div class="refusal-actions">
+            <AppButton v-if="correctable(item)" variant="ghost" @click="correct(item)">
+              {{ t('trip.rejected.fix') }}
+            </AppButton>
+            <AppButton variant="ghost" @click="queue.dismiss(item)">
+              {{ heldBack(item) > 0 ? t('trip.rejected.drop_trip') : t('trip.rejected.drop') }}
+            </AppButton>
+          </div>
+        </template>
+      </ScreenState>
+    </AppReveal>
 
     <!-- A trip is already open: the purchases wait rather than move there by themselves,
          because «item + place» is the key the product rests on. The choice is the person's
@@ -101,6 +103,7 @@ import { useI18n } from 'vue-i18n'
 import { ERROR, isSamePlaceName } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ScreenState from '@/components/ScreenState.vue'
@@ -130,6 +133,7 @@ export default defineComponent({
   name: 'TripNotices',
   components: {
     AppButton,
+    AppReveal,
     BottomSheet,
     ItemDetailsSheet,
     ScreenState,

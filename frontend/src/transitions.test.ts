@@ -181,6 +181,112 @@ describe('installViewTransitions', () => {
     expect(start).toHaveBeenCalledOnce()
   })
 
+  // A CSS animation of no length comes back half-way through once its length is back: what the
+  // screen put in during the move faded in a second time after it (adversarial А4).
+  it('cuts short at the end of a move what began to appear during it, and nothing else', async () => {
+    class FakeCSSAnimation {
+      constructor(
+        readonly animationName: string,
+        readonly startTime: number,
+      ) {}
+      cancel = vi.fn()
+    }
+    vi.stubGlobal('CSSAnimation', FakeCSSAnimation)
+    const clock = { now: 100 }
+    Object.defineProperty(document, 'timeline', {
+      value: {
+        get currentTime() {
+          return clock.now
+        },
+      },
+      configurable: true,
+    })
+    const during = new FakeCSSAnimation('appear', 150)
+    const before = new FakeCSSAnimation('appear', 50)
+    const other = new FakeCSSAnimation('pulse', 150)
+    Object.defineProperty(document, 'getAnimations', {
+      value: () => [during, before, other],
+      configurable: true,
+    })
+    stubViewTransitions()
+    const router = routerAt()
+    installViewTransitions(router)
+    await router.push('/purchases/manual')
+    await router.push('/purchases/manual/add')
+    await vi.waitFor(() => {
+      expect(document.documentElement.dataset.nav).toBeUndefined()
+    })
+    expect(during.cancel).toHaveBeenCalledOnce()
+    expect(before.cancel).not.toHaveBeenCalled()
+    expect(other.cancel).not.toHaveBeenCalled()
+    Reflect.deleteProperty(document, 'getAnimations')
+    Reflect.deleteProperty(document, 'timeline')
+  })
+
+  // What the screen puts in while the browser shows the move must not fade in after it — the
+  // arrival a second time (adversarial А5): the move is marked for its render, then let go.
+  it('marks a move the browser shows itself for its render alone', async () => {
+    stubViewTransitions()
+    const router = routerAt()
+    installViewTransitions(router)
+    await router.push('/purchases/manual')
+    await router.push('/purchases/manual/add')
+    const seen: (string | undefined)[] = []
+    router.afterEach(() => {
+      seen.push(document.documentElement.dataset.nav)
+    })
+
+    const event = new PopStateEvent('popstate', { state: null })
+    Object.defineProperty(event, 'hasUAVisualTransition', { value: true })
+    window.dispatchEvent(event)
+    await router.push('/purchases/manual')
+    expect(seen).toEqual(['browser'])
+    await vi.waitFor(() => {
+      expect(document.documentElement.dataset.nav).toBeUndefined()
+    })
+  })
+
+  // The account opened from the card of «Деньги» is a move with no direction of ours; the swipe back
+  // from it is still the browser's move (adversarial Б3).
+  it('marks a move the browser shows that has no direction of ours', async () => {
+    stubViewTransitions()
+    const router = routerAt()
+    installViewTransitions(router)
+    await router.push('/money')
+    await router.push('/money/accounts/0b6c1a1e-8f45-4c8e-9a51-6a2b9c1d2e3f')
+    expect(
+      direction(
+        router.resolve('/money/accounts/0b6c1a1e-8f45-4c8e-9a51-6a2b9c1d2e3f'),
+        router.resolve('/money'),
+      ),
+    ).toBeNull()
+    const seen: (string | undefined)[] = []
+    router.afterEach(() => {
+      seen.push(document.documentElement.dataset.nav)
+    })
+    const event = new PopStateEvent('popstate', { state: null })
+    Object.defineProperty(event, 'hasUAVisualTransition', { value: true })
+    window.dispatchEvent(event)
+    await router.push('/money')
+    expect(seen).toEqual(['browser'])
+  })
+
+  it('must not fire: a change of the query the browser shows is not a move', async () => {
+    stubViewTransitions()
+    const router = routerAt()
+    installViewTransitions(router)
+    await router.push('/money')
+    const seen: (string | undefined)[] = []
+    router.afterEach(() => {
+      seen.push(document.documentElement.dataset.nav)
+    })
+    const event = new PopStateEvent('popstate', { state: null })
+    Object.defineProperty(event, 'hasUAVisualTransition', { value: true })
+    window.dispatchEvent(event)
+    await router.push('/money?month=2026-08')
+    expect(seen).toEqual([undefined])
+  })
+
   it('does not animate at all when motion is reduced', async () => {
     reduceMotion(true)
     const { start } = stubViewTransitions()

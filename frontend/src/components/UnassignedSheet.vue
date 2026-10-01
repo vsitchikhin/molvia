@@ -16,16 +16,18 @@
       }}
     </p>
     <AppCard v-else as="ul" list>
-      <OperationRow
-        v-for="row in visible"
-        :key="`${row.id}-${row.side ?? ''}`"
-        :operation="row"
-        :categories="categories"
-        :name-of="nameOf"
-        :account-name="accountName"
-        :meta="metaOf(row)"
-        @open="openRow"
-      />
+      <AppReveal group>
+        <OperationRow
+          v-for="row in visible"
+          :key="`${row.id}-${row.side ?? ''}`"
+          :operation="row"
+          :categories="categories"
+          :name-of="nameOf"
+          :account-name="accountName"
+          :meta="metaOf(row)"
+          @open="openRow"
+        />
+      </AppReveal>
     </AppCard>
 
     <template #footer>
@@ -65,6 +67,7 @@ import type { AccountOperationView } from '@molvia/model'
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
 import OperationSheet from '@/components/OperationSheet.vue'
@@ -88,6 +91,7 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppReveal,
     BottomSheet,
     IconCheck,
     IconCloudOff,
@@ -236,6 +240,8 @@ export default defineComponent({
 }
 
 .strip {
+  @include appear;
+
   background: var(--warn-tint);
   color: var(--warn-ink);
 }

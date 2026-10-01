@@ -14,15 +14,17 @@
           @change="toggle"
         />
       </label>
-      <AppField
-        v-if="day"
-        :model-value="String(day)"
-        :label="t('settings.salary_shift.day')"
-        kind="select"
-        :options="days"
-        :disabled="saving || !online"
-        @update:model-value="choose(Number($event))"
-      />
+      <AppReveal>
+        <AppField
+          v-if="day"
+          :model-value="String(day)"
+          :label="t('settings.salary_shift.day')"
+          kind="select"
+          :options="days"
+          :disabled="saving || !online"
+          @update:model-value="choose(Number($event))"
+        />
+      </AppReveal>
       <p :id="`${id}-hint`" class="hint">{{ t('settings.salary_shift.hint') }}</p>
       <p v-if="!online" :id="`${id}-offline`" class="hint">
         {{ t('settings.salary_shift.offline') }}
@@ -47,6 +49,7 @@ import IconAlert from '~icons/mdi/alert-circle-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import { SALARY_SHIFT_DEFAULT, useSalaryShift } from '@/composables/useSalaryShift'
 
 /**
@@ -55,7 +58,7 @@ import { SALARY_SHIFT_DEFAULT, useSalaryShift } from '@/composables/useSalaryShi
  */
 export default defineComponent({
   name: 'SalaryShiftGroup',
-  components: { AppButton, AppCard, AppField, IconAlert },
+  components: { AppButton, AppCard, AppField, AppReveal, IconAlert },
   setup() {
     const { t } = useI18n()
     const shift = useSalaryShift()
@@ -84,7 +87,8 @@ export default defineComponent({
 }
 
 .card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-3);
 }
 

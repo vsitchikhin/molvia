@@ -179,6 +179,7 @@ export default defineComponent({
   left: 0;
   border-top: 1.5px dashed var(--border-strong);
   pointer-events: none;
+  transition: height var(--dur) var(--ease);
 }
 
 .bar {
@@ -205,7 +206,12 @@ export default defineComponent({
   min-height: 2px;
   border-radius: 8px 8px 3px 3px;
   background: var(--border-strong);
-  transition: background-color var(--dur-fast) var(--ease-out);
+
+  /* A new answer — another period, another category — grows the bars where they stand (MOL-151):
+     the area keeps its height, so nothing around it moves. */
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    height var(--dur) var(--ease);
 
   .chosen & {
     background: var(--bar-colour);
@@ -271,7 +277,8 @@ export default defineComponent({
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fill {
+  .fill,
+  .average {
     transition: none;
   }
 }

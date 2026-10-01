@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { ISSUE } from '#model/support/errors'
 import { barcodeWriteForm, hasRepeatedBarcode } from '#model/entities/barcode'
 import { barcodeSchema, itemSchema, newItemSchema } from '#model/entities/item'
+import { LOCALES } from '#model/support/locale'
 import type { Item } from '#model/entities/item'
 import { quantityCodec } from '#model/values/units'
 
@@ -100,6 +101,42 @@ export const catalogueBarcodeResponseSchema = z.strictObject({
   item: catalogueEntryCodec.nullable(),
 })
 export type CatalogueBarcodeResponse = z.infer<typeof catalogueBarcodeResponseSchema>
+
+/**
+ * The query string of `GET /catalogue/barcode/hint` (MOL-162): the code a lookup missed, in the
+ * query for the same reason as the lookup's, and the language of the interface — the server does not
+ * know it, and a name is picked in it.
+ */
+export const catalogueBarcodeHintQuerySchema = z.strictObject(
+  {
+    code: z.string({ error: ISSUE.QUERY_INVALID }),
+    lang: z.enum(LOCALES, { error: ISSUE.QUERY_INVALID }),
+  },
+  { error: ISSUE.QUERY_INVALID },
+)
+export type CatalogueBarcodeHintQuery = z.infer<typeof catalogueBarcodeHintQuerySchema>
+
+/**
+ * What Open Food Facts says a package is (MOL-162): a name «Предложить товар» starts from, the size
+ * of the package when it is a weight or a volume, and the product's page there — the attribution
+ * its licence asks for. Only ever a suggestion: the person confirms or corrects it. The name passes
+ * the same rule a proposed name does, so the sheet never starts from one it could not send.
+ */
+export const barcodeHintSchema = z.strictObject({
+  name: itemSchema.shape.name,
+  quantity: quantityCodec.nullable(),
+  url: z.url({ protocol: /^https$/, hostname: /(^|\.)openfoodfacts\.org$/ }),
+})
+export type BarcodeHint = z.infer<typeof barcodeHintSchema>
+
+/**
+ * A hint or `null`: Open Food Facts not knowing the code, being out of reach, or the code being a
+ * shop's own label are one answer — no hint — and none of them an error.
+ */
+export const catalogueBarcodeHintResponseSchema = z.strictObject({
+  hint: barcodeHintSchema.nullable(),
+})
+export type CatalogueBarcodeHintResponse = z.infer<typeof catalogueBarcodeHintResponseSchema>
 
 /**
  * The body of «Предложить товар»: products only, and the codes read from the package.

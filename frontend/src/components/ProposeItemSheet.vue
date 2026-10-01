@@ -10,6 +10,12 @@
       enterkeyhint="next"
     />
     <SegmentedControl v-model="unit" :legend="t('item.unit')" :options="units" />
+    <div v-if="sizeShown && size" class="size">
+      <p class="size-text">{{ t('item.propose.size', sizeWords(size)) }}</p>
+      <AppButton variant="icon" :label="t('item.propose.size_drop')" @click="size = null">
+        <IconClose />
+      </AppButton>
+    </div>
     <AppField
       v-model="note"
       :label="t('item.propose.note')"
@@ -18,6 +24,11 @@
     />
     <p v-if="nameTaken" class="code">{{ t('item.propose.name_taken', { name: nameTaken }) }}</p>
     <p v-if="code" class="code">{{ t('item.propose.code', { code }) }}</p>
+    <!-- The attribution the base's licence asks for (MOL-162): its page, opened by the person. Last,
+         away from the fields and with a target a thumb can take (review 2). -->
+    <a v-if="source" class="source" :href="source" target="_blank" rel="noopener noreferrer">
+      {{ t('item.propose.hint_source') }}
+    </a>
 
     <template #footer>
       <!-- There before its words, with only the text changing: a live region born together with
@@ -59,12 +70,16 @@ import { useI18n } from 'vue-i18n'
 import {
   ITEM_NAME_MAX,
   ITEM_NOTE_MAX,
+  decimalFromMilli,
   drawsNothing,
   pastedLine,
+  pickLocale,
   proposedItemSchema,
 } from '@molvia/model'
-import type { CatalogueEntry } from '@molvia/model'
+import type { BarcodeHint, CatalogueEntry, Quantity } from '@molvia/model'
+import IconClose from '~icons/mdi/close'
 import { api } from '@/api'
+import { packageSize } from '@/composables/useBarcodeHint'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -87,6 +102,14 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
  * not taken out: to add the item without it, the person closes the sheet and finds it by name. The
  * code another item already holds writes nothing, and that item is offered instead.
  *
+ * Opened with an empty name for a code Open Food Facts named (MOL-162), the form starts from what
+ * the base says: the name, the unit its size is in, and the size of the package — sent as how much
+ * is usually taken, so a purchase of it opens at «0,4 кг» and its price per kilo shows at once. A
+ * fact from the package, not a guess, which is why the unit may start chosen here. Only the hint at
+ * hand when the sheet opens: one that comes later is not used at all — filled in, it grew the sheet
+ * up under the thumb on its way to the name, and the tap chose «л» (adversarial Д). A name the person
+ * typed before — «другой товар», a word in the search — takes no hint either.
+ *
  * What the server refuses reads as one line, not under a field: its refusals are issue codes,
  * which the dictionary does not translate, and a blank name — the one refusal a person can make
  * here — never leaves, because the button waits for a name.
@@ -96,7 +119,7 @@ const STATUS_DELAY_MS = 100
 
 export default defineComponent({
   name: 'ProposeItemSheet',
-  components: { AppButton, AppField, BottomSheet, SegmentedControl },
+  components: { AppButton, AppField, BottomSheet, IconClose, SegmentedControl },
   props: {
     open: { type: Boolean, required: true },
     /** What was typed into the search; the name starts from it. */
@@ -108,6 +131,8 @@ export default defineComponent({
      * is that item's, and proposed again it would be asked about again.
      */
     nameTaken: { type: String as PropType<string | null>, default: null },
+    /** What Open Food Facts says the package of `code` is (MOL-162); it may come after the opening. */
+    hint: { type: Object as PropType<BarcodeHint | null>, default: null },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
@@ -120,10 +145,14 @@ export default defineComponent({
     writtenLate: (code: string) => typeof code === 'string',
   },
   setup(props, { emit }) {
-    const { t } = useI18n()
+    const { t, locale } = useI18n()
     const name = ref('')
     const unit = ref('')
     const note = ref('')
+    /** The size of the package, from the hint only; sent while the unit chosen is its own. */
+    const size = shallowRef<Quantity | null>(null)
+    /** The page of the product in Open Food Facts once the hint filled anything — the attribution. */
+    const source = ref<string | null>(null)
     const sending = ref(false)
     const failed = ref(false)
     const connected = ref(navigator.onLine)
@@ -163,11 +192,31 @@ export default defineComponent({
         name.value = pastedLine(props.query).trim()
         unit.value = ''
         note.value = ''
+        size.value = null
+        source.value = null
         failed.value = false
         holder.value = null
+        if (name.value === '' && props.hint !== null) fill(props.hint)
       },
       { immediate: true },
     )
+
+    /** The form from the hint, as the sheet opens (MOL-162). */
+    function fill(hint: BarcodeHint): void {
+      name.value = hint.name
+      if (hint.quantity !== null) {
+        unit.value = hint.quantity.unit
+        size.value = hint.quantity
+      }
+      source.value = hint.url
+    }
+
+    const sizeShown = computed(() => size.value !== null && unit.value === size.value.unit)
+
+    function sizeWords(quantity: Quantity): { amount: string; unit: string } {
+      const words = packageSize(quantity, pickLocale(locale.value))
+      return { amount: words.amount, unit: t(words.unitKey) }
+    }
 
     const input = computed(() =>
       proposedItemSchema.safeParse({
@@ -175,6 +224,9 @@ export default defineComponent({
         name: name.value,
         defaultUnit: unit.value,
         barcodes: props.code === null ? [] : [props.code],
+        ...(sizeShown.value && size.value !== null
+          ? { typicalQuantity: { value: decimalFromMilli(size.value), unit: size.value.unit } }
+          : {}),
         // Absent when it draws nothing — by the schema's own measure, so a pasted U+200B is left
         // out like spaces rather than refused with the button going grey (A6b).
         ...(drawsNothing(note.value) ? {} : { note: note.value }),
@@ -277,6 +329,10 @@ export default defineComponent({
       name,
       unit,
       note,
+      size,
+      sizeShown,
+      sizeWords,
+      source,
       units,
       connected,
       failed,
@@ -307,6 +363,32 @@ export default defineComponent({
 
 .failed {
   color: var(--bad-ink);
+}
+
+.source {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: var(--touch-target);
+  color: var(--accent-ink);
+  font-size: var(--text-footnote);
+}
+
+.size {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-left: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.size-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-callout);
+  font-variant-numeric: tabular-nums;
 }
 
 .code {
