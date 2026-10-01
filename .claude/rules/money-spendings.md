@@ -177,20 +177,21 @@ nothing up.
   MOL-159): «newcomer» is a guess from the month and the month before, so a person back after a whole
   empty month is greeted as one and finds «Траты» by flipping a month back. **«Счета», «Обмен денег»
   and «Категории» keep their figures under the skeleton and the error** (adversarial Г): they are
-  «now», read from answers of their own, and the month that failed is not theirs. **A spending of the
-  month the server refused is named on the summary and leads to «Траты»** («Не принята N трат этого
-  месяца», adversarial А): its row there is where it is put right, and the summary, which has no
-  row, said nothing at all — the ring even said «трат нет». **A refused record or amendment is a row
-  whatever page the journal has reached** (round 2, Е; round 3, И), and the month's by the day typed:
-  one still waiting for its first answer waits for the page of its day, but a refused one behind a
-  page never scrolled to was on no screen as a row, the summary took it for a refusal of nothing and
-  offered only «Скрыть», which threw the typing away. A refused amendment of a row not loaded stands
-  on the day typed, over the revision it was made on, until the page brings the server's row. A month
-  read whole has no page left to bring it, so there a refused amendment is no row (round 4, Л): its
-  spending was removed on another device, and «Скрыть» on the card is the way out. **A refused
-  spending of another month leads to «Траты» of that month** («Открыть траты в сентябре», round 4,
-  К), never to «Скрыть»: written on the 1st for the 30th from the summary, which stays on its month,
-  its card offered only the tap that threw it away. A finished trip opened from «Траты» leads
+  «now», read from answers of their own, and the month that failed is not theirs. **A spending the server refused is a row of
+  «Не приняты» on top of «Траты», in every month and whatever its pages** (`refusedRows`): opened,
+  it is what was typed — to fix and save again, or to drop with «Скрыть» in the sheet, beside the
+  reason. **The summary counts them** («Не приняты N трат») **and leads to «Траты»**; «Куда ушли»
+  says no «трат нет» over one typed into the month shown. **A refusal is never laid into the
+  journal**: laid there it stood only where the journal guessed its row was, and five rounds of the
+  adversarial review of MOL-159 found five edges of that guess — a page not loaded, a month not
+  answered, another month, a date moved across the month's edge, a spending removed on another
+  device — each one a refusal left on a card whose one action, «Скрыть», threw the typing away. An
+  amendment of a row the month has loaded goes again over the server's revision, one of a row not
+  loaded over the revision it was made on: a conflict comes back as a refusal again, never as a
+  loss. The price, named: an amendment of a spending removed on another device is a row too —
+  the phone cannot tell «on a page not read» from «gone» — and the sheet says «не найдено» beside
+  «Скрыть». The card under the switcher is left to what is not a spending's typing — a category, a
+  «Вернуть» too late. A finished trip opened from «Траты» leads
   back to «Траты» (`?from=money-spendings`, Р-12).
 - **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`), by the rules
   of the trip's (MOL-24): storage is the queue, one at a time under `navigator.locks`, held by a
