@@ -371,7 +371,11 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       await expect.poll(async () => (await focused(page)).body).toBe(false)
 
       await typeCode(page, '20000011')
-      await expect(page.getByText("Code 20000011 is a shop's own label")).toBeVisible()
+      // The block on the screen, not the live region, which says the same words (`e2e.md`): on a
+      // loaded machine both are there at once.
+      await expect(
+        page.locator('.bind-question').getByText("Code 20000011 is a shop's own label"),
+      ).toBeVisible()
       await expect.poll(async () => (await focused(page)).body).toBe(false)
     })
 
@@ -402,8 +406,11 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       })
 
       await page.keyboard.press('Enter')
+      // The state on the screen, not the live region, which says the same words (`e2e.md`).
       await expect(
-        page.getByText(`Could not link code ${code}. Try again — or record without the code`),
+        page
+          .locator('.state')
+          .getByText(`Could not link code ${code}. Try again — or record without the code`),
       ).toBeVisible()
       await expect.poll(async () => (await focused(page)).text).toBe('Try again')
 
@@ -721,7 +728,9 @@ test('tells how to stop Safari asking, once the camera is given, and reads after
   await context.grantPermissions(['camera'])
   await asSafari(page)
   await open(page, '/_kit')
-  await openScanner(page)
+  // Not `openScanner`: the hint may rise before the scanner's sheet is waited for, and then two
+  // sheets are open.
+  await page.getByRole('button', { name: 'Scan a barcode' }).click()
 
   // After the camera is live, which a loaded machine takes its time to give.
   await expect(cameraHint(page)).toBeVisible({ timeout: 15_000 })
@@ -765,7 +774,9 @@ test('says nothing where Safari will not ask — its setting says «Allow»', as
   await context.grantPermissions(['camera'])
   await asSafari(page, 'granted')
   await open(page, '/_kit')
-  await openScanner(page)
+  // Not `openScanner`: with nothing over it the scanner may read and close before its sheet is
+  // waited for.
+  await page.getByRole('button', { name: 'Scan a barcode' }).click()
 
   await expect(scanned(page, BARCODE)).toBeVisible({ timeout: READ })
   await expect(cameraHint(page)).toBeHidden()
