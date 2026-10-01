@@ -16,7 +16,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 
 - `backend/src/db/erasure-repository.ts` — Repository of erasure: everything about one Telegram id in one transaction, a dry run rolled back; `ACTOR_REFERENCES` names every key to `actors`. Tests: `backend/tests/erasure.integration.test.ts`.
 - `backend/src/db/export-repository.ts` — Repository of «Скачать мои данные» (MOL-93): everything of one owner as one read-only snapshot; `EXPORT_SECTION_OF` ties each erased table to its section, `EXPORT_COLUMNS` names every column as exported or left out and why. Tests: `backend/tests/export.integration.test.ts`.
-- `backend/src/db/failure.ts` — Postgres failures: foreign-key and unique violations turned into domain errors, and `describeFailure`, a failure logged by its kind without its message.
+- `backend/src/db/failure.ts` — Postgres failures: foreign-key and unique violations turned into domain errors, and `describeFailure`, a failure logged by its kind without its message; `describeMigrationFailure` adds the statement that failed, DDL from our files (MOL-153). Tests: `backend/tests/migration-log.integration.test.ts`.
 
 ## backend · other
 
@@ -32,6 +32,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 - `backend/tests/export.integration.test.ts` — Integration test: the export covers every key to `actors` and every column, counts what a dry run of erasure counts, leaks nobody else's row and no secret, keeps the removed marked.
 - `backend/tests/forget-bundle.integration.test.ts` — Integration test: the bundled `dist/forget.js` runs from the bundle alone, and `make forget` erases only with `YES=1` on the command line.
 - `backend/tests/life.ts` — Test support: `aLife`, a person touching every table erasure removes — the one life both the erasure and the export tests read.
+- `backend/tests/migration-log.integration.test.ts` — Integration test: a migration failing through drizzle's own migrator on a cast of a person's text is logged by its kind and statement, without the value Postgres puts into the message.
 - `backend/tests/request-log.integration.test.ts` — Integration test: a request is logged as method and path without the search query; an unknown address is neither logged with its query nor echoed.
 
 ## frontend · views

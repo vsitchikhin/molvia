@@ -1,3 +1,4 @@
+import { DrizzleQueryError } from 'drizzle-orm/errors'
 import { DomainError, ERROR } from '@molvia/model'
 
 /** A row pointed at something that is not there. */
@@ -105,4 +106,24 @@ export function describeFailure(error: unknown): FailureSummary {
     ...(code === undefined ? {} : { code }),
     ...(frames?.length ? { frames } : {}),
   }
+}
+
+/** What a failed migration may say about itself: its kind, and the statement that failed. */
+export interface MigrationFailure extends FailureSummary {
+  readonly statement?: string
+}
+
+/**
+ * A failed migration described for the log of a deploy (MOL-153, adversarial А). Its message is no
+ * safer than a request's: Postgres writes the value a cast refused into it — a person's note, under
+ * `SET DATA TYPE numeric USING "note"::numeric` — and pino appends the cause's message to the
+ * wrapper's. So it goes by its kind too, and beside the kind the statement that failed: drizzle's
+ * migrator wraps each in a `DrizzleQueryError` with no parameters, and the statement is DDL from our
+ * own files — what a broken deploy is fixed by. A query that carries parameters is not one of those,
+ * and is left out.
+ */
+export function describeMigrationFailure(error: unknown): MigrationFailure {
+  const statement =
+    error instanceof DrizzleQueryError && error.params.length === 0 ? error.query : undefined
+  return { ...describeFailure(error), ...(statement === undefined ? {} : { statement }) }
 }
