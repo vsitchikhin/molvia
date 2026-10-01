@@ -1,6 +1,8 @@
+import { DrizzleQueryError } from 'drizzle-orm/errors'
 import { describe, expect, it } from 'vitest'
 import type { AmdRate, CachedRate, RateProvider } from '@molvia/model'
 import type { PastRate } from '@/db/rates-repository'
+import { FeedError } from '@/rates/feed'
 import type { Published, RateFeed } from '@/rates/feed'
 import {
   FALLBACK_AFTER_FAILURES,
@@ -24,16 +26,33 @@ function answer(provider: RateProvider, date = FRIDAY): Published {
   return { provider, date, rates }
 }
 
+/**
+ * A failure the feed did not word: the body of an answer cut off mid-read, as Node 22's `fetch`
+ * throws it — `reach` words only a request with no answer at all (MOL-153).
+ */
+function cutOff(): Error {
+  return new TypeError('terminated', {
+    cause: Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' }),
+  })
+}
+
+/** A write the database refused, as drizzle throws it: the query and its parameters in the message. */
+function refusedWrite(): Error {
+  return new DrizzleQueryError(
+    'insert into "official_rates" ("provider", "currency", "date", "scaled") values ($1, $2, $3, $4)',
+    ['cba', 'RUB', FRIDAY, '4312300'],
+    Object.assign(new Error('write CONNECTION_ENDED 127.0.0.1:5500'), { code: 'CONNECTION_ENDED' }),
+  )
+}
+
 /** A feed that answers or fails as the test switches it, and counts how often it was asked. */
-function feed(provider: RateProvider, up = true, date = FRIDAY) {
+function feed(provider: RateProvider, up = true, date = FRIDAY, failure = cutOff) {
   const state = { up, date, asked: 0 }
   const self: RateFeed = {
     provider,
     fetchLatest() {
       state.asked += 1
-      return state.up
-        ? Promise.resolve(answer(provider, state.date))
-        : Promise.reject(new Error('down', { cause: new Error('ENOTFOUND api.cba.am') }))
+      return state.up ? Promise.resolve(answer(provider, state.date)) : Promise.reject(failure())
     },
   }
   return { feed: self, state }
@@ -48,10 +67,14 @@ interface Options {
   /** What the cache already holds of the central bank, before this run. */
   cached?: CachedRate[]
   writeFails?: boolean
+  /** The read of the earlier rates a jump is judged by fails, before anything is written. */
+  historyFails?: boolean
+  /** How the central bank fails when `cba` is false: by default, an answer cut off mid-read. */
+  cbaFailure?: () => Error
 }
 
 function harness(options: Options = {}) {
-  const cba = feed('cba', options.cba ?? true, options.cbaDate)
+  const cba = feed('cba', options.cba ?? true, options.cbaDate, options.cbaFailure)
   const cbr = feed('cbr', options.cbr ?? true, options.cbrDate)
   const erapi = feed('erapi', options.erapi ?? true, '2026-09-19')
   const written: RateProvider[][] = []
@@ -62,13 +85,14 @@ function harness(options: Options = {}) {
     fallbacks: [cbr.feed, erapi.feed],
     rates: {
       upsert: (rates) => {
-        if (options.writeFails) return Promise.reject(new Error('connection terminated'))
+        if (options.writeFails) return Promise.reject(refusedWrite())
         written.push([...new Set(rates.map((rate) => rate.provider))])
         cache.push(...rates)
         return Promise.resolve()
       },
       latestOnOrBefore: () => Promise.resolve(cache),
       history: (provider, currencies, date) => {
+        if (options.historyFails) return Promise.reject(refusedWrite())
         const byCurrency = new Map<AmdRate['currency'], PastRate[]>()
         for (const currency of currencies) {
           const own = cache
@@ -199,7 +223,7 @@ describe('Р-18: ЦБ РА отвечает, но курс стоит', () => {
 })
 
 describe('лог сбоя', () => {
-  it('несёт саму ошибку с причиной и дату последнего курса ЦБ РА (Д, С-2)', async () => {
+  it('сбой, который источник не назвал, — по виду, с кодом причины и датой последнего курса ЦБ РА (Д, MOL-153)', async () => {
     const cached: CachedRate = {
       provider: 'cba',
       currency: 'RUB',
@@ -212,9 +236,26 @@ describe('лог сбоя', () => {
 
     const [warning] = h.warnings
     expect(warning?.message).toBe('official rate fetch failed')
-    expect(warning?.details).toMatchObject({ provider: 'cba', lastKnown: '2026-09-16' })
-    const err = warning?.details.err as Error
-    expect((err.cause as Error).message).toBe('ENOTFOUND api.cba.am')
+    expect(warning?.details).toMatchObject({
+      provider: 'cba',
+      lastKnown: '2026-09-16',
+      errorName: 'TypeError',
+      code: 'UND_ERR_SOCKET',
+    })
+    expect(warning?.details).not.toHaveProperty('err')
+    expect(JSON.stringify(h.warnings)).not.toContain('other side closed')
+  })
+
+  it('ответ, который источник не прочёл, пишется словами источника', async () => {
+    const h = harness({ cba: false, cbaFailure: () => new FeedError('cba', 'HTTP 503') })
+    await h.run()
+
+    expect(h.warnings).toEqual([
+      {
+        message: 'official rate fetch failed',
+        details: { provider: 'cba', lastKnown: null, reason: 'cba: HTTP 503' },
+      },
+    ])
   })
 
   it('база не приняла ответ — это сбой записи, а не ЦБ РА: запасные не спрошены (Г)', async () => {
@@ -226,6 +267,33 @@ describe('лог сбоя', () => {
       message: 'official rate cache write failed',
       details: { provider: 'cba' },
     })
+  })
+
+  // A `DrizzleQueryError` carries the query and its parameters in its message and in fields of its
+  // own, and pino writes an `err` whole (MOL-153).
+  it.each([
+    ['запись', { writeFails: true }],
+    ['чтение прошлых курсов для метки скачка', { historyFails: true }],
+  ])('сбой базы на шаге «%s» пишется по виду — ни запроса, ни параметров', async (_, options) => {
+    const h = harness(options)
+    await h.run()
+
+    expect(h.written).toEqual([])
+    expect(h.warnings).toEqual([
+      {
+        message: 'official rate cache write failed',
+        details: {
+          provider: 'cba',
+          errorName: 'Error',
+          code: 'CONNECTION_ENDED',
+          frames: expect.any(Array) as unknown,
+        },
+      },
+    ])
+    const logged = JSON.stringify(h.warnings)
+    for (const word of ['official_rates', '4312300', FRIDAY, '127.0.0.1']) {
+      expect(logged).not.toContain(word)
+    }
   })
 })
 

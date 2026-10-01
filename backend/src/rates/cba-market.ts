@@ -1,5 +1,5 @@
 import type { MarketChannel, MarketRate, MarketSide } from '@molvia/model'
-import { FEED_TIMEOUT_MS, FOREIGN, FeedError } from './feed'
+import { FOREIGN, FeedError, reach } from './feed'
 import { readSheet, scaledFromCell } from './xlsx'
 import type { Sheet } from './xlsx'
 
@@ -289,15 +289,12 @@ function marketFile(file: keyof typeof MARKET_SHEETS, base = BASE): MarketFile {
   return {
     name: file,
     async fetch(known) {
-      const head = await fetch(url, {
-        method: 'HEAD',
-        signal: AbortSignal.timeout(FEED_TIMEOUT_MS),
-      })
+      const head = await reach('cba', url, { method: 'HEAD' })
       if (!head.ok) throw refuse(file, `HTTP ${String(head.status)}`)
       const version = versionOf(head.headers)
       if (version !== null && version === known) return 'unchanged'
       if (tooLong(head.headers)) throw refuse(file, 'too large')
-      const response = await fetch(url, { signal: AbortSignal.timeout(FEED_TIMEOUT_MS) })
+      const response = await reach('cba', url)
       if (!response.ok) throw refuse(file, `HTTP ${String(response.status)}`)
       const bytes = await bodyOf(response, file)
       return {

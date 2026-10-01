@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cbaFeed, parseCba } from './cba'
 import { parseCbr } from './cbr'
 import { parseErapi } from './erapi'
-import { FEED_TIMEOUT_MS, FOREIGN, request } from './feed'
+import { FEED_TIMEOUT_MS, FOREIGN, FeedError, request } from './feed'
 
 // Answers recorded from the providers on 19.09.2026 (a Saturday), byte for byte.
 function fixture(name: string): string {
@@ -118,6 +118,11 @@ describe('ExchangeRate-API', () => {
     for (const variant of variants) expect(() => parseErapi(JSON.stringify(variant))).toThrow()
   })
 
+  it('страница вместо JSON — сбой его словами, как у XML-источников, а не SyntaxError (MOL-153)', () => {
+    const page = '<!doctype html><title>Access denied in your region</title>'
+    expect(() => parseErapi(page)).toThrow(new FeedError('erapi', 'not JSON'))
+  })
+
   it('отвергает курс в экспоненциальной записи, строкой или нулём', () => {
     const body = JSON.parse(erapi) as { rates: Record<string, unknown> }
     for (const bad of [1e-7, '0.231762', 0]) {
@@ -192,9 +197,37 @@ describe('транспорт', () => {
     const pending = request('cba', 'https://example.invalid')
     controller.abort()
 
-    await expect(pending).rejects.toThrow('timed out')
+    await expect(pending).rejects.toThrow(new FeedError('cba', 'timed out'))
     expect(timeout).toHaveBeenCalledWith(FEED_TIMEOUT_MS)
     timeout.mockRestore()
+  })
+
+  // How Node 22's `fetch` fails, measured on 01.10.2026: the reason is in `cause`, as a message, a
+  // code, or both (MOL-153).
+  it.each([
+    [
+      'хост не находится',
+      Object.assign(new Error('getaddrinfo ENOTFOUND api.cba.am'), { code: 'ENOTFOUND' }),
+      'getaddrinfo ENOTFOUND api.cba.am',
+    ],
+    [
+      'редирект по кругу — у причины нет кода',
+      new Error('redirect count exceeded'),
+      'redirect count exceeded',
+    ],
+    [
+      'localhost отказал по обоим адресам — у причины нет сообщения',
+      Object.assign(new AggregateError([], ''), { code: 'ECONNREFUSED' }),
+      'ECONNREFUSED',
+    ],
+  ])('запрос без ответа (%s) — сбой источника его причиной', async (_, cause, said) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('fetch failed', { cause }))),
+    )
+    await expect(request('cba', 'https://example.invalid')).rejects.toThrow(
+      new FeedError('cba', said),
+    )
   })
 
   it('шлёт SOAP-конверт операции ExchangeRatesLatest', async () => {

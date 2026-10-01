@@ -1,3 +1,4 @@
+import { DrizzleQueryError } from 'drizzle-orm/errors'
 import { DomainError, ERROR } from '@molvia/model'
 
 /** A row pointed at something that is not there. */
@@ -105,4 +106,35 @@ export function describeFailure(error: unknown): FailureSummary {
     ...(code === undefined ? {} : { code }),
     ...(frames?.length ? { frames } : {}),
   }
+}
+
+/** What a failed migration may say about itself: its kind, and the statement or file that failed. */
+export interface MigrationFailure extends FailureSummary {
+  readonly statement?: string
+  readonly reason?: string
+}
+
+/**
+ * A failed migration described for the log of a deploy (MOL-153, adversarial А). Its message is no
+ * safer than a request's: Postgres writes the value a cast refused into it — a person's note, under
+ * `SET DATA TYPE numeric USING "note"::numeric` — and pino appends the cause's message to the
+ * wrapper's. So it goes by its kind too, and beside the kind the statement that failed: drizzle's
+ * migrator wraps each in a `DrizzleQueryError` with no parameters, and the statement is DDL from our
+ * own files — what a broken deploy is fixed by. A query that carries parameters is not one of those,
+ * and is left out.
+ *
+ * A failure with neither a query nor a code is the migrator itself, reading our folder — a file the
+ * journal names and the folder lacks, a journal left with merge markers — and its words name only
+ * our files: they are kept, or the log says «Error» where it could say which file (round 2, Е).
+ * Everything the database answers carries a code, and stays without words.
+ */
+export function describeMigrationFailure(error: unknown): MigrationFailure {
+  const summary = describeFailure(error)
+  if (error instanceof DrizzleQueryError) {
+    return error.params.length === 0 ? { ...summary, statement: error.query } : summary
+  }
+  if (summary.code === undefined && error instanceof Error && error.message) {
+    return { ...summary, reason: error.message }
+  }
+  return summary
 }
