@@ -59,13 +59,39 @@ export function published(
   return { provider, date, rates }
 }
 
-/** `fetch` with the timeout every feed shares; anything but 200 is the provider being down. */
+/**
+ * Why a request got no answer at all, in the words of Node's `fetch` (MOL-153): they speak of a
+ * public address the server asked, never of a person, so they are the feed's own words. The reason
+ * is in `cause`, and not always as a code — `redirect count exceeded` has only its message, and a
+ * refused connection to `localhost` only its code, under an `AggregateError` with no message.
+ */
+function unanswered(error: unknown): string {
+  const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error
+  if (!(cause instanceof Error)) return 'no answer'
+  const code = 'code' in cause && typeof cause.code === 'string' ? cause.code : ''
+  return cause.message || code || cause.name
+}
+
+/** `fetch` with the timeout every feed shares; a request with no answer is the provider down. */
+export async function reach(
+  provider: RateProvider,
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(FEED_TIMEOUT_MS) })
+  } catch (error) {
+    throw new FeedError(provider, unanswered(error))
+  }
+}
+
+/** `reach`, and anything but 200 is the provider being down too. */
 export async function request(
   provider: RateProvider,
   url: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(FEED_TIMEOUT_MS) })
+  const response = await reach(provider, url, init)
   if (!response.ok) throw new FeedError(provider, `HTTP ${String(response.status)}`)
   return response
 }

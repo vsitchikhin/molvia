@@ -1,6 +1,7 @@
 import process from 'node:process'
 import { env } from './env'
 import { getDb } from '@/db'
+import { describeMigrationFailure } from '@/db/failure'
 import { migrateToLatest } from '@/db/migrate'
 import { createMarketRateRepository } from '@/db/market-rates-repository'
 import { createRateRepository } from '@/db/rates-repository'
@@ -21,7 +22,7 @@ const app = buildServer()
 try {
   await migrateToLatest()
 } catch (error) {
-  app.log.error(error, 'migrations failed')
+  app.log.error(describeMigrationFailure(error), 'migrations failed')
   process.exit(1)
 }
 

@@ -9,6 +9,7 @@ import {
   readDaily,
   readExchangers,
 } from './cba-market'
+import { FeedError } from './feed'
 import { readSheet, sheetOf } from './xlsx'
 import type { CellValue, Sheet } from './xlsx'
 
@@ -317,6 +318,21 @@ describe('asking for a file', () => {
     if (!exchangers) throw new Error('no file')
     return { exchangers, fetch, gets, version }
   }
+
+  it('a HEAD with no answer is the bank down, in the words of its cause (MOL-153)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.reject(
+          new TypeError('fetch failed', { cause: new Error('redirect count exceeded') }),
+        ),
+      ),
+    )
+    const [bybranch] = marketFiles('https://example.test/')
+    await expect(bybranch?.fetch(null)).rejects.toThrow(
+      new FeedError('cba', 'redirect count exceeded'),
+    )
+  })
 
   it(
     'downloads a file once, and after that asks its HEAD: the bank ignores If-None-Match',

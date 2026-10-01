@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import type { MigrationConfig } from 'drizzle-orm/migrator'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import postgres from 'postgres'
@@ -26,11 +27,16 @@ function resolveMigrations(): string {
 
 export const MIGRATIONS = resolveMigrations()
 
-export async function migrateToLatest(): Promise<void> {
+/**
+ * The config is a test's own folder and journal; the app runs the chain as it is. A failure leaves
+ * the client open: both callers exit on it at once. Closing it there is what lost the log (MOL-153,
+ * adversarial З): on a connection the server cut mid-migration, `end()` makes postgres.js 3.4.9
+ * write to a socket already gone from a `setImmediate`, and that throw kills the process before
+ * the caller's `catch` says «migrations failed» and why — measured, as is that
+ * `end({ timeout: 0 })` throws the same.
+ */
+export async function migrateToLatest(config: Partial<MigrationConfig> = {}): Promise<void> {
   const client = postgres(env.DATABASE_URL, { max: 1, onnotice: () => undefined })
-  try {
-    await migrate(drizzle(client), { migrationsFolder: MIGRATIONS })
-  } finally {
-    await client.end()
-  }
+  await migrate(drizzle(client), { migrationsFolder: MIGRATIONS, ...config })
+  await client.end()
 }
