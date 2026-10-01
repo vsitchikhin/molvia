@@ -185,10 +185,8 @@ describe('словарь: повторяющиеся тексты', () => {
       'ЦБ РА': ['exchange.card_source_cba', 'trip.rate.source_cba'],
       'ЦБ РФ': ['exchange.card_source_cbr', 'trip.rate.source_cbr'],
       'open.er-api.com': ['exchange.card_source_erapi', 'trip.rate.source_erapi'],
-      // Счета (MOL-123): остаток счёта и остаток месяца — одно слово о разном; экран и пункт
-      // страницы приватности о том же; плавающая «Счёт», заголовок её шторки в правке и строка
-      // выбора счёта в шторках операций, как «Трата».
-      Остаток: ['accounts.balance', 'spending.rest'],
+      // Счета (MOL-123): экран и пункт страницы приватности о том же; плавающая «Счёт», заголовок
+      // её шторки в правке и строка выбора счёта в шторках операций.
       Счета: ['accounts.title', 'privacy.stored.accounts.term'],
       Счёт: ['accounts.picker.row_spending', 'accounts.screen.add', 'accounts.sheet.title_edit'],
     })

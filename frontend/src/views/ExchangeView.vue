@@ -130,7 +130,7 @@
         <MarketRatesCard :rows="overview.marketToday" />
 
         <!-- Incomes alone can make the rate (MOL-66): then there is the card, and no list. -->
-        <section v-if="overview.exchanges.length > 0" class="list">
+        <section v-if="overview.exchanges.length > 0" class="exchanges">
           <h2 class="caption">{{ t('exchange.list_title') }}</h2>
           <!-- A list, so a screen reader says how many and moves item by item (review Т-5). -->
           <ul class="cards">
@@ -431,6 +431,7 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.losses,
 .rate,
 .frozen,
 .strip {
@@ -512,7 +513,9 @@ export default defineComponent({
   color: var(--bad-ink);
 }
 
-.list {
+/* Not `.list`: a scoped class of this screen lands on the root of a child card too, and `AppCard
+   list` took this one's padding for «Обмен» (MOL-159). */
+.exchanges {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -522,7 +525,7 @@ export default defineComponent({
   padding-bottom: calc(var(--space-8) + var(--space-8) + var(--space-6));
 }
 
-.list .caption {
+.exchanges .caption {
   margin: 0;
 }
 

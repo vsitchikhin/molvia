@@ -472,7 +472,7 @@
     "income_uncounted": "и {amounts} не посчитано",
     "income_shifted_in": "с зарплатой {days}",
     "income_shifted_out": "зарплата {days} — в следующем месяце",
-    "rest": "Остаток",
+    "rest": "Остаток на счетах",
     "rest_spendable": "без сбережений ≈ {amount}",
     "rest_uncounted": "не посчитано: {accounts}",
     "rest_operations": "{n} операция не посчитана | {n} операции не посчитаны | {n} операций не посчитано",

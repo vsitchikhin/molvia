@@ -472,7 +472,7 @@
     "income_uncounted": "and {amounts} not counted",
     "income_shifted_in": "with the salary of {days}",
     "income_shifted_out": "the salary of {days} counts next month",
-    "rest": "Left",
+    "rest": "Left on accounts",
     "rest_spendable": "without savings ≈ {amount}",
     "rest_uncounted": "not counted: {accounts}",
     "rest_operations": "{n} operation not counted | {n} operations not counted",
