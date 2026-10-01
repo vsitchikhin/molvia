@@ -7,9 +7,10 @@ import { asBrowser, signedIn } from './session'
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
 /**
- * «Графики» end to end (MOL-74): the months the server counts side by side, reached from «Деньги»
- * by the ring of «Куда ушли» (MOL-156), a bar chosen by a tap, the period in the address
- * without an entry in the history, and the last answer kept for a shelf with no connection.
+ * «Графики» end to end (MOL-74, MOL-158): «Месяц» reached from «Деньги» by the ring of «Куда ушли» —
+ * its ring, the categories against the usual month and the pace — the month and «Месяц · Год» in the
+ * address without an entry in the history, «Год» with the cards of MOL-74 until MOL-160, and the
+ * last answer kept for a shelf with no connection.
  */
 
 function yerevanDay(days = 0): string {
@@ -18,83 +19,148 @@ function yerevanDay(days = 0): string {
   )
 }
 
-/** The middle of last month in Yerevan: a day any month has. */
-function lastMonthDay(): string {
+/** The 15th of the month `back` months before this one in Yerevan: a day any month has. */
+function monthsAgoDay(back: number): string {
   const day = new Date(`${yerevanDay().slice(0, 7)}-15T12:00:00Z`)
-  day.setUTCMonth(day.getUTCMonth() - 1)
+  day.setUTCMonth(day.getUTCMonth() - back)
   return day.toISOString().slice(0, 10)
 }
 
-async function seed(page: Page): Promise<void> {
+type Spend = (amount: string, spentOn: string, preset: string) => Promise<void>
+
+async function seed(page: Page, more?: (spend: Spend) => Promise<void>) {
   await signedIn(page)
   const headers = await asBrowser(page)
   const { categories } = (await (
     await page.request.get('/api/spending-categories', { headers })
   ).json()) as { categories: { id: string; preset: string | null }[] }
-  const cafe = categories.find((category) => category.preset === 'cafe')?.id
-  const rent = categories.find((category) => category.preset === 'rent')?.id
-  const spend = async (amount: string, spentOn: string, categoryId: string | undefined) => {
+  const spend: Spend = async (amount, spentOn, preset) => {
     const response = await page.request.post('/api/spendings', {
       headers,
-      data: { id: randomUUID(), spentOn, amount: { amount, currency: 'AMD' }, categoryId },
+      data: {
+        id: randomUUID(),
+        spentOn,
+        amount: { amount, currency: 'AMD' },
+        categoryId: categories.find((category) => category.preset === preset)?.id,
+      },
     })
     expect(response.status(), await response.text()).toBe(201)
   }
-  await spend('40000', lastMonthDay(), cafe)
-  await spend('180000', lastMonthDay(), rent)
-  await spend('30000', yerevanDay(), cafe)
+  await spend('40000', monthsAgoDay(1), 'cafe')
+  await spend('180000', monthsAgoDay(1), 'rent')
+  await spend('30000', yerevanDay(), 'cafe')
+  await more?.(spend)
 }
 
-test('the ring of «Куда ушли» opens the charts, a bar is chosen by a tap, «назад» is «Деньги»', async ({
+async function toCharts(page: Page): Promise<void> {
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: /Открыть графики/ }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Графики')
+}
+
+test('the ring of «Куда ушли» opens «Месяц» of the same month; a sector is chosen and let go', async ({
   page,
 }) => {
   await seed(page)
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   // The ring names this month's one category, and the card is one link (MOL-156).
-  const ring = page.getByRole('link', {
-    name: /^Куда ушли: Кафе и рестораны 100\s%\. Открыть графики$/,
-  })
-  await expect(ring.locator('.ring path')).toHaveCount(1)
-  await ring.click()
+  await page
+    .getByRole('link', { name: /^Куда ушли: Кафе и рестораны 100\s%\. Открыть графики$/ })
+    .click()
+  await expect(page).toHaveURL(new RegExp(`month=${yerevanDay().slice(0, 7)}`))
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Графики')
-  // Opened from the ring, the charts show the category the ring named first, not the period's
-  // largest, rent (review 3 of MOL-156, owner's choice «а»).
-  await expect(
-    page.getByRole('combobox', { name: 'Категория' }).locator('option:checked'),
-  ).toHaveText('Кафе и рестораны')
-
-  // The running month is read first; a tap on the bar before it reads that one.
-  const spent = page.locator('fieldset.chart').first()
-  await expect(spent).toContainText(/30\s000\s֏/)
-  const bars = spent.locator('label.bar')
-  const count = await bars.count()
-  expect(count).toBe(6)
-  await bars.nth(count - 2).click()
-  await expect(spent).toContainText(/220\s000\s֏/)
+  const where = page.getByRole('region', { name: 'Куда ушло' })
+  const centre = where.locator('.center')
+  await expect(centre).toContainText('идёт')
+  await expect(centre).toContainText(/30\s000\s֏/)
+  // The row is tapped, as a thumb does; its radio is what a screen reader reads.
+  const row = where.locator('.legend .row', { hasText: 'Кафе и рестораны' })
+  await row.click()
+  await expect(where.getByRole('radio', { name: /Кафе и рестораны/ })).toBeChecked()
+  await expect(centre).toContainText('Кафе и рестораны')
+  await expect(centre).toContainText('100')
+  await row.click()
+  await expect(centre).toContainText('идёт')
 
   await page.getByRole('button', { name: 'Назад Деньги' }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
 })
 
-test('the period moves by replace: «назад» from twelve months is «Деньги», not six', async ({
-  page,
-}) => {
+test('the month and the tab move by replace: «назад» from them is «Деньги»', async ({ page }) => {
   await seed(page)
-  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
-  await page.getByRole('link', { name: /Открыть графики/ }).click()
-  await expect(page.locator('fieldset.chart').first().locator('label.bar')).toHaveCount(6)
+  await toCharts(page)
+  const centre = page.getByRole('region', { name: 'Куда ушло' }).locator('.center')
+  await expect(centre).toContainText(/30\s000\s֏/)
 
-  await page.getByText('12 месяцев', { exact: true }).click()
-  await expect(page).toHaveURL(/period=12/)
-  await expect(page.locator('fieldset.chart').first().locator('label.bar')).toHaveCount(12)
+  await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
+  await expect(page).toHaveURL(new RegExp(`month=${monthsAgoDay(1).slice(0, 7)}`))
+  await expect(centre).toContainText(/220\s000\s֏/)
+
+  await page.getByText('Год', { exact: true }).click()
+  await expect(page).toHaveURL(/mode=year/)
+  // «Год» until MOL-160: twelve months of MOL-74 (owner's decision В-1); a bar is chosen by a tap.
+  const spent = page.locator('fieldset.chart').first()
+  const bars = spent.locator('label.bar')
+  await expect(bars).toHaveCount(12)
+  await bars.nth(10).click()
+  await expect(spent).toContainText(/220\s000\s֏/)
 
   await page.goBack()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
 })
 
-// The category card is the third: a choice that took the page to the top took the chart away from
-// the person who asked for it (MOL-136). Where the card stands on the screen is what the eye sees.
+test('a bookmark of the old period opens «Год»', async ({ page }) => {
+  await seed(page)
+  await page.goto('/money/charts?period=6')
+  await expect(page).toHaveURL(/mode=year/)
+  await expect(page).not.toHaveURL(/period=/)
+  await expect(page.locator('fieldset.chart').first().locator('label.bar')).toHaveCount(12)
+})
+
+test('against the usual comes with three closed months, and says when before (handoff 3g)', async ({
+  page,
+}) => {
+  await seed(page, async (spend) => {
+    await spend('20000', monthsAgoDay(2), 'cafe')
+  })
+  await toCharts(page)
+  // Two closed months with data: the card stays and names the month after which it comes.
+  const usual = page.getByRole('region', { name: 'Против обычного' })
+  await expect(usual).toContainText('Сравнение появится после')
+  await expect(usual).toContainText('Сейчас закрыты')
+  const pace = page.getByRole('region', { name: 'Темп месяца' })
+  await expect(pace).toContainText('Обычный месяц появится после')
+
+  await page.goto('/money')
+  const headers = await asBrowser(page)
+  const { categories } = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string; preset: string | null }[] }
+  const response = await page.request.post('/api/spendings', {
+    headers,
+    data: {
+      id: randomUUID(),
+      spentOn: monthsAgoDay(3),
+      amount: { amount: '10000', currency: 'AMD' },
+      categoryId: categories.find((category) => category.preset === 'cafe')?.id,
+    },
+  })
+  expect(response.status()).toBe(201)
+  await page.getByRole('link', { name: /Открыть графики/ }).click()
+
+  // Against the usual to this day of the month — whatever day it is, the café of this month is in it.
+  await expect(usual.getByRole('listitem')).not.toHaveCount(0)
+  await expect(usual).toContainText('Кафе и рестораны')
+  await expect(usual).toContainText('обычно')
+  await expect(pace).toContainText('Обычный')
+
+  // A tap on the pace chooses the day under it: the first of the month at its left edge.
+  await pace.locator('.area').click({ position: { x: 1, y: 60 } })
+  await expect(pace.locator('.reading')).toContainText(/^К 1 /)
+})
+
+// The category card of «Год» is the third: a choice that took the page to the top took the chart away
+// from the person who asked for it (MOL-136). Where the card stands on the screen is what the eye sees.
 /** Scrolls to the very end of the page, where the category card stands when it is the last one. */
 async function toTheEnd(page: Page): Promise<number> {
   await page.evaluate(() => {
@@ -105,16 +171,11 @@ async function toTheEnd(page: Page): Promise<number> {
   return scrolled
 }
 
-test('a category chosen at the end of the page stays under the thumb, and so does the period', async ({
-  page,
-}) => {
+test('a category chosen at the end of «Год» stays under the thumb', async ({ page }) => {
   await seed(page)
-  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
-  await page.getByRole('link', { name: /Открыть графики/ }).click()
+  await page.goto('/money/charts?mode=year')
   const card = page.getByRole('region', { name: 'Категория во времени' })
   const choice = page.getByRole('combobox', { name: 'Категория' })
-  // The ring opens the charts on this month's café; rent first, for the move under test.
-  await expect(choice.locator('option:checked')).toHaveText('Кафе и рестораны')
   await choice.selectOption({ label: 'Аренда жилья' })
   await expect(choice.locator('option:checked')).toHaveText('Аренда жилья')
 
@@ -127,48 +188,47 @@ test('a category chosen at the end of the page stays under the thumb, and so doe
   await expect(card).toContainText(/30\s000\s֏/)
   expect(await topOf(choice)).toBe(before)
   expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
+})
 
-  // Twelve months are read for the first time on this phone, and the answer is held back: under
-  // the skeleton the page is one window tall, and the period stays where it was.
+test('a month read for the first time keeps the switcher where it was under the skeleton', async ({
+  page,
+}) => {
+  await seed(page)
+  await toCharts(page)
+  await expect(page.getByRole('region', { name: 'Темп месяца' })).toBeVisible()
+
+  // The month before is read for the first time on this phone, and the answer is held back: under
+  // the skeleton the page is one window tall, and the switcher stays where it was (MOL-138).
   let answer: () => void = () => undefined
   const answered = new Promise<void>((resolve) => (answer = resolve))
-  await page.route('**/api/money/charts?period=12', async (route) => {
+  await page.route(`**/api/money/months/${monthsAgoDay(1).slice(0, 7)}/charts`, async (route) => {
     await answered
     await route.continue()
   })
-  const periods = page.getByRole('group', { name: 'Период' })
-  await standAt(periods, 60)
+  const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
+  await standAt(previous, 60)
   const down = await page.evaluate(() => window.scrollY)
   expect(down).toBeGreaterThan(0)
-  const period = await topOf(periods)
+  const at = await topOf(previous)
 
-  await page.getByText('12 месяцев', { exact: true }).click()
-  await expect(page).toHaveURL(/period=12/)
+  await previous.click()
   await expect(page.locator('.skeleton')).toBeVisible()
-  expect(await topOf(periods)).toBe(period)
+  expect(await topOf(previous)).toBe(at)
   expect(await page.evaluate(() => window.scrollY)).toBe(down)
 
   answer()
-  const bars = page.locator('fieldset.chart').first().locator('label.bar')
-  await expect(bars).toHaveCount(12)
-  expect(await topOf(periods)).toBe(period)
-
-  // Back to six, the period the phone keeps.
-  await page.getByText('6 месяцев', { exact: true }).click()
-  await expect(page).not.toHaveURL(/period=/)
-  await expect(bars).toHaveCount(6)
-  expect(await topOf(periods)).toBe(period)
-  expect(await page.evaluate(() => window.scrollY)).toBe(down)
+  await expect(page.getByRole('region', { name: 'Куда ушло' })).toContainText(/220\s000\s֏/)
+  expect(await topOf(previous)).toBe(at)
 })
 
-test('a line gone under the category keeps the choice and the page where they were', async ({
+test('a line gone under the category of «Год» keeps the choice and the page where they were', async ({
   page,
 }) => {
   await seed(page)
   // An address that names a category the charts do not have: said on the card, under the choice
   // (MOL-74, MOL-138 В-2). Chosen another, the line goes and the card is shorter at the very end of
   // the page: held, not brought up.
-  await page.goto(`/money/charts?category=${randomUUID()}`)
+  await page.goto(`/money/charts?mode=year&category=${randomUUID()}`)
   const card = page.getByRole('region', { name: 'Категория во времени' })
   const choice = page.getByRole('combobox', { name: 'Категория' })
   await expect(card).toContainText('Этой категории на графиках нет')
@@ -182,55 +242,38 @@ test('a line gone under the category keeps the choice and the page where they we
   expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
 })
 
-// The strip belongs to the charts of the period and stands under the period: neither its going with
-// a period not read nor its coming back over one the phone keeps moves the period (MOL-138, В-2;
-// adversarial Б2, round 2 Д1).
-test('offline, the period stays where it was, whether the phone keeps the period or not', async ({
+// The strip belongs to the month and stands under the switcher: neither its going with a month not
+// read nor its coming back over one the phone keeps moves the switcher (MOL-138, В-2; adversarial
+// Б2, round 2 Д1 of MOL-74).
+test('offline, the month is the last one read under a strip that is not red, and the switcher stays', async ({
   page,
   context,
 }) => {
   await seed(page)
-  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
-  await page.getByRole('link', { name: /Открыть графики/ }).click()
-  const bars = page.locator('fieldset.chart').first().locator('label.bar')
-  await expect(bars).toHaveCount(6)
+  await toCharts(page)
+  const centre = page.getByRole('region', { name: 'Куда ушло' }).locator('.center')
+  await expect(centre).toContainText(/30\s000\s֏/)
   await page.goBack()
+
   await context.setOffline(true)
   await page.getByRole('link', { name: /Открыть графики/ }).click()
   const strip = page.getByText(/Нет связи. Графики на/)
   await expect(strip).toBeVisible()
-
-  const periods = page.getByRole('group', { name: 'Период' })
-  await standAt(periods, 60)
-  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
-  await page.getByText('12 месяцев', { exact: true }).click()
-  await expect(page).toHaveURL(/period=12/)
-  await expect(strip).toBeHidden()
-  expect(await topOf(periods)).toBe(60)
-
-  // Back to six, kept on the phone: the strip goes with the move, back with the failed read.
-  await page.getByText('6 месяцев', { exact: true }).click()
-  await expect(page).not.toHaveURL(/period=/)
-  await expect(bars).toHaveCount(6)
-  await expect(strip).toBeVisible()
-  expect(await topOf(periods)).toBe(60)
-})
-
-test('with no connection the charts are the last ones read, under a strip that is not red', async ({
-  page,
-  context,
-}) => {
-  await seed(page)
-  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
-  await page.getByRole('link', { name: /Открыть графики/ }).click()
-  await expect(page.locator('fieldset.chart').first()).toContainText(/30\s000\s֏/)
-  await page.goBack()
-
-  await context.setOffline(true)
-  await page.getByRole('link', { name: /Открыть графики/ }).click()
-  const strip = page.locator('.strip')
-  await expect(strip).toContainText('Нет связи. Графики на')
-  await expect(page.locator('fieldset.chart').first()).toContainText(/30\s000\s֏/)
+  await expect(centre).toContainText(/30\s000\s֏/)
   await expect(page.getByRole('button', { name: 'Повторить' })).toHaveCount(0)
+
+  const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
+  await standAt(previous, 60)
+  const at = await topOf(previous)
+  await previous.click()
+  await expect(strip).toBeHidden()
+  // Said out loud too: taken by its heading, outside the live region (MOL-64).
+  await expect(page.getByRole('heading', { name: 'Нет связи' })).toBeVisible()
+  expect(await topOf(previous)).toBe(at)
+
+  // Back to this month, kept on the phone: the strip goes with the move, back with the failed read.
+  await page.getByRole('button', { name: 'Следующий месяц' }).click()
+  await expect(strip).toBeVisible()
+  expect(await topOf(previous)).toBe(at)
   await context.setOffline(false)
 })
