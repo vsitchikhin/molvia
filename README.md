@@ -30,18 +30,18 @@ Then the PWA is on the port `make ports` prints — 5300 for the first working c
 `make` on its own lists everything. The Makefile is the entry point; `bin/` only holds
 what it does not cover.
 
-|                 |                                                     |
-| --------------- | --------------------------------------------------- |
-| `make check`    | format, lint, types, tests — the definition of done |
-| `make e2e`      | end-to-end tests in a phone-sized browser           |
-| `make psql`     | psql inside this copy's database                    |
-| `make db-reset` | drop this copy's volume and start clean             |
-| `make icons`    | regenerate the app icons from `favicon.svg`         |
-| `make ports`    | this copy's index and ports                         |
+|                 |                                                        |
+| --------------- | ------------------------------------------------------ |
+| `make check`    | format, lint, types, tests — what CI checks, on demand |
+| `make e2e`      | end-to-end tests in a phone-sized browser              |
+| `make psql`     | psql inside this copy's database                       |
+| `make db-reset` | drop this copy's volume and start clean                |
+| `make icons`    | regenerate the app icons from `favicon.svg`            |
+| `make ports`    | this copy's index and ports                            |
 
-Checks also run on their own: `pre-commit` refuses dirty formatting or lint, `pre-push`
-refuses failing types or vitest, and CI repeats all of it and adds end-to-end on every push and
-pull request; `master` takes a pull request only when CI is green.
+Checks run in CI, on every push and pull request: formatting, lint, types, every test and
+end-to-end; `master` takes a pull request only when CI is green. Locally `pre-commit` only checks
+the formatting of the files committed.
 
 ## Layout
 

@@ -9,7 +9,6 @@ paths:
   - '.editorconfig'
   - 'bin/check-code-map.mjs'
   - 'bin/one-at-a-time.sh'
-  - 'bin/green.sh'
   - '.githooks/**'
   - 'Makefile'
   - 'docs/map/**'
@@ -90,43 +89,32 @@ behaviour passes, and that is left to review.
 
 ## The heavy checks take turns
 
-**One lock for the whole machine, taken by `pre-push` and by `make format`, `lint`, `typecheck`,
-`test`, `e2e` and `check` (MOL-139).** Since MOL-164 the push no longer runs end-to-end — CI does,
-and gates the merge (`.claude/rules/e2e.md`) — so the line is mostly `make check`. The copies exist so that several sessions work at once, and
-each push ran every check: four at once were four typechecks, four vitest runs and four Playwright
-runs with their browsers on eight cores and 16 GB. Measured on 29.09.2026: a load average of
-95–223, the swap full, a push of 10–20 minutes against about five alone the day before, and
-`search.integration.test.ts` running seventy minutes. Worse than slow: a test timed out under that
-load failed the push — locally there are no retries — and the push was started again into the same
-crowd. In turn, the last of four waits for three runs of a few minutes, and none of them fails for
-want of a core.
+**Every check is CI's** (MOL-165, owner's decision 01.10.2026). After MOL-164 the push ran types and
+vitest and the commit a type-aware lint of the whole repository — the lint past the queue, at every
+commit of every copy — and pushes still failed on a timeout: the machine was too loaded to finish
+them. With the ruleset of MOL-164, `master` takes a pull request only when CI is green, so a check
+here guarded nothing CI does not; it only made the machine slower for the copies that were writing
+code. **What stays is `pre-commit` on the files committed, Prettier alone** — seconds, and CI checks
+formatting rather than fixing it, so without it a push would come back red for a space. **The
+price, named:** an error of types or lint is met in CI some six minutes after the push rather than
+before it, and a task may push more than once; each push cancels the run before it, and the minutes
+are free on a public repository. `pre-push` went, and with it `bin/green.sh`, whose marks only it
+read.
+
+**One lock for the whole machine, taken by `make format`, `lint`, `typecheck`, `test`, `e2e` and
+`check` (MOL-139)** — what is still run here, by hand. The copies exist so that several sessions
+work at once, and each push once ran every check: four at once were four typechecks, four vitest
+runs and four Playwright runs with their browsers on eight cores and 16 GB. Measured on 29.09.2026:
+a load average of 95–223, the swap full, a push of 10–20 minutes against about five alone the day
+before, and `search.integration.test.ts` running seventy minutes. Worse than slow: a test timed out
+under that load failed, and was started again into the same crowd. In turn, the last of four waits
+for three runs of a few minutes, and none of them fails for want of a core.
 
 **The lock is `flock` held by the process that runs the command**, so the kernel drops it however
 that process ends: a lock file with a pid in it was the alternative, and breaking a stale one is a
 race between two waiters. The descriptor is closed on exec, so a server a run leaves behind does
 not hold the lock. `make check` takes one turn for all four steps — one per step would let another
 copy slip in between — and a run already inside the lock does not take it again.
-
-**A step green on this tree is not run again** (`bin/green.sh`): `make check` records typecheck and
-test, the push records each step it passes, and a push skips what is recorded for `HEAD^{tree}`.
-The Definition of Done runs `make check` just before the push, and the push used to repeat both
-steps on the same tree; a push the remote rejected repeated everything. A mark is written and
-trusted only when `git status` is empty, untracked files included — vitest would run a test git
-does not know. What is outside the tree — `.env`, `node_modules`, the database — is not in the
-mark; the price is accepted for a mark that lives minutes between a check and its push. The marks
-are per worktree (`git rev-parse --git-path`), since each copy has its own environment.
-
-**A push with nothing to run takes no turn** (MOL-164): when both steps are green on the tree it
-says so and leaves before the lock. The first push of this very task, right after a green `make
-check`, waited seven minutes behind another copy's end-to-end only to skip both.
-
-**A tree that differs from the green one only in documents is green too** (MOL-164): `*.md`,
-`docs/`, `.claude/`. No check that leaves a mark reads them — types, vitest — and a task's last
-commit is often its rules, after `make check` passed on the code; that commit used to run every step
-again. The comparison takes both names of a rename, so code moved into `docs/` is code taken away;
-the code map in `docs/map/` is lint's, which runs at commit and is never skipped. The list is
-written in `bin/green.sh` and is the place to widen it, with a reason: a file a test reads is not a
-document.
 
 **The integration files run in parallel, each worker in a database of its own** (MOL-164). They ran
 in turn because they shared `molvia_<index>_test` and each cleans its rows in `beforeEach`: in
