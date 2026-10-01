@@ -876,20 +876,23 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .accounts {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
 }
 
 .form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  /* A column, not a grid: a block of it grows and goes by `AppReveal`, which takes a flex
+     column's gap back with the block — a grid's stays and jumped (MOL-151, adversarial Б2). */
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
   padding: var(--space-4);
 }
 
 .field {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
 }
 

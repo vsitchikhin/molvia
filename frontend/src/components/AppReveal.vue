@@ -110,6 +110,11 @@ function play(element: HTMLElement, leaving: boolean, done: () => void): void {
   element.style.overflow = 'hidden'
   // What is going takes no tap and no focus: it is no longer there for the person (review №4).
   if (leaving) element.inert = true
+  // What grows does not also fade in by `appear` — a day of «Деньги» is both a row of the list and a
+  // child of the screen's block: one motion, not two (adversarial round 2).
+  else
+    for (const animation of element.getAnimations())
+      if ('animationName' in animation && animation.animationName === 'appear') animation.cancel()
   const animation = element.animate(leaving ? [whole, none] : [none, whole], {
     duration: Number.parseFloat(root.getPropertyValue('--dur')) || 0,
     easing: root.getPropertyValue('--ease').trim() || 'ease',

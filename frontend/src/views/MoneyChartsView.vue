@@ -87,11 +87,4 @@ export default defineComponent({
   gap: var(--space-3);
   padding: var(--space-4);
 }
-
-/* The answer comes in where the skeleton stood, faded only: the month and the year draw it inside
-   components of their own, which `AppScreen` does not see, and nothing under the thumb may move
-   (review №5, MOL-138). */
-.content > :deep(*) {
-  @include appear(0);
-}
 </style>

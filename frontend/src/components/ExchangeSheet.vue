@@ -562,7 +562,10 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .form {
-  display: grid;
+  /* A column, not a grid: a block of it grows and goes by `AppReveal`, which takes a flex
+     column's gap back with the block — a grid's stays and jumped (MOL-151, adversarial Б2). */
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
 }
 

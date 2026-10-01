@@ -87,7 +87,8 @@ export default defineComponent({
 }
 
 .card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-3);
 }
 

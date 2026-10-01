@@ -100,6 +100,20 @@ describe('AppReveal', () => {
     expect(items()).toEqual(['a', 'c'])
   })
 
+  // A day of «Деньги» is a row of the list and a child of the screen's block: grown, it does not also
+  // fade in (adversarial round 2).
+  it('cuts short the fade-in of a row it grows', async () => {
+    fakeAnimate()
+    const cancel = vi.fn()
+    vi.spyOn(Element.prototype, 'getAnimations').mockReturnValue([
+      { animationName: 'appear', cancel } as unknown as Animation,
+    ])
+    const { rows } = list(['a'])
+    rows.value = ['new', 'a']
+    await settled()
+    expect(cancel).toHaveBeenCalledOnce()
+  })
+
   // Going, it is no longer there: a second tap meant for the row sliding up under it pressed the
   // one going (review №4).
   it('takes no tap and no focus from a row going', async () => {
