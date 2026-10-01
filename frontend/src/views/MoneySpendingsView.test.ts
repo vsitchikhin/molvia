@@ -20,6 +20,7 @@ const amendSpending = vi.fn<(id: string, body: unknown) => Promise<unknown>>()
 const removeSpending = vi.fn<(id: string) => Promise<void>>()
 const restoreSpending = vi.fn<(id: string) => Promise<unknown>>()
 const trip = vi.fn<(id: string) => Promise<TripView>>()
+const spending = vi.fn<(id: string) => Promise<{ revision: number }>>()
 const moneyAccounts = vi.fn(() =>
   Promise.resolve({
     spendCurrency: 'AMD' as const,
@@ -37,6 +38,7 @@ vi.mock('@/api', () => ({
     removeSpending: (id: string) => removeSpending(id),
     restoreSpending: (id: string) => restoreSpending(id),
     trip: (id: string) => trip(id),
+    spending: (id: string) => spending(id),
     moneyAccounts: () => moneyAccounts(),
     spendingCategories: () => Promise.resolve({ categories: [] }),
   },
@@ -164,6 +166,7 @@ beforeEach(() => {
     removeSpending,
     restoreSpending,
     trip,
+    spending,
   ])
     mock.mockReset()
   recordSpending.mockResolvedValue(undefined)
@@ -298,6 +301,8 @@ describe('MoneySpendingsView: rows and the sheet', () => {
 
   it('a refused amendment opens on what was typed, names why, and goes again over the server’s version', async () => {
     moneyMonth.mockResolvedValue(month())
+    // The server's revision now — another device's amendment moved it past the one refused over.
+    spending.mockResolvedValue({ revision: 3 })
     localStorage.setItem('molvia.actor', ACTOR)
     localStorage.setItem(
       `molvia.spending-rejected.${ACTOR}`,
@@ -330,7 +335,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
       expect(amendSpending).toHaveBeenCalled()
     })
     expect(amendSpending.mock.calls[0]?.[0]).toBe(BARBER)
-    expect(amendSpending.mock.calls[0]?.[1]).toMatchObject({ revision: 1, amount: amd('6000') })
+    expect(amendSpending.mock.calls[0]?.[1]).toMatchObject({ revision: 3, amount: amd('6000') })
     expect(useSpendingQueueStore().rejected).toEqual([])
   })
 
@@ -604,6 +609,75 @@ describe('MoneySpendingsView: what round 2 of the review of MOL-159 found', () =
       expect(queue.rejected).toEqual([])
     })
     expect(amendSpending).toHaveBeenCalledTimes(1)
+  })
+
+  // «Сохраните ещё раз поверх» (round 6, О): wherever the refusal stands, and whatever revision the
+  // phone holds, the save goes over the one the server has — asked as the write leaves.
+  it('О: a conflict saved again from «Не приняты» goes over the server’s revision, not the one refused', async () => {
+    moneyMonth.mockResolvedValue(month())
+    spending.mockResolvedValue({ revision: 2 })
+    const SHAVE = 'eeeeeeee-0000-4000-8000-0000000000cc'
+    localStorage.setItem('molvia.actor', ACTOR)
+    localStorage.setItem(
+      `molvia.spending-rejected.${ACTOR}`,
+      JSON.stringify([
+        {
+          key: 'k1',
+          code: 'error.conflict',
+          write: {
+            kind: 'amend',
+            id: SHAVE,
+            body: {
+              revision: 1,
+              spentOn: '2026-08-31',
+              amount: { amount: '6000.00', currency: 'AMD' },
+              categoryId: BEAUTY,
+              note: 'Shave',
+            },
+          },
+        },
+      ]),
+    )
+    const view = await render()
+    await view.find(`[data-row="${SHAVE}"] .body`).trigger('click')
+    await risen()
+    await pressUntil(en.spending.sheet.save, () => {
+      expect(amendSpending).toHaveBeenCalled()
+    })
+    expect(spending).toHaveBeenCalledWith(SHAVE)
+    expect(amendSpending.mock.calls[0]?.[1]).toMatchObject({ revision: 2, amount: amd('6000') })
+    await vi.waitFor(() => {
+      expect(useSpendingQueueStore().rejected).toEqual([])
+    })
+  })
+
+  it('П: a refusal about a row on screen is that row’s alone — marked once, and its amendment takes it away', async () => {
+    moneyMonth.mockResolvedValue(month())
+    amendSpending.mockRejectedValueOnce(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
+    const view = await render()
+    const queue = useSpendingQueueStore()
+    queue.amend(BARBER, 1, {
+      spentOn: '2026-09-26',
+      amount: amd('6000'),
+      categoryId: BEAUTY,
+      note: 'Barber',
+    })
+    await vi.waitFor(() => {
+      expect(queue.rejected).toHaveLength(1)
+    })
+    await flushPromises()
+    const rows = view.findAll(`[data-row="${BARBER}"]`)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.text()).toContain(en.spending.refused)
+    expect(view.findAll('h2').some((head) => head.text() === en.spending.list.refused)).toBe(false)
+    await rows[0]?.find('.body').trigger('click')
+    await risen()
+    await pressUntil(en.spending.sheet.save, () => {
+      expect(amendSpending).toHaveBeenCalledTimes(2)
+    })
+    await vi.waitFor(() => {
+      expect(queue.rejected).toEqual([])
+    })
   })
 
   it('Ж: «Undo» is the queue’s, not the screen’s — it outlives «Траты» for the step back', async () => {

@@ -34,10 +34,10 @@
         <!-- A spending the server refused, of any month, is a row of «Не приняты» on top of «Траты»,
              put right there; the summary has no rows, so it counts them and leads there (MOL-159). -->
         <ScreenState
-          v-if="refused.length > 0"
+          v-if="refusals.length > 0"
           kind="attention"
           inline
-          :title="t('spending.summary.refused', { n: refused.length }, refused.length)"
+          :title="t('spending.summary.refused', { n: refusals.length }, refusals.length)"
           :body="t('spending.summary.refused_body')"
         >
           <template #action>
@@ -305,8 +305,9 @@ export default defineComponent({
     /** Refused spendings typed into the month shown: «Куда ушли» does not say «трат нет» over them. */
     const refusedHere = computed(
       () =>
-        screen.refused.value.filter((row) => row.spending.spentOn.startsWith(screen.selected.value))
-          .length,
+        screen.refusals.value.filter((row) =>
+          row.spending.spentOn.startsWith(screen.selected.value),
+        ).length,
     )
     const number = (value: number) => new Intl.NumberFormat(locale.value).format(value)
     /** One figure a row, and none until it is known (handoff MOL-157 01). */

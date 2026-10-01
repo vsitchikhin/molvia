@@ -15,6 +15,7 @@ const restoreSpending = vi.fn<(id: string) => Promise<unknown>>()
 const addSpendingCategory = vi.fn<(body: SpendingCategoryBody) => Promise<unknown>>()
 const archiveSpendingCategory = vi.fn<(id: string) => Promise<unknown>>()
 const restoreSpendingCategory = vi.fn<(id: string) => Promise<unknown>>()
+const spending = vi.fn<(id: string) => Promise<{ revision: number }>>()
 const calls: string[] = []
 vi.mock('@/api', () => ({
   api: {
@@ -25,6 +26,7 @@ vi.mock('@/api', () => ({
     ),
     removeSpending: (id: string) => (calls.push(`remove ${id}`), removeSpending(id)),
     restoreSpending: (id: string) => (calls.push(`restore ${id}`), restoreSpending(id)),
+    spending: (id: string) => (calls.push(`get ${id}`), spending(id)),
     addSpendingCategory: (body: SpendingCategoryBody) => (
       calls.push(`category-add ${body.id}`),
       addSpendingCategory(body)
@@ -76,7 +78,82 @@ describe('spending queue', () => {
       restoreSpendingCategory,
     ])
       mock.mockReset().mockResolvedValue(undefined)
+    spending.mockReset().mockResolvedValue({ revision: 5 })
     vi.restoreAllMocks()
+  })
+
+  // «Сохраните ещё раз поверх» (adversarial round 6 of MOL-159, О): the revision a conflict was
+  // refused over is the one that conflicts, and the phone may hold no newer one on any page.
+  describe('an amendment sent over what the server holds', () => {
+    it('asks the server its revision as it leaves, and goes over that', async () => {
+      const queue = fresh()
+      queue.amend(BARBER, 1, fields('6000'), true)
+      await queue.flush()
+      expect(calls).toEqual([`get ${BARBER}`, `amend ${BARBER} r5`])
+      expect(queue.rejected).toEqual([])
+    })
+
+    it('keeps «over» on the shelf — another window, or the app opened again, sends it the same', async () => {
+      const first = fresh('idle')
+      first.amend(BARBER, 1, fields('6000'), true)
+      const queue = fresh()
+      await queue.flush()
+      expect(calls).toEqual([`get ${BARBER}`, `amend ${BARBER} r5`])
+    })
+
+    it('an amendment folded into it, or made behind it while it is on the way, asks too', async () => {
+      const folded = fresh('idle')
+      folded.amend(BARBER, 1, fields('6000'), true)
+      folded.amend(BARBER, 1, fields('7000'))
+      useActorStore().state = 'ready'
+      await folded.flush()
+      expect(calls).toEqual([`get ${BARBER}`, `amend ${BARBER} r5`])
+
+      calls.length = 0
+      localStorage.clear()
+      let land: () => void = () => undefined
+      amendSpending.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            land = () => {
+              resolve(undefined)
+            }
+          }),
+      )
+      spending.mockResolvedValueOnce({ revision: 5 }).mockResolvedValueOnce({ revision: 6 })
+      const queue = fresh()
+      queue.amend(BARBER, 1, fields('6000'), true)
+      await settled()
+      queue.amend(BARBER, 1, fields('8000'))
+      land()
+      await queue.flush()
+      await settled()
+      await queue.flush()
+      expect(calls).toEqual([
+        `get ${BARBER}`,
+        `amend ${BARBER} r5`,
+        `get ${BARBER}`,
+        `amend ${BARBER} r6`,
+      ])
+    })
+
+    it('a spending gone from the server is refused as such, and the refusal keeps «over»', async () => {
+      spending.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
+      const queue = fresh()
+      queue.amend(BARBER, 1, fields('6000'), true)
+      await queue.flush()
+      expect(calls).toEqual([`get ${BARBER}`])
+      expect(queue.rejected).toMatchObject([
+        { code: ERROR.NOT_FOUND, write: { kind: 'amend', over: true } },
+      ])
+    })
+
+    it('must not fire: an amendment not marked goes over its own revision, asking nothing', async () => {
+      const queue = fresh()
+      queue.amend(BARBER, 3, fields('6000'))
+      await queue.flush()
+      expect(calls).toEqual([`amend ${BARBER} r3`])
+    })
   })
 
   it('sends nothing until the server has said who we are (MOL-56)', async () => {

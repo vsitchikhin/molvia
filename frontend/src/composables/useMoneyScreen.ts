@@ -37,7 +37,9 @@ export interface MoneyScreen extends MoneyMonth {
   readonly unsent: ComputedRef<number>
   /** Refusals of what is not a spending's typing — a category, «Вернуть» too late: a card each. */
   readonly otherRefusals: ComputedRef<RejectedSpendingWrite[]>
-  /** Every spending the server refused, of any month: «Не приняты» on top of «Траты». */
+  /** Every spending the server refused, of any month — what the summary counts. */
+  readonly refusals: ComputedRef<Extract<JournalRow, { kind: 'manual' }>[]>
+  /** Those of them with no marked row in the journal on screen: «Не приняты» on top of «Траты». */
   readonly refused: ComputedRef<Extract<JournalRow, { kind: 'manual' }>[]>
   reasonOf(code: WireCode): string
   /** «сентябре», «September»: a month after «в», as the words of the screens say it. */
@@ -135,13 +137,24 @@ export function useMoneyScreen(): MoneyScreen {
   )
 
   const journal = computed(() =>
-    money.month.value ? journalOf(money.month.value, queue.pending, tripQueue.removing) : [],
+    money.month.value
+      ? journalOf(money.month.value, queue.pending, tripQueue.removing, queue.rejected)
+      : [],
   )
   /** «Ещё не учтено»: the spendings of this month still on the phone — a row each, never a sum. */
   const unsent = computed(() =>
     money.month.value ? unsentIn(money.month.value, queue.pending) : 0,
   )
-  const refused = computed(() => refusedRows(money.month.value, queue.rejected, queue.pending))
+  const refusals = computed(() => refusedRows(money.month.value, queue.rejected, queue.pending))
+  /** Once on screen: a refusal whose row the journal shows marked is put right there (round 6, П). */
+  const refused = computed(() => {
+    const marked = new Set(
+      journal.value.flatMap((day) =>
+        day.rows.flatMap((row) => (row.kind === 'manual' && row.refusal ? [row.key] : [])),
+      ),
+    )
+    return refusals.value.filter((row) => !marked.has(row.key))
+  })
   const otherRefusals = computed(() =>
     queue.rejected.filter((item) => item.write.kind !== 'record' && item.write.kind !== 'amend'),
   )
@@ -241,6 +254,7 @@ export function useMoneyScreen(): MoneyScreen {
     journal,
     unsent,
     otherRefusals,
+    refusals,
     refused,
     reasonOf,
     monthIn,

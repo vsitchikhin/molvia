@@ -34,6 +34,7 @@ import type {
   SpendingView,
 } from '@molvia/model'
 import type { RejectedSpendingWrite, SpendingUndo, SpendingWrite } from '@/stores/spendingQueue'
+import { spendingOf } from '@/stores/spendingQueue'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
 
 /**
@@ -236,18 +237,26 @@ function localView(
 /**
  * The month's journal with the queue laid over it (MOL-82, requirements 12–15): a spending still
  * on the phone stands at the top of its day marked «Отправляем…», an amendment not yet sent marks
- * the server's row — whose figures stay the server's until it answers — and a removal hides the row.
- * A spending of a day the loaded pages have not reached yet waits for them: shown there, it would
- * stand among the wrong neighbours. A refusal is not the journal's: `refusedRows` (MOL-159).
+ * the server's row — whose figures stay the server's until it answers — a removal hides the row,
+ * and a refusal about a row on screen marks it «Не принята»: that row is where it is put right, and
+ * any amendment of it takes the refusal away. A spending of a day the loaded pages have not reached
+ * yet waits for them: shown there, it would stand among the wrong neighbours. A refusal with no row
+ * on screen is `refusedRows`'s (MOL-159).
  */
 export function journalOf(
   month: MoneyMonthView,
   pending: readonly SpendingWrite[],
   /** Trips whose removal is still on its way (MOL-76): their lines go, the figures stay the server's. */
   removedTrips: ReadonlySet<string> = new Set(),
+  rejected: readonly RejectedSpendingWrite[] = [],
 ): JournalDay[] {
   const removing = beingRemoved(pending)
   const editing = new Set(pending.flatMap((write) => (write.kind === 'amend' ? [write.id] : [])))
+  const refusals = new Map<string, RejectedSpendingWrite>()
+  for (const item of rejected) {
+    const id = spendingOf(item.write)
+    if (id) refusals.set(id, item)
+  }
 
   const days: JournalDay[] = month.days.map((day) => ({
     day: day.day,
@@ -270,14 +279,15 @@ export function journalOf(
             ]
       const { id } = entry.spending
       if (removing.has(id)) return []
+      const refusal = refusals.get(id) ?? null
       return [
         {
           kind: 'manual',
           key: id,
           spending: entry.spending,
           counted: entry.counted,
-          mark: editing.has(id) ? 'editing' : null,
-          refusal: null,
+          mark: refusal ? 'refused' : editing.has(id) ? 'editing' : null,
+          refusal,
           local: false,
         },
       ]
@@ -315,7 +325,8 @@ export function journalOf(
 
 /**
  * Every spending the server refused, as rows of its own — «Не приняты» on top of «Траты», whatever
- * the month and its pages (MOL-159). Laid into the journal, a refusal stood only where the journal
+ * the month and its pages (MOL-159); the screen leaves out one whose row the journal shows marked,
+ * so a refusal stands once (adversarial round 6, П). Laid into the journal, a refusal stood only where the journal
  * guessed its row was: a page not loaded, a month not answered, another month, a date moved across
  * the month's edge, a spending removed elsewhere — each guess was a refusal left on a card whose one
  * action threw the typing away (adversarial rounds 1–5). Here nothing is guessed: each opens on
