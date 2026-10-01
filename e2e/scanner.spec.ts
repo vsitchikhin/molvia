@@ -473,7 +473,11 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       await expect.poll(async () => (await focused(page)).body).toBe(false)
 
       await typeCode(page, '20000011')
-      await expect(page.getByText("Code 20000011 is a shop's own label")).toBeVisible()
+      // By the block, not the page: the words are said out loud too, and the live region holds them
+      // a second time (e2e.md, MOL-64).
+      await expect(
+        page.locator('.not-found').getByText("Code 20000011 is a shop's own label"),
+      ).toBeVisible()
       await expect.poll(async () => (await focused(page)).body).toBe(false)
     })
 
@@ -505,7 +509,9 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
 
       await page.keyboard.press('Enter')
       await expect(
-        page.getByText(`Could not link code ${code}. Try again — or record without the code`),
+        page
+          .locator('.state')
+          .getByText(`Could not link code ${code}. Try again — or record without the code`),
       ).toBeVisible()
       await expect.poll(async () => (await focused(page)).text).toBe('Try again')
 
