@@ -711,4 +711,10 @@ export default defineComponent({
   margin-top: var(--space-2);
   text-align: right;
 }
+
+/* The answer comes in where the skeleton stood, faded only: the screen keeps it in one block of its
+   own, which `AppScreen` does not see, and nothing under the thumb may move (review №5, MOL-138). */
+.content > * {
+  @include appear(0);
+}
 </style>

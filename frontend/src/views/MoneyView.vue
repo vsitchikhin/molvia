@@ -168,7 +168,9 @@
 
           <h2 class="group-caption">{{ t('spending.days_title') }}</h2>
           <p v-if="journal.length === 0" class="footnote">{{ t('spending.month_empty') }}</p>
-          <AppReveal group>
+          <!-- Another month is another answer, not days come and gone: it is just there (MOL-136,
+               adversarial А1). -->
+          <AppReveal :key="month.month" group>
             <section v-for="day in journal" :key="day.day" class="day">
               <h3 class="day-head">
                 <span>{{ dayTitle(day.day) }}</span>
@@ -396,8 +398,21 @@ export default defineComponent({
     )
     /** Whether a spending can be written here at all: a category is required, and known. */
     const canWrite = computed(() => categories.value.some((category) => !category.archived))
+    // A removal landed after the month on screen was read: its row is gone, not back for a moment
+    // until the month is read again (adversarial А3) — unless «Вернуть» is on its way.
+    const gone = computed(() => {
+      const read = fetchedAt.value?.getTime() ?? 0
+      const back = new Set(
+        queue.pending.flatMap((write) => (write.kind === 'restore' ? [write.id] : [])),
+      )
+      return new Set(
+        queue.gone.flatMap((item) => (item.at > read && !back.has(item.id) ? [item.id] : [])),
+      )
+    })
     const journal = computed(() =>
-      month.value ? journalOf(month.value, queue.pending, queue.rejected, tripQueue.removing) : [],
+      month.value
+        ? journalOf(month.value, queue.pending, queue.rejected, tripQueue.removing, gone.value)
+        : [],
     )
     const unsent = computed(() => (month.value ? unsentIn(month.value, queue.pending) : 0))
     const spendCurrency = computed(
@@ -978,5 +993,11 @@ export default defineComponent({
 
 .float > .undo {
   flex: 1;
+}
+
+/* The answer comes in where the skeleton stood, faded only: the screen keeps it in one block of its
+   own, which `AppScreen` does not see, and nothing under the thumb may move (review №5, MOL-138). */
+.content > * {
+  @include appear(0);
 }
 </style>

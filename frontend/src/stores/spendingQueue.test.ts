@@ -309,6 +309,29 @@ describe('spending queue', () => {
       expect(recordSpending.mock.calls[0]?.[0].amount.minor).toBe(600_000n)
     })
 
+    // The month on screen was read before the removal: its row must not come back until it is read
+    // again (MOL-151, adversarial А3), and «Вернуть» landed lets it go.
+    it('notes a removal that landed, and lets it go when «Вернуть» lands', async () => {
+      const queue = fresh()
+      const before = Date.now()
+      const undo = queue.remove(BARBER)
+      await settled()
+      expect(calls).toEqual([`remove ${BARBER}`])
+      expect(queue.gone.map((item) => item.id)).toEqual([BARBER])
+      expect(queue.gone[0]?.at).toBeGreaterThanOrEqual(before)
+      queue.restore(undo)
+      await settled()
+      expect(queue.gone).toEqual([])
+    })
+
+    it('must not fire: a removal refused is not gone', async () => {
+      removeSpending.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'revision'))
+      const queue = fresh()
+      queue.remove(BARBER)
+      await settled()
+      expect(queue.gone).toEqual([])
+    })
+
     it('removing one nobody began to send sends nothing at all (review У-1)', async () => {
       const queue = fresh('idle')
       queue.record({ id: BARBER, ...fields() })

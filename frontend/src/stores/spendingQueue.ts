@@ -234,6 +234,13 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
    * these until the server's names them (`categoriesWith` skips one it holds).
    */
   const arrived = ref<Extract<SpendingWrite, { kind: 'category-add' }>[]>([])
+  /**
+   * The spendings whose removal has landed, and when. Out of the queue on its answer, a removal no
+   * longer hides its row, while the month on screen is still the answer read before it: the row
+   * came back for a moment, and its day shrank, grew and shrank again (MOL-151, adversarial А3).
+   * The screen hides one until a month read after it; a removal taken back by «Вернуть» lets go.
+   */
+  const gone = ref<{ readonly id: string; readonly at: number }[]>([])
   let ahead = false
   /** The key of the write a send is carrying right now: it is never folded into. */
   let inFlight: string | null = null
@@ -283,6 +290,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     kept = []
     rejected.value = []
     arrived.value = []
+    gone.value = []
     sync(id)
     show()
   }
@@ -429,6 +437,11 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
         ]
       }
       if (!refusal && write.kind === 'category-add') arrived.value = [...arrived.value, write]
+      if (!refusal && (write.kind === 'remove' || write.kind === 'restore')) {
+        const others = gone.value.filter((item) => item.id !== write.id)
+        gone.value =
+          write.kind === 'remove' ? [...others, { id: write.id, at: Date.now() }] : others
+      }
       persist(owner)
       landed.value++
     }
@@ -629,6 +642,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     rejected,
     landed,
     arrived,
+    gone,
     flush,
     record,
     amend,

@@ -37,9 +37,7 @@
 
       <template v-else>
         <ul class="lines">
-          <AppReveal group>
-            <AccountLine v-for="account in shown" :key="account.id" :account="account" dense />
-          </AppReveal>
+          <AccountLine v-for="account in shown" :key="account.id" :account="account" dense />
         </ul>
         <RouterLink v-if="hidden > 0" class="more" :to="{ name: 'money-accounts' }">
           <span>{{ t('accounts.more', { n: hidden }, hidden) }}</span>
@@ -110,7 +108,6 @@ import AccountSheet from '@/components/AccountSheet.vue'
 import type { AccountOutcome } from '@/components/AccountSheet.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
-import AppReveal from '@/components/AppReveal.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import UnassignedSheet from '@/components/UnassignedSheet.vue'
 import { countedWhen, pageOrder, signedAmount } from '@/components/accounts'
@@ -135,7 +132,6 @@ export default defineComponent({
     AccountSheet,
     AppButton,
     AppCard,
-    AppReveal,
     IconAlert,
     IconChevron,
     IconCloudOff,

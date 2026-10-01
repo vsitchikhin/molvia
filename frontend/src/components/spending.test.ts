@@ -187,6 +187,15 @@ describe('the journal with the queue laid over it', () => {
     expect(unsentIn(month(), pending)).toBe(0)
   })
 
+  // Out of the queue on its answer, a removal hid nothing, and the month read before it brought the
+  // row back for a moment (MOL-151, adversarial А3).
+  it('hides a spending whose removal landed after the month was read', () => {
+    const shown = journalOf(month(), [], [])
+    const id = shown.flatMap((day) => day.rows)[0]?.key ?? ''
+    const days = journalOf(month(), [], [], new Set(), new Set([id]))
+    expect(days.flatMap((day) => day.rows.map((row) => row.key))).not.toContain(id)
+  })
+
   it('hides a spending still on the phone once its removal waits', () => {
     const days = journalOf(month(), [record(NEW, '2026-09-26'), { kind: 'remove', id: NEW }], [])
     expect(days.flatMap((day) => day.rows.map((row) => row.key))).not.toContain(NEW)
