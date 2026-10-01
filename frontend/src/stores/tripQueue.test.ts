@@ -1650,6 +1650,31 @@ describe('trip queue', () => {
       expect(ids).toEqual([MILK, BREAD])
     })
 
+    // Месяц «Денег», прочитанный до удаления, держит строку похода: ответ на удаление вывел его из
+    // очереди, и строка вырастала обратно (MOL-151, адверсариальное Б4).
+    it('удаление, на которое сервер ответил, помнится с моментом ответа; «Вернуть» отпускает', async () => {
+      removeTrip.mockResolvedValue(undefined)
+      restoreTrip.mockResolvedValue(answer('520'))
+      const queue = fresh()
+      const before = Date.now()
+      const undo = queue.removeTrip(TRIP, 'Ереван Сити')
+      await queue.flush()
+      expect(queue.gone.map((item) => item.id)).toEqual([TRIP])
+      expect(queue.gone[0]?.at).toBeGreaterThanOrEqual(before)
+      queue.restoreTrip(undo)
+      await queue.flush()
+      expect(queue.gone).toEqual([])
+    })
+
+    it('не должно сработать: удаление, которое не дошло, не помнится как ответившее', async () => {
+      removeTrip.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.removeTrip(TRIP, 'Ереван Сити')
+      await queue.flush()
+      expect(queue.gone).toEqual([])
+      expect(queue.removing.has(TRIP)).toBe(true)
+    })
+
     it('поход, начатый без связи: удаление уходит со связью, 404 — сделано', async () => {
       startTrip.mockRejectedValue(offline())
       removeTrip.mockRejectedValue(offline())

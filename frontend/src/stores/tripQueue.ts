@@ -733,6 +733,13 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     return gone
   })
   /**
+   * The trips whose removal has landed, and when. Out of the queue on its answer, a removal no
+   * longer hid the trip's line in «Деньги» while the month there was still read before it: the
+   * line grew back and went again (MOL-151, adversarial Б4, as А3 for a spending). The screen hides
+   * one until a month read after it; a «Вернуть» landed lets go.
+   */
+  const removedLanded = ref<{ readonly id: string; readonly at: number }[]>([])
+  /**
    * Raised when a removal, a «Вернуть» or the account of a trip has landed: what the server counts
    * has moved.
    */
@@ -835,6 +842,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     needsContext.value = null
     kept = []
     rejected.value = []
+    removedLanded.value = []
     sync(id)
     show()
   }
@@ -1014,6 +1022,12 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         if (!kept.some((item) => item.write.kind === 'restore' && item.write.tripId === tripId)) {
           forget(tripId)
         }
+      }
+      if (!refusal && (head.write.kind === 'delete' || head.write.kind === 'restore')) {
+        const { kind, tripId } = head.write
+        const others = removedLanded.value.filter((item) => item.id !== tripId)
+        removedLanded.value =
+          kind === 'delete' ? [...others, { id: tripId, at: Date.now() }] : others
       }
       if (!refusal && isMirrored(head.write)) {
         landed.value += 1
@@ -1527,6 +1541,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     removeTrip,
     restoreTrip,
     removing,
+    gone: removedLanded,
     landed,
     wrote,
     lastRemoved,

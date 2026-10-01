@@ -421,9 +421,23 @@ export default defineComponent({
         queue.gone.flatMap((item) => (item.at > read && !back.has(item.id) ? [item.id] : [])),
       )
     })
+    // The same for a record of «Покупки» (adversarial Б4): waiting, or landed after the read set
+    // out — unless its «Вернуть» is on its way, which `removing` already says.
+    const tripsGone = computed(() => {
+      const read = askedAt.value?.getTime() ?? 0
+      const back = new Set(
+        tripQueue.pending.flatMap((write) => (write.kind === 'restore' ? [write.tripId] : [])),
+      )
+      return new Set([
+        ...tripQueue.removing,
+        ...tripQueue.gone.flatMap((item) =>
+          item.at > read && !back.has(item.id) ? [item.id] : [],
+        ),
+      ])
+    })
     const journal = computed(() =>
       month.value
-        ? journalOf(month.value, queue.pending, queue.rejected, tripQueue.removing, gone.value)
+        ? journalOf(month.value, queue.pending, queue.rejected, tripsGone.value, gone.value)
         : [],
     )
     const unsent = computed(() => (month.value ? unsentIn(month.value, queue.pending) : 0))
