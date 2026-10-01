@@ -2,6 +2,8 @@ import { z } from 'zod'
 import {
   attachBarcodeBodySchema,
   barcodeTakenSchema,
+  catalogueBarcodeHintQuerySchema,
+  catalogueBarcodeHintResponseSchema,
   catalogueBarcodeQuerySchema,
   catalogueBarcodeResponseSchema,
   catalogueEntryCodec,
@@ -10,7 +12,7 @@ import {
   catalogueSearchResponseSchema,
   proposedItemSchema,
 } from '@molvia/model'
-import type { Item, ProposedItem } from '@molvia/model'
+import type { AppLocale, BarcodeHint, Item, ProposedItem } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import type { Attached } from '@/usecases/attach-barcode'
 import type { Proposal } from '@/usecases/propose-item'
@@ -21,6 +23,7 @@ export interface CatalogueApi {
   search(actorId: string, query: string): Promise<{ items: Item[]; near: boolean }>
   propose(actorId: string, input: ProposedItem): Promise<Proposal>
   byBarcode(code: string): Promise<Item | null>
+  hint(code: string, locale: AppLocale): Promise<BarcodeHint | null>
   attachBarcode(actorId: string, itemId: string, code: string): Promise<Attached>
   detachBarcode(itemId: string, code: string): Promise<void>
 }
@@ -71,6 +74,21 @@ export function catalogueRoutes(app: FastifyInstance, api: CatalogueApi): void {
         item: item === null ? null : catalogueEntryOf(item),
       }),
     )
+  })
+
+  /**
+   * What Open Food Facts says a package the catalogue missed is (MOL-162): a name for «Предложить
+   * товар» to start from, or `null`. Asked by the phone right after a miss, beside it rather than
+   * inside the lookup's answer — the miss waits for nobody, and the lookup's strict answer would
+   * refuse a field an installed app does not know (MOL-46). The code in the query, as the lookup's.
+   */
+  app.get('/catalogue/barcode/hint', { exposeHeadRoute: false }, async (request, reply) => {
+    const { code, lang } = parseQuery(catalogueBarcodeHintQuerySchema, request.query)
+    const hint = await api.hint(code, lang)
+
+    return reply
+      .header('cache-control', 'no-store')
+      .send(z.encode(catalogueBarcodeHintResponseSchema, { hint }))
   })
 
   /**

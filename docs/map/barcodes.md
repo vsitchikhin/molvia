@@ -20,11 +20,12 @@ Rules: `.claude/rules/barcodes.md`. A test beside its source, or mirroring it un
 
 ## backend · tests
 
-- `backend/tests/open-food-facts.integration.test.ts` — Integration test: the cache of Open Food Facts against the real schema — a find and a miss, the age, the overwrite, the CHECKs that keep a row whole, the item's `origin`.
+- `backend/tests/open-food-facts.integration.test.ts` — Integration test: the hint through the server with a fake of the base — the door, the query, the cache, the log, the mark of an item proposed after it — and the cache's table against the real schema: the age, the overwrite, the CHECKs that keep a row whole.
 
 ## backend · usecases
 
 - `backend/src/usecases/attach-barcode.ts` — Use case: «привязать код к ней?» — a code written to anyone's item in the name of who wrote it, or the item that holds it named; «не этот товар?» lets it go (MOL-100). Routes `POST`/`DELETE /catalogue/items/:itemId/barcodes` in `routes/catalogue.ts`; tests: `backend/tests/catalogue.integration.test.ts`.
+- `backend/src/usecases/hint-by-barcode.ts` — Use case: what Open Food Facts says a package the catalogue missed is (MOL-162) — only a code that could be written, the cache while it is believed (a find 30 days, a miss 7), then the base; a hint or `null`, never an error. Route `GET /catalogue/barcode/hint` in `routes/catalogue.ts`; tests: `backend/tests/open-food-facts.integration.test.ts`.
 - `backend/src/usecases/find-by-barcode.ts` — Use case: the item a scanned or typed code belongs to, looked up with its twins, the code as read first; writes nothing. Route `GET /catalogue/barcode` in `routes/catalogue.ts`; tests: `backend/tests/catalogue.integration.test.ts`.
 
 ## frontend · components

@@ -1,5 +1,11 @@
 import Fastify from 'fastify'
-import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type {
+  FastifyBaseLogger,
+  FastifyError,
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+} from 'fastify'
 import {
   DomainError,
   ERROR,
@@ -10,7 +16,7 @@ import {
 } from '@molvia/model'
 import type { ErrorCode, ErrorResponse } from '@molvia/model'
 import { InvalidBody } from '@/parse'
-import { VERSION, loginConfig } from '@/env'
+import { VERSION, env, loginConfig } from '@/env'
 import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
 import { healthRoutes } from '@/routes/health'
@@ -44,6 +50,9 @@ import { withdrawVerdict } from '@/usecases/withdraw-verdict'
 import { pendingVerdicts } from '@/usecases/pending-verdicts'
 import { attachBarcode, detachBarcode } from '@/usecases/attach-barcode'
 import { findByBarcode } from '@/usecases/find-by-barcode'
+import { hintByBarcode } from '@/usecases/hint-by-barcode'
+import { offUserAgent, openFoodFacts } from '@/open-food-facts/client'
+import type { OpenFoodFacts } from '@/open-food-facts/client'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { signIn } from '@/usecases/sign-in'
 import { endSession, listSessions, logout } from '@/usecases/sessions'
@@ -110,6 +119,7 @@ import { createActorRepository } from '@/db/actors-repository'
 import { createExchangeRepository } from '@/db/exchanges-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
+import { createOpenFoodFactsRepository } from '@/db/open-food-facts-repository'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
@@ -218,6 +228,12 @@ export interface ServerOptions {
   readonly login?: LoginConfiguration | null
   /** Where the log goes instead of stdout — for the test that reads what an auth failure logs. */
   readonly logStream?: { write(line: string): void }
+  /**
+   * The client of Open Food Facts, `null` for the hint off. Absent, it is built from the
+   * environment — on only where a contact is set (MOL-162): tests hand in a fake, and nothing but
+   * production ever asks the real base.
+   */
+  readonly openFoodFacts?: OpenFoodFacts | null
 }
 
 /**
@@ -227,6 +243,23 @@ export interface ServerOptions {
  * only compares two answers with each other.
  */
 const NAMED_BUILD = encodeURIComponent(VERSION)
+
+/**
+ * The client of Open Food Facts the environment asks for (MOL-162): on only where a contact is set,
+ * since the base asks every client for one (В-4). A failure is logged by its reason — never the
+ * code, which is what a person bought.
+ */
+function openFoodFactsOf(log: FastifyBaseLogger): OpenFoodFacts | null {
+  const contact = env.OPEN_FOOD_FACTS_CONTACT
+  if (contact === undefined) return null
+  return openFoodFacts({
+    ...(env.OPEN_FOOD_FACTS_URL === undefined ? {} : { url: env.OPEN_FOOD_FACTS_URL }),
+    userAgent: offUserAgent(VERSION, contact),
+    onFailure: (reason) => {
+      log.warn({ reason }, 'open food facts did not answer')
+    },
+  })
+}
 
 export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const app = Fastify({
@@ -420,6 +453,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     })
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
+    const hints = createOpenFoodFactsRepository(db)
+    const off =
+      options.openFoodFacts === undefined ? openFoodFactsOf(app.log) : options.openFoodFacts
     const events = createEventRepository(db)
     const tripData = tripRepositories(db)
     const transact = transactOn(db)
@@ -493,8 +529,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       )
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items }, actorId, query),
-        propose: (actorId, input) => proposeItem(items, actorId, input),
+        propose: (actorId, input) => proposeItem(items, hints, actorId, input),
         byBarcode: (code) => findByBarcode(items, code),
+        hint: (code, locale) => hintByBarcode({ cache: hints, off }, code, locale),
         attachBarcode: (actorId, itemId, code) => attachBarcode(items, actorId, itemId, code),
         detachBarcode: (itemId, code) => detachBarcode(items, itemId, code),
       })
