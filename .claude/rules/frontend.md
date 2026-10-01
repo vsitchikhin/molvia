@@ -258,8 +258,13 @@ The detail behind the frontend lines of `CLAUDE.md`.
   queue): removed from its screen and come back to «Деньги», it grew back and went (Б4). Both are kept on
   the device (`molvia.spending-gone`, `molvia.trip-gone`, `recallLanded` in `queueing.ts`), as the
   month they hide a row from is: kept in memory alone, a reload after a read that failed brought the
-  removed spending back until some read got through (Б5). Forgotten after 92 days, older than any
-  month the phone keeps unread. **What does not move, on purpose:** a change of the screen's own query beyond its
+  removed spending back until some read got through (Б5). The month is kept with its `askedAt`, not
+  its arrival alone: recalled after a restart, a read that set out before the removal looked newer
+  than it and brought the row back (Б6). The list is written over what is stored and heard through
+  `storage`, so a second window neither loses nor misses another's removal (round 5). Forgotten after
+  92 days, older than any month the phone keeps unread. Both moments are the phone's clock: set back,
+  a removal may hide a row restored from another device until a «Вернуть» lands here or 92 days
+  pass — a named price, narrow. **What does not move, on purpose:** a change of the screen's own query beyond its
   answer coming in under the control (MOL-136 — an overlay took the second tap, and «Вернуть» and
   the main action in the dock come in without the other going out: a `mode="out-in"` would hold
   back the button the screen gives the focus to once the strip goes — read from the code, not

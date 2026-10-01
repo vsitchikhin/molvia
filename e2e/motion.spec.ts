@@ -5,7 +5,7 @@ import { actorCodec, settingsOf } from '@molvia/model'
 import { asBrowser, signedIn } from './session'
 
 // Motion as it is (MOL-151): what must not move does not, and what moves does it once. Born of the
-// adversarial review of MOL-151 (А1–А5, Б1–Б5), each turned the other way round. А6 — a sheet's top lower
+// adversarial review of MOL-151 (А1–А5, Б1–Б6), each turned the other way round. А6 — a sheet's top lower
 // before a later keyboard — is not held here: Chromium draws every frame, the iPhone one at most
 // (adversarial round 2, У2), and the rule names the price.
 test.use({ locale: 'ru-RU', reducedMotion: 'no-preference' })
@@ -687,5 +687,81 @@ test('a spending removed before a read that failed stays gone after a reload (Б
   await expect(page.getByRole('button', { name: /Открыть трату: Остаётся/ })).toBeVisible()
   await failed
   await expect(page.getByRole('button', { name: /Открыть трату: Удаляемая/ })).toHaveCount(0)
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
+})
+
+test('a read that set out before a removal does not bring it back after a reload (Б6)', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const { categories } = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string }[] }
+  for (const [amount, note] of [
+    ['1500', 'Удаляемая'],
+    ['1000', 'Остаётся'],
+  ] as const) {
+    const response = await page.request.post('/api/spendings', {
+      headers,
+      data: {
+        id: randomUUID(),
+        spentOn: yerevanDay(),
+        amount: { amount, currency: 'AMD' },
+        categoryId: categories[0]?.id,
+        note,
+      },
+    })
+    expect(response.status(), await response.text()).toBe(201)
+  }
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await expect(page.getByRole('button', { name: /Открыть трату/ })).toHaveCount(2)
+  // Last month, so this one comes back from the phone's memory with a read on its way.
+  await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
+  await expect(page.getByRole('button', { name: /Открыть трату/ })).toHaveCount(0)
+  await settled(page)
+
+  // The first read of this month is slow — the server reads it at once, the phone has it after the
+  // removal landed, and keeps it; every read after it fails, the signal at the shelf.
+  const month = yerevanDay().slice(0, 7)
+  let reads = 0
+  await page.route(`**/api/money/months/${month}*`, async (route) => {
+    reads += 1
+    if (reads > 1) {
+      await route.abort('internetdisconnected')
+      return
+    }
+    const response = await route.fetch()
+    await new Promise((done) => setTimeout(done, 2500))
+    await route.fulfill({ response })
+  })
+  const slowRead = page.waitForResponse((response) =>
+    new URL(response.url()).pathname.endsWith(`/money/months/${month}`),
+  )
+  await page.getByRole('button', { name: 'Следующий месяц' }).click()
+  const row = page.getByRole('button', { name: /Открыть трату: Удаляемая/ })
+  await row.click()
+  const sheet = page.locator('dialog[open]')
+  const removed = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'DELETE' && response.url().includes('/spendings/'),
+  )
+  await pressInSheet(
+    () => sheet.getByRole('button', { name: 'Удалить трату' }).click(),
+    () => expect(sheet).toBeHidden({ timeout: 300 }),
+  )
+  expect((await removed).status()).toBeLessThan(300)
+  await slowRead
+  await expect(row).toHaveCount(0)
+
+  // The app put away and opened again: the month is the one that slow read left on the phone.
+  const failed = page.waitForEvent('requestfailed', (request) =>
+    request.url().includes(`/api/money/months/${month}`),
+  )
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+  await expect(page.getByRole('button', { name: /Открыть трату: Остаётся/ })).toBeVisible()
+  await failed
+  await expect(row).toHaveCount(0)
   await page.unrouteAll({ behavior: 'ignoreErrors' })
 })
