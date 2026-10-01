@@ -1574,9 +1574,12 @@ describe('«Деньги» (MOL-82)', () => {
     const { spentOn, categoryId } = body
     await client.amendSpending(SPENDING, { revision: 1, spentOn, categoryId, amount: body.amount })
     await client.restoreSpending(SPENDING)
+    await client.spending(SPENDING)
     expect(calls[0]).toMatchObject({ method: 'PUT', body: { revision: 1 } })
     expect(new URL(calls[0]?.url ?? '').pathname).toBe(`/spendings/${SPENDING}`)
     expect(new URL(calls[1]?.url ?? '').pathname).toBe(`/spendings/${SPENDING}/restore`)
+    expect(calls[2]?.method).toBe('GET')
+    expect(new URL(calls[2]?.url ?? '').pathname).toBe(`/spendings/${SPENDING}`)
 
     const removal = clientReplying(204, null)
     await removal.client.removeSpending('../actors/me')

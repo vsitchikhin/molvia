@@ -150,6 +150,52 @@ null` beside the same «Потрачено», and the contract says that this is
 of `GET /money/months/:month`, the sheet of a spending, and one's own categories. The screen adds
 nothing up.
 
+- **«Деньги» is the summary of the month, «Траты» its journal** (MOL-159, owner's decision В-8 of
+  MOL-155, handoff MOL-157 01, 02, 06): the owner found one screen of accounts, totals, exchanges,
+  bars and the whole journal «очень сложно анализировать». The summary is the month, the card
+  «Потрачено / Пришло / Остаток», «Куда ушли», and five ways out — «Траты» of the month shown, then
+  what is «now» and not the month's: «Счета», «Обмен денег», «Доходы», «Категории» — **each with one
+  figure from an answer the screen already has**: the rows of the journal and the incomes of
+  «Пришло», counted by the server (`count`, `incomeCount`), the live accounts of the accounts' page,
+  the person's own rate, the live categories. A figure not known yet is no figure, never a zero; the
+  row is a way in either way. **`count` is the rows of the journal** (Р-1) — a trip in two currencies
+  is two, as «И ещё N трат» counts — **and `incomeCount` the incomes of «Пришло»** (Р-2), a salary
+  moved in counted and one moved out not: the figure stands under «Пришло» and speaks of its money.
+  The price, named: «Доходы» group by the day an income came, so a salary of the 26th is September's
+  there and October's in the count. Both are defaulted (`null`), so a month kept before them, or an
+  answer of a server before them, reads; an installed phone of the version before fails the new
+  field and is offered «Обновить», as with `slices`. **The tiles are figures, not buttons** — one way,
+  one button: «Доходы» is a row; a closed month's rest is «На счетах 31 авг.». **«Траты»**
+  (`/money/spendings`, `meta.parent: 'money'`) is the journal moved whole, not copied — the queue's
+  rows, the pages, «Вернуть», the row of a saved spending brought into view — with the server's count
+  and sum on top, «· N ещё не учтена» beside them. **The two share `useMoneyScreen`**: the month in
+  the address, the sheet, the journal and the refusals. **«Добавить трату» is the strip under the
+  thumb** (`#docked`, as «Сфотографировать чек», MOL-128) on both, in every state where a category is
+  known; «Вернуть» floats over it. **A spending of another month moves «Траты» to it, never the
+  summary** (Р-5): there is no row on the summary to bring into view. A newcomer's state has no button
+  inside (Р-6) and no «Траты» under it, nothing to see there — the price, named (adversarial В of
+  MOL-159): «newcomer» is a guess from the month and the month before, so a person back after a whole
+  empty month is greeted as one and finds «Траты» by flipping a month back. **«Счета», «Обмен денег»
+  and «Категории» keep their figures under the skeleton and the error** (adversarial Г): they are
+  «now», read from answers of their own, and the month that failed is not theirs. **A refusal stands once, and always somewhere it can be put
+  right** (MOL-159): about a row the journal on screen shows, it marks that row, and any amendment of
+  the row takes it away; with no such row, it is a row of «Не приняты» on top of «Траты», in every
+  month and whatever its pages (`refusedRows`). «Не приняты» names the marked ones too and leads to the
+  first («И ещё 1 — отмечена в журнале ниже», round 7, Р): the summary counts every refusal, and the
+  second was left to be found among forty rows. Opened, it is what was typed — to fix and save again,
+  or to drop with «Скрыть» in the sheet, beside the reason. **The summary counts every one**
+  («Не приняты N трат») **and leads to «Траты»**; «Куда ушли» says no «трат нет» over one typed into
+  the month shown. The journal never makes a row for a refusal: laid there by a guess of where its row
+  was, a refusal was lost at every edge of the guess — a page not loaded, a month not answered,
+  another month, a date moved across the month's edge, a spending removed on another device (rounds
+  1–5). **«Сохраните ещё раз поверх» goes over the server's revision, asked as the write leaves**
+  (`over` on the amendment, `GET /spendings/:id`, round 6, О): the phone may hold the spending on no
+  page, and the revision a conflict was refused over is the one that conflicts; an amendment folded
+  into it, or made behind it while it is on the way, asks too. The price, named: an amendment of a
+  spending removed on another device is a row too — the phone cannot tell «on a page not read» from
+  «gone» — and the sheet says «не найдено» beside «Скрыть». The card under the switcher is left to
+  what is not a spending's typing — a category, a «Вернуть» too late. A finished trip opened from «Траты» leads
+  back to «Траты» (`?from=money-spendings`, Р-12).
 - **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`), by the rules
   of the trip's (MOL-24): storage is the queue, one at a time under `navigator.locks`, held by a
   lost connection, a 5xx, a portal, a `401` or a code the API did not say, sent only once the
@@ -194,17 +240,22 @@ nothing up.
   day's rate. The sheet converts while typing by `convertAcross` — MOL-24's exception — and only
   between the two currencies the running month's rate joins; a third says «Посчитаем по курсу дня
   траты» (Р-5).
-- **Removal asks nothing; `UndoStrip` gives ten seconds** where «Трата» floats, and stands still
-  while a finger or the person's focus is on it — not the focus it puts on «Вернуть» itself, or
+- **Removal asks nothing; `UndoStrip` gives ten seconds** over the strip «Добавить трату», and
+  stands still while a finger or the person's focus is on it — not the focus it puts on «Вернуть» itself, or
   the count would never run for a touch. **It stands whatever the screen becomes under it**: the
   only spending removed turns the month into a newcomer's, and the strip went with the button it
-  shared a block with (adversarial Г). The server keeps the removal ten minutes; the strip is what
-  the screen offers.
+  shared a block with (adversarial Г). **«Вернуть» is the queue's, not the screen's**
+  (`lastRemoved`, round 2 of MOL-159, Ж), as a trip's is (MOL-76): removed on «Траты», it stands on
+  «Деньги» after the step back with what is left of its ten seconds — the summary is where a sum
+  fallen short shows the mistake. **What is left is the strip's, not the clock's** (round 3, З): the
+  strip says it every second, held or not, and the next screen goes on from it; counted from the
+  removal, a strip held past ten seconds was forgotten by the step back. The server keeps the removal ten minutes; the strip is what the
+  screen offers.
 - **A date is shown in words over its native field** (`AppField`, `display`): «Сегодня, 27 сентября»
   is drawn, the field stays underneath to open the system picker and to be read by its own value,
   and Chrome's own calendar is kept unseen in its place — stretched over the field, it caught the
   sheet's «Сохранить». The spending just saved is scrolled
-  into view once its row is there; a finished trip opened from «Деньги» slides in as a push.
+  into view on «Траты» once its row is there; a finished trip opened from there slides in as a push.
 - **The sheet says «saved» after it has closed** (adversarial И): the move to the spending's month
   made while it was open was undone by the step back that closes it. It checks the day — a cleared
   picker or a day before 2000 would fall over in the queue's codec — and that the category is one of
@@ -243,10 +294,10 @@ nothing up.
   phone further east (adversarial Л). End-to-end runs the browser in `Asia/Yerevan`, a phone in
   Armenia; the component tests run in UTC and hold the phone's day where it is not Yerevan's.
 - **The categories are the owner's, not a month's**, so the newest month kept names them for a
-  month not read yet: «Трата» stands while the month loads, when it failed and offline on the first
-  of a month (review Т-5, Т-6) — and does not, where no category is known at all. «Категории ›»
-  stands without bars too (Т-7). This month on the phone (MOL-121) is looked at again whenever the app
-  comes back into view (adversarial З).
+  month not read yet: «Добавить трату» stands while the month loads, when it failed and offline on
+  the first of a month (review Т-5, Т-6) — and does not, where no category is known at all. The row
+  «Категории» stands before anything is spent too (Т-7). This month on the phone (MOL-121) is looked
+  at again whenever the app comes back into view (adversarial З).
 - **«Пусто» is read off the answer** (Р-6): the running month empty, no income, nothing the month
   before and nothing waiting. The server does not say «no history», and an empty August after a
   full July is «В этом месяце трат нет», not a newcomer.
@@ -255,9 +306,11 @@ nothing up.
   (`molvia.money`), so offline is a strip over them. A next page asked for while the month is read
   again from the start is asked again from the fresh answer (adversarial Е).
 - **A finished trip opened from «Деньги» leads back there** (owner's decision В-3):
-  `?from=money`, and the route lists which `from` it takes (`meta.from`) — an address must not
-  make any screen the parent of any other. The chevron says «‹ Деньги» and steps back onto the
-  same month; opened cold, «Деньги» is laid underneath.
+  `?from=money` — `?from=money-spendings` since its row is on «Траты» (MOL-159) — and the route
+  lists which `from` it takes (`meta.from`): an address must not make any screen the parent of any
+  other. The chevron names the screen it came from — «‹ Траты» since MOL-159 — and steps back onto
+  the same month (`backTarget` compares the path, not the query); opened cold, that screen is laid
+  underneath with its own parents — «Траты» of the running month over «Деньги».
 - **One's own category is made from the chips** («+ Своя», a sheet over the sheet, chosen as soon
   as it exists) **and kept on «Деньги → Категории»** (В-1): «Убрать» asks nothing, since it erases
   nothing, and «Вернуть» stands right under it. **A category that landed stays on the chips until the
@@ -279,10 +332,9 @@ nothing up.
   MOL-156); the month tab is that question answered on the month itself. **An empty month keeps
   the card**, with no ring — still the way into «Графики», where the year is (handoff 01,
   adversarial Г). Its «В этом месяце трат нет» is said
-  once, by the journal under it, until MOL-159 takes the journal to «Траты»: said twice, it was two
-  of the same line on one screen. A category the month
-  does not name is left out, never drawn as a second «Остальные» (review 7). «Категории ›» stands
-  under the card always. **`slices` defaults to empty so that a month kept on the phone before the
+  by the card itself since the journal went to «Траты» (MOL-159) — **unless a spending of the month
+  still waits on the phone**: «нет трат» over «Ещё не учтено: 1» said two things. A category the month
+  does not name is left out, never drawn as a second «Остальные» (review 7). **`slices` defaults to empty so that a month kept on the phone before the
   ring still reads through the strict codec** (review 6): lost, every month kept went with it
   offline. **The phone does not work the ring out for it** (review 9, owner's decision «а»): that
   would be a second exception to «the phone adds nothing up», for three months and one read. **A
@@ -351,7 +403,10 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   **summed in the spending currency** (Р-6): a difference in another currency — dollars from roubles
   — by the central bank of that day, since nobody named a price for it; without a comparison or
   such a rate the exchange is named («Без сравнения с ЦБ РА: N»), never summed. Twelve months
-  whatever the period (handoff 03); nothing measured — no card.
+  whatever the period (handoff 03); nothing measured — no card. **Since MOL-159 the card is «Обмен
+  денег»'s, against the market** (MOL-152, `money-rates.md`); `exchanges` of `GET /money/charts`
+  stays, against the central bank, for the installed phones that read it, until MOL-160 changes that
+  answer (Р-9).
 - **The rate of the pair is the central bank's at the end of each week** (owner's decision В-4,
   Р-14): `rates.official` of every Sunday of the period and of today, fresh for its day or a gap —
   a gap is drawn as a break, never as zero. One side for the whole line, the one the newest rate

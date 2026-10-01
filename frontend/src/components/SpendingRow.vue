@@ -49,6 +49,8 @@ export default defineComponent({
     category: { type: Object as PropType<SpendingCategoryView | null>, default: null },
     categoryName: { type: String, required: true },
     spendCurrency: { type: String as PropType<Currency>, required: true },
+    /** The day, where rows of different days stand together — «Не приняты» (MOL-159). */
+    when: { type: String, default: '' },
   },
   emits: ['open'],
   setup(props) {
@@ -77,7 +79,8 @@ export default defineComponent({
         return t('spending.trip_row_title', { place: props.row.placeName })
       return props.row.spending.note ?? props.categoryName
     })
-    const meta = computed(() => {
+    const meta = computed(() => [props.when, line.value].filter(Boolean).join(' · '))
+    const line = computed(() => {
       if (props.row.kind === 'trip')
         return t(
           'spending.trip_row_meta',

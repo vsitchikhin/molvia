@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { exchangeLossesCodec, exchangeLossesViewOf } from './exchange'
 import { monthSchema } from './money'
 import { spendingCategoryViewCodec, spendingCategoryViewOf } from './spending'
 import { exchangeDaySchema } from '#model/entities/exchange'
@@ -19,7 +20,6 @@ export const moneyChartsQuerySchema = z.strictObject({
 })
 
 const level = z.int().min(0).max(CHART_LEVEL)
-const signedLevel = z.int().min(-CHART_LEVEL).max(CHART_LEVEL)
 
 /**
  * `GET /money/charts` (MOL-74): the months of «Графики» side by side, the exchanges against the
@@ -64,22 +64,7 @@ export const moneyChartsCodec = z.strictObject({
     }),
   ),
   /** Null — no exchange of the twelve months could be measured: no card (handoff 03). */
-  exchanges: z
-    .strictObject({
-      total: signedMoneyCodec,
-      uncounted: z.int().min(0),
-      groups: z.array(
-        z.strictObject({
-          place: z.string().nullable(),
-          count: z.int().min(1),
-          difference: signedMoneyCodec,
-          /** Hundredths of a percent: −721 is «−7,21 %». */
-          percent: z.int(),
-          level: signedLevel,
-        }),
-      ),
-    })
-    .nullable(),
+  exchanges: exchangeLossesCodec.nullable(),
   /** Null — one currency for both, or nothing known of the pair in the period (Р-14). */
   rate: z
     .strictObject({
@@ -137,11 +122,7 @@ export function moneyChartsViewOf(
           ]
         : []
     }),
-    exchanges: exchanges && {
-      total: exchanges.total,
-      uncounted: exchanges.uncounted,
-      groups: exchanges.groups.map((group) => ({ ...group })),
-    },
+    exchanges: exchanges && exchangeLossesViewOf(exchanges),
     rate: rate && {
       points: rate.points.map((point) => ({ ...point })),
       exchanges: rate.exchanges.map((exchange) => ({ ...exchange })),

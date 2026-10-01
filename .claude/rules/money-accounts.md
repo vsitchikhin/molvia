@@ -141,7 +141,9 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
 
 ## «Счета» on the phone (MOL-123)
 
-The handoff of MOL-116 whole: a card on top of «Деньги», the page `/money/accounts`, one account at
+The handoff of MOL-116 whole: a card on top of «Деньги» — gone since MOL-159: the number of live
+accounts is the row «Счета» of «Деньги», and «Не попали в остатки» stands under the total of
+«Счета» — the page `/money/accounts`, one account at
 `/money/accounts/:accountId`, the sheet of an account, the check, and the choice of an account in the
 sheets of a spending, an income, an exchange and a trip's summary. The phone adds nothing up; every
 balance, total and difference is the server's.

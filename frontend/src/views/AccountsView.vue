@@ -83,6 +83,18 @@
             </p>
           </AppCard>
 
+          <!-- What went into no balance, under the total it is missing from — moved here from the
+               card «Деньги» had over the month (MOL-159, handoff MOL-157 07). -->
+          <AppCard v-if="overview.unassigned > 0" list>
+            <button type="button" class="unassigned" @click="unassignedOpen = true">
+              <IconInfo class="unassigned-icon" aria-hidden="true" />
+              <span class="unassigned-text">
+                {{ t('accounts.unassigned', { n: overview.unassigned }, overview.unassigned) }}
+              </span>
+              <IconChevron class="unassigned-icon" aria-hidden="true" />
+            </button>
+          </AppCard>
+
           <AppReveal group>
             <section v-for="group in groups" :key="group.key" class="group">
               <h2 class="group-caption">{{ group.title }}</h2>
@@ -165,6 +177,7 @@
       :online="online"
       @done="done"
     />
+    <UnassignedSheet v-model:open="unassignedOpen" :online="online" />
   </AppScreen>
 </template>
 
@@ -173,8 +186,10 @@ import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref } from
 import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconArchive from '~icons/mdi/archive-outline'
+import IconChevron from '~icons/mdi/chevron-right'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconDown from '~icons/mdi/chevron-down'
+import IconInfo from '~icons/mdi/information-outline'
 import IconPlus from '~icons/mdi/plus'
 import IconUndo from '~icons/mdi/undo-variant'
 import IconWallet from '~icons/mdi/wallet-outline'
@@ -192,6 +207,7 @@ import AppScreen from '@/components/AppScreen.vue'
 import FloatingDock from '@/components/FloatingDock.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import UnassignedSheet from '@/components/UnassignedSheet.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { countedWhen, pageOrder, removedOf, shortDay, signedAmount } from '@/components/accounts'
 import { rateWords } from '@/components/spending'
@@ -220,12 +236,15 @@ export default defineComponent({
     AppScreen,
     FloatingDock,
     IconArchive,
+    IconChevron,
     IconCloudOff,
     IconDown,
+    IconInfo,
     IconPlus,
     IconUndo,
     ScreenSkeleton,
     ScreenState,
+    UnassignedSheet,
     UndoStrip,
   },
   setup() {
@@ -251,6 +270,7 @@ export default defineComponent({
     })
     useReconnect(() => void store.refresh())
 
+    const unassignedOpen = ref(false)
     const phase = computed(() => store.phase)
     const overview = computed(() => store.overview)
     const live = computed(() => pageOrder(store.accounts))
@@ -370,6 +390,7 @@ export default defineComponent({
     const showsAdd = computed(() => phase.value === 'ready' && live.value.length > 0)
 
     return {
+      unassignedOpen,
       t,
       IconWallet,
       store,
@@ -583,6 +604,36 @@ export default defineComponent({
 
 .removed-note {
   padding: 0 var(--space-4) var(--space-3);
+}
+
+.unassigned {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-3) 0 var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-footnote);
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    @include focus-ring(-2px);
+  }
+}
+
+.unassigned-text {
+  flex: 1;
+}
+
+.unassigned-icon {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 /* The answer comes in where the skeleton stood, faded only: the screen keeps it in one block of its

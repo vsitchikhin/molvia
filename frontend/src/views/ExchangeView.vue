@@ -63,6 +63,11 @@
       </ScreenState>
 
       <template v-else-if="overview">
+        <!-- First under the strips (handoff MOL-157 05): what the exchanges of a year gave against
+             the market, by place — moved here from «Графики» (MOL-159, MOL-152). No card when
+             nothing of the twelve months was measured. -->
+        <ExchangeLosses v-if="overview.losses" :losses="overview.losses" />
+
         <AppCard class="rate">
           <p class="caption">{{ t('exchange.my_rate') }}</p>
           <template v-if="overview.wallet">
@@ -125,7 +130,7 @@
         <MarketRatesCard :rows="overview.marketToday" />
 
         <!-- Incomes alone can make the rate (MOL-66): then there is the card, and no list. -->
-        <section v-if="overview.exchanges.length > 0" class="list">
+        <section v-if="overview.exchanges.length > 0" class="exchanges">
           <h2 class="caption">{{ t('exchange.list_title') }}</h2>
           <!-- A list, so a screen reader says how many and moves item by item (review Т-5). -->
           <ul class="cards">
@@ -201,6 +206,7 @@ import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ExchangeCard from '@/components/ExchangeCard.vue'
+import ExchangeLosses from '@/components/ExchangeLosses.vue'
 import MarketRatesCard from '@/components/MarketRatesCard.vue'
 import ExchangeRemoveSheet from '@/components/ExchangeRemoveSheet.vue'
 import ExchangeSheet from '@/components/ExchangeSheet.vue'
@@ -230,6 +236,7 @@ export default defineComponent({
     AppReveal,
     AppScreen,
     ExchangeCard,
+    ExchangeLosses,
     ExchangeRemoveSheet,
     ExchangeSheet,
     FloatingDock,
@@ -428,6 +435,7 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.losses,
 .rate,
 .frozen,
 .strip {
@@ -511,7 +519,9 @@ export default defineComponent({
   color: var(--bad-ink);
 }
 
-.list {
+/* Not `.list`: a scoped class of this screen lands on the root of a child card too, and `AppCard
+   list` took this one's padding for «Обмен» (MOL-159). */
+.exchanges {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -521,7 +531,7 @@ export default defineComponent({
   padding-bottom: calc(var(--space-8) + var(--space-8) + var(--space-6));
 }
 
-.list .caption {
+.exchanges .caption {
   margin: 0;
 }
 

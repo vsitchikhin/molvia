@@ -1,9 +1,16 @@
 import {
   DomainError,
   ERROR,
+  EXCHANGE_LOSS_MONTHS,
   OFFICIAL_RATE_FRESH_DAYS,
+  RATE_SCALE,
   bestQuote,
+  chartMonths,
+  convertAcross,
+  convertSigned,
   currencySchema,
+  exchangeLosses,
+  exchangeLossesViewOf,
   exchangeRateOf,
   exchangersPending,
   heldEstimate,
@@ -14,6 +21,7 @@ import {
   marketQuotesToday,
   marketRateOf,
   marketSideOf,
+  monthOf,
   officialDifference,
   ownRates,
   pickOfficialRate,
@@ -30,6 +38,7 @@ import type {
   Exchange,
   ExchangeAmendBody,
   ExchangeBody,
+  ExchangeLossInput,
   ExchangeRate,
   ExchangeRevision,
   ExchangeView,
@@ -227,6 +236,68 @@ export function freshOfficialRate(
 ): ExchangeRate | null {
   const rate = steadyOf(pickOfficialRate(base, quote, rows, day))
   return rate && isRateFresh(yerevanDate(rate.asOf), day) ? rate : null
+}
+
+/**
+ * The official rate between two currencies on `day`, fresh for it, on whichever side its number is
+ * at least one — as «Деньги» count by it (MOL-73, С-1) — or null.
+ */
+export function officialAcross(
+  one: Currency,
+  other: Currency,
+  rows: readonly CachedRate[],
+  day: string,
+): ExchangeRate | null {
+  if (one === other) return null
+  const forward = freshOfficialRate(one, other, rows, day)
+  if (forward && forward.scaled >= RATE_SCALE) return forward
+  return freshOfficialRate(other, one, rows, day) ?? forward
+}
+
+/**
+ * «Обмены против рынка» (MOL-152, in MOL-159): the exchanges of the twelve months to today by place,
+ * each measured exactly as its card is — against the market of its day by its own channel when the
+ * person named it, else by the best for them (owner's decision В-3) — so the card and the sum never
+ * disagree, and the market is not read twice. A difference in another currency comes into the
+ * spending one by the official rate of that day (Р-6 of MOL-74); with none, or no market — a pair
+ * without the dram, a day with no figure — the exchange is named, never summed, and never set beside
+ * the central bank instead (handoff 05).
+ */
+export function marketLossesOf(
+  views: readonly ExchangeView[],
+  cached: ReadonlyMap<string, readonly CachedRate[]>,
+  spend: Currency,
+  today: string,
+): ExchangesResponse['losses'] {
+  const current = monthOf(today)
+  const from = `${chartMonths(current, EXCHANGE_LOSS_MONTHS)[0] ?? current}-01`
+  const inputs = views
+    .filter(({ exchangedOn }) => exchangedOn >= from && exchangedOn <= today)
+    .map((view): ExchangeLossInput => {
+      const { note, exchangedOn, received } = view
+      const unknown = { note, exchangedOn, difference: null, expected: null }
+      const measure = view.market?.own ?? view.market?.best
+      if (!measure) return unknown
+      const { difference } = measure
+      // What the market would have given for the same money: what came, less what came beyond it.
+      const expected = { minor: received.minor - difference.minor, currency: received.currency }
+      if (received.currency === spend) return { note, exchangedOn, difference, expected }
+      const rate = officialAcross(
+        received.currency,
+        spend,
+        cached.get(exchangedOn) ?? [],
+        exchangedOn,
+      )
+      const inSpend = rate && {
+        difference: convertSigned(difference, rate),
+        expected: convertAcross(expected, rate),
+      }
+      return inSpend?.difference && inSpend.expected
+        ? { note, exchangedOn, difference: inSpend.difference, expected: inSpend.expected }
+        : unknown
+    })
+  const losses = exchangeLosses(inputs, spend)
+  return losses && exchangeLossesViewOf(losses)
 }
 
 /**
@@ -470,6 +541,7 @@ export async function exchangesOverview(
       .map((exchange) => exchange.exchangedOn),
   )
   const { base, quote, rates } = money
+  const views = viewsOf(money.exchanges, money.cached, history, market, exchangersThrough, today)
   return {
     preference: money.preference,
     pair: base === quote ? null : { base, quote },
@@ -478,9 +550,10 @@ export async function exchangesOverview(
     walletUnknown: rates.unknownAt,
     heldEstimates: money.heldEstimates,
     baseSince: money.baseSince,
-    exchanges: viewsOf(money.exchanges, money.cached, history, market, exchangersThrough, today),
+    exchanges: views,
     receipts: [...money.receipts],
     marketToday: marketTodayOf(latest, official, today),
+    losses: marketLossesOf(views, money.cached, owner.spendCurrency, today),
   }
 }
 

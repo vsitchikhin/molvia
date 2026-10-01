@@ -61,6 +61,8 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     spentIncome: rub('68788'),
     income: rub('120000'),
     incomeUncounted: [],
+    count: 1,
+    incomeCount: 1,
     shiftedIn: [],
     shiftedOut: [],
     rest: {
@@ -240,7 +242,7 @@ describe('MoneyView: the four states', () => {
     expect(view.text()).toContain(en.spending.offline.body)
     expect(view.text()).not.toContain(en.state.retry)
     // No category is known on this phone, and a spending needs one (review Т-5).
-    expect(view.text()).not.toContain(en.spending.empty.action)
+    expect(view.text()).not.toContain(en.spending.summary.add)
   })
 
   it('offline on a month never read, another month kept: its categories take a spending', async () => {
@@ -251,7 +253,7 @@ describe('MoneyView: the four states', () => {
     moneyMonth.mockRejectedValue(new TypeError('network'))
     const view = await render()
     expect(view.text()).toContain(en.spending.offline.body)
-    await button(view, en.spending.empty.action).trigger('click')
+    await button(view, en.spending.summary.add).trigger('click')
     await risen()
     expect(document.querySelector('dialog[open]')?.textContent).toContain('Beauty and hygiene')
   })
@@ -264,16 +266,21 @@ describe('MoneyView: the four states', () => {
     moneyMonth.mockRejectedValue(new TypeError('network'))
     window.dispatchEvent(new Event('offline'))
     const view = await render()
-    expect(view.text()).toContain(en.spending.offline.strip)
+    // The hour the figures are of, under the switcher (handoff MOL-157 1e, MOL-138).
+    expect(view.text()).toContain('No connection. Figures as of')
     expect(view.text()).toContain('317,800')
+    const strip = view.get('.strip').element
+    const switcher = view.get(`button[aria-label="${en.spending.month_prev}"]`).element
+    expect(switcher.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('a newcomer is offered the first spending and the trip, with no «Трата» floating', async () => {
+  it('a newcomer is offered the first spending by the strip under the thumb, nothing inside', async () => {
     moneyMonth.mockResolvedValue(empty())
     const view = await render()
     expect(view.text()).toContain(en.spending.empty.title)
-    expect(view.text()).toContain(en.spending.empty.trip)
+    expect(view.find('.state button').exists()).toBe(false)
     expect(view.find('.float').exists()).toBe(false)
+    expect(button(view, en.spending.summary.add).exists()).toBe(true)
   })
 
   it('an empty month after a full one is a month, not a newcomer', async () => {
@@ -317,23 +324,6 @@ describe('MoneyView: the month', () => {
     expect(router.currentRoute.value.query.month).toBe('2026-08')
     expect(window.history.length).toBe(before)
     expect(moneyMonth).toHaveBeenLastCalledWith('2026-08', undefined)
-  })
-
-  it('a spending still on the phone is a row «Sending…» and a line on the card, never a sum', async () => {
-    moneyMonth.mockResolvedValue(month())
-    recordSpending.mockReturnValue(new Promise(() => undefined))
-    const view = await render()
-    useSpendingQueueStore().record({
-      id: 'eeeeeeee-0000-4000-8000-000000000002',
-      spentOn: '2026-09-27',
-      amount: amd('1500'),
-      categoryId: BEAUTY,
-      note: 'Taxi',
-    })
-    await flushPromises()
-    expect(view.text()).toContain(en.spending.pending)
-    expect(view.text()).toContain('Not counted yet: 1 spending is being sent')
-    expect(plain(view.text())).toContain('317,800')
   })
 })
 
@@ -400,7 +390,7 @@ describe('MoneyView: «Остаток» and «Пришло» (MOL-134)', () => {
 
   it('«Пришло» says where a salary went, both ways (Н-2)', async () => {
     moneyMonth.mockResolvedValue(month({ shiftedIn: ['2026-08-31'], shiftedOut: ['2026-09-26'] }))
-    const text = plain((await render()).get('.tile.income').text())
+    const text = plain((await render()).get('.tiles .tile').text())
     expect(text).toContain('with the salary of Aug 31')
     expect(text).toContain('the salary of Sep 26 counts next month')
   })
@@ -410,7 +400,7 @@ describe('MoneyView: the sheet', () => {
   it('checks on «Save»: no amount and no category are two errors, and nothing is queued', async () => {
     moneyMonth.mockResolvedValue(month())
     const view = await render()
-    await button(view, en.spending.add).trigger('click')
+    await button(view, en.spending.summary.add).trigger('click')
     await risen()
     await pressUntil(en.spending.sheet.save, () => {
       expect(document.querySelector('dialog[open]')?.textContent).toContain(
@@ -426,7 +416,7 @@ describe('MoneyView: the sheet', () => {
     moneyMonth.mockResolvedValue(month())
     recordSpending.mockReturnValue(new Promise(() => undefined))
     const view = await render()
-    await button(view, en.spending.add).trigger('click')
+    await button(view, en.spending.summary.add).trigger('click')
     await risen()
     const amount = document.querySelector<HTMLInputElement>('dialog[open] input[inputmode=decimal]')
     if (!amount) throw new Error('no amount')
@@ -445,116 +435,13 @@ describe('MoneyView: the sheet', () => {
     })
     expect(document.querySelector('dialog[open]')).toBeNull()
   })
-
-  it('С-2: brings the spending just saved into view once its row is there', async () => {
-    moneyMonth.mockResolvedValue(month())
-    recordSpending.mockReturnValue(new Promise(() => undefined))
-    const scrolled = vi.fn()
-    Element.prototype.scrollIntoView = scrolled
-    vi.stubGlobal('matchMedia', () => ({ matches: false }) as MediaQueryList)
-    const view = await render()
-    await button(view, en.spending.add).trigger('click')
-    await risen()
-    const amount = document.querySelector<HTMLInputElement>('dialog[open] input[inputmode=decimal]')
-    if (!amount) throw new Error('no amount')
-    amount.value = '1500'
-    amount.dispatchEvent(new Event('input'))
-    document.querySelector<HTMLInputElement>(`dialog[open] input[value="${BEAUTY}"]`)?.click()
-    await flushPromises()
-    await pressUntil(en.spending.sheet.save, () => {
-      expect(scrolled).toHaveBeenCalled()
-    })
-    const saved = useSpendingQueueStore().pending[0]
-    const row = scrolled.mock.contexts[0] as Element
-    expect(saved?.kind === 'record' && row.getAttribute('data-row')).toBe(
-      saved?.kind === 'record' ? saved.body.id : 'no record',
-    )
-    vi.unstubAllGlobals()
-  })
-
-  it('removes without a question and offers «Undo», which brings the same spending back', async () => {
-    moneyMonth.mockResolvedValue(month())
-    const view = await render()
-    await view.find('.body').trigger('click')
-    await risen()
-    // Sent first: an «Undo» before the removal left takes it out of the queue instead, which
-    // the queue's own tests pin.
-    await pressUntil(en.spending.sheet.remove, () => {
-      expect(removeSpending).toHaveBeenCalledWith(BARBER)
-    })
-    await flushPromises()
-    expect(view.text()).toContain('Deleted: Barber')
-    await button(view, en.spending.restore).trigger('click')
-    await vi.waitFor(() => {
-      expect(restoreSpending).toHaveBeenCalledWith(BARBER)
-    })
-    expect(view.find('.undo').exists()).toBe(false)
-  })
-
-  it('a refused amendment opens on what was typed, names why, and goes again over the server’s version', async () => {
-    moneyMonth.mockResolvedValue(month())
-    localStorage.setItem('molvia.actor', ACTOR)
-    localStorage.setItem(
-      `molvia.spending-rejected.${ACTOR}`,
-      JSON.stringify([
-        {
-          key: 'k1',
-          code: 'error.conflict',
-          write: {
-            kind: 'amend',
-            id: BARBER,
-            body: {
-              revision: 1,
-              spentOn: '2026-09-26',
-              amount: { amount: '6000.00', currency: 'AMD' },
-              categoryId: BEAUTY,
-              note: 'Barber',
-            },
-          },
-        },
-      ]),
-    )
-    const view = await render()
-    expect(view.text()).toContain(en.spending.refused)
-    await view.find('.body').trigger('click')
-    await risen()
-    const sheet = document.querySelector('dialog[open]')
-    expect(sheet?.textContent).toContain(en.spending.sheet.refused_conflict)
-    expect(sheet?.querySelector<HTMLInputElement>('input[inputmode=decimal]')?.value).toBe('6000')
-    await pressUntil(en.spending.sheet.save, () => {
-      expect(amendSpending).toHaveBeenCalled()
-    })
-    expect(amendSpending.mock.calls[0]?.[0]).toBe(BARBER)
-    expect(amendSpending.mock.calls[0]?.[1]).toMatchObject({ revision: 1, amount: amd('6000') })
-    expect(useSpendingQueueStore().rejected).toEqual([])
-  })
 })
 
 describe('MoneyView: what the review found (MOL-82)', () => {
-  it('Г: the only spending removed makes a newcomer — and «Undo» stays and brings it back', async () => {
-    moneyMonth.mockResolvedValueOnce(month({ previousSpent: null, income: rub('0') }))
-    moneyMonth.mockResolvedValue(empty())
-    const view = await render()
-    await view.find('.body').trigger('click')
-    await risen()
-    await pressUntil(en.spending.sheet.remove, () => {
-      expect(removeSpending).toHaveBeenCalledWith(BARBER)
-    })
-    await vi.waitFor(() => {
-      expect(view.text()).toContain(en.spending.empty.title)
-    })
-    expect(view.find('.undo').exists()).toBe(true)
-    moneyMonth.mockResolvedValue(month({ previousSpent: null, income: rub('0') }))
-    await button(view, en.spending.restore).trigger('click')
-    await vi.waitFor(() => {
-      expect(restoreSpending).toHaveBeenCalledWith(BARBER)
-    })
-  })
-
   it('Д: a cleared day is named, nothing is queued, and nothing falls over', async () => {
     moneyMonth.mockResolvedValue(month())
     const view = await render()
-    await button(view, en.spending.add).trigger('click')
+    await button(view, en.spending.summary.add).trigger('click')
     await risen()
     const dialog = document.querySelector('dialog[open]')
     const amount = dialog?.querySelector<HTMLInputElement>('input[inputmode=decimal]')
@@ -574,69 +461,6 @@ describe('MoneyView: what the review found (MOL-82)', () => {
     }
     expect(useSpendingQueueStore().pending).toEqual([])
     expect(recordSpending).not.toHaveBeenCalled()
-  })
-
-  it('Ж: a category the server does not know stands on no chip, and is not sent again', async () => {
-    moneyMonth.mockResolvedValue(month())
-    const view = await render()
-    const unknown = 'ffffffff-0000-4000-8000-00000000000f'
-    localStorage.setItem(
-      `molvia.spending-rejected.${ACTOR}`,
-      JSON.stringify([
-        {
-          key: 'k',
-          code: 'error.spending_category_unknown',
-          write: {
-            kind: 'record',
-            body: {
-              id: 'eeeeeeee-0000-4000-8000-000000000005',
-              spentOn: '2026-09-26',
-              amount: { amount: '1500.00', currency: 'AMD' },
-              categoryId: unknown,
-              note: 'Taxi',
-            },
-          },
-        },
-      ]),
-    )
-    window.dispatchEvent(new StorageEvent('storage', { key: `molvia.spending-rejected.${ACTOR}` }))
-    await flushPromises()
-    await view.findAll('.body').at(0)?.trigger('click')
-    await risen()
-    await pressUntil(en.spending.sheet.save, () => {
-      expect(document.querySelector('dialog[open]')?.textContent).toContain(
-        en.spending.sheet.bad_category,
-      )
-    })
-    expect(recordSpending).not.toHaveBeenCalled()
-  })
-
-  it('Т-4: amending a spending still on the phone keeps one write, and the row shows it', async () => {
-    moneyMonth.mockResolvedValue(month())
-    recordSpending.mockReturnValue(new Promise(() => undefined))
-    online(false)
-    const view = await render()
-    const queue = useSpendingQueueStore()
-    queue.record({
-      id: 'eeeeeeee-0000-4000-8000-000000000006',
-      spentOn: '2026-09-27',
-      amount: amd('5000'),
-      categoryId: BEAUTY,
-      note: 'Taxi',
-    })
-    await flushPromises()
-    await view.findAll('.body').at(0)?.trigger('click')
-    await risen()
-    const amount = document.querySelector<HTMLInputElement>('dialog[open] input[inputmode=decimal]')
-    if (!amount) throw new Error('no amount')
-    amount.value = '500'
-    amount.dispatchEvent(new Event('input'))
-    await pressUntil(en.spending.sheet.save, () => {
-      expect(document.querySelector('dialog[open]')).toBeNull()
-    })
-    const waiting = queue.pending.filter((write) => write.kind === 'record')
-    expect(waiting).toHaveLength(1)
-    expect(plain(view.findAll('.body').at(0)?.text() ?? '')).toContain('֏500')
   })
 
   // The month is the phone's (MOL-121): at 20:10 UTC Yerevan is in October and the phone, in the
@@ -663,37 +487,73 @@ describe('MoneyView: what the review found (MOL-82)', () => {
   it('Т-7: the way to one’s categories is there before anything is spent', async () => {
     moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('100') })
     const view = await render()
-    expect(view.find('a.categories-link').attributes('href')).toBe('/money/categories')
+    expect(view.find('a[href="/money/categories"]').exists()).toBe(true)
   })
 
-  it('«Куда ушли» is the ring, one way into «Графики», with the categories still under it (MOL-156)', async () => {
+  it('«Куда ушли» is the ring, one way into «Графики» of the same month (MOL-156, MOL-158)', async () => {
     moneyMonth.mockResolvedValue(month())
     const view = await render()
-    expect(view.find('.donut a').attributes('href')).toMatch(/^\/money\/charts/)
+    expect(view.find('.donut a').attributes('href')).toBe('/money/charts?month=2026-09')
     expect(view.findAll('.donut .ring path')).toHaveLength(1)
-    expect(view.find('a.categories-link').attributes('href')).toBe('/money/categories')
   })
 })
 
-describe('MoneyView: the way into the exchanges and incomes (MOL-81)', () => {
+describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
   const entries = (view: VueWrapper) =>
     view.findAll(`nav[aria-label="${en.spending.entries_label}"] a`).map((link) => ({
       href: link.attributes('href'),
       text: plain(link.text()),
+      label: link.attributes('aria-label'),
     }))
 
-  it('stands under «Spent» and names the person’s own rate beside the exchanges', async () => {
-    moneyMonth.mockResolvedValue(month())
+  it('five rows under the ring: «Траты» of the month, then what is «now»', async () => {
+    moneyMonth.mockResolvedValue(month({ count: 43, incomeCount: 2 }))
     const view = await render()
     expect(entries(view)).toEqual([
-      { href: '/money/exchange', text: `${en.exchange.title}4.62 ֏/₽` },
-      { href: '/money/incomes', text: en.income.title },
+      {
+        href: '/money/spendings',
+        text: `${en.spending.list.title}43`,
+        label: 'Spendings, 43',
+      },
+      { href: '/money/accounts', text: `${en.accounts.title}0`, label: `${en.accounts.title}, 0` },
+      {
+        href: '/money/exchange',
+        text: `${en.exchange.title}4.62 ֏/₽`,
+        label: `${en.exchange.title}, 4.62 ֏/₽`,
+      },
+      { href: '/money/incomes', text: `${en.income.title}2`, label: `${en.income.title}, 2` },
+      {
+        href: '/money/categories',
+        text: `${en.spending.categories_link}1`,
+        label: `${en.spending.categories_link}, 1`,
+      },
     ])
   })
 
-  it('must not fire: the central bank’s rate is not «my rate», so the row says nothing', async () => {
+  it('«Траты» open on the month shown, and the summary stays on it as a spending goes to another', async () => {
+    moneyMonth.mockResolvedValue(month({ month: '2026-08', rateKind: 'frozen' }))
+    const view = await render('/money?month=2026-08')
+    expect(entries(view)[0]?.href).toBe('/money/spendings?month=2026-08')
+    recordSpending.mockReturnValue(new Promise(() => undefined))
+    await button(view, en.spending.summary.add).trigger('click')
+    await risen()
+    const amount = document.querySelector<HTMLInputElement>('dialog[open] input[inputmode=decimal]')
+    if (!amount) throw new Error('no amount')
+    amount.value = '700'
+    amount.dispatchEvent(new Event('input'))
+    document.querySelector<HTMLInputElement>(`dialog[open] input[value="${BEAUTY}"]`)?.click()
+    await flushPromises()
+    await pressUntil(en.spending.sheet.save, () => {
+      expect(document.querySelector('dialog[open]')).toBeNull()
+    })
+    expect(router.currentRoute.value.query.month).toBe('2026-08')
+  })
+
+  it('must not fire: the central bank’s rate is not «my rate», and a count not sent is no figure', async () => {
     moneyMonth.mockResolvedValue(
       month({
+        count: null,
+        incomeCount: null,
         rate: {
           base: 'RUB',
           quote: 'AMD',
@@ -704,27 +564,36 @@ describe('MoneyView: the way into the exchanges and incomes (MOL-81)', () => {
       }),
     )
     const view = await render()
-    expect(entries(view).map(({ text }) => text)).toEqual([en.exchange.title, en.income.title])
+    const texts = entries(view).map(({ text }) => text)
+    expect(texts).toContain(en.spending.list.title)
+    expect(texts).toContain(en.exchange.title)
+    expect(texts).toContain(en.income.title)
   })
 
-  it('is there for a newcomer too — the only way left into them', async () => {
+  it('a newcomer has no «Траты» — nothing to see there — and the rest are there', async () => {
     moneyMonth.mockResolvedValue(empty())
     const view = await render()
     expect(view.text()).toContain(en.spending.empty.title)
-    expect(entries(view).map(({ href }) => href)).toEqual(['/money/exchange', '/money/incomes'])
+    expect(entries(view).map(({ href }) => href)).toEqual([
+      '/money/accounts',
+      '/money/exchange',
+      '/money/incomes',
+      '/money/categories',
+    ])
   })
 
   // A month that will not load must not close the way to the income that broke it (review Т-1).
-  it('stands beside the error and under the skeleton — the month is not the way in', async () => {
+  it('stands beside the error and under the skeleton, with no figure of the month', async () => {
     moneyMonth.mockRejectedValue(new ApiError(ERROR.INTERNAL))
     const failed = await render()
     expect(failed.text()).toContain(en.spending.load_error.title)
-    expect(entries(failed).map(({ href }) => href)).toEqual(['/money/exchange', '/money/incomes'])
+    expect(entries(failed).map(({ href }) => href)).toContain('/money/incomes')
+    expect(entries(failed)[0]).toMatchObject({ text: en.spending.list.title })
 
     moneyMonth.mockReturnValue(new Promise(() => undefined))
     const loading = await render()
     expect(loading.find('.skeleton').exists()).toBe(true)
-    expect(entries(loading)).toHaveLength(2)
+    expect(entries(loading)).toHaveLength(5)
   })
 
   it('must not fire: offline with nothing kept — the screens behind it would show nothing either', async () => {
@@ -732,5 +601,198 @@ describe('MoneyView: the way into the exchanges and incomes (MOL-81)', () => {
     moneyMonth.mockRejectedValue(new TypeError('network'))
     const view = await render()
     expect(entries(view)).toEqual([])
+  })
+})
+
+describe('MoneyView: the summary of the month (MOL-159)', () => {
+  it('the tiles are figures, not buttons, and a closed month names the day of its rest', async () => {
+    moneyMonth.mockResolvedValue(month({ month: '2026-08', rateKind: 'frozen' }))
+    const view = await render('/money?month=2026-08')
+    expect(view.findAll('.tiles button')).toHaveLength(0)
+    expect(view.get('.tile.rest').text()).toContain('On accounts Aug 31')
+  })
+
+  it('the journal is «Траты»’s: no row of it here', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    expect(view.text()).not.toContain('Barber')
+    expect(view.find('[data-row]').exists()).toBe(false)
+  })
+
+  it('an empty month says so inside «Куда ушли», unless a spending of it waits on the phone', async () => {
+    moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('100') })
+    recordSpending.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(view.get('.donut').text()).toContain(en.spending.month_empty)
+    useSpendingQueueStore().record({
+      id: 'eeeeeeee-0000-4000-8000-000000000009',
+      spentOn: '2026-09-27',
+      amount: amd('1500'),
+      categoryId: BEAUTY,
+      note: 'Taxi',
+    })
+    await flushPromises()
+    expect(view.get('.donut').text()).not.toContain(en.spending.month_empty)
+    expect(view.text()).toContain('Not counted yet: 1 spending is being sent')
+  })
+})
+
+describe('MoneyView: what the review of MOL-159 found', () => {
+  async function refused(spentOn: string): Promise<void> {
+    recordSpending.mockRejectedValue(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
+    const queue = useSpendingQueueStore()
+    queue.record({
+      id: 'eeeeeeee-0000-4000-8000-0000000000aa',
+      spentOn,
+      amount: amd('1500'),
+      categoryId: BEAUTY,
+      note: 'Taxi',
+    })
+    await vi.waitFor(() => {
+      expect(queue.rejected).toHaveLength(1)
+    })
+    await flushPromises()
+  }
+
+  // Every edge the rounds found, at once: wherever its row would be, a refused spending is counted
+  // here and leads to «Траты», whose «Не приняты» holds it — never a card whose one action drops it.
+  const full = () =>
+    month({
+      count: 45,
+      cursor: { day: '2026-09-26', moment: 0, id: BARBER },
+      remaining: 44,
+      remainingFrom: '2026-09-01',
+      remainingTo: '2026-09-25',
+    })
+  it.each([
+    ['this month', () => ({ ...empty(), previousSpent: amd('100') }), '2026-09-27'],
+    ['another month (К)', () => ({ ...empty(), previousSpent: amd('100') }), '2026-08-15'],
+    ['a day no page has reached (Е)', full, '2026-09-01'],
+    ['a month not answered yet', null, '2026-09-27'],
+  ] as const)(
+    'А–Н: a refused spending of %s is counted here and leads to «Траты», never to «Discard»',
+    async (_, answer, day) => {
+      if (answer) moneyMonth.mockResolvedValue(answer())
+      else moneyMonth.mockReturnValue(new Promise(() => undefined))
+      const view = await render()
+      await refused(day)
+      expect(view.text()).toContain('1 spending not accepted')
+      expect(view.text()).not.toContain(en.spending.rejected_other.title)
+      expect(view.findAll('button').some((one) => one.text() === en.spending.sheet.dismiss)).toBe(
+        false,
+      )
+      await button(view, en.spending.summary.refused_open).trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.name).toBe('money-spendings')
+    },
+  )
+
+  it('А: a refused spending of the month keeps «Куда ушли» from saying «no spendings»', async () => {
+    moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('100') })
+    const view = await render()
+    await refused('2026-09-27')
+    expect(view.get('.donut').text()).not.toContain(en.spending.month_empty)
+  })
+
+  it('И: a refused amendment of a row no page has brought is counted all the same', async () => {
+    moneyMonth.mockResolvedValue(
+      month({
+        count: 45,
+        cursor: { day: '2026-09-26', moment: 0, id: BARBER },
+        remaining: 44,
+        remainingFrom: '2026-09-01',
+        remainingTo: '2026-09-25',
+      }),
+    )
+    const view = await render()
+    amendSpending.mockRejectedValue(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
+    const queue = useSpendingQueueStore()
+    queue.amend('eeeeeeee-0000-4000-8000-000000000009', 1, {
+      spentOn: '2026-09-02',
+      amount: amd('6000'),
+      categoryId: BEAUTY,
+      note: 'Rent',
+    })
+    await vi.waitFor(() => {
+      expect(queue.rejected).toHaveLength(1)
+    })
+    await flushPromises()
+    expect(view.text()).toContain('1 spending not accepted')
+    expect(view.text()).not.toContain(en.spending.rejected_other.title)
+  })
+
+  it('Ж of round 2: a spending removed on «Траты» keeps its «Undo» here, with what is left of it', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    const queue = useSpendingQueueStore()
+    // What «Удалить» on «Траты» leaves in the queue's store, four seconds before the step back.
+    queue.lastRemoved = {
+      undo: { id: BARBER },
+      title: 'Barber',
+      amount: '֏5,000',
+      stamp: Date.now() - 4000,
+      left: 10,
+      at: Date.now() - 4000,
+    }
+    await flushPromises()
+    expect(view.text()).toContain('Deleted: Barber')
+    expect(view.get('.undo .count').text()).toBe('6')
+    await button(view, en.spending.restore).trigger('click')
+    await vi.waitFor(() => {
+      expect(restoreSpending).toHaveBeenCalledWith(BARBER)
+    })
+    expect(view.text()).not.toContain('Deleted: Barber')
+  })
+
+  it('З of round 3: held on «Траты» past its ten seconds, «Undo» goes on here from what the strip had left', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    const queue = useSpendingQueueStore()
+    // Removed fifteen seconds ago, a finger on the strip most of that time: it said 9 just now.
+    queue.lastRemoved = {
+      undo: { id: BARBER },
+      title: 'Barber',
+      amount: '֏5,000',
+      stamp: Date.now() - 15_000,
+      left: 9,
+      at: Date.now(),
+    }
+    await flushPromises()
+    expect(view.get('.undo .count').text()).toBe('9')
+    expect(queue.lastRemoved).not.toBeNull()
+  })
+
+  it('Ж, must not fire: a removal whose ten seconds ran out while no screen showed it is not offered', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    const queue = useSpendingQueueStore()
+    queue.lastRemoved = {
+      undo: { id: BARBER },
+      title: 'Barber',
+      amount: '֏5,000',
+      stamp: Date.now() - 11_000,
+      left: 10,
+      at: Date.now() - 11_000,
+    }
+    await flushPromises()
+    expect(view.text()).not.toContain('Deleted: Barber')
+    expect(queue.lastRemoved).toBeNull()
+  })
+
+  // «Счета», «Обмен денег» and «Категории» are «now», not the month's (handoff MOL-157 01): their
+  // figures come from answers of their own and stand whatever the month is doing.
+  it('Г: under the error and the skeleton, «Счета» and «Категории» keep their own figures', async () => {
+    moneyMonth.mockResolvedValueOnce(month())
+    const first = await render()
+    first.unmount()
+    moneyMonth.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render('/money?month=2026-08')
+    expect(view.text()).toContain(en.spending.load_error.title)
+    const links = view.findAll(`nav[aria-label="${en.spending.entries_label}"] a`)
+    const label = (href: string) =>
+      links.find((link) => link.attributes('href') === href)?.attributes('aria-label')
+    expect(label('/money/accounts')).toBe(`${en.accounts.title}, 0`)
+    expect(label('/money/categories')).toBe(`${en.spending.categories_link}, 1`)
+    expect(label('/money/spendings?month=2026-08')).toBeUndefined()
   })
 })

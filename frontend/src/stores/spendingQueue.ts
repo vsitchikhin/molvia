@@ -36,7 +36,17 @@ export type SpendingFields = Omit<SpendingBody, 'id'>
  */
 export type SpendingWrite =
   | { readonly kind: 'record'; readonly body: SpendingBody }
-  | { readonly kind: 'amend'; readonly id: string; readonly body: SpendingAmendBody }
+  | {
+      readonly kind: 'amend'
+      readonly id: string
+      readonly body: SpendingAmendBody
+      /**
+       * «Сохраните ещё раз поверх» after a conflict (MOL-159): sent over the revision the server
+       * holds as it leaves, asked of it then — the phone has it on no page it read, and the
+       * revision the amendment was refused over is the one that conflicts.
+       */
+      readonly over?: true
+    }
   | { readonly kind: 'remove'; readonly id: string }
   | { readonly kind: 'restore'; readonly id: string }
   | { readonly kind: 'category-add'; readonly body: SpendingCategoryBody }
@@ -96,7 +106,12 @@ function encode(write: SpendingWrite): Loose {
     case 'record':
       return { kind: write.kind, body: spendingBodySchema.encode(write.body) }
     case 'amend':
-      return { kind: write.kind, id: write.id, body: spendingAmendBodySchema.encode(write.body) }
+      return {
+        kind: write.kind,
+        id: write.id,
+        body: spendingAmendBodySchema.encode(write.body),
+        ...(write.over ? { over: true } : {}),
+      }
     case 'category-add':
       return { kind: write.kind, body: spendingCategoryBodySchema.encode(write.body) }
     default:
@@ -119,7 +134,10 @@ function decode(raw: unknown): SpendingWrite | null {
   if (typeof id !== 'string' || !isIdentifier(id)) return null
   if (kind === 'amend') {
     const body = spendingAmendBodySchema.safeParse(raw.body)
-    return body.success ? { kind, id, body: body.data } : null
+    if (!body.success) return null
+    return raw.over === true
+      ? { kind, id, body: body.data, over: true }
+      : { kind, id, body: body.data }
   }
   if (
     kind === 'remove' ||
@@ -245,6 +263,25 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
    */
   const arrived = ref<Extract<SpendingWrite, { kind: 'category-add' }>[]>([])
   /**
+   * The spending just removed, offered back for the ten seconds of its strip on «Траты» and
+   * «Деньги» alike, as a trip's is (MOL-76): held by the screen, «Вернуть» went with «Траты» on
+   * the step back to the summary — the very screen where a sum fallen short shows the mistake
+   * (adversarial round 2 of MOL-159, Ж). The server keeps the removal ten minutes.
+   */
+  const lastRemoved = ref<{
+    readonly undo: SpendingUndo
+    readonly title: string
+    readonly amount: string
+    readonly stamp: number
+    /**
+     * The seconds the strip had left at `at` — reported by the strip itself, which stands still
+     * while a finger or the focus is on it; the clock from the removal ran on under a held strip,
+     * and the summary forgot an «Вернуть» «Траты» still offered (adversarial round 3, З).
+     */
+    readonly left: number
+    readonly at: number
+  } | null>(null)
+  /**
    * The spendings whose removal has landed, and when. Out of the queue on its answer, a removal no
    * longer hides its row, while the month on screen is still the answer read before it: the row
    * came back for a moment, and its day shrank, grew and shrank again (MOL-151, adversarial А3).
@@ -300,6 +337,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     kept = []
     rejected.value = []
     arrived.value = []
+    lastRemoved.value = null
     gone.value = id ? recallLanded(`${GONE_KEY}.${id}`) : []
     sync(id)
     show()
@@ -358,7 +396,12 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
         await api.recordSpending(write.body)
         return
       case 'amend':
-        await api.amendSpending(write.id, write.body)
+        await api.amendSpending(
+          write.id,
+          write.over
+            ? { ...write.body, revision: (await api.spending(write.id)).revision }
+            : write.body,
+        )
         return
       case 'remove':
         await api.removeSpending(write.id)
@@ -496,9 +539,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     }
     if (write.kind === 'amend') {
       const fields = laterFields(write.id)
-      return fields
-        ? { kind: 'amend', id: write.id, body: amendOf(write.body.revision, fields) }
-        : write
+      return fields ? { ...write, body: amendOf(write.body.revision, fields) } : write
     }
     return write
   }
@@ -525,7 +566,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
    * «Сохранить» an amendment over `revision` — the version the screen showed. Folded into what
    * waits for the same spending, in its place and under a new key.
    */
-  function amend(id: string, revision: number, fields: SpendingFields): void {
+  function amend(id: string, revision: number, fields: SpendingFields, over = false): void {
     change(() => {
       const at = kept.findIndex(
         (item) =>
@@ -544,8 +585,9 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
       }
       if (earlier?.kind === 'amend') {
         const body = amendOf(earlier.body.revision, fields)
+        const folded = earlier.over || over ? ({ over: true } as const) : {}
         kept = kept.map((item, index) =>
-          index === at ? { key: newKey(), write: { kind: 'amend', id, body } } : item,
+          index === at ? { key: newKey(), write: { kind: 'amend', id, body, ...folded } } : item,
         )
         return
       }
@@ -560,7 +602,14 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
           : moving?.kind === 'amend'
             ? moving.body.revision + 1
             : revision
-      kept = [...kept, { key: newKey(), write: { kind: 'amend', id, body: amendOf(base, fields) } }]
+      // Behind one sent over whatever the server held, the revision it made is not known here:
+      // this one asks too, or it went over a guess and came back a conflict (round 6, О).
+      const mark =
+        over || (moving?.kind === 'amend' && moving.over) ? ({ over: true } as const) : {}
+      kept = [
+        ...kept,
+        { key: newKey(), write: { kind: 'amend', id, body: amendOf(base, fields), ...mark } },
+      ]
     })
   }
 
@@ -650,6 +699,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     rejected,
     landed,
     arrived,
+    lastRemoved,
     gone,
     flush,
     record,

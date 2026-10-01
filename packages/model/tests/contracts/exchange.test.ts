@@ -203,6 +203,20 @@ describe('exchangesResponseCodec', () => {
         ],
       },
     ],
+    losses: {
+      total: money(-1_338_100n, 'AMD'),
+      uncounted: 1,
+      groups: [
+        {
+          place: 'Звартноц',
+          count: 1,
+          difference: money(-1_460_400n, 'AMD'),
+          percent: -721,
+          level: -1000,
+        },
+        { place: null, count: 2, difference: money(122_300n, 'AMD'), percent: 149, level: 207 },
+      ],
+    },
   }
 
   it('crosses the wire and comes back the same', () => {
@@ -214,6 +228,7 @@ describe('exchangesResponseCodec', () => {
   it('reads an answer of a server older than the market as having none (MOL-137)', () => {
     const wire: Record<string, unknown> = { ...z.encode(exchangesResponseCodec, response) }
     delete wire.marketToday
+    delete wire.losses
     const [first] = z.encode(exchangesResponseCodec, response).exchanges
     if (!first) throw new Error('no exchange')
     const exchange: Record<string, unknown> = { ...first }
@@ -221,6 +236,7 @@ describe('exchangesResponseCodec', () => {
     delete exchange.channel
     const decoded = exchangesResponseCodec.parse({ ...wire, exchanges: [exchange] })
     expect(decoded.marketToday).toEqual([])
+    expect(decoded.losses).toBeNull()
     expect(decoded.exchanges[0]?.market).toBeNull()
     expect(decoded.exchanges[0]?.channel).toBeNull()
   })

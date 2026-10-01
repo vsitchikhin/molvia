@@ -36,6 +36,7 @@ export interface SpendingsApi {
   /** The use cases, already bound to their repositories by the composition point. */
   record(actor: Asking, body: SpendingBody): Promise<{ spending: SpendingView; created: boolean }>
   amend(actor: Asking, id: string, body: SpendingAmendBody): Promise<SpendingView>
+  one(actor: Asking, id: string): Promise<SpendingView>
   remove(actor: Asking, id: string): Promise<void>
   restore(actor: Asking, id: string): Promise<SpendingView>
   categories(actor: Asking): Promise<SpendingCategoriesResponse>
@@ -74,6 +75,16 @@ export function spendingRoutes(app: FastifyInstance, api: SpendingsApi): void {
     const { spending, created } = await api.record(ownerOf(request), body)
     return privately(reply.code(created ? 201 : 200)).send(z.encode(spendingViewCodec, spending))
   })
+
+  /** The spending as it stands: 404 for a missing, removed or someone else's one alike. */
+  app.get<{ Params: { spendingId: string } }>(
+    '/spendings/:spendingId',
+    { exposeHeadRoute: false },
+    async (request, reply) => {
+      const spending = await api.one(ownerOf(request), request.params.spendingId)
+      return privately(reply).send(z.encode(spendingViewCodec, spending))
+    },
+  )
 
   /** 200 for an amendment and a repeat of it; 409 when it moved on elsewhere; 404 otherwise. */
   app.put<{ Params: { spendingId: string } }>('/spendings/:spendingId', async (request, reply) => {

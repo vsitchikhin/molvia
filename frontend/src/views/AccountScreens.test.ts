@@ -21,7 +21,6 @@ import type {
   TripView,
 } from '@molvia/model'
 import AccountSheet from '@/components/AccountSheet.vue'
-import AccountsCard from '@/components/AccountsCard.vue'
 import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
 import IncomeSheet from '@/components/IncomeSheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
@@ -290,6 +289,27 @@ describe('the currency locked while the sheet was open (adversarial Ж)', () => 
   })
 })
 
+describe('«Не попали в остатки» on «Счета» (MOL-159)', () => {
+  it('stands under the total and opens the operations with no account', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue({ ...page([cash()]), unassigned: 3 })
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    const row = view.get('button.unassigned')
+    expect(row.text()).toContain('3 entries')
+    const total = view.get('.total').element
+    expect(
+      total.compareDocumentPosition(row.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('must not fire: everything went into a balance — no row', async () => {
+    const pinia = session()
+    moneyAccounts.mockResolvedValue(page([cash()]))
+    const view = await open(AccountsView, '/money/accounts', pinia)
+    expect(view.find('button.unassigned').exists()).toBe(false)
+  })
+})
+
 describe('«Вернуть» of a deleted account (adversarial Г)', () => {
   it('stays offered when the answer did not come, goes when it is too late', async () => {
     const pinia = session()
@@ -333,17 +353,6 @@ describe('«По счетам · Подставить» (review 22, adversarial 
       day: '2026-09-15',
     })
     expect(above.find('.held').exists()).toBe(true)
-  })
-})
-
-describe('the card of the accounts offline (review 17, adversarial Е)', () => {
-  it('is never red: a yellow circle, no alert', async () => {
-    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'offline', false))
-    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
-    const view = await open(AccountsCard, '/money', session(), { spendCurrency: 'AMD' })
-    expect(view.get('.circle').classes()).toContain('offline')
-    expect(view.find('[role="alert"]').exists()).toBe(false)
-    online.mockRestore()
   })
 })
 

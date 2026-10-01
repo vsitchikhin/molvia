@@ -115,6 +115,11 @@ export interface MoneyMonth {
   /** What came in, in the income currency, each income by the official rate of its own day (MOL-66). */
   readonly income: Money
   readonly incomeUncounted: readonly Money[]
+  /**
+   * How many incomes «Пришло» is of — counted or not, a salary moved in by `budgetMonthOf` and not
+   * one moved out: the figure beside «Доходы» on «Деньгах» speaks of the same money (MOL-159, Р-2).
+   */
+  readonly incomeCount: number
   /** Days of the salaries of the month before that count in this one («с зарплатой 31 авг.»). */
   readonly shiftedIn: readonly string[]
   /** Days of this month's salaries that count in the next one («зарплата 26 сент. — в октябре»). */
@@ -451,6 +456,7 @@ export function moneyMonth(input: MoneyMonthInput): MoneyMonth {
     spentIncome,
     income,
     incomeUncounted: listOf(incomeUncounted),
+    incomeCount: ofMonth.length,
     shiftedIn: daysOf(ofMonth.filter((income) => monthOf(income.receivedOn) !== input.month)),
     shiftedOut: daysOf(shiftedOut),
     rest: restOf(input.held, incomeCurrency),

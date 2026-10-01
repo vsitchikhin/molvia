@@ -29,17 +29,16 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 
 - `frontend/src/views/AccountScreens.test.ts` — Component test: the account and accounts screens re-ask the page, lock currency, keep «Вернуть», offer «Подставить», stay calm offline, handle check reasons.
 - `frontend/src/views/AccountView.vue` — One account's screen: its balance, start and last check, the journal by day a page at a time, «Сверить с фактом» or «Вернуть».
-- `frontend/src/views/AccountsView.vue` — «Счета» screen: totals in the spending currency, spending and savings accounts, the ones taken out of the choice.
+- `frontend/src/views/AccountsView.vue` — «Счета» screen: totals in the spending currency, «Не попали в остатки» under them (MOL-159), spending and savings accounts, the ones taken out of the choice.
 
 ## frontend · components
 
 - `frontend/src/components/AccountChoice.test.ts` — Component test: the account row and picker in spending, income and trip sheets choose, follow the currency, write «Без счёта» and «Списано».
-- `frontend/src/components/AccountLine.vue` — One account as a row: name, «сбережения» and balance on the «Деньги» card; with currency and last event on «Счета».
+- `frontend/src/components/AccountLine.vue` — One account as a row: name, «сбережения» and balance; with currency and last event on «Счета».
 - `frontend/src/components/AccountPickerSheet.vue` — «Счёт» picker sheet over an operation's sheet: accounts of its currency, others where «списано» covers them, «Без счёта».
 - `frontend/src/components/AccountRow.vue` — «Счёт: Наличные ֏ ›» row in an operation's sheet that opens the picker; absent while the owner has no account.
-- `frontend/src/components/AccountScreens.test.ts` — Component test: «Сверка» asks the fact first and waits for queued writes, «Записать разницу» writes once; account sheet and the «Деньги» card behave.
+- `frontend/src/components/AccountScreens.test.ts` — Component test: «Сверка» asks the fact first and waits for queued writes, «Записать разницу» writes once; the account sheet behaves.
 - `frontend/src/components/AccountSheet.vue` — «Новый счёт» / «Счёт» sheet: name, currency, savings, start; written with a connection only, «Удалить» or «Убрать из выбора».
-- `frontend/src/components/AccountsCard.vue` — «Счета» card on top of «Деньги»: current balances, its own loading and offline state, an offer when there is no account.
 - `frontend/src/components/ChargedField.vue` — «Списано со счёта» field under the account row: what left the account in its currency when the operation was in another.
 - `frontend/src/components/HeldFromAccounts.vue` — «По счетам на …: … · Подставить» hint under «сколько было до» of an exchange or income, filled only on tap.
 - `frontend/src/components/OperationExchangeSheet.vue` — An exchange opened from an account's journal, «не попали» or a check, read from «Обмен денег» and amended in its sheet.

@@ -260,6 +260,28 @@ describe('трата вне похода (MOL-73)', () => {
     expect((await call(stranger, 'PUT', `/spendings/${view.id}`, body)).statusCode).toBe(404)
   })
 
+  it('одна трата (MOL-159): своя — как стоит сейчас; удалённая, чужая и не id — один ответ 404', async () => {
+    const me = await owner()
+    const stranger = await owner()
+    const view = spendingViewCodec.parse((await spend(me)).json())
+    await call(me, 'PUT', `/spendings/${view.id}`, {
+      revision: 1,
+      spentOn: view.spentOn,
+      amount: { amount: '5500', currency: 'AMD' },
+      categoryId: view.categoryId,
+    })
+    const one = await call(me, 'GET', `/spendings/${view.id}`)
+    expect(one.statusCode).toBe(200)
+    expect(one.headers['cache-control']).toBe('no-store')
+    expect(spendingViewCodec.parse(one.json())).toMatchObject({ id: view.id, revision: 2 })
+    // The identifier in either case, answered in lower case (Р-3).
+    expect((await call(me, 'GET', `/spendings/${view.id.toUpperCase()}`)).statusCode).toBe(200)
+    expect((await call(stranger, 'GET', `/spendings/${view.id}`)).statusCode).toBe(404)
+    expect((await call(me, 'GET', '/spendings/not-an-id')).statusCode).toBe(404)
+    await call(me, 'DELETE', `/spendings/${view.id}`)
+    expect((await call(me, 'GET', `/spendings/${view.id}`)).statusCode).toBe(404)
+  })
+
   it('удаление — 204 и нет в месяце; «Вернуть» — тот же id; через десять минут — 404', async () => {
     const me = await owner()
     const view = spendingViewCodec.parse((await spend(me)).json())
@@ -312,6 +334,8 @@ describe('месяц «Денег» (MOL-73)', () => {
     const counted = await month(me, daysAgo(2).slice(0, 7))
     const lines = counted.days.flatMap((day) => day.entries)
     expect(lines).toHaveLength(2)
+    // «Траты, 2» on «Деньгах» is the rows «Траты» show (MOL-159, Р-1): a line per currency.
+    expect(counted.count).toBe(2)
     // Each line counts the purchases behind its own sum (В-7): the unpriced one is in neither.
     expect(lines.map((line) => (line.kind === 'trip' ? line.items : -1))).toEqual([1, 1])
     expect(counted.byCategory).toEqual([
@@ -409,6 +433,7 @@ describe('месяц «Денег» (MOL-73)', () => {
     })
     const september = await month(me, '2026-09')
     expect(september.income).toEqual({ minor: 9961500n, currency: 'RUB' })
+    expect(september).toMatchObject({ count: 1, incomeCount: 1 })
     expect(september.previousSpent).toEqual({ minor: 100000n, currency: 'AMD' })
     expect(september).toMatchObject({ rest: null, accountsFrom: null })
   })
@@ -437,9 +462,15 @@ describe('месяц «Денег» (MOL-73)', () => {
     expect(first.days[0]?.entries).toHaveLength(40)
     expect(first.days[0]?.total).toEqual({ minor: 450000n, currency: 'AMD' })
     expect(first.remaining).toBe(5)
+    expect(first.count).toBe(45)
     const next = await month(me, today.slice(0, 7), first.cursor ?? undefined)
     expect(next.days[0]?.entries).toHaveLength(5)
     expect(next.cursor).toBeNull()
+    // The count is the month's, not the page's (MOL-159).
+    expect(next.count).toBe(45)
+    const gone = idsOf(first)[0] ?? ''
+    expect((await call(me, 'DELETE', `/spendings/${gone}`)).statusCode).toBe(204)
+    expect((await month(me, today.slice(0, 7))).count).toBe(44)
   })
 })
 

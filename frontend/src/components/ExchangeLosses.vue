@@ -1,23 +1,23 @@
 <template>
   <AppCard as="section" list class="losses" :aria-labelledby="headingId">
     <div class="head">
-      <h2 :id="headingId" class="caption">{{ t('spending.charts.fx_title') }}</h2>
+      <h2 :id="headingId" class="caption">{{ t('exchange.vs_market.title') }}</h2>
       <p class="total" :class="{ negative: losses.total.minor < 0n }">
         {{ signedAmount(losses.total, locale, { plus: true, estimate: true }) }}
       </p>
-      <p class="note">{{ t('spending.charts.fx_note') }}</p>
+      <p class="note">{{ t('exchange.vs_market.note') }}</p>
       <p v-if="losses.uncounted > 0" class="note">
-        {{ t('spending.charts.fx_uncounted', { n: losses.uncounted }, losses.uncounted) }}
+        {{ t('exchange.vs_market.uncounted', { n: losses.uncounted }, losses.uncounted) }}
       </p>
     </div>
     <ul class="rows">
       <li v-for="group in losses.groups" :key="group.place ?? ''" class="row">
-        <span class="place">{{ group.place ?? t('spending.charts.fx_no_place') }}</span>
+        <span class="place">{{ group.place ?? t('exchange.vs_market.no_place') }}</span>
         <span class="percent" :class="toneOf(group.percent)">
           {{ signedPercent(group.percent, locale, true) }}
         </span>
         <span class="meta">{{
-          t('spending.charts.fx_count', { n: group.count }, group.count)
+          t('exchange.vs_market.count', { n: group.count }, group.count)
         }}</span>
         <span class="amount">
           {{ signedAmount(group.difference, locale, { plus: true, estimate: true }) }}
@@ -40,11 +40,6 @@
         </span>
       </li>
     </ul>
-    <RouterLink class="link" :to="{ name: 'exchange' }">
-      <IconSwap class="icon" aria-hidden="true" />
-      <span class="label">{{ t('exchange.title') }}</span>
-      <IconChevron class="chevron" aria-hidden="true" />
-    </RouterLink>
   </AppCard>
 </template>
 
@@ -52,26 +47,27 @@
 import { defineComponent, useId } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import IconChevron from '~icons/mdi/chevron-right'
-import IconSwap from '~icons/mdi/swap-horizontal'
 import { CHART_LEVEL } from '@molvia/model'
-import type { MoneyChartsView } from '@molvia/model'
+import type { ExchangeLossesView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import { signedAmount } from '@/components/accounts'
 import { signedPercent } from '@/components/charts'
 
 /**
- * «Обмены против курса ЦБ РА» (MOL-74, owner's decision В-1): the exchanges of twelve months by
- * exchanger, worst first — each with its count, its percent weighed by the money and its difference
- * in the spending currency, all the server's. Here «плохо / хорошо» is the meaning of the row, so
- * the colours are the verdict's; a bar grows from the centre line, minus to the left.
+ * «Обмены против рынка» (MOL-74, owner's decision В-1; on «Обмен денег» and against the market since
+ * MOL-152 in MOL-159): the exchanges of twelve months by exchanger, worst first — each with its
+ * count, its percent weighed by the money and its difference in the spending currency, all the
+ * server's. The total has no «≈ ₽» (review Р-7 of MOL-157): past differences at today's rate would
+ * creep with the rate. Here «плохо / хорошо» is the meaning of the row, so the colours are the
+ * verdict's, the minus red (Р-2); a bar grows from the centre line, minus to the left. The rows are
+ * not buttons.
  */
 export default defineComponent({
   name: 'ExchangeLosses',
-  components: { AppCard, IconChevron, IconSwap },
+  components: { AppCard },
   props: {
     losses: {
-      type: Object as PropType<NonNullable<MoneyChartsView['exchanges']>>,
+      type: Object as PropType<ExchangeLossesView>,
       required: true,
     },
   },
@@ -103,7 +99,7 @@ export default defineComponent({
 .total {
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--text-title);
+  font-size: var(--text-figure);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 
@@ -194,37 +190,5 @@ export default defineComponent({
   &.good {
     background: var(--good);
   }
-}
-
-.link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--touch-target-lg);
-  padding: 0 var(--space-4);
-  border-top: var(--hairline) solid var(--border);
-  color: var(--text);
-  text-decoration: none;
-
-  &:focus-visible {
-    @include focus-ring(-2px);
-  }
-}
-
-.icon {
-  width: 1.375rem;
-  height: 1.375rem;
-  color: var(--text-muted);
-}
-
-.label {
-  flex: 1;
-  font-size: var(--text-body);
-}
-
-.chevron {
-  width: 1.25rem;
-  height: 1.25rem;
-  color: var(--text-muted);
 }
 </style>

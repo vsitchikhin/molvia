@@ -99,6 +99,7 @@ describe('«Обмен денег» через API (MOL-40)', () => {
         { currency: 'USD', official: null, quotes: [] },
         { currency: 'EUR', official: null, quotes: [] },
       ],
+      losses: null,
     })
   })
 

@@ -24,6 +24,18 @@ async function openMoney(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
 }
 
+/** «Счета» from «Деньги» — by the row «Счета» since the card over the month went (MOL-159). */
+async function openAccounts(page: Page): Promise<void> {
+  await page.getByRole('link', { name: /^Счета/ }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Счета')
+}
+
+/** Back to «Деньги» by the chevron of a screen under it. */
+async function backToMoney(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Деньги' }).first().click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+}
+
 /** The sheet on top — a picker or a reason opened over another is the last one open. */
 function topSheet(page: Page): Locator {
   return page.locator('dialog[open]').last()
@@ -54,11 +66,12 @@ test('счёт, трата с него, «без счёта» в сверке �
   page,
 }) => {
   await openMoney(page)
-  const card = page.locator('.card').filter({ hasText: 'Счета' }).first()
-  await expect(card).toContainText('Где лежат деньги?')
-  await card.getByRole('button', { name: 'Добавить счёт' }).click()
+  await openAccounts(page)
+  await page.getByRole('button', { name: 'Добавить счёт' }).click()
   await addAccount(page, 'Наличные ֏', '10000')
-  await expect(card).toContainText(/Наличные ֏\s*10\s000\s֏/)
+  const account = page.getByRole('link', { name: /Наличные ֏/ })
+  await expect(account).toContainText(/10\s000\s֏/)
+  await backToMoney(page)
 
   // The first account of the currency is put in by the screen.
   await page.getByRole('button', { name: 'Добавить трату' }).click()
@@ -67,10 +80,9 @@ test('счёт, трата с него, «без счёта» в сверке �
   await expect(sheet.getByRole('button', { name: /Выбрать счёт:/ })).toContainText('Наличные ֏')
   await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
   await expect(sheet).toBeHidden()
-  await expect(card).toContainText(/Наличные ֏\s*7\s500\s֏/)
 
-  // «Без счёта» chosen by hand: in no balance, and named under the card.
-  await page.getByRole('button', { name: 'Трата', exact: true }).click()
+  // «Без счёта» chosen by hand: in no balance, and named under the total of «Счета».
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
   await writeSpending(page, '1000', 'Такси')
   await topSheet(page)
     .getByRole('button', { name: /Выбрать счёт:/ })
@@ -81,12 +93,13 @@ test('счёт, трата с него, «без счёта» в сверке �
     .getByRole('radio', { name: /Без счёта/ })
     .click()
   await topSheet(page).getByRole('button', { name: 'Сохранить трату' }).click()
-  await expect(card).toContainText('1 операция не попала в остатки')
-  await expect(card).toContainText(/Наличные ֏\s*7\s500\s֏/)
+  await expect(topSheet(page)).toBeHidden()
+  await openAccounts(page)
+  await expect(page.getByRole('button', { name: /1 операция не попала в остатки/ })).toBeVisible()
+  await expect(account).toContainText(/7\s500\s֏/)
 
   // The check: the fact first, then the server's count, the difference and its reason.
-  await card.getByRole('link', { name: 'Все' }).click()
-  await page.getByRole('link', { name: /Наличные ֏/ }).click()
+  await account.click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Наличные ֏')
   await page.getByRole('button', { name: 'Сверить с фактом' }).click()
   const check = topSheet(page)
@@ -120,9 +133,9 @@ test('разницу, которой нет причины, закрывает �
   page,
 }) => {
   await openMoney(page)
+  await openAccounts(page)
   await page.getByRole('button', { name: 'Добавить счёт' }).click()
   await addAccount(page, 'Карта ֏', '10000')
-  await page.getByRole('link', { name: 'Все' }).click()
   await page.getByRole('link', { name: /Карта ֏/ }).click()
 
   await page.getByRole('button', { name: 'Сверить с фактом' }).click()
@@ -146,10 +159,9 @@ test('счёт без операций удаляется с «Вернуть»,
   page,
 }) => {
   await openMoney(page)
+  await openAccounts(page)
   await page.getByRole('button', { name: 'Добавить счёт' }).click()
   await addAccount(page, 'Лишний', '0')
-  await page.getByRole('link', { name: 'Все' }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Счета')
 
   await page.getByRole('link', { name: /Лишний/ }).click()
   await page.getByRole('button', { name: 'Править' }).click()
@@ -165,11 +177,12 @@ test('счёт без операций удаляется с «Вернуть»,
   await expect(page.getByRole('link', { name: /Лишний/ })).toBeVisible()
 
   // Now with an operation: the server says «убрать», and the history stays.
-  await page.getByRole('button', { name: 'Деньги' }).first().click()
+  await backToMoney(page)
   await page.getByRole('button', { name: 'Добавить трату' }).click()
   await writeSpending(page, '500', 'Вода')
   await topSheet(page).getByRole('button', { name: 'Сохранить трату' }).click()
-  await page.getByRole('link', { name: 'Все' }).click()
+  await expect(topSheet(page)).toBeHidden()
+  await openAccounts(page)
   await page.getByRole('link', { name: /Лишний/ }).click()
   await page.getByRole('button', { name: 'Править' }).click()
   await page.waitForTimeout(400)
@@ -183,33 +196,11 @@ test('счёт без операций удаляется с «Вернуть»,
   await expect(page.getByRole('link', { name: /Лишний/ })).toBeVisible()
 })
 
-// Opened from a line of the card, the account has «Деньги» under it, not «Счета» — and «Вернуть»
-// stands on «Счета» (review 32): «Удалить» goes there, and «назад» from there is «Деньги».
-test('счёт, открытый строкой карточки, удаляется на «Счета» с «Вернуть»', async ({ page }) => {
-  await openMoney(page)
-  await page.getByRole('button', { name: 'Добавить счёт' }).click()
-  await addAccount(page, 'Лишний', '0')
-  await page.getByRole('link', { name: /Лишний/ }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Лишний')
-
-  await page.getByRole('button', { name: 'Править' }).click()
-  await page.waitForTimeout(400)
-  await topSheet(page).getByRole('button', { name: 'Удалить счёт' }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Счета')
-  await expect(page.locator('.undo .text')).toHaveText('Удалено: Лишний')
-  await page.waitForTimeout(1000)
-  await page.getByRole('button', { name: 'Вернуть' }).click()
-  await expect(page.getByRole('link', { name: /Лишний/ })).toBeVisible()
-
-  await page.goBack()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
-})
-
 test('без связи счета не красные, а шторка счёта ждёт связь', async ({ page, context }) => {
   await openMoney(page)
+  await openAccounts(page)
   await page.getByRole('button', { name: 'Добавить счёт' }).click()
   await addAccount(page, 'Наличные ֏', '1000')
-  await page.getByRole('link', { name: 'Все' }).click()
   await expect(page.getByRole('link', { name: /Наличные ֏/ })).toBeVisible()
 
   await context.setOffline(true)
@@ -228,9 +219,9 @@ test('без связи «Сверить» ждёт связь и не крас�
   context,
 }) => {
   await openMoney(page)
+  await openAccounts(page)
   await page.getByRole('button', { name: 'Добавить счёт' }).click()
   await addAccount(page, 'Наличные ֏', '1000')
-  await page.getByRole('link', { name: 'Все' }).click()
   await page.getByRole('link', { name: /Наличные ֏/ }).click()
 
   await context.setOffline(true)
@@ -250,9 +241,10 @@ test('без связи «Сверить» ждёт связь и не крас�
 test.describe('320 px, English', () => {
   test.use({ locale: 'en-US', viewport: { width: 320, height: 640 } })
 
-  test('the card, the page, the account and the check fit and speak English', async ({ page }) => {
+  test('the page, the account and the check fit and speak English', async ({ page }) => {
     await signedIn(page)
     await page.getByRole('link', { name: 'Money', exact: true }).click()
+    await page.getByRole('link', { name: /^Accounts/ }).click()
     await page.getByRole('button', { name: 'Add account' }).click()
     const sheet = topSheet(page)
     await expect(sheet).toContainText('New account')
@@ -266,11 +258,8 @@ test.describe('320 px, English', () => {
 
     const noSideScroll = () =>
       page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
-    await expect(page.getByRole('link', { name: /Card in roubles/ })).toBeVisible()
-    expect(await noSideScroll()).toBe(true)
-
-    await page.getByRole('link', { name: 'All' }).click()
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Accounts')
+    await expect(page.getByRole('link', { name: /Card in roubles/ })).toBeVisible()
     expect(await noSideScroll()).toBe(true)
 
     await page.getByRole('link', { name: /Card in roubles/ }).click()

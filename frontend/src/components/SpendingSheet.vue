@@ -757,7 +757,15 @@ export default defineComponent({
       // its record makes, which folds into it while nobody has begun to send it (review Т-4).
       else if (refused?.write.kind === 'record') queue.record({ id: row.spending.id, ...fields })
       else if (row.local) queue.amend(row.spending.id, 1, fields)
-      else queue.amend(row.spending.id, row.spending.revision, fields)
+      // «Сохраните ещё раз поверх»: over what the server holds when it leaves, asked of it then —
+      // the revision on screen may be the very one that conflicted (adversarial round 6, О).
+      else
+        queue.amend(
+          row.spending.id,
+          row.spending.revision,
+          fields,
+          refused?.write.kind === 'amend' && refused.code === ERROR.CONFLICT,
+        )
       // Told once the sheet is away: a move of the month made while it was open was undone by the
       // step back that closes it (adversarial И).
       after = () => {
@@ -808,8 +816,10 @@ export default defineComponent({
     function openTrip(): void {
       if (props.target.kind !== 'trip') return
       const tripId = props.target.row.tripId
-      after = () =>
-        void router.push({ name: 'purchase', params: { tripId }, query: { from: 'money' } })
+      // Back to the screen it was opened from — «Траты» since MOL-159 (`meta.from`, MOL-82 В-3).
+      const from =
+        router.currentRoute.value.name === 'money-spendings' ? 'money-spendings' : 'money'
+      after = () => void router.push({ name: 'purchase', params: { tripId }, query: { from } })
       emit('update:open', false)
     }
 

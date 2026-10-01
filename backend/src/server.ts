@@ -81,6 +81,7 @@ import {
   recordSpending,
   removeSpending,
   restoreSpending,
+  spendingOfOwner,
   spendingCategoriesOf,
 } from '@/usecases/spendings'
 import { chooseSalaryShift, moneyMonthOf, salaryShiftOf } from '@/usecases/money-month'
@@ -577,6 +578,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       spendingRoutes(guarded, {
         record: (actor, body) => recordSpending(tripData, actor, body),
         amend: (actor, id, body) => amendSpending(tripData, actor, id, body),
+        one: (actor, id) => spendingOfOwner(tripData, actor, id),
         remove: (actor, id) => removeSpending(tripData, actor, id),
         restore: (actor, id) => restoreSpending(tripData, actor, id),
         categories: (actor) => spendingCategoriesOf(tripData, actor),

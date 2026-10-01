@@ -238,17 +238,19 @@ function localView(
  * The month's journal with the queue laid over it (MOL-82, requirements 12–15): a spending still
  * on the phone stands at the top of its day marked «Отправляем…», an amendment not yet sent marks
  * the server's row — whose figures stay the server's until it answers — a removal hides the row,
- * and a refusal marks it «Не принята». A spending of a day the loaded pages have not reached yet
- * waits for them: shown there, it would stand among the wrong neighbours.
+ * and a refusal about a row on screen marks it «Не принята»: that row is where it is put right, and
+ * any amendment of it takes the refusal away. A spending of a day the loaded pages have not reached
+ * yet waits for them: shown there, it would stand among the wrong neighbours. A refusal with no row
+ * on screen is `refusedRows`'s (MOL-159).
  */
 export function journalOf(
   month: MoneyMonthView,
   pending: readonly SpendingWrite[],
-  rejected: readonly RejectedSpendingWrite[],
   /** Trips whose removal is still on its way (MOL-76): their lines go, the figures stay the server's. */
   removedTrips: ReadonlySet<string> = new Set(),
   /** Spendings whose removal landed after this month was read (MOL-151): gone, not back for a moment. */
   gone: ReadonlySet<string> = new Set(),
+  rejected: readonly RejectedSpendingWrite[] = [],
 ): JournalDay[] {
   const removing = beingRemoved(pending)
   const editing = new Set(pending.flatMap((write) => (write.kind === 'amend' ? [write.id] : [])))
@@ -296,25 +298,19 @@ export function journalOf(
 
   const known = new Set(days.flatMap((day) => day.rows.map((row) => row.key)))
   const reached = month.cursor === null ? '' : (month.days.at(-1)?.day ?? '')
-  const local = [
-    ...pending.flatMap((write) => (write.kind === 'record' ? [{ write, refusal: null }] : [])),
-    ...rejected.flatMap((item) =>
-      item.write.kind === 'record' ? [{ write: item.write, refusal: item }] : [],
-    ),
-  ]
-  for (const { write, refusal } of local) {
+  for (const write of pending) {
+    if (write.kind !== 'record') continue
     const spending = localView(write, pending)
     if (known.has(spending.id) || removing.has(spending.id)) continue
-    if (!spending.spentOn.startsWith(month.month)) continue
-    if (spending.spentOn < reached) continue
+    if (!spending.spentOn.startsWith(month.month) || spending.spentOn < reached) continue
     known.add(spending.id)
     const row: JournalRow = {
       kind: 'manual',
       key: spending.id,
       spending,
       counted: null,
-      mark: refusal ? 'refused' : 'waiting',
-      refusal,
+      mark: 'waiting',
+      refusal: null,
       local: true,
     }
     const at = days.findIndex((day) => day.day <= spending.spentOn)
@@ -327,6 +323,72 @@ export function journalOf(
     }
   }
   return days.filter((day) => day.rows.length > 0)
+}
+
+/**
+ * Every spending the server refused, as rows of its own — «Не приняты» on top of «Траты», whatever
+ * the month and its pages (MOL-159); the screen leaves out one whose row the journal shows marked,
+ * so a refusal stands once (adversarial round 6, П). Laid into the journal, a refusal stood only where the journal
+ * guessed its row was: a page not loaded, a month not answered, another month, a date moved across
+ * the month's edge, a spending removed elsewhere — each guess was a refusal left on a card whose one
+ * action threw the typing away (adversarial rounds 1–5). Here nothing is guessed: each opens on
+ * what was typed, and an amendment of a row the month has loaded goes again over the server's
+ * revision; one of a row not loaded, over the revision it was made on.
+ */
+export function refusedRows(
+  month: MoneyMonthView | null,
+  rejected: readonly RejectedSpendingWrite[],
+  pending: readonly SpendingWrite[],
+): Extract<JournalRow, { kind: 'manual' }>[] {
+  const loaded = new Map(
+    (month?.days ?? []).flatMap((day) =>
+      day.entries.flatMap((entry) =>
+        entry.kind === 'manual' ? [[entry.spending.id, entry] as const] : [],
+      ),
+    ),
+  )
+  return rejected.flatMap((refusal): Extract<JournalRow, { kind: 'manual' }>[] => {
+    const { write } = refusal
+    if (write.kind === 'record')
+      return [
+        {
+          kind: 'manual',
+          key: write.body.id,
+          spending: localView(write, pending),
+          counted: null,
+          mark: 'refused',
+          refusal,
+          local: true,
+        },
+      ]
+    if (write.kind !== 'amend') return []
+    const { id, body } = write
+    const held = loaded.get(id)?.spending
+    // The row says what was typed and refused; the revision is the server's when the month holds it.
+    return [
+      {
+        kind: 'manual',
+        key: id,
+        spending: {
+          id,
+          spentOn: body.spentOn,
+          amount: body.amount,
+          categoryId: body.categoryId,
+          note: body.note ?? null,
+          place: body.place ?? null,
+          rate: null,
+          accountId: body.accountId === undefined ? (held?.accountId ?? null) : body.accountId,
+          debited: body.debited ?? null,
+          revision: held?.revision ?? body.revision,
+          amendedAt: null,
+        },
+        counted: null,
+        mark: 'refused',
+        refusal,
+        local: false,
+      },
+    ]
+  })
 }
 
 /**

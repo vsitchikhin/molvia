@@ -16,6 +16,7 @@ import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
+import MoneySpendingsView from '@/views/MoneySpendingsView.vue'
 import MoneyView from '@/views/MoneyView.vue'
 
 const moneyMonth = vi.fn<(month: string, cursor?: JournalKey) => Promise<MoneyMonthView>>()
@@ -55,6 +56,8 @@ function month(spentOn: string): MoneyMonthView {
     spentIncome: rub('217'),
     income: rub('0'),
     incomeUncounted: [],
+    count: 0,
+    incomeCount: 0,
     shiftedIn: [],
     shiftedOut: [],
     rest: null,
@@ -102,7 +105,8 @@ function month(spentOn: string): MoneyMonthView {
 const views: VueWrapper[] = []
 let clock = 0
 
-async function render(handed?: SpendingPrefill): Promise<VueWrapper> {
+/** «Деньги» by default; the rows of the journal are on «Траты» (MOL-159). */
+async function render(handed?: SpendingPrefill, path = '/money'): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
   const actor = useActorStore()
@@ -110,8 +114,8 @@ async function render(handed?: SpendingPrefill): Promise<VueWrapper> {
   actor.state = 'ready'
   if (handed) useSpendingHandoffStore().hand(handed)
   const router = createRouter({ history: createMemoryHistory(), routes })
-  await router.push('/money')
-  const view = mount(MoneyView, {
+  await router.push(path)
+  const view = mount(path === '/money' ? MoneyView : MoneySpendingsView, {
     attachTo: document.body,
     global: { plugins: [pinia, router, createAppI18n('en')] },
   })
@@ -185,7 +189,7 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
     const view = await render()
     await view
       .findAll('button')
-      .find((one) => one.text().trim() === en.spending.add)
+      .find((one) => one.text().trim() === en.spending.summary.add)
       ?.trigger('click')
     await risen()
     expect(dayField().value).toBe('2026-09-28')
@@ -197,7 +201,7 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
     const view = await render()
     await view
       .findAll('button')
-      .find((one) => one.text().trim() === en.spending.add)
+      .find((one) => one.text().trim() === en.spending.summary.add)
       ?.trigger('click')
     await risen()
     const dialog = document.querySelector<HTMLDialogElement>('dialog[open]')
@@ -219,7 +223,7 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
   // by a day this phone has not reached; its note must still be amendable here (adversarial Л).
   it('a spending of a day ahead of the phone keeps its day and takes a new note', async () => {
     moneyMonth.mockResolvedValue(month('2026-09-29'))
-    const view = await render()
+    const view = await render(undefined, '/money/spendings')
     await amendNote(view)
     expect(dayField().max).toBe('2026-09-29')
     await pressUntil(en.spending.sheet.save, () => {
@@ -233,7 +237,7 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
 
   it('the journal says «Today» of the phone’s day, and «Yesterday» once its midnight is past (Т-3, adversarial Н)', async () => {
     moneyMonth.mockResolvedValue(month('2026-09-28'))
-    const view = await render()
+    const view = await render(undefined, '/money/spendings')
     expect(view.text()).toContain('Today · September 28')
     vi.setSystemTime(new Date('2026-09-29T00:20:00Z'))
     document.dispatchEvent(new Event('visibilitychange'))

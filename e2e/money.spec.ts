@@ -7,16 +7,22 @@ import { asBrowser, signedIn } from './session'
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
 /**
- * «Деньги» end to end (MOL-82): a spending written on the screen goes through the queue, the
- * month the server counts takes it in, a removal comes back with «Вернуть» — and all of it with
- * no connection too. What no component test shows is that the screen, the queue and the server
- * agree.
+ * «Деньги» end to end (MOL-82, MOL-159): a spending written on the summary goes through the queue,
+ * the month the server counts takes it in, its row is on «Траты», a removal there comes back with
+ * «Вернуть» — and all of it with no connection too. What no component test shows is that the
+ * screens, the queue and the server agree.
  */
 
 async function openMoney(page: Page): Promise<void> {
   await signedIn(page)
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+}
+
+/** «Траты» of the month on screen, by its row on «Деньги» (MOL-159). */
+async function openSpendings(page: Page): Promise<void> {
+  await page.getByRole('link', { name: /^Траты/ }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Траты')
 }
 
 async function writeSpending(
@@ -53,8 +59,11 @@ test('a spending lands in the month, and a removal comes back with «Верну�
   await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
   await expect(sheet).toBeHidden()
 
-  // The server's figure on the card, and the row in today's day.
+  // The server's figure on the summary, and «Траты, 1» under it; the row is on «Траты».
   await expect(page.locator('.spent .figure')).toHaveText(/5\s000\s֏/)
+  await expect(page.getByRole('link', { name: 'Траты, 1' })).toBeVisible()
+  await openSpendings(page)
+  await expect(page.locator('.total')).toContainText(/1 трата/)
   const row = page.getByRole('button', { name: /Открыть трату: Барбер/ })
   await expect(row).toBeVisible()
 
@@ -64,14 +73,19 @@ test('a spending lands in the month, and a removal comes back with «Верну�
   await sheet.getByRole('button', { name: 'Удалить трату' }).click()
   await expect(sheet).toBeHidden()
   await expect(row).toBeHidden()
-  // The only spending gone, the month read again is empty — a newcomer's screen — and «Вернуть»
-  // still stands: a person reads the strip before reaching for it (adversarial Г).
-  await expect(page.getByRole('heading', { name: 'Добавьте первую трату' })).toBeVisible()
+  // The only spending gone, the month read again is empty — and «Вернуть» still stands: a person
+  // reads the strip before reaching for it (adversarial Г).
+  await expect(page.getByRole('heading', { name: /трат нет/ })).toBeVisible()
   await page.waitForTimeout(1000)
   await page.getByRole('button', { name: 'Вернуть' }).click()
   await expect(row).toBeVisible()
+  await expect(page.locator('.total .figure')).toHaveText(/5\s000\s֏/)
+  await expect(page.getByRole('button', { name: 'Добавить трату' })).toBeVisible()
+
+  // «‹ Деньги» back onto the summary of the same month.
+  await page.getByRole('button', { name: 'Деньги' }).first().click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
   await expect(page.locator('.spent .figure')).toHaveText(/5\s000\s֏/)
-  await expect(page.getByRole('button', { name: 'Трата', exact: true })).toBeVisible()
 })
 
 test('with no connection a spending waits on the phone, uncounted, and goes when it is back', async ({
@@ -84,26 +98,30 @@ test('with no connection a spending waits on the phone, uncounted, and goes when
   await expect(page.locator('.spent .figure')).toHaveText(/160\s000\s֏/)
 
   await context.setOffline(true)
-  await page.getByRole('button', { name: 'Трата', exact: true }).click()
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
   await expect(page.locator('dialog[open]')).toContainText('Нет связи')
   await writeSpending(page, '1500', 'Транспорт', 'Такси')
 
-  // A row «Отправляем…», a line on the card — and the total is still the server's (Р-3).
+  // A line on the card — and the total is still the server's (Р-3); on «Траты», a row
+  // «Отправляем…» and a word beside the sum.
+  await expect(page.locator('.spent')).toContainText('Ещё не учтено: 1 трата отправляется')
+  await expect(page.locator('.spent .figure')).toHaveText(/160\s000\s֏/)
+  await openSpendings(page)
   await expect(page.getByRole('button', { name: /Открыть трату: Такси/ })).toContainText(
     'Отправляем…',
   )
-  await expect(page.locator('.spent')).toContainText('Ещё не учтено: 1 трата отправляется')
-  await expect(page.locator('.spent .figure')).toHaveText(/160\s000\s֏/)
+  await expect(page.locator('.total')).toContainText('1 ещё не учтена')
+  await expect(page.locator('.total .figure')).toHaveText(/160\s000\s֏/)
 
   await context.setOffline(false)
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
-  await expect(page.locator('.spent .figure')).toHaveText(/161\s500\s֏/)
+  await expect(page.locator('.total .figure')).toHaveText(/161\s500\s֏/)
   await expect(page.getByRole('button', { name: /Открыть трату: Такси/ })).not.toContainText(
     'Отправляем…',
   )
 })
 
-test('a spending saved while another month is looked at brings the screen to its own month', async ({
+test('a spending of another month: «Траты» go to it, the summary stays on its own (MOL-159)', async ({
   page,
 }) => {
   await openMoney(page)
@@ -112,11 +130,18 @@ test('a spending saved while another month is looked at brings the screen to its
   await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
   await expect(page).toHaveURL(/month=\d{4}-\d{2}/)
 
-  await page.getByRole('button', { name: 'Трата', exact: true }).click()
+  // The summary has no row to show: it stays on the month looked at (handoff MOL-157 06).
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
   await writeSpending(page, '1500', 'Транспорт', 'Такси')
-  // Today's spending: the screen comes back to this month and shows it (adversarial И).
+  await expect(page).toHaveURL(/month=\d{4}-\d{2}/)
+
+  // «Траты» open on that month; today's spending takes them to this one, row in view (adversarial И).
+  await openSpendings(page)
+  await expect(page).toHaveURL(/month=\d{4}-\d{2}/)
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  await writeSpending(page, '700', 'Транспорт', 'Автобус')
   await expect(page).not.toHaveURL(/month=/)
-  await expect(page.getByRole('button', { name: /Открыть трату: Такси/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Открыть трату: Автобус/ })).toBeVisible()
 })
 
 test('changing the month writes nothing into the history', async ({ page }) => {
@@ -134,9 +159,10 @@ function lastMonthDay(): string {
   return day.toISOString().slice(0, 10)
 }
 
-// The switcher is under the accounts card: taken to the top, it went down by the card, and the next
-// tap on the arrow missed it (MOL-136). Where it stands on the screen is what the thumb finds.
-/** Twelve spendings on each day given, then «Деньги» open on this month's twelve. */
+// Taken to the top, the switcher went down by what stood over it, and the next tap on the arrow
+// missed it (MOL-136). Where it stands on the screen is what the thumb finds — on «Траты», whose
+// journal makes the page tall (MOL-159).
+/** Twelve spendings on each day given, then «Траты» open on this month's twelve. */
 async function twelveADay(page: Page, days: string[]): Promise<void> {
   await signedIn(page)
   const headers = await asBrowser(page)
@@ -157,6 +183,7 @@ async function twelveADay(page: Page, days: string[]): Promise<void> {
       expect(response.status(), await response.text()).toBe(201)
     }
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await openSpendings(page)
   await expect(page.getByRole('button', { name: /Открыть трату/ })).toHaveCount(12)
 }
 
@@ -218,7 +245,7 @@ test('an empty month after a full one keeps the switcher where it was', async ({
   expect(scrolled).toBeGreaterThan(0)
 
   await previous.click()
-  await expect(page.getByText('В этом месяце трат нет')).toBeVisible()
+  await expect(page.getByRole('heading', { name: /трат нет/ })).toBeVisible()
   expect(await topOf(previous)).toBe(120)
   expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
 })
@@ -232,10 +259,10 @@ test('offline, a month not read keeps the switcher where it was, at the top of t
   await twelveADay(page, [yerevanDay(), lastMonthDay()])
   await context.setOffline(true)
   await page.evaluate(() => window.dispatchEvent(new Event('offline')))
-  const strip = page.getByText(/Нет связи. Новые траты сохраняются/)
+  const strip = page.getByText(/Нет связи. Траты на/)
   await expect(strip).toBeVisible()
 
-  // Not scrolled at all: where «Деньги» open, and where nothing can be made up by the scroll
+  // Not scrolled at all: where «Траты» open, and where nothing can be made up by the scroll
   // (adversarial round 2, Г).
   const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
   expect(await page.evaluate(() => window.scrollY)).toBe(0)
@@ -266,7 +293,7 @@ test('offline, between two months the phone keeps, the switcher stays over the s
 
   await context.setOffline(true)
   await page.evaluate(() => window.dispatchEvent(new Event('offline')))
-  const strip = page.getByText(/Нет связи. Новые траты сохраняются/)
+  const strip = page.getByText(/Нет связи. Траты на/)
   await expect(strip).toBeVisible()
   await standAt(previous, 120)
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
@@ -282,9 +309,12 @@ test('offline, between two months the phone keeps, the switcher stays over the s
   expect(await topOf(next)).toBe(120)
 })
 
-// A refusal of the queue is a row of its own month and a card on any other: it belongs to the month
-// shown, and it stands under the switcher (adversarial round 3, Ж).
-test('a refused spending moves nothing as the month changes, card or row', async ({ page }) => {
+// A refused spending is a row of «Не приняты» on top of «Траты» in every month (MOL-159), never a
+// card that drops it; it stands under the switcher and moves nothing as the month changes
+// (adversarial round 3, Ж).
+test('a refused spending moves nothing as the month changes: its row stands in every month', async ({
+  page,
+}) => {
   await twelveADay(page, [yerevanDay(), lastMonthDay()])
   await page.route('**/api/spendings', (route) =>
     route.request().method() === 'POST'
@@ -295,23 +325,28 @@ test('a refused spending moves nothing as the month changes, card or row', async
         })
       : route.fallback(),
   )
-  await page.getByRole('button', { name: 'Трата', exact: true }).click()
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
   await writeSpending(page, '1500', 'Транспорт', 'Такси')
-  const refusal = page.getByRole('heading', { name: 'Сервер не принял действие' })
-  await expect(page.getByRole('button', { name: /Открыть трату: Такси/ })).toBeVisible()
-  await expect(refusal).toHaveCount(0)
+  const card = page.getByRole('heading', { name: 'Сервер не принял действие' })
+  const row = page.getByRole('button', { name: /Открыть трату: Такси/ })
+  const group = page.getByRole('heading', { name: 'Не приняты' })
+  await expect(row).toBeVisible()
+  await expect(group).toBeVisible()
+  await expect(card).toHaveCount(0)
 
   const previous = page.getByRole('button', { name: 'Предыдущий месяц' })
   await standAt(previous, 120)
   await previous.click()
   await expect(page).toHaveURL(/month=/)
-  await expect(refusal).toBeVisible()
+  await expect(row).toBeVisible()
+  await expect(card).toHaveCount(0)
   expect(await topOf(previous)).toBe(120)
 
   const next = page.getByRole('button', { name: 'Следующий месяц' })
   await next.click()
   await expect(page).not.toHaveURL(/month=/)
-  await expect(refusal).toHaveCount(0)
+  await expect(row).toBeVisible()
+  await expect(card).toHaveCount(0)
   expect(await topOf(next)).toBe(120)
 })
 
@@ -362,9 +397,8 @@ test('a category of one’s own is made from the sheet, and a preset’s name is
   await expect(sheet.getByRole('radio', { name: 'Такси' })).toBeChecked()
   await sheet.getByRole('button', { name: 'Сохранить трату' }).click()
   await expect(sheet).toBeHidden()
-  await expect(page.getByRole('button', { name: /Открыть трату: Такси/ })).toBeVisible()
 
-  await page.getByRole('link', { name: 'Категории' }).click()
+  await page.getByRole('link', { name: /^Категории/ }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Категории')
   await expect(page.getByText('Такси')).toBeVisible()
   await page.getByRole('button', { name: 'Убрать категорию «Такси»' }).click()
@@ -475,7 +509,7 @@ test('«зарплата — в следующий месяц»: the salary coun
   expect(shift.status()).toBe(200)
 
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
-  const income = page.locator('.tile.income')
+  const income = page.locator('.tiles .tile').first()
   // Last month's salary is this month's «Пришло»; today's has gone to the next one.
   await expect(income).toContainText(/1\s*000\s*₽/)
   await expect(income).toContainText('с зарплатой')

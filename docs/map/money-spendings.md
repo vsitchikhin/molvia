@@ -45,7 +45,8 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 
 - `frontend/src/views/MoneyCategoriesView.vue` — «Деньги → Категории» screen: the owner's category list, «Убрать» and «Вернуть», through the queue.
 - `frontend/src/views/MoneyChartsView.vue` — «Графики» screen: «Месяц · Год» and the month in the address by `replace`, a bookmark of the old period opening the year.
-- `frontend/src/views/MoneyView.vue` — «Деньги» screen: one month counted by the server — spent, came in, «Куда ушли», the journal by day, queued rows marked.
+- `frontend/src/views/MoneyView.vue` — «Деньги» screen: the summary of one month counted by the server — spent, came in, «Остаток», «Куда ушли» — and five ways out with one figure each.
+- `frontend/src/views/MoneySpendingsView.vue` — «Траты» screen (MOL-159): the journal of the month by day, a page at a time, queued rows marked, the server's count and sum on top.
 
 ## frontend · components
 
@@ -56,10 +57,10 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/components/DeviationBars.vue` — «Против обычного»: the categories furthest from their usual month, a bar and the usual's mark, ±% with an arrow in the text's colour, «новая», the card of too few months.
 - `frontend/src/components/PaceLine.vue` — «Темп месяца»: the month's running total solid against the usual dashed, a day chosen on lifting or sideways and by a native range.
 - `frontend/src/components/ChartsMonth.vue` — «Графики → Месяц»: the month's answer in four states and its three cards; the sector and the day chosen on the screen, not in the address.
-- `frontend/src/components/ChartsYear.vue` — «Графики → Год» until MOL-160: the cards of MOL-74 over twelve months, the category in the address, the rate and the exchanges.
+- `frontend/src/components/ChartsYear.vue` — «Графики → Год» until MOL-160: the cards of MOL-74 over twelve months, the category in the address, the rate of the pair.
 - `frontend/src/components/CategoryChips.vue` — Category chips of a spending: a radio group in fixed order, nothing preselected, the last chip «+ Своя».
-- `frontend/src/components/ExchangeLosses.vue` — «Обмены против курса ЦБ РА» card: exchangers worst first, a bar from the centre line, the way to «Обмен денег».
-- `frontend/src/components/MoneyEntries.vue` — Rows on «Деньги» leading to «Обмен денег» and «Доходы», with the person's own rate beside exchanges.
+- `frontend/src/components/ExchangeLosses.vue` — «Обмены против рынка» card on top of «Обмен денег» (MOL-152, MOL-159): exchangers worst first, a bar from the centre line, no «≈ ₽».
+- `frontend/src/components/MoneyEntries.vue` — The ways out of «Деньги»: «Траты» of the month, «Счета», «Обмен денег», «Доходы», «Категории», each with one figure or none until known.
 - `frontend/src/components/MonthSwitcher.vue` — «‹ Сентябрь 2026 ›» month switcher of «Деньги»: no future months, no lower bound, no swipe.
 - `frontend/src/components/NewCategorySheet.vue` — «Новая категория» sheet over the spending sheet: a name, made through the queue, a preset's name refused.
 - `frontend/src/components/RateLine.vue` — The rate of the pair by week on «Графики»: an SVG line broken where there was no rate, one's exchanges as dots, a native range.
@@ -71,6 +72,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 
 ## frontend · composables
 
+- `frontend/src/composables/useMoneyScreen.ts` — Composable: what «Деньги» and «Траты» share — the month in the address by `replace`, the journal and refusals, the spending sheet, «Вернуть».
 - `frontend/src/composables/useMoneyMonth.ts` — Composable: one month of «Деньги» from the server, its later pages, re-read when the queue lands; remembered categories.
 - `frontend/src/composables/useChartPointer.ts` — Composable: a choice made on a chart by the whole area — a mouse on press, a finger on lifting or going sideways, a scroll never.
 - `frontend/src/composables/useMoneyCharts.ts` — Composable: «Графики» of a period and of a month (MOL-158) from the server, through `useKeptAnswer`.

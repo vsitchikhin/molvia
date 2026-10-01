@@ -7,6 +7,7 @@ import {
   journalOf,
   mergePages,
   rateWords,
+  refusedRows,
   unsentIn,
 } from '@/components/spending'
 import type { RejectedSpendingWrite, SpendingWrite } from '@/stores/spendingQueue'
@@ -57,6 +58,8 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     spentIncome: null,
     income: parseMoney('0', 'RUB'),
     incomeUncounted: [],
+    count: 0,
+    incomeCount: 0,
     shiftedIn: [],
     shiftedOut: [],
     rest: null,
@@ -124,7 +127,7 @@ const record = (id: string, spentOn: string): SpendingWrite => ({
 
 describe('the journal with the queue laid over it', () => {
   it('puts a spending still on the phone at the top of its day, with no figure of its own', () => {
-    const days = journalOf(month(), [record(NEW, '2026-09-26')], [])
+    const days = journalOf(month(), [record(NEW, '2026-09-26')])
     expect(days[0]?.rows.map((row) => row.key)).toEqual([NEW, BARBER])
     expect(days[0]?.rows[0]).toMatchObject({ mark: 'waiting', counted: null, local: true })
     // The day's total stays the server's: the phone adds nothing up (Р-3).
@@ -132,49 +135,32 @@ describe('the journal with the queue laid over it', () => {
   })
 
   it('makes a day for one the server has no rows on, and gives it no total', () => {
-    const days = journalOf(month(), [record(NEW, '2026-09-25')], [])
+    const days = journalOf(month(), [record(NEW, '2026-09-25')])
     expect(days.map((day) => day.day)).toEqual(['2026-09-26', '2026-09-25', '2026-09-24'])
     expect(days[1]?.total).toBeNull()
   })
 
   it('leaves out one of another month, and one of a day the pages have not reached', () => {
-    expect(journalOf(month(), [record(NEW, '2026-08-31')], []).flatMap((d) => d.rows)).toHaveLength(
-      3,
-    )
+    expect(journalOf(month(), [record(NEW, '2026-08-31')]).flatMap((d) => d.rows)).toHaveLength(3)
     const cut = month({ cursor: { day: '2026-09-24', moment: 1, id: RENT }, remaining: 5 })
-    const days = journalOf(cut, [record(NEW, '2026-09-20')], [])
+    const days = journalOf(cut, [record(NEW, '2026-09-20')])
     expect(days.flatMap((day) => day.rows.map((row) => row.key))).not.toContain(NEW)
   })
 
   it('hides a row being removed and marks one being amended — its figures stay the server’s', () => {
-    const days = journalOf(
-      month(),
-      [
-        { kind: 'remove', id: BARBER },
-        { kind: 'amend', id: RENT, body: { revision: 2, ...bodyOf(RENT, '2026-09-24') } },
-      ],
-      [],
-    )
+    const days = journalOf(month(), [
+      { kind: 'remove', id: BARBER },
+      { kind: 'amend', id: RENT, body: { revision: 2, ...bodyOf(RENT, '2026-09-24') } },
+    ])
     expect(days.map((day) => day.day)).toEqual(['2026-09-24'])
     expect(days[0]?.rows[0]).toMatchObject({ mark: 'editing', counted: amd('160000') })
   })
 
-  it('marks a refused row «Не принята», and a refused record stands where it would have', () => {
-    const refusals: RejectedSpendingWrite[] = [
-      {
-        key: 'a',
-        write: {
-          kind: 'amend',
-          id: RENT,
-          body: { revision: 1, ...bodyOf(RENT, '2026-09-24') },
-        },
-        code: 'error.conflict',
-      },
-      { key: 'b', write: record(NEW, '2026-09-26'), code: 'error.spending_in_future' },
-    ]
-    const days = journalOf(month(), [], refusals)
-    expect(days[0]?.rows[0]).toMatchObject({ key: NEW, mark: 'refused', local: true })
-    expect(days[1]?.rows[0]).toMatchObject({ key: RENT, mark: 'refused', local: false })
+  it('a refusal is not the journal’s: the row stays the server’s, and no refused record is drawn', () => {
+    const days = journalOf(month(), [])
+    expect(
+      days.flatMap((day) => day.rows).every((row) => row.kind === 'trip' || row.mark === null),
+    ).toBe(true)
   })
 
   it('Н2: a removal taken back by «Вернуть» behind it hides nothing and counts nothing', () => {
@@ -182,7 +168,7 @@ describe('the journal with the queue laid over it', () => {
       { kind: 'remove', id: BARBER },
       { kind: 'restore', id: BARBER },
     ]
-    const days = journalOf(month(), pending, [])
+    const days = journalOf(month(), pending)
     expect(days.flatMap((day) => day.rows.map((row) => row.key))).toContain(BARBER)
     expect(unsentIn(month(), pending)).toBe(0)
   })
@@ -190,39 +176,35 @@ describe('the journal with the queue laid over it', () => {
   // Out of the queue on its answer, a removal hid nothing, and the month read before it brought the
   // row back for a moment (MOL-151, adversarial А3).
   it('hides a spending whose removal landed after the month was read', () => {
-    const shown = journalOf(month(), [], [])
+    const shown = journalOf(month(), [])
     const id = shown.flatMap((day) => day.rows)[0]?.key ?? ''
-    const days = journalOf(month(), [], [], new Set(), new Set([id]))
+    const days = journalOf(month(), [], new Set(), new Set([id]))
     expect(days.flatMap((day) => day.rows.map((row) => row.key))).not.toContain(id)
   })
 
   it('hides a spending still on the phone once its removal waits', () => {
-    const days = journalOf(month(), [record(NEW, '2026-09-26'), { kind: 'remove', id: NEW }], [])
+    const days = journalOf(month(), [record(NEW, '2026-09-26'), { kind: 'remove', id: NEW }])
     expect(days.flatMap((day) => day.rows.map((row) => row.key))).not.toContain(NEW)
   })
 
   it('hides the line of a trip whose removal waits, and leaves the day total the server’s (MOL-76)', () => {
-    const shown = journalOf(month(), [], [])
+    const shown = journalOf(month(), [])
     const trip = shown.flatMap((day) => day.rows).find((row) => row.kind === 'trip')
     expect(trip).toBeDefined()
-    const hidden = journalOf(month(), [], [], new Set([TRIP]))
+    const hidden = journalOf(month(), [], new Set([TRIP]))
     expect(hidden.flatMap((day) => day.rows).some((row) => row.kind === 'trip')).toBe(false)
     expect(hidden.map((day) => day.total)).toEqual(shown.map((day) => day.total))
   })
 
   it('shows one still on the phone as last typed — the amendment behind its record (Т-4)', () => {
-    const days = journalOf(
-      month(),
-      [
-        record(NEW, '2026-09-26'),
-        {
-          kind: 'amend',
-          id: NEW,
-          body: { revision: 1, ...bodyOf(NEW, '2026-09-26'), amount: amd('500') },
-        },
-      ],
-      [],
-    )
+    const days = journalOf(month(), [
+      record(NEW, '2026-09-26'),
+      {
+        kind: 'amend',
+        id: NEW,
+        body: { revision: 1, ...bodyOf(NEW, '2026-09-26'), amount: amd('500') },
+      },
+    ])
     const row = days[0]?.rows[0]
     expect(row?.kind === 'manual' && row.spending.amount).toEqual(amd('500'))
   })
@@ -296,5 +278,60 @@ describe('what the screen prints', () => {
       asOf: new Date(),
     } as const
     expect(plain(rateWords(rate, 'ru-RU', t))).toBe('spending.rate_value:4,62 ֏|₽')
+  })
+})
+
+/**
+ * «Не приняты» (MOL-159): every refused typing is a row of its own, whatever the month shown and its
+ * pages — five rounds of review found a refusal left on a card whose one action threw it away, each
+ * time at another edge of a guess where its row was. These are those edges, all at once.
+ */
+describe('refused spendings, apart from the journal', () => {
+  const refusal = (write: SpendingWrite, code = 'error.spending_category_unknown') =>
+    ({ key: `k-${write.kind}`, write, code }) as RejectedSpendingWrite
+  const amendment = (id: string, spentOn: string, revision = 1): SpendingWrite => ({
+    kind: 'amend',
+    id,
+    body: { revision, ...bodyOf(id, spentOn), amount: amd('6000') },
+  })
+
+  it('a refused record is a row whatever the month: this one, another, a day no page reached, none answered', () => {
+    const cut = month({ cursor: { day: '2026-09-24', moment: 1, id: RENT }, remaining: 5 })
+    for (const [shown, day] of [
+      [month(), '2026-09-26'],
+      [month(), '2026-08-31'],
+      [cut, '2026-09-01'],
+      [null, '2026-09-26'],
+    ] as const) {
+      const rows = refusedRows(shown, [refusal(record(NEW, day))], [])
+      expect(rows).toHaveLength(1)
+      expect(rows[0]).toMatchObject({ key: NEW, mark: 'refused', local: true })
+      expect(rows[0]?.spending.spentOn).toBe(day)
+    }
+  })
+
+  it('a refused amendment of a row the month holds: what was typed, over the server’s revision', () => {
+    const [row] = refusedRows(month(), [refusal(amendment(RENT, '2026-09-24'))], [])
+    expect(row).toMatchObject({ key: RENT, mark: 'refused', local: false })
+    expect(row?.spending.amount).toEqual(amd('6000'))
+    expect(row?.spending.revision).toBe(2)
+  })
+
+  it('one of a row not loaded, moved across the month’s edge, or removed elsewhere: still a row, over its own revision', () => {
+    for (const day of ['2026-09-01', '2026-10-01']) {
+      const [row] = refusedRows(month(), [refusal(amendment(NEW, day, 4), 'error.not_found')], [])
+      expect(row).toMatchObject({ key: NEW, mark: 'refused', local: false })
+      expect(row?.spending).toMatchObject({ spentOn: day, revision: 4 })
+    }
+  })
+
+  it('must not fire: a refusal that is not a spending’s typing — a category, a removal — is no row', () => {
+    expect(
+      refusedRows(
+        month(),
+        [refusal({ kind: 'remove', id: BARBER }), refusal({ kind: 'restore', id: BARBER })],
+        [],
+      ),
+    ).toEqual([])
   })
 })

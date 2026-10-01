@@ -153,4 +153,34 @@ describe('a month on the wire', () => {
     delete older.slices
     expect(moneyMonthCodec.parse(older).slices).toEqual([])
   })
+
+  it('counts every row of the journal on every page, a page cut short too (MOL-159)', () => {
+    const whole = monthOf(
+      spendings(
+        MONEY_JOURNAL_PAGE + 1,
+        (index) => `2026-09-${String((index % 28) + 1).padStart(2, '0')}`,
+      ),
+    )
+    const first = moneyMonthViewOf(whole, null, categories)
+    expect(first.count).toBe(MONEY_JOURNAL_PAGE + 1)
+    const second = moneyMonthViewOf(whole, null, categories, first.cursor ?? undefined)
+    expect(idsOf(second)).toHaveLength(1)
+    expect(second.count).toBe(MONEY_JOURNAL_PAGE + 1)
+    expect(moneyMonthViewOf(monthOf([]), null, categories)).toMatchObject({
+      count: 0,
+      incomeCount: 0,
+    })
+  })
+
+  it('reads a month kept before the counts, or an older server, as counts not known (MOL-159, Р-3)', () => {
+    const view = moneyMonthViewOf(monthOf(spendings(2, () => '2026-09-01')), null, categories)
+    const older: Record<string, unknown> = { ...z.encode(moneyMonthCodec, view) }
+    delete older.count
+    delete older.incomeCount
+    expect(moneyMonthCodec.parse(older)).toMatchObject({ count: null, incomeCount: null })
+    expect(moneyMonthCodec.parse(z.encode(moneyMonthCodec, view))).toMatchObject({
+      count: 2,
+      incomeCount: 0,
+    })
+  })
 })

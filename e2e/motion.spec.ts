@@ -78,6 +78,13 @@ function reread(page: Page) {
   )
 }
 
+/** «Деньги», then its journal «Траты» (MOL-159): the rows a test watches live there. */
+async function openSpendings(page: Page): Promise<void> {
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: /^Траты/ }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Траты')
+}
+
 function yerevanDay(days = 0): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
     new Date(Date.now() + days * 86_400_000),
@@ -113,7 +120,7 @@ async function seed(page: Page): Promise<void> {
   await spend('1500', lastMonthDay(15), 'Пятнадцатое')
   await spend('1400', lastMonthDay(14), 'Четырнадцатое')
   await spend('1000', yerevanDay(), 'Сегодня')
-  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await openSpendings(page)
   await expect(page.getByRole('button', { name: /Открыть трату/ })).toHaveCount(1)
 }
 
@@ -188,7 +195,8 @@ test('a day removed takes the gap of the column with it: its neighbour does not 
     const neighbour = [...container.querySelectorAll<HTMLElement>(':scope > section.day')].find(
       (day) => day !== target,
     )
-    const caption = container.querySelector<HTMLElement>(':scope > h2')
+    // The line of the month's count and sum heads the days on «Траты» (MOL-159).
+    const caption = container.querySelector<HTMLElement>(':scope > .total')
     if (!neighbour || !caption) throw new Error('no neighbouring day or caption')
     window.scrollTo(0, 0)
     const leftHeight = target.getBoundingClientRect().height
@@ -477,7 +485,7 @@ test('a block going from a field takes the field’s gap with it: nothing below 
   expect(Math.abs(jump.moved)).toBeLessThan(1)
 })
 
-test('the swipe back from an account opened from the card of «Деньги» plays no arrival (Б3)', async ({
+test('the swipe back from an account opened from «Счета» plays no arrival (Б3)', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -485,9 +493,10 @@ test('the swipe back from an account opened from the card of «Деньги» pl
   })
   await signedIn(page)
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
-  const card = page.locator('.card').filter({ hasText: 'Счета' }).first()
-  await card.getByRole('button', { name: 'Добавить счёт' }).click()
+  // The card of accounts left «Деньги» for «Счета» (MOL-159).
+  await page.getByRole('link', { name: /^Счета/ }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Счета')
+  await page.getByRole('button', { name: 'Добавить счёт' }).click()
   const sheet = page.locator('dialog[open]').last()
   await expect(sheet).toContainText('Новый счёт')
   await settled(page)
@@ -500,7 +509,7 @@ test('the swipe back from an account opened from the card of «Деньги» pl
     () => sheet.getByRole('button', { name: 'Сохранить' }).click(),
     () => expect(sheet).toBeHidden({ timeout: 5000 }),
   )
-  await card
+  await page
     .getByRole('link', { name: /Наличные/ })
     .first()
     .click()
@@ -526,7 +535,7 @@ test('the swipe back from an account opened from the card of «Деньги» pl
     Object.assign(window, { move })
   })
   await page.goBack()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Счета')
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset.nav ?? null))
     .toBeNull()
@@ -537,7 +546,7 @@ test('the swipe back from an account opened from the card of «Деньги» pl
   expect(move.left).toBe(0)
 })
 
-/** A finished record of «Покупки» with only a receipt sum: a trip line of today in «Деньги». */
+/** A finished record of «Покупки» with only a receipt sum: a trip line of today in «Траты». */
 async function tripWithReceipt(page: Page, place: string): Promise<string> {
   const headers = await asBrowser(page)
   const me = actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json())
@@ -560,7 +569,7 @@ async function tripWithReceipt(page: Page, place: string): Promise<string> {
   return id
 }
 
-test('a record of «Покупки» removed from «Деньги» does not grow back there (Б4)', async ({
+test('a record of «Покупки» removed from «Траты» does not grow back there (Б4)', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -595,7 +604,7 @@ test('a record of «Покупки» removed from «Деньги» does not grow
   expect(spent.status()).toBe(201)
   await tripWithReceipt(page, 'Ереван Сити')
 
-  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await openSpendings(page)
   const row = page.getByRole('button', { name: /Ереван Сити/ })
   await expect(row).toBeVisible()
   await settled(page)
@@ -609,7 +618,7 @@ test('a record of «Покупки» removed from «Деньги» does not grow
   await page.evaluate(() => {
     ;(window as unknown as { moves: string[] }).moves.length = 0
   })
-  // A slow network: the server removes at once, its answer comes after the move back to «Деньги»,
+  // A slow network: the server removes at once, its answer comes after the move back to «Траты»,
   // and the fresh month after that — until then the month on screen is the one the phone keeps.
   const slow = (ms: number) => async (route: Route) => {
     const response = await route.fetch()
@@ -623,7 +632,7 @@ test('a record of «Покупки» removed from «Деньги» does not grow
   await page.route('**/api/money/months/*', slow(1500))
   const fresh = reread(page)
   await page.getByRole('button', { name: 'Удалить запись' }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Траты')
   await fresh
   await settled(page)
 
@@ -659,7 +668,7 @@ test('a spending removed before a read that failed stays gone after a reload (Б
     })
     expect(response.status(), await response.text()).toBe(201)
   }
-  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await openSpendings(page)
   await expect(page.getByRole('button', { name: /Открыть трату/ })).toHaveCount(2)
   await settled(page)
 
@@ -683,7 +692,7 @@ test('a spending removed before a read that failed stays gone after a reload (Б
     request.url().includes('/api/money/months/'),
   )
   await page.reload()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Траты')
   await expect(page.getByRole('button', { name: /Открыть трату: Остаётся/ })).toBeVisible()
   await failed
   await expect(page.getByRole('button', { name: /Открыть трату: Удаляемая/ })).toHaveCount(0)
@@ -714,7 +723,7 @@ test('a read that set out before a removal does not bring it back after a reload
     })
     expect(response.status(), await response.text()).toBe(201)
   }
-  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await openSpendings(page)
   await expect(page.getByRole('button', { name: /Открыть трату/ })).toHaveCount(2)
   // Last month, so this one comes back from the phone's memory with a read on its way.
   await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
@@ -759,7 +768,7 @@ test('a read that set out before a removal does not bring it back after a reload
     request.url().includes(`/api/money/months/${month}`),
   )
   await page.reload()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Траты')
   await expect(page.getByRole('button', { name: /Открыть трату: Остаётся/ })).toBeVisible()
   await failed
   await expect(row).toHaveCount(0)
