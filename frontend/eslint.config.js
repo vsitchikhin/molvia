@@ -111,5 +111,22 @@ export default defineConfigWithVueTs(
       ],
     },
   },
+  // One way into the camera (MOL-163): the browser asks for it once per page load, and a second
+  // caller of `getUserMedia` — a receipt with a viewfinder of its own — would bring a second set of
+  // refusals, stops and states to keep in step. The receipt takes its photo through the system
+  // camera (`<input capture>`), which asks the page for nothing.
+  {
+    files: ['src/**/*.{ts,vue}'],
+    ignores: ['src/composables/useCamera.ts', '**/*.test.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          property: 'getUserMedia',
+          message: 'The camera is reached through useCamera only (MOL-163).',
+        },
+      ],
+    },
+  },
   prettier,
 )
