@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -142,8 +143,10 @@ describe('соединение оборвано посреди миграции 
       }),
     )
     writeFileSync(join(folder, '0000_sleep.sql'), 'SELECT pg_sleep(3);')
-    // Beside the tests, so `tsx` resolves `@/` by this module's own tsconfig.
-    const script = join(process.cwd(), 'tests', `.mol153-boot-${String(process.pid)}.ts`)
+    // Beside this file, and run from the backend, so `tsx` resolves `@/` by the backend's own
+    // tsconfig whichever directory the suite was started from (the root, in CI).
+    const backend = fileURLToPath(new URL('..', import.meta.url))
+    const script = join(backend, 'tests', `.mol153-boot-${String(process.pid)}.ts`)
     writeFileSync(script, BOOT)
 
     const run = await new Promise<{ exit: number; stdout: string; stderr: string }>((resolve) => {
@@ -151,6 +154,7 @@ describe('соединение оборвано посреди миграции 
         process.execPath,
         ['--import', 'tsx', script],
         {
+          cwd: backend,
           env: { ...process.env, DATABASE_URL: testDatabaseUrl(), FOLDER: folder },
           timeout: 20_000,
         },
@@ -166,5 +170,33 @@ describe('соединение оборвано посреди миграции 
     expect(run.exit).toBe(1)
     const line = JSON.parse(run.stdout.trim()) as Record<string, unknown>
     expect(line).toMatchObject({ msg: 'migrations failed', code: 'CONNECTION_CLOSED' })
+  }, 30_000)
+})
+
+describe('`make migrate` — сбой печатается так же, как API пишет его в лог', () => {
+  it('выход 1 и сводка по виду: ни стека отказа, ни пароля из адреса (адверсариальный И)', async () => {
+    const backend = fileURLToPath(new URL('..', import.meta.url))
+    const run = await new Promise<{ exit: number; stdout: string; stderr: string }>((resolve) => {
+      execFile(
+        process.execPath,
+        ['--import', 'tsx', join(backend, 'src', 'db', 'migrate-cli.ts')],
+        {
+          cwd: backend,
+          // Nothing listens on port 1: the migrator fails before its first statement.
+          env: { ...process.env, DATABASE_URL: 'postgres://molvia:mol153-secret@127.0.0.1:1/x' },
+          timeout: 20_000,
+        },
+        (error, stdout, stderr) => {
+          resolve({ exit: error ? Number(error.code ?? 1) : 0, stdout, stderr })
+        },
+      )
+    })
+
+    expect(run.exit).toBe(1)
+    expect(run.stdout).not.toContain('migrations applied')
+    expect(run.stderr).toContain('migrations failed')
+    expect(run.stderr).toContain("code: 'ECONNREFUSED'")
+    expect(run.stderr).not.toContain('mol153-secret')
+    expect(run.stderr).not.toMatch(/^\s*cause:/m)
   }, 30_000)
 })
