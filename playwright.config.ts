@@ -45,6 +45,10 @@ const ci = Boolean(process.env.CI)
 // the spec rewrites is never the one `make prod-build` or a deploy reads.
 const previewPort = String(Number(pwaPort) + 1)
 
+// Open Food Facts is a fake of its own (MOL-162), on the next port of the API's band: a run asks the
+// real base nothing, and the hint is on — a contact set — only here and in production.
+const offPort = String(Number(apiPort) + 1)
+
 // The scanner's camera is a file (MOL-98): Chromium films the barcode `globalSetup` draws, and a
 // spec that wants the camera grants it — without the grant Chromium refuses, which is the case of
 // «no permission». The full Chromium, not the headless shell every other spec runs in: the shell
@@ -115,6 +119,13 @@ export default defineConfig({
 
   webServer: [
     {
+      command: 'node bin/fake-open-food-facts.mjs',
+      url: `http://127.0.0.1:${offPort}/health`,
+      env: { OFF_PORT: offPort },
+      reuseExistingServer: false,
+      stdout: 'pipe',
+    },
+    {
       // The database is recreated first, in the command of the server that needs it rather
       // than in an npm script: `npx playwright test` is what gets typed while debugging a
       // spec, and it would walk past a preparation step of its own.
@@ -127,6 +138,10 @@ export default defineConfig({
         DATABASE_URL: databaseUrl,
         TELEGRAM_BOT_USERNAME: 'molvia_test_bot',
         BOT_API_SECRET: 'e'.repeat(43),
+        OPEN_FOOD_FACTS_URL: `http://127.0.0.1:${offPort}`,
+        OPEN_FOOD_FACTS_CONTACT: 'e2e@molvia.test',
+        // The fake has no limit, and every spec of a missed code asks it once (adversarial Е).
+        OPEN_FOOD_FACTS_PER_MINUTE: '600',
       },
       // Never reuse: on these ports there is nothing of ours to reuse, and a server left by
       // a crashed run must fail loudly instead of quietly answering with old code.

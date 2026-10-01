@@ -18,6 +18,7 @@ import {
   items,
   loginRequests,
   marketRates,
+  openFoodFacts,
   officialRates,
   places,
   searchPicks,
@@ -175,6 +176,7 @@ export async function clearAll(db: Db): Promise<void> {
   await db.delete(events)
   await db.delete(officialRates)
   await db.delete(marketRates)
+  await db.delete(openFoodFacts)
   await db.delete(exchanges)
   await db.delete(incomes)
   await db.delete(searchPicks)

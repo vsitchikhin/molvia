@@ -10,6 +10,7 @@ paths:
   - 'bin/forget-actor.sh'
   - 'bot/src/erase*.ts'
   - 'frontend/src/views/PrivacyView*'
+  - 'backend/src/open-food-facts/**'
   - 'e2e/{privacy,export}.spec.ts'
   - 'deploy/Caddyfile'
   - 'docker-compose.prod.yml'
@@ -130,6 +131,15 @@ The detail behind the privacy lines of `CLAUDE.md`.
   (MOL-54); what the phone keeps in its storage is the queue and the drafts the app needs to work.
   **Any third-party script that sees data is a decision, not a dependency** — it changes what the
   privacy page says and is discussed before it lands.
+- **A third party learns of a code only from the server, never from the phone** (MOL-162, the owner's
+  decision on the task): a code the catalogue missed is asked of Open Food Facts by the API, so the base
+  sees the code, the server's address and our User-Agent — `Molvia/<build> (<contact>)`, the contact
+  from `.env` — and never the person, their phone or their session. **A shop's own label never leaves**
+  (`writtenBarcode` refuses it before anything is asked). The answers are kept in `open_food_facts`, a
+  code with a day and no one behind it, so neither erasure nor the copy reaches it; `items.origin` is
+  the catalogue's licence mark — the base is ODbL, what is derived from it is offered on request — and
+  the copy leaves it out with that reason. No photo of the base is ever fetched: a picture from its CDN
+  would hand the phone to a third party. `/privacy` says all of it under «Незнакомый штрихкод».
 - **Logs live fourteen days and carry no address and no query** (MOL-58). The API logs a request
   as its method and path — the query of `/catalogue/search` is what a person looked for; Caddy
   keeps no access log; Postgres logs its errors `terse`, without the row values of `DETAIL`;

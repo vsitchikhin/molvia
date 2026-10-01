@@ -14,12 +14,18 @@ paths:
   - 'frontend/src/views/{ItemSearchView,TripView}*'
   - 'frontend/src/components/{CatalogueCombobox,ProposeItemSheet,ItemDetailsSheet}*'
   - 'frontend/src/stores/{itemEntry,recentItems}*'
+  - 'backend/src/open-food-facts/**'
+  - 'backend/src/usecases/hint-by-barcode.*'
+  - 'backend/src/db/open-food-facts-repository.ts'
+  - 'frontend/src/composables/useBarcodeHint.*'
+  - 'bin/fake-open-food-facts.mjs'
 ---
 
 # Barcodes: the scanner, a code typed by hand, the item by its code
 
 The detail behind the barcode lines of `CLAUDE.md`. The scanner came in with MOL-98; finding an item
-by its code is MOL-99, a code in «Предложить товар» and bound to an item is MOL-100.
+by its code is MOL-99, a code in «Предложить товар» and bound to an item is MOL-100, a name for it from
+Open Food Facts is MOL-162.
 
 ## What the scanner is
 
@@ -440,3 +446,112 @@ codes too, and a wrong one needs a way out (В-1, below).
   sent by itself.
 - **A code written is remembered for offline** as one found is: the item it went to goes into «Часто
   берёте» with it once it is added to a record.
+
+## A hint from Open Food Facts (MOL-162)
+
+After MOL-100 a code met for the first time is written to its item, but the item is still typed from
+nothing at the shelf — what makes a stranger give up (the owner, 30.09.2026). Open Food Facts is an
+open base of products by their codes; for a code our catalogue missed, «Предложить товар» starts from
+what it says. Only ever a hint: the base holds what anyone typed — `test2`, `&quot;`, a name in
+French — and the person confirms or corrects it.
+
+- **Asked by the server, never the phone** (the task's decision, `privacy.md`): the base sees the
+  code, our address and `Molvia/<build> (<contact>)` — the contact is `OPEN_FOOD_FACTS_CONTACT`, the
+  owner's address in production's `.env` (В-4), and without it the hint is off: copies, CI and the
+  tests never ask the real base. **A shop's own label never leaves**, nor a code that does not check:
+  only a code `writtenBarcode` takes is asked, in the form it is written.
+- **Its own route, `GET /catalogue/barcode/hint?code=&lang=`** (Р-1), asked by the phone the moment a
+  code starts waiting for its item (`useBarcodeHint` follows `pendingCode`, so a reload of the draft
+  asks again). Not inside the lookup's answer: the miss waits for nobody, and that answer is strict —
+  a field added would be refused by every installed app (MOL-46). Behind the door, so the route is no
+  free proxy to the base's limit; the code in the query as the lookup's; `200 { hint | null }`, and
+  nothing else: unknown, out of reach, over the limit, a label — no hint, never an error.
+- **What is read** (`parseProduct`): found is `status: 1` with a product and only that — the base
+  answers a code it does not know with a `404` and `status: 0`, a code it calls invalid with a `200`
+  and `status: 0`, and a page «temporarily unavailable» in HTML with a `503` (all measured on
+  01.10.2026, recorded in `backend/tests/fixtures/open-food-facts/`). **The name** in each language of
+  the interface (Р-2): its own field, the main name when the product is in that language, English,
+  the main name in any language, the other interface language's — the first that is a name: entities
+  decoded, a line, a private-use glyph or a lone surrogate dropped (one U+F8FF lost the whole name and
+  kept the code unknown for a week — adversarial Ж), cut at 200, with a letter and two characters at
+  least. **The brand** goes after the name unless the name carries it — a word of the first brand that
+  says which mark it is (four letters or more as written, letters with a digit, or the first word of
+  three past a legal form) is a word of the name by the search key, all of it when none says (Р-3). A
+  legal form is one by its place — the Russian and Armenian ones at either edge («ООО КДВ», «Գրանդ
+  Քենդի» ՍՊԸ, adversarial В⁷), the European ones only trailing («Fit Parade LLC») — and never the whole
+  brand: «SAS», Yerevan's supermarket, and «Spa» are marks (В⁵); the brand is written after the name
+  without its form, its double quotes and whatever the cut left without its pair — a single quote off a
+  letter, a bracket whose partner stayed outside — as a shelf prints it (review 18, В⁶, В⁶′): «Pepsi
+  (PepsiCo)» is written «Pepsi PepsiCo», «Lay’s» keeps its apostrophe; «Nutella» + «Nutella,
+  Ferrero» is «Nutella», «Coca Cola» + «COCA-COLA SERVICES SA/NV» is «Coca Cola», «Сыр Савушкин 45%» +
+  «Савушкин продукт», «Напиток 7Up» + «7Up» and «Конфеты KDV» + «KDV Group» stay as they are — the
+  base keeps a mark with its company or country, the package prints the mark — and «Молоко 3,2%» +
+  «Простоквашино» is «Молоко 3,2% Простоквашино». Each rule before failed one way: the first word took
+  an article for the brand (adversarial В), both of two first words wrote the mark twice (В′), three
+  letters by the key let «для», «des», «for» pass (В″), four letters as written lost a mark with a
+  digit or of three letters (В‴), «ООО» standing first hid «КДВ» after it (В⁗), and a number alone met
+  a size or a fat in the name — «Danone 2» on «Йогурт 2,5%» (review 16). **The price, named:** a brand sharing a word with what the name
+  says of the product is lost — «Сыр Российский» + «Российский сыродел» — and so is one sharing a
+  function word of four letters or more («pour», «avec») or a first word of three («Les»); a company
+  written into its mark is written after it — «Pepsi Max» + «PepsiCo». **The size** is
+  `product_quantity` in g, kg, ml, cl, dl or l, as kg or l, up to fifty (Р-4); pieces, ounces and the
+  text of `quantity` («6 x 1,5 l») give none. Only the fields used are asked for: never a photo — its
+  licence, the rights on the package, and a picture from the base's CDN would hand it the phone.
+- **The limit is the base's, kept by the API** (Р-5, Р-6): a 2.5 s timeout — the median answer is
+  0.3–0.4 s, and the miss is on screen already; at most twelve questions a minute against the base's
+  fifteen from one address, past which it bans; a minute of silence after any failure; a code asked
+  twice at once is asked once. **A person's share is a third of the minute — four** (owner's decision
+  В-6): one person scanning a shelf of imports, or a script, held the hint off for everybody for as
+  long as they liked (adversarial А); at the shelf a code comes every ten to thirty seconds, so four
+  is plenty, and over the share there is simply no hint. **The price, named** (adversarial А′): three
+  people at their share in one minute take it all — three shelves of imports at once, or a script with
+  three accounts — and a fourth gets no hint until the minute turns. Counted in the API's process — there is
+  one; **a second instance needs a count they share.** `OPEN_FOOD_FACTS_PER_MINUTE` moves the limit,
+  and the share with it, for end-to-end alone, whose fake has no limit: at twelve the run spent its
+  own minute on the misses of MOL-100 and the spec of the hint lived by its turn (adversarial Е).
+- **The answers are kept** (`open_food_facts`, Р-7): a find believed thirty days, a miss seven — a
+  code nobody knows is scanned again and again — and a failure not kept at all. Past its days the base
+  is asked again, and a base that cannot answer leaves the old find standing. A row is a code and a
+  day: no person, no moment, so neither erasure nor the copy reaches it.
+- **On «Что взяли?»** (owner's decisions В-1, В-5): «Похоже, это «Nutella», 0,4 кг · по данным Open
+  Food Facts» in the block «Код … не знаком», **under** «Предложить товар», so the button stays where the
+  thumb saw it. Above it — В-1 as first chosen — the hint came 0.3–2.5 s after the block and moved the
+  button some 100 px down, and the tap aimed at it landed in the hint (review 1, adversarial Г);
+  holding the room instead would move it up on every miss, the common case in Armenia. Said out loud
+  with the miss, in one message, so neither cuts the other off — not over «Предложить товар» opened
+  meanwhile (review 3), but once that sheet is put away with nothing proposed (review 6). Nothing else on the screen changes: no hint, the block is exactly MOL-99's.
+- **In «Предложить товар»**: opened with an empty name — from the code's block, or with nothing typed
+  — the form starts from the hint: the name, the unit of its size and «В упаковке 0,4 кг ✕», sent as
+  `typicalQuantity`, so the purchase sheet of the item opens at «0,4 кг» and its price per kilo shows at
+  once. **The unit may start chosen here** — MOL-12 left it empty against a guess, and a size from the
+  package is no guess. A unit chosen that is not the size's hides the size and sends none. **Only the
+  hint at hand when the sheet opens**: one that comes later is not used at all. Filling what was
+  still empty (Р-8 as first decided) grew the sheet up under the thumb on its way to the name — 94 px
+  — and the tap chose «л» (adversarial Д), and an emptied field was not «untouched» (review 5). A name
+  typed before — the search's word, «другой товар» (`nameTaken` passes no hint) — takes none either.
+  «По данным Open Food Facts ↗» links the product's page, the attribution the licence asks for: last,
+  under the code's line and with a target of 44 px — between the name and the unit a thumb meant for
+  either opened a browser (review 2).
+- **ODbL** (owner's decision В-2): the base is share-alike, so what the catalogue takes from it is
+  marked — `items.origin = 'open_food_facts'`, set by the server when a new item is proposed with a code
+  the base named (`named`), never by the phone, and generously: the mark stays if the person rewrote the
+  name. `/privacy` offers an export of it on request; nobody asked yet, so no open file (В-2 «в» was
+  not chosen).
+- **How it is measured** (owner's decision В-3: no measurement before the code): on production, the
+  share of codes the base named, and of items proposed with its help —
+
+  ```sql
+  select count(*) filter (where found) as named, count(*) as asked from open_food_facts;
+  select count(*) filter (where origin = 'open_food_facts') as by_hint, count(*) as proposed
+    from items where created_by is not null and created_at >= '<the release>';
+  ```
+
+  The second leaves out the items of people erased since — their author is nulled — a small shift
+  over a period.
+
+- **Not here:** giving codes back to the base (a decision of its own); looking the hint's name up in
+  our catalogue — duplicates are `nameIdentity`'s (MOL-12) and the nightly merge's (MOL-106); Open
+  Prices, no source of prices for Armenia; the bot.
+- **End-to-end asks a fake** (`bin/fake-open-food-facts.mjs`, on the API's port + 1): codes led by
+  `46` are a can of stew named by their last digits, so a retry never meets an item a failed try
+  wrote; the rest unknown; a request without our User-Agent refused.
