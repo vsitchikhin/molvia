@@ -53,25 +53,27 @@
         :legend="t('exchange.sheet.channel')"
       />
 
-      <div v-if="showsHeld">
-        <AppField
-          v-model="held"
-          :label="t('exchange.sheet.held', { currency: sign(currencies.received) })"
-          kind="decimal"
-          :error="heldError"
-          :aria-describedby="`${id}-held`"
-        />
-        <p :id="`${id}-held`" class="hint">
-          {{ t('exchange.sheet.held_hint') }}
-          <template v-if="estimate"> <br />{{ estimate }} </template>
-        </p>
-        <HeldFromAccounts
-          :currency="currencies.received"
-          :day="day"
-          :except="editing?.id ?? null"
-          @fill="fillHeld"
-        />
-      </div>
+      <AppReveal>
+        <div v-if="showsHeld">
+          <AppField
+            v-model="held"
+            :label="t('exchange.sheet.held', { currency: sign(currencies.received) })"
+            kind="decimal"
+            :error="heldError"
+            :aria-describedby="`${id}-held`"
+          />
+          <p :id="`${id}-held`" class="hint">
+            {{ t('exchange.sheet.held_hint') }}
+            <template v-if="estimate"> <br />{{ estimate }} </template>
+          </p>
+          <HeldFromAccounts
+            :currency="currencies.received"
+            :day="day"
+            :except="editing?.id ?? null"
+            @fill="fillHeld"
+          />
+        </div>
+      </AppReveal>
 
       <AppField
         v-model="note"
@@ -156,6 +158,7 @@ import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
 import AccountRow from '@/components/AccountRow.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
@@ -185,6 +188,7 @@ export default defineComponent({
     AccountRow,
     AppButton,
     AppField,
+    AppReveal,
     BottomSheet,
     HeldFromAccounts,
     SegmentedControl,
