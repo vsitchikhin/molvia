@@ -116,6 +116,10 @@ does not know. What is outside the tree — `.env`, `node_modules`, the database
 mark; the price is accepted for a mark that lives minutes between a check and its push. The marks
 are per worktree (`git rev-parse --git-path`), since each copy has its own environment.
 
+**A push with nothing to run takes no turn** (MOL-164): when both steps are green on the tree it
+says so and leaves before the lock. The first push of this very task, right after a green `make
+check`, waited seven minutes behind another copy's end-to-end only to skip both.
+
 **A tree that differs from the green one only in documents is green too** (MOL-164): `*.md`,
 `docs/`, `.claude/`. No check that leaves a mark reads them — types, vitest — and a task's last
 commit is often its rules, after `make check` passed on the code; that commit used to run every step

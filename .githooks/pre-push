@@ -14,6 +14,13 @@
 
 set -euo pipefail
 
+# Nothing to run takes no turn (MOL-164): after `make check` both steps are green, and the push
+# waited minutes in the line only to skip them.
+if bin/green.sh has typecheck && bin/green.sh has test; then
+  echo "pre-push: types and vitest — already green on this tree"
+  exit 0
+fi
+
 if [[ -z "${MOLVIA_ONE_AT_A_TIME:-}" ]]; then
   exec bin/one-at-a-time.sh pre-push "$0" "$@"
 fi
