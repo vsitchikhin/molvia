@@ -238,6 +238,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   the phone's day of its taps. The frontend's tests run in UTC.
 - **A bar of «Графики» is the month of «Деньги»** (MOL-74): `countMonth` with `monthRate`, never a
   second count; its third figure is «Разница», since «Остаток» is the money on the accounts.
+  **The usual month is the mean of up to twelve closed months before, from three** (MOL-158): the
+  running month against it to the same day, and reading it freezes no month but the one shown.
 
 ### Money: accounts — `.claude/rules/money-accounts.md`
 
