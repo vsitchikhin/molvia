@@ -4,7 +4,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import type { CatalogueWrite } from '@molvia/client'
 import { ERROR, ISSUE, ITEM_NAME_MAX, ITEM_NOTE_MAX } from '@molvia/model'
-import type { CatalogueEntry, ProposedItem } from '@molvia/model'
+import type { BarcodeHint, CatalogueEntry, ProposedItem } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
@@ -37,12 +37,16 @@ const mounted: VueWrapper[] = []
  */
 let clock = 0
 
-async function render(query = '  тан ', code: string | null = null) {
+async function render(
+  query = '  тан ',
+  code: string | null = null,
+  hint: BarcodeHint | null = null,
+) {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/trip/add')
   const wrapper = mount(ProposeItemSheet, {
     attachTo: document.body,
-    props: { open: true, query, code },
+    props: { open: true, query, code, hint },
     global: { plugins: [router, createAppI18n('en')] },
   })
   mounted.push(wrapper)
@@ -490,6 +494,130 @@ describe('«Suggest an item»', () => {
       const sheet = await render()
 
       expect(sheet.text()).not.toContain(en.item.propose.code.split('{code}')[0] ?? '∅')
+    })
+  })
+
+  describe('a hint of Open Food Facts (MOL-162)', () => {
+    const CODE = '3017620422003'
+    const nutella: BarcodeHint = {
+      name: 'Nutella',
+      quantity: { milli: 400n, unit: 'kg' },
+      url: `https://world.openfoodfacts.org/product/${CODE}`,
+    }
+    const sizeLine = (sheet: VueWrapper) => sheet.find('.size')
+    const source = (sheet: VueWrapper) => sheet.find('a.source')
+
+    it('starts from the name, the unit and the size of the package, and links the base', async () => {
+      const sheet = await render('', CODE, nutella)
+
+      expect(fields(sheet).name.element.value).toBe('Nutella')
+      expect(submitButton(sheet).attributes('disabled')).toBeUndefined()
+      expect(sizeLine(sheet).text()).toContain('0.4 kg')
+      expect(source(sheet).attributes()).toMatchObject({
+        href: nutella.url,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+      })
+    })
+
+    it('sends the size of the package as how much is usually taken', async () => {
+      proposeItem.mockResolvedValue({ entry: tan, created: true })
+      const sheet = await render('', CODE, nutella)
+
+      await submitButton(sheet).trigger('click')
+
+      expect(proposeItem).toHaveBeenCalledWith({
+        kind: 'product',
+        name: 'Nutella',
+        defaultUnit: 'kg',
+        barcodes: [CODE],
+        typicalQuantity: { milli: 400n, unit: 'kg' },
+      })
+    })
+
+    it('lets the size go with ✕, and sends none then', async () => {
+      proposeItem.mockResolvedValue({ entry: tan, created: true })
+      const sheet = await render('', CODE, nutella)
+
+      await sizeLine(sheet).find('button').trigger('click')
+      await submitButton(sheet).trigger('click')
+
+      expect(sizeLine(sheet).exists()).toBe(false)
+      expect(proposeItem.mock.calls[0]?.[0]).not.toHaveProperty('typicalQuantity')
+    })
+
+    it('must not send a size in another unit: pieces chosen, the size is not shown or sent', async () => {
+      proposeItem.mockResolvedValue({ entry: tan, created: true })
+      const sheet = await render('', CODE, nutella)
+
+      await chooseUnit(sheet, en.item.unit_piece)
+      expect(sizeLine(sheet).exists()).toBe(false)
+      await submitButton(sheet).trigger('click')
+
+      expect(proposeItem.mock.calls[0]?.[0]).toMatchObject({ defaultUnit: 'piece' })
+      expect(proposeItem.mock.calls[0]?.[0]).not.toHaveProperty('typicalQuantity')
+    })
+
+    it('fills an untouched form with a hint that comes after the opening', async () => {
+      const sheet = await render('', CODE)
+      expect(fields(sheet).name.element.value).toBe('')
+
+      await sheet.setProps({ hint: nutella })
+
+      expect(fields(sheet).name.element.value).toBe('Nutella')
+      expect(sizeLine(sheet).exists()).toBe(true)
+      expect(source(sheet).exists()).toBe(true)
+    })
+
+    it('must not replace what the person set before a late hint came', async () => {
+      const sheet = await render('', CODE)
+      await fields(sheet).name.setValue('Нутелла')
+      await chooseUnit(sheet, en.item.unit_piece)
+
+      await sheet.setProps({ hint: nutella })
+
+      expect(fields(sheet).name.element.value).toBe('Нутелла')
+      expect(sizeLine(sheet).exists()).toBe(false)
+      expect(source(sheet).exists()).toBe(false)
+    })
+
+    it('fills only the unit and size when the person typed the name first', async () => {
+      const sheet = await render('', CODE)
+      await fields(sheet).name.setValue('Нутелла')
+
+      await sheet.setProps({ hint: nutella })
+
+      expect(fields(sheet).name.element.value).toBe('Нутелла')
+      expect(sizeLine(sheet).exists()).toBe(true)
+      expect(source(sheet).exists()).toBe(true)
+    })
+
+    it('must not take a hint over a name typed into the search', async () => {
+      const sheet = await render('тан', CODE, nutella)
+
+      expect(fields(sheet).name.element.value).toBe('тан')
+      expect(sizeLine(sheet).exists()).toBe(false)
+      expect(source(sheet).exists()).toBe(false)
+    })
+
+    it('a hint with no size gives the name only; the unit still waits', async () => {
+      const sheet = await render('', CODE, { ...nutella, quantity: null })
+
+      expect(fields(sheet).name.element.value).toBe('Nutella')
+      expect(sizeLine(sheet).exists()).toBe(false)
+      expect(submitButton(sheet).attributes('disabled')).toBeDefined()
+      expect(source(sheet).exists()).toBe(true)
+    })
+
+    it('opens fresh: no size and no link of the opening before', async () => {
+      const sheet = await render('', CODE, nutella)
+      await sheet.setProps({ open: false })
+      await sheet.setProps({ hint: null, query: 'тан' })
+      await sheet.setProps({ open: true })
+
+      expect(fields(sheet).name.element.value).toBe('тан')
+      expect(sizeLine(sheet).exists()).toBe(false)
+      expect(source(sheet).exists()).toBe(false)
     })
   })
 })

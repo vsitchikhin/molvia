@@ -11,6 +11,8 @@ import { ERROR } from '@molvia/model'
 import { tripViewCodec } from '@molvia/model'
 import type {
   AddExpenseBody,
+  AppLocale,
+  BarcodeHint,
   CatalogueEntry,
   CatalogueSearchResponse,
   ProposedItem,
@@ -35,9 +37,12 @@ const detachBarcode = vi.fn<(itemId: string, code: string) => Promise<void>>()
 const addExpense = vi.fn<(tripId: string, body: AddExpenseBody) => Promise<unknown>>()
 const currentTrip = vi.fn<() => Promise<unknown>>(() => Promise.resolve(null))
 const catalogueByBarcode = vi.fn<(code: string) => Promise<CatalogueEntry | null>>()
+const catalogueBarcodeHint =
+  vi.fn<(code: string, locale: AppLocale) => Promise<BarcodeHint | null>>()
 vi.mock('@/api', () => ({
   api: {
     catalogueByBarcode: (code: string) => catalogueByBarcode(code),
+    catalogueBarcodeHint: (code: string, locale: AppLocale) => catalogueBarcodeHint(code, locale),
     searchCatalogue: async (query: string) => {
       const answer = await searchCatalogue(query)
       return Array.isArray(answer) ? { items: answer, near: answer.length > 0 } : answer
@@ -151,6 +156,8 @@ beforeEach(() => {
   attachBarcode.mockReset()
   detachBarcode.mockReset()
   catalogueByBarcode.mockReset()
+  catalogueBarcodeHint.mockReset()
+  catalogueBarcodeHint.mockResolvedValue(null)
   online(true)
 })
 
@@ -875,6 +882,103 @@ describe('«What did you pick up?»', () => {
       expect(view.text()).toContain(en.item.barcode.offline_body)
       expect(names(view)).toEqual([bread.name])
       expect(useItemEntryStore(pinia).picked).toBeNull()
+    })
+
+    describe('a hint of Open Food Facts under a code nobody holds (MOL-162)', () => {
+      const nutella: BarcodeHint = {
+        name: 'Nutella',
+        quantity: { milli: 400n, unit: 'kg' },
+        url: `https://world.openfoodfacts.org/product/${CODE}`,
+      }
+      const hintText = 'Looks like “Nutella”, 0.4 kg'
+
+      it('asks for it in the interface language and shows it above the button, said out loud with the miss', async () => {
+        catalogueByBarcode.mockResolvedValue(null)
+        catalogueBarcodeHint.mockResolvedValue(nutella)
+        const view = await render()
+
+        await scan(view, CODE)
+
+        await vi.waitFor(() => {
+          expect(view.get('.code-hint').text()).toContain(hintText)
+        })
+        expect(view.get('.code-hint').text()).toContain(en.item.barcode.hint_source)
+        expect(catalogueBarcodeHint).toHaveBeenCalledWith(CODE, 'en')
+        const block = view.get('.not-found').html()
+        expect(block.indexOf('code-hint')).toBeLessThan(block.indexOf(en.item.empty.action))
+        await vi.waitFor(() => {
+          expect(view.get('.live').text()).toBe(
+            `${en.item.barcode.missing.replace('{code}', CODE)}. ${hintText}`,
+          )
+        })
+      })
+
+      it('fills «Suggest an item» opened from the block', async () => {
+        catalogueByBarcode.mockResolvedValue(null)
+        catalogueBarcodeHint.mockResolvedValue(nutella)
+        vi.spyOn(performance, 'now').mockReturnValue(0)
+        const view = await render()
+        await scan(view, CODE)
+        await vi.waitFor(() => {
+          expect(view.find('.code-hint').exists()).toBe(true)
+        })
+
+        await button(view, en.item.empty.action).trigger('click')
+        vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+
+        expect(view.get<HTMLInputElement>('dialog input[type="text"]').element.value).toBe(
+          'Nutella',
+        )
+        expect(view.get('dialog a.source').attributes('href')).toBe(nutella.url)
+      })
+
+      it('must not show a hint the base did not give, nor fail when asking fails', async () => {
+        catalogueByBarcode.mockResolvedValue(null)
+        catalogueBarcodeHint.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+        const view = await render()
+
+        await scan(view, CODE)
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(en.item.barcode.missing.replace('{code}', CODE))
+        })
+        await flushPromises()
+
+        expect(view.find('.code-hint').exists()).toBe(false)
+        expect(button(view, en.item.empty.action).exists()).toBe(true)
+      })
+
+      it('must not ask about a shop’s own label, nor about a code someone holds', async () => {
+        catalogueByBarcode.mockResolvedValue(milk)
+        const view = await render()
+        await scan(view, CODE)
+        await scan(view, '2000000000008')
+        await flushPromises()
+
+        expect(catalogueBarcodeHint).not.toHaveBeenCalled()
+      })
+
+      it('must not show the hint of the code before: a new code asks again', async () => {
+        const OTHER = '4850000000014'
+        catalogueByBarcode.mockResolvedValue(null)
+        catalogueBarcodeHint.mockImplementation((code) =>
+          Promise.resolve(code === CODE ? nutella : null),
+        )
+        const view = await render()
+        await scan(view, CODE)
+        await vi.waitFor(() => {
+          expect(view.find('.code-hint').exists()).toBe(true)
+        })
+
+        await scan(view, OTHER)
+        await vi.waitFor(() => {
+          expect(view.text()).toContain(en.item.barcode.missing.replace('{code}', OTHER))
+        })
+        await flushPromises()
+
+        expect(catalogueBarcodeHint).toHaveBeenLastCalledWith(OTHER, 'en')
+        expect(view.find('.code-hint').exists()).toBe(false)
+      })
     })
 
     describe('the adversarial pass (MOL-99)', () => {

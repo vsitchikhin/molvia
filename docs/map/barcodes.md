@@ -34,6 +34,7 @@ Rules: `.claude/rules/barcodes.md`. A test beside its source, or mirroring it un
 
 ## frontend · composables
 
+- `frontend/src/composables/useBarcodeHint.ts` — Composable: what Open Food Facts says the package of the code waiting for its item is (MOL-162) — asked when the code starts waiting, dropped when it stops; quiet, no states of its own.
 - `frontend/src/composables/useBarcodeLookup.ts` — Composable: the item a scanned code belongs to on «Что взяли?» — the server, else the codes the device found items by; found, missing, offline, error.
 - `frontend/src/composables/useBarcodeScan.ts` — Composable: reads frames while the camera is live, one at a time, and hands over the first code of a barcode's shape two frames agree on.
 - `frontend/src/composables/useCamera.ts` — Composable: the back camera for the viewfinder — its refusals sorted into states, stopped when closed or hidden, the torch.

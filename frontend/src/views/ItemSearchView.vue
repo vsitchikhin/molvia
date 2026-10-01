@@ -165,6 +165,12 @@
 
         <div v-else-if="barcode === 'missing'" class="not-found">
           <p class="not-found-text">{{ t('item.barcode.missing', { code: barcodeCode }) }}</p>
+          <!-- What Open Food Facts says the package is (MOL-162, В-1): above the button, which does
+               not move when it comes, and filling «Предложить товар» once tapped. -->
+          <p v-if="codeHint" class="code-hint">
+            {{ hintWords(codeHint) }}
+            <span class="code-hint-source">{{ t('item.barcode.hint_source') }}</span>
+          </p>
           <AppButton @click="proposeByCode">
             <template #icon><IconPlus /></template>
             {{ t('item.empty.action') }}
@@ -266,6 +272,7 @@
       :query="proposingByCode || nameTaken ? '' : query"
       :code="pendingCode"
       :name-taken="nameTaken"
+      :hint="nameTaken ? null : codeHint"
       :on-closed="afterProposing"
       @proposed="proposed"
       @taken="takenOnProposal"
@@ -299,8 +306,8 @@ import { useSelectedTrip } from '@/composables/useSelectedTrip'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
-import { ERROR } from '@molvia/model'
-import type { CatalogueEntry } from '@molvia/model'
+import { ERROR, decimalFromMilli } from '@molvia/model'
+import type { AppLocale, BarcodeHint, CatalogueEntry } from '@molvia/model'
 import IconBarcode from '~icons/mdi/barcode-scan'
 import IconClose from '~icons/mdi/close'
 import IconPlus from '~icons/mdi/plus'
@@ -314,7 +321,9 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { api } from '@/api'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useBarcodeHint } from '@/composables/useBarcodeHint'
 import { useBarcodeLookup } from '@/composables/useBarcodeLookup'
+import { shown } from '@/composables/useItemDetails'
 import { useCatalogueSearch } from '@/composables/useCatalogueSearch'
 import { currentIdentity } from '@/stores/identity'
 import { useItemEntryStore } from '@/stores/itemEntry'
@@ -350,7 +359,7 @@ export default defineComponent({
     ScreenState,
   },
   setup() {
-    const { t } = useI18n()
+    const { t, locale } = useI18n()
     const route = useRoute()
     const selected = useSelectedTrip(() =>
       route.name === 'finished-search' && typeof route.params.tripId === 'string'
@@ -412,6 +421,19 @@ export default defineComponent({
     watch(barcode, (next) => {
       if (next === 'missing') pendingCode.value = lookup.code.value
     })
+
+    /** What Open Food Facts says the waiting code's package is (MOL-162): follows the code. */
+    const interfaceLocale = computed<AppLocale>(() => (locale.value === 'en' ? 'en' : 'ru'))
+    const { hint: codeHint } = useBarcodeHint(pendingCode, interfaceLocale)
+
+    function hintWords(hint: BarcodeHint): string {
+      if (hint.quantity === null) return t('item.barcode.hint', { name: hint.name })
+      return t('item.barcode.hint_size', {
+        name: hint.name,
+        amount: shown(decimalFromMilli(hint.quantity), locale.value === 'ru' ? ',' : '.'),
+        unit: t(hint.quantity.unit === 'kg' ? 'item.unit_kg' : 'item.unit_l'),
+      })
+    }
 
     // The strip goes with its ✕, which held the focus: the field takes it back — what the person
     // does next is type (adversarial О).
@@ -730,6 +752,16 @@ export default defineComponent({
       }
     })
 
+    // The hint comes after «не знаком» was said, often before it was read out: said again with it, in
+    // one message, so neither is cut off by the other (MOL-162).
+    watch(codeHint, (hint) => {
+      if (hint === null || barcode.value !== 'missing') return
+      withdrawCode?.()
+      withdrawCode = announce?.(
+        `${t('item.barcode.missing', { code: lookup.code.value })}. ${hintWords(hint)}`,
+      )
+    })
+
     // The question about a code is said as the lookup's answers are: the block says nothing of
     // itself, and the focus on its first button reads only the button (MOL-100).
     let withdrawBind: (() => void) | undefined
@@ -964,6 +996,8 @@ export default defineComponent({
       afterScanning,
       proposingByCode,
       nameTaken,
+      codeHint,
+      hintWords,
       proposeByCode,
       takenOnProposal,
       pendingCode,
@@ -1022,6 +1056,25 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-callout);
   line-height: var(--leading-body);
+}
+
+.code-hint {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-self: stretch;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--accent-tint);
+  color: var(--text);
+  font-size: var(--text-callout);
+  line-height: var(--leading-body);
+}
+
+.code-hint-source {
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
 }
 
 .bind-question {
