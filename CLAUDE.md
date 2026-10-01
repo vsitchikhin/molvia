@@ -455,8 +455,9 @@ differently in every working copy by design.
   waits for. A step already green on the very same clean tree — by `make check` or an earlier
   push — is not run again (`bin/green.sh`), nor on a tree that differs from it only in documents
   (`*.md`, `docs/`, `.claude/`). **A test run typed by hand takes the same lock**
-  (`bin/one-at-a-time.sh <label> npx vitest run …`) unless it is one file of Unit or Use case; a
-  watch, `--ui` or `--debug` is refused by the lock, since it never gives it back. Why, in
+  (`bin/one-at-a-time.sh <label> npx vitest run …`) unless it is one file of Unit or Use case; the
+  lock gives the command no terminal, so vitest never watches under it, and refuses Playwright's
+  `--ui` and `--debug`, which never give it back. Why, in
   `.claude/rules/workspace.md`.
 - **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, in two
   jobs: checks and e2e. CI **checks** formatting rather than fixing it — `make format`

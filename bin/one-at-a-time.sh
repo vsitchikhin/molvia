@@ -30,23 +30,22 @@ fi
 lock="${XDG_CACHE_HOME:-$HOME/.cache}/molvia/checks.lock"
 mkdir -p "$(dirname "$lock")"
 
-# A run that never ends on its own holds every copy's turn until someone stops it: vitest without
-# `run` watches when it is in a terminal, Playwright's `--ui` and `--debug` wait for a person. Refused
-# rather than taken — a person types these, and the wait they cause is somebody else's (MOL-162,
-# adversarial Л2). `make` and the hooks never pass any of them.
+# A run that never ends on its own holds every copy's turn until someone stops it (MOL-162, adversarial
+# Л2–Л4). vitest watches only when its stdin is a terminal, so the command gets none (below) — in any
+# spelling: a path to the binary, a version, `sh -c`. Playwright's UI and debugger wait for a person
+# whatever stdin is, so those are refused with the reason: `--ui`, `--ui-port`, `--ui-host`,
+# `--debug`, `PWDEBUG`. Hidden inside `sh -c`, they still pass — the price of reading words. `make`
+# and the hooks pass none of them.
 endless=""
+[[ -n "${PWDEBUG:-}" ]] && endless="PWDEBUG"
 for arg in "${@:2}"; do
   case "$arg" in
-    --ui | --debug | --watch | -w | watch) endless="$arg" ;;
+    --ui | --ui=* | --ui-port | --ui-port=* | --ui-host | --ui-host=* | --debug | PWDEBUG=*) endless="$arg" ;;
   esac
 done
-if [[ -z "$endless" ]] && printf '%s\n' "${@:2}" | grep -qx 'vitest' &&
-  ! printf '%s\n' "${@:2}" | grep -qxE 'run|--run'; then
-  endless="vitest without run"
-fi
 if [[ -n "$endless" ]]; then
-  echo "one-at-a-time: «${endless}» does not end by itself and would hold every copy's turn —" \
-    "use \`npx vitest run …\` and run a watch or a UI outside the lock" >&2
+  echo "one-at-a-time: «${endless}» waits for a person and would hold every copy's turn —" \
+    "run Playwright's UI or debugger outside the lock" >&2
   exit 2
 fi
 
@@ -78,6 +77,8 @@ exec perl -e '
   print $lock "$label\n";
   $lock->flush;
 
+  # No terminal for the command: a test runner that would watch (vitest) runs once instead.
+  open(STDIN, "<", "/dev/null") or die "one-at-a-time: cannot read /dev/null: $!\n";
   my $status = system { $command[0] } @command;
   exit 127 if $status == -1;
   exit 128 + ($status & 127) if $status & 127;

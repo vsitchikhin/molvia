@@ -112,11 +112,13 @@ without the lock; Component, Integration, end-to-end and any run of a whole modu
 **The price:** a single integration file waits for whatever push holds the lock — minutes on each
 round of a fix.
 
-**What does not end by itself is refused, not queued** (adversarial Л2): vitest without `run` watches
-when it is in a terminal, and Playwright's `--ui` and `--debug` wait for a person — under the lock
-each held every copy's turn until somebody pressed `q`. The script answers them with exit 2 and the
-reason; a watch or a UI runs outside the lock. An agent never trips it — vitest does not watch under
-one — but a person typing the line from this rule would. **A waiting run names the copy by its root**
+**What does not end by itself never holds the lock** (adversarial Л2–Л4). vitest watches only when its
+stdin is a terminal, so the script gives the command none (`/dev/null`): under the lock vitest runs once
+in any spelling — `npx vitest …` without `run`, a path to the binary, a version, `sh -c`. A list of
+words to refuse was tried first and leaked both ways: it refused `npm run test -w …`, npm's workspace,
+and let `./node_modules/.bin/vitest` through. Playwright's UI and debugger wait for a person whatever
+stdin is, so `--ui`, `--ui-port`, `--ui-host`, `--debug` and `PWDEBUG` are refused with exit 2 and the
+reason; **the price**: hidden in `sh -c` they still pass. **A waiting run names the copy by its root**
 (`git rev-parse --show-toplevel`), not the folder the run was typed in: a module's tests are typed
 in the module, and «waiting for backend» was every copy (Л1).
 
