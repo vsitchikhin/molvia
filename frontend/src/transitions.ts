@@ -87,14 +87,16 @@ export function installViewTransitions(router: Router): void {
   router.beforeResolve((to, from) => {
     const byBrowser = animatedByBrowser
     animatedByBrowser = false
-    const move = direction(from, to)
-    if (!move) return
     const root = document.documentElement
-    if (byBrowser) {
+    // Any move to another screen the browser shows, with a direction of ours or not — the account
+    // opened from the card of «Деньги» has none, and the swipe back from it came in twice (Б3).
+    if (byBrowser && from.matched.length > 0 && !sameScreen(from, to)) {
       root.dataset.nav = 'browser'
       shownByBrowser = now()
       return
     }
+    const move = direction(from, to)
+    if (!move || byBrowser) return
     if (typeof document.startViewTransition !== 'function' || reducedMotion()) return
 
     return new Promise<void>((proceed) => {

@@ -246,6 +246,47 @@ describe('installViewTransitions', () => {
     })
   })
 
+  // The account opened from the card of «Деньги» is a move with no direction of ours; the swipe back
+  // from it is still the browser's move (adversarial Б3).
+  it('marks a move the browser shows that has no direction of ours', async () => {
+    stubViewTransitions()
+    const router = routerAt()
+    installViewTransitions(router)
+    await router.push('/money')
+    await router.push('/money/accounts/0b6c1a1e-8f45-4c8e-9a51-6a2b9c1d2e3f')
+    expect(
+      direction(
+        router.resolve('/money/accounts/0b6c1a1e-8f45-4c8e-9a51-6a2b9c1d2e3f'),
+        router.resolve('/money'),
+      ),
+    ).toBeNull()
+    const seen: (string | undefined)[] = []
+    router.afterEach(() => {
+      seen.push(document.documentElement.dataset.nav)
+    })
+    const event = new PopStateEvent('popstate', { state: null })
+    Object.defineProperty(event, 'hasUAVisualTransition', { value: true })
+    window.dispatchEvent(event)
+    await router.push('/money')
+    expect(seen).toEqual(['browser'])
+  })
+
+  it('must not fire: a change of the query the browser shows is not a move', async () => {
+    stubViewTransitions()
+    const router = routerAt()
+    installViewTransitions(router)
+    await router.push('/money')
+    const seen: (string | undefined)[] = []
+    router.afterEach(() => {
+      seen.push(document.documentElement.dataset.nav)
+    })
+    const event = new PopStateEvent('popstate', { state: null })
+    Object.defineProperty(event, 'hasUAVisualTransition', { value: true })
+    window.dispatchEvent(event)
+    await router.push('/money?month=2026-08')
+    expect(seen).toEqual([undefined])
+  })
+
   it('does not animate at all when motion is reduced', async () => {
     reduceMotion(true)
     const { start } = stubViewTransitions()
