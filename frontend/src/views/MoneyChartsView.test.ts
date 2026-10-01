@@ -6,16 +6,21 @@ import type { Router } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { ERROR, parseMoney, parseRate, yerevanMidnight } from '@molvia/model'
-import type { MoneyChartsView } from '@molvia/model'
+import type { MoneyChartMonthView, MoneyChartsView } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
+import { localDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import MoneyChartsViewScreen from './MoneyChartsView.vue'
 
 const moneyCharts = vi.fn<(period: 6 | 12) => Promise<MoneyChartsView>>()
+const moneyChartMonth = vi.fn<(month: string) => Promise<MoneyChartMonthView>>()
 vi.mock('@/api', () => ({
-  api: { moneyCharts: (period: 6 | 12) => moneyCharts(period) },
+  api: {
+    moneyCharts: (period: 6 | 12) => moneyCharts(period),
+    moneyChartMonth: (month: string) => moneyChartMonth(month),
+  },
 }))
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
@@ -126,7 +131,10 @@ function charts(patch: Partial<MoneyChartsView> = {}): MoneyChartsView {
 const views: VueWrapper[] = []
 let router: Router
 
-async function render(path = '/money/charts'): Promise<VueWrapper> {
+/** «Год» until MOL-160: the cards of MOL-74 (owner's decision В-1). */
+const YEAR = '/money/charts?mode=year'
+
+async function render(path = YEAR): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
   const actor = useActorStore()
@@ -152,6 +160,7 @@ beforeEach(() => {
   localStorage.clear()
   sessionStorage.clear()
   moneyCharts.mockReset()
+  moneyChartMonth.mockReset()
   online(true)
 })
 afterEach(() => {
@@ -160,12 +169,13 @@ afterEach(() => {
 })
 
 describe('MoneyChartsView (MOL-74): the four states', () => {
-  it('loads with a skeleton, the period already there, and asks for six months', async () => {
+  it('loads with a skeleton, «Месяц · Год» already there, and asks for twelve months', async () => {
     moneyCharts.mockReturnValue(new Promise(() => undefined))
     const view = await render()
     expect(view.find('.skeleton').exists()).toBe(true)
-    expect(view.text()).toContain(en.spending.charts.period_12)
-    expect(moneyCharts).toHaveBeenCalledWith(6)
+    expect(view.text()).toContain(en.spending.charts.mode_year)
+    expect(moneyCharts).toHaveBeenCalledWith(12)
+    expect(moneyChartMonth).not.toHaveBeenCalled()
   })
 
   it('a failed read is red with «Try again», and trying again reads again', async () => {
@@ -235,16 +245,18 @@ describe('MoneyChartsView: the charts', () => {
     expect(plain(view.text())).toContain('Difference · Sep')
   })
 
-  it('the period moves by replace and asks again', async () => {
+  it('a bookmark of the old period opens the year, and «Месяц» moves by replace (MOL-158)', async () => {
     moneyCharts.mockResolvedValue(charts())
-    const view = await render()
+    moneyChartMonth.mockReturnValue(new Promise(() => undefined))
+    const view = await render('/money/charts?period=6')
+    expect(router.currentRoute.value.query).toEqual({ mode: 'year' })
+    expect(moneyCharts).toHaveBeenCalledWith(12)
     const replace = vi.spyOn(router, 'replace')
-    moneyCharts.mockResolvedValue(charts({ period: 12 }))
-    await view.find('input[value="12"]').setValue(true)
+    await view.find('input[value="month"]').setValue(true)
     await flushPromises()
     expect(replace).toHaveBeenCalled()
-    expect(router.currentRoute.value.query.period).toBe('12')
-    expect(moneyCharts).toHaveBeenLastCalledWith(12)
+    expect(router.currentRoute.value.query.mode).toBeUndefined()
+    expect(moneyChartMonth).toHaveBeenCalled()
   })
 
   it('opens on the largest category, or on the one it was sent for', async () => {
@@ -253,18 +265,20 @@ describe('MoneyChartsView: the charts', () => {
     expect((first.find('select').element as HTMLSelectElement).value).toBe(GROCERIES)
     first.unmount()
 
-    const view = await render(`/money/charts?category=${CAFE}`)
+    const view = await render(`/money/charts?mode=year&category=${CAFE}`)
     expect((view.find('select').element as HTMLSelectElement).value).toBe(CAFE)
     expect(plain(view.text())).toContain('−9% vs August · ֏34,500 on average')
   })
 
   it('says so when the address names a category the charts do not have, rather than swap in silence (adversarial А)', async () => {
     moneyCharts.mockResolvedValue(charts())
-    const view = await render('/money/charts?category=ffffffff-0000-4000-8000-000000000099')
+    const view = await render(
+      '/money/charts?mode=year&category=ffffffff-0000-4000-8000-000000000099',
+    )
     expect((view.find('select').element as HTMLSelectElement).value).toBe(GROCERIES)
     expect(plain(view.text())).toContain('That category is not on the charts — showing «Groceries»')
 
-    const own = await render(`/money/charts?category=${CAFE}`)
+    const own = await render(`/money/charts?mode=year&category=${CAFE}`)
     expect(own.find('.missing').exists()).toBe(false)
   })
 
@@ -365,7 +379,7 @@ describe('MoneyChartsView: the charts', () => {
       string,
       { answer: { spentAverage: { amount: string } | null } }
     >
-    expect(kept['6']?.answer.spentAverage?.amount).toBe('999999.00')
+    expect(kept['12']?.answer.spentAverage?.amount).toBe('999999.00')
   })
 
   it('an answer whose later read failed is still shown and kept, under the strip (d9 round 2 Е2, review С-10)', async () => {
@@ -411,5 +425,396 @@ describe('MoneyChartsView: the charts', () => {
     expect(card()).toContain('My exchange September 28: 4.02 ֏ per 1 ₽')
     await view.find('.rate-line input[type="range"]').setValue('1')
     expect(card()).toContain(en.spending.charts.rate_none)
+  })
+})
+
+const RENT = 'ffffffff-0000-4000-8000-000000000003'
+const PRESETS = ['groceries', 'cafe', 'rent', 'home', 'beauty', 'transport', 'telecom', 'pets']
+const categoryOf = (index: number) => `ffffffff-0000-4000-8000-00000000000${String(index + 1)}`
+const SEPTEMBER = '/money/charts?month=2026-09'
+
+/** September 2026, closed: eight categories on the ring, the usual of June — August. */
+function monthCharts(patch: Partial<MoneyChartMonthView> = {}): MoneyChartMonthView {
+  const day = (index: number) => `2026-09-${String(index + 1).padStart(2, '0')}`
+  return {
+    month: '2026-09',
+    running: false,
+    spendCurrency: 'AMD',
+    incomeCurrency: 'RUB',
+    spent: amd('274523'),
+    spentIncome: rub('63800'),
+    uncounted: [],
+    slices: [
+      {
+        categoryId: categoryOf(6),
+        amount: amd('68076'),
+        income: rub('15821'),
+        count: 1,
+        level: 248,
+        members: [],
+      },
+      {
+        categoryId: GROCERIES,
+        amount: amd('60318'),
+        income: rub('14018'),
+        count: 1,
+        level: 220,
+        members: [],
+      },
+      {
+        categoryId: categoryOf(3),
+        amount: amd('51294'),
+        income: rub('11921'),
+        count: 1,
+        level: 187,
+        members: [],
+      },
+      {
+        categoryId: categoryOf(4),
+        amount: amd('43728'),
+        income: rub('10162'),
+        count: 1,
+        level: 159,
+        members: [],
+      },
+      {
+        categoryId: CAFE,
+        amount: amd('20390'),
+        income: rub('4739'),
+        count: 1,
+        level: 74,
+        members: [],
+      },
+      {
+        categoryId: categoryOf(7),
+        amount: amd('17917'),
+        income: rub('4164'),
+        count: 1,
+        level: 65,
+        members: [],
+      },
+      {
+        categoryId: null,
+        amount: amd('12800'),
+        income: rub('2975'),
+        count: 2,
+        level: 47,
+        members: [categoryOf(5), RENT],
+      },
+    ],
+    usual: { from: '2026-06', to: '2026-08', months: 3 },
+    comparedFrom: null,
+    closed: ['2026-06', '2026-07', '2026-08'],
+    firstMonth: '2026-06',
+    deviations: [
+      {
+        categoryId: RENT,
+        amount: amd('0'),
+        average: amd('100875'),
+        change: -100,
+        level: 0,
+        averageLevel: 1000,
+      },
+      {
+        categoryId: categoryOf(6),
+        amount: amd('68076'),
+        average: amd('13900'),
+        change: 390,
+        level: 675,
+        averageLevel: 138,
+      },
+      {
+        categoryId: CAFE,
+        amount: amd('20390'),
+        average: amd('0'),
+        change: null,
+        level: 202,
+        averageLevel: 0,
+      },
+    ],
+    pace: {
+      days: Array.from({ length: 30 }, (_, index) => ({
+        day: day(index),
+        cumulative: amd(String((index + 1) * 9000)),
+        income: rub(String((index + 1) * 2000)),
+        level: Math.round(((index + 1) * 1000) / 30),
+      })),
+      usual: Array.from({ length: 30 }, (_, index) => ({
+        day: day(index),
+        cumulative: amd(String((index + 1) * 6000)),
+        level: Math.round(((index + 1) * 666) / 30),
+      })),
+    },
+    categories: PRESETS.map((preset, index) => ({
+      id: categoryOf(index),
+      preset,
+      name: null,
+      colour: null,
+      archived: false,
+    })) as MoneyChartMonthView['categories'],
+    ...patch,
+  }
+}
+
+describe('MoneyChartsView (MOL-158): «Месяц»', () => {
+  it('opens on the month of this phone when the address names none, and draws the skeleton', async () => {
+    moneyChartMonth.mockReturnValue(new Promise(() => undefined))
+    const view = await render('/money/charts')
+    expect(view.find('.skeleton').exists()).toBe(true)
+    expect(moneyChartMonth).toHaveBeenCalledWith(localDay().slice(0, 7))
+    expect(moneyCharts).not.toHaveBeenCalled()
+  })
+
+  it('draws the ring with its centre and a legend, «Остальные» named under it', async () => {
+    moneyChartMonth.mockResolvedValue(monthCharts())
+    const view = await render(SEPTEMBER)
+    const card = plain(view.findAll('section')[0]?.text() ?? '')
+    expect(card).toContain('September')
+    expect(card).toContain('֏274,523')
+    expect(card).toContain('≈ ₽63,800')
+    expect(view.findAll('.legend .row')).toHaveLength(7)
+    expect(card).toContain('Others: transport and rent')
+    expect(card).toContain(en.spending.charts.donut_order)
+  })
+
+  it('a row chosen fills the centre, and a second tap lets it go (review Р-4)', async () => {
+    moneyChartMonth.mockResolvedValue(monthCharts())
+    const view = await render(SEPTEMBER)
+    const radio = view.find('.legend .row input')
+    await radio.trigger('click')
+    const centre = () => plain(view.find('.center').text())
+    expect(centre()).toContain('֏68,076')
+    expect(centre()).toContain('25% · ≈ ₽15,821')
+    expect(view.find('.legend .row').classes()).toContain('chosen')
+    expect(view.findAll('.ring .arc.muted')).toHaveLength(6)
+    await radio.trigger('click')
+    expect(centre()).toContain('֏274,523')
+    expect(view.findAll('.ring .arc.muted')).toHaveLength(0)
+  })
+
+  it('against the usual: a percent with an arrow, «new» where the usual is nothing', async () => {
+    moneyChartMonth.mockResolvedValue(monthCharts())
+    const view = await render(SEPTEMBER)
+    const rows = view.findAll('.rows .row').map((row) => plain(row.text()))
+    expect(rows[0]).toContain('−100%')
+    expect(rows[0]).toContain('֏0 · usually ֏100,875')
+    expect(rows[1]).toContain('+390%')
+    expect(rows[2]).toContain(en.spending.charts.vs_usual_new)
+    expect(view.text()).toContain('September against the average of June — August')
+  })
+
+  it('with too few closed months the cards stay and name the first month with a comparison (handoff 3g, adversarial Г)', async () => {
+    // A closed September, data from August: before it only August is closed; November is the first
+    // month with three closed before it — never «after September», which is already past.
+    moneyChartMonth.mockResolvedValue(
+      monthCharts({
+        usual: null,
+        comparedFrom: '2026-11',
+        closed: ['2026-08'],
+        firstMonth: '2026-08',
+        deviations: [],
+        pace: { days: monthCharts().pace.days, usual: null },
+      }),
+    )
+    const view = await render(SEPTEMBER)
+    const text = plain(view.text())
+    expect(text).toContain('The comparison starts with November')
+    expect(text).toContain('Only August is closed before September.')
+    expect(text).toContain('The usual month’s dashed line starts with November')
+    expect(text).not.toContain('so far')
+    expect(view.find('.usual').exists()).toBe(false)
+    // No usual to set the day beside: the day in the income currency instead.
+    expect(text).toContain('≈ ₽60,000')
+  })
+
+  it('the pace reads the last day of a closed month, and another one by the arrows', async () => {
+    moneyChartMonth.mockResolvedValue(monthCharts())
+    const view = await render(SEPTEMBER)
+    const reading = () => plain(view.find('.pace .reading').text())
+    expect(reading()).toContain('By September 30')
+    expect(reading()).toContain('֏270,000')
+    expect(reading()).toContain('usually by this day ֏180,000 · +50%')
+    await view.find('.pace input[type="range"]').setValue('11')
+    expect(reading()).toContain('By September 12')
+    expect(reading()).toContain('֏108,000')
+  })
+
+  it('the month moves by replace and asks again; a new month lets the sector go', async () => {
+    moneyChartMonth.mockResolvedValue(monthCharts())
+    const view = await render(SEPTEMBER)
+    await view.find('.legend .row input').trigger('click')
+    moneyChartMonth.mockResolvedValue(monthCharts({ month: '2026-08' }))
+    const replace = vi.spyOn(router, 'replace')
+    await view.find(`button[aria-label="${en.spending.month_prev}"]`).trigger('click')
+    await flushPromises()
+    expect(replace).toHaveBeenCalled()
+    expect(router.currentRoute.value.query.month).toBe('2026-08')
+    expect(moneyChartMonth).toHaveBeenLastCalledWith('2026-08')
+    expect(view.find('.legend .row.chosen').exists()).toBe(false)
+  })
+
+  it('a newcomer sees an offer, not an empty ring', async () => {
+    moneyChartMonth.mockResolvedValue(
+      monthCharts({
+        spent: amd('0'),
+        spentIncome: rub('0'),
+        slices: [],
+        usual: null,
+        comparedFrom: '2026-12',
+        closed: [],
+        firstMonth: null,
+        deviations: [],
+        pace: { days: [], usual: null },
+      }),
+    )
+    const view = await render(SEPTEMBER)
+    expect(view.text()).toContain(en.spending.charts.empty.title)
+    expect(view.find('.ring').exists()).toBe(false)
+  })
+
+  it('a month before the first with data is a grey ring, not the offer to a newcomer (adversarial К)', async () => {
+    moneyChartMonth.mockResolvedValue(
+      monthCharts({
+        month: '2026-05',
+        spent: amd('0'),
+        spentIncome: rub('0'),
+        slices: [],
+        usual: null,
+        comparedFrom: '2026-09',
+        closed: [],
+        firstMonth: '2026-06',
+        deviations: [],
+      }),
+    )
+    const view = await render('/money/charts?month=2026-05')
+    expect(view.text()).not.toContain(en.spending.charts.empty.title)
+    expect(view.findAll('.ring .arc')).toHaveLength(1)
+    expect(plain(view.text())).toContain('None is closed before May.')
+  })
+
+  it('with a usual and no dashed line says why, never that it comes (adversarial И)', async () => {
+    moneyChartMonth.mockResolvedValue(
+      monthCharts({ pace: { days: monthCharts().pace.days, usual: null } }),
+    )
+    const view = await render(SEPTEMBER)
+    expect(view.text()).toContain(en.spending.charts.pace_uncounted)
+    expect(view.text()).not.toContain('starts with')
+  })
+
+  it('a sector gone from a new answer of the same month is let go, not the whole ring dimmed (adversarial А)', async () => {
+    moneyChartMonth.mockResolvedValue(monthCharts())
+    const view = await render(SEPTEMBER)
+    await view.find('.legend .row input').trigger('click')
+    expect(view.findAll('.ring .arc.muted')).toHaveLength(6)
+    // The same month again, the first category now in «Остальные».
+    const [, ...others] = monthCharts().slices
+    moneyChartMonth.mockResolvedValue(monthCharts({ slices: others }))
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(view.findAll('.ring .arc.muted')).toHaveLength(0)
+    expect(view.find('.legend .row.chosen').exists()).toBe(false)
+  })
+
+  it('a new answer of the same month keeps the day chosen while the line reaches it (adversarial З)', async () => {
+    moneyChartMonth.mockResolvedValue(monthCharts())
+    const view = await render(SEPTEMBER)
+    await view.find('.pace input[type="range"]').setValue('2')
+    const longer = monthCharts().pace.days.slice(0, 29)
+    moneyChartMonth.mockResolvedValue(
+      monthCharts({ pace: { days: longer, usual: monthCharts().pace.usual } }),
+    )
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(plain(view.find('.pace .reading').text())).toContain('By September 3')
+  })
+
+  it("the day of arrival is worked out for every answer, never kept from yesterday's (adversarial round 2, Н1, Н2)", async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const october = (days: number) =>
+        monthCharts({
+          month: '2026-10',
+          running: true,
+          pace: {
+            days: monthCharts()
+              .pace.days.slice(0, days)
+              .map((day) => ({ ...day, day: day.day.replace('2026-09', '2026-10') })),
+            usual: null,
+          },
+        })
+      // Yesterday's answer is on the phone; today's comes: the day is today, nobody chose the 11th.
+      vi.setSystemTime(new Date('2026-10-11T09:00:00Z'))
+      moneyChartMonth.mockResolvedValue(october(11))
+      ;(await render('/money/charts')).unmount()
+      vi.setSystemTime(new Date('2026-10-12T09:00:00Z'))
+      moneyChartMonth.mockResolvedValue(october(12))
+      const view = await render('/money/charts')
+      expect(plain(view.find('.pace .reading').text())).toContain('By October 12 · today')
+      view.unmount()
+
+      // September kept from when it ran, opened on the 1st of October: its last day, not the 1st.
+      vi.setSystemTime(new Date('2026-09-29T09:00:00Z'))
+      moneyChartMonth.mockResolvedValue(
+        monthCharts({
+          running: true,
+          pace: { days: monthCharts().pace.days.slice(0, 29), usual: null },
+        }),
+      )
+      ;(await render(SEPTEMBER)).unmount()
+      vi.setSystemTime(new Date('2026-10-01T09:00:00Z'))
+      moneyChartMonth.mockResolvedValue(monthCharts())
+      const closed = await render(SEPTEMBER)
+      expect(plain(closed.find('.pace .reading').text())).toContain('By September 30')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("whether the month runs is the phone's calendar's, in every word of the screen (review 3)", async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      // September kept on its 30th, while it ran; opened offline on the 1st of October.
+      vi.setSystemTime(new Date('2026-09-30T09:00:00Z'))
+      moneyChartMonth.mockResolvedValue(monthCharts({ running: true }))
+      ;(await render(SEPTEMBER)).unmount()
+      vi.setSystemTime(new Date('2026-10-01T09:00:00Z'))
+      online(false)
+      moneyChartMonth.mockRejectedValue(new TypeError('network'))
+      const view = await render(SEPTEMBER)
+      expect(view.find('.strip').exists()).toBe(true)
+      expect(view.find('.center-label').text()).toBe('September')
+      expect(view.text()).toContain('September against the average of June — August')
+      expect(view.text()).not.toContain('so far')
+      expect(plain(view.find('.pace .reading').text())).not.toContain('today')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a month still to come in the address is this month (adversarial В)', async () => {
+    moneyChartMonth.mockReturnValue(new Promise(() => undefined))
+    await render('/money/charts?month=2099-05')
+    expect(moneyChartMonth).toHaveBeenCalledWith(localDay().slice(0, 7))
+  })
+
+  it('a month with nothing spent, after months that were, is a grey ring of nothing', async () => {
+    moneyChartMonth.mockResolvedValue(
+      monthCharts({ spent: amd('0'), spentIncome: rub('0'), slices: [] }),
+    )
+    const view = await render(SEPTEMBER)
+    expect(plain(view.find('.center').text())).toContain('֏0')
+    expect(view.findAll('.ring .arc')).toHaveLength(1)
+    expect(view.find('fieldset.legend').exists()).toBe(false)
+  })
+
+  it('offline with the month kept shows it under a yellow strip, never red', async () => {
+    moneyChartMonth.mockResolvedValueOnce(monthCharts())
+    ;(await render(SEPTEMBER)).unmount()
+    online(false)
+    moneyChartMonth.mockRejectedValue(new TypeError('network'))
+    const view = await render(SEPTEMBER)
+    expect(view.find('.strip').text()).toContain('No connection. Charts as of')
+    expect(plain(view.text())).toContain('֏274,523')
+    expect(view.find('.state.bad').exists()).toBe(false)
   })
 })

@@ -1,6 +1,13 @@
 <template>
   <svg class="ring" viewBox="-50 -50 100 100" aria-hidden="true" focusable="false">
-    <path v-for="sector in arcs" :key="sector.key" :d="sector.d" :fill="sector.colour" />
+    <path
+      v-for="sector in arcs"
+      :key="sector.key"
+      class="arc"
+      :class="{ muted: chosen !== null && sector.key !== chosen }"
+      :d="sector.d"
+      :fill="sector.colour"
+    />
   </svg>
 </template>
 
@@ -19,6 +26,8 @@ export interface RingSector {
 
 /** The gap between two sectors, in radians (handoff MOL-157, 03). */
 const GAP = 0.045
+/** How much thicker the chosen sector is, of the hundred (handoff MOL-157, 03). */
+export const CHOSEN_THICKER = 5
 /** A sector narrower than this many gaps goes without one: a gap would eat it (handoff 03). */
 const GAPLESS_BELOW = 2.5
 const TURN = Math.PI * 2
@@ -34,11 +43,16 @@ export default defineComponent({
     sectors: { type: Array as PropType<readonly RingSector[]>, required: true },
     /** How thick the ring is, of the hundred it is drawn in: 16 compact, 12 full (handoff 01, 03). */
     thickness: { type: Number, default: 16 },
+    /**
+     * The sector chosen on «Графики» (MOL-158): thicker, inwards, and every other one dimmed — the
+     * choice is seen by more than colour (handoff 03). Null — nothing chosen.
+     */
+    chosen: { type: String as PropType<string | null>, default: null },
   },
   setup(props) {
     const arcs = computed(() => {
-      const shape = arc<{ startAngle: number; endAngle: number }>()
-        .innerRadius(50 - props.thickness)
+      const shape = arc<{ startAngle: number; endAngle: number; inner: number }>()
+        .innerRadius((sector) => sector.inner)
         .outerRadius(50)
       const drawn = props.sectors.filter((sector) => sector.level > 0)
       let start = 0
@@ -48,7 +62,8 @@ export default defineComponent({
         // radius. d3's `padAngle` keeps a gap of the same width instead, measured further out than
         // the ring, and it came out 0,054 outside and 0,080 inside (adversarial В).
         const trim = drawn.length > 1 && sweep >= GAPLESS_BELOW * GAP ? GAP / 2 : 0
-        const d = shape({ startAngle: start + trim, endAngle: start + sweep - trim }) ?? ''
+        const inner = 50 - props.thickness - (sector.key === props.chosen ? CHOSEN_THICKER : 0)
+        const d = shape({ startAngle: start + trim, endAngle: start + sweep - trim, inner }) ?? ''
         start += sweep
         return { key: sector.key, colour: sector.colour, d }
       })
@@ -63,5 +78,19 @@ export default defineComponent({
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.arc {
+  transition: opacity var(--dur-fast) var(--ease-out);
+
+  &.muted {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arc {
+    transition: none;
+  }
 }
 </style>

@@ -95,22 +95,22 @@ export function chartMonths(current: Month, count: number): Month[] {
   return months
 }
 
-function levelOf(minor: bigint, tallest: bigint): number {
+export function levelOf(minor: bigint, tallest: bigint): number {
   if (tallest <= 0n || minor <= 0n) return 0
   return Number(divideRounded(minor * BigInt(CHART_LEVEL), tallest))
 }
 
-function tallestOf(values: readonly bigint[]): bigint {
+export function tallestOf(values: readonly bigint[]): bigint {
   return values.reduce((most, value) => (value > most ? value : most), 0n)
 }
 
 /** A month has something to show: anything spent — counted or not — or anything that came in. */
-function holdsData(month: MoneyMonth): boolean {
+export function holdsData(month: MoneyMonth): boolean {
   return month.days.length > 0 || month.income.minor > 0n || month.incomeUncounted.length > 0
 }
 
 /** The mean of whole minor units, rounded half away from zero, as every figure of «Деньги» is. */
-function meanOf(values: readonly bigint[], currency: Currency): Money | null {
+export function meanOf(values: readonly bigint[], currency: Currency): Money | null {
   if (values.length === 0) return null
   const sum = values.reduce((total, value) => total + value, 0n)
   if (sum > INT8_MAX || sum < -INT8_MAX) return null
@@ -168,7 +168,7 @@ export interface MoneyCharts {
  * size — 0,01 ֏ in August and 10¹⁴ ֏ in September is ten thousand billion per cent — and one past
  * 2⁵³ took the whole screen down. Such a figure says nothing a person can use; it is left unsaid.
  */
-function changeOf(current: Money, previous: Money): number | null {
+export function changeOf(current: Money, previous: Money): number | null {
   const change = percentChange(current, previous)
   return change !== null && Number.isSafeInteger(change) ? change : null
 }
