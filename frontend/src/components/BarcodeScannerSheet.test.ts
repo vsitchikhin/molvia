@@ -623,6 +623,29 @@ describe('BarcodeScannerSheet · how to stop Safari asking', () => {
     expect(getUserMedia).not.toHaveBeenCalled()
   })
 
+  it('lights no camera for a scanner gone with its screen while the browser answered (adversarial Д)', async () => {
+    const browser = safari('held')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const sheet = await render()
+    mounted.splice(mounted.indexOf(sheet), 1)
+    sheet.unmount()
+    browser.answer('prompt')
+    await settle()
+    expect(getUserMedia).not.toHaveBeenCalled()
+  })
+
+  it('lights no camera for a scanner gone while the browser kept silent (adversarial Д)', async () => {
+    safari('held')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const sheet = await render()
+    mounted.splice(mounted.indexOf(sheet), 1)
+    sheet.unmount()
+    // Past the ceiling, where the start would go on without an answer.
+    await new Promise((resolve) => setTimeout(resolve, PERMISSION_WAIT * 2))
+    await settle()
+    expect(getUserMedia).not.toHaveBeenCalled()
+  })
+
   it('asks for the camera once for one opening, however the answers cross (adversarial В)', async () => {
     // Seen before: the line, not the sheet, so nothing lies over the scanner's own buttons.
     localStorage.setItem('molvia.camera-hint', '1')
