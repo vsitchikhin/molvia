@@ -1,7 +1,9 @@
 import { onUnmounted, shallowRef, watch } from 'vue'
 import type { Ref, ShallowRef } from 'vue'
-import type { AppLocale, BarcodeHint } from '@molvia/model'
+import { decimalFromMilli } from '@molvia/model'
+import type { AppLocale, BarcodeHint, Quantity } from '@molvia/model'
 import { api } from '@/api'
+import { shown } from '@/composables/useItemDetails'
 
 export interface BarcodeHintState {
   /** The hint for `code` now, or `null`: none asked yet, none given, or the base out of reach. */
@@ -48,4 +50,18 @@ export function useBarcodeHint(code: Ref<string | null>, locale: Ref<AppLocale>)
   onUnmounted(() => inFlight?.abort())
 
   return { hint }
+}
+
+/**
+ * The size of a package as the screen says it — «0,4 кг» — in the unit the item is counted in, as
+ * the purchase sheet will show it; the unit's word is the dictionary's, by its key.
+ */
+export function packageSize(
+  quantity: Quantity,
+  locale: AppLocale,
+): { amount: string; unitKey: 'item.unit_kg' | 'item.unit_l' } {
+  return {
+    amount: shown(decimalFromMilli(quantity), locale === 'ru' ? ',' : '.'),
+    unitKey: quantity.unit === 'kg' ? 'item.unit_kg' : 'item.unit_l',
+  }
 }

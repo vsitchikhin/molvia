@@ -904,8 +904,9 @@ describe('«What did you pick up?»', () => {
         })
         expect(view.get('.code-hint').text()).toContain(en.item.barcode.hint_source)
         expect(catalogueBarcodeHint).toHaveBeenCalledWith(CODE, 'en')
+        // Under the button, which then never moves when the hint comes (В-5, adversarial Г).
         const block = view.get('.not-found').html()
-        expect(block.indexOf('code-hint')).toBeLessThan(block.indexOf(en.item.empty.action))
+        expect(block.indexOf('code-hint')).toBeGreaterThan(block.indexOf(en.item.empty.action))
         await vi.waitFor(() => {
           expect(view.get('.live').text()).toBe(
             `${en.item.barcode.missing.replace('{code}', CODE)}. ${hintText}`,
@@ -931,6 +932,29 @@ describe('«What did you pick up?»', () => {
           'Nutella',
         )
         expect(view.get('dialog a.source').attributes('href')).toBe(nutella.url)
+      })
+
+      it('must not say a late hint over «Suggest an item» opened meanwhile (review 3)', async () => {
+        catalogueByBarcode.mockResolvedValue(null)
+        let land!: (hint: BarcodeHint) => void
+        catalogueBarcodeHint.mockReturnValue(new Promise((resolve) => (land = resolve)))
+        vi.spyOn(performance, 'now').mockReturnValue(0)
+        const view = await render()
+        await scan(view, CODE)
+        const missing = en.item.barcode.missing.replace('{code}', CODE)
+        await vi.waitFor(() => {
+          expect(view.get('.live').text()).toBe(missing)
+        })
+        await button(view, en.item.empty.action).trigger('click')
+        vi.spyOn(performance, 'now').mockReturnValue(1_000_000)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+
+        land(nutella)
+        await flushPromises()
+        await new Promise((resolve) => setTimeout(resolve, 150))
+
+        expect(view.get('.live').text()).not.toContain(hintText)
+        expect(view.get<HTMLInputElement>('dialog input[type="text"]').element.value).toBe('')
       })
 
       it('must not show a hint the base did not give, nor fail when asking fails', async () => {

@@ -9,10 +9,6 @@
       autocapitalize="sentences"
       enterkeyhint="next"
     />
-    <!-- The attribution the base's licence asks for (MOL-162): its page, opened by the person. -->
-    <a v-if="source" class="source" :href="source" target="_blank" rel="noopener noreferrer">
-      {{ t('item.propose.hint_source') }}
-    </a>
     <SegmentedControl v-model="unit" :legend="t('item.unit')" :options="units" />
     <div v-if="sizeShown && size" class="size">
       <p class="size-text">{{ t('item.propose.size', sizeWords(size)) }}</p>
@@ -28,6 +24,11 @@
     />
     <p v-if="nameTaken" class="code">{{ t('item.propose.name_taken', { name: nameTaken }) }}</p>
     <p v-if="code" class="code">{{ t('item.propose.code', { code }) }}</p>
+    <!-- The attribution the base's licence asks for (MOL-162): its page, opened by the person. Last,
+         away from the fields and with a target a thumb can take (review 2). -->
+    <a v-if="source" class="source" :href="source" target="_blank" rel="noopener noreferrer">
+      {{ t('item.propose.hint_source') }}
+    </a>
 
     <template #footer>
       <!-- There before its words, with only the text changing: a live region born together with
@@ -72,12 +73,13 @@ import {
   decimalFromMilli,
   drawsNothing,
   pastedLine,
+  pickLocale,
   proposedItemSchema,
 } from '@molvia/model'
 import type { BarcodeHint, CatalogueEntry, Quantity } from '@molvia/model'
 import IconClose from '~icons/mdi/close'
 import { api } from '@/api'
-import { shown } from '@/composables/useItemDetails'
+import { packageSize } from '@/composables/useBarcodeHint'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -103,9 +105,10 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
  * Opened with an empty name for a code Open Food Facts named (MOL-162), the form starts from what
  * the base says: the name, the unit its size is in, and the size of the package — sent as how much
  * is usually taken, so a purchase of it opens at «0,4 кг» and its price per kilo shows at once. A
- * fact from the package, not a guess, which is why the unit may start chosen here. A hint that comes
- * after the sheet opened fills only what is still empty: nothing changes under the person's finger.
- * A name the person typed before — «другой товар», a word in the search — takes no hint at all.
+ * fact from the package, not a guess, which is why the unit may start chosen here. Only the hint at
+ * hand when the sheet opens: one that comes later is not used at all — filled in, it grew the sheet
+ * up under the thumb on its way to the name, and the tap chose «л» (adversarial Д). A name the person
+ * typed before — «другой товар», a word in the search — takes no hint either.
  *
  * What the server refuses reads as one line, not under a field: its refusals are issue codes,
  * which the dictionary does not translate, and a blank name — the one refusal a person can make
@@ -150,8 +153,6 @@ export default defineComponent({
     const size = shallowRef<Quantity | null>(null)
     /** The page of the product in Open Food Facts once the hint filled anything — the attribution. */
     const source = ref<string | null>(null)
-    /** Whether this opening started with no name — the only one a hint may fill. */
-    let startedEmpty = false
     const sending = ref(false)
     const failed = ref(false)
     const connected = ref(navigator.onLine)
@@ -195,36 +196,26 @@ export default defineComponent({
         source.value = null
         failed.value = false
         holder.value = null
-        startedEmpty = name.value === ''
-        fill(props.hint)
+        if (name.value === '' && props.hint !== null) fill(props.hint)
       },
       { immediate: true },
     )
 
-    /** What is still empty, from the hint (MOL-162, Р-8): nothing the person has set is replaced. */
-    function fill(hint: BarcodeHint | null): void {
-      if (!props.open || !startedEmpty || hint === null) return
-      let used = false
-      if (name.value === '') {
-        name.value = hint.name
-        used = true
-      }
-      if (hint.quantity !== null && size.value === null && unit.value === '') {
+    /** The form from the hint, as the sheet opens (MOL-162). */
+    function fill(hint: BarcodeHint): void {
+      name.value = hint.name
+      if (hint.quantity !== null) {
         unit.value = hint.quantity.unit
         size.value = hint.quantity
-        used = true
       }
-      if (used) source.value = hint.url
+      source.value = hint.url
     }
-    watch(() => props.hint, fill)
 
     const sizeShown = computed(() => size.value !== null && unit.value === size.value.unit)
 
     function sizeWords(quantity: Quantity): { amount: string; unit: string } {
-      return {
-        amount: shown(decimalFromMilli(quantity), locale.value === 'ru' ? ',' : '.'),
-        unit: t(quantity.unit === 'kg' ? 'item.unit_kg' : 'item.unit_l'),
-      }
+      const words = packageSize(quantity, pickLocale(locale.value))
+      return { amount: words.amount, unit: t(words.unitKey) }
     }
 
     const input = computed(() =>
@@ -375,7 +366,10 @@ export default defineComponent({
 }
 
 .source {
+  display: inline-flex;
+  align-items: center;
   align-self: flex-start;
+  min-height: var(--touch-target);
   color: var(--accent-ink);
   font-size: var(--text-footnote);
 }

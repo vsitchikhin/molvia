@@ -165,16 +165,17 @@
 
         <div v-else-if="barcode === 'missing'" class="not-found">
           <p class="not-found-text">{{ t('item.barcode.missing', { code: barcodeCode }) }}</p>
-          <!-- What Open Food Facts says the package is (MOL-162, В-1): above the button, which does
-               not move when it comes, and filling «Предложить товар» once tapped. -->
-          <p v-if="codeHint" class="code-hint">
-            {{ hintWords(codeHint) }}
-            <span class="code-hint-source">{{ t('item.barcode.hint_source') }}</span>
-          </p>
           <AppButton @click="proposeByCode">
             <template #icon><IconPlus /></template>
             {{ t('item.empty.action') }}
           </AppButton>
+          <!-- What Open Food Facts says the package is (MOL-162): under the button, so the button
+               stays where the thumb saw it when the hint comes (owner's decision В-5, in place of
+               В-1's «above», which moved it ~100 px — adversarial Г). -->
+          <p v-if="codeHint" class="code-hint">
+            {{ hintWords(codeHint) }}
+            <span class="code-hint-source">{{ t('item.barcode.hint_source') }}</span>
+          </p>
           <p class="not-found-text">{{ t('item.barcode.missing_hint') }}</p>
         </div>
 
@@ -306,7 +307,7 @@ import { useSelectedTrip } from '@/composables/useSelectedTrip'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
-import { ERROR, decimalFromMilli } from '@molvia/model'
+import { ERROR, pickLocale } from '@molvia/model'
 import type { AppLocale, BarcodeHint, CatalogueEntry } from '@molvia/model'
 import IconBarcode from '~icons/mdi/barcode-scan'
 import IconClose from '~icons/mdi/close'
@@ -321,9 +322,8 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { api } from '@/api'
 import { useAnnouncer } from '@/composables/useAnnouncer'
-import { useBarcodeHint } from '@/composables/useBarcodeHint'
+import { packageSize, useBarcodeHint } from '@/composables/useBarcodeHint'
 import { useBarcodeLookup } from '@/composables/useBarcodeLookup'
-import { shown } from '@/composables/useItemDetails'
 import { useCatalogueSearch } from '@/composables/useCatalogueSearch'
 import { currentIdentity } from '@/stores/identity'
 import { useItemEntryStore } from '@/stores/itemEntry'
@@ -423,15 +423,16 @@ export default defineComponent({
     })
 
     /** What Open Food Facts says the waiting code's package is (MOL-162): follows the code. */
-    const interfaceLocale = computed<AppLocale>(() => (locale.value === 'en' ? 'en' : 'ru'))
+    const interfaceLocale = computed<AppLocale>(() => pickLocale(locale.value))
     const { hint: codeHint } = useBarcodeHint(pendingCode, interfaceLocale)
 
     function hintWords(hint: BarcodeHint): string {
       if (hint.quantity === null) return t('item.barcode.hint', { name: hint.name })
+      const size = packageSize(hint.quantity, interfaceLocale.value)
       return t('item.barcode.hint_size', {
         name: hint.name,
-        amount: shown(decimalFromMilli(hint.quantity), locale.value === 'ru' ? ',' : '.'),
-        unit: t(hint.quantity.unit === 'kg' ? 'item.unit_kg' : 'item.unit_l'),
+        amount: size.amount,
+        unit: t(size.unitKey),
       })
     }
 
@@ -753,9 +754,10 @@ export default defineComponent({
     })
 
     // The hint comes after «не знаком» was said, often before it was read out: said again with it, in
-    // one message, so neither is cut off by the other (MOL-162).
+    // one message, so neither is cut off by the other (MOL-162). Not over «Предложить товар» opened
+    // meanwhile: the person is in the form, which a late hint does not touch (review 3).
     watch(codeHint, (hint) => {
-      if (hint === null || barcode.value !== 'missing') return
+      if (hint === null || barcode.value !== 'missing' || proposing.value) return
       withdrawCode?.()
       withdrawCode = announce?.(
         `${t('item.barcode.missing', { code: lookup.code.value })}. ${hintWords(hint)}`,

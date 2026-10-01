@@ -558,38 +558,23 @@ describe('«Suggest an item»', () => {
       expect(proposeItem.mock.calls[0]?.[0]).not.toHaveProperty('typicalQuantity')
     })
 
-    it('fills an untouched form with a hint that comes after the opening', async () => {
+    it('must not take a hint that comes after the opening: the form stays as it opened (adversarial Д)', async () => {
       const sheet = await render('', CODE)
+      await fields(sheet).name.setValue('Нут')
+      await fields(sheet).name.setValue('')
+
+      await sheet.setProps({ hint: nutella })
+
       expect(fields(sheet).name.element.value).toBe('')
-
-      await sheet.setProps({ hint: nutella })
-
-      expect(fields(sheet).name.element.value).toBe('Nutella')
-      expect(sizeLine(sheet).exists()).toBe(true)
-      expect(source(sheet).exists()).toBe(true)
-    })
-
-    it('must not replace what the person set before a late hint came', async () => {
-      const sheet = await render('', CODE)
-      await fields(sheet).name.setValue('Нутелла')
-      await chooseUnit(sheet, en.item.unit_piece)
-
-      await sheet.setProps({ hint: nutella })
-
-      expect(fields(sheet).name.element.value).toBe('Нутелла')
       expect(sizeLine(sheet).exists()).toBe(false)
       expect(source(sheet).exists()).toBe(false)
+      expect(submitButton(sheet).attributes('disabled')).toBeDefined()
     })
 
-    it('fills only the unit and size when the person typed the name first', async () => {
-      const sheet = await render('', CODE)
-      await fields(sheet).name.setValue('Нутелла')
-
-      await sheet.setProps({ hint: nutella })
-
-      expect(fields(sheet).name.element.value).toBe('Нутелла')
-      expect(sizeLine(sheet).exists()).toBe(true)
-      expect(source(sheet).exists()).toBe(true)
+    it('puts the attribution last, under the code, as a target a thumb can take (review 2)', async () => {
+      const sheet = await render('', CODE, nutella)
+      const order = sheet.findAll('.code, a.source').map((node) => node.classes()[0])
+      expect(order).toEqual(['code', 'source'])
     })
 
     it('must not take a hint over a name typed into the search', async () => {
