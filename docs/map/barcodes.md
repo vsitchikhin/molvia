@@ -33,10 +33,6 @@ Rules: `.claude/rules/barcodes.md`. A test beside its source, or mirroring it un
 - `frontend/src/scanner/frames.ts` — `cropOf`, the frame on the screen in the camera's pixels through a cover fit; `createReadStreak`, two reads in a row.
 - `frontend/src/scanner/protocol.ts` — The messages between the page and the decoding worker.
 
-## frontend · public
-
-- `frontend/public/camera-probe.html` — MOL-163, temporary: a static page on the app's own origin that logs when the phone asks for the camera — after a stop, a history entry, a disabled track, the background, `<input capture>` — and what `permissions.query` says. Removed by the task's last commit.
-
 ## e2e
 
 - `e2e/scanner.spec.ts` — Spec in the `camera` project: the fake camera's barcode read by the worker with the app's own wasm; no permission; no camera, and the digits typed by hand.
