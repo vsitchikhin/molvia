@@ -10,6 +10,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `packages/model/src/contracts/spending.ts` — Wire schemas of spendings and categories: body and amendment, a spending's view, a category's body and view, the categories answer.
 - `packages/model/src/entities/money-month.ts` — The month of «Деньги» counted whole: months and budget month, journal entries and order, «Пришло», «Остаток», `percentChange`, `shareOf`.
 - `packages/model/src/entities/money-charts.ts` — The months of «Графики» laid out from counted months: levels, «Разница», averages, category series, exchanges by exchanger, the rate line by week.
+- `packages/model/src/entities/money-chart-month.ts` — «Графики → Месяц» from counted months: the usual month of up to twelve closed ones from three, against the usual by category, the pace by day, the ring with «Остальные» named.
 - `packages/model/src/entities/spending-category.ts` — Spending category entity: the thirteen presets and their order, the trip's category, name limit, palette colour, chip order.
 - `packages/model/src/entities/spending.ts` — Spending entity: money spent outside a trip, its text limits, undo window and its amount in the spending currency.
 
