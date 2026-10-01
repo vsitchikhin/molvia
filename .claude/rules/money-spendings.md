@@ -180,7 +180,10 @@ nothing up.
   «now», read from answers of their own, and the month that failed is not theirs. **A spending of the
   month the server refused is named on the summary and leads to «Траты»** («Не принята N трат этого
   месяца», adversarial А): its row there is where it is put right, and the summary, which has no
-  row, said nothing at all — the ring even said «трат нет». A finished trip opened from «Траты» leads
+  row, said nothing at all — the ring even said «трат нет». **A refused record is a row whatever
+  page the journal has reached** (round 2, Е): one still waiting for its first answer waits for the
+  page of its day, but a refused one behind a page never scrolled to was on no screen as a row, the
+  summary took it for a refusal of nothing and offered only «Скрыть», which threw it away. A finished trip opened from «Траты» leads
   back to «Траты» (`?from=money-spendings`, Р-12).
 - **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`), by the rules
   of the trip's (MOL-24): storage is the queue, one at a time under `navigator.locks`, held by a
@@ -230,8 +233,11 @@ nothing up.
   stands still while a finger or the person's focus is on it — not the focus it puts on «Вернуть» itself, or
   the count would never run for a touch. **It stands whatever the screen becomes under it**: the
   only spending removed turns the month into a newcomer's, and the strip went with the button it
-  shared a block with (adversarial Г). The server keeps the removal ten minutes; the strip is what
-  the screen offers.
+  shared a block with (adversarial Г). **«Вернуть» is the queue's, not the screen's**
+  (`lastRemoved`, round 2 of MOL-159, Ж), as a trip's is (MOL-76): removed on «Траты», it stands on
+  «Деньги» after the step back with what is left of its ten seconds — the summary is where a sum
+  fallen short shows the mistake. The server keeps the removal ten minutes; the strip is what the
+  screen offers.
 - **A date is shown in words over its native field** (`AppField`, `display`): «Сегодня, 27 сентября»
   is drawn, the field stays underneath to open the system picker and to be read by its own value,
   and Chrome's own calendar is kept unseen in its place — stretched over the field, it caught the
