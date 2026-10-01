@@ -37,14 +37,17 @@ mkdir -p "$(dirname "$lock")"
 # So `--watch` in any spelling but `=false` is refused always: npm, npx and Playwright have no such
 # flag. `-w` is refused beside a vitest or after `--`, where it is vitest's — elsewhere it is npm's
 # workspace (Л3), also folded with other short flags (`-wu`, Л8). `watch` and `dev` are refused after a
-# vitest unless `run` came first — vitest finds its command past options (`-c … watch`, Л8), and after
-# `run` a word is a filter; the price: `vitest -t watch …` without `run` is refused too. Playwright's UI and debugger wait for a person whatever stdin is:
-# `--ui`, `--ui-port`, `--ui-host`, `--debug` in any spelling, `PWDEBUG`. Hidden inside `sh -c`, a
-# flag still passes — the price of reading words. `make` passes none of them.
+# vitest unless `run` or `--run` came first — vitest finds its command past options (`-c … watch`, Л8),
+# and after `run` a word is a filter. A `run` straight after an option with no `=` may be its value
+# (`-t run watch`, Л9), so it does not count. The price: `vitest -t watch …` and `vitest --silent run
+# watch` are refused too. Playwright's UI and debugger wait for a person whatever stdin is: `--ui`,
+# `--ui-port`, `--ui-host`, `--debug` in any spelling, `PWDEBUG`. Hidden inside `sh -c`, a flag still
+# passes — the price of reading words. `make` passes none of them.
 endless=""
 vitest=""
 passed=""
 once=""
+previous=""
 [[ -n "${PWDEBUG:-}" ]] && endless="PWDEBUG"
 for arg in "${@:2}"; do
   case "$arg" in
@@ -53,12 +56,14 @@ for arg in "${@:2}"; do
       ;;
     --watch=false | --watch=0 | --watch=no) ;;
     --watch | --watch=*) endless="$arg" ;;
+    --run) [[ -n "$vitest" ]] && once=1 ;;
     -*w*) [[ "$arg" != --* && (-n "$vitest" || -n "$passed") ]] && endless="vitest $arg" ;;
     watch | dev) [[ -n "$vitest" && -z "$once" ]] && endless="vitest $arg" ;;
-    run) [[ -n "$vitest" ]] && once=1 ;;
+    run) [[ -n "$vitest" && ("$previous" != -* || "$previous" == *=*) ]] && once=1 ;;
     --) passed=1 ;;
     vitest | vitest@* | */vitest) vitest=1 ;;
   esac
+  previous="$arg"
 done
 if [[ -n "$endless" ]]; then
   echo "one-at-a-time: «${endless}» never ends by itself and would hold every copy's turn —" \
