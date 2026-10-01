@@ -32,6 +32,7 @@ import {
   exchangeChannelSchema,
   incomeSourceSchema,
   itemKindSchema,
+  itemOriginSchema,
   marketChannelSchema,
   marketSideSchema,
   placeKindSchema,
@@ -50,6 +51,7 @@ import type {
   ExchangeChannel,
   IncomeSource,
   ItemKind,
+  ItemOrigin,
   MarketChannel,
   MarketSide,
   PlaceKind,
@@ -284,6 +286,12 @@ export const items = pgTable(
     defaultUnit: text('default_unit').$type<BaseUnit>().notNull(),
     typicalQtyMilli: bigint('typical_qty_milli', { mode: 'bigint' }),
     typicalQtyUnit: text('typical_qty_unit').$type<BaseUnit>(),
+    /**
+     * Where the item's data may have come from besides its author (MOL-162): `open_food_facts` for
+     * one proposed with a code the base named — ODbL, shared on request, and this is what tells it
+     * from the rest. Null for everything else, every item before the mark included.
+     */
+    origin: text('origin').$type<ItemOrigin>(),
     /** null for a seeded item — it belongs to nobody. */
     createdBy: uuid('created_by').references((): AnyPgColumn => actors.id, {
       onDelete: 'set null',
@@ -297,6 +305,10 @@ export const items = pgTable(
     // database rather than by whoever writes the next use case.
     unique('items_id_kind_key').on(table.id, table.kind),
     check('items_kind_known', oneOf(table.kind, itemKindSchema.options)),
+    check(
+      'items_origin_known',
+      sql`${table.origin} is null or ${oneOf(table.origin, itemOriginSchema.options)}`,
+    ),
     // An empty key is a row the catalogue cannot reach: search compares against this column
     // and nothing else. The blanks are listed rather than left to plain `btrim`, which only
     // strips the ASCII space — a key of one no-break space would pass and the item would be
@@ -348,6 +360,53 @@ export const itemBarcodes = pgTable(
     // The four lengths a GTIN has — EAN-8, UPC-A, EAN-13, GTIN-14, the same shape the
     // domain schema checks. A range of 8..14 quietly accepts a mistyped nine digits.
     check('item_barcodes_gtin_shape', sql`${table.code} ~ '^([0-9]{8}|[0-9]{12,14})$'`),
+  ],
+)
+
+/**
+ * What Open Food Facts said of a code (MOL-162): the base allows fifteen reads a minute and bans past
+ * it, and a code nobody knows is scanned again and again, so both a find and a miss are kept — a find
+ * thirty days, a miss seven, decided by the reader. A failure is not a row: it says nothing of the
+ * code. A row says that some code was looked up and not by whom, and only the day: no person, no
+ * moment, so neither erasure nor the copy of one's data reaches it.
+ *
+ * `found` is a name worth showing, one for each language of the interface; the size is of the
+ * package, in the unit an item is counted in. Keyed by the code as it is written (`writtenBarcode`).
+ */
+export const openFoodFacts = pgTable(
+  'open_food_facts',
+  {
+    code: varchar('code', { length: 14 }).primaryKey(),
+    found: boolean('found').notNull(),
+    nameRu: varchar('name_ru', { length: 200 }),
+    nameEn: varchar('name_en', { length: 200 }),
+    quantityMilli: bigint('quantity_milli', { mode: 'bigint' }),
+    quantityUnit: text('quantity_unit').$type<BaseUnit>(),
+    fetchedOn: date('fetched_on')
+      .notNull()
+      .default(sql`current_date`),
+  },
+  (table) => [
+    check('open_food_facts_gtin_shape', sql`${table.code} ~ '^([0-9]{8}|[0-9]{12,14})$'`),
+    // A find has a name in every language, a miss has none — never half of one.
+    check(
+      'open_food_facts_names_found',
+      sql`${table.found} = (${table.nameRu} is not null) and ${table.found} = (${table.nameEn} is not null)`,
+    ),
+    check(
+      'open_food_facts_quantity_paired',
+      sql`(${table.quantityMilli} is null) = (${table.quantityUnit} is null)`,
+    ),
+    check('open_food_facts_quantity_found', sql`${table.found} or ${table.quantityMilli} is null`),
+    check(
+      'open_food_facts_quantity_positive',
+      sql`${table.quantityMilli} is null or ${table.quantityMilli} > 0`,
+    ),
+    // A package's size is a weight or a volume; pieces are never read from the base.
+    check(
+      'open_food_facts_quantity_unit',
+      sql`${table.quantityUnit} is null or ${oneOf(table.quantityUnit, ['kg', 'l'])}`,
+    ),
   ],
 )
 

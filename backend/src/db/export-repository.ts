@@ -292,7 +292,11 @@ export const EXPORT_COLUMNS: Readonly<
       'typical_qty_unit',
       'created_at',
     ],
-    omitted: { created_by: OWNER, search_key: 'made from the name, never typed' },
+    omitted: {
+      created_by: OWNER,
+      search_key: 'made from the name, never typed',
+      origin: "the catalogue's licence mark (MOL-162), not anything the person entered",
+    },
   },
   // Read twice: the codes of the items the person added, whoever wrote them, and every code the
   // person wrote, to whichever item (MOL-100) — the second is theirs, as an item's author is.
