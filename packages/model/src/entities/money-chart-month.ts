@@ -81,6 +81,8 @@ export interface MonthCharts {
    * there are fewer than `USUAL_MIN_CLOSED`, and then `usualFrom` says after which month it comes.
    */
   readonly usual: { readonly from: Month; readonly to: Month; readonly months: number } | null
+  /** The closed months from the first with anything in it, oldest first — «закрыт только август». */
+  readonly closed: readonly Month[]
   readonly usualFrom: Month | null
   readonly deviations: readonly Deviation[]
   readonly pace: { readonly days: readonly PaceDay[]; readonly usual: readonly PacePoint[] | null }
@@ -310,6 +312,7 @@ export function monthCharts(input: MonthChartsInput): MonthCharts {
         ? { from: first.month, to: last.month, months: usedClosed.length }
         : null,
     usualFrom: enough ? null : usualFrom,
+    closed: usedClosed.map((one) => one.month),
     deviations,
     pace,
   }

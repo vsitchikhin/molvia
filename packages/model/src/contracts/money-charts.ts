@@ -176,6 +176,7 @@ export const moneyChartMonthCodec = z.strictObject({
   /** Null below three closed months; `usualFrom` is then the month after which it comes. */
   usual: z.strictObject({ from: monthSchema, to: monthSchema, months: z.int().min(1) }).nullable(),
   usualFrom: monthSchema.nullable(),
+  closed: z.array(monthSchema),
   deviations: z.array(
     z.strictObject({
       categoryId: z.uuid(),
@@ -212,6 +213,7 @@ export function moneyChartMonthViewOf(
   return {
     ...charts,
     uncounted: [...charts.uncounted],
+    closed: [...charts.closed],
     slices: charts.slices.map((slice) => ({ ...slice, members: [...slice.members] })),
     deviations: charts.deviations.map((row) => ({ ...row })),
     pace: {

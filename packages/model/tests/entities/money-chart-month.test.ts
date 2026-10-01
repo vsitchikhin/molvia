@@ -137,7 +137,9 @@ describe('monthCharts — the usual month', () => {
       expect(answer.pace.usual).toBeNull()
     }
     // Data from August: August, September, October make three — «после октября».
-    expect(charts(september, closed.slice(2), '2026-09-12').usualFrom).toBe('2026-10')
+    const august = charts(september, closed.slice(2), '2026-09-12')
+    expect(august.usualFrom).toBe('2026-10')
+    expect(august.closed).toEqual(['2026-08'])
     // The very first month: it is the start.
     expect(charts(september, [], '2026-09-12').usualFrom).toBe('2026-11')
     const three = charts(september, closed, '2026-09-12')
