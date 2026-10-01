@@ -154,16 +154,23 @@ function now(): number {
  * time — in Chromium it dropped to half its opacity and came in anew (adversarial А4). Those are cut
  * short; one inserted before the move began plays on.
  */
+/** How far two times of one frame may differ by rounding alone, in milliseconds. */
+const SAME_FRAME = 0.5
+
 function endMove(root: HTMLElement, since: number): void {
   delete root.dataset.nav
   // Where nothing is laid out — the component tests — there is nothing to cut short.
   if (typeof document.getAnimations !== 'function' || typeof CSSAnimation === 'undefined') return
-  // `getAnimations` brings the styles up to date first: the length is already back.
+  // `getAnimations` brings the styles up to date first: the length is already back. An animation
+  // started in the very frame the move began has that frame's time, but the two come by different
+  // sums and differ in the last bits — 2559.9599999999996 against 2559.96 — so it was left to play
+  // the arrival again, now and then (MOL-159, Б3 of MOL-151 on «Счета»). Half a millisecond is far
+  // inside one frame, and far from any animation started before the move.
   for (const animation of document.getAnimations()) {
     if (
       animation instanceof CSSAnimation &&
       animation.animationName === 'appear' &&
-      Number(animation.startTime ?? since) >= since
+      Number(animation.startTime ?? since) >= since - SAME_FRAME
     )
       animation.cancel()
   }
