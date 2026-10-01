@@ -379,14 +379,14 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   touching, every scroll that started on a chart changed the reading under the thumb; a mouse or a pen
   chooses on press. **A new answer of the same period keeps the bar chosen** — the sources of the
   watch are compared one by one, since a getter of an array is a new array on every answer.
-- **The period and the category are in the address and move by `replace`**; the category chosen is
-  kept for as long as the app is open, for a way in that names none, and the first one is the
-  largest of the period (Р-8), not the handoff's «Кафе». **A category in the address comes first** —
-  a link that names one leaves the one chosen before behind (MOL-156, owner's decision on adversarial
-  round 2, Д); since MOL-158 the ring of «Куда ушли» opens «Месяц» and names none. **Every live
-  category of the owner is offered**, spent in the period or not, and
-  the ring of «Куда ушли» on a month older than six opens twelve (adversarial А, d9 Г): a category
-  sent from there was swapped for the largest, in silence, with its own id still in the address. One
+- **The category is in the address and moves by `replace`** — the period was too, until MOL-158
+  made «Год» twelve months and `?period=` a way into it; the category chosen is kept for as long as
+  the app is open, for a way in that names none, and the first one is the largest of the period
+  (Р-8), not the handoff's «Кафе». **A category in the address comes first** — a link that names one
+  leaves the one chosen before behind (MOL-156, owner's decision on adversarial round 2, Д); since
+  MOL-158 the ring of «Куда ушли» opens «Месяц» and names none. **Every live category of the owner
+  is offered**, spent in the period or not (adversarial А, d9 Г): a category sent from an older month
+  was swapped for the largest, in silence, with its own id still in the address. One
   the answer still lacks — a removed category, a stale link — is named: «Этой категории на графиках
   нет — показаны …». Only
   the person's choice or the address is remembered. **Only the latest read is kept on the phone**
@@ -422,10 +422,22 @@ does an installed phone of the old version. Requirements and plan in
   (`USUAL_MIN_CLOSED`, owner's decision В-2 of the review of MOL-157): one or two are an odd month
   dressed as a habit. **The three are calendar months** (Р-4), a half first month included — a month
   short in anything spent leaves the usual line, a month short in a category leaves that category's
-  usual, as on MOL-74's charts, and neither moves the threshold, so «после октября» is a date that
-  holds. The price, named: in such a month the usual is of two. Below three the answer says after
-  which month it comes (`usualFrom`) and which months are closed (`closed`), so the phone names them
-  and works nothing out; the cards stay and say so (handoff 3g), never hidden.
+  usual, as on MOL-74's charts, and neither moves the threshold, so the month it names is a date that
+  holds. The price, named: in such a month the usual is of two. **The salary is moved in the usual
+  months as in the month shown** (adversarial Е): counted without the shift, a salary of the 26th
+  made its month one «with anything in it» that «Деньги» and «Год» call empty, and opened the
+  comparison a month early.
+- **Below three the answer names the first month that has a comparison** (`comparedFrom`, the first
+  with data plus three) **and the months closed before the one shown** (`closed`), and the phone says
+  «Сравнение — с октября · до сентября закрыты июль и август» — true of a past month as of the running
+  one (adversarial Г): «появится после сентября, сейчас закрыты июль и август», said of a closed
+  September on the 1st of October, promised a date already gone and named what was closed before it,
+  not now. The cards stay and say so (handoff 3g), never hidden. A month past `9999-12` is no month
+  to name, so it is null — no 500 of the answer's own codec (adversarial Ж). With a usual and no line
+  — every closed month short — the pace says why, never that it comes (adversarial И).
+- **The offer to a newcomer is for one with nothing at all** (`firstMonth`, the first month spent or
+  come in, of the whole history; adversarial К): a month before the first with data is a grey ring of
+  nothing, and its first month with a comparison is counted from that first month.
 - **The running month is compared to the same day, a closed one to the whole** (owner's decision В-3
   of the review): on the 12th, 20 000 ֏ of groceries against a usual whole month of 60 000 was
   «−67 %», when by the 12th the usual is what was spent by the 12th. **The day is today, or the last
@@ -435,7 +447,10 @@ does an installed phone of the old version. Requirements and plan in
 - **«Против обычного» is the five categories furthest from their usual, by the difference in the
   spending currency** (handoff 08, not in percent): a tie by the order of the chips. Spent and never
   usual is «новая» (`change` null), usual and not spent is «−100 %» with its mark in place — **unless
-  the category was put away** (Р-5): «−100 %» of what the person removed is noise. One scale for the
+  the category was put away** (Р-5): «−100 %» of what the person removed is noise. **A sum not whole
+  is compared with nothing** (adversarial Д): a category short in the month shown — a spending no
+  rate counted — and one short in every usual month are no row, the rule a usual month is held to,
+  both ways; the ring above names what was not counted. One scale for the
   card, its widest sum or usual. More is not worse: the change is an arrow and a number in the colour
   of the text, never red or green.
 - **«Темп месяца» is the running total by day against the usual's** — for day d the mean of the
@@ -449,8 +464,12 @@ does an installed phone of the old version. Requirements and plan in
   tap lets a sector go** (review Р-4 of MOL-157); the chosen one is thicker inwards, the others
   dimmed, its row on `--surface-2`. **The centre is no live region** (review Р-6): the radio chosen
   says it. A tap on the ring finds the sector by its angle — the levels the server gave, turned into
-  a turn.
+  a turn — **and only on the band it is drawn as** (adversarial Б): the hole is the centre's words,
+  the corners of the box are not the ring.
 - **The sector and the day are the screen's, never the address's** (Р-9, handoff 06): a new answer of
-  the same month keeps them, another month lets the sector go. **The last three months read are kept
+  the same month keeps them — the sector while the ring still has it, the day while the line still
+  reaches it (adversarial А, З): a sector gone into «Остальные» dimmed the whole ring with nothing
+  chosen, and a spending dated tomorrow threw the day back to today. Another month lets both go.
+  **The month of the address is never one still to come** (adversarial В), as on «Деньгах». **The last three months read are kept
   per owner** (`molvia.chartmonths`, Р-8) through the one memory the year uses (`useKeptAnswer`): only
   the latest read, offline or error decided after the failure, a yellow strip under the switchers.
