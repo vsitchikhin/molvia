@@ -21,7 +21,10 @@
           :body="reasonOf(item.code)"
         >
           <template #action>
-            <AppButton variant="ghost" @click="queue.dismiss(item)">
+            <AppButton v-if="refusalMonth(item)" variant="ghost" @click="openRefusal(item)">
+              {{ t('spending.rejected_other.open', { month: monthIn(refusalMonth(item) ?? '') }) }}
+            </AppButton>
+            <AppButton v-else variant="ghost" @click="queue.dismiss(item)">
               {{ t('spending.sheet.dismiss') }}
             </AppButton>
           </template>
@@ -206,7 +209,6 @@ export default defineComponent({
     const { categories, today, month, more, loadMore } = screen
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
-    const monthIn = (value: string) => t(`spending.month_in.${value.slice(5)}`)
     /**
      * «≈ 52 000 ₽ · 1 ещё не учтена»: either part may be missing — no rate, nothing waiting — and the
      * dot stands only between two (adversarial Б of MOL-159: two templates in the markup lost the
@@ -317,7 +319,6 @@ export default defineComponent({
       IconWallet,
       month,
       whole,
-      monthIn,
       approx,
       categoryOf,
       categoryNameOf,

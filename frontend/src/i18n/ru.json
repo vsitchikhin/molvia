@@ -612,7 +612,8 @@
     "error_strip": "Сервер не ответил — траты на {when}",
     "rejected_other": {
       "title": "Сервер не принял действие",
-      "unknown": "Сервер ответил: {code}"
+      "unknown": "Сервер ответил: {code}",
+      "open": "Открыть траты в {month}"
     },
     "category": {
       "groceries": "Продукты",

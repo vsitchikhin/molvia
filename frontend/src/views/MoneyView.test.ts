@@ -666,12 +666,19 @@ describe('MoneyView: what the review of MOL-159 found', () => {
     expect(router.currentRoute.value.name).toBe('money-spendings')
   })
 
-  it('А, must not fire: a refusal of another month is the old card, with «Убрать»', async () => {
+  it('К of round 4: a refusal of another month is not this month’s, and leads to «Траты» of its own', async () => {
     moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('100') })
     const view = await render()
     await refused('2026-08-15')
     expect(view.text()).toContain(en.spending.rejected_other.title)
-    expect(view.text()).not.toContain(en.spending.summary.refused_open)
+    expect(view.text()).not.toContain('of this month not accepted')
+    // Not «Discard», which threw the spending away: its row is on «Траты» of August.
+    expect(view.findAll('button').some((one) => one.text() === en.spending.sheet.dismiss)).toBe(
+      false,
+    )
+    await button(view, 'Open spendings in August').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/money/spendings?month=2026-08')
   })
 
   it('Е of round 2: a refused spending of a day the first page has not reached is named all the same', async () => {

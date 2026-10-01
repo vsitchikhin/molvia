@@ -542,6 +542,52 @@ describe('MoneySpendingsView: what round 2 of the review of MOL-159 found', () =
     expect(view.text()).not.toContain(en.spending.rejected_other.title)
   })
 
+  it('К of round 4: a refusal of another month moves «Траты» to it, where it is a row', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    recordSpending.mockRejectedValue(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
+    const queue = useSpendingQueueStore()
+    queue.record({
+      id: 'eeeeeeee-0000-4000-8000-0000000000aa',
+      spentOn: '2026-08-31',
+      amount: amd('1500'),
+      categoryId: BEAUTY,
+      note: 'Taxi',
+    })
+    await vi.waitFor(() => {
+      expect(queue.rejected).toHaveLength(1)
+    })
+    await flushPromises()
+    const before = router.options.history.state.position
+    await button(view, 'Open spendings in August').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/money/spendings?month=2026-08')
+    // By replace, as every move of the month: «back» does not walk through months.
+    expect(router.options.history.state.position).toBe(before)
+  })
+
+  it('Л of round 4: a refused amendment of a spending the server no longer has is no row in a month read whole', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    amendSpending.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
+    const queue = useSpendingQueueStore()
+    const RENT = 'eeeeeeee-0000-4000-8000-000000000009'
+    queue.amend(RENT, 3, {
+      spentOn: '2026-09-02',
+      amount: amd('6000'),
+      categoryId: BEAUTY,
+      note: 'Rent',
+    })
+    await vi.waitFor(() => {
+      expect(queue.rejected).toHaveLength(1)
+    })
+    await flushPromises()
+    expect(view.find(`[data-row="${RENT}"]`).exists()).toBe(false)
+    // The card says why, and «Discard» is the way out of a refusal about nothing left.
+    expect(view.text()).toContain(en.spending.rejected_other.title)
+    expect(button(view, en.spending.sheet.dismiss).exists()).toBe(true)
+  })
+
   it('Ж: «Undo» is the queue’s, not the screen’s — it outlives «Траты» for the step back', async () => {
     moneyMonth.mockResolvedValue(month())
     const view = await render()

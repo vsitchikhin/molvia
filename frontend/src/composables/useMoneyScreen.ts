@@ -38,7 +38,11 @@ export interface MoneyScreen extends MoneyMonth {
   readonly otherRefusals: ComputedRef<RejectedSpendingWrite[]>
   /** Refusals a row of this month carries — on «Траты»; the summary names them and leads there. */
   readonly rowRefusals: ComputedRef<RejectedSpendingWrite[]>
+  refusalMonth(item: RejectedSpendingWrite): string | null
+  openRefusal(item: RejectedSpendingWrite): void
   reasonOf(code: WireCode): string
+  /** «сентябре», «September»: a month after «в», as the words of the screens say it. */
+  monthIn(month: string): string
   readonly liveRate: ComputedRef<ExchangeRate | null>
   nameOf(category: SpendingCategoryView): string
   whenOf(at: Date): string
@@ -145,16 +149,43 @@ export function useMoneyScreen(): MoneyScreen {
    * switcher; one a row of the month carries is that row's on «Траты» (adversarial round 3, Ж).
    * A record or an amendment is the month's by the day typed, or by its row on screen: before the
    * month's answer the journal is empty, and the refusal went to the card whose one action throws
-   * the typing away (review of MOL-159, round 2; adversarial round 3, И).
+   * the typing away (review of MOL-159, round 2; adversarial round 3, И). Once the month has
+   * answered, an amendment is the month's only by its row: a month read whole has none for a
+   * spending removed elsewhere (adversarial round 4, Л).
    */
+  const answered = computed(() => money.month.value?.month === selected.value)
   const carried = ({ write }: RejectedSpendingWrite) =>
-    (write.kind === 'record' || write.kind === 'amend') &&
-    (monthOfDay(write.body.spentOn) === selected.value ||
-      journal.value.some((day) =>
-        day.rows.some((row) => row.kind === 'manual' && row.key === spendingOf(write)),
-      ))
+    write.kind === 'record'
+      ? monthOfDay(write.body.spentOn) === selected.value
+      : write.kind === 'amend' &&
+        (journal.value.some((day) =>
+          day.rows.some((row) => row.kind === 'manual' && row.key === spendingOf(write)),
+        ) ||
+          (!answered.value && monthOfDay(write.body.spentOn) === selected.value))
   const otherRefusals = computed(() => queue.rejected.filter((item) => !carried(item)))
   const rowRefusals = computed(() => queue.rejected.filter(carried))
+  /**
+   * The month whose «Траты» a refusal under the switcher is put right on — a spending of another
+   * month, typed on the 1st for the 30th from the summary that stays on its month (adversarial
+   * round 4, К): its card led only to «Скрыть», which threw the spending away.
+   */
+  function refusalMonth({ write }: RejectedSpendingWrite): string | null {
+    if (write.kind !== 'record' && write.kind !== 'amend') return null
+    const into = monthOfDay(write.body.spentOn)
+    return into === selected.value ? null : into
+  }
+  /** «Траты» of that month: moved to on «Траты», opened from the summary. */
+  function openRefusal(item: RejectedSpendingWrite): void {
+    const into = refusalMonth(item)
+    if (!into) return
+    if (route.name === 'money-spendings') goMonth(into)
+    else
+      void router.push({
+        name: 'money-spendings',
+        query: into === currentMonth.value ? {} : { month: into },
+      })
+  }
+  const monthIn = (value: string) => t(`spending.month_in.${value.slice(5)}`)
   const reasonOf = (code: WireCode) =>
     code.startsWith('error.') ? t(code) : t('spending.rejected_other.unknown', { code })
 
@@ -251,7 +282,10 @@ export function useMoneyScreen(): MoneyScreen {
     unsent,
     otherRefusals,
     rowRefusals,
+    refusalMonth,
+    openRefusal,
     reasonOf,
+    monthIn,
     /** «Мой курс на сегодня» for the sheet: only a running month's rate is today's. */
     liveRate: money.todayRate,
     nameOf,

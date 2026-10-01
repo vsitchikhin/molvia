@@ -334,9 +334,11 @@ export function journalOf(
   // A refused amendment of a row on a page not loaded yet stands as that row, on the day typed
   // (adversarial round 3, И): it marks the server's row, and that row was on no screen — the
   // refusal went to the card whose «Скрыть» threw the typing away. The revision is the one it was
-  // made over; the server's figures come with the page.
+  // made over; the server's figures come with the page. A month read whole has no such page: a row
+  // not in it is not the server's any more — removed on another device — and stood as a ghost to
+  // put right (adversarial round 4, Л); its refusal stays the card's, with «Скрыть».
   for (const refusal of rejected) {
-    if (refusal.write.kind !== 'amend') continue
+    if (refusal.write.kind !== 'amend' || month.cursor === null) continue
     const { id, body } = refusal.write
     if (known.has(id) || removing.has(id) || !body.spentOn.startsWith(month.month)) continue
     place({

@@ -26,7 +26,10 @@
           :body="reasonOf(item.code)"
         >
           <template #action>
-            <AppButton variant="ghost" @click="queue.dismiss(item)">
+            <AppButton v-if="refusalMonth(item)" variant="ghost" @click="openRefusal(item)">
+              {{ t('spending.rejected_other.open', { month: monthIn(refusalMonth(item) ?? '') }) }}
+            </AppButton>
+            <AppButton v-else variant="ghost" @click="queue.dismiss(item)">
               {{ t('spending.sheet.dismiss') }}
             </AppButton>
           </template>

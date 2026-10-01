@@ -612,7 +612,8 @@
     "error_strip": "The server did not answer — spending as of {when}",
     "rejected_other": {
       "title": "The server did not accept an action",
-      "unknown": "The server answered: {code}"
+      "unknown": "The server answered: {code}",
+      "open": "Open spendings in {month}"
     },
     "category": {
       "groceries": "Groceries",
