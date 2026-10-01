@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {
   CATALOGUE_QUERY_MAX,
+  catalogueBarcodeHintQuerySchema,
+  catalogueBarcodeHintResponseSchema,
   catalogueEntryCodec,
   catalogueEntryOf,
   catalogueSearchQuerySchema,
@@ -199,5 +201,76 @@ describe('proposedItemSchema', () => {
   it('stays as strict as the input it narrows: no author and no key from the body', () => {
     expect(pathOf({ ...cheese, createdBy: CREATOR })).toBe('unrecognized_keys')
     expect(pathOf({ ...cheese, searchKey: 'sir' })).toBe('unrecognized_keys')
+  })
+})
+
+describe('подсказка по коду (MOL-162)', () => {
+  const hint = {
+    name: 'Nutella',
+    quantity: { value: '0.4', unit: 'kg' },
+    url: 'https://world.openfoodfacts.org/product/3017620422003',
+  }
+
+  it('читает подсказку и пустой ответ', () => {
+    expect(catalogueBarcodeHintResponseSchema.parse({ hint })).toEqual({
+      hint: { ...hint, quantity: { milli: 400n, unit: 'kg' } },
+    })
+    expect(catalogueBarcodeHintResponseSchema.parse({ hint: null })).toEqual({ hint: null })
+  })
+
+  it('без объёма — null, а не пропуск', () => {
+    expect(
+      catalogueBarcodeHintResponseSchema.parse({ hint: { ...hint, quantity: null } }).hint,
+    ).toMatchObject({ quantity: null })
+    expect(() =>
+      catalogueBarcodeHintResponseSchema.parse({ hint: { name: hint.name, url: hint.url } }),
+    ).toThrow()
+  })
+
+  it('строгая: лишнее поле — отказ, как у записи справочника', () => {
+    expect(() =>
+      catalogueBarcodeHintResponseSchema.parse({ hint: { ...hint, image: 'https://x' } }),
+    ).toThrow()
+    expect(() => catalogueBarcodeHintResponseSchema.parse({ hint, extra: 1 })).toThrow()
+  })
+
+  it.each([
+    ['http', 'http://world.openfoodfacts.org/product/1'],
+    ['чужой сайт', 'https://evil.example/product/1'],
+    ['сайт, кончающийся похоже', 'https://notopenfoodfacts.org/product/1'],
+    ['javascript', 'javascript:alert(1)'],
+  ])('ссылка только на openfoodfacts.org по https: %s', (_case, url) => {
+    expect(() => catalogueBarcodeHintResponseSchema.parse({ hint: { ...hint, url } })).toThrow()
+  })
+
+  it('поддомен страны — тоже OFF', () => {
+    expect(
+      catalogueBarcodeHintResponseSchema.parse({
+        hint: { ...hint, url: 'https://am.openfoodfacts.org/product/1' },
+      }).hint?.url,
+    ).toBe('https://am.openfoodfacts.org/product/1')
+  })
+
+  it('имя — по правилу имени позиции: невидимое не проходит', () => {
+    expect(() =>
+      catalogueBarcodeHintResponseSchema.parse({ hint: { ...hint, name: '\u200b' } }),
+    ).toThrow()
+  })
+
+  it('запрос: код и язык интерфейса обязательны, лишнее — отказ', () => {
+    expect(catalogueBarcodeHintQuerySchema.parse({ code: '3017620422003', lang: 'ru' })).toEqual({
+      code: '3017620422003',
+      lang: 'ru',
+    })
+    for (const query of [
+      { code: '3017620422003' },
+      { code: '3017620422003', lang: 'hy' },
+      { code: ['1', '2'], lang: 'ru' },
+      { code: '3017620422003', lang: 'ru', actorId: 'x' },
+    ]) {
+      const result = catalogueBarcodeHintQuerySchema.safeParse(query)
+      expect(result.success).toBe(false)
+      expect(result.error?.issues[0]?.message).toBe(ISSUE.QUERY_INVALID)
+    }
   })
 })

@@ -9,3 +9,5 @@ package-lock.json
 coverage
 # Recorded provider responses: byte for byte what came over the wire (MOL-39)
 backend/tests/fixtures/rates
+# Recorded Open Food Facts answers, byte for byte (MOL-162)
+backend/tests/fixtures/open-food-facts

@@ -7,6 +7,12 @@ Rules: `.claude/rules/barcodes.md`. A test beside its source, or mirroring it un
 
 - `packages/model/src/entities/barcode.ts` — `typedBarcode`: a code typed by hand checked by its last digit and given in the scanner's form — UPC-A and UPC-E as thirteen digits; `barcodeTwins`, the forms of one package; `writtenBarcode`, the form a code is written to the catalogue in (MOL-100).
 
+## backend · open-food-facts
+
+- `backend/src/open-food-facts/product.ts` — `parseProduct`: an answer of Open Food Facts read into a hint (MOL-162) — a name per interface language, the brand when the name lacks it, the size of the package in kg or l; found only on `status: 1`, anything not JSON of that shape thrown.
+- `backend/tests/fixtures/open-food-facts/` — Answers of Open Food Facts recorded byte for byte on 01.10.2026 that the parser is tested on: Nutella, Coca-Cola, a code it does not know, a code it calls invalid.
+- `backend/tests/fixtures/open-food-facts/unavailable.html` — Fixture: the base's «Page temporarily unavailable» page, a `503` in HTML, which the parser must take for the base out of reach.
+
 ## backend · usecases
 
 - `backend/src/usecases/attach-barcode.ts` — Use case: «привязать код к ней?» — a code written to anyone's item in the name of who wrote it, or the item that holds it named; «не этот товар?» lets it go (MOL-100). Routes `POST`/`DELETE /catalogue/items/:itemId/barcodes` in `routes/catalogue.ts`; tests: `backend/tests/catalogue.integration.test.ts`.
