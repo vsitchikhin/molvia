@@ -11,7 +11,7 @@ try {
 
 // The run has its own ports and its own database (MOL-60). Its own ports because
 // `reuseExistingServer` would otherwise hand the suite the dev API whenever `make dev` is
-// up — and pre-push runs e2e exactly then — so no DATABASE_URL of ours would ever reach a
+// up — and `make e2e` runs exactly then — so no DATABASE_URL of ours would ever reach a
 // process. Its own database because a run used to leave a catalogue item and a purchase in
 // the one a person types into by hand, and the suite degraded from that.
 // All three are required, and none has a default: a default here is the ports of copy 0,
@@ -66,10 +66,14 @@ export default defineConfig({
   globalSetup: './e2e/barcode-video.ts',
   fullyParallel: true,
   forbidOnly: ci,
+  // A test green only on a retry fails the run (MOL-164): a pull request merges only on a green CI,
+  // and a flake passed quietly there is a flake nobody meets until it is red for good. The retries
+  // stay, so the report says «flaky» rather than only «failed».
   retries: ci ? 2 : 0,
+  failOnFlakyTests: ci,
   reporter: ci ? 'github' : 'list',
   // A trace of every failure outside CI (MOL-67): there are no retries here, so `on-first-retry`
-  // never wrote one, and a flake met on pre-push left nothing behind but its message. The price:
+  // never wrote one, and a flake met in a local run left nothing behind but its message. The price:
   // it is recorded for every test and dropped when it passes — measured at 12–22 % of a full run
   // (four pairs, 26.09.2026, ~66 s against ~59 s). And an overload that times a test out can
   // still lose it: it is saved while the context is torn down, which shares the test's timeout.

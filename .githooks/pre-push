@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Refuses a push whose types or tests are not green — every layer, end-to-end included.
-# The push is the moment the work leaves this machine, so it is the right place for the
-# slow checks; the fast ones already ran at commit time.
+# Refuses a push whose types, unit, component or integration tests are not green. The push is
+# the moment the work leaves this machine; formatting and lint already ran at commit time.
+#
+# End-to-end is CI's (MOL-164): the same suite runs there on every push, with no queue, and a pull
+# request merges only when it is green. Here it held every copy's push in one line for minutes.
+# `make e2e` still runs it on demand.
 #
 # The copies on this machine take turns (MOL-139): a push waits while another copy's push or
 # `make check` runs, and says whose. A step that already passed on this very tree — by
@@ -28,7 +31,6 @@ step() {
 }
 
 step typecheck "types" npm run --silent typecheck
-step test "unit and component tests" npm run --silent test
-step e2e "end-to-end" npm run --silent test:e2e
+step test "unit, component and integration tests" npm run --silent test
 
 echo "pre-push: green"
