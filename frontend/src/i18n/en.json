@@ -492,7 +492,10 @@
       "donut_later": "Shares appear once the month is refreshed",
       "donut_uncounted": "Shares appear once the spending has a rate",
       "add": "Add spending",
-      "offline_strip": "No connection. Figures as of {when} — new spendings are kept on the phone and sent when you are back online"
+      "offline_strip": "No connection. Figures as of {when} — new spendings are kept on the phone and sent when you are back online",
+      "refused": "{n} spending of this month not accepted | {n} spendings of this month not accepted",
+      "refused_body": "The server did not accept it — fix or remove it in Spendings",
+      "refused_open": "Open Spendings"
     },
     "charts": {
       "title": "Charts",
@@ -717,7 +720,7 @@
     "list": {
       "title": "Spendings",
       "count": "{n} spending | {n} spendings",
-      "unsent": "· {n} spending not counted yet | · {n} spendings not counted yet",
+      "unsent": "{n} spending not counted yet | {n} spendings not counted yet",
       "offline_strip": "No connection. Spendings as of {when}. New ones are kept on the phone and sent when you are back online",
       "empty": {
         "title": "No spendings in {month}",
@@ -858,7 +861,7 @@
     "vs_market": {
       "title": "Exchanges against the market",
       "note": "Over 12 months, each exchange against the market of its day by the Central Bank of Armenia: its own channel when named, else the best rate. Minus — you gave more than the market",
-      "uncounted": "Not compared: {n} exchange — the Central Bank has no market for that pair or day | Not compared: {n} exchanges — the Central Bank has no market for that pair or those days",
+      "uncounted": "Not compared: {n} exchange — no market or rate for that day | Not compared: {n} exchanges — no market or rate for those days",
       "count": "{n} exchange | {n} exchanges",
       "no_place": "No place"
     }

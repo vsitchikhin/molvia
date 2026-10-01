@@ -31,6 +31,22 @@
             </AppButton>
           </template>
         </ScreenState>
+        <!-- A spending of this month the server refused is a row of «Траты», put right there; the
+             summary has no row, so it names them and leads there (adversarial А of MOL-159) —
+             otherwise a spending written here and refused vanished from the screen it was written on. -->
+        <ScreenState
+          v-if="rowRefusals.length > 0"
+          kind="attention"
+          inline
+          :title="t('spending.summary.refused', { n: rowRefusals.length }, rowRefusals.length)"
+          :body="t('spending.summary.refused_body')"
+        >
+          <template #action>
+            <AppButton variant="ghost" @click="openSpendings">
+              {{ t('spending.summary.refused_open') }}
+            </AppButton>
+          </template>
+        </ScreenState>
 
         <ScreenSkeleton v-if="phase === 'loading'" :groups="[24, 58, 40, 100, 30, 70, 52]" />
 
@@ -131,7 +147,11 @@
           </AppCard>
 
           <!-- An empty month keeps the card too: the way into «Графики» is there, the year is (Г). -->
-          <CategoryDonutCard :month="month" :name-of="nameOf" :unsent="unsent" />
+          <CategoryDonutCard
+            :month="month"
+            :name-of="nameOf"
+            :unsent="unsent + rowRefusals.length"
+          />
         </template>
 
         <!-- The ways out of the month, each with one figure: they stand by the error and under the
@@ -147,27 +167,16 @@
       </template>
     </div>
 
-    <!-- «Вернуть» stands whatever the screen became under it — the only spending removed makes a
-         newcomer of the person (adversarial Г) — over the strip of «Добавить трату». -->
-    <FloatingDock v-if="removed || tripRemoved" class="float">
-      <UndoStrip
-        v-if="removed"
-        :key="removed.stamp"
-        :text="t('spending.removed', { title: removed.title, amount: removed.amount })"
-        :announcement="
-          t('spending.removed_announced', { title: removed.title, amount: removed.amount })
-        "
-        :action="t('spending.restore')"
-        @restore="restore"
-        @expire="removed = null"
-      />
-      <TripUndoStrip v-else class="undo" />
+    <!-- A spending is removed on «Траты», where its row is; the sheet here only adds one. A trip's
+         «Вернуть» is the app's, wherever the trip was removed from (MOL-76), over the strip. -->
+    <FloatingDock v-if="tripRemoved" class="float">
+      <TripUndoStrip class="undo" />
     </FloatingDock>
 
     <!-- Wherever there is something to write it into, a slow answer and a broken server included
          (review Т-6), and offline on a month never read while another month names the categories. -->
     <template v-if="canWrite && phase !== 'idle'" #docked>
-      <AppButton ref="addButton" size="large" block @click="compose()">
+      <AppButton size="large" block @click="compose()">
         <template #icon><IconPlus /></template>
         {{ t('spending.summary.add') }}
       </AppButton>
@@ -184,7 +193,6 @@
       :made="made"
       @add-category="newCategoryOpen = true"
       @saved="saved"
-      @removed="onRemoved"
     />
     <NewCategorySheet
       v-model:open="newCategoryOpen"
@@ -198,6 +206,7 @@
 <script lang="ts">
 import { computed, defineComponent, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconPlus from '~icons/mdi/plus'
 import IconWallet from '~icons/mdi/wallet-outline'
@@ -216,7 +225,6 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SpendingSheet from '@/components/SpendingSheet.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
-import UndoStrip from '@/components/UndoStrip.vue'
 import { pageOrder } from '@/components/accounts'
 import { rateWords } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
@@ -249,13 +257,10 @@ export default defineComponent({
     ScreenState,
     SpendingSheet,
     TripUndoStrip,
-    UndoStrip,
   },
   setup() {
     const { t, locale } = useI18n()
     const screen = useMoneyScreen()
-    // «Добавить трату», where the focus goes once «Вернуть» has done its work.
-    const { addButton } = screen
     const { month, queue, currentMonth } = screen
 
     // The number of accounts beside «Счета»: «now», not the month's, whatever month is open.
@@ -400,6 +405,15 @@ export default defineComponent({
      * The summary stays on its month whatever month the spending went into — there is no row here
      * to bring into view; «Траты» go to it (handoff MOL-157 06, Р-5).
      */
+    const router = useRouter()
+    function openSpendings(): void {
+      const month = screen.selected.value
+      void router.push({
+        name: 'money-spendings',
+        query: month === currentMonth.value ? {} : { month },
+      })
+    }
+
     function saved(): void {
       screen.lookAtToday()
       if (!screen.online.value) screen.announce?.(t('spending.saved_offline'))
@@ -407,7 +421,6 @@ export default defineComponent({
 
     return {
       ...screen,
-      addButton,
       t,
       IconWallet,
       newcomer,
@@ -423,6 +436,7 @@ export default defineComponent({
       foreign,
       rateLine,
       saved,
+      openSpendings,
     }
   },
 })

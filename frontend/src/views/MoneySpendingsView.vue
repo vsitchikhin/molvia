@@ -63,12 +63,7 @@
             </span>
             <span class="sum">
               <span class="figure">{{ whole(month.spent) }}</span>
-              <span class="approx">
-                <template v-if="month.spentIncome">≈ {{ whole(month.spentIncome) }}</template>
-                <template v-if="unsent > 0">
-                  {{ t('spending.list.unsent', { n: unsent }, unsent) }}
-                </template>
-              </span>
+              <span v-if="approx" class="approx">{{ approx }}</span>
             </span>
           </div>
 
@@ -209,6 +204,22 @@ export default defineComponent({
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
     const monthIn = (value: string) => t(`spending.month_in.${value.slice(5)}`)
+    /**
+     * «≈ 52 000 ₽ · 1 ещё не учтена»: either part may be missing — no rate, nothing waiting — and the
+     * dot stands only between two (adversarial Б of MOL-159: two templates in the markup lost the
+     * space before it, and with no «≈» the line began with it).
+     */
+    const approx = computed(() => {
+      const value = month.value
+      if (!value) return ''
+      const unsent = screen.unsent.value
+      return [
+        value.spentIncome ? `≈ ${whole(value.spentIncome)}` : null,
+        unsent > 0 ? t('spending.list.unsent', { n: unsent }, unsent) : null,
+      ]
+        .filter((part) => part !== null)
+        .join(' · ')
+    })
 
     const groceries = computed(
       () => categories.value.find((category) => category.preset === 'groceries') ?? null,
@@ -304,6 +315,7 @@ export default defineComponent({
       month,
       whole,
       monthIn,
+      approx,
       categoryOf,
       categoryNameOf,
       dayTitle,

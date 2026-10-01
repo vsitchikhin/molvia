@@ -415,6 +415,27 @@ describe('«Обмены против рынка» на «Обмене дене�
     expect((await read(cookie)).losses).toBeNull()
   })
 
+  it('правка канала отдаёт новый итог: не назван — лучший курс, наличные в банке — свой (В-3)', async () => {
+    const { cookie } = await owner()
+    const id = randomUUID()
+    await record(cookie, { id })
+    expect((await read(cookie)).losses?.total.minor).toBe(-123_212n)
+    const amended = await app.inject({
+      method: 'PUT',
+      url: `/exchanges/${id}`,
+      headers: { cookie },
+      payload: {
+        given: { amount: '20000', currency: 'RUB' },
+        received: { amount: '83200', currency: 'AMD' },
+        exchangedOn: day,
+        channel: 'bankCash',
+        revision: 1,
+      },
+    })
+    expect(amended.statusCode).toBe(200)
+    expect(overviewOf(amended.json()).losses?.total.minor).toBe(99_640n)
+  })
+
   it('удаление и «Вернуть» отдают новый итог; чужие обмены не видны', async () => {
     const { cookie } = await owner()
     const stranger = await owner()

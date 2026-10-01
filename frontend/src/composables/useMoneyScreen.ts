@@ -36,6 +36,8 @@ export interface MoneyScreen extends MoneyMonth {
   readonly journal: ComputedRef<JournalDay[]>
   readonly unsent: ComputedRef<number>
   readonly otherRefusals: ComputedRef<RejectedSpendingWrite[]>
+  /** Refusals a row of this month carries — on «Траты»; the summary names them and leads there. */
+  readonly rowRefusals: ComputedRef<RejectedSpendingWrite[]>
   reasonOf(code: WireCode): string
   readonly liveRate: ComputedRef<ExchangeRate | null>
   nameOf(category: SpendingCategoryView): string
@@ -131,15 +133,13 @@ export function useMoneyScreen(): MoneyScreen {
    * Refusals no row of this month carries — «Вернуть» too late, a category — said under the
    * switcher; one a row of the month carries is that row's on «Траты» (adversarial round 3, Ж).
    */
-  const otherRefusals = computed(() =>
-    queue.rejected.filter(
-      (item) =>
-        !['record', 'amend'].includes(item.write.kind) ||
-        !journal.value.some((day) =>
-          day.rows.some((row) => row.kind === 'manual' && row.key === spendingOf(item.write)),
-        ),
-    ),
-  )
+  const carried = (item: RejectedSpendingWrite) =>
+    ['record', 'amend'].includes(item.write.kind) &&
+    journal.value.some((day) =>
+      day.rows.some((row) => row.kind === 'manual' && row.key === spendingOf(item.write)),
+    )
+  const otherRefusals = computed(() => queue.rejected.filter((item) => !carried(item)))
+  const rowRefusals = computed(() => queue.rejected.filter(carried))
   const reasonOf = (code: WireCode) =>
     code.startsWith('error.') ? t(code) : t('spending.rejected_other.unknown', { code })
 
@@ -204,6 +204,7 @@ export function useMoneyScreen(): MoneyScreen {
     journal,
     unsent,
     otherRefusals,
+    rowRefusals,
     reasonOf,
     /** «Мой курс на сегодня» for the sheet: only a running month's rate is today's. */
     liveRate: money.todayRate,

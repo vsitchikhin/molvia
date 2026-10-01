@@ -636,3 +636,58 @@ describe('MoneyView: the summary of the month (MOL-159)', () => {
     expect(view.text()).toContain('Not counted yet: 1 spending is being sent')
   })
 })
+
+describe('MoneyView: what the review of MOL-159 found', () => {
+  async function refused(spentOn: string): Promise<void> {
+    recordSpending.mockRejectedValue(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
+    const queue = useSpendingQueueStore()
+    queue.record({
+      id: 'eeeeeeee-0000-4000-8000-0000000000aa',
+      spentOn,
+      amount: amd('1500'),
+      categoryId: BEAUTY,
+      note: 'Taxi',
+    })
+    await vi.waitFor(() => {
+      expect(queue.rejected).toHaveLength(1)
+    })
+    await flushPromises()
+  }
+
+  it('А: a refused spending of this month is named here and leads to «Траты» of the month', async () => {
+    moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('100') })
+    const view = await render()
+    await refused('2026-09-27')
+    expect(view.text()).toContain('1 spending of this month not accepted')
+    // Not «no spendings» while one waits to be put right.
+    expect(view.get('.donut').text()).not.toContain(en.spending.month_empty)
+    await button(view, en.spending.summary.refused_open).trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('money-spendings')
+  })
+
+  it('А, must not fire: a refusal of another month is the old card, with «Убрать»', async () => {
+    moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('100') })
+    const view = await render()
+    await refused('2026-08-15')
+    expect(view.text()).toContain(en.spending.rejected_other.title)
+    expect(view.text()).not.toContain(en.spending.summary.refused_open)
+  })
+
+  // «Счета», «Обмен денег» and «Категории» are «now», not the month's (handoff MOL-157 01): their
+  // figures come from answers of their own and stand whatever the month is doing.
+  it('Г: under the error and the skeleton, «Счета» and «Категории» keep their own figures', async () => {
+    moneyMonth.mockResolvedValueOnce(month())
+    const first = await render()
+    first.unmount()
+    moneyMonth.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render('/money?month=2026-08')
+    expect(view.text()).toContain(en.spending.load_error.title)
+    const links = view.findAll(`nav[aria-label="${en.spending.entries_label}"] a`)
+    const label = (href: string) =>
+      links.find((link) => link.attributes('href') === href)?.attributes('aria-label')
+    expect(label('/money/accounts')).toBe(`${en.accounts.title}, 0`)
+    expect(label('/money/categories')).toBe(`${en.spending.categories_link}, 1`)
+    expect(label('/money/spendings?month=2026-08')).toBeUndefined()
+  })
+})

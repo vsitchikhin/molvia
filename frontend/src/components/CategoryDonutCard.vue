@@ -68,7 +68,10 @@ export default defineComponent({
       type: Function as PropType<(category: SpendingCategoryView) => string>,
       required: true,
     },
-    /** Spendings of the month still on the phone: the month is not «empty» while they wait. */
+    /**
+     * Spendings of the month still on the phone, waiting or refused: the month is not «empty» while
+     * any of them is there to be sent or put right.
+     */
     unsent: { type: Number, default: 0 },
   },
   setup(props) {

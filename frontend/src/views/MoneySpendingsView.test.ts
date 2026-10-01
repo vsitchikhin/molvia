@@ -230,8 +230,24 @@ describe('MoneySpendingsView: rows and the sheet', () => {
     await flushPromises()
     expect(view.text()).toContain(en.spending.pending)
     expect(plain(view.get('.total').text())).toContain('317,800')
-    expect(plain(view.get('.total').text())).toContain('· 1 spending not counted yet')
-    expect(plain(view.get('.total').text())).toContain('1 spending')
+    // One dot between the two parts, a space on either side (adversarial Б).
+    expect(plain(view.get('.approx').text())).toBe('≈ ₽68,788 · 1 spending not counted yet')
+  })
+
+  it('must not fire: with no «≈» the waiting spending starts the line, with no dot before it', async () => {
+    moneyMonth.mockResolvedValue(month({ spentIncome: null }))
+    recordSpending.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(view.find('.approx').exists()).toBe(false)
+    useSpendingQueueStore().record({
+      id: 'eeeeeeee-0000-4000-8000-000000000003',
+      spentOn: '2026-09-27',
+      amount: amd('1500'),
+      categoryId: BEAUTY,
+      note: 'Taxi',
+    })
+    await flushPromises()
+    expect(plain(view.get('.approx').text())).toBe('1 spending not counted yet')
   })
 
   it('С-2: brings the spending just saved into view once its row is there', async () => {
