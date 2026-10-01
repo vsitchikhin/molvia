@@ -527,7 +527,7 @@ test.describe('the receipt total (MOL-78)', () => {
   test('asked at «Finish» while some price is missing, then amended and removed on the finished record', async ({
     page,
   }) => {
-    // One walk through the record, «Записаны», «Деньги» and back into the finished record.
+    // One walk through the record, «Записаны», «Траты» and back into the finished record.
     test.setTimeout(60_000)
     const setting = await device(page)
     const headers = await asBrowser(page)
@@ -551,12 +551,16 @@ test.describe('the receipt total (MOL-78)', () => {
     }
     expect(history.trips[0]?.total).toEqual([{ amount: '1400.00', currency: 'AMD' }])
 
-    // «Деньги» file the record by its receipt, every purchase behind it (Р-4).
+    // «Деньги» file the record by its receipt, every purchase behind it (Р-4) — a row of «Траты»
+    // since MOL-159.
     await page.getByRole('link', { name: 'Money', exact: true }).click()
+    await page.getByRole('link', { name: /^Spendings/ }).click()
     // The row of the journal by its role and name — one element, so the strict mode holds (review 6).
     const line = page.getByRole('button', { name: /Purchases at “Ереван Сити”/ })
     await expect(line).toContainText('1,400', { timeout: 15_000 })
     await expect(line).toContainText('2 items')
+    // «Траты» are a nested screen with no tab bar: back to «Money», then the tab.
+    await page.getByRole('button', { name: 'Money' }).first().click()
     await page.getByRole('link', { name: 'Purchases', exact: true }).click()
     await expect(page).toHaveURL(/\/purchases$/)
 
