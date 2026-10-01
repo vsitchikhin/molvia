@@ -129,6 +129,14 @@ describe('имя', () => {
     expect(parseProduct(answer({ product_name: name }))).toEqual({ found: false })
   })
 
+  it.each([
+    ['символ частной области', 'Apple \uf8ff juice', 'Apple juice'],
+    ['сущность частной области', 'Молоко&#xE000; 3,2%', 'Молоко 3,2%'],
+    ['одинокий суррогат', 'Кефир \ud800 1%', 'Кефир 1%'],
+  ])('%s вырезается, а не губит имя (адверсариальный Ж)', (_case, name, expected) => {
+    expect(found(answer({ product_name_ru: name })).names.ru).toBe(expected)
+  })
+
   it('«test2» проходит: правило под каждую порчу не пишется, имя правит человек (Р-9)', () => {
     expect(found(answer({ product_name: 'test2' })).names.ru).toBe('test2')
   })
@@ -152,6 +160,28 @@ describe('бренд (Р-3)', () => {
       found(answer({ product_name_ru: 'Молоко Prostokvashino', brands: 'Простоквашино' })).names.ru,
     ).toBe('Молоко Prostokvashino')
   })
+
+  it.each([
+    [
+      'артикль первым словом бренда',
+      'Yaourt à la vanille',
+      'La Laitière',
+      'Yaourt à la vanille La Laitière',
+    ],
+    [
+      'сорт сыра первым словом бренда',
+      'Сыр Российский',
+      'Российский сыродел',
+      'Сыр Российский Российский сыродел',
+    ],
+    ['бренд из двух слов, оба в имени', 'Coca Cola Zero', 'Coca-Cola', 'Coca Cola Zero'],
+    ['бренд из коротких слов', 'Печенье LU', 'LU', 'Печенье LU'],
+  ])(
+    'одно совпавшее слово — ещё не бренд в имени (адверсариальный В): %s',
+    (_case, name, brands, expected) => {
+      expect(found(answer({ product_name_ru: name, brands })).names.ru).toBe(expected)
+    },
+  )
 
   it('бренд-мусор не дописывается', () => {
     expect(found(answer({ product_name_ru: 'Молоко', brands: '123, Danone' })).names.ru).toBe(

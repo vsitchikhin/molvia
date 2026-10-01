@@ -114,6 +114,16 @@ describe('hintByBarcode', () => {
     expect(put).toEqual([])
   })
 
+  it('a miss past its days and a base that cannot answer — still no hint, nothing kept', async () => {
+    const { cache, off, asked, put } = world(
+      { [NUTELLA]: { answer: { found: false }, ageDays: MISSED_FRESH_DAYS } },
+      { [NUTELLA]: null },
+    )
+    expect(await hintByBarcode({ cache, off }, NUTELLA, 'ru')).toBeNull()
+    expect(asked).toEqual([NUTELLA])
+    expect(put).toEqual([])
+  })
+
   it('a base that cannot answer about a code nobody kept — no hint, nothing kept', async () => {
     const { cache, off, put } = world({}, { [NUTELLA]: null })
     expect(await hintByBarcode({ cache, off }, NUTELLA, 'ru')).toBeNull()

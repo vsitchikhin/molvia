@@ -62,6 +62,8 @@ function decodeEntities(text: string): string {
   })
 }
 
+const UNDRAWN = /[\p{Co}\p{Cs}]/gu
+
 /**
  * A name as a proposal could send it, or `null`. The base holds what anyone typed: HTML entities,
  * line breaks, a code where a name should be. A name with no letter, or of one character, is no
@@ -70,7 +72,13 @@ function decodeEntities(text: string): string {
  */
 function cleanName(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
-  const line = pastedLine(decodeEntities(raw)).replace(/\s+/gu, ' ').trim()
+  const line = pastedLine(decodeEntities(raw))
+    // A private-use glyph — Apple's logo from its keyboard, an icon font copied along — or a lone
+    // surrogate draws nothing a shelf prints: dropped, not a reason to lose the whole name and keep
+    // the code as unknown for a week (adversarial Ж).
+    .replace(UNDRAWN, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
   const cut = Array.from(line).slice(0, ITEM_NAME_MAX).join('').trim()
   if (Array.from(cut).length < 2 || !/\p{L}/u.test(cut)) return null
   const name = itemSchema.shape.name.safeParse(cut)
@@ -78,18 +86,25 @@ function cleanName(raw: unknown): string | null {
 }
 
 /**
- * The brand goes after the name unless the name carries it already (Р-3): «Nutella» with the
- * brands «Nutella, Ferrero» stays «Nutella», «Coca Cola» with «COCA-COLA SERVICES SA/NV» stays as
- * it is — the first word of the first brand, by the search key, is among the name's words — and
- * «Молоко 3,2%» with «Простоквашино» becomes «Молоко 3,2% Простоквашино». A name the brand would
- * take past the limit stays without it.
+ * The brand goes after the name unless the name carries it already (Р-3). Carrying it is having
+ * the first two words of the first brand that are three letters or longer — one, when it has one —
+ * among the name's words, by the search key: «Nutella» with «Nutella, Ferrero» stays «Nutella»,
+ * «Coca Cola» with «COCA-COLA SERVICES SA/NV» stays as it is, «Молоко 3,2%» with «Простоквашино»
+ * becomes «Молоко 3,2% Простоквашино». One word was too little: an article or a sort counted as the
+ * brand — «La Laitière» was lost on «Yaourt à la vanille», «Российский сыродел» on «Сыр Российский»
+ * (adversarial В). A name the brand would take past the limit stays without it.
  */
 function withBrand(name: string, brands: unknown): string {
   if (typeof brands !== 'string') return name
   const brand = cleanName(brands.split(',')[0])
   if (brand === null) return name
-  const first = toSearchKey(brand).split(' ')[0] ?? ''
-  if (first === '' || toSearchKey(name).split(' ').includes(first)) return name
+  const words = toSearchKey(brand)
+    .split(' ')
+    .filter((word) => word !== '')
+  const long = words.filter((word) => Array.from(word).length >= 3)
+  const probe = (long.length > 0 ? long : words).slice(0, 2)
+  const named = new Set(toSearchKey(name).split(' '))
+  if (probe.length === 0 || probe.every((word) => named.has(word))) return name
   return cleanName(`${name} ${brand}`) === `${name} ${brand}` ? `${name} ${brand}` : name
 }
 
