@@ -14,7 +14,7 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 ## backend · db
 
 - `backend/src/db/migrate-cli.ts` — CLI entry for `make migrate` and `make up`: the same migrator the API runs at boot.
-- `backend/src/db/migrate.ts` — Migrator: finds the migrations folder from source or from the bundle and applies pending migrations; run at API start.
+- `backend/src/db/migrate.ts` — Migrator: finds the migrations folder from source or from the bundle and applies pending migrations; run at API start. A failure leaves the client to the caller's exit, so «migrations failed» is logged first (MOL-153).
 
 ## backend · other
 

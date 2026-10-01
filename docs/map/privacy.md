@@ -32,7 +32,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 - `backend/tests/export.integration.test.ts` — Integration test: the export covers every key to `actors` and every column, counts what a dry run of erasure counts, leaks nobody else's row and no secret, keeps the removed marked.
 - `backend/tests/forget-bundle.integration.test.ts` — Integration test: the bundled `dist/forget.js` runs from the bundle alone, and `make forget` erases only with `YES=1` on the command line.
 - `backend/tests/life.ts` — Test support: `aLife`, a person touching every table erasure removes — the one life both the erasure and the export tests read.
-- `backend/tests/migration-log.integration.test.ts` — Integration test: a migration failing through drizzle's own migrator on a cast of a person's text is logged by its kind and statement, without the value Postgres puts into the message; a file the journal names and the folder lacks is named.
+- `backend/tests/migration-log.integration.test.ts` — Integration test: a migration failing through drizzle's own migrator on a cast of a person's text is logged by its kind and statement, without the value Postgres puts into the message; a file the journal names and the folder lacks is named; a connection cut mid-migration still ends in that line.
 - `backend/tests/request-log.integration.test.ts` — Integration test: a request is logged as method and path without the search query; an unknown address is neither logged with its query nor echoed.
 
 ## frontend · views
