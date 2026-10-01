@@ -180,7 +180,9 @@ nothing up.
   «now», read from answers of their own, and the month that failed is not theirs. **A refusal stands once, and always somewhere it can be put
   right** (MOL-159): about a row the journal on screen shows, it marks that row, and any amendment of
   the row takes it away; with no such row, it is a row of «Не приняты» on top of «Траты», in every
-  month and whatever its pages (`refusedRows`). Opened, it is what was typed — to fix and save again,
+  month and whatever its pages (`refusedRows`). «Не приняты» names the marked ones too and leads to the
+  first («И ещё 1 — отмечена в журнале ниже», round 7, Р): the summary counts every refusal, and the
+  second was left to be found among forty rows. Opened, it is what was typed — to fix and save again,
   or to drop with «Скрыть» in the sheet, beside the reason. **The summary counts every one**
   («Не приняты N трат») **and leads to «Траты»**; «Куда ушли» says no «трат нет» over one typed into
   the month shown. The journal never makes a row for a refusal: laid there by a guess of where its row
