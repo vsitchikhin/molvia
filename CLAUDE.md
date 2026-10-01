@@ -358,6 +358,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   viewport**, never of the window, and it scrolls itself to the field being typed in (MOL-135);
   **the lift is the pinned box less the visible height**, never `100dvh` or `innerHeight`, and
   **before the keys come it takes the height they left last time** (MOL-151).
+- **Nothing comes or goes in one frame** (MOL-151): `appear` fades in what is put in the page,
+  `AppReveal` grows and shrinks what pushes its neighbours; never while a screen moves, never under
+  «reduce motion», never for an answer read (more than three rows at once), and never the sheet's
+  own height or a change of a screen's own query beyond its answer.
 
 ### End-to-end — `.claude/rules/e2e.md`
 

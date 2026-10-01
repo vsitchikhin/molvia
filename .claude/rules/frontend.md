@@ -217,6 +217,31 @@ The detail behind the frontend lines of `CLAUDE.md`.
   all; the arrows in the catalogue list, which a smooth scroll lags behind. **Never
   `scroll-behavior: smooth` in the CSS** — Stylelint refuses it: a scroll with `behavior: 'auto'`
   takes it from the CSS, and the sheet's compensation would slide; a smooth scroll says so itself.
+- **Nothing comes or goes in one frame** (MOL-151, the owner: «многие моменты работают как-то
+  сильно резко», and «все надо делать» over the whole list). Three ways, one grammar, every length a
+  token: **`appear`** (the mixin) fades a thing in with a short rise when it is put in the page — a
+  state of `ScreenState`, a strip, a notice, «Вернуть», the dock, what a screen puts in its
+  content in place of the skeleton (`AppScreen`, `> :slotted(*)`); an animation, so the element's
+  own transitions stay its own. **`AppReveal`** grows what pushes its neighbours from nothing and
+  shrinks it back — a row of a list (`group`), an error under a field, a block of a sheet — by its
+  height, padding and margins in the flow, so the rest slides; no row is taken out of the flow, which
+  a slide of the others would need. **Colour changes** of a control (a button come active, a chip
+  chosen) and **stale dimming** are transitions of their own. **None of it plays while a screen
+  moves** (`html[data-nav]`): the view transition brings the new screen in already, and a block
+  fading inside it played the arrival twice. **None under «reduce motion».** **An answer read is not
+  a row added**: more than `BULK` (3) rows coming or going in one render — a month, a page, a first
+  answer — just appear and are just gone, or a month would shrink out row by row; the first render is
+  never played. **What does not move, on purpose:** a change of the screen's own query beyond its
+  answer coming in under the control (MOL-136 — an overlay took the second tap, and «Вернуть» and
+  the main action in the dock come in without the other going out: a `mode="out-in"` would hold
+  back the button the screen gives the focus to once the strip goes — read from the code, not
+  tried); the card of accounts over the month's
+  switcher (a height animated there takes the switcher from under the thumb, MOL-138); the reading
+  and the cursor of a chart under a finger, rows re-ranked by every letter of a search, the countdown
+  of «Вернуть»; and **the height of a sheet as a whole** — the lift over the keyboard and `reveal`
+  measure that box (MOL-135, MOL-151), so only blocks inside it grow. Bars of «Графики» grow to a new
+  answer where they stand: the area keeps its height. Component tests stub transitions (Vue Test
+  Utils), so `AppReveal.test.ts` un-stubs them and fakes `animate`; e2e meets the motion as it is.
 - **A screen is built from the kit, not drawn anew** (MOL-18): `AppButton`, `AppField`,
   `SegmentedControl`, `VerdictBadge`, `AppCard`, `BottomSheet` in `components/`, every state of
   them on the development-only page `/_kit`. `AppCard` carries exactly the differences between
