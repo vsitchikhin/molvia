@@ -86,12 +86,24 @@
           {{ t('scanner.scan') }}
         </AppButton>
       </div>
-      <AppButton v-else variant="secondary" block @click="toTyping">
-        <template #icon><IconKeyboard /></template>
-        {{ t('scanner.manual') }}
-      </AppButton>
+      <div v-else class="actions">
+        <AppButton v-if="hint.offer.value" variant="ghost" block @click="hint.show">
+          {{ t('scanner.camera_hint_offer') }}
+        </AppButton>
+        <AppButton variant="secondary" block @click="toTyping">
+          <template #icon><IconKeyboard /></template>
+          {{ t('scanner.manual') }}
+        </AppButton>
+      </div>
     </template>
   </BottomSheet>
+
+  <!-- Over the scanner, a sheet over a sheet: «‹» puts it away, and any way it goes counts as seen. -->
+  <CameraHintSheet
+    :open="hint.open.value"
+    :place="hint.place.value"
+    @update:open="$event || hint.dismiss()"
+  />
 </template>
 
 <script lang="ts">
@@ -106,10 +118,12 @@ import IconKeyboard from '~icons/mdi/keyboard-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import CameraHintSheet from '@/components/CameraHintSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { useBarcodeScan } from '@/composables/useBarcodeScan'
 import { useCamera } from '@/composables/useCamera'
+import { useCameraHint } from '@/composables/useCameraHint'
 import { videoFrames } from '@/scanner/capture'
 
 // The camera's refusals the sheet draws, each with its own way out (MOL-19). Keys written out
@@ -142,6 +156,7 @@ export default defineComponent({
     AppButton,
     AppField,
     BottomSheet,
+    CameraHintSheet,
     IconKeyboard,
     IconScan,
     IconTorch,
@@ -176,6 +191,8 @@ export default defineComponent({
     const cameraMissing = ref(false)
 
     const camera = useCamera(video)
+    // How to stop Safari asking for the camera on every page load (MOL-163).
+    const hint = useCameraHint()
 
     function done(code: string): void {
       emit('read', code)
@@ -183,7 +200,10 @@ export default defineComponent({
     }
 
     const scan = useBarcodeScan({
-      live: computed(() => props.open && !typing.value && camera.kind.value === 'live'),
+      // Nothing is read under the hint: a code taken there would be taken unseen (Р-5).
+      live: computed(
+        () => props.open && !typing.value && !hint.open.value && camera.kind.value === 'live',
+      ),
       frames: () => (video.value && frame.value ? videoFrames(video.value, frame.value) : null),
       onCode: (code) => {
         // A buzz where the phone has one (not iPhone): the code was taken, look at the screen. Not
@@ -215,6 +235,7 @@ export default defineComponent({
 
     watch(camera.kind, (kind) => {
       if (kind === 'insecure' || kind === 'none') cameraMissing.value = true
+      if (kind === 'live') hint.started()
     })
     // A reader that failed leaves nothing for the camera to do: no video is drawn and no frame is
     // read, so it stops rather than run unseen under the error (review С-6, adversarial В).
@@ -230,6 +251,10 @@ export default defineComponent({
       // The video must be in the page before the stream is handed to it.
       await nextTick()
       scan.warm()
+      // Asked before the camera: once it is given, Safari answers «granted» until the page reloads.
+      await hint.check()
+      // Put away or turned to the digits while the browser answered: no camera is wanted now.
+      if (!props.open || typing.value) return
       await camera.start()
     }
 
@@ -250,6 +275,7 @@ export default defineComponent({
           // on the viewfinder as the sheet slides down, until it is put away (adversarial Е″).
           holdStill()
           camera.stop()
+          hint.reset()
         }
       },
       { immediate: true },
@@ -334,6 +360,7 @@ export default defineComponent({
       toCamera,
       retry,
       submitTyped,
+      hint,
     }
   },
 })

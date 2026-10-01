@@ -15,6 +15,7 @@ Rules: `.claude/rules/barcodes.md`. A test beside its source, or mirroring it un
 ## frontend · components
 
 - `frontend/src/components/BarcodeScannerSheet.vue` — The scanner sheet: live viewfinder with its frame and torch, the camera's refusals, the digits typed by hand; emits the code and closes.
+- `frontend/src/components/CameraHintSheet.vue` — «Камера без вопросов» over the scanner (MOL-163): where Safari's setting is, for a tab and for the app from the home screen, what it costs and what happens without it; no link, iOS opens no Settings from a page.
 
 ## frontend · composables
 

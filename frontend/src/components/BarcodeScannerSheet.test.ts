@@ -487,3 +487,119 @@ describe('BarcodeScannerSheet', () => {
     expect(track.stop).toHaveBeenCalled()
   })
 })
+
+// Safari on an iPhone (MOL-163): asks for the camera once per page load unless its setting says
+// «Разрешить», and tells which of the two it will do through `permissions.query`.
+describe('BarcodeScannerSheet · how to stop Safari asking', () => {
+  const SAFARI = ['vendor', 'maxTouchPoints', 'permissions'] as const
+
+  function safari(state: PermissionState): void {
+    const values = {
+      vendor: 'Apple Computer, Inc.',
+      maxTouchPoints: 5,
+      permissions: { query: () => Promise.resolve({ state }) },
+    }
+    for (const name of SAFARI) {
+      Object.defineProperty(navigator, name, { value: values[name], configurable: true })
+    }
+  }
+
+  // A closed dialog keeps its words in the page: what is up is a dialog with `open`.
+  function hintUp(): boolean {
+    return [...document.querySelectorAll('dialog[open]')].some((dialog) =>
+      dialog.textContent.includes(en.scanner.camera_hint_title),
+    )
+  }
+
+  function pageButton(text: string): HTMLButtonElement {
+    const found = [...document.querySelectorAll('button')].find(
+      (candidate) => candidate.textContent.trim() === text,
+    )
+    if (!found) throw new Error(`no button «${text}»`)
+    return found
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  afterEach(() => {
+    for (const name of SAFARI) Reflect.deleteProperty(navigator, name)
+  })
+
+  it('tells how, over a live viewfinder, once Safari has asked — and reads nothing under it', async () => {
+    safari('prompt')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    codes = ['4850000000007', '4850000000007']
+    const sheet = await render()
+
+    expect(hintUp()).toBe(true)
+    expect(document.body.textContent).toContain(en.scanner.camera_hint_tab_path)
+    expect(sheet.emitted('read')).toBeUndefined()
+
+    // Past the hint's own rise: until it has come up, a sheet takes no tap (MOL-69).
+    clock += 1000
+    pageButton(en.scanner.camera_hint_ok).click()
+    await settle()
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await settle()
+
+    expect(hintUp()).toBe(false)
+    expect(sheet.emitted('read')).toEqual([['4850000000007']])
+  })
+
+  it('must not tell where Safari will not ask', async () => {
+    safari('granted')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const sheet = await render()
+    expect(hintUp()).toBe(false)
+    expect(sheet.text()).not.toContain(en.scanner.camera_hint_offer)
+  })
+
+  it('must not tell outside Safari on a touch screen', async () => {
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    await render()
+    expect(hintUp()).toBe(false)
+  })
+
+  it('must not tell before the camera is given', async () => {
+    safari('prompt')
+    getUserMedia.mockRejectedValue(named('NotAllowedError'))
+    await render()
+    expect(hintUp()).toBe(false)
+  })
+
+  it('tells once on this phone; after that a quiet line brings it back', async () => {
+    safari('prompt')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    await render()
+    // Past the hint's own rise: until it has come up, a sheet takes no tap (MOL-69).
+    clock += 1000
+    pageButton(en.scanner.camera_hint_ok).click()
+    await settle()
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await settle()
+    for (const wrapper of mounted.splice(0)) wrapper.unmount()
+
+    const sheet = await render()
+    expect(hintUp()).toBe(false)
+    await button(sheet, en.scanner.camera_hint_offer).trigger('click')
+    await settle()
+    expect(hintUp()).toBe(true)
+  })
+
+  it('starts no camera for a sheet put away while the browser answered', async () => {
+    let answer: (state: { state: PermissionState }) => void = () => undefined
+    safari('prompt')
+    Object.defineProperty(navigator, 'permissions', {
+      value: { query: () => new Promise((resolve) => (answer = resolve)) },
+      configurable: true,
+    })
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const sheet = await render()
+    await sheet.setProps({ open: false })
+    answer({ state: 'prompt' })
+    await settle()
+    expect(getUserMedia).not.toHaveBeenCalled()
+  })
+})

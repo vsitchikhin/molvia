@@ -1389,12 +1389,24 @@
     "insecure_title": "The camera needs a secure connection",
     "insecure_body": "Open the app at an https address — or type the code's digits in.",
     "denied_title": "No access to the camera",
-    "denied_body": "iPhone: Settings → Safari → Camera → “Allow”. Android: the icon left of the address → Permissions → Camera. Or type the code's digits in.",
+    "denied_body": "iPhone: Settings → Apps → Safari → Camera → “Allow”. Android: the icon left of the address → Permissions → Camera. Or type the code's digits in.",
     "none_title": "No camera",
     "none_body": "This device has no camera. Type the code's digits in.",
     "error_title": "The camera did not start",
     "error_body": "Another app may be holding it. Close it and try again.",
     "reader_title": "The scanner is not responding",
-    "reader_body": "Try again — or type the code's digits in."
+    "reader_body": "Try again — or type the code's digits in.",
+    "camera_hint_title": "Camera without asking",
+    "camera_hint_app_body": "Safari asks for the camera every time Molvia starts. To stop it asking, allow the camera in Settings:",
+    "camera_hint_app_path": "Settings → Apps → Safari → Camera → “Allow”",
+    "camera_hint_app_search": "Quicker: search Settings for “Safari”.",
+    "camera_hint_app_price": "This allows the camera for every website in Safari, not only Molvia.",
+    "camera_hint_app_otherwise": "If nothing is changed, Safari will ask on every start, and after “Allow” the camera works as it does now.",
+    "camera_hint_tab_body": "Safari asks for the camera every time the page loads again. To stop it asking, allow the camera for this website:",
+    "camera_hint_tab_path": "aA in the address bar → Website Settings → Camera → “Allow”",
+    "camera_hint_tab_price": "This allows it for Molvia only.",
+    "camera_hint_tab_otherwise": "If nothing is changed, Safari will ask after every reload, and after “Allow” the camera works as it does now.",
+    "camera_hint_ok": "Got it",
+    "camera_hint_offer": "Safari asks every time? How to stop it"
   }
 }
