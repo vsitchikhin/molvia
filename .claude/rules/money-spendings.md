@@ -180,10 +180,12 @@ nothing up.
   «now», read from answers of their own, and the month that failed is not theirs. **A spending of the
   month the server refused is named on the summary and leads to «Траты»** («Не принята N трат этого
   месяца», adversarial А): its row there is where it is put right, and the summary, which has no
-  row, said nothing at all — the ring even said «трат нет». **A refused record is a row whatever
-  page the journal has reached** (round 2, Е): one still waiting for its first answer waits for the
-  page of its day, but a refused one behind a page never scrolled to was on no screen as a row, the
-  summary took it for a refusal of nothing and offered only «Скрыть», which threw it away. A finished trip opened from «Траты» leads
+  row, said nothing at all — the ring even said «трат нет». **A refused record or amendment is a row
+  whatever page the journal has reached** (round 2, Е; round 3, И), and the month's by the day typed:
+  one still waiting for its first answer waits for the page of its day, but a refused one behind a
+  page never scrolled to was on no screen as a row, the summary took it for a refusal of nothing and
+  offered only «Скрыть», which threw the typing away. A refused amendment of a row not loaded stands
+  on the day typed, over the revision it was made on, until the page brings the server's row. A finished trip opened from «Траты» leads
   back to «Траты» (`?from=money-spendings`, Р-12).
 - **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`), by the rules
   of the trip's (MOL-24): storage is the queue, one at a time under `navigator.locks`, held by a
@@ -236,7 +238,9 @@ nothing up.
   shared a block with (adversarial Г). **«Вернуть» is the queue's, not the screen's**
   (`lastRemoved`, round 2 of MOL-159, Ж), as a trip's is (MOL-76): removed on «Траты», it stands on
   «Деньги» after the step back with what is left of its ten seconds — the summary is where a sum
-  fallen short shows the mistake. The server keeps the removal ten minutes; the strip is what the
+  fallen short shows the mistake. **What is left is the strip's, not the clock's** (round 3, З): the
+  strip says it every second, held or not, and the next screen goes on from it; counted from the
+  removal, a strip held past ten seconds was forgotten by the step back. The server keeps the removal ten minutes; the strip is what the
   screen offers.
 - **A date is shown in words over its native field** (`AppField`, `display`): «Сегодня, 27 сентября»
   is drawn, the field stays underneath to open the system picker and to be read by its own value,
