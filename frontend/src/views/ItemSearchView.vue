@@ -756,12 +756,21 @@ export default defineComponent({
     // The hint comes after «не знаком» was said, often before it was read out: said again with it, in
     // one message, so neither is cut off by the other (MOL-162). Not over «Предложить товар» opened
     // meanwhile: the person is in the form, which a late hint does not touch (review 3).
-    watch(codeHint, (hint) => {
-      if (hint === null || barcode.value !== 'missing' || proposing.value) return
+    // A hint that came under the sheet is said once the sheet is put away with nothing proposed: the
+    // line stands under the button by then, and nothing said it (review 6).
+    let hintUnsaid = false
+    function sayHint(hint: BarcodeHint): void {
+      hintUnsaid = false
       withdrawCode?.()
       withdrawCode = announce?.(
         `${t('item.barcode.missing', { code: lookup.code.value })}. ${hintWords(hint)}`,
       )
+    }
+    watch(codeHint, (hint) => {
+      hintUnsaid = false
+      if (hint === null || barcode.value !== 'missing') return
+      if (proposing.value) hintUnsaid = true
+      else sayHint(hint)
     })
 
     // The question about a code is said as the lookup's answers are: the block says nothing of
@@ -943,6 +952,8 @@ export default defineComponent({
         }
         return
       }
+      const hint = codeHint.value
+      if (!item && hintUnsaid && hint !== null && barcode.value === 'missing') sayHint(hint)
       if (item && byCode) {
         // Proposed, the code's question is answered: its block goes with it (review С-5) — and with it
         // the button the sheet would give the focus back to: the title holds it (adversarial Ф′).

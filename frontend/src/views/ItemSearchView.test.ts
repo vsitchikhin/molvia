@@ -955,6 +955,16 @@ describe('«What did you pick up?»', () => {
 
         expect(view.get('.live').text()).not.toContain(hintText)
         expect(view.get<HTMLInputElement>('dialog input[type="text"]').element.value).toBe('')
+
+        // Put away with nothing proposed: the line under the button is said now (review 6).
+        const propose = view.findComponent({ name: 'ProposeItemSheet' })
+        propose.vm.$emit('update:open', false)
+        // The sheet's own close hook, as `BottomSheet` calls it once its step back has landed.
+        const closed = propose.vm.$attrs['on-closed'] as () => void
+        closed()
+        await vi.waitFor(() => {
+          expect(view.get('.live').text()).toBe(`${missing}. ${hintText}`)
+        })
       })
 
       it('must not show a hint the base did not give, nor fail when asking fails', async () => {
