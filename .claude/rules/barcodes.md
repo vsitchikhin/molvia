@@ -477,10 +477,10 @@ French — and the person confirms or corrects it.
   least. **The brand** goes after the name unless the name carries it — a word of the first brand that
   says which mark it is (four letters or more as written, letters with a digit, or the first word of
   three past a legal form) is a word of the name by the search key, all of it when none says (Р-3). A
-  legal form is one by its place — the Russian and Armenian ones lead («ООО КДВ»), the European ones
-  trail («Fit Parade LLC») — and never the whole brand: «SAS», Yerevan's supermarket, and «Spa» are
-  marks (adversarial В⁵); the brand is written after the name without its form, as a shelf prints it
-  (review 18): «Nutella» + «Nutella,
+  legal form is one by its place — the Russian and Armenian ones at either edge («ООО КДВ», «Գրանդ
+  Քենդի» ՍՊԸ, adversarial В⁷), the European ones only trailing («Fit Parade LLC») — and never the whole
+  brand: «SAS», Yerevan's supermarket, and «Spa» are marks (В⁵); the brand is written after the name
+  without its form and without its double quotes, as a shelf prints it (review 18, В⁶): «Nutella» + «Nutella,
   Ferrero» is «Nutella», «Coca Cola» + «COCA-COLA SERVICES SA/NV» is «Coca Cola», «Сыр Савушкин 45%» +
   «Савушкин продукт», «Напиток 7Up» + «7Up» and «Конфеты KDV» + «KDV Group» stay as they are — the
   base keeps a mark with its company or country, the package prints the mark — and «Молоко 3,2%» +

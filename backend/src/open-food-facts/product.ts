@@ -85,24 +85,25 @@ function cleanName(raw: unknown): string | null {
   return name.success ? name.data : null
 }
 
+const DOUBLE_QUOTES = /[«»„“”‟"‹›]/gu
+
 /** A word of a brand as it is written: letters and digits, with the marks that sit on them. */
 const WRITTEN_WORD = /[\p{L}\p{N}][\p{L}\p{M}\p{N}]*/gu
 
 /**
- * The legal forms a brand may be written with, by the search key, and where each stands: the Russian and
- * Armenian ones lead — «ООО КДВ», «ՍՊԸ …» — the European ones trail — «Fit Parade LLC», «Nestlé SA». They
- * name no mark, and one standing first hid the mark after it (adversarial В⁗). By place, since a form
- * is also a word: «SAS» is Yerevan's supermarket and «Spa» a Belgian water, and taken out wherever they
- * stood they lost the brand or wrote the mark twice (В⁵). A closed list: the forms of the markets the
- * base is read in.
+ * The legal forms a brand may be written with, by the search key, and where each stands. The Russian
+ * and Armenian ones stand either way — «ООО КДВ», «Красный Октябрь» ОАО, «Գրանդ Քենդի» ՍՊԸ (adversarial
+ * В⁷) — and no mark is spelled as one. The European ones only trail — «Fit Parade LLC», «Nestlé SA» —
+ * since at the front they are words: «SAS» is Yerevan's supermarket and «Spa» a Belgian water, and
+ * taken out wherever they stood they lost the brand or wrote the mark twice (В⁵). They name no mark,
+ * and one standing first hid the mark after it (В⁗). A closed list: the forms of the markets the base is
+ * read in.
  */
-const LEADING_FORMS = new Set(
-  ['ООО', 'ОАО', 'ЗАО', 'ПАО', 'АО', 'ИП', 'ТОО', 'ЧП', 'ГК', 'ՍՊԸ', 'ՓԲԸ', 'ԲԲԸ'].map((form) =>
-    toSearchKey(form),
-  ),
-)
+const LOCAL_FORMS = ['ООО', 'ОАО', 'ЗАО', 'ПАО', 'АО', 'ИП', 'ТОО', 'ЧП', 'ГК', 'ՍՊԸ', 'ՓԲԸ', 'ԲԲԸ']
+const LEADING_FORMS = new Set(LOCAL_FORMS.map((form) => toSearchKey(form)))
 const TRAILING_FORMS = new Set(
   [
+    ...LOCAL_FORMS,
     'LLC',
     'Ltd',
     'Inc',
@@ -179,8 +180,14 @@ function withBrand(name: string, brands: unknown): string {
     .filter((word) => word !== '')
   const named = new Set(toSearchKey(name).split(' '))
   if (probe.length === 0 || probe.some((word) => named.has(word))) return name
-  // Written after the name without its legal form: a shelf prints «Красный Октябрь», not «ОАО» (review 18).
-  const mark = brand.slice(first.index, last.index + last[0].length)
+  // Written after the name without its legal form: a shelf prints «Красный Октябрь», not «ОАО» (review
+  // 18). And without its double quotes: cut at the words, «Савушкин» продукт kept a closing quote and
+  // lost the opening one (adversarial В⁶); an apostrophe is a letter's, «Lay's», and stays.
+  const mark = brand
+    .slice(first.index, last.index + last[0].length)
+    .replace(DOUBLE_QUOTES, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
   return cleanName(`${name} ${mark}`) === `${name} ${mark}` ? `${name} ${mark}` : name
 }
 
