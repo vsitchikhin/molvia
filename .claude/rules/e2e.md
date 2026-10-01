@@ -5,9 +5,23 @@ paths:
   - 'bin/e2e-database.mjs'
 ---
 
-# End-to-end: its database, its ports, the login seam, the camera, traces, the live region
+# End-to-end: where it runs, its database, its ports, the login seam, the camera, traces, the live region
 
 The detail behind the end-to-end lines of `CLAUDE.md`.
+
+- **End-to-end runs in CI, not on the push** (MOL-164). After MOL-139 a push following `make check`
+  ran only this suite, and every copy waited for the others' in the machine's one line: on
+  01.10.2026 a measurement in molvia7 waited 7½ minutes for one push of another copy before it began.
+  CI ran the very same suite on every push anyway — on GitHub's machines, in parallel, with no line,
+  and for free on a public repository — so the push was paying a second time for an answer CI
+  already gave. **What keeps it a gate is the ruleset on `master`**: a pull request merges only when
+  both jobs, «format, lint, types, tests» and «end-to-end», are green; before it nothing but habit
+  stopped a red merge. **And a flake fails CI** (`failOnFlakyTests`): the push ran with no retries,
+  so a flaky test failed loudly there; CI keeps its two retries so the report names a flake as one,
+  but a test green only on a retry is red. **The price, named:** the answer comes with CI, some
+  seven minutes after the push, rather than in two to four here with an empty line; the agent's
+  «done» waits for it (`gh pr checks --watch`). `make e2e` is the same suite here, on demand — for a
+  spec being written, or a change the agent wants seen before it leaves the machine.
 
 - **End-to-end has a database of its own too, and it is dropped before every run**
   (`molvia_<index>_e2e`, MOL-60). Until then the suite started the API without a
@@ -18,14 +32,14 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   there is no second migrator. Recreated rather than truncated: it also makes the schema
   match the migrations after a branch switch, with no hand-kept list of tables. Not the
   `_test` database, because that one is never cleaned between runs — its tests own their
-  rows — and `pre-push` runs both suites back to back.
+  rows — and a copy may run both suites back to back.
 - **The browser is in `Asia/Yerevan`** (`timezoneId`, MOL-121): the app dates by the phone's
   calendar and the specs by Yerevan's, and in CI's UTC the two parted from 20:00 to midnight. A
   phone in another zone is the component tests' — they run in UTC.
 - **The run also has its own ports** (`E2E_API_PORT`, `E2E_PWA_PORT` — the neighbouring port
   in this copy's band). A database alone would not have closed it: `reuseExistingServer`
   handed the suite the dev API whenever `make dev` was up, so no `DATABASE_URL` of ours
-  reached a process — and `pre-push` runs e2e exactly then. Now the two stacks coexist.
+  reached a process — and `make e2e` is run exactly then. Now the two stacks coexist.
 - **Every spec comes in through `open()` in `e2e/session.ts`, and it waits for two things
   apart** (MOL-67). The seam's answer has no limit of its own, as the app itself waits for it
   (`devLogin` has no timeout): on an overloaded machine that answer is what is slow — up to 23 s

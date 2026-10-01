@@ -360,6 +360,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 ### End-to-end — `.claude/rules/e2e.md`
 
 - **End-to-end has a database and ports of its own**, and the database is dropped before every run.
+- **End-to-end runs in CI, not on the push** (MOL-164): a pull request merges only on both jobs
+  green, and a test green only on a retry is red there.
 - **Every spec comes in through `open()` in `e2e/session.ts`.**
 - **The sheet alone also runs on WebKit** (`iphone`, MOL-80); a test it cannot run says why.
 - **Words said out loud are taken by a locator outside the live region**, never muted with
@@ -434,14 +436,18 @@ differently in every working copy by design.
 ### Gates that run without being asked
 
 - **Hooks** (`.githooks`, wired by `make setup`, no husky). `pre-commit` refuses a commit
-  whose formatting or lint is dirty; `pre-push` refuses a push whose types or tests —
-  end-to-end included — are not green. The slow checks sit at push because that is when
-  the work leaves the machine. A deliberate bypass is `--no-verify`; needing it twice in a
-  row means the rule is wrong and should be changed, not dodged.
+  whose formatting or lint is dirty; `pre-push` refuses a push whose types or vitest — unit,
+  component, integration — are not green. A deliberate bypass is `--no-verify`; needing it
+  twice in a row means the rule is wrong and should be changed, not dodged.
+- **End-to-end is CI's, not the push's** (MOL-164): the same suite runs there on every push,
+  in parallel and with no queue between the copies, and **`master` takes a pull request only
+  when both CI jobs are green** — a ruleset, not a habit. A flake green only on a retry fails
+  CI (`failOnFlakyTests`). `make e2e` runs it here on demand.
 - **The copies take turns** (MOL-139): `pre-push` and the check targets of the `Makefile` run
   under one lock for the whole machine, `bin/one-at-a-time.sh`, and a waiting run says whose it
   waits for. A step already green on the very same clean tree — by `make check` or an earlier
-  push — is not run again (`bin/green.sh`). Why, in `.claude/rules/workspace.md`.
+  push — is not run again (`bin/green.sh`), nor on a tree that differs from it only in documents
+  (`*.md`, `docs/`, `.claude/`). Why, in `.claude/rules/workspace.md`.
 - **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, in two
   jobs: checks and e2e. CI **checks** formatting rather than fixing it — `make format`
   mutates files, and a diff must fail rather than be silently repaired. It generates its
@@ -662,7 +668,8 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
 - **Catalogue search is tested only against a real Postgres.** `pg_trgm`, `unaccent` and
   `fuzzystrmatch` cannot be faked, and they are exactly what breaks. Integration tests run against a
   **separate database** on the same server (`molvia_<index>_test`), created and migrated
-  by the vitest global setup — a test run can never truncate data entered by hand. This is
+  by the vitest global setup — a test run can never truncate data entered by hand. Each worker
+  runs its files in a copy of it (`…_test_w<n>`, MOL-164), so the files go in parallel. This is
   why `make check` needs `make up` first, and why CI runs a Postgres service.
 - **When a test fails, look for the bug in the code first** — do not adjust the test to
   match the behaviour. A test proves the app works, not the other way round. And **never by
@@ -710,8 +717,10 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
 ### After a task
 
 **Definition of Done:** `make check` — `format` -> `lint` -> `typecheck` -> `test`,
-all green. Run them once after the entire plan, not after each step: `format` mutates files
-and would otherwise hide real lint errors.
+all green — **and then both CI jobs green on the pull request** (`gh pr checks --watch`):
+end-to-end runs only there (MOL-164), so «pushed» is not «done», and a red CI is the task's
+to fix exactly as a refused push was. Run `make check` once after the entire plan, not after
+each step: `format` mutates files and would otherwise hide real lint errors.
 
 If a decision changed along the way — **update the product plan in Confluence immediately.**
 A plan that diverges from the code is worthless, and here the plan matters more than the code.
