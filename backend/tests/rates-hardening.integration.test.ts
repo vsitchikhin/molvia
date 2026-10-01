@@ -317,13 +317,23 @@ describe('Г. Сбой базы — не сбой ЦБ РА', () => {
 })
 
 describe('Д. В предупреждении — дата последнего курса ЦБ РА и причина', () => {
-  it('warn несёт ошибку и lastKnown из кеша', async () => {
+  it('warn несёт причину её кодом и lastKnown из кеша (MOL-153)', async () => {
     await rates.upsert(
       answer('cba', daysAgo(3)).rates.map((rate): CachedRate => ({ ...rate, jump: false })),
     )
     const warnings: Record<string, unknown>[] = []
     const run = officialRatesRefresh({
-      primary: { provider: 'cba', fetchLatest: () => Promise.reject(new Error('down')) },
+      primary: {
+        provider: 'cba',
+        fetchLatest: () =>
+          Promise.reject(
+            new TypeError('fetch failed', {
+              cause: Object.assign(new Error('getaddrinfo ENOTFOUND api.cba.am'), {
+                code: 'ENOTFOUND',
+              }),
+            }),
+          ),
+      },
       fallbacks: [],
       rates,
       log: { warn: (details) => warnings.push(details as Record<string, unknown>) },
@@ -332,8 +342,13 @@ describe('Д. В предупреждении — дата последнего 
     await run()
 
     expect(warnings).toHaveLength(1)
-    expect(warnings[0]).toMatchObject({ provider: 'cba', lastKnown: daysAgo(3) })
-    expect(warnings[0]?.err).toBeInstanceOf(Error)
+    expect(warnings[0]).toMatchObject({
+      provider: 'cba',
+      lastKnown: daysAgo(3),
+      errorName: 'TypeError',
+      code: 'ENOTFOUND',
+    })
+    expect(warnings[0]).not.toHaveProperty('err')
   })
 })
 
