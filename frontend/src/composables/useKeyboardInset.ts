@@ -73,14 +73,16 @@ export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<bo
     const keys = whole - viewport.height > KEYBOARD
     underKeys(keys)
     if (keys) {
+      keysSeen = true
       forget()
       const field = typedIn(element)
-      if (field) remember(field, whole, viewport.height)
+      if (field && keyed(field)) remember(field, whole, viewport.height)
     } else if (foreseen !== null) {
       place(element, 0, foreseen)
       return
     }
-    // Never below zero: a visual viewport past the end of the box is nothing the keys cover.
+    // Never below zero: a visible part taller than what is left of the box over the keys — Safari's
+    // window shrunk a moment before it said so — leaves nothing for the keys to cover.
     place(element, pinnedBottom() - viewport.height, viewport.height)
   }
 
@@ -95,12 +97,15 @@ export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<bo
   }
 
   // A field of the sheet focused with no keys up yet, on a touch screen: the sheet takes the height
-  // they left the last time at once, so the picture iOS slides up with them is already right.
+  // they left the last time at once, so the picture iOS slides up with them is already right. Only
+  // before the first keyboard of the page: it is the one that comes late, while the page draws
+  // nothing. Any later one comes in 50 to 160 ms over a page that is drawn, and a sheet made lower
+  // at the tap dropped its top by hundreds of pixels and then flew up with the keys (adversarial А6).
   function foresee(): void {
     const element = target.value
     const viewport = window.visualViewport
     const field = element && typedIn(element)
-    if (!field || !viewport || viewport.scale > 1 || !touch()) return
+    if (!field || !keyed(field) || keysSeen || !viewport || viewport.scale > 1 || !touch()) return
     const whole = windowHeight()
     if (whole - viewport.height > KEYBOARD) return
     const height = recall(field, whole)
@@ -127,6 +132,7 @@ export function useKeyboardInset(target: Ref<HTMLElement | null>, active: Ref<bo
   }
 
   function start(): void {
+    watchKeys()
     window.visualViewport?.addEventListener('resize', measure)
     window.visualViewport?.addEventListener('scroll', measure)
     // Safari shrinks the window under the keys with no event of the visual viewport, a scroll of
@@ -219,6 +225,39 @@ function reveal(sheet: HTMLElement): void {
  * visible part this much shorter than the window is a keyboard.
  */
 const KEYBOARD = 150
+
+/**
+ * What brings the keys up: a select and a date bring a picker of their own, and a height remembered
+ * for them is no keyboard's — a tap on «День» made the sheet short for 1.5 s and then jumped
+ * (adversarial У1). They are still kept in sight like any field typed in.
+ */
+const PICKED = [
+  'select',
+  ...['date', 'time', 'datetime-local', 'month', 'week'].map((type) => `input[type="${type}"]`),
+].join(', ')
+
+function keyed(field: HTMLElement): boolean {
+  return !field.matches(PICKED)
+}
+
+/**
+ * Whether a keyboard has come up on this page yet, under a sheet or not: only the first one is late
+ * (MOL-151, П-1 and the logs of MOL-135). Heard once for the app, from the moment it is loaded.
+ */
+let keysSeen = false
+let watching = false
+
+function watchKeys(): void {
+  const viewport = window.visualViewport
+  if (watching || !viewport) return
+  watching = true
+  const heard = (): void => {
+    if (viewport.scale <= 1 && windowHeight() - viewport.height > KEYBOARD) keysSeen = true
+  }
+  viewport.addEventListener('resize', heard)
+}
+
+watchKeys()
 
 /**
  * How long a height foreseen for the keys waits for them. The first keyboard of a page came after

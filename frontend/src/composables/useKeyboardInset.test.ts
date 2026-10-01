@@ -26,17 +26,18 @@ function fakeViewport(height: number, offsetTop = 0, scale = 1) {
   return viewport
 }
 
-function host(active = false) {
+function host(active = false, use = useKeyboardInset) {
   const on = ref(active)
   const target = ref<HTMLElement | null>(null)
   const view = mount(
     defineComponent(() => {
-      useKeyboardInset(target, on)
+      use(target, on)
       return () =>
         h('div', { ref: target }, [
           h('input', { 'data-field': '' }),
           h('input', { 'data-amount': '', inputmode: 'decimal' }),
           h('button', { 'data-button': '' }),
+          h('input', { 'data-date': '', type: 'date' }),
           h('div', { 'data-block': '', tabindex: -1 }),
         ])
     }),
@@ -479,10 +480,15 @@ describe('useKeyboardInset takes the height the keys left last time', () => {
   const KEY = 'molvia.keyboard'
   const AMOUNT = 'decimal 699x390'
 
-  beforeEach(() => {
+  // A page of its own for every test: whether a keyboard came up yet is the page's.
+  let fresh: typeof useKeyboardInset
+
+  beforeEach(async () => {
     vi.useFakeTimers()
     vi.stubGlobal('innerWidth', 390)
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(pointer: coarse)' }))
+    vi.resetModules()
+    ;({ useKeyboardInset: fresh } = await import('@/composables/useKeyboardInset'))
   })
 
   async function opened(kept: Record<string, unknown> | string | null = { [AMOUNT]: 395 }) {
@@ -491,7 +497,7 @@ describe('useKeyboardInset takes the height the keys left last time', () => {
     const viewport = fakeViewport(699)
     vi.stubGlobal('innerHeight', 699)
     const layout = fakeLayout(699)
-    const view = host()
+    const view = host(false, fresh)
     view.on.value = true
     await nextTick()
     const field = (which: string) => {
@@ -523,6 +529,43 @@ describe('useKeyboardInset takes the height the keys left last time', () => {
     keysCome(sheet)
     expect(sheet.height()).toBe('395px')
     expect(sheet.inset()).toBe('0px')
+  })
+
+  // The keys of a page come late only the first time; later ones come in 50–160 ms over a page that
+  // is drawn, and a sheet made lower at the tap dropped by hundreds of pixels first (adversarial А6).
+  it('must not fire: a field tapped once a keyboard has been up on the page', async () => {
+    const sheet = await opened()
+    sheet.field('[data-amount]').focus()
+    keysCome(sheet)
+    sheet.field('[data-amount]').blur()
+    vi.stubGlobal('innerHeight', 699)
+    sheet.layout.floor = 699
+    sheet.viewport.height = 699
+    sheet.viewport.offsetTop = 0
+    sheet.viewport.fire('resize')
+    expect(sheet.height()).toBe('699px')
+    sheet.field('[data-field]').focus()
+    expect(sheet.height()).toBe('699px')
+    sheet.field('[data-amount]').focus()
+    expect(sheet.height()).toBe('699px')
+  })
+
+  // A select and a date bring a picker, not keys: nothing is remembered for them, nothing
+  // foreseen (adversarial У1).
+  it('must not fire: a date focused with the keys still up is not remembered', async () => {
+    const sheet = await opened(null)
+    sheet.field('[data-field]').focus()
+    sheet.viewport.height = 369
+    sheet.viewport.fire('resize')
+    sheet.field('[data-date]').focus()
+    window.dispatchEvent(new Event('scroll'))
+    expect(JSON.parse(localStorage.getItem(KEY) ?? '{}')).toEqual({ 'input 699x390': 369 })
+  })
+
+  it('must not fire: a date focused takes no remembered height', async () => {
+    const sheet = await opened({ 'date 699x390': 369 })
+    sheet.field('[data-date]').focus()
+    expect(sheet.height()).toBe('699px')
   })
 
   it('remembers what the keys left, by their kind and the window', async () => {
