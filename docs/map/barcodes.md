@@ -15,12 +15,14 @@ Rules: `.claude/rules/barcodes.md`. A test beside its source, or mirroring it un
 ## frontend · components
 
 - `frontend/src/components/BarcodeScannerSheet.vue` — The scanner sheet: live viewfinder with its frame and torch, the camera's refusals, the digits typed by hand; emits the code and closes.
+- `frontend/src/components/CameraHintSheet.vue` — «Камера без вопросов» over the scanner (MOL-163): where Safari's setting is, for a tab and for the app from the home screen, what it costs and what happens without it; no link, iOS opens no Settings from a page.
 
 ## frontend · composables
 
 - `frontend/src/composables/useBarcodeLookup.ts` — Composable: the item a scanned code belongs to on «Что взяли?» — the server, else the codes the device found items by; found, missing, offline, error.
 - `frontend/src/composables/useBarcodeScan.ts` — Composable: reads frames while the camera is live, one at a time, and hands over the first code of a barcode's shape two frames agree on.
 - `frontend/src/composables/useCamera.ts` — Composable: the back camera for the viewfinder — its refusals sorted into states, stopped when closed or hidden, the torch.
+- `frontend/src/composables/useCameraHint.ts` — Composable: whether to tell the person how to stop Safari asking for the camera on every page load (MOL-163) — Safari on a touch screen, `permissions.query` says `prompt`; the sheet once on this phone, a quiet line after; a tab or the app from the home screen.
 
 ## frontend · scanner
 
@@ -30,10 +32,6 @@ Rules: `.claude/rules/barcodes.md`. A test beside its source, or mirroring it un
 - `frontend/src/scanner/decode.ts` — Reading one frame: the four retail formats, the code as zxing gives it; `locateWasm`, the app's own copy of the reader.
 - `frontend/src/scanner/frames.ts` — `cropOf`, the frame on the screen in the camera's pixels through a cover fit; `createReadStreak`, two reads in a row.
 - `frontend/src/scanner/protocol.ts` — The messages between the page and the decoding worker.
-
-## frontend · public
-
-- `frontend/public/camera-probe.html` — MOL-163, temporary: a static page on the app's own origin that logs when the phone asks for the camera — after a stop, a history entry, a disabled track, the background, `<input capture>` — and what `permissions.query` says. Removed by the task's last commit.
 
 ## e2e
 

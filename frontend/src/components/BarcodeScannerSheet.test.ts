@@ -5,6 +5,7 @@ import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
+import { PERMISSION_WAIT } from '@/composables/useCameraHint'
 import type * as ReaderModule from '@/scanner/barcodeReader'
 import type { ReaderWorker } from '@/scanner/barcodeReader'
 import type { ReaderReply } from '@/scanner/protocol'
@@ -485,5 +486,215 @@ describe('BarcodeScannerSheet', () => {
     const sheet = await render()
     await sheet.setProps({ open: false })
     expect(track.stop).toHaveBeenCalled()
+  })
+})
+
+// Safari on an iPhone (MOL-163): asks for the camera once per page load unless its setting says
+// «Разрешить», and tells which of the two it will do through `permissions.query`.
+describe('BarcodeScannerSheet · how to stop Safari asking', () => {
+  const SAFARI = ['vendor', 'maxTouchPoints', 'userAgent', 'permissions'] as const
+
+  // The answer to `permissions.query` given at once, or held until the test hands it over.
+  function safari(state: PermissionState | 'held'): { answer: (state: PermissionState) => void } {
+    const held: ((status: { state: PermissionState }) => void)[] = []
+    const values = {
+      vendor: 'Apple Computer, Inc.',
+      maxTouchPoints: 5,
+      userAgent:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1',
+      permissions: {
+        query: () =>
+          state === 'held'
+            ? new Promise<{ state: PermissionState }>((resolve) => held.push(resolve))
+            : Promise.resolve({ state }),
+      },
+    }
+    for (const name of SAFARI) {
+      Object.defineProperty(navigator, name, { value: values[name], configurable: true })
+    }
+    return {
+      answer: (answer) => {
+        for (const resolve of held.splice(0)) resolve({ state: answer })
+      },
+    }
+  }
+
+  // A closed dialog keeps its words in the page: what is up is a dialog with `open`.
+  function hintUp(): boolean {
+    return [...document.querySelectorAll('dialog[open]')].some((dialog) =>
+      dialog.textContent.includes(en.scanner.camera_hint_title),
+    )
+  }
+
+  function pageButton(text: string): HTMLButtonElement {
+    const found = [...document.querySelectorAll('button')].find(
+      (candidate) => candidate.textContent.trim() === text,
+    )
+    if (!found) throw new Error(`no button «${text}»`)
+    return found
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  afterEach(() => {
+    for (const name of SAFARI) Reflect.deleteProperty(navigator, name)
+  })
+
+  it('tells how, over a live viewfinder, once Safari has asked — and reads nothing under it', async () => {
+    safari('prompt')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    codes = ['4850000000007', '4850000000007']
+    const sheet = await render()
+
+    expect(hintUp()).toBe(true)
+    expect(document.body.textContent).toContain(en.scanner.camera_hint_tab_path)
+    expect(sheet.emitted('read')).toBeUndefined()
+
+    // Past the hint's own rise: until it has come up, a sheet takes no tap (MOL-69).
+    clock += 1000
+    pageButton(en.scanner.camera_hint_ok).click()
+    await settle()
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await settle()
+
+    expect(hintUp()).toBe(false)
+    expect(sheet.emitted('read')).toEqual([['4850000000007']])
+  })
+
+  it('must not tell where Safari will not ask', async () => {
+    safari('granted')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const sheet = await render()
+    expect(hintUp()).toBe(false)
+    expect(sheet.text()).not.toContain(en.scanner.camera_hint_offer)
+  })
+
+  it('must not tell outside Safari on a touch screen', async () => {
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    await render()
+    expect(hintUp()).toBe(false)
+  })
+
+  it('must not tell before the camera is given', async () => {
+    safari('prompt')
+    getUserMedia.mockRejectedValue(named('NotAllowedError'))
+    await render()
+    expect(hintUp()).toBe(false)
+  })
+
+  it('tells once on this phone; after that a quiet line brings it back', async () => {
+    safari('prompt')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    await render()
+    // Past the hint's own rise: until it has come up, a sheet takes no tap (MOL-69).
+    clock += 1000
+    pageButton(en.scanner.camera_hint_ok).click()
+    await settle()
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await settle()
+    for (const wrapper of mounted.splice(0)) wrapper.unmount()
+
+    const sheet = await render()
+    expect(hintUp()).toBe(false)
+    await button(sheet, en.scanner.camera_hint_offer).trigger('click')
+    await settle()
+    expect(hintUp()).toBe(true)
+  })
+
+  it('starts no camera for a sheet put away while the browser answered', async () => {
+    const browser = safari('held')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const sheet = await render()
+    await sheet.setProps({ open: false })
+    browser.answer('prompt')
+    await settle()
+    expect(getUserMedia).not.toHaveBeenCalled()
+  })
+
+  it('starts no camera for a sheet turned to the digits while the browser answered', async () => {
+    const browser = safari('held')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const sheet = await render()
+    await button(sheet, en.scanner.manual).trigger('click')
+    browser.answer('prompt')
+    await settle()
+    expect(getUserMedia).not.toHaveBeenCalled()
+  })
+
+  it('lights no camera for a scanner gone with its screen while the browser answered (adversarial Д)', async () => {
+    const browser = safari('held')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const sheet = await render()
+    mounted.splice(mounted.indexOf(sheet), 1)
+    sheet.unmount()
+    browser.answer('prompt')
+    await settle()
+    expect(getUserMedia).not.toHaveBeenCalled()
+  })
+
+  it('lights no camera for a scanner gone while the browser kept silent (adversarial Д)', async () => {
+    safari('held')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const sheet = await render()
+    mounted.splice(mounted.indexOf(sheet), 1)
+    sheet.unmount()
+    // Past the ceiling, where the start would go on without an answer.
+    await new Promise((resolve) => setTimeout(resolve, PERMISSION_WAIT * 2))
+    await settle()
+    expect(getUserMedia).not.toHaveBeenCalled()
+  })
+
+  it('asks for the camera once for one opening, however the answers cross (adversarial В)', async () => {
+    // Seen before: the line, not the sheet, so nothing lies over the scanner's own buttons.
+    localStorage.setItem('molvia.camera-hint', '1')
+    const browser = safari('held')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const sheet = await render()
+    // Put away and opened again while Safari answered.
+    await sheet.setProps({ open: false })
+    await settle()
+    await sheet.setProps({ open: true })
+    await settle()
+    browser.answer('prompt')
+    await settle()
+    expect(getUserMedia).toHaveBeenCalledTimes(1)
+
+    // The digits and back to the camera while it answered — past the sheet's rise, which takes no tap.
+    getUserMedia.mockClear()
+    clock += 1000
+    await button(sheet, en.scanner.manual).trigger('click')
+    await settle()
+    await button(sheet, en.scanner.scan).trigger('click')
+    await settle()
+    browser.answer('prompt')
+    await settle()
+    expect(getUserMedia).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks for the camera anyway when the browser does not answer in time (adversarial Б)', async () => {
+    safari('held')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    await render()
+    expect(getUserMedia).not.toHaveBeenCalled()
+    // A real timer, polled: on a loaded machine the ceiling's own timer may come late.
+    await vi.waitFor(
+      () => {
+        expect(getUserMedia).toHaveBeenCalledTimes(1)
+      },
+      { timeout: PERMISSION_WAIT * 10, interval: 20 },
+    )
+    await settle()
+    expect(hintUp()).toBe(false)
+  })
+
+  it('puts the quiet line in the footer before the camera answers, not under a live picture', async () => {
+    localStorage.setItem('molvia.camera-hint', '1')
+    safari('prompt')
+    getUserMedia.mockReturnValue(new Promise<MediaStream>(() => undefined))
+    const sheet = await render()
+    expect(getUserMedia).toHaveBeenCalledTimes(1)
+    expect(sheet.text()).toContain(en.scanner.camera_hint_offer)
   })
 })

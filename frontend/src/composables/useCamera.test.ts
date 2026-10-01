@@ -233,4 +233,13 @@ describe('useCamera', () => {
     scope.stop()
     expect(track.stop).toHaveBeenCalled()
   })
+
+  it('asks for no camera once its scope is let go (MOL-163, adversarial Д)', async () => {
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const { start, kind, scope } = camera()
+    scope.stop()
+    await start()
+    expect(getUserMedia).not.toHaveBeenCalled()
+    expect(kind.value).toBe('idle')
+  })
 })

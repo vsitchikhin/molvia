@@ -13,13 +13,15 @@ import { asBrowser, open } from './session'
  * pick up?», where MOL-99 put it.
  */
 
+const scanButton = (page: Page) => page.getByRole('button', { name: 'Scan a barcode' })
+
 /**
  * Opens the scanner and waits for its sheet to be up: until it has risen it takes no tap at all
  * (MOL-69), and a refusal is drawn at once — on a loaded machine a tap on «Type it in» landed while
  * the sheet still rose and went nowhere. Its rise, then the double-tap floor it never goes under.
  */
 async function openScanner(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Scan a barcode' }).click()
+  await scanButton(page).click()
   await page
     .locator('dialog[open]')
     .evaluate((dialog) =>
@@ -371,7 +373,11 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       await expect.poll(async () => (await focused(page)).body).toBe(false)
 
       await typeCode(page, '20000011')
-      await expect(page.getByText("Code 20000011 is a shop's own label")).toBeVisible()
+      // The block on the screen, not the live region, which says the same words (`e2e.md`): on a
+      // loaded machine both are there at once.
+      await expect(
+        page.locator('.bind-question').getByText("Code 20000011 is a shop's own label"),
+      ).toBeVisible()
       await expect.poll(async () => (await focused(page)).body).toBe(false)
     })
 
@@ -402,8 +408,11 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       })
 
       await page.keyboard.press('Enter')
+      // The state on the screen, not the live region, which says the same words (`e2e.md`).
       await expect(
-        page.getByText(`Could not link code ${code}. Try again — or record without the code`),
+        page
+          .locator('.state')
+          .getByText(`Could not link code ${code}. Try again — or record without the code`),
       ).toBeVisible()
       await expect.poll(async () => (await focused(page)).text).toBe('Try again')
 
@@ -689,4 +698,88 @@ test('slides down with the barcode it read still on the screen, not black', asyn
   )
 
   expect(leaving?.spread).toBeGreaterThan(100)
+})
+
+/**
+ * Safari on an iPhone (MOL-163): Apple's vendor on a touch screen, and a browser that answers it
+ * will ask for the camera — which Safari does once per page load until its setting says «Allow».
+ * Chromium is given the camera all the same; only what the page is told is Safari's.
+ */
+async function asSafari(page: Page, state: PermissionState = 'prompt'): Promise<void> {
+  await page.addInitScript((answer) => {
+    Object.defineProperty(navigator, 'vendor', { value: 'Apple Computer, Inc.' })
+    Object.defineProperty(navigator, 'maxTouchPoints', { value: 5 })
+    Object.defineProperty(navigator, 'userAgent', {
+      value:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1',
+    })
+    const query = navigator.permissions.query.bind(navigator.permissions)
+    navigator.permissions.query = (descriptor) =>
+      descriptor.name === 'camera'
+        ? Promise.resolve({ state: answer } as PermissionStatus)
+        : query(descriptor)
+  }, state)
+}
+const cameraHint = (page: Page) => page.getByRole('dialog', { name: 'Camera without asking' })
+
+test('tells how to stop Safari asking, once the camera is given, and reads after «Got it»', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(READ * 2)
+  await context.grantPermissions(['camera'])
+  await asSafari(page)
+  await open(page, '/_kit')
+  // Not `openScanner`: the hint may rise before the scanner's sheet is waited for, and then two
+  // sheets are open.
+  await scanButton(page).click()
+
+  // After the camera is live, which a loaded machine takes its time to give.
+  await expect(cameraHint(page)).toBeVisible({ timeout: 15_000 })
+  await expect(cameraHint(page)).toContainText('The page menu by the address bar')
+  // Until it has come up a sheet takes no tap (MOL-69), and on a loaded machine its rise starts a
+  // frame late — a tap timed by its animations landed before it and was held. Tapped until it goes.
+  await expect(async () => {
+    if (await cameraHint(page).isVisible()) {
+      await cameraHint(page).getByRole('button', { name: 'Got it' }).click({ timeout: 500 })
+    }
+    await expect(cameraHint(page)).toBeHidden({ timeout: 500 })
+  }).toPass({ timeout: 10_000 })
+  await expect(scanned(page, BARCODE)).toBeVisible({ timeout: READ })
+})
+
+test('seen on this phone, the hint waits behind a quiet line', async ({ page, context }) => {
+  await context.grantPermissions(['camera'])
+  await asSafari(page)
+  await page.addInitScript(() => {
+    localStorage.setItem('molvia.camera-hint', '1')
+  })
+  // A reader that never arrives keeps the viewfinder up: the code it films would close it.
+  await page.route(WASM, () => undefined)
+  await open(page, '/_kit')
+  await openScanner(page)
+
+  const quiet = scanner(page).getByRole('button', {
+    name: 'Safari asks every time? How to stop it',
+  })
+  await expect(quiet).toBeVisible({ timeout: 15_000 })
+  await expect(cameraHint(page)).toBeHidden()
+  await quiet.click()
+  await expect(cameraHint(page)).toBeVisible()
+})
+
+test('says nothing where Safari will not ask — its setting says «Allow»', async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(READ * 2)
+  await context.grantPermissions(['camera'])
+  await asSafari(page, 'granted')
+  await open(page, '/_kit')
+  // Not `openScanner`: with nothing over it the scanner may read and close before its sheet is
+  // waited for.
+  await scanButton(page).click()
+
+  await expect(scanned(page, BARCODE)).toBeVisible({ timeout: READ })
+  await expect(cameraHint(page)).toBeHidden()
 })
