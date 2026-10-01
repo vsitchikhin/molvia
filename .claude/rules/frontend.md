@@ -240,11 +240,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
   fading inside it played the arrival twice. **At the end of the move what was put in meanwhile is
   cut short** (`endMove` in `transitions.ts`): a CSS animation of no length comes back half-way
   through once its length is back, and in Chromium an answer come at the end of the move dropped to
-  half its opacity and came in anew (adversarial А4). **A move the browser shows itself** — the iOS
+  half its opacity and came in anew (adversarial А4). «Meanwhile» is from the frame the move began,
+  with half a millisecond of slack (`SAME_FRAME`): two times of one frame come by different sums and
+  differ in the last bits, and an animation started in that very frame was left to play the arrival
+  again, now and then (MOL-159, the swipe back to «Счета»). **A move the browser shows itself** — the iOS
   edge swipe, Android's predictive back — is marked too (`data-nav="browser"`) for its render alone:
   nothing of ours plays, and without the mark the screen came in again after the gesture (А5). Any
   move to another screen, with a direction of ours or not: the account opened from the card of
-  «Деньги» has none, and the swipe back from it came in twice (Б3). **None under «reduce motion».** **An answer read is not
+  «Деньги» had none, and the swipe back from it came in twice (Б3; the card is on «Счета» since
+  MOL-159, and the test swipes back there). **None under «reduce motion».** **An answer read is not
   a row added**: more than `BULK` (3) rows coming or going in one render — a month, a page, a first
   answer — just appear and are just gone, or a month would shrink out row by row; the first render is
   never played. **Another month is another list** (`:key` by month on the days of «Деньги»): a month
