@@ -37,6 +37,7 @@ import {
   tripPaymentBodySchema,
   tripReceiptBodySchema,
   unassignedOperationsCodec,
+  moneyChartMonthCodec,
   moneyChartsCodec,
   moneyMonthCodec,
   monthSchema,
@@ -96,6 +97,7 @@ import type {
   TripPaymentBody,
   TripReceiptBody,
   UnassignedOperationsResponse,
+  MoneyChartMonthView,
   MoneyChartsView,
   MoneyMonthView,
   SalaryShift,
@@ -320,6 +322,8 @@ export interface MolviaClient {
   moneyMonth(month: string, cursor?: JournalKey): Promise<MoneyMonthView>
   /** «Графики» (MOL-74): the last six or twelve months side by side, counted by the server. */
   moneyCharts(period: 6 | 12): Promise<MoneyChartsView>
+  /** «Графики → Месяц» (MOL-158): one month's ring, against the usual and pace. */
+  moneyChartMonth(month: string): Promise<MoneyChartMonthView>
   /** «Зарплата с … числа — в следующий месяц» (MOL-134): `day` null is off. */
   salaryShift(): Promise<SalaryShift>
   /** Saved on the tap, whole each time: safe to repeat. */
@@ -717,6 +721,11 @@ export function createClient(options: ClientOptions): MolviaClient {
     },
 
     moneyCharts: (period) => request(`/money/charts?period=${String(period)}`, moneyChartsCodec),
+
+    moneyChartMonth: async (month) => {
+      if (!monthSchema.safeParse(month).success) throw new ApiError(ERROR.NOT_FOUND, 'month', false)
+      return request(`/money/months/${month}/charts`, moneyChartMonthCodec)
+    },
 
     salaryShift: () => request('/actors/me/salary-shift', salaryShiftSchema),
 

@@ -40,13 +40,12 @@ import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconChevron from '~icons/mdi/chevron-right'
-import { chartMonths, formatEstimate, monthOf, shareOf } from '@molvia/model'
+import { formatEstimate, shareOf } from '@molvia/model'
 import type { MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import DonutRing from '@/components/DonutRing.vue'
 import type { RingSector } from '@/components/DonutRing.vue'
 import { categoryColour } from '@/components/spending'
-import { localDay } from '@/days'
 
 /** How many sectors are named beside the ring; the rest are counted (handoff MOL-157, 01). */
 const NAMED = 3
@@ -72,13 +71,6 @@ export default defineComponent({
   setup(props) {
     const { t, locale } = useI18n()
     /**
-     * A month older than the six the charts open on opens them on twelve, so the month tapped is
-     * among the bars (adversarial А of MOL-74).
-     */
-    const period = computed(() =>
-      chartMonths(monthOf(localDay()), 6).includes(props.month.month) ? {} : { period: '12' },
-    )
-    /**
      * Every sector of the ring. One of a category the month does not name stays on the ring, so it
      * closes, but in `--border` and with no name: called «Остальные», it passed for a second one
      * (review 7). Never happens while the month names every category, archived ones too.
@@ -92,7 +84,6 @@ export default defineComponent({
         const share = shareOf(slice.amount, props.month.spent)
         return {
           key: slice.categoryId ?? 'rest',
-          id: category?.id ?? null,
           named: category !== undefined,
           name: category ? props.nameOf(category) : t('spending.charts.rest'),
           colour:
@@ -118,15 +109,8 @@ export default defineComponent({
     const top = computed(() => rows.value.slice(0, NAMED))
     /** Sectors past the three that the ring draws: one of no level is on no ring (adversarial Б). */
     const hidden = computed(() => rows.value.slice(NAMED).filter((row) => row.level > 0).length)
-    /**
-     * The charts open on the largest category of the ring, the one seen first (review 3, owner's
-     * choice «а»): opened on the period's largest, the card named «Кафе» and «Графики» showed rent.
-     * The first sector always names one — «Остальные» are only ever last (`donutSlices`).
-     */
-    const query = computed(() => {
-      const first = rows.value[0]?.id
-      return first ? { ...period.value, category: first } : period.value
-    })
+    /** «Графики → Месяц» of the same month (MOL-158, handoff MOL-157 06): its full ring is there. */
+    const query = computed(() => ({ month: props.month.month }))
     const label = computed(() =>
       t('spending.summary.donut_label', {
         list: top.value.map((row) => `${row.name} ${row.share}`).join(', '),

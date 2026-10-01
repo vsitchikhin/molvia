@@ -33,7 +33,7 @@ setup: ## Prepare a fresh working copy: symlinks, .env, dependencies
 
 hooks: ## Point git at the repository's hooks (per clone; worktrees share it)
 	git config core.hooksPath .githooks
-	@echo "hooks: pre-commit checks format and lint, pre-push runs types and every test"
+	@echo "hooks: pre-commit checks format and lint, pre-push runs types and vitest; end-to-end is CI's"
 	@echo "       bypass a single run with --no-verify"
 
 ## --- dev stack -----------------------------------------------------------

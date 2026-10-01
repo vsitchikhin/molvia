@@ -101,4 +101,5 @@ support types, the shared integration tests, the migrations.
 - `backend/tests/ownership.integration.test.ts` — Integration test: every repository read and write is scoped to its owner; someone else's row answers as a missing one.
 - `backend/tests/repositories.integration.test.ts` — Integration test: the core repositories — actors, catalogue, places, trips with purchases, verdicts — write and read back.
 - `backend/tests/schema.integration.test.ts` — Integration test: the constraints the schema itself refuses — uniqueness, paired columns, references, gate log, picks, sessions.
-- `backend/tests/setup-db.ts` — Vitest global setup: creates the copy's test database if missing and migrates it before integration tests.
+- `backend/tests/setup-db.ts` — Vitest global setup: creates and migrates the copy's test database — the workers' template — drops the last run's copies and builds the API bundle once.
+- `backend/tests/setup-worker.ts` — Vitest setup file: gives each integration worker its own copy of the test database, made from it as a template.

@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
@@ -184,8 +184,6 @@ describe('dist/seed-catalogue.js', () => {
     'is built beside the server and answers from the bundle alone',
     { timeout: FULL_RUN_MS },
     async () => {
-      execFileSync('node', ['bin/bundle.mjs', 'backend'], { cwd: root, stdio: 'pipe' })
-
       const dry = seed()
 
       expect(dry.status).toBe(0)

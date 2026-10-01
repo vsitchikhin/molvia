@@ -16,8 +16,9 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, '**/*.attack.*'],
     environment: 'node',
     globalSetup: ['./tests/setup-db.ts'],
-    // One database, shared by every file: run them in turn. In parallel they delete each
-    // other's rows in `beforeEach` and fail in a way that looks like a schema bug.
-    fileParallelism: false,
+    // A database per worker, copied from the migrated one (MOL-164), so the files run in
+    // parallel: in one shared database they deleted each other's rows in `beforeEach` and failed
+    // in a way that looks like a schema bug, which is why they once ran in turn — 85 s of CI.
+    setupFiles: ['./tests/setup-worker.ts'],
   },
 })
