@@ -115,6 +115,7 @@
         "
         :action="t('spending.restore')"
         @restore="restore"
+        @tick="keepLeft"
         @expire="forgetRemoved"
       />
       <!-- A trip opened from here and removed comes back here, with its «Вернуть» (MOL-76). -->

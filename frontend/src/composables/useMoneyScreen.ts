@@ -13,7 +13,7 @@ import type { MoneyMonth } from '@/composables/useMoneyMonth'
 import { localDay, purchaseDay, timeOfDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
-import { useSpendingQueueStore } from '@/stores/spendingQueue'
+import { spendingOf, useSpendingQueueStore } from '@/stores/spendingQueue'
 import type { RejectedSpendingWrite } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
@@ -54,11 +54,13 @@ export interface MoneyScreen extends MoneyMonth {
   >
   readonly addButton: Ref<ComponentPublicInstance | null>
   onRemoved(value: Removed): void
+  /** What the strip has left, as it counts: the next screen goes on from it. */
+  keepLeft(seconds: number): void
   forgetRemoved(): void
   restore(): Promise<void>
 }
 
-/** The ten seconds of «Вернуть»: counted from the removal, not from each screen showing it. */
+/** The ten seconds of «Вернуть»: counted by the strip, not started again by each screen showing it. */
 const UNDO_SECONDS = 10
 /** Removals whose strip has been shown once: said aloud and given the focus then, and only then. */
 const shownRemovals = new Set<number>()
@@ -141,18 +143,16 @@ export function useMoneyScreen(): MoneyScreen {
   /**
    * Refusals no row of this month carries — «Вернуть» too late, a category — said under the
    * switcher; one a row of the month carries is that row's on «Траты» (adversarial round 3, Ж).
-   * A record is the month's by its day, not by a row on screen: before the month's answer the
-   * journal is empty, and the record went to the card whose one action throws it away (review of
-   * MOL-159, round 2). An amendment is a row's only when the row is loaded — the spending stays on
-   * the server whatever its card does.
+   * A record or an amendment is the month's by the day typed, or by its row on screen: before the
+   * month's answer the journal is empty, and the refusal went to the card whose one action throws
+   * the typing away (review of MOL-159, round 2; adversarial round 3, И).
    */
   const carried = ({ write }: RejectedSpendingWrite) =>
-    write.kind === 'record'
-      ? monthOfDay(write.body.spentOn) === selected.value
-      : write.kind === 'amend' &&
-        journal.value.some((day) =>
-          day.rows.some((row) => row.kind === 'manual' && row.key === write.id),
-        )
+    (write.kind === 'record' || write.kind === 'amend') &&
+    (monthOfDay(write.body.spentOn) === selected.value ||
+      journal.value.some((day) =>
+        day.rows.some((row) => row.kind === 'manual' && row.key === spendingOf(write)),
+      ))
   const otherRefusals = computed(() => queue.rejected.filter((item) => !carried(item)))
   const rowRefusals = computed(() => queue.rejected.filter(carried))
   const reasonOf = (code: WireCode) =>
@@ -191,7 +191,7 @@ export function useMoneyScreen(): MoneyScreen {
   const removed = computed(() => {
     const value = queue.lastRemoved
     if (!value) return null
-    const left = UNDO_SECONDS - Math.floor((Date.now() - value.stamp) / 1000)
+    const left = value.left - Math.floor((Date.now() - value.at) / 1000)
     return left > 0 ? { ...value, left, quiet: shownRemovals.has(value.stamp) } : null
   })
   // After the strip is drawn: a removal whose time ran out while no screen showed it is
@@ -209,7 +209,13 @@ export function useMoneyScreen(): MoneyScreen {
   const addButton = ref<ComponentPublicInstance | null>(null)
 
   function onRemoved(value: Removed): void {
-    queue.lastRemoved = { ...value, stamp: Date.now() }
+    const now = Date.now()
+    queue.lastRemoved = { ...value, stamp: now, left: UNDO_SECONDS, at: now }
+  }
+
+  function keepLeft(seconds: number): void {
+    const value = queue.lastRemoved
+    if (value) queue.lastRemoved = { ...value, left: seconds, at: Date.now() }
   }
 
   function forgetRemoved(): void {
@@ -259,6 +265,7 @@ export function useMoneyScreen(): MoneyScreen {
     removed,
     addButton,
     onRemoved,
+    keepLeft,
     forgetRemoved,
     restore,
   }

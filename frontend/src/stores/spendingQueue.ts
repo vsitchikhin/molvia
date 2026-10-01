@@ -245,6 +245,13 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     readonly title: string
     readonly amount: string
     readonly stamp: number
+    /**
+     * The seconds the strip had left at `at` — reported by the strip itself, which stands still
+     * while a finger or the focus is on it; the clock from the removal ran on under a held strip,
+     * and the summary forgot an «Вернуть» «Траты» still offered (adversarial round 3, З).
+     */
+    readonly left: number
+    readonly at: number
   } | null>(null)
   let ahead = false
   /** The key of the write a send is carrying right now: it is never folded into. */

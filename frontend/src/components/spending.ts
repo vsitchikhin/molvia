@@ -294,6 +294,19 @@ export function journalOf(
 
   const known = new Set(days.flatMap((day) => day.rows.map((row) => row.key)))
   const reached = month.cursor === null ? '' : (month.days.at(-1)?.day ?? '')
+  /** A row only the phone knows of, at the top of its day — a day of its own if the month has none. */
+  function place(row: Extract<JournalRow, { kind: 'manual' }>): void {
+    known.add(row.key)
+    const { spentOn } = row.spending
+    const at = days.findIndex((day) => day.day <= spentOn)
+    const same = days[at]
+    if (same?.day === spentOn) same.rows.unshift(row)
+    else {
+      const day: JournalDay = { day: spentOn, total: null, estimated: false, rows: [row] }
+      if (at === -1) days.push(day)
+      else days.splice(at, 0, day)
+    }
+  }
   const local = [
     ...pending.flatMap((write) => (write.kind === 'record' ? [{ write, refusal: null }] : [])),
     ...rejected.flatMap((item) =>
@@ -308,8 +321,7 @@ export function journalOf(
     // is to be put right, and behind a page never scrolled to it was nowhere (adversarial round 2
     // of MOL-159, Е) — the summary named it nothing, and «Скрыть» on the card there threw it away.
     if (!refusal && spending.spentOn < reached) continue
-    known.add(spending.id)
-    const row: JournalRow = {
+    place({
       kind: 'manual',
       key: spending.id,
       spending,
@@ -317,15 +329,37 @@ export function journalOf(
       mark: refusal ? 'refused' : 'waiting',
       refusal,
       local: true,
-    }
-    const at = days.findIndex((day) => day.day <= spending.spentOn)
-    const same = days[at]
-    if (same?.day === spending.spentOn) same.rows.unshift(row)
-    else {
-      const day: JournalDay = { day: spending.spentOn, total: null, estimated: false, rows: [row] }
-      if (at === -1) days.push(day)
-      else days.splice(at, 0, day)
-    }
+    })
+  }
+  // A refused amendment of a row on a page not loaded yet stands as that row, on the day typed
+  // (adversarial round 3, И): it marks the server's row, and that row was on no screen — the
+  // refusal went to the card whose «Скрыть» threw the typing away. The revision is the one it was
+  // made over; the server's figures come with the page.
+  for (const refusal of rejected) {
+    if (refusal.write.kind !== 'amend') continue
+    const { id, body } = refusal.write
+    if (known.has(id) || removing.has(id) || !body.spentOn.startsWith(month.month)) continue
+    place({
+      kind: 'manual',
+      key: id,
+      spending: {
+        id,
+        spentOn: body.spentOn,
+        amount: body.amount,
+        categoryId: body.categoryId,
+        note: body.note ?? null,
+        place: body.place ?? null,
+        rate: null,
+        accountId: body.accountId ?? null,
+        debited: body.debited ?? null,
+        revision: body.revision,
+        amendedAt: null,
+      },
+      counted: null,
+      mark: 'refused',
+      refusal,
+      local: false,
+    })
   }
   return days.filter((day) => day.rows.length > 0)
 }

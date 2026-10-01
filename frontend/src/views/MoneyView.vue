@@ -182,6 +182,7 @@
         "
         :action="t('spending.restore')"
         @restore="restore"
+        @tick="keepLeft"
         @expire="forgetRemoved"
       />
       <TripUndoStrip v-else class="undo" />

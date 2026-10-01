@@ -514,6 +514,34 @@ describe('MoneySpendingsView: what round 2 of the review of MOL-159 found', () =
     expect(view.text()).not.toContain(en.spending.rejected_other.title)
   })
 
+  it('И of round 3: a refused amendment of a row on a page not loaded stands as that row', async () => {
+    moneyMonth.mockResolvedValue(
+      month({
+        count: 45,
+        cursor: { day: '2026-09-26', moment: 0, id: BARBER },
+        remaining: 44,
+        remainingFrom: '2026-09-01',
+        remainingTo: '2026-09-25',
+      }),
+    )
+    const view = await render()
+    amendSpending.mockRejectedValue(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
+    const queue = useSpendingQueueStore()
+    const RENT = 'eeeeeeee-0000-4000-8000-000000000009'
+    queue.amend(RENT, 3, {
+      spentOn: '2026-09-02',
+      amount: amd('6000'),
+      categoryId: BEAUTY,
+      note: 'Rent',
+    })
+    await vi.waitFor(() => {
+      expect(queue.rejected).toHaveLength(1)
+    })
+    await flushPromises()
+    expect(view.find(`[data-row="${RENT}"]`).text()).toContain(en.spending.refused)
+    expect(view.text()).not.toContain(en.spending.rejected_other.title)
+  })
+
   it('Ж: «Undo» is the queue’s, not the screen’s — it outlives «Траты» for the step back', async () => {
     moneyMonth.mockResolvedValue(month())
     const view = await render()

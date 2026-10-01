@@ -49,6 +49,14 @@ describe('UndoStrip', () => {
     expect(strip.emitted('expire')).toHaveLength(1)
   })
 
+  it('says what is left every second, held too — the next screen goes on from it (MOL-159, З)', async () => {
+    const strip = render()
+    await vi.advanceTimersByTimeAsync(3_000)
+    await strip.trigger('pointerenter')
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(strip.emitted('tick')?.map(([left]) => left)).toEqual([9, 8, 7, 7, 7, 7, 7, 7])
+  })
+
   it('stands still while the person has the focus in it', async () => {
     const strip = render()
     await vi.advanceTimersByTimeAsync(0)

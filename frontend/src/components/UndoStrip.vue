@@ -48,7 +48,8 @@ export default defineComponent({
      */
     quiet: { type: Boolean, default: false },
   },
-  emits: ['restore', 'expire'],
+  /** `tick`: what is left, every second, held or not — a screen taking the strip over goes on from it. */
+  emits: ['restore', 'expire', 'tick'],
   setup(props, { emit }) {
     const left = ref(props.seconds)
     const button = ref<ComponentPublicInstance | null>(null)
@@ -59,8 +60,8 @@ export default defineComponent({
     const announce = useAnnouncer()
 
     function tick(): void {
-      if (held || focused) return
-      left.value -= 1
+      if (!held && !focused) left.value -= 1
+      emit('tick', left.value)
       if (left.value <= 0) {
         clearInterval(timer)
         emit('expire')

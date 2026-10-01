@@ -710,6 +710,8 @@ describe('MoneyView: what the review of MOL-159 found', () => {
       title: 'Barber',
       amount: '֏5,000',
       stamp: Date.now() - 4000,
+      left: 10,
+      at: Date.now() - 4000,
     }
     await flushPromises()
     expect(view.text()).toContain('Deleted: Barber')
@@ -721,6 +723,51 @@ describe('MoneyView: what the review of MOL-159 found', () => {
     expect(view.text()).not.toContain('Deleted: Barber')
   })
 
+  it('З of round 3: held on «Траты» past its ten seconds, «Undo» goes on here from what the strip had left', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    const queue = useSpendingQueueStore()
+    // Removed fifteen seconds ago, a finger on the strip most of that time: it said 9 just now.
+    queue.lastRemoved = {
+      undo: { id: BARBER },
+      title: 'Barber',
+      amount: '֏5,000',
+      stamp: Date.now() - 15_000,
+      left: 9,
+      at: Date.now(),
+    }
+    await flushPromises()
+    expect(view.get('.undo .count').text()).toBe('9')
+    expect(queue.lastRemoved).not.toBeNull()
+  })
+
+  it('И of round 3: a refused amendment of a row the first page has not reached is named all the same', async () => {
+    moneyMonth.mockResolvedValue(
+      month({
+        count: 45,
+        cursor: { day: '2026-09-26', moment: 0, id: BARBER },
+        remaining: 44,
+        remainingFrom: '2026-09-01',
+        remainingTo: '2026-09-25',
+      }),
+    )
+    const view = await render()
+    amendSpending.mockRejectedValue(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
+    const queue = useSpendingQueueStore()
+    queue.amend('eeeeeeee-0000-4000-8000-000000000009', 1, {
+      spentOn: '2026-09-02',
+      amount: amd('6000'),
+      categoryId: BEAUTY,
+      note: 'Rent',
+    })
+    await vi.waitFor(() => {
+      expect(queue.rejected).toHaveLength(1)
+    })
+    await flushPromises()
+    expect(view.text()).toContain('1 spending of this month not accepted')
+    expect(view.text()).not.toContain(en.spending.rejected_other.title)
+  })
+
   it('Ж, must not fire: a removal whose ten seconds ran out while no screen showed it is not offered', async () => {
     moneyMonth.mockResolvedValue(month())
     const view = await render()
@@ -730,6 +777,8 @@ describe('MoneyView: what the review of MOL-159 found', () => {
       title: 'Barber',
       amount: '֏5,000',
       stamp: Date.now() - 11_000,
+      left: 10,
+      at: Date.now() - 11_000,
     }
     await flushPromises()
     expect(view.text()).not.toContain('Deleted: Barber')
