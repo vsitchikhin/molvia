@@ -213,6 +213,15 @@ describe('словарь: повторяющиеся тексты', () => {
       Finish: ['trip.finish', 'trip.finish_confirm.ok'],
       // The screen's title and the way to it from «Where it went» (MOL-156), as in Russian.
       Charts: ['spending.charts.title', 'spending.summary.charts'],
+      // «Куда ушли» on «Деньги» and «Куда ушло» on «Графики» (MOL-158): one phrase in English.
+      'Where it went': ['spending.categories_title', 'spending.charts.where_title'],
+      // A month after «после» and after «к»: two cases in Russian, one name in English (MOL-158).
+      ...Object.fromEntries(
+        Object.entries(en.spending.month_to).map(([number, name]) => [
+          name,
+          [`spending.month_of.${number}`, `spending.month_to.${number}`],
+        ]),
+      ),
       // The strip of a trip removed is the strip of a spending removed (MOL-76).
       Undo: ['spending.restore', 'trip.remove.restore'],
       'What to buy': ['advice.title', 'nav.advice'],
