@@ -255,7 +255,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   it seen. «Before» is when the read **set out** (`askedAt`), not when its answer came: a read sent
   before the removal and come after it still held the row, which came back for seconds (Б1). A
   record of «Покупки» in the same journal is held the same way by its own queue (`gone` of the trip
-  queue): removed from its screen and come back to «Деньги», it grew back and went (Б4). **What does not move, on purpose:** a change of the screen's own query beyond its
+  queue): removed from its screen and come back to «Деньги», it grew back and went (Б4). Both are kept on
+  the device (`molvia.spending-gone`, `molvia.trip-gone`, `recallLanded` in `queueing.ts`), as the
+  month they hide a row from is: kept in memory alone, a reload after a read that failed brought the
+  removed spending back until some read got through (Б5). Forgotten after 92 days, older than any
+  month the phone keeps unread. **What does not move, on purpose:** a change of the screen's own query beyond its
   answer coming in under the control (MOL-136 — an overlay took the second tap, and «Вернуть» and
   the main action in the dock come in without the other going out: a `mode="out-in"` would hold
   back the button the screen gives the focus to once the strip goes — read from the code, not

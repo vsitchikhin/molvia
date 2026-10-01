@@ -5,7 +5,7 @@ import { actorCodec, settingsOf } from '@molvia/model'
 import { asBrowser, signedIn } from './session'
 
 // Motion as it is (MOL-151): what must not move does not, and what moves does it once. Born of the
-// adversarial review of MOL-151 (А1–А5, Б1–Б4), each turned the other way round. А6 — a sheet's top lower
+// adversarial review of MOL-151 (А1–А5, Б1–Б5), each turned the other way round. А6 — a sheet's top lower
 // before a later keyboard — is not held here: Chromium draws every frame, the iPhone one at most
 // (adversarial round 2, У2), and the rule names the price.
 test.use({ locale: 'ru-RU', reducedMotion: 'no-preference' })
@@ -632,5 +632,60 @@ test('a record of «Покупки» removed from «Деньги» does not grow
   await expect(row).toHaveCount(0)
   await expect(page.getByRole('button', { name: /Открыть трату: Сегодня/ })).toBeVisible()
   // A read still on its slow way is nothing this test waits for.
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
+})
+
+test('a spending removed before a read that failed stays gone after a reload (Б5)', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const { categories } = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string }[] }
+  for (const [amount, note] of [
+    ['1500', 'Удаляемая'],
+    ['1000', 'Остаётся'],
+  ] as const) {
+    const response = await page.request.post('/api/spendings', {
+      headers,
+      data: {
+        id: randomUUID(),
+        spentOn: yerevanDay(),
+        amount: { amount, currency: 'AMD' },
+        categoryId: categories[0]?.id,
+        note,
+      },
+    })
+    expect(response.status(), await response.text()).toBe(201)
+  }
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await expect(page.getByRole('button', { name: /Открыть трату/ })).toHaveCount(2)
+  await settled(page)
+
+  // From now on every read of the month fails — the signal at the shelf. The removal gets through.
+  await page.route('**/api/money/months/**', (route) => route.abort('internetdisconnected'))
+  const removed = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'DELETE' && response.url().includes('/spendings/'),
+  )
+  await page.getByRole('button', { name: /Открыть трату: Удаляемая/ }).click()
+  const sheet = page.locator('dialog[open]')
+  await pressInSheet(
+    () => sheet.getByRole('button', { name: 'Удалить трату' }).click(),
+    () => expect(sheet).toBeHidden({ timeout: 300 }),
+  )
+  expect((await removed).status()).toBeLessThan(300)
+  await expect(page.getByRole('button', { name: /Открыть трату: Удаляемая/ })).toHaveCount(0)
+
+  // The app put away and opened again: the month comes from the phone, and the read of it fails.
+  const failed = page.waitForEvent('requestfailed', (request) =>
+    request.url().includes('/api/money/months/'),
+  )
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+  await expect(page.getByRole('button', { name: /Открыть трату: Остаётся/ })).toBeVisible()
+  await failed
+  await expect(page.getByRole('button', { name: /Открыть трату: Удаляемая/ })).toHaveCount(0)
   await page.unrouteAll({ behavior: 'ignoreErrors' })
 })
