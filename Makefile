@@ -33,7 +33,7 @@ setup: ## Prepare a fresh working copy: symlinks, .env, dependencies
 
 hooks: ## Point git at the repository's hooks (per clone; worktrees share it)
 	git config core.hooksPath .githooks
-	@echo "hooks: pre-commit checks format and lint, pre-push runs types and vitest; end-to-end is CI's"
+	@echo "hooks: pre-commit checks the formatting of the commit; everything else is CI's"
 	@echo "       bypass a single run with --no-verify"
 
 ## --- dev stack -----------------------------------------------------------
@@ -121,12 +121,11 @@ e2e: ## Run the end-to-end tests in a phone-sized browser
 	$(NEED_SCAFFOLD)
 	$(ONE_AT_A_TIME) npm run test:e2e
 
-# One turn for the whole run, not one per step: between the steps another copy would slip in. A
-# check that leaves the tree clean spares the push the same two steps (bin/green.sh).
-check: ## Definition of Done, in order: format, lint, typecheck, test
+# One turn for the whole run, not one per step: between the steps another copy would slip in. On
+# demand: the Definition of Done is a green CI (MOL-165).
+check: ## Everything CI checks but end-to-end, in order: format, lint, typecheck, test
 	$(NEED_SCAFFOLD)
 	$(ONE_AT_A_TIME) $(MAKE) --no-print-directory format lint typecheck test
-	@./bin/green.sh record typecheck test
 
 ## --- misc ----------------------------------------------------------------
 

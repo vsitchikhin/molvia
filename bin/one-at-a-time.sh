@@ -36,7 +36,7 @@ mkdir -p "$(dirname "$lock")"
 # it watches with no terminal at all, so a vitest with one of those and without `run` is refused, and
 # only a vitest: `-w` of npm is its workspace (Л3). Playwright's UI and debugger wait for a person whatever stdin is:
 # `--ui`, `--ui-port`, `--ui-host`, `--debug` in any spelling, `PWDEBUG`. Hidden inside `sh -c`, a
-# flag still passes — the price of reading words. `make` and the hooks pass none of them.
+# flag still passes — the price of reading words. `make` passes none of them.
 endless=""
 vitest=""
 once=""
