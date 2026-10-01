@@ -4,12 +4,14 @@
  * named against the real schema — the CHECKs that keep a row whole, the age by the database's
  * calendar, the overwrite.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import { ISSUE, catalogueBarcodeHintResponseSchema } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createOpenFoodFactsRepository } from '@/db/open-food-facts-repository'
 import { items, openFoodFacts } from '@/db/schema'
+import { OFF_PER_MINUTE, openFoodFacts as openFoodFactsClient } from '@/open-food-facts/client'
 import type { OpenFoodFacts } from '@/open-food-facts/client'
 import type { OffAnswer } from '@/open-food-facts/product'
 import { buildServer } from '@/server'
@@ -316,5 +318,67 @@ describe('«Предложить товар» после подсказки (В-
 
   it('без кода — без пометки', async () => {
     expect(await propose([])).toEqual({ status: 201, origin: null })
+  })
+})
+
+describe('доля лимита на человека (В-6, адверсариальный А)', () => {
+  const nutellaAnswer = readFileSync(
+    new URL('./fixtures/open-food-facts/nutella.json', import.meta.url),
+    'utf8',
+  )
+  const unknownAnswer = readFileSync(
+    new URL('./fixtures/open-food-facts/unknown.json', import.meta.url),
+    'utf8',
+  )
+
+  /** An EAN-13 that checks, led by `48` — no shop's label, so it is asked. */
+  function freshCode(n: number): string {
+    const body = `48${String(n).padStart(10, '0')}`
+    let sum = 0
+    for (let i = body.length - 1, weight = 3; i >= 0; i--, weight = 4 - weight) {
+      sum += Number(body[i]) * weight
+    }
+    return `${body}${String((10 - (sum % 10)) % 10)}`
+  }
+
+  it('двенадцать новых кодов одного человека не выключают подсказку другому', async () => {
+    const asked: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        asked.push(url)
+        return Promise.resolve(
+          url.includes(`/product/${NUTELLA}?`)
+            ? new Response(nutellaAnswer, { status: 200 })
+            : new Response(unknownAnswer, { status: 404 }),
+        )
+      }),
+    )
+    const server = buildServer({
+      db,
+      openFoodFacts: openFoodFactsClient({ url: 'https://off.test', userAgent: 'Molvia/test (x)' }),
+    })
+    await server.ready()
+    try {
+      const hintFor = async (actor: string, code: string): Promise<unknown> => {
+        const response = await server.inject({
+          method: 'GET',
+          url: `/catalogue/barcode/hint?code=${code}&lang=ru`,
+          headers: { cookie: await signIn(db, actor) },
+        })
+        return (JSON.parse(response.body) as { hint: unknown }).hint
+      }
+      const mallory = await insertActor(db)
+      const alice = await insertActor(db)
+
+      const burst = Array.from({ length: OFF_PER_MINUTE }, (_, i) => freshCode(i + 1))
+      await Promise.all(burst.map((code) => hintFor(mallory, code)))
+
+      expect(asked).toHaveLength(4)
+      expect(await hintFor(alice, NUTELLA)).toMatchObject({ name: 'Nutella' })
+    } finally {
+      await server.close()
+      vi.unstubAllGlobals()
+    }
   })
 })

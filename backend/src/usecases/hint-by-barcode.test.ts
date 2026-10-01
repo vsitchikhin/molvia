@@ -5,6 +5,7 @@ import type { OffAnswer } from '@/open-food-facts/product'
 import { FOUND_FRESH_DAYS, MISSED_FRESH_DAYS, hintByBarcode } from './hint-by-barcode'
 
 const NUTELLA = '3017620422003'
+const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 
 const nutella: OffAnswer = {
   found: true,
@@ -32,7 +33,8 @@ function world(
     named: () => Promise.reject(new Error('named was not expected')),
   }
   const off: OpenFoodFacts = {
-    product: (code) => {
+    product: (code, who) => {
+      expect(who).toBe(ACTOR)
       asked.push(code)
       return Promise.resolve(code in answers ? (answers[code] ?? null) : { found: false })
     },
@@ -44,25 +46,25 @@ describe('hintByBarcode', () => {
   it('asks the base about a code nobody kept, keeps the answer and hints in the language asked', async () => {
     const { cache, off, asked, put } = world({}, { [NUTELLA]: nutella })
 
-    expect(await hintByBarcode({ cache, off }, NUTELLA, 'ru')).toEqual(nutellaHint)
+    expect(await hintByBarcode({ cache, off }, ACTOR, NUTELLA, 'ru')).toEqual(nutellaHint)
     expect(asked).toEqual([NUTELLA])
     expect(put).toEqual([[NUTELLA, nutella]])
   })
 
   it('names the product in English for an English interface', async () => {
     const { cache, off } = world({}, { [NUTELLA]: nutella })
-    expect((await hintByBarcode({ cache, off }, NUTELLA, 'en'))?.name).toBe('Nutella')
+    expect((await hintByBarcode({ cache, off }, ACTOR, NUTELLA, 'en'))?.name).toBe('Nutella')
   })
 
   it('keeps a miss too, and answers it with no hint', async () => {
     const { cache, off, put } = world()
-    expect(await hintByBarcode({ cache, off }, '4850001270126', 'ru')).toBeNull()
+    expect(await hintByBarcode({ cache, off }, ACTOR, '4850001270126', 'ru')).toBeNull()
     expect(put).toEqual([['4850001270126', { found: false }]])
   })
 
   it('asks in the form the code is written in: twelve digits as thirteen', async () => {
     const { cache, off, asked } = world()
-    await hintByBarcode({ cache, off }, '012345678905', 'ru')
+    await hintByBarcode({ cache, off }, ACTOR, '012345678905', 'ru')
     expect(asked).toEqual(['0012345678905'])
   })
 
@@ -73,34 +75,34 @@ describe('hintByBarcode', () => {
     ['a GTIN-14 of a case', '13017620422000'],
   ])('never asks about %s', async (_case, code) => {
     const { cache, off, asked, put } = world()
-    expect(await hintByBarcode({ cache, off }, code, 'ru')).toBeNull()
+    expect(await hintByBarcode({ cache, off }, ACTOR, code, 'ru')).toBeNull()
     expect(asked).toEqual([])
     expect(put).toEqual([])
   })
 
   it('asks nothing and answers nothing when the hint is off', async () => {
     const { cache } = world({ [NUTELLA]: { answer: nutella, ageDays: 0 } })
-    expect(await hintByBarcode({ cache, off: null }, NUTELLA, 'ru')).toBeNull()
+    expect(await hintByBarcode({ cache, off: null }, ACTOR, NUTELLA, 'ru')).toBeNull()
   })
 
   it(`believes a find for ${String(FOUND_FRESH_DAYS)} days without asking`, async () => {
     const { cache, off, asked } = world({
       [NUTELLA]: { answer: nutella, ageDays: FOUND_FRESH_DAYS - 1 },
     })
-    expect(await hintByBarcode({ cache, off }, NUTELLA, 'ru')).toEqual(nutellaHint)
+    expect(await hintByBarcode({ cache, off }, ACTOR, NUTELLA, 'ru')).toEqual(nutellaHint)
     expect(asked).toEqual([])
   })
 
   it(`believes a miss for ${String(MISSED_FRESH_DAYS)} days, then asks again`, async () => {
     const fresh = world({ [NUTELLA]: { answer: { found: false }, ageDays: MISSED_FRESH_DAYS - 1 } })
-    expect(await hintByBarcode(fresh, NUTELLA, 'ru')).toBeNull()
+    expect(await hintByBarcode(fresh, ACTOR, NUTELLA, 'ru')).toBeNull()
     expect(fresh.asked).toEqual([])
 
     const stale = world(
       { [NUTELLA]: { answer: { found: false }, ageDays: MISSED_FRESH_DAYS } },
       { [NUTELLA]: nutella },
     )
-    expect(await hintByBarcode(stale, NUTELLA, 'ru')).toEqual(nutellaHint)
+    expect(await hintByBarcode(stale, ACTOR, NUTELLA, 'ru')).toEqual(nutellaHint)
     expect(stale.put).toEqual([[NUTELLA, nutella]])
   })
 
@@ -109,7 +111,7 @@ describe('hintByBarcode', () => {
       { [NUTELLA]: { answer: nutella, ageDays: FOUND_FRESH_DAYS } },
       { [NUTELLA]: null },
     )
-    expect(await hintByBarcode({ cache, off }, NUTELLA, 'ru')).toEqual(nutellaHint)
+    expect(await hintByBarcode({ cache, off }, ACTOR, NUTELLA, 'ru')).toEqual(nutellaHint)
     expect(asked).toEqual([NUTELLA])
     expect(put).toEqual([])
   })
@@ -119,14 +121,14 @@ describe('hintByBarcode', () => {
       { [NUTELLA]: { answer: { found: false }, ageDays: MISSED_FRESH_DAYS } },
       { [NUTELLA]: null },
     )
-    expect(await hintByBarcode({ cache, off }, NUTELLA, 'ru')).toBeNull()
+    expect(await hintByBarcode({ cache, off }, ACTOR, NUTELLA, 'ru')).toBeNull()
     expect(asked).toEqual([NUTELLA])
     expect(put).toEqual([])
   })
 
   it('a base that cannot answer about a code nobody kept — no hint, nothing kept', async () => {
     const { cache, off, put } = world({}, { [NUTELLA]: null })
-    expect(await hintByBarcode({ cache, off }, NUTELLA, 'ru')).toBeNull()
+    expect(await hintByBarcode({ cache, off }, ACTOR, NUTELLA, 'ru')).toBeNull()
     expect(put).toEqual([])
   })
 })

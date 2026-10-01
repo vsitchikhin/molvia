@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { OFF_PAUSE_MS, OFF_PER_MINUTE, OFF_TIMEOUT_MS, offUserAgent, openFoodFacts } from './client'
+import {
+  OFF_PAUSE_MS,
+  OFF_PER_MINUTE,
+  OFF_TIMEOUT_MS,
+  offUserAgent,
+  openFoodFacts,
+  personalShare,
+} from './client'
 
 function fixture(name: string): string {
   return readFileSync(
@@ -10,6 +17,8 @@ function fixture(name: string): string {
 }
 
 const NUTELLA = '3017620422003'
+const ANNA = 'anna'
+const BORIS = 'boris'
 
 describe('клиент Open Food Facts', () => {
   let clock = 1_000_000
@@ -45,7 +54,7 @@ describe('клиент Open Food Facts', () => {
     const timeout = vi.spyOn(AbortSignal, 'timeout')
     answering(fixture('nutella.json'))
 
-    const answer = await client().product(NUTELLA)
+    const answer = await client().product(NUTELLA, ANNA)
 
     expect(answer).toMatchObject({ found: true, product: { names: { ru: 'Nutella' } } })
     expect(fetch).toHaveBeenCalledWith(
@@ -61,8 +70,8 @@ describe('клиент Open Food Facts', () => {
     answering(fixture('unknown.json'), 404)
     const off = client()
 
-    expect(await off.product('4850001270129')).toEqual({ found: false })
-    expect(await off.product('4850001270129')).toEqual({ found: false })
+    expect(await off.product('4850001270129', ANNA)).toEqual({ found: false })
+    expect(await off.product('4850001270129', ANNA)).toEqual({ found: false })
     expect(fetch).toHaveBeenCalledTimes(2)
     expect(failures).toEqual([])
   })
@@ -71,30 +80,30 @@ describe('клиент Open Food Facts', () => {
     answering(fixture('unavailable.html'), 503)
     const off = client()
 
-    expect(await off.product(NUTELLA)).toBeNull()
+    expect(await off.product(NUTELLA, ANNA)).toBeNull()
     expect(failures).toEqual(['open food facts: HTTP 503'])
     expect(failures.join()).not.toContain(NUTELLA)
 
     clock += OFF_PAUSE_MS - 1
-    expect(await off.product(NUTELLA)).toBeNull()
+    expect(await off.product(NUTELLA, ANNA)).toBeNull()
     expect(fetch).toHaveBeenCalledTimes(1)
 
     answering(fixture('nutella.json'))
     clock += 1
-    expect(await off.product(NUTELLA)).toMatchObject({ found: true })
+    expect(await off.product(NUTELLA, ANNA)).toMatchObject({ found: true })
   })
 
   it('HTML с кодом 200 — тоже сбой, а не промах', async () => {
     answering(fixture('unavailable.html'), 200)
 
-    expect(await client().product(NUTELLA)).toBeNull()
+    expect(await client().product(NUTELLA, ANNA)).toBeNull()
     expect(failures).toEqual(['open food facts: not json'])
   })
 
   it.each([429, 403, 500])('HTTP %i — база недоступна', async (status) => {
     answering('{}', status)
 
-    expect(await client().product(NUTELLA)).toBeNull()
+    expect(await client().product(NUTELLA, ANNA)).toBeNull()
     expect(failures).toEqual([`open food facts: HTTP ${String(status)}`])
   })
 
@@ -104,28 +113,85 @@ describe('клиент Open Food Facts', () => {
       vi.fn(() => Promise.reject(new DOMException(`timed out ${NUTELLA}`, 'TimeoutError'))),
     )
 
-    expect(await client().product(NUTELLA)).toBeNull()
+    expect(await client().product(NUTELLA, ANNA)).toBeNull()
     expect(failures).toEqual(['TimeoutError'])
   })
 
-  it(`не больше ${String(OFF_PER_MINUTE)} вопросов в минуту; сверх — null без запроса и без паузы`, async () => {
+  it(`не больше ${String(OFF_PER_MINUTE)} вопросов в минуту на всех; сверх — null без запроса и без паузы`, async () => {
     answering(fixture('unknown.json'), 404)
     const off = client()
 
     for (let i = 0; i < OFF_PER_MINUTE; i += 1) {
       clock += 1000
-      expect(await off.product(`48500012701${String(i).padStart(2, '0')}`)).toEqual({
+      const who = `person ${String(i % 3)}`
+      expect(await off.product(`48500012701${String(i).padStart(2, '0')}`, who)).toEqual({
         found: false,
       })
     }
-    expect(await off.product('4850001270129')).toBeNull()
+    expect(await off.product('4850001270129', 'someone else')).toBeNull()
     expect(fetch).toHaveBeenCalledTimes(OFF_PER_MINUTE)
 
     // The first question leaves the window a minute after it was asked.
     clock = 1_000_000 + 1000 + 60_000
-    expect(await off.product('4850001270129')).toEqual({ found: false })
+    expect(await off.product('4850001270129', 'someone else')).toEqual({ found: false })
     expect(fetch).toHaveBeenCalledTimes(OFF_PER_MINUTE + 1)
     expect(failures).toEqual([])
+  })
+
+  it('доля человека — треть минуты: четыре из двенадцати; другой человек свою долю получает (В-6)', async () => {
+    answering(fixture('unknown.json'), 404)
+    const off = client()
+    expect(personalShare(OFF_PER_MINUTE)).toBe(4)
+
+    for (let i = 0; i < 4; i += 1) {
+      expect(await off.product(`4850001270${String(i).padStart(3, '0')}`, BORIS)).toEqual({
+        found: false,
+      })
+    }
+    expect(await off.product('4850001270999', BORIS)).toBeNull()
+    expect(fetch).toHaveBeenCalledTimes(4)
+
+    answering(fixture('nutella.json'))
+    expect(await off.product(NUTELLA, ANNA)).toMatchObject({ found: true })
+    expect(failures).toEqual([])
+  })
+
+  it('доля возвращается через минуту после первого вопроса', async () => {
+    answering(fixture('unknown.json'), 404)
+    const off = client()
+    for (let i = 0; i < 4; i += 1)
+      await off.product(`4850001270${String(i).padStart(3, '0')}`, BORIS)
+    expect(await off.product('4850001270999', BORIS)).toBeNull()
+
+    clock += 60_000
+    expect(await off.product('4850001270999', BORIS)).toEqual({ found: false })
+  })
+
+  it('код, уже спрошенный другим, долю не тратит: тот же вопрос', async () => {
+    let resolve: (response: Response) => void = () => undefined
+    fetch = vi.fn(
+      () =>
+        new Promise<Response>((done) => {
+          resolve = done
+        }),
+    )
+    vi.stubGlobal('fetch', fetch)
+    const off = client()
+    const first = off.product(NUTELLA, ANNA)
+    for (let i = 0; i < 5; i += 1) void off.product(NUTELLA, BORIS)
+    resolve(new Response(fixture('nutella.json')))
+    await first
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('предел задаётся, доля идёт за ним: шестьсот в минуту — двести человеку', async () => {
+    answering(fixture('unknown.json'), 404)
+    const off = openFoodFacts({ userAgent: 'Molvia/test (x)', perMinute: 600, now })
+    for (let i = 0; i < 200; i += 1) {
+      expect(await off.product(`4850${String(i).padStart(9, '0')}`, ANNA)).toEqual({ found: false })
+    }
+    expect(await off.product('4851000000000', ANNA)).toBeNull()
+    expect(personalShare(1)).toBe(1)
   })
 
   it('второй вопрос о коде, пока первый в пути, — тот же ответ без второго запроса', async () => {
@@ -139,8 +205,8 @@ describe('клиент Open Food Facts', () => {
     vi.stubGlobal('fetch', fetch)
     const off = client()
 
-    const first = off.product(NUTELLA)
-    const second = off.product(NUTELLA)
+    const first = off.product(NUTELLA, ANNA)
+    const second = off.product(NUTELLA, ANNA)
     resolve(new Response(fixture('nutella.json')))
 
     expect(await first).toMatchObject({ found: true })
@@ -148,7 +214,7 @@ describe('клиент Open Food Facts', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
 
     answering(fixture('nutella.json'))
-    await off.product(NUTELLA)
+    await off.product(NUTELLA, ANNA)
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 

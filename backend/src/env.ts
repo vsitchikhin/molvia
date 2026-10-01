@@ -42,6 +42,11 @@ const envSchema = z.object({
     .transform((contact) => (contact === '' ? undefined : contact)),
   /** Where the base is asked; end-to-end points it at a fake of its own. */
   OPEN_FOOD_FACTS_URL: z.url({ protocol: /^https?$/ }).optional(),
+  /**
+   * Questions a minute to the base — end-to-end only, whose fake has no limit; production keeps
+   * `OFF_PER_MINUTE`, the base's own limit less a reserve, and never sets it.
+   */
+  OPEN_FOOD_FACTS_PER_MINUTE: z.coerce.number().int().positive().optional(),
 })
 
 export const env = envSchema.parse(process.env)

@@ -136,6 +136,8 @@ export default defineConfig({
         BOT_API_SECRET: 'e'.repeat(43),
         OPEN_FOOD_FACTS_URL: `http://127.0.0.1:${offPort}`,
         OPEN_FOOD_FACTS_CONTACT: 'e2e@molvia.test',
+        // The fake has no limit, and every spec of a missed code asks it once (adversarial Е).
+        OPEN_FOOD_FACTS_PER_MINUTE: '600',
       },
       // Never reuse: on these ports there is nothing of ours to reuse, and a server left by
       // a crashed run must fail loudly instead of quietly answering with old code.

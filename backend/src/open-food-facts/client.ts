@@ -17,6 +17,16 @@ export const OFF_TIMEOUT_MS = 2_500
  */
 export const OFF_PER_MINUTE = 12
 
+/**
+ * A person's share of the minute (MOL-162, owner's decision В-6): a third of it — four of twelve. At
+ * the shelf a code is scanned every ten to thirty seconds, so four is plenty for one, and one person
+ * scanning a shelf of imports, or a script, leaves the rest for two others (adversarial А). Over the
+ * share there is no hint, as over the limit: the miss on screen as it was.
+ */
+export function personalShare(perMinute: number): number {
+  return Math.max(1, Math.floor(perMinute / 3))
+}
+
 /** After a failure the base is left alone this long: a base that is down is not asked per scan. */
 export const OFF_PAUSE_MS = 60_000
 
@@ -33,10 +43,10 @@ export function offUserAgent(version: string, contact: string): string {
 export interface OpenFoodFacts {
   /**
    * What the base says of a code, or `null` when it was not asked or did not answer — over the
-   * limit, pausing after a failure, or failing now. `null` is never cached: it says nothing of the
-   * code.
+   * limit or `who`'s share of it, pausing after a failure, or failing now. `null` is never cached:
+   * it says nothing of the code. `who` is the person asking; it never leaves the server.
    */
-  product(code: string): Promise<OffAnswer | null>
+  product(code: string, who: string): Promise<OffAnswer | null>
 }
 
 export interface OpenFoodFactsOptions {
@@ -48,6 +58,12 @@ export interface OpenFoodFactsOptions {
   readonly userAgent: string
   /** Why the base did not answer — never the code: the API's log carries no query (MOL-58). */
   readonly onFailure?: (reason: string) => void
+  /**
+   * The questions a minute, `OFF_PER_MINUTE` unless said; a person's share follows it. Raised only for
+   * end-to-end, whose fake of the base has no limit — every spec of a missed code is a question, and
+   * at twelve the run's own spec of the hint fell to its turn (adversarial Е).
+   */
+  readonly perMinute?: number
   readonly now?: () => number
 }
 
@@ -68,16 +84,30 @@ function reasonOf(error: unknown): string {
 export function openFoodFacts(options: OpenFoodFactsOptions): OpenFoodFacts {
   const base = options.url ?? OPEN_FOOD_FACTS_URL
   const now = options.now ?? Date.now
+  const perMinute = options.perMinute ?? OFF_PER_MINUTE
+  const share = personalShare(perMinute)
   const asked: number[] = []
+  const askedBy = new Map<string, number[]>()
   const inFlight = new Map<string, Promise<OffAnswer | null>>()
   let pausedUntil = 0
 
-  function mayAsk(): boolean {
+  function recent(moments: number[], at: number): number[] {
+    while (moments.length > 0 && (moments[0] ?? 0) <= at - MINUTE_MS) moments.shift()
+    return moments
+  }
+
+  function mayAsk(who: string): boolean {
     const at = now()
     if (at < pausedUntil) return false
-    while (asked.length > 0 && (asked[0] ?? 0) <= at - MINUTE_MS) asked.shift()
-    if (asked.length >= OFF_PER_MINUTE) return false
+    const mine = recent(askedBy.get(who) ?? [], at)
+    if (recent(asked, at).length >= perMinute || mine.length >= share) return false
     asked.push(at)
+    mine.push(at)
+    askedBy.set(who, mine)
+    // Forgotten once their minute is over, so the map holds only who asked within it.
+    for (const [person, moments] of askedBy) {
+      if (recent(moments, at).length === 0) askedBy.delete(person)
+    }
     return true
   }
 
@@ -102,10 +132,10 @@ export function openFoodFacts(options: OpenFoodFactsOptions): OpenFoodFacts {
   }
 
   return {
-    product(code) {
+    product(code, who) {
       const pending = inFlight.get(code)
       if (pending !== undefined) return pending
-      if (!mayAsk()) return Promise.resolve(null)
+      if (!mayAsk(who)) return Promise.resolve(null)
       const question = ask(code).finally(() => inFlight.delete(code))
       inFlight.set(code, question)
       return question

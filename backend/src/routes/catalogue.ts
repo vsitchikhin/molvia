@@ -23,7 +23,7 @@ export interface CatalogueApi {
   search(actorId: string, query: string): Promise<{ items: Item[]; near: boolean }>
   propose(actorId: string, input: ProposedItem): Promise<Proposal>
   byBarcode(code: string): Promise<Item | null>
-  hint(code: string, locale: AppLocale): Promise<BarcodeHint | null>
+  hint(actorId: string, code: string, locale: AppLocale): Promise<BarcodeHint | null>
   attachBarcode(actorId: string, itemId: string, code: string): Promise<Attached>
   detachBarcode(itemId: string, code: string): Promise<void>
 }
@@ -84,7 +84,7 @@ export function catalogueRoutes(app: FastifyInstance, api: CatalogueApi): void {
    */
   app.get('/catalogue/barcode/hint', { exposeHeadRoute: false }, async (request, reply) => {
     const { code, lang } = parseQuery(catalogueBarcodeHintQuerySchema, request.query)
-    const hint = await api.hint(code, lang)
+    const hint = await api.hint(request.actorId, code, lang)
 
     return reply
       .header('cache-control', 'no-store')

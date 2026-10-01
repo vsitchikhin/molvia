@@ -255,6 +255,9 @@ function openFoodFactsOf(log: FastifyBaseLogger): OpenFoodFacts | null {
   return openFoodFacts({
     ...(env.OPEN_FOOD_FACTS_URL === undefined ? {} : { url: env.OPEN_FOOD_FACTS_URL }),
     userAgent: offUserAgent(VERSION, contact),
+    ...(env.OPEN_FOOD_FACTS_PER_MINUTE === undefined
+      ? {}
+      : { perMinute: env.OPEN_FOOD_FACTS_PER_MINUTE }),
     onFailure: (reason) => {
       log.warn({ reason }, 'open food facts did not answer')
     },
@@ -531,7 +534,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         search: (actorId, query) => searchCatalogue({ items }, actorId, query),
         propose: (actorId, input) => proposeItem(items, hints, actorId, input),
         byBarcode: (code) => findByBarcode(items, code),
-        hint: (code, locale) => hintByBarcode({ cache: hints, off }, code, locale),
+        hint: (actorId, code, locale) =>
+          hintByBarcode({ cache: hints, off }, actorId, code, locale),
         attachBarcode: (actorId, itemId, code) => attachBarcode(items, actorId, itemId, code),
         detachBarcode: (itemId, code) => detachBarcode(items, itemId, code),
       })

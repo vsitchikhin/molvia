@@ -37,10 +37,12 @@ function hintOf(answer: OffAnswer, code: string, locale: AppLocale): BarcodeHint
  * item in every shop and never leaves the server, and a code that does not check is on no package.
  * The answer kept is used while it is believed (`FOUND_FRESH_DAYS`, `MISSED_FRESH_DAYS`); past that
  * the base is asked again, and when it cannot be, a find kept from before is still a find. Out of
- * reach, over its limit or knowing nothing — no hint, and never an error: the hint is a bonus.
+ * reach, over its limit or the person's share of it (В-6), or knowing nothing — no hint, and never an
+ * error: the hint is a bonus.
  */
 export async function hintByBarcode(
   deps: HintDeps,
+  actorId: string,
   code: string,
   locale: AppLocale,
 ): Promise<BarcodeHint | null> {
@@ -52,7 +54,7 @@ export async function hintByBarcode(
   const freshFor = kept?.answer.found ? FOUND_FRESH_DAYS : MISSED_FRESH_DAYS
   if (kept !== null && kept.ageDays < freshFor) return hintOf(kept.answer, written.code, locale)
 
-  const answer = await deps.off.product(written.code)
+  const answer = await deps.off.product(written.code, actorId)
   if (answer === null) return kept === null ? null : hintOf(kept.answer, written.code, locale)
   await deps.cache.put(written.code, answer)
   return hintOf(answer, written.code, locale)
