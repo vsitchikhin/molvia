@@ -940,7 +940,9 @@ SOAP-запрос `ExchangeRatesByDateRangeByISO`, пишутся только �
 open.er-api — `not JSON`, как у XML-источников (В). Адверсариальный проход опроверг и замер про лог
 упавших миграций (А): Postgres кладёт в сообщение значение, которое не привелось, — текст человека
 при смене типа столбца. Теперь и там вид плюс упавшая инструкция из наших файлов
-(`describeMigrationFailure`). Правила — `.claude/rules/money-rates.md` и `.claude/rules/privacy.md`.
+(`describeMigrationFailure`); сбой самого мигратора — файла, названного в журнале, нет — пишется
+его словами: они только о наших файлах (раунд 2, Е). Правила — `.claude/rules/money-rates.md` и
+`.claude/rules/privacy.md`.
 
 ## Экран «Деньги» (MOL-82)
 

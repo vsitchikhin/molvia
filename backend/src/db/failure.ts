@@ -108,9 +108,10 @@ export function describeFailure(error: unknown): FailureSummary {
   }
 }
 
-/** What a failed migration may say about itself: its kind, and the statement that failed. */
+/** What a failed migration may say about itself: its kind, and the statement or file that failed. */
 export interface MigrationFailure extends FailureSummary {
   readonly statement?: string
+  readonly reason?: string
 }
 
 /**
@@ -121,9 +122,19 @@ export interface MigrationFailure extends FailureSummary {
  * migrator wraps each in a `DrizzleQueryError` with no parameters, and the statement is DDL from our
  * own files — what a broken deploy is fixed by. A query that carries parameters is not one of those,
  * and is left out.
+ *
+ * A failure with neither a query nor a code is the migrator itself, reading our folder — a file the
+ * journal names and the folder lacks, a journal left with merge markers — and its words name only
+ * our files: they are kept, or the log says «Error» where it could say which file (round 2, Е).
+ * Everything the database answers carries a code, and stays without words.
  */
 export function describeMigrationFailure(error: unknown): MigrationFailure {
-  const statement =
-    error instanceof DrizzleQueryError && error.params.length === 0 ? error.query : undefined
-  return { ...describeFailure(error), ...(statement === undefined ? {} : { statement }) }
+  const summary = describeFailure(error)
+  if (error instanceof DrizzleQueryError) {
+    return error.params.length === 0 ? { ...summary, statement: error.query } : summary
+  }
+  if (summary.code === undefined && error instanceof Error && error.message) {
+    return { ...summary, reason: error.message }
+  }
+  return summary
 }

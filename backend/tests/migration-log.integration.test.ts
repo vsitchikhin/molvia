@@ -18,21 +18,25 @@ describe('лог упавшей миграции — вид и инструкц�
   const sql = connect()
   const folders: string[] = []
 
-  async function failingMigration(statement: string): Promise<unknown> {
+  /** The journal names every tag; a tag whose statement is `null` has no file beside it. */
+  async function failingMigration(files: Record<string, string | null>): Promise<unknown> {
     const folder = mkdtempSync(join(tmpdir(), 'mol153-'))
     folders.push(folder)
     mkdirSync(join(folder, 'meta'))
+    const entries = Object.keys(files).map((tag, idx) => ({
+      idx,
+      version: '7',
+      when: 1759300000000 + idx,
+      tag,
+      breakpoints: true,
+    }))
     writeFileSync(
       join(folder, 'meta', '_journal.json'),
-      JSON.stringify({
-        version: '7',
-        dialect: 'postgresql',
-        entries: [
-          { idx: 0, version: '7', when: 1759300000000, tag: '0000_mol153', breakpoints: true },
-        ],
-      }),
+      JSON.stringify({ version: '7', dialect: 'postgresql', entries }),
     )
-    writeFileSync(join(folder, '0000_mol153.sql'), statement)
+    for (const [tag, statement] of Object.entries(files)) {
+      if (statement !== null) writeFileSync(join(folder, `${tag}.sql`), statement)
+    }
     const client = connect()
     try {
       await migrate(drizzle(client), {
@@ -67,12 +71,23 @@ describe('лог упавшей миграции — вид и инструкц�
   it('смена типа столбца с текстом человека: Postgres кладёт значение в сообщение — в лог оно не идёт', async () => {
     const statement =
       'ALTER TABLE "mol153_notes" ALTER COLUMN "note" SET DATA TYPE numeric USING "note"::numeric;'
-    const error = await failingMigration(statement)
+    const error = await failingMigration({ '0000_mol153': statement })
 
     // The danger is real: the value is in the cause's message.
     expect(String((error as Error).cause)).toContain(TYPED)
     const summary = describeMigrationFailure(error)
     expect(summary).toMatchObject({ errorName: 'Error', code: '22P02', statement })
     expect(JSON.stringify(summary)).not.toContain(TYPED)
+  })
+
+  it('журнал называет файл, которого нет, — в логе его имя: слова мигратора о наших файлах (Е)', async () => {
+    const error = await failingMigration({
+      '0000_mol153': 'SELECT 1;',
+      '0001_folded_away': null,
+    })
+
+    const summary = describeMigrationFailure(error)
+    expect(summary).not.toHaveProperty('code')
+    expect(summary.reason).toContain('0001_folded_away.sql')
   })
 })

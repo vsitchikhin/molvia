@@ -143,7 +143,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   rest of the parameters behind it. `forget` prints the same. A migration failing at boot logs its
   kind and the statement that failed, DDL from our own files (`describeMigrationFailure`, MOL-153):
   its message is no safer — Postgres writes the value a cast refused into it, a person's note under
-  `USING "note"::numeric`. An unknown address answers without echoing it and is not
+  `USING "note"::numeric`. A failure with neither a query nor a code is the migrator reading our
+  folder — a file the journal names and the folder lacks — and keeps its words. An unknown address answers without echoing it and is not
   logged with its query. What the privacy page (`/privacy`) says about data is a promise these
   rules keep, and it is read before signing in — the one route with `meta.public`, which
   `App.vue` draws past the login screen (MOL-56), linked from that screen and from the settings: a change to either is a change to both — and it says only what they keep: other

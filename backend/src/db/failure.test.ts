@@ -48,7 +48,7 @@ describe('describeFailure — вид сбоя без слова из его со
   })
 })
 
-describe('describeMigrationFailure — вид и упавшая инструкция, без сообщения (MOL-153)', () => {
+describe('describeMigrationFailure — вид и упавшая инструкция или файл, без значения строки (MOL-153)', () => {
   it('у запроса с параметрами инструкции нет: это не миграция, параметры — чьи-то', () => {
     const summary = describeMigrationFailure(driverFailure([REVIEW, 5]))
     expect(summary).not.toHaveProperty('statement')
@@ -56,10 +56,13 @@ describe('describeMigrationFailure — вид и упавшая инструкц
     expect(JSON.stringify(summary)).not.toContain('Вкусно')
   })
 
-  it('сбой не базы — только вид', () => {
-    const summary = describeMigrationFailure(new Error(REVIEW))
-    expect(summary).toMatchObject({ errorName: 'Error' })
-    expect(summary).not.toHaveProperty('statement')
+  it('ответ базы без обёртки — по виду: у него есть код, а в сообщении значение строки', () => {
+    const refused = Object.assign(new Error(`invalid input syntax for type numeric: "${REVIEW}"`), {
+      code: '22P02',
+    })
+    const summary = describeMigrationFailure(refused)
+    expect(summary).toMatchObject({ errorName: 'Error', code: '22P02' })
+    expect(summary).not.toHaveProperty('reason')
     expect(JSON.stringify(summary)).not.toContain('Вкусно')
   })
 })
