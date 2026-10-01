@@ -201,6 +201,9 @@ describe('какие ключи приложение пишет на устро�
     // человеке.
     const ownerless = [
       'molvia.actor',
+      // Лист «Камера без вопросов» уже показан на этом телефоне: настройка Safari — телефона, а
+      // не человека, и выход её не меняет (MOL-163).
+      'molvia.camera-hint',
       'molvia.invite',
       'molvia.leaving',
       'molvia.login',
