@@ -42,8 +42,8 @@
       :body="t('spending.charts.empty.body')"
     />
     <template v-else>
-      <DonutChart v-model="sector" :charts="charts" :name-of="nameOf" />
-      <DeviationBars :charts="charts" :name-of="nameOf" />
+      <DonutChart v-model="sector" :charts="onScreen ?? charts" :name-of="nameOf" />
+      <DeviationBars :charts="onScreen ?? charts" :name-of="nameOf" />
       <AppCard as="section" class="card" :aria-labelledby="`${id}-pace`">
         <div class="head">
           <h2 :id="`${id}-pace`" class="caption">{{ t('spending.charts.pace_title') }}</h2>
@@ -89,7 +89,8 @@ import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen } from '@/components/accounts'
 import { longMonth, monthGenitive, signedPercent } from '@/components/charts'
 import { useMoneyChartMonth } from '@/composables/useMoneyCharts'
-import { calendarDay, localDay } from '@/days'
+import { useLocalDay } from '@/composables/useLocalDay'
+import { calendarDay } from '@/days'
 
 /**
  * «Графики → Месяц» (MOL-158, handoff MOL-157 03): where the month went, what went past the usual
@@ -115,6 +116,18 @@ export default defineComponent({
   setup(props) {
     const { t, locale } = useI18n()
     const { phase, charts, stale, fetchedAt, retry } = useMoneyChartMonth(toRef(props, 'month'))
+    const today = useLocalDay()
+    /**
+     * The answer as the screen says it: whether the month runs is the phone's calendar's to say, not
+     * the answer's — one kept from September 30th, opened offline on October 1st, said «Сентябрь ·
+     * идёт» over a pace already on the 30th (review 3). Every word of «идёт», «на сегодня» and
+     * «сегодня» reads this one.
+     */
+    const onScreen = computed(() =>
+      charts.value === null
+        ? null
+        : { ...charts.value, running: charts.value.month === today.value.slice(0, 7) },
+    )
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
     const when = (at: Date) => countedWhen(at, locale.value)
@@ -139,9 +152,8 @@ export default defineComponent({
     function dayOnArrival(): number {
       const days = charts.value?.pace.days ?? []
       const last = Math.max(0, days.length - 1)
-      const today = localDay()
-      if (charts.value?.month !== today.slice(0, 7)) return last
-      return Math.min(last, Math.max(0, Number(today.slice(8, 10)) - 1))
+      if (!onScreen.value?.running) return last
+      return Math.min(last, Math.max(0, Number(today.value.slice(8, 10)) - 1))
     }
     /**
      * The day shown: the one the person chose while the line still reaches it (adversarial З), else
@@ -166,8 +178,8 @@ export default defineComponent({
       { immediate: true },
     )
     watch(
-      () => charts.value,
-      (shown) => {
+      [() => charts.value, today],
+      ([shown]) => {
         arrival.value = dayOnArrival()
         if (!shown) return
         const keys = shown.slices.map((slice) => slice.categoryId ?? 'rest')
@@ -206,7 +218,7 @@ export default defineComponent({
       if (!shown || !day) return null
       const date = calendarDay(day.day, locale.value)
       const label =
-        shown.running && day.day === localDay()
+        onScreen.value?.running && day.day === today.value
           ? t('spending.charts.pace_today', { date })
           : t('spending.charts.pace_day', { date })
       const usual = shown.pace.usual?.[dayAt.value]
@@ -246,6 +258,7 @@ export default defineComponent({
       IconDonut,
       phase,
       charts,
+      onScreen,
       stale,
       fetchedAt,
       retry,

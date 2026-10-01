@@ -464,7 +464,9 @@ does an installed phone of the old version. Requirements and plan in
   radios); it says the day and both sums. The day on arrival is today in a running month, else the
   last (Р-7) — **worked out for every answer, and «running» by the phone's calendar** (adversarial
   round 2, Н1, Н2): taken as a choice, the day of an answer kept from yesterday stood over today's,
-  and a September kept from when it ran opened on the 1st on the 1st of October.
+  and a September kept from when it ran opened on the 1st on the 1st of October. **Every word of «идёт», «на сегодня» and «сегодня» reads the same
+  calendar** (review 3): an answer kept on the 30th, opened offline on the 1st, said «Сентябрь · идёт»
+  over a pace already on the 30th.
 - **The ring's sectors carry what they are in the income currency and who is in «Остальные»** (Р-2):
   «25 % · ≈ 15 821 ₽» is a conversion, the server's; the share is the model's `shareOf`. **A second
   tap lets a sector go** (review Р-4 of MOL-157); the chosen one is thicker inwards, the others

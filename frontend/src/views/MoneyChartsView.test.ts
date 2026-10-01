@@ -770,6 +770,27 @@ describe('MoneyChartsView (MOL-158): «Месяц»', () => {
     }
   })
 
+  it("whether the month runs is the phone's calendar's, in every word of the screen (review 3)", async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      // September kept on its 30th, while it ran; opened offline on the 1st of October.
+      vi.setSystemTime(new Date('2026-09-30T09:00:00Z'))
+      moneyChartMonth.mockResolvedValue(monthCharts({ running: true }))
+      ;(await render(SEPTEMBER)).unmount()
+      vi.setSystemTime(new Date('2026-10-01T09:00:00Z'))
+      online(false)
+      moneyChartMonth.mockRejectedValue(new TypeError('network'))
+      const view = await render(SEPTEMBER)
+      expect(view.find('.strip').exists()).toBe(true)
+      expect(view.find('.center-label').text()).toBe('September')
+      expect(view.text()).toContain('September against the average of June — August')
+      expect(view.text()).not.toContain('so far')
+      expect(plain(view.find('.pace .reading').text())).not.toContain('today')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('a month still to come in the address is this month (adversarial В)', async () => {
     moneyChartMonth.mockReturnValue(new Promise(() => undefined))
     await render('/money/charts?month=2099-05')
