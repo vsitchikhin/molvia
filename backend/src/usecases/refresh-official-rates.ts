@@ -180,8 +180,8 @@ export function officialRatesRefresh({
       }
       return answer
     } catch (error) {
-      // The feed's own words, or the kind alone: the cause a deploy needs (MOL-39, С-2) survives
-      // as the driver's code — `ENOTFOUND`, `ECONNREFUSED`, `CERT_HAS_EXPIRED` (MOL-153).
+      // The feed's own words, or the kind alone (MOL-153): the cause a deploy needs (MOL-39, С-2)
+      // is a `FeedError` already — `reach` words a request with no answer by its `cause`.
       log.warn(
         {
           provider: feed.provider,

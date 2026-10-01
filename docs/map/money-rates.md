@@ -40,7 +40,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 - `backend/src/rates/cba-market.ts` — Feeds of the market (MOL-137): three central-bank xlsx files — people in cash and not, all bank clients, exchange offices — strict readers of their sheets, a `HEAD` before each download and a ceiling held on the stream.
 - `backend/src/rates/cbr.ts` — Feed of the Bank of Russia, first fallback: parses the daily XML and turns rouble quotes into drams.
 - `backend/src/rates/erapi.ts` — Feed of open.er-api.com, second fallback: parses its JSON against the dram and inverts it to drams per unit.
-- `backend/src/rates/feed.ts` — Shared feed plumbing: the `RateFeed` interface, the foreign-currency list, timeout, strict `published` check, HTTP request.
+- `backend/src/rates/feed.ts` — Shared feed plumbing: the `RateFeed` interface, the foreign-currency list, timeout, strict `published` check, HTTP request; `reach` turns a request with no answer into a `FeedError` worded by its `cause` (MOL-153).
 - `backend/src/rates/feeds.test.ts` — Unit test: each provider's recorded answer parses to the right rates, and malformed, zero, dated-wrong or slow answers are refused whole.
 - `backend/src/rates/market-feeds.test.ts` — Unit test: the three recorded xlsx files and the SOAP archive read to the right figures, and a file with one cell moved, zeroed or renamed refused whole.
 - `backend/src/rates/schedule.ts` — The hourly refresh timer and whether the API refreshes at boot, given when the cache was last written.

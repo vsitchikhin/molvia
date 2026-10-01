@@ -21,7 +21,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * than guessed at. The day is the one in Yerevan at the moment it says it last updated.
  */
 export function parseErapi(json: string): Published {
-  const body: unknown = JSON.parse(json)
+  let body: unknown
+  try {
+    body = JSON.parse(json)
+  } catch {
+    // A page in place of the answer — a block by region, say: told as such, as the XML feeds tell
+    // theirs (MOL-153), rather than as a `SyntaxError` logged by its kind alone.
+    throw new FeedError('erapi', 'not JSON')
+  }
   if (!isRecord(body) || body.result !== 'success' || body.base_code !== 'AMD') {
     throw new FeedError('erapi', 'not a successful answer against AMD')
   }
