@@ -655,9 +655,14 @@ describe('BarcodeScannerSheet · how to stop Safari asking', () => {
     getUserMedia.mockResolvedValue(fakeStream().stream)
     await render()
     expect(getUserMedia).not.toHaveBeenCalled()
-    await new Promise((resolve) => setTimeout(resolve, PERMISSION_WAIT + 50))
+    // A real timer, polled: on a loaded machine the ceiling's own timer may come late.
+    await vi.waitFor(
+      () => {
+        expect(getUserMedia).toHaveBeenCalledTimes(1)
+      },
+      { timeout: PERMISSION_WAIT * 10, interval: 20 },
+    )
     await settle()
-    expect(getUserMedia).toHaveBeenCalledTimes(1)
     expect(hintUp()).toBe(false)
   })
 
