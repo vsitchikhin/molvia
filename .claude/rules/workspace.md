@@ -126,9 +126,11 @@ only when its stdin is a terminal, so the script gives the command none (`/dev/n
 `npx vitest …` without `run`, a path to the binary, a version, `sh -c` run once. **Told to watch** it
 watches with no terminal at all, and `run` does not stop it — `npm run test -- --watch` is `vitest run
 --watch`. So `--watch` in any spelling but `=false` is refused always (npm, npx and Playwright have no
-such flag); `-w` beside a vitest or after `--`, where it is vitest's — elsewhere it is npm's workspace,
-and `npm run test -w …` is how a module is tested (Л3); `watch` and `dev` only as vitest's command, the
-word right after it — after `run` a word is a filter. Playwright's UI and debugger wait for a person
+such flag); `-w` beside a vitest or after `--`, alone or folded with other short flags (`-wu`), where
+it is vitest's — elsewhere it is npm's workspace, and `npm run test -w …` is how a module is tested
+(Л3, Л8); `watch` and `dev` after a vitest unless `run` came first — vitest finds its command past
+options (`-c … watch`), and after `run` a word is a filter (Л8); the price: `vitest -t watch` without
+`run` is refused too. Playwright's UI and debugger wait for a person
 whatever stdin is: `--ui`, `--ui-port`, `--ui-host`, `--debug` in any spelling and `PWDEBUG` are
 refused. **The price:** hidden in `sh -c`, a flag still passes — the script reads words, not meaning.
 **A waiting run names the copy by its root**

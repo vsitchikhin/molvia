@@ -36,14 +36,15 @@ mkdir -p "$(dirname "$lock")"
 # `run` or not — an explicit flag overrules `run`, and `npm run test -- --watch` is `vitest run --watch`.
 # So `--watch` in any spelling but `=false` is refused always: npm, npx and Playwright have no such
 # flag. `-w` is refused beside a vitest or after `--`, where it is vitest's — elsewhere it is npm's
-# workspace (Л3). `watch` and `dev` are refused only as vitest's command, the word right after it:
-# after `run` a word is a filter. Playwright's UI and debugger wait for a person whatever stdin is:
+# workspace (Л3), also folded with other short flags (`-wu`, Л8). `watch` and `dev` are refused after a
+# vitest unless `run` came first — vitest finds its command past options (`-c … watch`, Л8), and after
+# `run` a word is a filter; the price: `vitest -t watch …` without `run` is refused too. Playwright's UI and debugger wait for a person whatever stdin is:
 # `--ui`, `--ui-port`, `--ui-host`, `--debug` in any spelling, `PWDEBUG`. Hidden inside `sh -c`, a
 # flag still passes — the price of reading words. `make` passes none of them.
 endless=""
 vitest=""
 passed=""
-previous=""
+once=""
 [[ -n "${PWDEBUG:-}" ]] && endless="PWDEBUG"
 for arg in "${@:2}"; do
   case "$arg" in
@@ -52,16 +53,11 @@ for arg in "${@:2}"; do
       ;;
     --watch=false | --watch=0 | --watch=no) ;;
     --watch | --watch=*) endless="$arg" ;;
-    -w) [[ -n "$vitest" || -n "$passed" ]] && endless="vitest -w" ;;
-    watch | dev) [[ -n "$previous" ]] && endless="vitest $arg" ;;
+    -*w*) [[ "$arg" != --* && (-n "$vitest" || -n "$passed") ]] && endless="vitest $arg" ;;
+    watch | dev) [[ -n "$vitest" && -z "$once" ]] && endless="vitest $arg" ;;
+    run) [[ -n "$vitest" ]] && once=1 ;;
     --) passed=1 ;;
-  esac
-  previous=""
-  case "$arg" in
-    vitest | vitest@* | */vitest)
-      vitest=1
-      previous=1
-      ;;
+    vitest | vitest@* | */vitest) vitest=1 ;;
   esac
 done
 if [[ -n "$endless" ]]; then
