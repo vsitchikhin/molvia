@@ -9,7 +9,7 @@ that area's map; here are the shell's own specs and what every run stands on.
 - `e2e/barcode-video.ts` — Global setup: draws an EAN-13 with its own encoder into the one-frame Y4M the `camera` project's fake camera films.
 - `e2e/header.spec.ts` — Spec: at 320px, in both languages, the back label steps down by the ladder and never overlaps the title or leaves the window.
 - `e2e/live-region.ts` — Helper: records every announcement added to the app's live region, and reads what it holds now.
-- `e2e/motion.spec.ts` — Spec with motion on: a kept month just there, a day removed shrinking once and taking its gap, no second arrival after a move or the browser's own back, a sheet's top not dropping before the keys.
+- `e2e/motion.spec.ts` — Spec with motion on: a kept month just there, a day removed shrinking once and taking its gap, no second arrival after a move or the browser's own back, the charts' answer coming in.
 - `e2e/navigation.spec.ts` — Spec: the shell in a phone browser — tabs and system «back», the nested chevron, collapsing title, safe areas, moves and focus.
 - `e2e/pwa-update.spec.ts` — Spec in the `pwa` project, against the built app: a new `sw.js` brings «Update», the tap reloads onto it, nothing reloads by itself; a first visit too, alone and beside another window.
 - `e2e/scroll.ts` — Helper: stands a control a given distance below the top of the window and reads where it stands, for «the page stayed».

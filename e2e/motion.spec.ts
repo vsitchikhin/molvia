@@ -4,7 +4,9 @@ import type { Page } from '@playwright/test'
 import { asBrowser, signedIn } from './session'
 
 // Motion as it is (MOL-151): what must not move does not, and what moves does it once. Born of the
-// adversarial review of MOL-151 (А1–А6), each turned the other way round.
+// adversarial review of MOL-151 (А1–А5, Б1–Б3), each turned the other way round. А6 — a sheet's top lower
+// before a later keyboard — is not held here: Chromium draws every frame, the iPhone one at most
+// (adversarial round 2, У2), and the rule names the price.
 test.use({ locale: 'ru-RU', reducedMotion: 'no-preference' })
 
 interface Played {
@@ -31,8 +33,54 @@ async function recordAnimate(page: Page): Promise<void> {
   })
 }
 
-function yerevanDay(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(new Date())
+/**
+ * Waits for what moves rather than for a clock (review №8): the move between screens over and every
+ * animation running in the page played out. A paused one — held on purpose by a test — is not
+ * waited for. Where a test asks that nothing moves, there is nothing to wait for but the moment it
+ * would have, and those waits stay what they are.
+ */
+async function settled(page: Page): Promise<void> {
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.nav ?? null))
+    .toBeNull()
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.playState === 'running' &&
+            Number(animation.effect?.getComputedTiming().endTime) !== Infinity,
+        )
+        .map((animation) => animation.finished.catch(() => undefined)),
+    ),
+  )
+}
+
+/**
+ * Presses in a sheet once it takes the press: until it is up it takes none, for the floor of a
+ * double tap after it opened (MOL-69) — a clock of the product, so pressed again rather than waited.
+ */
+async function pressInSheet(press: () => Promise<void>, took: () => Promise<void>): Promise<void> {
+  await expect(async () => {
+    await press()
+    await took()
+  }).toPass({ intervals: [100] })
+}
+
+/** The month read again after the queue's answer: the last thing a removal changes. */
+function reread(page: Page) {
+  return page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      /\/api\/money\/months\/[^/]+$/.test(new URL(response.url()).pathname),
+  )
+}
+
+function yerevanDay(days = 0): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
+    new Date(Date.now() + days * 86_400_000),
+  )
 }
 
 function lastMonthDay(day: number): string {
@@ -71,7 +119,7 @@ async function seed(page: Page): Promise<void> {
 async function toLastMonth(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
   await expect(page.getByRole('button', { name: /Открыть трату/ })).toHaveCount(2)
-  await page.waitForTimeout(600)
+  await settled(page)
 }
 
 test('another month the phone keeps is just there: no day grows or shrinks (MOL-136, А1)', async ({
@@ -86,7 +134,7 @@ test('another month the phone keeps is just there: no day grows or shrinks (MOL-
   })
   await page.getByRole('button', { name: 'Следующий месяц' }).click()
   await expect(page.getByRole('button', { name: /Открыть трату/ })).toHaveCount(1)
-  await page.waitForTimeout(600)
+  await settled(page)
 
   const days = await page.evaluate(() =>
     (window as unknown as { played: Played[] }).played
@@ -120,10 +168,14 @@ test('a day removed takes the gap of the column with it: its neighbour does not 
 
   await page.getByRole('button', { name: /Открыть трату: Пятнадцатое/ }).click()
   const sheet = page.locator('dialog[open]')
-  await page.waitForTimeout(400)
-  await sheet.getByRole('button', { name: 'Удалить трату' }).click()
-  await expect(sheet).toBeHidden()
-  await page.waitForTimeout(1500)
+  await settled(page)
+  const read = reread(page)
+  await pressInSheet(
+    () => sheet.getByRole('button', { name: 'Удалить трату' }).click(),
+    () => expect(sheet).toBeHidden({ timeout: 300 }),
+  )
+  await read
+  await settled(page)
 
   const jump = await page.evaluate(async () => {
     const all = (window as unknown as { held: { target: HTMLElement; animation: Animation }[] })
@@ -168,10 +220,14 @@ test('a day removed shrinks once, and does not come back before the month is rea
 
   await page.getByRole('button', { name: /Открыть трату: Пятнадцатое/ }).click()
   const sheet = page.locator('dialog[open]')
-  await page.waitForTimeout(400)
-  await sheet.getByRole('button', { name: 'Удалить трату' }).click()
-  await expect(sheet).toBeHidden()
-  await page.waitForTimeout(1500)
+  await settled(page)
+  const read = reread(page)
+  await pressInSheet(
+    () => sheet.getByRole('button', { name: 'Удалить трату' }).click(),
+    () => expect(sheet).toBeHidden({ timeout: 300 }),
+  )
+  await read
+  await settled(page)
 
   const moves = await page.evaluate(() =>
     (window as unknown as { played: Played[] }).played
@@ -192,7 +248,7 @@ test('an answer come at the end of a move does not fade in a second time after i
   await signedIn(page)
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Настройки')
-  await page.waitForTimeout(500)
+  await settled(page)
   // The move held for a second, so that an answer let go near its end lands inside it even on a
   // busy machine: the 220 ms of the app left too narrow a window, and the answer came after it.
   await page.addStyleTag({
@@ -242,7 +298,7 @@ test('an answer come at the end of a move does not fade in a second time after i
 
   await page.getByRole('link', { name: 'Устройства', exact: true }).click()
   await expect(page.locator('section.list')).toBeVisible()
-  await page.waitForTimeout(1200)
+  await settled(page)
 
   const frames = await page.evaluate(
     () => (window as unknown as { frames: { nav: boolean; opacity: number | null }[] }).frames,
@@ -267,7 +323,7 @@ test('a move back the browser shows itself plays no arrival after it (А5)', asy
   await page.getByRole('link', { name: 'Настройки', exact: true }).click()
   await page.getByRole('link', { name: 'Устройства', exact: true }).click()
   await expect(page.locator('section.list')).toBeVisible()
-  await page.waitForTimeout(600)
+  await settled(page)
 
   // When the mark of the browser's move comes and goes, by the animations' own clock.
   await page.evaluate(() => {
@@ -304,98 +360,178 @@ test('a move back the browser shows itself plays no arrival after it (А5)', asy
   expect(arrival.running).toBe(0)
 })
 
-/**
- * The iOS keyboard, as `money.spec.ts` stands in for it: the keys cover the bottom `covered` px.
- */
-async function fakeKeyboard(page: Page): Promise<(covered: number) => Promise<void>> {
-  await page.addInitScript(() => {
-    const events = new EventTarget()
-    const state = { covered: 0 }
-    const viewport = {
-      get height() {
-        return window.innerHeight - state.covered
-      },
-      get width() {
-        return window.innerWidth
-      },
-      get offsetTop() {
-        return state.covered
-      },
-      get pageTop() {
-        return window.scrollY + state.covered
-      },
-      offsetLeft: 0,
-      pageLeft: 0,
-      scale: 1,
-      addEventListener: events.addEventListener.bind(events),
-      removeEventListener: events.removeEventListener.bind(events),
-    }
-    Object.defineProperty(window, 'visualViewport', { get: () => viewport, configurable: true })
-    Object.assign(window, {
-      keyboard(covered: number) {
-        state.covered = covered
-        events.dispatchEvent(new Event('resize'))
-        events.dispatchEvent(new Event('scroll'))
-      },
-    })
-  })
-  return async (covered) => {
-    await page.evaluate((c) => {
-      ;(window as unknown as { keyboard: (c: number) => void }).keyboard(c)
-    }, covered)
-  }
-}
-
-test('a field tapped in an open sheet: its top does not drop before the keys come (А6)', async ({
+test('a spending removed while its month was being read does not come back with that read (Б1)', async ({
   page,
 }) => {
-  const keyboard = await fakeKeyboard(page)
-  await signedIn(page)
-  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
-  const { decimal, text } = await page.evaluate(() => {
-    const kept = {
-      [`decimal ${String(innerHeight)}x${String(innerWidth)}`]: Math.round(innerHeight * 0.55),
-      [`text ${String(innerHeight)}x${String(innerWidth)}`]: Math.round(innerHeight * 0.5),
+  await seed(page)
+  await toLastMonth(page)
+  await page.getByRole('button', { name: 'Следующий месяц' }).click()
+  await expect(page.getByRole('button', { name: /Открыть трату/ })).toHaveCount(1)
+
+  // The month the phone keeps comes from its memory at once; the read of it is on a slow network:
+  // the server reads it now, the phone has the answer seconds later — after the removal landed.
+  const september = lastMonthDay(15).slice(0, 7)
+  let slow = true
+  await page.route(`**/api/money/months/${september}*`, async (route) => {
+    const response = await route.fetch()
+    if (slow) {
+      slow = false
+      await new Promise((done) => setTimeout(done, 2500))
     }
-    localStorage.setItem('molvia.keyboard', JSON.stringify(kept))
-    return {
-      decimal: innerHeight - Math.round(innerHeight * 0.55),
-      text: innerHeight - Math.round(innerHeight * 0.5),
-    }
+    await route.fulfill({ response })
   })
-
-  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  const months = (n: number) => {
+    let left = n
+    return page.waitForResponse((response) => {
+      if (!new URL(response.url()).pathname.endsWith(`/money/months/${september}`)) return false
+      left -= 1
+      return left === 0
+    })
+  }
+  const both = months(2)
+  await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
+  await page.getByRole('button', { name: /Открыть трату: Пятнадцатое/ }).click()
   const sheet = page.locator('dialog[open]')
-  await expect(sheet.getByLabel('Сумма')).toBeFocused()
-  await page.waitForTimeout(400)
-  await keyboard(decimal)
-  await page.waitForTimeout(200)
-  // «✓» over the keys: the field lets the focus go, the keys go down.
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  await keyboard(0)
-  await page.waitForTimeout(300)
-  const rest = await sheet.evaluate((dialog) => Math.round(dialog.getBoundingClientRect().top))
-
+  await settled(page)
+  // Every frame: whether the 15th stands in the list — not the day going, which is inert.
   await page.evaluate(() => {
-    const tops: number[] = []
+    const seen: boolean[] = []
     const look = () => {
-      const dialog = document.querySelector('dialog[open]')
-      if (dialog) tops.push(Math.round(dialog.getBoundingClientRect().top))
+      seen.push(
+        [...document.querySelectorAll<HTMLElement>('section.day')].some(
+          (day) => !day.inert && day.innerText.includes('Пятнадцатое'),
+        ),
+      )
       requestAnimationFrame(look)
     }
     requestAnimationFrame(look)
-    Object.assign(window, { tops })
+    Object.assign(window, { seen })
   })
-  await sheet.getByLabel(/Что это/).tap()
-  // The page's second keyboard: 128–212 ms after the focus on the owner's iPhone.
-  await page.waitForTimeout(150)
-  const beforeKeys = await page.evaluate(() => [...(window as unknown as { tops: number[] }).tops])
-  await keyboard(text)
-  await page.waitForTimeout(200)
-  const landed = await sheet.evaluate((dialog) => Math.round(dialog.getBoundingClientRect().top))
+  await pressInSheet(
+    () => sheet.getByRole('button', { name: 'Удалить трату' }).click(),
+    () => expect(sheet).toBeHidden({ timeout: 300 }),
+  )
+  await both
+  await settled(page)
 
-  expect(beforeKeys.length).toBeGreaterThan(3)
-  expect(Math.max(...beforeKeys)).toBeLessThanOrEqual(rest)
-  expect(landed).toBeLessThanOrEqual(rest)
+  const seen = await page.evaluate(() => (window as unknown as { seen: boolean[] }).seen)
+  const gone = seen.indexOf(false)
+  expect(gone).toBeGreaterThanOrEqual(0)
+  expect(seen.slice(gone)).not.toContain(true)
+})
+
+test('a block going from a field takes the field’s gap with it: nothing below jumps (Б2)', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const held: { target: Element; animation: Animation }[] = []
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- called through .call(this)
+    const original = Element.prototype.animate
+    Element.prototype.animate = function (this: Element, frames, options) {
+      const animation = original.call(this, frames, options)
+      const first = (frames as Keyframe[] | null)?.[0]
+      // The line going is held a moment before its end, where it is no height and still there.
+      if (this.matches('p.conversion') && first?.height !== '0px') {
+        const end = Number(animation.effect?.getComputedTiming().endTime ?? 0)
+        animation.pause()
+        animation.currentTime = end - 0.01
+        held.push({ target: this, animation })
+      }
+      return animation
+    }
+    Object.assign(window, { held })
+  })
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('button', { name: 'Добавить трату' }).click()
+  const sheet = page.locator('dialog[open]')
+  await settled(page)
+  await pressInSheet(
+    () => sheet.locator('label.segment', { hasText: 'Доллары' }).click(),
+    () => expect(sheet.getByRole('radio', { name: 'Доллары' })).toBeChecked({ timeout: 300 }),
+  )
+  await sheet.getByLabel('Сумма').fill('10')
+  await expect(sheet.locator('p.conversion')).toBeVisible()
+  await settled(page)
+  await sheet.getByLabel('Сумма').fill('')
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { held: unknown[] }).held.length))
+    .toBe(1)
+
+  const jump = await page.evaluate(async () => {
+    const { target, animation } = (
+      window as unknown as { held: { target: HTMLElement; animation: Animation }[] }
+    ).held[0] as { target: HTMLElement; animation: Animation }
+    const field = target.parentElement
+    const below = field?.nextElementSibling
+    if (!field || !(below instanceof HTMLElement)) throw new Error('no field or nothing below it')
+    const distance = () => below.getBoundingClientRect().top - field.getBoundingClientRect().top
+    const before = distance()
+    animation.play()
+    await animation.finished
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
+    return { removed: !target.isConnected, moved: before - distance() }
+  })
+  expect(jump.removed).toBe(true)
+  expect(Math.abs(jump.moved)).toBeLessThan(1)
+})
+
+test('the swipe back from an account opened from the card of «Деньги» plays no arrival (Б3)', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(PopStateEvent.prototype, 'hasUAVisualTransition', { get: () => true })
+  })
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+  const card = page.locator('.card').filter({ hasText: 'Счета' }).first()
+  await card.getByRole('button', { name: 'Добавить счёт' }).click()
+  const sheet = page.locator('dialog[open]').last()
+  await expect(sheet).toContainText('Новый счёт')
+  await settled(page)
+  await sheet.getByLabel('Имя').fill('Наличные')
+  await sheet.getByLabel('Остаток').fill('10000')
+  await sheet.getByLabel('На день').fill(yerevanDay(-1))
+  // Pressed again only if nothing closed for long: a second «Сохранить» that went through would make
+  // a second account.
+  await pressInSheet(
+    () => sheet.getByRole('button', { name: 'Сохранить' }).click(),
+    () => expect(sheet).toBeHidden({ timeout: 5000 }),
+  )
+  await card
+    .getByRole('link', { name: /Наличные/ })
+    .first()
+    .click()
+  await expect(page).toHaveURL(/\/money\/accounts\//)
+  await settled(page)
+
+  // What is still coming in at the very moment the browser's move is over: put in during it, it
+  // must have been cut short; an answer come after it fades in as anything that comes does.
+  await page.evaluate(() => {
+    const move: { marked: boolean; left: number | null } = { marked: false, left: null }
+    new MutationObserver(() => {
+      if (document.documentElement.dataset.nav === 'browser') move.marked = true
+      else if (move.marked && move.left === null)
+        move.left = document
+          .getAnimations()
+          .filter(
+            (animation) =>
+              animation instanceof CSSAnimation &&
+              animation.animationName === 'appear' &&
+              animation.playState === 'running',
+          ).length
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-nav'] })
+    Object.assign(window, { move })
+  })
+  await page.goBack()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.nav ?? null))
+    .toBeNull()
+  const move = await page.evaluate(
+    () => (window as unknown as { move: { marked: boolean; left: number | null } }).move,
+  )
+  expect(move.marked).toBe(true)
+  expect(move.left).toBe(0)
 })

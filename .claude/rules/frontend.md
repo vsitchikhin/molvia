@@ -223,14 +223,18 @@ The detail behind the frontend lines of `CLAUDE.md`.
   state of `ScreenState`, a strip, a notice, «Вернуть», the dock, what a screen puts in its
   content in place of the skeleton (`AppScreen`, `> :slotted(*)`); an animation, so the element's
   own transitions stay its own. A screen that keeps its answer in one block of its own — «Деньги»,
-  «Счета», «Графики», «Категории» — fades the block's children in itself, with no rise: the control
-  that chose the answer stands among them (review №5, MOL-138). **`AppReveal`** grows what pushes its neighbours from nothing and
+  «Счета», «Категории» — fades the block's children in itself, with no rise: the control that chose
+  the answer stands among them (review №5, MOL-138). «Графики» draw the answer inside `ChartsMonth`
+  and `ChartsYear`, components of several roots, which take no scope of the screen's: their cards
+  fade in from there (review №7). **`AppReveal`** grows what pushes its neighbours from nothing and
   shrinks it back — a row of a list (`group`), an error under a field, a block of a sheet — by its
   height, padding and margins in the flow, so the rest slides; no row is taken out of the flow, which
   a slide of the others would need. The gap of a flex column is its parent's and does not shrink with
   the row, so the margin on the row's side takes it back — otherwise the neighbour jumped by 12 px at
-  the end (adversarial А2); a grid's gap stays, its rows have none of this. **What is going takes no
-  tap and no focus** (`inert`, review №4). **Colour changes** of a control (a button come active, a chip
+  the end (adversarial А2). A grid's gap stays whatever its rows do, so a sheet that grows blocks is a
+  flex column, not a grid — the spending, the exchange, the income, the salary day (adversarial Б2). **What is going takes no
+  tap and no focus** (`inert`, review №4). What it grows does not also fade in by `appear`: a day of
+  «Деньги» is a row of the list and a child of the screen's block, and played both. **Colour changes** of a control (a button come active, a chip
   chosen) and **stale dimming** are transitions of their own. **None of it plays while a screen
   moves** (`html[data-nav]`): the view transition brings the new screen in already, and a block
   fading inside it played the arrival twice. **At the end of the move what was put in meanwhile is
@@ -238,7 +242,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   through once its length is back, and in Chromium an answer come at the end of the move dropped to
   half its opacity and came in anew (adversarial А4). **A move the browser shows itself** — the iOS
   edge swipe, Android's predictive back — is marked too (`data-nav="browser"`) for its render alone:
-  nothing of ours plays, and without the mark the screen came in again after the gesture (А5). **None under «reduce motion».** **An answer read is not
+  nothing of ours plays, and without the mark the screen came in again after the gesture (А5). Any
+  move to another screen, with a direction of ours or not: the account opened from the card of
+  «Деньги» has none, and the swipe back from it came in twice (Б3). **None under «reduce motion».** **An answer read is not
   a row added**: more than `BULK` (3) rows coming or going in one render — a month, a page, a first
   answer — just appear and are just gone, or a month would shrink out row by row; the first render is
   never played. **Another month is another list** (`:key` by month on the days of «Деньги»): a month
@@ -246,7 +252,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   (adversarial А1). **A removal landed is gone at once** (`gone` in the spending queue): out of the
   queue on its answer, it no longer hid its row while the month on screen was still the one read
   before, and the day shrank, grew and shrank again (А3) — the flicker was there before, motion made
-  it seen. **What does not move, on purpose:** a change of the screen's own query beyond its
+  it seen. «Before» is when the read **set out** (`askedAt`), not when its answer came: a read sent
+  before the removal and come after it still held the row, which came back for seconds (Б1). **What does not move, on purpose:** a change of the screen's own query beyond its
   answer coming in under the control (MOL-136 — an overlay took the second tap, and «Вернуть» and
   the main action in the dock come in without the other going out: a `mode="out-in"` would hold
   back the button the screen gives the focus to once the strip goes — read from the code, not
@@ -408,11 +415,13 @@ The detail behind the frontend lines of `CLAUDE.md`.
   first frame of the rise, so the sheet rises that high, and the picture iOS slides is already right.
   Only on a touch screen, and let go if the keys have not come in `KEYBOARD_LATE` (1500 ms: a
   hardware keyboard never comes) or the focus leaves first; an event of the viewport without the
-  keys does not take it away. **Only before the first keyboard of the page** (adversarial А6): it is
-  the one that comes late over a page that draws nothing; any later one comes in 50 to 160 ms over a
-  page that is drawn, and a sheet made lower at a tap in it dropped its top by hundreds of pixels for
-  those frames and then flew up with the keys. Whether one has come is heard from the app's load,
-  under a sheet or not. **Only a field with keys**: a select and a date bring a picker of their own,
+  keys does not take it away. **On every such focus**, not only before the page's first keyboard —
+  which the first round of review asked for (adversarial А6) and the log refuted (round 2, У2): a later
+  keyboard came 128 to 263 ms after the focus with no frame of the page between or with one. With
+  none, iOS slides what was drawn before the focus, and nothing here can change it; with one, that
+  frame is what it slides — made lower, the sheet lands in place, left tall its top went off the
+  screen. **The price is that one frame**: the top lower for the 15–36 ms before the keys. In
+  Chromium every frame is drawn, so e2e cannot hold this either way; the unit test holds the rule. **Only a field with keys**: a select and a date bring a picker of their own,
   and a height remembered for them made the sheet short for 1.5 s and then jumped (У1); they are
   still kept in sight like any field typed in. **The price:** the very first keyboard on a phone, or
   after its data was cleared, has nothing to go by and still slides. Neither is the focus put off nor
