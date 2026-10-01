@@ -384,12 +384,15 @@ French — and the person confirms or corrects it.
   the main name in any language, the other interface language's — the first that is a name: entities
   decoded, a line, a private-use glyph or a lone surrogate dropped (one U+F8FF lost the whole name and
   kept the code unknown for a week — adversarial Ж), cut at 200, with a letter and two characters at
-  least. **The brand** goes after the name unless the name carries it — the first two words of the
-  first brand that are three letters or longer (one, when it has one) are words of the name by the
-  search key (Р-3): «Nutella» + «Nutella, Ferrero» is «Nutella», «Coca Cola» + «COCA-COLA SERVICES
-  SA/NV» is «Coca Cola», «Молоко 3,2%» + «Простоквашино» is «Молоко 3,2% Простоквашино». One word was
-  too little: an article or a sort passed for the brand — «La Laitière» was lost on «Yaourt à la
-  vanille» (adversarial В). **The size** is
+  least. **The brand** goes after the name unless the name carries it — any word of the first brand
+  three letters or longer (all of it, when every word is shorter) is a word of the name by the search
+  key (Р-3): «Nutella» + «Nutella, Ferrero» is «Nutella», «Coca Cola» + «COCA-COLA SERVICES SA/NV» is
+  «Coca Cola», «Сыр Савушкин 45%» + «Савушкин продукт» stays as it is — the base keeps a mark with its
+  company or country, the package prints the mark — and «Молоко 3,2%» + «Простоквашино» is «Молоко
+  3,2% Простоквашино». The first word alone took an article for the brand — «La Laitière» was lost on
+  «Yaourt à la vanille» (adversarial В) — and both of two first words wrote the mark twice (В′).
+  **The price, named:** a brand sharing a word with what the name says of the product is lost —
+  «Сыр Российский» + «Российский сыродел». **The size** is
   `product_quantity` in g, kg, ml, cl, dl or l, as kg or l, up to fifty (Р-4); pieces, ounces and the
   text of `quantity` («6 x 1,5 l») give none. Only the fields used are asked for: never a photo — its
   licence, the rights on the package, and a picture from the base's CDN would hand it the phone.
@@ -399,7 +402,9 @@ French — and the person confirms or corrects it.
   twice at once is asked once. **A person's share is a third of the minute — four** (owner's decision
   В-6): one person scanning a shelf of imports, or a script, held the hint off for everybody for as
   long as they liked (adversarial А); at the shelf a code comes every ten to thirty seconds, so four
-  is plenty, and over the share there is simply no hint. Counted in the API's process — there is
+  is plenty, and over the share there is simply no hint. **The price, named** (adversarial А′): three
+  people at their share in one minute take it all — three shelves of imports at once, or a script with
+  three accounts — and a fourth gets no hint until the minute turns. Counted in the API's process — there is
   one; **a second instance needs a count they share.** `OPEN_FOOD_FACTS_PER_MINUTE` moves the limit,
   and the share with it, for end-to-end alone, whose fake has no limit: at twelve the run spent its
   own minute on the misses of MOL-100 and the spec of the hint lived by its turn (adversarial Е).
@@ -413,7 +418,7 @@ French — and the person confirms or corrects it.
   button some 100 px down, and the tap aimed at it landed in the hint (review 1, adversarial Г);
   holding the room instead would move it up on every miss, the common case in Armenia. Said out loud
   with the miss, in one message, so neither cuts the other off — not over «Предложить товар» opened
-  meanwhile (review 3). Nothing else on the screen changes: no hint, the block is exactly MOL-99's.
+  meanwhile (review 3), but once that sheet is put away with nothing proposed (review 6). Nothing else on the screen changes: no hint, the block is exactly MOL-99's.
 - **In «Предложить товар»**: opened with an empty name — from the code's block, or with nothing typed
   — the form starts from the hint: the name, the unit of its size and «В упаковке 0,4 кг ✕», sent as
   `typicalQuantity`, so the purchase sheet of the item opens at «0,4 кг» and its price per kilo shows at
