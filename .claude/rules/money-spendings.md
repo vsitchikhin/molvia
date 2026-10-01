@@ -185,7 +185,12 @@ nothing up.
   one still waiting for its first answer waits for the page of its day, but a refused one behind a
   page never scrolled to was on no screen as a row, the summary took it for a refusal of nothing and
   offered only «Скрыть», which threw the typing away. A refused amendment of a row not loaded stands
-  on the day typed, over the revision it was made on, until the page brings the server's row. A finished trip opened from «Траты» leads
+  on the day typed, over the revision it was made on, until the page brings the server's row. A month
+  read whole has no page left to bring it, so there a refused amendment is no row (round 4, Л): its
+  spending was removed on another device, and «Скрыть» on the card is the way out. **A refused
+  spending of another month leads to «Траты» of that month** («Открыть траты в сентябре», round 4,
+  К), never to «Скрыть»: written on the 1st for the 30th from the summary, which stays on its month,
+  its card offered only the tap that threw it away. A finished trip opened from «Траты» leads
   back to «Траты» (`?from=money-spendings`, Р-12).
 - **Every write of «Деньги» goes through its own queue** (`stores/spendingQueue`), by the rules
   of the trip's (MOL-24): storage is the queue, one at a time under `navigator.locks`, held by a
