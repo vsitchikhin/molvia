@@ -23,6 +23,8 @@ export interface MoneyMonth {
   readonly month: ComputedRef<MoneyMonthView | null>
   readonly stale: ComputedRef<MoneyStale | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  /** When the read of the month on screen set out (MOL-151, adversarial Б1). */
+  readonly askedAt: ComputedRef<Date | null>
   /** The owner's categories: this month's answer's, or those of the newest month kept. */
   readonly knownCategories: ComputedRef<MoneyMonthView['categories']>
   /**
@@ -49,6 +51,11 @@ const KEPT_MONTHS = 3
 interface Remembered {
   readonly answer: MoneyMonthView
   readonly fetchedAt: Date
+  /**
+   * When the read set out: what the server knew is as of then, not of when the answer came. A month
+   * recalled from the phone has only its arrival, which is older than anything since anyway.
+   */
+  readonly askedAt?: Date
 }
 
 function recallAll(owner: string): Record<string, unknown> {
@@ -150,6 +157,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
   async function ask(id: string, month: string): Promise<void> {
     const mine = ++latest
     const wanted = pages
+    const askedAt = new Date()
     try {
       const first = await api.moneyMonth(month)
       // The first page is what is kept, as a first read answers it: the cursor of a later page
@@ -161,7 +169,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
         answer = mergePages(answer, await api.moneyMonth(month, answer.cursor))
       }
       if (actor.id !== id || selected.value !== month || mine !== latest) return
-      shown.value = { answer, fetchedAt: firstAt }
+      shown.value = { answer, fetchedAt: firstAt, askedAt }
       kept.value = answer.categories
       if (answer.rateKind === 'live') keptRate.value = answer.rate
       failure.value = null
@@ -215,7 +223,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
         else void loadMore()
         return
       }
-      shown.value = { answer: mergePages(current.answer, next), fetchedAt: current.fetchedAt }
+      shown.value = { ...current, answer: mergePages(current.answer, next) }
       pages += 1
       more.value = 'idle'
     } catch {
@@ -251,6 +259,7 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
       return failure.value ?? 'loading'
     }),
     fetchedAt: computed(() => shown.value?.fetchedAt ?? null),
+    askedAt: computed(() => shown.value?.askedAt ?? shown.value?.fetchedAt ?? null),
     knownCategories: computed(() => shown.value?.answer.categories ?? kept.value),
     todayRate: computed(() =>
       shown.value?.answer.rateKind === 'live' ? shown.value.answer.rate : keptRate.value,

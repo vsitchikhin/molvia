@@ -369,8 +369,18 @@ export default defineComponent({
         ? asked
         : currentMonth.value
     })
-    const { phase, month, stale, fetchedAt, more, loadMore, retry, knownCategories, todayRate } =
-      useMoneyMonth(selected)
+    const {
+      phase,
+      month,
+      stale,
+      fetchedAt,
+      askedAt,
+      more,
+      loadMore,
+      retry,
+      knownCategories,
+      todayRate,
+    } = useMoneyMonth(selected)
 
     function goMonth(next: string): void {
       void router.replace({
@@ -401,7 +411,9 @@ export default defineComponent({
     // A removal landed after the month on screen was read: its row is gone, not back for a moment
     // until the month is read again (adversarial А3) — unless «Вернуть» is on its way.
     const gone = computed(() => {
-      const read = fetchedAt.value?.getTime() ?? 0
+      // As of when the read set out: one sent before the removal and come after it still holds the
+      // row (adversarial Б1).
+      const read = askedAt.value?.getTime() ?? 0
       const back = new Set(
         queue.pending.flatMap((write) => (write.kind === 'restore' ? [write.id] : [])),
       )
