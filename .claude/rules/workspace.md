@@ -100,6 +100,15 @@ load failed the push — locally there are no retries — and the push was start
 crowd. In turn, the last of four waits for three runs of a few minutes, and none of them fails for
 want of a core.
 
+**A run of tests typed by hand takes the lock too: `bin/one-at-a-time.sh <label> npx vitest …`,
+`… npx playwright test …`** (owner's decision, 01.10.2026, MOL-162). The lock holds only what goes
+through `make` and the hooks, and a session fixing a review runs single files directly, again and
+again — with a reviewer's worktree beside it doing the same. On 01.10.2026 the load reached 87–131
+while every push was waiting its turn: the pushes took turns, the direct runs did not, and four
+specs of one copy failed on `page.goto` under it and passed in one worker. A direct run of a single
+pure unit file is cheap and may skip it; anything with Postgres, a browser or a whole workspace
+waits its turn.
+
 **The lock is `flock` held by the process that runs the command**, so the kernel drops it however
 that process ends: a lock file with a pid in it was the alternative, and breaking a stale one is a
 race between two waiters. The descriptor is closed on exec, so a server a run leaves behind does

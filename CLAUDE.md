@@ -446,7 +446,9 @@ differently in every working copy by design.
 - **The copies take turns** (MOL-139): `pre-push` and the check targets of the `Makefile` run
   under one lock for the whole machine, `bin/one-at-a-time.sh`, and a waiting run says whose it
   waits for. A step already green on the very same clean tree — by `make check` or an earlier
-  push — is not run again (`bin/green.sh`). Why, in `.claude/rules/workspace.md`.
+  push — is not run again (`bin/green.sh`). **A test run typed by hand takes the same lock**
+  (`bin/one-at-a-time.sh <label> npx vitest …`) unless it is one pure unit file. Why, in
+  `.claude/rules/workspace.md`.
 - **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, in two
   jobs: checks and e2e. CI **checks** formatting rather than fixing it — `make format`
   mutates files, and a diff must fail rather than be silently repaired. It generates its
