@@ -180,7 +180,16 @@ export function officialRatesRefresh({
       }
       return answer
     } catch (error) {
-      log.warn({ provider: feed.provider, err: error, lastKnown }, 'official rate fetch failed')
+      // The feed's own words, or the kind alone: the cause a deploy needs (MOL-39, С-2) survives
+      // as the driver's code — `ENOTFOUND`, `ECONNREFUSED`, `CERT_HAS_EXPIRED` (MOL-153).
+      log.warn(
+        {
+          provider: feed.provider,
+          lastKnown,
+          ...(error instanceof FeedError ? { reason: error.message } : describeFailure(error)),
+        },
+        'official rate fetch failed',
+      )
       return null
     }
   }
@@ -234,7 +243,11 @@ export function officialRatesRefresh({
       }
       await rates.upsert(marked)
     } catch (error) {
-      log.warn({ provider: answer.provider, err: error }, 'official rate cache write failed')
+      // A `DrizzleQueryError` carries the query and its parameters: told by its kind (privacy.md).
+      log.warn(
+        { provider: answer.provider, ...describeFailure(error) },
+        'official rate cache write failed',
+      )
     }
   }
 
