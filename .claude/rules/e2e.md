@@ -20,7 +20,7 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   so a flaky test failed loudly there; CI keeps its two retries so the report names a flake as one,
   but a test green only on a retry is red. **The price, named:** the answer comes with CI, some
   seven minutes after the push, rather than in two to four here with an empty line; the agent's
-  «done» waits for it (`gh pr checks --watch`). `make e2e` is the same suite here, on demand — for a
+  «done» waits for it (`gh pr checks --watch`). Since MOL-165 every other check is CI's as well. `make e2e` is the same suite here, on demand — for a
   spec being written, or a change the agent wants seen before it leaves the machine.
 
 - **End-to-end has a database of its own too, and it is dropped before every run**

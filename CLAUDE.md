@@ -434,7 +434,7 @@ make e2e         # end-to-end tests in a phone-sized browser
 make icons       # regenerate the app icons from favicon.svg
 make certs       # locally trusted dev certificate, for the camera on a real phone
 make prod-build  # build the production images without deploying them
-make check       # format -> lint -> typecheck -> test, in order
+make check       # format -> lint -> typecheck -> test, on demand; CI runs it anyway
 make ports       # this copy's index and ports
 ```
 
@@ -443,19 +443,16 @@ differently in every working copy by design.
 
 ### Gates that run without being asked
 
-- **Hooks** (`.githooks`, wired by `make setup`, no husky). `pre-commit` refuses a commit
-  whose formatting or lint is dirty; `pre-push` refuses a push whose types or vitest — unit,
-  component, integration — are not green. A deliberate bypass is `--no-verify`; needing it
-  twice in a row means the rule is wrong and should be changed, not dodged.
-- **End-to-end is CI's, not the push's** (MOL-164): the same suite runs there on every push,
-  in parallel and with no queue between the copies, and **`master` takes a pull request only
-  when both CI jobs are green** — a ruleset, not a habit. A flake green only on a retry fails
-  CI (`failOnFlakyTests`). `make e2e` runs it here on demand.
-- **The copies take turns** (MOL-139): `pre-push` and the check targets of the `Makefile` run
-  under one lock for the whole machine, `bin/one-at-a-time.sh`, and a waiting run says whose it
-  waits for. A step already green on the very same clean tree — by `make check` or an earlier
-  push — is not run again (`bin/green.sh`), nor on a tree that differs from it only in documents
-  (`*.md`, `docs/`, `.claude/`). Why, in `.claude/rules/workspace.md`.
+- **Every check is CI's** (MOL-164, MOL-165): lint, types, every test and end-to-end run there on
+  every push, in parallel and with no queue between the copies, and **`master` takes a pull
+  request only when both CI jobs are green** — a ruleset, not a habit. A flake green only on a
+  retry fails CI (`failOnFlakyTests`). There is no `pre-push`.
+- **The one local hook that checks is `pre-commit`, and only the formatting of the files
+  committed** (`.githooks`, wired by `make setup`, no husky) — seconds, since CI checks formatting
+  rather than fixing it. `commit-msg` holds the subject. A deliberate bypass is `--no-verify`.
+- **What runs here by hand takes turns** (MOL-139): `make check`, `make e2e` and the other check
+  targets run under one lock for the whole machine, `bin/one-at-a-time.sh`, and a waiting run says
+  whose it waits for. Why, in `.claude/rules/workspace.md`.
 - **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, in two
   jobs: checks and e2e. CI **checks** formatting rather than fixing it — `make format`
   mutates files, and a diff must fail rather than be silently repaired. It generates its
@@ -724,11 +721,11 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
 
 ### After a task
 
-**Definition of Done:** `make check` — `format` -> `lint` -> `typecheck` -> `test`,
-all green — **and then both CI jobs green on the pull request** (`gh pr checks --watch`):
-end-to-end runs only there (MOL-164), so «pushed» is not «done», and a red CI is the task's
-to fix exactly as a refused push was. Run `make check` once after the entire plan, not after
-each step: `format` mutates files and would otherwise hide real lint errors.
+**Definition of Done: both CI jobs green on the pull request** (`gh pr checks --watch`, MOL-165).
+Every check runs there, so «pushed» is not «done», and a red CI is the task's to fix exactly as a
+refused push once was. Locally the work runs what it needs to be written — the test file being
+changed, `make check` or `make e2e` when the agent wants an answer before the push — never as a
+duty: the machine carries several copies, and CI repeats all of it on every push anyway.
 
 If a decision changed along the way — **update the product plan in Confluence immediately.**
 A plan that diverges from the code is worthless, and here the plan matters more than the code.
