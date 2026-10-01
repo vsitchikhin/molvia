@@ -1,0 +1,395 @@
+<!doctype html>
+<!--
+  MOL-163: a throwaway page that measures when the phone asks for the camera — not a screen of the
+  app, so its words are written in place rather than through i18n. Served from the app's own origin,
+  because a permission is kept per origin. Removed by the last commit of the task.
+-->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- So that «На экран Домой» opens it as an app of its own, which is the mode measured. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Замер камеры" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>Замер камеры · Molvia</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font:
+          16px/1.4 system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+          max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+        background: Canvas;
+        color: CanvasText;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 8px;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 2px 12px;
+        margin: 0 0 12px;
+        font-size: 14px;
+      }
+      dt {
+        opacity: 0.7;
+      }
+      dd {
+        margin: 0;
+        font-weight: 600;
+        overflow-wrap: anywhere;
+      }
+      video {
+        display: block;
+        width: 100%;
+        max-height: 160px;
+        object-fit: cover;
+        background: #000;
+        border-radius: 8px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      button,
+      label.button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 6px 8px;
+        border: 1px solid GrayText;
+        border-radius: 8px;
+        background: ButtonFace;
+        color: ButtonText;
+        font: inherit;
+        font-size: 15px;
+        text-align: center;
+      }
+      button.main {
+        background: #8c491a;
+        color: #fffaf2;
+        border-color: transparent;
+      }
+      .marks {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .marks p {
+        grid-column: 1 / -1;
+        margin: 0;
+        font-size: 14px;
+        opacity: 0.7;
+      }
+      input[type='file'] {
+        display: none;
+      }
+      pre {
+        margin: 0 0 12px;
+        padding: 8px;
+        min-height: 120px;
+        max-height: 40vh;
+        overflow: auto;
+        font-size: 12px;
+        white-space: pre-wrap;
+        border: 1px solid GrayText;
+        border-radius: 8px;
+      }
+      details {
+        margin-bottom: 12px;
+        font-size: 14px;
+      }
+      summary {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        font-weight: 600;
+      }
+      ol {
+        padding-left: 20px;
+      }
+      li {
+        margin-bottom: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Замер камеры</h1>
+    <dl>
+      <dt>Режим</dt>
+      <dd id="mode"></dd>
+      <dt>Разрешение</dt>
+      <dd id="permission"></dd>
+      <dt>Камера</dt>
+      <dd id="camera">выключена</dd>
+    </dl>
+    <video id="video" muted playsinline autoplay></video>
+
+    <div class="grid">
+      <button class="main" id="start">Включить</button>
+      <button id="stop">Стоп</button>
+      <button id="off">Трек выкл</button>
+      <button id="on">Трек вкл</button>
+      <button id="push">Запись в истории</button>
+      <button id="back">Назад</button>
+      <button id="hash">Сменить #hash</button>
+      <label class="button"
+        >Снять чек<input id="receipt" type="file" accept="image/*" capture="environment"
+      /></label>
+      <button id="reload">Перезагрузить</button>
+      <button id="note">Заметка</button>
+    </div>
+
+    <div class="marks">
+      <p>К последней строке журнала:</p>
+      <button id="asked">был запрос</button>
+      <button id="silent">не было</button>
+      <button id="lit">индикатор горит</button>
+      <button id="dark">индикатор погас</button>
+    </div>
+
+    <pre id="log" aria-live="polite"></pre>
+    <div class="grid">
+      <button id="share">Отправить журнал</button>
+      <button id="copy">Скопировать</button>
+      <button id="clear">Очистить журнал</button>
+    </div>
+
+    <details open>
+      <summary>Порядок шагов</summary>
+      <p>
+        Всё — сначала во вкладке Safari, потом со значка на домашнем экране (Поделиться → «На экран
+        Домой» → открыть с него). После каждого «Включить» отметить «был запрос» или «не было».
+      </p>
+      <ol>
+        <li><b>З-1.</b> «Включить».</li>
+        <li>
+          <b>З-2.</b> «Стоп» → сразу «Включить». «Стоп» → подождать минуту → «Включить». «Стоп» →
+          подождать пять минут → «Включить».
+        </li>
+        <li>
+          <b>З-3.</b> «Стоп» → «Запись в истории» → «Включить». «Стоп» → «Назад» → «Включить».
+          «Стоп» → «Сменить #hash» → «Включить». И при включённой камере: «Запись в истории»,
+          «Назад» — жива ли картинка.
+        </li>
+        <li>
+          <b>З-4.</b> «Включить» → «Трек выкл» → отметить индикатор (точка у часов) → подождать
+          минуту → «Трек вкл»: был ли запрос, есть ли картинка.
+        </li>
+        <li>
+          <b>З-5.</b> «Включить» → свернуть на 10 секунд → вернуться: есть ли картинка; потом
+          «Включить». «Стоп» → свернуть → вернуться → «Включить».
+        </li>
+        <li><b>З-6.</b> «Снять чек»: спросил ли сайт разрешение (не путать с самой камерой).</li>
+        <li>
+          <b>З-7.</b> «Перезагрузить» → «Включить». Во вкладке: aA → «Настройки веб-сайта» → Камера
+          → «Разрешить», затем ещё раз З-1…З-3. В приложении на домашнем экране — поискать такую
+          настройку и записать «Заметкой», нашлась ли.
+        </li>
+      </ol>
+      <p>Затем «Отправить журнал» — и прислать текст.</p>
+    </details>
+
+    <script>
+      'use strict'
+      const KEY = 'camera-probe.log'
+      // The same constraints the scanner asks with (`useCamera.ts`), so the phone is asked the
+      // same question.
+      const CONSTRAINTS = {
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          advanced: [{ focusMode: 'continuous' }],
+        },
+      }
+      const $ = (id) => document.getElementById(id)
+      const video = $('video')
+      let stream = null
+      let permission = null
+      let hashes = 0
+
+      function read() {
+        try {
+          return JSON.parse(localStorage.getItem(KEY) || '[]')
+        } catch {
+          return []
+        }
+      }
+      let lines = read()
+
+      function save() {
+        try {
+          localStorage.setItem(KEY, JSON.stringify(lines))
+        } catch {
+          // A private window: the log lives as long as the page.
+        }
+        $('log').textContent = lines.join('\n')
+        $('log').scrollTop = $('log').scrollHeight
+      }
+
+      function time() {
+        return new Date().toTimeString().slice(0, 8)
+      }
+
+      function mode() {
+        if (matchMedia('(display-mode: standalone)').matches || navigator.standalone === true)
+          return 'приложение'
+        return 'вкладка'
+      }
+
+      function trackState() {
+        const track = stream && stream.getVideoTracks()[0]
+        if (!track) return 'нет трека'
+        return `${track.readyState}${track.enabled ? '' : ', выкл'}${track.muted ? ', muted' : ''}`
+      }
+
+      function log(text) {
+        lines.push(`${time()} ${text} · разрешение: ${permission ? permission.state : '—'}`)
+        save()
+        $('camera').textContent = trackState()
+      }
+
+      function mark(text) {
+        if (lines.length === 0) return
+        lines[lines.length - 1] += ` · ${text}`
+        save()
+      }
+
+      async function watchPermission() {
+        if (!navigator.permissions || typeof navigator.permissions.query !== 'function') {
+          $('permission').textContent = 'API нет'
+          return
+        }
+        try {
+          permission = await navigator.permissions.query({ name: 'camera' })
+          $('permission').textContent = permission.state
+          permission.onchange = () => {
+            $('permission').textContent = permission.state
+            log(`разрешение сменилось на ${permission.state}`)
+          }
+        } catch (error) {
+          $('permission').textContent = `query отказал: ${error.name}`
+        }
+      }
+
+      function stopAll() {
+        for (const track of stream ? stream.getTracks() : []) track.stop()
+        stream = null
+        video.srcObject = null
+      }
+
+      $('start').onclick = async () => {
+        stopAll()
+        const before = permission ? permission.state : '—'
+        const started = performance.now()
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(CONSTRAINTS)
+          video.srcObject = stream
+          await video.play().catch(() => undefined)
+          const took = Math.round(performance.now() - started)
+          log(`включить · ${took} мс · было ${before}`)
+        } catch (error) {
+          const took = Math.round(performance.now() - started)
+          log(`включить · ${took} мс · было ${before} · ОТКАЗ ${error.name}`)
+        }
+      }
+      $('stop').onclick = () => {
+        stopAll()
+        log('стоп')
+      }
+      $('off').onclick = () => {
+        for (const track of stream ? stream.getVideoTracks() : []) track.enabled = false
+        log('трек выкл')
+      }
+      $('on').onclick = () => {
+        for (const track of stream ? stream.getVideoTracks() : []) track.enabled = true
+        log('трек вкл')
+      }
+      // As the sheet lays its entry (`useSheetHistory`): the same address, a state of its own.
+      $('push').onclick = () => {
+        history.pushState({ probe: Date.now() }, '', location.href)
+        log(`запись в истории · длина ${history.length}`)
+      }
+      $('back').onclick = () => history.back()
+      $('hash').onclick = () => {
+        location.hash = `h${++hashes}`
+      }
+      $('receipt').onchange = (event) => {
+        const file = event.target.files && event.target.files[0]
+        log(file ? `снят чек · ${Math.round(file.size / 1024)} КБ` : 'снять чек · отменено')
+        event.target.value = ''
+      }
+      $('reload').onclick = () => {
+        log('перезагрузка')
+        location.reload()
+      }
+      $('note').onclick = () => {
+        const text = prompt('Заметка')
+        if (text) log(`заметка: ${text}`)
+      }
+      $('asked').onclick = () => mark('ЗАПРОС БЫЛ')
+      $('silent').onclick = () => mark('запроса не было')
+      $('lit').onclick = () => mark('индикатор горит')
+      $('dark').onclick = () => mark('индикатор погас')
+
+      function text() {
+        return lines.join('\n')
+      }
+      $('share').onclick = async () => {
+        if (typeof navigator.share === 'function') {
+          try {
+            await navigator.share({ text: text() })
+            return
+          } catch {
+            // Cancelled: nothing to do.
+            return
+          }
+        }
+        $('copy').onclick()
+      }
+      $('copy').onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(text())
+          log('журнал скопирован')
+        } catch {
+          getSelection().selectAllChildren($('log'))
+        }
+      }
+      $('clear').onclick = () => {
+        lines = []
+        save()
+      }
+
+      addEventListener('popstate', () => log(`назад (popstate) · трек: ${trackState()}`))
+      addEventListener('hashchange', () => log(`#hash → ${location.hash} · трек: ${trackState()}`))
+      addEventListener('pageshow', (event) => {
+        if (event.persisted) log('страница вернулась из кэша')
+      })
+      document.addEventListener('visibilitychange', () =>
+        log(
+          `${document.visibilityState === 'hidden' ? 'в фон' : 'из фона'} · трек: ${trackState()}`,
+        ),
+      )
+
+      $('mode').textContent = mode()
+      void watchPermission().then(() => {
+        log(`загрузка · ${mode()} · ${navigator.userAgent}`)
+      })
+    </script>
+  </body>
+</html>
