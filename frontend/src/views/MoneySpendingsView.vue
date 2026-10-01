@@ -107,13 +107,15 @@
       <UndoStrip
         v-if="removed"
         :key="removed.stamp"
+        :seconds="removed.left"
+        :quiet="removed.quiet"
         :text="t('spending.removed', { title: removed.title, amount: removed.amount })"
         :announcement="
           t('spending.removed_announced', { title: removed.title, amount: removed.amount })
         "
         :action="t('spending.restore')"
         @restore="restore"
-        @expire="removed = null"
+        @expire="forgetRemoved"
       />
       <!-- A trip opened from here and removed comes back here, with its «Вернуть» (MOL-76). -->
       <TripUndoStrip v-else class="undo" />

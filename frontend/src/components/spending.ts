@@ -304,7 +304,10 @@ export function journalOf(
     const spending = localView(write, pending)
     if (known.has(spending.id) || removing.has(spending.id)) continue
     if (!spending.spentOn.startsWith(month.month)) continue
-    if (spending.spentOn < reached) continue
+    // A row waiting for its first answer waits for the page of its day; a refused one does not: it
+    // is to be put right, and behind a page never scrolled to it was nowhere (adversarial round 2
+    // of MOL-159, Е) — the summary named it nothing, and «Скрыть» on the card there threw it away.
+    if (!refusal && spending.spentOn < reached) continue
     known.add(spending.id)
     const row: JournalRow = {
       kind: 'manual',

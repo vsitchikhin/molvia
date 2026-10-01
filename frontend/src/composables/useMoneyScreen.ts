@@ -1,4 +1,4 @@
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { ComponentPublicInstance, ComputedRef, Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -48,11 +48,20 @@ export interface MoneyScreen extends MoneyMonth {
   readonly target: Ref<SpendingTarget>
   compose(prefill?: SpendingPrefill): void
   openRow(row: JournalRow, day: string): void
-  readonly removed: Ref<(Removed & { stamp: number }) | null>
+  /** The spending just removed and what is left of its ten seconds — on either screen. */
+  readonly removed: ComputedRef<
+    (Removed & { readonly stamp: number; readonly left: number; readonly quiet: boolean }) | null
+  >
   readonly addButton: Ref<ComponentPublicInstance | null>
   onRemoved(value: Removed): void
+  forgetRemoved(): void
   restore(): Promise<void>
 }
+
+/** The ten seconds of «Вернуть»: counted from the removal, not from each screen showing it. */
+const UNDO_SECONDS = 10
+/** Removals whose strip has been shown once: said aloud and given the focus then, and only then. */
+const shownRemovals = new Set<number>()
 
 /**
  * What «Деньги» and «Траты» share (MOL-159): one month of the server's in the address, moved by
@@ -168,19 +177,44 @@ export function useMoneyScreen(): MoneyScreen {
     sheetOpen.value = true
   }
 
-  const removed = ref<(Removed & { stamp: number }) | null>(null)
+  /**
+   * «Вернуть» is the queue's, not the screen's (adversarial round 2, Ж): removed on «Траты», it
+   * stands on «Деньги» after the step back, with the rest of its ten seconds — as a trip's does
+   * (`TripUndoStrip`).
+   */
+  const removed = computed(() => {
+    const value = queue.lastRemoved
+    if (!value) return null
+    const left = UNDO_SECONDS - Math.floor((Date.now() - value.stamp) / 1000)
+    return left > 0 ? { ...value, left, quiet: shownRemovals.has(value.stamp) } : null
+  })
+  // After the strip is drawn: a removal whose time ran out while no screen showed it is
+  // forgotten, and one drawn is marked as said.
+  watch(
+    () => queue.lastRemoved,
+    (value) => {
+      if (!value) return
+      if (removed.value) shownRemovals.add(value.stamp)
+      else queue.lastRemoved = null
+    },
+    { immediate: true, flush: 'post' },
+  )
   /** «Добавить трату»: where the focus goes once «Вернуть» has done its work and gone. */
   const addButton = ref<ComponentPublicInstance | null>(null)
 
   function onRemoved(value: Removed): void {
-    removed.value = { ...value, stamp: Date.now() }
+    queue.lastRemoved = { ...value, stamp: Date.now() }
+  }
+
+  function forgetRemoved(): void {
+    queue.lastRemoved = null
   }
 
   async function restore(): Promise<void> {
-    const value = removed.value
+    const value = queue.lastRemoved
     if (!value) return
     queue.restore(value.undo)
-    removed.value = null
+    queue.lastRemoved = null
     announce?.(t('spending.restored'))
     await nextTick()
     ;(addButton.value?.$el as HTMLElement | undefined)?.focus()
@@ -219,6 +253,7 @@ export function useMoneyScreen(): MoneyScreen {
     removed,
     addButton,
     onRemoved,
+    forgetRemoved,
     restore,
   }
 }

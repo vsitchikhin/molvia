@@ -234,6 +234,18 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
    * these until the server's names them (`categoriesWith` skips one it holds).
    */
   const arrived = ref<Extract<SpendingWrite, { kind: 'category-add' }>[]>([])
+  /**
+   * The spending just removed, offered back for the ten seconds of its strip on «Траты» and
+   * «Деньги» alike, as a trip's is (MOL-76): held by the screen, «Вернуть» went with «Траты» on
+   * the step back to the summary — the very screen where a sum fallen short shows the mistake
+   * (adversarial round 2 of MOL-159, Ж). The server keeps the removal ten minutes.
+   */
+  const lastRemoved = ref<{
+    readonly undo: SpendingUndo
+    readonly title: string
+    readonly amount: string
+    readonly stamp: number
+  } | null>(null)
   let ahead = false
   /** The key of the write a send is carrying right now: it is never folded into. */
   let inFlight: string | null = null
@@ -283,6 +295,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     kept = []
     rejected.value = []
     arrived.value = []
+    lastRemoved.value = null
     sync(id)
     show()
   }
@@ -629,6 +642,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
     rejected,
     landed,
     arrived,
+    lastRemoved,
     flush,
     record,
     amend,

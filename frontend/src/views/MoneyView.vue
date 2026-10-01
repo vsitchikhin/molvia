@@ -167,16 +167,30 @@
       </template>
     </div>
 
-    <!-- A spending is removed on «Траты», where its row is; the sheet here only adds one. A trip's
-         «Вернуть» is the app's, wherever the trip was removed from (MOL-76), over the strip. -->
-    <FloatingDock v-if="tripRemoved" class="float">
-      <TripUndoStrip class="undo" />
+    <!-- A spending is removed on «Траты», where its row is, and its «Вернуть» comes back here with
+         the step back (adversarial round 2, Ж); a trip's is the app's, wherever the trip was removed
+         from (MOL-76). Both over the strip. -->
+    <FloatingDock v-if="removed || tripRemoved" class="float">
+      <UndoStrip
+        v-if="removed"
+        :key="removed.stamp"
+        :seconds="removed.left"
+        :quiet="removed.quiet"
+        :text="t('spending.removed', { title: removed.title, amount: removed.amount })"
+        :announcement="
+          t('spending.removed_announced', { title: removed.title, amount: removed.amount })
+        "
+        :action="t('spending.restore')"
+        @restore="restore"
+        @expire="forgetRemoved"
+      />
+      <TripUndoStrip v-else class="undo" />
     </FloatingDock>
 
     <!-- Wherever there is something to write it into, a slow answer and a broken server included
          (review Т-6), and offline on a month never read while another month names the categories. -->
     <template v-if="canWrite && phase !== 'idle'" #docked>
-      <AppButton size="large" block @click="compose()">
+      <AppButton ref="addButton" size="large" block @click="compose()">
         <template #icon><IconPlus /></template>
         {{ t('spending.summary.add') }}
       </AppButton>
@@ -225,6 +239,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SpendingSheet from '@/components/SpendingSheet.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
+import UndoStrip from '@/components/UndoStrip.vue'
 import { pageOrder } from '@/components/accounts'
 import { rateWords } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
@@ -257,11 +272,14 @@ export default defineComponent({
     ScreenState,
     SpendingSheet,
     TripUndoStrip,
+    UndoStrip,
   },
   setup() {
     const { t, locale } = useI18n()
     const screen = useMoneyScreen()
     const { month, queue, currentMonth } = screen
+    // «Добавить трату», where the focus goes once «Вернуть» has done its work.
+    const { addButton } = screen
 
     // The number of accounts beside «Счета»: «now», not the month's, whatever month is open.
     const accounts = useAccountsStore()
@@ -421,6 +439,7 @@ export default defineComponent({
 
     return {
       ...screen,
+      addButton,
       t,
       IconWallet,
       newcomer,

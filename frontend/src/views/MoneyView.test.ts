@@ -674,6 +674,60 @@ describe('MoneyView: what the review of MOL-159 found', () => {
     expect(view.text()).not.toContain(en.spending.summary.refused_open)
   })
 
+  it('Е of round 2: a refused spending of a day the first page has not reached is named all the same', async () => {
+    // A full month: the first page reaches back to the 26th, the 1st–25th wait on the next one.
+    moneyMonth.mockResolvedValue(
+      month({
+        count: 45,
+        cursor: { day: '2026-09-26', moment: 0, id: BARBER },
+        remaining: 44,
+        remainingFrom: '2026-09-01',
+        remainingTo: '2026-09-25',
+      }),
+    )
+    const view = await render()
+    await refused('2026-09-01')
+    expect(view.text()).toContain('1 spending of this month not accepted')
+    // Not the card whose one action is «Discard» — that threw the spending away.
+    expect(view.text()).not.toContain(en.spending.rejected_other.title)
+  })
+
+  it('Ж of round 2: a spending removed on «Траты» keeps its «Undo» here, with what is left of it', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    const queue = useSpendingQueueStore()
+    // What «Удалить» on «Траты» leaves in the queue's store, four seconds before the step back.
+    queue.lastRemoved = {
+      undo: { id: BARBER },
+      title: 'Barber',
+      amount: '֏5,000',
+      stamp: Date.now() - 4000,
+    }
+    await flushPromises()
+    expect(view.text()).toContain('Deleted: Barber')
+    expect(view.get('.undo .count').text()).toBe('6')
+    await button(view, en.spending.restore).trigger('click')
+    await vi.waitFor(() => {
+      expect(restoreSpending).toHaveBeenCalledWith(BARBER)
+    })
+    expect(view.text()).not.toContain('Deleted: Barber')
+  })
+
+  it('Ж, must not fire: a removal whose ten seconds ran out while no screen showed it is not offered', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    const queue = useSpendingQueueStore()
+    queue.lastRemoved = {
+      undo: { id: BARBER },
+      title: 'Barber',
+      amount: '֏5,000',
+      stamp: Date.now() - 11_000,
+    }
+    await flushPromises()
+    expect(view.text()).not.toContain('Deleted: Barber')
+    expect(queue.lastRemoved).toBeNull()
+  })
+
   // «Счета», «Обмен денег» and «Категории» are «now», not the month's (handoff MOL-157 01): their
   // figures come from answers of their own and stand whatever the month is doing.
   it('Г: under the error and the skeleton, «Счета» and «Категории» keep their own figures', async () => {

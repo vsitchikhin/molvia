@@ -4,7 +4,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import type { Router } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { parseMoney } from '@molvia/model'
+import { ApiError } from '@molvia/client'
+import { ERROR, parseMoney } from '@molvia/model'
 import type { JournalKey, MoneyMonthView, SpendingBody, TripView } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
@@ -480,5 +481,53 @@ describe('MoneySpendingsView: the journal of the month (MOL-159)', () => {
     const view = await render('/money/spendings?month=2026-08')
     expect(view.text()).toContain(en.spending.title)
     expect(router.currentRoute.value.meta.parent).toBe('money')
+  })
+})
+
+describe('MoneySpendingsView: what round 2 of the review of MOL-159 found', () => {
+  it('Е: a refused spending of a day the first page has not reached stands as a row to put right', async () => {
+    moneyMonth.mockResolvedValue(
+      month({
+        count: 45,
+        cursor: { day: '2026-09-26', moment: 0, id: BARBER },
+        remaining: 44,
+        remainingFrom: '2026-09-01',
+        remainingTo: '2026-09-25',
+      }),
+    )
+    const view = await render()
+    recordSpending.mockRejectedValue(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
+    const queue = useSpendingQueueStore()
+    const RENT = 'eeeeeeee-0000-4000-8000-000000000009'
+    queue.record({
+      id: RENT,
+      spentOn: '2026-09-01',
+      amount: amd('150000'),
+      categoryId: BEAUTY,
+      note: 'Rent',
+    })
+    await vi.waitFor(() => {
+      expect(queue.rejected).toHaveLength(1)
+    })
+    await flushPromises()
+    expect(view.find(`[data-row="${RENT}"]`).text()).toContain(en.spending.refused)
+    expect(view.text()).not.toContain(en.spending.rejected_other.title)
+  })
+
+  it('Ж: «Undo» is the queue’s, not the screen’s — it outlives «Траты» for the step back', async () => {
+    moneyMonth.mockResolvedValue(month())
+    const view = await render()
+    await view.find('.body').trigger('click')
+    await risen()
+    await pressUntil(en.spending.sheet.remove, () => {
+      expect(removeSpending).toHaveBeenCalledWith(BARBER)
+    })
+    await flushPromises()
+    view.unmount()
+    views.splice(views.indexOf(view), 1)
+    expect(useSpendingQueueStore().lastRemoved).toMatchObject({
+      undo: { id: BARBER },
+      title: 'Barber',
+    })
   })
 })
