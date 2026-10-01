@@ -41,6 +41,8 @@ export interface MoneyScreen extends MoneyMonth {
   readonly refusals: ComputedRef<Extract<JournalRow, { kind: 'manual' }>[]>
   /** Those of them with no marked row in the journal on screen: «Не приняты» on top of «Траты». */
   readonly refused: ComputedRef<Extract<JournalRow, { kind: 'manual' }>[]>
+  /** Those marked on their own row in the journal on screen, by key. */
+  readonly refusedInJournal: ComputedRef<string[]>
   reasonOf(code: WireCode): string
   /** «сентябре», «September»: a month after «в», as the words of the screens say it. */
   monthIn(month: string): string
@@ -171,15 +173,24 @@ export function useMoneyScreen(): MoneyScreen {
     money.month.value ? unsentIn(money.month.value, queue.pending) : 0,
   )
   const refusals = computed(() => refusedRows(money.month.value, queue.rejected, queue.pending))
-  /** Once on screen: a refusal whose row the journal shows marked is put right there (round 6, П). */
-  const refused = computed(() => {
-    const marked = new Set(
-      journal.value.flatMap((day) =>
-        day.rows.flatMap((row) => (row.kind === 'manual' && row.refusal ? [row.key] : [])),
+  /** The refusals whose row the journal on screen shows marked: put right there (round 6, П). */
+  const marked = computed(
+    () =>
+      new Set(
+        journal.value.flatMap((day) =>
+          day.rows.flatMap((row) => (row.kind === 'manual' && row.refusal ? [row.key] : [])),
+        ),
       ),
-    )
-    return refusals.value.filter((row) => !marked.has(row.key))
-  })
+  )
+  /** Once on screen: the rest stand in «Не приняты». */
+  const refused = computed(() => refusals.value.filter((row) => !marked.value.has(row.key)))
+  /**
+   * «Не приняты» names the marked ones too and leads to the first: the summary counted every
+   * refusal, and a second one was left to be found among forty rows (adversarial round 7, Р).
+   */
+  const refusedInJournal = computed(() =>
+    refusals.value.filter((row) => marked.value.has(row.key)).map((row) => row.key),
+  )
   const otherRefusals = computed(() =>
     queue.rejected.filter((item) => item.write.kind !== 'record' && item.write.kind !== 'amend'),
   )
@@ -281,6 +292,7 @@ export function useMoneyScreen(): MoneyScreen {
     otherRefusals,
     refusals,
     refused,
+    refusedInJournal,
     reasonOf,
     monthIn,
     /** «Мой курс на сегодня» for the sheet: only a running month's rate is today's. */

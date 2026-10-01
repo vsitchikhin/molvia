@@ -726,6 +726,8 @@
     "list": {
       "title": "Spendings",
       "refused": "Not accepted",
+      "refused_more": "And {n} more, marked in the journal below | And {n} more, marked in the journal below",
+      "refused_below": "{n} marked in the journal below — show | {n} marked in the journal below — show",
       "count": "{n} spending | {n} spendings",
       "unsent": "{n} spending not counted yet | {n} spendings not counted yet",
       "offline_strip": "No connection. Spendings as of {when}. New ones are kept on the phone and sent when you are back online",

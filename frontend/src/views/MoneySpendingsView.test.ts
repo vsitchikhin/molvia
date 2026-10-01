@@ -669,7 +669,8 @@ describe('MoneySpendingsView: what round 2 of the review of MOL-159 found', () =
     const rows = view.findAll(`[data-row="${BARBER}"]`)
     expect(rows).toHaveLength(1)
     expect(rows[0]?.text()).toContain(en.spending.refused)
-    expect(view.findAll('h2').some((head) => head.text() === en.spending.list.refused)).toBe(false)
+    // «Не приняты» only names it, and leads to it (round 7, Р): no row of its own there.
+    expect(button(view, '1 marked in the journal below — show').exists()).toBe(true)
     await rows[0]?.find('.body').trigger('click')
     await risen()
     await pressUntil(en.spending.sheet.save, () => {
@@ -678,6 +679,45 @@ describe('MoneySpendingsView: what round 2 of the review of MOL-159 found', () =
     await vi.waitFor(() => {
       expect(queue.rejected).toEqual([])
     })
+  })
+
+  // The summary counts every refusal; «Не приняты» names the ones marked on their rows too, and
+  // leads to the first (adversarial round 7, Р).
+  it('Р: «Не приняты» names a refusal marked in the journal and leads to its row', async () => {
+    moneyMonth.mockResolvedValue(month())
+    recordSpending.mockRejectedValue(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
+    amendSpending.mockRejectedValueOnce(new ApiError(ERROR.SPENDING_CATEGORY_UNKNOWN))
+    const view = await render()
+    const queue = useSpendingQueueStore()
+    queue.amend(BARBER, 1, {
+      spentOn: '2026-09-26',
+      amount: amd('6000'),
+      categoryId: BEAUTY,
+      note: 'Barber',
+    })
+    await vi.waitFor(() => {
+      expect(queue.rejected).toHaveLength(1)
+    })
+    await flushPromises()
+    // Only the marked one: the block says where it is.
+    expect(button(view, '1 marked in the journal below — show').exists()).toBe(true)
+
+    const TAXI = 'eeeeeeee-0000-4000-8000-0000000000aa'
+    queue.record({
+      id: TAXI,
+      spentOn: '2026-09-27',
+      amount: amd('1500'),
+      categoryId: BEAUTY,
+      note: 'Taxi',
+    })
+    await vi.waitFor(() => {
+      expect(queue.rejected).toHaveLength(2)
+    })
+    await flushPromises()
+    expect(view.find(`[data-row="${TAXI}"]`).exists()).toBe(true)
+    const more = button(view, 'And 1 more, marked in the journal below')
+    await more.trigger('click')
+    expect(document.activeElement?.closest(`[data-row="${BARBER}"]`)).not.toBeNull()
   })
 
   it('Ж: «Undo» is the queue’s, not the screen’s — it outlives «Траты» for the step back', async () => {

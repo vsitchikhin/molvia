@@ -32,9 +32,9 @@
         <!-- Every spending the server refused, of any month, whatever the month shown and its pages:
              opened, it is what was typed — to fix and save again, or to drop (MOL-159). -->
         <AppReveal>
-          <section v-if="refused.length > 0" class="day">
+          <section v-if="refusals.length > 0" class="day">
             <h2 class="day-head">{{ t('spending.list.refused') }}</h2>
-            <AppCard as="ul" list>
+            <AppCard v-if="refused.length > 0" as="ul" list>
               <AppReveal group>
                 <SpendingRow
                   v-for="row in refused"
@@ -49,6 +49,21 @@
                 />
               </AppReveal>
             </AppCard>
+            <!-- The rest are marked on their own rows below: named here, and led to (round 7, Р). -->
+            <AppButton
+              v-if="refusedInJournal.length > 0"
+              variant="ghost"
+              class="to-marked"
+              @click="toMarked"
+            >
+              {{
+                t(
+                  refused.length > 0 ? 'spending.list.refused_more' : 'spending.list.refused_below',
+                  { n: refusedInJournal.length },
+                  refusedInJournal.length,
+                )
+              }}
+            </AppButton>
           </section>
         </AppReveal>
 
@@ -308,6 +323,16 @@ export default defineComponent({
     /** The spending just saved, until its row is on screen and brought into view (review С-2). */
     const toShow = ref<string | null>(null)
 
+    /** The first refusal marked in the journal, brought into view and given the focus. */
+    function toMarked(): void {
+      const key = screen.refusedInJournal.value[0]
+      const row = key ? document.querySelector<HTMLElement>(`.day [data-row="${key}"] .body`) : null
+      if (!row) return
+      const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      row.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' })
+      row.focus({ preventScroll: true })
+    }
+
     function add(): void {
       toShow.value = null
       screen.compose()
@@ -356,6 +381,7 @@ export default defineComponent({
       rangeOf,
       sentinel,
       add,
+      toMarked,
       open,
       saved,
     }
@@ -446,6 +472,10 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
+}
+
+.to-marked {
+  justify-self: start;
 }
 
 .day-total {
