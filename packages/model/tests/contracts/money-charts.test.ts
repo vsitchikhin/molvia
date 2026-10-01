@@ -38,6 +38,7 @@ function month(name: string, spent: bigint, byCategory: [string, bigint][] = [])
     spentIncome: money(spent / 4n, 'RUB'),
     income: money(10_000_00n, 'RUB'),
     incomeUncounted: [],
+    incomeCount: 0,
     shiftedIn: [],
     shiftedOut: [],
     rest: null,

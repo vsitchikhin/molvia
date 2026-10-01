@@ -55,6 +55,8 @@ function month(spentOn: string): MoneyMonthView {
     spentIncome: rub('217'),
     income: rub('0'),
     incomeUncounted: [],
+    count: 0,
+    incomeCount: 0,
     shiftedIn: [],
     shiftedOut: [],
     rest: null,

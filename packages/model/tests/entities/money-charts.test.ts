@@ -45,6 +45,7 @@ function month(name: string, of: MonthOf = {}): MoneyMonth {
     spentIncome: of.spentIncome === null ? null : rub(of.spentIncome ?? Math.round(spent / 4)),
     income: rub(of.income ?? 0),
     incomeUncounted: of.incomeUncounted ?? [],
+    incomeCount: 0,
     shiftedIn: [],
     shiftedOut: [],
     rest: null,

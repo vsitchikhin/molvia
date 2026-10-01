@@ -61,6 +61,8 @@ function month(patch: Partial<MoneyMonthView> = {}): MoneyMonthView {
     spentIncome: rub('68788'),
     income: rub('120000'),
     incomeUncounted: [],
+    count: 1,
+    incomeCount: 1,
     shiftedIn: [],
     shiftedOut: [],
     rest: {

@@ -312,6 +312,8 @@ describe('месяц «Денег» (MOL-73)', () => {
     const counted = await month(me, daysAgo(2).slice(0, 7))
     const lines = counted.days.flatMap((day) => day.entries)
     expect(lines).toHaveLength(2)
+    // «Траты, 2» on «Деньгах» is the rows «Траты» show (MOL-159, Р-1): a line per currency.
+    expect(counted.count).toBe(2)
     // Each line counts the purchases behind its own sum (В-7): the unpriced one is in neither.
     expect(lines.map((line) => (line.kind === 'trip' ? line.items : -1))).toEqual([1, 1])
     expect(counted.byCategory).toEqual([
@@ -409,6 +411,7 @@ describe('месяц «Денег» (MOL-73)', () => {
     })
     const september = await month(me, '2026-09')
     expect(september.income).toEqual({ minor: 9961500n, currency: 'RUB' })
+    expect(september).toMatchObject({ count: 1, incomeCount: 1 })
     expect(september.previousSpent).toEqual({ minor: 100000n, currency: 'AMD' })
     expect(september).toMatchObject({ rest: null, accountsFrom: null })
   })
@@ -437,9 +440,15 @@ describe('месяц «Денег» (MOL-73)', () => {
     expect(first.days[0]?.entries).toHaveLength(40)
     expect(first.days[0]?.total).toEqual({ minor: 450000n, currency: 'AMD' })
     expect(first.remaining).toBe(5)
+    expect(first.count).toBe(45)
     const next = await month(me, today.slice(0, 7), first.cursor ?? undefined)
     expect(next.days[0]?.entries).toHaveLength(5)
     expect(next.cursor).toBeNull()
+    // The count is the month's, not the page's (MOL-159).
+    expect(next.count).toBe(45)
+    const gone = idsOf(first)[0] ?? ''
+    expect((await call(me, 'DELETE', `/spendings/${gone}`)).statusCode).toBe(204)
+    expect((await month(me, today.slice(0, 7))).count).toBe(44)
   })
 })
 

@@ -49,6 +49,8 @@ function page(days: [string, ReturnType<typeof entry>[]][], cursor: JournalKey |
     spentIncome: null,
     income: amd('0'),
     incomeUncounted: [],
+    count: 0,
+    incomeCount: 0,
     shiftedIn: [],
     shiftedOut: [],
     rest: null,

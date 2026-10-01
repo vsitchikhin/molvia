@@ -87,6 +87,14 @@ export const moneyMonthCodec = z.strictObject({
   spentIncome: moneyCodec.nullable(),
   income: moneyCodec,
   incomeUncounted: z.array(moneyCodec),
+  /**
+   * The rows of the whole journal — a spending, a trip's line per currency — and the incomes of
+   * «Пришло» (MOL-159): the figures beside «Траты» and «Доходы» on «Деньгах», the same on every page.
+   * Defaulted, as `slices` is, so that a month kept on the phone before them, or an answer of the
+   * server before them, still reads — as a row with no figure.
+   */
+  count: z.int().min(0).nullable().default(null),
+  incomeCount: z.int().min(0).nullable().default(null),
   /** Salaries of the month before counted in this one, and this month's counted in the next (MOL-134). */
   shiftedIn: z.array(exchangeDaySchema),
   shiftedOut: z.array(exchangeDaySchema),
@@ -192,9 +200,10 @@ export function moneyMonthViewOf(
   categories: readonly SpendingCategory[],
   after?: JournalKey,
 ): MoneyMonthView {
-  const rows = month.days
-    .flatMap((day) => day.entries.map((entry) => ({ day, entry, key: journalKeyOf(entry) })))
-    .filter(({ key }) => after === undefined || journalOrder(after, key) < 0)
+  const all = month.days.flatMap((day) =>
+    day.entries.map((entry) => ({ day, entry, key: journalKeyOf(entry) })),
+  )
+  const rows = all.filter(({ key }) => after === undefined || journalOrder(after, key) < 0)
   const page = rows.slice(0, MONEY_JOURNAL_PAGE)
   const rest = rows.slice(MONEY_JOURNAL_PAGE)
 
@@ -227,6 +236,8 @@ export function moneyMonthViewOf(
     uncounted: [...month.uncounted],
     foreign: [...month.foreign],
     incomeUncounted: [...month.incomeUncounted],
+    count: all.length,
+    incomeCount: month.incomeCount,
     shiftedIn: [...month.shiftedIn],
     shiftedOut: [...month.shiftedOut],
     byCategory: [...month.byCategory],

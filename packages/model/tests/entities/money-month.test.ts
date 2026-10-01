@@ -384,6 +384,20 @@ describe('зарплата с N-го — в «Пришло» следующег�
     expect(september).toMatchObject({ shiftedIn: [], shiftedOut: [] })
   })
 
+  it('counts the incomes of «Пришло»: one moved in, not one moved out, and one with no rate (MOL-159)', () => {
+    const incomes = [
+      income('102345 RUB', '2026-08-31'),
+      income('99615 RUB', '2026-09-15'),
+      income('500 USD', '2026-09-20', 'bonus'),
+      income('101000 RUB', '2026-09-26'),
+    ]
+    const september = month({ incomes, salaryShiftDay: 25 })
+    expect(september.incomeUncounted).toEqual([toMoney('500 USD')])
+    expect(september.incomeCount).toBe(3)
+    expect(month({ incomes }).incomeCount).toBe(3)
+    expect(month({}).incomeCount).toBe(0)
+  })
+
   it('names a day once, however many salaries came on it', () => {
     const incomes = [income('1 RUB', '2026-08-31'), income('2 RUB', '2026-08-31')]
     expect(month({ incomes, salaryShiftDay: 25 }).shiftedIn).toEqual(['2026-08-31'])
