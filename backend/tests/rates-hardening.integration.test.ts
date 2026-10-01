@@ -4,13 +4,14 @@
  */
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { parseRate, pickOfficialRate, tripViewCodec, yerevanDate } from '@molvia/model'
 import type { AmdRate, CachedRate, RateProvider, TripView } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
 import { officialRates } from '@/db/schema'
-import { parseCba } from '@/rates/cba'
+import { cbaFeed, parseCba } from '@/rates/cba'
 import { parseErapi } from '@/rates/erapi'
 import type { Published, RateFeed } from '@/rates/feed'
 import { buildServer } from '@/server'
@@ -317,23 +318,26 @@ describe('Г. Сбой базы — не сбой ЦБ РА', () => {
 })
 
 describe('Д. В предупреждении — дата последнего курса ЦБ РА и причина', () => {
-  it('warn несёт причину её кодом и lastKnown из кеша (MOL-153)', async () => {
+  /** A port nothing listens on: taken from the system, then let go. */
+  async function closedPort(): Promise<number> {
+    const server = createServer()
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    if (address === null || typeof address === 'string') throw new Error('no port')
+    await new Promise((resolve) => server.close(resolve))
+    return address.port
+  }
+
+  // The whole chain (MOL-153): the central bank's own feed, Node's `fetch`, `reach` wording the
+  // cause, and the refresh writing it — the cause С-2 asked for, in the feed's words.
+  it('warn несёт причину словами источника и lastKnown из кеша (MOL-153)', async () => {
     await rates.upsert(
       answer('cba', daysAgo(3)).rates.map((rate): CachedRate => ({ ...rate, jump: false })),
     )
     const warnings: Record<string, unknown>[] = []
+    const port = await closedPort()
     const run = officialRatesRefresh({
-      primary: {
-        provider: 'cba',
-        fetchLatest: () =>
-          Promise.reject(
-            new TypeError('fetch failed', {
-              cause: Object.assign(new Error('getaddrinfo ENOTFOUND api.cba.am'), {
-                code: 'ENOTFOUND',
-              }),
-            }),
-          ),
-      },
+      primary: cbaFeed(`http://127.0.0.1:${String(port)}/`),
       fallbacks: [],
       rates,
       log: { warn: (details) => warnings.push(details as Record<string, unknown>) },
@@ -341,14 +345,13 @@ describe('Д. В предупреждении — дата последнего 
 
     await run()
 
-    expect(warnings).toHaveLength(1)
-    expect(warnings[0]).toMatchObject({
-      provider: 'cba',
-      lastKnown: daysAgo(3),
-      errorName: 'TypeError',
-      code: 'ENOTFOUND',
-    })
-    expect(warnings[0]).not.toHaveProperty('err')
+    expect(warnings).toEqual([
+      {
+        provider: 'cba',
+        lastKnown: daysAgo(3),
+        reason: `cba: connect ECONNREFUSED 127.0.0.1:${String(port)}`,
+      },
+    ])
   })
 })
 

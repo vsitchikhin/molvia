@@ -26,10 +26,13 @@ function answer(provider: RateProvider, date = FRIDAY): Published {
   return { provider, date, rates }
 }
 
-/** How `fetch` fails when the host does not resolve, measured on Node 22: the code is in `cause`. */
-function unresolved(): Error {
-  return new TypeError('fetch failed', {
-    cause: Object.assign(new Error('getaddrinfo ENOTFOUND api.cba.am'), { code: 'ENOTFOUND' }),
+/**
+ * A failure the feed did not word: the body of an answer cut off mid-read, as Node 22's `fetch`
+ * throws it — `reach` words only a request with no answer at all (MOL-153).
+ */
+function cutOff(): Error {
+  return new TypeError('terminated', {
+    cause: Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' }),
   })
 }
 
@@ -43,7 +46,7 @@ function refusedWrite(): Error {
 }
 
 /** A feed that answers or fails as the test switches it, and counts how often it was asked. */
-function feed(provider: RateProvider, up = true, date = FRIDAY, failure = unresolved) {
+function feed(provider: RateProvider, up = true, date = FRIDAY, failure = cutOff) {
   const state = { up, date, asked: 0 }
   const self: RateFeed = {
     provider,
@@ -66,7 +69,7 @@ interface Options {
   writeFails?: boolean
   /** The read of the earlier rates a jump is judged by fails, before anything is written. */
   historyFails?: boolean
-  /** How the central bank fails when `cba` is false: by default, a host that does not resolve. */
+  /** How the central bank fails when `cba` is false: by default, an answer cut off mid-read. */
   cbaFailure?: () => Error
 }
 
@@ -220,7 +223,7 @@ describe('Р-18: ЦБ РА отвечает, но курс стоит', () => {
 })
 
 describe('лог сбоя', () => {
-  it('несёт причину сбоя её кодом и дату последнего курса ЦБ РА (Д, С-2, MOL-153)', async () => {
+  it('сбой, который источник не назвал, — по виду, с кодом причины и датой последнего курса ЦБ РА (Д, MOL-153)', async () => {
     const cached: CachedRate = {
       provider: 'cba',
       currency: 'RUB',
@@ -237,10 +240,10 @@ describe('лог сбоя', () => {
       provider: 'cba',
       lastKnown: '2026-09-16',
       errorName: 'TypeError',
-      code: 'ENOTFOUND',
+      code: 'UND_ERR_SOCKET',
     })
     expect(warning?.details).not.toHaveProperty('err')
-    expect(JSON.stringify(h.warnings)).not.toContain('api.cba.am')
+    expect(JSON.stringify(h.warnings)).not.toContain('other side closed')
   })
 
   it('ответ, который источник не прочёл, пишется словами источника', async () => {
