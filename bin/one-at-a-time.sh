@@ -31,30 +31,37 @@ lock="${XDG_CACHE_HOME:-$HOME/.cache}/molvia/checks.lock"
 mkdir -p "$(dirname "$lock")"
 
 # A run that never ends on its own holds every copy's turn until someone stops it (MOL-162, adversarial
-# Л2–Л6). vitest watches by default only when its stdin is a terminal, so the command gets none (below):
-# a path to the binary, a version, `sh -c` run once. Told to watch — `--watch`, `-w`, `watch`, `dev` —
-# it watches with no terminal at all, so a vitest with one of those and without `run` is refused, and
-# only a vitest: `-w` of npm is its workspace (Л3). Playwright's UI and debugger wait for a person whatever stdin is:
+# Л2–Л7). vitest watches by default only when its stdin is a terminal, so the command gets none (below):
+# a path to the binary, a version, `sh -c` run once. Told to watch it watches with no terminal at all,
+# `run` or not — an explicit flag overrules `run`, and `npm run test -- --watch` is `vitest run --watch`.
+# So `--watch` in any spelling but `=false` is refused always: npm, npx and Playwright have no such
+# flag. `-w` is refused beside a vitest or after `--`, where it is vitest's — elsewhere it is npm's
+# workspace (Л3). `watch` and `dev` are refused only as vitest's command, the word right after it:
+# after `run` a word is a filter. Playwright's UI and debugger wait for a person whatever stdin is:
 # `--ui`, `--ui-port`, `--ui-host`, `--debug` in any spelling, `PWDEBUG`. Hidden inside `sh -c`, a
 # flag still passes — the price of reading words. `make` passes none of them.
 endless=""
 vitest=""
-once=""
-for arg in "${@:2}"; do
-  case "$arg" in
-    vitest | vitest@* | */vitest) vitest=1 ;;
-    # With `run` vitest never watches, and a later `watch` is the name of a test to filter by.
-    run | --run) once=1 ;;
-  esac
-done
-[[ -n "$once" ]] && vitest=""
+passed=""
+previous=""
 [[ -n "${PWDEBUG:-}" ]] && endless="PWDEBUG"
 for arg in "${@:2}"; do
   case "$arg" in
     --ui | --ui=* | --ui-port | --ui-port=* | --ui-host | --ui-host=* | --debug | --debug=* | PWDEBUG=*)
       endless="$arg"
       ;;
-    --watch | --watch=true | -w | watch | dev) [[ -n "$vitest" ]] && endless="vitest $arg" ;;
+    --watch=false | --watch=0 | --watch=no) ;;
+    --watch | --watch=*) endless="$arg" ;;
+    -w) [[ -n "$vitest" || -n "$passed" ]] && endless="vitest -w" ;;
+    watch | dev) [[ -n "$previous" ]] && endless="vitest $arg" ;;
+    --) passed=1 ;;
+  esac
+  previous=""
+  case "$arg" in
+    vitest | vitest@* | */vitest)
+      vitest=1
+      previous=1
+      ;;
   esac
 done
 if [[ -n "$endless" ]]; then
