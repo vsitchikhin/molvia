@@ -110,6 +110,34 @@ before, and `search.integration.test.ts` running seventy minutes. Worse than slo
 under that load failed, and was started again into the same crowd. In turn, the last of four waits
 for three runs of a few minutes, and none of them fails for want of a core.
 
+**A run of tests typed by hand takes the lock too: `bin/one-at-a-time.sh <label> npx vitest run …`,
+`… npx playwright test …`** (owner's decision, 01.10.2026, MOL-162). The lock holds only what goes
+through `make`, and a session fixing a review runs single files directly, again and
+again — with a reviewer's worktree beside it doing the same. On 01.10.2026 the load reached 87–131
+while every push was waiting its turn: the pushes took turns, the direct runs did not, and four
+specs of one copy failed on `page.goto` under it and passed in one worker. **By the layers of the
+table «Testing» in `CLAUDE.md`:** one file of Unit or Use case — no database, no DOM — may run
+without the lock; Component, Integration, end-to-end and any run of a whole module wait their turn.
+**The price:** a single integration file waits for whatever run holds the lock — minutes on each
+round of a fix.
+
+**What does not end by itself never holds the lock** (adversarial Л2–Л7). vitest watches by default
+only when its stdin is a terminal, so the script gives the command none (`/dev/null`): under the lock
+`npx vitest …` without `run`, a path to the binary, a version, `sh -c` run once. **Told to watch** it
+watches with no terminal at all, and `run` does not stop it — `npm run test -- --watch` is `vitest run
+--watch`. So `--watch` in any spelling but `=false` is refused always (npm, npx and Playwright have no
+such flag); `-w` beside a vitest or after `--`, alone or folded with other short flags (`-wu`), where
+it is vitest's — elsewhere it is npm's workspace, and `npm run test -w …` is how a module is tested
+(Л3, Л8); `watch` and `dev` after a vitest unless `run` or `--run` came first — vitest finds its
+command past options (`-c … watch`), and after `run` a word is a filter (Л8); a `run` straight after an
+option with no `=` may be its value (`-t run watch`), so it does not count (Л9). The price: `vitest -t
+watch` without `run` and `vitest --silent run watch` are refused too. Playwright's UI and debugger wait for a person
+whatever stdin is: `--ui`, `--ui-port`, `--ui-host`, `--debug` in any spelling and `PWDEBUG` are
+refused. **The price:** hidden in `sh -c`, a flag still passes — the script reads words, not meaning.
+**A waiting run names the copy by its root**
+(`git rev-parse --show-toplevel`), not the folder the run was typed in: a module's tests are typed
+in the module, and «waiting for backend» was every copy (Л1).
+
 **The lock is `flock` held by the process that runs the command**, so the kernel drops it however
 that process ends: a lock file with a pid in it was the alternative, and breaking a stale one is a
 race between two waiters. The descriptor is closed on exec, so a server a run leaves behind does

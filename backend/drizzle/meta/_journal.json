@@ -246,6 +246,13 @@
       "when": 1790787580585,
       "tag": "0034_barcode_authors",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1790840868956,
+      "tag": "0035_open_food_facts",
+      "breakpoints": true
     }
   ]
 }

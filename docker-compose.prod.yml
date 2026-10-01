@@ -54,6 +54,8 @@ services:
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:?set TELEGRAM_BOT_USERNAME}
       BOT_API_SECRET: ${BOT_API_SECRET:?set BOT_API_SECRET}
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Optional: empty leaves the Open Food Facts hint off (MOL-162).
+      OPEN_FOOD_FACTS_CONTACT: ${OPEN_FOOD_FACTS_CONTACT:-}
     depends_on:
       postgres:
         condition: service_healthy

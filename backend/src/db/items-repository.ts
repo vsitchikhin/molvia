@@ -16,7 +16,7 @@ import {
   synonymPairedKinds,
   toSearchKey,
 } from '@molvia/model'
-import type { Item, ItemKind, NewItem } from '@molvia/model'
+import type { Item, ItemKind, ItemOrigin, NewItem } from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -40,8 +40,15 @@ export interface ItemRepository {
    *
    * `createdBy` is null for the seed (MOL-112), which goes through here so that running it again
    * doubles nothing and a name someone already proposed stays theirs.
+   *
+   * `origin` marks a new item whose data may be Open Food Facts' (MOL-162); an item already there
+   * keeps its own.
    */
-  createUnlessNamed(input: NewItem, createdBy: string | null): Promise<Proposal>
+  createUnlessNamed(
+    input: NewItem,
+    createdBy: string | null,
+    origin?: ItemOrigin | null,
+  ): Promise<Proposal>
   /**
    * «Привязать код к ней?» (MOL-100): the code written to this item by this person, or the item
    * that already holds it or one of its twins — then nothing is written. The code already on this
@@ -782,7 +789,12 @@ export function createItemRepository(db: Conn): ItemRepository {
   }
 
   /** The one insert of an item, inside the caller's transaction. */
-  async function insert(tx: Conn, input: NewItem, createdBy: string | null): Promise<Item> {
+  async function insert(
+    tx: Conn,
+    input: NewItem,
+    createdBy: string | null,
+    origin: ItemOrigin | null = null,
+  ): Promise<Item> {
     const typical = quantityTo(input.typicalQuantity)
     const id = randomUUID()
     const [row] = await tx
@@ -795,6 +807,7 @@ export function createItemRepository(db: Conn): ItemRepository {
         defaultUnit: input.defaultUnit,
         typicalQtyMilli: typical.milli,
         typicalQtyUnit: typical.unit,
+        origin,
         createdBy,
       })
       .returning()
@@ -901,7 +914,7 @@ export function createItemRepository(db: Conn): ItemRepository {
       return item ?? null
     },
 
-    createUnlessNamed(input, createdBy) {
+    createUnlessNamed(input, createdBy, origin = null) {
       const key = toSearchKey(input.name)
       const wanted = nameIdentity(input.name)
 
@@ -931,7 +944,7 @@ export function createItemRepository(db: Conn): ItemRepository {
 
           const claimed = await claim(tx, input.barcodes, null)
           if ('taken' in claimed) return holder(tx, claimed.taken)
-          return { item: await insert(tx, input, createdBy), created: true }
+          return { item: await insert(tx, input, createdBy, origin), created: true }
         }),
       )
     },
