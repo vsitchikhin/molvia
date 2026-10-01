@@ -8,8 +8,12 @@
       <p v-if="place === 'app'" class="aside">{{ t('scanner.camera_hint_app_search') }}</p>
       <p class="aside">{{ t(TEXT[place].price) }}</p>
       <!-- The way for every site, checked on the owner's phone; the tab's own is behind a page menu
-           that moved between versions of iOS (review 1). -->
-      <p v-if="place === 'tab'" class="aside">{{ t('scanner.camera_hint_tab_or') }}</p>
+           that moved between versions of iOS (review 1). The search finds Safari where «Приложения»
+           is not yet — before iOS 18 it stood at the top of Settings (review 5). -->
+      <template v-if="place === 'tab'">
+        <p class="aside">{{ t('scanner.camera_hint_tab_or') }}</p>
+        <p class="aside">{{ t('scanner.camera_hint_app_search') }}</p>
+      </template>
       <p class="aside">{{ t(TEXT[place].otherwise) }}</p>
     </div>
 

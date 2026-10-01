@@ -16,8 +16,9 @@ export const PERMISSION_WAIT = 300
 
 // Browsers of iOS that are WebKit with Apple's vendor too, and keep the camera in settings of their
 // own, where the way the sheet names leads nowhere: Chrome, Firefox, Edge, Opera, Yandex — the
-// browser of much of the diaspora — DuckDuckGo and the Google app (adversarial А).
-const NOT_SAFARI = /CriOS|FxiOS|EdgiOS|OPiOS|OPT\/|YaBrowser|YaApp|DuckDuckGo|Ddg\/|GSA\//
+// browser of much of the diaspora — Aloha, DuckDuckGo and the Google app (adversarial А, А′).
+const NOT_SAFARI =
+  /CriOS|FxiOS|EdgiOS|OPiOS|OPT\/|YaBrowser|YaApp|AlohaBrowser|DuckDuckGo|Ddg\/|GSA\//
 
 function standalone(): boolean {
   return (

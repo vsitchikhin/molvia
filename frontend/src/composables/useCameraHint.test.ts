@@ -21,6 +21,8 @@ const NOT_SAFARI = {
     'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Mobile/15E148 Safari/604.1 Ddg/26.4',
   googleApp:
     'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) GSA/380.0.123456789 Mobile/15E148 Safari/604.1',
+  aloha:
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/605.1.15 AlohaBrowser/8.9.0',
   opera:
     'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 OPT/5.4.0 Mobile/15E148 Safari/604.1',
   // A browser inside another app, on a bare WKWebView: a link opened in a messenger.
