@@ -130,6 +130,10 @@ export default defineConfigWithVueTs(
           property: 'webkitGetUserMedia',
           message: 'The camera is reached through useCamera only (MOL-163).',
         },
+        {
+          property: 'mozGetUserMedia',
+          message: 'The camera is reached through useCamera only (MOL-163).',
+        },
       ],
     },
   },
