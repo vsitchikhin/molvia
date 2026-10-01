@@ -242,6 +242,22 @@ describe('бренд (Р-3)', () => {
   )
 
   it.each([
+    ['Напиток газированный', 'Pepsi (PepsiCo)', 'Напиток газированный Pepsi PepsiCo'],
+    ['Йогурт', 'Danone (Активиа)', 'Йогурт Danone Активиа'],
+    ['Творог', '(Савушкин) продукт', 'Творог Савушкин продукт'],
+    ['Сок', '[Добрый] Coca-Cola', 'Сок Добрый Coca-Cola'],
+    ['Juice', '‘Simply’ Orange', 'Juice Simply Orange'],
+    ['Juice', "'Simply' Orange", 'Juice Simply Orange'],
+    ['Чипсы', 'Lay’s Max', 'Чипсы Lay’s Max'],
+    ['Сок', 'Добрый (Coca-Cola) Россия', 'Сок Добрый (Coca-Cola) Россия'],
+  ])(
+    'скобка и одинарная кавычка без пары после среза не остаются (адверсариальный В⁶′): «%s» + «%s»',
+    (name, brands, expected) => {
+      expect(found(answer({ product_name_ru: name, brands })).names.ru).toBe(expected)
+    },
+  )
+
+  it.each([
     ['Хлеб 7 злаков', 'Хлебзавод 7', 'Хлеб 7 злаков Хлебзавод 7'],
     ['Йогурт 2,5%', 'Danone 2', 'Йогурт 2,5% Danone 2'],
   ])(

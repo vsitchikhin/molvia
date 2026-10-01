@@ -480,7 +480,9 @@ French — and the person confirms or corrects it.
   legal form is one by its place — the Russian and Armenian ones at either edge («ООО КДВ», «Գրանդ
   Քենդի» ՍՊԸ, adversarial В⁷), the European ones only trailing («Fit Parade LLC») — and never the whole
   brand: «SAS», Yerevan's supermarket, and «Spa» are marks (В⁵); the brand is written after the name
-  without its form and without its double quotes, as a shelf prints it (review 18, В⁶): «Nutella» + «Nutella,
+  without its form, its double quotes and whatever the cut left without its pair — a single quote off a
+  letter, a bracket whose partner stayed outside — as a shelf prints it (review 18, В⁶, В⁶′): «Pepsi
+  (PepsiCo)» is written «Pepsi PepsiCo», «Lay’s» keeps its apostrophe; «Nutella» + «Nutella,
   Ferrero» is «Nutella», «Coca Cola» + «COCA-COLA SERVICES SA/NV» is «Coca Cola», «Сыр Савушкин 45%» +
   «Савушкин продукт», «Напиток 7Up» + «7Up» and «Конфеты KDV» + «KDV Group» stay as they are — the
   base keeps a mark with its company or country, the package prints the mark — and «Молоко 3,2%» +

@@ -86,6 +86,26 @@ function cleanName(raw: unknown): string | null {
 }
 
 const DOUBLE_QUOTES = /[«»„“”‟"‹›]/gu
+/** A single quote that is not an apostrophe: not between two letters, as in «Lay’s». */
+const SINGLE_QUOTES = /(?<![\p{L}\p{N}])['‘’‚‛]|['‘’‚‛](?![\p{L}\p{N}])/gu
+const BRACKETS: Readonly<Record<string, string>> = { ')': '(', ']': '[', '}': '{' }
+
+/** The mark with every bracket that lost its partner to the cut dropped: «Pepsi (PepsiCo» is «Pepsi PepsiCo». */
+function paired(mark: string): string {
+  const chars = Array.from(mark)
+  const open: number[] = []
+  const lost = new Set<number>()
+  chars.forEach((char, index) => {
+    if (char === '(' || char === '[' || char === '{') open.push(index)
+    const opener = BRACKETS[char]
+    if (opener === undefined) return
+    const at = open.at(-1)
+    if (at !== undefined && chars[at] === opener) open.pop()
+    else lost.add(index)
+  })
+  for (const index of open) lost.add(index)
+  return chars.filter((_, index) => !lost.has(index)).join('')
+}
 
 /** A word of a brand as it is written: letters and digits, with the marks that sit on them. */
 const WRITTEN_WORD = /[\p{L}\p{N}][\p{L}\p{M}\p{N}]*/gu
@@ -181,11 +201,15 @@ function withBrand(name: string, brands: unknown): string {
   const named = new Set(toSearchKey(name).split(' '))
   if (probe.length === 0 || probe.some((word) => named.has(word))) return name
   // Written after the name without its legal form: a shelf prints «Красный Октябрь», not «ОАО» (review
-  // 18). And without its double quotes: cut at the words, «Савушкин» продукт kept a closing quote and
-  // lost the opening one (adversarial В⁶); an apostrophe is a letter's, «Lay's», and stays.
-  const mark = brand
-    .slice(first.index, last.index + last[0].length)
-    .replace(DOUBLE_QUOTES, '')
+  // 18). And with nothing the cut at the words left without its pair: «Савушкин» продукт kept a closing
+  // quote (adversarial В⁶), «Pepsi (PepsiCo)» an opening bracket (В⁶′). Double quotes go all, a single
+  // one only off a letter — «Lay’s» keeps its apostrophe — and a bracket only when its partner is lost.
+  const mark = paired(
+    brand
+      .slice(first.index, last.index + last[0].length)
+      .replace(DOUBLE_QUOTES, '')
+      .replace(SINGLE_QUOTES, ''),
+  )
     .replace(/\s+/gu, ' ')
     .trim()
   return cleanName(`${name} ${mark}`) === `${name} ${mark}` ? `${name} ${mark}` : name
