@@ -1,4 +1,4 @@
-import { RATE_SCALE, currencySchema, walletCross } from '@molvia/model'
+import { currencySchema, walletCross } from '@molvia/model'
 import type {
   Actor,
   AmdRate,
@@ -10,7 +10,7 @@ import type {
   RatePreference,
   Receipt,
 } from '@molvia/model'
-import { freshOfficialRate, officialRateOf, officialRatesOn, sinceDay } from './exchanges'
+import { officialAcross, officialRateOf, officialRatesOn, sinceDay } from './exchanges'
 import type { Today } from './today'
 import type { TripRepositories } from '@/db/unit-of-work'
 
@@ -85,10 +85,7 @@ export async function dayRates(repositories: Repositories, owner: Owner): Promis
 
   async function official(one: Currency, other: Currency, day: string) {
     if (one === other) return null
-    const rows = await officialRows(day)
-    const forward = freshOfficialRate(one, other, rows, day)
-    if (forward && forward.scaled >= RATE_SCALE) return forward
-    return freshOfficialRate(other, one, rows, day) ?? forward
+    return officialAcross(one, other, await officialRows(day), day)
   }
 
   return {

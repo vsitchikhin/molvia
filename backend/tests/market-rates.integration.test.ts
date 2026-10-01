@@ -315,3 +315,123 @@ describe('«Обмен денег» против рынка (MOL-137)', () => {
     expect(response.statusCode).toBe(400)
   })
 })
+
+describe('«Обмены против рынка» на «Обмене денег» (MOL-152, в MOL-159)', () => {
+  const day = daysAgo(1)
+
+  beforeEach(async () => {
+    await rates.upsert([official('4.3187', day)])
+    await market.upsert([
+      figure('bankCash', '4.110180', day),
+      figure('bankNoncash', '4.221606', day),
+      figure('bankCash', '4.347948', day, 'bankSells'),
+      figure('bankNoncash', '4.361759', day, 'bankSells'),
+    ])
+  })
+
+  const read = async (cookie: string) =>
+    overviewOf((await app.inject({ method: 'GET', url: '/exchanges', headers: { cookie } })).json())
+
+  it('рубли за наличные в банке — плюс против рынка, хотя против ЦБ РА был минус', async () => {
+    const { cookie } = await owner()
+    const answer = overviewOf(
+      (await record(cookie, { channel: 'bankCash', note: 'Ардшинбанк' })).json(),
+    )
+    expect(answer.exchanges[0]?.official?.difference).toEqual({ minor: -317_400n, currency: 'AMD' })
+    // 20 000 × 4.110180 = 82 203.60 ֏ for cash in a bank; the exchange gave 996.40 more.
+    expect(answer.losses).toMatchObject({
+      total: { minor: 99_640n, currency: 'AMD' },
+      uncounted: 0,
+      groups: [{ place: 'Ардшинбанк', count: 1, difference: { minor: 99_640n }, percent: 121 }],
+    })
+  })
+
+  it('канал не назван — против лучшего курса дня; назван — против своего (В-3)', async () => {
+    const { cookie } = await owner()
+    await record(cookie, { note: 'ВТБ' })
+    await record(cookie, { note: 'Ардшинбанк', channel: 'bankCash' })
+    const { losses } = await read(cookie)
+    // Non-cash bought roubles dearer: 84 432.12 ֏ against the 83 200 given — −1 232.12 ֏.
+    expect(losses?.groups.map(({ place, difference }) => [place, difference.minor])).toEqual([
+      ['ВТБ', -123_212n],
+      ['Ардшинбанк', 99_640n],
+    ])
+    expect(losses?.total).toEqual({ minor: -23_572n, currency: 'AMD' })
+  })
+
+  it('пара без драма и день без цифр рынка — «без сравнения», ЦБ РА вместо рынка не встаёт', async () => {
+    const { cookie } = await owner()
+    await rates.upsert([official('4.3', daysAgo(40)), official('86', day, 'USD')])
+    await record(cookie, {
+      given: { amount: '251000', currency: 'RUB' },
+      received: { amount: '2900', currency: 'USD' },
+    })
+    await record(cookie, { exchangedOn: daysAgo(40) })
+    expect((await read(cookie)).losses).toBeNull()
+    await record(cookie, {})
+    expect((await read(cookie)).losses).toMatchObject({
+      total: { minor: -123_212n },
+      uncounted: 2,
+    })
+  })
+
+  it('разница в рублях — в драмы по ЦБ своего дня; без свежего курса — «без сравнения»', async () => {
+    const { cookie } = await owner()
+    // 43 000 ֏ at the lowest the banks sold for, 4.347948, buy 9 889.72 ₽; the exchange gave 9 900.
+    await record(cookie, {
+      given: { amount: '43000', currency: 'AMD' },
+      received: { amount: '9900', currency: 'RUB' },
+    })
+    const counted = (await read(cookie)).losses
+    expect(counted?.uncounted).toBe(0)
+    expect(counted?.total.currency).toBe('AMD')
+    // 10.28 ₽ more, at 4.3187 ֏ a rouble.
+    expect(counted?.total.minor).toBe(4_440n)
+
+    const early = daysAgo(30)
+    await market.upsert([figure('bankCash', '4.30', early, 'bankSells')])
+    await record(cookie, {
+      given: { amount: '43000', currency: 'AMD' },
+      received: { amount: '9900', currency: 'RUB' },
+      exchangedOn: early,
+    })
+    expect((await read(cookie)).losses?.uncounted).toBe(1)
+  })
+
+  it('обменники ещё не пришли — итог по банкам; пришли — пересчитан сам (Р-14)', async () => {
+    const { cookie } = await owner()
+    await record(cookie, { channel: 'exchanger' })
+    expect((await read(cookie)).losses?.total.minor).toBe(-123_212n)
+    await market.upsert([figure('exchanger', '4.157339', day)])
+    expect((await read(cookie)).losses?.total.minor).toBe(5_322n)
+  })
+
+  it('обмен старше двенадцати месяцев в итог не входит и не назван', async () => {
+    const { cookie } = await owner()
+    const old = daysAgo(400)
+    await rates.upsert([official('4.3', old)])
+    await market.upsert([figure('bankCash', '4.11', old)])
+    await record(cookie, { exchangedOn: old })
+    expect((await read(cookie)).losses).toBeNull()
+  })
+
+  it('удаление и «Вернуть» отдают новый итог; чужие обмены не видны', async () => {
+    const { cookie } = await owner()
+    const stranger = await owner()
+    const id = randomUUID()
+    await record(cookie, { id })
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: `/exchanges/${id}`,
+      headers: { cookie },
+    })
+    expect(overviewOf(removed.json()).losses).toBeNull()
+    const back = await app.inject({
+      method: 'POST',
+      url: `/exchanges/${id}/restore`,
+      headers: { cookie },
+    })
+    expect(overviewOf(back.json()).losses?.total.minor).toBe(-123_212n)
+    expect((await read(stranger.cookie)).losses).toBeNull()
+  })
+})

@@ -7,6 +7,8 @@ import {
   lostCostReasonSchema,
   walletBasisSchema,
 } from '#model/entities/exchange'
+import { CHART_LEVEL } from '#model/entities/money-charts'
+import type { ExchangeLosses } from '#model/entities/money-charts'
 import { ERROR, ISSUE } from '#model/support/errors'
 import { currencySchema, moneyCodec, signedMoneyCodec } from '#model/values/money'
 import type { Money } from '#model/values/money'
@@ -230,6 +232,36 @@ const currencyCostCodec = z.strictObject({
 })
 
 /**
+ * The exchanges of twelve months by exchanger, worst first (MOL-74): what each place gave more — or
+ * less — than the measure, in the spending currency. Against the central bank on «Графики», against
+ * the market on «Обмен денег» (MOL-152, in MOL-159).
+ */
+export const exchangeLossesCodec = z.strictObject({
+  total: signedMoneyCodec,
+  uncounted: z.int().min(0),
+  groups: z.array(
+    z.strictObject({
+      place: z.string().nullable(),
+      count: z.int().min(1),
+      difference: signedMoneyCodec,
+      /** Hundredths of a percent: −721 is «−7,21 %». */
+      percent: z.int(),
+      level: z.int().min(-CHART_LEVEL).max(CHART_LEVEL),
+    }),
+  ),
+})
+export type ExchangeLossesView = z.output<typeof exchangeLossesCodec>
+
+/** The losses as they go on the wire. */
+export function exchangeLossesViewOf(losses: ExchangeLosses): ExchangeLossesView {
+  return {
+    total: losses.total,
+    uncounted: losses.uncounted,
+    groups: losses.groups.map((group) => ({ ...group })),
+  }
+}
+
+/**
  * «Обмен денег» whole: the preference, the pair a trip would convert by today — the currency of
  * conversion into the spending one, or null when the two are one — the wallet of that pair, what
  * the other currencies held by exchange cost, the hints for the next exchange into each, and the
@@ -280,5 +312,12 @@ export const exchangesResponseCodec = z.strictObject({
   receipts: z.array(receiptCodec),
   /** «Курсы по данным ЦБ РА» — the dollar, the euro and the rouble (MOL-137, В-1). */
   marketToday: z.array(marketTodayCodec).default([]),
+  /**
+   * «Обмены против рынка» (MOL-152, in MOL-159): the exchanges of twelve months by place, each
+   * against the market of its day — its own channel when named, else the best — as its card sets it.
+   * Null — nothing of the twelve months measured: no card. Defaulted so that an answer of the server
+   * before it still reads.
+   */
+  losses: exchangeLossesCodec.nullable().default(null),
 })
 export type ExchangesResponse = z.output<typeof exchangesResponseCodec>
