@@ -5,6 +5,7 @@ import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
+import { PERMISSION_WAIT } from '@/composables/useCameraHint'
 import type * as ReaderModule from '@/scanner/barcodeReader'
 import type { ReaderWorker } from '@/scanner/barcodeReader'
 import type { ReaderReply } from '@/scanner/protocol'
@@ -491,16 +492,30 @@ describe('BarcodeScannerSheet', () => {
 // Safari on an iPhone (MOL-163): asks for the camera once per page load unless its setting says
 // «Разрешить», and tells which of the two it will do through `permissions.query`.
 describe('BarcodeScannerSheet · how to stop Safari asking', () => {
-  const SAFARI = ['vendor', 'maxTouchPoints', 'permissions'] as const
+  const SAFARI = ['vendor', 'maxTouchPoints', 'userAgent', 'permissions'] as const
 
-  function safari(state: PermissionState): void {
+  // The answer to `permissions.query` given at once, or held until the test hands it over.
+  function safari(state: PermissionState | 'held'): { answer: (state: PermissionState) => void } {
+    const held: ((status: { state: PermissionState }) => void)[] = []
     const values = {
       vendor: 'Apple Computer, Inc.',
       maxTouchPoints: 5,
-      permissions: { query: () => Promise.resolve({ state }) },
+      userAgent:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1',
+      permissions: {
+        query: () =>
+          state === 'held'
+            ? new Promise<{ state: PermissionState }>((resolve) => held.push(resolve))
+            : Promise.resolve({ state }),
+      },
     }
     for (const name of SAFARI) {
       Object.defineProperty(navigator, name, { value: values[name], configurable: true })
+    }
+    return {
+      answer: (answer) => {
+        for (const resolve of held.splice(0)) resolve({ state: answer })
+      },
     }
   }
 
@@ -589,17 +604,69 @@ describe('BarcodeScannerSheet · how to stop Safari asking', () => {
   })
 
   it('starts no camera for a sheet put away while the browser answered', async () => {
-    let answer: (state: { state: PermissionState }) => void = () => undefined
-    safari('prompt')
-    Object.defineProperty(navigator, 'permissions', {
-      value: { query: () => new Promise((resolve) => (answer = resolve)) },
-      configurable: true,
-    })
+    const browser = safari('held')
     getUserMedia.mockResolvedValue(fakeStream().stream)
     const sheet = await render()
     await sheet.setProps({ open: false })
-    answer({ state: 'prompt' })
+    browser.answer('prompt')
     await settle()
     expect(getUserMedia).not.toHaveBeenCalled()
+  })
+
+  it('starts no camera for a sheet turned to the digits while the browser answered', async () => {
+    const browser = safari('held')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const sheet = await render()
+    await button(sheet, en.scanner.manual).trigger('click')
+    browser.answer('prompt')
+    await settle()
+    expect(getUserMedia).not.toHaveBeenCalled()
+  })
+
+  it('asks for the camera once for one opening, however the answers cross (adversarial В)', async () => {
+    // Seen before: the line, not the sheet, so nothing lies over the scanner's own buttons.
+    localStorage.setItem('molvia.camera-hint', '1')
+    const browser = safari('held')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    const sheet = await render()
+    // Put away and opened again while Safari answered.
+    await sheet.setProps({ open: false })
+    await settle()
+    await sheet.setProps({ open: true })
+    await settle()
+    browser.answer('prompt')
+    await settle()
+    expect(getUserMedia).toHaveBeenCalledTimes(1)
+
+    // The digits and back to the camera while it answered — past the sheet's rise, which takes no tap.
+    getUserMedia.mockClear()
+    clock += 1000
+    await button(sheet, en.scanner.manual).trigger('click')
+    await settle()
+    await button(sheet, en.scanner.scan).trigger('click')
+    await settle()
+    browser.answer('prompt')
+    await settle()
+    expect(getUserMedia).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks for the camera anyway when the browser does not answer in time (adversarial Б)', async () => {
+    safari('held')
+    getUserMedia.mockResolvedValue(fakeStream().stream)
+    await render()
+    expect(getUserMedia).not.toHaveBeenCalled()
+    await new Promise((resolve) => setTimeout(resolve, PERMISSION_WAIT + 50))
+    await settle()
+    expect(getUserMedia).toHaveBeenCalledTimes(1)
+    expect(hintUp()).toBe(false)
+  })
+
+  it('puts the quiet line in the footer before the camera answers, not under a live picture', async () => {
+    localStorage.setItem('molvia.camera-hint', '1')
+    safari('prompt')
+    getUserMedia.mockReturnValue(new Promise<MediaStream>(() => undefined))
+    const sheet = await render()
+    expect(getUserMedia).toHaveBeenCalledTimes(1)
+    expect(sheet.text()).toContain(en.scanner.camera_hint_offer)
   })
 })

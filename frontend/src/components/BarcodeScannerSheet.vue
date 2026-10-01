@@ -252,9 +252,10 @@ export default defineComponent({
       await nextTick()
       scan.warm()
       // Asked before the camera: once it is given, Safari answers «granted» until the page reloads.
-      await hint.check()
-      // Put away or turned to the digits while the browser answered: no camera is wanted now.
-      if (!props.open || typing.value) return
+      const current = await hint.check()
+      // Put away or turned to the digits while the browser answered, or overtaken by a later start —
+      // opened again, «Сканировать» again: this start wants no camera (adversarial В).
+      if (!current || !props.open || typing.value) return
       await camera.start()
     }
 
