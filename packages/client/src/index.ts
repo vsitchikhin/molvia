@@ -40,6 +40,8 @@ import {
   tripPaymentBodySchema,
   tripReceiptBodySchema,
   unassignedOperationsCodec,
+  budgetPlanBodySchema,
+  moneyBudgetCodec,
   moneyChartMonthCodec,
   moneyChartYearCodec,
   moneyMonthCodec,
@@ -106,6 +108,8 @@ import type {
   TripPaymentBody,
   TripReceiptBody,
   UnassignedOperationsResponse,
+  BudgetPlanBody,
+  MoneyBudgetView,
   MoneyChartMonthView,
   MoneyChartYearView,
   MoneyMonthView,
@@ -339,6 +343,13 @@ export interface MolviaClient {
   moneyChartMonth(month: string): Promise<MoneyChartMonthView>
   /** «Графики → Год» (MOL-160): the calendar year's ring, months against the usual, categories. */
   moneyChartYear(year: string): Promise<MoneyChartYearView>
+  /** «Бюджет» (MOL-117): the month's plans against what was spent, counted by the server. */
+  moneyBudget(month: string): Promise<MoneyBudgetView>
+  /**
+   * A plan from a month on (В-1): answered with that month's budget. Safe to repeat — the same
+   * plan from the same month is the same row. `error.not_found` for a category not one's own.
+   */
+  setBudgetPlan(body: BudgetPlanBody): Promise<MoneyBudgetView>
   /** «Зарплата с … числа — в следующий месяц» (MOL-134): `day` null is off. */
   salaryShift(): Promise<SalaryShift>
   /** Saved on the tap, whole each time: safe to repeat. */
@@ -760,6 +771,17 @@ export function createClient(options: ClientOptions): MolviaClient {
       if (!yearSchema.safeParse(year).success) throw new ApiError(ERROR.NOT_FOUND, 'year', false)
       return request(`/money/years/${year}/charts`, moneyChartYearCodec)
     },
+
+    moneyBudget: async (month) => {
+      if (!monthSchema.safeParse(month).success) throw new ApiError(ERROR.NOT_FOUND, 'month', false)
+      return request(`/money/months/${month}/budget`, moneyBudgetCodec)
+    },
+
+    setBudgetPlan: async (body) =>
+      request('/budget/plans', moneyBudgetCodec, {
+        method: 'PUT',
+        body: encode(budgetPlanBodySchema, body),
+      }),
 
     salaryShift: () => request('/actors/me/salary-shift', salaryShiftSchema),
 

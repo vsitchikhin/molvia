@@ -28,11 +28,14 @@ import IconChevron from '~icons/mdi/chevron-right'
 import IconList from '~icons/mdi/format-list-bulleted'
 import IconShape from '~icons/mdi/shape-outline'
 import IconSwap from '~icons/mdi/swap-horizontal'
+import IconTarget from '~icons/mdi/target'
 import AppCard from '@/components/AppCard.vue'
 
 /** The one figure of each row, or null until it is known — the row is a way in either way. */
 export interface EntryValues {
   readonly spendings: string | null
+  /** «осталось 118 700 ֏», «сверх плана …», «не задан» (MOL-117, В-3). */
+  readonly budget: string | null
   readonly accounts: string | null
   /** The person's own rate; the central bank's is not «my rate», so none says nothing (MOL-81). */
   readonly rate: string | null
@@ -42,6 +45,7 @@ export interface EntryValues {
 
 const NONE: EntryValues = {
   spendings: null,
+  budget: null,
   accounts: null,
   rate: null,
   incomes: null,
@@ -49,9 +53,10 @@ const NONE: EntryValues = {
 }
 
 /**
- * The ways out of «Деньги» (MOL-159, handoff MOL-157 01): «Траты» of the month shown, then what is
- * «now» and not the month's — «Счета», «Обмен денег», «Доходы», «Категории» — each with one figure,
- * all of them from answers the screen already has. A newcomer has no «Траты»: nothing to see there.
+ * The ways out of «Деньги» (MOL-159, handoff MOL-157 01): «Траты» and «Бюджет» of the month shown
+ * (MOL-117, В-3), then what is «now» and not the month's — «Счета», «Обмен денег», «Доходы»,
+ * «Категории» — each with one figure, all of them from answers the screen already has. A newcomer
+ * has no «Траты»: nothing to see there; «Бюджет» stands, since a plan may come before a spending.
  */
 export default defineComponent({
   name: 'MoneyEntries',
@@ -81,6 +86,13 @@ export default defineComponent({
             name: 'money-spendings',
             query: props.month ? { month: props.month } : {},
           },
+        },
+        {
+          key: 'budget',
+          name: t('budget.title'),
+          value: props.values.budget,
+          icon: markRaw(IconTarget),
+          to: { name: 'money-budget', query: props.month ? { month: props.month } : {} },
         },
         {
           key: 'accounts',

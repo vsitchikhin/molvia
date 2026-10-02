@@ -12,6 +12,7 @@ import IncomesView from '@/views/IncomesView.vue'
 import DevicesView from '@/views/DevicesView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
 import MoneySpendingsView from '@/views/MoneySpendingsView.vue'
+import MoneyBudgetView from '@/views/MoneyBudgetView.vue'
 import MoneyView from '@/views/MoneyView.vue'
 import AccountView from '@/views/AccountView.vue'
 import AccountsView from '@/views/AccountsView.vue'
@@ -32,6 +33,7 @@ export type RouteName =
   | 'verdicts'
   | 'money'
   | 'money-spendings'
+  | 'money-budget'
   | 'money-categories'
   | 'money-charts'
   | 'money-accounts'
@@ -165,6 +167,13 @@ export const routes = [
     name: 'money-spendings',
     component: MoneySpendingsView,
     meta: { titleKey: 'spending.list.title', parent: 'money' },
+  },
+  // «Бюджет» (MOL-117): the plans of the month «Деньги» has open, the month in the same address.
+  {
+    path: '/money/budget',
+    name: 'money-budget',
+    component: MoneyBudgetView,
+    meta: { titleKey: 'budget.title', parent: 'money' },
   },
   {
     path: '/money/exchange',

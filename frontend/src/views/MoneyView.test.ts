@@ -508,14 +508,21 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
       label: link.attributes('aria-label'),
     }))
 
-  it('five rows under the ring: «Траты» of the month, then what is «now»', async () => {
-    moneyMonth.mockResolvedValue(month({ count: 43, incomeCount: 2 }))
+  it('six rows under the ring: «Траты» and «Бюджет» of the month, then what is «now»', async () => {
+    moneyMonth.mockResolvedValue(
+      month({ count: 43, incomeCount: 2, budget: { planned: true, left: amd('118700') } }),
+    )
     const view = await render()
     expect(entries(view)).toEqual([
       {
         href: '/money/spendings',
         text: `${en.spending.list.title}43`,
         label: 'Spendings, 43',
+      },
+      {
+        href: '/money/budget',
+        text: `${en.budget.title}֏118,700 left`,
+        label: `${en.budget.title}, ֏118,700 left`,
       },
       { href: '/money/accounts', text: `${en.accounts.title}0`, label: `${en.accounts.title}, 0` },
       {
@@ -577,6 +584,7 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
     const view = await render()
     expect(view.text()).toContain(en.spending.empty.title)
     expect(entries(view).map(({ href }) => href)).toEqual([
+      '/money/budget',
       '/money/accounts',
       '/money/exchange',
       '/money/incomes',
@@ -595,7 +603,26 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
     moneyMonth.mockReturnValue(new Promise(() => undefined))
     const loading = await render()
     expect(loading.find('.skeleton').exists()).toBe(true)
-    expect(entries(loading)).toHaveLength(5)
+    expect(entries(loading)).toHaveLength(6)
+  })
+
+  it('says of «Бюджет» what is over, that no plan is set, and nothing it does not know (MOL-117)', async () => {
+    const figure = async (budget: MoneyMonthView['budget']) => {
+      moneyMonth.mockResolvedValue(month({ month: '2026-08', rateKind: 'frozen', budget }))
+      const view = await render('/money?month=2026-08')
+      return entries(view)[1]
+    }
+    expect(
+      await figure({ planned: true, left: { minor: -250_000n, currency: 'AMD' } }),
+    ).toMatchObject({
+      href: '/money/budget?month=2026-08',
+      text: `${en.budget.title}֏2,500 over`,
+    })
+    expect(await figure({ planned: false, left: null })).toMatchObject({
+      text: `${en.budget.title}${en.budget.entry.none}`,
+    })
+    expect(await figure({ planned: true, left: null })).toMatchObject({ text: en.budget.title })
+    expect(await figure(null)).toMatchObject({ text: en.budget.title })
   })
 
   it('must not fire: offline with nothing kept — the screens behind it would show nothing either', async () => {

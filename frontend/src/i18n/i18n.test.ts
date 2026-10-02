@@ -122,6 +122,7 @@ describe('словарь: повторяющиеся тексты', () => {
       // The settings handoff names its own save action, independently of purchase editing.
       Сохранить: [
         'accounts.sheet.save',
+        'budget.sheet.save',
         'item.save_edit',
         'settings.save',
         'trip.receipt.sheet.save',
@@ -171,7 +172,13 @@ describe('словарь: повторяющиеся тексты', () => {
       Убрать: ['spending.categories.remove', 'spending.sheet.dismiss', 'trip.rejected.drop'],
       Категории: ['spending.categories.title', 'spending.categories_link'],
       Прочее: ['income.source.other', 'spending.category.other'],
-      Сумма: ['income.sheet.amount', 'spending.sheet.amount', 'trip.receipt.sheet.label'],
+      // И сегмент плана «Бюджета» — сумма против доли пришедшего (MOL-117).
+      Сумма: [
+        'budget.sheet.kind_amount',
+        'income.sheet.amount',
+        'spending.sheet.amount',
+        'trip.receipt.sheet.label',
+      ],
       // Название экрана и пункт страницы приватности о том же (MOL-58, MOL-66).
       Доходы: ['income.title', 'privacy.stored.incomes.term'],
       // Плавающая кнопка и заголовок её шторки, как «Трата» (MOL-81); подписи сумм карточки и
@@ -229,7 +236,13 @@ describe('словарь: повторяющиеся тексты', () => {
       Ratings: ['nav.verdicts', 'verdict.title'],
       Settings: ['nav.settings', 'settings.title'],
       Money: ['nav.money', 'settings.group_money', 'spending.title'],
-      Save: ['accounts.sheet.save', 'item.save_edit', 'settings.save', 'trip.receipt.sheet.save'],
+      Save: [
+        'accounts.sheet.save',
+        'budget.sheet.save',
+        'item.save_edit',
+        'settings.save',
+        'trip.receipt.sheet.save',
+      ],
       'No connection': [
         'devices.offline.title',
         'exchange.offline.title',
