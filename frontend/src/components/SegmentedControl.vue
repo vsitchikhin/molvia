@@ -145,6 +145,13 @@ export default defineComponent({
   }
 }
 
+/* Over the segment's own hit area (`::after`), so a tap on the word lands on the word — and on the
+   label through it — rather than on the box laid over it. */
+.word {
+  position: relative;
+  z-index: 1;
+}
+
 /* Its word is its basis, never wrapped; the semibold of the chosen one is reserved under every
    word, or the segments would shift by a pixel on each tap. */
 .fit .segment {
