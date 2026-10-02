@@ -138,6 +138,16 @@ export const ru = {
   'rate.failed': 'Не дождался ответа. Нажмите ещё раз через минуту.',
   /** An erased account, or an item gone from the catalogue: nothing a second press could fix. */
   'rate.gone': 'Эту оценку уже не поставить: аккаунта или товара больше нет.',
+  /**
+   * The switch under the last reminder of the evening (MOL-103, В-2, В-3). The buttons are part of
+   * the reminder, so Russian like it; the outcome speaks the presser's language. An outcome begins
+   * with its own 🔕 or 🔔: that is where the bot finds it in the text again.
+   */
+  'remind.stop': '🔕 Не напоминать',
+  'remind.resume': '🔔 Вернуть напоминания',
+  'remind.stopped': '🔕 Напоминания выключены. Вернуть — кнопкой ниже или в настройках приложения.',
+  'remind.resumed': '🔔 Напоминания снова включены.',
+  'remind.switchFailed': 'Не дождался ответа. Нажмите ещё раз через минуту.',
 } as const
 
 /**

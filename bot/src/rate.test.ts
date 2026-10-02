@@ -74,7 +74,8 @@ function press(
     from = FROM,
     text = QUESTION,
     chat = CHAT,
-  }: { from?: object; text?: string; chat?: object } = {},
+    markup = scale(MILK),
+  }: { from?: object; text?: string; chat?: object; markup?: object } = {},
 ): Update {
   return {
     update_id: 2,
@@ -89,7 +90,7 @@ function press(
         chat: chat as never,
         from: { ...FROM, id: 42, is_bot: true },
         text,
-        reply_markup: scale(MILK),
+        reply_markup: markup as never,
       },
     },
   }
@@ -201,6 +202,35 @@ describe('кнопки 1–5 под напоминанием (MOL-101)', () => {
       expect(rateFromBot).not.toHaveBeenCalled()
     },
   )
+
+  it('строка выключателя и его итог остаются после оценки (MOL-103, Р-7)', async () => {
+    const rateFromBot = vi.fn(() => Promise.resolve())
+    const { bot, calls } = harness({ rateFromBot })
+    const stopped = `${QUESTION}\n\n${t('ru', 'remind.stopped')}`
+
+    await bot.handleUpdate(
+      press(`rate:${MILK}:5`, { text: stopped, markup: scale(MILK, undefined, 'on') }),
+    )
+
+    expect(edits(calls)).toEqual([
+      {
+        method: 'editMessageText',
+        payload: expect.objectContaining({
+          text: `${QUESTION}\n\n✓ ${t('ru', 'rate.done', { score: 5 })}\n\n${t('ru', 'remind.stopped')}`,
+          reply_markup: scale(MILK, 5, 'on'),
+        }) as unknown,
+      },
+    ])
+  })
+
+  it('под последним сообщением «Не напоминать» после оценки на месте', async () => {
+    const rateFromBot = vi.fn(() => Promise.resolve())
+    const { bot, calls } = harness({ rateFromBot })
+
+    await bot.handleUpdate(press(`rate:${MILK}:3`, { markup: scale(MILK, undefined, 'off') }))
+
+    expect(edits(calls)[0]?.payload.reply_markup).toEqual(scale(MILK, 3, 'off'))
+  })
 
   it('в группе не оценивает', async () => {
     const rateFromBot = vi.fn(() => Promise.resolve())

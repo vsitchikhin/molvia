@@ -6,6 +6,7 @@ import { eraseComposer } from './erase'
 import type { EraseDeps } from './erase'
 import { loginComposer } from './login'
 import type { LoginDeps } from './login'
+import { muteComposer } from './mute'
 import { rateComposer } from './rate'
 
 /**
@@ -47,6 +48,8 @@ export function assembleBot(
   bot.use(eraseComposer(deps))
   // The scale under a rating reminder (MOL-101), before the same catch-all.
   bot.use(rateComposer(deps))
+  // «Не напоминать» under it, and Telegram's word that the bot was blocked (MOL-103).
+  bot.use(muteComposer(deps))
   bot.use(loginComposer(deps))
 
   // The last resort: a handler that throws must not take the process with it. The update itself
@@ -58,7 +61,14 @@ export function assembleBot(
   return bot
 }
 
+/**
+ * The updates the bot handles, named rather than left to «the previous setting» Telegram keeps for
+ * a token: `my_chat_member` is how a block reaches the reminders (MOL-103), and a token once polled
+ * with a narrower list would silently never hear of one.
+ */
+export const ALLOWED_UPDATES = ['message', 'callback_query', 'my_chat_member'] as const
+
 /** Long polling that actually runs handlers concurrently — the whole reason for the runner. */
 export function startBot(bot: Bot): RunnerHandle {
-  return run(bot)
+  return run(bot, { runner: { fetch: { allowed_updates: ALLOWED_UPDATES } } })
 }
