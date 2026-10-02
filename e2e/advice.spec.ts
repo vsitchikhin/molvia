@@ -235,7 +235,9 @@ test('the newcomer`s action is large enough to hit with a thumb, and in view', a
   await expect(button).toBeVisible()
 
   const box = await button.boundingBox()
-  expect(box?.height ?? 0).toBeGreaterThanOrEqual(52)
+  // Chromium lays out in sixty-fourths of a pixel: caught mid-rise at a fractional top, 52 reads
+  // 51.99994 (CI, MOL-92). One unit of layout is not a thumb's worth.
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(52 - 1 / 64)
 })
 
 test('a mis-tapped verdict is amended where it is met, and withdrawn from there too', async ({
