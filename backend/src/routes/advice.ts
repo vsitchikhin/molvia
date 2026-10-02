@@ -3,8 +3,15 @@ import {
   adviceResponseSchema,
   adviceSearchResponseSchema,
   catalogueSearchQuerySchema,
+  ownPricesQuerySchema,
+  ownPricesResponseSchema,
 } from '@molvia/model'
-import type { AdviceResponse, AdviceSearchResponse } from '@molvia/model'
+import type {
+  AdviceResponse,
+  AdviceSearchResponse,
+  OwnPricesQuery,
+  OwnPricesResponse,
+} from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { parseQuery } from '@/parse'
 
@@ -12,6 +19,11 @@ export interface AdviceApi {
   /** The use case, already bound to its repositories by the composition point. */
   advice(actorId: string): Promise<AdviceResponse>
   search(actorId: string, query: string): Promise<AdviceSearchResponse>
+  /** «Тут дешевле» (MOL-92); the zone is the phone's, for the day of a record from an old queue. */
+  prices(
+    owner: { readonly actorId: string; readonly zone?: string },
+    query: OwnPricesQuery,
+  ): Promise<OwnPricesResponse>
 }
 
 /**
@@ -37,5 +49,18 @@ export function adviceRoutes(app: FastifyInstance, api: AdviceApi): void {
     return reply
       .header('cache-control', 'no-store')
       .send(z.encode(adviceSearchResponseSchema, answer))
+  })
+
+  /**
+   * «Тут дешевле» on the sheet of a purchase (MOL-92): the person's own last prices of an item in
+   * the record's city, and the alternatives of its kind. The item in the query, as every lookup
+   * here is. It writes nothing.
+   */
+  app.get('/advice/prices', { exposeHeadRoute: false }, async (request, reply) => {
+    const query = parseQuery(ownPricesQuerySchema, request.query)
+    const owner = { actorId: request.actorId, ...(request.zone ? { zone: request.zone } : {}) }
+    const answer = await api.prices(owner, query)
+
+    return reply.header('cache-control', 'no-store').send(z.encode(ownPricesResponseSchema, answer))
   })
 }

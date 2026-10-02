@@ -2,11 +2,9 @@ import { randomUUID } from 'node:crypto'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import {
-  ADJECTIVE_WORD,
   DomainError,
   ERROR,
   ITEM_BARCODES_MAX,
-  NOUN_WORD,
   WORD_BREAK,
   barcodeTwins,
   itemSchema,
@@ -20,6 +18,7 @@ import type { Item, ItemKind, ItemOrigin, NewItem } from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
+import { kindAt } from './kind-word'
 import { idOrNull, rowLimit, theRow } from './rows'
 import { itemBarcodes, items, searchPicks } from './schema'
 
@@ -388,24 +387,8 @@ export function rankedCandidates(
     (synonym) =>
       sql` or ${items.searchKey} like ${`${synonym}%`} or ${items.searchKey} like ${`% ${synonym}%`}`,
   )
-  // Where the kind stands: the first word of the name that is not an adjective, by the domain's
-  // own pattern. The adjectives are plain words, so the n-th word of the name is the n-th of
-  // the key. Past the end when every word describes — `split_part` then answers ''.
-  const kindAt =
-    synonyms.length === 0
-      ? sql`1`
-      : sql`coalesce((
-          select min(u.n)::int
-          from (
-            -- Split by the domain's own class and counted over the words alone, as \`kindKey\`
-            -- does: a no-break space is a break there, and \`\\s\` of Postgres does not see it.
-            select w, row_number() over (order by at) as n
-            from unnest(regexp_split_to_array(${items.name}, ${WORD_BREAK}))
-                 with ordinality as s(w, at)
-            where w <> ''
-          ) u
-          where u.w !~ ${ADJECTIVE_WORD} or u.w ~ ${NOUN_WORD}
-        ), 1000)`
+  // Where the kind stands: the first word of the name that is not an adjective (`kindAt`).
+  const kindAtName = synonyms.length === 0 ? sql`1` : kindAt(items.name)
 
   // The fats typed with «%» that the name carries, whole (\`fatPattern\`): «кефир 2,5% 1 л» names
   // «Кефир 2,5%», and «1 л», a size every row misses alike, must not hand the row to «Кефир» or
@@ -523,7 +506,7 @@ export function rankedCandidates(
              -- applies to these alone: a name brought in by «лори» for «сыр» is no candidate
              -- of «сыр», and measured against it anyway, «Рис» passed as two edits from \`sir\`.
              ${typedHere} as typed,
-             ${kindAt} as kind_at,
+             ${kindAtName} as kind_at,
              ${fatHits} as fat_hits
       from ${items}
       where ${items.searchKey} %> ${key} or ${items.searchKey} = ${key}${sql.join(bySynonym)}
@@ -542,7 +525,7 @@ export function rankedCandidates(
       select ${items.id}, ${items.searchKey},
              word_similarity(${key}, ${items.searchKey}),
              (${items.searchKey} %> ${key} or ${items.searchKey} = ${key}),
-             ${kindAt},
+             ${kindAtName},
              ${fatHits}
       from ${items}
       join admitted a on a.id = ${items.id}

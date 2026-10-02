@@ -33,6 +33,7 @@ import { verdictRoutes } from '@/routes/verdicts'
 import { sessionRoutes } from '@/routes/sessions'
 import { exchangeRoutes } from '@/routes/exchanges'
 import { advice, adviceSearch } from '@/usecases/advice'
+import { ownPrices } from '@/usecases/own-prices'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
@@ -608,6 +609,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           advice({ actors, verdicts, expenses: tripData.expenses, events }, actorId),
         search: (actorId, query) =>
           adviceSearch({ actors, verdicts, expenses: tripData.expenses, items }, actorId, query),
+        prices: (owner, query) =>
+          ownPrices({ actors, verdicts, expenses: tripData.expenses, items }, owner, query),
       })
       verdictRoutes(guarded, {
         rate: (actorId, itemId, rating) => rateItem({ items, verdicts }, actorId, itemId, rating),

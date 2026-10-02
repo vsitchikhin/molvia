@@ -15,12 +15,13 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 ## backend · routes
 
-- `backend/src/routes/advice.ts` — Routes `GET /advice` (the whole «Что брать» screen, no parameters) and `GET /advice/search?q=` (MOL-128), never cached. Tests: `backend/tests/advice.integration.test.ts`, `backend/tests/advice-search.integration.test.ts`.
+- `backend/src/routes/advice.ts` — Routes `GET /advice` (the whole «Что брать» screen, no parameters), `GET /advice/search?q=` (MOL-128) and `GET /advice/prices` («Тут дешевле», MOL-92), never cached. Tests: `backend/tests/advice.integration.test.ts`, `backend/tests/advice-search.integration.test.ts`, `backend/tests/advice-prices-own.integration.test.ts`.
 - `backend/src/routes/verdicts.ts` — Routes of verdicts: `PUT`, `PATCH`, `DELETE /verdicts/:itemId` and `GET /verdicts/pending`. Tests: `backend/tests/verdicts.integration.test.ts`.
 
 ## backend · usecases
 
 - `backend/src/usecases/advice.ts` — Use cases «Что брать»: rows by verdict with prices, own or shared scope, the once-a-day `advice_viewed` in shared mode; and its search — the catalogue's answer with each item's row by the same rules, rated ones past the limit kept, no visit written.
+- `backend/src/usecases/own-prices.ts` — Use case «Тут дешевле» (MOL-92): the person's own last prices of an item in the record's city, and the other products of its kind with the rating «Что брать» shows; «не брать нигде» never asked about; writes nothing.
 - `backend/src/usecases/amend-verdict.ts` — Use case «Изменить оценку»: changes the score or the review of one's own verdict; nothing to change is not found.
 - `backend/src/usecases/pending-verdicts.ts` — Use case «Оценки»: the person's purchases not yet rated, one card per item.
 - `backend/src/usecases/rate-item.ts` — Use case «Поставить оценку»: a first or repeated verdict on any catalogue item, the body checked against the item's kind.
@@ -43,6 +44,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 - `backend/tests/advice-verdicts.integration.test.ts` — Integration test: the verdict rows of «Что брать» — own versus shared, three people for an aggregate, order and limit.
 - `backend/tests/advice-search-seed.integration.test.ts` — Integration test: the search on «Что брать» over the real seed — a rated item past the limit of twenty is found, its «не брать нигде» too.
 - `backend/tests/advice-search.integration.test.ts` — Integration test: `GET /advice/search` — transliteration and typos, a row past `ADVICE_LIMIT`, the threshold of three, no price on «не брать нигде», nothing written.
+- `backend/tests/advice-prices-own.integration.test.ts` — Integration test: `GET /advice/prices` — the last price of a place, the record's city, only one's own, `except`, «не брать нигде» with no prices, the alternatives of a kind, nothing written.
 - `backend/tests/advice.integration.test.ts` — Integration test: `GET /advice` through the server — the three groups, prices, nothing of others without access, the event log.
 - `backend/tests/events-repository.integration.test.ts` — Integration test: the 0.3 week-four return by cohort and access, pending windows, and recording at most once a day.
 - `backend/tests/gates-reader.integration.test.ts` — Integration test: the gates reader reads both gates over one window, counts the erased, inside a read-only transaction.

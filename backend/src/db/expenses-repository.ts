@@ -13,6 +13,7 @@ import type {
 import { moneyFrom, moneyTo, quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
+import { kindAt } from './kind-word'
 import { idOrNull, rowLimit } from './rows'
 import { expenses, identityOf, items, placeIdentity, places, trips, verdicts } from './schema'
 
@@ -91,6 +92,23 @@ export interface ExpenseRepository {
    * the same reason: half a median between two prices is a price nobody ever paid.
    */
   medianPriceFor(query: PriceQuery): Promise<PriceMedian[]>
+  /**
+   * «Тут дешевле» (MOL-92): the **last** price this person paid in each place of the city, one
+   * row per item, place, currency and unit — «цены в магазинах подниматься могут, а вот
+   * спускаются редко» (owner's decision, В-3). Built on the rows the other two aggregates read,
+   * in the own mode and only in the city asked about (В-4). Each item's places come cheapest
+   * first inside a currency and unit.
+   *
+   * «Last» is by the day of the record as the phone named it (MOL-121), then the moment it
+   * began, then the moment the row was written: two packs in one record — the later one.
+   */
+  ownLatestFor(query: OwnLatestQuery): Promise<OwnLatestPrice[]>
+  /**
+   * The other products this person bought with a price in the city whose word of the kind is
+   * `kind` (`kindKey`, MOL-45; MOL-92, В-7) — the candidates for «другое молоко». Ids only, at
+   * most `limit`: whether they are rated, and how, is the verdicts' to say.
+   */
+  ownItemsOfKind(query: OwnKindQuery): Promise<string[]>
 }
 
 /**
@@ -116,6 +134,28 @@ export interface PriceQuery {
   readonly country: string
   readonly city: string
   readonly limit?: number
+  /** A purchase left out — the one the sheet amends, never compared with itself (MOL-92, Т-9). */
+  readonly except?: string
+}
+
+/** What «Тут дешевле» asks for (MOL-92): this person's own purchases, in the city of the record. */
+export interface OwnLatestQuery {
+  readonly actorId: string
+  readonly itemIds: readonly string[]
+  readonly country: string
+  readonly city: string
+  readonly except?: string
+}
+
+/** The candidates for «другое молоко» (MOL-92, В-7): the word of the kind, and whom to leave out. */
+export interface OwnKindQuery {
+  readonly actorId: string
+  /** `kindKey` of the item on the sheet; empty matches nothing. */
+  readonly kind: string
+  readonly notItem: string
+  readonly country: string
+  readonly city: string
+  readonly limit: number
 }
 
 /**
@@ -201,6 +241,37 @@ interface PriceMedianShape extends Record<string, unknown> {
   unit: BaseUnit | null
   scaledMinor: string | null
   observations: string
+}
+
+/**
+ * The last price paid for an item in one place (MOL-92). The day is left to the caller: the
+ * record's own day where the phone named one, else the moment it began read in the zone of the
+ * request — a zone this file does not know.
+ */
+export interface OwnLatestPrice {
+  readonly itemId: string
+  readonly placeId: string
+  readonly placeName: string
+  readonly currency: Currency
+  readonly unit: BaseUnit
+  readonly scaledMinor: bigint
+  /** How many purchases of it there are in the place, in this currency and unit. */
+  readonly observations: number
+  /** `trips.started_on` — the phone's day at «Записать покупки», absent from an old queue. */
+  readonly startedOn: string | null
+  readonly startedAt: Date
+}
+
+interface OwnLatestShape extends Record<string, unknown> {
+  itemId: string
+  placeId: string
+  placeName: string
+  currency: Currency | null
+  unit: BaseUnit | null
+  scaledMinor: string | null
+  observations: string
+  startedOn: string | null
+  startedAt: Date | string
 }
 
 type ExpenseRow = typeof expenses.$inferSelect
@@ -303,6 +374,9 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
     const here = sql`${places.country} = ${query.country}
       and ${placeIdentity(places.city)} = ${identityOf(query.city)}`
     const visible = query.scope === 'own' ? mine : sql`${mine} or (${here})`
+    // A malformed one can be no row, so there is nothing to leave out.
+    const left = query.except === undefined ? null : idOrNull(query.except)
+    const except = left === null ? sql`` : sql` and ${expenses.id} <> ${left}::uuid`
 
     return {
       rows: sql`
@@ -324,6 +398,11 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
               -- (adversarial round 1, F4). A row added to a trip later — the sauce found in the
               -- bag at home — belongs to the visit it was bought on, which is the same answer.
               ${trips.startedAt} as bought_at,
+              -- What the last of them is decided by (MOL-92): the phone's day of the record, then
+              -- the moment it began, then the moment the row was written.
+              ${trips.startedOn}::text as started_on,
+              ${expenses.createdAt} as written_at,
+              ${expenses.id} as expense_id,
               ${trips.actorId} as actor_id,
               ${mine} as mine,
               -- Whether the place is in this person's own city. Read by the order alone: the
@@ -341,7 +420,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
               -- unit price, so it is skipped by an explicit condition rather than silently.
               and ${expenses.amountMinor} is not null
               and ${expenses.qtyMilli} is not null
-              and (${visible})
+              and (${visible})${except}
           ),
           -- A grouped count rather than a window: Postgres has no DISTINCT inside one.
           -- Currency and unit stay part of the key here as everywhere else, and they are
@@ -654,6 +733,86 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           },
         ]
       })
+    },
+
+    async ownLatestFor(query) {
+      const priced = pricedRows({ ...query, scope: 'own', minBuyers: 1 })
+      if (!priced) return []
+
+      const found = await db.execute<OwnLatestShape>(sql`
+        select * from (
+          select distinct on (item_id, place_id, currency, unit)
+            item_id as "itemId",
+            place_id as "placeId",
+            place_name as "placeName",
+            currency,
+            unit,
+            unit_price::text as "scaledMinor",
+            -- Counted before \`distinct on\` keeps one row: a window is computed first.
+            (count(*) over (partition by item_id, place_id, currency, unit))::text as observations,
+            started_on as "startedOn",
+            bought_at as "startedAt"
+          -- In the own mode every row is the person's own, so \`priced\` holds them all; the city
+          -- is a condition of its own (В-4), outside the privacy rule's \`or\`.
+          from (select * ${priced.rows}) own
+          where nearby
+          order by item_id, place_id, currency, unit,
+                   coalesce(started_on, (bought_at at time zone 'Asia/Yerevan')::date::text) desc,
+                   bought_at desc, written_at desc, expense_id desc
+        ) latest
+        -- Cheapest last price first, inside a currency and unit; names by the collation the
+        -- places of «Что брать» are ordered by, so a tie reads the same on both.
+        order by "itemId", currency, unit, "scaledMinor"::numeric,
+                 "placeName" collate "und-x-icu", "placeId"
+        ${priced.limit}
+      `)
+
+      return found.flatMap((row) => {
+        if (row.currency === null || row.unit === null || row.scaledMinor === null) return []
+        return [
+          {
+            itemId: row.itemId,
+            placeId: row.placeId,
+            placeName: row.placeName,
+            currency: row.currency,
+            unit: row.unit,
+            scaledMinor: BigInt(row.scaledMinor),
+            observations: Number(row.observations),
+            startedOn: row.startedOn,
+            startedAt: asDate(row.startedAt),
+          },
+        ]
+      })
+    },
+
+    async ownItemsOfKind({ actorId, kind, notItem, country, city, limit }) {
+      if (idOrNull(actorId) === null || kind === '') return []
+      const other = idOrNull(notItem)
+
+      const found = await db
+        .selectDistinct({ itemId: expenses.itemId })
+        .from(expenses)
+        .innerJoin(trips, eq(trips.id, expenses.tripId))
+        .innerJoin(places, eq(places.id, trips.placeId))
+        .innerJoin(items, eq(items.id, expenses.itemId))
+        .where(
+          and(
+            eq(trips.actorId, actorId),
+            isNull(trips.deletedAt),
+            sql`${expenses.amountMinor} is not null`,
+            sql`${expenses.qtyMilli} is not null`,
+            eq(places.country, country),
+            sql`${placeIdentity(places.city)} = ${identityOf(city)}`,
+            // A dish is the venue's own (MOL-28): «cheaper in another restaurant» is another dish.
+            eq(items.kind, 'product'),
+            other === null ? undefined : sql`${items.id} <> ${other}::uuid`,
+            sql`split_part(${items.searchKey}, ' ', ${kindAt(items.name)}) = ${kind}`,
+          ),
+        )
+        .orderBy(asc(expenses.itemId))
+        .limit(rowLimit(limit))
+
+      return found.map((row) => row.itemId)
     },
   }
 }

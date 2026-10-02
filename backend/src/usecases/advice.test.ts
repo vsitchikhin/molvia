@@ -101,6 +101,8 @@ function deps(world: World = {}) {
       return Promise.resolve(world.prices ?? [])
     },
     medianPriceFor: () => Promise.resolve(world.medians ?? []),
+    ownLatestFor: () => Promise.reject(new Error('ownLatestFor was not expected')),
+    ownItemsOfKind: () => Promise.reject(new Error('ownItemsOfKind was not expected')),
   }
 
   const events: EventRepository = {
