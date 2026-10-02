@@ -92,6 +92,12 @@ export interface YearCharts {
    */
   readonly averageFrom: Month | null
   readonly closedCount: number
+  /**
+   * The day of the running month it is compared to the usual by: today, or the last day spent on when
+   * it is later — a rent dated tomorrow (Р-6 of MOL-158). The screen names this day, never the phone's
+   * (review 4). Null for a year with no running month.
+   */
+  readonly comparedTo: string | null
   /** What came in less what went out over the year; null when a month of it has no «Разница» (Р-7). */
   readonly differenceTotal: Money | null
   /** The months of the year with something and no «Разница» — what `differenceTotal` lacks. */
@@ -184,8 +190,13 @@ export function yearCharts(input: YearChartsInput): YearCharts {
   const enough = used.length >= USUAL_MIN_CLOSED
   let from = since ?? input.firstMonth
   if (from !== null) for (let step = 0; step < USUAL_MIN_CLOSED; step += 1) from = nextMonth(from)
+  // «после декабря» is a promise to this year too: its last closed month is December (review 3).
   const averageFrom =
-    !enough && from !== null && from.length === 7 && from > current && from <= `${year}-12`
+    !enough &&
+    from !== null &&
+    from.length === 7 &&
+    from > current &&
+    previousMonth(from) <= `${year}-12`
       ? from
       : null
 
@@ -225,12 +236,19 @@ export function yearCharts(input: YearChartsInput): YearCharts {
     month.spentIncome === null || !wholeMonth(month)
       ? null
       : { minor: month.income.minor - month.spentIncome.minor, currency: income }
+  // A sum not whole is compared with nothing (adversarial Д of MOL-158): «не посчитано» stands by it.
   const changeAgainst = (
     month: Month,
     amount: Money,
     whole: Money | null,
     sameDay: Money | null,
-  ) => (month === current ? sameDay && changeOf(amount, sameDay) : whole && changeOf(amount, whole))
+    short: boolean,
+  ) =>
+    short
+      ? null
+      : month === current
+        ? sameDay && changeOf(amount, sameDay)
+        : whole && changeOf(amount, whole)
 
   const spentTallest = tallestOf([...shown.map((month) => month.spent.minor), average?.minor ?? 0n])
   const flowTallest = tallestOf(
@@ -264,7 +282,7 @@ export function yearCharts(input: YearChartsInput): YearCharts {
       income: one.income,
       incomeUncounted: one.incomeUncounted,
       difference: differenceOf(one),
-      change: changeAgainst(month, one.spent, average, usualToDay),
+      change: changeAgainst(month, one.spent, average, usualToDay, one.uncounted.length > 0),
       spentLevel: levelOf(one.spent.minor, spentTallest),
       incomeLevel: levelOf(one.income.minor, flowTallest),
       spentIncomeLevel:
@@ -380,7 +398,13 @@ export function yearCharts(input: YearChartsInput): YearCharts {
           amount,
           change:
             kinds[index] === 'data'
-              ? changeAgainst(month, amount, categoryAverage, categoryToDay)
+              ? changeAgainst(
+                  month,
+                  amount,
+                  categoryAverage,
+                  categoryToDay,
+                  counted.get(month)?.uncountedIn.includes(id) ?? false,
+                )
               : null,
           level: levelOf(amount.minor, tallest),
         }
@@ -412,6 +436,10 @@ export function yearCharts(input: YearChartsInput): YearCharts {
           }
         : null,
     averageFrom,
+    comparedTo:
+      runningMonth && current.startsWith(year)
+        ? `${current}-${String(cutoff).padStart(2, '0')}`
+        : null,
     closedCount: used.length,
     differenceTotal: differenceSum === null ? null : { minor: differenceSum, currency: income },
     differenceMissing,

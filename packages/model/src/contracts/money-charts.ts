@@ -142,6 +142,8 @@ export const moneyChartYearCodec = z.strictObject({
     .nullable(),
   averageFrom: monthSchema.nullable(),
   closedCount: z.int().min(0),
+  /** The day the running month is compared to the usual by; null — no running month. */
+  comparedTo: exchangeDaySchema.nullable(),
   differenceTotal: signedMoneyCodec.nullable(),
   differenceMissing: z.array(monthSchema),
   /** The owner's first month with anything in it; null — a newcomer, offered a start. */

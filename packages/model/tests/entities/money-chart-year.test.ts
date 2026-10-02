@@ -452,3 +452,53 @@ describe('yearCharts — «Графики → Год» (MOL-160)', () => {
     })
   })
 })
+
+describe('yearCharts — review and adversarial pass of PR #106', () => {
+  it('compares no month short in what was spent, and no category short in it (А, review 2)', () => {
+    // June to August whole; September's cafe paid in dollars with no rate — «не посчитано: $30».
+    const months = run('2026-06', '2026-10', (month) =>
+      month === '2026-09'
+        ? [spending(100_000, '2026-09-05', 'groceries'), spending(30, '2026-09-10', 'cafe', 'USD')]
+        : month === '2026-10'
+          ? []
+          : [
+              spending(100_000, `${month}-05`, 'groceries'),
+              spending(20_000, `${month}-10`, 'cafe'),
+            ],
+    )
+    const charts = year('2026', months, '2026-10-02', '2026-06')
+    expect(charts.average?.amount).toEqual(money(12_000_000n, 'AMD'))
+    expect(charts.months[8]?.change).toBeNull()
+    const cafe = charts.categories.find((one) => one.categoryId === id('cafe'))
+    expect(cafe?.points[8]?.change).toBeNull()
+    // Control: «Продукты» of September are whole, and compared.
+    const groceries = charts.categories.find((one) => one.categoryId === id('groceries'))
+    expect(groceries?.points[8]?.change).toBe(0)
+  })
+
+  it('names the day the running month is compared by: tomorrow, when a payment is dated so (В, review 4)', () => {
+    const months = run('2026-07', '2026-10', (month) =>
+      month === '2026-10'
+        ? [spending(10_000, '2026-10-01'), spending(50_000, '2026-10-03')]
+        : [spending(10_000, `${month}-01`), spending(50_000, `${month}-20`)],
+    )
+    const charts = year('2026', months, '2026-10-02', '2026-07')
+    expect(charts.comparedTo).toBe('2026-10-03')
+    expect(charts.months[9]?.change).toBe(500)
+    // Control: nothing dated ahead — the day is today's.
+    const today = [...months.slice(0, 3), counted('2026-10', [spending(10_000, '2026-10-01')])]
+    expect(year('2026', today, '2026-10-02', '2026-07').comparedTo).toBe('2026-10-02')
+  })
+
+  it('has no day compared by for a past year', () => {
+    const months = run('2025-06', '2026-02', monthly(1000))
+    expect(year('2025', months, '2026-02-10', '2025-06').comparedTo).toBeNull()
+  })
+
+  it('promises «после декабря» to the year whose third closed month is December (review 3)', () => {
+    const months = run('2026-10', '2026-11', monthly(1000))
+    const charts = year('2026', months, '2026-11-15', '2026-10')
+    expect(charts.closedCount).toBe(1)
+    expect(charts.averageFrom).toBe('2027-01')
+  })
+})

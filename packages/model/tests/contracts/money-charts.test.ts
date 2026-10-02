@@ -113,6 +113,17 @@ describe('moneyChartYearCodec (MOL-160)', () => {
     expect(sent.categories.map((one) => one.category.id)).toEqual([GROCERIES])
   })
 
+  it('carries a year past what money holds as no sum, through the codec both ways (d9 А of MOL-74)', () => {
+    const past = { ...view(), spent: null, spentIncome: null, slices: [] }
+    expect(z.decode(moneyChartYearCodec, z.encode(moneyChartYearCodec, past))).toEqual(past)
+  })
+
+  it('carries the day the running month is compared by, and refuses one that is not a day', () => {
+    const wire = z.encode(moneyChartYearCodec, view())
+    expect(wire.comparedTo).toBe('2026-09-20')
+    expect(moneyChartYearCodec.safeParse({ ...wire, comparedTo: '2026-09' }).success).toBe(false)
+  })
+
   it('refuses a year of eleven months and a field the phone does not know', () => {
     const wire = z.encode(moneyChartYearCodec, view())
     expect(moneyChartYearCodec.safeParse({ ...wire, months: wire.months.slice(1) }).success).toBe(
