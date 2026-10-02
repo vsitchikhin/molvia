@@ -225,7 +225,7 @@ import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconPlus from '~icons/mdi/plus'
 import IconWallet from '~icons/mdi/wallet-outline'
 import { formatEstimate, formatRate, lastDayOf, percentChange, previousMonth } from '@molvia/model'
-import type { Money } from '@molvia/model'
+import type { Money, MoneyMonthView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
@@ -242,7 +242,7 @@ import SpendingSheet from '@/components/SpendingSheet.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { pageOrder } from '@/components/accounts'
-import { rateWords } from '@/components/spending'
+import { budgetAmount, rateWords } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
 import { useReconnect } from '@/composables/useReconnect'
 import { calendarDay } from '@/days'
@@ -323,6 +323,7 @@ export default defineComponent({
       const rate = screen.liveRate.value
       return {
         spendings: value?.count == null ? null : number(value.count),
+        budget: budgetWords(value?.budget ?? null),
         accounts: live === null ? null : number(live),
         rate: rate?.source === 'personal' ? formatRate(rate, locale.value) : null,
         incomes: value?.incomeCount == null ? null : number(value.incomeCount),
@@ -332,6 +333,17 @@ export default defineComponent({
             : null,
       }
     })
+
+    /** The month's «Бюджет» in one figure (MOL-117, В-3): what is left, what is over, or no plan. */
+    function budgetWords(budget: MoneyMonthView['budget']): string | null {
+      if (!budget) return null
+      if (!budget.planned) return t('budget.entry.none')
+      if (!budget.left) return null
+      const amount = budgetAmount(budget.left, locale.value)
+      return budget.left.minor < 0n
+        ? t('budget.entry.over', { amount })
+        : t('budget.entry.left', { amount })
+    }
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
     const signed = (value: Money) =>

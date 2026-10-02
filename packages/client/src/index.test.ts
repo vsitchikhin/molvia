@@ -1572,6 +1572,48 @@ describe('«Деньги» (MOL-82)', () => {
     expect(asked).toHaveLength(0)
   })
 
+  it('reads «Бюджет» (MOL-117) of a month, and asks nothing for a month that is none', async () => {
+    const { client, calls } = clientReplying(200, {})
+    await expect(client.moneyBudget('2026-09')).rejects.toThrow()
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe('/money/months/2026-09/budget')
+
+    const { client: none, calls: asked } = clientReplying(200, {})
+    await expect(none.moneyBudget('../actors')).rejects.toMatchObject({ code: 'error.not_found' })
+    expect(asked).toHaveLength(0)
+  })
+
+  it('sends a plan as the wire says it — a sum as a decimal string, a percent whole', async () => {
+    const { client, calls } = clientReplying(200, {})
+    await expect(
+      client.setBudgetPlan({
+        categoryId: CATEGORY,
+        from: '2026-10',
+        plan: { kind: 'amount', amount: { minor: 25_000_000n, currency: 'AMD' } },
+      }),
+    ).rejects.toThrow()
+    await expect(
+      client.setBudgetPlan({
+        categoryId: null,
+        from: '2026-10',
+        plan: { kind: 'share', percent: 25 },
+      }),
+    ).rejects.toThrow()
+    expect(calls[0]).toMatchObject({
+      method: 'PUT',
+      body: {
+        categoryId: CATEGORY,
+        from: '2026-10',
+        plan: { kind: 'amount', amount: { amount: '250000.00', currency: 'AMD' } },
+      },
+    })
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe('/budget/plans')
+    expect(calls[1]?.body).toEqual({
+      categoryId: null,
+      from: '2026-10',
+      plan: { kind: 'share', percent: 25 },
+    })
+  })
+
   it('reads and saves «зарплата с … числа» (MOL-134) at its own address, off as null', async () => {
     const { client, calls } = clientReplying(200, { day: 25 })
     expect(await client.salaryShift()).toEqual({ day: 25 })

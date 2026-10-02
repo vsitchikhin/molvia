@@ -1,21 +1,21 @@
 ---
 paths:
-  - 'packages/model/src/{entities,contracts}/{spending,spending-category,money,money-month,money-charts,money-chart-month,money-chart-year}.ts'
+  - 'packages/model/src/{entities,contracts}/{spending,spending-category,money,money-month,money-charts,money-chart-month,money-chart-year,money-budget}.ts'
   - 'packages/model/tests/{entities,contracts}/{spending,money,money-month,money-charts,money-chart-month,money-chart-year}*.test.ts'
-  - 'backend/src/db/{spendings,spending-categories,money}-repository.ts'
+  - 'backend/src/db/{spendings,spending-categories,money,budget-plans}-repository.ts'
   - 'backend/src/usecases/{spendings,money-month,money-rates,money}*.ts'
   - 'backend/src/routes/spendings.ts'
   - 'backend/tests/spendings*.ts'
-  - 'backend/tests/{salary-shift,month-rest,money-chart-month,money-chart-year}*.ts'
-  - 'backend/drizzle/*spending*.sql'
+  - 'backend/tests/{salary-shift,month-rest,money-chart-month,money-chart-year,money-budget}*.ts'
+  - 'backend/drizzle/*{spending,budget}*.sql'
   - 'frontend/src/views/Money*'
-  - 'frontend/src/components/{Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*,BarChart*,DonutRing*,DonutChart*,DeviationBars*,PaceLine*,Charts*,ExchangeLosses*,charts*}'
-  - 'frontend/src/composables/{useMoneyMonth,useMoneyCharts,useKeptAnswer,useChartPointer}*'
+  - 'frontend/src/components/{Budget*,Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*,BarChart*,DonutRing*,DonutChart*,DeviationBars*,PaceLine*,Charts*,ExchangeLosses*,charts*}'
+  - 'frontend/src/composables/{useMoneyMonth,useMoneyCharts,useMoneyBudget,useKeptAnswer,useChartPointer}*'
   - 'frontend/src/composables/useSalaryShift*'
   - 'frontend/src/components/SalaryShift*'
   - 'frontend/src/stores/{spendingQueue,queueing,spendingHandoff}*'
   - 'frontend/src/days*'
-  - 'e2e/money{,-charts}.spec.ts'
+  - 'e2e/money{,-charts,-budget}.spec.ts'
 ---
 
 # Money: spendings, the month, and «Деньги» on the phone
@@ -153,8 +153,8 @@ nothing up.
 - **«Деньги» is the summary of the month, «Траты» its journal** (MOL-159, owner's decision В-8 of
   MOL-155, handoff MOL-157 01, 02, 06): the owner found one screen of accounts, totals, exchanges,
   bars and the whole journal «очень сложно анализировать». The summary is the month, the card
-  «Потрачено / Пришло / Остаток», «Куда ушли», and five ways out — «Траты» of the month shown, then
-  what is «now» and not the month's: «Счета», «Обмен денег», «Доходы», «Категории» — **each with one
+  «Потрачено / Пришло / Остаток», «Куда ушли», and six ways out — «Траты» and «Бюджет» (MOL-117) of
+  the month shown, then what is «now» and not the month's: «Счета», «Обмен денег», «Доходы», «Категории» — **each with one
   figure from an answer the screen already has**: the rows of the journal and the incomes of
   «Пришло», counted by the server (`count`, `incomeCount`), the live accounts of the accounts' page,
   the person's own rate, the live categories. A figure not known yet is no figure, never a zero; the
@@ -598,3 +598,90 @@ MOL-158); since, it is the calendar year above. Requirements and plan in
   **The month of the address is never one still to come** (adversarial В), as on «Деньгах». **The last three months read are kept
   per owner** (`molvia.chartmonths`, Р-8) through the one memory the year uses (`useKeptAnswer`): only
   the latest read, offline or error decided after the failure, a yellow strip under the switchers.
+
+## «Бюджет» (MOL-117)
+
+**The owner's sheet «Бюджет месяца» moved into the app**: what a category is planned at, against what
+was spent in it. Owner's decisions В-1…В-5 of 02.10.2026; requirements and plan in
+`.scratch/tasks/{requirements,plans}/MOL-117.md`. Its formulas, read before planning, said what the
+task did not: five plans of six there are a percent of the month's income — «Продукты 10 %»,
+«Накопления 25 %» — and one is a sum, the rent.
+
+- **A plan holds from its month on** (В-1): a row of `budget_plans` with `from_month`, and the plan of
+  a month is the row of its category with the latest `from_month` not after it (`planIn`) — set once,
+  it carries over; changed in November, September stays as it was, so a past month's «уложился»
+  never moves. **A write from month M replaces every later row of its category** (Р-9), under the
+  owner's lock: one rule instead of a history of edits, and the sheet says «с октября и дальше».
+  Neither a sum nor a percent is «no plan from this month».
+- **A plan is a sum in the spending currency or a whole percent of «Пришло»** (В-2, Р-1): the share is
+  of «Пришло» as the month counts it — the salary moved by `budgetMonthOf`, as the sheet's «месяц
+  бюджета» is (Р-3) — brought into the spending currency **by the month's rate**, frozen for a closed
+  month, the rate «≈ потрачено» is counted by. No rate, and a share is no plan, never a zero.
+  **Nothing come in yet, and the share waits for it** (`awaitingIncome`, review 1, adversarial В): no
+  plan, no «сверх плана» on all that was spent, out of «осталось» but **in «Потрачено» of the total**:
+  its category is planned, and its spending is no «вне плана» (adversarial З of round 2). The total
+  says «доля появится», the way in has no figure, and **with no row counted the plan and «осталось»
+  are a dash, never «0 ֏»** (review 9), **and while some row with a plan is in no figure of «План» it
+  reads «250 000 ֏ и ещё»** (`planShort`, review 12, adversarial Л of round 3): «Потрачено» holds that
+  row's spending, so the three figures are not one sum, and the card says so in one word. **A plan
+  known in part claims no «сверх плана»** (review 10): a share of a «Пришло» short of a rate is a
+  floor, and past it the row's and the total's `left` are null. **A spending short of a rate does
+  not hide one** (review 13, adversarial К): what was spent is a floor too, so past a whole plan it
+  is over; within it «осталось» stays a figure under «не всё посчитано». **The two footnotes are two
+  unknowns, each said on its own** (adversarial М of round 4): «доля появится» by a row that waits,
+  «не всё посчитано» by a row whose plan or spending some rate did not count — the rows' own flags. Read as a plan of zero, every share was over its plan in every month
+  until the salary; the price — a month with only shares says no «осталось» until something comes
+  in. A sum typed in another currency is refused (`CURRENCY_MISMATCH`); one kept from before a move
+  is converted by the month's rate and printed «≈» (Р-4) — with no rate to convert it by it is no
+  plan and «не всё посчитано», never a plan marked whole that no footnote speaks of (review 14,
+  adversarial Н of round 5) — and **its sheet never puts it in the field
+  as a sum of this currency** (adversarial Б): «Сохранить» untouched made 250 000 ֏ into 250 000 ₽.
+  The sheet says what it was and asks for a sum anew.
+- **What was spent is the month's `byCategory`, never a second count** (Р-2): the budget is
+  `monthBudget` over the very `countMonth` and `monthRate` of `GET /money/months/:month`, frozen and
+  settled as it is (`settleThaws`); a trip is in «Продукты»; an integration test holds every row
+  equal to the month. **A sum not whole is no share**: a category short of a rate, or a share of a
+  «Пришло» short of one, has its «осталось» but no percent, and the total is not said as a figure on
+  the way in.
+- **The rows are the categories with a plan in the order of the chips**, never by how far they went:
+  a row does not move under the finger. **What was spent with no plan stands apart** (Р-6), «Без
+  плана», and is no part of «осталось» — the sheet's ИТОГО counts so. **A removed category keeps its
+  plan** (Р-5, MOL-73 В-3): it has a row in a month something was spent in it, and none where it is
+  only removed; «Вернуть» brings the plan back with it. **Its row is no button, with a plan or not**
+  (review 7, adversarial И): a plan is offered for the live categories only. **A row whose plan would carry the total past what
+  money holds is left out of it** (adversarial А), as a spending is from «Потрачено»: the answer that
+  failed to encode was a 500 for good, with no screen to take the plan back from. **And it is out of
+  reach**: a plan is at most 10¹⁵ minor units (`BUDGET_AMOUNT_MAX_MINOR`, ten trillion drams), refused
+  on the way in as `error.invalid_amount` and by the sheet under its field (adversarial Н of round 6)
+  — a thousand of them fit what money holds, so the guard is no path a person takes, and no footnote
+  is owed to it. **A percent past a
+  safe integer is none** (`used`, `savings.actual`, adversarial А2) for the same reason.
+- **Over the plan is a warning, never red, and said in words, never by a minus** (Р-7, review 5):
+  «сверх плана» in `--warn`, the figure without its sign, the bar to the edge — with no mark of the
+  plan on it, which would be a division the phone does not make. Red is an error, and spending past a
+  plan is a fact. **Every figure of the screen is whole units unless that prints a nought for money
+  that is there** (`budgetAmount`, adversarial Г, Г6): 0,40 ֏ over, or spent, is «0,40 ֏» — under half
+  a unit of the currency's own exponent. **The share of a plan is rounded as a
+  person rounds, but «100 %» only once the plan is spent**: 248 800 of 250 000 is «99 %». **«≈» of the
+  total in the income currency only when that is another currency** (review 4).
+- **The savings target is a plan with no category** (В-4): a whole percent of «Пришло», never a sum —
+  putting aside is no spending, and in the app savings are an account (MOL-115), not a category.
+  **Set alone, it is a plan of the month** (adversarial Д): no «Плана пока нет» over it, and no «не
+  задан» on the way in.
+  Against it, «Разница» of «Пришло» (`savings.actual`), only for whole sums; «пока» while the month
+  runs. There is no starting capital and no «Остаток» on this screen (Р-11): «Остаток» is the money on
+  the accounts, on «Деньгах».
+- **On the phone** (В-3, В-5): a sixth way out of «Деньги», under «Траты» — both are of the month
+  shown — with one figure, the month's `budget` (the first page's, as `rest`; defaulted for a month
+  kept before it): «осталось N», «сверх плана N», «не задан», or none when the sum is not whole.
+  `/money/budget`, the month in the address by `replace`, its last three answers kept per owner
+  (`molvia.budget`), built from the kit after the plan artifact's frames — the newer handoffs of
+  «Деньги» are later work (owner's note on В-5). **A plan is written with a connection only** (Р-8),
+  as an account is: it is set at home, not at the shelf; **the write's own answer is the month's
+  budget and is shown** (`write` of `useKeptAnswer`, review 6) — no second count of the month — **and
+  it is numbered when it sets out**, as a read is: a read set out while the write was on its way may
+  have counted before it or after, so then the month is read once more (adversarial Ж of round 2).
+  Numbered on arrival, the write's older answer put back a spending landed meanwhile.
+  The sheet works no plan out of «Пришло» — what a percent comes to is the server's, on the row.
+- **Private, and it goes with its owner** (Р-13): erasure takes `budget_plans` before the categories
+  they point at, and the copy of one's data has them (`budgetPlans`, version 7).

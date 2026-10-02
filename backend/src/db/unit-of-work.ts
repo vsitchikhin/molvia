@@ -1,3 +1,5 @@
+import { createBudgetPlanRepository } from './budget-plans-repository'
+import type { BudgetPlanRepository } from './budget-plans-repository'
 import { createExchangeRepository } from './exchanges-repository'
 import type { ExchangeRepository } from './exchanges-repository'
 import { createExpenseRepository } from './expenses-repository'
@@ -51,6 +53,8 @@ export interface TripRepositories {
   readonly money: MoneyRepository
   /** Where the money lies (MOL-115): the accounts, their operations and checks. */
   readonly moneyAccounts: MoneyAccountRepository
+  /** What the person plans a month at (MOL-117): «Бюджет», counted against the month above. */
+  readonly budgetPlans: BudgetPlanRepository
 }
 
 export function tripRepositories(conn: Conn): TripRepositories {
@@ -68,6 +72,7 @@ export function tripRepositories(conn: Conn): TripRepositories {
     spendingCategories: createSpendingCategoryRepository(conn),
     money: createMoneyRepository(conn),
     moneyAccounts: createMoneyAccountRepository(conn),
+    budgetPlans: createBudgetPlanRepository(conn),
   }
 }
 

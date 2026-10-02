@@ -1571,5 +1571,74 @@
     "camera_hint_tab_otherwise": "If nothing is changed, Safari will ask after every reload — then just answer it “Allow”.",
     "camera_hint_ok": "Got it",
     "camera_hint_offer": "Safari asks every time? How to stop it"
+  },
+  "budget": {
+    "title": "Budget",
+    "offline_strip": "No connection. Figures as of {when}",
+    "offline_body": "This month's budget has not been loaded on this phone yet. It will appear once the connection is back",
+    "load_error": {
+      "title": "The budget did not load",
+      "body": "The month's plan and spendings did not come. Try again"
+    },
+    "empty": {
+      "title": "No plan yet",
+      "body": "Set how much you are ready to spend on a category a month — as a sum or a share of what came in. The plan carries over to the next months by itself"
+    },
+    "total": {
+      "left": "Left of the plan",
+      "over": "Over the plan",
+      "planned": "Plan",
+      "unplanned": "Outside the plan",
+      "not_whole": "Not all counted: some spendings or incomes have no rate",
+      "awaiting": "A share of income comes once something comes in this month",
+      "planned_more": "{amount} and more"
+    },
+    "row": {
+      "of": "{spent} of {planned}",
+      "share": "{percent} % of income",
+      "over": "over the plan",
+      "awaiting": "nothing came in yet"
+    },
+    "unplanned": "No plan",
+    "add": "Set a category plan",
+    "savings": {
+      "title": "Put aside",
+      "target": "Target — {percent} % of income",
+      "no_target": "No target set",
+      "so_far": "{percent} so far",
+      "of": "Difference {difference} of {income}",
+      "no_income": "Nothing has come in this month yet",
+      "not_whole": "Cannot count: some spendings or incomes have no rate"
+    },
+    "entry": {
+      "none": "not set",
+      "left": "{amount} left",
+      "over": "{amount} over"
+    },
+    "saved": "Plan «{name}» saved",
+    "removed": "Plan «{name}» removed",
+    "sheet": {
+      "meta": "Plan for a month",
+      "title_choose": "New plan",
+      "kind": "How to set the plan",
+      "kind_amount": "Sum",
+      "kind_share": "% of income",
+      "amount": "Sum a month",
+      "percent": "Share of income",
+      "amount_hint": "How much you are ready to spend on this category in a month",
+      "share_hint": "A share of the month's «Came in» at the month's rate: more comes in — the plan grows too",
+      "savings_hint": "How much of what came in you want to keep. Compared with «came in − went out»",
+      "from": "From {month} on. {before} stays as it was",
+      "bad_amount": "Enter a sum, for example 250 000",
+      "bad_percent": "Enter a whole number from 0 to {max}",
+      "category_gone": "This category is gone — refresh the screen",
+      "failed": "Not saved. Try again",
+      "offline": "No connection. A plan is saved only online",
+      "save": "Save",
+      "wait_online": "Waiting for connection",
+      "remove": "Remove the plan",
+      "other_currency": "The plan was {amount}, before the spending currency changed. Enter a sum in {sign}",
+      "too_big": "Too large a sum for a month's plan"
+    }
   }
 }

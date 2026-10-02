@@ -56,6 +56,7 @@ function page(days: [string, ReturnType<typeof entry>[]][], cursor: JournalKey |
     rest: null,
     accountsFrom: null,
     accountsRemoved: false,
+    budget: null,
     rate: null,
     rateKind: 'live',
     previousSpent: null,

@@ -183,4 +183,15 @@ describe('a month on the wire', () => {
       incomeCount: 0,
     })
   })
+
+  it('carries the figure of «Бюджет», and reads an answer older than it as not known (MOL-117)', () => {
+    const month = monthOf(spendings(1, () => '2026-09-01'))
+    const budget = { planned: true, left: money(-250000n, 'AMD') }
+    const view = moneyMonthViewOf(month, null, categories, undefined, budget)
+    expect(moneyMonthCodec.parse(z.encode(moneyMonthCodec, view)).budget).toEqual(budget)
+    expect(moneyMonthViewOf(month, null, categories).budget).toBeNull()
+    const older: Record<string, unknown> = { ...z.encode(moneyMonthCodec, view) }
+    delete older.budget
+    expect(moneyMonthCodec.parse(older).budget).toBeNull()
+  })
 })

@@ -4,6 +4,7 @@ import type { Db } from './index'
 import type { ErasedTable } from './erasure-repository'
 import {
   actors,
+  budgetPlans,
   events,
   exchangeRevisions,
   exchanges,
@@ -42,6 +43,7 @@ export const EXPORT_SECTION_OF: Readonly<Record<ErasedTable, keyof ExportContent
   incomes: 'incomes',
   spendings: 'spendings',
   spending_categories: 'spendingCategories',
+  budget_plans: 'budgetPlans',
   money_month_rates: 'monthRates',
   money_account_checks: 'accountChecks',
   money_accounts: 'moneyAccounts',
@@ -263,6 +265,10 @@ export const EXPORT_COLUMNS: Readonly<
     exported: ['month', 'base', 'quote', 'scaled', 'source', 'as_of'],
     omitted: { actor_id: OWNER },
   },
+  budget_plans: {
+    exported: ['category_id', 'from_month', 'amount_minor', 'currency', 'percent', 'updated_at'],
+    omitted: { actor_id: OWNER },
+  },
   money_accounts: {
     exported: [
       'id',
@@ -402,6 +408,11 @@ export function createExportRepository(db: Db): ExportRepository {
             .from(moneyMonthRates)
             .where(eq(moneyMonthRates.actorId, actorId))
             .orderBy(asc(moneyMonthRates.month), asc(moneyMonthRates.base))
+          const planRows = await tx
+            .select()
+            .from(budgetPlans)
+            .where(eq(budgetPlans.actorId, actorId))
+            .orderBy(asc(budgetPlans.fromMonth), asc(budgetPlans.categoryId))
           const accountRows = await tx
             .select()
             .from(moneyAccounts)
@@ -726,6 +737,20 @@ export function createExportRepository(db: Db): ExportRepository {
                 source: row.source,
                 asOf: row.asOf,
               },
+            })),
+            budgetPlans: planRows.map((row) => ({
+              categoryId: row.categoryId,
+              from: row.fromMonth,
+              plan:
+                row.amountMinor !== null && row.currency !== null
+                  ? {
+                      kind: 'amount' as const,
+                      amount: { minor: row.amountMinor, currency: row.currency },
+                    }
+                  : row.percent !== null
+                    ? { kind: 'share' as const, percent: row.percent }
+                    : null,
+              updatedAt: row.updatedAt,
             })),
             moneyAccounts: accountRows.map((row) => ({
               id: row.id,
