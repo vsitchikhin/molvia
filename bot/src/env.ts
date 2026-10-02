@@ -39,6 +39,13 @@ const environmentSchema = z.object({
    * `.env` is simply missing a line deserves to be told that instead.
    */
   BOT_API_SECRET: z.union([z.literal(''), botApiSecretSchema]).default(''),
+  /**
+   * Where the bot says it is alive (MOL-142): a healthchecks.io ping URL, set in production's
+   * `.env.prod` only. Empty is off — compose passes a variable it was not given as empty — and a
+   * copy without it sends nothing anywhere. https only: the URL is a secret of sorts, since
+   * whoever has it can say «alive» for us.
+   */
+  BOT_PULSE_URL: z.union([z.literal(''), z.url({ protocol: /^https$/ })]).default(''),
 })
 
 export interface BotEnvironment {
@@ -46,6 +53,8 @@ export interface BotEnvironment {
   readonly secret: string
   readonly apiBaseUrl: string
   readonly appBaseUrl: string
+  /** Absent means no pulse: not a single request leaves for it. */
+  readonly pulseUrl?: string
 }
 
 export function readEnvironment(): BotEnvironment {
@@ -54,6 +63,7 @@ export function readEnvironment(): BotEnvironment {
     secret: value.BOT_API_SECRET,
     apiBaseUrl: value.API_BASE_URL ?? `http://127.0.0.1:${String(value.API_PORT)}`,
     appBaseUrl: value.APP_BASE_URL ?? `http://127.0.0.1:${String(value.PWA_PORT)}`,
+    ...(value.BOT_PULSE_URL ? { pulseUrl: value.BOT_PULSE_URL } : {}),
   }
 }
 

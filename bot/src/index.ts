@@ -1,7 +1,8 @@
 import process from 'node:process'
 import { createBotClient } from '@molvia/client'
 import { assembleBot, startBot } from './assemble'
-import { startReminders } from './remind'
+import { createPulse } from './pulse'
+import { REMIND_EVERY_MS, startReminders } from './remind'
 import { botToken, readEnvironment, refusedNames } from './env'
 import type { BotEnvironment } from './env'
 
@@ -69,6 +70,8 @@ const api = createBotClient({
 })
 const bot = assembleBot(botToken, { api, appUrl: environment.appBaseUrl })
 const runner = startBot(bot)
+// The pulse (MOL-142) beats on a claim that went through; without a URL it never goes out.
+const pulse = createPulse(environment.pulseUrl)
 // The rating reminders (MOL-101): every minute the API is asked who is due, and they are sent.
 const stopReminders = startReminders(
   createBotClient({
@@ -78,6 +81,10 @@ const stopReminders = startReminders(
   }),
   bot.api,
   environment.appBaseUrl,
+  REMIND_EVERY_MS,
+  () => {
+    void pulse()
+  },
 )
 
 // The runner keeps fetching updates until it is told to stop, and a kill without this leaves

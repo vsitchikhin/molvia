@@ -26,15 +26,16 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 
 - `bot/src/answer.ts` — How a button press is answered, for login, erasure and the reminder alike: `settle` writes an outcome, `settleKeeping` writes one and keeps the buttons, `refuse` shows over the message, the spinner, the keyboard.
 - `bot/src/assemble.ts` — Wires the bot: per-chat `sequentialize`, the erase, rate and switch composers before the login's, and the concurrent runner with the updates it handles named.
-- `bot/src/env.ts` — The bot's environment: the Telegram token read alone, `BOT_API_SECRET`, the API and app addresses; a refusal names variables, never values.
+- `bot/src/env.ts` — The bot's environment: the Telegram token read alone, `BOT_API_SECRET`, the API and app addresses, the pulse URL; a refusal names variables, never values.
 - `bot/src/erase.ts` — `/delete`: one question naming what goes and what stays, «Удалить навсегда» valid for ten minutes, erasing whoever pressed.
 - `bot/src/i18n.ts` — `t()`: a bot message by key in the sender's language through `pickLocale`, with `{name}` substitution.
 - `bot/src/i18n/en.ts` — The bot's English dictionary, mirroring the Russian one key for key.
 - `bot/src/i18n/ru.ts` — The bot's Russian dictionary, every message it sends; its keys are the `Dictionary` type.
-- `bot/src/index.ts` — The bot process's entry: exits quietly without a token or secret, builds the API client with a five-second timeout, starts the reminders, runs until stopped.
+- `bot/src/index.ts` — The bot process's entry: exits quietly without a token or secret, builds the API client with a five-second timeout, starts the reminders with the pulse, runs until stopped.
 - `bot/src/mute.ts` — The switch in the bot (MOL-103): «Не напоминать» and «Вернуть напоминания» for whoever pressed, the outcome written with the scale kept; `my_chat_member` of a block and an unblock.
 - `bot/src/rate.ts` — A press of 1–5 under a rating reminder (MOL-101): the verdict of whoever pressed, the outcome written under the question, the scale kept with the digit marked and the switch's row with it.
-- `bot/src/remind.ts` — The rating reminder (MOL-101): the minute timer that claims what is due, a message an item with the scale 1–5, only the first one ringing, «Не напоминать» under the last; a 403 turns the reminders off (MOL-103); the keyboard and the outcomes read back off the message.
+- `bot/src/pulse.ts` — The bot's pulse (MOL-142): a ping to healthchecks.io after a claim went through, at most once in five minutes, counted from the last that succeeded; without a URL, nothing; the URL never logged.
+- `bot/src/remind.ts` — The rating reminder (MOL-101): the minute timer that claims what is due, tells the pulse a claim went through, a message an item with the scale 1–5, only the first one ringing, «Не напоминать» under the last; a 403 turns the reminders off (MOL-103); the keyboard and the outcomes read back off the message.
 - `bot/src/login.ts` — The bot's half of the login: `/start` with a code asks «Впустить это устройство в ваш аккаунт Molvia?»; «Войти» and «Это не я» confirm or decline.
 - `bot/src/when.ts` — `timeAgo`: the age of a login request in words («2 минуты назад») for the bot's question.
 

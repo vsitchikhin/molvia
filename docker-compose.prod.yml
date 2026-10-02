@@ -84,6 +84,9 @@ services:
       BOT_API_SECRET: ${BOT_API_SECRET:?set BOT_API_SECRET}
       # Real login requires the bot to run (MOL-54).
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN}
+      # The bot's pulse to healthchecks.io (MOL-142). Optional: empty sends nothing, and the
+      # check «molvia-bot» then raises its alarm — which is how a forgotten line is noticed.
+      BOT_PULSE_URL: ${BOT_PULSE_URL:-}
     depends_on:
       - backend
 
