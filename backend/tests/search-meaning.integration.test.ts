@@ -12,6 +12,7 @@ import { catalogueEntryCodec, catalogueSearchResponseSchema, newItemSchema } fro
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
 import { OWNER_WORDS } from './seed-words'
+import { SEED_ABSENT, SHELF_WORDS } from '@molvia/model/testing/search-corpus'
 import { CATALOGUE_SEED } from '@/catalogue-seed'
 import { createItemEmbeddingRepository } from '@/db/item-embeddings-repository'
 import { createItemRepository, rankedCandidates } from '@/db/items-repository'
@@ -114,6 +115,151 @@ describe('what the letters found does not move (owner’s decision В-3)', () =>
     const lastMilk = names.findLastIndex((found) => found.startsWith('Молоко'))
     const firstOther = names.findIndex((found) => !found.startsWith('Молоко'))
     expect(firstOther).toBeGreaterThan(lastMilk)
+  })
+})
+
+/**
+ * Every shelf word of the corpus and every thing the seed does not carry (MOL-105), pinned whole:
+ * the name seen first and whether the answer is near — the poor answers too, since a change of the
+ * threshold or the model shows here as what it moves. Prices this pins, named in `search.md`: an
+ * Armenian or Georgian shelf word finds a name by its spelling and calls it near («կաթնամթերք» →
+ * «Матнакаш», «ბოსტნეული» → «Бастурма»); «бытовая химия», «гигиена», «приправы» find nothing.
+ * The words marked at the threshold have their nearest name within 0.006 of it. Five of them answer
+ * otherwise on x86 than on ARM — the model's arithmetic differs in the last digits between the two
+ * (CI and production are x86, a Mac is ARM): those carry both answers seen, either holds.
+ */
+type Answer = readonly [string | null, boolean]
+const SHELF_ANSWERS: readonly (readonly [string, string | null, boolean, Answer?])[] = [
+  ['молочка', 'Молоко', true],
+  ['молочное', 'Молоко', true],
+  ['молочные продукты', 'Молоко', true],
+  ['кисломолочка', 'Молоко', true],
+  ['кисломолочное', 'Молоко', true],
+  ['կաթնամթերք', 'Матнакаш', true],
+  ['რძის პროდუქტები', null, false],
+  ['mlečni proizvodi', 'Молоко', true],
+  ['млечни производи', 'Молоко', true],
+  ['птица', 'Пицца', true],
+  ['курятина', 'Курица', true],
+  ['мясные продукты', 'Говядина', true],
+  ['միս', 'Рис', true],
+  ['ხორცი', null, false, ['Хрен', true]], // either way: ARM, x86
+  ['meso', 'Пакеты мусорные', true],
+  ['копчёности', null, false],
+  ['колбасные изделия', 'Колбаса', true],
+  ['морепродукты', 'Креветки', true],
+  ['рыбное', 'Филе рыбное', true],
+  ['ձուկ', 'Лук-порей', true],
+  ['riba', 'Рыба', true],
+  ['овощи', 'Смесь овощная замороженная', true],
+  ['корнеплоды', 'Морковь', true],
+  ['բանջարեղեն', null, false],
+  ['ბოსტნეული', 'Бастурма', true],
+  ['povrće', null, false],
+  ['поврће', null, false],
+  ['пряные травы', null, false],
+  ['фрукты', 'Пастила фруктовая', true],
+  ['цитрусовые', 'Апельсины', true],
+  ['միրգ', 'Маргарин', true],
+  ['ხილი', null, false],
+  ['voće', 'Вода', false],
+  ['воће', 'Вода', false],
+  ['выпечка', 'Бумага для выпечки', true],
+  ['хлебобулочные', 'Хлебцы', true],
+  ['hleb', 'Хлеб', true], // at the threshold
+  ['крупы', 'Крупа кукурузная', true],
+  ['каши', 'Кешью', true],
+  ['бакалея', 'Баклажаны', true],
+  ['злаки', 'Батончик злаковый', true], // at the threshold
+  ['бобовые', null, false],
+  ['приправы', null, false],
+  ['пряности', null, false, ['Перец острый', true]], // either way: ARM, x86
+  ['специи', 'Перец острый', true],
+  ['консервы', 'Тунец консервированный', true],
+  ['соленья', 'Арахис солёный', true],
+  ['закатки', 'Котлеты', true],
+  ['заморозка', 'Пломбир', true],
+  ['полуфабрикаты', null, false],
+  ['замороженное', 'Ягоды замороженные', true],
+  ['кулинария', 'Голень куриная', false],
+  ['сладкое', 'Сахар', true],
+  ['сладости', 'Леденцы', true],
+  ['к чаю', 'Чай', true],
+  ['десерты', 'Пирожные', true],
+  ['кондитерка', 'Пирожные', true],
+  ['քաղցրավենիք', null, false],
+  ['slatkiši', null, false],
+  ['снеки', 'Соус соевый', false],
+  ['закуски к пиву', 'Пиво', true],
+  ['напитки', 'Пиво', true],
+  ['газировка', 'Лимонад', true],
+  ['безалкогольное', 'Пиво безалкогольное', true],
+  ['горячие напитки', 'Чай холодный', true],
+  ['piće', 'Пицца', true],
+  ['алкоголь', 'Водка', true],
+  ['выпивка', null, false, ['Водка', true]], // either way: ARM, x86
+  ['спиртное', 'Водка', true],
+  ['ալկոհոլ', null, false],
+  ['alkohol', null, false],
+  ['детское питание', 'Пюре детское', false, ['Смесь детская', true]], // either way: ARM, x86
+  ['для малыша', 'Смесь детская', true],
+  ['бытовая химия', null, false],
+  ['для уборки', 'Средство чистящее', true],
+  ['моющее', 'Средство чистящее', true],
+  ['хозтовары', 'Мыло хозяйственное', true], // at the threshold
+  ['для дома', 'Крем для рук', false],
+  ['гигиена', null, false],
+  ['косметика', null, false],
+  ['уход за собой', null, false],
+  ['для кошки', 'Корм для кошек', false],
+  ['зоотовары', 'Пелёнки для животных', true],
+  ['для питомца', 'Лакомство для собак', true, ['Пелёнки для животных', true]], // either way: ARM, x86
+]
+
+const ABSENT_ANSWERS: readonly (readonly [string, string | null, boolean])[] = [
+  ['кружка', 'Грудка куриная', false], // at the threshold
+  ['зарядка для телефона', null, false],
+  ['носки', 'Виски', false],
+  ['футболка', null, false],
+  ['сигареты', null, false],
+  ['бензин', null, false],
+  ['таблетки от головы', null, false],
+  ['витамины', null, false],
+  ['цветы', 'Капуста цветная', true],
+  ['газета', 'Гата', false],
+  ['билет на автобус', null, false],
+  ['стрижка', 'Стружка кокосовая', true],
+  ['молоток', 'Молоко', false],
+  ['шуруповёрт', null, false],
+  ['краска', 'Икра красная', true],
+  ['клей', 'Сироп кленовый', true],
+  ['ручка шариковая', null, false],
+  ['тетрадь', null, false],
+  ['игрушка', null, false],
+  ['наушники', null, false],
+  ['зонт', null, false],
+  ['кастрюля', null, false],
+  ['сковорода', null, false],
+  ['кроссовки', null, false],
+  ['симкарта', null, false],
+]
+
+describe('the corpus of shelf words, pinned whole', () => {
+  it('pins an answer for every word of the corpus, and for nothing else', () => {
+    expect(SHELF_ANSWERS.map(([word]) => word)).toEqual(SHELF_WORDS.map(([word]) => word))
+    expect(ABSENT_ANSWERS.map(([word]) => word)).toEqual([...SEED_ABSENT])
+  })
+
+  it.each(
+    [...SHELF_ANSWERS, ...ABSENT_ANSWERS].map(([word, name, near, other]) => ({
+      word,
+      answers: [[name, near] as const, ...(other ? [other] : [])],
+    })),
+  )('«$word» → $answers', async ({ word, answers }) => {
+    const { names, near } = await search(word)
+    expect(answers.map((answer) => JSON.stringify(answer))).toContain(
+      JSON.stringify([names[0] ?? null, near]),
+    )
   })
 })
 
