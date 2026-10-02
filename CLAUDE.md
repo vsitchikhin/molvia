@@ -182,9 +182,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **An aggregate needs three people** (`AGGREGATE_MIN_CONTRIBUTIONS`); a stranger's lone verdict
   does not appear at all. **Prices are stricter**, filtered by the asker's country and city, one's
   own purchases excepted and put own city first (Р-26).
-- **A place's price is its last one, not its lowest** (MOL-166): one's own last where one bought,
-  by the fragment «Тут дешевле» reads (`latestFirst`); a place opened by others — the lower median
-  of each buyer's last.
+- **A place's price is its last one, not its lowest** (MOL-166): its last purchase in any currency
+  and unit, never the last of a pair; one's own where one bought, by the fragment «Тут дешевле»
+  reads (`latestFirst`); a place opened by others — the lower median of each buyer's last within
+  `SHARED_PRICE_FRESH_DAYS`.
 - **«Только если дёшево» is the lower median from three purchases**; one «currency + unit» per
   item; order by rating down, then name.
 - **The limit never cuts one's own rows or the warnings** (Р-23, Р-25:

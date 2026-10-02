@@ -177,6 +177,19 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   people's figures is a price someone paid without naming who was there yesterday. The moving
   picture stays the known limit it was under the minimum. Places are ordered by this price, own
   city first; `observations` and the latest visit still count every purchase, for Р-4 alone.
+  **«Last» is the place's, not the pair's** (adversarial А, owner's decision): a place is named
+  by its last purchase in whatever currency and unit it was made, and a pair it was not made in is
+  not that place's price at all — three August kilos at a discount stood under «Дешевле всего»
+  for a shop where a pack was bought in September, and with access a place one bought packs in was
+  named by strangers' kilos. A buyer's last is decided before the threshold of three filters
+  (`place_last`, `mine_here` in `pricedRows`), and a pair of a place opened by others needs three
+  buyers whose last purchase there is in it. **Other people's last purchases count for
+  `SHARED_PRICE_FRESH_DAYS` (90) days** (adversarial Б, owner's decision), by the record's day in
+  the phone's zone; fewer than three within the window and the place is closed. One's own has no
+  window (В-1). The prices, named: two who bought at a discount fifty days ago and never came back
+  still hold the place at the discount while the one who goes there now sees today's on their own
+  screen (Б1 of the adversarial report — the window closes it only past ninety days); a place one
+  bought at last year shows one's own year-old price over three strangers' of this week (Б2, В-1).
 - **The threshold of «только если дёшево» is the lower median, from three purchases**
   (`PRICE_MEDIAN_MIN_OBSERVATIONS`, MOL-33's answer) — `percentile_disc(0.5)`, a price someone
   actually paid, the same rule `isRateJump` follows. Fewer than three and the field is `null`,
@@ -272,7 +285,9 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
 - **A place's price is the last one paid there, not the lowest** (В-3, the owner's comment: «цены в
   магазинах подниматься могут, а вот спускаются редко»). Last by the record's own day as the phone
   named it (MOL-121), then the moment it began, then the moment the row was written; the day printed
-  is that purchase's. **«Что брать» names the same price** (MOL-166), by the same fragment
+  is that purchase's. **One row a place, in the currency and unit of that last purchase** (MOL-166,
+  adversarial А): a price typed by the kilo is compared only with places whose last purchase was by
+  the kilo — the August kilo of a shop where a pack was bought since is no longer said. **«Что брать» names the same price** (MOL-166), by the same fragment
   (`latestFirst`) — a test asks both about one place.
 - **Only the city of the record** (В-4): a cheaper Erevan receipt is no action at a Gyumri shelf.
   **The server reads it off the record's place** (`trip=`, review №1): `TripView` carries no city,
