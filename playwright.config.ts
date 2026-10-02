@@ -134,6 +134,9 @@ export default defineConfig({
       // No central bank in a test run: its answer would decide the outcome (MOL-39).
       env: {
         RATES_REFRESH: 'off',
+        // Without the model of the search by meaning (MOL-105): the search answers by the letters,
+        // and this run is the proof that it holds without it.
+        EMBEDDINGS: 'off',
         API_PORT: apiPort,
         DATABASE_URL: databaseUrl,
         TELEGRAM_BOT_USERNAME: 'molvia_test_bot',
