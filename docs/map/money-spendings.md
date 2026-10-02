@@ -87,4 +87,4 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 ## e2e
 
 - `e2e/money.spec.ts` — End-to-end: a spending lands in the month through the queue, offline too; «Вернуть», own categories, «Остаток» and the salary shift.
-- `e2e/money-charts.spec.ts` — End-to-end: «Графики → Месяц» from the ring of «Куда ушли», the month by `replace`, a sector, the usual from three months, a day of the pace; «Год», a bar by a tap, offline.
+- `e2e/money-charts.spec.ts` — End-to-end: «Графики → Месяц» from the ring of «Куда ушли», the month by `replace`, a sector, the usual from three months, a day of the pace; «Год» of the calendar year — the year by `replace` back to the first with data, its average across the new year, a sector choosing the category; offline.
