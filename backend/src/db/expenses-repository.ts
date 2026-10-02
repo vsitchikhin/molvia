@@ -222,6 +222,18 @@ function asDate(value: Date | string): Date {
 }
 
 /**
+ * Which purchase in a place is the last one (MOL-92, В-3): the record's own day as the phone named
+ * it (MOL-121), else the moment it began read as a day in `zone`; then that moment, then the moment
+ * the row was written — two packs in one record, the later one. An `order by` over the columns of
+ * `pricedRows`, written once: «Что брать» and «Тут дешевле» name a place by the same purchase, or
+ * the home and the sheet disagree about one milk (MOL-166).
+ */
+function latestFirst(zone: string): SQL {
+  return sql`coalesce(started_on, (bought_at at time zone ${zone})::date::text) desc,
+             bought_at desc, written_at desc, expense_id desc`
+}
+
+/**
  * The two pieces of the statement both price aggregates share. What they mean, and why the
  * choosing happens on the row rather than on the aggregate, is written once — over
  * `pricedRows` below, where it is built.
@@ -788,9 +800,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           -- is a condition of its own (В-4), outside the privacy rule's \`or\`.
           from (select * ${priced.rows}) own
           where nearby
-          order by item_id, place_id, currency, unit,
-                   coalesce(started_on, (bought_at at time zone ${await zoneFor(query.zone)})::date::text) desc,
-                   bought_at desc, written_at desc, expense_id desc
+          order by item_id, place_id, currency, unit, ${latestFirst(await zoneFor(query.zone))}
         ) latest
         -- Cheapest last price first, inside a currency and unit; names by the collation the
         -- places of «Что брать» are ordered by, so a tie reads the same on both.
