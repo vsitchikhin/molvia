@@ -26,6 +26,7 @@ vi.mock('@/api', () => ({
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const GROCERIES = 'ffffffff-0000-4000-8000-000000000001'
 const CAFE = 'ffffffff-0000-4000-8000-000000000002'
+const OTHER = 'ffffffff-0000-4000-8000-000000000009'
 const amd = (text: string) => parseMoney(text, 'AMD')
 const rub = (text: string) => parseMoney(text, 'RUB')
 const plain = (text: string) => text.replace(/\s/g, ' ')
@@ -117,6 +118,7 @@ function yearCharts(patch: Partial<MoneyChartYearView> = {}): MoneyChartYearView
     average: null,
     averageFrom: '2026-11',
     closedCount: 1,
+    comparedTo: '2026-09-30',
     differenceTotal: rub('104813'),
     differenceMissing: [],
     firstMonth: '2026-08',
@@ -300,7 +302,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     )
     const view = await render()
     expect(plain(view.text())).toContain(
-      '֏179,841 on average — October 2025 to August 2026, without the running month',
+      '֏179,841 on average, October 2025 to August 2026, without the running month',
     )
     expect(charts(view)[0]?.find('.average').attributes('style')).toContain('height: 57.6%')
   })
@@ -458,6 +460,84 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     const view = await render()
     expect(view.find('.rate-line').exists()).toBe(false)
     expect(view.find('.losses').exists()).toBe(false)
+  })
+
+  it('a newcomer has neither arrow, and the arrow back waits for the first answer (adversarial Д)', async () => {
+    moneyChartYear.mockReturnValue(new Promise(() => undefined))
+    const waiting = await render()
+    const [back] = waiting.find('.switcher').findAll('button')
+    expect(back?.attributes('aria-disabled')).toBe('true')
+    waiting.unmount()
+
+    moneyChartYear.mockResolvedValue(
+      yearCharts({ firstMonth: null, monthsShown: 0, slices: [], categories: [] }),
+    )
+    const view = await render()
+    const buttons = view.find('.switcher').findAll('button')
+    expect(buttons.map((one) => one.attributes('aria-disabled'))).toEqual(['true', 'true'])
+    await buttons[0]?.trigger('click')
+    await flushPromises()
+    expect(moneyChartYear).toHaveBeenLastCalledWith('2026')
+  })
+
+  it('names the day the server compared the running month by, not the phone’s (adversarial В)', async () => {
+    vi.setSystemTime(new Date('2026-09-12T08:00:00Z'))
+    moneyChartYear.mockResolvedValue(yearCharts({ comparedTo: '2026-09-15' }))
+    const view = await render()
+    expect(plain(charts(view)[0]?.text() ?? '')).toContain('+2% against the usual by September 15')
+  })
+
+  it('says why there is no average when every closed month is short, not «3 of 3» (adversarial Б)', async () => {
+    moneyChartYear.mockResolvedValue(yearCharts({ averageFrom: null, closedCount: 3 }))
+    const view = await render()
+    expect(view.text()).toContain(en.spending.charts.year_avg_uncounted)
+    expect(view.text()).not.toContain('3 of 3')
+  })
+
+  it('a category chosen in the list chooses its sector, or lets the sector go (owner’s Е)', async () => {
+    moneyChartYear.mockResolvedValue(
+      yearCharts({
+        categories: [
+          ...yearCharts().categories,
+          {
+            category: { id: OTHER, preset: 'other', name: null, colour: null, archived: false },
+            average: null,
+            averageLevel: null,
+            points: CALENDAR.map((month) => ({ month, amount: amd('0'), change: null, level: 0 })),
+          },
+        ],
+      }),
+    )
+    const view = await render()
+    const radio = (id: string) =>
+      view.find(`.legend input[value="${id}"]`).element as HTMLInputElement
+    await view.find(`.legend input[value="${GROCERIES}"]`).trigger('click')
+    await flushPromises()
+    await view.find('select').setValue(CAFE)
+    await flushPromises()
+    expect(radio(CAFE).checked).toBe(true)
+    expect(radio(GROCERIES).checked).toBe(false)
+    expect(router.currentRoute.value.query.category).toBe(CAFE)
+
+    await view.find('select').setValue(OTHER)
+    await flushPromises()
+    expect(
+      view.findAll('.legend input').some((one) => (one.element as HTMLInputElement).checked),
+    ).toBe(false)
+  })
+
+  it('lets «нет курса месяца» wrap in its column, never a sum (review 10)', async () => {
+    const base = yearCharts()
+    const months = base.months.map((month) =>
+      month.month === '2026-09'
+        ? { ...month, spentIncome: null, spentIncomeLevel: null, difference: null }
+        : month,
+    )
+    moneyChartYear.mockResolvedValue({ ...base, months })
+    const view = await render()
+    const flow = charts(view)[1]
+    expect(flow?.findAll('.value.words')).toHaveLength(2)
+    expect(flow?.find('.value:not(.words)').text()).toContain('₽120,000')
   })
 
   it('must not fire: an answer that lost the race is not what the phone keeps', async () => {

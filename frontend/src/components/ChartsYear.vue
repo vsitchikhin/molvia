@@ -101,7 +101,9 @@
               </p>
               <p class="column">
                 <span class="label">{{ t('spending.charts.spent_legend') }}</span>
-                <span class="value">{{ approx(flowMonth.spentIncome) }}</span>
+                <span class="value" :class="{ words: flowMonth.spentIncome === null }">
+                  {{ approx(flowMonth.spentIncome) }}
+                </span>
               </p>
               <p class="column">
                 <span class="label">
@@ -111,7 +113,13 @@
                     })
                   }}
                 </span>
-                <span class="value" :class="{ negative: (flowMonth.difference?.minor ?? 0n) < 0n }">
+                <span
+                  class="value"
+                  :class="{
+                    negative: (flowMonth.difference?.minor ?? 0n) < 0n,
+                    words: flowMonth.difference === null,
+                  }"
+                >
                   {{ differenceOf(flowMonth) }}
                 </span>
               </p>
@@ -133,7 +141,7 @@
           :options="categoryOptions"
           hide-label
           class="category"
-          @update:model-value="chooseCategory"
+          @update:model-value="chooseFromList"
         >
           <template #lead>
             <span class="dot" :style="{ background: categoryColour(series.category) }"></span>
@@ -172,7 +180,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconChart from '~icons/mdi/chart-bar'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
-import { formatEstimate, previousMonth } from '@molvia/model'
+import { USUAL_MIN_CLOSED, formatEstimate, previousMonth } from '@molvia/model'
 import type { Money, MoneyChartYearView, SpendingCategoryView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
@@ -253,7 +261,8 @@ export default defineComponent({
 
     /**
      * The first year with anything in it, owner-wide: kept from any answer, so the arrow back stays
-     * bounded while another year loads (Р-9).
+     * bounded while another year loads (Р-9). Until an answer names one — a newcomer, or no answer
+     * yet — it is this year: the arrow back went on to 2025, 2024… on an empty screen (adversarial Д).
      */
     const known = ref<string | null>(null)
     watch(
@@ -263,7 +272,7 @@ export default defineComponent({
       },
       { immediate: true },
     )
-    const first = computed(() => known.value)
+    const first = computed(() => known.value ?? props.current)
 
     /** Whether a month runs is the phone's calendar's to say, not the answer's (review 3 of MOL-158). */
     const runningMonth = computed(() => today.value.slice(0, 7))
@@ -271,14 +280,17 @@ export default defineComponent({
       month === runningMonth.value
         ? t('spending.charts.center_running', { month: longMonth(month, locale.value) })
         : longMonth(month, locale.value)
-    /** «+73 % к среднему», the running month «+2 % к обычному к 12 сентября» (owner's decision В-2). */
+    /**
+     * «+73 % к среднему», the running month «+2 % к обычному к 12 сентября» (owner's decision В-2) —
+     * by the day the server compared to, a payment dated tomorrow included (adversarial В).
+     */
     const changeWords = (month: string, change: number | null) => {
       if (change === null) return null
       const value = signedPercent(change, locale.value)
       return month === runningMonth.value
         ? t('spending.charts.year_change_running', {
             change: value,
-            day: calendarDay(today.value, locale.value),
+            day: calendarDay(charts.value?.comparedTo ?? today.value, locale.value),
           })
         : t('spending.charts.year_change', { change: value })
     }
@@ -375,10 +387,14 @@ export default defineComponent({
           ...span,
         })
       }
-      return shown.averageFrom
-        ? t('spending.charts.year_avg_few', {
-            month: monthGenitive(previousMonth(shown.averageFrom), t),
-          })
+      if (shown.averageFrom) {
+        return t('spending.charts.year_avg_few', {
+          month: monthGenitive(previousMonth(shown.averageFrom), t),
+        })
+      }
+      // Months enough, each short in something: «3 из 3» said no to itself (adversarial Б).
+      return shown.closedCount >= USUAL_MIN_CLOSED
+        ? t('spending.charts.year_avg_uncounted')
         : t('spending.charts.year_avg_short', { n: shown.closedCount })
     })
 
@@ -469,8 +485,11 @@ export default defineComponent({
         typeof wanted === 'string' && series.value !== null && series.value.category.id !== wanted
       )
     })
+    /** The category this screen last asked the address for: the address answers a step later. */
+    let asked: string | null = null
     function chooseCategory(id: string): void {
       lastCategory = id
+      asked = id
       if (route.query.category === id) return
       void router.replace({ query: { ...route.query, category: id } })
     }
@@ -514,8 +533,18 @@ export default defineComponent({
     // is no one category, and letting a sector go leaves the category where it is.
     const sector = ref<string | null>(null)
     watch(sector, (key) => {
-      if (key !== null && key !== 'rest') chooseCategory(key)
+      if (key !== null && key !== 'rest' && key !== asked) chooseCategory(key)
     })
+    /**
+     * A category chosen in the list chooses its sector too, or lets the sector go when the ring has
+     * none of its own (owner's decision Е of the review): the ring and the card say one thing, and a
+     * tap on the sector shown never lets go of a category the card no longer shows.
+     */
+    function chooseFromList(id: string): void {
+      chooseCategory(id)
+      const own = charts.value?.slices.some((slice) => slice.categoryId === id) ?? false
+      sector.value = own ? id : null
+    }
     watch(
       () => props.year,
       () => {
@@ -564,6 +593,7 @@ export default defineComponent({
       categoryOptions,
       categoryMissing,
       chooseCategory,
+      chooseFromList,
       categoryBars,
       categoryAt,
       categoryPoint,
@@ -713,6 +743,11 @@ export default defineComponent({
 
   &.negative {
     color: var(--bad-ink);
+  }
+
+  /* «нет курса месяца» is words, not a sum: in a third of the card it ran into the next column. */
+  &.words {
+    white-space: normal;
   }
 }
 
