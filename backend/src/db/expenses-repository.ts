@@ -813,7 +813,8 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
                 -- else has opened it (В-1); once one has stopped going and three others go now,
                 -- it is theirs, named by their figure (adversarial О, owner's decision) — a single
                 -- purchase a year ago hid from someone with access a place three bought at today.
-                mine_here and (bool_or(own_recent) over place or not bool_or(their_named) over place)
+                mine_here
+                  and (bool_or(own_recent) over place or not bool_or(their_named) over place)
                   as own
               from (
                 select
