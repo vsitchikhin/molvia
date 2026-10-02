@@ -191,6 +191,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The search on «Что брать» is answered by the server** (`GET /advice/search`, MOL-128): the
   list's own statement and rules for what is found, never glued on the phone; it writes no visit and
   no pick; offline — the remembered list by the start of words.
+- **«Тут дешевле» is one's own history only** (`GET /advice/prices`, MOL-92): a place's last price,
+  the record's city, «не брать нигде» with no price; another item of the kind (`kindKey`) when
+  cheaper and rated no worse; it writes nothing; offline — the answer remembered, let go by a verdict.
 
 ### Money: rates, exchanges, incomes — `.claude/rules/money-rates.md`
 
@@ -648,8 +651,10 @@ database access. In a product about data integrity, two write paths will silentl
   is being typed, the sheet shows its unit price and its estimate in the income currency through
   `unitPrice()` and `convertMoney()` of `packages/model` — the very functions the server calls.
   At the shelf with no connection the price per litre is needed now, to decide whether to take
-  the thing. Once written, every number on screen is the server's; the phone never adds up a
-  total, not even for rows still in the queue.
+  the thing. **And «Тут дешевле» (MOL-92) compares that price with the person's own past ones
+  through `cheaperHint`** — the server sends the prices and cannot know what is typed. Once
+  written, every number on screen is the server's; the phone never adds up a total, not even for
+  rows still in the queue.
 - Split components so they are not overloaded, but without five wrappers around one tag.
   One well-scoped component beats five trivial ones.
 

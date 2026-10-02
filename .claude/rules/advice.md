@@ -2,19 +2,22 @@
 paths:
   - 'packages/model/src/{entities,contracts}/{advice,verdict,events}.ts'
   - 'packages/model/src/values/gate.ts'
+  - 'packages/model/src/entities/cheaper-hint.ts'
+  - 'packages/model/tests/entities/cheaper-hint.test.ts'
+  - 'backend/src/db/kind-word.ts'
   - 'packages/model/tests/{entities,contracts}/{advice,verdict}.test.ts'
   - 'backend/src/db/{verdicts,events,expenses}-repository.ts'
   - 'backend/src/db/gates-reader.ts'
   - 'backend/src/{gates,gates-cli}*.ts'
   - 'bin/gates.sh'
-  - 'backend/src/usecases/{advice,rate-item,amend-verdict,withdraw-verdict,pending-verdicts}*.ts'
+  - 'backend/src/usecases/{advice,rate-item,amend-verdict,withdraw-verdict,pending-verdicts,own-prices}*.ts'
   - 'backend/src/routes/{advice,verdicts}.ts'
   - 'backend/tests/{advice,verdicts,ratings-gate,events,pending,gates-reader}*.ts'
   - 'backend/drizzle/*{events,verdict,advice}*.sql'
   - 'frontend/src/views/{AdviceView,VerdictsView}*'
   - 'frontend/src/components/{Advice*,adviceRow*,Verdict*,rating*,RatingScale*}'
-  - 'frontend/src/composables/{useAdvice,useVerdictQueue}*'
-  - 'frontend/src/stores/verdictDrafts*'
+  - 'frontend/src/composables/{useAdvice,useVerdictQueue,useCheaperHint}*'
+  - 'frontend/src/stores/{verdictDrafts,ownPrices}*'
   - 'e2e/{advice,verdicts}.spec.ts'
 ---
 
@@ -244,6 +247,59 @@ only ever answer «not rated yet», and would teach that it is useless).
   read from the key's own table, never copied. «yo» against «Ёжик» (`ejik`) is the key's rule, not
   the filter's. The strip says the
   search is the list's only, as of its age.
+
+## «Тут дешевле» on the sheet of a purchase (MOL-92)
+
+**The person types a price and sees where they paid less** — the reason to enter a price and not only
+a rating, given back the moment it is typed. `GET /advice/prices?item=&country=&city=[&except=]`
+answers, `cheaperHint` of the domain says which line to show against what is typed. The owner's
+decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
+
+- **Only one's own purchases** (В-1 of the 0.2 round, 26.09.2026): with access or without, the same
+  answer. Other people's prices by city are an aggregate, and aggregates are 0.3's hypothesis. Family
+  (MOL-88) joins when it exists, by one condition on the rows.
+- **A place's price is the last one paid there, not the lowest** (В-3, the owner's comment: «цены в
+  магазинах подниматься могут, а вот спускаются редко»). Last by the record's own day as the phone
+  named it (MOL-121), then the moment it began, then the moment the row was written; the day printed
+  is that purchase's. **«Что брать» still names the minimum** — moving it is MOL-166, kept apart
+  because the last price of a place in the shared mode is one stranger's receipt.
+- **Only the city of the record** (В-4): a cheaper Erevan receipt is no action at a Gyumri shelf. The
+  phone sends the city: `TripView` carries none, and a field added to it would be refused by every
+  older client's strict codec — so it is the start's own context while that start is still in the
+  queue, else the person's settings, which a record starts from (MOL-65). **The price, named:** a
+  record amended after the person moved city is compared with the new city.
+- **«Не брать нигде» says nothing** — the answer is a union on `level`, and `never` has no field for a
+  price, a place or an alternative. The level and the ratings are those «Что брать» shows this person,
+  read by the same `adviceRowsFor` and `describe`, so the sheet and the screen cannot disagree on what
+  is bad. A withdrawn verdict is no verdict: prices again.
+- **Another item of the kind** (В-3, В-7…В-9): one's own products bought with a price in the city
+  whose word of the kind is the item's (`kindKey`, MOL-45 — the SQL spelling is `kindAt`, one
+  fragment for the search and for this). Shown when strictly cheaper than the price typed — before
+  one is, than the item's own cheapest — and rated no worse by the printed tenth (Р-22); beside an
+  item not rated, only one in «Брать» (В-8); an unrated alternative never (Р-11). Of those that
+  qualify, the best rated, the cheapest breaking a tie — «если Марианна дешевле, но оценена ниже,
+  показываем Анелик» (В-9). The server sends at most `OWN_ALTERNATIVES_MAX`, best rated first, since
+  which one qualifies depends on what is typed. **The word of the kind is coarser than a category**:
+  «Сыр плавленый» is an alternative to «Сыр Лори»; «оценено не хуже» is what holds it, and embeddings
+  (MOL-87) may replace the word. «Молоко Марианна 3.2» and «… 3.2%» are two items until MOL-87 merges
+  them — a second rule of identity here would be a second place that decides (Р-14).
+- **Only products** (Р-1): a dish is the venue's own, and «cheaper in another restaurant» is another
+  dish. An item the catalogue does not hold has the same empty answer.
+- **The comparison is the domain's, called by the phone** — the one extension of MOL-24's exception:
+  the server sends prices, it cannot know what is being typed. Unit prices of past purchases are the
+  server's (SQL, `UNIT_PRICE_SCALE`); compared only inside one currency and unit, the typed price's
+  own.
+- **It writes nothing**: no `advice_viewed`, no pick. The person looks at their own prices.
+- **A hint, not a screen**: no loading, no error. With a signal it waits for the server; with none,
+  the last answer for the item and city remembered on the device (`molvia.own-prices.<owner>`, a
+  hundred items, В-5) — never for an amendment, whose remembered answer may hold the row itself
+  (`except`, Т-9). **A verdict given on this phone lets go of every remembered answer naming the
+  item**, as itself or as an alternative: a memory older than «не брать нигде» would put a price
+  beside it with no signal. A verdict given on another device while this one is offline is not
+  heard — the price, named, narrow.
+- **It lives in the box of the unit price and grows it downwards** (В-6): the fields above never move
+  when the answer comes late. Never red — red is «не брать нигде». Read out with the unit price, after
+  the same pause, through the one live region.
 
 ## A withdrawn verdict
 

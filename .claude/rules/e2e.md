@@ -96,7 +96,7 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **seven things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
-  count of an answer, and an empty answer's own words), `ItemDetailsSheet` (the price per unit),
+  count of an answer, and an empty answer's own words), `ItemDetailsSheet` (the price per unit, with «Тут дешевле», MOL-92),
   `VerdictCard` («Pick a rating»), `useSettings` (the form's notice) and `YourDataGroup` («Файл
   готов», MOL-93). Whatever any of them
   says is on the screen twice, so a plain `getByText` matches two nodes and playwright's strict
