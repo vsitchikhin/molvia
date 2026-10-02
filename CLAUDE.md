@@ -630,8 +630,9 @@ database access. In a product about data integrity, two write paths will silentl
   contributions — three of them, and a contribution is a person, not a row
   (`AGGREGATE_MIN_CONTRIBUTIONS`). Otherwise someone's basket can be derived from the
   "average price". **An open place discloses exact prices, not blurred ones:** once three
-  buyers open it, the minimum is one person's actual receipt and the median of three is a
-  second — and the median's is in no list of places. Both are accepted: the number of three is
+  buyers open it, its price — the lower median of each buyer's last there (MOL-166) — is one
+  person's actual receipt, and the threshold of «только если дёшево», the lower median of every
+  purchase in the city, is a second, which no place in the list names. Both are accepted: the number of three is
   argued from the arithmetic of an _average_, and neither of these averages anything. Closing
   it means giving up the threshold, since a middle built from what is already shown almost
   never has three places behind it. **The threshold closes the still picture, not the moving

@@ -21,8 +21,9 @@ export type AdviceScope = z.infer<typeof adviceScopeSchema>
 
 /**
  * A place and what it charges for one item — its last unit price, not the lowest ever seen
- * (MOL-166). `observations` is how many purchases stand behind it — the same honesty the rating count carries: one purchase is a
- * number, not a history.
+ * (MOL-166): one's own last purchase there, or the lower median of each buyer's last. It does not
+ * stand on `observations`, which is how many purchases there are in the place, in this currency
+ * and unit — what the server weighs to choose one «currency + unit» per item (Р-4).
  */
 export const advicePlaceSchema = z.strictObject({
   placeId: z.uuid(),

@@ -212,16 +212,17 @@ describe('где дешевле', () => {
       tripId: trip.id,
       itemId,
       quantity: litre,
-      amount: price,
+      amount: cheaper,
     })
-    // Две пачки одной записи — по поздней строке; без паузы их моменты могут совпасть.
+    // Две пачки одной записи — по поздней строке, хотя ранняя дешевле; без паузы их моменты могут
+    // совпасть.
     await db.execute(sql`select pg_sleep(0.01)`)
     await expenses.add(actorId, {
       id: randomUUID(),
       tripId: trip.id,
       itemId,
       quantity: litre,
-      amount: cheaper,
+      amount: price,
     })
     await expenses.add(actorId, {
       id: randomUUID(),
@@ -235,7 +236,7 @@ describe('где дешевле', () => {
     const drams = rows.find((row) => row.currency === 'AMD')
 
     expect(rows).toHaveLength(2)
-    expect(drams?.scaledMinor).toBe(unitPrice(cheaper, litre).scaledMinor)
+    expect(drams?.scaledMinor).toBe(unitPrice(price, litre).scaledMinor)
     expect(drams?.observations).toBe(2)
   })
 
