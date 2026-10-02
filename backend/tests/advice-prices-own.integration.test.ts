@@ -365,7 +365,7 @@ describe('«Что брать» and the sheet name one price for one place (MOL-
     expect(await sheet(me, milk)).toEqual(named)
   })
 
-  it('names a place where a pack was bought last by the pack, on the list and on the sheet (adversarial А)', async () => {
+  it('names a place where a pack was bought last by the pack, and keeps the row in kilos (adversarial А, Д)', async () => {
     const me = await insertActor(db)
     const cheese = await item('Сыр Чанах')
     await rate(me, cheese, 5)
@@ -385,12 +385,15 @@ describe('«Что брать» and the sheet name one price for one place (MOL-
       quantity: kilo,
     })
 
-    // The pairs weigh one purchase each now, and the later visit chooses the pack (Р-4).
-    const named = [
-      { name: 'SAS', price: unitPrice(amd(120_000), { milli: 1000n, unit: 'piece' }).scaledMinor },
-    ]
-    expect(await home(me)).toEqual(named)
-    expect((await sheet(me, cheese)).filter((place) => place.name === 'SAS')).toEqual(named)
+    // The kilo weighs four purchases and the pack one (Р-4 by every purchase, adversarial Д), so
+    // the row stays in kilos; SAS, whose last purchase was the pack, is not in it.
+    const kilos = { name: 'Ереван Сити', price: unitPrice(amd(280_000), kilo).scaledMinor }
+    const pack = {
+      name: 'SAS',
+      price: unitPrice(amd(120_000), { milli: 1000n, unit: 'piece' }).scaledMinor,
+    }
+    expect(await home(me)).toEqual([kilos])
+    expect(await sheet(me, cheese)).toEqual([kilos, pack])
   })
 
   it('reads a record from an old queue in the zone the request names, on the list and in its search', async () => {

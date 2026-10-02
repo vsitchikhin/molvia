@@ -460,9 +460,15 @@ describe('место — его последняя покупка, а не по�
     await bought(me, cheese, sas, amd(120_000), piece, { on: '2026-09-20' })
     await bought(me, cheese, city, amd(280_000), kilo, { on: '2026-09-18' })
 
-    expect(rowsOf(await expenses.placePricesFor(ownPrices(me, [cheese])))).toEqual([
+    const rows = await expenses.placePricesFor(ownPrices(me, [cheese]))
+    expect(rowsOf(rows)).toEqual([
       ['SAS', 'piece', price(120_000, piece)],
       ['Ереван Сити', 'kg', price(280_000)],
+    ])
+    // Пара весит всеми своими покупками, и августовскими кило SAS тоже (адверсариальный Д).
+    expect(rows.map((row) => [row.unit, row.observations, row.pairObservations])).toEqual([
+      ['piece', 1, 1],
+      ['kg', 1, 4],
     ])
   })
 
@@ -521,6 +527,21 @@ describe('давность чужих последних (MOL-166, адверс�
     expect(open?.scaledMinor).toBe(price(600_000))
     // Трое покупали, но в окне — двое: место закрыто.
     expect(await expenses.placePricesFor(sharedPrices(me, [pastEdge]))).toEqual([])
+  })
+
+  it('окно считается от сегодня телефона, когда запрос его называет (MOL-121)', async () => {
+    const me = await insertActor(db)
+    const itemId = await insertItem(db)
+    const theirs = await insertPlace(db, { name: 'Зовуни' })
+    for (const days of [1, 2, SHARED_PRICE_FRESH_DAYS + 5]) {
+      await bought(await insertActor(db), itemId, theirs, amd(600_000), kilo, { on: ago(days) })
+    }
+
+    // От сегодня сервера третий покупатель вне окна, от «сегодня» десять дней назад — внутри.
+    expect(await expenses.placePricesFor(sharedPrices(me, [itemId]))).toEqual([])
+    expect(
+      await expenses.placePricesFor({ ...sharedPrices(me, [itemId]), today: ago(10) }),
+    ).toHaveLength(1)
   })
 
   it('старая последняя покупка вернувшегося покупателя не держит место на акции', async () => {

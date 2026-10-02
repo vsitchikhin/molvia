@@ -42,15 +42,20 @@ function rated(patch: Partial<AdviceVerdictRow> & { sum: number }): AdviceVerdic
   return { itemId: BEEF, name: 'Говядина, вырезка', count: 1, review: null, isMine: true, ...patch }
 }
 
+/** A place alone in its pair unless the pair's weight is named. */
 function price(patch: Partial<PlacePrice> & { scaledMinor: bigint }): PlacePrice {
+  const observations = patch.observations ?? 1
+  const latestVisitAt = patch.latestVisitAt ?? new Date('2026-09-18T10:00:00.000Z')
   return {
     itemId: BEEF,
     placeId: MARKET,
     placeName: 'Рынок в Гюмри',
     currency: 'AMD',
     unit: 'kg',
-    observations: 1,
-    latestVisitAt: new Date('2026-09-18T10:00:00.000Z'),
+    observations,
+    latestVisitAt,
+    pairObservations: observations,
+    pairLatestVisitAt: latestVisitAt,
     ...patch,
   }
 }
@@ -242,6 +247,27 @@ describe('места и порог', () => {
 
     expect(row?.level === 'take' && row.places).toHaveLength(1)
     expect(row?.level === 'take' && row.places[0]?.unitPrice.currency).toBe('AMD')
+  })
+
+  it('взвешивает пару всеми её покупками, а не местами, которые она называет (адверсариальный Д)', async () => {
+    // SAS: десять кило, потом пачка — место названо пачкой; рынок: одно кило. Пара «кг» весит 11.
+    const prices = [
+      price({ scaledMinor: perKilo(240_000), observations: 1, pairObservations: 11 }),
+      price({
+        placeId: SAS,
+        placeName: 'SAS',
+        unit: 'piece',
+        scaledMinor: 120_000n,
+        observations: 1,
+        latestVisitAt: new Date('2026-10-01T10:00:00.000Z'),
+      }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
+      'Рынок в Гюмри',
+    ])
   })
 
   it('при равном числе наблюдений решает последняя покупка', async () => {
@@ -507,9 +533,19 @@ describe('зона телефона (MOL-166)', () => {
   it('доходит до цен мест: «последняя» читается в той же зоне, что на листе', async () => {
     const { deps: withZone, queries } = asking([rated({ itemId: BEEF, sum: 5 })])
 
-    await advice(withZone, ACTOR, 'Asia/Tokyo')
+    await advice(withZone, ACTOR, { zone: 'Asia/Tokyo' })
 
     expect(queries.map((query) => query.zone)).toEqual(['Asia/Tokyo'])
+  })
+
+  it('несёт и сегодня телефона — от него окно чужих цен', async () => {
+    const { deps: withToday, queries } = asking([rated({ itemId: BEEF, sum: 5 })])
+
+    await advice(withToday, ACTOR, { today: '2026-10-02', zone: 'Asia/Yerevan' })
+
+    expect(queries.map(({ today, zone }) => ({ today, zone }))).toEqual([
+      { today: '2026-10-02', zone: 'Asia/Yerevan' },
+    ])
   })
 
   it('без зоны поля нет вовсе — репозиторий берёт Ереван', async () => {
@@ -519,5 +555,6 @@ describe('зона телефона (MOL-166)', () => {
 
     expect(queries).toHaveLength(1)
     expect(queries[0]).not.toHaveProperty('zone')
+    expect(queries[0]).not.toHaveProperty('today')
   })
 })

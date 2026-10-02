@@ -29,6 +29,7 @@ import type { ExpenseRepository, PlacePrice, PriceMedian } from '@/db/expenses-r
 import type { ItemRepository } from '@/db/items-repository'
 import type { AdviceVerdictRow, VerdictRepository } from '@/db/verdicts-repository'
 import { SEARCH_LIMIT } from '@/usecases/search-catalogue'
+import type { Today } from '@/usecases/today'
 
 export interface AdviceDeps {
   readonly actors: ActorRepository
@@ -62,8 +63,11 @@ const groupKeyOf = (price: { currency: string; unit: string }): GroupKey =>
 export async function advice(
   { actors, verdicts, expenses, events }: AdviceDeps,
   actorId: string,
-  /** The phone's (MOL-121): which purchase of a place is its last, as «Тут дешевле» reads it. */
-  zone?: string,
+  /**
+   * The phone's day and zone (MOL-121): which purchase of a place is its last, as «Тут дешевле»
+   * reads it, and the today other people's last purchases are counted back from.
+   */
+  phone: Today = {},
 ): Promise<AdviceResponse> {
   const actor = await actors.byId(actorId)
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
@@ -81,7 +85,7 @@ export async function advice(
     limit: ADVICE_LIMIT,
   })
 
-  const rows = await describe(expenses, actor, scope, rated.rows, zone)
+  const rows = await describe(expenses, actor, scope, rated.rows, phone)
 
   // Encoded here rather than only in the route, the way `tripViewFor` is: an answer the wire
   // cannot carry has to fail where it was built, beside the data that made it.
@@ -148,7 +152,7 @@ export async function adviceSearch(
   { actors, verdicts, expenses, items }: AdviceSearchDeps,
   actorId: string,
   query: string,
-  zone?: string,
+  phone: Today = {},
 ): Promise<AdviceSearchResponse> {
   const actor = await actors.byId(actorId)
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
@@ -173,7 +177,7 @@ export async function adviceSearch(
             itemIds,
           })
         ).rows
-  const rows = await describe(expenses, actor, scope, rated, zone)
+  const rows = await describe(expenses, actor, scope, rated, phone)
   const byItem = new Map(rows.map((row) => [row.itemId, row]))
   const answered = [...first, ...past.filter((item) => byItem.has(item.id))]
 
@@ -204,7 +208,7 @@ async function describe(
   actor: { readonly id: string; readonly country: string; readonly city: string },
   scope: AdviceScope,
   rated: readonly AdviceVerdictRow[],
-  zone: string | undefined,
+  { today, zone }: Today,
 ): Promise<AdviceRow[]> {
   const levelled = rated.map((row) => ({ row, level: verdictLevel(row.sum, row.count) }))
   const asked = (...levels: readonly VerdictLevel[]) =>
@@ -226,6 +230,7 @@ async function describe(
     expenses.placePricesFor({
       ...query,
       itemIds: asked('take', 'if_cheap'),
+      ...(today === undefined ? {} : { today }),
       ...(zone === undefined ? {} : { zone }),
     }),
     expenses.medianPriceFor({ ...query, itemIds: asked('if_cheap') }),
@@ -257,13 +262,18 @@ function groupPrices(places: readonly PlacePrice[]): Map<string, Map<GroupKey, P
  * an offline queue delivered it: a single trip abroad must not replace a year of buying the
  * same thing at home. Two prices from different groups cannot be
  * compared without a rate, and a rate belongs to one trip and one day.
+ *
+ * Weighed by every purchase in the pair, the server's `pairObservations` — not by the places the
+ * pair still names (MOL-166, adversarial Д): a place is named by its last purchase alone, and one
+ * pack in a shop bought by the kilo for ten weeks turned the row to pieces and hid the market.
  */
 function dominant(groups: Map<GroupKey, PlacePrice[]>): [GroupKey, PlacePrice[]] | undefined {
   let best: [GroupKey, PlacePrice[]] | undefined
   let bestWeight = { observations: 0, latestVisitAt: 0 }
   for (const [key, places] of groups) {
-    const observations = places.reduce((sum, place) => sum + place.observations, 0)
-    const latestVisitAt = Math.max(...places.map((place) => place.latestVisitAt.getTime()))
+    // The same on every row of one pair; the largest, should a caller ever hand two apart.
+    const observations = Math.max(...places.map((place) => place.pairObservations))
+    const latestVisitAt = Math.max(...places.map((place) => place.pairLatestVisitAt.getTime()))
     const better =
       observations > bestWeight.observations ||
       (observations === bestWeight.observations && latestVisitAt > bestWeight.latestVisitAt) ||

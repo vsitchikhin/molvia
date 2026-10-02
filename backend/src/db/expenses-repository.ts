@@ -107,9 +107,8 @@ export interface ExpenseRepository {
    * «Тут дешевле» (MOL-92): the **last** price this person paid in each place of the city, one
    * row per item and place, in the currency and unit of that last purchase (MOL-166, adversarial
    * А) — «цены в магазинах подниматься могут, а вот спускаются редко» (owner's decision, В-3).
-   * Built on the rows the other two aggregates read,
-   * in the own mode and only in the city asked about (В-4). Each item's places come cheapest
-   * first inside a currency and unit.
+   * Built on the rows the other two aggregates read, in the own mode and only in the city asked
+   * about (В-4). Each item's places come cheapest first inside a currency and unit.
    *
    * «Last» is by the day of the record as the phone named it (MOL-121), then the moment it
    * began, then the moment the row was written: two packs in one record — the later one.
@@ -160,6 +159,11 @@ export interface PriceQuery {
    * Read by `placePricesFor` alone; Yerevan's without one.
    */
   readonly zone?: string
+  /**
+   * The phone's today (`TODAY_HEADER`, MOL-121), which `freshDays` counts back from — «today» is
+   * the phone's on the server too. Without one, the server's day in `zone`.
+   */
+  readonly today?: string
 }
 
 /** What «Тут дешевле» asks for (MOL-92): this person's own purchases, in the city of the record. */
@@ -221,6 +225,14 @@ export interface PlacePrice {
    * the next reader to «fix» it back to `created_at`, which is what the offline queue stamps.
    */
   readonly latestVisitAt: Date
+  /**
+   * What the pair this row is in weighs for Р-4: every purchase of the item in this currency and
+   * unit, in every place, and the latest visit among them — including places the pair does not
+   * name because their last purchase was made in another (MOL-166, adversarial Д). The same on
+   * every row of one pair.
+   */
+  readonly pairObservations: number
+  readonly pairLatestVisitAt: Date
 }
 
 /**
@@ -278,6 +290,8 @@ interface PlacePriceShape extends Record<string, unknown> {
   scaledMinor: string | null
   observations: string
   latestVisitAt: Date | string
+  pairObservations: string
+  pairLatestVisitAt: Date | string
 }
 
 interface PriceMedianShape extends Record<string, unknown> {
@@ -739,12 +753,25 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
     async placePricesFor(query) {
       const zone = await zoneFor(query.zone)
       const priced = pricedRows(query, zone)
+      // «Today» is the phone's where the request names it (MOL-121); else the server's, in its zone.
+      const today =
+        query.today === undefined
+          ? sql`(now() at time zone ${zone})::date`
+          : sql`${query.today}::date`
       if (!priced) return []
 
       const found = await db.execute<PlacePriceShape>(sql`
         select "itemId", "placeId", "placeName", currency, unit, price::text as "scaledMinor",
-               observations, "latestVisitAt"
+               observations::text, "latestVisitAt", "pairObservations"::text, "pairLatestVisitAt"
         from (
+          -- What a pair weighs is every purchase of the item in it, in every place — counted
+          -- before the places a pair does not name are left out (adversarial Д, owner's decision):
+          -- weighed by what remained, one pack in a shop bought by the kilo for ten weeks turned
+          -- the whole row to pieces and hid the market where the kilo is cheaper.
+          select places.*,
+            sum(observations) over pair as "pairObservations",
+            max("latestVisitAt") over pair as "pairLatestVisitAt"
+          from (
           select
             item_id as "itemId",
             place_id as "placeId",
@@ -760,25 +787,30 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
               percentile_disc(0.5) within group (order by unit_price)
                 filter (where place_last and fresh)
             ) as price,
-            count(*)::text as observations,
+            count(*) as observations,
             max(bought_at) as "latestVisitAt",
-            bool_or(nearby) as nearby
+            bool_or(nearby) as nearby,
+            -- A pair is the place's only where its last purchase was made in it (adversarial А):
+            -- an August kilo is not what a shop charges once packs were bought there since. Where
+            -- this person bought, that is their own last purchase, and nobody else's figure stands
+            -- in for it; elsewhere, three buyers whose last purchase there is recent and in this
+            -- pair.
+            bool_or(mine and place_last)
+              or (not bool_or(mine_here)
+                  and count(distinct actor_id) filter (where place_last and fresh)
+                      >= ${query.minBuyers}) as named
           from (
             -- By the day of the record, as «last» is: a purchase of \`freshDays\` days ago counts.
             select *,
               coalesce(started_on, (bought_at at time zone ${zone})::date::text)::date
-                >= (now() at time zone ${zone})::date - ${query.freshDays}::int as fresh
+                >= ${today} - ${query.freshDays}::int as fresh
             ${priced.rows}
           ) showable
           group by item_id, place_id, place_name, currency, unit
-          -- A pair is the place's only where its last purchase was made in it (adversarial А): an
-          -- August kilo is not what a shop charges once packs were bought there since. Where this
-          -- person bought, that is their own last purchase, and nobody else's figure stands in for
-          -- it; elsewhere, three buyers whose last purchase there is recent and in this pair.
-          having bool_or(mine and place_last)
-              or (not bool_or(mine_here)
-                  and count(distinct actor_id) filter (where place_last and fresh) >= ${query.minBuyers})
-        ) places
+          ) places
+          window pair as (partition by "itemId", currency, unit)
+        ) weighed
+        where named
         -- Ordered here rather than after, and by the price itself: the screen shows the
         -- places of one item cheapest first, and a second sort in JavaScript would compare
         -- names by another alphabet than the one that ordered the rows of the answer (F7).
@@ -808,6 +840,8 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
             scaledMinor: BigInt(row.scaledMinor),
             observations: Number(row.observations),
             latestVisitAt: asDate(row.latestVisitAt),
+            pairObservations: Number(row.pairObservations),
+            pairLatestVisitAt: asDate(row.pairLatestVisitAt),
           },
         ]
       })
