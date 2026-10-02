@@ -376,8 +376,11 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   (`molvia.erased`, owner's decision В-3, on this tab's own shelf, review 4): «Ваши данные удалены»
   on the erasure's own `204`; «не знаем, удалились ли» on an intent finished by «nobody»; «это
   нажатие ничего не удалило» after a first-tap `401` once the door closes. The note goes as it is
-  read, whenever the server names somebody, and on «Выйти»'s own `204` — the last thing done was
-  not an erasure (round 3, Ж). **A failure keeps its door** (Б): a failed erasure
+  read, whenever the server names somebody, and **on a tap of «Выйти»** — the last thing done
+  was not an erasure, however that way out ends, its own `204` or the server's «nobody» (round 3
+  Ж, round 4 Ж′). **An erasure whose answer was lost stays unknown through a «Выйти»** (round 4,
+  № 11): neither its `204` nor «nobody» says anything of the person, so `molvia.erasing` is kept
+  and either ending says «не знаем». **A failure keeps its door** (Б): a failed erasure
   is not shown in the sheet of «Выйти», nor the other way; and it does not outlive the session it
   was about — the server's «nobody» takes it away, since the door closes over the sheet without
   closing it, and a login on the same page found the old words there (round 2, Г). The session is the whole proof (В-1): it

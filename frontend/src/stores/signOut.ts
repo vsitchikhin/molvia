@@ -100,9 +100,10 @@ export const useSignOutStore = defineStore('signOut', () => {
   let finishing = false
 
   /**
-   * What the login screen says about an intent finished by the server's «nobody» rather than its
-   * own answer: nothing for «Выйти», which that word completes; for an erasure, that its outcome is
-   * not known — the answer was lost, and «no session» is also a session that ended by itself.
+   * What the login screen says about an intent finished by the server's «nobody», or by «Выйти»'s
+   * own `204`, rather than by the erasure's answer: nothing for «Выйти» alone, which either word
+   * completes; for an erasure still waiting, that its outcome is not known — the answer was lost,
+   * and neither word says anything about the person.
    */
   function noteOfWaiting(owner: string): ErasureNote | null {
     return erasingOwner() === owner ? 'unknown' : null
@@ -151,7 +152,12 @@ export const useSignOutStore = defineStore('signOut', () => {
     }
     leaving.value = true
     failure.value = null
-    markLeaving(owner, way === 'erase')
+    // An erasure whose answer was lost stays unknown through a «Выйти»: its `204` and its «nobody»
+    // say nothing of the person, and both say «не знаем» on the login screen (round 4, № 11).
+    markLeaving(owner, way === 'erase' || wasErasing)
+    // A tap of «Выйти» is the last thing done here: a note of an earlier «Удалить» is not about it,
+    // however this way out ends — its own `204` or the server's «nobody» (round 3 Ж, round 4 Ж′).
+    if (way === 'logout') dropErasureNote()
     const before = actor.heard
     try {
       await (way === 'erase' ? api.eraseMe() : api.logout())
@@ -195,9 +201,7 @@ export const useSignOutStore = defineStore('signOut', () => {
       if (actor.heard !== before && actor.nobody) void finish(owner, noteOfWaiting(owner))
       return
     }
-    // A note of an earlier tap of «Удалить» is not about this way out (round 3, Ж).
-    if (way === 'logout') dropErasureNote()
-    await finish(owner, way === 'erase' ? 'erased' : null)
+    await finish(owner, way === 'erase' ? 'erased' : noteOfWaiting(owner))
   }
 
   /**

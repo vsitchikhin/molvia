@@ -455,6 +455,89 @@ describe('«Удалить мои данные» в настройках (MOL-94
     expect(sessionStorage.getItem('molvia.erased')).toBeNull()
   })
 
+  it('№ 11: удаление с потерянным ответом, потом «Выйти» с 204 — экран входа скажет «не знаем»', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToErase(view)
+    eraseMe.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'timeout', false))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch', false))
+    confirmButton().click()
+    await flushPromises()
+    sheet().querySelector<HTMLButtonElement>('button[aria-label]')?.click()
+    await flushPromises()
+    expect(localStorage.getItem('molvia.erasing')).toBe(OWNER)
+
+    await view.get('button.leave').trigger('click')
+    await flushPromises()
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    logout.mockResolvedValue(undefined)
+    ;[...sheet().querySelectorAll('button')]
+      .find((button) => button.textContent.trim() === en.sign_out.confirm)
+      ?.click()
+    await flushPromises()
+
+    expect(replaced).toEqual(['/'])
+    expect(sessionStorage.getItem('molvia.erased')).toBe('unknown')
+  })
+
+  it('№ 11: то же, но ответ «Выйти» потерян и выход доделало «никого» — тоже «не знаем»', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToErase(view)
+    eraseMe.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'timeout', false))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch', false))
+    confirmButton().click()
+    await flushPromises()
+    sheet().querySelector<HTMLButtonElement>('button[aria-label]')?.click()
+    await flushPromises()
+
+    await view.get('button.leave').trigger('click')
+    await flushPromises()
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    logout.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'timeout', false))
+    ;[...sheet().querySelectorAll('button')]
+      .find((button) => button.textContent.trim() === en.sign_out.confirm)
+      ?.click()
+    await flushPromises()
+
+    me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(replaced).toEqual(['/'])
+    expect(sessionStorage.getItem('molvia.erased')).toBe('unknown')
+  })
+
+  it('Ж′: «сессии нет» на удаление, потом «Выйти» с потерянным ответом и «никого» — экран входа молчит', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToErase(view)
+    eraseMe.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch', false))
+    confirmButton().click()
+    await flushPromises()
+    expect(sessionStorage.getItem('molvia.erased')).toBe('kept')
+    sheet().querySelector<HTMLButtonElement>('button[aria-label]')?.click()
+    await flushPromises()
+
+    await view.get('button.leave').trigger('click')
+    await flushPromises()
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    logout.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'timeout', false))
+    ;[...sheet().querySelectorAll('button')]
+      .find((button) => button.textContent.trim() === en.sign_out.confirm)
+      ?.click()
+    await flushPromises()
+
+    me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(replaced).toEqual(['/'])
+    expect(sessionStorage.getItem('molvia.erased')).toBeNull()
+  })
+
   it('шторку закрыли после сбоя, а сессии уже нет — стирание доделано, экран входа скажет «не знаем»', async () => {
     fillTheDrawer()
     const view = await render()
