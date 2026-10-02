@@ -243,6 +243,17 @@ a nested screen, «Покупки» without one would have said none of it. «N 
 until the record going on is known — before that its own waiting purchases would be counted
 (review Р-18).
 
+**A record open elsewhere is another shop when the name or the city differs** (MOL-120, adversarial
+Б1, owner's В-4): the index over `places` takes the city, so «Ереван Сити» of Gyumri left open
+yesterday is not the one a start names in Yerevan today, and «Дописать в ту запись» would write
+Yerevan's prices against the Gyumri shop for good. The record carries its place's city as
+`placeCity`, **beside `place`, never inside** — the phone keeps a record in `molvia.trip` and the
+history, the version before drops an unknown field at that level (`TRIP_FIELDS`, `TRIP_KEYS`) and
+reads `place` strictly; the start names its own by its `context`. «The same shop» is the domain's
+`cityWhereNameRepeats` over the pair: one name in two cities is said with both («Уже открыта запись
+в «Ереван Сити» в Гюмри»), different names without; a side with no city — a server before it, a
+start the old queue kept without a context — leaves the name alone to decide, as before.
+
 **No circle over an action anywhere** (MOL-77): the empty state's «+» read as a button and was the
 thing the owner tapped, so `ScreenState` draws an empty state without a circle when it is given no
 icon. **«Покупки» is empty only for a history known to be empty**: every write to a record persists
@@ -266,7 +277,21 @@ no memory is offline or a failure, never a newcomer — MOL-56's «no answer is 
 The memory of `useAdvice` is that knowledge, so no flag of its own is kept; `answeredEmpty` stays
 «Покупки»'s. «Ждут оценки» names places, not trips: a card carries the place and the moment the
 server took the purchase, and a purchase made with no signal arrives with the queue hours later, so
-no gap tells one trip from two (round 2, З1). **And it names them, never counts them**: a card
-carries the name without the city, so «Ереван Сити» of Gyumri and of Yerevan are one name — a
-number would claim what the phone does not know (round 3, И2). The handoff's «Из чека «SAS»» is not
-used: the queue of verdicts does not know a source (MOL-124, П-9).
+no gap tells one trip from two (round 2, З1). **And it names them, never counts them** (round 3,
+И2): a number would claim more than the line needs to say. **A place is its name and, where that
+name stands in two cities, its city** (MOL-120, owner's decisions В-1, В-2): «Из «Ереван Сити» в
+Гюмри и «Ереван Сити» в Ереване»; a name of one city reads alone, its city noise. The card of
+«Оценки» takes the same city from the queue — a card alone cannot know there is another shop of its
+name — so a card's city goes once the other card is rated. The rule is the domain's
+`cityWhereNameRepeats`, names and cities folded as the index over `places` folds them; **a card with
+no city** — a server before MOL-120, a card the phone kept from one — **leaves the whole queue named
+as before**, since it may be either shop: no city printed, and the names kept apart as written, not
+folded — «Ереван Сити» and «ЕРЕВАН СИТИ» may be the shops of two cities, and folded they read as one
+(adversarial А1). **The case is looked up by the city of the settings a spelling folds to**
+(`settingsCityOf`, А2): a place keeps its city as first written, and «гюмри» is «в Гюмри», never
+«(гюмри)». **A draft of a verdict keeps the city beside its card, never inside** (А4): the version
+before reads the card strictly, and a rollback dropped a verdict saved with no signal. The queue the
+phone remembers and the memory of «Что брать» keep the city inside the answer — **the price, named**:
+a rollback of MOL-120 forgets those two, which are caches, and the next answer brings them back.
+The handoff's «Из чека «SAS»» is not used: the queue of verdicts does not know a source (MOL-124,
+П-9).

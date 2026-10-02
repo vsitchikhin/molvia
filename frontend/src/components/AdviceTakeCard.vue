@@ -24,11 +24,13 @@
 import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { cityWhereNameRepeats } from '@molvia/model'
 import type { AdvicePlace, AdviceScope } from '@molvia/model'
 import AdviceRating from '@/components/AdviceRating.vue'
 import AppCard from '@/components/AppCard.vue'
 import VerdictBadge from '@/components/VerdictBadge.vue'
 import { placesView, unitPriceText, whereKey } from '@/components/adviceRow'
+import { placeLabel } from '@/components/placeLabel'
 import type { TakeRow } from '@/components/adviceRow'
 
 /**
@@ -55,9 +57,13 @@ export default defineComponent({
     edit: () => true,
   },
   setup(props) {
-    const { t, locale } = useI18n()
+    const i18n = useI18n()
+    const { t, locale } = i18n
 
     const places = computed(() => placesView(props.row.places))
+    // A place is named with its city where another place of the row shares its name (MOL-120).
+    const cityOf = computed(() => cityWhereNameRepeats(props.row.places))
+    const named = (place: AdvicePlace): string => placeLabel(place.name, cityOf.value(place), i18n)
 
     const unitPrice = (place: AdvicePlace): string =>
       unitPriceText(place.unitPrice, t, locale.value)
@@ -69,14 +75,14 @@ export default defineComponent({
     const where = computed(() => {
       const view = places.value
       if (view.kind === 'none') return ''
-      return t(whereKey(view), { place: view.best.name })
+      return t(whereKey(view), { place: named(view.best) })
     })
 
     const also = computed(() => {
       const view = places.value
       if (view.kind === 'none') return ''
       const rest = view.rest.map((place) =>
-        t('advice.also_place', { place: place.name, price: unitPrice(place) }),
+        t('advice.also_place', { place: named(place), price: unitPrice(place) }),
       )
       return t('advice.also_at', { places: rest.join(' · ') })
     })

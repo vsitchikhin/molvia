@@ -5,13 +5,13 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 
 ## packages/model
 
-- `packages/model/src/contracts/settings.ts` — Contract of the four settings (country, city, two currencies): `SETTINGS_CITIES`, `geographyAllowed`, the update body with its base.
+- `packages/model/src/contracts/settings.ts` — Contract of the four settings (country, city, two currencies): `SETTINGS_CITIES`, `settingsCityOf` (the settings' city a stored spelling folds to, MOL-120), `geographyAllowed`, the update body with its base.
 - `packages/model/src/contracts/trip.ts` — Wire contract of trips: start/add/finish/restore/rate-choice bodies, `deviceIdSchema`, trip view and history codecs (a history row with `itemCount` and `total`, MOL-128), recent places.
 - `packages/model/src/entities/expense.ts` — Entity of a trip purchase: item required, quantity and amount optional; the new-row and patch schemas.
 - `packages/model/src/entities/place.ts` — Entity of a place (shop or venue) with its country and city; the schema a new place is named by.
 - `packages/model/src/entities/trip.ts` — Entity of a trip: rate snapshot and rate choice, `TRIP_UNDO_MINUTES`, the effective rate, staleness, totals and conversion.
 - `packages/model/src/values/geo.ts` — Value schemas of a country code and a city name, and the time zone a country's day is read in (MOL-101).
-- `packages/model/src/values/place-identity.ts` — When two spellings name one place, the TypeScript twin of the database's place index. Tests: `backend/tests/place-identity.integration.test.ts`.
+- `packages/model/src/values/place-identity.ts` — When two spellings name one place, the TypeScript twin of the database's place index; and `cityWhereNameRepeats` (MOL-120), the one rule for when a place is printed with its city. Tests: `backend/tests/place-identity.integration.test.ts`.
 
 ## backend · routes
 
@@ -82,7 +82,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `frontend/src/composables/useCurrentTrip.ts` — Composable: the trip going on, from the store's last answer and the queue's unsent start/finish.
 - `frontend/src/composables/useFinishedTrip.ts` — Composable behind «Записанные покупки»: rows, amending, adding, removal and the refused-write notices.
 - `frontend/src/composables/useItemDetails.ts` — Composable: the state of «сколько, в чём, почём», parsed as typed, with unit price and estimate from the domain.
-- `frontend/src/composables/usePendingFrom.ts` — The line under «N покупок ждут оценки»: places by name, never counted (MOL-77), on «Покупки» and the newcomer's «Что брать».
+- `frontend/src/composables/usePendingFrom.ts` — The line under «N покупок ждут оценки»: places by name — and city, where one name stands in two (MOL-120) — never counted (MOL-77), on «Покупки» and the newcomer's «Что брать».
 - `frontend/src/composables/useSelectedTrip.ts` — Composable: one trip chosen by id, from the history cache and the server, with loading, missing and offline states.
 - `frontend/src/composables/useSettings.ts` — Composable and store of the settings form: draft kept per account, base, conflict per choice, save and its notices.
 - `frontend/src/composables/useTripContext.ts` — Composable behind the trip-context sheet: a draft of the settings handed to the queue for the held trip.

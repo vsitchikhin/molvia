@@ -52,6 +52,7 @@ export const TRIP_FIELDS = [
   'rateJump',
   'rateStale',
   'place',
+  'placeCity',
   'expenses',
   'total',
   'converted',

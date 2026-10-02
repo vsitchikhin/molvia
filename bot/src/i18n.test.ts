@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { en } from '@/i18n/en'
 import { ru } from '@/i18n/ru'
-import { t } from './i18n'
+import { SETTINGS_CITIES } from '@molvia/model'
+import { hasMessage, t } from './i18n'
 
 /** `{device}`, `{n}` — what a message expects to be handed when it is printed. */
 function placeholders(message: string): string[] {
@@ -31,6 +32,12 @@ describe('словарь бота', () => {
     for (const key of Object.keys(RU)) {
       expect(placeholders(EN[key] ?? ''), key).toEqual(placeholders(RU[key] ?? ''))
     }
+  })
+})
+
+describe('словарь бота: города', () => {
+  it('у каждого города настроек есть «в …» — иначе его место встанет в скобках (MOL-120)', () => {
+    for (const city of SETTINGS_CITIES) expect(hasMessage(`remind.in.${city}`), city).toBe(true)
   })
 })
 
