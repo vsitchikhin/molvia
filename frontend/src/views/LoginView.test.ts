@@ -257,13 +257,11 @@ it('leads to «Data and privacy», which opens without a session', async () => {
 
 describe('после «Удалить мои данные» (MOL-94, В-3)', () => {
   it('говорит, что данные удалены, один раз — и убирает отметку', async () => {
-    localStorage.setItem('molvia.erased', '1')
-    sessionStorage.setItem('molvia.erased', '1')
+    sessionStorage.setItem('molvia.erased', 'erased')
 
     const first = await render()
     expect(first.view.text()).toContain(en.login.erased)
     expect(first.view.text()).toContain(en.login.offer.title)
-    expect(localStorage.getItem('molvia.erased')).toBeNull()
     expect(sessionStorage.getItem('molvia.erased')).toBeNull()
     first.view.unmount()
 
@@ -271,8 +269,23 @@ describe('после «Удалить мои данные» (MOL-94, В-3)', () 
     expect(again.view.text()).not.toContain(en.login.erased)
   })
 
-  it('без отметки — обычный экран входа: «Выйти» ничего такого не говорит', async () => {
+  it('исход неизвестен — так и говорит; удаления не было — тоже (adversarial А)', async () => {
+    sessionStorage.setItem('molvia.erased', 'unknown')
+    const unknown = await render()
+    expect(unknown.view.get('.erasure').text()).toBe(en.login.erase_unknown)
+    expect(unknown.view.get('.erasure').classes()).toContain('doubt')
+    unknown.view.unmount()
+
+    sessionStorage.setItem('molvia.erased', 'kept')
+    const kept = await render()
+    expect(kept.view.get('.erasure').text()).toBe(en.login.erase_kept)
+    expect(kept.view.text()).not.toContain(en.login.erased)
+  })
+
+  it('без отметки или с чужим значением — обычный экран входа', async () => {
+    sessionStorage.setItem('molvia.erased', '1')
     const { view } = await render()
-    expect(view.text()).not.toContain(en.login.erased)
+    expect(view.find('.erasure').exists()).toBe(false)
+    expect(sessionStorage.getItem('molvia.erased')).toBeNull()
   })
 })

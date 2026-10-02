@@ -156,7 +156,7 @@ describe('«Удалить мои данные» в настройках (MOL-94
     confirmButton().click()
     await flushPromises()
     expect(localStorage.getItem(`molvia.advice.${OWNER}`)).toBe('{}')
-    expect(localStorage.getItem('molvia.erased')).toBeNull()
+    expect(sessionStorage.getItem('molvia.erased')).toBeNull()
     expect(replaced).toEqual([])
 
     answer()
@@ -166,7 +166,9 @@ describe('«Удалить мои данные» в настройках (MOL-94
     expect(logout).not.toHaveBeenCalled()
     expect(ownersKeys()).toEqual([])
     expect(localStorage.getItem('molvia.total-flipped')).toBe('1')
-    expect(localStorage.getItem('molvia.erased')).toBe('1')
+    // On this tab's shelf only: a neighbour hearing the drawer go must not take it (review 4).
+    expect(sessionStorage.getItem('molvia.erased')).toBe('erased')
+    expect(localStorage.getItem('molvia.erased')).toBeNull()
     expect(replaced).toEqual(['/'])
   })
 
@@ -217,7 +219,7 @@ describe('«Удалить мои данные» в настройках (MOL-94
     expect(localStorage.getItem(`molvia.advice.${OWNER}`)).toBe('{}')
   })
 
-  it('потерянный ответ: повтор находит «сессии нет», красных слов нет, стирание доделывает «кто я»', async () => {
+  it('потерянный ответ: повтор находит «сессии нет» — «не знаем», стирание доделывает «кто я»', async () => {
     fillTheDrawer()
     const view = await render()
     await askToErase(view)
@@ -230,8 +232,9 @@ describe('«Удалить мои данные» в настройках (MOL-94
 
     confirmButton().click()
     await flushPromises()
-    // The refusal alone settles nothing: the drawer waits for the server's own «nobody».
-    expect(sheet().textContent).not.toContain(en.erase.error)
+    // The refusal alone settles nothing: the drawer waits for the server's own «nobody», and the
+    // sheet says nobody can tell yet (adversarial В).
+    expect(sheet().textContent).toContain(en.erase.unknown)
     expect(localStorage.getItem(`molvia.advice.${OWNER}`)).toBe('{}')
 
     me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
@@ -240,9 +243,112 @@ describe('«Удалить мои данные» в настройках (MOL-94
 
     expect(ownersKeys()).toEqual([])
     expect(replaced).toEqual(['/'])
-    // Settled by «nobody», not by the erasure's own 204: the login screen says nothing it does
-    // not know.
-    expect(localStorage.getItem('molvia.erased')).toBeNull()
+    // Settled by «nobody», not by the erasure's own 204: the login screen says it is not known.
+    expect(sessionStorage.getItem('molvia.erased')).toBe('unknown')
+  })
+
+  it('А: сессии не было ещё до нажатия — ничего не стёрто ни там, ни тут, и это сказано', async () => {
+    fillTheDrawer()
+    localStorage.setItem(`molvia.trip-queue.${OWNER}`, '[]')
+    const view = await render()
+    await askToErase(view)
+    eraseMe.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+
+    confirmButton().click()
+    await flushPromises()
+    expect(sheet().textContent).toContain(en.erase.signed_out)
+    expect(localStorage.getItem('molvia.leaving')).toBeNull()
+    expect(sessionStorage.getItem('molvia.erased')).toBe('kept')
+
+    // The seam asks who this is, and the server knows nobody: the door closes, the drawer stays —
+    // a 401 erases nothing, and the account is still there to sign back into.
+    me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    sessionEnded()
+    await flushPromises()
+
+    expect(localStorage.getItem(`molvia.trip-queue.${OWNER}`)).toBe('[]')
+    expect(localStorage.getItem(`molvia.advice.${OWNER}`)).toBe('{}')
+    expect(replaced).toEqual([])
+    expect(sessionStorage.getItem('molvia.erased')).toBe('kept')
+  })
+
+  it('В: «сессии нет», а «кто я» не ответил — каждое нажатие говорит, что удаления не было', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToErase(view)
+    eraseMe.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'timeout', false))
+
+    for (let press = 0; press < 3; press += 1) {
+      confirmButton().click()
+      await flushPromises()
+      expect(sheet().textContent).toContain(en.erase.signed_out)
+    }
+    expect(eraseMe).toHaveBeenCalledTimes(3)
+    expect(localStorage.getItem(`molvia.advice.${OWNER}`)).toBe('{}')
+  })
+
+  it('В: «сессии нет», а сервер назвал того же владельца — отметка снята, второе нажатие стирает', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToErase(view)
+    eraseMe.mockRejectedValueOnce(new ApiError(ERROR.NO_ACTOR)).mockResolvedValueOnce(undefined)
+
+    confirmButton().click()
+    await flushPromises()
+    // Signed in again in another tab meanwhile: the server knows this owner under a new cookie.
+    sessionEnded()
+    await flushPromises()
+    expect(sheet().textContent).toContain(en.erase.signed_out)
+    expect(sessionStorage.getItem('molvia.erased')).toBeNull()
+
+    confirmButton().click()
+    await flushPromises()
+    expect(ownersKeys()).toEqual([])
+    expect(sessionStorage.getItem('molvia.erased')).toBe('erased')
+    expect(replaced).toEqual(['/'])
+  })
+
+  it('шторку закрыли после сбоя, а сессии уже нет — стирание доделано, экран входа скажет «не знаем»', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToErase(view)
+    eraseMe.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'timeout', false))
+    confirmButton().click()
+    await flushPromises()
+
+    me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    sheet().querySelector<HTMLButtonElement>('button[aria-label]')?.click()
+    await flushPromises()
+
+    expect(ownersKeys()).toEqual([])
+    expect(replaced).toEqual(['/'])
+    expect(sessionStorage.getItem('molvia.erased')).toBe('unknown')
+  })
+
+  it('Б: сбой удаления, пришедший при закрытом листе, не попадает в лист «Выйти» — и наоборот', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToErase(view)
+    let fail: (error: unknown) => void = () => undefined
+    eraseMe.mockReturnValue(
+      new Promise<void>((_resolve, reject) => {
+        fail = reject
+      }),
+    )
+    confirmButton().click()
+    await flushPromises()
+    sheet().querySelector<HTMLButtonElement>('button[aria-label]')?.click()
+    await flushPromises()
+    fail(new ApiError(ERROR.INTERNAL))
+    await flushPromises()
+
+    await view.get('button.leave').trigger('click')
+    await flushPromises()
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(sheet().textContent).not.toContain(en.sign_out.error)
+    expect(sheet().textContent).not.toContain(en.erase.error)
   })
 
   it('шторку закрыли после сбоя, а сессия жива — намерение снято, ящик цел', async () => {
@@ -287,7 +393,7 @@ describe('«Удалить мои данные» в настройках (MOL-94
 
     expect(logout).toHaveBeenCalledTimes(1)
     expect(eraseMe).toHaveBeenCalledTimes(1)
-    expect(localStorage.getItem('molvia.erased')).toBeNull()
+    expect(sessionStorage.getItem('molvia.erased')).toBeNull()
     expect(replaced).toEqual(['/'])
   })
 })

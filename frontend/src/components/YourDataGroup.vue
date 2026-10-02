@@ -62,7 +62,7 @@
       v-model:open="eraseOpen"
       :busy="signOut.leaving"
       :offline="!online"
-      :failure="signOut.failure"
+      :failure="signOut.eraseFailure"
       @confirm="signOut.leave('erase')"
     />
   </section>

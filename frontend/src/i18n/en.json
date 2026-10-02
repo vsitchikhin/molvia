@@ -994,7 +994,9 @@
     "final": "This cannot be undone. You can download a copy first: «Download my data».",
     "confirm": "Delete for good",
     "offline": "Deleting needs a connection.",
-    "error": "Could not delete: the server did not answer. Try again."
+    "error": "Could not delete: the server did not answer. Try again.",
+    "signed_out": "Your data was not deleted: this sign-in has already ended — in «Devices», for instance.",
+    "unknown": "We do not know whether the data was deleted: the answer to the last tap was lost, and the sign-in is gone."
   },
   "identity": {
     "error": {
@@ -1046,7 +1048,9 @@
       "title": "No internet, no sign-in",
       "body": "We will try by ourselves once the connection is back."
     },
-    "erased": "Your data has been deleted. You can sign in again, and it will be a new, empty account."
+    "erased": "Your data has been deleted. You can sign in again, and it will be a new, empty account.",
+    "erase_unknown": "We do not know whether your data was deleted: the server's answer was lost. Sign in: if the account is empty, it was deleted; if not, delete it again.",
+    "erase_kept": "Your data was not deleted: the sign-in on this device had already ended. Sign in and delete it again."
   },
   "dev": {
     "kit": {
@@ -1272,7 +1276,7 @@
     },
     "erase": {
       "title": "Delete everything",
-      "text": "In Settings, «Delete my data», or send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they, the items you added to the shared catalogue and the barcodes you linked stay, without your name. Deleting from Settings also erases the copies on the phone you deleted from; on other devices, and after /delete, they may remain: to remove them, sign out in Settings, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data. It is there so that whether Molvia gets used is counted honestly."
+      "text": "In Settings, «Delete my data», or send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they, the items you added to the shared catalogue and the barcodes you linked stay, without your name. Deleting from Settings also erases the copies on the phone you deleted from; on other devices, and after /delete, they may remain: to remove them, delete the app there or clear the site's data — or sign out there in Settings beforehand. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data. It is there so that whether Molvia gets used is counted honestly."
     }
   },
   "accounts": {

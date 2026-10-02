@@ -9,14 +9,22 @@
     <p v-if="offline" class="warn">{{ t('erase.offline') }}</p>
     <!-- Keys written whole: one built from a string is seen by neither the linter nor vue-tsc. -->
     <p v-else-if="failure" class="failed" role="alert">
-      {{ failure === 'offline' ? t('erase.offline') : t('erase.error') }}
+      {{
+        failure === 'offline'
+          ? t('erase.offline')
+          : failure === 'signed_out'
+            ? t('erase.signed_out')
+            : failure === 'unknown'
+              ? t('erase.unknown')
+              : t('erase.error')
+      }}
     </p>
 
     <template #footer>
       <AppButton
         variant="danger-ghost"
         block
-        :disabled="busy"
+        :busy="busy"
         :inactive="offline"
         @click="$emit('confirm')"
       >
@@ -50,7 +58,10 @@ export default defineComponent({
     busy: { type: Boolean, default: false },
     /** No connection now: nothing can be erased, and the sheet says so before a tap. */
     offline: { type: Boolean, default: false },
-    failure: { type: String as PropType<'offline' | 'error' | null>, default: null },
+    failure: {
+      type: String as PropType<'offline' | 'error' | 'signed_out' | 'unknown' | null>,
+      default: null,
+    },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',

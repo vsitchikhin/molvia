@@ -1,10 +1,19 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
-import { clearLeaving, forgetOwner, leavingOwner, markErased, markLeaving } from '@/stores/identity'
+import {
+  clearLeaving,
+  dropErasureNote,
+  erasingOwner,
+  forgetOwner,
+  leavingOwner,
+  markLeaving,
+  noteErasure,
+} from '@/stores/identity'
+import type { ErasureNote } from '@/stores/identity'
 import { whileQueueIsStill } from '@/stores/tripQueue'
 import { whileSpendingsAreStill } from '@/stores/spendingQueue'
 
@@ -42,6 +51,12 @@ function whileQueuesAreStill(owner: string, work: () => void): Promise<void> {
 export type WayOut = 'logout' | 'erase'
 
 /**
+ * Why the last attempt did not go through. The erasure has two of its own (adversarial А, В): its
+ * `401` says the session was gone, which for «Выйти» is the goal and for an erasure is not.
+ */
+type Failure = 'offline' | 'error' | 'signed_out' | 'unknown'
+
+/**
  * «Выйти» on this device (MOL-57, owner's decisions Q1–Q3), and since MOL-94 «Удалить мои данные»
  * through the same door: one intent — «this owner leaves this device» — and one ending, so the two
  * cannot drift apart. Only the request differs, and what the login screen says after the reload.
@@ -70,9 +85,28 @@ export const useSignOutStore = defineStore('signOut', () => {
   const actor = useActorStore()
   /** The request is on its way — the sheet holds its button. */
   const leaving = ref(false)
-  /** Why the last attempt did not end the session: no connection, or the server did not answer. */
-  const failure = ref<'offline' | 'error' | null>(null)
+  /**
+   * Why the last attempt failed, and through which door (adversarial Б): one value for both sheets
+   * showed a failed erasure in the sheet of «Выйти» as «Не получилось выйти», and the other way.
+   */
+  const failure = ref<{ readonly way: WayOut; readonly kind: Failure } | null>(null)
+  const logoutFailure = computed(() => {
+    const last = failure.value
+    return last?.way === 'logout' && (last.kind === 'offline' || last.kind === 'error')
+      ? last.kind
+      : null
+  })
+  const eraseFailure = computed(() => (failure.value?.way === 'erase' ? failure.value.kind : null))
   let finishing = false
+
+  /**
+   * What the login screen says about an intent finished by the server's «nobody» rather than its
+   * own answer: nothing for «Выйти», which that word completes; for an erasure, that its outcome is
+   * not known — the answer was lost, and «no session» is also a session that ended by itself.
+   */
+  function noteOfWaiting(owner: string): ErasureNote | null {
+    return erasingOwner() === owner ? 'unknown' : null
+  }
 
   /**
    * The owner is let go in this window first, so a write still in flight — a rating answering
@@ -80,16 +114,16 @@ export const useSignOutStore = defineStore('signOut', () => {
    * queue's lock so a window sending it cannot write it back; then the page is loaded afresh at
    * `/`, the one sweep that forgets the stores' memory as well.
    */
-  async function finish(owner: string, way: WayOut = 'logout'): Promise<void> {
+  async function finish(owner: string, note: ErasureNote | null): Promise<void> {
     if (finishing) return
     finishing = true
     actor.release()
     await whileQueuesAreStill(owner, () => {
       forgetOwner(owner)
     })
-    // Only the erasure's own `204` says it (В-3). One settled by the server's «nobody» after a lost
-    // answer may be a session that ended by itself, and the screen says nothing it does not know.
-    if (way === 'erase') markErased()
+    // «Удалены» only on the erasure's own `204` (В-3); the screen says nothing it does not know.
+    if (note) noteErasure(note)
+    else dropErasureNote()
     window.location.replace('/')
   }
 
@@ -101,23 +135,37 @@ export const useSignOutStore = defineStore('signOut', () => {
     // nothing leaves and nothing is left behind (round 3, Е1). A cancelled tap at the shelf with no
     // signal used to leave an intent that locked the app at the next launch until a signal came.
     if (!connected()) {
-      failure.value = 'offline'
+      failure.value = { way, kind: 'offline' }
       return
     }
+    // An erasure of this owner tried before, its answer lost: a `401` now may be that erasure done.
+    const unsettled = way === 'erase' && erasingOwner() === owner
     leaving.value = true
     failure.value = null
-    markLeaving(owner)
+    markLeaving(owner, way === 'erase')
     const before = actor.heard
     try {
       await (way === 'erase' ? api.eraseMe() : api.logout())
     } catch (error) {
       leaving.value = false
-      // A repeat of the erasure after a lost answer finds no session: the server did its part the
-      // first time. That refusal is not the word that settles it — `me()` is, and the seam in
-      // `api.ts` has asked it — so the sheet waits for it rather than say that nothing happened.
-      const gone = way === 'erase' && error instanceof ApiError && error.code === ERROR.NO_ACTOR
-      // Decided after the failure (MOL-19, A1).
-      if (!gone) failure.value = connected() ? 'error' : 'offline'
+      if (way === 'erase' && error instanceof ApiError && error.code === ERROR.NO_ACTOR) {
+        if (!unsettled) {
+          // **The session was gone before the tap** (adversarial А): ended from «Устройства», run
+          // out in a tab left open. The server erased nothing, so the device erases nothing either
+          // — MOL-56's «a 401 erases nothing», the queue may hold a purchase of an account that is
+          // still there. The sheet says so, and so does the login screen once the door closes.
+          clearLeaving()
+          noteErasure('kept')
+          failure.value = { way, kind: 'signed_out' }
+          return
+        }
+        // A repeat after a lost answer: the first tap may have erased everything, or the session
+        // may have ended meanwhile — nobody can tell, and the sheet says that rather than nothing.
+        failure.value = { way, kind: 'unknown' }
+      } else {
+        // Decided after the failure (MOL-19, A1).
+        failure.value = { way, kind: connected() ? 'error' : 'offline' }
+      }
       if (notReached(error)) {
         clearLeaving()
         return
@@ -125,10 +173,10 @@ export const useSignOutStore = defineStore('signOut', () => {
       // The server may have said «nobody» while this was in flight — its settling was skipped
       // then, and nothing will settle it again. Only that: an answer «this owner» given meanwhile
       // may be about the moment before the way out landed.
-      if (actor.heard !== before && actor.nobody) void finish(owner)
+      if (actor.heard !== before && actor.nobody) void finish(owner, noteOfWaiting(owner))
       return
     }
-    await finish(owner, way)
+    await finish(owner, way === 'erase' ? 'erased' : null)
   }
 
   /**
@@ -147,9 +195,11 @@ export const useSignOutStore = defineStore('signOut', () => {
 
   /** The server has answered who this browser is, and a «Выйти» may be waiting for that answer. */
   function settle(): void {
+    // Somebody is signed in: no login screen is coming that a note about an erasure was for.
+    if (!actor.nobody) dropErasureNote()
     const owner = leavingOwner()
     if (!owner || leaving.value) return
-    if (actor.nobody) void finish(owner)
+    if (actor.nobody) void finish(owner, noteOfWaiting(owner))
     else if (actor.id === owner) clearLeaving()
     else void erase(owner)
   }
@@ -175,5 +225,5 @@ export const useSignOutStore = defineStore('signOut', () => {
     if (document.visibilityState === 'visible') ask()
   })
 
-  return { leaving, failure, leave, stay, settle }
+  return { leaving, logoutFailure, eraseFailure, leave, stay, settle }
 })

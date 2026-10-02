@@ -17,7 +17,7 @@
  * seven days, and with it whatever the trip queue had not sent. That is a property of MOL-24;
  * the session itself survives, because a cookie the server set is not what ITP caps.
  */
-import { forget, forgetWhere, read, reshape, sharedHolds, write } from '@/stores/storage'
+import { forget, forgetWhere, read, reshape, sharedHolds, write, writeOwn } from '@/stores/storage'
 
 const KEY = 'molvia.actor'
 
@@ -32,10 +32,27 @@ export const LOGIN_KEY = 'molvia.login'
 const LEAVING_KEY = 'molvia.leaving'
 
 /**
- * The server has just erased the person who used this device (MOL-94, В-3): the login screen says
- * so once and takes the mark away. It names nobody — the drawer it would point at is gone.
+ * The way out waiting in `molvia.leaving` is «Удалить мои данные», not «Выйти» (MOL-94, adversarial
+ * А). Kept beside it rather than in it, so the intent's value stays an owner's id. For «Выйти» a
+ * server that knows no session is the goal reached; for an erasure it says nothing about whether the
+ * person is gone, and this is what tells the two apart.
+ */
+const ERASING_KEY = 'molvia.erasing'
+
+/**
+ * What the login screen of **this tab** says about an erasure just tried (MOL-94, В-3): `erased` —
+ * the server's own `204`; `unknown` — an answer was lost and the server then knew no session;
+ * `kept` — the session was gone before the tap, and nothing was erased. On this window's shelf
+ * only (review 4): the screen is the one brought up by this tab's reload or its closing door, and a
+ * neighbour hearing the drawer go must not take the note. It names nobody.
  */
 const ERASED_KEY = 'molvia.erased'
+
+export type ErasureNote = 'erased' | 'unknown' | 'kept'
+
+function isNote(value: string | null): value is ErasureNote {
+  return value === 'erased' || value === 'unknown' || value === 'kept'
+}
 
 /** What this browser is right now. `null` until `/actors/me` has answered once. */
 let current: string | null = null
@@ -128,6 +145,7 @@ export function forgetOwner(owner: string): void {
   // signed in here, they name that person (self-review Р3-2).
   reshape(KEY, (value) => (value === owner ? null : value))
   reshape(LEAVING_KEY, (value) => (value === owner ? null : value))
+  reshape(ERASING_KEY, (value) => (value === owner ? null : value))
   reshape(LOGIN_KEY, (value) => withoutClaimOf(owner, value))
 }
 
@@ -152,8 +170,16 @@ function withoutClaimOf(owner: string, value: string): string | null {
  * person asked for would never come. With this on the device, the server's «no session» finishes
  * it instead.
  */
-export function markLeaving(owner: string): void {
+export function markLeaving(owner: string, erasing = false): void {
   write(LEAVING_KEY, owner)
+  if (erasing) write(ERASING_KEY, owner)
+  else forget(ERASING_KEY)
+}
+
+/** Whose erasure is waiting for its outcome — written with the intent, gone with it. */
+export function erasingOwner(): string | null {
+  const stored = read(ERASING_KEY)
+  return isIdentifier(stored) ? stored : null
 }
 
 export function leavingOwner(): string | null {
@@ -164,6 +190,7 @@ export function leavingOwner(): string | null {
 /** The person closed the sheet, or the server said the session is alive: nothing to finish. */
 export function clearLeaving(): void {
   forget(LEAVING_KEY)
+  forget(ERASING_KEY)
 }
 
 /**
@@ -209,14 +236,19 @@ export function forgetTheInviteDoor(): void {
 
 export const IDENTITY_KEY = KEY
 
-/** Written right before the page is loaded afresh after «Удалить мои данные». */
-export function markErased(): void {
-  write(ERASED_KEY, '1')
+/** Written right before the login screen of this tab comes up after «Удалить мои данные». */
+export function noteErasure(note: ErasureNote): void {
+  writeOwn(ERASED_KEY, note)
 }
 
-/** Whether the login screen has to say the data is gone — once: the mark goes as it is read. */
-export function takeErased(): boolean {
-  const erased = read(ERASED_KEY) === '1'
-  if (erased) forget(ERASED_KEY)
-  return erased
+/** The server has said who this is: no login screen is coming that the note was for. */
+export function dropErasureNote(): void {
+  forget(ERASED_KEY)
+}
+
+/** What the login screen has to say about an erasure — once: the note goes as it is read. */
+export function takeErasureNote(): ErasureNote | null {
+  const note = read(ERASED_KEY, true)
+  forget(ERASED_KEY)
+  return isNote(note) ? note : null
 }

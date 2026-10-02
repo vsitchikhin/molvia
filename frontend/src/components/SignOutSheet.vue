@@ -11,7 +11,7 @@
       <AppButton
         variant="danger-ghost"
         block
-        :disabled="busy"
+        :busy="busy"
         :inactive="offline"
         @click="$emit('confirm')"
       >
