@@ -672,3 +672,17 @@ describe('MoneyBudgetView: round 5 of the review (MOL-117)', () => {
     expect(view.find('.total').text()).toContain(en.budget.total.not_whole)
   })
 })
+
+describe('MoneyBudgetView: round 6 of the review (MOL-117)', () => {
+  it('refuses a plan past ten trillion under the field, and sends nothing (Н)', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    await view.findAll('li .row')[2]?.trigger('click')
+    await flushPromises()
+    type('input[inputmode=decimal]', '10000000000001')
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(document.querySelector('dialog[open]')?.textContent).toContain(en.budget.sheet.too_big)
+    })
+    expect(setBudgetPlan).not.toHaveBeenCalled()
+  })
+})

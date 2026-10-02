@@ -78,6 +78,17 @@ describe('PUT /budget/plans body (MOL-117)', () => {
     expect(budgetPlanBodySchema.safeParse({ ...body, plan }).success).toBe(false)
   })
 
+  it('takes a sum up to ten trillion drams and refuses one past it (Н of round 6)', () => {
+    const sum = (amount: string) => ({
+      ...body,
+      plan: { kind: 'amount', amount: { amount, currency: 'AMD' } },
+    })
+    expect(budgetPlanBodySchema.safeParse(sum('10000000000000')).success).toBe(true)
+    const past = budgetPlanBodySchema.safeParse(sum('10000000000000.01'))
+    expect(past.success).toBe(false)
+    expect(past.error?.issues[0]?.message).toBe('error.invalid_amount')
+  })
+
   it('takes the savings target as a share and never as a sum (В-4)', () => {
     const savings = { categoryId: null, from: '2026-10' }
     expect(

@@ -651,7 +651,11 @@ task did not: five plans of six there are a percent of the month's income — «
   only removed; «Вернуть» brings the plan back with it. **Its row is no button, with a plan or not**
   (review 7, adversarial И): a plan is offered for the live categories only. **A row whose plan would carry the total past what
   money holds is left out of it** (adversarial А), as a spending is from «Потрачено»: the answer that
-  failed to encode was a 500 for good, with no screen to take the plan back from. **A percent past a
+  failed to encode was a 500 for good, with no screen to take the plan back from. **And it is out of
+  reach**: a plan is at most 10¹⁵ minor units (`BUDGET_AMOUNT_MAX_MINOR`, ten trillion drams), refused
+  on the way in as `error.invalid_amount` and by the sheet under its field (adversarial Н of round 6)
+  — a thousand of them fit what money holds, so the guard is no path a person takes, and no footnote
+  is owed to it. **A percent past a
   safe integer is none** (`used`, `savings.actual`, adversarial А2) for the same reason.
 - **Over the plan is a warning, never red, and said in words, never by a minus** (Р-7, review 5):
   «сверх плана» in `--warn`, the figure without its sign, the bar to the edge — with no mark of the

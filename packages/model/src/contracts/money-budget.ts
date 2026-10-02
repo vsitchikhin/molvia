@@ -1,7 +1,8 @@
 import { z } from 'zod'
+import { ERROR } from '#model/support/errors'
 import { monthSchema } from './money'
 import { spendingCategoryViewCodec, spendingCategoryViewOf } from './spending'
-import { budgetPercentSchema } from '#model/entities/money-budget'
+import { BUDGET_AMOUNT_MAX_MINOR, budgetPercentSchema } from '#model/entities/money-budget'
 import type { MonthBudget } from '#model/entities/money-budget'
 import { categoryOrder } from '#model/entities/spending-category'
 import type { SpendingCategory } from '#model/entities/spending-category'
@@ -27,6 +28,11 @@ export const budgetPlanBodySchema = z
   .refine((body) => body.categoryId !== null || body.plan?.kind !== 'amount', {
     path: ['plan'],
   })
+  // On the way in only: a stored plan is answered whatever it is, never a 500 of the answer's codec.
+  .refine(
+    (body) => body.plan?.kind !== 'amount' || body.plan.amount.minor <= BUDGET_AMOUNT_MAX_MINOR,
+    { path: ['plan'], error: ERROR.INVALID_AMOUNT },
+  )
 export type BudgetPlanBody = z.output<typeof budgetPlanBodySchema>
 
 /**

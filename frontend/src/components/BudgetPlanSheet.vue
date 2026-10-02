@@ -79,6 +79,7 @@ import IconClose from '~icons/mdi/close'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import { ApiError } from '@molvia/client'
 import {
+  BUDGET_AMOUNT_MAX_MINOR,
   BUDGET_PERCENT_MAX,
   ERROR,
   currencySign,
@@ -242,7 +243,12 @@ export default defineComponent({
         return { kind: 'share', percent }
       }
       try {
-        return { kind: 'amount', amount: parseMoney(text, props.spendCurrency) }
+        const amount = parseMoney(text, props.spendCurrency)
+        if (amount.minor > BUDGET_AMOUNT_MAX_MINOR) {
+          problem.value = t('budget.sheet.too_big')
+          return null
+        }
+        return { kind: 'amount', amount }
       } catch {
         problem.value = t('budget.sheet.bad_amount')
         return null

@@ -15,6 +15,13 @@ export const BUDGET_PERCENT_MAX = 100
 export const budgetPercentSchema = z.int().min(0).max(BUDGET_PERCENT_MAX)
 
 /**
+ * The most a plan of one category can be, in minor units: 10¹⁵ — ten trillion drams. A thousand such
+ * plans still fit what money holds, so a total past it is out of reach (adversarial А, Н of rounds 5
+ * and 6); the check in `totalOf` stays as a guard, not as a path a person can take.
+ */
+export const BUDGET_AMOUNT_MAX_MINOR = 10n ** 15n
+
+/**
  * What a category is planned at (MOL-117, В-2): a sum in the spending currency, or a share of
  * «Пришло» of the month — the salary moved as «Пришло» moves it, as the sheet's «месяц бюджета» does.
  */
