@@ -176,12 +176,13 @@ export const useSignOutStore = defineStore('signOut', () => {
           // nothing either — MOL-56's «a 401 erases nothing», the queue may hold a purchase of an
           // account that is still there. The sheet and the login screen say what is known: this
           // tap deleted nothing, and an empty account on signing in means it was deleted before.
-          noteErasure('kept')
-          failure.value = { way, kind: 'signed_out' }
           // A «Выйти» that was waiting (round 2, Д): «no session» is the very word that completes
           // it, so it is put back as it was, and the server's next «nobody» finishes it — never
-          // dropped, or the next launch offline would open the app of the person who left.
+          // dropped, or the next launch offline would open the app of the person who left. Before
+          // the note, which `putBack` also restores: this tap's note is the one that stands (№ 12).
           putBack()
+          noteErasure('kept')
+          failure.value = { way, kind: 'signed_out' }
           if (wasLeaving && actor.heard !== before && actor.nobody) void finish(owner, null)
           return
         }
