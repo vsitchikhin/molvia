@@ -392,8 +392,11 @@ is down meanwhile — minutes, accepted while production is the owner's alone.
      (`git show <the master before the merge>:docker-compose.prod.yml`, `scp` it to `~/molvia/`),
      `up -d postgres` alone, then rebuild under musl:
      `ssh molvia 'cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres psql -U molvia -d molvia -v ON_ERROR_STOP=1' < deploy/reindex-text.sql`.
-     A unique key that refuses names a pair the window let in; it is settled by hand and the file
-     run again. Then `up -d`. The API's journal names the statement `0038` failed on
+     A unique key that refuses names one pair the window let in, and leaves every index as it was.
+     All the pairs at once are a `group by` on the key of `places_identity_key` with index scans
+     off (`set enable_indexscan = off; set enable_bitmapscan = off`) — the index itself is the broken
+     one. A pair is settled by hand — the trips and verdicts of one row moved to the other, a verdict
+     of one person on one item in both kept once — and the file run again. Then `up -d`. The API's journal names the statement `0038` failed on
      (`describeMigrationFailure`); that duplicate is settled by hand too, then from step 1 again.
    - **`1` — `0038` ran**: the indexes are glibc's, and **alpine must not come back** — under musl
      they would answer wrongly, and `0038`, recorded as applied, would never rebuild them again. Stay
