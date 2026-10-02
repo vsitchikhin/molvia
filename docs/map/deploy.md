@@ -5,7 +5,7 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 
 ## backend · routes
 
-- `backend/src/routes/health.ts` — Route `GET /health`: the database probe and the build's version, which the deploy and the e2e run wait on.
+- `backend/src/routes/health.ts` — Route `GET /health`: the database probe and the build's version, which the deploy, the e2e run and the outside watch wait on; `503` with the same body when the database does not answer (MOL-142).
 
 ## backend · usecases
 
@@ -30,11 +30,12 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 
 ## repository
 
-- `.env.prod.example` — Template of the server's `.env.prod`: domain, Postgres credentials, the production bot's token and username, the bot–API secret.
+- `.env.prod.example` — Template of the server's `.env.prod`: domain, Postgres credentials, the production bot's token and username, the bot–API secret, the bot's pulse URL.
 - `.github/workflows/release.yml` — Release workflow: after green CI on master builds the three images and rolls them out over ssh; a version tag names built images.
+- `.github/workflows/watch.yml` — The outside watch (MOL-142): every five minutes `/api/health` and the page to the healthchecks.io check «molvia-up» — a `/fail` when three of four tries half a minute apart fail — and the certificate's term to «molvia-cert»; red only when it could not report.
 - `bin/bundle.mjs` — esbuild bundler for the API and bot images; the API also gets its forget, seed-catalogue and gates tools.
 - `deploy/Caddyfile` — Caddy config: TLS for the domain, `/api` stripped and proxied to the API, internal routes closed, SPA fallback, headers, no access log.
-- `deploy/README.md` — Operations guide: new machine, deploys and the deploy key, login setup, local prod stack, erasure, seeding, gates, backups and restore.
+- `deploy/README.md` — Operations guide: new machine, deploys and the deploy key, login setup, local prod stack, erasure, seeding, gates, signals, backups and restore.
 - `deploy/backup/backup.env.example` — Template of the server's `backup.env`: age recipient, R2 remote, healthchecks.io URL, retention days.
 - `deploy/backup/backup.sh` — Nightly backup: `pg_dump` in the container, encrypted to the owner's age key, streamed to R2, pinged to healthchecks.io.
 - `deploy/backup/molvia-backup.service` — systemd unit running the nightly backup script as the deploy user.
