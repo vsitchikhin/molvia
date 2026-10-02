@@ -210,7 +210,13 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   adversarial Ж): three kilos in an Erevan shop headed a Gyumri resident's row over the market of
   their own city. **Any place of another pair on the row takes «Дешевле всего» away** (adversarial
   З, owner's decision): «Дешевле всего: Рынок 2 400 ֏/кг» over «Пятёрочка 300 ₽/кг» read as a lie,
-  whatever the word compared.
+  whatever the word compared. **A place of another pair stands on the row only while its last
+  purchase is within `SHARED_PRICE_FRESH_DAYS`** (adversarial И, owner's decision; the first pair
+  has no window, В-1): a cheese bought once in Moscow two years ago stayed under «Ещё» for good and
+  took the word with it. **«Ещё» is own city first across pairs too** (Р-26, adversarial Ж′). The
+  price of Р-27, named (owner's decision on review №10): the first pair also gives the threshold of
+  «только если дёшево», so one pack bought at home over ten kilos in Erevan leaves the row without a
+  threshold until the pack's pair has three purchases.
 - **Order is by rating down, then by name, in all three groups.** The handoff asked for
   ascending unit price; that sorts _different products_ by a number — milk at 570 ֏/л above
   beef at 4 790 ֏/кг — and «compare by unit price» is about one item across places.

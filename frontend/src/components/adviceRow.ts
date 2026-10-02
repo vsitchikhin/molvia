@@ -17,8 +17,9 @@ export type NeverRow = Extract<AdviceRow, { level: 'never' }>
  *
  * The server returns the places **own city first, then by price** (MOL-31, Р-26), not by price
  * alone: a cheaper receipt from another city stands below a dearer place at home, because
- * «cheaper elsewhere» is not somewhere one can go. So the first place is the one to name — and
- * it is not always the cheapest.
+ * «cheaper elsewhere» is not somewhere one can go. The first place is of the row's own «currency +
+ * unit»; the others may be of another pair, a place whose last purchase was made in it (MOL-166,
+ * adversarial Е, Ж′). So the first place is the one to name — and it is not always the cheapest.
  *
  * `cheapest` says whether it happens to be. **The superlative is said only when it is true**
  * (MOL-32, А1): «Дешевле всего: Рынок в Гюмри — 4 000 ֏/кг» over a line reading «Ещё: SAS
