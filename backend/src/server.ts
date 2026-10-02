@@ -33,6 +33,7 @@ import { verdictRoutes } from '@/routes/verdicts'
 import { sessionRoutes } from '@/routes/sessions'
 import { exchangeRoutes } from '@/routes/exchanges'
 import { advice, adviceSearch } from '@/usecases/advice'
+import { ownNever } from '@/usecases/own-never'
 import { ownPrices } from '@/usecases/own-prices'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
@@ -628,6 +629,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         amend: (actorId, itemId, patch) => amendVerdict(verdicts, actorId, itemId, patch),
         withdraw: (actorId, itemId) => withdrawVerdict(verdicts, actorId, itemId),
         pending: (actorId) => pendingVerdicts(tripData.expenses, actorId),
+        never: (actorId) => ownNever(verdicts, actorId),
       })
       guardedDone()
     })

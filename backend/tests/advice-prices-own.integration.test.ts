@@ -6,7 +6,13 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
-import { ZONE_HEADER, ownPricesResponseSchema, toSearchKey, unitPrice } from '@molvia/model'
+import {
+  ZONE_HEADER,
+  ownNeverResponseSchema,
+  ownPricesResponseSchema,
+  toSearchKey,
+  unitPrice,
+} from '@molvia/model'
 import type { Money, OwnPrices, OwnPricesResponse, Quantity } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { actors, events, expenses, searchPicks, trips, verdicts } from '@/db/schema'
@@ -286,6 +292,67 @@ describe('GET /advice/prices — «last» in the zone of the request (review №
     expect(
       placesOf(await prices(me, { item: milk, zone: 'America/Los_Angeles' }))[0],
     ).toMatchObject({ price: perLitre(600), day: '2026-09-12' })
+  })
+})
+
+describe('GET /advice/prices — a zone Postgres does not know (adversarial Ж)', () => {
+  it('orders a record from an old queue by Yerevan’s day rather than answering 500', async () => {
+    const me = await insertActor(db)
+    const milk = await item('Молоко Ашхар 1 л')
+    await bought(me, milk, await erevan('Зовуни'), 540, {
+      on: null,
+      at: new Date('2026-09-12T10:00:00Z'),
+    })
+
+    // `Intl` knows the name, tzdata does not.
+    const reply = await ask(me, { item: milk, zone: 'US/Pacific-New' })
+
+    expect(reply.status).toBe(200)
+    const answer = ownPricesResponseSchema.parse(JSON.parse(reply.body))
+    expect(placesOf(answer.prices)).toHaveLength(1)
+  })
+})
+
+describe('GET /verdicts/never — one’s own «не брать нигде» (adversarial Б′)', () => {
+  async function never(actor: string): Promise<string[]> {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/verdicts/never',
+      headers: { cookie: await signIn(db, actor) },
+    })
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['cache-control']).toBe('no-store')
+    return ownNeverResponseSchema.parse(JSON.parse(response.body)).itemIds.sort()
+  }
+
+  it('lists one’s own «1» and «2», not «3», not a withdrawn one, not a stranger’s', async () => {
+    const me = await insertActor(db)
+    const stranger = await insertActor(db)
+    const [one, two, three, withdrawn, theirs] = await Promise.all(
+      ['Молоко 1', 'Молоко 2', 'Молоко 3', 'Молоко 4', 'Молоко 5'].map((name) => item(name)),
+    )
+    if (!one || !two || !three || !withdrawn || !theirs) throw new Error('no items')
+    await rate(me, one, 1)
+    await rate(me, two, 2)
+    await rate(me, three, 3)
+    await rate(me, withdrawn, 1)
+    await db.update(verdicts).set({ deletedAt: new Date() }).where(eq(verdicts.itemId, withdrawn))
+    await rate(stranger, theirs, 1)
+
+    expect(await never(me)).toEqual([one, two].sort())
+  })
+
+  it('lists one’s own «1» with access while three strangers’ «5» put it in «Брать» on «Что брать»', async () => {
+    const me = await insertActor(db)
+    const milk = await item('Молоко Ашхар 1 л')
+    await rate(me, milk, 1)
+    for (let n = 0; n < 3; n += 1) await rate(await insertActor(db), milk, 5)
+    await db
+      .update(actors)
+      .set({ sharedUntil: sql`now() + interval '30 days'` })
+      .where(eq(actors.id, me))
+
+    expect(await never(me)).toEqual([milk])
   })
 })
 

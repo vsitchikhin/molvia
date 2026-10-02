@@ -171,6 +171,7 @@ function placeOf(owner: Today, price: OwnLatestPrice): OwnPlacePrice {
     placeId: price.placeId,
     name: price.placeName,
     unitPrice: { scaledMinor: price.scaledMinor, currency: price.currency, unit: price.unit },
+    quantity: { milli: price.quantityMilli, unit: price.unit },
     day: price.startedOn ?? dayOfMoment(owner, price.startedAt),
     observations: price.observations,
   }

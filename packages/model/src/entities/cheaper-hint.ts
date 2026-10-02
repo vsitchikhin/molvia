@@ -1,7 +1,8 @@
 import type { OwnPlacePrice, OwnPrices } from '#model/contracts/advice'
 import type { Currency } from '#model/values/money'
-import { compareUnitPrice } from '#model/values/units'
-import type { BaseUnit, UnitPrice } from '#model/values/units'
+import { minorPerMajor } from '#model/values/money'
+import { UNIT_PRICE_SCALE, compareUnitPrice } from '#model/values/units'
+import type { BaseUnit, Quantity, UnitPrice } from '#model/values/units'
 
 /**
  * What «Тут дешевле» says of the item on the sheet (MOL-92), by the price typed against the
@@ -9,7 +10,7 @@ import type { BaseUnit, UnitPrice } from '#model/values/units'
  *
  * - `best` — nothing typed yet: where it was cheapest, said plainly (В-1);
  * - `there` — typed dearer: where it was cheaper;
- * - `same` — typed at that price, within `SAME_PRICE_PERMILLE` (В-2);
+ * - `same` — typed at that price, within `samePrice` (В-2);
  * - `cheaper` — typed below every place: «тут дешевле» (В-2).
  *
  * `here` says the place is the record's own (Р-3): «здесь же брали по 600 ֏/л».
@@ -44,6 +45,8 @@ export interface CheaperHintInput {
   readonly unit: BaseUnit
   /** The unit price of what is typed, or `null` while there is none; its own pair is the group. */
   readonly typed: UnitPrice | null
+  /** How much is typed: the till's rounding of the sum wobbles a small purchase's price most (Г′). */
+  readonly typedQuantity?: Quantity | null
   /** The record's place, when the phone knows it; a record started offline has none yet. */
   readonly here: string | null
 }
@@ -52,18 +55,38 @@ const NOTHING: CheaperHint = { item: null, alternative: null }
 
 /**
  * Two unit prices this close are one price, in thousandths of the earlier one (MOL-92, adversarial
- * Г). Loose goods are weighed and the till rounds the sum to a dram: 690 ֏/кг on the tag came out
- * 689,63 one time and 690,67 the next, and compared exactly the same tag said «дороже» in yellow, or
- * «дешевле» in green, by the weight alone. Half a per cent holds that noise — under one dram on a
- * kilo of 690 even for 0,15 kg — and still tells 543 from 540.
+ * Г): a price on a tag seen twice, under the wobble of how it was typed.
  */
 export const SAME_PRICE_PERMILLE = 5n
 
-/** Whether `price` is within `SAME_PRICE_PERMILLE` of `earlier` — inside one currency and unit. */
-export function samePrice(price: UnitPrice, earlier: UnitPrice): boolean {
+/**
+ * How far a unit price may move by the till alone: a sum is typed whole, so half a unit of the
+ * currency either way, spread over what was bought (adversarial Г′). 690 ֏/кг for 0,15 kg is 103,50,
+ * paid 104 — 693,33 ֏/кг; the same tag for 1,234 kg came out 689,63. The less bought, the more it
+ * wobbles: half a per cent held 0,611 kg and not 0,15.
+ */
+function tillNoise(price: UnitPrice, quantity: Quantity): bigint {
+  if (quantity.milli <= 0n) return 0n
+  return (minorPerMajor(price.currency) * 1000n * UNIT_PRICE_SCALE) / (2n * quantity.milli)
+}
+
+/**
+ * Whether `price`, of `quantity`, is the same as `earlier`, of `earlierQuantity` — inside one currency
+ * and unit: within `SAME_PRICE_PERMILLE`, or within what the till's rounding of both sums can move.
+ */
+export function samePrice(
+  price: UnitPrice,
+  quantity: Quantity | null,
+  earlier: UnitPrice,
+  earlierQuantity: Quantity | null,
+): boolean {
   compareUnitPrice(price, earlier)
   const gap = price.scaledMinor - earlier.scaledMinor
-  return (gap < 0n ? -gap : gap) * 1000n <= SAME_PRICE_PERMILLE * earlier.scaledMinor
+  const relative = (SAME_PRICE_PERMILLE * earlier.scaledMinor) / 1000n
+  const rounding =
+    (quantity ? tillNoise(price, quantity) : 0n) +
+    (earlierQuantity ? tillNoise(earlier, earlierQuantity) : 0n)
+  return (gap < 0n ? -gap : gap) <= (relative > rounding ? relative : rounding)
 }
 
 /** «4.5» → 45: the printed tenth, which decides as it decides the groups (MOL-31, Р-22). */
@@ -85,9 +108,13 @@ function cheapestIn(
   return best
 }
 
-function kindOf(typed: UnitPrice | null, best: OwnPlacePrice): ItemHint['kind'] {
+function kindOf(
+  typed: UnitPrice | null,
+  typedQuantity: Quantity | null,
+  best: OwnPlacePrice,
+): ItemHint['kind'] {
   if (typed === null) return 'best'
-  if (samePrice(typed, best.unitPrice)) return 'same'
+  if (samePrice(typed, typedQuantity, best.unitPrice, best.quantity)) return 'same'
   return compareUnitPrice(typed, best.unitPrice) < 0 ? 'cheaper' : 'there'
 }
 
@@ -106,18 +133,20 @@ function kindOf(typed: UnitPrice | null, best: OwnPlacePrice): ItemHint['kind'] 
  */
 export function cheaperHint(input: CheaperHintInput): CheaperHint {
   const { answer, typed, here } = input
+  const typedQuantity = typed ? (input.typedQuantity ?? null) : null
   if (answer.level === 'never') return NOTHING
   // What is typed names its own pair, so the two can never be compared across one.
   const { currency, unit } = typed ?? input
 
   const best = cheapestIn(answer.places, currency, unit)
   const item: ItemHint | null = best && {
-    kind: kindOf(typed, best),
+    kind: kindOf(typed, typedQuantity, best),
     place: best,
     here: here !== null && best.placeId === here.toLowerCase(),
   }
 
   const reference = typed ?? best?.unitPrice ?? null
+  const referenceQuantity = typed ? typedQuantity : (best?.quantity ?? null)
   if (reference === null) return { item, alternative: null }
 
   const floor = answer.level === 'unrated' ? null : tenths(answer.rating)
@@ -127,7 +156,7 @@ export function cheaperHint(input: CheaperHintInput): CheaperHint {
     const place = cheapestIn(other.places, currency, unit)
     // Cheaper by more than the noise of a scale: at one price there is no reason to change.
     if (!place || compareUnitPrice(place.unitPrice, reference) >= 0) continue
-    if (samePrice(place.unitPrice, reference)) continue
+    if (samePrice(place.unitPrice, place.quantity, reference, referenceQuantity)) continue
     const better =
       alternative === null ||
       tenths(other.rating) > tenths(alternative.rating) ||

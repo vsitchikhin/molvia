@@ -29,6 +29,7 @@ function place(
     placeId,
     name: placeId === ZOVUNI ? 'Зовуни' : 'Ереван Сити',
     unitPrice: per(amount, unit, currency),
+    quantity: { milli: 1000n, unit },
     day,
     observations: 1,
   }
@@ -92,21 +93,47 @@ describe('cheaperHint · the item itself', () => {
     expect(hint(history, 537).item?.kind).toBe('cheaper')
   })
 
-  it('reads one tag of loose goods as one price, whatever the till’s rounding (adversarial Г)', () => {
-    const kilo = (amount: number, grams: number): UnitPrice =>
-      unitPrice(
-        { minor: BigInt(amount) * 100n, currency: 'AMD' },
-        { milli: BigInt(grams), unit: 'kg' },
+  describe('one tag of loose goods is one price, whatever the till’s rounding (adversarial Г, Г′)', () => {
+    const grams = (milli: number) => ({ milli: BigInt(milli), unit: 'kg' as const })
+    const paid = (amount: number, milli: number): UnitPrice =>
+      unitPrice({ minor: BigInt(amount) * 100n, currency: 'AMD' }, grams(milli))
+    const weighed = (amount: number, milli: number): OwnPlacePrice => ({
+      ...place(CITY, 0, { unit: 'kg' }),
+      unitPrice: paid(amount, milli),
+      quantity: grams(milli),
+    })
+    const typed = (amount: number, milli: number) => ({
+      typed: paid(amount, milli),
+      typedQuantity: grams(milli),
+    })
+
+    it('690 ֏/кг: 1,234 kg for 851 last time, and 0,611 / 0,876 / 1,050 / 0,15 kg now', () => {
+      const tomatoes = rated([weighed(851, 1234)])
+      for (const [amount, milli] of [
+        [422, 611],
+        [604, 876],
+        [725, 1050],
+        // 103,50 paid 104 — 693,33 ֏/кг: half a per cent does not hold it, the till's half a dram does.
+        [104, 150],
+      ] as const) {
+        expect(hint(tomatoes, null, typed(amount, milli)).item?.kind).toBe('same')
+      }
+    })
+
+    it('800 ֏/кг of parsley: 0,25 kg for 200, then 0,083 kg for 66', () => {
+      expect(hint(rated([weighed(200, 250)]), null, typed(66, 83)).item?.kind).toBe('same')
+    })
+
+    it('still tells a price that moved: 104 ֏ for 0,15 kg against 800 ֏/кг', () => {
+      // 693,33 against 800: far past what rounding can do.
+      expect(hint(rated([weighed(200, 250)]), null, typed(104, 150)).item?.kind).toBe('cheaper')
+    })
+
+    it('without the quantity typed, half a per cent alone', () => {
+      expect(hint(rated([weighed(851, 1234)]), null, { typed: paid(104, 150) }).item?.kind).toBe(
+        'there',
       )
-    // 690 ֏/кг on the tag; 1,234 kg came to 851 ֏ last time — 689,63 ֏/кг.
-    const tomatoes = rated([{ ...place(CITY, 0, { unit: 'kg' }), unitPrice: kilo(851, 1234) }])
-    for (const [amount, grams] of [
-      [422, 611],
-      [604, 876],
-      [725, 1050],
-    ] as const) {
-      expect(hint(tomatoes, null, { typed: kilo(amount, grams) }).item?.kind).toBe('same')
-    }
+    })
   })
 
   it('says «здесь же» when the cheapest was the record’s own place (Р-3), whatever the case of its id', () => {

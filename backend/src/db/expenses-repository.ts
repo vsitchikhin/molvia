@@ -171,6 +171,9 @@ export interface OwnKindQuery {
  */
 const PLACES_PER_ITEM = 50
 
+/** The day of a moment the phone named no zone for is Yerevan's (MOL-121). */
+const YEREVAN = 'Asia/Yerevan'
+
 /**
  * Not a domain entity but the result of an aggregate: a place and the lowest unit price
  * observed there. Currency and unit are part of the key rather than of the value — two
@@ -261,6 +264,8 @@ export interface OwnLatestPrice {
   readonly currency: Currency
   readonly unit: BaseUnit
   readonly scaledMinor: bigint
+  /** How much that last purchase was, in thousandths of the unit (adversarial Г′). */
+  readonly quantityMilli: bigint
   /** How many purchases of it there are in the place, in this currency and unit. */
   readonly observations: number
   /** `trips.started_on` — the phone's day at «Записать покупки», absent from an old queue. */
@@ -275,6 +280,7 @@ interface OwnLatestShape extends Record<string, unknown> {
   currency: Currency | null
   unit: BaseUnit | null
   scaledMinor: string | null
+  quantityMilli: string | null
   observations: string
   startedOn: string | null
   startedAt: Date | string
@@ -294,6 +300,24 @@ function toExpense(row: ExpenseRow): Expense {
 }
 
 export function createExpenseRepository(db: Conn): ExpenseRepository {
+  /**
+   * The zones Postgres knows, read once (adversarial Ж). The phone's zone is checked by `Intl`, and
+   * a name ICU knows and tzdata does not — renamed, or new — met `time zone not recognized` and a 500
+   * for every record from before MOL-121. Such a zone orders by Yerevan's day, as one with none does.
+   */
+  let knownZones: Promise<ReadonlySet<string>> | null = null
+  async function zoneFor(zone: string | undefined): Promise<string> {
+    if (zone === undefined) return YEREVAN
+    knownZones ??= db
+      .execute<{ name: string }>(sql`select name from pg_timezone_names`)
+      .then((rows) => new Set(rows.map((row) => row.name)))
+      .catch((error: unknown) => {
+        knownZones = null
+        throw error
+      })
+    return (await knownZones).has(zone) ? zone : YEREVAN
+  }
+
   /**
    * An expense has no `actor_id` of its own — deliberately, since MOL-6 — so it belongs to a
    * person through its trip. The ownership is a condition of the statement rather than a
@@ -409,6 +433,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
               ${trips.startedOn}::text as started_on,
               ${expenses.createdAt} as written_at,
               ${expenses.id} as expense_id,
+              ${expenses.qtyMilli} as qty_milli,
               ${trips.actorId} as actor_id,
               ${mine} as mine,
               -- Whether the place is in this person's own city. Read by the order alone: the
@@ -754,6 +779,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
             currency,
             unit,
             unit_price::text as "scaledMinor",
+            qty_milli::text as "quantityMilli",
             -- Counted before \`distinct on\` keeps one row: a window is computed first.
             (count(*) over (partition by item_id, place_id, currency, unit))::text as observations,
             started_on as "startedOn",
@@ -763,7 +789,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           from (select * ${priced.rows}) own
           where nearby
           order by item_id, place_id, currency, unit,
-                   coalesce(started_on, (bought_at at time zone ${query.zone ?? 'Asia/Yerevan'})::date::text) desc,
+                   coalesce(started_on, (bought_at at time zone ${await zoneFor(query.zone)})::date::text) desc,
                    bought_at desc, written_at desc, expense_id desc
         ) latest
         -- Cheapest last price first, inside a currency and unit; names by the collation the
@@ -774,7 +800,14 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
       `)
 
       return found.flatMap((row) => {
-        if (row.currency === null || row.unit === null || row.scaledMinor === null) return []
+        if (
+          row.currency === null ||
+          row.unit === null ||
+          row.scaledMinor === null ||
+          row.quantityMilli === null
+        ) {
+          return []
+        }
         return [
           {
             itemId: row.itemId,
@@ -783,6 +816,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
             currency: row.currency,
             unit: row.unit,
             scaledMinor: BigInt(row.scaledMinor),
+            quantityMilli: BigInt(row.quantityMilli),
             observations: Number(row.observations),
             startedOn: row.startedOn,
             startedAt: asDate(row.startedAt),

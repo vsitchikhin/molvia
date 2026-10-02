@@ -122,3 +122,18 @@ export const pendingVerdictsCodec = z
   })
   .refine((answer) => answer.total >= answer.items.length, { error: ISSUE.RESPONSE_INVALID })
 export type PendingVerdicts = z.output<typeof pendingVerdictsCodec>
+
+/** At most so many of one's own «не брать нигде» come back: far above anyone's shelf of the bad. */
+export const OWN_NEVER_MAX = 1000
+
+/**
+ * `GET /verdicts/never` (MOL-92, adversarial Б′): the items the person themselves rated «не брать
+ * нигде», live verdicts only. With access «Что брать» lists the average of three people, and the
+ * person's own «1» given in the bot's reminder reads «Брать» there — yet the hint reads one's own
+ * verdicts (adversarial Д), and a remembered price of it must go. A route of its own: a field added to
+ * the answer of «Что брать» would be refused by every older client's strict codec.
+ */
+export const ownNeverResponseSchema = z.strictObject({
+  itemIds: z.array(z.uuid()).max(OWN_NEVER_MAX),
+})
+export type OwnNeverResponse = z.output<typeof ownNeverResponseSchema>

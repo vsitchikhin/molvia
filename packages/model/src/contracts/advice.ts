@@ -5,7 +5,7 @@ import { itemSchema } from '#model/entities/item'
 import { placeSchema } from '#model/entities/place'
 import { verdictFields } from '#model/entities/verdict'
 import { isCalendarDay } from '#model/values/rates'
-import { unitPriceCodec } from '#model/values/units'
+import { quantityCodec, unitPriceCodec } from '#model/values/units'
 
 /**
  * Whose figures an answer carries (MOL-31, Р-11). One mode per answer rather than per row:
@@ -224,6 +224,11 @@ export const ownPlacePriceSchema = z.strictObject({
   placeId: z.uuid(),
   name: placeSchema.shape.name,
   unitPrice: unitPriceCodec,
+  /**
+   * How much that purchase was (adversarial Г′): the till rounds a sum to a dram, so the less was
+   * bought the more the price per unit wobbles — the sheet allows for it when it says «как в …».
+   */
+  quantity: quantityCodec,
   day: z.string().refine(isCalendarDay, { error: ISSUE.RESPONSE_INVALID }),
   observations: z.int().positive(),
 })

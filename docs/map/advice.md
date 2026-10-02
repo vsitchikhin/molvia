@@ -7,7 +7,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 - `packages/model/src/contracts/advice.ts` — Wire contract of «Что брать»: `scope`, the row as a union on `level`, places with unit prices, limits, the answer, the search's answer (an item found with its row or `null`, MOL-128), and «Тут дешевле» — the person's own last prices and alternatives, a union on `level` (MOL-92).
 - `packages/model/src/contracts/events.ts` — Contract of the event log: the event types, `advice_viewed` among them, each with the payload tied to its type.
-- `packages/model/src/contracts/verdict.ts` — Wire contract of verdicts: the path by item, the rating and amendment bodies, the verdict card and the pending list.
+- `packages/model/src/contracts/verdict.ts` — Wire contract of verdicts: the path by item, the rating and amendment bodies, the verdict card, the pending list and one's own «не брать нигде» (MOL-92).
 - `packages/model/src/entities/cheaper-hint.ts` — «Тут дешевле» (MOL-92): `cheaperHint` — what the sheet of a purchase says of the item's own last prices and of another item of its kind, against the price typed.
 - `packages/model/src/entities/catalogue.ts` — Frozen mapping of item kinds and place kinds onto the two halves of the 0.3 gate, product and venue.
 - `packages/model/src/entities/verdict.ts` — Entity: a verdict, one per item, plus `verdictLevel`, `averageScore`, the level thresholds and `AGGREGATE_MIN_CONTRIBUTIONS`.
@@ -16,11 +16,12 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 ## backend · routes
 
 - `backend/src/routes/advice.ts` — Routes `GET /advice` (the whole «Что брать» screen, no parameters), `GET /advice/search?q=` (MOL-128) and `GET /advice/prices` («Тут дешевле», MOL-92), never cached. Tests: `backend/tests/advice.integration.test.ts`, `backend/tests/advice-search.integration.test.ts`, `backend/tests/advice-prices-own.integration.test.ts`.
-- `backend/src/routes/verdicts.ts` — Routes of verdicts: `PUT`, `PATCH`, `DELETE /verdicts/:itemId` and `GET /verdicts/pending`. Tests: `backend/tests/verdicts.integration.test.ts`.
+- `backend/src/routes/verdicts.ts` — Routes of verdicts: `PUT`, `PATCH`, `DELETE /verdicts/:itemId`, `GET /verdicts/pending` and `GET /verdicts/never` (one's own «не брать нигде», MOL-92). Tests: `backend/tests/verdicts.integration.test.ts`, `backend/tests/advice-prices-own.integration.test.ts`.
 
 ## backend · usecases
 
 - `backend/src/usecases/advice.ts` — Use cases «Что брать»: rows by verdict with prices, own or shared scope, the once-a-day `advice_viewed` in shared mode; and its search — the catalogue's answer with each item's row by the same rules, rated ones past the limit kept, no visit written.
+- `backend/src/usecases/own-never.ts` — Use case: the items the person themselves rated «не брать нигде», live verdicts only — what «Тут дешевле» remembered for no signal lets go of (MOL-92, Б′).
 - `backend/src/usecases/own-prices.ts` — Use case «Тут дешевле» (MOL-92): the person's own last prices of an item in the record's city, and the other products of its kind with the person's own rating — with access or without; «не брать нигде» never asked about; writes nothing.
 - `backend/src/usecases/amend-verdict.ts` — Use case «Изменить оценку»: changes the score or the review of one's own verdict; nothing to change is not found.
 - `backend/src/usecases/pending-verdicts.ts` — Use case «Оценки»: the person's purchases not yet rated, one card per item.

@@ -12,6 +12,7 @@ import {
   settingsUpdateSchema,
   adviceResponseSchema,
   adviceSearchResponseSchema,
+  ownNeverResponseSchema,
   ownPricesQuerySchema,
   ownPricesResponseSchema,
   addExpenseBodySchema,
@@ -76,6 +77,7 @@ import type {
   SettingsGeography,
   AdviceResponse,
   AdviceSearchResponse,
+  OwnNeverResponse,
   OwnPricesQuery,
   OwnPricesResponse,
   AddExpenseBody,
@@ -415,6 +417,8 @@ export interface MolviaClient {
    * other items of its kind. The record by `trip` when the server holds it, else its city.
    */
   ownPrices(query: OwnPricesQuery): Promise<OwnPricesResponse>
+  /** One's own «не брать нигде» (MOL-92, adversarial Б′): what «Тут дешевле» lets go of. */
+  ownNever(): Promise<OwnNeverResponse>
 }
 
 const exportEnvelopeSchema = z.looseObject({
@@ -889,5 +893,6 @@ export function createClient(options: ClientOptions): MolviaClient {
       if (parsed.except !== undefined) search.set('except', parsed.except)
       return request(`/advice/prices?${search.toString()}`, ownPricesResponseSchema)
     },
+    ownNever: async () => request('/verdicts/never', ownNeverResponseSchema),
   }
 }

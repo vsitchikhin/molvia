@@ -198,7 +198,13 @@ describe('the numbers the screen depends on', () => {
 })
 
 describe('ownPricesSchema (MOL-92, «Тут дешевле»)', () => {
-  const zovuni = { ...market, name: 'Зовуни', day: '2026-09-12', observations: 3 }
+  const zovuni = {
+    ...market,
+    name: 'Зовуни',
+    quantity: { value: '1.000', unit: 'kg' },
+    day: '2026-09-12',
+    observations: 3,
+  }
   const marianna = {
     itemId: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d',
     name: 'Молоко Марианна',

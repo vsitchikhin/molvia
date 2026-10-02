@@ -1207,6 +1207,7 @@ describe('the trip', () => {
         placeId: MARKET,
         name: 'Зовуни',
         unitPrice: { amount: '540.00000000', currency: 'AMD', unit: 'l' },
+        quantity: { value: '1.000', unit: 'l' },
         day: '2026-09-12',
         observations: 1,
       }
@@ -1231,6 +1232,13 @@ describe('the trip', () => {
       expect(
         answer.prices.level !== 'never' && answer.prices.places[0]?.unitPrice.scaledMinor,
       ).toBe(54_000_000_000n)
+    })
+
+    it('asks one’s own «не брать нигде» of the verdicts (MOL-92, Б′)', async () => {
+      const { client, calls } = clientReplying(200, { itemIds: [BEEF] })
+
+      expect(await client.ownNever()).toEqual({ itemIds: [BEEF] })
+      expect(new URL(calls[0]?.url ?? '').pathname).toBe('/verdicts/never')
     })
 
     it('refuses a «не брать нигде» that arrived with a price in «Тут дешевле»', async () => {
