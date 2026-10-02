@@ -125,6 +125,15 @@ export const moneyMonthCodec = z.strictObject({
   accountsFrom: exchangeDaySchema.nullable(),
   /** Every account there is was removed: the way to one is «Вернуть», not «Завести счёт». */
   accountsRemoved: z.boolean(),
+  /**
+   * The figure of «Бюджет» among the ways out (MOL-117, В-3): whether the month has a plan, and what
+   * is left of it — null when the sum is not whole. **The first page only**, as `rest`. Defaulted, as
+   * `count` is: a month kept before it, or an answer of a server before it, is a row with no figure.
+   */
+  budget: z
+    .strictObject({ planned: z.boolean(), left: signedMoneyCodec.nullable() })
+    .nullable()
+    .default(null),
   rate: rateCodec.nullable(),
   rateKind: z.enum(['live', 'frozen']),
   previousSpent: moneyCodec.nullable(),
@@ -199,6 +208,7 @@ export function moneyMonthViewOf(
   previousSpent: MoneyMonth['spent'] | null,
   categories: readonly SpendingCategory[],
   after?: JournalKey,
+  budget: MoneyMonthView['budget'] = null,
 ): MoneyMonthView {
   const all = month.days.flatMap((day) =>
     day.entries.map((entry) => ({ day, entry, key: journalKeyOf(entry) })),
@@ -231,6 +241,7 @@ export function moneyMonthViewOf(
     },
     accountsFrom: month.accountsFrom,
     accountsRemoved: month.accountsRemoved,
+    budget,
     rate: month.rate,
     rateKind: month.rateKind,
     uncounted: [...month.uncounted],

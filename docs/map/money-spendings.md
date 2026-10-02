@@ -6,8 +6,10 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 ## packages/model
 
 - `packages/model/src/contracts/money.ts` — Wire schemas of the «Деньги» month: the month address, journal page cursor, the month view, the salary-shift setting.
+- `packages/model/src/contracts/money-budget.ts` — Wire schemas of «Бюджет» (MOL-117): a plan as a sum or a percent, the body of `PUT /budget/plans`, the month's budget answer.
 - `packages/model/src/contracts/money-charts.ts` — Wire schemas of «Графики», every height the server counted: the month's charts of MOL-158 and the year's of MOL-160 (`yearSchema`), the sector of a ring shared.
 - `packages/model/src/contracts/spending.ts` — Wire schemas of spendings and categories: body and amendment, a spending's view, a category's body and view, the categories answer.
+- `packages/model/src/entities/money-budget.ts` — The budget of a month (MOL-117): which plan holds from which month, a share of «Пришло» by the month's rate, rows against `byCategory`, «Без плана», the total, the savings target.
 - `packages/model/src/entities/money-month.ts` — The month of «Деньги» counted whole: months and budget month, journal entries and order, «Пришло», «Остаток», `percentChange`, `shareOf`.
 - `packages/model/src/entities/money-charts.ts` — What every chart shares: levels, the ring's sectors (`donutSlices`), months of a period, means and changes, and the exchanges by exchanger of «Обмен денег».
 - `packages/model/src/entities/money-chart-month.ts` — «Графики → Месяц» from counted months: the usual month of up to twelve closed ones from three, against the usual by category, the pace by day, the ring with «Остальные» named.
