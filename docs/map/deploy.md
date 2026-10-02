@@ -5,7 +5,7 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 
 ## backend · routes
 
-- `backend/src/routes/health.ts` — Route `GET /health`: the database probe and the build's version, which the deploy and the e2e run wait on.
+- `backend/src/routes/health.ts` — Route `GET /health`: the database probe and the build's version, which the deploy, the e2e run and the outside watch wait on; `503` with the same body when the database does not answer (MOL-142).
 
 ## backend · usecases
 
