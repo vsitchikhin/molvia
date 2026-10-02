@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ERROR, ISSUE } from '@molvia/model'
+import { ERROR, ISSUE, SETTINGS_CITIES } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
@@ -417,6 +417,15 @@ describe('словарь: каждое сообщение компилирует
     // и появление `@:` означало бы, что текст потерял самостоятельность незаметно.
     for (const [key, value] of [...Object.entries(RU), ...Object.entries(EN)]) {
       expect(value, key).not.toMatch(/@[:.]/)
+    }
+  })
+})
+
+describe('словарь: города', () => {
+  it('у каждого города настроек есть «в …» — иначе его место встанет в скобках (MOL-120)', () => {
+    for (const city of SETTINGS_CITIES) {
+      expect(RU[`place.cities_in.${city}`], city).toBeDefined()
+      expect(EN[`place.cities_in.${city}`], city).toBeDefined()
     }
   })
 })

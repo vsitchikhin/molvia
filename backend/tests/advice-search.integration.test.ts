@@ -166,6 +166,29 @@ describe('GET /advice/search', () => {
     )
   })
 
+  it('у каждого места — его город, как у списка (MOL-120)', async () => {
+    const me = await insertActor(db)
+    const bread = await item('Лаваш')
+    await rate(me, bread, 5)
+    await bought(
+      me,
+      bread,
+      await insertPlace(db, { name: 'Ереван Сити', city: 'Ереван' }),
+      amd(240),
+    )
+    await bought(me, bread, await insertPlace(db, { name: 'Ереван Сити' }), amd(250))
+
+    const [found] = (await search(me, 'lavash')).items
+
+    // Own city first (Р-26), each place under its own city.
+    expect(
+      found?.advice?.level === 'take' && found.advice.places.map(({ name, city }) => [name, city]),
+    ).toEqual([
+      ['Ереван Сити', 'Гюмри'],
+      ['Ереван Сити', 'Ереван'],
+    ])
+  })
+
   it('в общем режиме чужой одиночный вердикт не виден: позиция — «ещё не оценивали»', async () => {
     const me = await insertActor(db)
     await grantAccess(me)

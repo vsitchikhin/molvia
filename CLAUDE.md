@@ -194,6 +194,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
 - **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, **every other reader
   filters `deleted_at IS NULL`**; the reminder skips a purchase made before the withdrawal (MOL-101).
+- **A place is named with its city only where its name stands in two cities of one set** (MOL-120):
+  the queue of «Оценки», a row of «Что брать», one reminder — one rule, `cityWhereNameRepeats` in
+  the domain; the city is optional on the wire, and a place without one leaves its set named as
+  before.
 - **The search on «Что брать» is answered by the server** (`GET /advice/search`, MOL-128): the
   list's own statement and rules for what is found, never glued on the phone; it writes no visit and
   no pick; offline — the remembered list by the start of words.
@@ -427,6 +431,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   line by hand.
 - **A merge is a deploy** (MOL-90); a failed deploy puts the previous image back, not the schema,
   **so a migration that drops or renames goes out in two merges**.
+- **The Postgres image is an exact tag and part of the contract** (MOL-105): ICU, `vector` and
+  glibc; a tag that moves glibc or ICU comes with a migration that rebuilds the text indexes, as
+  `0038`. **A migration skipped by its stamp stops the boot** (`assertEveryMigrationApplied`).
 - **Production is watched from outside** (MOL-142): `watch.yml` every five minutes and the bot's
   pulse — after a claim, while it hears Telegram, never in its first minute — to healthchecks.io
   and its own Telegram, never our bot; **`/health` is `503` whenever it is not `ok`**, and the bot

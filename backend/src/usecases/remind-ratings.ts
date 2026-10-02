@@ -13,10 +13,14 @@ import type { DueReminders, PendingVerdict } from '@molvia/model'
 import type { ReminderRepository } from '@/db/reminders-repository'
 
 /** What of an item the bot is handed, checked by the contract it reads (adversarial А). */
-const sendableFields = reminderItemSchema.pick({ name: true, placeName: true })
+const sendableFields = reminderItemSchema.pick({ name: true, placeName: true, placeCity: true })
 
 function sendable(item: PendingVerdict): boolean {
-  return sendableFields.safeParse({ name: item.name, placeName: item.placeName }).success
+  return sendableFields.safeParse({
+    name: item.name,
+    placeName: item.placeName,
+    placeCity: item.placeCity,
+  }).success
 }
 
 /**
@@ -109,10 +113,11 @@ export async function remindRatings(
     }
     due.push({
       telegramUserId: candidate.telegramUserId,
-      items: claimed.items.map(({ itemId, name, placeName, boughtAt }) => ({
+      items: claimed.items.map(({ itemId, name, placeName, placeCity, boughtAt }) => ({
         itemId,
         name,
         placeName,
+        placeCity,
         daysAgo: daysBetween(localClock(boughtAt, timeZone).day, clock.day),
       })),
       total: claimed.total,

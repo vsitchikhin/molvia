@@ -298,6 +298,37 @@ describe('verdict drafts', () => {
     expect(again.drafts[bread.itemId]?.card.boughtAt).toEqual(milk.boughtAt)
   })
 
+  it('MOL-120, А4: the city is kept beside the card, which the version before reads strictly', async () => {
+    online(false)
+    rateItem.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+    fresh().save({ ...milk, placeCity: 'Гюмри' }, 4, 'Кислит')
+    await settled()
+
+    const [stored] = JSON.parse(localStorage.getItem(KEY) ?? '[]') as Record<string, unknown>[]
+    // The card is the shape the version before MOL-120 parses with its strict codec — a rollback
+    // must not drop a verdict saved with no signal.
+    expect(Object.keys(stored?.card ?? {}).sort()).toEqual(
+      ['boughtAt', 'itemId', 'name', 'placeName'].sort(),
+    )
+    expect(stored?.placeCity).toBe('Гюмри')
+
+    const again = fresh()
+    expect(again.drafts[milk.itemId]?.card).toEqual({ ...milk, placeCity: 'Гюмри' })
+  })
+
+  it('MOL-120: a city that does not read is lost alone, never the words', () => {
+    const good = {
+      card: { ...milk, boughtAt: milk.boughtAt.toISOString() },
+      score: 4,
+      review: 'Кислит',
+      state: 'saved',
+      error: null,
+    }
+    localStorage.setItem(KEY, JSON.stringify([{ ...good, placeCity: ZERO_WIDTH }]))
+    expect(fresh().drafts[milk.itemId]).toMatchObject({ card: milk, review: 'Кислит' })
+    expect(fresh().drafts[milk.itemId]?.card.placeCity).toBeUndefined()
+  })
+
   it('15: a broken memory is an empty one; a broken entry is dropped alone', () => {
     localStorage.setItem(KEY, '{not json')
     expect(fresh().drafts).toEqual({})

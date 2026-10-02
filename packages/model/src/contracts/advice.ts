@@ -24,10 +24,15 @@ export type AdviceScope = z.infer<typeof adviceScopeSchema>
  * (MOL-166): one's own last purchase there, or the lower median of each buyer's last. It does not
  * stand on `observations`, which is how many purchases there are in the place, in this currency
  * and unit — what the server weighs to choose one «currency + unit» per item (Р-4).
+ *
+ * `city` is printed only where two places of one row share a name (MOL-120,
+ * `cityWhereNameRepeats`). Optional, though the server always sends it: the phone reads the answer
+ * it remembered from a server before it.
  */
 export const advicePlaceSchema = z.strictObject({
   placeId: z.uuid(),
   name: placeSchema.shape.name,
+  city: placeSchema.shape.city.optional(),
   unitPrice: unitPriceCodec,
   observations: z.int().positive(),
 })

@@ -46,6 +46,11 @@ await build({
   format: 'esm',
   sourcemap: true,
   minify: false, // a readable stack trace is worth more than the kilobytes
+  // A class esbuild renames to dodge a global keeps its own `name` (MOL-142). node-fetch, under
+  // grammY, takes a signal only if its constructor is called `AbortSignal`: the bot's first use
+  // of the global one (`AbortSignal.timeout`) renamed abort-controller's class `AbortSignal2`, and
+  // every call to Telegram failed in production while every test, run unbundled, passed.
+  keepNames: true,
   // What keeps the development login seam out of production (MOL-52, Р-14). Substituted here
   // rather than trusted at runtime: a variable can be set wrong and nobody finds out, whereas
   // a literal folds the condition in `server.ts` to `false`, the branch goes, and the module

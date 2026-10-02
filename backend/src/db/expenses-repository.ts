@@ -215,6 +215,8 @@ export interface PlacePrice {
   readonly placeId: string
   /** Carried rather than looked up after: the statement already joins the place for its city. */
   readonly placeName: string
+  /** Printed where two places of one row share the name (MOL-120). */
+  readonly placeCity: string
   readonly currency: Currency
   readonly unit: BaseUnit
   /** The same scale `unitPrice()` produces, so the domain can compare these directly. */
@@ -300,6 +302,7 @@ interface PlacePriceShape extends Record<string, unknown> {
   itemId: string
   placeId: string
   placeName: string
+  placeCity: string
   currency: Currency | null
   unit: BaseUnit | null
   scaledMinor: string | null
@@ -491,6 +494,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
               ${expenses.itemId} as item_id,
               ${trips.placeId} as place_id,
               ${places.name} as place_name,
+              ${places.city} as place_city,
               ${expenses.amountCurrency} as currency,
               ${expenses.qtyUnit} as unit,
               round(
@@ -726,6 +730,8 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           // Aliased: both names are `name`, and a subquery keeps only the bare column name.
           name: sql<string>`${items.name}`.as('item_name'),
           placeName: sql<string>`${places.name}`.as('place_name'),
+          // The same place's city, so a card tells two shops of one name apart (MOL-120).
+          placeCity: sql<string>`${places.city}`.as('place_city'),
           boughtAt: boughtAt.as('bought_at'),
           // Inside one trip every purchase has its day, so the order of entry breaks the tie.
           enteredAt: sql<Date>`${expenses.createdAt}`.as('entered_at'),
@@ -749,6 +755,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           itemId: latest.itemId,
           name: latest.name,
           placeName: latest.placeName,
+          placeCity: latest.placeCity,
           boughtAt: latest.boughtAt,
           total: sql<number>`count(*) over ()`.mapWith(Number),
         })
@@ -757,10 +764,11 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
         .limit(rowLimit(limit))
 
       return {
-        items: rows.map(({ itemId, name, placeName, boughtAt }) => ({
+        items: rows.map(({ itemId, name, placeName, placeCity, boughtAt }) => ({
           itemId,
           name,
           placeName,
+          placeCity,
           boughtAt,
         })),
         total: rows[0]?.total ?? 0,
@@ -778,7 +786,8 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
       if (!priced) return []
 
       const found = await db.execute<PlacePriceShape>(sql`
-        select "itemId", "placeId", "placeName", currency, unit, price::text as "scaledMinor",
+        select "itemId", "placeId", "placeName", "placeCity", currency, unit,
+               price::text as "scaledMinor",
                observations::text, "latestVisitAt", "pairObservations"::text, "pairLatestVisitAt",
                nearby, recent
         from (
@@ -801,7 +810,8 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           from (
             -- Each figure as the place's own or as other people's, by whose place it is.
             select
-              "itemId", "placeId", "placeName", currency, unit, observations, nearby, their_buyers,
+              "itemId", "placeId", "placeName", "placeCity", currency, unit, observations, nearby,
+              their_buyers,
               case when own then own_price else their_price end as price,
               -- A place of one's own is as fresh as one's own last purchase there, and votes for
               -- its pair with one's own purchases and visit, as its price is (adversarial М, М′):
@@ -832,6 +842,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
                   item_id as "itemId",
                   place_id as "placeId",
                   place_name as "placeName",
+                  place_city as "placeCity",
                   currency,
                   unit,
                   bool_or(mine_here) as mine_here,
@@ -861,7 +872,8 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
                       >= ${today} - ${query.freshDays}::int as fresh
                   ${priced.rows}
                 ) showable
-                group by item_id, place_id, place_name, currency, unit
+                -- Name and city are the place's own: grouping by them splits nothing.
+                group by item_id, place_id, place_name, place_city, currency, unit
               ) grouped
               window place as (partition by "itemId", "placeId")
             ) owned
@@ -893,6 +905,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
             itemId: row.itemId,
             placeId: row.placeId,
             placeName: row.placeName,
+            placeCity: row.placeCity,
             currency: row.currency,
             unit: row.unit,
             scaledMinor: BigInt(row.scaledMinor),

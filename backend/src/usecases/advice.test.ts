@@ -50,6 +50,7 @@ function price(patch: Partial<PlacePrice> & { scaledMinor: bigint }): PlacePrice
     itemId: BEEF,
     placeId: MARKET,
     placeName: 'Рынок в Гюмри',
+    placeCity: 'Гюмри',
     currency: 'AMD',
     unit: 'kg',
     observations,
@@ -200,6 +201,26 @@ describe('места и порог', () => {
     expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
       'Рынок в Гюмри',
       'SAS',
+    ])
+  })
+
+  it('несёт город каждого места — экран назовёт его, где имя повторяется (MOL-120)', async () => {
+    const prices = [
+      price({ placeId: MARKET, placeName: 'Ереван Сити', scaledMinor: perKilo(479_000) }),
+      price({
+        placeId: SAS,
+        placeName: 'Ереван Сити',
+        placeCity: 'Ереван',
+        nearby: false,
+        scaledMinor: perKilo(450_000),
+      }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    expect(row?.level === 'take' && row.places.map(({ name, city }) => [name, city])).toEqual([
+      ['Ереван Сити', 'Гюмри'],
+      ['Ереван Сити', 'Ереван'],
     ])
   })
 

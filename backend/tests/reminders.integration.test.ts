@@ -128,7 +128,16 @@ describe('ступень 1 — вечером следующего дня', () =
       reminders: [
         {
           telegramUserId: anna.tg,
-          items: [{ itemId: milk, name: 'Молоко Ашхар 1 л', placeName: 'Ереван Сити', daysAgo: 1 }],
+          items: [
+            {
+              itemId: milk,
+              name: 'Молоко Ашхар 1 л',
+              placeName: 'Ереван Сити',
+              // The bot prints it only where two items of one reminder share the name (MOL-120).
+              placeCity: 'Гюмри',
+              daysAgo: 1,
+            },
+          ],
           total: 1,
         },
       ],

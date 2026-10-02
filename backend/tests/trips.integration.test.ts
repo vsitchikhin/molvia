@@ -148,6 +148,15 @@ describe('поход у полки — фикстуры хендоффа', () =>
     expect(place).toMatchObject({ name: 'SAS', country: 'AM', city: 'Ереван', kind: 'store' })
   })
 
+  it('запись несёт город своего места — выбор открытой записи различает два города (MOL-120)', async () => {
+    const actor = await insertActor(db, { city: 'Ереван' })
+
+    const view = trip(await start(actor, 'Ереван Сити'))
+
+    expect(view.placeCity).toBe('Ереван')
+    expect((await current(actor))?.placeCity).toBe('Ереван')
+  })
+
   it('ответ не кэшируется: траты приватны', async () => {
     const actor = await insertActor(db)
     expect((await start(actor)).headers['cache-control']).toBe('no-store')
