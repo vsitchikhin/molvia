@@ -234,6 +234,11 @@ test('the newcomer`s action is large enough to hit with a thumb, and in view', a
   await expect(button).toBeInViewport({ ratio: 1 })
   await expect(button).toBeVisible()
 
+  // Measured at rest: `appear` rises the state by a fractional `translate`, and a box read mid-way
+  // came out 51.99994 tall in CI — float error of a moving box, not a smaller button (MOL-94).
+  await page.evaluate(() =>
+    Promise.allSettled(document.getAnimations().map((animation) => animation.finished)),
+  )
   const box = await button.boundingBox()
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(52)
 })
