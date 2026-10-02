@@ -4,8 +4,13 @@ import {
   moneyChartsCodec,
   moneyChartsQuerySchema,
   moneyChartsViewOf,
+  moneyChartYearCodec,
+  moneyChartYearViewOf,
+  yearSchema,
 } from '#model/contracts/money-charts'
+import { yearCharts } from '#model/entities/money-chart-year'
 import { exchangeLosses, moneyCharts, rateLine } from '#model/entities/money-charts'
+import { moneyMonth } from '#model/entities/money-month'
 import type { MoneyMonth } from '#model/entities/money-month'
 import type { SpendingCategory } from '#model/entities/spending-category'
 import { money } from '#model/values/money'
@@ -134,5 +139,115 @@ describe('moneyChartsCodec', () => {
     const tall = { ...wire, months: [{ ...wire.months[0], spentLevel: 1001 }] }
     expect(moneyChartsCodec.safeParse(tall).success).toBe(false)
     expect(moneyChartsCodec.safeParse({ ...wire, sponsored: true }).success).toBe(false)
+  })
+})
+
+const OWNER = '3f2b1c6e-9a4d-4c1b-8f7e-2d5a6b8c9e01'
+const PETS = '00000000-0000-4000-9000-000000000002'
+
+const yearCategories: SpendingCategory[] = [
+  {
+    id: GROCERIES,
+    actorId: OWNER,
+    preset: 'groceries',
+    name: null,
+    colour: null,
+    archivedAt: null,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+  },
+  {
+    id: PETS,
+    actorId: OWNER,
+    preset: 'pets',
+    name: null,
+    colour: null,
+    archivedAt: new Date('2026-05-01T00:00:00Z'),
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+  },
+]
+
+function counted(month: string, groceries: bigint) {
+  return moneyMonth({
+    month,
+    spendCurrency: 'AMD',
+    incomeCurrency: 'RUB',
+    spendings: [
+      {
+        id: `00000000-0000-4000-8000-0000000000${month.slice(5)}`,
+        actorId: OWNER,
+        spentOn: `${month}-10`,
+        amount: money(groceries, 'AMD'),
+        categoryId: GROCERIES,
+        note: null,
+        place: null,
+        rate: null,
+        accountId: null,
+        debited: null,
+        revision: 1,
+        createdAt: new Date(`${month}-10T10:00:00Z`),
+        amendedAt: null,
+      },
+    ],
+    trips: [],
+    incomes: [],
+    salaryShiftDay: null,
+    categories: yearCategories,
+    rate: {
+      base: 'RUB',
+      quote: 'AMD',
+      scaled: parseRate('5'),
+      source: 'official',
+      asOf: yerevanMidnight(`${month}-01`),
+    },
+    rateKind: 'frozen',
+    inSpend: () => null,
+    incomeInIncome: () => null,
+  })
+}
+
+function view() {
+  const months = ['2026-06', '2026-07', '2026-08', '2026-09'].map((month) =>
+    counted(month, 300_000n),
+  )
+  return moneyChartYearViewOf(
+    yearCharts({
+      year: '2026',
+      months,
+      before: [],
+      today: '2026-09-20',
+      groceries: GROCERIES,
+      categories: yearCategories.map((one) => ({ id: one.id, archived: one.archivedAt !== null })),
+      firstMonth: '2026-06',
+    }),
+    yearCategories,
+  )
+}
+
+describe('yearSchema', () => {
+  it('is a year of four digits whose January a rate may be dated by', () => {
+    expect(yearSchema.safeParse('2026').success).toBe(true)
+    expect(yearSchema.safeParse('0000').success).toBe(false)
+    expect(yearSchema.safeParse('26').success).toBe(false)
+    expect(yearSchema.safeParse('2026-01').success).toBe(false)
+  })
+})
+
+describe('moneyChartYearCodec (MOL-160)', () => {
+  it('carries the year whole and back, every series named by its category', () => {
+    const sent = view()
+    const wire = z.encode(moneyChartYearCodec, sent)
+    expect(z.decode(moneyChartYearCodec, wire)).toEqual(sent)
+    expect(sent.months).toHaveLength(12)
+    expect(sent.average).toMatchObject({ from: '2026-06', to: '2026-08', months: 3 })
+    // A removed category not spent in the year is offered nowhere (Р-8 of the review).
+    expect(sent.categories.map((one) => one.category.id)).toEqual([GROCERIES])
+  })
+
+  it('refuses a year of eleven months and a field the phone does not know', () => {
+    const wire = z.encode(moneyChartYearCodec, view())
+    expect(moneyChartYearCodec.safeParse({ ...wire, months: wire.months.slice(1) }).success).toBe(
+      false,
+    )
+    expect(moneyChartYearCodec.safeParse({ ...wire, boost: 1 }).success).toBe(false)
   })
 })
