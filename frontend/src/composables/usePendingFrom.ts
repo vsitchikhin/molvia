@@ -30,13 +30,19 @@ export function usePendingFrom(queue: VerdictQueue): ComputedRef<string | null> 
   return computed(() => {
     const cards = [...queue.cards.value].sort((a, b) => b.boughtAt.getTime() - a.boughtAt.getTime())
     const cityOf = cityWhereNameRepeats(cards.map(placeOfCard))
+    // One place is one row of `places`: name and city as the index folds them. Without every city
+    // the phone cannot fold — «Ереван Сити» and «ЕРЕВАН СИТИ» may be two cities' shops — so the
+    // names are kept apart as written, as before MOL-120 (adversarial А1).
+    const folded = cards.every((card) => card.placeCity !== undefined)
     const places = new Map<string, string>()
     for (const card of cards) {
       const city = cityOf(placeOfCard(card))
-      const key = JSON.stringify([
-        placeNameIdentity(card.placeName),
-        city === null ? null : placeNameIdentity(city),
-      ])
+      const key = folded
+        ? JSON.stringify([
+            placeNameIdentity(card.placeName),
+            placeNameIdentity(card.placeCity ?? ''),
+          ])
+        : card.placeName
       if (places.has(key)) continue
       const quoted = t('trip.home.pending.place', { place: card.placeName })
       places.set(key, placeLabel(quoted, city, i18n))

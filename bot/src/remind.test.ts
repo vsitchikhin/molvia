@@ -89,6 +89,8 @@ describe('текст напоминания', () => {
     expect(reminderText(item('Молоко'), 0, APP, 'Ереван')).toMatch(
       /^Вчера · Ереван Сити в Ереване\n/,
     )
+    // A place keeps the spelling its city was first written in: «гюмри» is Gyumri (adversarial А2).
+    expect(reminderText(item('Молоко'), 0, APP, 'гюмри')).toMatch(/^Вчера · Ереван Сити в Гюмри\n/)
     expect(reminderText(item('Молоко'), 0, APP, 'Ванадзор')).toMatch(
       /^Вчера · Ереван Сити \(Ванадзор\)\n/,
     )

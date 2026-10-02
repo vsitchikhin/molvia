@@ -2,7 +2,7 @@ import { GrammyError, InlineKeyboard } from 'grammy'
 import type { Api } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
-import { cityWhereNameRepeats } from '@molvia/model'
+import { cityWhereNameRepeats, settingsCityOf } from '@molvia/model'
 import type { Reminder, ReminderItem } from '@molvia/model'
 import type { InlineKeyboardMarkup } from 'grammy/types'
 import { hasMessage, t } from './i18n'
@@ -120,11 +120,15 @@ export function writeText({ question, rated, switched }: ReminderText): string {
   return parts.join('').replace(/^\n\n/, '')
 }
 
-/** «Ереван Сити в Ереване», or the name alone where `city` is `null` (MOL-120). */
+/**
+ * «Ереван Сити в Ереване», or the name alone where `city` is `null` (MOL-120). The case is looked
+ * up by the city of the settings the stored spelling folds to — «гюмри» is Gyumri (adversarial А2).
+ */
 function placeText(name: string, city: string | null): string {
   if (city === null) return name
-  const key = `remind.in.${city}`
-  return hasMessage(key)
+  const known = settingsCityOf(city)
+  const key = `remind.in.${known ?? ''}`
+  return known !== null && hasMessage(key)
     ? t(undefined, 'remind.placeIn', { place: name, where: t(undefined, key) })
     : t(undefined, 'remind.placeInBrackets', { place: name, city })
 }

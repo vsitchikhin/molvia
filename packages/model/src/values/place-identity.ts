@@ -74,8 +74,10 @@ export interface NamedPlace {
 /**
  * The city a place is printed with among these (MOL-120): only where its name stands in two
  * cities or more — «Ереван Сити» of Gyumri beside «Ереван Сити» of Yerevan — and nowhere else,
- * where it is noise. One rule for the queue of verdicts, the places of «Что брать» and the
- * reminder, so the three never disagree over the same pair of shops.
+ * where it is noise. One rule for the queue of verdicts, a row of «Что брать» and a reminder,
+ * each applying it to the set it shows — so they may differ over one shop, and on purpose
+ * (owner's В-1): a reminder of three items names the Gyumri shop alone while «Оценки», holding
+ * the Yerevan one as a fourth card, names it with its city (adversarial А5).
  *
  * Name and city are compared as the index over `places` compares them, so «SAS» of Gyumri and
  * «sas» of Yerevan repeat. A place with no city — an answer of the server before MOL-120, or one

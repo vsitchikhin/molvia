@@ -46,6 +46,11 @@ describe('VerdictCard', () => {
     expect(known.get('.context').text()).toBe('Sep 12 · Ереван Сити in Yerevan')
     known.unmount()
 
+    // The city of the settings in another spelling still takes its case (adversarial А2).
+    const folded = render(undefined, 'гюмри')
+    expect(folded.get('.context').text()).toBe('Sep 12 · Ереван Сити in Gyumri')
+    folded.unmount()
+
     const unknown = render(undefined, 'Ванадзор')
     expect(unknown.get('.context').text()).toBe('Sep 12 · Ереван Сити (Ванадзор)')
     unknown.unmount()
