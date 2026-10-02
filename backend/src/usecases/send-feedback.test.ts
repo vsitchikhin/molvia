@@ -18,7 +18,7 @@ const message: FeedbackBody = {
   clientKey: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d',
 }
 
-function fake(write: FeedbackWrite, calls: unknown[][]): FeedbackRepository {
+function fake(write: FeedbackWrite, calls: unknown[][]): Pick<FeedbackRepository, 'record'> {
   return {
     record: (...args) => {
       calls.push(args)

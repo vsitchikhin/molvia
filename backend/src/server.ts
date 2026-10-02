@@ -398,6 +398,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const removedSpendings = createSpendingRepository(db)
     const removedTrips = createTripRepository(db)
     const removedAccounts = createMoneyAccountRepository(db)
+    const messages = createFeedbackRepository(db)
     let stopCleanup: (() => Promise<void>) | undefined
     let stopExchangeCleanup: (() => Promise<void>) | undefined
     let stopIncomeCleanup: (() => Promise<void>) | undefined
@@ -405,6 +406,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopTripCleanup: (() => Promise<void>) | undefined
     let stopAccountCleanup: (() => Promise<void>) | undefined
     let stopSessionCleanup: (() => Promise<void>) | undefined
+    let stopFeedbackCleanup: (() => Promise<void>) | undefined
     instance.addHook('onReady', (ready) => {
       stopCleanup = startLoginCleanup(
         () => loginRequests.removeExpired(),
@@ -458,6 +460,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           instance.log.error('expired session cleanup failed')
         },
       )
+      // A message to the developer lives a year from the last word of its thread (MOL-147, В-4 of
+      // MOL-150), whether or not anyone writes again.
+      stopFeedbackCleanup = startLoginCleanup(
+        () => messages.purgeStale(),
+        () => {
+          instance.log.error('stale feedback cleanup failed')
+        },
+      )
       ready()
     })
     instance.addHook('onClose', async () => {
@@ -468,6 +478,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopTripCleanup?.()
       await stopAccountCleanup?.()
       await stopSessionCleanup?.()
+      await stopFeedbackCleanup?.()
     })
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
@@ -543,7 +554,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         eraseMe(createErasureRepository(db), telegramUserId),
       )
       feedbackRoutes(guarded, (actorId, message) =>
-        sendFeedback(createFeedbackRepository(db), actorId, message, VERSION),
+        sendFeedback(messages, actorId, message, VERSION),
       )
       sessionRoutes(guarded, {
         list: (actorId, currentId) => listSessions(sessions, actorId, currentId),

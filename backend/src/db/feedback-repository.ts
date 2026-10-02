@@ -1,5 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { DomainError, ERROR } from '@molvia/model'
+import { DomainError, ERROR, FEEDBACK_KEPT_YEARS } from '@molvia/model'
 import type { FeedbackBody } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -25,6 +25,12 @@ export interface FeedbackRepository {
     apiBuild: string,
     limit: number,
   ): Promise<FeedbackWrite>
+
+  /**
+   * Threads whose last message — the person's or the owner's reply — is older than they are kept
+   * (MOL-150, В-4): removed whole, the first message taking its continuations and replies along.
+   */
+  purgeStale(): Promise<void>
 }
 
 type Row = typeof feedback.$inferSelect
@@ -86,6 +92,20 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
           return { kind: 'written', number: theRow(written, 'feedback').id }
         }),
       )
+    },
+
+    async purgeStale() {
+      await db.execute(sql`
+        delete from feedback
+        where thread_id is null
+          and id in (
+            select coalesce(f.thread_id, f.id)
+            from feedback f
+            left join feedback_replies r on r.feedback_id = f.id
+            group by coalesce(f.thread_id, f.id)
+            having greatest(max(f.created_at), max(r.created_at))
+              < clock_timestamp() - make_interval(years => ${FEEDBACK_KEPT_YEARS})
+          )`)
     },
   }
 }

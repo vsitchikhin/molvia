@@ -4,7 +4,8 @@ import { eq } from 'drizzle-orm'
 import { ERROR, FEEDBACK_DAY_LIMIT, ISSUE } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { VERSION } from '@/env'
-import { feedback } from '@/db/schema'
+import { createFeedbackRepository } from '@/db/feedback-repository'
+import { feedback, feedbackReplies } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
@@ -234,5 +235,81 @@ describe('POST /feedback (MOL-147)', () => {
     expect(statuses.filter((status) => status === 201)).toHaveLength(FEEDBACK_DAY_LIMIT)
     expect(statuses.filter((status) => status === 429)).toHaveLength(3)
     expect(await db.select().from(feedback)).toHaveLength(FEEDBACK_DAY_LIMIT)
+  })
+})
+
+describe('срок — год от последнего сообщения нити (MOL-147, В-4 MOL-150)', () => {
+  const monthsAgo = (months: number) => new Date(Date.now() - months * 30.5 * 86_400_000)
+
+  async function aMessage(actorId: string, at: Date, thread?: { id: number; reply?: number }) {
+    const [row] = await db
+      .insert(feedback)
+      .values({
+        actorId,
+        kind: 'bug',
+        text: 'текст',
+        locale: 'ru',
+        apiBuild: 'dev',
+        threadId: thread?.id,
+        inReplyTo: thread?.reply,
+        createdAt: at,
+      })
+      .returning({ id: feedback.id })
+    if (row === undefined) throw new Error('no message')
+    return row.id
+  }
+
+  async function aReply(feedbackId: number, at: Date) {
+    const [row] = await db
+      .insert(feedbackReplies)
+      .values({ feedbackId, text: 'ответ', delivered: 'sent', createdAt: at })
+      .returning({ id: feedbackReplies.id })
+    if (row === undefined) throw new Error('no reply')
+    return row.id
+  }
+
+  it('уходит нить, где всё старше года; живёт та, где хоть что-то моложе', async () => {
+    const anna = await insertActor(db)
+    const old = await aMessage(anna, monthsAgo(24))
+    await aReply(old, monthsAgo(23))
+    const answered = await aMessage(anna, monthsAgo(24))
+    await aReply(answered, monthsAgo(2))
+    const continued = await aMessage(anna, monthsAgo(24))
+    const reply = await aReply(continued, monthsAgo(23))
+    await aMessage(anna, monthsAgo(1), { id: continued, reply })
+    const lapsed = await aMessage(anna, monthsAgo(24))
+    const lapsedReply = await aReply(lapsed, monthsAgo(24))
+    await aMessage(anna, monthsAgo(13), { id: lapsed, reply: lapsedReply })
+    const recent = await aMessage(anna, monthsAgo(11))
+    const stale = await aMessage(anna, monthsAgo(13))
+
+    await createFeedbackRepository(db).purgeStale()
+
+    const left = await db.select({ id: feedback.id, thread: feedback.threadId }).from(feedback)
+    const threads = new Set(left.map((row) => row.thread ?? row.id))
+    expect([...threads].sort((a, b) => a - b)).toEqual([answered, continued, recent])
+    expect(threads).not.toContain(old)
+    expect(threads).not.toContain(lapsed)
+    expect(threads).not.toContain(stale)
+    expect(left).toHaveLength(4)
+    const replies = await db
+      .select({ feedbackId: feedbackReplies.feedbackId })
+      .from(feedbackReplies)
+    expect(replies.map((row) => row.feedbackId).sort((a, b) => a - b)).toEqual([
+      answered,
+      continued,
+    ])
+  })
+
+  it('не трогает ничего моложе года — ни чужого, ни своего', async () => {
+    const anna = await insertActor(db)
+    const boris = await insertActor(db)
+    await aMessage(anna, monthsAgo(11))
+    await aReply(await aMessage(boris, monthsAgo(6)), monthsAgo(5))
+
+    await createFeedbackRepository(db).purgeStale()
+
+    expect(await db.select().from(feedback)).toHaveLength(2)
+    expect(await db.select().from(feedbackReplies)).toHaveLength(1)
   })
 })

@@ -9,7 +9,7 @@ import type { FeedbackRepository } from '@/db/feedback-repository'
  * day's limit the sheet keeps the text and says to send it tomorrow (MOL-150, Р-3, Р-4).
  */
 export async function sendFeedback(
-  repository: FeedbackRepository,
+  repository: Pick<FeedbackRepository, 'record'>,
   actorId: string,
   message: FeedbackBody,
   apiBuild: string,
