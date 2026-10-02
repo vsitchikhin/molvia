@@ -430,7 +430,9 @@ shows what it moves.
   «meso» «Пакеты мусорные»; others find nothing. Armenian names are still found by their letters
   through the alphabet above. Russian words of a shelf with no word of its kind in the names find
   nothing — «бытовая химия», «гигиена», «приправы». Eight words of the corpus have their nearest
-  name within 0.006 of the threshold and fall either way on another machine. All of it is pinned
+  name within 0.006 of the threshold, and five of them answer otherwise on x86 — CI and production —
+  than on a Mac's ARM: the model's arithmetic differs in its last digits, so «выпивка» finds «Водка»
+  in production and nothing on a Mac. Those carry both answers seen. All of it is pinned
   word by word — `SHELF_WORDS` and `SEED_ABSENT` of the corpus, `search-meaning.integration.test.ts`.
 - **The vectors are also the ground the merging of duplicates stands on** (MOL-106): two names close
   by spelling and by meaning, with every number equal.

@@ -124,9 +124,12 @@ describe('what the letters found does not move (owner’s decision В-3)', () =>
  * threshold or the model shows here as what it moves. Prices this pins, named in `search.md`: an
  * Armenian or Georgian shelf word finds a name by its spelling and calls it near («կաթնամթերք» →
  * «Матнакаш», «ბოსტნეული» → «Бастурма»); «бытовая химия», «гигиена», «приправы» find nothing.
- * The words marked at the threshold have their nearest name within 0.006 of it.
+ * The words marked at the threshold have their nearest name within 0.006 of it. Five of them answer
+ * otherwise on x86 than on ARM — the model's arithmetic differs in the last digits between the two
+ * (CI and production are x86, a Mac is ARM): those carry both answers seen, either holds.
  */
-const SHELF_ANSWERS: readonly (readonly [string, string | null, boolean])[] = [
+type Answer = readonly [string | null, boolean]
+const SHELF_ANSWERS: readonly (readonly [string, string | null, boolean, Answer?])[] = [
   ['молочка', 'Молоко', true],
   ['молочное', 'Молоко', true],
   ['молочные продукты', 'Молоко', true],
@@ -140,7 +143,7 @@ const SHELF_ANSWERS: readonly (readonly [string, string | null, boolean])[] = [
   ['курятина', 'Курица', true],
   ['мясные продукты', 'Говядина', true],
   ['միս', 'Рис', true],
-  ['ხორცი', null, false], // at the threshold
+  ['ხორცი', null, false, ['Хрен', true]], // either way: ARM, x86
   ['meso', 'Пакеты мусорные', true],
   ['копчёности', null, false],
   ['колбасные изделия', 'Колбаса', true],
@@ -170,7 +173,7 @@ const SHELF_ANSWERS: readonly (readonly [string, string | null, boolean])[] = [
   ['злаки', 'Батончик злаковый', true], // at the threshold
   ['бобовые', null, false],
   ['приправы', null, false],
-  ['пряности', null, false], // at the threshold
+  ['пряности', null, false, ['Перец острый', true]], // either way: ARM, x86
   ['специи', 'Перец острый', true],
   ['консервы', 'Тунец консервированный', true],
   ['соленья', 'Арахис солёный', true],
@@ -194,11 +197,11 @@ const SHELF_ANSWERS: readonly (readonly [string, string | null, boolean])[] = [
   ['горячие напитки', 'Чай холодный', true],
   ['piće', 'Пицца', true],
   ['алкоголь', 'Водка', true],
-  ['выпивка', null, false], // at the threshold
+  ['выпивка', null, false, ['Водка', true]], // either way: ARM, x86
   ['спиртное', 'Водка', true],
   ['ալկոհոլ', null, false],
   ['alkohol', null, false],
-  ['детское питание', 'Пюре детское', false], // at the threshold
+  ['детское питание', 'Пюре детское', false, ['Смесь детская', true]], // either way: ARM, x86
   ['для малыша', 'Смесь детская', true],
   ['бытовая химия', null, false],
   ['для уборки', 'Средство чистящее', true],
@@ -210,7 +213,7 @@ const SHELF_ANSWERS: readonly (readonly [string, string | null, boolean])[] = [
   ['уход за собой', null, false],
   ['для кошки', 'Корм для кошек', false],
   ['зоотовары', 'Пелёнки для животных', true],
-  ['для питомца', 'Лакомство для собак', true],
+  ['для питомца', 'Лакомство для собак', true, ['Пелёнки для животных', true]], // either way: ARM, x86
 ]
 
 const ABSENT_ANSWERS: readonly (readonly [string, string | null, boolean])[] = [
@@ -247,9 +250,16 @@ describe('the corpus of shelf words, pinned whole', () => {
     expect(ABSENT_ANSWERS.map(([word]) => word)).toEqual([...SEED_ABSENT])
   })
 
-  it.each([...SHELF_ANSWERS, ...ABSENT_ANSWERS])('«%s» → %s, near %s', async (word, name, near) => {
-    const { names, near: found } = await search(word)
-    expect([names[0] ?? null, found]).toEqual([name, near])
+  it.each(
+    [...SHELF_ANSWERS, ...ABSENT_ANSWERS].map(([word, name, near, other]) => ({
+      word,
+      answers: [[name, near] as const, ...(other ? [other] : [])],
+    })),
+  )('«$word» → $answers', async ({ word, answers }) => {
+    const { names, near } = await search(word)
+    expect(answers.map((answer) => JSON.stringify(answer))).toContain(
+      JSON.stringify([names[0] ?? null, near]),
+    )
   })
 })
 
