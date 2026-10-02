@@ -217,6 +217,40 @@ const file: ExportFile = {
     },
   ],
   addedBarcodes: [{ barcode: '4850001234567', itemId: id(8), addedAt: at }],
+  feedback: [
+    {
+      number: 41,
+      kind: 'bug',
+      text: 'Не открывается «Деньги»',
+      locale: 'ru',
+      pageBuild: 'v0.1.3-20-gd90f9cee',
+      apiBuild: 'v0.1.3-20-gd90f9cee',
+      route: 'money',
+      platform: 'ios 18 app',
+      errorCode: 'error.internal',
+      fromError: true,
+      thread: null,
+      inReplyTo: null,
+      createdAt: at,
+      replies: [{ number: 7, text: 'Починили', delivered: 'sent', createdAt: at }],
+    },
+    {
+      number: 42,
+      kind: 'bug',
+      text: 'Спасибо',
+      locale: 'ru',
+      pageBuild: null,
+      apiBuild: 'v0.1.3-21-g0a1b2c3d',
+      route: null,
+      platform: null,
+      errorCode: null,
+      fromError: false,
+      thread: 41,
+      inReplyTo: 7,
+      createdAt: at,
+      replies: [],
+    },
+  ],
   catalogue: {
     items: [{ id: id(8), kind: 'product', name: 'Молоко Ашхар 1 л' }],
     places: [{ id: id(5), kind: 'store', name: 'Ереван Сити', country: 'AM', city: 'Гюмри' }],
@@ -242,7 +276,8 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(7)
+    expect(wire.version).toBe(8)
+    expect(wire.feedback[1]).toMatchObject({ thread: 41, inReplyTo: 7, replies: [] })
     expect(wire.budgetPlans[0]?.plan).toEqual({
       kind: 'amount',
       amount: { amount: '250000.00', currency: 'AMD' },

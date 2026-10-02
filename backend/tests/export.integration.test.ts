@@ -13,6 +13,8 @@ import {
   exchangeRevisions,
   exchanges,
   expenses,
+  feedback,
+  feedbackReplies,
   incomeRevisions,
   incomes,
   itemBarcodes,
@@ -317,6 +319,40 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     },
     { actorId, categoryId: null, fromMonth: '2026-09', percent: 25, updatedAt: at(24) },
   ])
+  // «Написать разработчику» (MOL-147): a message from an error screen, the owner's reply, and the
+  // person's answer to it from the bot.
+  const [message] = await db
+    .insert(feedback)
+    .values({
+      actorId,
+      kind: 'bug',
+      text: 'Не открывается «Деньги»',
+      locale: 'ru',
+      pageBuild: 'v0.1.3-20-gd90f9cee',
+      apiBuild: 'v0.1.3-20-gd90f9cee',
+      route: 'money',
+      platform: 'ios 18 app',
+      errorCode: 'error.internal',
+      fromError: true,
+      clientKey: randomUUID(),
+      createdAt: at(25),
+    })
+    .returning({ id: feedback.id })
+  if (message === undefined) throw new Error('no message')
+  const [reply] = await db
+    .insert(feedbackReplies)
+    .values({ feedbackId: message.id, text: 'Починили', delivered: 'sent', createdAt: at(26) })
+    .returning({ id: feedbackReplies.id })
+  await db.insert(feedback).values({
+    actorId,
+    kind: 'bug',
+    text: 'Спасибо, работает',
+    locale: 'ru',
+    apiBuild: 'v0.1.3-21-g0a1b2c3d',
+    threadId: message.id,
+    inReplyTo: reply?.id,
+    createdAt: at(27),
+  })
 }
 
 describe('состав экспорта — один источник правды со стиранием (MOL-93)', () => {
@@ -442,6 +478,7 @@ describe('состав экспорта — один источник правд
     }
     expect(content.exchanges.flatMap((exchange) => exchange.earlierVersions)).toHaveLength(1)
     expect(content.incomes.flatMap((income) => income.earlierVersions)).toHaveLength(1)
+    expect(content.feedback.flatMap((message) => message.replies)).toHaveLength(1)
   })
 })
 

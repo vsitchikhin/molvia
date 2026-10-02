@@ -23,6 +23,13 @@ export const FEEDBACK_DAY_LIMIT = 10
 /** A thread lives this long after its last message, the person's or the owner's (MOL-150, В-4). */
 export const FEEDBACK_KEPT_YEARS = 1
 
+/**
+ * What became of the owner's reply (MOL-150, Р-11): reached the person, the bot was blocked, or the
+ * message was gone by then. Written by the bot's half (MOL-148).
+ */
+export const FEEDBACK_DELIVERY = ['sent', 'blocked', 'gone'] as const
+export type FeedbackDelivery = (typeof FEEDBACK_DELIVERY)[number]
+
 export const FEEDBACK_SYSTEMS = [
   'ios',
   'ipados',
