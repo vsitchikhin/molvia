@@ -64,6 +64,7 @@ function hint(answer: OwnPrices, typed: number | null, extra: Partial<CheaperHin
     currency: 'AMD',
     unit: 'l',
     typed: typed === null ? null : per(typed),
+    typedQuantity: null,
     here: CITY,
     ...extra,
   })

@@ -46,7 +46,7 @@ export interface CheaperHintInput {
   /** The unit price of what is typed, or `null` while there is none; its own pair is the group. */
   readonly typed: UnitPrice | null
   /** How much is typed: the till's rounding of the sum wobbles a small purchase's price most (Г′). */
-  readonly typedQuantity?: Quantity | null
+  readonly typedQuantity: Quantity | null
   /** The record's place, when the phone knows it; a record started offline has none yet. */
   readonly here: string | null
 }
@@ -135,7 +135,9 @@ function kindOf(
  */
 export function cheaperHint(input: CheaperHintInput): CheaperHint {
   const { answer, typed, here } = input
-  const typedQuantity = typed ? (input.typedQuantity ?? null) : null
+  // Required of every caller (adversarial round 4): left out, the till's rounding of a small sum
+  // went uncounted without a word, and 0,15 kg of tomatoes read «дороже» again.
+  const typedQuantity = typed ? input.typedQuantity : null
   if (answer.level === 'never') return NOTHING
   // What is typed names its own pair, so the two can never be compared across one.
   const { currency, unit } = typed ?? input
