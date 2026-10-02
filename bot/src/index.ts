@@ -1,8 +1,10 @@
 import process from 'node:process'
 import { createBotClient } from '@molvia/client'
-import { assembleBot, startBot } from './assemble'
-import { startReminders } from './remind'
+import { assembleBot, introduce, startBot, telegramFailure } from './assemble'
+import { createPulse, hearTelegram } from './pulse'
+import { REMIND_EVERY_MS, startReminders } from './remind'
 import { botToken, readEnvironment, refusedNames } from './env'
+import type { RunnerHandle } from '@grammyjs/runner'
 import type { BotEnvironment } from './env'
 
 // Every working copy needs its own bot: two processes on one token steal each other's
@@ -68,7 +70,9 @@ const api = createBotClient({
   timeoutMs: API_TIMEOUT_MS,
 })
 const bot = assembleBot(botToken, { api, appUrl: environment.appBaseUrl })
-const runner = startBot(bot)
+// The pulse (MOL-142) beats on a claim that went through while the runner hears Telegram; without
+// a URL it never goes out. The listener goes in before the runner's first `getUpdates`.
+const pulse = createPulse(environment.pulseUrl, { listening: hearTelegram(bot) })
 // The rating reminders (MOL-101): every minute the API is asked who is due, and they are sent.
 const stopReminders = startReminders(
   createBotClient({
@@ -78,16 +82,36 @@ const stopReminders = startReminders(
   }),
   bot.api,
   environment.appBaseUrl,
+  REMIND_EVERY_MS,
+  () => {
+    void pulse()
+  },
 )
 
 // The runner keeps fetching updates until it is told to stop, and a kill without this leaves
-// whatever it is holding half-handled. Compose sends SIGTERM on every deploy.
+// whatever it is holding half-handled. Compose sends SIGTERM on every deploy. A stop that comes
+// while the bot still asks Telegram who it is cuts that short, and the runner never starts.
+const stopping = new AbortController()
+let runner: RunnerHandle | undefined
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {
+    stopping.abort()
     // Side by side, not one after the other (adversarial З): the runner stops taking updates while
     // the evening's last messages go out, and neither waits for the other inside the grace period.
-    void Promise.all([stopReminders(), runner.stop()])
+    void Promise.all([stopReminders(), runner?.stop()])
   })
 }
 
-await runner.task()
+// A failure the runner gives up on — a revoked token, a second poller, fifteen hours of Telegram
+// away — ends the process for compose to start again. It is logged by its kind: printed whole, the
+// error carries the bot's token in the request's address (MOL-142, adversarial round 3 Д2).
+try {
+  await introduce(bot, stopping.signal)
+  if (!stopping.signal.aborted) {
+    runner = startBot(bot)
+    await runner.task()
+  }
+} catch (error) {
+  console.error(`[molvia] telegram: ${telegramFailure(error)}, stopping`)
+  process.exit(1)
+}
