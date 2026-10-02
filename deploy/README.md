@@ -261,11 +261,11 @@ They go through healthchecks.io's own Telegram integration, never through our bo
 is down takes the bot with it. healthchecks.io and GitHub see the server's address and nothing of
 anyone's data.
 
-| Check           | Who pings                                                             | Period · grace | Silence or `/fail` means                                                                                  |
-| --------------- | --------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------- |
-| `molvia-up`     | `.github/workflows/watch.yml`, from GitHub, every five minutes        | 5 min · 15 min | the API with its database, the page or the certificate's term — or GitHub itself                          |
-| `molvia-bot`    | the bot, after a claim of reminders went through, at most every 5 min | 5 min · 10 min | the bot is down or cannot reach the API or the internet — and without the bot nobody can sign in (MOL-54) |
-| `molvia-backup` | `backup/backup.sh`, nightly                                           | 1 day · 1 hour | no copy of the database tonight (Backups, below)                                                          |
+| Check            | Who pings                                                             | Period · grace | Silence or `/fail` means                                                                                  |
+| ---------------- | --------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------- |
+| `molvia-up`      | `.github/workflows/watch.yml`, from GitHub, every five minutes        | 5 min · 15 min | the API with its database, the page or the certificate's term — or GitHub itself                          |
+| `molvia-bot`     | the bot, after a claim of reminders went through, at most every 5 min | 5 min · 10 min | the bot is down or cannot reach the API or the internet — and without the bot nobody can sign in (MOL-54) |
+| `molvia-backups` | `backup/backup.sh`, nightly                                           | 1 day · 1 hour | no copy of the database tonight (Backups, below)                                                          |
 
 - **What the watch checks.** `GET /api/health` is `200` with `"status":"ok"` — `/health` answers
   `503` whenever it is not ok, the database down included, with the same body. `GET /` is `200`.
