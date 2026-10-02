@@ -908,6 +908,7 @@
       "mine": "My exchange {day} · {rate}",
       "mine_place": "{place} · {change} against the market",
       "mine_no_market": "{place} · no market that day",
+      "mine_no_rate": "{place} · not compared: no central bank rate that day",
       "no_change": "not compared",
       "none": "No exchanges that week",
       "none_year": "No exchanges in 12 months",

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { parseRate, yerevanMidnight } from '@molvia/model'
 import type { ExchangeRate, ExchangeRateChartView } from '@molvia/model'
 import ExchangeRateChart from './ExchangeRateChart.vue'
+import { calendarDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 
 type Pair = ExchangeRateChartView['pairs'][number]
@@ -94,6 +95,18 @@ async function tap(view: ReturnType<typeof chart>['view'], area: Element, x: num
   area.dispatchEvent(touch('pointerup', x))
   await view.vm.$nextTick()
 }
+
+/** A touch lifted where it landed, at a height. */
+async function at(view: ReturnType<typeof chart>['view'], area: Element, x: number, y: number) {
+  const event = (type: string) =>
+    new PointerEvent(type, { clientX: x, clientY: y, pointerType: 'touch', bubbles: true })
+  area.dispatchEvent(event('pointerdown'))
+  area.dispatchEvent(event('pointerup'))
+  await view.vm.$nextTick()
+}
+
+/** «22 мар.» — a week's day as the reading prints it. */
+const calendarDayOf = (day: string) => calendarDay(day, 'ru', { day: 'numeric', month: 'short' })
 
 /** `Intl` puts a no-break space before «%»: read as the eye reads it. */
 const plain = (text: string | undefined) => text?.replaceAll('\u00a0', ' ')
@@ -202,6 +215,81 @@ describe('ExchangeRateChart (MOL-161)', () => {
     )
     await view.vm.$nextTick()
     expect(view.find('.none').text()).toBe('Обменов на этой неделе не было')
+  })
+
+  it('over a week of a phone-sized line the height chooses no other week (review 4, adversarial Ж)', async () => {
+    // Fifty weeks 20 thousandths apart — some 6 px on 300 — the line rising, one gap, no exchange.
+    const weeks = Array.from({ length: 51 }, (_, index) => {
+      const day = new Date(Date.UTC(2025, 9, 12) + index * 7 * 86_400_000)
+        .toISOString()
+        .slice(0, 10)
+      return index === 30
+        ? { day, rate: null, x: index * 20, level: null }
+        : { day, rate: rate('4.50', day), x: index * 20, level: index * 20 }
+    })
+    const { view, area } = chart([rouble({ weeks, exchanges: [] })])
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    const weekAt = async (index: number, y: number) => {
+      await at(view, area, index * 6, y)
+      return view.find('.reading .week').text()
+    }
+    const name = (index: number) => `Неделя по ${calendarDayOf(weeks[index]?.day ?? '')} · рынок`
+    for (const y of [2, 90, 178]) expect(await weekAt(25, y)).toBe(name(25))
+    // The gap is chosen by its x at any height, and says it has no market.
+    for (const y of [2, 90, 178]) {
+      expect(await weekAt(30, y)).toBe(name(30))
+      expect(view.find('.figure').text()).toBe('Рынка за эту неделю нет')
+    }
+  })
+
+  it('a second tap on two exchanges of one day at one rate chooses the other (adversarial И)', async () => {
+    const one = point('a0000000-0000-4000-8000-000000000007', '2026-02-24', 3, 571, {
+      place: 'Касса 1',
+    })
+    const two = point('a0000000-0000-4000-8000-000000000008', '2026-02-24', 3, 571, {
+      place: 'Касса 2',
+    })
+    const { view, area } = chart([rouble({ exchanges: [one, two] })])
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    // Opened on the latest, «Касса 2»; a tap on the dot turns to «Касса 1», another back.
+    expect(view.find('.mine-place').text()).toContain('Касса 2')
+    await at(view, area, 171, 100)
+    expect(view.find('.mine-place').text()).toContain('Касса 1')
+    await at(view, area, 171, 100)
+    expect(view.find('.mine-place').text()).toContain('Касса 2')
+  })
+
+  it('must not fire: a finger sliding over such marks does not turn them over', async () => {
+    const one = point('a0000000-0000-4000-8000-000000000007', '2026-02-24', 3, 571, {
+      place: 'Касса 1',
+    })
+    const two = point('a0000000-0000-4000-8000-000000000008', '2026-02-24', 3, 571, {
+      place: 'Касса 2',
+    })
+    const { view, area } = chart([rouble({ exchanges: [one, two] })])
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    const event = (type: string, x: number) =>
+      new PointerEvent(type, { clientX: x, clientY: 100, pointerType: 'touch', bubbles: true })
+    // Down on the dot, sideways past the slop, back over it, lifted on it.
+    area.dispatchEvent(event('pointerdown', 171))
+    for (const x of [180, 176, 172]) area.dispatchEvent(event('pointermove', x))
+    area.dispatchEvent(event('pointerup', 172))
+    await view.vm.$nextTick()
+    expect(view.find('.mine-place').text()).toContain('Касса 2')
+  })
+
+  it('with a market and no central bank rate to measure by, says that, not «no market» (К)', () => {
+    const { view } = chart([
+      rouble({
+        exchanges: [
+          point('a0000000-0000-4000-8000-000000000009', '2026-02-28', 3, 714, { percent: null }),
+        ],
+      }),
+    ])
+    expect(view.findAll('.mark')).toHaveLength(2)
+    expect(view.find('.mine-place').text()).toBe(
+      'Ардшинбанк · без сравнения: курса ЦБ РА того дня нет',
+    )
   })
 
   it('must not fire: a scroll that started on the chart chooses nothing', async () => {

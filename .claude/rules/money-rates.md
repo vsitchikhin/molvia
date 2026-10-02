@@ -322,7 +322,9 @@ rate exactly as before.
   with no comparison there, none on the point — **and the mark from it ends at that
   market, never at the line** (В-1): roubles sold for cash at 4,15 when banks bought cash at 4,110 and
   all clients near 4,22 are «+0,97 %», and a mark to the line said the opposite. The line is the
-  background, where the market went; with no market of the day a point has no mark and says so.
+  background, where the market went; with no market of the day a point has no mark and says so,
+  and with a market and no central bank rate to bring the difference into the spending currency it
+  has its mark, no percent, and says it is the rate that is missing (adversarial К).
   **The line is on the side of the pair's latest exchange in the window** (В-2), the others of the
   pair not drawn: the bank's selling rate is another line, and a purchase of roubles set on the line
   of their sale looked a windfall. **The pairs are the currencies changed against the dram in the
@@ -332,16 +334,20 @@ rate exactly as before.
   (`rateChart`, `exchange-rate-chart.ts`): three ticks a step of 1, 2, 3 or 5 × 10ⁿ apart within the
   scale, multiples of that power — «4,30 · 4,60 · 4,90» — or one when none fit two digits; the phone
   names the months. **The scale is the figures, and no narrower than a hundredth of their middle**
-  (`rateScale`, adversarial Г2): a flat year with an exchange 0,07 % off it drew those 0,07 % the whole
-  height of the card; a year of the market spans ten percent and more and is drawn as it is. **A week
-  with a figure between two gaps is a dot of the line** (adversarial Д), never left out. It comes with `GET /exchanges` and every write's answer, as `losses` does, and
-  is defaulted for a server before it. The finger chooses as on every chart of the section
-  (`useChartPointer`), **the nearest of what can be chosen, each by its own place**: an exchange by
-  its day, a week with none by its end (review 1) — found through the week first, a tap right on an
-  exchange of a Monday chose the week ending the day before — **and among those within a finger
-  across (`FINGER_PX`), by height** (`ChartPoint`, adversarial Б): two exchanges of one day stand at
-  one x, and by x alone the finger reached one of them; a week with no figure gives way to any mark.
-  The latest exchange by default, two of one day in the order they were made, never by their ids
+  (`rateScale`, adversarial Г2): a flat year with an exchange 0,07 % off it drew those 0,07 % the
+  whole height of the card; a year of the market spans ten percent and more and is drawn as it is.
+  **A week with a figure between two gaps is a dot of the line** (adversarial Д), never left out. It
+  comes with `GET /exchanges` and every write's answer, as `losses` does, and is defaulted for a
+  server before it. The finger chooses as on every chart of the section (`useChartPointer`), **the
+  nearest of what can be chosen, each by its own place**: an exchange by its day, a week with none by
+  its end (review 1) — found through the week first, a tap right on an exchange of a Monday chose the
+  week ending the day before. **Only between exchanges does the height decide** (`ChartPoint`,
+  `FINGER_PX`; adversarial Б, review 4): two exchanges of one day stand at one x, and by x alone the
+  finger reached one of them; a week is chosen by its x alone — let into the height, a finger above
+  the line chose a week two ahead (a week is some 6 px on a phone), and a gap, with no height, could
+  not be chosen at all (adversarial Ж). **A second tap on exchanges drawn one over another — one day,
+  one rate — chooses the next of them** (adversarial И); a slide keeps the one chosen (`tap`). The
+  latest exchange by default, two of one day in the order they were made, never by their ids
   (review 2). **A hidden radio for each week with no exchange and for each exchange** (Р-6): one per
   week left the second exchange of a week out of reach of the keys. The scale is never stretched to a
   tick (review 3): stretched to a tick rounded off a flat line, the line was pressed to the top. A

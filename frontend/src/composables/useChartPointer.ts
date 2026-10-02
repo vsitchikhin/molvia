@@ -13,6 +13,12 @@ export interface ChartPoint {
   readonly y: number | null
   readonly width: number
   readonly height: number
+  /**
+   * One deliberate choice — a finger lifted where it touched, a mouse pressed — never a step of a
+   * drag: a chart that turns a second tap into the next of marks drawn one over another (MOL-161,
+   * adversarial И) must not turn them over while the finger slides.
+   */
+  readonly tap: boolean
 }
 
 export interface ChartPointer {
@@ -35,7 +41,7 @@ export function useChartPointer(
 ): ChartPointer {
   let touch: { x: number; y: number; sideways: boolean } | null = null
 
-  function at(event: PointerEvent): void {
+  function at(event: PointerEvent, tap: boolean): void {
     const box = area.value?.getBoundingClientRect()
     if (!box || box.width <= 0) return
     const x = event.clientX - box.left
@@ -45,6 +51,7 @@ export function useChartPointer(
       y: height > 0 ? event.clientY - box.top : null,
       width: box.width,
       height,
+      tap,
     })
   }
 
@@ -52,22 +59,22 @@ export function useChartPointer(
     down(event) {
       if (event.pointerType === 'touch')
         touch = { x: event.clientX, y: event.clientY, sideways: false }
-      else at(event)
+      else at(event, true)
     },
     move(event) {
       if (event.pointerType !== 'touch') {
         // A mouse passing over chooses nothing; a pressed button does.
-        if (event.buttons !== 0) at(event)
+        if (event.buttons !== 0) at(event, false)
         return
       }
       if (!touch) return
       const dx = Math.abs(event.clientX - touch.x)
       const dy = Math.abs(event.clientY - touch.y)
       if (!touch.sideways && dx > INTENT_PX && dx > dy) touch.sideways = true
-      if (touch.sideways) at(event)
+      if (touch.sideways) at(event, false)
     },
     up(event) {
-      if (event.pointerType === 'touch' && touch) at(event)
+      if (event.pointerType === 'touch' && touch) at(event, !touch.sideways)
       touch = null
     },
     cancel() {
