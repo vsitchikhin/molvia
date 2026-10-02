@@ -9,12 +9,15 @@ import { newVerdictSchema } from '#model/entities/verdict'
 /**
  * One item a reminder asks about (MOL-101): the name and the place of its latest purchase, as the
  * card of «Оценки» has them — the person has to remember what it was — and how many of their days
- * ago that was, so the bot can say «вчера» without knowing their zone.
+ * ago that was, so the bot can say «вчера» without knowing their zone. The place's city goes as on
+ * the card (MOL-120): printed where two items of one reminder name one shop of two cities, and
+ * optional, so a bot of the new version reads the API of the old one.
  */
 export const reminderItemSchema = z.strictObject({
   itemId: z.uuid(),
   name: itemSchema.shape.name,
   placeName: placeSchema.shape.name,
+  placeCity: placeSchema.shape.city.optional(),
   daysAgo: z.int().positive(),
 })
 export type ReminderItem = z.infer<typeof reminderItemSchema>

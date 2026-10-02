@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {
   PENDING_VERDICTS_LIMIT,
+  pendingVerdictCodec,
   pendingVerdictsCodec,
   ratingSchema,
   verdictAmendmentSchema,
@@ -154,6 +155,21 @@ describe('pendingVerdictsCodec', () => {
     }
 
     expect(pendingVerdictsCodec.safeParse(wire).success).toBe(false)
+  })
+
+  it('carries the city of the place, and reads a card without one (MOL-120)', () => {
+    const wire = { ...card, boughtAt: '2026-09-18T17:40:00.000Z' }
+    const there = { ...card, placeCity: 'Гюмри' }
+
+    expect(
+      z.decode(pendingVerdictsCodec, z.encode(pendingVerdictsCodec, { items: [there], total: 1 })),
+    ).toEqual({ items: [there], total: 1 })
+    // An answer of the server before MOL-120, and a card the phone kept from one.
+    expect(pendingVerdictsCodec.safeParse({ items: [wire], total: 1 }).success).toBe(true)
+    expect(pendingVerdictCodec.safeParse(wire).success).toBe(true)
+    // A city is a visible line, as the place's own.
+    expect(pendingVerdictCodec.safeParse({ ...wire, placeCity: '' }).success).toBe(false)
+    expect(pendingVerdictCodec.safeParse({ ...wire, placeCity: '\u200B' }).success).toBe(false)
   })
 
   it('carries at most one page, and a total that is a count', () => {

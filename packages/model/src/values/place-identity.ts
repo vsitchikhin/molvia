@@ -64,3 +64,35 @@ export function placeNameIdentity(name: string): string {
 export function isSamePlaceName(a: string, b: string): boolean {
   return placeNameIdentity(a) === placeNameIdentity(b)
 }
+
+/** A place as an answer names it: its name, and its city where the server sent one. */
+export interface NamedPlace {
+  readonly name: string
+  readonly city?: string | undefined
+}
+
+/**
+ * The city a place is printed with among these (MOL-120): only where its name stands in two
+ * cities or more — «Ереван Сити» of Gyumri beside «Ереван Сити» of Yerevan — and nowhere else,
+ * where it is noise. One rule for the queue of verdicts, the places of «Что брать» and the
+ * reminder, so the three never disagree over the same pair of shops.
+ *
+ * Name and city are compared as the index over `places` compares them, so «SAS» of Gyumri and
+ * «sas» of Yerevan repeat. A place with no city — an answer of the server before MOL-120, or one
+ * the phone kept from it — could be either shop, so then no place of the set is given its city:
+ * the set reads as it did before, and claims no two places where it cannot tell them apart.
+ */
+export function cityWhereNameRepeats(
+  places: readonly NamedPlace[],
+): (place: NamedPlace) => string | null {
+  const cities = new Map<string, Set<string>>()
+  for (const place of places) {
+    if (place.city === undefined) return () => null
+    const name = placeNameIdentity(place.name)
+    const seen = cities.get(name) ?? new Set<string>()
+    seen.add(placeNameIdentity(place.city))
+    cities.set(name, seen)
+  }
+  return (place) =>
+    (cities.get(placeNameIdentity(place.name))?.size ?? 0) > 1 ? (place.city ?? null) : null
+}
