@@ -386,14 +386,42 @@ describe('«Что брать» and the sheet name one price for one place (MOL-
     })
 
     // The kilo weighs four purchases and the pack one (Р-4 by every purchase, adversarial Д), so
-    // the row stays in kilos; SAS, whose last purchase was the pack, is not in it.
+    // the row is in kilos first; SAS, whose last purchase was the pack, follows with its own unit
+    // (adversarial Е).
     const kilos = { name: 'Ереван Сити', price: unitPrice(amd(280_000), kilo).scaledMinor }
     const pack = {
       name: 'SAS',
       price: unitPrice(amd(120_000), { milli: 1000n, unit: 'piece' }).scaledMinor,
     }
-    expect(await home(me)).toEqual([kilos])
+    expect(await home(me)).toEqual([kilos, pack])
     expect(await sheet(me, cheese)).toEqual([kilos, pack])
+  })
+
+  it('keeps the shop of every week on the row when the kilo is a market of a year ago (adversarial Е)', async () => {
+    const me = await insertActor(db)
+    const cheese = await item('Сыр Чанах')
+    await rate(me, cheese, 5)
+    const sas = await erevan('SAS')
+    const kilo: Quantity = { milli: 1000n, unit: 'kg' }
+    for (let week = 1; week <= 10; week += 1) {
+      const on = `2026-07-${String(week + 10).padStart(2, '0')}`
+      await bought(me, cheese, sas, 2600, { on, at: new Date(`${on}T09:00:00Z`), quantity: kilo })
+    }
+    await bought(me, cheese, sas, 1200, {
+      on: '2026-10-01',
+      at: new Date('2026-10-01T09:00:00Z'),
+      quantity: { milli: 1000n, unit: 'piece' },
+    })
+    await bought(me, cheese, await erevan('Рынок'), 2400, {
+      on: '2025-08-28',
+      at: new Date('2025-08-28T09:00:00Z'),
+      quantity: kilo,
+    })
+
+    expect(await home(me)).toEqual([
+      { name: 'Рынок', price: unitPrice(amd(240_000), kilo).scaledMinor },
+      { name: 'SAS', price: unitPrice(amd(120_000), { milli: 1000n, unit: 'piece' }).scaledMinor },
+    ])
   })
 
   it('reads a record from an old queue in the zone the request names, on the list and in its search', async () => {

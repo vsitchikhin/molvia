@@ -232,7 +232,7 @@ describe('места и порог', () => {
     expect(row?.level === 'take' && row.places).toEqual([])
   })
 
-  it('берёт группу с бóльшим числом наблюдений, а не последнюю покупку', async () => {
+  it('ставит первой группу с бóльшим числом наблюдений, а не последнюю покупку', async () => {
     const prices = [
       price({ scaledMinor: perKilo(479_000), observations: 8 }),
       price({
@@ -245,8 +245,11 @@ describe('места и порог', () => {
 
     const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
 
-    expect(row?.level === 'take' && row.places).toHaveLength(1)
-    expect(row?.level === 'take' && row.places[0]?.unitPrice.currency).toBe('AMD')
+    // Другая пара не пропадает, а идёт следом (адверсариальный Е).
+    expect(row?.level === 'take' && row.places.map((place) => place.unitPrice.currency)).toEqual([
+      'AMD',
+      'RUB',
+    ])
   })
 
   it('взвешивает пару всеми её покупками, а не местами, которые она называет (адверсариальный Д)', async () => {
@@ -265,8 +268,12 @@ describe('места и порог', () => {
 
     const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
 
-    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
-      'Рынок в Гюмри',
+    // Строка в кило; SAS, чья последняя покупка — пачка, — следом, со своей единицей (Е).
+    expect(
+      row?.level === 'take' && row.places.map((place) => [place.name, place.unitPrice.unit]),
+    ).toEqual([
+      ['Рынок в Гюмри', 'kg'],
+      ['SAS', 'piece'],
     ])
   })
 

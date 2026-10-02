@@ -271,7 +271,7 @@ describe('цены', () => {
     expect(row?.level === 'take' && row.places).toEqual([])
   })
 
-  it('не смешивает валюты: показывает ту, в которой покупали чаще', async () => {
+  it('не смешивает валюты: первой — та, в которой покупали чаще, другая — следом', async () => {
     // Two places: a place is named by its last purchase alone (MOL-166, А), so the pairs are
     // weighed across places.
     const actorId = await insertActor(db)
@@ -284,8 +284,11 @@ describe('цены', () => {
     await bought(actorId, itemId, other, { minor: 50_000n, currency: 'RUB' })
 
     const [row] = (await screen(actorId)).rows
-    expect(row?.level === 'take' && row.places).toHaveLength(1)
-    expect(row?.level === 'take' && row.places[0]?.unitPrice.currency).toBe('AMD')
+    // Место в рублях не пропадает, а идёт следом со своей валютой (MOL-166, адверсариальный Е).
+    expect(row?.level === 'take' && row.places.map((place) => place.unitPrice.currency)).toEqual([
+      'AMD',
+      'RUB',
+    ])
   })
 })
 

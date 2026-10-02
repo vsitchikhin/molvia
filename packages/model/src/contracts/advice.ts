@@ -84,7 +84,9 @@ export const adviceRowSchema = z.discriminatedUnion('level', [
      * price alone**, and the difference is the screen's to carry: a cheaper receipt from
      * another city stands below a dearer place at home, because «cheaper elsewhere» is not
      * somewhere one can go. So the first place is not always the cheapest, and only a screen
-     * that compares the prices may call it so (MOL-32, А1). Empty when the item was rated but
+     * that compares the prices may call it so (MOL-32, А1). The row's own «currency + unit»
+     * comes first; places whose last purchase was in another pair follow it, each in its own,
+     * and are never compared with it (MOL-166, adversarial Е). Empty when the item was rated but
      * never bought.
      */
     places: z.array(advicePlaceSchema),

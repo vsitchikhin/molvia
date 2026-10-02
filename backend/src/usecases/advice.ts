@@ -257,37 +257,36 @@ function groupPrices(places: readonly PlacePrice[]): Map<string, Map<GroupKey, P
 }
 
 /**
- * Which «currency + unit» an item's prices are shown in (Р-4). The one with the most
- * observations, and the most recent visit breaks a tie — the day of the trip, never the hour
- * an offline queue delivered it: a single trip abroad must not replace a year of buying the
- * same thing at home. Two prices from different groups cannot be
- * compared without a rate, and a rate belongs to one trip and one day.
+ * The «currency + unit» pairs of an item, the one its row is shown in first (Р-4). The one with
+ * the most observations, and the most recent visit breaks a tie — the day of the trip, never the
+ * hour an offline queue delivered it: a single trip abroad must not replace a year of buying the
+ * same thing at home. Two prices from different pairs cannot be compared without a rate, and a
+ * rate belongs to one trip and one day: the threshold and the superlative stay inside the first.
  *
  * Weighed by every purchase in the pair, the server's `pairObservations` — not by the places the
  * pair still names (MOL-166, adversarial Д): a place is named by its last purchase alone, and one
  * pack in a shop bought by the kilo for ten weeks turned the row to pieces and hid the market.
+ *
+ * **The other pairs follow, not vanish** (MOL-166, adversarial Е, owner's decision): a place whose
+ * last purchase is in another pair is still where one buys — weighed into kilos by its own ten
+ * kilos, a shop of packs left the row naming a market bought at once a year ago, and the shop of
+ * every week nowhere. Its places come after the first pair's, each with its own unit.
  */
-function dominant(groups: Map<GroupKey, PlacePrice[]>): [GroupKey, PlacePrice[]] | undefined {
-  let best: [GroupKey, PlacePrice[]] | undefined
-  let bestWeight = { observations: 0, latestVisitAt: 0 }
-  for (const [key, places] of groups) {
-    // The same on every row of one pair; the largest, should a caller ever hand two apart.
-    const observations = Math.max(...places.map((place) => place.pairObservations))
-    const latestVisitAt = Math.max(...places.map((place) => place.pairLatestVisitAt.getTime()))
-    const better =
-      observations > bestWeight.observations ||
-      (observations === bestWeight.observations && latestVisitAt > bestWeight.latestVisitAt) ||
-      // Both equal: the key itself decides, so two loads of one screen cannot disagree.
-      (observations === bestWeight.observations &&
-        latestVisitAt === bestWeight.latestVisitAt &&
-        best !== undefined &&
-        key < best[0])
-    if (better) {
-      best = [key, places]
-      bestWeight = { observations, latestVisitAt }
-    }
-  }
-  return best
+function ranked(groups: Map<GroupKey, PlacePrice[]>): [GroupKey, PlacePrice[]][] {
+  // The same on every row of one pair; the largest, should a caller ever hand two apart.
+  const weight = (places: readonly PlacePrice[]) => ({
+    observations: Math.max(...places.map((place) => place.pairObservations)),
+    latestVisitAt: Math.max(...places.map((place) => place.pairLatestVisitAt.getTime())),
+  })
+  return [...groups].sort(([aKey, aPlaces], [bKey, bPlaces]) => {
+    const [a, b] = [weight(aPlaces), weight(bPlaces)]
+    // Both equal: the key itself decides, so two loads of one screen cannot disagree.
+    return (
+      b.observations - a.observations ||
+      b.latestVisitAt - a.latestVisitAt ||
+      (aKey < bKey ? -1 : aKey > bKey ? 1 : 0)
+    )
+  })
 }
 
 function placesOf(places: readonly PlacePrice[]): AdvicePlace[] {
@@ -324,8 +323,9 @@ function rowOf(
   // нигде» gets no price, no place and no threshold — the row has no field to put them in.
   if (level === 'never') return { ...rated, level }
 
-  const chosen = groups ? dominant(groups) : undefined
-  const places = placesOf(chosen?.[1] ?? [])
+  const pairs = groups ? ranked(groups) : []
+  const chosen = pairs[0]
+  const places = placesOf(pairs.flatMap(([, inPair]) => inPair))
   if (level === 'take') return { ...rated, level, places }
 
   const median = chosen ? medians.get(`${row.itemId}${chosen[0]}`) : undefined

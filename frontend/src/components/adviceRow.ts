@@ -40,20 +40,28 @@ export type PlacesView =
 export function placesView(places: readonly AdvicePlace[]): PlacesView {
   const [best, ...rest] = places
   if (!best) return { kind: 'none' }
+  const peers = rest.filter((place) => samePair(place, best))
   return {
     kind: 'places',
     best,
     rest,
     // One place is no comparison at all, so there is nothing to be cheapest among. Prices of
-    // two currencies or two units are no comparison either — the server sends one pair per
-    // item (Р-4), and if that ever stops being true the word goes rather than the screen.
-    cheapest: rest.length > 0 && rest.every((place) => dearer(place, best)),
+    // two currencies or two units are no comparison either: the server puts the places of the
+    // row's own pair first and those whose last purchase was in another after them (MOL-166,
+    // adversarial Е), and the word weighs only the first against its own pair.
+    cheapest: peers.length > 0 && peers.every((place) => dearer(place, best)),
   }
 }
 
+function samePair(place: AdvicePlace, best: AdvicePlace): boolean {
+  return (
+    place.unitPrice.currency === best.unitPrice.currency &&
+    place.unitPrice.unit === best.unitPrice.unit
+  )
+}
+
 function dearer(place: AdvicePlace, best: AdvicePlace): boolean {
-  const [a, b] = [place.unitPrice, best.unitPrice]
-  return a.currency === b.currency && a.unit === b.unit && a.scaledMinor >= b.scaledMinor
+  return place.unitPrice.scaledMinor >= best.unitPrice.scaledMinor
 }
 
 /** The key of the word over the named place: a superlative only where it is the truth. */
