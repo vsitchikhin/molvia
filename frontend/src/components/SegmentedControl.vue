@@ -1,5 +1,5 @@
 <template>
-  <fieldset class="segmented" :disabled="disabled">
+  <fieldset class="segmented" :class="{ fit }" :disabled="disabled">
     <legend class="legend" :class="{ hidden: hideLegend }">{{ legend }}</legend>
     <div class="track">
       <label
@@ -16,11 +16,13 @@
           :checked="option.value === modelValue"
           @change="$emit('update:modelValue', option.value)"
         />
-        <template v-if="option.spoken">
-          <span aria-hidden="true">{{ option.label }}</span>
-          <span class="spoken">{{ option.spoken }}</span>
-        </template>
-        <template v-else>{{ option.label }}</template>
+        <span
+          class="word"
+          :data-word="option.label"
+          :aria-hidden="option.spoken ? 'true' : undefined"
+          >{{ option.label }}</span
+        >
+        <span v-if="option.spoken" class="spoken">{{ option.spoken }}</span>
       </label>
     </div>
   </fieldset>
@@ -61,6 +63,12 @@ export default defineComponent({
      * (MOL-40, review С-2). On the fieldset, so every radio and the arrows go quiet at once.
      */
     disabled: { type: Boolean, default: false },
+    /**
+     * Each segment as wide as its word, the room left shared out evenly — for words of unequal
+     * length, where even thirds cut the longest: «Системная · Светлая · Тёмная» on a 320 px phone
+     * (MOL-111, the owner's В-1). iOS calls it `apportionsSegmentWidthsByContent`.
+     */
+    fit: { type: Boolean, default: false },
   },
   emits: {
     'update:modelValue': (value: string) => typeof value === 'string',
@@ -99,6 +107,10 @@ export default defineComponent({
 }
 
 .track {
+  /* Its own stacking context: the word is lifted over its segment's hit area (below), and without
+     this it rose over everything of the same level — the pinned header too, which a segment
+     scrolled under it then drew through and took the taps of («‹ Деньги» on «Графики»). */
+  isolation: isolate;
   display: flex;
   gap: var(--segment-inset);
   min-height: var(--touch-target);
@@ -134,6 +146,34 @@ export default defineComponent({
     position: absolute;
     inset: calc(var(--segment-inset) * -1) 0;
     content: '';
+  }
+}
+
+/* Over the segment's own hit area (`::after`), so a tap on the word lands on the word — and on the
+   label through it — rather than on the box laid over it. Within the track alone (`isolation`). */
+.word {
+  position: relative;
+  z-index: 1;
+}
+
+/* Its word is its basis, never wrapped; the semibold of the chosen one is reserved under every
+   word, or the segments would shift by a pixel on each tap. */
+.fit .segment {
+  flex: 1 1 auto;
+  padding: 0 var(--space-2);
+  white-space: nowrap;
+}
+
+.fit .word {
+  display: inline-flex;
+  flex-direction: column;
+
+  &::before {
+    height: 0;
+    overflow: hidden;
+    font-weight: var(--weight-medium);
+    visibility: hidden;
+    content: attr(data-word);
   }
 }
 

@@ -17,8 +17,11 @@
  *
  * Two overrides are supported on purpose:
  *   @media (prefers-color-scheme: dark)  — the system decides
- *   [data-scheme="light" | "dark"]       — the user decided, stored in localStorage
- * The manual selector wins because it is more specific.
+ *   [data-scheme="light" | "dark"]       — the person decided, on this device (MOL-111)
+ * The person's choice wins both ways, and not by specificity — `:root` and an attribute weigh the
+ * same: the system's dark block stays off a root marked light, and a root marked dark takes the
+ * dark values whatever the system says. `color-scheme` follows, or a native `<select>`, date or
+ * scroll bar would be drawn in the system's scheme on top of ours.
  */
 
 :root {
@@ -289,12 +292,14 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-scheme='light']) {
     @include dark-scheme;
   }
 }
 
 [data-scheme='dark'] {
+  color-scheme: dark;
+
   @include dark-scheme;
 }
 
