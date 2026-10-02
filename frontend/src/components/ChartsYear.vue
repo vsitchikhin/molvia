@@ -1,6 +1,13 @@
 <template>
-  <!-- Under the tabs: they are about the charts of the one chosen, and over them they came
-       and went with its answer and took them from under the thumb (MOL-138, owner's В-2). -->
+  <MonthSwitcher
+    unit="year"
+    :month="year"
+    :current="current"
+    :first="first"
+    @change="(value: string) => $emit('change', value)"
+  />
+  <!-- Under the switcher: it is about the year chosen, and over it they came and went with its
+       answer and took it from under the thumb (MOL-138, owner's В-2). -->
   <p v-if="stale === 'offline' && fetchedAt" class="strip">
     <IconCloudOff class="strip-icon" aria-hidden="true" />
     {{ t('spending.charts.offline.strip', { when: when(fetchedAt) }) }}
@@ -14,7 +21,7 @@
     @retry="retry"
   />
 
-  <ScreenSkeleton v-if="phase === 'loading'" :groups="[40, 28, 90, 40, 28, 90, 40, 28, 70]" />
+  <ScreenSkeleton v-if="phase === 'loading'" :groups="[28, 100, 62, 40, 28, 90, 40, 28, 90]" />
 
   <ScreenState
     v-else-if="phase === 'error'"
@@ -33,9 +40,8 @@
   />
 
   <template v-else-if="charts">
-    <p v-if="range" class="range">{{ range }}</p>
     <ScreenState
-      v-if="charts.since === null"
+      v-if="charts.firstMonth === null"
       kind="empty"
       tone="accent"
       :icon="IconChart"
@@ -44,15 +50,32 @@
     />
 
     <template v-else>
+      <DonutChart
+        v-if="ring"
+        v-model="sector"
+        class="answer"
+        :charts="ring"
+        :title="t('spending.charts.where_year_title')"
+        :label="centreLabel"
+        :note="both ? t('spending.charts.year_rate_note') : null"
+        :name-of="nameOf"
+      />
+
       <AppCard as="section" class="card" :aria-labelledby="`${id}-spent`">
         <h2 :id="`${id}-spent`" class="caption">{{ t('spending.charts.spent_title') }}</h2>
-        <BarChart v-model="spentAt" :bars="spentBars" :legend="t('spending.charts.spent_title')">
+        <BarChart
+          v-model="spentAt"
+          :bars="spentBars"
+          :legend="t('spending.charts.spent_title')"
+          :average="charts.average?.level ?? null"
+        >
           <template v-if="spentMonth">
-            <p class="month">{{ longMonth(spentMonth.month, locale) }}</p>
+            <p class="month">{{ monthLabel(spentMonth.month) }}</p>
             <p class="figure">{{ whole(spentMonth.spent) }}</p>
             <p class="detail">{{ spentDetail }}</p>
           </template>
         </BarChart>
+        <p class="hint" :class="{ dashed: charts.average }">{{ averageNote }}</p>
         <p class="hint">{{ t('spending.charts.spent_hint') }}</p>
       </AppCard>
 
@@ -101,7 +124,7 @@
 
       <AppCard v-if="series" as="section" class="card" :aria-labelledby="`${id}-category`">
         <h2 :id="`${id}-category`" class="caption">
-          {{ t('spending.charts.category_title') }}
+          {{ t('spending.charts.category_months_title') }}
         </h2>
         <AppField
           :model-value="series.category.id"
@@ -123,88 +146,73 @@
         <BarChart
           v-model="categoryAt"
           :bars="categoryBars"
-          :legend="t('spending.charts.category_title')"
+          :legend="t('spending.charts.category_months_title')"
           :colour="categoryColour(series.category)"
           :average="series.averageLevel"
           short
         >
           <div v-if="categoryPoint" class="split">
             <p>
-              <span class="month">{{ longMonth(categoryPoint.month, locale) }}</span>
+              <span class="month">{{ monthLabel(categoryPoint.month) }}</span>
               <span class="figure small">{{ whole(categoryPoint.amount) }}</span>
             </p>
-            <p class="detail right">{{ categoryDetail }}</p>
+            <p v-if="categoryDetail" class="detail right">{{ categoryDetail }}</p>
           </div>
         </BarChart>
-        <p class="hint">{{ t('spending.charts.category_hint') }}</p>
+        <p v-if="series.average" class="hint">{{ t('spending.charts.category_avg') }}</p>
       </AppCard>
     </template>
-
-    <!-- The rate stands without spendings too: the first thing an emigrant does is change money
-         (adversarial В). -->
-    <AppCard v-if="rate" as="section" class="card" :aria-labelledby="`${id}-rate`">
-      <h2 :id="`${id}-rate`" class="caption">{{ rateTitle }}</h2>
-      <RateLine
-        v-model="rateAt"
-        :points="ratePoints"
-        :marks="rateMarks"
-        :legend="rateTitle"
-        :first="rateEnds.first"
-        :last="rateEnds.last"
-      >
-        <template v-if="ratePoint">
-          <p class="month">
-            {{ t('spending.charts.rate_week', { day: day(ratePoint.day) }) }}
-          </p>
-          <p class="figure small">
-            {{
-              ratePoint.rate ? rateWords(ratePoint.rate, locale, t) : t('spending.charts.rate_none')
-            }}
-          </p>
-          <p v-for="mine in rateMine" :key="mine" class="detail">{{ mine }}</p>
-        </template>
-      </RateLine>
-      <p class="hint">{{ t('spending.charts.rate_hint') }}</p>
-    </AppCard>
   </template>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, useId, watch } from 'vue'
+import { computed, defineComponent, ref, toRef, useId, watch } from 'vue'
+import type { Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconChart from '~icons/mdi/chart-bar'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
-import { currencySign, formatEstimate } from '@molvia/model'
-import type { Money, MoneyChartsView, SpendingCategoryView } from '@molvia/model'
+import { formatEstimate, previousMonth } from '@molvia/model'
+import type { Money, MoneyChartYearView, SpendingCategoryView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
 import BarChart from '@/components/BarChart.vue'
 import type { ChartBar } from '@/components/BarChart.vue'
-import RateLine from '@/components/RateLine.vue'
+import DonutChart from '@/components/DonutChart.vue'
+import type { DonutData } from '@/components/DonutChart.vue'
+import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen, signedAmount } from '@/components/accounts'
-import { longMonth, shortMonth, versusPrevious } from '@/components/charts'
-import { categoryColour, rateWords } from '@/components/spending'
-import { useMoneyCharts } from '@/composables/useMoneyCharts'
-import { calendarDay, monthOf } from '@/days'
+import {
+  longMonth,
+  monthGenitive,
+  monthName,
+  monthSpan,
+  shortMonth,
+  signedPercent,
+} from '@/components/charts'
+import { categoryColour } from '@/components/spending'
+import { useLocalDay } from '@/composables/useLocalDay'
+import { useMoneyChartYear } from '@/composables/useMoneyCharts'
+import { calendarDay } from '@/days'
+
+type YearMonth = MoneyChartYearView['months'][number]
 
 /**
  * The category last chosen, for as long as the app is open (handoff 03, «в памяти вкладки»), for a
- * way in that names none — the card of «Куда ушли» with no ring: an empty month, a month kept before
- * the ring, one nothing was counted in by a rate. A category in the
- * address comes first: the ring names its largest, the one just seen (MOL-156, owner's decision on
- * adversarial round 2, Д), and so a tap on it leaves the one chosen here behind.
+ * way in that names none. A category in the address comes first (MOL-156, adversarial round 2, Д).
  */
 let lastCategory: string | null = null
 
 /**
- * «Графики → Год» until MOL-160 (MOL-158, owner's decision В-1): the cards of MOL-74 over the last
- * twelve months — spending, what came in and went out, a category over time — and the rate of the
- * pair by week; the exchanges went to «Обмен денег» (MOL-159). Every figure and every height is the
- * server's; the screen chooses a bar and words. The category is in the address and moves by
- * `replace`.
+ * «Графики → Год» (MOL-160, handoff MOL-157 04): «‹ 2026 ›», the calendar year's ring, its twelve
+ * months against the usual month as a dashed line, what came in and went out, and a category by
+ * month. Every figure and every height is the server's; the screen chooses a bar, a sector and
+ * words. **A sector chosen on the ring chooses its category below** (owner's decision В-3), through
+ * the address like any choice of the category, and nothing scrolls; letting it go changes nothing.
+ * The year and the category are in the address and move by `replace`; the bars and the sector are
+ * the screen's (Р-8).
  */
 export default defineComponent({
   name: 'ChartsYear',
@@ -212,66 +220,118 @@ export default defineComponent({
     AppCard,
     AppField,
     BarChart,
+    DonutChart,
     IconCloudOff,
-    RateLine,
+    MonthSwitcher,
     ScreenSkeleton,
     ScreenState,
   },
-  setup() {
+  props: {
+    year: { type: String, required: true },
+    /** This year on the phone: the last one there is to see. */
+    current: { type: String, required: true },
+  },
+  emits: {
+    change: (year: string) => typeof year === 'string',
+  },
+  setup(props) {
     const { t, locale } = useI18n()
     const route = useRoute()
     const router = useRouter()
-
-    // Twelve months until the year of MOL-160 (owner's decision В-1): the period goes with it.
-    const { phase, charts, stale, fetchedAt, retry } = useMoneyCharts(ref<6 | 12>(12))
+    const today = useLocalDay()
+    const { phase, charts, stale, fetchedAt, retry } = useMoneyChartYear(toRef(props, 'year'))
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
     const approx = (value: Money | null) =>
       value ? `≈ ${whole(value)}` : t('spending.charts.no_rate')
     const signedApprox = (value: Money) =>
       `≈ ${signedAmount(value, locale.value, { plus: true, estimate: true })}`
-    /** «Разница» of a month, or why there is none: no rate of the month, or something not counted. */
-    const differenceOf = (month: MoneyChartsView['months'][number]) =>
-      month.difference
-        ? signedApprox(month.difference)
-        : month.spentIncome === null
-          ? t('spending.charts.no_rate')
-          : t('spending.charts.difference_uncounted')
     const when = (at: Date) => countedWhen(at, locale.value)
-    const day = (value: string) => calendarDay(value, locale.value)
+    const nameOf = (category: SpendingCategoryView) =>
+      category.preset ? t(`spending.category.${category.preset}`) : (category.name ?? '')
+    const both = computed(() => charts.value?.spendCurrency !== charts.value?.incomeCurrency)
 
-    const range = computed(() => {
-      const months = charts.value?.months
-      const first = months?.[0]?.month
-      const last = months?.at(-1)?.month
-      if (!first || !last) return null
-      const from =
-        first.slice(0, 4) === last.slice(0, 4)
-          ? longMonth(first, locale.value).replace(/\s\S+$/, '')
-          : longMonth(first, locale.value)
-      return t('spending.charts.range', { from, to: monthOf(last, locale.value) })
-    })
-
-    const months = computed<MoneyChartsView['months']>(() => charts.value?.months ?? [])
-    const lastIndex = computed(() => Math.max(0, months.value.length - 1))
-
-    // Each chart keeps its own choice; a new period starts every one on its last month.
-    const spentAt = ref(0)
-    const flowAt = ref(0)
-    const categoryAt = ref(0)
-    const rateAt = ref(0)
-    // Sources apart, compared one by one: a getter of an array is a new array on every answer, and
-    // every answer — a write landed, the connection back — threw the choice to the last month (review).
+    /**
+     * The first year with anything in it, owner-wide: kept from any answer, so the arrow back stays
+     * bounded while another year loads (Р-9).
+     */
+    const known = ref<string | null>(null)
     watch(
-      [() => charts.value?.period, lastIndex, () => charts.value?.rate?.points.length],
-      () => {
-        spentAt.value = lastIndex.value
-        flowAt.value = lastIndex.value
-        categoryAt.value = lastIndex.value
-        rateAt.value = Math.max(0, (charts.value?.rate?.points.length ?? 1) - 1)
+      () => charts.value?.firstMonth,
+      (first) => {
+        if (first) known.value = first.slice(0, 4)
       },
       { immediate: true },
     )
+    const first = computed(() => known.value)
+
+    /** Whether a month runs is the phone's calendar's to say, not the answer's (review 3 of MOL-158). */
+    const runningMonth = computed(() => today.value.slice(0, 7))
+    const monthLabel = (month: string) =>
+      month === runningMonth.value
+        ? t('spending.charts.center_running', { month: longMonth(month, locale.value) })
+        : longMonth(month, locale.value)
+    /** «+73 % к среднему», the running month «+2 % к обычному к 12 сентября» (owner's decision В-2). */
+    const changeWords = (month: string, change: number | null) => {
+      if (change === null) return null
+      const value = signedPercent(change, locale.value)
+      return month === runningMonth.value
+        ? t('spending.charts.year_change_running', {
+            change: value,
+            day: calendarDay(today.value, locale.value),
+          })
+        : t('spending.charts.year_change', { change: value })
+    }
+
+    /** The ring with its categories named as the month's are: the series carry them (Р-13). */
+    const ring = computed(() => {
+      const shown = charts.value
+      if (!shown) return null
+      const data: DonutData = {
+        ...shown,
+        categories: shown.categories.map((one) => one.category),
+      }
+      return data
+    })
+    const centreLabel = computed(() => {
+      const n = charts.value?.monthsShown ?? 0
+      return t('spending.charts.year_center', { year: props.year, n }, n)
+    })
+
+    const months = computed<MoneyChartYearView['months']>(() => charts.value?.months ?? [])
+    const quiet = (month: YearMonth) => month.kind !== 'data'
+
+    /**
+     * The bar shown on arrival (Р-8): the running month in this year, else the last with a bar. A
+     * choice of the person's stands while its bar has one; another year lets it go.
+     */
+    const arrival = computed(() => {
+      const shown = months.value
+      const running = shown.findIndex(
+        (month) => month.month === runningMonth.value && !quiet(month),
+      )
+      if (running !== -1) return running
+      return shown.findLastIndex((month) => !quiet(month))
+    })
+    function choice(barsOf: () => readonly { quiet?: boolean }[]): Ref<number> {
+      const chosen = ref<number | null>(null)
+      watch(
+        () => props.year,
+        () => {
+          chosen.value = null
+        },
+      )
+      return computed({
+        get: () => {
+          const at = chosen.value
+          const bars = barsOf()
+          return at !== null && bars[at] && !bars[at].quiet ? at : Math.max(0, arrival.value)
+        },
+        set: (index: number) => {
+          chosen.value = index
+        },
+      })
+    }
 
     const spentBars = computed<ChartBar[]>(() =>
       months.value.map((month) => ({
@@ -282,17 +342,20 @@ export default defineComponent({
           amount: whole(month.spent),
         }),
         level: month.spentLevel,
+        quiet: quiet(month),
       })),
     )
-    const spentMonth = computed(() => months.value[spentAt.value] ?? null)
+    const spentAt = choice(() => spentBars.value)
+    const spentMonth = computed(() => {
+      const month = months.value[spentAt.value]
+      return month && !quiet(month) ? month : null
+    })
     const spentDetail = computed(() => {
       const month = spentMonth.value
       if (!month) return ''
       const parts = [
-        charts.value?.incomeCurrency === charts.value?.spendCurrency
-          ? null
-          : approx(month.spentIncome),
-        versusPrevious(month.change, month.month, locale.value, t),
+        both.value ? approx(month.spentIncome) : null,
+        changeWords(month.month, month.change),
         month.uncounted.length > 0
           ? t('spending.charts.uncounted', {
               amounts: month.uncounted.map((amount) => whole(amount)).join(', '),
@@ -300,6 +363,23 @@ export default defineComponent({
           : null,
       ]
       return parts.filter((part) => part !== null).join(' · ')
+    })
+    /** Under the bars: what the dashed line is, or when it comes — or why it will not (Р-6). */
+    const averageNote = computed(() => {
+      const shown = charts.value
+      if (!shown) return ''
+      if (shown.average) {
+        const span = monthSpan(shown.average.from, shown.average.to, locale.value)
+        return t(shown.running ? 'spending.charts.year_avg_running' : 'spending.charts.year_avg', {
+          amount: whole(shown.average.amount),
+          ...span,
+        })
+      }
+      return shown.averageFrom
+        ? t('spending.charts.year_avg_few', {
+            month: monthGenitive(previousMonth(shown.averageFrom), t),
+          })
+        : t('spending.charts.year_avg_short', { n: shown.closedCount })
     })
 
     const flowBars = computed<ChartBar[]>(() =>
@@ -313,9 +393,21 @@ export default defineComponent({
         }),
         level: month.spentIncomeLevel,
         outline: month.incomeLevel,
+        quiet: quiet(month),
       })),
     )
-    const flowMonth = computed(() => months.value[flowAt.value] ?? null)
+    const flowAt = choice(() => flowBars.value)
+    const flowMonth = computed(() => {
+      const month = months.value[flowAt.value]
+      return month && !quiet(month) ? month : null
+    })
+    /** «Разница» of a month, or why there is none: no rate of the month, or something not counted. */
+    const differenceOf = (month: YearMonth) =>
+      month.difference
+        ? signedApprox(month.difference)
+        : month.spentIncome === null
+          ? t('spending.charts.no_rate')
+          : t('spending.charts.difference_uncounted')
     /** What of the month did not convert, said under the figures it is missing from (adversarial d9 В). */
     const flowUncounted = computed(() => {
       const month = flowMonth.value
@@ -330,21 +422,30 @@ export default defineComponent({
           : []),
       ]
     })
+    /** «За 2026 год разница ≈ +695 969 ₽», or which months keep it from being counted (Р-7). */
     const flowNote = computed(() => {
-      const currency = charts.value?.incomeCurrency ?? 'RUB'
-      const words = t(`spending.charts.currency_in.${currency}`)
-      const average = charts.value?.differenceAverage
-      return average
-        ? t('spending.charts.income_note', {
-            amount: signedApprox(average),
-            currency: words,
-          })
-        : t('spending.charts.income_only', { currency: words })
+      const shown = charts.value
+      const currency = t(`spending.charts.currency_in.${shown?.incomeCurrency ?? 'RUB'}`)
+      if (shown?.differenceTotal) {
+        // The words carry their own «≈».
+        return t('spending.charts.year_flow_note', {
+          year: props.year,
+          amount: signedAmount(shown.differenceTotal, locale.value, { plus: true, estimate: true }),
+          currency,
+        })
+      }
+      if (shown && shown.differenceMissing.length > 0) {
+        return t('spending.charts.year_flow_missing', {
+          year: props.year,
+          months: new Intl.ListFormat(locale.value, { type: 'conjunction' }).format(
+            shown.differenceMissing.map((month) => monthName(month, locale.value)),
+          ),
+          currency,
+        })
+      }
+      return t('spending.charts.income_only', { currency })
     })
 
-    function nameOf(category: SpendingCategoryView): string {
-      return category.preset ? t(`spending.category.${category.preset}`) : (category.name ?? '')
-    }
     const categoryOptions = computed(() =>
       (charts.value?.categories ?? []).map((one) => ({
         value: one.category.id,
@@ -352,10 +453,9 @@ export default defineComponent({
       })),
     )
     /**
-     * The category asked for — in the address, else the last one chosen — or the largest. The server
-     * offers every category of the owner, spent in the period or not, so one tapped on an older month
-     * is drawn as its months of nothing rather than swapped for another (adversarial А); only a choice
-     * of the person's, or the address, is remembered.
+     * The category asked for — in the address, else the last one chosen — or the year's largest. The
+     * server offers every live category, spent in the year or not, so one asked for is drawn as its
+     * months of nothing rather than swapped for another (adversarial А of MOL-74).
      */
     const series = computed(() => {
       const all = charts.value?.categories ?? []
@@ -371,6 +471,7 @@ export default defineComponent({
     })
     function chooseCategory(id: string): void {
       lastCategory = id
+      if (route.query.category === id) return
       void router.replace({ query: { ...route.query, category: id } })
     }
     watch(
@@ -381,7 +482,7 @@ export default defineComponent({
       { immediate: true },
     )
     const categoryBars = computed<ChartBar[]>(() =>
-      (series.value?.points ?? []).map((point) => ({
+      (series.value?.points ?? []).map((point, index) => ({
         key: point.month,
         label: shortMonth(point.month, locale.value),
         spoken: t('spending.charts.bar_label', {
@@ -389,62 +490,41 @@ export default defineComponent({
           amount: whole(point.amount),
         }),
         level: point.level,
+        quiet: months.value[index] ? quiet(months.value[index]) : true,
       })),
     )
-    const categoryPoint = computed(() => series.value?.points[categoryAt.value] ?? null)
+    const categoryAt = choice(() => categoryBars.value)
+    const categoryPoint = computed(() => {
+      const bar = categoryBars.value[categoryAt.value]
+      return bar && !bar.quiet ? (series.value?.points[categoryAt.value] ?? null) : null
+    })
     const categoryDetail = computed(() => {
       const point = categoryPoint.value
       if (!point) return ''
-      const change =
-        versusPrevious(point.change, point.month, locale.value, t) ??
-        t('spending.charts.category_no_previous')
       const average = series.value?.average
-      return average
-        ? `${change} · ${t('spending.charts.category_average', { amount: whole(average) })}`
-        : change
+      return [
+        changeWords(point.month, point.change),
+        average ? t('spending.charts.category_average', { amount: whole(average) }) : null,
+      ]
+        .filter((part) => part !== null)
+        .join(' · ')
     })
 
-    const rate = computed(() => charts.value?.rate ?? null)
-    const rateTitle = computed(() => {
-      const known = rate.value?.points.find((point) => point.rate !== null)?.rate
-      const mark = rate.value?.exchanges[0]?.rate
-      const any = known ?? mark
-      if (!any) return ''
-      return t('spending.charts.rate_title', {
-        one: currencySign(any.base, locale.value),
-        other: currencySign(any.quote, locale.value),
-      })
+    // A sector chosen on the ring chooses its category below (owner's decision В-3); «Остальные»
+    // is no one category, and letting a sector go leaves the category where it is.
+    const sector = ref<string | null>(null)
+    watch(sector, (key) => {
+      if (key !== null && key !== 'rest') chooseCategory(key)
     })
-    const ratePoints = computed(() =>
-      (rate.value?.points ?? []).map((point) => ({
-        level: point.level,
-        spoken: t('spending.charts.rate_spoken', {
-          day: day(point.day),
-          rate: point.rate
-            ? rateWords(point.rate, locale.value, t)
-            : t('spending.charts.rate_none'),
-        }),
-      })),
+    watch(
+      () => props.year,
+      () => {
+        sector.value = null
+      },
     )
-    const rateMarks = computed(() =>
-      (rate.value?.exchanges ?? []).map(({ week, level }) => ({ week, level })),
-    )
-    const ratePoint = computed(() => rate.value?.points[rateAt.value] ?? null)
-    const rateMine = computed(() =>
-      (rate.value?.exchanges ?? [])
-        .filter((exchange) => exchange.week === rateAt.value)
-        .map((exchange) =>
-          t('spending.charts.rate_mine', {
-            day: day(exchange.day),
-            rate: rateWords(exchange.rate, locale.value, t),
-          }),
-        ),
-    )
-    const rateEnds = computed(() => {
-      const points = rate.value?.points ?? []
-      const short = (value: string | undefined) =>
-        value ? calendarDay(value, locale.value, { day: 'numeric', month: 'short' }) : ''
-      return { first: short(points[0]?.day), last: short(points.at(-1)?.day) }
+    watch(charts, (shown) => {
+      const keys = shown?.slices.map((slice) => slice.categoryId ?? 'rest') ?? []
+      if (sector.value !== null && !keys.includes(sector.value)) sector.value = null
     })
 
     return {
@@ -457,54 +537,43 @@ export default defineComponent({
       stale,
       fetchedAt,
       retry,
-      range,
+      first,
       when,
-      day,
       whole,
       approx,
-      differenceOf,
-      flowUncounted,
-      longMonth,
+      both,
+      nameOf,
+      ring,
+      centreLabel,
+      sector,
+      monthLabel,
       shortMonth,
       categoryColour,
-      rateWords,
-      spentAt,
-      flowAt,
-      categoryAt,
-      rateAt,
       spentBars,
+      spentAt,
       spentMonth,
       spentDetail,
+      averageNote,
       flowBars,
+      flowAt,
       flowMonth,
+      differenceOf,
+      flowUncounted,
       flowNote,
       series,
       categoryOptions,
-      chooseCategory,
       categoryMissing,
-      nameOf,
+      chooseCategory,
       categoryBars,
+      categoryAt,
       categoryPoint,
       categoryDetail,
-      rate,
-      rateTitle,
-      ratePoints,
-      rateMarks,
-      ratePoint,
-      rateMine,
-      rateEnds,
     }
   },
 })
 </script>
 
 <style scoped lang="scss">
-.range {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-
 .strip {
   @include appear;
 
@@ -601,6 +670,20 @@ export default defineComponent({
 
 .hint {
   margin-top: var(--space-3);
+
+  & + & {
+    margin-top: var(--space-1);
+  }
+
+  /* The dashed line's own key, drawn as it is on the chart: told apart by its form (handoff 04). */
+  &.dashed::before {
+    display: inline-block;
+    width: 1rem;
+    margin-right: var(--space-2);
+    border-top: 2px dashed var(--text-muted);
+    content: '';
+    vertical-align: middle;
+  }
 }
 
 .columns {
@@ -664,7 +747,8 @@ export default defineComponent({
 /* The answer comes in where the skeleton stood, faded only: nothing under the thumb may move
    (MOL-151, review №5 and №7, MOL-138). Here and not on the screen: a component of several roots
    takes no scope of the screen's. */
-.card {
+.card,
+.answer {
   @include appear(0);
 }
 </style>
