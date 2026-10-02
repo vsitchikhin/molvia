@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { ERROR, ISSUE } from '@molvia/model'
 import { buildServer } from '@/server'
+import { createErasureRepository } from '@/db/erasure-repository'
 import { actors, erasures, items, sessions, verdicts } from '@/db/schema'
 import { connectDrizzle } from './db'
 import {
@@ -103,6 +104,53 @@ function eraseMine(cookie?: string, url = '/actors/me') {
 }
 
 describe('DELETE /actors/me — «Удалить мои данные» в настройках (MOL-94)', () => {
+  it('стирает ровно то же, что дверь бота: две одинаковые жизни, по одной каждой дверью', async () => {
+    const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
+    const byBot = telegramId()
+    const bySettings = telegramId()
+    const anna = await insertActor(db, { telegramUserId: byBot })
+    const boris = await insertActor(db, { telegramUserId: bySettings })
+    await aLife(db, anna, byBot, shared)
+    await aLife(db, boris, bySettings, shared)
+    const cookie = await signIn(db, boris)
+    const erasure = createErasureRepository(db)
+    // What each erasure would take, counted by the dry run — the real run, rolled back.
+    const before = await erasure.erase(byBot, { dryRun: true })
+    const counted = await erasure.erase(bySettings, { dryRun: true })
+    // Boris has one session more, the one he asks with.
+    expect({
+      ...counted,
+      erased: { ...counted.erased, sessions: counted.erased.sessions - 1 },
+    }).toEqual(before)
+
+    expect((await erase({ telegramUserId: byBot })).statusCode).toBe(204)
+    expect((await eraseMine(cookie)).statusCode).toBe(204)
+
+    for (const tg of [byBot, bySettings]) {
+      const left = await erasure.erase(tg, { dryRun: true })
+      expect(left.found).toBe(false)
+      expect(Object.values(left.erased).every((n) => n === 0)).toBe(true)
+    }
+    expect((await db.select().from(erasures)).map((row) => row.erased)).toEqual([2])
+  })
+
+  it('первый запрос дня: срок сдвинут и тут же погашен — одна строка Set-Cookie (ревью 3)', async () => {
+    const anna = await insertActor(db)
+    const cookie = await signIn(db, anna)
+    const yesterday = new Date(Date.now() - 30 * 3_600_000)
+    await db
+      .update(sessions)
+      .set({ createdAt: yesterday, lastSeenAt: yesterday })
+      .where(eq(sessions.actorId, anna))
+
+    const response = await eraseMine(cookie)
+
+    expect(response.statusCode).toBe(204)
+    expect(response.headers['set-cookie']).toBe(
+      '__Host-molvia_session=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax',
+    )
+  })
+
   it('стирает владельца сессии со всей его жизнью, входами на всех устройствах и гасит cookie', async () => {
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
