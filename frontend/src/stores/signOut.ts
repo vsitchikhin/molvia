@@ -121,9 +121,10 @@ export const useSignOutStore = defineStore('signOut', () => {
     await whileQueuesAreStill(owner, () => {
       forgetOwner(owner)
     })
-    // «Удалены» only on the erasure's own `204` (В-3); the screen says nothing it does not know.
+    // «Удалены» only on the erasure's own `204` (В-3); the screen says nothing it does not know. A
+    // note written by this tab's last tap stays: a «Выйти» it found waiting finishes here (round 2,
+    // Д), and the tap is still the last thing the person did.
     if (note) noteErasure(note)
-    else dropErasureNote()
     window.location.replace('/')
   }
 
@@ -140,6 +141,8 @@ export const useSignOutStore = defineStore('signOut', () => {
     }
     // An erasure of this owner tried before, its answer lost: a `401` now may be that erasure done.
     const unsettled = way === 'erase' && erasingOwner() === owner
+    // A «Выйти» of this owner waiting for the server's word, which this tap is about to write over.
+    const waiting = !unsettled && leavingOwner() === owner
     leaving.value = true
     failure.value = null
     markLeaving(owner, way === 'erase')
@@ -151,12 +154,22 @@ export const useSignOutStore = defineStore('signOut', () => {
       if (way === 'erase' && error instanceof ApiError && error.code === ERROR.NO_ACTOR) {
         if (!unsettled) {
           // **The session was gone before the tap** (adversarial А): ended from «Устройства», run
-          // out in a tab left open. The server erased nothing, so the device erases nothing either
-          // — MOL-56's «a 401 erases nothing», the queue may hold a purchase of an account that is
-          // still there. The sheet says so, and so does the login screen once the door closes.
-          clearLeaving()
+          // out in a tab left open, or the person already erased through another door — a `401`
+          // is all of them at once (self-review 8). This tap erased nothing, so the device erases
+          // nothing either — MOL-56's «a 401 erases nothing», the queue may hold a purchase of an
+          // account that is still there. The sheet and the login screen say what is known: this
+          // tap deleted nothing, and an empty account on signing in means it was deleted before.
           noteErasure('kept')
           failure.value = { way, kind: 'signed_out' }
+          if (!waiting) {
+            clearLeaving()
+            return
+          }
+          // A «Выйти» was waiting (round 2, Д): «no session» is the very word that completes it, so
+          // it is put back as it was, and the server's next «nobody» finishes it — never dropped,
+          // or the next launch offline would open the app of the person who left.
+          markLeaving(owner)
+          if (actor.heard !== before && actor.nobody) void finish(owner, null)
           return
         }
         // A repeat after a lost answer: the first tap may have erased everything, or the session
@@ -197,6 +210,9 @@ export const useSignOutStore = defineStore('signOut', () => {
   function settle(): void {
     // Somebody is signed in: no login screen is coming that a note about an erasure was for.
     if (!actor.nobody) dropErasureNote()
+    // Nobody is: words about the session that just ended do not outlive it — the door closes over
+    // the sheet without closing it, and a login on this very page found them there (round 2, Г).
+    else failure.value = null
     const owner = leavingOwner()
     if (!owner || leaving.value) return
     if (actor.nobody) void finish(owner, noteOfWaiting(owner))

@@ -53,7 +53,7 @@ test('«Удалить мои данные» стирает человека и 
 
 // Adversarial А: the session ended from «Устройства» while the sheet was open. The server erases
 // nothing, and the phone must neither erase its drawer nor look as if it had.
-test('сессию кончили, пока лист открыт: «Данные не удалены», ящик цел, вход — тот же человек', async ({
+test('сессию кончили, пока лист открыт: нажатие ничего не удалило, ящик цел, вход — тот же человек', async ({
   page,
 }) => {
   const owner = await signedIn(page)
@@ -90,7 +90,7 @@ test('сессию кончили, пока лист открыт: «Данны�
   expect((await answered).status()).toBe(401)
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Вход')
-  await expect(page.locator('.erasure')).toHaveText(/Данные не удалены/)
+  await expect(page.locator('.erasure')).toHaveText(/это нажатие ничего не удалило/)
   // A 401 erases nothing: the drawer of an account that is still there stays.
   expect(await page.evaluate(() => localStorage.getItem('molvia.actor'))).toBe(owner)
 

@@ -995,7 +995,7 @@
     "confirm": "Delete for good",
     "offline": "Deleting needs a connection.",
     "error": "Could not delete: the server did not answer. Try again.",
-    "signed_out": "Your data was not deleted: this sign-in has already ended — in «Devices», for instance.",
+    "signed_out": "This sign-in has already ended, and this tap deleted nothing. If you have already deleted your data — here, in the bot or on another device — it is gone; if not, sign in and delete it again.",
     "unknown": "We do not know whether the data was deleted: the answer to the last tap was lost, and the sign-in is gone."
   },
   "identity": {
@@ -1050,7 +1050,7 @@
     },
     "erased": "Your data has been deleted. You can sign in again, and it will be a new, empty account.",
     "erase_unknown": "We do not know whether your data was deleted: the server's answer was lost. Sign in: if the account is empty, it was deleted; if not, delete it again.",
-    "erase_kept": "Your data was not deleted: the sign-in on this device had already ended. Sign in and delete it again."
+    "erase_kept": "The sign-in on this device had already ended, and this tap deleted nothing. Sign in: if the account is empty, the data is already deleted; if not, delete it again."
   },
   "dev": {
     "kit": {

@@ -309,6 +309,62 @@ describe('«Удалить мои данные» в настройках (MOL-94
     expect(replaced).toEqual(['/'])
   })
 
+  it('Г: слова о кончившейся сессии уходят с ней — вход на той же странице открывает лист чистым', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToErase(view)
+    eraseMe.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    confirmButton().click()
+    await flushPromises()
+    expect(sheet().textContent).toContain(en.erase.signed_out)
+
+    // The door closes over the sheet without closing it: no `stay()` is called.
+    me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    sessionEnded()
+    await flushPromises()
+
+    expect(useSignOutStore().eraseFailure).toBeNull()
+    expect(sheet().textContent).not.toContain(en.erase.signed_out)
+  })
+
+  it('Д: ждущий «Выйти» переживает «Удалить навсегда» → 401 и доделывается первым «никого»', async () => {
+    fillTheDrawer()
+    localStorage.setItem(`molvia.trip-queue.${OWNER}`, '[]')
+    const view = await render()
+    // «Выйти» landed, its answer was lost, and the server could not be asked when the sheet closed.
+    await view.get('button.leave').trigger('click')
+    await flushPromises()
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    logout.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'timeout', false))
+    me.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'Failed to fetch', false))
+    ;[...sheet().querySelectorAll('button')]
+      .find((button) => button.textContent.trim() === en.sign_out.confirm)
+      ?.click()
+    await flushPromises()
+    sheet().querySelector<HTMLButtonElement>('button[aria-label]')?.click()
+    await flushPromises()
+    expect(localStorage.getItem('molvia.leaving')).toBe(OWNER)
+
+    await askToErase(view)
+    eraseMe.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    confirmButton().click()
+    await flushPromises()
+    expect(sheet().textContent).toContain(en.erase.signed_out)
+    // The way out is put back as it was — a «Выйти», not an erasure.
+    expect(localStorage.getItem('molvia.leaving')).toBe(OWNER)
+    expect(localStorage.getItem('molvia.erasing')).toBeNull()
+
+    me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    sessionEnded()
+    await flushPromises()
+
+    expect(ownersKeys()).toEqual([])
+    expect(replaced).toEqual(['/'])
+    // The tap was the last thing done here, and the login screen says what is known of it.
+    expect(sessionStorage.getItem('molvia.erased')).toBe('kept')
+  })
+
   it('шторку закрыли после сбоя, а сессии уже нет — стирание доделано, экран входа скажет «не знаем»', async () => {
     fillTheDrawer()
     const view = await render()

@@ -362,17 +362,22 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   session is gone and nothing about the person. So the intent says which door it is
   (`molvia.erasing` beside `molvia.leaving`), and a `401 error.no_actor` on the erasure is read by
   what came before it. **On a first tap the session was gone before it** — ended from
-  «Устройства», run out in a tab left open: the server erased nothing, so the device erases nothing
-  either (MOL-56's «a `401` erases nothing» — the queue may hold a purchase of an account still
-  there), the intent goes, and the sheet says «Данные не удалены». **On a repeat after a lost
+  «Устройства», run out in a tab left open, or the person erased through another door: the `401` is
+  all of them at once, so **the words say only what is known** (self-review 8, round 2 Е) — this
+  tap deleted nothing, and an empty account on signing in means the data went before. The device
+  erases nothing (MOL-56's «a `401` erases nothing» — the queue may hold a purchase of an account
+  still there) and the intent goes — **unless a «Выйти» was waiting** (round 2, Д): «no session» is
+  what completes it, so it is put back, and the server's next «nobody» finishes it. **On a repeat after a lost
   answer** nobody can tell whether the first tap erased everything; the sheet says that, and the
   server's next «nobody» finishes the intent as «Выйти» does. A refusal never leaves the sheet as
   it was before the tap (В). **The login screen of this tab says what came of it, once**
   (`molvia.erased`, owner's decision В-3, on this tab's own shelf, review 4): «Ваши данные удалены»
-  on the erasure's own `204`; «не знаем, удалились ли» on an intent finished by «nobody»; «Данные
-  не удалены» after a first-tap `401` once the door closes. The note goes as it is read, and
-  whenever the server names somebody. **A failure keeps its door** (Б): a failed erasure is not
-  shown in the sheet of «Выйти», nor the other way. The session is the whole proof (В-1): it
+  on the erasure's own `204`; «не знаем, удалились ли» on an intent finished by «nobody»; «это
+  нажатие ничего не удалило» after a first-tap `401` once the door closes. The note goes as it is
+  read, and whenever the server names somebody. **A failure keeps its door** (Б): a failed erasure
+  is not shown in the sheet of «Выйти», nor the other way; and it does not outlive the session it
+  was about — the server's «nobody» takes it away, since the door closes over the sheet without
+  closing it, and a login on the same page found the old words there (round 2, Г). The session is the whole proof (В-1): it
   already opens every row and the copy of them, and a stranger at a forgotten sign-in is answered
   by «Устройства»; **the price, named:** whoever holds a live session can erase the person, and an
   intent finished by «nobody» after a lost answer erases the drawer even where the session merely
