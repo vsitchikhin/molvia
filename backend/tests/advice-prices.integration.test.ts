@@ -561,7 +561,7 @@ describe('давность чужих последних (MOL-166, адверс�
     expect(row?.scaledMinor).toBe(price(600_000))
   })
 
-  it('своя последняя — без окна: прошлогодняя цена своего места остаётся (В-1)', async () => {
+  it('своя последняя — без окна в своём режиме; с доступом место, открытое тремя свежими, — их (В-1, О)', async () => {
     const me = await insertActor(db)
     const itemId = await insertItem(db)
     const placeId = await insertPlace(db)
@@ -573,8 +573,9 @@ describe('давность чужих последних (MOL-166, адверс�
     expect((await expenses.placePricesFor(ownPrices(me, [itemId])))[0]?.scaledMinor).toBe(
       price(400_000),
     )
+    // Я там давно не брал, а трое берут сейчас — место их (адверсариальный О, решение владельца).
     expect((await expenses.placePricesFor(sharedPrices(me, [itemId])))[0]?.scaledMinor).toBe(
-      price(400_000),
+      price(610_000),
     )
   })
 })
@@ -597,6 +598,7 @@ describe('своё место в общем режиме — свежесть п
     expect(row?.recent).toBe(false)
     expect(Date.now() - (row?.latestVisitAt.getTime() ?? 0)).toBeGreaterThan(700 * 86_400_000)
   })
+
   it('за пару своего места голосуют только мои покупки (адверсариальный М′)', async () => {
     const me = await insertActor(db)
     const cheese = await insertItem(db)
@@ -606,7 +608,8 @@ describe('своё место в общем режиме — свежесть п
       await bought(me, cheese, sas, amd(260_000), kilo, { on: ago(days) })
     }
     await bought(me, cheese, shop, amd(80_000), piece, { on: ago(730) })
-    for (const days of [6, 5, 4]) {
+    // Двое других: место не открыто, оно моё — и голосует моей пачкой (при трёх свежих оно их, О).
+    for (const days of [6, 5]) {
       await bought(await insertActor(db), cheese, shop, amd(90_000), piece, { on: ago(days) })
     }
 
@@ -615,5 +618,44 @@ describe('своё место в общем режиме — свежесть п
       ['piece', 1],
       ['kg', 3],
     ])
+  })
+})
+
+describe('своё место, где давно не брал, — по цене открывших его свежих (MOL-166, адверсариальный О)', () => {
+  const price = (minor: number) => unitPrice(amd(minor), kilo).scaledMinor
+
+  it('трое свежих открыли место — его называет их медиана, а не моя прошлогодняя цена', async () => {
+    const me = await insertActor(db)
+    const cheese = await insertItem(db)
+    const market = await insertPlace(db, { name: 'Рынок' })
+    await bought(me, cheese, market, amd(200_000), kilo, { on: ago(400) })
+    for (const minor of [250_000, 260_000, 270_000]) {
+      await bought(await insertActor(db), cheese, market, amd(minor), kilo, { on: ago(3) })
+    }
+
+    const [row] = await expenses.placePricesFor(sharedPrices(me, [cheese]))
+    expect(row?.scaledMinor).toBe(price(260_000))
+    expect(row?.recent).toBe(true)
+  })
+
+  it('не открыто или я беру там сам — по-прежнему моя цена (В-1)', async () => {
+    const me = await insertActor(db)
+    const cheese = await insertItem(db)
+    const market = await insertPlace(db, { name: 'Рынок' })
+    await bought(me, cheese, market, amd(200_000), kilo, { on: ago(400) })
+    for (const minor of [250_000, 260_000]) {
+      await bought(await insertActor(db), cheese, market, amd(minor), kilo, { on: ago(3) })
+    }
+    // Двое — место не открыто: моя давняя цена.
+    expect((await expenses.placePricesFor(sharedPrices(me, [cheese])))[0]?.scaledMinor).toBe(
+      price(200_000),
+    )
+
+    await bought(await insertActor(db), cheese, market, amd(270_000), kilo, { on: ago(2) })
+    await bought(me, cheese, market, amd(210_000), kilo, { on: ago(1) })
+    // Трое открыли, но я беру там сам — моя последняя.
+    expect((await expenses.placePricesFor(sharedPrices(me, [cheese])))[0]?.scaledMinor).toBe(
+      price(210_000),
+    )
   })
 })

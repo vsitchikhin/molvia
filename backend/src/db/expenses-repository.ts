@@ -784,61 +784,75 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           -- before the places a pair does not name are left out (adversarial Д, owner's decision):
           -- weighed by what remained, one pack in a shop bought by the kilo for ten weeks turned
           -- the whole row to pieces and hid the market where the kilo is cheaper.
-          select places.*,
+          select chosen.*,
             sum(weight) over pair as "pairObservations",
             max(visited) over pair as "pairLatestVisitAt"
           from (
-          select
-            item_id as "itemId",
-            place_id as "placeId",
-            place_name as "placeName",
-            currency,
-            unit,
-            -- One's own last purchase in the place, wherever one bought; otherwise the place was
-            -- opened by other people, and its price is the lower median of each buyer's last there
-            -- — \`percentile_disc\`, a price someone paid, as the threshold of «только если дёшево»
-            -- is (MOL-166, В-1) — of those bought within the window (adversarial Б).
-            coalesce(
-              min(unit_price) filter (where mine and place_last),
-              percentile_disc(0.5) within group (order by unit_price)
-                filter (where place_last and fresh)
-            ) as price,
-            count(*) as observations,
-            -- A place of one's own is as fresh as one's own last purchase there, as its price is
-            -- (adversarial М, owner's decision): other people's visits made a two-year-old price
-            -- of mine head the row of someone with access, and hid a pack of mine fresher than it.
-            case when bool_or(mine_here) then max(bought_at) filter (where mine)
-                 else max(bought_at) end as "latestVisitAt",
-            -- What the place votes for its pair with (Р-4): at a place of one's own, one's own
-            -- purchases and visit alone, as its price (adversarial М′, owner's decision) — with
-            -- access, other people's packs at a shop of mine put my two-year-old price at the head.
-            case when bool_or(mine_here) then count(*) filter (where mine)
-                 else count(*) end as weight,
-            case when bool_or(mine_here) then max(bought_at) filter (where mine)
-                 else max(bought_at) end as visited,
-            bool_or(nearby) as nearby,
-            -- Whether the place's last purchase is within the window — what a place of a pair
-            -- other than the row's first must be to stand on the row (adversarial И); one's own
-            -- by one's own purchase (М).
-            bool_or(place_last and fresh and (mine or not mine_here)) as recent,
-            -- A pair is the place's only where its last purchase was made in it (adversarial А):
-            -- an August kilo is not what a shop charges once packs were bought there since. Where
-            -- this person bought, that is their own last purchase, and nobody else's figure stands
-            -- in for it; elsewhere, three buyers whose last purchase there is recent and in this
-            -- pair.
-            bool_or(mine and place_last)
-              or (not bool_or(mine_here)
-                  and count(distinct actor_id) filter (where place_last and fresh)
-                      >= ${query.minBuyers}) as named
-          from (
-            -- By the day of the record, as «last» is: a purchase of \`freshDays\` days ago counts.
-            select *,
-              coalesce(started_on, (bought_at at time zone ${zone})::date::text)::date
-                >= ${today} - ${query.freshDays}::int as fresh
-            ${priced.rows}
-          ) showable
-          group by item_id, place_id, place_name, currency, unit
-          ) places
+            -- Each figure as the place's own or as other people's, by whose place it is.
+            select
+              "itemId", "placeId", "placeName", currency, unit, observations, nearby,
+              case when own then own_price else their_price end as price,
+              -- A place of one's own is as fresh as one's own last purchase there, and votes for
+              -- its pair with one's own purchases and visit, as its price is (adversarial М, М′):
+              -- other people's packs at a shop of mine put my two-year-old price at the head.
+              case when own then own_visit else any_visit end as "latestVisitAt",
+              case when own then own_weight else observations end as weight,
+              case when own then own_visit else any_visit end as visited,
+              -- Whether the place's last purchase is within the window — what a place of a pair
+              -- other than the row's first must be to stand on the row (adversarial И).
+              case when own then own_recent else their_recent end as recent,
+              -- A pair is the place's only where its last purchase was made in it (adversarial
+              -- А): an August kilo is not what a shop charges once packs were bought there since.
+              -- Where this person's own, that is their own last purchase and nobody else's figure
+              -- stands in for it; elsewhere, three buyers whose last purchase there is recent and
+              -- in this pair.
+              case when own then own_named else their_named end as named
+            from (
+              select grouped.*,
+                -- A place is one's own while one bought there within the window, or while nobody
+                -- else has opened it (В-1); once one has stopped going and three others go now,
+                -- it is theirs, named by their figure (adversarial О, owner's decision) — a single
+                -- purchase a year ago hid from someone with access a place three bought at today.
+                mine_here and (bool_or(own_recent) over place or not bool_or(their_named) over place)
+                  as own
+              from (
+                select
+                  item_id as "itemId",
+                  place_id as "placeId",
+                  place_name as "placeName",
+                  currency,
+                  unit,
+                  bool_or(mine_here) as mine_here,
+                  -- One's own last purchase in the place; for other people's, the lower median of
+                  -- each buyer's last there — \`percentile_disc\`, a price someone paid, as the
+                  -- threshold of «только если дёшево» is (MOL-166, В-1) — of those bought within
+                  -- the window (adversarial Б).
+                  min(unit_price) filter (where mine and place_last) as own_price,
+                  percentile_disc(0.5) within group (order by unit_price)
+                    filter (where place_last and fresh) as their_price,
+                  count(*) as observations,
+                  count(*) filter (where mine) as own_weight,
+                  max(bought_at) filter (where mine) as own_visit,
+                  max(bought_at) as any_visit,
+                  bool_or(nearby) as nearby,
+                  bool_or(mine and place_last and fresh) as own_recent,
+                  bool_or(place_last and fresh) as their_recent,
+                  bool_or(mine and place_last) as own_named,
+                  count(distinct actor_id) filter (where place_last and fresh)
+                    >= ${query.minBuyers} as their_named
+                from (
+                  -- By the day of the record, as «last» is: a purchase of \`freshDays\` days ago
+                  -- counts.
+                  select *,
+                    coalesce(started_on, (bought_at at time zone ${zone})::date::text)::date
+                      >= ${today} - ${query.freshDays}::int as fresh
+                  ${priced.rows}
+                ) showable
+                group by item_id, place_id, place_name, currency, unit
+              ) grouped
+              window place as (partition by "itemId", "placeId")
+            ) owned
+          ) chosen
           window pair as (partition by "itemId", currency, unit)
         ) weighed
         where named
