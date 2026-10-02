@@ -1,9 +1,11 @@
 import {
   balancesOn,
+  budgetFigure,
   budgetMonthOf,
   convertAcross,
   convertSigned,
   lastDayOf,
+  monthBudget,
   monthOf,
   moneyMonth,
   moneyMonthViewOf,
@@ -36,7 +38,14 @@ import type { Today } from './today'
 
 type Repositories = Pick<
   TripRepositories,
-  'spendings' | 'spendingCategories' | 'money' | 'exchanges' | 'incomes' | 'rates' | 'moneyAccounts'
+  | 'spendings'
+  | 'spendingCategories'
+  | 'money'
+  | 'exchanges'
+  | 'incomes'
+  | 'rates'
+  | 'moneyAccounts'
+  | 'budgetPlans'
 >
 type Owner = Pick<Actor, 'id' | 'incomeCurrency' | 'spendCurrency'> & Today
 
@@ -303,15 +312,20 @@ export async function moneyMonthOf(
     cursor === undefined
       ? heldAt(repositories, owner, rates, month, today, rate)
       : Promise.resolve(undefined)
-  const [counted, before] = await Promise.all([
+  // The figure of «Бюджет» among the ways out (MOL-117, В-3) — the first page's, as the rest is.
+  const plans =
+    cursor === undefined ? repositories.budgetPlans.list(owner.id) : Promise.resolve(null)
+  const [counted, before, planned] = await Promise.all([
     held.then((accounts) =>
       count(repositories, owner, rates, month, categories, rate, kind, salaryShiftDay, accounts),
     ),
     count(repositories, owner, rates, previousMonth(month), categories, null, 'frozen', null),
+    plans,
   ])
   // «−8 % к августу» needs an August: a month with nothing in it is no month to compare with.
   const previousSpent = before.days.length > 0 ? before.spent : null
-  return moneyMonthViewOf(counted, previousSpent, categories, cursor)
+  const budget = planned && budgetFigure(monthBudget(counted, planned, categories))
+  return moneyMonthViewOf(counted, previousSpent, categories, cursor, budget)
 }
 
 /** `GET /actors/me/salary-shift` (MOL-134, В-3): from which day a salary counts in the next month. */

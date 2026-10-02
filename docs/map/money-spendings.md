@@ -19,11 +19,12 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 
 ## backend · routes
 
-- `backend/src/routes/spendings.ts` — HTTP of «Деньги»: `/spendings` and `/spending-categories` writes and undo, `GET /money/months/:month` and its `/charts`, `/actors/me/salary-shift`.
+- `backend/src/routes/spendings.ts` — HTTP of «Деньги»: `/spendings` and `/spending-categories` writes and undo, `GET /money/months/:month` and its `/charts` and `/budget`, `PUT /budget/plans`, `/actors/me/salary-shift`.
 
 ## backend · usecases
 
 - `backend/src/usecases/money-month.ts` — Use case: the month of «Деньги» with its rates read first and a closed month frozen, and the salary-shift setting. Tests: `backend/tests/spendings.integration.test.ts`.
+- `backend/src/usecases/money-budget.ts` — Use case: `GET /money/months/:month/budget` — the month counted and frozen as «Деньги» count it, the plans set against it — and `PUT /budget/plans`, a plan from a month on. Tests: `backend/tests/money-budget.integration.test.ts`.
 - `backend/src/usecases/money-chart-month.ts` — Use case: `GET /money/months/:month/charts` — the month as «Деньги» count it, the usual months before it counted with no rate and never frozen. Tests: `backend/tests/money-chart-month.integration.test.ts`.
 - `backend/src/usecases/money-chart-year.ts` — Use case: `GET /money/years/:year/charts` — every month of the calendar year counted and frozen as «Деньги» count it, the usual's months before the year with no rate. Tests: `backend/tests/money-chart-year.integration.test.ts`.
 - `backend/src/usecases/money.test.ts` — Use-case test: day rates, a spending's rate snapshot on record and amend, and month freezing hold on fake repositories.
@@ -40,6 +41,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 ## backend · tests
 
 - `backend/tests/month-rest.integration.test.ts` — Integration test: «Остаток» is the accounts' money at the month's end — which accounts and operations count, frozen and uncounted cases.
+- `backend/tests/money-budget.integration.test.ts` — Integration test: «Бюджет» spends what the month of «Деньги» spends, a plan holds from its month on, a share of «Пришло» by the frozen rate, the savings target, a removed category, privacy.
 - `backend/tests/money-chart-month.integration.test.ts` — Integration test: the month of «Графики → Месяц» equals its month of «Деньги», only it is frozen, the usual from three closed months, a removed category, privacy.
 - `backend/tests/money-chart-year.integration.test.ts` — Integration test: every month of «Графики → Год» equals its month of «Деньги» and the year is their sum, what is frozen, the average from three, privacy, 404.
 - `backend/tests/salary-shift.integration.test.ts` — Integration test: «Зарплата — в следующий месяц» is set and cleared per owner, bounded, and moves a salary into next month's «Пришло».
