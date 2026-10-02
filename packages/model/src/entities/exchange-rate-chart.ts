@@ -133,20 +133,24 @@ export interface RateChart {
 /**
  * The first day of the last `months` months (MOL-168, В-1 «б»): the day after the same day of the
  * month that many months back — the last day of a shorter month in its place — so the 2nd of October
- * looks back a month from the 3rd of September, and the 31st of March from the 1st. Taken from the
- * same day itself, with today, a month was a day longer than one: on the day of a monthly exchange
- * «Месяц» held the last one too, and «Обмены против рынка» summed thirteen exchanges for twelve
- * months, twelve the next day (adversarial В). The year is the window of «Обмены против рынка» too.
+ * looks back a month from the 3rd of September. **On the last day of a month, from the 1st of the
+ * month `months − 1` back**: whole months, the 30th of November from the 1st, the 28th of February
+ * 2029 a year from the 1st of March 2028. Taken from the same day itself, with today, a month was a
+ * day longer than one: on the day of a monthly exchange «Месяц» held the last one too, and «Обмены
+ * против рынка» summed thirteen exchanges for twelve months (adversarial В); and the day after the
+ * 30th of October is still October, its 31st — where an exchange of the last day of every month lay
+ * (adversarial round 2, В′). The year is the window of «Обмены против рынка» too.
  */
 export function ratePeriodFrom(today: string, months: number): string {
   const index = Number(today.slice(0, 4)) * 12 + Number(today.slice(5, 7)) - 1 - months
-  const year = Math.floor(index / 12)
-  const month = index - year * 12
-  const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
-  const day = Math.min(Number(today.slice(8, 10)), last)
-  return dayAfter(
-    `${String(year).padStart(4, '0')}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
-  )
+  const dayOf = (at: number, day: number) => {
+    const year = Math.floor(at / 12)
+    const month = at - year * 12
+    const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+    return `${String(year).padStart(4, '0')}-${String(month + 1).padStart(2, '0')}-${String(Math.min(day, last)).padStart(2, '0')}`
+  }
+  if (dayAfter(today).slice(8, 10) === '01') return dayOf(index + 1, 1)
+  return dayAfter(dayOf(index, Number(today.slice(8, 10))))
 }
 
 /** The days the month is read on: every day from `from` to `today` (MOL-168, В-2 «а»). */

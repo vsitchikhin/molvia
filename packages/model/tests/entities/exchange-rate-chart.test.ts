@@ -471,6 +471,17 @@ describe('ratePeriodFrom', () => {
     expect(ratePeriodFrom('2026-03-30', 1)).toBe('2026-03-01')
   })
 
+  it('looks back whole months on the last day of a month (adversarial round 2, В′)', () => {
+    // The day after the 30th of October is still October: the 30th of November from the 1st.
+    expect(ratePeriodFrom('2026-11-30', 1)).toBe('2026-11-01')
+    expect(ratePeriodFrom('2027-02-28', 1)).toBe('2027-02-01')
+    expect(ratePeriodFrom('2027-04-30', 6)).toBe('2026-11-01')
+    expect(ratePeriodFrom('2029-02-28', 12)).toBe('2028-03-01')
+    expect(ratePeriodFrom('2026-12-31', 12)).toBe('2026-01-01')
+    // The day before the last is not the last: the day after the same day, as on any day.
+    expect(ratePeriodFrom('2026-11-29', 1)).toBe('2026-10-30')
+  })
+
   it('crosses the year back', () => {
     expect(ratePeriodFrom('2026-01-15', 1)).toBe('2025-12-16')
     expect(ratePeriodFrom('2026-03-02', 6)).toBe('2025-09-03')
@@ -547,6 +558,25 @@ describe('rateChart by period (MOL-168)', () => {
       rateChart([rub], [exchange(day)], TODAY)?.pairs[0]?.periods[12]?.exchanges
     expect(year(YEAR_FROM)).toHaveLength(1)
     expect(year('2025-10-02')).toEqual([])
+  })
+
+  it('holds one exchange of the last day of a month, on the last day of a shorter one (В′)', () => {
+    const ends = [
+      '2028-02-29',
+      '2028-03-31',
+      '2028-04-30',
+      '2028-05-31',
+      '2028-06-30',
+      '2028-07-31',
+    ]
+      .concat(['2028-08-31', '2028-09-30', '2028-10-31', '2028-11-30', '2028-12-31', '2029-01-31'])
+      .concat(['2029-02-28'])
+    const line = { ...rub, rows: [row('2029-02-27', '4.20')] }
+    const periods = rateChart([line], ends.map((day) => exchange(day)).reverse(), '2029-02-28')
+      ?.pairs[0]?.periods
+    expect(periods?.[1]?.exchanges.map(({ day }) => day)).toEqual(['2029-02-28'])
+    expect(periods?.[6]?.exchanges).toHaveLength(6)
+    expect(periods?.[12].exchanges).toHaveLength(12)
   })
 
   it('holds one monthly exchange a month and twelve a year, on the very day of one (adversarial В)', () => {
