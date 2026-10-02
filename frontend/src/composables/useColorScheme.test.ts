@@ -32,12 +32,13 @@ function media(scheme: 'light' | 'dark'): string | null {
 const SYSTEM = { light: '(prefers-color-scheme: light)', dark: '(prefers-color-scheme: dark)' }
 
 beforeEach(() => {
+  // The module's choice outlives a test; the system is where every test starts — chosen first, as
+  // choosing writes it, and then the shelves emptied.
+  useColorScheme().choose('system')
   localStorage.clear()
   sessionStorage.clear()
   delete document.documentElement.dataset.scheme
   document.head.innerHTML = themeColors.join('')
-  // The module's choice outlives a test; the system is where every test starts.
-  useColorScheme().choose('system')
 })
 
 /**
@@ -88,7 +89,7 @@ describe('the script that sets the scheme before the first paint', () => {
   })
 
   it('answers what the module answers, for every pair of shelves', () => {
-    const values = [null, 'light', 'dark', 'blue']
+    const values = [null, 'light', 'dark', 'system', 'blue']
     for (const shared of values) {
       for (const own of values) {
         localStorage.clear()
@@ -143,13 +144,28 @@ describe('useColorScheme', () => {
     expect(media('light')).toBe('not all')
   })
 
-  it('«Системная» is no key at all, on either shelf', () => {
+  it('«Системная» is written too, on both shelves, and draws the system', () => {
     const { choose } = useColorScheme()
     choose('light')
     choose('system')
-    expect(localStorage.getItem(SCHEME_KEY)).toBeNull()
-    expect(sessionStorage.getItem(SCHEME_KEY)).toBeNull()
+    expect(localStorage.getItem(SCHEME_KEY)).toBe('system')
+    expect(sessionStorage.getItem(SCHEME_KEY)).toBe('system')
     expect(document.documentElement.dataset.scheme).toBeUndefined()
+  })
+
+  // Adversarial Б: `write` was content with the tab's shelf, and the shared one, read first, kept
+  // the choice the person had left — and answered it after a reload.
+  it('a choice the shared shelf refused does not give way to its past after a reload', () => {
+    useColorScheme().choose('light')
+    stub(localStorage, 'setItem', () => {
+      throw new Error('QuotaExceededError')
+    })
+    useColorScheme().choose('dark')
+    expect(localStorage.getItem(SCHEME_KEY)).toBeNull()
+    expect(storedScheme()).toBe('dark')
+    delete document.documentElement.dataset.scheme
+    runPrePaint()
+    expect(document.documentElement.dataset.scheme).toBe('dark')
   })
 
   it('writes nothing for the scheme already chosen', () => {
@@ -192,24 +208,49 @@ describe('installColorScheme', () => {
     expect(document.documentElement.dataset.scheme).toBe('dark')
   })
 
-  it('follows another window, and brings this window’s own shelf in line', () => {
+  it('follows another window, and brings only this window’s own shelf in line', () => {
     useColorScheme().choose('dark')
     installColorScheme()
     // Another window chose light: the shared shelf says so, this tab's still says dark.
     localStorage.setItem(SCHEME_KEY, 'light')
+    // Review С-3: the shared shelf is not written back — an event handled late would put its stale
+    // value over a newer one and send it round again.
+    const shared = vi.fn()
+    stub(localStorage, 'setItem', shared)
     heard(SCHEME_KEY, 'light')
     expect(useColorScheme().scheme.value).toBe('light')
     expect(document.documentElement.dataset.scheme).toBe('light')
     expect(sessionStorage.getItem(SCHEME_KEY)).toBe('light')
+    expect(shared).not.toHaveBeenCalled()
   })
 
   it('goes back to the system when another window chose it, and the reload agrees', () => {
     useColorScheme().choose('dark')
     installColorScheme()
+    localStorage.setItem(SCHEME_KEY, 'system')
+    heard(SCHEME_KEY, 'system')
+    expect(document.documentElement.dataset.scheme).toBeUndefined()
+    expect(sessionStorage.getItem(SCHEME_KEY)).toBe('system')
+    expect(storedScheme()).toBe('system')
+  })
+
+  // Adversarial В: «Системная» was a removed key, and a tab that missed it — unloaded, closed and
+  // brought back — read its own «Тёмная» from under the empty shared shelf at every reload.
+  it('a tab that never heard «Системная» still comes back to it', () => {
+    sessionStorage.setItem(SCHEME_KEY, 'dark')
+    localStorage.setItem(SCHEME_KEY, 'system')
+    installColorScheme()
+    expect(useColorScheme().scheme.value).toBe('system')
+    runPrePaint()
+    expect(document.documentElement.dataset.scheme).toBeUndefined()
+  })
+
+  it('takes a key removed elsewhere for the system', () => {
+    useColorScheme().choose('dark')
+    installColorScheme()
     localStorage.removeItem(SCHEME_KEY)
     heard(SCHEME_KEY, null)
-    expect(document.documentElement.dataset.scheme).toBeUndefined()
-    expect(sessionStorage.getItem(SCHEME_KEY)).toBeNull()
+    expect(useColorScheme().scheme.value).toBe('system')
     expect(storedScheme()).toBe('system')
   })
 

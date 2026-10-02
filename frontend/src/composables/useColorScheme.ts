@@ -1,6 +1,6 @@
 import { readonly, ref } from 'vue'
 import type { Ref } from 'vue'
-import { forget, read, write } from '@/stores/storage'
+import { read, writeEverywhere, writeOwn } from '@/stores/storage'
 
 /**
  * The scheme this device is drawn in (MOL-111): the system's, or one the person chose. A property
@@ -16,7 +16,7 @@ export type Scheme = 'system' | 'light' | 'dark'
  */
 export const SCHEME_KEY = 'molvia.scheme'
 
-/** «Системная» is no key at all; anything else under it — an old or foreign value — is too. */
+/** Anything but the two — `system`, nothing, an old or foreign value — is the system's scheme. */
 function schemeOf(value: string | null): Scheme {
   return value === 'light' || value === 'dark' ? value : 'system'
 }
@@ -26,12 +26,14 @@ export function storedScheme(): Scheme {
 }
 
 /**
- * `write` puts the choice on both shelves, so a window's own shelf has to be brought in line with
- * what another window chose — or its old choice is read back at the next reload.
+ * Every choice is written, «Системная» too, and on both shelves. Not a removed key: the shared shelf
+ * is read first, and only an empty one lets a tab's own past through — a tab that kept «Тёмная» and
+ * missed «Системная» (unloaded, closed and brought back) came back dark at every reload (adversarial
+ * В). Everywhere, or the past goes: a shared shelf that refused the write but kept its old value
+ * answered that value after a reload — the choice the person had just left (adversarial Б).
  */
 function keep(scheme: Scheme): void {
-  if (scheme === 'system') forget(SCHEME_KEY)
-  else write(SCHEME_KEY, scheme)
+  writeEverywhere(SCHEME_KEY, scheme)
 }
 
 /**
@@ -58,8 +60,10 @@ const current = ref<Scheme>('system')
 
 /**
  * Takes the stored choice and follows the other windows of the app: `storage` fires in each of them
- * but the one that wrote, and a cleared storage arrives with no key at all. The value is taken from
- * the event — the shared shelf's — and kept on this window's own shelf too.
+ * but the one that wrote, and a cleared storage arrives with no key at all. The value is the event's
+ * — the shared shelf's — and only this window's own shelf is brought in line with it: written back
+ * to the shared one, an event handled late put a stale choice over a newer one and sent it round
+ * again (review С-3, adversarial А).
  */
 export function installColorScheme(): void {
   current.value = storedScheme()
@@ -67,7 +71,7 @@ export function installColorScheme(): void {
   window.addEventListener('storage', (event) => {
     if (event.key !== SCHEME_KEY && event.key !== null) return
     const scheme = event.key === null ? 'system' : schemeOf(event.newValue)
-    keep(scheme)
+    writeOwn(SCHEME_KEY, scheme)
     current.value = scheme
     applyScheme(scheme)
   })

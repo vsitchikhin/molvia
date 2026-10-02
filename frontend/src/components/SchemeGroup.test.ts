@@ -21,9 +21,10 @@ function checked(view: VueWrapper): string[] {
 }
 
 beforeEach(() => {
+  // Chosen first, as choosing writes it, and then the shelves emptied.
+  useColorScheme().choose('system')
   localStorage.clear()
   sessionStorage.clear()
-  useColorScheme().choose('system')
   delete document.documentElement.dataset.scheme
 })
 
@@ -65,11 +66,11 @@ describe('SchemeGroup', () => {
     expect(view.find('button').exists()).toBe(false)
   })
 
-  it('«Системная» takes the key away and gives the screen back to the system', async () => {
+  it('«Системная» is kept as itself and gives the screen back to the system', async () => {
     const view = render()
     await view.get('input[value="dark"]').setValue(true)
     await view.get('input[value="system"]').setValue(true)
-    expect(localStorage.getItem(SCHEME_KEY)).toBeNull()
+    expect(localStorage.getItem(SCHEME_KEY)).toBe('system')
     expect(document.documentElement.dataset.scheme).toBeUndefined()
   })
 
