@@ -72,8 +72,17 @@ press — the only channel people are given, because there Telegram already says
   that pause, since no stop cuts it short.
 - **The runner's own log is off** (`silent: true`, round 2 Г2): it printed a failed `getUpdates`
   whole, and grammY's network error carries the request's address — the bot's token in it — into
-  journald, on every try. `startBot` logs the failure itself, by its kind:
-  `[molvia] telegram getUpdates: <code | network>`.
+  journald, on every try. A failure of a call to Telegram is logged by its kind, `telegramFailure`
+  — Telegram's code or `network` — and so is the one the runner gives up on (a revoked token, a
+  second poller, fifteen hours away): `index.ts` catches it, says
+  `[molvia] telegram: <kind>, stopping` and exits 1 for compose — left unhandled, Node printed it
+  whole, token and all (round 3 Д2).
+- **Who the bot is, it asks itself, before the runner starts** (`introduce`, round 3 Д1). Left to the
+  runner, `getMe` was grammY's `bot.init()`: a silent retry doubling its pause up to twenty minutes,
+  so a bot started while Telegram was away stayed deaf some seventeen minutes after it came back and
+  said nothing in the log. Now the pause grows as the runner's does, a 429 waits what Telegram asks,
+  each failure is `[molvia] telegram getMe: <kind>`, a 401 ends the process, and a stop cuts the
+  wait short.
 - **Updates of different people are handled at once; updates of one person, in order** — and
   both halves are load-bearing (MOL-55, О-4). `bot.start()` handles updates strictly one after
   another, which is grammY's ordering guarantee and was measured costing the next person their
