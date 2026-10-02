@@ -392,6 +392,58 @@ describe('ExchangeRateChart (MOL-161)', () => {
     expect(shown()).toBe('Первый')
   })
 
+  it('a tap on a neighbour 6,3 px off is a new spot, not the next of the round (adversarial С)', async () => {
+    // Weekly at one rate: centres 6,3 px apart — inside a ring of the first tap, yet seen apart.
+    const dots = [
+      ['a0000000-0000-4000-8000-000000000041', '2026-02-17', 2, 550, 'Первый'],
+      ['a0000000-0000-4000-8000-000000000042', '2026-02-24', 3, 571, 'Второй'],
+      ['a0000000-0000-4000-8000-000000000043', '2026-03-03', 4, 592, 'Третий'],
+    ] as const
+    const exchanges = dots.map(([id, day, week, x, place]) => point(id, day, week, x, { place }))
+    const { view, area } = chart([rouble({ exchanges })])
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    const shown = () => view.find('.mine-place').text().split(' · ')[0]
+    await at(view, area, 171.3, 106.2)
+    expect(shown()).toBe('Второй')
+    await at(view, area, 177.6, 106.2)
+    expect(shown()).toBe('Третий')
+    await at(view, area, 165, 106.2)
+    expect(shown()).toBe('Первый')
+  })
+
+  it('a new answer begins the round afresh: the dot now under the finger (adversarial Р)', async () => {
+    const one = point('a0000000-0000-4000-8000-000000000044', '2026-02-24', 3, 571, {
+      place: 'Касса 1',
+    })
+    const two = point('a0000000-0000-4000-8000-000000000045', '2026-02-24', 3, 571, {
+      place: 'Касса 2',
+    })
+    const far = point('a0000000-0000-4000-8000-000000000046', '2026-02-24', 3, 571, {
+      place: 'Дальний',
+      level: 700,
+    })
+    const { view, area } = chart([rouble({ exchanges: [one, two, far] })])
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    await at(view, area, 171.3, 106.2)
+    expect(view.find('.mine-place').text()).toContain('Касса 1')
+    // The scale grew: «Дальний» came down onto the spot, the tills went 20 px lower.
+    await view.setProps({
+      chart: {
+        pairs: [
+          rouble({
+            exchanges: [
+              { ...one, level: 290 },
+              { ...two, level: 290 },
+              { ...far, level: 400 },
+            ],
+          }),
+        ],
+      },
+    })
+    await at(view, area, 171.3, 106.2)
+    expect(view.find('.mine-place').text()).toContain('Дальний')
+  })
+
   it('a chain of dots 7 px apart: a tap and a slide choose the one under the finger (adversarial Н)', async () => {
     // One place, one rate, every eight days: centres 7,2 px apart on 300 px, each overlapping the next.
     const chain = [

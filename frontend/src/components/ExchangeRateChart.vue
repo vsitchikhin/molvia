@@ -214,6 +214,8 @@ const MARGIN = 50
 const FINGER_PX = 12
 /** How far from its centre a dot is drawn, its ring included (`.halo`, 14 px wide). */
 const RING_PX = 7
+/** Dots whose centres are this close are drawn as one: a round goes on over them. */
+const STACK_PX = 3
 /** Half the end of the mark, in thousandths of the plot's width. */
 const TICK = 14
 
@@ -329,6 +331,14 @@ export default defineComponent({
         round = null
       },
     )
+    // A new answer moves the dots — a scale grown with a new rate — and a round of the old places
+    // would turn over dots no longer under the finger (adversarial Р).
+    watch(
+      () => props.chart,
+      () => {
+        round = null
+      },
+    )
 
     function choose(index: number): void {
       const item = items.value[index]
@@ -350,8 +360,9 @@ export default defineComponent({
      * Monday's dot lay nearer the end of the week before. **Taps again on one spot go round the dots
      * drawn over it** — whose ring covers the touch (`RING_PX`): one day and one rate, or days nearly
      * one (adversarial И) — **in order of their distance from where the round began**, so the first
-     * tap is the dot under the finger and every dot of the spot comes in turn. A spot is a touch
-     * within `RING_PX` of the last tap, a finger's jitter. Turned from the one chosen, the middle of
+     * tap is the dot under the finger and every dot of the spot comes in turn. A tap is on the spot
+     * while it is within `RING_PX` of where the round began — a finger's jitter — and the dot under it
+     * is drawn there, within `STACK_PX` (adversarial С); a new answer begins afresh (Р). Turned from the one chosen, the middle of
      * three dots 7 px apart went to the first (Н); turned from the nearest, three dots on one spot
      * went round two (О, review 7); turned in order of days, a tap on one of three dots 2,7 px apart
      * showed its neighbour (П). A tap on a new spot right on the dot already chosen goes on to the
@@ -400,8 +411,15 @@ export default defineComponent({
       }
       const key = items.value[chosenIndex.value]?.key
       const last = round
-      if (last && Math.hypot(finger.x - last.x, finger.y - last.y) <= RING_PX) {
-        // Again on the spot: the next of its dots, round, from the one chosen.
+      const under = items.value[hit]?.exchange
+      // Again on the spot: the finger near where the round began, and the dot under it drawn there —
+      // a neighbour seen apart is a new spot, however near (adversarial С).
+      if (
+        last &&
+        under &&
+        Math.hypot(finger.x - last.x, finger.y - last.y) <= RING_PX &&
+        apart(under, last) <= STACK_PX
+      ) {
         const held = key === undefined ? -1 : last.keys.indexOf(key)
         if (held !== -1) {
           chooseKey(last.keys[(held + 1) % last.keys.length])

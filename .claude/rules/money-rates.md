@@ -344,14 +344,17 @@ rate exactly as before.
   nearer the end of the week before, which was chosen with the dot under the finger. **Taps again on
   one spot go round the dots drawn over it** — whose ring covers the touch (`RING_PX`): one day and
   one rate, or days nearly one (adversarial И) — **in order of their distance from where the round
-  began**: the first tap is the dot under the finger, and every dot of the spot comes in turn. A spot
-  is a touch within `RING_PX` of the last tap — a finger's jitter. Turned from the one chosen, the
-  middle of three dots 7 px apart went to the first (Н); turned from the nearest, three dots on one
-  spot went round two (О, review 7); turned in order of days, a tap right on one of three dots 2,7 px
-  apart showed its neighbour (П). **The price, named:** within one spot the round goes on — a tap
-  2,7 px off the last, right on another dot, shows the next of the round, not that dot; a finger
-  cannot tell them apart either. A tap on a new spot right on the dot already chosen goes on to the
-  next. **A slide follows the finger** (`tap`), kept only by a dot drawn right on the one under it.
+  began**: the first tap is the dot under the finger, and every dot of the spot comes in turn. A tap
+  is on the spot while it lands within `RING_PX` of **where the round began** — a finger's jitter —
+  **and the dot under it is drawn there**, its centre within `STACK_PX` (adversarial С): a neighbour
+  6,3 px off, seen apart, is a new spot, and a tap right on it chooses it. **A new answer begins
+  afresh** (adversarial Р): the dots move with the scale, and a round of the old places turned over
+  dots no longer under the finger. Turned from the one chosen, the middle of three dots 7 px apart
+  went to the first (Н); turned from the nearest, three dots on one spot went round two (О, review
+  7); turned in order of days, a tap right on one of three dots 2,7 px apart showed its neighbour
+  (П). **The price, named:** within `STACK_PX` the round goes on — a tap 2,7 px off where it began,
+  right on another dot, shows the next of the round, not that dot; a finger cannot tell them apart
+  either. A tap on a new spot right on the dot already chosen goes on to the next. **A slide follows the finger** (`tap`), kept only by a dot drawn right on the one under it.
   **With no dot under the finger, the nearest by x alone** — a week with no exchange by its end, an
   exchange by its day (review 1), never by height: let into the height, a week was chosen two ahead
   on a line of 6 px weeks, and a gap could not be chosen at all (review 4, adversarial Ж). The latest
