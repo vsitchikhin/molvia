@@ -183,8 +183,13 @@ function inDrams(rate: ExchangeRate, currency: ForeignCurrency): bigint | null {
   return null
 }
 
-function drams(currency: ForeignCurrency, scaled: bigint, day: string): ExchangeRate {
-  return { base: currency, quote: 'AMD', scaled, source: 'official', asOf: yerevanMidnight(day) }
+function drams(
+  currency: ForeignCurrency,
+  scaled: bigint,
+  day: string,
+  source: ExchangeRate['source'] = 'official',
+): ExchangeRate {
+  return { base: currency, quote: 'AMD', scaled, source, asOf: yerevanMidnight(day) }
 }
 
 /**
@@ -212,7 +217,10 @@ export function rateChart(
     const weeks = ends.map((day) => ({ day, row: weekRate(onSide, day) }))
     if (weeks.every(({ row }) => row === null)) return []
 
-    const own = exchanges
+    // The list comes newest first: turned, and sorted by the day alone — a stable sort — two
+    // exchanges of one day stay in the order they were made, the latest last, as the pairs read it.
+    const own = [...exchanges]
+      .reverse()
       .flatMap((exchange) => {
         const pair = marketSideOf(exchange.given.currency, exchange.received.currency)
         const day = exchange.exchangedOn
@@ -220,11 +228,12 @@ export function rateChart(
         if (day < from || day > today || !exchange.rate) return []
         const scaled = inDrams(exchange.rate, currency)
         if (scaled === null) return []
-        const measure = exchange.market?.own ?? exchange.market?.best ?? null
+        const offered = exchange.market?.own ?? exchange.market?.best ?? null
+        // What the market would have given for the same money, as «Обмены против рынка» has it —
+        // and where that is nothing, no comparison, as it leaves such an exchange out of its sum.
+        const expected = offered ? exchange.received.minor - offered.difference.minor : 0n
+        const measure = expected > 0n ? offered : null
         const market = measure && inDrams(measure.rate, currency)
-        const { minor } = exchange.received
-        // What the market would have given for the same money, as «Обмены против рынка» has it.
-        const expected = measure ? minor - measure.difference.minor : 0n
         return [
           {
             exchange,
@@ -235,11 +244,9 @@ export function rateChart(
         ]
       })
       .sort((one, other) =>
-        one.exchange.exchangedOn !== other.exchange.exchangedOn
-          ? one.exchange.exchangedOn < other.exchange.exchangedOn
-            ? -1
-            : 1
-          : one.exchange.id < other.exchange.id
+        one.exchange.exchangedOn === other.exchange.exchangedOn
+          ? 0
+          : one.exchange.exchangedOn < other.exchange.exchangedOn
             ? -1
             : 1,
       )
@@ -252,13 +259,15 @@ export function rateChart(
       figures.reduce((least, value) => (value < least ? value : least)),
       figures.reduce((most, value) => (value > most ? value : most)),
     )
-    const all = [...figures, ...ticks]
-    const lowest = all.reduce((least, value) => (value < least ? value : least))
-    const highest = all.reduce((most, value) => (value > most ? value : most))
+    // The heights are of the figures alone: a single tick rounded to two digits may fall outside
+    // them, and stretching the scale to it pressed a flat line to the top of the card.
+    const lowest = figures.reduce((least, value) => (value < least ? value : least))
+    const highest = figures.reduce((most, value) => (value > most ? value : most))
     const levelAt = (scaled: bigint) =>
       highest === lowest
         ? CHART_LEVEL / 2
         : Number(divideRounded((scaled - lowest) * BigInt(CHART_LEVEL), highest - lowest))
+    const tickAt = (scaled: bigint) => Math.min(CHART_LEVEL, Math.max(0, levelAt(scaled)))
 
     return [
       {
@@ -275,7 +284,8 @@ export function rateChart(
           day: exchange.exchangedOn,
           week: ends.findIndex((end) => end >= exchange.exchangedOn),
           x: xOf(exchange.exchangedOn),
-          rate: drams(currency, scaled, exchange.exchangedOn),
+          // The person's own, as the exchange's card says it.
+          rate: drams(currency, scaled, exchange.exchangedOn, 'personal'),
           level: levelAt(scaled),
           // Named as «Обмены против рынка» names its place.
           place: exchange.note?.trim() ?? null,
@@ -288,7 +298,7 @@ export function rateChart(
         })),
         levels: ticks.map((scaled) => ({
           rate: drams(currency, scaled, today),
-          level: levelAt(scaled),
+          level: tickAt(scaled),
         })),
       },
     ]

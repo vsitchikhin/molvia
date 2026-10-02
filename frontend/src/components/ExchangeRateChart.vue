@@ -2,7 +2,9 @@
   <AppCard v-if="pair" as="section" class="rate-chart" :aria-labelledby="headingId">
     <h2 :id="headingId" class="caption">{{ t(`exchange.rate_chart.title.${pair.currency}`) }}</h2>
     <p class="legend" aria-hidden="true">
-      <span class="key"><span class="swatch line"></span>{{ legendMarket }}</span>
+      <span class="key"
+        ><span class="swatch line"></span>{{ t('exchange.rate_chart.legend_market') }}</span
+      >
       <span class="key"
         ><span class="swatch dot"></span>{{ t('exchange.rate_chart.legend_mine') }}</span
       >
@@ -177,7 +179,7 @@
 import { computed, defineComponent, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { CHART_LEVEL, currencySign, decimalFromRate, formatRate } from '@molvia/model'
+import { CHART_LEVEL, RATE_SCALE, currencySign, decimalFromRate, formatRate } from '@molvia/model'
 import type { ExchangeRate, ExchangeRateChartView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
@@ -205,9 +207,9 @@ const TICK = 14
  * «Курс рубля за 12 месяцев» (MOL-161, handoff MOL-157 05, frames 6c and 6d): the market of all
  * bank clients at the end of each week — the only row with a year of history, and the legend says
  * so (Р-3) — the person's exchanges as dots on their own day, and from each a mark to the market it
- * was measured by (В-1), so the mark and the percent always say the same. A week is chosen as a bar
- * is — on lifting the finger or once it goes sideways — the nearest one, and its exchange when it
- * had one; by default the latest exchange. Hidden radios, one per week with no exchange and one per
+ * was measured by (В-1), so the mark and the percent always say the same. A choice is made as a bar
+ * is — on lifting the finger or once it goes sideways — the nearest exchange by its day or week with
+ * none by its end; by default the latest exchange. Hidden radios, one per week with no exchange and one per
  * exchange, give the keyboard and a screen reader every choice. Every height is the server's.
  */
 export default defineComponent({
@@ -315,22 +317,25 @@ export default defineComponent({
       currency.value = props.chart.pairs.find((one) => one.currency === value)?.currency ?? null
     }
 
-    /** The nearest week; when it had exchanges, the one nearest the finger (handoff 05). */
+    /**
+     * The nearest of what can be chosen, each by its own place on the line: an exchange by its day,
+     * a week with none by its end (review 1). Found through the week first, a tap right on an
+     * exchange of a Monday chose the week before, whose end lies nearer.
+     */
     const pointer = useChartPointer(area, (fraction) => {
       const shown = pair.value
       if (!shown) return
       const x = fraction * 1000
-      const nearest = (candidates: readonly { x: number }[]) =>
-        candidates.reduce<number>(
-          (best, one, index) =>
-            Math.abs(one.x - x) < Math.abs((candidates[best]?.x ?? Infinity) - x) ? index : best,
-          0,
-        )
-      const weekIndex = nearest(shown.weeks)
-      const points = shown.exchanges.filter((point) => point.week === weekIndex)
-      const point = points[nearest(points)]
-      const key = point ? point.id : `week-${shown.weeks[weekIndex]?.day ?? ''}`
-      choose(items.value.findIndex((item) => item.key === key))
+      let nearest = -1
+      let distance = Infinity
+      items.value.forEach((item, index) => {
+        const away = Math.abs((item.exchange?.x ?? shown.weeks[item.week]?.x ?? 0) - x)
+        if (away < distance) {
+          nearest = index
+          distance = away
+        }
+      })
+      choose(nearest)
     })
 
     const yOf = (level: number) => 1000 - MARGIN - (level * (1000 - 2 * MARGIN)) / CHART_LEVEL
@@ -347,7 +352,7 @@ export default defineComponent({
 
     /** «4,30» — the tick alone; whole when every tick is whole, «386» for the dollar. */
     function tickOf(rate: ExchangeRate): string {
-      const whole = (pair.value?.levels ?? []).every((tick) => tick.rate.scaled % 1_000_000n === 0n)
+      const whole = (pair.value?.levels ?? []).every((tick) => tick.rate.scaled % RATE_SCALE === 0n)
       return new Intl.NumberFormat(locale.value, {
         minimumFractionDigits: whole ? 0 : 2,
         maximumFractionDigits: 2,
@@ -378,7 +383,6 @@ export default defineComponent({
       })),
     )
 
-    const legendMarket = computed(() => t('exchange.rate_chart.legend_market'))
     return {
       t,
       headingId: useId(),
@@ -393,7 +397,6 @@ export default defineComponent({
       runs,
       monthLabels,
       pairOptions,
-      legendMarket,
       TICK,
       yOf,
       rateOf,

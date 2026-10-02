@@ -33,7 +33,10 @@ function point(id: string, day: string, week: number, x: number, of: Partial<Poi
   }
 }
 
-/** Five weeks a quarter of the card apart, the third with no figure; two exchanges in the second. */
+/**
+ * Four weeks from 8 February to 8 March, a day 1000 / 28 of the card — every x by its day, as the
+ * server lays it — the third week with no figure, two exchanges in the second.
+ */
 function rouble(of: Partial<Pair> = {}): Pair {
   return {
     currency: 'RUB',
@@ -43,15 +46,15 @@ function rouble(of: Partial<Pair> = {}): Pair {
       { day: '2026-02-15', rate: rate('4.80', '2026-02-13'), x: 250, level: 800 },
       { day: '2026-02-22', rate: null, x: 500, level: null },
       { day: '2026-03-01', rate: rate('4.60', '2026-02-27'), x: 750, level: 450 },
-      { day: '2026-03-04', rate: rate('4.30', '2026-03-04'), x: 1000, level: 0 },
+      { day: '2026-03-08', rate: rate('4.30', '2026-03-06'), x: 1000, level: 0 },
     ],
     exchanges: [
-      point('a0000000-0000-4000-8000-000000000001', '2026-02-10', 1, 200, { place: null }),
-      point('a0000000-0000-4000-8000-000000000002', '2026-02-14', 1, 240, {
+      point('a0000000-0000-4000-8000-000000000001', '2026-02-10', 1, 71, { place: null }),
+      point('a0000000-0000-4000-8000-000000000002', '2026-02-14', 1, 214, {
         percent: null,
         market: null,
       }),
-      point('a0000000-0000-4000-8000-000000000003', '2026-02-28', 3, 760),
+      point('a0000000-0000-4000-8000-000000000003', '2026-02-28', 3, 714),
     ],
     levels: [
       { rate: rate('4.30', '2026-03-04'), level: 0 },
@@ -118,15 +121,23 @@ describe('ExchangeRateChart (MOL-161)', () => {
     expect(view.find('.mine').exists()).toBe(false)
   })
 
-  it('on a week with exchanges, the one nearest the finger (handoff 05)', async () => {
+  it('the exchange nearest the finger, each by its own day (handoff 05)', async () => {
     const { view, area } = chart()
-    // 70 px of 300 is x 233: the second week, and of its two exchanges the one at 240.
-    await tap(view, area, 70)
+    // 64 px of 300 is x 213: the exchange of 14 February, the second of its week.
+    await tap(view, area, 64)
     expect(view.find('.mine-rate').text()).toContain('14 февр.')
     expect(plain(view.find('.mine-place').text())).toBe('Ардшинбанк · рынка того дня нет')
-    await tap(view, area, 58)
+    await tap(view, area, 21)
     expect(view.find('.mine-rate').text()).toContain('10 февр.')
     expect(plain(view.find('.mine-place').text())).toBe('Без места · −0,40 % к рынку')
+  })
+
+  it('a tap right on an exchange of a Monday chooses it, not the week ending the day before', async () => {
+    // 23 February is a Monday of the week to 1 March, a day past the end of the week to the 22nd.
+    const monday = point('a0000000-0000-4000-8000-000000000004', '2026-02-23', 3, 536)
+    const { view, area } = chart([rouble({ exchanges: [monday] })])
+    await tap(view, area, 161)
+    expect(view.find('.mine-rate').text()).toContain('23 февр.')
   })
 
   it('must not fire: a scroll that started on the chart chooses nothing', async () => {

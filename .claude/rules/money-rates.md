@@ -331,9 +331,14 @@ rate exactly as before.
   figures, multiples of that power — «4,30 · 4,60 · 4,90» — or one when none fit two digits; the phone
   names the months. It comes with `GET /exchanges` and every write's answer, as `losses` does, and
   is defaulted for a server before it. The finger chooses as on every chart of the section
-  (`useChartPointer`): the nearest week, and its exchange nearest the finger when it had one; the
-  latest exchange by default. **A hidden radio for each week with no exchange and for each exchange**
-  (Р-6): one per week left the second exchange of a week out of reach of the keys.
+  (`useChartPointer`), **the nearest of what can be chosen, each by its own place**: an exchange by
+  its day, a week with none by its end (review 1) — found through the week first, a tap right on an
+  exchange of a Monday chose the week ending the day before. The latest exchange by default, two of
+  one day in the order they were made, never by their ids (review 2). **A hidden radio for each week
+  with no exchange and for each exchange** (Р-6): one per week left the second exchange of a week out
+  of reach of the keys. The heights are of the figures alone, a single tick kept within the card
+  (review 3): stretched to a tick rounded off a flat line, the line was pressed to the top. A market
+  that would have given nothing compares nothing, as «Обмены против рынка» leaves it out.
 
 ## Incomes
 

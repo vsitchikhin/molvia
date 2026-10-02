@@ -266,6 +266,30 @@ describe('rateChart', () => {
     expect(points[0]?.x).toBeLessThan(points[1]?.x ?? 0)
   })
 
+  it('keeps two exchanges of one day in the order they were made, whatever their ids', () => {
+    // The list comes newest first: the evening's exchange, then the morning's.
+    const chart = rateChart(
+      [rub],
+      [
+        exchange('2026-09-22', { id: '00000000-0000-4000-8000-000000000001', note: 'Обменник' }),
+        exchange('2026-09-22', { id: 'ffffffff-ffff-4fff-bfff-ffffffffffff', note: 'Ардшинбанк' }),
+      ],
+      FROM,
+      TODAY,
+    )
+    expect(chart?.pairs[0]?.exchanges.map(({ place }) => place)).toEqual(['Ардшинбанк', 'Обменник'])
+  })
+
+  it('compares nothing where the market would have given nothing, as «Обмены против рынка»', () => {
+    const chart = rateChart(
+      [rub],
+      [exchange('2026-09-22', { amount: 100, best: { rate: '4.10', difference: 100 } })],
+      FROM,
+      TODAY,
+    )
+    expect(chart?.pairs[0]?.exchanges[0]).toMatchObject({ percent: null, market: null })
+  })
+
   it('draws neither the other side, nor another pair, nor the days outside the window', () => {
     const chart = rateChart(
       [rub],
@@ -308,6 +332,35 @@ describe('rateChart', () => {
     const pair = chart?.pairs[0]
     expect(pair?.levels).toEqual([{ rate: drams('4.15', TODAY), level: CHART_LEVEL / 2 }])
     expect(pair?.exchanges[0]?.level).toBe(CHART_LEVEL / 2)
+  })
+
+  it('keeps a flat line at half height when its one tick rounds off the figures', () => {
+    const chart = rateChart(
+      [{ ...rub, rows: [row('2026-09-25', '4.152')] }],
+      [exchange('2026-09-29', { rate: '4.152' })],
+      FROM,
+      TODAY,
+    )
+    const pair = chart?.pairs[0]
+    expect(pair?.levels.map(({ rate }) => rate.scaled)).toEqual([parseRate('4.15')])
+    expect(pair?.weeks.at(-1)?.level).toBe(CHART_LEVEL / 2)
+    expect(pair?.exchanges[0]?.level).toBe(CHART_LEVEL / 2)
+  })
+
+  it('gives each tick a height within the card when the figures are not flat', () => {
+    const chart = rateChart(
+      [{ ...rub, rows: [row('2026-09-25', '4.152'), row('2026-10-01', '4.156')] }],
+      [],
+      FROM,
+      TODAY,
+    )
+    // 4,15 lies under the lowest figure: at the bottom, never below the card.
+    expect(chart?.pairs[0]?.levels).toEqual([{ rate: drams('4.15', TODAY), level: 0 }])
+  })
+
+  it("says the exchange's own rate is the person's", () => {
+    const chart = rateChart([rub], [exchange('2026-09-29')], FROM, TODAY)
+    expect(chart?.pairs[0]?.exchanges[0]?.rate.source).toBe('personal')
   })
 
   it('leaves out a pair with no figure in any week, and is null with none left', () => {
