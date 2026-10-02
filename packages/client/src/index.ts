@@ -39,7 +39,6 @@ import {
   unassignedOperationsCodec,
   moneyChartMonthCodec,
   moneyChartYearCodec,
-  moneyChartsCodec,
   moneyMonthCodec,
   monthSchema,
   yearSchema,
@@ -101,7 +100,6 @@ import type {
   UnassignedOperationsResponse,
   MoneyChartMonthView,
   MoneyChartYearView,
-  MoneyChartsView,
   MoneyMonthView,
   SalaryShift,
   SpendingAmendBody,
@@ -323,8 +321,6 @@ export interface MolviaClient {
    * A page after `cursor` carries no «Остаток» (MOL-134): take it from the first page.
    */
   moneyMonth(month: string, cursor?: JournalKey): Promise<MoneyMonthView>
-  /** «Графики» (MOL-74): the last six or twelve months side by side, counted by the server. */
-  moneyCharts(period: 6 | 12): Promise<MoneyChartsView>
   /** «Графики → Месяц» (MOL-158): one month's ring, against the usual and pace. */
   moneyChartMonth(month: string): Promise<MoneyChartMonthView>
   /** «Графики → Год» (MOL-160): the calendar year's ring, months against the usual, categories. */
@@ -726,8 +722,6 @@ export function createClient(options: ClientOptions): MolviaClient {
         : ''
       return request(`/money/months/${month}${query}`, moneyMonthCodec)
     },
-
-    moneyCharts: (period) => request(`/money/charts?period=${String(period)}`, moneyChartsCodec),
 
     moneyChartMonth: async (month) => {
       if (!monthSchema.safeParse(month).success) throw new ApiError(ERROR.NOT_FOUND, 'month', false)

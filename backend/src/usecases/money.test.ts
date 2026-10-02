@@ -20,7 +20,7 @@ import type {
   SpendingAmendBody,
   SpendingCategory,
 } from '@molvia/model'
-import { moneyChartsOf } from './money-charts'
+import { moneyChartYearOf } from './money-chart-year'
 import { moneyMonthOf } from './money-month'
 import { dayRates } from './money-rates'
 import { amendSpending, recordSpending, removeSpending } from './spendings'
@@ -220,6 +220,8 @@ function repositoriesOf(world: World) {
         return Promise.resolve(rate)
       },
       salaryShift: () => Promise.resolve(null),
+      firstSpentDay: () =>
+        Promise.resolve((world.spendings ?? []).map((one) => one.spentOn).sort()[0] ?? null),
     }),
   }
   return { repositories, asked, frozen, written }
@@ -516,8 +518,8 @@ describe('moneyMonthOf (MOL-73)', () => {
   })
 })
 
-describe('moneyChartsOf (MOL-74)', () => {
-  it('reads the rows of the whole period once, however many months it counts (Р-3)', async () => {
+describe('moneyChartYearOf (MOL-160)', () => {
+  it('reads the rows of the year and of the usual before it once, however many months it counts', async () => {
     const world = repositoriesOf({
       exchanges: [exchange('100000 RUB', '410000 AMD', '2026-08-05')],
       spendings: [spending('41000 AMD', '2026-08-20'), spending('5000 AMD', '2026-04-02')],
@@ -541,22 +543,23 @@ describe('moneyChartsOf (MOL-74)', () => {
         frozenRate: () => Promise.resolve(null),
         freeze: (_, __, rate) => Promise.resolve(rate),
         salaryShift: () => Promise.resolve(null),
+        firstSpentDay: () => money.firstSpentDay(owner.id),
       }),
     }
-    const view = await moneyChartsOf(repositories, owner, 12, NOW)
+    const view = await moneyChartYearOf(repositories, owner, '2026', NOW)
     expect(view.months).toHaveLength(12)
-    // The month before the period too: «к октябрю» of the first bar.
+    // The usual's twelve closed months before September reach back to last September (В-1).
     expect(reads).toEqual(['spendings 2025-09-01..2026-09-30', 'trips 2025-09-01..2026-09-30'])
   })
 
-  it('draws each bar from the month «Деньги» shows', async () => {
+  it('draws each month from the month «Деньги» shows', async () => {
     const world = () =>
       repositoriesOf({
         exchanges: [exchange('100000 RUB', '410000 AMD', '2026-08-05')],
         spendings: [spending('41000 AMD', '2026-08-20'), spending('20 USD', '2026-09-03')],
         cache: [official('USD', '390', '2026-09-03')],
       }).repositories
-    const view = await moneyChartsOf(world(), owner, 6, NOW)
+    const view = await moneyChartYearOf(world(), owner, '2026', NOW)
     for (const month of ['2026-08', '2026-09']) {
       const shown = await moneyMonthOf(world(), owner, month, undefined, NOW)
       const bar = view.months.find((one) => one.month === month)

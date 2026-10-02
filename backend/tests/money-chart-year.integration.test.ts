@@ -14,7 +14,9 @@ import type { CachedRate, MoneyChartYearView, MoneyMonthView } from '@molvia/mod
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
 import { moneyMonthRates } from '@/db/schema'
+import { tripRepositories } from '@/db/unit-of-work'
 import { buildServer } from '@/server'
+import { moneyChartYearOf } from '@/usecases/money-chart-year'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
 
@@ -56,7 +58,12 @@ async function owner(): Promise<Owner> {
   return { id, cookie: await signIn(db, id) }
 }
 
-async function call(me: Owner, method: 'GET' | 'POST' | 'DELETE', url: string, body?: unknown) {
+async function call(
+  me: Owner,
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  url: string,
+  body?: unknown,
+) {
   return app.inject({
     method,
     url,
@@ -103,6 +110,31 @@ async function spend(
   })
   expect(response.statusCode).toBe(201)
   return id
+}
+
+async function receive(me: Owner, amount: string, receivedOn: string) {
+  const response = await call(me, 'POST', '/incomes', {
+    id: randomUUID(),
+    amount: { amount, currency: 'RUB' },
+    receivedOn,
+    source: 'salary',
+  })
+  expect(response.statusCode).toBe(201)
+}
+
+async function exchange(
+  me: Owner,
+  given: [string, string],
+  received: [string, string],
+  exchangedOn: string,
+) {
+  const response = await call(me, 'POST', '/exchanges', {
+    id: randomUUID(),
+    given: { amount: given[0], currency: given[1] },
+    received: { amount: received[0], currency: received[1] },
+    exchangedOn,
+  })
+  expect(response.statusCode).toBe(201)
 }
 
 /** The central bank's rouble and dollar for every day of the last two hundred, steady. */
@@ -223,4 +255,90 @@ describe('«Графики → Год» (MOL-160)', () => {
     expect(extra.statusCode).toBe(400)
     expect(JSON.stringify(extra.json())).toContain('period')
   })
+})
+
+describe('«Графики → Год» — заморозка, как на «Деньгах» (Р-2)', () => {
+  /** The year whose closed month is the last one: it has one to freeze, whatever today is. */
+  const year = m1.slice(0, 4)
+  const monthOfYear = (charts: MoneyChartYearView, value: string) =>
+    charts.months.find((one) => one.month === value)
+
+  it(
+    'каждый месяц — и с доходами, и с зарплатой, сдвинутой в следующий месяц — как на «Деньгах»',
+    async () => {
+      await cacheRates()
+      const me = await owner()
+      await call(me, 'PUT', '/actors/me/salary-shift', { day: 25 })
+      await spend(me, '120000', 'AMD', `${m1}-05`, 'cafe')
+      await receive(me, '100000', `${m1}-10`)
+      // The salary of the 26th counts in the month after (MOL-134).
+      await receive(me, '51000', `${m2}-26`)
+
+      const charts = await chartYear(me, year)
+      for (const one of charts.months.filter((each) => each.kind === 'data')) {
+        const seen = await month(me, one.month)
+        expect(one.income, one.month).toEqual(seen.income)
+        expect(one.spentIncome, one.month).toEqual(seen.spentIncome)
+      }
+      expect(monthOfYear(charts, m1)?.income.minor).toBe(15_100_000n)
+    },
+    HEAVY_MS,
+  )
+
+  it(
+    'сегодняшний обмен закрытый месяц не двигает, обмен его дня — двигает',
+    async () => {
+      await cacheRates()
+      const me = await owner()
+      await spend(me, '100000', 'AMD', `${m1}-10`, 'cafe')
+      await exchange(me, ['10000', 'RUB'], ['40000', 'AMD'], `${m2}-10`)
+      const august = monthOfYear(await chartYear(me, year), m1)
+
+      await exchange(me, ['10000', 'RUB'], ['50000', 'AMD'], today)
+      expect(monthOfYear(await chartYear(me, year), m1)).toEqual(august)
+
+      await exchange(me, ['10000', 'RUB'], ['30000', 'AMD'], `${m1}-01`)
+      const moved = monthOfYear(await chartYear(me, year), m1)
+      expect(moved?.spentIncome).not.toEqual(august?.spentIncome)
+      expect(moved?.spentIncome).toEqual((await month(me, m1)).spentIncome)
+    },
+    HEAVY_MS,
+  )
+
+  it(
+    'обмен, записанный, пока месяцы замораживаются, всё равно двигает их после (adversarial Ж)',
+    async () => {
+      await cacheRates()
+      const me = await owner()
+      await spend(me, '100000', 'AMD', `${m1}-10`, 'cafe')
+      await exchange(me, ['10000', 'RUB'], ['40000', 'AMD'], daysAgo(150))
+      const repositories = tripRepositories(db)
+      const freeze = repositories.money.freeze.bind(repositories.money)
+      let written = false
+      const racing = {
+        ...repositories,
+        money: {
+          ...repositories.money,
+          async freeze(...args: Parameters<typeof freeze>) {
+            if (!written) {
+              written = true
+              await exchange(me, ['10000', 'RUB'], ['30000', 'AMD'], `${m1}-01`)
+            }
+            return freeze(...args)
+          },
+        },
+      }
+      const read = await moneyChartYearOf(
+        racing,
+        { id: me.id, incomeCurrency: 'RUB', spendCurrency: 'AMD' },
+        year,
+      )
+      expect(written).toBe(true)
+      const stale = monthOfYear(read, m1)?.spentIncome
+      const after = await month(me, m1)
+      expect(after.spentIncome).not.toEqual(stale)
+      expect(monthOfYear(await chartYear(me, year), m1)?.spentIncome).toEqual(after.spentIncome)
+    },
+    HEAVY_MS,
+  )
 })

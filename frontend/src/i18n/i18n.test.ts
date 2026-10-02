@@ -325,6 +325,7 @@ describe('словарь: плюральные формы', () => {
       'spending.rest_operations',
       'spending.summary.donut_more',
       'spending.summary.refused',
+      'spending.charts.year_center',
       'spending.trip_row_meta',
       'spending.more',
       'spending.sheet.trip_meta',

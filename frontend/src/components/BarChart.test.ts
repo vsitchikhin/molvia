@@ -2,7 +2,6 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import BarChart from './BarChart.vue'
 import type { ChartBar } from './BarChart.vue'
-import RateLine from './RateLine.vue'
 
 const bars: ChartBar[] = ['2026-07', '2026-08', '2026-09'].map((key, index) => ({
   key,
@@ -160,50 +159,5 @@ describe('BarChart — quiet months (MOL-160)', () => {
     expect(average.attributes('style')).toContain('height: 50%')
     // First in the area, so only a stacking of its own puts it over the bars that follow.
     expect(view.find('.area').element.firstElementChild).toBe(average.element)
-  })
-})
-
-describe('RateLine (MOL-74, Р-14)', () => {
-  const points = [
-    { level: 0, spoken: 'a' },
-    { level: 500, spoken: 'b' },
-    { level: null, spoken: 'c' },
-    { level: 1000, spoken: 'd' },
-  ]
-
-  function line(modelValue = 3) {
-    const view = mount(RateLine, {
-      props: {
-        points,
-        marks: [{ week: 1, level: 200 }],
-        modelValue,
-        legend: 'Курс',
-        first: 'x',
-        last: 'y',
-      },
-    })
-    view.find('.area').element.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect
-    return view
-  }
-
-  it('breaks the line where there was no rate: a stretch and a lone dot, never a zero', () => {
-    const view = line()
-    expect(view.findAll('polyline')).toHaveLength(1)
-    expect(view.find('polyline').attributes('points')).toBe('0,900 333.3333333333333,500')
-    // The lone week after the gap, and the chosen one on it.
-    expect(view.findAll('line.dot')).toHaveLength(2)
-    expect(view.findAll('line.mark')).toHaveLength(1)
-  })
-
-  it('chooses the nearest week by finger and by the range, which says the week', async () => {
-    const view = line()
-    view
-      .find('.area')
-      .element.dispatchEvent(new PointerEvent('pointerdown', { clientX: 90, pointerType: 'mouse' }))
-    expect(view.emitted('update:modelValue')?.at(-1)).toEqual([1])
-    const range = view.find('input[type="range"]')
-    expect(range.attributes('aria-valuetext')).toBe('d')
-    await range.setValue('2')
-    expect(view.emitted('update:modelValue')?.at(-1)).toEqual([2])
   })
 })

@@ -507,7 +507,6 @@
     },
     "charts": {
       "title": "Графики",
-      "range": "{from} — {to}",
       "spent_title": "Расходы по месяцам",
       "spent_hint": "Коснитесь столбца или проведите пальцем по графику. Каждый месяц — по курсу того месяца",
       "bar_label": "{month}, {amount}",
@@ -515,7 +514,6 @@
       "spent_legend": "Ушло",
       "difference": "Разница · {month}",
       "pair_label": "{month}: пришло {income}, ушло {spent}",
-      "income_note": "В среднем за месяц {amount}. Всё в {currency} — валюте дохода",
       "income_only": "Всё в {currency} — валюте дохода",
       "currency_in": {
         "AMD": "драмах",
@@ -528,17 +526,8 @@
       "income_uncounted": "Пришло, не посчитано: {amounts}",
       "spent_uncounted": "Ушло, не посчитано: {amounts}",
       "uncounted": "не посчитано: {amounts}",
-      "category_title": "Категория во времени",
       "category_average": "в среднем {amount}",
-      "category_no_previous": "нет трат месяцем раньше",
       "category_missing": "Этой категории на графиках нет — показаны «{name}»",
-      "category_hint": "Пунктир — в среднем за период",
-      "rate_title": "Курс {one} и {other}",
-      "rate_week": "Неделя по {day}",
-      "rate_none": "ЦБ РА курса не публиковал",
-      "rate_mine": "Мой обмен {day}: {rate}",
-      "rate_spoken": "Неделя по {day}: {rate}",
-      "rate_hint": "Линия — курс ЦБ РА в конце недели, точки — ваши обмены",
       "empty": {
         "title": "Графики появятся с первыми тратами",
         "body": "Нужен хотя бы один месяц трат или доходов. Покупки из магазина попадут сюда сами"
