@@ -161,11 +161,11 @@ describe('«Напоминать об оценке в Telegram» в настро
 
   it('выключается и включается, повтор — тот же ответ', async () => {
     const anna = await person()
-    for (const _ of [1, 2]) {
+    for (const attempt of ['first', 'repeat']) {
       const response = await choose(anna, { on: false })
-      expect(response.statusCode).toBe(200)
-      expect(response.headers['cache-control']).toBe('no-store')
-      expect(response.json()).toEqual({ off: 'chosen' })
+      expect(response.statusCode, attempt).toBe(200)
+      expect(response.headers['cache-control'], attempt).toBe('no-store')
+      expect(response.json(), attempt).toEqual({ off: 'chosen' })
     }
     expect((await read(anna)).json()).toEqual({ off: 'chosen' })
     expect((await choose(anna, { on: true })).json()).toEqual({ off: null })
