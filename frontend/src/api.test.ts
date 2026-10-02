@@ -94,3 +94,34 @@ describe('чего шов не принимает за конец сессии',
     expect(told).not.toHaveBeenCalled()
   })
 })
+
+describe('последний отказ — код экрана ошибки в сообщении разработчику (MOL-147, В-1)', () => {
+  it('помнит код последнего отказа любого вызова, свежий — минуту', async () => {
+    const { api, lastRefusal, REFUSAL_FRESH_MS } = await freshApi()
+    expect(lastRefusal()).toBeNull()
+    advice.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'timeout', false))
+
+    await api.advice().catch(() => undefined)
+    await api.me().catch(() => undefined)
+    const at = Date.now()
+
+    expect(lastRefusal(at)).toBe(ERROR.INTERNAL)
+    expect(lastRefusal(at + REFUSAL_FRESH_MS - 1_000)).toBe(ERROR.INTERNAL)
+    expect(lastRefusal(at + REFUSAL_FRESH_MS + 1_000)).toBeNull()
+  })
+
+  it('не берёт за отказ то, что не ответ API, и успех кода не стирает', async () => {
+    const { api, lastRefusal } = await freshApi()
+    me.mockRejectedValue(new TypeError('Failed to fetch'))
+    await api.me().catch(() => undefined)
+    expect(lastRefusal()).toBeNull()
+
+    advice.mockRejectedValueOnce(new ApiError(ISSUE.BODY_INVALID))
+    await api.advice().catch(() => undefined)
+    me.mockResolvedValue({ id: 'кто-то' })
+    await api.me()
+
+    expect(lastRefusal()).toBe(ISSUE.BODY_INVALID)
+  })
+})

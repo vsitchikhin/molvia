@@ -35,6 +35,12 @@ export interface PwaUpdate {
   apply(): void
   /** The build an answer of the API named (`VERSION_HEADER`). */
   serverVersion(version: string): void
+  /**
+   * The build this page runs as: the first the API named to it — the page has no version of its
+   * own. Null before the first answer, and on a copy that was not built by the release. What a
+   * message to the developer says the page was (MOL-147).
+   */
+  build(): string | null
 }
 
 /** How often a page on the screen looks for a new version by itself (Р-1). */
@@ -65,6 +71,7 @@ export const NO_UPDATE: PwaUpdate = {
   phase: readonly(shallowRef<UpdatePhase>('none')),
   apply: () => undefined,
   serverVersion: () => undefined,
+  build: () => null,
 }
 
 export function usePwaUpdate(): PwaUpdate {
@@ -309,5 +316,5 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
   window.addEventListener('online', check)
   watch()
 
-  return { phase: readonly(phase), apply, serverVersion }
+  return { phase: readonly(phase), apply, serverVersion, build: () => build ?? null }
 }

@@ -1,6 +1,7 @@
 import { ApiError, createClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { MolviaClient } from '@molvia/client'
+import type { WireCode } from '@molvia/model'
 import { localDay } from '@/days'
 
 // Nothing about identity is passed in, and that is the change MOL-53 made: what proves a
@@ -36,6 +37,23 @@ export function onMissingActor(told: () => void): void {
   missing = told
 }
 
+/** The last refusal any call met, and when (MOL-147, В-1). */
+let refused: { readonly code: WireCode; readonly at: number } | undefined
+
+/** How long a refusal stays the reason of an error screen shown after it. */
+export const REFUSAL_FRESH_MS = 60_000
+
+/**
+ * The code of the last refusal, if it came within `REFUSAL_FRESH_MS` before `now` — what an error
+ * screen says it failed with in a message to the developer (MOL-147, В-1). No screen keeps the code
+ * itself: every loader turns a failure into «offline» or «error» before the screen sees it, so the
+ * one seam every call passes through keeps it instead. Another call failing in the same minute
+ * lends its code — the sheet shows it before anything is sent.
+ */
+export function lastRefusal(now: number = Date.now()): WireCode | null {
+  return refused !== undefined && now - refused.at <= REFUSAL_FRESH_MS ? refused.code : null
+}
+
 type Call = (...args: never[]) => Promise<unknown>
 
 /**
@@ -60,7 +78,10 @@ function watching<T extends Call>(call: T): T {
     try {
       return await call(...args)
     } catch (error) {
-      if (error instanceof ApiError && error.code === ERROR.NO_ACTOR) missing?.()
+      if (error instanceof ApiError) {
+        refused = { code: error.code, at: Date.now() }
+        if (error.code === ERROR.NO_ACTOR) missing?.()
+      }
       throw error
     }
   }) as T
