@@ -403,10 +403,12 @@ rate exactly as before.
   stand a pixel past the edge (round 2, Б′). **Of two names that would run into each other, one
   gives way**, measured as well, with `LABEL_SPACE_PX` between them (review 1, 2, adversarial А, Б,
   round 3 Н): the one laid from an end — a month the window holds the tail of, or today's — unless
-  it alone names its month, else the later; it keeps its width, unseen. Half a year begun on the
-  26th of April put «апр» and «май» 10 px apart; on a 320 px phone «28 сент.» laid from the edge lay
-  over «5 окт.», which a threshold in thousandths, `LABEL_GAP`, knew nothing of. With no chart in a
-  period the note under it goes too: it speaks of a tap.
+  it alone names its month, or days of its month follow it — of two names the earlier then gives
+  way, having none to leave under the month before (round 5, Т: «29 марта · 12 · 19» in WebKit at
+  320 px) — else the later; it keeps its width, unseen. Half a year begun on the 26th of April put
+  «апр» and «май» 10 px apart; on a 320 px phone «28 сент.» laid from the edge lay over «5 окт.»,
+  which a threshold in thousandths, `LABEL_GAP`, knew nothing of. With no chart in a period the note
+  under it goes too: it speaks of a tap.
 
 ## Incomes
 

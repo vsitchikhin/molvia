@@ -562,8 +562,9 @@ export default defineComponent({
      * run into each other, one gives way** — measured too, so on a 320 px phone «28 сент.» laid from
      * the edge no longer lies over «5 окт.» (round 3, Н): the one laid from an end — a month the
      * window holds the tail of, or today's — unless it alone names its month, which the other then
-     * does not; else the later. A name given way keeps its width (`visibility`), so measuring again
-     * finds the same.
+     * does not, or days of its month follow it, which would then stand under the month before
+     * («29 марта · 12 · 19» in WebKit, round 5, Т); else the later. A name given way keeps its width
+     * (`visibility`), so measuring again finds the same.
      */
     function placeLabels(): void {
       const box = monthsBox.value
@@ -591,7 +592,13 @@ export default defineComponent({
           }
           let yields = before.edge ? before : label
           const other = yields === before ? label : before
-          if (yields.names && !other.names) yields = other
+          // A name days of its own month follow keeps its place: given way, they would stand under
+          // the month before (round 5, Т). Of two names the earlier has none to leave behind.
+          const leaves = placed.some(
+            (one) =>
+              !one.names && one.key > yields.key && one.key.startsWith(yields.key.slice(0, 7)),
+          )
+          if (yields.names && (!other.names || leaves)) yields = other
           gone[yields.key] = true
           if (yields === label) break
           kept.pop()

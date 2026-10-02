@@ -801,6 +801,22 @@ describe('ExchangeRateChart by period (MOL-168)', () => {
     expect(seen(view)).toEqual(['7 сент.', '21'])
   })
 
+  it('gives way the earlier of two names when days of the later follow it (round 5, Т)', async () => {
+    measured(206)
+    // WebKit, 320 px: «29 марта» and «5 апр.» run into each other, both centred; the 12th and the
+    // 19th of April after them must not stand under March.
+    const days = ['2027-03-29', '2027-04-05', '2027-04-12', '2027-04-19']
+    const steps = days.map((day, index) => ({
+      day,
+      rate: rate('4.50', day),
+      x: [300, 520, 760, 950][index] ?? 0,
+      level: 500,
+    }))
+    const { view } = chart([rouble({}, { 1: month({ steps, exchanges: [] }) })], 1)
+    await view.vm.$nextTick()
+    expect(seen(view)).toEqual(['5 апр.', '12', '19'])
+  })
+
   it("gives way today's month laid from the end of half a year to the one before (round 3, Н2)", async () => {
     measured(206)
     const days = ['2026-09-06', '2026-12-06', '2027-02-07', '2027-03-01']
