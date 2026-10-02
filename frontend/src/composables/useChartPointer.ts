@@ -4,12 +4,11 @@ import type { Ref } from 'vue'
 const INTENT_PX = 8
 
 /**
- * Where on the area the pointer is, in pixels from its top left corner: a chart whose marks differ
+ * How high on the area the pointer is, in pixels from its top, and the area's size: a chart whose marks differ
  * by height too — two exchanges of one day on the line of the rate (MOL-161, adversarial Б) — tells
  * them apart by it. `y` is null where the area has no height to measure by.
  */
 export interface ChartPoint {
-  readonly x: number
   readonly y: number | null
   readonly width: number
   readonly height: number
@@ -47,7 +46,6 @@ export function useChartPointer(
     const x = event.clientX - box.left
     const height = box.height > 0 ? box.height : 0
     pick(Math.min(1, Math.max(0, x / box.width)), {
-      x,
       y: height > 0 ? event.clientY - box.top : null,
       width: box.width,
       height,

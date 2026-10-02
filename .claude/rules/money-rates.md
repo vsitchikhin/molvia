@@ -338,20 +338,21 @@ rate exactly as before.
   whole height of the card; a year of the market spans ten percent and more and is drawn as it is.
   **A week with a figure between two gaps is a dot of the line** (adversarial Д), never left out. It
   comes with `GET /exchanges` and every write's answer, as `losses` does, and is defaulted for a
-  server before it. The finger chooses as on every chart of the section (`useChartPointer`), **the
-  nearest of what can be chosen, each by its own place**: an exchange by its day, a week with none by
-  its end (review 1) — found through the week first, a tap right on an exchange of a Monday chose the
-  week ending the day before. **Only between exchanges does the height decide** (`ChartPoint`,
-  `FINGER_PX`; adversarial Б, review 4): two exchanges of one day stand at one x, and by x alone the
-  finger reached one of them; a week is chosen by its x alone — let into the height, a finger above
-  the line chose a week two ahead (a week is some 6 px on a phone), and a gap, with no height, could
-  not be chosen at all (adversarial Ж). **A second tap on exchanges drawn one over another — one day,
-  one rate — chooses the next of them** (adversarial И); a slide keeps the one chosen (`tap`). The
-  latest exchange by default, two of one day in the order they were made, never by their ids
-  (review 2). **A hidden radio for each week with no exchange and for each exchange** (Р-6): one per
-  week left the second exchange of a week out of reach of the keys. The scale is never stretched to a
-  tick (review 3): stretched to a tick rounded off a flat line, the line was pressed to the top. A
-  market that would have given nothing has no mark.
+  server before it. The finger chooses as on every chart of the section (`useChartPointer`), **by
+  what is drawn, in pixels** (adversarial Л, М, review 6): **a dot within a finger of the touch
+  (`FINGER_PX`) is chosen**, the nearest — measured in thousandths, the left half of a Monday's dot
+  lay nearer the end of the week before, which was chosen with the dot under the finger. **Dots
+  drawn one over another** — centres closer than a dot is wide (`DOT_PX`): one day and one rate, or
+  two days and nearly one — **are turned over by a second tap** (adversarial И), and a slide keeps the
+  one chosen (`tap`); a tap on the dot already chosen, alone, keeps it. **With no dot under the
+  finger, the nearest by x alone** — a week with no exchange by its end, an exchange by its day
+  (review 1), never by height: let into the height, a week was chosen two ahead on a line of 6 px
+  weeks, and a gap could not be chosen at all (review 4, adversarial Ж). The latest exchange by
+  default, two of one day in the order they were made, never by their ids (review 2). **A hidden
+  radio for each week with no exchange and for each exchange** (Р-6): one per week left the second
+  exchange of a week out of reach of the keys. The scale is never stretched to a tick (review 3):
+  stretched to a tick rounded off a flat line, the line was pressed to the top. A market that would
+  have given nothing has no mark.
 
 ## Incomes
 

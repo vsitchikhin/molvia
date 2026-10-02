@@ -210,8 +210,10 @@ interface Item {
 
 /** The line keeps a twentieth of the plot clear above and below, so no dot is cut. */
 const MARGIN = 50
-/** How far across two exchanges may lie and still be one finger's choice, decided by height. */
+/** How far from the touch a dot is still under the finger — its own radius and some. */
 const FINGER_PX = 12
+/** How wide a dot is drawn (`.point`): centres closer than this are drawn one over another. */
+const DOT_PX = 10
 /** Half the end of the mark, in thousandths of the plot's width. */
 const TICK = 14
 
@@ -334,50 +336,52 @@ export default defineComponent({
     }
 
     /**
-     * The nearest of what can be chosen, each by its own place on the line: an exchange by its day,
-     * a week with none by its end (review 1) — found through the week first, a tap right on an
-     * exchange of a Monday chose the week before. **Only between exchanges does the height decide**
-     * (adversarial Б, review 4): two of one day stand at one x, and by x alone the finger reached one
-     * of them; let a week in too and a finger above the line chose a week two ahead — a week is
-     * some 6 px — and a gap with no height could never be chosen (adversarial Ж). **A second tap on
-     * marks drawn one over another chooses the next of them** (adversarial И): one day, one rate.
+     * A tap is read by what is drawn, in pixels (adversarial Л, М, review 6). **A dot within a finger
+     * of the touch is chosen** — the nearest; measured in thousandths, the left half of a Monday's
+     * dot lay nearer the end of the week before, and the dot drawn over the finger chose a week with
+     * no exchange. **Dots drawn one over another** — centres closer than a dot is wide, one day and
+     * one rate or two days and nearly one — **are turned over by a second tap**, and a slide keeps the
+     * one chosen (adversarial И, `tap`). **With no dot under the finger, the nearest by x alone**: a
+     * week with no exchange by its end, an exchange by its day (review 1) — never by height, which
+     * chose a week two ahead over a line of 6 px weeks and left a gap out of reach (review 4, Ж).
      */
     const pointer = useChartPointer(area, (fraction, point) => {
       const shown = pair.value
       if (!shown) return
-      const across = items.value.map((item) => {
-        const x = item.exchange?.x ?? shown.weeks[item.week]?.x ?? 0
-        return (Math.abs(x - fraction * 1000) * point.width) / 1000
+      const xOf = (x: number) => (x * point.width) / 1000
+      const yAt = (level: number) => (yOf(level) * point.height) / 1000
+      // Where the finger is across, held within the area as the fraction is.
+      const fingerX = fraction * point.width
+      const across = items.value.map((item) =>
+        Math.abs(xOf(item.exchange?.x ?? shown.weeks[item.week]?.x ?? 0) - fingerX),
+      )
+      const apart = (one: Point, other: { x: number; y: number }) =>
+        Math.hypot(xOf(one.x) - other.x, point.y === null ? 0 : yAt(one.level) - other.y)
+      const finger = { x: fingerX, y: point.y ?? 0 }
+
+      let hit = -1
+      items.value.forEach((item, index) => {
+        if (!item.exchange || apart(item.exchange, finger) > FINGER_PX) return
+        const best = items.value[hit]?.exchange
+        if (!best || apart(item.exchange, finger) < apart(best, finger)) hit = index
       })
-      let nearest = -1
-      across.forEach((dx, index) => {
-        if (nearest === -1 || dx < (across[nearest] ?? Infinity)) nearest = index
-      })
-      const first = items.value[nearest]
-      if (!first?.exchange) {
+      if (hit === -1) {
+        let nearest = -1
+        across.forEach((dx, index) => {
+          if (nearest === -1 || dx < (across[nearest] ?? Infinity)) nearest = index
+        })
         choose(nearest)
         return
       }
-      const heightOf = (level: number) =>
-        point.y === null ? 0 : Math.abs((yOf(level) * point.height) / 1000 - point.y)
-      let chosenAt = nearest
-      items.value.forEach((item, index) => {
-        const dx = across[index] ?? Infinity
-        const best = items.value[chosenAt]?.exchange
-        if (!item.exchange || !best || dx > (across[nearest] ?? 0) + FINGER_PX) return
-        const dy = heightOf(item.exchange.level)
-        const bestDy = heightOf(best.level)
-        if (dy < bestDy || (dy === bestDy && dx < (across[chosenAt] ?? Infinity))) chosenAt = index
-      })
-      const target = items.value[chosenAt]?.exchange
-      // The marks under the finger drawn as one: the next of them when one of them is chosen.
+
+      const centre = items.value[hit]?.exchange
+      const at = centre && { x: xOf(centre.x), y: point.y === null ? 0 : yAt(centre.level) }
       const stacked = items.value.flatMap((item, index) =>
-        item.exchange?.x === target?.x && item.exchange?.level === target?.level ? [index] : [],
+        item.exchange && at && apart(item.exchange, at) < DOT_PX ? [index] : [],
       )
-      // A slide keeps the one already chosen of them; only a tap turns to the next.
       const held = stacked.indexOf(chosenIndex.value)
-      if (held === -1) choose(chosenAt)
-      else if (point.tap) choose(stacked[(held + 1) % stacked.length] ?? chosenAt)
+      if (held === -1) choose(hit)
+      else if (point.tap) choose(stacked[(held + 1) % stacked.length] ?? hit)
     })
 
     const yOf = (level: number) => 1000 - MARGIN - (level * (1000 - 2 * MARGIN)) / CHART_LEVEL

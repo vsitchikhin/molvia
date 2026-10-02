@@ -292,6 +292,66 @@ describe('ExchangeRateChart (MOL-161)', () => {
     )
   })
 
+  it('a tap anywhere on a dot chooses it, not the week whose end lies nearer (adversarial Л)', async () => {
+    // A phone-sized line: weeks some 6 px apart, an exchange on the Monday after the week to 22 Feb.
+    const weeks = Array.from({ length: 51 }, (_, index) => {
+      const day = new Date(Date.UTC(2025, 9, 12) + index * 7 * 86_400_000)
+        .toISOString()
+        .slice(0, 10)
+      return { day, rate: rate('4.50', day), x: index * 20, level: 500 }
+    })
+    const monday = point('a0000000-0000-4000-8000-000000000010', weeks[20]?.day ?? '', 20, 403, {
+      level: 900,
+    })
+    const { view, area } = chart([rouble({ weeks, exchanges: [monday] })])
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    // The dot's centre: 403 × 0.3 = 120.9 px across, (1000 − 50 − 810) × 0.18 = 25.2 px down.
+    for (const dx of [-4.5, -2, 0, 2, 4.5]) {
+      await at(view, area, 0, 0)
+      expect(view.find('.mine').exists()).toBe(false)
+      await at(view, area, 120.9 + dx, 25.2)
+      expect(view.find('.mine-place').text()).toContain('Ардшинбанк')
+    }
+  })
+
+  it('dots of two days drawn as one are turned over by a second tap too (adversarial М, review 6)', async () => {
+    // A day apart at one rate: some 0,9 px across — one spot on the screen.
+    const first = point('a0000000-0000-4000-8000-000000000011', '2026-02-24', 3, 571, {
+      place: 'Вторник',
+    })
+    const second = point('a0000000-0000-4000-8000-000000000012', '2026-02-25', 3, 574, {
+      place: 'Среда',
+      level: 410,
+    })
+    const { view, area } = chart([rouble({ exchanges: [first, second] })])
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    expect(view.find('.mine-place').text()).toContain('Среда')
+    const seen = new Set<string>()
+    for (let tap = 0; tap < 4; tap += 1) {
+      await at(view, area, 171.6, 106)
+      seen.add(view.find('.mine-place').text().split(' · ')[0] ?? '')
+    }
+    expect([...seen].sort()).toEqual(['Вторник', 'Среда'])
+  })
+
+  it('must not fire: two dots a finger apart but drawn apart are not turned over', async () => {
+    // One day, 4,25 and 4,40: the dots stand some 30 px apart.
+    const low = point('a0000000-0000-4000-8000-000000000013', '2026-02-24', 3, 571, {
+      place: 'Утро',
+      level: 300,
+    })
+    const high = point('a0000000-0000-4000-8000-000000000014', '2026-02-24', 3, 571, {
+      place: 'Вечер',
+      level: 500,
+    })
+    const { view, area } = chart([rouble({ exchanges: [low, high] })])
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    // «Вечер» at (1000 − 50 − 450) × 0.18 = 90 px; tapped on it twice, it stays.
+    await at(view, area, 171.3, 90)
+    await at(view, area, 171.3, 90)
+    expect(view.find('.mine-place').text()).toContain('Вечер')
+  })
+
   it('must not fire: a scroll that started on the chart chooses nothing', async () => {
     const { view, area } = chart()
     area.dispatchEvent(touch('pointerdown', 3, 50))
