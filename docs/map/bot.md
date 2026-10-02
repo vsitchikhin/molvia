@@ -26,6 +26,7 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 
 - `bot/src/answer.ts` — How a button press is answered, for login, erasure and the reminder alike: `settle` writes an outcome, `settleKeeping` writes one and keeps the buttons, `refuse` shows over the message, the spinner, the keyboard.
 - `bot/src/assemble.ts` — Wires the bot: per-chat `sequentialize`, the erase, rate and switch composers before the login's, and the concurrent runner with the updates it handles named, a `getUpdates` retried at a pause growing linearly, its own log off and a failure logged by kind (`telegramFailure`); `introduce` asks `getMe` before it, retried the same way.
+- `bot/src/bundle.test.ts` — Test of the bot as it ships (MOL-142): builds the bundle and checks that a class esbuild renamed keeps its name — node-fetch under grammY takes a signal only from a constructor called `AbortSignal`.
 - `bot/src/env.ts` — The bot's environment: the Telegram token read alone, `BOT_API_SECRET`, the API and app addresses, the pulse URL; a refusal names variables, never values.
 - `bot/src/erase.ts` — `/delete`: one question naming what goes and what stays, «Удалить навсегда» valid for ten minutes, erasing whoever pressed.
 - `bot/src/i18n.ts` — `t()`: a bot message by key in the sender's language through `pickLocale`, with `{name}` substitution.
