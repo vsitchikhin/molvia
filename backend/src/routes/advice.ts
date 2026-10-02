@@ -12,13 +12,19 @@ import type {
   OwnPricesQuery,
   OwnPricesResponse,
 } from '@molvia/model'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { parseQuery } from '@/parse'
 
 export interface AdviceApi {
-  /** The use case, already bound to its repositories by the composition point. */
-  advice(actorId: string): Promise<AdviceResponse>
-  search(actorId: string, query: string): Promise<AdviceSearchResponse>
+  /**
+   * The use case, already bound to its repositories by the composition point. The zone is the
+   * phone's, for the day of a record from an old queue — the one «Тут дешевле» reads (MOL-166).
+   */
+  advice(owner: { readonly actorId: string; readonly zone?: string }): Promise<AdviceResponse>
+  search(
+    owner: { readonly actorId: string; readonly zone?: string },
+    query: string,
+  ): Promise<AdviceSearchResponse>
   /** «Тут дешевле» (MOL-92); the zone is the phone's, for the day of a record from an old queue. */
   prices(
     owner: { readonly actorId: string; readonly zone?: string },
@@ -31,8 +37,13 @@ export interface AdviceApi {
  * the answer carries follows from the person's access and never from the request.
  */
 export function adviceRoutes(app: FastifyInstance, api: AdviceApi): void {
+  const ownerOf = (request: FastifyRequest) => ({
+    actorId: request.actorId,
+    ...(request.zone ? { zone: request.zone } : {}),
+  })
+
   app.get('/advice', { exposeHeadRoute: false }, async (request, reply) => {
-    const answer = await api.advice(request.actorId)
+    const answer = await api.advice(ownerOf(request))
 
     // Personal, and the owner travels in a header: nothing about this answer is cacheable.
     return reply.header('cache-control', 'no-store').send(z.encode(adviceResponseSchema, answer))
@@ -44,7 +55,7 @@ export function adviceRoutes(app: FastifyInstance, api: AdviceApi): void {
    */
   app.get('/advice/search', { exposeHeadRoute: false }, async (request, reply) => {
     const { q } = parseQuery(catalogueSearchQuerySchema, request.query)
-    const answer = await api.search(request.actorId, q)
+    const answer = await api.search(ownerOf(request), q)
 
     return reply
       .header('cache-control', 'no-store')
@@ -58,8 +69,7 @@ export function adviceRoutes(app: FastifyInstance, api: AdviceApi): void {
    */
   app.get('/advice/prices', { exposeHeadRoute: false }, async (request, reply) => {
     const query = parseQuery(ownPricesQuerySchema, request.query)
-    const owner = { actorId: request.actorId, ...(request.zone ? { zone: request.zone } : {}) }
-    const answer = await api.prices(owner, query)
+    const answer = await api.prices(ownerOf(request), query)
 
     return reply.header('cache-control', 'no-store').send(z.encode(ownPricesResponseSchema, answer))
   })

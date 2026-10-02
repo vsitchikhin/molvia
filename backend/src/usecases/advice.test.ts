@@ -3,7 +3,12 @@ import { ERROR, actorSchema, itemSchema, unitPrice } from '@molvia/model'
 import type { Actor, Item, Money, Quantity } from '@molvia/model'
 import type { ActorRepository } from '@/db/actors-repository'
 import type { EventRepository, RecordedEvent } from '@/db/events-repository'
-import type { ExpenseRepository, PlacePrice, PriceMedian } from '@/db/expenses-repository'
+import type {
+  ExpenseRepository,
+  PlacePrice,
+  PriceMedian,
+  PriceQuery,
+} from '@/db/expenses-repository'
 import type { ItemRepository } from '@/db/items-repository'
 import type { AdviceQuery, AdviceVerdictRow, VerdictRepository } from '@/db/verdicts-repository'
 import { ADVICE_SEARCH_CANDIDATES, advice, adviceSearch } from './advice'
@@ -482,5 +487,37 @@ describe('поиск «Что брать» (MOL-128)', () => {
     await expect(adviceSearch(world.deps, ACTOR, 'сыр')).rejects.toThrow(
       expect.objectContaining({ code: ERROR.NO_ACTOR }),
     )
+  })
+})
+
+describe('зона телефона (MOL-166)', () => {
+  function asking(rows: AdviceVerdictRow[]) {
+    const all = deps({ rows })
+    const queries: PriceQuery[] = []
+    const expenses: ExpenseRepository = {
+      ...all.expenses,
+      placePricesFor: (query) => {
+        queries.push(query)
+        return Promise.resolve([])
+      },
+    }
+    return { deps: { ...all, expenses }, queries }
+  }
+
+  it('доходит до цен мест: «последняя» читается в той же зоне, что на листе', async () => {
+    const { deps: withZone, queries } = asking([rated({ itemId: BEEF, sum: 5 })])
+
+    await advice(withZone, ACTOR, 'Asia/Tokyo')
+
+    expect(queries.map((query) => query.zone)).toEqual(['Asia/Tokyo'])
+  })
+
+  it('без зоны поля нет вовсе — репозиторий берёт Ереван', async () => {
+    const { deps: withoutZone, queries } = asking([rated({ itemId: BEEF, sum: 5 })])
+
+    await advice(withoutZone, ACTOR)
+
+    expect(queries).toHaveLength(1)
+    expect(queries[0]).not.toHaveProperty('zone')
   })
 })

@@ -8,6 +8,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import {
   ZONE_HEADER,
+  adviceResponseSchema,
+  adviceSearchResponseSchema,
   ownNeverResponseSchema,
   ownPricesResponseSchema,
   toSearchKey,
@@ -310,6 +312,66 @@ describe('GET /advice/prices — a zone Postgres does not know (adversarial Ж)'
     expect(reply.status).toBe(200)
     const answer = ownPricesResponseSchema.parse(JSON.parse(reply.body))
     expect(placesOf(answer.prices)).toHaveLength(1)
+  })
+})
+
+describe('«Что брать» and the sheet name one price for one place (MOL-166)', () => {
+  /** What the home says of an item, read through the contract the client parses. */
+  async function home(actor: string, zone?: string, q?: string) {
+    const headers: Record<string, string> = { cookie: await signIn(db, actor) }
+    if (zone) headers[ZONE_HEADER] = zone
+    const url = q === undefined ? '/advice' : `/advice/search?q=${encodeURIComponent(q)}`
+    const response = await app.inject({ method: 'GET', url, headers })
+    expect(response.statusCode).toBe(200)
+    const rows =
+      q === undefined
+        ? adviceResponseSchema.parse(JSON.parse(response.body)).rows
+        : adviceSearchResponseSchema
+            .parse(JSON.parse(response.body))
+            .items.flatMap((found) => (found.advice ? [found.advice] : []))
+    const [row] = rows
+    if (row?.level !== 'take') throw new Error('expected one row in «Брать»')
+    return row.places.map((place) => ({ name: place.name, price: place.unitPrice.scaledMinor }))
+  }
+
+  const sheet = async (actor: string, milk: string, zone?: string) =>
+    placesOf(await prices(actor, { item: milk, ...(zone ? { zone } : {}) })).map(
+      ({ name, price }) => ({ name, price }),
+    )
+
+  it('names the last price of each place, as the sheet does — not the lowest ever', async () => {
+    const me = await insertActor(db)
+    const milk = await item('Молоко Ашхар 1 л')
+    await rate(me, milk, 5)
+    const zovuni = await erevan('Зовуни')
+    await bought(me, milk, zovuni, 540, { on: '2026-08-12' })
+    await bought(me, milk, zovuni, 600, { on: '2026-09-20' })
+    await bought(me, milk, await erevan('SAS'), 580, { on: '2026-09-15' })
+
+    const named = [
+      { name: 'SAS', price: perLitre(580) },
+      { name: 'Зовуни', price: perLitre(600) },
+    ]
+    expect(await home(me)).toEqual(named)
+    expect(await sheet(me, milk)).toEqual(named)
+  })
+
+  it('reads a record from an old queue in the zone the request names, on the list and in its search', async () => {
+    // No day of its own: 01:30 of the 13th in Yerevan, 14:30 of the 12th in Los Angeles.
+    const me = await insertActor(db)
+    const milk = await item('Молоко Ашхар 1 л')
+    await rate(me, milk, 5)
+    const zovuni = await erevan('Зовуни')
+    await bought(me, milk, zovuni, 540, { on: null, at: new Date('2026-09-12T21:30:00Z') })
+    await bought(me, milk, zovuni, 600, { on: '2026-09-12', at: new Date('2026-09-12T23:00:00Z') })
+
+    const yerevan = [{ name: 'Зовуни', price: perLitre(540) }]
+    const losAngeles = [{ name: 'Зовуни', price: perLitre(600) }]
+    expect(await home(me)).toEqual(yerevan)
+    expect(await sheet(me, milk)).toEqual(yerevan)
+    expect(await home(me, 'America/Los_Angeles')).toEqual(losAngeles)
+    expect(await home(me, 'America/Los_Angeles', 'молоко')).toEqual(losAngeles)
+    expect(await sheet(me, milk, 'America/Los_Angeles')).toEqual(losAngeles)
   })
 })
 

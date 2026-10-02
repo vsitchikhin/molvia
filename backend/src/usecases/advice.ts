@@ -61,6 +61,8 @@ const groupKeyOf = (price: { currency: string; unit: string }): GroupKey =>
 export async function advice(
   { actors, verdicts, expenses, events }: AdviceDeps,
   actorId: string,
+  /** The phone's (MOL-121): which purchase of a place is its last, as «Тут дешевле» reads it. */
+  zone?: string,
 ): Promise<AdviceResponse> {
   const actor = await actors.byId(actorId)
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
@@ -78,7 +80,7 @@ export async function advice(
     limit: ADVICE_LIMIT,
   })
 
-  const rows = await describe(expenses, actor, scope, rated.rows)
+  const rows = await describe(expenses, actor, scope, rated.rows, zone)
 
   // Encoded here rather than only in the route, the way `tripViewFor` is: an answer the wire
   // cannot carry has to fail where it was built, beside the data that made it.
@@ -145,6 +147,7 @@ export async function adviceSearch(
   { actors, verdicts, expenses, items }: AdviceSearchDeps,
   actorId: string,
   query: string,
+  zone?: string,
 ): Promise<AdviceSearchResponse> {
   const actor = await actors.byId(actorId)
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
@@ -169,7 +172,7 @@ export async function adviceSearch(
             itemIds,
           })
         ).rows
-  const rows = await describe(expenses, actor, scope, rated)
+  const rows = await describe(expenses, actor, scope, rated, zone)
   const byItem = new Map(rows.map((row) => [row.itemId, row]))
   const answered = [...first, ...past.filter((item) => byItem.has(item.id))]
 
@@ -200,6 +203,7 @@ async function describe(
   actor: { readonly id: string; readonly country: string; readonly city: string },
   scope: AdviceScope,
   rated: readonly AdviceVerdictRow[],
+  zone: string | undefined,
 ): Promise<AdviceRow[]> {
   const levelled = rated.map((row) => ({ row, level: verdictLevel(row.sum, row.count) }))
   const asked = (...levels: readonly VerdictLevel[]) =>
@@ -217,7 +221,11 @@ async function describe(
   // «только если дёшево», so asking for the medians of everything else was half the work of
   // every screen spent on a number nobody would read.
   const [places, medians] = await Promise.all([
-    expenses.placePricesFor({ ...query, itemIds: asked('take', 'if_cheap') }),
+    expenses.placePricesFor({
+      ...query,
+      itemIds: asked('take', 'if_cheap'),
+      ...(zone === undefined ? {} : { zone }),
+    }),
     expenses.medianPriceFor({ ...query, itemIds: asked('if_cheap') }),
   ])
 
