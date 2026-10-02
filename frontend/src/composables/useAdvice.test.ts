@@ -12,7 +12,10 @@ import { recallOwnPrices, rememberOwnPrices } from '@/stores/ownPrices'
 
 const advice = vi.fn<() => Promise<AdviceResponse>>()
 const me = vi.fn<() => Promise<ActorView>>()
-vi.mock('@/api', () => ({ api: { advice: () => advice(), me: () => me() } }))
+const ownNever = vi.fn<() => Promise<{ itemIds: string[] }>>()
+vi.mock('@/api', () => ({
+  api: { advice: () => advice(), me: () => me(), ownNever: () => ownNever() },
+}))
 
 const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const OTHER = '1a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d'
@@ -205,6 +208,7 @@ describe('useAdvice', () => {
       placeId: 'aaaaaaaa-0000-4000-8000-000000000001',
       name: 'Зовуни',
       unitPrice: { scaledMinor: 54_000_000_000n, currency: 'AMD' as const, unit: 'l' as const },
+      quantity: { milli: 1000n, unit: 'l' as const },
       day: '2026-09-12',
       observations: 1,
     }
@@ -234,6 +238,39 @@ describe('useAdvice', () => {
 
     expect(recallOwnPrices(ME, milk, where)).toBeNull()
     expect(recallOwnPrices(ME, bread, where)).not.toBeNull()
+  })
+
+  it('with access lets go of one’s own «не брать нигде», never of the list’s average (Б′, review №6)', async () => {
+    freshPinia()
+    const where = { country: 'AM', city: 'Ереван' }
+    const zovuni = {
+      placeId: 'aaaaaaaa-0000-4000-8000-000000000001',
+      name: 'Зовуни',
+      unitPrice: { scaledMinor: 54_000_000_000n, currency: 'AMD' as const, unit: 'l' as const },
+      quantity: { milli: 1000n, unit: 'l' as const },
+      day: '2026-09-12',
+      observations: 1,
+    }
+    const prices = (itemId: string) => ({
+      itemId,
+      level: 'unrated' as const,
+      places: [zovuni],
+      alternatives: [],
+    })
+    // The town says «не брать нигде» of 4 over the person’s own «5»; the person said «1» of 1, which
+    // the town's average puts in «Брать».
+    const mine = row(1, 'take').itemId
+    const town = row(4, 'never').itemId
+    rememberOwnPrices(ME, mine, where, prices(mine), Date.now())
+    rememberOwnPrices(ME, town, where, prices(town), Date.now())
+    ownNever.mockResolvedValue({ itemIds: [mine] })
+    advice.mockResolvedValue(answer([row(1, 'take'), row(4, 'never')], 2, 'shared'))
+
+    await mounted()
+
+    expect(ownNever).toHaveBeenCalled()
+    expect(recallOwnPrices(ME, mine, where)).toBeNull()
+    expect(recallOwnPrices(ME, town, where)).not.toBeNull()
   })
 
   it('an answer with no rows is empty, not a failure', async () => {

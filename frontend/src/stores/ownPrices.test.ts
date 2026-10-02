@@ -22,6 +22,7 @@ const place = {
   placeId: ZOVUNI,
   name: 'Зовуни',
   unitPrice: { scaledMinor: 54_000_000_000n, currency: 'AMD' as const, unit: 'l' as const },
+  quantity: { milli: 1000n, unit: 'l' as const },
   day: '2026-09-12',
   observations: 2,
 }
@@ -109,6 +110,12 @@ describe('the memory of «Тут дешевле» (MOL-92, В-5)', () => {
 
     rememberOwnPrices(ME, OTHER, erevan, answer(OTHER), askedAt)
     expect(recallOwnPrices(ME, OTHER, erevan)).not.toBeNull()
+  })
+
+  it('finds an answer whatever the spelling of the city — the place’s or the settings’ (review №7)', () => {
+    rememberOwnPrices(ME, MILK, { country: 'AM', city: 'ереван' }, answer(MILK), Date.now())
+
+    expect(recallOwnPrices(ME, MILK, { country: 'AM', city: 'Ереван ' })).toEqual(answer(MILK))
   })
 
   it('reads past an entry or a record an older build wrote differently', () => {

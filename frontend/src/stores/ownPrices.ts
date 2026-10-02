@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { ownPricesSchema, settingsGeographySchema } from '@molvia/model'
+import { ownPricesSchema, placeNameIdentity, settingsGeographySchema } from '@molvia/model'
 import type { OwnPrices, SettingsGeography } from '@molvia/model'
 import { read, write } from '@/stores/storage'
 
@@ -14,9 +14,13 @@ function keyOf(owner: string): string {
   return `molvia.own-prices.${owner}`
 }
 
-/** One answer per item and city: the same milk is another history in another city (В-4). */
+/**
+ * One answer per item and city: the same milk is another history in another city (В-4). The city
+ * by the fold places are stored under (review №7): an answer is kept under the spelling of the
+ * record's place, and a record still queued is looked up by the spelling of its settings.
+ */
 function slotOf(itemId: string, where: SettingsGeography): string {
-  return `${itemId.toLowerCase()}|${where.country}|${where.city}`
+  return `${itemId.toLowerCase()}|${where.country}|${placeNameIdentity(where.city)}`
 }
 
 interface Entry {

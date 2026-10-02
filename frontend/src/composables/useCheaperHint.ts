@@ -8,6 +8,7 @@ import type {
   Currency,
   OwnPrices,
   OwnPricesQuery,
+  Quantity,
   SettingsGeography,
   UnitPrice,
 } from '@molvia/model'
@@ -40,6 +41,8 @@ export interface CheaperHintInput {
   /** The record's place, when the server has named it (Р-3). */
   readonly here: MaybeRefOrGetter<string | null>
   readonly typed: MaybeRefOrGetter<UnitPrice | null>
+  /** How much is typed: a small purchase's price wobbles most by the till's rounding (Г′). */
+  readonly typedQuantity: MaybeRefOrGetter<Quantity | null>
   readonly currency: MaybeRefOrGetter<Currency>
   readonly unit: MaybeRefOrGetter<BaseUnit>
 }
@@ -125,18 +128,16 @@ export function useCheaperHint(input: CheaperHintInput): { hint: ComputedRef<Che
     )
   })
 
-  // The typed price the hint follows, once typing pauses.
-  const settled = ref<UnitPrice | null>(toValue(input.typed))
+  // The typed price the hint follows, once typing pauses — with the quantity it was typed for.
+  const now = () => ({ price: toValue(input.typed), quantity: toValue(input.typedQuantity) })
+  const settled = ref(now())
   let pause: ReturnType<typeof setTimeout> | undefined
-  watch(
-    () => toValue(input.typed),
-    (typed) => {
-      clearTimeout(pause)
-      pause = setTimeout(() => {
-        settled.value = typed
-      }, HINT_SETTLE_MS)
-    },
-  )
+  watch(now, (typed) => {
+    clearTimeout(pause)
+    pause = setTimeout(() => {
+      settled.value = typed
+    }, HINT_SETTLE_MS)
+  })
   onUnmounted(() => {
     clearTimeout(pause)
   })
@@ -148,7 +149,8 @@ export function useCheaperHint(input: CheaperHintInput): { hint: ComputedRef<Che
       answer: known,
       currency: toValue(input.currency),
       unit: toValue(input.unit),
-      typed: settled.value,
+      typed: settled.value.price,
+      typedQuantity: settled.value.quantity,
       here: toValue(input.here),
     })
   })

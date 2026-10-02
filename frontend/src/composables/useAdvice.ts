@@ -102,6 +102,27 @@ function split(rows: readonly AdviceRow[]): AdviceGroups {
  * A remembered list outranks a failure: while there is something to show, offline is a strip
  * above the rows, not a screen of its own (Р-5).
  */
+/**
+ * «Тут дешевле» remembered for no signal must not outlive a «не брать нигде» given anywhere — in the
+ * bot's reminder too, which never speaks to the phone (MOL-92, adversarial Б). The hint reads one's
+ * own verdicts (adversarial Д): in the own mode the list's levels are those, and with access they are
+ * an average of three — so the person's own are asked for (Б′), and a town's «1» over one's own «5»
+ * lets nothing go (review №6). A failure costs only the memory's freshness.
+ */
+function forgetOwnNever(owner: string, fresh: AdviceResponse): void {
+  if (fresh.scope === 'own') {
+    const never = fresh.rows.filter((row) => row.level === 'never').map((row) => row.itemId)
+    forgetOwnPrices(owner, never, { rated: false })
+    return
+  }
+  api
+    .ownNever()
+    .then(({ itemIds }) => {
+      forgetOwnPrices(owner, itemIds, { rated: false })
+    })
+    .catch(() => undefined)
+}
+
 export function useAdvice(): Advice {
   const actor = useActorStore()
 
@@ -189,13 +210,7 @@ export function useAdvice(): Advice {
       failure.value = null
       confirmed.value = true
       remember()
-      // «Тут дешевле» remembered for no signal must not outlive a «не брать нигде» given anywhere —
-      // in the bot's reminder too, which never speaks to the phone (MOL-92, adversarial Б).
-      forgetOwnPrices(
-        id,
-        fresh.rows.filter((row) => row.level === 'never').map((row) => row.itemId),
-        { rated: false },
-      )
+      forgetOwnNever(id, fresh)
     } catch {
       if (owner.value !== id || mine !== latest || location.value !== where) return
       // Decided after the failure, never narrowed from a check before the request: a

@@ -45,6 +45,7 @@ import type { Loose } from '@/stores/queueing'
 import { read, writeEverywhere } from '@/stores/storage'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripStore } from '@/stores/trip'
+import { rememberRecordCity } from '@/stores/ownPrices'
 
 /**
  * One write to a trip, kept until the server has it — starting and finishing it included
@@ -1234,6 +1235,14 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       lastRemoved.value = null
       // The day of the tap, now, by the calendar the phone holds now (adversarial round 4 Ф).
       if (!entry.tapDay) entry = { ...entry, ...dayOfTap(entry.startedAt) }
+      // «Тут дешевле» with no signal needs the record's city once the server holds the record — and
+      // a record started at the door with a signal never had its city answered (MOL-92, А′).
+      if (id && entry.context) {
+        rememberRecordCity(id, entry.tripId, {
+          country: entry.context.country,
+          city: entry.context.city,
+        })
+      }
     }
     if (entry.kind === 'finish') {
       const earlier = kept.find((item) => sameWrite(item.write, entry))?.write

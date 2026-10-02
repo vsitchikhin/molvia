@@ -597,6 +597,7 @@ describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
     placeId,
     name: placeId === ZOVUNI ? 'Зовуни' : 'Ереван Сити',
     unitPrice: litre(amount),
+    quantity: { milli: 1000n, unit: 'l' as const },
     day,
     observations: 1,
   })

@@ -119,6 +119,8 @@ export interface ItemDetails {
   readonly currency: Ref<Currency>
   readonly expenseId: string
   readonly unitPrice: ComputedRef<UnitPrice | null>
+  /** How much is typed, once it parses — what «Тут дешевле» weighs the till's rounding by (MOL-92). */
+  readonly typedQuantity: ComputedRef<Quantity | null>
   readonly converted: ComputedRef<Money | null>
   readonly errors: ComputedRef<Record<DetailsField, ErrorCode | null>>
   leave: (field: DetailsField) => void
@@ -197,6 +199,8 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
   const parsedAmount = computed(() =>
     parsed(amount.value, (text) => parseMoney(text, currency.value)),
   )
+
+  const typedQuantity = computed(() => valueOf(parsedQuantity.value))
 
   const unitPrice = computed<UnitPrice | null>(() => {
     const q = valueOf(parsedQuantity.value)
@@ -315,6 +319,7 @@ export function useItemDetails(input: ItemDetailsInput): ItemDetails {
     currency,
     expenseId,
     unitPrice,
+    typedQuantity,
     converted,
     errors,
     leave,
