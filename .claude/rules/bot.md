@@ -58,9 +58,10 @@ press — the only channel people are given, because there Telegram already says
   within two minutes (`hearTelegram`, a transformer on the bot's own API). The claim alone proved
   the API, not the sign-in: the runner retries a failing `getUpdates` for up to fifteen hours with
   the process alive, and half an hour of Telegram down kept the pulse «alive» over a sign-in that
-  was dead (А1). **The first beat comes five minutes into the process**, never at once: a bot dying
+  was dead (А1). **The first beat comes a minute into the process**, never at once: a bot dying
   on a revoked token or a second poller (`401`, `409`) beat on every restart of its crash loop
-  (А2). A failed ping is tried a claim later; one on its way is not doubled; none waits for an
+  (А2) — such a process does not hear Telegram anyway, and the minute is the margin on top. Five
+  minutes made rollouts a few minutes apart add up into a false alarm (round 2, Г1). A failed ping is tried a claim later; one on its way is not doubled; none waits for an
   evening's messages. Without `BOT_PULSE_URL` — every copy and the end-to-end run — not one request
   leaves; the URL is never logged, and a failure is logged by its kind. It is not in the API's
   `/health`: `deploy.md` says why.
@@ -69,6 +70,10 @@ press — the only channel people are given, because there Telegram already says
   Telegram down the doubled pause had grown to some 27 minutes, and the sign-in stayed dead that
   long after Telegram was back. Now it is seconds — and a stop during an outage waits out at most
   that pause, since no stop cuts it short.
+- **The runner's own log is off** (`silent: true`, round 2 Г2): it printed a failed `getUpdates`
+  whole, and grammY's network error carries the request's address — the bot's token in it — into
+  journald, on every try. `startBot` logs the failure itself, by its kind:
+  `[molvia] telegram getUpdates: <code | network>`.
 - **Updates of different people are handled at once; updates of one person, in order** — and
   both halves are load-bearing (MOL-55, О-4). `bot.start()` handles updates strictly one after
   another, which is grammY's ordering guarantee and was measured costing the next person their

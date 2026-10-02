@@ -285,8 +285,9 @@ the time before an alarm, twenty minutes for the site and fifteen for the bot.
   apart, and three failing is a `/fail` saying what they saw: `health 503`, `pwa 000`. A rollout
   fails one or two.
 - **What the bot's pulse proves**: the bot reached the API, a `getUpdates` of Telegram succeeded in
-  the last two minutes — the sign-in's way in — and the process has lived five minutes, so a crash
-  loop never says «alive». After a rollout the first ping comes five to six minutes in. A failed
+  the last two minutes — the sign-in's way in — and the process has lived a minute, so a crash loop
+  never says «alive». After a rollout the first ping comes one to two minutes in, so rollouts a few
+  minutes apart do not add up into an alarm. A failed
   `getUpdates` is retried at a pause growing by a tenth of a second a try, so after Telegram comes
   back the bot hears it within seconds — the runner's default doubled the pause, and half an hour of
   Telegram down left the sign-in dead for another half hour.
@@ -315,8 +316,8 @@ the time before an alarm, twenty minutes for the site and fifteen for the bot.
 - **The URLs are kept like secrets**: whoever has one can say «alive» for us. They are printed
   nowhere — not in a log, not here.
 - **After setting a check up, see it turn green.** A new check is grey until its first ping and
-  raises nothing while grey: `molvia-up` and `molvia-cert` after the first run, `molvia-bot` five to
-  six minutes after the bot starts.
+  raises nothing while grey: `molvia-up` and `molvia-cert` after the first run, `molvia-bot` one to
+  two minutes after the bot starts.
 
 ### Trying the alarm
 
@@ -345,8 +346,9 @@ ping for a day — the runs could not read the certificate: their warnings say s
 **`molvia-bot`.** `ssh molvia`, then `docker compose -f docker-compose.prod.yml --env-file .env.prod
 ps bot` — is it running, how often did it restart — and `logs --tail 50 bot`:
 
-- `[grammY runner] Error while fetching updates` — the bot does not hear Telegram: the machine's way
-  to `api.telegram.org`, or Telegram itself;
+- `[molvia] telegram getUpdates: <code | network>` — the bot does not hear Telegram: the machine's
+  way to `api.telegram.org`, or Telegram itself. The runner's own log is off: it printed the request
+  whole, the bot's token in it;
 - the container restarting — a revoked token (`401`) or another process on the same token (`409`);
 - `[molvia] remind claim: <code>` — the API refuses the claim;
 - `[molvia] pulse: <kind>` — the ping did not go out: `network`, `timeout` or healthchecks.io's status.
