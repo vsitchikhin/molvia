@@ -345,6 +345,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   sends** (MOL-101) — at most once; 19:00 of the person's day, then 3 and 7 days, then six months
   of silence, and any own verdict starts over; a press is the verdict of `ctx.from.id` and keeps
   the scale.
+- **The reminders' switch is `actors.reminders_off`, and it says why** (MOL-103): `chosen` or
+  `blocked`; a block never overwrites «chosen», an unblock turns on only what blocking turned off,
+  and «on» starts the ladder over. In the app it is its own address, never the settings form.
 - **Telegram updates are never logged whole.**
 
 ### Frontend — `.claude/rules/frontend.md`
