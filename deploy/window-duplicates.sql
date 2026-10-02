@@ -30,7 +30,10 @@ DELETE FROM login_requests
 
 -- Everything else is named, never merged here: a place carries trips and verdicts, and two of one
 -- shop are made one by hand (deploy/README.md, step 6). Every unique index whose key is text or an
--- expression, grouped by its own key as the index defines it.
+-- expression, grouped by its own key as the index defines it — and over the rows it holds unique: a
+-- partial index's own condition, and no key that is null unless the index takes nulls as equal.
+-- Grouped plainly, the own spending categories of one person (`preset` null, outside the partial
+-- index) were «a pair» for good (adversarial round 6, И).
 DO $$
 DECLARE
   target record;
@@ -39,7 +42,13 @@ BEGIN
   FOR target IN
     SELECT i.indexrelid::regclass AS index_name, i.indrelid::regclass AS table_name,
            (SELECT string_agg(pg_get_indexdef(i.indexrelid, k, true), ', ' ORDER BY k)
-              FROM generate_series(1, i.indnkeyatts) AS k) AS key
+              FROM generate_series(1, i.indnkeyatts) AS k) AS key,
+           concat_ws(' AND ',
+             '(' || pg_get_expr(i.indpred, i.indrelid) || ')',
+             CASE WHEN NOT i.indnullsnotdistinct THEN
+               (SELECT string_agg('(' || pg_get_indexdef(i.indexrelid, k, true) || ') IS NOT NULL', ' AND ')
+                  FROM generate_series(1, i.indnkeyatts) AS k)
+             END) AS held
     FROM pg_index i
     JOIN pg_class c ON c.oid = i.indexrelid
     JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -48,8 +57,8 @@ BEGIN
         OR EXISTS (SELECT 1 FROM unnest(i.indcollation::oid[]) AS coll(id) WHERE coll.id <> 0))
   LOOP
     FOR pair IN EXECUTE format(
-      'SELECT row(%s)::text AS key, count(*) AS rows FROM %s GROUP BY %s HAVING count(*) > 1',
-      target.key, target.table_name, target.key)
+      'SELECT row(%s)::text AS key, count(*) AS rows FROM %s WHERE %s GROUP BY %s HAVING count(*) > 1',
+      target.key, target.table_name, coalesce(nullif(target.held, ''), 'true'), target.key)
     LOOP
       RAISE NOTICE 'twice in %: % (% rows)', target.index_name, pair.key, pair.rows;
     END LOOP;
