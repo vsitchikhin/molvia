@@ -35,7 +35,12 @@ function donut(modelValue: string | null = null) {
     ],
   } satisfies MoneyChartMonthView
   const view = mount(DonutChart, {
-    props: { charts, nameOf: (one) => one.name ?? one.preset ?? '', modelValue },
+    props: {
+      charts,
+      label: 'Сентябрь · идёт',
+      nameOf: (one) => one.name ?? one.preset ?? '',
+      modelValue,
+    },
     global: { plugins: [createAppI18n('ru')] },
   })
   const box = view.find('.ring-box').element
@@ -44,7 +49,7 @@ function donut(modelValue: string | null = null) {
 }
 
 describe('DonutChart (MOL-158)', () => {
-  it('says the running month and its total in the centre, with no rate where one currency is all', () => {
+  it('says the words given and the total in the centre, with no rate where one currency is all', () => {
     const view = donut()
     expect(view.find('.center-label').text()).toBe('Сентябрь · идёт')
     expect(view.find('.center-figure').text().replace(/\s/g, ' ')).toBe('400 ֏')

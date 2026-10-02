@@ -249,6 +249,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   second count; its third figure is «Разница», since «Остаток» is the money on the accounts.
   **The usual month is the mean of up to twelve closed months before, from three** (MOL-158): the
   running month against it to the same day, and reading it freezes no month but the one shown.
+  **«Год» is the calendar year, the sum of its months** (MOL-160): its dashed line is that same
+  usual month, ending with the year's last closed one, and a month before the data or to come is a
+  label with no bar.
 
 ### Money: accounts — `.claude/rules/money-accounts.md`
 
@@ -348,6 +351,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   sends** (MOL-101) — at most once; 19:00 of the person's day, then 3 and 7 days, then six months
   of silence, and any own verdict starts over; a press is the verdict of `ctx.from.id` and keeps
   the scale.
+- **The reminders' switch is `actors.reminders_off`, and it says why** (MOL-103): `chosen` or
+  `blocked`; a block never overwrites «chosen», an unblock turns on only what blocking turned off,
+  **the settings never lift a block** (В-5), and «on» starts the ladder over unless it reminded
+  today. Whoever writes to the bot has not blocked it. In the app it is its own address, never the
+  settings form.
 - **Telegram updates are never logged whole.**
 
 ### Frontend — `.claude/rules/frontend.md`

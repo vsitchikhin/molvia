@@ -452,6 +452,8 @@
     "subtitle": "Only you can see this",
     "month_prev": "Previous month",
     "month_next": "Next month",
+    "year_prev": "Previous year",
+    "year_next": "Next year",
     "spent": "Spent",
     "vs_previous": "{percent} vs {month}",
     "month_to": {
@@ -516,7 +518,6 @@
     },
     "charts": {
       "title": "Charts",
-      "range": "{from} — {to}",
       "spent_title": "Spending by month",
       "spent_hint": "Tap a bar or slide a finger along the chart. Each month at that month's rate",
       "bar_label": "{month}, {amount}",
@@ -524,7 +525,6 @@
       "spent_legend": "Out",
       "difference": "Difference · {month}",
       "pair_label": "{month}: in {income}, out {spent}",
-      "income_note": "{amount} a month on average. All in {currency}, the income currency",
       "income_only": "All in {currency}, the income currency",
       "currency_in": {
         "AMD": "drams",
@@ -537,17 +537,8 @@
       "income_uncounted": "In, not counted: {amounts}",
       "spent_uncounted": "Out, not counted: {amounts}",
       "uncounted": "not counted: {amounts}",
-      "category_title": "Category over time",
       "category_average": "{amount} on average",
-      "category_no_previous": "nothing the month before",
       "category_missing": "That category is not on the charts — showing «{name}»",
-      "category_hint": "Dashed line: the average for the period",
-      "rate_title": "{one} and {other} rate",
-      "rate_week": "Week to {day}",
-      "rate_none": "The CBA published no rate",
-      "rate_mine": "My exchange {day}: {rate}",
-      "rate_spoken": "Week to {day}: {rate}",
-      "rate_hint": "The line is the CBA rate at the end of each week, the dots are your exchanges",
       "empty": {
         "title": "Charts appear with your first spending",
         "body": "At least one month of spending or income is needed. Purchases from a shop come here by themselves"
@@ -565,6 +556,23 @@
       "mode_month": "Month",
       "mode_year": "Year",
       "where_title": "Where it went",
+      "where_year_title": "Where it went this year",
+      "year_center": "{year} · {n} month | {year} · {n} months",
+      "year_rate_note": "Each month at that month's rate",
+      "year_no_rate_one": "no rate for {month}",
+      "year_no_rate_many": "no rate for {n} month | no rate for {n} months",
+      "year_change": "{change} against the average",
+      "year_change_running": "{change} against the usual by {day}",
+      "year_avg": "{amount} on average, {from} to {to}",
+      "year_avg_running": "{amount} on average, {from} to {to}, without the running month",
+      "year_avg_few": "The average comes after {month}: three closed months are needed",
+      "year_avg_short": "Too few closed months for an average: {n} of 3",
+      "year_avg_uncounted": "No average: every closed month has spending with no rate",
+      "year_avg_beyond": "No average: the months add up to more than can be counted",
+      "year_flow_note": "Difference for {year} ≈ {amount}. All in {currency}, the income currency",
+      "year_flow_missing": "The difference for {year} can't be counted: not everything converted — {months}. All in {currency}, the income currency",
+      "category_months_title": "Category by month",
+      "category_avg": "Dashed line: the average of closed months",
       "center_running": "{month} · ongoing",
       "center_share": "{share} · ≈ {amount}",
       "rest_names": "Others: {names}",
@@ -1173,19 +1181,27 @@
       "hand_over": "Save or send"
     },
     "group_money": "Money",
+    "group_reminders": "Reminders",
+    "tap": {
+      "offline": "Cannot save without a connection — the switch comes back with it.",
+      "save_failed": "Not saved. Check the connection and try again.",
+      "load_error": "The setting could not be loaded."
+    },
     "salary_shift": {
       "label": "Salary counts in the next month",
       "day": "From which day",
       "day_option": "from day {day}",
-      "hint": "A salary received on this day or later counts in «Came in» of the next month. The day it came in and the account balances stay as they are.",
-      "offline": "Cannot save without a connection — the switch comes back with it.",
-      "save_failed": "Not saved. Check the connection and try again.",
-      "load_error": "The setting could not be loaded."
+      "hint": "A salary received on this day or later counts in «Came in» of the next month. The day it came in and the account balances stay as they are."
+    },
+    "reminders": {
+      "label": "Remind me to rate in Telegram",
+      "hint": "The evening after a purchase the bot asks how it was. Leave it unanswered and it asks less often, then keeps quiet for half a year.",
+      "blocked": "The bot is blocked in Telegram, so the reminders turned off by themselves. Unblock the bot and they come back."
     }
   },
   "privacy": {
     "title": "Data and privacy",
-    "revised": "Revised 1 October 2026",
+    "revised": "Revised 2 October 2026",
     "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
@@ -1227,7 +1243,7 @@
       },
       "reminders": {
         "term": "Rating reminders",
-        "text": "When the bot last reminded you to rate your purchases, and which reminder in a row it was — so that it writes less often if you do not answer. The message itself carries the item and the shop to Telegram: otherwise the question would not say what it is about."
+        "text": "When the bot last reminded you to rate your purchases, and which reminder in a row it was — so that it writes less often if you do not answer. And whether the reminders are off — by you, or because you blocked the bot. The message itself carries the item and the shop to Telegram: otherwise the question would not say what it is about."
       },
       "search": {
         "term": "Search picks",

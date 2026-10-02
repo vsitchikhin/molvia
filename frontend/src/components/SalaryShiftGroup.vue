@@ -4,17 +4,15 @@
     <AppCard class="card">
       <label class="row">
         <span class="label">{{ t('settings.salary_shift.label') }}</span>
-        <input
-          class="switch"
-          type="checkbox"
-          role="switch"
+        <AppSwitch
           :checked="!!day"
           :disabled="day === undefined || saving || !online"
           :aria-describedby="online ? `${id}-hint` : `${id}-hint ${id}-offline`"
-          @change="toggle"
+          @toggle="toggle"
         />
       </label>
-      <AppReveal>
+      <!-- Drawn once the answer is known, so the first answer only appears (MOL-151). -->
+      <AppReveal v-if="day !== undefined">
         <AppField
           v-if="day"
           :model-value="String(day)"
@@ -27,14 +25,14 @@
       </AppReveal>
       <p :id="`${id}-hint`" class="hint">{{ t('settings.salary_shift.hint') }}</p>
       <p v-if="!online" :id="`${id}-offline`" class="hint">
-        {{ t('settings.salary_shift.offline') }}
+        {{ t('settings.tap.offline') }}
       </p>
       <p v-else-if="saveFailed" class="failed" role="alert">
-        <IconAlert aria-hidden="true" />{{ t('settings.salary_shift.save_failed') }}
+        <IconAlert aria-hidden="true" />{{ t('settings.tap.save_failed') }}
       </p>
       <div v-else-if="failure === 'error'" class="failed">
         <IconAlert aria-hidden="true" />
-        <span>{{ t('settings.salary_shift.load_error') }}</span>
+        <span>{{ t('settings.tap.load_error') }}</span>
         <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
       </div>
     </AppCard>
@@ -50,6 +48,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
+import AppSwitch from '@/components/AppSwitch.vue'
 import { SALARY_SHIFT_DEFAULT, useSalaryShift } from '@/composables/useSalaryShift'
 
 /**
@@ -58,7 +57,7 @@ import { SALARY_SHIFT_DEFAULT, useSalaryShift } from '@/composables/useSalaryShi
  */
 export default defineComponent({
   name: 'SalaryShiftGroup',
-  components: { AppButton, AppCard, AppField, AppReveal, IconAlert },
+  components: { AppButton, AppCard, AppField, AppReveal, AppSwitch, IconAlert },
   setup() {
     const { t } = useI18n()
     const shift = useSalaryShift()
@@ -66,8 +65,7 @@ export default defineComponent({
       value: String(index + 1),
       label: t('settings.salary_shift.day_option', { day: index + 1 }),
     }))
-    function toggle(event: Event): void {
-      const on = (event.target as HTMLInputElement).checked
+    function toggle(on: boolean): void {
       void shift.choose(on ? SALARY_SHIFT_DEFAULT : null)
     }
     return { t, id: useId(), days, toggle, ...shift }
@@ -106,49 +104,6 @@ export default defineComponent({
   overflow-wrap: anywhere;
 }
 
-.switch {
-  position: relative;
-  flex: none;
-  width: var(--switch-width);
-  height: var(--switch-height);
-  margin: 0;
-  border-radius: var(--radius-pill);
-  background: var(--border-strong);
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease);
-  appearance: none;
-
-  &::before {
-    position: absolute;
-    top: var(--space-1);
-    left: var(--space-1);
-    width: calc(var(--switch-height) - 2 * var(--space-1));
-    height: calc(var(--switch-height) - 2 * var(--space-1));
-    border-radius: 50%;
-    background: var(--surface);
-    box-shadow: var(--shadow-sm);
-    transition: transform var(--dur-fast) var(--ease);
-    content: '';
-  }
-
-  &:checked {
-    background: var(--accent-solid);
-  }
-
-  &:checked::before {
-    transform: translateX(calc(var(--switch-width) - var(--switch-height)));
-  }
-
-  &:disabled {
-    cursor: default;
-    opacity: var(--opacity-stale);
-  }
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
 .hint {
   margin: 0;
   color: var(--text-muted);
@@ -168,13 +123,6 @@ export default defineComponent({
     flex: none;
     width: var(--space-4);
     height: var(--space-4);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .switch,
-  .switch::before {
-    transition: none;
   }
 }
 </style>

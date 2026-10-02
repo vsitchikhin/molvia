@@ -41,13 +41,20 @@ export async function settle(ctx: Context, key: MessageKey): Promise<void> {
  * `sequentialize` keeps them in order, so the last press is the verdict and the message says so.
  *
  * `fallback` is what arrives when the message cannot be edited — the outcome alone, as a reply.
+ * **A message Telegram handed over without its text** (`InaccessibleMessage`) is not edited at all:
+ * its question cannot be read back, and an edit would leave the outcome alone in its place, the
+ * question and the scale gone (adversarial Г). `text` is `null` then, and the outcome is a reply.
  */
 export async function settleKeeping(
   ctx: Context,
-  text: string,
+  text: string | null,
   keyboard: InlineKeyboard,
   fallback: string,
 ): Promise<void> {
+  if (text === null) {
+    await ctx.reply(fallback)
+    return
+  }
   try {
     await ctx.editMessageText(text, { reply_markup: keyboard })
   } catch (error) {
@@ -106,10 +113,13 @@ export async function stopSpinner(ctx: Context): Promise<void> {
   }
 }
 
-/** Buttons that can no longer do anything, taken away without touching what was written. */
-export async function dropKeyboard(ctx: Context): Promise<void> {
+/**
+ * Buttons that can no longer do anything, taken away without touching what was written — all of
+ * them, or all but `keep`, the ones that still can.
+ */
+export async function dropKeyboard(ctx: Context, keep?: InlineKeyboard): Promise<void> {
   try {
-    await ctx.editMessageReplyMarkup()
+    await ctx.editMessageReplyMarkup(keep ? { reply_markup: keep } : undefined)
   } catch {
     // Already gone, or the message is: neither changes what the person is looking at.
   }

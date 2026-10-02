@@ -5,19 +5,11 @@ import type { MolviaBotClient } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import { dropKeyboard, refuse, settleKeeping, stopSpinner } from './answer'
 import { t } from './i18n'
-import { SCALE_DATA, scale } from './remind'
+import { SCALE_DATA, keyboardOf, readText, scale, shownText, writeText } from './remind'
 
 export interface RateDeps {
   readonly api: MolviaBotClient
 }
-
-/**
- * Where the outcome begins in a reminder's text. The text is Telegram's memory of the question
- * (the bot keeps none), so a second press finds the first one's outcome there and replaces it:
- * everything from this mark on is the last press's word. A mark rather than a line count, because
- * the last message of the day carries one more line.
- */
-const OUTCOME = '\n\n✓ '
 
 /**
  * A press of 1–5 under a rating reminder (MOL-101): the verdict of **whoever pressed**
@@ -43,9 +35,12 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
         error instanceof ApiError &&
         (error.code === ERROR.NOT_FOUND || error.code === ISSUE.PATH_INVALID)
       ) {
-        // An erased account or an item gone: no press of this message can succeed again.
+        // An erased account or an item gone: no press of the scale can succeed again. The switch
+        // under the last message of the evening still can, and it is that evening's only one
+        // (review №3).
         await refuse(ctx, 'rate.gone')
-        await dropKeyboard(ctx)
+        const { offer } = keyboardOf(ctx.callbackQuery.message?.reply_markup)
+        await dropKeyboard(ctx, offer ? scale(undefined, undefined, offer) : undefined)
         return
       }
       console.error(
@@ -57,10 +52,13 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
     }
 
     const outcome = t(ctx.from.language_code, 'rate.done', { score })
-    const question = (ctx.callbackQuery.message?.text ?? '').split(OUTCOME)[0] ?? ''
+    const message = ctx.callbackQuery.message
+    // The switch's row and its outcome stay as the message holds them (MOL-103, Р-7).
+    const { offer } = keyboardOf(message?.reply_markup)
+    const shown = shownText(message)
     try {
-      const text = question === '' ? outcome : `${question}${OUTCOME}${outcome}`
-      await settleKeeping(ctx, text, scale(itemId, score), outcome)
+      const text = shown === null ? null : writeText({ ...readText(shown), rated: outcome })
+      await settleKeeping(ctx, text, scale(itemId, score, offer), outcome)
     } finally {
       await stopSpinner(ctx)
     }

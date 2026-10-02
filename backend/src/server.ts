@@ -46,6 +46,11 @@ import { recentPlaces } from '@/usecases/recent-places'
 import { rateFromBot } from '@/usecases/rate-from-bot'
 import { rateItem } from '@/usecases/rate-item'
 import { remindRatings } from '@/usecases/remind-ratings'
+import {
+  chooseReminders,
+  remindersSettingOf,
+  switchRemindersFromBot,
+} from '@/usecases/reminders-switch'
 import type { QuietToday } from '@/usecases/remind-ratings'
 import { amendVerdict } from '@/usecases/amend-verdict'
 import { withdrawVerdict } from '@/usecases/withdraw-verdict'
@@ -88,7 +93,7 @@ import {
 } from '@/usecases/spendings'
 import { chooseSalaryShift, moneyMonthOf, salaryShiftOf } from '@/usecases/money-month'
 import { moneyChartMonthOf } from '@/usecases/money-chart-month'
-import { moneyChartsOf } from '@/usecases/money-charts'
+import { moneyChartYearOf } from '@/usecases/money-chart-year'
 import { spendingRoutes } from '@/routes/spendings'
 import { createSpendingRepository } from '@/db/spendings-repository'
 import { createTripRepository } from '@/db/trips-repository'
@@ -109,6 +114,7 @@ import { createMoneyAccountRepository } from '@/db/money-accounts-repository'
 import { createSettingsRepository } from '@/db/settings-repository'
 import { saveSettings } from '@/usecases/save-settings'
 import { settingsRoute } from '@/routes/settings'
+import { remindersRoutes } from '@/routes/reminders'
 import { startTrip } from '@/usecases/start-trip'
 import { removeTrip, restoreTrip } from '@/usecases/remove-trip'
 import { startLogin } from '@/usecases/start-login'
@@ -499,6 +505,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         ),
       rateFromBot: (itemId, body) =>
         rateFromBot({ actors, items, verdicts, reminders }, itemId, body),
+      switchReminders: (body) => switchRemindersFromBot(reminders, body, new Date()),
     })
 
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).
@@ -534,6 +541,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       settingsRoute(guarded, (owner, input) =>
         saveSettings(createSettingsRepository(db), tripData.money, owner, input),
       )
+      remindersRoutes(guarded, {
+        setting: (owner) => remindersSettingOf(reminders, { id: owner }),
+        choose: (owner, body) => chooseReminders(reminders, { id: owner }, body, new Date()),
+      })
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items }, actorId, query),
         propose: (actorId, input) => proposeItem(items, hints, actorId, input),
@@ -588,8 +599,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         archiveCategory: (actor, id, archived) =>
           archiveSpendingCategory(tripData, actor, id, archived),
         month: (actor, month, cursor) => moneyMonthOf(tripData, actor, month, cursor),
-        charts: (actor, period) => moneyChartsOf(tripData, actor, period),
         chartMonth: (actor, month) => moneyChartMonthOf(tripData, actor, month),
+        chartYear: (actor, year) => moneyChartYearOf(tripData, actor, year),
         salaryShift: (actor) => salaryShiftOf(tripData, actor),
         setSalaryShift: (actor, body) => chooseSalaryShift(tripData, actor, body),
       })

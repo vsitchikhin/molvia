@@ -7,10 +7,11 @@ import { asBrowser, signedIn } from './session'
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
 /**
- * «Графики» end to end (MOL-74, MOL-158): «Месяц» reached from «Деньги» by the ring of «Куда ушли» —
- * its ring, the categories against the usual month and the pace — the month and «Месяц · Год» in the
- * address without an entry in the history, «Год» with the cards of MOL-74 until MOL-160, and the
- * last answer kept for a shelf with no connection.
+ * «Графики» end to end (MOL-74, MOL-158, MOL-160): «Месяц» reached from «Деньги» by the ring of «Куда
+ * ушли» — its ring, the categories against the usual month and the pace — «Год» of the calendar year
+ * with its ring, twelve months against the usual and a category by month; the month, the year and
+ * «Месяц · Год» in the address without an entry in the history, and the last answer kept for a shelf
+ * with no connection.
  */
 
 function yerevanDay(days = 0): string {
@@ -24,6 +25,11 @@ function monthsAgoDay(back: number): string {
   const day = new Date(`${yerevanDay().slice(0, 7)}-15T12:00:00Z`)
   day.setUTCMonth(day.getUTCMonth() - back)
   return day.toISOString().slice(0, 10)
+}
+
+/** The day is of this year in Yerevan: in January, last month is not. */
+function sameYear(day: string): boolean {
+  return day.slice(0, 4) === yerevanDay().slice(0, 4)
 }
 
 type Spend = (amount: string, spentOn: string, preset: string) => Promise<void>
@@ -98,12 +104,17 @@ test('the month and the tab move by replace: «назад» from them is «Де�
 
   await page.getByText('Год', { exact: true }).click()
   await expect(page).toHaveURL(/mode=year/)
-  // «Год» until MOL-160: twelve months of MOL-74 (owner's decision В-1); a bar is chosen by a tap.
-  const spent = page.locator('fieldset.chart').first()
-  const bars = spent.locator('label.bar')
-  await expect(bars).toHaveCount(12)
-  await bars.nth(10).click()
-  await expect(spent).toContainText(/220\s000\s֏/)
+  // Twelve months of the calendar year, a bar only where there is data (MOL-160, handoff 04).
+  const spent = page.getByRole('region', { name: 'Расходы по месяцам' })
+  await expect(spent.locator('.labels .label')).toHaveCount(12)
+  await expect(spent).toContainText('идёт')
+  if (sameYear(monthsAgoDay(1))) {
+    // Last month is of this year in eleven months of twelve: its bar is chosen by a tap.
+    const bars = spent.locator('label.bar')
+    await expect(bars).toHaveCount(2)
+    await bars.first().click()
+    await expect(spent).toContainText(/220\s000\s֏/)
+  }
 
   await page.goBack()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
@@ -114,7 +125,90 @@ test('a bookmark of the old period opens «Год»', async ({ page }) => {
   await page.goto('/money/charts?period=6')
   await expect(page).toHaveURL(/mode=year/)
   await expect(page).not.toHaveURL(/period=/)
-  await expect(page.locator('fieldset.chart').first().locator('label.bar')).toHaveCount(12)
+  const spent = page.getByRole('region', { name: 'Расходы по месяцам' })
+  await expect(spent.locator('.labels .label')).toHaveCount(12)
+})
+
+test('«Год» moves by replace to the year before, as far back as there is anything (MOL-160)', async ({
+  page,
+}) => {
+  await seed(page, async (spend) => {
+    // Twelve months back is always last year, whatever this month is.
+    await spend('7000', monthsAgoDay(12), 'pets')
+  })
+  await toCharts(page)
+  await page.getByText('Год', { exact: true }).click()
+  const year = Number(yerevanDay().slice(0, 4))
+  await expect(page.locator('.switcher .month')).toHaveText(String(year))
+  await expect(page.getByRole('button', { name: 'Следующий год' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
+
+  await page.getByRole('button', { name: 'Предыдущий год' }).click()
+  await expect(page).toHaveURL(new RegExp(`year=${String(year - 1)}`))
+  await expect(page.locator('.switcher .month')).toHaveText(String(year - 1))
+  await expect(page.getByRole('region', { name: 'Куда ушло за год' })).toContainText(/7\s000\s֏/)
+  // The first year with anything in it: no further back.
+  await expect(page.getByRole('button', { name: 'Предыдущий год' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
+
+  await page.goBack()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+})
+
+test('the average of «Год» comes with three closed months, across the new year too (В-1)', async ({
+  page,
+}) => {
+  await seed(page, async (spend) => {
+    await spend('20000', monthsAgoDay(2), 'cafe')
+  })
+  await page.goto('/money/charts?mode=year')
+  const spent = page.getByRole('region', { name: 'Расходы по месяцам' })
+  // «после …» while that month is of this year; in December — how many of the three there are.
+  await expect(spent).toContainText(/Среднее появится после|мало закрытых месяцев/)
+  await expect(spent.locator('.average')).toHaveCount(0)
+
+  const headers = await asBrowser(page)
+  const { categories } = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string; preset: string | null }[] }
+  const response = await page.request.post('/api/spendings', {
+    headers,
+    data: {
+      id: randomUUID(),
+      spentOn: monthsAgoDay(3),
+      amount: { amount: '10000', currency: 'AMD' },
+      categoryId: categories.find((category) => category.preset === 'cafe')?.id,
+    },
+  })
+  expect(response.status()).toBe(201)
+  await page.reload()
+  await expect(spent).toContainText('В среднем')
+  await expect(spent.locator('.average')).toHaveCount(1)
+})
+
+test('a sector of the year’s ring chooses its category below, with no scroll (В-3)', async ({
+  page,
+}) => {
+  // Rent this month too: the year's largest is not the café in any month, January included.
+  await seed(page, async (spend) => {
+    await spend('180000', yerevanDay(), 'rent')
+  })
+  await page.goto('/money/charts?mode=year')
+  const choice = page.getByRole('combobox', { name: 'Категория' })
+  await expect(choice.locator('option:checked')).not.toHaveText('Кафе и рестораны')
+  const scrolled = await page.evaluate(() => window.scrollY)
+
+  await page
+    .getByRole('region', { name: 'Куда ушло за год' })
+    .locator('.legend .row', { hasText: 'Кафе и рестораны' })
+    .click()
+  await expect(page).toHaveURL(/category=/)
+  await expect(choice.locator('option:checked')).toHaveText('Кафе и рестораны')
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled)
 })
 
 test('against the usual comes with three closed months, and says when before (handoff 3g)', async ({
@@ -174,7 +268,7 @@ async function toTheEnd(page: Page): Promise<number> {
 test('a category chosen at the end of «Год» stays under the thumb', async ({ page }) => {
   await seed(page)
   await page.goto('/money/charts?mode=year')
-  const card = page.getByRole('region', { name: 'Категория во времени' })
+  const card = page.getByRole('region', { name: 'Категория по месяцам' })
   const choice = page.getByRole('combobox', { name: 'Категория' })
   await choice.selectOption({ label: 'Аренда жилья' })
   await expect(choice.locator('option:checked')).toHaveText('Аренда жилья')
@@ -229,7 +323,7 @@ test('a line gone under the category of «Год» keeps the choice and the page
   // (MOL-74, MOL-138 В-2). Chosen another, the line goes and the card is shorter at the very end of
   // the page: held, not brought up.
   await page.goto(`/money/charts?mode=year&category=${randomUUID()}`)
-  const card = page.getByRole('region', { name: 'Категория во времени' })
+  const card = page.getByRole('region', { name: 'Категория по месяцам' })
   const choice = page.getByRole('combobox', { name: 'Категория' })
   await expect(card).toContainText('Этой категории на графиках нет')
 

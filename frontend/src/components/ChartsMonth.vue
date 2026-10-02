@@ -42,7 +42,13 @@
       :body="t('spending.charts.empty.body')"
     />
     <template v-else>
-      <DonutChart v-model="sector" class="answer" :charts="onScreen ?? charts" :name-of="nameOf" />
+      <DonutChart
+        v-model="sector"
+        class="answer"
+        :charts="onScreen ?? charts"
+        :label="centreLabel"
+        :name-of="nameOf"
+      />
       <DeviationBars class="answer" :charts="onScreen ?? charts" :name-of="nameOf" />
       <AppCard as="section" class="card" :aria-labelledby="`${id}-pace`">
         <div class="head">
@@ -192,6 +198,11 @@ export default defineComponent({
 
     const length = computed(() => Number(lastDayOf(props.month).slice(8, 10)))
     const monthWord = computed(() => longMonth(props.month, locale.value).replace(/\s\S+$/, ''))
+    const centreLabel = computed(() =>
+      onScreen.value?.running
+        ? t('spending.charts.center_running', { month: monthWord.value })
+        : monthWord.value,
+    )
     const paceDays = computed(() => {
       const shown = charts.value
       if (!shown) return []
@@ -269,6 +280,7 @@ export default defineComponent({
       dayAt,
       length,
       monthWord,
+      centreLabel,
       paceDays,
       paceUsual,
       reading,

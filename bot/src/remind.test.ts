@@ -10,10 +10,14 @@ import { t } from './i18n'
 import {
   RETRY_AFTER_CAP_SECONDS,
   SCALE_DATA,
+  SWITCH_DATA,
+  keyboardOf,
+  readText,
   remindDue,
   reminderText,
   scale,
   startReminders,
+  writeText,
 } from './remind'
 
 const APP = 'https://molvia.test'
@@ -108,6 +112,48 @@ describe('шкала', () => {
   })
 })
 
+describe('строка выключателя и итоги в тексте (MOL-103)', () => {
+  it('кнопка несёт только действие', () => {
+    for (const offer of ['off', 'on'] as const) {
+      const [button] = scale(MILK, undefined, offer).inline_keyboard[1] ?? []
+      const data = button && 'callback_data' in button ? button.callback_data : ''
+      expect(data).toBe(`remind:${offer}`)
+      expect(data).toMatch(SWITCH_DATA)
+    }
+    expect(scale(MILK).inline_keyboard).toHaveLength(1)
+  })
+
+  it('клавиатура читается обратно: позиция, нажатая цифра, предложенное действие', () => {
+    expect(keyboardOf(scale(MILK, 4, 'on'))).toEqual({ itemId: MILK, pressed: 4, offer: 'on' })
+    expect(keyboardOf(scale(MILK))).toEqual({ itemId: MILK })
+    expect(keyboardOf(undefined)).toEqual({})
+    expect(keyboardOf(scale(undefined, undefined, 'off')).offer).toBe('off')
+  })
+
+  it('итог оценки и итог выключателя не стирают друг друга, в любом порядке', () => {
+    const question = reminderText(item('Хлеб'), 2, APP)
+    const stopped = t('ru', 'remind.stopped')
+    const rated = t('ru', 'rate.done', { score: 4 })
+    const both = writeText({ question, rated, switched: stopped })
+
+    expect(readText(both)).toEqual({ question, rated, switched: stopped })
+    expect(readText(writeText({ question, switched: stopped }))).toEqual({
+      question,
+      switched: stopped,
+    })
+    expect(readText(question)).toEqual({ question })
+    expect(readText(writeText({ ...readText(both), rated: '5' }))).toEqual({
+      question,
+      rated: '5',
+      switched: stopped,
+    })
+    // English outcomes carry the same marks.
+    expect(readText(writeText({ question, switched: t('en', 'remind.resumed') })).switched).toBe(
+      t('en', 'remind.resumed'),
+    )
+  })
+})
+
 describe('рассылка (MOL-101)', () => {
   it('сообщение на позицию, звенит только первое, «ещё» — только под последним', async () => {
     const { api, calls } = telegram()
@@ -131,20 +177,73 @@ describe('рассылка (MOL-101)', () => {
     expect(calls[0]?.payload.reply_markup).toEqual(scale(MILK))
   })
 
-  it('заблокировавший бота не останавливает остальных, и ему дальше не шлём', async () => {
+  it('«Не напоминать» — только под последним сообщением вечера (MOL-103, В-2)', async () => {
+    const { api, calls } = telegram()
+    const reminders = [
+      { telegramUserId: 777, items: [item('Кефир'), item('Сыр'), item('Хлеб')], total: 3 },
+      { telegramUserId: 888, items: [item('Молоко')], total: 1 },
+    ]
+
+    await remindDue(claiming(reminders) as MolviaBotClient, api, APP)
+
+    expect(calls.map((call) => keyboardOf(call.payload.reply_markup as never).offer)).toEqual([
+      undefined,
+      undefined,
+      'off',
+      'off',
+    ])
+    expect(calls[2]?.payload.reply_markup).toEqual(scale(MILK, undefined, 'off'))
+  })
+
+  it('заблокировавший бота не останавливает остальных, ему дальше не шлём и напоминания выключаем', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const { api, calls } = telegram([777])
+    const switchReminders = vi.fn(() => Promise.resolve())
     const reminders = [
       { telegramUserId: 777, items: [item('Кефир'), item('Сыр')], total: 2 },
       { telegramUserId: 888, items: [item('Хлеб')], total: 1 },
     ]
 
-    await remindDue(claiming(reminders) as MolviaBotClient, api, APP)
+    await remindDue({ ...claiming(reminders), switchReminders } as MolviaBotClient, api, APP)
 
     expect(calls.map((call) => call.payload.chat_id)).toEqual([777, 888])
+    expect(switchReminders.mock.calls).toEqual([[777, 'blocked']])
     // The code, never the chat.
     expect(error.mock.calls.flat().join(' ')).not.toContain('777')
     expect(error.mock.calls.flat().join(' ')).toContain('403')
+  })
+
+  it('API не принял выключение после 403 — в журнал по коду, остальные получают своё', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api, calls } = telegram([777])
+    const switchReminders = vi.fn(() => Promise.reject(new ApiError(ERROR.INTERNAL)))
+    const reminders = [
+      { telegramUserId: 777, items: [item('Кефир')], total: 1 },
+      { telegramUserId: 888, items: [item('Хлеб')], total: 1 },
+    ]
+
+    await remindDue({ ...claiming(reminders), switchReminders } as MolviaBotClient, api, APP)
+
+    expect(calls.map((call) => call.payload.chat_id)).toEqual([777, 888])
+    expect(error.mock.calls.flat().join(' ')).toContain(`remind blocked: ${ERROR.INTERNAL}`)
+    expect(error.mock.calls.flat().join(' ')).not.toContain('777')
+  })
+
+  it('другая ошибка отправки напоминания не выключает', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api } = telegram([], 1, RETRY_AFTER_CAP_SECONDS + 1)
+    const switchReminders = vi.fn(() => Promise.resolve())
+
+    await remindDue(
+      {
+        ...claiming([{ telegramUserId: 777, items: [item('Кефир')], total: 1 }]),
+        switchReminders,
+      } as MolviaBotClient,
+      api,
+      APP,
+    )
+
+    expect(switchReminders).not.toHaveBeenCalled()
   })
 
   it('429: ждёт, сколько сказал Telegram, и повторяет один раз', async () => {

@@ -158,7 +158,8 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
 /**
  * The rating reminder's lever (MOL-101, В-4) under the login: if gate 0.2 says stop, whether the
  * reminders did not go out, went out and were not pressed, or were pressed and there was little to
- * ask about. No line of its own to cross, so no verdict — only the counts and the share with its n.
+ * ask about — and whether it annoys: how many turned it off, and how (MOL-103, В-4). No line of its
+ * own to cross, so no verdict — only the counts and the share with its n.
  * A press is counted on its own day, so the share of a window is of the items asked in it and the
  * presses made in it; at its edges the two need not be the same days.
  */
@@ -183,6 +184,10 @@ function reminderLines(reminders: RemindersInWindow): string[] {
           ]
         : share(reminders.rated, reminders.items),
     ),
+    // People, on the day they turned it off; one who turned it on and off again counts twice.
+    row('turned off under a reminder', [String(reminders.offButton), 'people']),
+    row('turned off in the settings', [String(reminders.offSettings), 'people']),
+    row('blocked the bot', [String(reminders.offBlocked), 'people, reminders off by it']),
   ]
 }
 

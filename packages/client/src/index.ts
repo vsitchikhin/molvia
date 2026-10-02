@@ -41,10 +41,13 @@ import {
   tripReceiptBodySchema,
   unassignedOperationsCodec,
   moneyChartMonthCodec,
-  moneyChartsCodec,
+  moneyChartYearCodec,
   moneyMonthCodec,
   monthSchema,
+  yearSchema,
   salaryShiftSchema,
+  chooseRemindersSchema,
+  remindersSettingSchema,
   spendingAmendBodySchema,
   spendingBodySchema,
   spendingCategoriesResponseCodec,
@@ -104,8 +107,9 @@ import type {
   TripReceiptBody,
   UnassignedOperationsResponse,
   MoneyChartMonthView,
-  MoneyChartsView,
+  MoneyChartYearView,
   MoneyMonthView,
+  RemindersSetting,
   SalaryShift,
   SpendingAmendBody,
   SpendingBody,
@@ -326,14 +330,18 @@ export interface MolviaClient {
    * A page after `cursor` carries no «Остаток» (MOL-134): take it from the first page.
    */
   moneyMonth(month: string, cursor?: JournalKey): Promise<MoneyMonthView>
-  /** «Графики» (MOL-74): the last six or twelve months side by side, counted by the server. */
-  moneyCharts(period: 6 | 12): Promise<MoneyChartsView>
   /** «Графики → Месяц» (MOL-158): one month's ring, against the usual and pace. */
   moneyChartMonth(month: string): Promise<MoneyChartMonthView>
+  /** «Графики → Год» (MOL-160): the calendar year's ring, months against the usual, categories. */
+  moneyChartYear(year: string): Promise<MoneyChartYearView>
   /** «Зарплата с … числа — в следующий месяц» (MOL-134): `day` null is off. */
   salaryShift(): Promise<SalaryShift>
   /** Saved on the tap, whole each time: safe to repeat. */
   chooseSalaryShift(day: number | null): Promise<SalaryShift>
+  /** «Напоминать об оценке в Telegram» (MOL-103): `off` null is on, else why it is off. */
+  remindersSetting(): Promise<RemindersSetting>
+  /** Saved on the tap; turned on, the reminders start over. Safe to repeat. */
+  chooseReminders(on: boolean): Promise<RemindersSetting>
   /**
    * «Сохранить» a new spending. Named by the device, so safe to repeat: `created` is `false` for
    * the same one again, `error.conflict` for the same identifier with anything else — or while it
@@ -735,11 +743,14 @@ export function createClient(options: ClientOptions): MolviaClient {
       return request(`/money/months/${month}${query}`, moneyMonthCodec)
     },
 
-    moneyCharts: (period) => request(`/money/charts?period=${String(period)}`, moneyChartsCodec),
-
     moneyChartMonth: async (month) => {
       if (!monthSchema.safeParse(month).success) throw new ApiError(ERROR.NOT_FOUND, 'month', false)
       return request(`/money/months/${month}/charts`, moneyChartMonthCodec)
+    },
+
+    moneyChartYear: async (year) => {
+      if (!yearSchema.safeParse(year).success) throw new ApiError(ERROR.NOT_FOUND, 'year', false)
+      return request(`/money/years/${year}/charts`, moneyChartYearCodec)
     },
 
     salaryShift: () => request('/actors/me/salary-shift', salaryShiftSchema),
@@ -748,6 +759,14 @@ export function createClient(options: ClientOptions): MolviaClient {
       request('/actors/me/salary-shift', salaryShiftSchema, {
         method: 'PUT',
         body: encode(salaryShiftSchema, { day }),
+      }),
+
+    remindersSetting: () => request('/actors/me/reminders', remindersSettingSchema),
+
+    chooseReminders: async (on) =>
+      request('/actors/me/reminders', remindersSettingSchema, {
+        method: 'PUT',
+        body: encode(chooseRemindersSchema, { on }),
       }),
 
     recordSpending: async (body) => {
