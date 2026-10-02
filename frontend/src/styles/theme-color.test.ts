@@ -29,14 +29,15 @@ describe('colours outside the tokens', () => {
     ['light', light],
     ['dark', dark],
   ])('the %s status bar is --surface of that scheme', (scheme, block) => {
+    // Each names its scheme too: the person's choice points the status bar by it (MOL-111).
     const meta = new RegExp(
-      `<meta name="theme-color" media="\\(prefers-color-scheme: ${scheme}\\)" content="(#[0-9a-f]{6})"`,
+      `<meta\\s+name="theme-color"\\s+media="\\(prefers-color-scheme: ${scheme}\\)"\\s+content="(#[0-9a-f]{6})"\\s+data-scheme-of="${scheme}"`,
     ).exec(html)
     expect(meta?.[1]).toBe(token(block, 'surface'))
   })
 
   it('declares no theme colour that ignores the scheme', () => {
-    expect(html).not.toMatch(/<meta name="theme-color" content=/)
+    expect(html).not.toMatch(/<meta\s+name="theme-color"\s+content=/)
   })
 
   it('the manifest carries the light --surface and --sunken', () => {

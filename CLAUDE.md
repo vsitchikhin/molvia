@@ -368,6 +368,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
   `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the
   failure; polite states speak through the one live region in `App.vue`.
+- **The scheme is the device's** (MOL-111): `molvia.scheme`, set before the first paint by the script
+  in `index.html` — the one reader of storage outside `storage.ts`; the person's choice wins both ways
+  by selectors, and the status bar follows by `media`, the manifest never.
 - **Native HTML first, then Reka UI, never a styled kit**; the catalogue combobox is our own.
   Interface icons come from MDI through `unplugin-icons`.
 - **An installed app takes a new version only when hidden and holding no typing** (`pwaUpdate.ts`),

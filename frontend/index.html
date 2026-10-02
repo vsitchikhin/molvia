@@ -18,8 +18,42 @@
     <!-- The status bar of the installed app is painted with this. It is --surface of each
          scheme, so the bar runs into the header without a seam; theme-color.test.ts holds
          both values to _tokens.scss. -->
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fffaf2" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#201c19" />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#fffaf2"
+      data-scheme-of="light"
+    />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#201c19"
+      data-scheme-of="dark"
+    />
+    <!-- The scheme the person chose on this device (MOL-111), before anything is painted: the
+         module that keeps it is deferred, and a dark screen flashing white at every launch is the
+         thing this prevents. After the theme colours, which it points, and before the styles. The
+         one reader of storage outside storage.ts, and it reads as `read` does — the shared shelf,
+         then this tab's, the first value found — so the two never answer differently;
+         useColorScheme.ts does the rest, and its test runs this script. -->
+    <script>
+      ;(() => {
+        let value = null
+        for (const shelf of ['localStorage', 'sessionStorage']) {
+          try {
+            value = window[shelf].getItem('molvia.scheme')
+          } catch {
+            value = null
+          }
+          if (value) break
+        }
+        if (value !== 'light' && value !== 'dark') return
+        document.documentElement.dataset.scheme = value
+        for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
+          meta.setAttribute('media', meta.dataset.schemeOf === value ? 'all' : 'not all')
+        }
+      })()
+    </script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Molvia</title>

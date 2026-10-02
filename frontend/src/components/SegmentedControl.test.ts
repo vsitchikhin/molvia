@@ -63,6 +63,31 @@ describe('SegmentedControl', () => {
     expect(legend.text()).toBe('Unit')
   })
 
+  // The widths are the browser's to give: the e2e of «Тема» holds one line at 320 px (MOL-111).
+  it('takes its widths from the words only when asked to', () => {
+    const even = render()
+    expect(even.classes()).not.toContain('fit')
+    const fit = mount(SegmentedControl, {
+      props: { modelValue: 'l', options: UNITS, legend: 'Unit', fit: true },
+    })
+    expect(fit.classes()).toContain('fit')
+    // Each word carries itself for the semibold reserved under it.
+    expect(fit.findAll('.word').map((word) => word.attributes('data-word'))).toEqual([
+      'kg',
+      'l',
+      'pc',
+    ])
+  })
+
+  it('reads out the spoken name, not the sign', () => {
+    const view = render('amd', [
+      { value: 'amd', label: '֏', spoken: 'Drams' },
+      { value: 'usd', label: '$', spoken: 'Dollars' },
+    ])
+    expect(view.findAll('[aria-hidden="true"]').map((sign) => sign.text())).toEqual(['֏', '$'])
+    expect(view.findAll('.spoken').map((name) => name.text())).toEqual(['Drams', 'Dollars'])
+  })
+
   it('does not warn at four segments', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     render('kg', [...UNITS, { value: 'g', label: 'g' }])
