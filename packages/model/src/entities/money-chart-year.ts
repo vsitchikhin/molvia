@@ -86,12 +86,19 @@ export interface YearCharts {
     readonly months: number
   } | null
   /**
-   * The first month with an average, while there is none — «Среднее появится после октября»; null
-   * when it would not be a month of this year still to come, and the screen says how many of the
-   * three there are instead (`closedCount`, Р-6).
+   * The first month with an average, while there is none — «Среднее появится после октября», the
+   * month named being the one before it. That month is of this year and still to come, December
+   * included, so the first may be January of the next (review 3); null otherwise, and the screen says
+   * how many of the three there are instead (`closedCount`, Р-6).
    */
   readonly averageFrom: Month | null
   readonly closedCount: number
+  /**
+   * Why there is no average, said by the server and never guessed by the screen (adversarial З):
+   * `few` — below three closed months; `uncounted` — three and more, each short in what was spent;
+   * `beyond` — a sum past what money holds. Null when there is one.
+   */
+  readonly averageMissing: 'few' | 'uncounted' | 'beyond' | null
   /**
    * The day of the running month it is compared to the usual by: today, or the last day spent on when
    * it is later — a rent dated tomorrow (Р-6 of MOL-158). The screen names this day, never the phone's
@@ -436,6 +443,8 @@ export function yearCharts(input: YearChartsInput): YearCharts {
           }
         : null,
     averageFrom,
+    averageMissing:
+      average !== null ? null : !enough ? 'few' : spentWhole.length === 0 ? 'uncounted' : 'beyond',
     comparedTo:
       runningMonth && current.startsWith(year)
         ? `${current}-${String(cutoff).padStart(2, '0')}`

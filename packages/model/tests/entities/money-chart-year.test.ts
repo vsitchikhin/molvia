@@ -502,3 +502,29 @@ describe('yearCharts — review and adversarial pass of PR #106', () => {
     expect(charts.averageFrom).toBe('2027-01')
   })
 })
+
+describe('yearCharts — round 2 of the adversarial pass', () => {
+  it('says why there is no average: too few, each short, or past what money holds (З)', () => {
+    const few = year('2026', run('2026-08', '2026-10', monthly(1000)), '2026-10-02', '2026-08')
+    expect([few.average, few.averageMissing]).toEqual([null, 'few'])
+
+    const short = run('2026-07', '2026-10', (month) =>
+      month === '2026-10'
+        ? []
+        : [spending(1000, `${month}-05`), spending(10, `${month}-12`, 'other', 'USD')],
+    )
+    expect(year('2026', short, '2026-10-02', '2026-07').averageMissing).toBe('uncounted')
+
+    // Each month whole and within money; the three together are not (d9 А of MOL-74).
+    const huge = INT8_MAX / 200n
+    const beyond = run('2026-07', '2026-10', (month) =>
+      month === '2026-10' ? [] : [spending(huge, `${month}-05`)],
+    )
+    const charts = year('2026', beyond, '2026-10-02', '2026-07')
+    expect(charts.months[6]?.uncounted).toEqual([])
+    expect([charts.average, charts.averageMissing]).toEqual([null, 'beyond'])
+
+    const whole = year('2026', run('2026-07', '2026-10', monthly(1000)), '2026-10-02', '2026-07')
+    expect(whole.averageMissing).toBeNull()
+  })
+})

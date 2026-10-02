@@ -385,8 +385,10 @@ MOL-74's unless they name MOL-160, and hold for the year.
   row. **Below three the line says when it comes, and only if the month it comes after is of the
   year** (Р-6) — «после декабря» too, read in January (review 3): a past year with fewer, or a
   December whose third closed month is January, says how many of the three there are — a date
-  already gone was the lesson of adversarial Г of MOL-158. **Three and more, each short, is no «3
-  из 3»** (adversarial Б): the line says spending in each had no rate.
+  already gone was the lesson of adversarial Г of MOL-158. **Why there is no average is the server's
+  word** (`averageMissing`): too few closed months, three and more each short — no «3 из 3»
+  (adversarial Б) — or a sum past money; guessed from the count, the screen blamed a rate for a sum
+  of ten zeros too many (adversarial З).
 - **«Разница» of the year is the sum of the months'** (Р-7) only when every month with data has
   one; otherwise the note names the months that keep it from being counted. A sum with a hole would
   read as a total.
@@ -499,7 +501,9 @@ MOL-74's unless they name MOL-160, and hold for the year.
   MOL-160): the bound is the answer's, so the switcher stands in `ChartsYear`, over its strip.
   **Until an answer names a first year, the bound is this year** — a newcomer's, or before the first
   answer: read as «no bound», the arrow went on to 2025, 2024… on an empty screen, a year read and
-  its months frozen at every tap (adversarial Д).
+  its months frozen at every tap (adversarial Д). **Offline with nothing kept for this year there is
+  no bound**: the years the phone keeps are behind the arrow, and offline a tap reads nothing — the
+  bound of this year locked them away (adversarial Ж).
 
 ## «Графики → Месяц» (MOL-158)
 

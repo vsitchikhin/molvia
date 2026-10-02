@@ -142,6 +142,8 @@ export const moneyChartYearCodec = z.strictObject({
     .nullable(),
   averageFrom: monthSchema.nullable(),
   closedCount: z.int().min(0),
+  /** Why there is no average: too few closed months, each short, or a sum past money. */
+  averageMissing: z.enum(['few', 'uncounted', 'beyond']).nullable(),
   /** The day the running month is compared to the usual by; null — no running month. */
   comparedTo: exchangeDaySchema.nullable(),
   differenceTotal: signedMoneyCodec.nullable(),

@@ -118,6 +118,7 @@ function yearCharts(patch: Partial<MoneyChartYearView> = {}): MoneyChartYearView
     average: null,
     averageFrom: '2026-11',
     closedCount: 1,
+    averageMissing: 'few',
     comparedTo: '2026-09-30',
     differenceTotal: rub('104813'),
     differenceMissing: [],
@@ -298,6 +299,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
       yearCharts({
         average: { amount: amd('179841'), level: 576, from: '2025-10', to: '2026-08', months: 11 },
         averageFrom: null,
+        averageMissing: null,
       }),
     )
     const view = await render()
@@ -488,10 +490,35 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
   })
 
   it('says why there is no average when every closed month is short, not «3 of 3» (adversarial Б)', async () => {
-    moneyChartYear.mockResolvedValue(yearCharts({ averageFrom: null, closedCount: 3 }))
+    moneyChartYear.mockResolvedValue(
+      yearCharts({ averageFrom: null, closedCount: 3, averageMissing: 'uncounted' }),
+    )
     const view = await render()
     expect(view.text()).toContain(en.spending.charts.year_avg_uncounted)
     expect(view.text()).not.toContain('3 of 3')
+  })
+
+  it('names a sum past money as such, not a missing rate (adversarial З)', async () => {
+    moneyChartYear.mockResolvedValue(
+      yearCharts({ averageFrom: null, closedCount: 3, averageMissing: 'beyond' }),
+    )
+    const view = await render()
+    expect(view.text()).toContain(en.spending.charts.year_avg_beyond)
+    expect(view.text()).not.toContain(en.spending.charts.year_avg_uncounted)
+  })
+
+  it('offline with nothing kept for this year, the arrow back reaches the years kept (adversarial Ж)', async () => {
+    moneyChartYear.mockResolvedValueOnce(yearCharts({ year: '2025', running: false }))
+    ;(await render('/money/charts?mode=year&year=2025')).unmount()
+    online(false)
+    moneyChartYear.mockRejectedValue(new TypeError('network'))
+    const view = await render()
+    const [back] = view.find('.switcher').findAll('button')
+    expect(back?.attributes('aria-disabled')).toBeUndefined()
+    await back?.trigger('click')
+    await flushPromises()
+    expect(view.find('.switcher .month').text()).toBe('2025')
+    expect(view.find('.strip').text()).toContain('No connection. Charts as of')
   })
 
   it('a category chosen in the list chooses its sector, or lets the sector go (owner’s Е)', async () => {

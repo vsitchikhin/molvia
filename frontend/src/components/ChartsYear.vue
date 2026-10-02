@@ -180,7 +180,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconChart from '~icons/mdi/chart-bar'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
-import { USUAL_MIN_CLOSED, formatEstimate, previousMonth } from '@molvia/model'
+import { formatEstimate, previousMonth } from '@molvia/model'
 import type { Money, MoneyChartYearView, SpendingCategoryView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
@@ -263,6 +263,8 @@ export default defineComponent({
      * The first year with anything in it, owner-wide: kept from any answer, so the arrow back stays
      * bounded while another year loads (Р-9). Until an answer names one — a newcomer, or no answer
      * yet — it is this year: the arrow back went on to 2025, 2024… on an empty screen (adversarial Д).
+     * **Offline with nothing kept for this year there is no bound**: the years kept on the phone are
+     * behind the arrow, and a tap reads nothing from the server (adversarial Ж).
      */
     const known = ref<string | null>(null)
     watch(
@@ -272,7 +274,10 @@ export default defineComponent({
       },
       { immediate: true },
     )
-    const first = computed(() => known.value ?? props.current)
+    const first = computed(
+      () =>
+        known.value ?? (charts.value === null && phase.value === 'offline' ? null : props.current),
+    )
 
     /** Whether a month runs is the phone's calendar's to say, not the answer's (review 3 of MOL-158). */
     const runningMonth = computed(() => today.value.slice(0, 7))
@@ -392,10 +397,11 @@ export default defineComponent({
           month: monthGenitive(previousMonth(shown.averageFrom), t),
         })
       }
-      // Months enough, each short in something: «3 из 3» said no to itself (adversarial Б).
-      return shown.closedCount >= USUAL_MIN_CLOSED
-        ? t('spending.charts.year_avg_uncounted')
-        : t('spending.charts.year_avg_short', { n: shown.closedCount })
+      // Why, as the server says it: «3 из 3» said no to itself (adversarial Б), and a guess from the
+      // count named a missing rate for a sum past money (adversarial З).
+      if (shown.averageMissing === 'uncounted') return t('spending.charts.year_avg_uncounted')
+      if (shown.averageMissing === 'beyond') return t('spending.charts.year_avg_beyond')
+      return t('spending.charts.year_avg_short', { n: shown.closedCount })
     })
 
     const flowBars = computed<ChartBar[]>(() =>
