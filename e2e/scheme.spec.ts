@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { open, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -59,6 +59,8 @@ test('the scheme chosen on this phone wins over the system both ways, and is the
   // The app itself kept away: what is drawn now is the script in the head, alone.
   await page.route('**/src/main.ts*', (route) => route.abort())
   await page.reload()
+  // Review С-2: proven kept away, or `installColorScheme` would pass for the script.
+  await expect(page.locator('#app')).toBeEmpty()
   await expect(page.locator('html')).toHaveAttribute('data-scheme', 'dark')
   await expect(page.locator('meta[data-scheme-of="dark"]')).toHaveAttribute('media', 'all')
   await page.unroute('**/src/main.ts*')
@@ -81,7 +83,7 @@ test('the scheme chosen on this phone wins over the system both ways, and is the
     colorScheme: 'light dark',
     ground: GROUND.dark,
     bar: { light: '(prefers-color-scheme: light)', dark: '(prefers-color-scheme: dark)' },
-    kept: null,
+    kept: 'system',
   })
   await page.emulateMedia({ colorScheme: 'light' })
   await expect.poll(async () => (await drawn(page)).ground).toBe(GROUND.light)
@@ -120,7 +122,10 @@ test('«Системная» is one line in its segment on a 320 px phone, and n
   })
 })
 
-test('another window of the app follows the choice without a reload', async ({ page, context }) => {
+test('another window of the app follows the choice, and one that missed it comes back to it', async ({
+  page,
+  context,
+}) => {
   await page.emulateMedia({ colorScheme: 'light' })
   await signedIn(page, '/settings')
   const other = await context.newPage()
@@ -129,10 +134,63 @@ test('another window of the app follows the choice without a reload', async ({ p
   await expect(other.getByRole('heading', { level: 1 })).toBeVisible()
   await choose(page, 'Тёмная')
   await expect(other.locator('html')).toHaveAttribute('data-scheme', 'dark')
-  await choose(page, 'Системная')
-  await expect(other.locator('html')).not.toHaveAttribute('data-scheme')
+  await choose(page, 'Светлая')
+  await expect(other.locator('html')).toHaveAttribute('data-scheme', 'light')
   // Its own shelf followed too: a reload of it does not bring the old choice back.
   await other.reload()
   await expect(other.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(other.locator('html')).toHaveAttribute('data-scheme', 'light')
+  // Adversarial В: away while «Системная» was chosen — unloaded, as a browser does to a tab behind —
+  // it heard nothing, and its own shelf still says «Светлая».
+  await other.goto('about:blank')
+  await choose(page, 'Системная')
+  await open(other)
+  await expect(other.getByRole('heading', { level: 1 })).toBeVisible()
   await expect(other.locator('html')).not.toHaveAttribute('data-scheme')
+})
+
+/** Scrolls the page until the middle of `target` stands `y` from the top of the window. */
+async function bringTo(page: Page, target: Locator, y: number): Promise<void> {
+  const box = await target.boundingBox()
+  if (!box) throw new Error('no box')
+  await page.evaluate(
+    (by) => {
+      window.scrollBy(0, by)
+    },
+    box.y + box.height / 2 - y,
+  )
+  await expect
+    .poll(async () => {
+      const now = await target.boundingBox()
+      return now ? Math.abs(now.y + now.height / 2 - y) <= 1 : false
+    })
+    .toBe(true)
+}
+
+// Adversarial Д: the word, lifted over its segment's hit area, rose over the pinned header as well —
+// drawn through it, and a tap on the header chose a scheme («‹ Деньги» on «Графики» went nowhere).
+test('a segment scrolled under the pinned header stays under it, and the header keeps its taps', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  await page.emulateMedia({ colorScheme: 'light' })
+  await signedIn(page, '/settings')
+  const bar = await page.locator('header.bar').boundingBox()
+  if (!bar) throw new Error('no header')
+  const word = scheme(page).locator('.word', { hasText: 'Тёмная' })
+  await bringTo(page, word, bar.y + bar.height / 2)
+  const box = await word.boundingBox()
+  if (!box) throw new Error('no word')
+  const x = box.x + box.width / 2
+  const y = box.y + box.height / 2
+  expect(y).toBeLessThan(bar.y + bar.height)
+  expect(
+    await page.evaluate(
+      (at) => document.elementFromPoint(at.x, at.y)?.closest('header.bar') !== null,
+      { x, y },
+    ),
+  ).toBe(true)
+  await page.mouse.click(x, y)
+  await expect(scheme(page).getByRole('radio', { name: 'Системная', exact: true })).toBeChecked()
+  await expect(page.locator('html')).not.toHaveAttribute('data-scheme')
 })
