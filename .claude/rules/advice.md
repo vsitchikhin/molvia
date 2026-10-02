@@ -269,7 +269,11 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
   shop with a signal had the settings' Gyumri asked for until this was the rule. Only a record still
   in the queue, which the server has never seen, is named by the country and city its start carries.
   A record not the asker's, removed or missing answers empty with `where: null`. The answer names
-  the city it was counted in, and the phone keeps it per record for no signal.
+  the city it was counted in, and the phone keeps it per record for no signal — **and a start put in
+  the queue keeps its own** (adversarial А′): a record started at the door with a signal is the
+  server's before its first sheet, and with none inside nothing else would know its city. The
+  remembered city is folded as a place's name is (review №7): a place keeps the spelling it was first
+  written with, the settings their own.
 - **«Не брать нигде» says nothing** — the answer is a union on `level`, and `never` has no field for a
   price, a place or an alternative. **The level and the ratings are the person's own verdicts, with
   access or without** (owner's decision on adversarial Д, 02.10.2026, over Р-10): read in the shared
@@ -294,11 +298,15 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
 - **The comparison is the domain's, called by the phone** — the one extension of MOL-24's exception:
   the server sends prices, it cannot know what is being typed. Unit prices of past purchases are the
   server's (SQL, `UNIT_PRICE_SCALE`); compared only inside one currency and unit, the typed price's
-  own. **Within half a per cent it is one price** (`SAME_PRICE_PERMILLE`, adversarial Г): loose goods
-  are weighed and the till rounds the sum, so one tag of 690 ֏/кг came out 689,63 and 690,67, and
-  compared exactly it read «дороже» in yellow or «дешевле» in green by the weight. An alternative
-  must be cheaper by more than that. «Last» for a record from an old queue is its moment read in the
-  request's zone — the zone its printed day is counted in (review №3).
+  own. **Two prices are one within half a per cent, or within what the till's rounding of both sums
+  can move** (`samePrice`, adversarial Г, Г′): loose goods are weighed and a sum is typed whole, so one
+  tag of 690 ֏/кг came out 689,63 and 690,67, and 0,15 kg — 104 ֏ for 103,50 — 693,33; compared exactly
+  it read «дороже» in yellow or «дешевле» in green by the weight. Half a unit of the currency on each
+  sum, spread over what was bought: the past purchase's quantity travels with its price. An
+  alternative must be cheaper by more than that. «Last» for a record from an old queue is its moment
+  read in the request's zone — the zone its printed day is counted in (review №3) — and a zone
+  Postgres does not know, though `Intl` does, is read as Yerevan's rather than answering 500
+  (adversarial Ж).
 - **It writes nothing**: no `advice_viewed`, no pick. The person looks at their own prices.
 - **A hint, not a screen**: no loading, no error. With a signal it waits for the server — a
   remembered answer may predate a verdict given since. With none, **or when the connection goes
@@ -310,7 +318,10 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
 - **What the phone hears of «не брать нигде» lets go of every remembered answer naming the item**,
   as itself or as an alternative (adversarial Б): a verdict given on this phone, the answer of the
   hint itself, and every answer of «Что брать» — the list the app opens on, so a «1» given in the
-  bot's reminder is heard at the next launch with a signal. **An answer asked before a verdict let
+  bot's reminder is heard at the next launch with a signal. **One's own «не брать», as the hint
+  reads**: without access the list's levels are one's own; with access they are an average, so the
+  phone asks `GET /verdicts/never` (adversarial Б′) — a field added to the list would be refused by
+  every older client — and a town's «1» over one's own «5» lets nothing go (review №6). **An answer asked before a verdict let
   something go is not remembered, whenever it lands** (adversarial В). The price, named: a verdict
   given elsewhere is not heard while the phone stays offline, and a rating moved within «Брать» or
   «Только если дёшево» lets nothing go.
@@ -318,7 +329,8 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
   a line coming in lifts the fields above it: **it grows over frames through `AppReveal`, never in
   one** (adversarial Е, MOL-151), and follows what is typed only once typing pauses
   (`HINT_SETTLE_MS`) — each keystroke of «620» crosses a price, and a line came and went under the
-  finger with each. Never red — red is «не брать нигде». Read out with the unit price, after the
+  finger with each. **A line that says something else goes and comes too** (keyed by its words,
+  adversarial Е′): changed in place from one line to two, it lifted the price by 17 px in a frame. Never red — red is «не брать нигде». Read out with the unit price, after the
   same pause, through the one live region.
 
 ## A withdrawn verdict
