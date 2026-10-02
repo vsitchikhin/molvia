@@ -22,7 +22,7 @@ import { startLoginCleanup } from '@/login-cleanup'
 import { healthRoutes } from '@/routes/health'
 import { internalAuthRoutes } from '@/routes/internal-auth'
 import { withActor } from '@/routes/actor'
-import { actorExportRoute, actorMeRoute } from '@/routes/actors'
+import { actorEraseRoute, actorExportRoute, actorMeRoute } from '@/routes/actors'
 import { authRoutes } from '@/routes/auth'
 import { adviceRoutes } from '@/routes/advice'
 import { devLoginRoute } from '@/routes/dev-login'
@@ -524,6 +524,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       actorMeRoute(guarded)
       actorExportRoute(guarded, (actorId, sessionId) =>
         exportMine(createExportRepository(db), actorId, sessionId),
+      )
+      actorEraseRoute(guarded, (telegramUserId) =>
+        eraseMe(createErasureRepository(db), telegramUserId),
       )
       sessionRoutes(guarded, {
         list: (actorId, currentId) => listSessions(sessions, actorId, currentId),
