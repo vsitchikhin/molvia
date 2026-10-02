@@ -85,6 +85,15 @@ describe('текст напоминания', () => {
     expect(reminderText(item('Сыр', 11), 0, APP)).toMatch(/^11 дн\. назад · /)
   })
 
+  it('город места — в предложном падеже, город не из словаря — в скобках (MOL-120)', () => {
+    expect(reminderText(item('Молоко'), 0, APP, 'Ереван')).toMatch(
+      /^Вчера · Ереван Сити в Ереване\n/,
+    )
+    expect(reminderText(item('Молоко'), 0, APP, 'Ванадзор')).toMatch(
+      /^Вчера · Ереван Сити \(Ванадзор\)\n/,
+    )
+  })
+
   it('адрес приложения со слешем на конце не даёт двойного слеша', () => {
     expect(reminderText(item('Молоко'), 1, `${APP}/`)).toContain(`${APP}/verdicts`)
     expect(reminderText(item('Молоко'), 1, `${APP}/`)).not.toContain('//verdicts')
@@ -175,6 +184,38 @@ describe('рассылка (MOL-101)', () => {
       reminderText(item('Хлеб'), 2, APP),
     ])
     expect(calls[0]?.payload.reply_markup).toEqual(scale(MILK))
+  })
+
+  it('город — только где два места напоминания носят одно имя (MOL-120)', async () => {
+    const { api, calls } = telegram()
+    const at = (name: string, placeName: string, placeCity?: string) => ({
+      ...item(name),
+      placeName,
+      ...(placeCity === undefined ? {} : { placeCity }),
+    })
+    const reminders = [
+      {
+        telegramUserId: 777,
+        items: [
+          at('Кефир', 'Ереван Сити', 'Ереван'),
+          at('Сыр', 'SAS', 'Ереван'),
+          at('Хлеб', 'Ереван Сити', 'Гюмри'),
+        ],
+        total: 3,
+      },
+      // An API before MOL-120 sends no city: the names stay as they were.
+      { telegramUserId: 778, items: [at('Кефир', 'SAS'), at('Хлеб', 'SAS', 'Гюмри')], total: 2 },
+    ]
+
+    await remindDue(claiming(reminders) as MolviaBotClient, api, APP)
+
+    expect(calls.map((call) => String(call.payload.text).split('\n')[0])).toEqual([
+      'Вчера · Ереван Сити в Ереване',
+      'Вчера · SAS',
+      'Вчера · Ереван Сити в Гюмри',
+      'Вчера · SAS',
+      'Вчера · SAS',
+    ])
   })
 
   it('«Не напоминать» — только под последним сообщением вечера (MOL-103, В-2)', async () => {

@@ -131,6 +131,14 @@ export const ru = {
   /** Three days and more: an abbreviation, so one form fits every number. */
   'remind.daysAgo': '{n} дн. назад',
   'remind.question': '{when} · {place}\n{name} — как вам?\n1 — плохо, 5 — отлично',
+  /**
+   * A place with its city, where two items of one reminder name a shop of one name in two cities
+   * (MOL-120). The city in the prepositional case, a key per city; one with no key is bracketed.
+   */
+  'remind.placeIn': '{place} {where}',
+  'remind.placeInBrackets': '{place} ({city})',
+  'remind.in.Гюмри': 'в Гюмри',
+  'remind.in.Ереван': 'в Ереване',
   /** Under the last message of the day, when more items wait than the three asked about. */
   'remind.more': 'Ещё {n} ждут в «Оценках»: {url}',
   /** Written under the question after a press; the scale stays, so a slip is one more press. */
