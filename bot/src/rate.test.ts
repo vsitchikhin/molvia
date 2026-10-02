@@ -232,6 +232,33 @@ describe('кнопки 1–5 под напоминанием (MOL-101)', () => {
     expect(edits(calls)[0]?.payload.reply_markup).toEqual(scale(MILK, 3, 'off'))
   })
 
+  it('товара или аккаунта нет — шкала уходит, а «Не напоминать» остаётся (ревью №3)', async () => {
+    const rateFromBot = vi.fn(() => Promise.reject(new ApiError(ERROR.NOT_FOUND)))
+    const { bot, calls } = harness({ rateFromBot })
+
+    await bot.handleUpdate(press(`rate:${MILK}:4`, { markup: scale(MILK, undefined, 'off') }))
+
+    expect(calls.find((call) => call.method === 'editMessageReplyMarkup')?.payload).toMatchObject({
+      reply_markup: scale(undefined, undefined, 'off'),
+    })
+  })
+
+  it('сообщение без текста не переписывается — итог уходит ответом (адверсариальный Г)', async () => {
+    const rateFromBot = vi.fn(() => Promise.resolve())
+    const { bot, calls } = harness({ rateFromBot })
+    const update = press(`rate:${MILK}:4`)
+    const query = update.callback_query as unknown as { message: Record<string, unknown> }
+    query.message = { chat: CHAT, message_id: 10, date: 0 }
+
+    await bot.handleUpdate(update)
+
+    expect(rateFromBot).toHaveBeenCalledWith(777, MILK, 4)
+    expect(edits(calls)).toEqual([])
+    expect(calls.find((call) => call.method === 'sendMessage')?.payload.text).toBe(
+      t('ru', 'rate.done', { score: 4 }),
+    )
+  })
+
   it('в группе не оценивает', async () => {
     const rateFromBot = vi.fn(() => Promise.resolve())
     const { bot } = harness({ rateFromBot })

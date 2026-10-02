@@ -69,6 +69,8 @@ async function lagBetween(updates: readonly [Update, Update]): Promise<number> {
         ),
       )
     },
+    // Every `/start` also says the bot is not blocked (MOL-103); not waited for, so it delays nothing.
+    switchReminders: () => Promise.resolve(),
   }
 
   let served = false

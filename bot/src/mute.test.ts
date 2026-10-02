@@ -181,6 +181,38 @@ describe('«Не напоминать» под напоминанием (MOL-103
     expect(error.mock.calls.flat().join(' ')).not.toContain('777')
   })
 
+  it('«Вернуть» стёртому аккаунту — отказ поверх и кнопки уходят, «включены» не пишется (адверсариальный В)', async () => {
+    const switchReminders = vi.fn(() => Promise.reject(new ApiError(ERROR.NOT_FOUND)))
+    const { bot, calls } = harness({ switchReminders })
+
+    await bot.handleUpdate(
+      press('remind:on', {
+        text: `${QUESTION}\n\n${t('ru', 'remind.stopped')}`,
+        markup: scale(MILK, undefined, 'on'),
+      }),
+    )
+
+    expect(edits(calls)).toEqual([])
+    expect(alert(calls)?.text).toBe(t('ru', 'remind.gone'))
+    expect(calls.some((call) => call.method === 'editMessageReplyMarkup')).toBe(true)
+  })
+
+  it('сообщение без текста (InaccessibleMessage) не переписывается — итог уходит ответом (адверсариальный Г)', async () => {
+    const switchReminders = vi.fn(() => Promise.resolve())
+    const { bot, calls } = harness({ switchReminders })
+    const update = press('remind:off')
+    const query = update.callback_query as unknown as { message: Record<string, unknown> }
+    query.message = { chat: CHAT, message_id: 10, date: 0 }
+
+    await bot.handleUpdate(update)
+
+    expect(switchReminders).toHaveBeenCalledWith(777, 'off')
+    expect(edits(calls)).toEqual([])
+    expect(calls.find((call) => call.method === 'sendMessage')?.payload.text).toBe(
+      t('ru', 'remind.stopped'),
+    )
+  })
+
   it.each(['remind:', 'remind:pause', 'remind:off:777', 'remind:on '])(
     'данные кнопки %s — до API не доходит',
     async (data) => {
@@ -202,6 +234,29 @@ describe('«Не напоминать» под напоминанием (MOL-103
     )
 
     expect(switchReminders).not.toHaveBeenCalled()
+  })
+})
+
+describe('/start — бот не заблокирован', () => {
+  it('передаёт «разблокирован» и не держит вход: ответ на /start идёт как прежде', async () => {
+    const switchReminders = vi.fn(() => new Promise<void>(() => undefined))
+    const previewLogin = vi.fn(() => Promise.reject(new ApiError(ERROR.LOGIN_UNAVAILABLE)))
+    const { bot, calls } = harness({ switchReminders, previewLogin })
+
+    await bot.handleUpdate({
+      update_id: 5,
+      message: {
+        message_id: 11,
+        date: 0,
+        chat: CHAT,
+        from: FROM,
+        text: '/start',
+        entities: [{ type: 'bot_command', offset: 0, length: 6 }],
+      },
+    })
+
+    expect(switchReminders).toHaveBeenCalledWith(777, 'unblocked')
+    expect(calls.some((call) => call.method === 'sendMessage')).toBe(true)
   })
 })
 

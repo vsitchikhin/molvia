@@ -1,3 +1,4 @@
+import { DomainError, ERROR } from '@molvia/model'
 import type {
   Actor,
   ChooseReminders,
@@ -35,13 +36,17 @@ export async function chooseReminders(
 
 /**
  * The bot's word on the switch (MOL-103): «Не напоминать» or «Вернуть напоминания» pressed, or
- * Telegram saying the bot was blocked or unblocked. An account with no owner changes nothing and is
- * not an error: «off» is true of it either way, as erasure's «ваших данных нет» is (Р-6).
+ * Telegram saying the bot was blocked or unblocked. An account with no owner changes nothing, and
+ * for «off», «blocked» and «unblocked» that is no error: «off» is true of it either way, as
+ * erasure's «ваших данных нет» is (Р-6), and Telegram's word is nobody's to answer. **«On» for no
+ * one is `404`** (adversarial В): «Напоминания снова включены» to an erased account was a statement
+ * about its data, and false.
  */
 export async function switchRemindersFromBot(
   reminders: Pick<ReminderRepository, 'switchReminders'>,
   { telegramUserId, change }: SwitchRemindersFromBot,
   now: Date,
 ): Promise<void> {
-  await reminders.switchReminders({ telegramUserId }, change, 'bot', now)
+  const off = await reminders.switchReminders({ telegramUserId }, change, 'bot', now)
+  if (off === undefined && change === 'on') throw new DomainError(ERROR.NOT_FOUND)
 }

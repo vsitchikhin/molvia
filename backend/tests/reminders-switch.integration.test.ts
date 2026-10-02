@@ -395,6 +395,14 @@ describe('бот: кнопки, блокировка и разблокировк
     expect((await choose(anna, { on: true })).json()).toEqual({ off: null })
   })
 
+  it('«Вернуть» для незнакомого Telegram-id — 404: включать некого (адверсариальный В)', async () => {
+    const response = await fromBot({ telegramUserId: telegramId(), change: 'on' })
+    expect(response.statusCode).toBe(404)
+    expect((await fromBot({ telegramUserId: telegramId(), change: 'unblocked' })).statusCode).toBe(
+      204,
+    )
+  })
+
   it('незнакомый Telegram-id — 204, и ничего не записано', async () => {
     await person()
     const response = await fromBot({ telegramUserId: telegramId(), change: 'off' })

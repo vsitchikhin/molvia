@@ -94,6 +94,14 @@ export interface ReminderText {
   readonly switched?: string
 }
 
+/**
+ * The text of the message a press came under, or `null` when Telegram handed it over without one —
+ * an `InaccessibleMessage`: then there is nothing to read back, and nothing may be written over it.
+ */
+export function shownText(message: { readonly text?: string } | undefined): string | null {
+  return message?.text ?? null
+}
+
 export function readText(text: string): ReminderText {
   const [head = '', switched] = text.split(SWITCHED)
   const [question = '', rated] = head.split(RATED)

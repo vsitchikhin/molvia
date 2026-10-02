@@ -5,7 +5,7 @@ import type { MolviaBotClient } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import { dropKeyboard, refuse, settleKeeping, stopSpinner } from './answer'
 import { t } from './i18n'
-import { SCALE_DATA, keyboardOf, readText, scale, writeText } from './remind'
+import { SCALE_DATA, keyboardOf, readText, scale, shownText, writeText } from './remind'
 
 export interface RateDeps {
   readonly api: MolviaBotClient
@@ -35,9 +35,12 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
         error instanceof ApiError &&
         (error.code === ERROR.NOT_FOUND || error.code === ISSUE.PATH_INVALID)
       ) {
-        // An erased account or an item gone: no press of this message can succeed again.
+        // An erased account or an item gone: no press of the scale can succeed again. The switch
+        // under the last message of the evening still can, and it is that evening's only one
+        // (review №3).
         await refuse(ctx, 'rate.gone')
-        await dropKeyboard(ctx)
+        const { offer } = keyboardOf(ctx.callbackQuery.message?.reply_markup)
+        await dropKeyboard(ctx, offer ? scale(undefined, undefined, offer) : undefined)
         return
       }
       console.error(
@@ -52,8 +55,9 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
     const message = ctx.callbackQuery.message
     // The switch's row and its outcome stay as the message holds them (MOL-103, Р-7).
     const { offer } = keyboardOf(message?.reply_markup)
+    const shown = shownText(message)
     try {
-      const text = writeText({ ...readText(message?.text ?? ''), rated: outcome })
+      const text = shown === null ? null : writeText({ ...readText(shown), rated: outcome })
       await settleKeeping(ctx, text, scale(itemId, score, offer), outcome)
     } finally {
       await stopSpinner(ctx)

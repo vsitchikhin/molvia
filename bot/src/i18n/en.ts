@@ -65,5 +65,6 @@ export const en: Dictionary = {
   'remind.stopped':
     '🔕 Reminders are off. Bring them back with the button below or in the app’s settings.',
   'remind.resumed': '🔔 Reminders are on again.',
+  'remind.gone': 'Nothing to turn on: the Molvia account is gone.',
   'remind.switchFailed': 'No answer came back. Please press again in a minute.',
 }
