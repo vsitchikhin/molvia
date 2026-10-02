@@ -271,9 +271,13 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
   A record not the asker's, removed or missing answers empty with `where: null`. The answer names
   the city it was counted in, and the phone keeps it per record for no signal.
 - **«Не брать нигде» says nothing** — the answer is a union on `level`, and `never` has no field for a
-  price, a place or an alternative. The level and the ratings are those «Что брать» shows this person,
-  read by the same `adviceRowsFor` and `describe`, so the sheet and the screen cannot disagree on what
-  is bad. A withdrawn verdict is no verdict: prices again.
+  price, a place or an alternative. **The level and the ratings are the person's own verdicts, with
+  access or without** (owner's decision on adversarial Д, 02.10.2026, over Р-10): read in the shared
+  mode, three strangers' «1» hid the prices of an item the person rated «5», and three strangers' «5»
+  offered an item they never rated — an average in the hint, which is 0.3's. Read by the same
+  `adviceRowsFor` and `describe` as «Что брать», in its own mode. With access the two may disagree:
+  the screen says the town's «не брать нигде», the sheet the person's own «5» — named, on purpose.
+  A withdrawn verdict is no verdict: prices again.
 - **Another item of the kind** (В-3, В-7…В-9): one's own products bought with a price in the city
   whose word of the kind is the item's (`kindKey`, MOL-45 — the SQL spelling is `kindAt`, one
   fragment for the search and for this). Shown when strictly cheaper than the price typed — before

@@ -239,7 +239,8 @@ export const OWN_ALTERNATIVES_MAX = 20
 
 /**
  * Another item of the same kind (`kindKey`, MOL-45, В-7) the person has bought in this city, with
- * the rating they see for it on «Что брать». Only what is rated and not «не брать нигде» comes:
+ * their own rating of it — never an average, with access or without (adversarial Д). Only what they
+ * rated and not «не брать нигде» comes:
  * «оценено лучше или так же» cannot be checked without a rating (Р-11).
  */
 export const ownAlternativeSchema = z.strictObject({
@@ -259,8 +260,8 @@ const ownPricedFields = {
 }
 
 /**
- * The prices of `GET /advice/prices` (MOL-92): a union on the level the person sees the item at on
- * «Что брать», as `adviceRowSchema` is. **«Не брать нигде» has no field for a price, a place or an
+ * The prices of `GET /advice/prices` (MOL-92): a union on the level of the person's own verdict,
+ * as `adviceRowSchema` is on «Что брать». **«Не брать нигде» has no field for a price, a place or an
  * alternative** (Т-3): the product's core rule held by the type checker, not by the sheet. An item
  * not rated is `unrated` and still has its prices: the hint is the person's own history.
  */

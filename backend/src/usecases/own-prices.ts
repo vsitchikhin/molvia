@@ -7,13 +7,11 @@ import {
   NEVER_BELOW_TENTHS,
   OWN_ALTERNATIVES_MAX,
   averageScore,
-  hasSharedAccess,
   kindKey,
   ownPricesResponseSchema,
   verdictLevel,
 } from '@molvia/model'
 import type {
-  AdviceScope,
   OwnAlternative,
   OwnPlacePrice,
   OwnPrices,
@@ -50,10 +48,11 @@ const KIND_CANDIDATES = 200
  * the record's city, and the other items of its kind they bought there with the rating they see
  * for each on «Что брать». Which line the sheet says is `cheaperHint`'s — it knows what is typed.
  *
- * **Only one's own purchases** (Т-1): with access or without, the same answer — the prices of
- * other people are an aggregate, and aggregates are 0.3's hypothesis. The level, and the ratings
- * of the alternatives, are the ones «Что брать» shows this person, read by the same statement
- * (Р-6, Р-10): a screen and a sheet that disagreed on «не брать нигде» would be two products.
+ * **Only one's own purchases and one's own verdicts** (Т-1; owner's decision on adversarial Д,
+ * 02.10.2026): with access or without, the same answer. «Что брать» with access shows an average of
+ * three people; read here, strangers' «1» hid the person's own prices of an item they rated «5», and
+ * strangers' «5» offered an item the person never rated. The level and the ratings come from the same
+ * statement as «Что брать»'s, `adviceRowsFor` and `describe`, in its own mode.
  *
  * **«Не брать нигде» is never asked about**: its prices are not filtered out of the answer, they
  * are not read (Т-3). A dish has no hint (Р-1), and an item the catalogue does not hold has none
@@ -68,7 +67,6 @@ export async function ownPrices(
 ): Promise<OwnPricesResponse> {
   const actor = await actors.byId(owner.actorId)
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
-  const scope: AdviceScope = hasSharedAccess(actor, new Date()) ? 'shared' : 'own'
 
   const item = await items.byId(query.item)
   const where = await geographyOf(trips, places, actor.id, query)
@@ -92,7 +90,9 @@ export async function ownPrices(
   const asked = [item.id, ...candidates]
   const { rows } = await verdicts.adviceRowsFor({
     actorId: actor.id,
-    scope,
+    // The person's own verdicts, with access or without (owner's decision on adversarial Д): the
+    // hint is one's own history, and an average of strangers is 0.3's.
+    scope: 'own',
     minContributions: AGGREGATE_MIN_CONTRIBUTIONS,
     neverBelowTenths: NEVER_BELOW_TENTHS,
     warningsReserved: ADVICE_WARNINGS_RESERVED,

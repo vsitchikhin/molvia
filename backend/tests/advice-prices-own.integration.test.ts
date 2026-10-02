@@ -371,6 +371,44 @@ describe('GET /advice/prices — the level', () => {
   })
 })
 
+describe('GET /advice/prices — one’s own verdicts, with access or without (adversarial Д)', () => {
+  const grant = (actorId: string) =>
+    db
+      .update(actors)
+      .set({ sharedUntil: sql`now() + interval '30 days'` })
+      .where(eq(actors.id, actorId))
+
+  it('keeps one’s own prices on one’s own «5» whatever three strangers gave', async () => {
+    const me = await insertActor(db)
+    const milk = await item('Молоко Ашхар 1 л')
+    await bought(me, milk, await erevan('Зовуни'), 540)
+    await rate(me, milk, 5)
+    for (let n = 0; n < 3; n += 1) await rate(await insertActor(db), milk, 1)
+
+    const without = await prices(me, { item: milk })
+    await grant(me)
+    const withAccess = await prices(me, { item: milk })
+
+    expect(without).toMatchObject({ level: 'take', rating: '5.0', places: [{ name: 'Зовуни' }] })
+    expect(withAccess).toEqual(without)
+  })
+
+  it('offers no alternative rated only by strangers', async () => {
+    const me = await insertActor(db)
+    const anelik = await item('Молоко Анелик 1 л')
+    const marianna = await item('Молоко Марианна 1 л')
+    const zovuni = await erevan('Зовуни')
+    await bought(me, anelik, zovuni, 620)
+    await rate(me, anelik, 4)
+    await bought(me, marianna, zovuni, 480)
+    for (let n = 0; n < 3; n += 1) await rate(await insertActor(db), marianna, 5)
+    await grant(me)
+
+    const answer = await prices(me, { item: anelik })
+    expect(answer.level !== 'never' && answer.alternatives).toEqual([])
+  })
+})
+
 describe('GET /advice/prices — another item of the kind (В-3, В-7)', () => {
   it('brings one’s own rated products of the same word of the kind, with their last prices', async () => {
     const me = await insertActor(db)

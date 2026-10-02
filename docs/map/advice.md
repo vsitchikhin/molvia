@@ -21,7 +21,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 ## backend · usecases
 
 - `backend/src/usecases/advice.ts` — Use cases «Что брать»: rows by verdict with prices, own or shared scope, the once-a-day `advice_viewed` in shared mode; and its search — the catalogue's answer with each item's row by the same rules, rated ones past the limit kept, no visit written.
-- `backend/src/usecases/own-prices.ts` — Use case «Тут дешевле» (MOL-92): the person's own last prices of an item in the record's city, and the other products of its kind with the rating «Что брать» shows; «не брать нигде» never asked about; writes nothing.
+- `backend/src/usecases/own-prices.ts` — Use case «Тут дешевле» (MOL-92): the person's own last prices of an item in the record's city, and the other products of its kind with the person's own rating — with access or without; «не брать нигде» never asked about; writes nothing.
 - `backend/src/usecases/amend-verdict.ts` — Use case «Изменить оценку»: changes the score or the review of one's own verdict; nothing to change is not found.
 - `backend/src/usecases/pending-verdicts.ts` — Use case «Оценки»: the person's purchases not yet rated, one card per item.
 - `backend/src/usecases/rate-item.ts` — Use case «Поставить оценку»: a first or repeated verdict on any catalogue item, the body checked against the item's kind.
