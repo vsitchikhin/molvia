@@ -8,6 +8,7 @@ import type { ActorView, AdvicePlace, AdviceResponse, AdviceRow } from '@molvia/
 import { useAdvice } from '@/composables/useAdvice'
 import type { Advice } from '@/composables/useAdvice'
 import { useActorStore } from '@/stores/actor'
+import { recallOwnPrices, rememberOwnPrices } from '@/stores/ownPrices'
 
 const advice = vi.fn<() => Promise<AdviceResponse>>()
 const me = vi.fn<() => Promise<ActorView>>()
@@ -194,6 +195,45 @@ describe('useAdvice', () => {
     expect(held.total.value).toBe(9)
     expect(held.scope.value).toBe('own')
     expect(held.stale.value).toBeNull()
+  })
+
+  it('lets «Тут дешевле» remembered for no signal go of what the list calls «не брать нигде» (MOL-92, Б)', async () => {
+    freshPinia()
+    const named = row(4, 'never').itemId
+    const where = { country: 'AM', city: 'Ереван' }
+    const zovuni = {
+      placeId: 'aaaaaaaa-0000-4000-8000-000000000001',
+      name: 'Зовуни',
+      unitPrice: { scaledMinor: 54_000_000_000n, currency: 'AMD' as const, unit: 'l' as const },
+      day: '2026-09-12',
+      observations: 1,
+    }
+    const milk = 'dddddddd-0000-4000-8000-000000000001'
+    const bread = 'dddddddd-0000-4000-8000-000000000003'
+    const prices = (itemId: string, alternative?: string) => ({
+      itemId,
+      level: 'unrated' as const,
+      places: [zovuni],
+      alternatives: alternative
+        ? [
+            {
+              itemId: alternative,
+              name: 'Позиция 4',
+              level: 'take' as const,
+              rating: '4.5',
+              places: [zovuni],
+            },
+          ]
+        : [],
+    })
+    rememberOwnPrices(ME, milk, where, prices(milk, named), Date.now())
+    rememberOwnPrices(ME, bread, where, prices(bread), Date.now())
+    advice.mockResolvedValue(answer([row(1, 'take'), row(4, 'never')]))
+
+    await mounted()
+
+    expect(recallOwnPrices(ME, milk, where)).toBeNull()
+    expect(recallOwnPrices(ME, bread, where)).not.toBeNull()
   })
 
   it('an answer with no rows is empty, not a failure', async () => {

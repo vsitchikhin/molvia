@@ -181,7 +181,7 @@ export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
   function save(card: PendingVerdict, score: Score, review: string): void {
     put({ card, score, review, state: 'saved', error: null })
     // «Тут дешевле» remembered before this verdict no longer says what the item is (MOL-92).
-    forgetOwnPrices(actor.id, card.itemId)
+    forgetOwnPrices(actor.id, [card.itemId])
     void flush()
   }
 

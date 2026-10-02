@@ -37,21 +37,26 @@
         </template>
       </AppField>
 
-      <!-- «Тут дешевле» lives in the box of the figure it compares (MOL-92, В-6) and grows it
-           downwards: the fields above never move when the answer comes late (Т-7). -->
+      <!-- «Тут дешевле» lives in the box of the figure it compares (MOL-92, В-6). The sheet stands
+           on the bottom of the screen, so a line coming in lifts everything above it: it grows over
+           frames, never in one (MOL-151), and follows typing only once it pauses (adversarial Е). -->
       <div class="per-unit-box">
         <div class="per-unit">
           <span class="per-unit-label">{{ t('item.unit_price_label') }}</span>
           <span class="per-unit-value">{{ perUnit ?? '—' }}</span>
         </div>
-        <p v-if="itemHint" class="hint" :class="`hint-${itemHint.kind}`" data-hint="item">
-          <component :is="itemHint.icon" class="hint-icon" aria-hidden="true" />
-          <span>{{ itemHint.text }}</span>
-        </p>
-        <p v-if="alternativeHint" class="hint hint-alternative" data-hint="alternative">
-          <IconSwapHorizontal class="hint-icon" aria-hidden="true" />
-          <span>{{ alternativeHint }}</span>
-        </p>
+        <AppReveal>
+          <p v-if="itemHint" class="hint" :class="`hint-${itemHint.kind}`" data-hint="item">
+            <component :is="itemHint.icon" class="hint-icon" aria-hidden="true" />
+            <span>{{ itemHint.text }}</span>
+          </p>
+        </AppReveal>
+        <AppReveal>
+          <p v-if="alternativeHint" class="hint hint-alternative" data-hint="alternative">
+            <IconSwapHorizontal class="hint-icon" aria-hidden="true" />
+            <span>{{ alternativeHint }}</span>
+          </p>
+        </AppReveal>
       </div>
       <p v-if="!perUnit" class="caption">{{ t('item.unit_price_pending') }}</p>
       <!-- The price of the package needs no quantity: a weight not yet known still has its
@@ -135,17 +140,18 @@ import type {
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { formatRating, unitPriceText } from '@/components/adviceRow'
 import { useCheaperHint } from '@/composables/useCheaperHint'
+import type { HintRecord } from '@/composables/useCheaperHint'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useItemDetails } from '@/composables/useItemDetails'
 import type { DetailsField, RetryPurchase } from '@/composables/useItemDetails'
 import { calendarDay } from '@/days'
-import { useActorStore } from '@/stores/actor'
 import { useRecentItemsStore } from '@/stores/recentItems'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -170,6 +176,7 @@ export default defineComponent({
   components: {
     AppButton,
     AppField,
+    AppReveal,
     BottomSheet,
     IconMenuDown,
     IconSwapHorizontal,
@@ -303,15 +310,22 @@ export default defineComponent({
     })
 
     /**
-     * «Тут дешевле» (MOL-92): the record's city — the one its start was given, while that start is
-     * still on the phone, else the person's settings, which a record starts from (MOL-65).
+     * «Тут дешевле» (MOL-92): the record written into, by its id once the server holds it — the
+     * server reads its city off its place — and by the city of its start while that start is still
+     * in the queue (review №1). No record, no hint.
      */
-    const actor = useActorStore()
-    const local = current.local.value
-    const context = (local?.id === writeInto.value ? local.context : undefined) ?? actor.settings
+    const record = computed<HintRecord | null>(() => {
+      const local = current.local.value
+      const into = writeInto.value
+      if (local?.id === into) {
+        const queued = local.context
+        return queued ? { where: { country: queued.country, city: queued.city } } : null
+      }
+      return into === null ? null : { tripId: into }
+    })
     const { hint } = useCheaperHint({
       itemId: props.entry.id,
-      where: context ? { country: context.country, city: context.city } : null,
+      record,
       except: props.expense?.id ?? null,
       here: () => trip.value?.place.id ?? null,
       typed: () => details.unitPrice.value,

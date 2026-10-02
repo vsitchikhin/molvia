@@ -163,7 +163,7 @@ export default defineComponent({
       sending.value = true
       failure.value = null
       // «Тут дешевле» remembered before this verdict no longer says what the item is (MOL-92).
-      forgetOwnPrices(currentIdentity(), props.itemId)
+      forgetOwnPrices(currentIdentity(), [props.itemId])
       try {
         await run()
         emit('saved')

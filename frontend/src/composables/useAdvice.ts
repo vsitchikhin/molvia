@@ -7,6 +7,7 @@ import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { read, write } from '@/stores/storage'
+import { forgetOwnPrices } from '@/stores/ownPrices'
 
 /** `idle` — no identity, so there is nobody to advise. */
 export type AdvicePhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'offline'
@@ -188,6 +189,13 @@ export function useAdvice(): Advice {
       failure.value = null
       confirmed.value = true
       remember()
+      // «Тут дешевле» remembered for no signal must not outlive a «не брать нигде» given anywhere —
+      // in the bot's reminder too, which never speaks to the phone (MOL-92, adversarial Б).
+      forgetOwnPrices(
+        id,
+        fresh.rows.filter((row) => row.level === 'never').map((row) => row.itemId),
+        { rated: false },
+      )
     } catch {
       if (owner.value !== id || mine !== latest || location.value !== where) return
       // Decided after the failure, never narrowed from a check before the request: a
