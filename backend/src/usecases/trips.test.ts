@@ -254,6 +254,10 @@ function fakeRepositories(
       // Any change of a trip's money takes its «списано» off (Р-32): nothing to see here.
       dropTripDebited: () => Promise.resolve(),
     },
+    budgetPlans: {
+      list: unexpected('budgetPlans.list'),
+      set: unexpected('budgetPlans.set'),
+    },
   }
 }
 

@@ -15,6 +15,7 @@ const REPORT: ErasureReport = {
     exchanges: 2,
     incomes: 1,
     spendings: 7,
+    budget_plans: 2,
     spending_categories: 13,
     money_month_rates: 1,
     money_account_checks: 1,

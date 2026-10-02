@@ -8,6 +8,7 @@ import { ACTOR_REFERENCES, ERASED_TABLES, createErasureRepository } from '@/db/e
 import { EXPORT_COLUMNS, EXPORT_SECTION_OF, createExportRepository } from '@/db/export-repository'
 import {
   actors,
+  budgetPlans,
   events,
   exchangeRevisions,
   exchanges,
@@ -304,6 +305,18 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     source: 'personal',
     asOf: at(21),
   })
+  // «Бюджет» (MOL-117): a sum of a category, and the savings target as a share.
+  await db.insert(budgetPlans).values([
+    {
+      actorId,
+      categoryId: own,
+      fromMonth: '2026-09',
+      amountMinor: 1_500_000n,
+      currency: 'AMD',
+      updatedAt: at(23),
+    },
+    { actorId, categoryId: null, fromMonth: '2026-09', percent: 25, updatedAt: at(24) },
+  ])
 }
 
 describe('состав экспорта — один источник правды со стиранием (MOL-93)', () => {

@@ -32,6 +32,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 
 ## backend · db
 
+- `backend/src/db/budget-plans-repository.ts` — Repository of «Бюджет» (MOL-117): the owner's plans read whole, a plan written from a month on under the owner's lock, replacing the later ones of its category.
 - `backend/src/db/money-repository.ts` — Repository of what «Деньги» reads beside spendings: a month's finished trips as journal lines and the frozen rate of a closed month.
 - `backend/src/db/spending-categories-repository.ts` — Repository of the owner's categories: presets given on first read, one's own named by the device, archive and restore.
 - `backend/src/db/spendings-repository.ts` — Repository of spendings outside trips: add with repeat/conflict, amend by revision, mark-remove, restore and final erase.

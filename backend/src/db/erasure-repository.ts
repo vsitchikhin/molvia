@@ -11,6 +11,7 @@ import { yerevanWeek } from './yerevan-week'
  * table that references an owner cannot join the schema without joining erasure too.
  */
 export const ACTOR_REFERENCES = [
+  'budget_plans.actor_id',
   'events.actor_id',
   'exchanges.actor_id',
   'incomes.actor_id',
@@ -40,6 +41,7 @@ export const ERASED_TABLES = [
   'exchanges',
   'incomes',
   'spendings',
+  'budget_plans',
   'spending_categories',
   'money_month_rates',
   'money_account_checks',
@@ -133,6 +135,7 @@ export function createErasureRepository(db: Db): ErasureRepository {
             exchanges: 0,
             incomes: 0,
             spendings: 0,
+            budget_plans: 0,
             spending_categories: 0,
             money_month_rates: 0,
             money_account_checks: 0,
@@ -195,6 +198,10 @@ export function createErasureRepository(db: Db): ErasureRepository {
             // pointed at, and the rates the person's closed months were frozen at.
             erased.spendings = await count(
               sql`delete from spendings where actor_id = ${actorId} returning 1`,
+            )
+            // The plans of «Бюджет» (MOL-117) point at the categories, so they go before them.
+            erased.budget_plans = await count(
+              sql`delete from budget_plans where actor_id = ${actorId} returning 1`,
             )
             erased.spending_categories = await count(
               sql`delete from spending_categories where actor_id = ${actorId} returning 1`,
