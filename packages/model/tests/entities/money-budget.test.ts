@@ -459,3 +459,82 @@ describe('monthBudget — savings (В-4)', () => {
     expect(budget.savings).toMatchObject({ target: 25, difference: null, actual: null })
   })
 })
+
+describe('monthBudget — round 2 of the review', () => {
+  it('says no plan and no «осталось» while every share waits, and counts its spending (review 9, З)', () => {
+    const budget = monthBudget(
+      month({ income: cash('0 RUB'), byCategory: spentIn({ groceries: '52300 AMD' }) }),
+      [plan('groceries', '2026-10', share(10))],
+      categories,
+    )
+    expect(budget.total).toMatchObject({
+      planned: null,
+      spent: cash('52300 AMD'),
+      left: null,
+      leftIncome: null,
+      whole: false,
+    })
+  })
+
+  it('counts a waiting share in «Потрачено», never in «осталось», beside a sum (З)', () => {
+    const budget = monthBudget(
+      month({ income: cash('0 RUB'), byCategory: spentIn({ groceries: '52300 AMD' }) }),
+      [plan('groceries', '2026-10', share(10)), plan('rent', '2026-10', amount('250000 AMD'))],
+      categories,
+    )
+    expect(budget.total).toMatchObject({
+      planned: cash('250000 AMD'),
+      spent: cash('52300 AMD'),
+      left: cash('250000 AMD'),
+      whole: false,
+    })
+  })
+
+  it('claims no «сверх плана» against a plan known in part (review 10)', () => {
+    const budget = monthBudget(
+      month({
+        income: cash('10000 RUB'),
+        incomeUncounted: [cash('500 USD')],
+        byCategory: spentIn({ groceries: '45000 AMD' }),
+      }),
+      [plan('groceries', '2026-10', share(10))],
+      categories,
+    )
+    expect(budget.rows[0]).toMatchObject({ planned: cash('4300 AMD'), left: null, used: null })
+    expect(budget.total).toMatchObject({ left: null, whole: false })
+
+    const dollars = monthBudget(
+      month({
+        income: cash('0 RUB'),
+        incomeUncounted: [cash('100 USD')],
+        byCategory: spentIn({ groceries: '45000 AMD' }),
+      }),
+      [plan('groceries', '2026-10', share(10))],
+      categories,
+    )
+    expect(dollars.rows[0]).toMatchObject({ planned: cash('0 AMD'), left: null })
+  })
+
+  it('keeps the left of a plan known in part while it is not spent past', () => {
+    const [row] = monthBudget(
+      month({ incomeUncounted: [cash('500 USD')], byCategory: spentIn({ groceries: '1000 AMD' }) }),
+      [plan('groceries', '2026-10', share(10))],
+      categories,
+    ).rows
+    expect(row?.left).toEqual(cash('76400 AMD'))
+  })
+
+  it('says no percent past a safe integer, of a plan or of what was put aside (А2)', () => {
+    const budget = monthBudget(
+      month({
+        byCategory: spentIn({ cafe: '1000000000000 AMD' }),
+        income: cash('0.01 RUB'),
+        spentIncome: cash('2500000000000 RUB'),
+      }),
+      [plan('cafe', '2026-10', amount('0.01 AMD'))],
+      categories,
+    )
+    expect(budget.rows[0]?.used).toBeNull()
+    expect(budget.savings.actual).toBeNull()
+  })
+})

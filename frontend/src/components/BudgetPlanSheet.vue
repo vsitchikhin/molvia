@@ -88,12 +88,12 @@ import {
   previousMonth,
 } from '@molvia/model'
 import type {
+  BudgetPlanBody,
   BudgetPlanValue,
   Currency,
   MoneyBudgetView,
   SpendingCategoryView,
 } from '@molvia/model'
-import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -107,11 +107,10 @@ export type BudgetSubject =
   | { readonly kind: 'choose' }
   | { readonly kind: 'savings' }
 
-/** What the sheet hands the screen once it has closed: and the month's budget the write came back with. */
+/** What the sheet hands the screen once it has closed. */
 export interface BudgetOutcome {
   readonly kind: 'saved' | 'removed'
   readonly name: string
-  readonly budget: MoneyBudgetView
 }
 
 /**
@@ -144,6 +143,11 @@ export default defineComponent({
     nameOf: { type: Function as PropType<(id: string) => string>, required: true },
     spendCurrency: { type: String as PropType<Currency>, required: true },
     online: { type: Boolean, default: true },
+    /** The write, the screen's: it shows the budget the write comes back with (review 6, Ж). */
+    save: {
+      type: Function as PropType<(body: BudgetPlanBody) => Promise<MoneyBudgetView>>,
+      required: true,
+    },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',
@@ -269,11 +273,10 @@ export default defineComponent({
       }
       sending.value = true
       try {
-        const budget = await api.setBudgetPlan({ categoryId: id, from: props.month, plan })
+        await props.save({ categoryId: id, from: props.month, plan })
         finished({
           kind: plan ? 'saved' : 'removed',
           name: id === null ? t('budget.savings.title') : props.nameOf(id),
-          budget,
         })
       } catch (caught) {
         const code = caught instanceof ApiError ? caught.code : null

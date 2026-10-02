@@ -1,6 +1,6 @@
 import type { ComputedRef, Ref } from 'vue'
 import { moneyBudgetCodec } from '@molvia/model'
-import type { MoneyBudgetView } from '@molvia/model'
+import type { BudgetPlanBody, MoneyBudgetView } from '@molvia/model'
 import { api } from '@/api'
 import { useKeptAnswer } from '@/composables/useKeptAnswer'
 import type { KeptPhase } from '@/composables/useKeptAnswer'
@@ -11,8 +11,8 @@ export interface MoneyBudgetState {
   readonly stale: ComputedRef<'loading' | 'offline' | 'error' | null>
   readonly fetchedAt: ComputedRef<Date | null>
   readonly retry: () => Promise<void>
-  /** The budget a plan's write came back with: shown, with no second read (review 6). */
-  readonly accept: (month: string, budget: MoneyBudgetView) => void
+  /** A plan from its month on (В-1): the month's budget it came back with is shown (review 6). */
+  readonly save: (body: BudgetPlanBody) => Promise<MoneyBudgetView>
 }
 
 /**
@@ -28,5 +28,9 @@ export function useMoneyBudget(month: Ref<string>): MoneyBudgetState {
     codec: moneyBudgetCodec,
     kept: 3,
   })
-  return { ...kept, budget: kept.answer }
+  return {
+    ...kept,
+    budget: kept.answer,
+    save: (body) => kept.write(body.from, () => api.setBudgetPlan(body)),
+  }
 }

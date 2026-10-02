@@ -84,7 +84,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/composables/useChartPointer.ts` — Composable: a choice made on a chart by the whole area — a mouse on press, a finger on lifting or going sideways, a scroll never.
 - `frontend/src/composables/useMoneyBudget.ts` — Composable: «Бюджет» of a month from the server through `useKeptAnswer`, the last three months kept per owner.
 - `frontend/src/composables/useMoneyCharts.ts` — Composable: «Графики» of a month (MOL-158) and of a year (MOL-160) from the server, through `useKeptAnswer`.
-- `frontend/src/composables/useKeptAnswer.ts` — Composable: an answer of «Графики» or «Бюджет» kept per owner and subject, only the latest read, offline or error decided after the failure, re-read when a write lands, or taken from a write's own answer (`accept`).
+- `frontend/src/composables/useKeptAnswer.ts` — Composable: an answer of «Графики» or «Бюджет» kept per owner and subject, only the latest read, offline or error decided after the failure, re-read when a write lands, or taken from a write's own answer, numbered when the write sets out (`write`).
 - `frontend/src/composables/useSalaryShift.ts` — Composable: the «Зарплата — в следующий месяц» setting through `useTapSetting`, read and saved on the tap.
 
 ## frontend · stores

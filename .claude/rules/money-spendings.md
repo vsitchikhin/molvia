@@ -619,8 +619,12 @@ task did not: five plans of six there are a percent of the month's income — «
   бюджета» is (Р-3) — brought into the spending currency **by the month's rate**, frozen for a closed
   month, the rate «≈ потрачено» is counted by. No rate, and a share is no plan, never a zero.
   **Nothing come in yet, and the share waits for it** (`awaitingIncome`, review 1, adversarial В): no
-  plan, no «сверх плана» on all that was spent, out of «осталось» — the total says «доля появится»,
-  the way in has no figure. Read as a plan of zero, every share was over its plan in every month
+  plan, no «сверх плана» on all that was spent, out of «осталось» but **in «Потрачено» of the total**:
+  its category is planned, and its spending is no «вне плана» (adversarial З of round 2). The total
+  says «доля появится», the way in has no figure, and **with no row counted the plan and «осталось»
+  are a dash, never «0 ֏»** (review 9). **A plan known in part claims no «сверх плана»** (review
+  10): a share of a «Пришло» short of a rate is a floor, and past it the row's and the total's
+  `left` are null. Read as a plan of zero, every share was over its plan in every month
   until the salary; the price — a month with only shares says no «осталось» until something comes
   in. A sum typed in another currency is refused (`CURRENCY_MISMATCH`); one kept from before a move
   is converted by the month's rate and printed «≈» (Р-4), and **its sheet never puts it in the field
@@ -636,10 +640,11 @@ task did not: five plans of six there are a percent of the month's income — «
   a row does not move under the finger. **What was spent with no plan stands apart** (Р-6), «Без
   плана», and is no part of «осталось» — the sheet's ИТОГО counts so. **A removed category keeps its
   plan** (Р-5, MOL-73 В-3): it has a row in a month something was spent in it, and none where it is
-  only removed; «Вернуть» brings the plan back with it. Its «Без плана» row is no button (review 7): a
-  plan is offered for the live categories only. **A row whose plan would carry the total past what
+  only removed; «Вернуть» brings the plan back with it. **Its row is no button, with a plan or not**
+  (review 7, adversarial И): a plan is offered for the live categories only. **A row whose plan would carry the total past what
   money holds is left out of it** (adversarial А), as a spending is from «Потрачено»: the answer that
-  failed to encode was a 500 for good, with no screen to take the plan back from.
+  failed to encode was a 500 for good, with no screen to take the plan back from. **A percent past a
+  safe integer is none** (`used`, `savings.actual`, adversarial А2) for the same reason.
 - **Over the plan is a warning, never red, and said in words, never by a minus** (Р-7, review 5):
   «сверх плана» in `--warn`, the figure without its sign, the bar to the edge — with no mark of the
   plan on it, which would be a division the phone does not make. Red is an error, and spending past a
@@ -661,7 +666,10 @@ task did not: five plans of six there are a percent of the month's income — «
   (`molvia.budget`), built from the kit after the plan artifact's frames — the newer handoffs of
   «Деньги» are later work (owner's note on В-5). **A plan is written with a connection only** (Р-8),
   as an account is: it is set at home, not at the shelf; **the write's own answer is the month's
-  budget and is shown** (`accept` of `useKeptAnswer`, review 6) — no second count of the month.
+  budget and is shown** (`write` of `useKeptAnswer`, review 6) — no second count of the month — **and
+  it is numbered when it sets out**, as a read is: a read set out while the write was on its way may
+  have counted before it or after, so then the month is read once more (adversarial Ж of round 2).
+  Numbered on arrival, the write's older answer put back a spending landed meanwhile.
   The sheet works no plan out of «Пришло» — what a percent comes to is the server's, on the row.
 - **Private, and it goes with its owner** (Р-13): erasure takes `budget_plans` before the categories
   they point at, and the copy of one's data has them (`budgetPlans`, version 7).

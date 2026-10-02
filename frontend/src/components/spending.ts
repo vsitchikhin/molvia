@@ -460,6 +460,7 @@ export interface Removed {
  */
 export function budgetAmount(value: Money, locale: string): string {
   const size = { ...value, minor: value.minor < 0n ? -value.minor : value.minor }
-  const whole = formatEstimate(size, locale)
-  return size.minor !== 0n && !/[1-9]/.test(whole) ? formatMoney(size, locale) : whole
+  // Under half a unit rounds to nought; the unit is the currency's own (review 11).
+  const half = size.minor * 2n < 10n ** BigInt(MINOR_EXPONENT[size.currency])
+  return size.minor !== 0n && half ? formatMoney(size, locale) : formatEstimate(size, locale)
 }

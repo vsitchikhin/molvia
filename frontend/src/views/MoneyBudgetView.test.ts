@@ -11,6 +11,7 @@ import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
+import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import MoneyBudgetViewScreen from './MoneyBudgetView.vue'
 
 const moneyBudget = vi.fn<(month: string) => Promise<MoneyBudgetView>>()
@@ -455,5 +456,94 @@ describe('MoneyBudgetView: what the review found (MOL-117)', () => {
     const shown = plain((await render()).find('.total').text())
     expect(shown).toContain(en.budget.total.over)
     expect(shown).toContain('֏0.40')
+  })
+})
+
+describe('MoneyBudgetView: round 2 of the review (MOL-117)', () => {
+  it('a spending landed while a plan is on its way stays: the month is read once more (Ж)', async () => {
+    moneyBudget.mockResolvedValue(budget())
+    const view = await render()
+    let answer: (value: MoneyBudgetView) => void = () => undefined
+    setBudgetPlan.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    await view.findAll('li .row')[2]?.trigger('click')
+    await flushPromises()
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(setBudgetPlan).toHaveBeenCalled()
+    })
+
+    const [groceries, ...rest] = budget().rows
+    if (!groceries) throw new Error('no row')
+    const landed = budget({
+      rows: [{ ...groceries, spent: amd('60300'), left: amd('17100') }, ...rest],
+    })
+    moneyBudget.mockResolvedValue(landed)
+    useSpendingQueueStore().landed += 1
+    await vi.waitFor(() => {
+      expect(rowTexts(view)[0]).toContain('֏60,300')
+    })
+
+    // The write was counted before the spending landed: its answer is not trusted, the month is read.
+    answer(budget())
+    await vi.waitFor(() => {
+      clock += 1000
+      expect(moneyBudget).toHaveBeenCalledTimes(3)
+    })
+    await flushPromises()
+    expect(rowTexts(view)[0]).toContain('֏60,300')
+  })
+
+  it('with every share waiting, «осталось» and the plan are a dash, what was spent is said (review 9, З)', async () => {
+    const [groceries] = budget().rows
+    if (!groceries) throw new Error('no row')
+    moneyBudget.mockResolvedValue(
+      budget({
+        rows: [
+          {
+            ...groceries,
+            planned: null,
+            awaitingIncome: true,
+            estimated: false,
+            left: null,
+            used: null,
+          },
+        ],
+        total: {
+          planned: null,
+          spent: amd('52300'),
+          left: null,
+          unplanned: amd('6500'),
+          leftIncome: null,
+          whole: false,
+        },
+      }),
+    )
+    const shown = plain((await render()).find('.total').text())
+    expect(shown).toContain(`${en.budget.total.left}—`)
+    expect(shown).toContain(`${en.budget.total.planned}—`)
+    expect(shown).toContain('֏52,300')
+    expect(shown).not.toContain('֏0')
+  })
+
+  it('a removed category with a plan is shown, and no plan is offered for it (И)', async () => {
+    const [, , rent] = budget().rows
+    if (!rent) throw new Error('no row')
+    moneyBudget.mockResolvedValue(
+      budget({
+        rows: [{ ...rent, categoryId: PETS }],
+        unplanned: [],
+        categories: budget().categories.map((one) =>
+          one.id === PETS ? { ...one, archived: true } : one,
+        ),
+      }),
+    )
+    const view = await render()
+    expect(view.find('li .row.still').text()).toContain('Pets')
+    await view.find('li .row.still').trigger('click')
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')).toBeNull()
   })
 })

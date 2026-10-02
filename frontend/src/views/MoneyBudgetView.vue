@@ -58,7 +58,7 @@
           <dl class="trio">
             <div>
               <dt>{{ t('budget.total.planned') }}</dt>
-              <dd>{{ whole(budget.total.planned) }}</dd>
+              <dd>{{ budget.total.planned ? whole(budget.total.planned) : '—' }}</dd>
             </div>
             <div>
               <dt>{{ t('spending.spent') }}</dt>
@@ -73,7 +73,14 @@
 
         <AppCard v-if="budget.rows.length > 0" as="ul" list>
           <li v-for="row in rows" :key="row.categoryId">
-            <button type="button" class="row" @click="edit(row.categoryId, row.plan)">
+            <!-- A removed category is offered no plan, with one or not (review 7, adversarial И). -->
+            <component
+              :is="row.archived ? 'div' : 'button'"
+              :type="row.archived ? undefined : 'button'"
+              class="row"
+              :class="{ still: row.archived }"
+              @click="row.archived || edit(row.categoryId, row.plan)"
+            >
               <span class="head">
                 <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
                 <span class="name">{{ row.name }}</span>
@@ -86,7 +93,7 @@
                 <span>{{ row.of }}</span>
                 <span :class="{ over: row.over }">{{ row.used }}</span>
               </span>
-            </button>
+            </component>
           </li>
         </AppCard>
 
@@ -146,6 +153,7 @@
       :name-of="nameOf"
       :spend-currency="budget?.spendCurrency ?? 'AMD'"
       :online="online"
+      :save="save"
       @done="done"
     />
   </AppScreen>
@@ -217,7 +225,7 @@ export default defineComponent({
       })
     }
 
-    const { phase, budget, stale, fetchedAt, retry, accept } = useMoneyBudget(month)
+    const { phase, budget, stale, fetchedAt, retry, save } = useMoneyBudget(month)
 
     const online = ref(navigator.onLine)
     const onLine = () => (online.value = true)
@@ -252,8 +260,9 @@ export default defineComponent({
     const when = (at: Date) => countedWhen(at, locale.value)
 
     const overall = computed(() => {
+      // No row counted, or over a plan known in part: «осталось» is not said as a figure (review 9, 10).
       const left = budget.value?.total?.left
-      if (!left) return { over: false, figure: '' }
+      if (!left) return { over: false, figure: '—' }
       return { over: left.minor < 0n, figure: amount(left) }
     })
     /** Some share waits for «Пришло»: the total says that, not «нет курса» (review 1). */
@@ -279,6 +288,7 @@ export default defineComponent({
           plan: row.plan,
           name: nameOf(row.categoryId),
           colour: colourOf(row.categoryId),
+          archived: categoryOf(row.categoryId)?.archived === true,
           over,
           // Over the plan is said by the words beside it, never by a minus (Р-7, review 5).
           left: row.left === null ? '—' : amount(row.left),
@@ -360,9 +370,8 @@ export default defineComponent({
       plan.value = target == null ? null : { kind: 'share', percent: target }
       sheetOpen.value = true
     }
-    /** The write's own answer is the month's budget now: shown, with no second read (review 6). */
+    /** The write's answer is already shown by `save` (review 6); the outcome is only said. */
     function done(outcome: BudgetOutcome): void {
-      accept(outcome.budget.month, outcome.budget)
       announce?.(
         t(outcome.kind === 'saved' ? 'budget.saved' : 'budget.removed', { name: outcome.name }),
       )
@@ -380,6 +389,7 @@ export default defineComponent({
       stale,
       fetchedAt,
       retry,
+      save,
       online,
       whole,
       amount,

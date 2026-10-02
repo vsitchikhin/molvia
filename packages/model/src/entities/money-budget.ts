@@ -68,7 +68,11 @@ export interface BudgetRow {
   readonly spent: Money
   /** Something of the category had no rate (`uncountedIn`): what was spent is short by it. */
   readonly spentWhole: boolean
-  /** The plan less what was spent, signed — below zero is «сверх плана» (Р-7). */
+  /**
+   * The plan less what was spent, signed — below zero is «сверх плана» (Р-7). Null with no plan, and
+   * where a plan known only in part is spent past (review 10): a share of a «Пришло» short of a rate
+   * is a floor of the plan, and «over» against a floor is not known.
+   */
   readonly left: Money | null
   /**
    * What was spent of the plan, in whole percent rounded as a person rounds — but «100 %» only once
@@ -85,10 +89,18 @@ export interface BudgetUnplanned {
 }
 
 export interface BudgetTotal {
-  /** The plans of the rows, what was spent in them, and what is left — signed. */
-  readonly planned: Money
+  /**
+   * The plans of the rows counted, and what is left of them, signed — null while no row is counted:
+   * every share waiting for «Пришло» is no «Осталось 0 ֏» (review 9). `left` is null too where the
+   * plans are known only in part and spent past them (review 10).
+   */
+  readonly planned: Money | null
+  /**
+   * What was spent in every category with a plan — a share still waiting for «Пришло» too: its
+   * category is planned, and its spending is no «вне плана» (adversarial З of round 2).
+   */
   readonly spent: Money
-  readonly left: Money
+  readonly left: Money | null
   /** What was spent in categories with no plan, apart (Р-6): it is no part of «осталось». */
   readonly unplanned: Money
   /**
@@ -193,7 +205,11 @@ export function monthBudget(
     }
     if (category.archivedAt !== null && !touched) continue
     const { planned, estimated, whole, awaitingIncome } = plannedOf(plan, month)
-    const left = planned === null ? null : { minor: planned.minor - spent.minor, currency: spend }
+    const remaining = planned === null ? null : planned.minor - spent.minor
+    const left =
+      remaining === null || (!whole && remaining < 0n)
+        ? null
+        : { minor: remaining, currency: spend }
     rows.push({
       categoryId: category.id,
       plan,
@@ -217,9 +233,21 @@ export function monthBudget(
   }
 }
 
+/**
+ * A percent the wire can carry, or none: past a safe integer it says nothing a person reads, and an
+ * answer that cannot encode is a 500 for good (adversarial А2 of round 2) — a plan of 0,01 ֏ beside a
+ * large spending, a «Пришло» of a kopeck.
+ */
+function safePercent(value: bigint): number | null {
+  return value > BigInt(Number.MAX_SAFE_INTEGER) || value < -BigInt(Number.MAX_SAFE_INTEGER)
+    ? null
+    : Number(value)
+}
+
 function usedOf(spent: Money, planned: Money): number | null {
   if (planned.minor <= 0n) return null
-  const rounded = Number(divideRounded(spent.minor * 100n, planned.minor))
+  const rounded = safePercent(divideRounded(spent.minor * 100n, planned.minor))
+  if (rounded === null) return null
   return spent.minor < planned.minor ? Math.min(rounded, 99) : rounded
 }
 
@@ -232,21 +260,26 @@ function totalOf(
   // A row whose plan would carry the sum past what money holds is left out, as a spending is from
   // «Потрачено» (adversarial А); what was spent is at most the month's, which money holds.
   let planned = 0n
-  let spent = 0n
+  let spentCounted = 0n
   let counted = 0
   for (const row of rows) {
     if (row.planned === null || planned + row.planned.minor > INT8_MAX) continue
     planned += row.planned.minor
-    spent += row.spent.minor
+    spentCounted += row.spent.minor
     counted += 1
   }
-  const left: Money = { minor: planned - spent, currency: spend }
   const whole = counted === rows.length && rows.every((row) => row.plannedWhole && row.spentWhole)
+  const remaining = planned - spentCounted
+  const left: Money | null =
+    counted === 0 || (!whole && remaining < 0n) ? null : { minor: remaining, currency: spend }
   const leftIncome =
-    month.incomeCurrency === spend || month.rate === null ? null : convertSigned(left, month.rate)
+    left === null || month.incomeCurrency === spend || month.rate === null
+      ? null
+      : convertSigned(left, month.rate)
   return {
-    planned: { minor: planned, currency: spend },
-    spent: { minor: spent, currency: spend },
+    planned: counted === 0 ? null : { minor: planned, currency: spend },
+    // Every row's spending is of the month's, which money holds.
+    spent: { minor: rows.reduce((sum, row) => sum + row.spent.minor, 0n), currency: spend },
     left,
     unplanned: {
       minor: unplanned.reduce((sum, row) => sum + row.spent.minor, 0n),
@@ -273,7 +306,7 @@ function savingsOf(month: MoneyMonth, plan: BudgetPlanValue | null): BudgetSavin
     target,
     income: month.income,
     difference: { minor: difference, currency: month.income.currency },
-    actual: Number(divideRounded(difference * 100n, month.income.minor)),
+    actual: safePercent(divideRounded(difference * 100n, month.income.minor)),
   }
 }
 
@@ -285,6 +318,6 @@ export function budgetFigure(budget: MonthBudget): { planned: boolean; left: Mon
   return {
     // The savings target is a plan too (adversarial Д): set alone, the month is no «не задан».
     planned: budget.total !== null || budget.savings.target !== null,
-    left: budget.total?.whole ? budget.total.left : null,
+    left: budget.total?.whole ? (budget.total.left ?? null) : null,
   }
 }

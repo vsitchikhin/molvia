@@ -24,10 +24,13 @@ export interface KeptAnswer<T> {
   readonly kept: ComputedRef<readonly Remembered<T>[]>
   readonly retry: () => Promise<void>
   /**
-   * An answer a write came back with (MOL-117, review 6): the latest there is for its subject, kept
-   * and shown as a read's would be — no second read for what the write already said.
+   * A write that answers with the subject's new state (MOL-117, review 6): its answer is shown as a
+   * read's would be — no second read for what the write already said — **numbered when it sets out**,
+   * as a read is. A read that set out while the write was on its way may have counted before the
+   * write or after it, so then neither is trusted and the subject is read once more (adversarial Ж of
+   * round 2): numbered on arrival, the write's older answer put back a spending landed meanwhile.
    */
-  readonly accept: (subject: string, answer: T) => void
+  readonly write: (subject: string, run: () => Promise<T>) => Promise<T>
 }
 
 export interface KeptAnswerOptions<T> {
@@ -160,18 +163,24 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
     }
   }
 
-  function accept(asked: string, answer: T): void {
+  async function written(asked: string, run: () => Promise<T>): Promise<T> {
     const id = actor.id
-    if (!id) return
     const mine = ++latest
+    const answer = await run()
+    if (!id || actor.id !== id) return answer
+    if (latest !== mine) {
+      void load()
+      return answer
+    }
     answered.set(asked, mine)
     const fetchedAt = new Date()
     remember(id, asked, answer, fetchedAt)
     recallKept()
-    if (subject.value !== asked) return
+    if (subject.value !== asked) return answer
     shown.value = { answer, fetchedAt }
     failure.value = null
     confirmed.value = true
+    return answer
   }
 
   adopt()
@@ -200,6 +209,6 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
     fetchedAt: computed(() => shown.value?.fetchedAt ?? null),
     kept: computed(() => stored.value),
     retry: load,
-    accept,
+    write: written,
   }
 }
