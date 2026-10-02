@@ -212,8 +212,8 @@ interface Item {
 const MARGIN = 50
 /** How far from the touch a dot is still under the finger — its own radius and some. */
 const FINGER_PX = 12
-/** How wide a dot is drawn (`.point`): centres closer than this are drawn one over another. */
-const DOT_PX = 10
+/** How far from its centre a dot is drawn, its ring included (`.halo`, 14 px wide). */
+const RING_PX = 7
 /** Half the end of the mark, in thousandths of the plot's width. */
 const TICK = 14
 
@@ -336,14 +336,16 @@ export default defineComponent({
     }
 
     /**
-     * A tap is read by what is drawn, in pixels (adversarial Л, М, review 6). **A dot within a finger
-     * of the touch is chosen** — the nearest; measured in thousandths, the left half of a Monday's
-     * dot lay nearer the end of the week before, and the dot drawn over the finger chose a week with
-     * no exchange. **Dots drawn one over another** — centres closer than a dot is wide, one day and
-     * one rate or two days and nearly one — **are turned over by a second tap**, and a slide keeps the
-     * one chosen (adversarial И, `tap`). **With no dot under the finger, the nearest by x alone**: a
-     * week with no exchange by its end, an exchange by its day (review 1) — never by height, which
-     * chose a week two ahead over a line of 6 px weeks and left a gap out of reach (review 4, Ж).
+     * A tap is read by what is drawn, in pixels (adversarial Л, М, Н, review 6). **The dot under the
+     * finger is chosen** — the nearest within `FINGER_PX`; measured in thousandths, the left half of a
+     * Monday's dot lay nearer the end of the week before. **A tap on the dot already chosen turns to
+     * the next of the dots drawn over the same spot** — whose ring covers the touch (`RING_PX`): one
+     * day and one rate, or two days and nearly one (adversarial И). Turned from the one chosen
+     * rather than the one touched, a tap on the middle of three dots a few pixels apart went to the
+     * first (Н). **A slide follows the finger**, kept only by a dot drawn right on the one under it.
+     * **With no dot under the finger, the nearest by x alone**: a week with no exchange by its end,
+     * an exchange by its day (review 1) — never by height, which chose a week two ahead over a line
+     * of 6 px weeks and left a gap out of reach (review 4, Ж).
      */
     const pointer = useChartPointer(area, (fraction, point) => {
       const shown = pair.value
@@ -374,14 +376,23 @@ export default defineComponent({
         return
       }
 
-      const centre = items.value[hit]?.exchange
-      const at = centre && { x: xOf(centre.x), y: point.y === null ? 0 : yAt(centre.level) }
-      const stacked = items.value.flatMap((item, index) =>
-        item.exchange && at && apart(item.exchange, at) < DOT_PX ? [index] : [],
+      const target = items.value[hit]?.exchange
+      const chosen = items.value[chosenIndex.value]?.exchange
+      if (!point.tap) {
+        // A slide follows the finger; only a dot drawn right on the one under it keeps the choice.
+        if (!chosen || !target || apart(chosen, finger) > apart(target, finger)) choose(hit)
+        return
+      }
+      if (chosenIndex.value !== hit) {
+        choose(hit)
+        return
+      }
+      // A tap on the dot already chosen turns to the next of those drawn over the same spot.
+      const covering = items.value.flatMap((item, index) =>
+        item.exchange && apart(item.exchange, finger) <= RING_PX ? [index] : [],
       )
-      const held = stacked.indexOf(chosenIndex.value)
-      if (held === -1) choose(hit)
-      else if (point.tap) choose(stacked[(held + 1) % stacked.length] ?? hit)
+      const held = covering.indexOf(hit)
+      if (held !== -1 && covering.length > 1) choose(covering[(held + 1) % covering.length] ?? hit)
     })
 
     const yOf = (level: number) => 1000 - MARGIN - (level * (1000 - 2 * MARGIN)) / CHART_LEVEL

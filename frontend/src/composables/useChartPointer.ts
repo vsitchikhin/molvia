@@ -4,9 +4,9 @@ import type { Ref } from 'vue'
 const INTENT_PX = 8
 
 /**
- * How high on the area the pointer is, in pixels from its top, and the area's size: a chart whose marks differ
- * by height too — two exchanges of one day on the line of the rate (MOL-161, adversarial Б) — tells
- * them apart by it. `y` is null where the area has no height to measure by.
+ * How high on the area the pointer is, in pixels from its top, and the area's size: a chart whose
+ * marks differ by height too — two exchanges of one day on the line of the rate (MOL-161,
+ * adversarial Б) — tells them apart by it. `y` is null where the area has no height to measure by.
  */
 export interface ChartPoint {
   readonly y: number | null

@@ -334,6 +334,36 @@ describe('ExchangeRateChart (MOL-161)', () => {
     expect([...seen].sort()).toEqual(['Вторник', 'Среда'])
   })
 
+  it('a chain of dots 7 px apart: a tap and a slide choose the one under the finger (adversarial Н)', async () => {
+    // One place, one rate, every eight days: centres 7,2 px apart on 300 px, each overlapping the next.
+    const chain = [
+      ['a0000000-0000-4000-8000-000000000015', '2026-02-20', 2, 547, 'Первый'],
+      ['a0000000-0000-4000-8000-000000000016', '2026-02-24', 3, 571, 'Второй'],
+      ['a0000000-0000-4000-8000-000000000017', '2026-02-28', 3, 595, 'Третий'],
+    ] as const
+    const exchanges = chain.map(([id, day, week, x, place]) => point(id, day, week, x, { place }))
+    const { view, area } = chart([rouble({ exchanges })])
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    const shown = () => view.find('.mine-place').text().split(' · ')[0]
+    expect(shown()).toBe('Третий')
+    // The middle one's centre: 571 × 0.3 = 171,3 px across, (1000 − 50 − 360) × 0.18 = 106,2 down.
+    await at(view, area, 171.3, 106.2)
+    expect(shown()).toBe('Второй')
+    // A slide from left of the first to the last shows each in turn.
+    const event = (type: string, x: number) =>
+      new PointerEvent(type, { clientX: x, clientY: 106.2, pointerType: 'touch', bubbles: true })
+    const seen: string[] = []
+    area.dispatchEvent(event('pointerdown', 150))
+    for (let x = 160; x <= 180; x += 0.5) {
+      area.dispatchEvent(event('pointermove', x))
+      await view.vm.$nextTick()
+      const place = shown()
+      if (place && seen.at(-1) !== place) seen.push(place)
+    }
+    area.dispatchEvent(event('pointerup', 180))
+    expect(seen.slice(-3)).toEqual(['Первый', 'Второй', 'Третий'])
+  })
+
   it('must not fire: two dots a finger apart but drawn apart are not turned over', async () => {
     // One day, 4,25 and 4,40: the dots stand some 30 px apart.
     const low = point('a0000000-0000-4000-8000-000000000013', '2026-02-24', 3, 571, {
