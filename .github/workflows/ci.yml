@@ -23,7 +23,7 @@ jobs:
     # credentials match what bin/init-env.sh writes, so CI and a working copy agree.
     services:
       postgres:
-        image: postgres:17-alpine
+        image: pgvector/pgvector:0.8.7-pg17-bookworm
         env:
           POSTGRES_DB: molvia_0
           POSTGRES_USER: molvia
@@ -63,7 +63,7 @@ jobs:
     # with it, /health reports ok rather than degraded, which is what a user would see.
     services:
       postgres:
-        image: postgres:17-alpine
+        image: pgvector/pgvector:0.8.7-pg17-bookworm
         env:
           POSTGRES_DB: molvia_0
           POSTGRES_USER: molvia

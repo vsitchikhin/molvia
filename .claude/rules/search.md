@@ -373,8 +373,8 @@ shows what it moves.
 **Embeddings are a 0.2 question, not a 0.1 one.** They answer what trigrams cannot —
 «молочка» reaching kefir and curd, and the duplicate merging the canonical catalogue needs.
 They are not the answer to typos or transliteration, both of which are already solved
-deterministically above. The cost is real: `vector` is not in `postgres:17-alpine`, so it
-means owning the image, plus a model resident in memory on a cheap VPS.
+deterministically above. The image carries `vector` since MOL-105 (`deploy.md`); the cost left
+is a model resident in memory on a cheap VPS.
 
 ## How the catalogue grows
 
