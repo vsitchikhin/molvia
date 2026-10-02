@@ -52,10 +52,11 @@ beforeEach(() => {
 async function evening(
   day: string,
   repository: ReminderRepository = reminders,
+  time = '19:00',
 ): Promise<DueReminders> {
   const due = await remindRatings(
     repository,
-    yerevan(day, '19:00'),
+    yerevan(day, time),
     (error) => failures.push(error),
     new Map(),
   )
@@ -247,7 +248,7 @@ describe('выключено — значит выключено', () => {
       ...reminders,
       candidates: async () => {
         const found = await reminders.candidates()
-        await reminders.switchReminders({ actorId: anna.id }, 'off', 'settings')
+        await reminders.switchReminders({ actorId: anna.id }, 'off', 'settings', new Date())
         return found
       },
     }
@@ -270,6 +271,78 @@ describe('включение начинает лестницу заново (Р-
     expect(await ladderOf(anna)).toBeNull()
     expect(asked(await evening('2026-07-21'))).toEqual({ [anna.tg]: ['Кефир'] })
     expect(await ladderOf(anna)).toEqual({ step: 1, remindedOn: '2026-07-21' })
+  })
+
+  it.each([
+    ['кнопками в боте', 'off', 'on', 'bot'],
+    ['в настройках', 'off', 'on', 'settings'],
+    ['блокировкой и разблокировкой', 'blocked', 'unblocked', 'bot'],
+  ] as const)(
+    'выключил и включил %s тем же вечером — те же вопросы второй раз не приходят (адверсариальный А)',
+    async (_how, off, on, via) => {
+      const anna = await person()
+      await bought(anna, 'Молоко', yerevan('2026-07-13', '10:00'))
+      expect(asked(await evening('2026-07-14'))).toEqual({ [anna.tg]: ['Молоко'] })
+
+      await reminders.switchReminders(
+        { actorId: anna.id },
+        off,
+        via,
+        yerevan('2026-07-14', '19:05'),
+      )
+      await reminders.switchReminders({ actorId: anna.id }, on, via, yerevan('2026-07-14', '19:06'))
+
+      expect(asked(await evening('2026-07-14', reminders, '19:07'))).toEqual({})
+      expect(await ladderOf(anna)).toEqual({ step: 1, remindedOn: '2026-07-14' })
+      const [day] = await db.select().from(reminderDays).where(eq(reminderDays.day, '2026-07-14'))
+      expect(day).toMatchObject({ firstSteps: 1, items: 1 })
+    },
+  )
+
+  it('вечер ступени 2: выключил и включил — ни ступени 1 о том же, ни второй ступени 2', async () => {
+    const anna = await person()
+    await bought(anna, 'Молоко', yerevan('2026-07-12', '10:00'))
+    await evening('2026-07-13')
+    await bought(anna, 'Кефир', yerevan('2026-07-15', '10:00'))
+    expect(asked(await evening('2026-07-16'))).toEqual({ [anna.tg]: ['Кефир', 'Молоко'] })
+
+    await reminders.switchReminders(
+      { actorId: anna.id },
+      'off',
+      'bot',
+      yerevan('2026-07-16', '19:05'),
+    )
+    await reminders.switchReminders(
+      { actorId: anna.id },
+      'on',
+      'bot',
+      yerevan('2026-07-16', '19:06'),
+    )
+
+    expect(asked(await evening('2026-07-16', reminders, '19:07'))).toEqual({})
+    expect(await ladderOf(anna)).toEqual({ step: 2, remindedOn: '2026-07-16' })
+  })
+
+  it('включил на следующий день — лестница с нуля: ступень 1 о вчерашнем', async () => {
+    const anna = await person()
+    await bought(anna, 'Молоко', yerevan('2026-07-13', '10:00'))
+    await evening('2026-07-14')
+    await reminders.switchReminders(
+      { actorId: anna.id },
+      'off',
+      'bot',
+      yerevan('2026-07-14', '19:05'),
+    )
+    await bought(anna, 'Кефир', yerevan('2026-07-14', '20:00'))
+
+    await reminders.switchReminders(
+      { actorId: anna.id },
+      'on',
+      'bot',
+      yerevan('2026-07-15', '09:00'),
+    )
+    expect(await ladderOf(anna)).toBeNull()
+    expect(asked(await evening('2026-07-15'))).toEqual({ [anna.tg]: ['Кефир'] })
   })
 
   it('повторное «включить» на включённом лестницу не трогает', async () => {

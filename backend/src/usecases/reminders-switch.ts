@@ -22,8 +22,14 @@ export async function chooseReminders(
   reminders: Pick<ReminderRepository, 'switchReminders'>,
   owner: Pick<Actor, 'id'>,
   { on }: ChooseReminders,
+  now: Date,
 ): Promise<RemindersSetting> {
-  const off = await reminders.switchReminders({ actorId: owner.id }, on ? 'on' : 'off', 'settings')
+  const off = await reminders.switchReminders(
+    { actorId: owner.id },
+    on ? 'on' : 'off',
+    'settings',
+    now,
+  )
   return { off: off ?? null }
 }
 
@@ -35,6 +41,7 @@ export async function chooseReminders(
 export async function switchRemindersFromBot(
   reminders: Pick<ReminderRepository, 'switchReminders'>,
   { telegramUserId, change }: SwitchRemindersFromBot,
+  now: Date,
 ): Promise<void> {
-  await reminders.switchReminders({ telegramUserId }, change, 'bot')
+  await reminders.switchReminders({ telegramUserId }, change, 'bot', now)
 }

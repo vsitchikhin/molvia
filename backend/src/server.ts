@@ -503,7 +503,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         ),
       rateFromBot: (itemId, body) =>
         rateFromBot({ actors, items, verdicts, reminders }, itemId, body),
-      switchReminders: (body) => switchRemindersFromBot(reminders, body),
+      switchReminders: (body) => switchRemindersFromBot(reminders, body, new Date()),
     })
 
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).
@@ -541,7 +541,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       )
       remindersRoutes(guarded, {
         setting: (owner) => remindersSettingOf(reminders, { id: owner }),
-        choose: (owner, body) => chooseReminders(reminders, { id: owner }, body),
+        choose: (owner, body) => chooseReminders(reminders, { id: owner }, body, new Date()),
       })
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items }, actorId, query),
