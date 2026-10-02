@@ -8,6 +8,7 @@ paths:
   - 'backend/drizzle/**'
   - 'backend/src/db/migrate*.ts'
   - 'backend/src/routes/health.ts'
+  - 'bot/src/pulse.ts'
   - '.env.prod.example'
 ---
 
@@ -79,6 +80,21 @@ The shape worth knowing here:
   a form the copied grammar missed each time. `v0.2.0`
   starts the 0.2 cohort. **`/api/health` names the build** — `git describe --long`,
   `v0.1.1-3-g1a2b3c4`.
+- **Production is watched from outside, never from the machine (MOL-142; MOL-149, В-4).** A watch on
+  the same machine does not notice the machine is down. `.github/workflows/watch.yml` asks every
+  five minutes for `/api/health`, the page and the certificate's term, and pings the healthchecks.io
+  check `molvia-up` — or its `/fail`, saying what; the bot pings `molvia-bot` after a claim of
+  reminders went through. The alarm is healthchecks.io's own Telegram integration, never our bot,
+  which lies down with the machine. **`/health` is `503` whenever it is not `ok`**, with the same
+  body: a 200 saying «degraded» is a database down that a watch reading the status never sees. The
+  rollout reads the body and is unchanged by it. **A `/fail` waits for four checks half a minute
+  apart**, since it raises the alarm with no grace and every merge leaves the API silent for seconds;
+  a run is red only when it could not report, or GitHub's e-mail would come on top of Telegram.
+  **The bot is not in `/health`**: after a rollout the API knows nothing of it for a minute, and the
+  rollout would roll back. Both ping URLs are kept like secrets — whoever has one can say «alive» —
+  and printed nowhere. The prices, accepted by the owner: a fall is noticed within twenty minutes,
+  not five, since GitHub's cron runs late; GitHub down is a false alarm. `deploy/README.md`,
+  «Signals».
 - **A failed deploy puts the previous image back, not the schema.** Pending migrations run in
   one transaction, so a migration that fails leaves the schema as it was and the old image
   finds what it knew. One that succeeded while something else failed stays applied, and the

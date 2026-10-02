@@ -254,6 +254,76 @@ whole; without it, until now. A day is Yerevan's; a moment needs its offset.
 
 In a working copy the same thing is `make gates FROM=2026-10-05 [TO=2026-10-31]`.
 
+## Signals (MOL-142)
+
+Three checks at healthchecks.io tell the owner in Telegram that something in production is down.
+They go through healthchecks.io's own Telegram integration, never through our bot: a machine that
+is down takes the bot with it. healthchecks.io and GitHub see the server's address and nothing of
+anyone's data.
+
+| Check           | Who pings                                                             | Period · grace | Silence or `/fail` means                                                                                  |
+| --------------- | --------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------- |
+| `molvia-up`     | `.github/workflows/watch.yml`, from GitHub, every five minutes        | 5 min · 15 min | the API with its database, the page or the certificate's term — or GitHub itself                          |
+| `molvia-bot`    | the bot, after a claim of reminders went through, at most every 5 min | 5 min · 10 min | the bot is down or cannot reach the API or the internet — and without the bot nobody can sign in (MOL-54) |
+| `molvia-backup` | `backup/backup.sh`, nightly                                           | 1 day · 1 hour | no copy of the database tonight (Backups, below)                                                          |
+
+- **What the watch checks.** `GET /api/health` is `200` with `"status":"ok"` — `/health` answers
+  `503` whenever it is not ok, the database down included, with the same body. `GET /` is `200`.
+  The certificate is good for more than fourteen days: Caddy renews it itself, but silently fails
+  to when DNS breaks. curl checks the chain and the name on every request, so a bad certificate
+  is a `000`.
+- **A rollout does not wake anyone.** `/fail` raises the alarm at once, with no grace, and every
+  merge leaves the API silent for seconds. So the watch believes a failure only once four checks
+  half a minute apart all saw one, and a `/fail` says what they saw: `health 503`, `pwa 000`,
+  `cert expires Dec 25 13:23:34 2026 GMT`.
+- **A run is red only when it could not report** — no secret, or the ping did not go. A site that
+  is down is a `/fail` and a green run.
+- **The prices, accepted** (MOL-149): GitHub's cron runs late under load and now and then skips a
+  run, so a fall is noticed within twenty minutes, not five; an outage of GitHub Actions is a false
+  `molvia-up`. GitHub switches the schedule off in a public repository after sixty days without a
+  commit — Actions → Watch → «Enable workflow» brings it back.
+- **The bot's pulse is not in `/health`** on purpose: after every rollout the API would know nothing
+  of the bot for its first minute, and the rollout would roll back.
+
+### Where it is set
+
+- The checks are the owner's healthchecks.io account, the one the backups report to, each with the
+  Telegram integration.
+- `molvia-up`'s ping URL is the repository secret `HC_UP_URL` (`gh secret set HC_UP_URL`). Without
+  it every run of the watch is red.
+- `molvia-bot`'s ping URL is `BOT_PULSE_URL` in `~/molvia/.env.prod`, handed to the bot by
+  `docker-compose.prod.yml`. Empty, the bot sends nothing — and `molvia-bot` raises its alarm, which
+  is how a forgotten line is noticed. Working copies and the end-to-end run leave it empty.
+- **Both URLs are kept like secrets**: whoever has one can say «alive» for us. They are printed
+  nowhere — not in a log, not here.
+
+### Trying the alarm
+
+```bash
+gh workflow run watch.yml -f domain=molvia.invalid
+```
+
+A minute and a half of tries, then a `/fail` and a message in Telegram. The next scheduled run puts
+`molvia-up` back up.
+
+### When an alarm comes
+
+**`molvia-up`.** Actions → Watch → the latest run: its warning names what failed.
+
+- `health 503` — the API runs and the database does not answer: `ssh molvia`, then
+  `docker compose -f docker-compose.prod.yml --env-file .env.prod ps postgres` and its `logs`.
+- `health 502`, `health 000`, `pwa 000` — the API, Caddy or the machine: `ssh molvia` first; if that
+  hangs too, it is the machine, and Contabo's panel. A rollout gone wrong is in
+  `tail ~/molvia/deploy.log`.
+- `cert expires …` — Caddy's renewal failed: `docker compose … logs frontend | grep -i acme`, and
+  check the domain's A record in Cloudflare.
+- No run at all in Actions for twenty minutes — GitHub, not us: https://www.githubstatus.com.
+
+**`molvia-bot`.** `ssh molvia`, then `docker compose -f docker-compose.prod.yml --env-file .env.prod
+ps bot` — is it running, how often did it restart — and `logs --tail 50 bot`.
+`[molvia] remind claim: <code>` is the API refusing the claim; `[molvia] pulse: <kind>` is the ping
+that did not go out — `network`, `timeout` or healthchecks.io's status.
+
 ## Backups (MOL-70)
 
 Every night at 04:00 in Yerevan `molvia-backup.timer` runs `backup/backup.sh`: `pg_dump` inside the

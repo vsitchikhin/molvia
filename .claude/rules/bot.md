@@ -51,6 +51,14 @@ press — the only channel people are given, because there Telegram already says
 - **The bot keeps no state of its own.** The login code rides in the button's `callback_data`,
   which is Telegram's memory rather than ours, and everything else is asked of the API — the
   only write path there is. So nothing survives a restart, because nothing needs to.
+- **The pulse is the one thing the bot holds in memory** (MOL-142, `pulse.ts`): when its last ping
+  to healthchecks.io succeeded. A claim of reminders that went through — an empty one too — beats,
+  at most once in five minutes, counted from the last ping that succeeded, so a failed one is tried a
+  claim later; a ping on its way is not doubled, and none waits for an evening's messages. It proves
+  the bot reached the API and the internet, which «the process runs» does not. A restart forgets it
+  and costs one early ping. Without `BOT_PULSE_URL` — every copy and the end-to-end run — not one
+  request leaves; the URL is never logged, since whoever has it can say «alive» for the bot, and a
+  failure is logged by its kind. It is not in the API's `/health`: `deploy.md` says why.
 - **Updates of different people are handled at once; updates of one person, in order** — and
   both halves are load-bearing (MOL-55, О-4). `bot.start()` handles updates strictly one after
   another, which is grammY's ordering guarantee and was measured costing the next person their

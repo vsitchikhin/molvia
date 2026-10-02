@@ -423,6 +423,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   line by hand.
 - **A merge is a deploy** (MOL-90); a failed deploy puts the previous image back, not the schema,
   **so a migration that drops or renames goes out in two merges**.
+- **Production is watched from outside** (MOL-142): `watch.yml` every five minutes and the bot's
+  pulse after a claim, both to healthchecks.io and its own Telegram, never our bot; **`/health` is
+  `503` whenever it is not `ok`**, and the bot is not in it.
 
 ## Tracker and documentation
 
