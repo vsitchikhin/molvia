@@ -94,6 +94,7 @@ function yearCharts(patch: Partial<MoneyChartYearView> = {}): MoneyChartYearView
     spent: amd('586483'),
     spentIncome: rub('135187'),
     spentIncomeMissing: null,
+    rateMissing: [],
     uncounted: [],
     slices: [
       {
@@ -587,21 +588,20 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
   })
 
   it('names the month that keeps the year’s «≈» from being counted (review 14)', async () => {
-    const base = yearCharts({ spentIncome: null, spentIncomeMissing: 'rate' })
-    const months = base.months.map((month) =>
-      month.month === '2026-08'
-        ? { ...month, spentIncome: null, spentIncomeLevel: null, difference: null }
-        : month,
+    moneyChartYear.mockResolvedValue(
+      yearCharts({ spentIncome: null, spentIncomeMissing: 'rate', rateMissing: ['2026-08'] }),
     )
-    moneyChartYear.mockResolvedValue({ ...base, months })
     const one = await render()
     expect(one.find('.figure .center-sub').text()).toBe('no rate for August')
     one.unmount()
 
-    const both = base.months.map((month) =>
-      month.kind === 'data' ? { ...month, spentIncome: null, spentIncomeLevel: null } : month,
+    moneyChartYear.mockResolvedValue(
+      yearCharts({
+        spentIncome: null,
+        spentIncomeMissing: 'rate',
+        rateMissing: ['2026-08', '2026-09'],
+      }),
     )
-    moneyChartYear.mockResolvedValue({ ...base, months: both })
     const two = await render()
     expect(two.find('.figure .center-sub').text()).toBe('no rate for 2 months')
   })

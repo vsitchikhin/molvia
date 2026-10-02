@@ -543,6 +543,7 @@ describe('yearCharts — round 5 of the adversarial pass', () => {
     ]
     const missing = year('2026', rate, '2026-02-20', '2026-01')
     expect([missing.spentIncome, missing.spentIncomeMissing]).toEqual([null, 'rate'])
+    expect(missing.rateMissing).toEqual(['2026-02'])
 
     // Every month has its «≈», each within money, and the year's sum too — but not the sum of «≈»:
     // a rate of 0,1 ֏ for a rouble makes the roubles ten times the drams.
@@ -557,5 +558,18 @@ describe('yearCharts — round 5 of the adversarial pass', () => {
 
     const whole = year('2026', run('2026-07', '2026-09', monthly(1000)), '2026-09-20', '2026-07')
     expect(whole.spentIncomeMissing).toBeNull()
+  })
+})
+
+describe('yearCharts — round 6 of the adversarial pass', () => {
+  it('a month whose own «≈» is past money had a rate: no «нет курса» for it (М″)', () => {
+    // July's «≈» alone is past money at 0,1 ֏ for a rouble; August and September are ordinary.
+    const july = counted('2026-07', [spending(10n ** 16n, '2026-07-05')], '0.1')
+    const months = [july, ...run('2026-08', '2026-09', monthly(1000))]
+    const charts = year('2026', months, '2026-09-20', '2026-07')
+    expect(charts.months[6]?.spentIncome).toBeNull()
+    expect(charts.spent).not.toBeNull()
+    expect(charts.rateMissing).toEqual([])
+    expect([charts.spentIncome, charts.spentIncomeMissing]).toEqual([null, 'beyond'])
   })
 })

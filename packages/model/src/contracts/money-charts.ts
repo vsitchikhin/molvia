@@ -112,6 +112,8 @@ export const moneyChartYearCodec = z.strictObject({
   spentIncome: moneyCodec.nullable(),
   /** Why there is no «≈»: a month with no rate, or a sum past money. */
   spentIncomeMissing: z.enum(['rate', 'beyond']).nullable(),
+  /** The months spent in with no rate of their own. */
+  rateMissing: z.array(monthSchema),
   uncounted: z.array(moneyCodec),
   slices: z.array(sliceCodec),
   months: z
@@ -190,6 +192,7 @@ export function moneyChartYearViewOf(
     })),
     average: charts.average && { ...charts.average },
     differenceMissing: [...charts.differenceMissing],
+    rateMissing: [...charts.rateMissing],
     categories: charts.categories.flatMap((series) => {
       const category = named.get(series.categoryId)
       return category

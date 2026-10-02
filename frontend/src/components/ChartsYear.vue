@@ -319,13 +319,12 @@ export default defineComponent({
       // The server says why there is no «≈» (adversarial М′): a sum past money is no rate's fault,
       // and nothing is said under it.
       if (shown?.spentIncomeMissing !== 'rate') return shown?.spentIncomeMissing ? '' : null
-      const missing = shown.months.filter(
-        (month) => month.kind === 'data' && month.spentIncome === null,
-      )
+      // The months the server names, not every month with no «≈»: one past money had a rate (М″).
+      const missing = shown.rateMissing
       const [one] = missing
       if (!one) return null
       return missing.length === 1
-        ? t('spending.charts.year_no_rate_one', { month: monthName(one.month, locale.value) })
+        ? t('spending.charts.year_no_rate_one', { month: monthName(one, locale.value) })
         : t('spending.charts.year_no_rate_many', { n: missing.length }, missing.length)
     })
     const centreLabel = computed(() => {

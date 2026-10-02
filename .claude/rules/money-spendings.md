@@ -511,6 +511,10 @@ MOL-74's unless they name MOL-160, and hold for the year.
   И, М). **Why the year has no «≈» is the server's word too** (`spentIncomeMissing`, adversarial
   М′), as the average's is: a month without a rate is named — «нет курса за август», review 14, as
   «Пришло и ушло» names its own — and a sum of «≈» past money says nothing, never «нет курса».
+  **«Without a rate» is read off the month's rate, never off its «≈»** (`rateMissing`, adversarial
+  М″): a month's own «≈» past money is null too, and that month had a rate. The price, named: the
+  column of «Пришло и ушло» of such a month still says «нет курса месяца» — a month's `spentIncome`
+  has been one null for both since MOL-74, and telling them apart there is the month's contract.
 
 ## «Графики → Месяц» (MOL-158)
 

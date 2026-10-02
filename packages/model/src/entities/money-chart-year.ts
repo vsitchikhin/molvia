@@ -71,9 +71,15 @@ export interface YearCharts {
   readonly spentIncome: Money | null
   /**
    * Why the year has no «≈», said by the server (adversarial М′): `rate` — a month spent in has no
-   * rate; `beyond` — the sum, or the sum of the months' «≈», is past what money holds. Null with one.
+   * rate (`rateMissing`); `beyond` — a sum or a «≈», the year's or a month's, is past what money
+   * holds. Null with one.
    */
   readonly spentIncomeMissing: 'rate' | 'beyond' | null
+  /**
+   * The months spent in with no rate of their own — «нет курса за август». Read off the month's rate,
+   * not its «≈»: a month's «≈» past money is null too, and that month had a rate (adversarial М″).
+   */
+  readonly rateMissing: readonly Month[]
   readonly uncounted: readonly Money[]
   readonly slices: readonly MonthSlice[]
   /** Always twelve, January first. */
@@ -361,6 +367,9 @@ export function yearCharts(input: YearChartsInput): YearCharts {
           }
         })
 
+  const rateMissing = shown
+    .filter((month) => month.spentIncome === null && month.rate === null)
+    .map((month) => month.month)
   const spentIncomeSum = shown.every((month) => month.spentIncome !== null)
     ? held(shown.reduce((sum, month) => sum + (month.spentIncome?.minor ?? 0n), 0n))
     : null
@@ -441,9 +450,10 @@ export function yearCharts(input: YearChartsInput): YearCharts {
     spentIncomeMissing:
       spent !== null && spentIncomeSum !== null
         ? null
-        : spent !== null && shown.some((month) => month.spentIncome === null)
+        : spent !== null && rateMissing.length > 0
           ? 'rate'
           : 'beyond',
+    rateMissing,
     uncounted: addedUp(shown.flatMap((month) => month.uncounted)),
     slices,
     months,
