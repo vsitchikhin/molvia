@@ -28,6 +28,7 @@ const file: ExportFile = {
     incomeCurrencySince: null,
     ratePreference: 'personal',
     salaryShiftDay: 25,
+    remindersOff: null,
     sharedUntil: null,
     createdAt: at,
     updatedAt: at,
@@ -231,7 +232,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(5)
+    expect(wire.version).toBe(6)
   })
 
   it('reads its own file back into the same values', () => {

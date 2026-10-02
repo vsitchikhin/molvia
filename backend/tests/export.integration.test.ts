@@ -103,7 +103,12 @@ async function aFullLife(actorId: string, telegramUserId: number) {
   const at = (minute: number) => new Date(Date.UTC(2026, 8, 20, 10, minute))
   await db
     .update(actors)
-    .set({ incomeCurrencySince: at(0), salaryShiftDay: 25, sharedUntil: at(1) })
+    .set({
+      incomeCurrencySince: at(0),
+      salaryShiftDay: 25,
+      remindersOff: 'chosen',
+      sharedUntil: at(1),
+    })
     .where(eq(actors.id, actorId))
   await insertSession(db, { actorId, deviceName: 'iPhone · Safari' })
   await insertLoginRequest(db, { telegramUserId, deviceName: 'Mac', consumedAt: new Date() })
