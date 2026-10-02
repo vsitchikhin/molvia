@@ -23,7 +23,7 @@ async function named(name: string): Promise<string> {
 }
 
 async function names(query: string, limit = 20): Promise<string[]> {
-  return (await repo.search(query, limit, nobody)).items.map((item) => item.name)
+  return (await repo.search(query, limit, nobody, null)).items.map((item) => item.name)
 }
 
 /** A candidate by trigrams, so a missing answer below is the distance speaking. */
@@ -145,7 +145,7 @@ describe('search — the shape of the query', () => {
 
   it('keeps its threshold to itself: the next statement on its connection sees the default', async () => {
     await named('Молоко «Ашхар»')
-    await repo.search('малако', 10, nobody)
+    await repo.search('малако', 10, nobody, null)
     // Read through the drizzle handle the repository used — a pool of one, so this is the
     // very connection. The file's other client would pass with a plain SET as well.
     const [row] = await db.execute<{ threshold: string }>(
@@ -161,7 +161,7 @@ describe('search — the shape of the query', () => {
     const seen = await db.transaction(async (tx) => {
       await tx.execute(raw`set local jit = on`)
       const before = await tx.execute(raw`select 1 from items where search_key %> 'malako'`)
-      await createItemRepository(tx).search('малако', 10, nobody)
+      await createItemRepository(tx).search('малако', 10, nobody, null)
       const after = await tx.execute(raw`select 1 from items where search_key %> 'malako'`)
       const [row] = await tx.execute<{ threshold: string; jit: string }>(
         raw`select current_setting('pg_trgm.word_similarity_threshold') as threshold,
@@ -184,7 +184,7 @@ describe('search — the shape of the query', () => {
     await named('Молоко «Ашхар»')
     const fresh = connectDrizzle()
     try {
-      const found = (await createItemRepository(fresh.db).search('малако', 10, nobody)).items
+      const found = (await createItemRepository(fresh.db).search('малако', 10, nobody, null)).items
       const [row] = await fresh.db.execute<{ threshold: string }>(
         raw`select current_setting('pg_trgm.word_similarity_threshold') as threshold`,
       )
@@ -673,7 +673,7 @@ describe('search — what it must not find', () => {
       },
     }) as Conn
     const spied = createItemRepository(counted)
-    for (const query of ['', '   ', '!!!', '«»']) await spied.search(query, 10, nobody)
+    for (const query of ['', '   ', '!!!', '«»']) await spied.search(query, 10, nobody, null)
     expect(transactions).toBe(0)
   })
 
@@ -695,8 +695,8 @@ describe('search — edges', () => {
     // one word of up to 600 characters, and levenshtein refuses anything past 255.
     const word = 'a'.repeat(300)
     await insertItem(db, { name: 'Длинное', searchKey: word })
-    expect((await repo.search(word, 10, nobody)).items).toBeInstanceOf(Array)
-    expect((await repo.search('щ'.repeat(150), 10, nobody)).items).toBeInstanceOf(Array)
+    expect((await repo.search(word, 10, nobody, null)).items).toBeInstanceOf(Array)
+    expect((await repo.search('щ'.repeat(150), 10, nobody, null)).items).toBeInstanceOf(Array)
   })
 
   it('does not lose the newest item: two thousand older candidates do not push it out', async () => {
@@ -747,8 +747,10 @@ describe('search — edges', () => {
     // reach levenshtein whole and answer a 500 to everyone, once such an item existed.
     await named('щ'.repeat(200))
     await named('Сыр Лори')
-    expect((await repo.search('щ'.repeat(130), 10, nobody)).items).toBeInstanceOf(Array)
-    expect((await repo.search(`сыр ${'щ'.repeat(150)}`, 10, nobody)).items).toBeInstanceOf(Array)
+    expect((await repo.search('щ'.repeat(130), 10, nobody, null)).items).toBeInstanceOf(Array)
+    expect((await repo.search(`сыр ${'щ'.repeat(150)}`, 10, nobody, null)).items).toBeInstanceOf(
+      Array,
+    )
   })
 
   it('returns exactly as many as asked: 0, 1, N, N+1', async () => {
@@ -775,7 +777,7 @@ describe('search — edges', () => {
 describe('search — the items it returns', () => {
   it('carries an item without barcodes as an empty list', async () => {
     await named('Лаваш')
-    const [item] = (await repo.search('lavash', 10, nobody)).items
+    const [item] = (await repo.search('lavash', 10, nobody, null)).items
     expect(item?.barcodes).toEqual([])
   })
 
@@ -783,7 +785,7 @@ describe('search — the items it returns', () => {
     const id = await named('Джермук')
     const codes = Array.from({ length: 20 }, (_, index) => String(4850000000000 + index))
     await db.insert(itemBarcodes).values([...codes].reverse().map((code) => ({ code, itemId: id })))
-    const [item] = (await repo.search('джермук', 10, nobody)).items
+    const [item] = (await repo.search('джермук', 10, nobody, null)).items
     expect(item?.barcodes).toEqual(codes)
   })
 
@@ -791,7 +793,7 @@ describe('search — the items it returns', () => {
     // The column accepts a blank note; the domain does not. Reading it must be a 500 with a
     // log line, not garbage on the screen (Р-3 of MOL-7).
     await insertItem(db, { name: 'Мацун', searchKey: toSearchKey('Мацун'), note: '   ' })
-    await expect(repo.search('мацун', 10, nobody)).rejects.toThrow()
+    await expect(repo.search('мацун', 10, nobody, null)).rejects.toThrow()
   })
 })
 
@@ -851,7 +853,7 @@ describe('search — a word the shelf writes otherwise (MOL-45)', () => {
     await named('Картофель')
     const young = await named('Картофель молодой')
     await createSearchPickRepository(db).remember(actorId, 'картошка', young)
-    const found = (await repo.search('картошка', 20, actorId)).items.map((item) => item.name)
+    const found = (await repo.search('картошка', 20, actorId, null)).items.map((item) => item.name)
     expect(found).toEqual(['Картофель молодой', 'Картофель'])
   })
 
@@ -931,7 +933,7 @@ describe("search — a word of the person's own (MOL-45)", () => {
   const picks = createSearchPickRepository(db)
 
   async function namesFor(actorId: string, query: string): Promise<string[]> {
-    return (await repo.search(query, 20, actorId)).items.map((item) => item.name)
+    return (await repo.search(query, 20, actorId, null)).items.map((item) => item.name)
   }
 
   it('finds by a query that found nothing, once the item was taken by another word', async () => {
@@ -1073,7 +1075,7 @@ describe('search — what the person took before (MOL-11)', () => {
   }
 
   async function namesFor(actorId: string, query: string): Promise<string[]> {
-    return (await repo.search(query, 20, actorId)).items.map((item) => item.name)
+    return (await repo.search(query, 20, actorId, null)).items.map((item) => item.name)
   }
 
   /** Two milks that tie on «молоко»; `second` is the one the id puts below. */
@@ -1228,7 +1230,8 @@ describe('search — what the person took before (MOL-11)', () => {
     const actorId = await insertActor(db)
     const { first, second, secondId } = await twoMilks()
     const firstId =
-      (await repo.search('молоко', 20, actorId)).items.find((item) => item.name === first)?.id ?? ''
+      (await repo.search('молоко', 20, actorId, null)).items.find((item) => item.name === first)
+        ?.id ?? ''
 
     await db.transaction(async (tx) => {
       const inTx = createSearchPickRepository(tx)
@@ -1307,7 +1310,7 @@ describe('search — how near the answer is (MOL-46)', () => {
   const picks = createSearchPickRepository(db)
 
   async function answer(query: string, actorId: string = nobody): Promise<[string[], boolean]> {
-    const { items: found, near } = await repo.search(query, 20, actorId)
+    const { items: found, near } = await repo.search(query, 20, actorId, null)
     return [found.map((item) => item.name), near]
   }
 
@@ -1426,7 +1429,7 @@ describe('search — how near the answer is (MOL-46)', () => {
     await named('Кекс Ашхар 1 л')
     expect(await answer('кефр ашхар 1 л')).toEqual([['Кекс Ашхар 1 л', 'Кефир Ашхар 0,5 л'], true])
 
-    const { items: found, near } = await repo.search('кефр ашхар 1 л', 1, nobody)
+    const { items: found, near } = await repo.search('кефр ашхар 1 л', 1, nobody, null)
     expect([found.map((item) => item.name), near]).toEqual([['Кекс Ашхар 1 л'], false])
   })
 
@@ -1539,7 +1542,7 @@ describe('search — at one distance, the shorter name first (MOL-112, В-5)', (
     await named('Кефир')
     await createSearchPickRepository(db).remember(actor, 'кефир', kefir)
 
-    const { items: found } = await repo.search('кефир', 20, actor)
+    const { items: found } = await repo.search('кефир', 20, actor, null)
     expect(found.map((item) => item.name)).toEqual(['Кефир 2,5%', 'Кефир'])
   })
 })

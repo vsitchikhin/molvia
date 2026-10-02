@@ -28,6 +28,8 @@ import type { EventRepository } from '@/db/events-repository'
 import type { ExpenseRepository, PlacePrice, PriceMedian } from '@/db/expenses-repository'
 import type { ItemRepository } from '@/db/items-repository'
 import type { AdviceVerdictRow, VerdictRepository } from '@/db/verdicts-repository'
+import type { Embedder } from '@/embeddings/embedder'
+import { queryMeaning } from '@/usecases/query-meaning'
 import { SEARCH_LIMIT } from '@/usecases/search-catalogue'
 import type { Today } from '@/usecases/today'
 
@@ -41,6 +43,8 @@ export interface AdviceDeps {
 /** The search writes nothing, so it is handed no log (В-2). */
 export interface AdviceSearchDeps extends Omit<AdviceDeps, 'events'> {
   readonly items: ItemRepository
+  /** The search by meaning, as «Что взяли?» has it (MOL-105): «молочка» shows the rated kefir. */
+  readonly embedder: Pick<Embedder, 'model' | 'query'>
 }
 
 /**
@@ -149,7 +153,7 @@ export const ADVICE_SEARCH_CANDIDATES = 500
  * entry of a purchase, and here nothing was bought.
  */
 export async function adviceSearch(
-  { actors, verdicts, expenses, items }: AdviceSearchDeps,
+  { actors, verdicts, expenses, items, embedder }: AdviceSearchDeps,
   actorId: string,
   query: string,
   phone: Today = {},
@@ -158,7 +162,12 @@ export async function adviceSearch(
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
   const scope: AdviceScope = hasSharedAccess(actor, new Date()) ? 'shared' : 'own'
 
-  const found = await items.search(query, ADVICE_SEARCH_CANDIDATES, actorId)
+  const found = await items.search(
+    query,
+    ADVICE_SEARCH_CANDIDATES,
+    actorId,
+    await queryMeaning(embedder, query),
+  )
   const close = new Set(found.nearIds)
   const first = found.items.slice(0, SEARCH_LIMIT)
   const past = found.items.slice(SEARCH_LIMIT).filter((item) => close.has(item.id))

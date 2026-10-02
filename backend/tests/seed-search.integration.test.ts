@@ -34,7 +34,7 @@ afterAll(async () => {
 })
 
 async function first(query: string): Promise<[string | undefined, boolean]> {
-  const { items, near } = await repo.search(query, 20, nobody)
+  const { items, near } = await repo.search(query, 20, nobody, null)
   return [items[0]?.name, near]
 }
 

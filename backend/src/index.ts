@@ -2,6 +2,7 @@ import process from 'node:process'
 import { env } from './env'
 import { getDb } from '@/db'
 import { describeMigrationFailure } from '@/db/failure'
+import { startEmbedder } from '@/embeddings/embedder'
 import { migrateToLatest } from '@/db/migrate'
 import { createMarketRateRepository } from '@/db/market-rates-repository'
 import { createRateRepository } from '@/db/rates-repository'
@@ -15,7 +16,11 @@ import { marketRatesRefresh } from '@/usecases/refresh-market-rates'
 import { officialRatesRefresh } from '@/usecases/refresh-official-rates'
 import { buildServer } from './server'
 
-const app = buildServer()
+// The model of the search by meaning loads in the background (MOL-105): the API answers by the
+// letters until it is ready, and without its files, for good.
+const app = buildServer(
+  env.EMBEDDINGS === 'on' ? { embedder: (log) => startEmbedder(env.EMBEDDINGS_DIR, log) } : {},
+)
 
 // Migrations run at boot rather than as a separate deploy step: there is one instance,
 // and a schema that lags the code it is deployed with is the worse failure of the two.
