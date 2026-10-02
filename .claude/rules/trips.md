@@ -243,6 +243,17 @@ a nested screen, «Покупки» without one would have said none of it. «N 
 until the record going on is known — before that its own waiting purchases would be counted
 (review Р-18).
 
+**A record open elsewhere is another shop when the name or the city differs** (MOL-120, adversarial
+Б1, owner's В-4): the index over `places` takes the city, so «Ереван Сити» of Gyumri left open
+yesterday is not the one a start names in Yerevan today, and «Дописать в ту запись» would write
+Yerevan's prices against the Gyumri shop for good. The record carries its place's city as
+`placeCity`, **beside `place`, never inside** — the phone keeps a record in `molvia.trip` and the
+history, the version before drops an unknown field at that level (`TRIP_FIELDS`, `TRIP_KEYS`) and
+reads `place` strictly; the start names its own by its `context`. «The same shop» is the domain's
+`cityWhereNameRepeats` over the pair: one name in two cities is said with both («Уже открыта запись
+в «Ереван Сити» в Гюмри»), different names without; a side with no city — a server before it, a
+start the old queue kept without a context — leaves the name alone to decide, as before.
+
 **No circle over an action anywhere** (MOL-77): the empty state's «+» read as a button and was the
 thing the owner tapped, so `ScreenState` draws an empty state without a circle when it is given no
 icon. **«Покупки» is empty only for a history known to be empty**: every write to a record persists
