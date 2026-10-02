@@ -25,6 +25,7 @@ import {
   DEVICE_NAME_MAX,
   EVENT,
   LOGIN_CODE_MAX,
+  REMINDERS_OFF,
   baseUnitSchema,
   catalogueSubjectSchema,
   currencySchema,
@@ -48,6 +49,7 @@ import type {
   BaseUnit,
   Currency,
   EventPayload,
+  RemindersOff,
   ExchangeChannel,
   IncomeSource,
   ItemKind,
@@ -240,6 +242,13 @@ export const actors = pgTable(
      * form of MOL-65 compares its four fields, and those four are also a trip's context (Н-1).
      */
     salaryShiftDay: smallint('salary_shift_day'),
+    /**
+     * Why the rating reminders are off (MOL-103): `chosen` by the person, `blocked` — they blocked
+     * the bot. Empty is on, as every account starts. Here rather than in `rating_reminders`
+     * (review Т-3): a ladder with nothing to ask about deletes its row, and the switch would go
+     * with it. Beside the settings, as `salary_shift_day` is, and for the same reason (Р-1).
+     */
+    remindersOff: text('reminders_off').$type<RemindersOff>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.
@@ -264,6 +273,7 @@ export const actors = pgTable(
       'actors_salary_shift_day_of_month',
       sql`${table.salaryShiftDay} between 1 and ${sql.raw(String(SALARY_SHIFT_DAY_MAX))}`,
     ),
+    check('actors_reminders_off_known', oneOf(table.remindersOff, REMINDERS_OFF)),
   ],
 )
 
@@ -1555,11 +1565,18 @@ export const reminderDays = pgTable(
     items: integer('items').notNull().default(0),
     /** New verdicts given by a press under a reminder, on the day of the press. */
     rated: integer('rated').notNull().default(0),
+    /**
+     * People whose reminders went from on to off that day (MOL-103, В-4), by how: «Не напоминать»
+     * under a reminder, the switch in the settings, the bot blocked. Whether the lever annoys.
+     */
+    offButton: integer('off_button').notNull().default(0),
+    offSettings: integer('off_settings').notNull().default(0),
+    offBlocked: integer('off_blocked').notNull().default(0),
   },
   (table) => [
     check(
       'reminder_days_counts_non_negative',
-      sql`least(${table.firstSteps}, ${table.secondSteps}, ${table.thirdSteps}, ${table.items}, ${table.rated}) >= 0`,
+      sql`least(${table.firstSteps}, ${table.secondSteps}, ${table.thirdSteps}, ${table.items}, ${table.rated}, ${table.offButton}, ${table.offSettings}, ${table.offBlocked}) >= 0`,
     ),
   ],
 )

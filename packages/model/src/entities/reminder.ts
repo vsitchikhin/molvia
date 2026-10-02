@@ -131,3 +131,42 @@ function shiftMonths(day: string, months: number): string {
   target.setUTCDate(Math.min(date, last))
   return target.toISOString().slice(0, 10)
 }
+
+/**
+ * Why a person's reminders are off (MOL-103); none — they are on, as every account starts.
+ * `chosen` — they turned them off themselves, in the settings or under a reminder; `blocked` — they
+ * blocked the bot, and Telegram said so. The reason is kept because the two end differently: an
+ * unblocked bot turns back on only what blocking turned off (В-1), and the screen says which it is.
+ */
+export const REMINDERS_OFF = ['chosen', 'blocked'] as const
+export type RemindersOff = (typeof REMINDERS_OFF)[number]
+
+/**
+ * What can happen to the switch: turned off or on by the person, the bot blocked or unblocked.
+ * `off` and `on` come from the settings or from the buttons under a reminder; the other two only
+ * from Telegram.
+ */
+export const REMINDER_SWITCHES = ['off', 'on', 'blocked', 'unblocked'] as const
+export type ReminderSwitch = (typeof REMINDER_SWITCHES)[number]
+
+/**
+ * Where a switch leaves the person's reminders (MOL-103). The person's own word wins both ways:
+ * blocking does not make «chosen» into «blocked», and unblocking turns on only what blocking
+ * turned off — someone who said «не напоминать» and later unblocked the bot to sign in is still
+ * not reminded (В-1).
+ */
+export function switchReminders(
+  current: RemindersOff | null,
+  change: ReminderSwitch,
+): RemindersOff | null {
+  switch (change) {
+    case 'off':
+      return 'chosen'
+    case 'on':
+      return null
+    case 'blocked':
+      return current ?? 'blocked'
+    case 'unblocked':
+      return current === 'blocked' ? null : current
+  }
+}
