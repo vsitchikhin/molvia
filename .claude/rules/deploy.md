@@ -70,7 +70,10 @@ The shape worth knowing here:
   refuses a change from none to one; a database created under glibc records it and is warned on.
   **The move is done with writes stopped** (adversarial А, В): the new image under an API that has
   not run the migration, or a deploy rolled back after it failed, leaves musl's indexes answering
-  under glibc in silence. Procedure: `deploy/README.md`, «The Postgres image is part of the
+  under glibc in silence. **After a rollback the database says whether the migration ran, never the
+  rollback** (round 2, Г): `vector` is there or not. Alpine comes back only if it is not — back over
+  indexes glibc built, the same corruption the other way round, and the migration, recorded as
+  applied, would never run again. Procedure: `deploy/README.md`, «The Postgres image is part of the
   contract».
 - **Postgres publishes no port.** It is reachable only over the compose network.
 - **The PWA calls `/api/...`** and Caddy strips the prefix — the same shape the Vite dev

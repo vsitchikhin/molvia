@@ -358,8 +358,10 @@ nothing (adversarial review of MOL-105, А and В, measured):
 So nothing writes from the last copy to the end, and a failure goes back to alpine by hand. The app
 is down meanwhile — minutes, accepted while production is the owner's alone.
 
-1. **Stop writes, take a copy**:
-   `ssh molvia 'cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod stop backend bot && sudo -n systemctl start molvia-backup.service'`.
+1. **Stop writes, take a copy** — two commands, so a copy that fails is seen as one:
+   `ssh molvia 'cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod stop backend bot'`,
+   then `ssh -t molvia 'sudo systemctl start molvia-backup.service'` — it returns once the copy is
+   made (`Type=oneshot`).
 2. **The drill on that copy**, from the branch: `deploy/backup/restore.sh --drill` restores it into
    the image the script now names and builds every index under glibc — the very uniqueness `0038`'s
    `REINDEX` asks for. A pair glibc folds into one fails the restore here; it is settled by hand —
@@ -376,12 +378,24 @@ is down meanwhile — minutes, accepted while production is the owner's alone.
    version of the new ICU (`und-x-icu` warned on every query until it did).
 5. **Check**: `/api/health`, «Что брать» in the app, and the journal of `postgres` for
    `collation … version mismatch` — there must be none.
-6. **If the job rolled back** («rolling back to …» in its log): `0038` failed, and its transaction
-   left every index as musl built it — the data is whole and agrees with alpine, so alpine goes back
-   before anything else writes: stop `backend` and `bot` as in step 1, copy the previous compose file
-   (`git show <the master before the merge>:docker-compose.prod.yml`, `scp` it to `~/molvia/`), and
-   `up -d`. The API's journal names the statement that failed (`describeMigrationFailure`); the
-   duplicate is settled by hand, then from step 1 again.
+6. **If the job rolled back** («rolling back to …» in its log), the rollback has brought the old API
+   and bot up again on the new image: stop them as in step 1 first. Then **ask the database whether
+   `0038` ran, never the rollback** (round 2 of the adversarial review, Г) — the job rolls back on
+   anything its 90 seconds of health did not see, and much of that comes after the migration
+   committed:
+   `echo "select count(*) from pg_extension where extname = 'vector'" | ssh molvia 'cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres psql -U molvia -d molvia -At'`.
+   `vector` is created in the transaction that rebuilds the indexes, so it answers for both.
+   - **`0` — `0038` failed**, and its transaction left every index as musl built it: the data is
+     whole and agrees with alpine, so alpine goes back before anything writes. Copy the previous
+     compose file (`git show <the master before the merge>:docker-compose.prod.yml`, `scp` it to
+     `~/molvia/`) and `up -d`. The API's journal names the statement that failed
+     (`describeMigrationFailure`); the duplicate is settled by hand, then from step 1 again.
+   - **`1` — `0038` ran**: the indexes are glibc's, and **alpine must not come back** — under musl
+     they would answer wrongly, and `0038`, recorded as applied, would never rebuild them again. Stay
+     on the new image: `up -d` as the machine stands runs the previous API on it, which needs nothing
+     of `vector` and agrees with the indexes. The reason of the rollback is in `deploy.log` and the
+     API's journal — health, the bot, a migration skipped by its stamp — and the next deploy is an
+     ordinary one.
 
 On a volume moved off alpine the database's own collation stays without a version: Postgres refuses
 a change from none to one. A database created under glibc — CI, a new copy, the drill, a restore —
