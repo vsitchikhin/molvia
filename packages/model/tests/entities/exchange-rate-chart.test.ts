@@ -19,8 +19,8 @@ import type { ExchangeRate } from '#model/values/rates'
 
 const FROM = '2025-11-01'
 const TODAY = '2026-10-02'
-/** The year of the chart: the same day a year back (MOL-168, В-1 «б»). */
-const YEAR_FROM = '2025-10-02'
+/** The year of the chart: the day after the same day a year back (MOL-168, В-1 «б»). */
+const YEAR_FROM = '2025-10-03'
 
 /** A pair's year, as every chart test before MOL-168 read the one period there was. */
 function year(chart: RateChart | null, index = 0) {
@@ -245,8 +245,8 @@ describe('rateChart', () => {
     )
     const gap = weeks.find(({ day }) => day === '2026-06-07')
     expect(gap).toMatchObject({ rate: null, level: null })
-    // 2 October 2025 is a Thursday: the first week ends three days in, of 365.
-    expect(weeks[0]).toMatchObject({ day: '2025-10-05', x: 8 })
+    // 3 October 2025 is a Friday: the first week ends two days in, of 364.
+    expect(weeks[0]).toMatchObject({ day: '2025-10-05', x: 5 })
     expect(weeks.at(-1)).toMatchObject({ day: TODAY, x: CHART_LEVEL })
     expect(year(chart)?.exchanges).toEqual([])
   })
@@ -454,25 +454,27 @@ describe('rateChart', () => {
 })
 
 describe('ratePeriodFrom', () => {
-  it('looks back the same day of the month (MOL-168, В-1 «б»)', () => {
+  it('looks back from the day after the same day of the month (MOL-168, В-1 «б»)', () => {
     expect(RATE_CHART_MONTHS.map((months) => ratePeriodFrom(TODAY, months))).toEqual([
-      '2026-09-02',
-      '2026-04-02',
+      '2026-09-03',
+      '2026-04-03',
       YEAR_FROM,
     ])
   })
 
-  it('takes the last day of a shorter month, a leap February too', () => {
-    expect(ratePeriodFrom('2026-03-31', 1)).toBe('2026-02-28')
-    expect(ratePeriodFrom('2028-03-31', 1)).toBe('2028-02-29')
-    expect(ratePeriodFrom('2026-12-31', 1)).toBe('2026-11-30')
-    expect(ratePeriodFrom('2026-08-31', 6)).toBe('2026-02-28')
-    expect(ratePeriodFrom('2028-02-29', 12)).toBe('2027-02-28')
+  it('takes the last day of a shorter month for the same day, a leap February too', () => {
+    expect(ratePeriodFrom('2026-03-31', 1)).toBe('2026-03-01')
+    expect(ratePeriodFrom('2028-03-31', 1)).toBe('2028-03-01')
+    expect(ratePeriodFrom('2026-12-31', 1)).toBe('2026-12-01')
+    expect(ratePeriodFrom('2026-08-31', 6)).toBe('2026-03-01')
+    expect(ratePeriodFrom('2028-02-29', 12)).toBe('2027-03-01')
+    expect(ratePeriodFrom('2026-03-30', 1)).toBe('2026-03-01')
   })
 
   it('crosses the year back', () => {
-    expect(ratePeriodFrom('2026-01-15', 1)).toBe('2025-12-15')
-    expect(ratePeriodFrom('2026-03-02', 6)).toBe('2025-09-02')
+    expect(ratePeriodFrom('2026-01-15', 1)).toBe('2025-12-16')
+    expect(ratePeriodFrom('2026-03-02', 6)).toBe('2025-09-03')
+    expect(ratePeriodFrom('2026-01-31', 1)).toBe('2026-01-01')
   })
 
   it('makes the year of the chart the window of «Обмены против рынка»', () => {
@@ -505,8 +507,8 @@ describe('rateChart by period (MOL-168)', () => {
   it('reads the month by days and half a year and the year by weeks', () => {
     const periods = rateChart([rub], [], TODAY)?.pairs[0]?.periods
     expect(periods?.[1]?.step).toBe('day')
-    expect(periods?.[1]?.steps).toHaveLength(31)
-    expect(periods?.[1]?.steps[0]).toMatchObject({ day: '2026-09-02', x: 0 })
+    expect(periods?.[1]?.steps).toHaveLength(30)
+    expect(periods?.[1]?.steps[0]).toMatchObject({ day: '2026-09-03', x: 0 })
     expect(periods?.[1]?.steps.at(-1)).toMatchObject({ day: TODAY, x: CHART_LEVEL })
     expect(periods?.[6]?.step).toBe('week')
     expect(periods?.[6]?.steps[0]?.day).toBe('2026-04-05')
@@ -520,7 +522,7 @@ describe('rateChart by period (MOL-168)', () => {
     expect(on('2026-09-27')).toEqual(drams('4.22', '2026-09-25'))
     expect(on('2026-09-28')).toEqual(drams('4.20', '2026-09-28'))
     // Eight days and more with no row is a gap, as for a week.
-    expect(on('2026-09-02')).toBeNull()
+    expect(on('2026-09-03')).toBeNull()
   })
 
   it('puts an exchange of a Sunday on its own day of the month and in its week of the year', () => {
@@ -530,20 +532,34 @@ describe('rateChart by period (MOL-168)', () => {
     const point = month?.exchanges[0]
     expect(month?.steps[point?.step ?? -1]?.day).toBe('2026-09-27')
     expect(year?.steps[year.exchanges[0]?.step ?? -1]?.day).toBe('2026-09-27')
-    // The 25th day of 30 in the month, the 360th of 365 in the year.
-    expect(point?.x).toBe(833)
+    // The 24th day of 29 in the month, the 359th of 364 in the year.
+    expect(point?.x).toBe(828)
     expect(year?.exchanges[0]?.x).toBe(986)
   })
 
   it('takes an exchange of the first day of a period, and leaves out the day before', () => {
-    const chart = rateChart([rub], [exchange('2026-09-02'), exchange('2026-09-01')], TODAY)
+    const chart = rateChart([rub], [exchange('2026-09-03'), exchange('2026-09-02')], TODAY)
     const days = (months: 1 | 6 | 12) =>
       chart?.pairs[0]?.periods[months]?.exchanges.map(({ day }) => day)
-    expect(days(1)).toEqual(['2026-09-02'])
-    expect(days(6)).toEqual(['2026-09-01', '2026-09-02'])
-    expect(
-      rateChart([rub], [exchange(YEAR_FROM)], TODAY)?.pairs[0]?.periods[12]?.exchanges,
-    ).toHaveLength(1)
+    expect(days(1)).toEqual(['2026-09-03'])
+    expect(days(6)).toEqual(['2026-09-02', '2026-09-03'])
+    const year = (day: string) =>
+      rateChart([rub], [exchange(day)], TODAY)?.pairs[0]?.periods[12]?.exchanges
+    expect(year(YEAR_FROM)).toHaveLength(1)
+    expect(year('2025-10-02')).toEqual([])
+  })
+
+  it('holds one monthly exchange a month and twelve a year, on the very day of one (adversarial В)', () => {
+    // 20 000 ₽ on the 2nd of every month, 2 October 2025 to 2 October 2026; today is the 2nd.
+    const monthly = Array.from({ length: 13 }, (_, index) => {
+      const month = 9 + index
+      const year = 2025 + Math.floor(month / 12)
+      return exchange(`${String(year)}-${String((month % 12) + 1).padStart(2, '0')}-02`)
+    }).reverse()
+    const periods = rateChart([rub], monthly, TODAY)?.pairs[0]?.periods
+    expect(periods?.[1]?.exchanges.map(({ day }) => day)).toEqual([TODAY])
+    expect(periods?.[6]?.exchanges).toHaveLength(6)
+    expect(periods?.[12].exchanges).toHaveLength(12)
   })
 
   it('scales each period by its own figures: the month is not pressed by the spring', () => {

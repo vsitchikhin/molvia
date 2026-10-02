@@ -227,7 +227,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **«Курс рубля за 12 месяцев» is the line of all bank clients, the one row with a year of history,
   named so** (MOL-161); a point's percent and its mark are its card's own market, never the line (В-1),
   and the line is on the side of the pair's latest exchange (В-2). **The month, half a year and the
-  year come in one answer** (MOL-168): each from the same day N months back — the year is the window
+  year come in one answer** (MOL-168): each from the day after the same day N months back — the year is the window
   of «Обмены против рынка» — the month by days, a weekend at Friday's figure; the pairs are the year's,
   and the period is the screen's address.
 

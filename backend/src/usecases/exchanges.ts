@@ -276,8 +276,8 @@ export function marketLossesOf(
 
 /**
  * The first day of the twelve months «Обмены против рынка» and the year of the line of the rate look
- * back on: the same day a year ago (MOL-168, В-1 «б») — one window, so a point of the year always has
- * the percent of its place.
+ * back on: from the day after the same day a year ago (MOL-168, В-1 «б», adversarial В) — one window,
+ * so a point of the year always has the percent of its place.
  */
 function windowFrom(today: string): string {
   return ratePeriodFrom(today, EXCHANGE_LOSS_MONTHS)

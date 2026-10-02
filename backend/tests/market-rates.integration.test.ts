@@ -415,7 +415,7 @@ describe('«Обмены против рынка» на «Обмене дене�
     expect((await read(cookie)).losses).toBeNull()
   })
 
-  it('окно — тот же день год назад: первый день в итоге и на графике года, день до него — нигде (MOL-168, В-1 «б»)', async () => {
+  it('окно — со дня после того же числа год назад: первый день в итоге и на графике года, тот же день — нигде (MOL-168, В-1 «б», adversarial В)', async () => {
     const first = ratePeriodFrom(yerevanDate(new Date()), 12)
     const before = yerevanDate(
       new Date(Date.parse(`${first}T12:00:00+04:00`) - 24 * 60 * 60 * 1000),
