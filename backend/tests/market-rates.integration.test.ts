@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { exchangesResponseCodec, parseRate, yerevanDate } from '@molvia/model'
+import { exchangesResponseCodec, parseRate, ratePeriodFrom, yerevanDate } from '@molvia/model'
 import type { CachedRate, ExchangesResponse, MarketRate } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createMarketRateRepository } from '@/db/market-rates-repository'
@@ -415,6 +415,28 @@ describe('«Обмены против рынка» на «Обмене дене�
     expect((await read(cookie)).losses).toBeNull()
   })
 
+  it('окно — тот же день год назад: первый день в итоге и на графике года, день до него — нигде (MOL-168, В-1 «б»)', async () => {
+    const first = ratePeriodFrom(yerevanDate(new Date()), 12)
+    const before = yerevanDate(
+      new Date(Date.parse(`${first}T12:00:00+04:00`) - 24 * 60 * 60 * 1000),
+    )
+    await rates.upsert([official('4.3', first), official('4.3', before)])
+    await market.upsert([
+      figure('bankCash', '4.11', first),
+      figure('bankCash', '4.11', before),
+      figure('banksAll', '4.23', first),
+    ])
+    const { cookie } = await owner()
+    await record(cookie, { exchangedOn: before, note: 'Вчера год назад' })
+    expect((await read(cookie)).losses).toBeNull()
+    await record(cookie, { exchangedOn: first, note: 'Год назад' })
+    const answer = await read(cookie)
+    expect(answer.losses?.groups.map(({ place }) => place)).toEqual(['Год назад'])
+    const [point, ...rest] = answer.rateCharts?.pairs[0]?.periods[12].exchanges ?? []
+    expect(rest).toEqual([])
+    expect(point).toMatchObject({ day: first, percent: answer.losses?.groups[0]?.percent })
+  })
+
   it('правка канала отдаёт новый итог: не назван — лучший курс, наличные в банке — свой (В-3)', async () => {
     const { cookie } = await owner()
     const id = randomUUID()
@@ -477,16 +499,16 @@ describe('«Курс рубля за 12 месяцев» на «Обмене д�
 
   it('линия — «все клиенты банков» своей стороны, нал и безнал на неё не попадают (Р-3)', async () => {
     const { cookie } = await owner()
-    const { rateChart } = await read(cookie)
+    const { rateCharts } = await read(cookie)
     // No exchanges yet: the currency of conversion alone, a line with no points (Р-5).
-    expect(rateChart?.pairs.map(({ currency, side }) => [currency, side])).toEqual([
+    expect(rateCharts?.pairs.map(({ currency, side }) => [currency, side])).toEqual([
       ['RUB', 'bankBuys'],
     ])
-    const [pair] = rateChart?.pairs ?? []
-    const figures = pair?.weeks.flatMap(({ rate }) => (rate ? [rate.scaled] : []))
+    const [pair] = rateCharts?.pairs ?? []
+    const figures = pair?.periods[12].steps.flatMap(({ rate }) => (rate ? [rate.scaled] : []))
     expect(new Set(figures)).toEqual(new Set([parseRate('4.25'), parseRate('4.23')]))
-    expect(pair?.weeks.at(-1)?.day).toBe(yerevanDate(new Date()))
-    expect(pair?.exchanges).toEqual([])
+    expect(pair?.periods[12].steps.at(-1)?.day).toBe(yerevanDate(new Date()))
+    expect(pair?.periods[12].exchanges).toEqual([])
   })
 
   it('точка в ответе записи сразу, и её процент — тот же, что в «Обменах против рынка» (В-1)', async () => {
@@ -494,7 +516,7 @@ describe('«Курс рубля за 12 месяцев» на «Обмене д�
     const answer = overviewOf(
       (await record(cookie, { channel: 'bankCash', note: 'Ардшинбанк' })).json(),
     )
-    const point = answer.rateChart?.pairs[0]?.exchanges[0]
+    const point = answer.rateCharts?.pairs[0]?.periods[12].exchanges[0]
     expect(point).toMatchObject({
       day,
       place: 'Ардшинбанк',
@@ -508,6 +530,26 @@ describe('«Курс рубля за 12 месяцев» на «Обмене д�
     expect(point?.market?.level).toBeLessThan(point?.level ?? 0)
   })
 
+  it('месяц днями, полгода и год неделями — из одного ответа, процент точки везде тот же (MOL-168)', async () => {
+    const { cookie } = await owner()
+    const answer = overviewOf(
+      (await record(cookie, { channel: 'bankCash', note: 'Ардшинбанк' })).json(),
+    )
+    const periods = answer.rateCharts?.pairs[0]?.periods
+    expect([periods?.[1]?.step, periods?.[6]?.step, periods?.[12].step]).toEqual([
+      'day',
+      'week',
+      'week',
+    ])
+    const today = yerevanDate(new Date())
+    expect(periods?.[1]?.steps[0]?.day).toBe(ratePeriodFrom(today, 1))
+    expect(periods?.[1]?.steps.at(-1)?.day).toBe(today)
+    const percent = answer.losses?.groups[0]?.percent
+    for (const period of [periods?.[1], periods?.[6], periods?.[12]]) {
+      expect(period?.exchanges.map((point) => [point.day, point.percent])).toEqual([[day, percent]])
+    }
+  })
+
   it('купил рубли за драмы последним — линия стороны продажи, сданные рубли не рисуются (В-2)', async () => {
     const { cookie } = await owner()
     await record(cookie, { exchangedOn: weekAgo })
@@ -515,9 +557,9 @@ describe('«Курс рубля за 12 месяцев» на «Обмене д�
       given: { amount: '46000', currency: 'AMD' },
       received: { amount: '10000', currency: 'RUB' },
     })
-    const [pair] = (await read(cookie)).rateChart?.pairs ?? []
+    const [pair] = (await read(cookie)).rateCharts?.pairs ?? []
     expect(pair?.side).toBe('bankSells')
-    expect(pair?.exchanges.map(({ rate }) => rate.scaled)).toEqual([parseRate('4.6')])
+    expect(pair?.periods[12].exchanges.map(({ rate }) => rate.scaled)).toEqual([parseRate('4.6')])
   })
 
   it('купил рубли за драмы — процент точки тот же, что у места в «Обменах против рынка» (adversarial В)', async () => {
@@ -535,7 +577,7 @@ describe('«Курс рубля за 12 месяцев» на «Обмене д�
     // −0,67 ₽ of 100,67 ₽ is −0,6655 %; in drams by the bank of the day, −2,89 ֏ of 434,76 ֏ — −0,66 %.
     expect(answer.exchanges[0]?.market?.best.difference).toEqual({ minor: -67n, currency: 'RUB' })
     const [group] = answer.losses?.groups ?? []
-    const [point] = answer.rateChart?.pairs[0]?.exchanges ?? []
+    const [point] = answer.rateCharts?.pairs[0]?.periods[12].exchanges ?? []
     expect(group?.percent).toBe(-66)
     expect(point?.percent).toBe(group?.percent)
   })
@@ -545,33 +587,33 @@ describe('«Курс рубля за 12 месяцев» на «Обмене д�
     const stranger = await owner()
     const id = randomUUID()
     await record(cookie, { id })
-    expect((await read(stranger.cookie)).rateChart?.pairs[0]?.exchanges).toEqual([])
+    expect((await read(stranger.cookie)).rateCharts?.pairs[0]?.periods[12].exchanges).toEqual([])
     const removed = await app.inject({
       method: 'DELETE',
       url: `/exchanges/${id}`,
       headers: { cookie },
     })
-    expect(overviewOf(removed.json()).rateChart?.pairs[0]?.exchanges).toEqual([])
+    expect(overviewOf(removed.json()).rateCharts?.pairs[0]?.periods[12].exchanges).toEqual([])
     const back = await app.inject({
       method: 'POST',
       url: `/exchanges/${id}/restore`,
       headers: { cookie },
     })
-    expect(overviewOf(back.json()).rateChart?.pairs[0]?.exchanges.map((one) => one.id)).toEqual([
-      id,
-    ])
+    expect(
+      overviewOf(back.json()).rateCharts?.pairs[0]?.periods[12].exchanges.map((one) => one.id),
+    ).toEqual([id])
   })
 
   it('рынка за окно нет или считать не в чем — графика нет', async () => {
     const { cookie } = await owner()
     await db.delete(marketRates)
-    expect((await read(cookie)).rateChart).toBeNull()
+    expect((await read(cookie)).rateCharts).toBeNull()
     const dram = await insertActor(db, { incomeCurrency: 'AMD' })
     const answer = await app.inject({
       method: 'GET',
       url: '/exchanges',
       headers: { cookie: await signIn(db, dram) },
     })
-    expect(overviewOf(answer.json()).rateChart).toBeNull()
+    expect(overviewOf(answer.json()).rateCharts).toBeNull()
   })
 })

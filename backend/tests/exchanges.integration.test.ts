@@ -101,7 +101,7 @@ describe('«Обмен денег» через API (MOL-40)', () => {
       ],
       losses: null,
       // No market in the window: no line to draw (MOL-161).
-      rateChart: null,
+      rateCharts: null,
     })
   })
 
