@@ -30,6 +30,10 @@ The shape worth knowing here:
   only, 45 MB of 288 — into `node_modules`; the model, fetched and checked by sha256 in the build,
   into `model/`. The runtime is `node:22-bookworm-slim`, since that build is for glibc. The image is
   some 520 MB, the API's memory some 460 MB with the model loaded.
+  **Names survive the bundle** (`keepNames`, MOL-142): node-fetch under grammY takes a signal only
+  from a constructor called `AbortSignal`, and the bot's first use of the global one had esbuild
+  rename abort-controller's class — every call to Telegram failed in production, every unbundled
+  test passed. `bot/src/bundle.test.ts` builds the bot and checks the name.
 - **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
   exists only for trying the stack on a laptop, where Docker Desktop has no journald.
 - **The database is copied every night, encrypted, off the machine** (MOL-70): `pg_dump` inside the
