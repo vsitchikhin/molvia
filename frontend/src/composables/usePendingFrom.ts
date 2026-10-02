@@ -44,7 +44,7 @@ export function usePendingFrom(queue: VerdictQueue): ComputedRef<string | null> 
           ])
         : card.placeName
       if (places.has(key)) continue
-      const quoted = t('trip.home.pending.place', { place: card.placeName })
+      const quoted = t('place.quoted', { place: card.placeName })
       places.set(key, placeLabel(quoted, city, i18n))
     }
     const [a, b] = places.values()

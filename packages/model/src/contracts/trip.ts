@@ -164,6 +164,13 @@ export const tripViewCodec = z.strictObject({
    */
   rateStale: z.boolean(),
   place: tripPlaceSchema.strict(),
+  /**
+   * The place's city (MOL-120, adversarial Б1): «Ереван Сити» of Gyumri open while a start names
+   * the one of Yerevan is another shop, and the choice of MOL-25 must say so. Beside `place`, never
+   * inside: the phone keeps a trip in two caches the version before reads — it drops a field it
+   * does not know at this level and reads `place` strictly. Optional for the server before it.
+   */
+  placeCity: placeSchema.shape.city.optional(),
   expenses: z.array(tripExpenseCodec),
   /**
    * What the trip came to (`tripMoney`, MOL-78): the receipt's sum when there is one, else one sum
@@ -271,6 +278,7 @@ export function tripViewOf(
         : null,
     rateStale: isTripRateStale(trip),
     place: tripPlaceOf(place),
+    placeCity: place.city,
     expenses: rows,
     total: [...total],
     receipt: trip.receipt,
