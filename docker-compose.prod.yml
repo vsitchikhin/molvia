@@ -88,6 +88,10 @@ services:
       BOT_API_SECRET: ${BOT_API_SECRET:?set BOT_API_SECRET}
       # Real login requires the bot to run (MOL-54).
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN}
+      # The bot's pulse to healthchecks.io (MOL-142). A line missing from `.env.prod` refuses to
+      # start: a check that never got a ping stays «new» and never raises an alarm, so a forgotten
+      # line would never be noticed (adversarial В1). Empty, on purpose, switches the pulse off.
+      BOT_PULSE_URL: ${BOT_PULSE_URL?set BOT_PULSE_URL in .env.prod, or leave it empty to switch the pulse off}
     depends_on:
       - backend
 

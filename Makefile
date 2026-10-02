@@ -137,7 +137,8 @@ prod-build: ## Build the production images without deploying them
 	@# right at deploy time and pointless when only building. Placeholders satisfy the
 	@# interpolation; nothing here reaches an image.
 	DOMAIN=localhost POSTGRES_DB=molvia POSTGRES_USER=molvia POSTGRES_PASSWORD=build \
-	TELEGRAM_BOT_TOKEN=build TELEGRAM_BOT_USERNAME=build_bot BOT_API_SECRET=build docker compose -f docker-compose.prod.yml build
+	TELEGRAM_BOT_TOKEN=build TELEGRAM_BOT_USERNAME=build_bot BOT_API_SECRET=build BOT_PULSE_URL= \
+	docker compose -f docker-compose.prod.yml build
 
 certs: ## Issue a locally trusted dev certificate, for testing the camera on a phone
 	@command -v mkcert >/dev/null || { \

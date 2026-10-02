@@ -254,6 +254,110 @@ whole; without it, until now. A day is Yerevan's; a moment needs its offset.
 
 In a working copy the same thing is `make gates FROM=2026-10-05 [TO=2026-10-31]`.
 
+## Signals (MOL-142)
+
+Four checks at healthchecks.io tell the owner in Telegram that something in production is down.
+They go through healthchecks.io's own Telegram integration, never through our bot: a machine that
+is down takes the bot with it. healthchecks.io and GitHub see the server's address and nothing of
+anyone's data.
+
+| Check            | Who pings                                                                   | Period · grace  | Silence or `/fail` means                                                                               |
+| ---------------- | --------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------ |
+| `molvia-up`      | `.github/workflows/watch.yml`, from GitHub, every five minutes              | 10 min · 10 min | the API with its database or the page — or GitHub itself                                               |
+| `molvia-cert`    | the same run                                                                | 1 day · 1 hour  | the certificate has fourteen days left or fewer — or a day of runs that could not read it              |
+| `molvia-bot`     | the bot, after a claim of reminders, while it hears Telegram, every 5–6 min | 6 min · 9 min   | the bot is down, does not hear Telegram or cannot reach the API — and then nobody can sign in (MOL-54) |
+| `molvia-backups` | `backup/backup.sh`, nightly                                                 | 1 day · 1 hour  | no copy of the database tonight (Backups, below)                                                       |
+
+The periods are a little longer than the pings' rhythm — GitHub's cron runs late, the bot beats every
+five to six minutes — so the panel is not yellow with «late» all the time; period and grace add up to
+the time before an alarm, twenty minutes for the site and fifteen for the bot.
+
+- **What the watch checks.** `GET /api/health` is `200` with `"status":"ok"` — `/health` answers
+  `503` whenever it is not ok, the database down included, with the same body. `GET /` is `200`.
+  curl checks the certificate's chain and name on every request, so a bad certificate is a `000`.
+  The certificate's term, more than fourteen days, is a check of its own: Caddy renews it itself
+  but silently fails to when DNS breaks, and «expires in 13 days» is a state that holds for days —
+  on the site's check it kept a fall of the API silent, since healthchecks.io speaks only when a
+  check flips. A certificate that could not be read is the site's matter and sends nothing to
+  `molvia-cert`.
+- **A rollout does not wake anyone.** `/fail` raises the alarm at once, with no grace, and every
+  merge leaves the API silent for seconds. So once a check fails, four are made half a minute
+  apart, and three failing is a `/fail` saying what they saw: `health 503`, `pwa 000`. A rollout
+  fails one or two.
+- **What the bot's pulse proves**: the bot reached the API, a `getUpdates` of Telegram succeeded in
+  the last two minutes — the sign-in's way in — and the process has lived a minute, so a crash loop
+  never says «alive». After a rollout the first ping comes one to two minutes in, so rollouts a few
+  minutes apart do not add up into an alarm. A failed `getUpdates` — and the `getMe` a starting bot
+  asks first — is retried at a pause growing by a tenth of a second a try, so after Telegram comes
+  back the bot hears it within seconds, whether it was running or starting then; grammY's own
+  retries doubled the pause, and half an hour of Telegram down left the sign-in dead for another
+  quarter to half an hour.
+- **A run is red only when it could not report** — a secret missing, or a ping that did not go. A
+  site that is down is a `/fail` and a green run.
+- **The prices, accepted** (MOL-149): GitHub's cron runs late under load and now and then skips a
+  run, so a fall is noticed within twenty minutes, not five; an outage of GitHub Actions is a false
+  `molvia-up`. **A partial failure is not seen**: a site failing every second request passes three
+  checks in four — that is the share of 5xx MOL-145 watches, not availability. GitHub switches the
+  schedule off in a public repository after sixty days without a commit — Actions → Watch → «Enable
+  workflow» brings it back.
+- **The bot's pulse is not in `/health`** on purpose: after every rollout the API would know nothing
+  of the bot for its first minute, and the rollout would roll back.
+
+### Where it is set
+
+- The checks are the owner's healthchecks.io account, the one the backups report to, each with the
+  Telegram integration.
+- The watch's ping URLs are the repository secrets `HC_UP_URL` and `HC_CERT_URL`
+  (`gh secret set …`). Without either, every run is red.
+- `molvia-bot`'s ping URL is `BOT_PULSE_URL` in `~/molvia/.env.prod`, handed to the bot by
+  `docker-compose.prod.yml`. **The line is required**: without it compose refuses to start, since
+  a check that never got a ping stays «new» and never raises an alarm — a forgotten line would go
+  unnoticed for good. Empty, on purpose, switches the pulse off; working copies and the end-to-end
+  run never send it.
+- **The URLs are kept like secrets**: whoever has one can say «alive» for us. They are printed
+  nowhere — not in a log, not here.
+- **After setting a check up, see it turn green.** A new check is grey until its first ping and
+  raises nothing while grey: `molvia-up` and `molvia-cert` after the first run, `molvia-bot` one to
+  two minutes after the bot starts.
+
+### Trying the alarm
+
+```bash
+gh workflow run watch.yml -f domain=molvia.invalid
+```
+
+A minute and a half of tries, then a `/fail` and a message in Telegram. The next scheduled run puts
+`molvia-up` back up. `molvia-cert` stays as it was: an unreadable certificate sends it nothing.
+
+### When an alarm comes
+
+**`molvia-up`.** Actions → Watch → the latest run: its warning names what failed.
+
+- `health 503` — the API runs and the database does not answer: `ssh molvia`, then
+  `docker compose -f docker-compose.prod.yml --env-file .env.prod ps postgres` and its `logs`.
+- `health 502`, `health 000`, `pwa 000` — the API, Caddy or the machine: `ssh molvia` first; if that
+  hangs too, it is the machine, and Contabo's panel. A rollout gone wrong is in
+  `tail ~/molvia/deploy.log`.
+- No run at all in Actions for twenty minutes — GitHub, not us: https://www.githubstatus.com.
+
+**`molvia-cert`.** The `/fail` says when it expires. Caddy's renewal failed:
+`docker compose … logs frontend | grep -i acme`, and check the domain's A record in Cloudflare. No
+ping for a day — the runs could not read the certificate: their warnings say so.
+
+**`molvia-bot`.** `ssh molvia`, then `docker compose -f docker-compose.prod.yml --env-file .env.prod
+ps bot` — is it running, how often did it restart — and `logs --tail 50 bot`:
+
+- `[molvia] telegram getUpdates: <code | network>` or `[molvia] telegram getMe: <code | network>` —
+  the bot does not hear Telegram: the machine's way to `api.telegram.org`, or Telegram itself. The
+  second is a bot that started while Telegram was away and has not yet learnt who it is. The
+  runner's own log is off: it printed the request whole, the bot's token in it;
+- `[molvia] telegram: <code | network>, stopping`, and the container restarting — the token in
+  `.env.prod` is wrong (`401`: revoked, cut short, or a stray character after it; `404`: a space or
+  a quote before it), another process on the same token (`409`), or fifteen hours of Telegram away.
+  A `401` or a `404` — compare the line with the token BotFather gives;
+- `[molvia] remind claim: <code>` — the API refuses the claim;
+- `[molvia] pulse: <kind>` — the ping did not go out: `network`, `timeout` or healthchecks.io's status.
+
 ## Backups (MOL-70)
 
 Every night at 04:00 in Yerevan `molvia-backup.timer` runs `backup/backup.sh`: `pg_dump` inside the
