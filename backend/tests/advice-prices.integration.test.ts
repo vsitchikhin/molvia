@@ -578,3 +578,23 @@ describe('давность чужих последних (MOL-166, адверс�
     )
   })
 })
+
+describe('своё место в общем режиме — свежесть по своей покупке, как и цена (MOL-166, адверсариальный М)', () => {
+  it('чужие свежие покупки не делают свежей мою давнюю', async () => {
+    const me = await insertActor(db)
+    const cheese = await insertItem(db)
+    const shop = await insertPlace(db, { name: 'Магазин у дома' })
+    await bought(me, cheese, shop, amd(80_000), piece, {
+      on: ago(730),
+      at: new Date(Date.now() - 730 * 86_400_000),
+    })
+    for (const days of [10, 5]) {
+      await bought(await insertActor(db), cheese, shop, amd(90_000), piece, { on: ago(days) })
+    }
+
+    const [row] = await expenses.placePricesFor(sharedPrices(me, [cheese]))
+    expect(row?.scaledMinor).toBe(unitPrice(amd(80_000), piece).scaledMinor)
+    expect(row?.recent).toBe(false)
+    expect(Date.now() - (row?.latestVisitAt.getTime() ?? 0)).toBeGreaterThan(700 * 86_400_000)
+  })
+})

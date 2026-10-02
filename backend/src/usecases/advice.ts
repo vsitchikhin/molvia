@@ -303,10 +303,9 @@ function ranked(groups: Map<GroupKey, PlacePrice[]>): [GroupKey, PlacePrice[]][]
  * city, then price (Р-26, Р-27). The rest are the rest of that pair and the places of the other
  * pairs bought at within the window (adversarial И, owner's decision: the first pair has none, В-1)
  * or no earlier than the place the row names (adversarial К of round 6, owner's decision Н): a row
- * never hides a place fresher than the one it names,
- * **own city first across all of them** (Р-26, adversarial Ж′): pairs laid end to end put an Erevan
- * shop of the first pair over the shop next door in the second. Otherwise in the order of the pairs
- * and of the server.
+ * never hides a place fresher than the one it names, **own city first across all of them** (Р-26,
+ * adversarial Ж′): pairs laid end to end put an Erevan shop of the first pair over the shop next
+ * door in the second. Otherwise in the order of the pairs and of the server.
  */
 function rowPlaces(pairs: readonly [GroupKey, PlacePrice[]][]): PlacePrice[] {
   const [first, ...others] = pairs

@@ -220,9 +220,10 @@ export interface PlacePrice {
   readonly observations: number
   /**
    * The day of the most recent **visit** in which this was bought — `trips.started_at`, not
-   * the moment a row reached the server (F4). It breaks the tie between two «currency + unit»
-   * groups, and it is named after the trip on purpose: called «the latest purchase» it invited
-   * the next reader to «fix» it back to `created_at`, which is what the offline queue stamps.
+   * the moment a row reached the server (F4) — and at a place of one's own, one's own visit, as
+   * its price is (adversarial М). It is what a place of another pair is set against on the row
+   * (Н), and it is named after the trip on purpose: called «the latest purchase» it invited the
+   * next reader to «fix» it back to `created_at`, which is what the offline queue stamps.
    */
   readonly latestVisitAt: Date
   /**
@@ -785,7 +786,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           -- the whole row to pieces and hid the market where the kilo is cheaper.
           select places.*,
             sum(observations) over pair as "pairObservations",
-            max("latestVisitAt") over pair as "pairLatestVisitAt"
+            max(visited) over pair as "pairLatestVisitAt"
           from (
           select
             item_id as "itemId",
@@ -803,11 +804,17 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
                 filter (where place_last and fresh)
             ) as price,
             count(*) as observations,
-            max(bought_at) as "latestVisitAt",
+            -- A place of one's own is as fresh as one's own last purchase there, as its price is
+            -- (adversarial М, owner's decision): other people's visits made a two-year-old price
+            -- of mine head the row of someone with access, and hid a pack of mine fresher than it.
+            case when bool_or(mine_here) then max(bought_at) filter (where mine)
+                 else max(bought_at) end as "latestVisitAt",
+            max(bought_at) as visited,
             bool_or(nearby) as nearby,
             -- Whether the place's last purchase is within the window — what a place of a pair
-            -- other than the row's first must be to stand on the row (adversarial И).
-            bool_or(place_last and fresh) as recent,
+            -- other than the row's first must be to stand on the row (adversarial И); one's own
+            -- by one's own purchase (М).
+            bool_or(place_last and fresh and (mine or not mine_here)) as recent,
             -- A pair is the place's only where its last purchase was made in it (adversarial А):
             -- an August kilo is not what a shop charges once packs were bought there since. Where
             -- this person bought, that is their own last purchase, and nobody else's figure stands
