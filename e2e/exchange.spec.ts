@@ -259,3 +259,107 @@ test('how the money was changed goes with the exchange, and the next one starts 
   await expect(sheet).toContainText('Правка обмена')
   await expect(sheet.getByRole('radio', { name: 'Не указано' })).toBeChecked()
 })
+
+/** A rate as it crosses the wire: drams per unit, the market's, dated by Yerevan's midnight. */
+function wireRate(value: string, day: string) {
+  return {
+    base: 'RUB',
+    quote: 'AMD',
+    rate: value,
+    source: 'official',
+    asOf: new Date(Date.parse(`${day}T00:00:00.000Z`) - 4 * 60 * 60 * 1000).toISOString(),
+  }
+}
+
+/**
+ * «Курс рубля за 12 месяцев» (MOL-161) on a phone. This run has no market — the refresh is off —
+ * so the server answers with no chart, and that is the first thing held. The line itself is put
+ * into the answer on its way (`page.route`): what the server counts is held by the integration
+ * tests; what only a browser shows is the tap on the line, the keys on the radios and the card in
+ * its place under «Обмены против рынка».
+ */
+test('the rate of twelve months: no market — no card; the latest exchange first, a week by the finger', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const recorded = await page.request.post('/api/exchanges', {
+    headers,
+    data: {
+      id: randomUUID(),
+      given: { amount: '20000', currency: 'RUB' },
+      received: { amount: '83200', currency: 'AMD' },
+      exchangedOn: '2026-02-28',
+    },
+  })
+  expect(recorded.status()).toBe(201)
+
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Обмен денег' }).click()
+  await expect(page.getByText('Мой курс', { exact: true })).toBeVisible()
+  await expect(page.locator('.rate-chart')).toHaveCount(0)
+
+  await page.route('**/api/exchanges', async (route) => {
+    if (route.request().method() !== 'GET') return route.continue()
+    const response = await route.fetch()
+    const json = (await response.json()) as Record<string, unknown>
+    json.rateChart = {
+      pairs: [
+        {
+          currency: 'RUB',
+          side: 'bankBuys',
+          weeks: [
+            { day: '2026-02-08', rate: wireRate('4.900000', '2026-02-06'), x: 0, level: 1000 },
+            { day: '2026-02-15', rate: wireRate('4.800000', '2026-02-13'), x: 250, level: 800 },
+            { day: '2026-02-22', rate: null, x: 500, level: null },
+            { day: '2026-03-01', rate: wireRate('4.600000', '2026-02-27'), x: 750, level: 450 },
+            { day: '2026-03-04', rate: wireRate('4.300000', '2026-03-04'), x: 1000, level: 0 },
+          ],
+          exchanges: [
+            {
+              id: randomUUID(),
+              day: '2026-02-28',
+              week: 3,
+              x: 760,
+              rate: wireRate('4.160000', '2026-02-28'),
+              level: 300,
+              place: 'Ардшинбанк',
+              percent: 121,
+              market: { rate: wireRate('4.110180', '2026-02-28'), level: 200, basis: 'bankCash' },
+            },
+          ],
+          levels: [
+            { rate: wireRate('4.300000', '2026-03-04'), level: 0 },
+            { rate: wireRate('4.600000', '2026-03-04'), level: 500 },
+            { rate: wireRate('4.900000', '2026-03-04'), level: 1000 },
+          ],
+        },
+      ],
+    }
+    await route.fulfill({ response, json })
+  })
+  await page.reload()
+
+  const card = page.locator('.rate-chart')
+  await expect(card.getByRole('heading', { name: 'Курс рубля за 12 месяцев' })).toBeVisible()
+  // Under «Обмены против рынка» when there is one, and above «Мой курс» always (handoff 05).
+  const chartTop = (await card.boundingBox())?.y ?? 0
+  const rateTop = (await page.getByText('Мой курс', { exact: true }).boundingBox())?.y ?? 0
+  expect(chartTop).toBeLessThan(rateTop)
+
+  await expect(card.locator('.mine-rate')).toHaveText('Мой обмен 28 февр. · 4,16 ֏/₽')
+  await expect(card.locator('.mine-place')).toHaveText(/Ардшинбанк · \+1,21\s%\sк рынку/)
+
+  // A finger lifted at the left edge: the first week, which had no exchange.
+  const area = card.locator('.area')
+  await area.tap({ position: { x: 2, y: 60 } })
+  await expect(card.locator('.reading')).toContainText('Неделя по 8 февр. · рынок')
+  await expect(card.locator('.none')).toHaveText('Обменов на этой неделе не было')
+
+  // The keys walk the radios: one more step brings the second week.
+  await card.getByRole('radio', { name: /Неделя по 8 февраля/ }).focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(card.locator('.figure')).toHaveText('4,80 ֏/₽')
+  await page.keyboard.press('ArrowRight')
+  await expect(card.locator('.figure')).toHaveText('Рынка за эту неделю нет')
+})

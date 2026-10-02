@@ -25,6 +25,17 @@ export interface MarketRateRepository {
     day: string,
   ): Promise<readonly MarketRate[]>
 
+  /**
+   * Every row of one channel for these currencies dated from `from` to `to`, oldest first — the
+   * line of «Курс рубля за 12 месяцев» (MOL-161). Which row a week takes is the domain's rule.
+   */
+  series(
+    channel: MarketChannel,
+    currencies: readonly MarketRate['currency'][],
+    from: string,
+    to: string,
+  ): Promise<readonly MarketRate[]>
+
   /** Each channel's latest row of each currency and side, of any age — the block of today. */
   latest(): Promise<readonly MarketRate[]>
 
@@ -94,6 +105,23 @@ export function createMarketRateRepository(db: Conn): MarketRateRepository {
           lte(marketRates.rateDate, day),
         ),
       )
+      return rows.map(toRate)
+    },
+
+    async series(channel, currencies, from, to) {
+      if (currencies.length === 0) return []
+      const rows = await db
+        .select()
+        .from(marketRates)
+        .where(
+          and(
+            eq(marketRates.channel, channel),
+            inArray(marketRates.currency, [...currencies]),
+            gte(marketRates.rateDate, from),
+            lte(marketRates.rateDate, to),
+          ),
+        )
+        .orderBy(marketRates.rateDate)
       return rows.map(toRate)
     },
 

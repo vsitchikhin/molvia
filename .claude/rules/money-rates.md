@@ -2,7 +2,8 @@
 paths:
   - 'packages/model/src/values/{rates,money,market-rates}.ts'
   - 'packages/model/src/{entities,contracts}/{exchange,income}.ts'
-  - 'packages/model/tests/{values,entities,contracts}/{rates,money,market-rates,exchange,income}.test.ts'
+  - 'packages/model/src/entities/exchange-rate-chart.ts'
+  - 'packages/model/tests/{values,entities,contracts}/{rates,money,market-rates,exchange,exchange-rate-chart,income}.test.ts'
   - 'backend/src/rates/**'
   - 'backend/src/db/{rates,market-rates,exchanges,incomes}-repository.ts'
   - 'backend/src/usecases/{exchanges,incomes,refresh-official-rates,refresh-market-rates,choose-trip-rate,money-rates,start-trip}*.ts'
@@ -307,6 +308,63 @@ rate exactly as before.
   write's answer** (В-2): a written exchange is in the sum at once; defaulted (`null`) for a server
   before it. No «≈ ₽» under the sum (review Р-7 of MOL-157): past differences at today's rate would
   creep with the rate.
+- **«Курс рубля за 12 месяцев» stands under it, and its line is all bank clients** (MOL-161, handoff
+  MOL-157 05, owner's decisions В-1, В-2 of 02.10.2026): the market at the end of every week of the
+  same window as «Обмены против рынка» — Sundays and today, each week the latest row fresh for it by
+  `OFFICIAL_RATE_FRESH_DAYS`, a week with none a gap, never a zero. **Only `banksAll` has a year of
+  history** — people's cash and non-cash are collected from 30.09.2026, the exchange offices come a
+  week at a time with no archive — so the legend names it («Рынок · все клиенты банков», Р-3): for
+  the rouble it runs some 2.6 % above cash, and unnamed it read as the market the person changed at.
+  **A point is the person's exchange on its own day, measured as its card measures it** — `market.own
+?? market.best` of the list — **its percent made of the very drams of «Обмены против рынка»**
+  (`marketMeasuresOf`, Р-4, adversarial В): counted apart from the money received, 100 ₽ bought for
+  437,91 ֏ read «−0,67 %» on the point and «−0,66 %» on its place, rounded at different places;
+  with no comparison there, none on the point — **and the mark from it ends at that
+  market, never at the line** (В-1): roubles sold for cash at 4,15 when banks bought cash at 4,110 and
+  all clients near 4,22 are «+0,97 %», and a mark to the line said the opposite. The line is the
+  background, where the market went; with no market of the day a point has no mark and says so,
+  and with a market and no central bank rate to bring the difference into the spending currency it
+  has its mark, no percent, and says it is the rate that is missing (adversarial К).
+  **The line is on the side of the pair's latest exchange in the window** (В-2), the others of the
+  pair not drawn: the bank's selling rate is another line, and a purchase of roubles set on the line
+  of their sale looked a windfall. **The pairs are the currencies changed against the dram in the
+  window**, the currency of conversion first; with none, the currency of conversion alone, a line with
+  no points, unless it is the dram; a pair with no figure in any week is left out, and with none left
+  there is no card (`rateChart: null`). **Every height, position, percent and tick is the server's**
+  (`rateChart`, `exchange-rate-chart.ts`): three ticks a step of 1, 2, 3 or 5 × 10ⁿ apart within the
+  scale, multiples of that power — «4,30 · 4,60 · 4,90» — or one when none fit two digits; the phone
+  names the months. **The scale is the figures, and no narrower than a hundredth of their middle**
+  (`rateScale`, adversarial Г2): a flat year with an exchange 0,07 % off it drew those 0,07 % the
+  whole height of the card; a year of the market spans ten percent and more and is drawn as it is.
+  **A week with a figure between two gaps is a dot of the line** (adversarial Д), never left out. It
+  comes with `GET /exchanges` and every write's answer, as `losses` does, and is defaulted for a
+  server before it. The finger chooses as on every chart of the section (`useChartPointer`), **by
+  what is drawn, in pixels** (adversarial Л, М, Н, review 6): **the dot under the finger is chosen**
+  — the nearest within `FINGER_PX`; measured in thousandths, the left half of a Monday's dot lay
+  nearer the end of the week before, which was chosen with the dot under the finger. **Taps again on
+  one spot go round the dots drawn on it** — centres within `STACK_PX` of the dot the round began
+  with: one day and one rate, or days nearly one (adversarial И) — **in order of their distance from
+  the first tap**: the first tap is the dot under the finger, and every dot of the spot comes in
+  turn. **A tap is on the spot while the dot under it is drawn there**, wherever on it the finger
+  lands (review 8: measured from the first touch, a finger 5 px off the centre began a new round
+  every time, and three on one spot went round two); a neighbour seen apart is a new spot, however
+  near (adversarial С, Т: gathered by a ring of 7 px, a dot tapped again turned to its neighbours 6
+  px off). **A new answer begins afresh** (adversarial Р): the dots move with the scale. Turned from
+  the one chosen, the middle of three dots 7 px apart went to the first (Н); turned from the
+  nearest, three dots on one spot went round two (О, review 7); turned in order of days, a tap right
+  on one of three dots 2,7 px apart showed its neighbour (П). **The price, named:** within
+  `STACK_PX` the round goes on — a tap right on another dot 2,7 px off the first shows the next of
+  the round, not that dot; a finger cannot tell them apart either. A tap on a new spot right on the
+  dot already chosen goes on to the next. **A slide follows the finger** (`tap`), kept only by a dot
+  drawn right on the one under it.
+  **With no dot under the finger, the nearest by x alone** — a week with no exchange by its end, an
+  exchange by its day (review 1), never by height: let into the height, a week was chosen two ahead
+  on a line of 6 px weeks, and a gap could not be chosen at all (review 4, adversarial Ж). The latest
+  exchange by default, two of one day in the order they were made, never by their ids (review 2).
+  **A hidden radio for each week with no exchange and for each exchange** (Р-6): one per week left the
+  second exchange of a week out of reach of the keys. The scale is never stretched to a tick (review
+  3): stretched to a tick rounded off a flat line, the line was pressed to the top. A market that
+  would have given nothing has no mark.
 
 ## Incomes
 

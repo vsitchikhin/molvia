@@ -152,7 +152,8 @@ export interface ExchangeLosses {
   readonly uncounted: number
 }
 
-function hundredthsOf(part: bigint, whole: bigint): number {
+/** Hundredths of a percent `part` is of `whole` — a place's and an exchange's alike (MOL-161). */
+export function hundredthsOf(part: bigint, whole: bigint): number {
   if (whole <= 0n) return 0
   return Number(divideRounded(part * 10_000n, whole))
 }
