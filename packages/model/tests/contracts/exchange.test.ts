@@ -217,38 +217,58 @@ describe('exchangesResponseCodec', () => {
         { place: null, count: 2, difference: money(122_300n, 'AMD'), percent: 149, level: 207 },
       ],
     },
-    rateChart: {
+    rateCharts: {
       pairs: [
         {
           currency: 'RUB',
           side: 'bankBuys',
-          weeks: [
-            {
-              day: '2026-09-20',
-              rate: { ...rate, scaled: 4_224_000n, source: 'official' },
-              x: 980,
-              level: 160,
+          periods: {
+            1: {
+              step: 'day',
+              steps: [
+                {
+                  day: '2026-09-26',
+                  rate: { ...rate, scaled: 4_224_000n, source: 'official' },
+                  x: 960,
+                  level: 500,
+                },
+                { day: '2026-09-27', rate: null, x: 1000, level: null },
+              ],
+              exchanges: [],
+              levels: [{ rate: { ...rate, scaled: 4_220_000n, source: 'official' }, level: 480 }],
             },
-            { day: '2026-09-27', rate: null, x: 1000, level: null },
-          ],
-          exchanges: [
-            {
-              id: body.id,
-              day: '2026-09-15',
-              week: 0,
-              x: 960,
-              rate: { ...rate, scaled: 4_750_000n },
-              level: 1000,
-              place: 'Ардшинбанк',
-              percent: 1255,
-              market: {
-                rate: { ...rate, scaled: 4_224_000n, source: 'official' },
-                level: 160,
-                basis: 'banksAll',
-              },
+            6: null,
+            12: {
+              step: 'week',
+              steps: [
+                {
+                  day: '2026-09-20',
+                  rate: { ...rate, scaled: 4_224_000n, source: 'official' },
+                  x: 980,
+                  level: 160,
+                },
+                { day: '2026-09-27', rate: null, x: 1000, level: null },
+              ],
+              exchanges: [
+                {
+                  id: body.id,
+                  day: '2026-09-15',
+                  step: 0,
+                  x: 960,
+                  rate: { ...rate, scaled: 4_750_000n },
+                  level: 1000,
+                  place: 'Ардшинбанк',
+                  percent: 1255,
+                  market: {
+                    rate: { ...rate, scaled: 4_224_000n, source: 'official' },
+                    level: 160,
+                    basis: 'banksAll',
+                  },
+                },
+              ],
+              levels: [{ rate: { ...rate, scaled: 4_500_000n, source: 'official' }, level: 560 }],
             },
-          ],
-          levels: [{ rate: { ...rate, scaled: 4_500_000n, source: 'official' }, level: 560 }],
+          },
         },
       ],
     },
@@ -264,7 +284,7 @@ describe('exchangesResponseCodec', () => {
     const wire: Record<string, unknown> = { ...z.encode(exchangesResponseCodec, response) }
     delete wire.marketToday
     delete wire.losses
-    delete wire.rateChart
+    delete wire.rateCharts
     const [first] = z.encode(exchangesResponseCodec, response).exchanges
     if (!first) throw new Error('no exchange')
     const exchange: Record<string, unknown> = { ...first }
@@ -273,9 +293,18 @@ describe('exchangesResponseCodec', () => {
     const decoded = exchangesResponseCodec.parse({ ...wire, exchanges: [exchange] })
     expect(decoded.marketToday).toEqual([])
     expect(decoded.losses).toBeNull()
-    expect(decoded.rateChart).toBeNull()
+    expect(decoded.rateCharts).toBeNull()
     expect(decoded.exchanges[0]?.market).toBeNull()
     expect(decoded.exchanges[0]?.channel).toBeNull()
+  })
+
+  it('reads the year alone of a server before MOL-168 and draws nothing of it (Р-4)', () => {
+    const wire: Record<string, unknown> = { ...z.encode(exchangesResponseCodec, response) }
+    delete wire.rateCharts
+    // The chart as MOL-161 sent it: the weeks of the year, a shape this page no longer reads.
+    wire.rateChart = { pairs: [{ currency: 'RUB', side: 'bankBuys', weeks: [], exchanges: [] }] }
+    const decoded = exchangesResponseCodec.parse(wire)
+    expect(decoded.rateCharts).toBeNull()
   })
 
   it('is strict: a field the screen never reads fails rather than travelling past it', () => {

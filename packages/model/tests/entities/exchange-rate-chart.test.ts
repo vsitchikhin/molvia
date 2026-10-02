@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
+  RATE_CHART_MONTHS,
   rateChart,
   rateChartPairs,
+  rateDays,
   rateLevels,
+  ratePeriodFrom,
   rateScale,
   rateWeeks,
-  weekRate,
+  stepRate,
 } from '#model/entities/exchange-rate-chart'
-import type { RateChartExchangeInput } from '#model/entities/exchange-rate-chart'
-import { CHART_LEVEL } from '#model/entities/money-charts'
+import type { RateChart, RateChartExchangeInput } from '#model/entities/exchange-rate-chart'
+import { CHART_LEVEL, EXCHANGE_LOSS_MONTHS } from '#model/entities/money-charts'
 import type { Currency } from '#model/values/money'
 import type { MarketChannel, MarketRate, MarketSide } from '#model/values/market-rates'
 import { parseRate, yerevanMidnight } from '#model/values/rates'
@@ -16,6 +19,13 @@ import type { ExchangeRate } from '#model/values/rates'
 
 const FROM = '2025-11-01'
 const TODAY = '2026-10-02'
+/** The year of the chart: the same day a year back (MOL-168, В-1 «б»). */
+const YEAR_FROM = '2025-10-02'
+
+/** A pair's year, as every chart test before MOL-168 read the one period there was. */
+function year(chart: RateChart | null, index = 0) {
+  return chart?.pairs[index]?.periods[12]
+}
 
 function row(
   date: string,
@@ -105,20 +115,20 @@ describe('rateWeeks', () => {
   })
 })
 
-describe('weekRate', () => {
+describe('stepRate', () => {
   const rows = [row('2026-03-16', '4.50'), row('2026-03-20', '4.60'), row('2026-03-23', '4.70')]
 
   it('takes the latest row of the week, never one after its end', () => {
-    expect(weekRate(rows, '2026-03-22')?.scaled).toBe(parseRate('4.60'))
+    expect(stepRate(rows, '2026-03-22')?.scaled).toBe(parseRate('4.60'))
   })
 
   it('takes a row up to a week before the end, and none older', () => {
-    expect(weekRate([row('2026-03-15', '4.40')], '2026-03-22')?.date).toBe('2026-03-15')
-    expect(weekRate([row('2026-03-14', '4.40')], '2026-03-22')).toBeNull()
+    expect(stepRate([row('2026-03-15', '4.40')], '2026-03-22')?.date).toBe('2026-03-15')
+    expect(stepRate([row('2026-03-14', '4.40')], '2026-03-22')).toBeNull()
   })
 
   it('is none with no rows', () => {
-    expect(weekRate([], '2026-03-22')).toBeNull()
+    expect(stepRate([], '2026-03-22')).toBeNull()
   })
 })
 
@@ -226,8 +236,8 @@ describe('rateChart', () => {
   const rub = { currency: 'RUB' as const, side: 'bankBuys' as const, rows: line }
 
   it('draws the line by all bank clients at the end of each week, a gap where none is fresh', () => {
-    const chart = rateChart([rub], [], FROM, TODAY)
-    const weeks = chart?.pairs[0]?.weeks ?? []
+    const chart = rateChart([rub], [], TODAY)
+    const weeks = year(chart)?.steps ?? []
     expect(weeks.find(({ day }) => day === '2026-03-22')?.rate?.scaled).toBe(parseRate('4.60'))
     expect(weeks.find(({ day }) => day === '2026-09-27')?.rate?.scaled).toBe(parseRate('4.22'))
     expect(weeks.find(({ day }) => day === '2026-09-27')?.rate?.asOf).toEqual(
@@ -235,9 +245,10 @@ describe('rateChart', () => {
     )
     const gap = weeks.find(({ day }) => day === '2026-06-07')
     expect(gap).toMatchObject({ rate: null, level: null })
-    expect(weeks[0]?.x).toBe(3)
+    // 2 October 2025 is a Thursday: the first week ends three days in, of 365.
+    expect(weeks[0]).toMatchObject({ day: '2025-10-05', x: 8 })
     expect(weeks.at(-1)).toMatchObject({ day: TODAY, x: CHART_LEVEL })
-    expect(chart?.pairs[0]?.exchanges).toEqual([])
+    expect(year(chart)?.exchanges).toEqual([])
   })
 
   it('sets a cash exchange beside its own channel: the percent and the mark agree (В-1)', () => {
@@ -251,13 +262,12 @@ describe('rateChart', () => {
           own: { rate: '4.11', difference: 400 },
         }),
       ],
-      FROM,
       TODAY,
     )
-    const point = chart?.pairs[0]?.exchanges[0]
+    const point = year(chart)?.exchanges[0]
     expect(point).toMatchObject({
       day: '2026-09-29',
-      week: rateWeeks(FROM, TODAY).length - 1,
+      step: rateWeeks(YEAR_FROM, TODAY).length - 1,
       place: 'Ардшинбанк',
       // 400 of the 41 100 ֏ the market would have given.
       percent: 97,
@@ -265,7 +275,7 @@ describe('rateChart', () => {
     })
     expect(point?.rate.scaled).toBe(parseRate('4.15'))
     // The mark ends below the point, the line runs above both.
-    const week = chart?.pairs[0]?.weeks.find(({ day }) => day === '2026-10-02')
+    const week = year(chart)?.steps.find(({ day }) => day === '2026-10-02')
     expect(point?.market?.level).toBeLessThan(point?.level ?? 0)
     expect(point?.level).toBeLessThan(week?.level ?? 0)
   })
@@ -277,10 +287,9 @@ describe('rateChart', () => {
         exchange('2026-09-21', { best: { rate: '4.20', difference: -200, basis: 'banksAll' } }),
         exchange('2026-09-22', { note: null }),
       ],
-      FROM,
       TODAY,
     )
-    const [measured, bare] = chart?.pairs[0]?.exchanges ?? []
+    const [measured, bare] = year(chart)?.exchanges ?? []
     expect(measured).toMatchObject({ percent: -48, market: { basis: 'banksAll' } })
     expect(bare).toMatchObject({ percent: null, market: null, place: null })
   })
@@ -292,12 +301,11 @@ describe('rateChart', () => {
         exchange('2026-09-24', { id: 'b0000000-0000-4000-8000-000000000000' }),
         exchange('2026-09-22', { id: 'a0000000-0000-4000-8000-000000000000' }),
       ],
-      FROM,
       TODAY,
     )
-    const points = chart?.pairs[0]?.exchanges ?? []
+    const points = year(chart)?.exchanges ?? []
     expect(points.map(({ day }) => day)).toEqual(['2026-09-22', '2026-09-24'])
-    expect(points[0]?.week).toBe(points[1]?.week)
+    expect(points[0]?.step).toBe(points[1]?.step)
     expect(points[0]?.x).toBeLessThan(points[1]?.x ?? 0)
   })
 
@@ -315,20 +323,18 @@ describe('rateChart', () => {
           measured: { difference: -289n, expected: 43_476n },
         }),
       ],
-      FROM,
       TODAY,
     )
-    expect(chart?.pairs[0]?.exchanges[0]?.percent).toBe(-66)
+    expect(year(chart)?.exchanges[0]?.percent).toBe(-66)
   })
 
   it('has no percent where «Обмены против рынка» has no comparison', () => {
     const chart = rateChart(
       [rub],
       [exchange('2026-09-29', { best: { rate: '4.11', difference: 400 }, measured: null })],
-      FROM,
       TODAY,
     )
-    expect(chart?.pairs[0]?.exchanges[0]).toMatchObject({
+    expect(year(chart)?.exchanges[0]).toMatchObject({
       percent: null,
       market: { basis: 'bankCash' },
     })
@@ -342,20 +348,18 @@ describe('rateChart', () => {
         exchange('2026-09-22', { id: '00000000-0000-4000-8000-000000000001', note: 'Обменник' }),
         exchange('2026-09-22', { id: 'ffffffff-ffff-4fff-bfff-ffffffffffff', note: 'Ардшинбанк' }),
       ],
-      FROM,
       TODAY,
     )
-    expect(chart?.pairs[0]?.exchanges.map(({ place }) => place)).toEqual(['Ардшинбанк', 'Обменник'])
+    expect(year(chart)?.exchanges.map(({ place }) => place)).toEqual(['Ардшинбанк', 'Обменник'])
   })
 
   it('compares nothing where the market would have given nothing, as «Обмены против рынка»', () => {
     const chart = rateChart(
       [rub],
       [exchange('2026-09-22', { amount: 100, best: { rate: '4.10', difference: 100 } })],
-      FROM,
       TODAY,
     )
-    expect(chart?.pairs[0]?.exchanges[0]).toMatchObject({ percent: null, market: null })
+    expect(year(chart)?.exchanges[0]).toMatchObject({ percent: null, market: null })
   })
 
   it('draws neither the other side, nor another pair, nor the days outside the window', () => {
@@ -364,24 +368,22 @@ describe('rateChart', () => {
       [
         exchange('2026-09-21', { given: 'AMD', received: 'RUB', rate: '4.60' }),
         exchange('2026-09-21', { given: 'USD', rate: '386' }),
-        exchange('2025-10-31'),
+        exchange('2025-10-01'),
         exchange('2026-10-03'),
         exchange('2026-09-21', { rate: null }),
       ],
-      FROM,
       TODAY,
     )
-    expect(chart?.pairs[0]?.exchanges).toEqual([])
+    expect(year(chart)?.exchanges).toEqual([])
   })
 
   it('lays the ticks over the line, the points and the marks alike', () => {
     const chart = rateChart(
       [rub],
       [exchange('2026-09-29', { rate: '4.95', best: { rate: '4.11', difference: 0 } })],
-      FROM,
       TODAY,
     )
-    const pair = chart?.pairs[0]
+    const pair = year(chart)
     // 4,11 is the lowest figure, 4,95 the highest: the middle is 4,53.
     expect(pair?.levels.map(({ rate }) => rate.scaled)).toEqual(
       ['4.20', '4.50', '4.80'].map(parseRate),
@@ -394,10 +396,9 @@ describe('rateChart', () => {
     const chart = rateChart(
       [{ ...rub, rows: [row('2026-09-25', '4.15')] }],
       [exchange('2026-09-29')],
-      FROM,
       TODAY,
     )
-    const pair = chart?.pairs[0]
+    const pair = year(chart)
     expect(pair?.levels).toEqual([
       { rate: drams('4.13', TODAY), level: 18 },
       { rate: drams('4.15', TODAY), level: CHART_LEVEL / 2 },
@@ -410,14 +411,13 @@ describe('rateChart', () => {
     const chart = rateChart(
       [{ ...rub, rows: [row('2026-09-25', '4.152')] }],
       [exchange('2026-09-29', { rate: '4.152' })],
-      FROM,
       TODAY,
     )
-    const pair = chart?.pairs[0]
+    const pair = year(chart)
     expect(pair?.levels.map(({ rate }) => rate.scaled)).toEqual(
       ['4.14', '4.15', '4.16'].map(parseRate),
     )
-    expect(pair?.weeks.at(-1)?.level).toBe(CHART_LEVEL / 2)
+    expect(pair?.steps.at(-1)?.level).toBe(CHART_LEVEL / 2)
     expect(pair?.exchanges[0]?.level).toBe(CHART_LEVEL / 2)
   })
 
@@ -432,26 +432,154 @@ describe('rateChart', () => {
           best: { rate: '4.60', difference: 34 },
         }),
       ],
-      FROM,
       TODAY,
     )
-    const point = chart?.pairs[0]?.exchanges[0]
+    const point = year(chart)?.exchanges[0]
     expect(point?.percent).toBe(7)
     // A scale of 0,046 around 4,6017: the point and its mark some 74 thousandths apart.
     expect((point?.level ?? 0) - (point?.market?.level ?? 0)).toBe(74)
   })
 
   it("says the exchange's own rate is the person's", () => {
-    const chart = rateChart([rub], [exchange('2026-09-29')], FROM, TODAY)
-    expect(chart?.pairs[0]?.exchanges[0]?.rate.source).toBe('personal')
+    const chart = rateChart([rub], [exchange('2026-09-29')], TODAY)
+    expect(year(chart)?.exchanges[0]?.rate.source).toBe('personal')
   })
 
   it('leaves out a pair with no figure in any week, and is null with none left', () => {
     const usd = { currency: 'USD' as const, side: 'bankBuys' as const, rows: [] }
-    expect(rateChart([rub, usd], [], FROM, TODAY)?.pairs.map(({ currency }) => currency)).toEqual([
-      'RUB',
+    expect(rateChart([rub, usd], [], TODAY)?.pairs.map(({ currency }) => currency)).toEqual(['RUB'])
+    expect(rateChart([usd], [exchange('2026-09-21', { given: 'USD' })], TODAY)).toBeNull()
+    expect(rateChart([], [], TODAY)).toBeNull()
+  })
+})
+
+describe('ratePeriodFrom', () => {
+  it('looks back the same day of the month (MOL-168, В-1 «б»)', () => {
+    expect(RATE_CHART_MONTHS.map((months) => ratePeriodFrom(TODAY, months))).toEqual([
+      '2026-09-02',
+      '2026-04-02',
+      YEAR_FROM,
     ])
-    expect(rateChart([usd], [exchange('2026-09-21', { given: 'USD' })], FROM, TODAY)).toBeNull()
-    expect(rateChart([], [], FROM, TODAY)).toBeNull()
+  })
+
+  it('takes the last day of a shorter month, a leap February too', () => {
+    expect(ratePeriodFrom('2026-03-31', 1)).toBe('2026-02-28')
+    expect(ratePeriodFrom('2028-03-31', 1)).toBe('2028-02-29')
+    expect(ratePeriodFrom('2026-12-31', 1)).toBe('2026-11-30')
+    expect(ratePeriodFrom('2026-08-31', 6)).toBe('2026-02-28')
+    expect(ratePeriodFrom('2028-02-29', 12)).toBe('2027-02-28')
+  })
+
+  it('crosses the year back', () => {
+    expect(ratePeriodFrom('2026-01-15', 1)).toBe('2025-12-15')
+    expect(ratePeriodFrom('2026-03-02', 6)).toBe('2025-09-02')
+  })
+
+  it('makes the year of the chart the window of «Обмены против рынка»', () => {
+    expect(RATE_CHART_MONTHS.at(-1)).toBe(EXCHANGE_LOSS_MONTHS)
+  })
+})
+
+describe('rateDays', () => {
+  it('reads every day from the first to today, across a month', () => {
+    expect(rateDays('2026-09-29', '2026-10-02')).toEqual([
+      '2026-09-29',
+      '2026-09-30',
+      '2026-10-01',
+      '2026-10-02',
+    ])
+    expect(rateDays(TODAY, TODAY)).toEqual([TODAY])
+  })
+})
+
+describe('rateChart by period (MOL-168)', () => {
+  // The bank publishes on working days: Friday the 25th and Monday the 28th, nothing between.
+  const rows = [
+    row('2026-03-20', '4.60'),
+    row('2026-09-25', '4.22'),
+    row('2026-09-28', '4.20'),
+    row('2026-10-02', '4.25'),
+  ]
+  const rub = { currency: 'RUB' as const, side: 'bankBuys' as const, rows }
+
+  it('reads the month by days and half a year and the year by weeks', () => {
+    const periods = rateChart([rub], [], TODAY)?.pairs[0]?.periods
+    expect(periods?.[1]?.step).toBe('day')
+    expect(periods?.[1]?.steps).toHaveLength(31)
+    expect(periods?.[1]?.steps[0]).toMatchObject({ day: '2026-09-02', x: 0 })
+    expect(periods?.[1]?.steps.at(-1)).toMatchObject({ day: TODAY, x: CHART_LEVEL })
+    expect(periods?.[6]?.step).toBe('week')
+    expect(periods?.[6]?.steps[0]?.day).toBe('2026-04-05')
+    expect(periods?.[12]?.steps).toHaveLength(rateWeeks(YEAR_FROM, TODAY).length)
+  })
+
+  it("draws a weekend of the month at Friday's figure, the one its exchange is measured by (В-2 «а»)", () => {
+    const month = rateChart([rub], [], TODAY)?.pairs[0]?.periods[1]
+    const on = (day: string) => month?.steps.find((step) => step.day === day)?.rate
+    expect(on('2026-09-26')).toEqual(drams('4.22', '2026-09-25'))
+    expect(on('2026-09-27')).toEqual(drams('4.22', '2026-09-25'))
+    expect(on('2026-09-28')).toEqual(drams('4.20', '2026-09-28'))
+    // Eight days and more with no row is a gap, as for a week.
+    expect(on('2026-09-02')).toBeNull()
+  })
+
+  it('puts an exchange of a Sunday on its own day of the month and in its week of the year', () => {
+    const chart = rateChart([rub], [exchange('2026-09-27')], TODAY)
+    const month = chart?.pairs[0]?.periods[1]
+    const year = chart?.pairs[0]?.periods[12]
+    const point = month?.exchanges[0]
+    expect(month?.steps[point?.step ?? -1]?.day).toBe('2026-09-27')
+    expect(year?.steps[year.exchanges[0]?.step ?? -1]?.day).toBe('2026-09-27')
+    // The 25th day of 30 in the month, the 360th of 365 in the year.
+    expect(point?.x).toBe(833)
+    expect(year?.exchanges[0]?.x).toBe(986)
+  })
+
+  it('takes an exchange of the first day of a period, and leaves out the day before', () => {
+    const chart = rateChart([rub], [exchange('2026-09-02'), exchange('2026-09-01')], TODAY)
+    const days = (months: 1 | 6 | 12) =>
+      chart?.pairs[0]?.periods[months]?.exchanges.map(({ day }) => day)
+    expect(days(1)).toEqual(['2026-09-02'])
+    expect(days(6)).toEqual(['2026-09-01', '2026-09-02'])
+    expect(
+      rateChart([rub], [exchange(YEAR_FROM)], TODAY)?.pairs[0]?.periods[12]?.exchanges,
+    ).toHaveLength(1)
+  })
+
+  it('scales each period by its own figures: the month is not pressed by the spring', () => {
+    const periods = rateChart([rub], [], TODAY)?.pairs[0]?.periods
+    expect(periods?.[12]?.levels.map(({ rate }) => rate.scaled)).toEqual(
+      ['4.30', '4.40', '4.50'].map(parseRate),
+    )
+    expect(periods?.[1]?.levels.map(({ rate }) => rate.scaled)).toEqual(
+      ['4.21', '4.23', '4.25'].map(parseRate),
+    )
+  })
+
+  it('keeps the pair of the year in a month with none of its exchanges: a line with no points (Р-1)', () => {
+    const usd = {
+      currency: 'USD' as const,
+      side: 'bankBuys' as const,
+      rows: [
+        row('2026-05-04', '386', { currency: 'USD' }),
+        row('2026-09-28', '384', { currency: 'USD' }),
+      ],
+    }
+    const chart = rateChart(
+      [rub, usd],
+      [exchange('2026-05-04', { given: 'USD', rate: '386' })],
+      TODAY,
+    )
+    const dollar = chart?.pairs.find(({ currency }) => currency === 'USD')
+    expect(dollar?.periods[1]?.exchanges).toEqual([])
+    expect(dollar?.periods[6]?.exchanges).toHaveLength(1)
+  })
+
+  it('has no month with no figure in it while the year has one (Р-6)', () => {
+    const spring = { ...rub, rows: [row('2026-05-20', '4.60')] }
+    const periods = rateChart([spring], [exchange('2026-09-22')], TODAY)?.pairs[0]?.periods
+    expect(periods?.[1]).toBeNull()
+    expect(periods?.[6]?.steps.some(({ rate }) => rate !== null)).toBe(true)
+    expect(periods?.[12]).toBeTruthy()
   })
 })
