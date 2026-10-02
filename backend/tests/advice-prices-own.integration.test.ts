@@ -246,19 +246,28 @@ describe('GET /advice/prices — the item’s own places', () => {
     ])
   })
 
-  it('keeps currencies and units apart, each its own row', async () => {
+  it('names a place by its last purchase, in that purchase’s currency and unit (MOL-166, А)', async () => {
     const me = await insertActor(db)
     const milk = await item('Молоко Ашхар 1 л')
     const zovuni = await erevan('Зовуни')
-    await bought(me, milk, zovuni, 540)
-    await bought(me, milk, zovuni, 0, { amount: { minor: 15_000n, currency: 'RUB' } })
-    await bought(me, milk, zovuni, 600, { quantity: { milli: 1000n, unit: 'piece' } })
+    await bought(me, milk, zovuni, 540, { on: '2026-09-10' })
+    await bought(me, milk, zovuni, 0, {
+      on: '2026-09-11',
+      amount: { minor: 15_000n, currency: 'RUB' },
+    })
+    await bought(me, milk, zovuni, 600, {
+      on: '2026-09-12',
+      quantity: { milli: 1000n, unit: 'piece' },
+    })
+    await bought(me, milk, await erevan('SAS'), 580, { on: '2026-09-01' })
 
     const answer = await prices(me, { item: milk })
     expect(
       answer.level !== 'never' &&
-        answer.places.map((place) => place.unitPrice.currency + place.unitPrice.unit),
-    ).toEqual(['AMDl', 'AMDpiece', 'RUBl'])
+        answer.places.map(
+          (place) => `${place.name} ${place.unitPrice.currency}${place.unitPrice.unit}`,
+        ),
+    ).toEqual(['SAS AMDl', 'Зовуни AMDpiece'])
   })
 
   it('dates a record from an old queue by its moment in the zone of the request (MOL-121)', async () => {
@@ -354,6 +363,34 @@ describe('«Что брать» and the sheet name one price for one place (MOL-
     ]
     expect(await home(me)).toEqual(named)
     expect(await sheet(me, milk)).toEqual(named)
+  })
+
+  it('names a place where a pack was bought last by the pack, on the list and on the sheet (adversarial А)', async () => {
+    const me = await insertActor(db)
+    const cheese = await item('Сыр Чанах')
+    await rate(me, cheese, 5)
+    const sas = await erevan('SAS')
+    const kilo: Quantity = { milli: 1000n, unit: 'kg' }
+    for (const on of ['2026-08-01', '2026-08-08', '2026-08-15']) {
+      await bought(me, cheese, sas, 2400, { on, at: new Date(`${on}T09:00:00Z`), quantity: kilo })
+    }
+    await bought(me, cheese, sas, 1200, {
+      on: '2026-09-20',
+      at: new Date('2026-09-20T09:00:00Z'),
+      quantity: { milli: 1000n, unit: 'piece' },
+    })
+    await bought(me, cheese, await erevan('Ереван Сити'), 2800, {
+      on: '2026-09-18',
+      at: new Date('2026-09-18T09:00:00Z'),
+      quantity: kilo,
+    })
+
+    // The pairs weigh one purchase each now, and the later visit chooses the pack (Р-4).
+    const named = [
+      { name: 'SAS', price: unitPrice(amd(120_000), { milli: 1000n, unit: 'piece' }).scaledMinor },
+    ]
+    expect(await home(me)).toEqual(named)
+    expect((await sheet(me, cheese)).filter((place) => place.name === 'SAS')).toEqual(named)
   })
 
   it('reads a record from an old queue in the zone the request names, on the list and in its search', async () => {

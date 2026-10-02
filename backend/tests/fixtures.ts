@@ -1,7 +1,12 @@
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto'
 import type { ActorSettings } from '@molvia/model'
 import { eq } from 'drizzle-orm'
-import { actorSettingsSchema, AGGREGATE_MIN_CONTRIBUTIONS, SESSION_COOKIE } from '@molvia/model'
+import {
+  actorSettingsSchema,
+  AGGREGATE_MIN_CONTRIBUTIONS,
+  SESSION_COOKIE,
+  SHARED_PRICE_FRESH_DAYS,
+} from '@molvia/model'
 import { createSessionRepository } from '@/db/sessions-repository'
 import type { Db } from '@/db/index'
 import type { PriceQuery } from '@/db/expenses-repository'
@@ -203,6 +208,7 @@ export function ownPrices(actorId: string, itemIds: readonly string[], limit?: n
     itemIds,
     scope: 'own',
     minBuyers: AGGREGATE_MIN_CONTRIBUTIONS,
+    freshDays: SHARED_PRICE_FRESH_DAYS,
     country: 'AM',
     city: 'Гюмри',
     ...(limit === undefined ? {} : { limit }),

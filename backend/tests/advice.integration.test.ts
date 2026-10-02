@@ -272,13 +272,16 @@ describe('цены', () => {
   })
 
   it('не смешивает валюты: показывает ту, в которой покупали чаще', async () => {
+    // Two places: a place is named by its last purchase alone (MOL-166, А), so the pairs are
+    // weighed across places.
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
+    const other = await insertPlace(db, { name: 'Рынок' })
     const itemId = await insertItem(db)
     await rate(actorId, itemId, 5)
     await bought(actorId, itemId, placeId, amd(479_000))
     await bought(actorId, itemId, placeId, amd(490_000))
-    await bought(actorId, itemId, placeId, { minor: 50_000n, currency: 'RUB' })
+    await bought(actorId, itemId, other, { minor: 50_000n, currency: 'RUB' })
 
     const [row] = (await screen(actorId)).rows
     expect(row?.level === 'take' && row.places).toHaveLength(1)

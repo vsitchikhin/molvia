@@ -8,6 +8,7 @@ import {
   EVENT,
   NEVER_BELOW_TENTHS,
   PRICE_MEDIAN_MIN_OBSERVATIONS,
+  SHARED_PRICE_FRESH_DAYS,
   adviceResponseSchema,
   adviceSearchResponseSchema,
   averageScore,
@@ -213,6 +214,7 @@ async function describe(
     actorId: actor.id,
     scope,
     minBuyers: AGGREGATE_MIN_CONTRIBUTIONS,
+    freshDays: SHARED_PRICE_FRESH_DAYS,
     country: actor.country,
     city: actor.city,
   }

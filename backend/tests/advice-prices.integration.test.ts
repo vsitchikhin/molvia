@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
-import { AGGREGATE_MIN_CONTRIBUTIONS, unitPrice } from '@molvia/model'
+import {
+  AGGREGATE_MIN_CONTRIBUTIONS,
+  SHARED_PRICE_FRESH_DAYS,
+  unitPrice,
+  yerevanDate,
+} from '@molvia/model'
 import type { Money, Quantity } from '@molvia/model'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, ownPrices } from './fixtures'
@@ -13,6 +18,10 @@ const { db, close } = connectDrizzle()
 const expenses = createExpenseRepository(db)
 
 const kilo: Quantity = { milli: 1000n, unit: 'kg' }
+const piece: Quantity = { milli: 1000n, unit: 'piece' }
+
+/** The day `days` before today in Yerevan: the window of other people's prices counts from today. */
+const ago = (days: number) => yerevanDate(new Date(Date.now() - days * 24 * 60 * 60 * 1000))
 const amd = (minor: number): Money => ({ minor: BigInt(minor), currency: 'AMD' })
 
 /** The same query the screen makes for someone who may see other people's prices. */
@@ -382,9 +391,9 @@ describe('цена места — последняя, а не минимум (MO
     const me = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
-    await bought(me, itemId, placeId, amd(600_000), kilo, { on: '2026-09-01' })
+    await bought(me, itemId, placeId, amd(600_000), kilo, { on: ago(30) })
     for (const minor of [400_000, 410_000, 420_000]) {
-      await bought(await insertActor(db), itemId, placeId, amd(minor), kilo, { on: '2026-09-25' })
+      await bought(await insertActor(db), itemId, placeId, amd(minor), kilo, { on: ago(7) })
     }
 
     const [row] = await expenses.placePricesFor(sharedPrices(me, [itemId]))
@@ -398,17 +407,17 @@ describe('цена места — последняя, а не минимум (MO
     const itemId = await insertItem(db)
     const theirs = await insertPlace(db, { name: 'Ереван Сити' })
     const [a, b, c] = [await insertActor(db), await insertActor(db), await insertActor(db)]
-    await bought(a, itemId, theirs, amd(520_000), kilo, { on: '2026-08-05' })
-    await bought(a, itemId, theirs, amd(590_000), kilo, { on: '2026-09-28' })
-    await bought(b, itemId, theirs, amd(610_000), kilo, { on: '2026-09-20' })
-    await bought(c, itemId, theirs, amd(600_000), kilo, { on: '2026-09-30' })
+    await bought(a, itemId, theirs, amd(520_000), kilo, { on: ago(58) })
+    await bought(a, itemId, theirs, amd(590_000), kilo, { on: ago(4) })
+    await bought(b, itemId, theirs, amd(610_000), kilo, { on: ago(12) })
+    await bought(c, itemId, theirs, amd(600_000), kilo, { on: ago(2) })
 
     const [row] = await expenses.placePricesFor(sharedPrices(me, [itemId]))
     expect(row?.scaledMinor).toBe(price(600_000))
     expect(row?.observations).toBe(4)
 
     // Г покупает дороже всех: середина сдвигается к нижней из двух средних, его чек не назван.
-    await bought(await insertActor(db), itemId, theirs, amd(650_000), kilo, { on: '2026-10-01' })
+    await bought(await insertActor(db), itemId, theirs, amd(650_000), kilo, { on: ago(1) })
     const [four] = await expenses.placePricesFor(sharedPrices(me, [itemId]))
     expect(four?.scaledMinor).toBe(price(600_000))
   })
@@ -418,18 +427,133 @@ describe('цена места — последняя, а не минимум (MO
     const itemId = await insertItem(db)
     const theirs = await insertPlace(db, { name: 'Ереван Сити' })
     const often = await insertActor(db)
-    for (const [minor, on] of [
-      [300_000, '2026-09-01'],
-      [310_000, '2026-09-02'],
-      [700_000, '2026-09-03'],
+    for (const [minor, days] of [
+      [300_000, 31],
+      [310_000, 30],
+      [700_000, 29],
     ] as const) {
-      await bought(often, itemId, theirs, amd(minor), kilo, { on })
+      await bought(often, itemId, theirs, amd(minor), kilo, { on: ago(days) })
     }
-    await bought(await insertActor(db), itemId, theirs, amd(500_000), kilo, { on: '2026-09-04' })
-    await bought(await insertActor(db), itemId, theirs, amd(510_000), kilo, { on: '2026-09-05' })
+    await bought(await insertActor(db), itemId, theirs, amd(500_000), kilo, { on: ago(28) })
+    await bought(await insertActor(db), itemId, theirs, amd(510_000), kilo, { on: ago(27) })
 
     const [row] = await expenses.placePricesFor(sharedPrices(me, [itemId]))
     // Последние: 700, 500, 510 — середина 510; по всем покупкам была бы 500 или ниже.
     expect(row?.scaledMinor).toBe(price(510_000))
+  })
+})
+
+describe('место — его последняя покупка, а не последняя в паре (MOL-166, адверсариальный А)', () => {
+  const price = (minor: number, quantity: Quantity = kilo) =>
+    unitPrice(amd(minor), quantity).scaledMinor
+  const rowsOf = (rows: Awaited<ReturnType<typeof expenses.placePricesFor>>) =>
+    rows.map((row) => [row.placeName, row.unit, row.scaledMinor])
+
+  it('свой режим: августовские кило не называют место, где в сентябре брали пачку', async () => {
+    const me = await insertActor(db)
+    const cheese = await insertItem(db)
+    const sas = await insertPlace(db, { name: 'SAS' })
+    const city = await insertPlace(db, { name: 'Ереван Сити' })
+    for (const on of ['2026-08-01', '2026-08-08', '2026-08-15']) {
+      await bought(me, cheese, sas, amd(240_000), kilo, { on })
+    }
+    await bought(me, cheese, sas, amd(120_000), piece, { on: '2026-09-20' })
+    await bought(me, cheese, city, amd(280_000), kilo, { on: '2026-09-18' })
+
+    expect(rowsOf(await expenses.placePricesFor(ownPrices(me, [cheese])))).toEqual([
+      ['SAS', 'piece', price(120_000, piece)],
+      ['Ереван Сити', 'kg', price(280_000)],
+    ])
+  })
+
+  it('общий режим: где я брал пачкой, середина чужих кило место не называет', async () => {
+    const me = await insertActor(db)
+    const cheese = await insertItem(db)
+    const sas = await insertPlace(db, { name: 'SAS' })
+    await bought(me, cheese, sas, amd(120_000), piece, { on: ago(10) })
+    for (const minor of [240_000, 260_000, 280_000]) {
+      await bought(await insertActor(db), cheese, sas, amd(minor), kilo, { on: ago(5) })
+    }
+
+    expect(rowsOf(await expenses.placePricesFor(sharedPrices(me, [cheese])))).toEqual([
+      ['SAS', 'piece', price(120_000, piece)],
+    ])
+  })
+
+  it('общий режим, чужое место: покупатель, бравший последней пачку, в кило не считается', async () => {
+    const me = await insertActor(db)
+    const cheese = await insertItem(db)
+    const sas = await insertPlace(db, { name: 'SAS' })
+    const switched = await insertActor(db)
+    await bought(switched, cheese, sas, amd(240_000), kilo, { on: ago(20) })
+    await bought(switched, cheese, sas, amd(120_000), piece, { on: ago(3) })
+    await bought(await insertActor(db), cheese, sas, amd(260_000), kilo, { on: ago(5) })
+    await bought(await insertActor(db), cheese, sas, amd(280_000), kilo, { on: ago(5) })
+
+    // В кило — двое с последней покупкой, в штуках — один: место закрыто в обеих парах.
+    expect(await expenses.placePricesFor(sharedPrices(me, [cheese]))).toEqual([])
+
+    await bought(await insertActor(db), cheese, sas, amd(250_000), kilo, { on: ago(1) })
+    expect(rowsOf(await expenses.placePricesFor(sharedPrices(me, [cheese])))).toEqual([
+      ['SAS', 'kg', price(260_000)],
+    ])
+  })
+})
+
+describe('давность чужих последних (MOL-166, адверсариальный Б)', () => {
+  const price = (minor: number) => unitPrice(amd(minor), kilo).scaledMinor
+
+  it('последняя покупка ровно на краю окна считается, днём раньше — нет', async () => {
+    const me = await insertActor(db)
+    const theirs = await insertPlace(db, { name: 'Зовуни' })
+    const atEdge = await insertItem(db)
+    const pastEdge = await insertItem(db)
+    for (const [itemId, days] of [
+      [atEdge, SHARED_PRICE_FRESH_DAYS],
+      [pastEdge, SHARED_PRICE_FRESH_DAYS + 1],
+    ] as const) {
+      await bought(await insertActor(db), itemId, theirs, amd(600_000), kilo, { on: ago(1) })
+      await bought(await insertActor(db), itemId, theirs, amd(610_000), kilo, { on: ago(2) })
+      await bought(await insertActor(db), itemId, theirs, amd(540_000), kilo, { on: ago(days) })
+    }
+
+    const [open] = await expenses.placePricesFor(sharedPrices(me, [atEdge]))
+    expect(open?.scaledMinor).toBe(price(600_000))
+    // Трое покупали, но в окне — двое: место закрыто.
+    expect(await expenses.placePricesFor(sharedPrices(me, [pastEdge]))).toEqual([])
+  })
+
+  it('старая последняя покупка вернувшегося покупателя не держит место на акции', async () => {
+    const me = await insertActor(db)
+    const itemId = await insertItem(db)
+    const theirs = await insertPlace(db, { name: 'Зовуни' })
+    for (const buyer of [await insertActor(db), await insertActor(db)]) {
+      await bought(buyer, itemId, theirs, amd(540_000), kilo, {
+        on: ago(SHARED_PRICE_FRESH_DAYS + 30),
+      })
+    }
+    for (const buyer of [await insertActor(db), await insertActor(db), await insertActor(db)]) {
+      await bought(buyer, itemId, theirs, amd(600_000), kilo, { on: ago(3) })
+    }
+
+    const [row] = await expenses.placePricesFor(sharedPrices(me, [itemId]))
+    expect(row?.scaledMinor).toBe(price(600_000))
+  })
+
+  it('своя последняя — без окна: прошлогодняя цена своего места остаётся (В-1)', async () => {
+    const me = await insertActor(db)
+    const itemId = await insertItem(db)
+    const placeId = await insertPlace(db)
+    await bought(me, itemId, placeId, amd(400_000), kilo, { on: ago(400) })
+    for (const minor of [600_000, 610_000, 620_000]) {
+      await bought(await insertActor(db), itemId, placeId, amd(minor), kilo, { on: ago(3) })
+    }
+
+    expect((await expenses.placePricesFor(ownPrices(me, [itemId])))[0]?.scaledMinor).toBe(
+      price(400_000),
+    )
+    expect((await expenses.placePricesFor(sharedPrices(me, [itemId])))[0]?.scaledMinor).toBe(
+      price(400_000),
+    )
   })
 })

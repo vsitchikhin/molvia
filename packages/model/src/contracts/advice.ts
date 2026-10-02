@@ -113,6 +113,15 @@ export type AdviceRow = z.output<typeof adviceRowSchema>
 export const PRICE_MEDIAN_MIN_OBSERVATIONS = 3
 
 /**
+ * How long another person's last purchase in a place still says what the place charges (MOL-166,
+ * the owner's decision on adversarial Б). Older, it is no longer counted towards a place opened by
+ * other people: two who bought at a discount in August and never came back held the place at the
+ * discount, while the one who still shops there saw today's price on the same screen. One's own
+ * last purchase has no such window — it is what the sheet compares with, dated (MOL-166, В-1).
+ */
+export const SHARED_PRICE_FRESH_DAYS = 90
+
+/**
  * How many rows one answer carries. It bounds the answer, not the screen: in the own mode a
  * person has as many rows as they have ratings, and in the shared one the list is everything
  * anyone has rated (Р-14), so this stops being generous as soon as there are many people —
