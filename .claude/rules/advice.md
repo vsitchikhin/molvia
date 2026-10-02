@@ -301,8 +301,11 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
   own. **Two prices are one within half a per cent, or within what the till's rounding of both sums
   can move** (`samePrice`, adversarial Г, Г′): loose goods are weighed and a sum is typed whole, so one
   tag of 690 ֏/кг came out 689,63 and 690,67, and 0,15 kg — 104 ֏ for 103,50 — 693,33; compared exactly
-  it read «дороже» in yellow or «дешевле» in green by the weight. Half a unit of the currency on each
-  sum, spread over what was bought: the past purchase's quantity travels with its price. An
+  it read «дороже» in yellow or «дешевле» in green by the weight. Half the step a till rounds a sum to
+  (`TILL_STEP_MINOR`, a property of the currency like its exponent), on each sum, spread over what was
+  bought: the past purchase's quantity travels with its price. A whole dram, since a shop rounds the
+  hundredths away; a kopeck and a cent elsewhere — half a euro on a litre made €1,79 «как» €1,19
+  (adversarial Г″, review №8). Whether people type whole roubles is the owner's to correct. An
   alternative must be cheaper by more than that. «Last» for a record from an old queue is its moment
   read in the request's zone — the zone its printed day is counted in (review №3) — and a zone
   Postgres does not know, though `Intl` does, is read as Yerevan's rather than answering 500

@@ -1,6 +1,6 @@
 import type { OwnPlacePrice, OwnPrices } from '#model/contracts/advice'
 import type { Currency } from '#model/values/money'
-import { minorPerMajor } from '#model/values/money'
+import { TILL_STEP_MINOR } from '#model/values/money'
 import { UNIT_PRICE_SCALE, compareUnitPrice } from '#model/values/units'
 import type { BaseUnit, Quantity, UnitPrice } from '#model/values/units'
 
@@ -60,14 +60,16 @@ const NOTHING: CheaperHint = { item: null, alternative: null }
 export const SAME_PRICE_PERMILLE = 5n
 
 /**
- * How far a unit price may move by the till alone: a sum is typed whole, so half a unit of the
- * currency either way, spread over what was bought (adversarial Г′). 690 ֏/кг for 0,15 kg is 103,50,
+ * How far a unit price may move by the till alone: half the step the till rounds a sum to
+ * (`TILL_STEP_MINOR`), spread over what was bought (adversarial Г′). 690 ֏/кг for 0,15 kg is 103,50,
  * paid 104 — 693,33 ֏/кг; the same tag for 1,234 kg came out 689,63. The less bought, the more it
- * wobbles: half a per cent held 0,611 kg and not 0,15.
+ * wobbles: half a per cent held 0,611 kg and not 0,15. The step is the currency's, never a whole
+ * unit of any (adversarial Г″): a euro till counts cents, and half a euro on a litre made €1,79 «как»
+ * €1,19.
  */
 function tillNoise(price: UnitPrice, quantity: Quantity): bigint {
   if (quantity.milli <= 0n) return 0n
-  return (minorPerMajor(price.currency) * 1000n * UNIT_PRICE_SCALE) / (2n * quantity.milli)
+  return (TILL_STEP_MINOR[price.currency] * 1000n * UNIT_PRICE_SCALE) / (2n * quantity.milli)
 }
 
 /**

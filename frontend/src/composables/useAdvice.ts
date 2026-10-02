@@ -91,18 +91,6 @@ function split(rows: readonly AdviceRow[]): AdviceGroups {
 }
 
 /**
- * «Что брать» as this phone sees it (MOL-32): the server's answer, and the last one it gave.
- *
- * The memory is not about speed. Offline the screen has to name the age of what it shows —
- * «список на вчера в 21:40» is what a person judges by, «данные могут быть неактуальны» is
- * not — and it can name it only if it kept the answer. Verdicts are worked out on the server
- * and there is nothing on the phone to compute them from, so the choice is the remembered
- * list or an empty screen at the shelf (В-5).
- *
- * A remembered list outranks a failure: while there is something to show, offline is a strip
- * above the rows, not a screen of its own (Р-5).
- */
-/**
  * «Тут дешевле» remembered for no signal must not outlive a «не брать нигде» given anywhere — in the
  * bot's reminder too, which never speaks to the phone (MOL-92, adversarial Б). The hint reads one's
  * own verdicts (adversarial Д): in the own mode the list's levels are those, and with access they are
@@ -123,6 +111,18 @@ function forgetOwnNever(owner: string, fresh: AdviceResponse): void {
     .catch(() => undefined)
 }
 
+/**
+ * «Что брать» as this phone sees it (MOL-32): the server's answer, and the last one it gave.
+ *
+ * The memory is not about speed. Offline the screen has to name the age of what it shows —
+ * «список на вчера в 21:40» is what a person judges by, «данные могут быть неактуальны» is
+ * not — and it can name it only if it kept the answer. Verdicts are worked out on the server
+ * and there is nothing on the phone to compute them from, so the choice is the remembered
+ * list or an empty screen at the shelf (В-5).
+ *
+ * A remembered list outranks a failure: while there is something to show, offline is a strip
+ * above the rows, not a screen of its own (Р-5).
+ */
 export function useAdvice(): Advice {
   const actor = useActorStore()
 

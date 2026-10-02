@@ -22,6 +22,20 @@ export const MINOR_EXPONENT: Readonly<Record<Currency, MinorExponent>> = Object.
 
 const POW10 = [1n, 10n, 100n, 1000n] as const
 
+/**
+ * The step a till rounds a sum to, in minor units — a property of the currency, as its exponent is
+ * (MOL-92, adversarial Г″, review №8). An Armenian receipt prints hundredths and the shop rounds them
+ * away, so a sum is paid and typed in whole drams; a till in roubles, dollars or euros counts to the
+ * kopeck and the cent. What «Тут дешевле» allows a price per unit to wobble by: half a step on a sum.
+ * The rouble is the owner's to correct — people may type whole roubles where the till printed kopecks.
+ */
+export const TILL_STEP_MINOR: Readonly<Record<Currency, bigint>> = Object.freeze({
+  AMD: 100n,
+  RUB: 1n,
+  USD: 1n,
+  EUR: 1n,
+})
+
 export function minorPerMajor(currency: Currency): bigint {
   return POW10[MINOR_EXPONENT[currency]]
 }

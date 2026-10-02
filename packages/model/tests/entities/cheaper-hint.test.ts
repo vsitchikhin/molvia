@@ -129,6 +129,47 @@ describe('cheaperHint · the item itself', () => {
       expect(hint(rated([weighed(200, 250)]), null, typed(104, 150)).item?.kind).toBe('cheaper')
     })
 
+    it('a till of cents wobbles by cents: euros and dollars tell a price apart (adversarial Г″)', () => {
+      const cents = (minor: number, milli: number, currency: Currency): UnitPrice =>
+        unitPrice({ minor: BigInt(minor), currency }, { milli: BigInt(milli), unit: 'l' })
+      const litre = (minor: number, currency: Currency): OwnPlacePrice => ({
+        ...place(ZOVUNI, 0, { currency }),
+        unitPrice: cents(minor, 1000, currency),
+      })
+      const typedIn = (minor: number, milli: number, currency: Currency) => ({
+        currency,
+        typed: cents(minor, milli, currency),
+        typedQuantity: { milli: BigInt(milli), unit: 'l' as const },
+      })
+
+      // €1,19 a litre at Зовуни; €1,79 now is half as dear again.
+      expect(hint(rated([litre(119, 'EUR')]), null, typedIn(179, 1000, 'EUR')).item?.kind).toBe(
+        'there',
+      )
+      // A cent of rounding on a litre is still one price.
+      expect(hint(rated([litre(119, 'EUR')]), null, typedIn(120, 1000, 'EUR')).item?.kind).toBe(
+        'same',
+      )
+      // 0,2 kg for $1,60 — $8/kg — against $10,90 for 1 kg: a third dearer there, not the same.
+      const cheese = rated([
+        {
+          ...place(ZOVUNI, 0, { unit: 'kg', currency: 'USD' }),
+          unitPrice: unitPrice({ minor: 1090n, currency: 'USD' }, { milli: 1000n, unit: 'kg' }),
+        },
+      ])
+      expect(
+        hint(cheese, null, {
+          typed: unitPrice({ minor: 160n, currency: 'USD' }, { milli: 200n, unit: 'kg' }),
+          typedQuantity: { milli: 200n, unit: 'kg' },
+        }).item?.kind,
+      ).toBe('cheaper')
+      // Марианна at $1,09 against Анелик typed at $1,99 — named.
+      const marianna = alternative(MARIANNA, '4.5', [litre(109, 'USD')])
+      expect(
+        hint(rated([], [marianna], '4.0'), null, typedIn(199, 1000, 'USD')).alternative?.itemId,
+      ).toBe(MARIANNA)
+    })
+
     it('without the quantity typed, half a per cent alone', () => {
       expect(hint(rated([weighed(851, 1234)]), null, { typed: paid(104, 150) }).item?.kind).toBe(
         'there',
