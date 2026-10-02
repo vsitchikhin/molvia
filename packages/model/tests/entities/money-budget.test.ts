@@ -172,6 +172,15 @@ describe('monthBudget — the rows', () => {
     expect(row?.used).toBeNull()
   })
 
+  it('plans nothing of nothing with no rate of the month either', () => {
+    const [row] = monthBudget(
+      month({ income: cash('0 RUB'), rate: null }),
+      [plan('cafe', '2026-10', share(5))],
+      categories,
+    ).rows
+    expect(row).toMatchObject({ planned: cash('0 AMD'), plannedWhole: true })
+  })
+
   it('cannot count a share with no rate of the month — no plan, never a zero', () => {
     const budget = monthBudget(
       month({ rate: null, byCategory: spentIn({ cafe: '1000 AMD' }) }),

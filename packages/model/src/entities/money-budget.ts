@@ -123,9 +123,10 @@ function plannedOf(
       whole: true,
     }
   }
+  // Nothing came in is nothing in any currency, with or without a rate — as `spentIncome` is.
   const income =
-    month.income.currency === spend
-      ? month.income
+    month.income.currency === spend || month.income.minor === 0n
+      ? { minor: month.income.minor, currency: spend }
       : month.rate === null
         ? null
         : convertAcross(month.income, month.rate)
