@@ -186,8 +186,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   and unit, never the last of a pair; one's own where one bought, by the fragment «Тут дешевле»
   reads (`latestFirst`); a place opened by others — the lower median of each buyer's last within
   `SHARED_PRICE_FRESH_DAYS`.
-- **«Только если дёшево» is the lower median from three purchases**; one «currency + unit» per
-  item; order by rating down, then name.
+- **«Только если дёшево» is the lower median from three purchases**; per item the «currency +
+  unit» of most purchases first, the other pairs' places after it, never compared (MOL-166); order
+  by rating down, then name.
 - **The limit never cuts one's own rows or the warnings** (Р-23, Р-25:
   `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
 - **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, **every other reader

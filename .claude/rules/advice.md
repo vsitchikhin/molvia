@@ -180,6 +180,7 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   (`pairObservations`, adversarial Д, owner's decision) — the places a pair names are fewer, and
   weighed by them one pack in a shop bought by the kilo for ten weeks turned the row to pieces and
   hid the market where the kilo is cheaper. `observations` of a place is its purchases in the pair.
+  A place whose last purchase is in another pair is not lost: it follows on the row (below).
   **«Last» is the place's, not the pair's** (adversarial А, owner's decision): a place is named
   by its last purchase in whatever currency and unit it was made, and a pair it was not made in is
   not that place's price at all — three August kilos at a discount stood under «Дешевле всего»
@@ -198,10 +199,13 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   (`PRICE_MEDIAN_MIN_OBSERVATIONS`, MOL-33's answer) — `percentile_disc(0.5)`, a price someone
   actually paid, the same rule `isRateJump` follows. Fewer than three and the field is `null`,
   which the contract requires the server to say rather than omit.
-- **One «currency + unit» per item, the one with the most observations**, ties broken by the
-  latest purchase (MOL-31, Р-4). Two prices in different currencies have no common ground
-  without a rate, and a rate belongs to one trip and one day, so they are never shown side by
-  side.
+- **One «currency + unit» per item comes first, the one with the most observations**, ties
+  broken by the latest purchase (MOL-31, Р-4). Two prices in different currencies have no common
+  ground without a rate, and a rate belongs to one trip and one day, so they are never compared:
+  the threshold and the superlative stay inside the first pair. **The places of the other pairs
+  follow it, each with its own unit** (MOL-166, adversarial Е, owner's decision) — before, they
+  were never shown at all, and once a place is named by its last purchase alone that hid the shop
+  of every week behind one pack while the row named a market bought at once a year ago.
 - **Order is by rating down, then by name, in all three groups.** The handoff asked for
   ascending unit price; that sorts _different products_ by a number — milk at 570 ֏/л above
   beef at 4 790 ֏/кг — and «compare by unit price» is about one item across places.
