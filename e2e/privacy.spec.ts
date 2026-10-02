@@ -9,7 +9,8 @@ test('«Данные и приватность» opens by its address without a 
   await page.goto('/privacy')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Данные и приватность')
   await expect(page.getByRole('heading', { name: 'Удалить всё' })).toBeVisible()
-  await expect(page.getByText(/Отправьте \/delete боту/)).toBeVisible()
+  // Both doors (MOL-94): the row in the settings and the bot's command.
+  await expect(page.getByText(/«Удалить мои данные», или отправьте \/delete боту/)).toBeVisible()
 })
 
 test('and from the login screen, which is where a person without a session meets it', async ({
