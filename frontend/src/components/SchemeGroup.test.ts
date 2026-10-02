@@ -1,18 +1,19 @@
 import { mount } from '@vue/test-utils'
+import type { VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import SchemeGroup from '@/components/SchemeGroup.vue'
 import { SCHEME_KEY, installColorScheme, useColorScheme } from '@/composables/useColorScheme'
 import { createAppI18n } from '@/i18n'
 import ru from '@/i18n/ru.json'
 
-const views: ReturnType<typeof render>[] = []
-function render() {
+const views: VueWrapper[] = []
+function render(): VueWrapper {
   const view = mount(SchemeGroup, { global: { plugins: [createAppI18n('ru')] } })
   views.push(view)
   return view
 }
 
-function checked(view: ReturnType<typeof render>): string[] {
+function checked(view: VueWrapper): string[] {
   return view
     .findAll('input')
     .filter((input) => (input.element as HTMLInputElement).checked)
