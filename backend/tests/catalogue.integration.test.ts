@@ -215,7 +215,7 @@ describe('GET /catalogue/search — the answer', () => {
     await add({ name: 'Молочный шоколад' })
 
     const reply = await search(actor, q('молоко'))
-    const direct = (await repository.search('молоко', SEARCH_LIMIT, actor)).items
+    const direct = (await repository.search('молоко', SEARCH_LIMIT, actor, null)).items
 
     expect(ids(found(reply))).toEqual(ids(direct))
     expect(found(reply).length).toBeGreaterThan(0)

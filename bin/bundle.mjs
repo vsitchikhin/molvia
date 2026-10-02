@@ -72,6 +72,10 @@ await build({
   // `bundle-seam.integration.test.ts` checks the built file rather than taking any of this on
   // trust: every step here fails silently, and what ships if one does is an open route.
   minifySyntax: true,
+  // The one module left beside the file (MOL-105): onnxruntime carries a native library, which no
+  // bundle can hold. The API's image copies it next to `dist/` as `node_modules/onnxruntime-node`,
+  // the linux build alone; the API loads it only when the model is there, and runs without it.
+  external: ['onnxruntime-node'],
   // ESM output cannot use require(); a few dependencies still reach for it.
   banner: {
     js: [

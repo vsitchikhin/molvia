@@ -12,6 +12,10 @@
 .lavish/
 .lavish
 
+# the embedding model of catalogue search, `make model` (symlink to ../_shared/molvia/models)
+.models/
+.models
+
 # deps and build output
 node_modules/
 dist/

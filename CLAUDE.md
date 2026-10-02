@@ -116,6 +116,7 @@ the load is I/O-bound, with three orders of magnitude of headroom.
 | API               | Fastify + Zod                                           | Zod schemas shared with the frontend and the bot                                           |
 | DB                | PostgreSQL + Drizzle                                    | schema in TS, generated migrations, honest drop into raw SQL                               |
 | Bot               | grammY + `@grammyjs/runner`                             | distribution, auth, rating reminders; the runner is what makes it serve two people at once |
+| Search by meaning | EmbeddingGemma q4 on `onnxruntime-node`, in the API     | a pinned model, no service of its own; 45 ms a query on the VPS (MOL-105)                  |
 | Receipt OCR (1.0) | separate Python service                                 | the TS ecosystem has nothing here                                                          |
 | Tests             | Vitest (domain, use case, component) + Playwright (e2e) | three vitest projects, so the domain keeps running without a DOM                           |
 | Lint              | ESLint 9 type-aware + Stylelint + Prettier              | strictest tier; SFCs go through the same type checker as `.ts`                             |
@@ -167,7 +168,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **At one distance the order is fixed** (MOL-112): found by the word before by a synonym, whole
   word before a start, fats typed with «%», then the shorter name, then the similarity, the uuid.
 - **The thresholds were measured and kept** (MOL-14); a change of either is checked against the
-  pinned corpus. **Embeddings are a 0.2 question.**
+  pinned corpus.
+- **The meaning is an addition, never a condition** (MOL-105): EmbeddingGemma in the API, one
+  writer of `item_embeddings`; without the model the search is the letters'. A name found by meaning
+  stands after one edit and before two, near; nothing within one edit moves. Similarity 0.40, from
+  four letters — measured, and a vector of another model is never read.
 - **The catalogue grows by «Предложить товар» and the seed** (MOL-112): the seed only adds, is
   not a migration, never stays in `_test` or `_e2e`, and holds no brands.
 
@@ -354,6 +359,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   (`EXPORT_COLUMNS`); stored, never counted; the removed marked; no secret.
 - **Locks are taken in one order everywhere**: the account, then the request rows, then the owner.
 - **No third-party trackers or analytics**; any third-party script that sees data is a decision.
+  onnxruntime's telemetry is off (`ORT_DISABLE_TELEMETRY`, MOL-105).
 - **Logs live fourteen days and carry no address and no query**; a failure is logged by its kind
   through `describeFailure`, never by its message.
 
@@ -420,7 +426,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 ### Deployment — `.claude/rules/deploy.md`
 
-- **`api` and `bot` ship as a single bundled file each**; every container logs to journald for
+- **`api` and `bot` ship as a single bundled file each** — beside the API's only `onnxruntime-node`
+  and the model (MOL-105); every container logs to journald for
   fourteen days; the database is copied every night, encrypted, off the machine.
 - **Migrations run when the API starts. A merged migration is never rewritten**; before the merge
   a task's migrations may be folded, and every database that ran the old file is brought into

@@ -24,6 +24,12 @@ The shape worth knowing here:
   carries three more files, `dist/forget.js` — the owner's fallback for erasure (MOL-58) —,
   `dist/seed-catalogue.js` (MOL-112) and `dist/gates.js` (MOL-91), since the machine has neither
   the source nor a published database port.
+  **One module beside the file, and the model** (MOL-105, owner's decision В-1): onnxruntime's
+  native library cannot be bundled, so `bin/bundle.mjs` leaves `onnxruntime-node` out and the image
+  copies it — its JavaScript, `onnxruntime-common`, and the native build of the image's machine
+  only, 45 MB of 288 — into `node_modules`; the model, fetched and checked by sha256 in the build,
+  into `model/`. The runtime is `node:22-bookworm-slim`, since that build is for glibc. The image is
+  some 520 MB, the API's memory some 460 MB with the model loaded.
   **Names survive the bundle** (`keepNames`, MOL-142): node-fetch under grammY takes a signal only
   from a constructor called `AbortSignal`, and the bot's first use of the global one had esbuild
   rename abort-controller's class — every call to Telegram failed in production, every unbundled

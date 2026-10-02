@@ -14,8 +14,8 @@
  *   of every maker. «Белизна» is the common name of chlorine bleach from many makers, and is
  *   let in as a kind.
  * - **No categories.** «овощи», «фрукты», «специи», «сладости» name a shelf, not a purchase, and
- *   an answer to them is a list of everything; reaching kefir from «молочка» is what embeddings
- *   are for in 0.2.
+ *   an answer to them is a list of everything; reaching the milk from «молочка» is the search
+ *   by meaning's (MOL-105), in the API.
  * - **The forms people type are written out** — singular and plural, the nominative, the
  *   genitive and the accusative: «картошка», «картошки», «картошку». A word is looked up by its
  *   exact key: with an edit budget «белки» would be one edit from «булки» and find buns. A form

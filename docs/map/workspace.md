@@ -57,7 +57,8 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `Makefile` — The canonical entry point: setup, stack, database, migrate, forget, seed, gates, dev, format, lint, typecheck, test, check, certs, icons.
 - `bin/check-code-map.mjs` — Refuses a code map that lies: a file it does not cover, a path that does not exist, a file with two homes; run by `npm run lint`.
 - `bin/init-env.sh` — Generates this copy's `.env` from its index: ports, databases, compose project; keeps bot settings across `--force`.
-- `bin/link-shared.sh` — Points `.scratch` and `.lavish` at the directory shared by all working copies; idempotent.
+- `bin/fetch-model.mjs` — Fetches the pinned embedding model (MOL-105) into `.models/` or a given directory, file by file against its sha256, with the notice of its terms; `make model`, CI and the API's image.
+- `bin/link-shared.sh` — Points `.scratch`, `.lavish` and `.models` at the directory shared by all working copies; idempotent.
 - `bin/one-at-a-time.sh` — Runs a command under the one lock all copies share, so the heavy checks of several copies take turns; gives the command no terminal so vitest does not watch by default, refuses a vitest told to watch and Playwright's UI and debugger, names the waited copy by its root.
 - `docker-compose.yml` — Development stack: this copy's Postgres only, on the loopback, named by the copy's index.
 - `eslint.config.base.js` — Shared lint preset every module opts into: type-aware rules, the alias-or-sibling import shape, the `deny` helper.
