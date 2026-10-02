@@ -43,7 +43,10 @@ function harness(api: Partial<MolviaBotClient>): { bot: Bot; calls: Call[] } {
   const calls: Call[] = []
   const bot = assembleBot(
     '42:TEST',
-    { api: api as MolviaBotClient, appUrl: 'https://molvia.test' },
+    {
+      api: { switchReminders: () => Promise.resolve(), ...api } as MolviaBotClient,
+      appUrl: 'https://molvia.test',
+    },
     { botInfo: BOT_INFO },
   )
   const transformer: Transformer = (_prev, method, payload) => {
@@ -214,14 +217,14 @@ describe('«Не напоминать» под напоминанием (MOL-103
   })
 
   it.each(['remind:', 'remind:pause', 'remind:off:777', 'remind:on '])(
-    'данные кнопки %s — до API не доходит',
+    'данные кнопки %s — до выключателя не доходят (только «разблокирован» от самого нажатия)',
     async (data) => {
       const switchReminders = vi.fn(() => Promise.resolve())
       const { bot } = harness({ switchReminders })
 
       await bot.handleUpdate(press(data))
 
-      expect(switchReminders).not.toHaveBeenCalled()
+      expect(switchReminders.mock.calls).toEqual([[777, 'unblocked']])
     },
   )
 
@@ -237,26 +240,82 @@ describe('«Не напоминать» под напоминанием (MOL-103
   })
 })
 
-describe('/start — бот не заблокирован', () => {
-  it('передаёт «разблокирован» и не держит вход: ответ на /start идёт как прежде', async () => {
-    const switchReminders = vi.fn(() => new Promise<void>(() => undefined))
+describe('кто пишет боту, тот его не заблокировал (адверсариальный раунд 2, Н)', () => {
+  const text = (body: string): Update => ({
+    update_id: 5,
+    message: {
+      message_id: 11,
+      date: 0,
+      chat: CHAT,
+      from: FROM,
+      text: body,
+      ...(body.startsWith('/')
+        ? { entities: [{ type: 'bot_command', offset: 0, length: body.length }] }
+        : {}),
+    },
+  })
+
+  it.each(['/start', 'привет, напоминания не приходят'])(
+    '«%s» передаёт «разблокирован» и не держит ответ',
+    async (body) => {
+      const switchReminders = vi.fn(() => new Promise<void>(() => undefined))
+      const previewLogin = vi.fn(() => Promise.reject(new ApiError(ERROR.LOGIN_UNAVAILABLE)))
+      const { bot, calls } = harness({ switchReminders, previewLogin })
+
+      await bot.handleUpdate(text(body))
+
+      expect(switchReminders).toHaveBeenCalledWith(777, 'unblocked')
+      expect(calls.some((call) => call.method === 'sendMessage')).toBe(true)
+    },
+  )
+
+  it('цифра под старым напоминанием — тоже «разблокирован», и оценка записана', async () => {
+    const switchReminders = vi.fn(() => Promise.resolve())
+    const rateFromBot = vi.fn(() => Promise.resolve())
+    const { bot } = harness({ switchReminders, rateFromBot })
+
+    await bot.handleUpdate(press(`rate:${MILK}:4`))
+
+    expect(switchReminders).toHaveBeenCalledWith(777, 'unblocked')
+    expect(rateFromBot).toHaveBeenCalledWith(777, MILK, 4)
+  })
+
+  it('«Не напоминать» после «разблокирован» остаётся «выключить»', async () => {
+    const switchReminders = vi.fn(() => Promise.resolve())
+    const { bot } = harness({ switchReminders })
+
+    await bot.handleUpdate(press('remind:off'))
+
+    expect(switchReminders.mock.calls).toEqual([
+      [777, 'unblocked'],
+      [777, 'off'],
+    ])
+  })
+
+  it('в группе и в my_chat_member «разблокирован» не уходит', async () => {
+    const switchReminders = vi.fn(() => Promise.resolve())
+    const { bot } = harness({ switchReminders })
+
+    await bot.handleUpdate(
+      press('remind:off', { chat: { id: -100, type: 'group', title: 'Семья' } }),
+    )
+    await bot.handleUpdate(member('kicked'))
+
+    expect(switchReminders.mock.calls).toEqual([[777, 'blocked']])
+  })
+
+  it('API не принял «разблокирован» — в журнал по коду, ответ на сообщение идёт', async () => {
+    const switchReminders = vi.fn(() => Promise.reject(new ApiError(ERROR.INTERNAL)))
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const previewLogin = vi.fn(() => Promise.reject(new ApiError(ERROR.LOGIN_UNAVAILABLE)))
     const { bot, calls } = harness({ switchReminders, previewLogin })
 
-    await bot.handleUpdate({
-      update_id: 5,
-      message: {
-        message_id: 11,
-        date: 0,
-        chat: CHAT,
-        from: FROM,
-        text: '/start',
-        entities: [{ type: 'bot_command', offset: 0, length: 6 }],
-      },
-    })
+    await bot.handleUpdate(text('/start'))
+    await Promise.resolve()
 
-    expect(switchReminders).toHaveBeenCalledWith(777, 'unblocked')
     expect(calls.some((call) => call.method === 'sendMessage')).toBe(true)
+    expect(error.mock.calls.flat().join(' ')).toContain(`remind unblock: ${ERROR.INTERNAL}`)
+    expect(error.mock.calls.flat().join(' ')).not.toContain('777')
   })
 })
 

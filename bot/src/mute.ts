@@ -1,5 +1,5 @@
 import { Composer } from 'grammy'
-import type { Context } from 'grammy'
+import type { Context, MiddlewareFn } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
@@ -70,17 +70,6 @@ export function muteComposer({ api }: MuteDeps): Composer<Context> {
     }
   })
 
-  // Whoever writes to the bot has not blocked it. `my_chat_member` of an unblock is kept by Telegram
-  // for a day at most, and a bot down longer would leave `blocked` for good while the screen says
-  // «разблокируйте — и вернутся»; the `/start` that follows an unblock says it again. Not waited for:
-  // the login behind it must not stand in the API's queue, and «unblocked» never turns on «chosen».
-  composer.chatType('private').command('start', async (ctx, next) => {
-    api.switchReminders(ctx.from.id, 'unblocked').catch((error: unknown) => {
-      logged('remind unblock', error)
-    })
-    await next()
-  })
-
   composer.on('my_chat_member', async (ctx) => {
     if (ctx.chat.type !== 'private') return
     const status = ctx.myChatMember.new_chat_member.status
@@ -96,4 +85,33 @@ export function muteComposer({ api }: MuteDeps): Composer<Context> {
   })
 
   return composer
+}
+
+/**
+ * **Whoever writes to the bot has not blocked it** (MOL-103, adversarial round 2 Н): any message or
+ * press in a private chat passes «unblocked» to the API. Telegram keeps an unblock's `my_chat_member`
+ * for a day at most, and a bot down longer left `blocked` for good — with the settings unable to lift
+ * it (В-5) and the screen saying «разблокируйте — и вернутся» to someone who had. `/start` alone was
+ * not enough: unblocking from Telegram's list sends none, and a chat with its history shows no
+ * «START» — a word typed or a digit pressed under an old reminder is what such a person does.
+ *
+ * Installed first, before every composer, since each of them may end the update. Not waited for:
+ * the login or the rating behind it must not stand in the API's queue, and «unblocked» changes only
+ * `blocked` — on anyone else it writes nothing. The named price: a press followed at once by a block
+ * may let its «unblocked» arrive after the block's word and turn the reminders on for one evening,
+ * until that evening's 403 turns them off again.
+ */
+export function heardFrom({ api }: MuteDeps): MiddlewareFn {
+  return async (ctx, next) => {
+    if (ctx.chat?.type === 'private' && ctx.from && (ctx.message || ctx.callbackQuery)) {
+      const telegramUserId = ctx.from.id
+      // A promise first: a client that throws at once must not take the update with it.
+      void Promise.resolve()
+        .then(async () => api.switchReminders(telegramUserId, 'unblocked'))
+        .catch((error: unknown) => {
+          logged('remind unblock', error)
+        })
+    }
+    await next()
+  }
 }

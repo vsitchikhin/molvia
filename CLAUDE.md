@@ -347,7 +347,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   the scale.
 - **The reminders' switch is `actors.reminders_off`, and it says why** (MOL-103): `chosen` or
   `blocked`; a block never overwrites «chosen», an unblock turns on only what blocking turned off,
-  and «on» starts the ladder over. In the app it is its own address, never the settings form.
+  **the settings never lift a block** (В-5), and «on» starts the ladder over unless it reminded
+  today. Whoever writes to the bot has not blocked it. In the app it is its own address, never the
+  settings form.
 - **Telegram updates are never logged whole.**
 
 ### Frontend — `.claude/rules/frontend.md`

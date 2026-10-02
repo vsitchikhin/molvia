@@ -44,7 +44,10 @@ function harness(api: Partial<MolviaBotClient>): { bot: Bot; calls: Call[] } {
   let shown: unknown
   const bot = assembleBot(
     '42:TEST',
-    { api: api as MolviaBotClient, appUrl: 'https://molvia.test' },
+    {
+      api: { switchReminders: () => Promise.resolve(), ...api } as MolviaBotClient,
+      appUrl: 'https://molvia.test',
+    },
     { botInfo: BOT_INFO },
   )
   const transformer: Transformer = (_prev, method, payload) => {

@@ -242,7 +242,8 @@ in `.scratch/tasks/requirements/MOL-103.md`.
   switch would go with it. The reason is kept because the two end differently, and `switchReminders`
   in the domain is the whole rule: **blocking does not overwrite «chosen», and unblocking turns on
   only what blocking turned off** (В-1) — someone who said «не напоминать» and later unblocked the
-  bot to sign in is still not reminded. The person's own «on» clears either.
+  bot to sign in is still not reminded. The person's own «on» clears either from the bot; from the
+  settings, only «chosen» (В-5, below).
 - **The settings cannot lift a block** (В-5, owner's decision 02.10.2026): `switchReminders` takes
   where a change came from, and «on» from the settings leaves `blocked` as it is — the group shows
   the switch inactive and says to unblock the bot. Turned on over a blocked bot, the next evening's
@@ -285,13 +286,18 @@ in `.scratch/tasks/requirements/MOL-103.md`.
 - **Telegram says when the bot is blocked** (`my_chat_member` of a private chat): `kicked` turns the
   reminders off at once, `member` passes «unblocked» to the API, which decides what it turns on. **A
   403 while sending is the fallback** (Р-5), for a block the bot did not hear about while it was
-  down; a failure to report it is the log's, by its code — the next evening's 403 asks again. **So
-  is `/start`**: whoever writes to the bot has not blocked it, and Telegram keeps an unblock's
-  `my_chat_member` for a day at most — a bot down longer left `blocked` for good under a screen
-  saying «разблокируйте — и вернутся». Not waited for, so the login behind it does not stand in the
-  API's queue; «unblocked» never turns on «chosen». The updates the bot polls for are named
-  (`ALLOWED_UPDATES`): left to «the previous setting» a token keeps, one once polled with a narrower
-  list would never hear of a block.
+  down; a failure to report it is the log's, by its code — the next evening's 403 asks again.
+  **Whoever writes to the bot has not blocked it** (`heardFrom`, adversarial round 2 Н): any message
+  or press in a private chat passes «unblocked», installed before every composer. Telegram keeps an
+  unblock's `my_chat_member` for a day at most, and a bot down longer left `blocked` for good — with
+  the settings unable to lift it (В-5) and the screen asking for what was already done. `/start`
+  alone was not enough: an unblock from Telegram's list sends none, and a chat with its history
+  shows no «START»; a word typed or a digit pressed under an old reminder is what such a person
+  does. Not waited for, so the login or the rating behind it does not stand in the API's queue;
+  «unblocked» writes nothing on anyone not blocked. **The named price:** a press followed at once by
+  a block may let its «unblocked» arrive after the block and turn the reminders on until that
+  evening's 403. The updates the bot polls for are named (`ALLOWED_UPDATES`): left to «the previous
+  setting» a token keeps, one once polled with a narrower list would never hear of a block.
 - **Turning off is counted** (В-4): `reminder_days` adds `off_button`, `off_settings` and
   `off_blocked` — people whose reminders went from on to off that day, by how, with no id — and
   `make gates` prints them under the lever, as counts and no verdict: whether the reminder annoys.

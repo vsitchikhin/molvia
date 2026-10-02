@@ -6,7 +6,7 @@ import { eraseComposer } from './erase'
 import type { EraseDeps } from './erase'
 import { loginComposer } from './login'
 import type { LoginDeps } from './login'
-import { muteComposer } from './mute'
+import { heardFrom, muteComposer } from './mute'
 import { rateComposer } from './rate'
 
 /**
@@ -43,6 +43,8 @@ export function assembleBot(
    * (adversarial Е1).
    */
   bot.use(sequentialize((ctx) => ctx.chat?.id.toString()))
+  // Before every composer, any of which may end the update: whoever writes has not blocked the bot.
+  bot.use(heardFrom(deps))
   // Before the login, which ends in a catch-all: every text is greeted and every unknown press
   // is refused there, so `/delete` and its buttons would never get past it.
   bot.use(eraseComposer(deps))

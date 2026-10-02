@@ -46,9 +46,8 @@ import { useReminders } from '@/composables/useReminders'
 /**
  * «Напоминать об оценке в Telegram» (MOL-103): its own group under «Деньги», saved on the tap and
  * never part of the form (Р-1). Until the answer comes it shows «on», as nearly everyone has it, so
- * the switch does not cross over on every opening (review №1). **Off by a blocked bot, the switch is
- * inactive** (В-5): only an unblock brings the reminders back, and the line under it says so. Off by a blocked bot, it says so — the person may not know the
- * block turned the reminders off, and unblocking brings them back (В-1).
+ * the switch does not cross over on every opening (review №1). **Off by a blocked bot, the switch
+ * is inactive** (В-5): only an unblock brings the reminders back, and the line under it says so.
  */
 export default defineComponent({
   name: 'RemindersGroup',
