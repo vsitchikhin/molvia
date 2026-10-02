@@ -35,6 +35,8 @@ export interface MoneyChartYearState {
   readonly charts: ComputedRef<MoneyChartYearView | null>
   readonly stale: ComputedRef<'loading' | 'offline' | 'error' | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  /** Every year kept on the phone: the first year with data is known before this one answers. */
+  readonly kept: ComputedRef<readonly MoneyChartYearView[]>
   readonly retry: () => Promise<void>
 }
 

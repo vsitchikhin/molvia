@@ -522,6 +522,8 @@ describe('yearCharts — round 2 of the adversarial pass', () => {
     )
     const charts = year('2026', beyond, '2026-10-02', '2026-07')
     expect(charts.months[6]?.uncounted).toEqual([])
+    // No sum, and no «≈» of it under the «—» (adversarial И).
+    expect([charts.spent, charts.spentIncome]).toEqual([null, null])
     expect([charts.average, charts.averageMissing]).toEqual([null, 'beyond'])
 
     const whole = year('2026', run('2026-07', '2026-10', monthly(1000)), '2026-10-02', '2026-07')

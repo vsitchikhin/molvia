@@ -507,8 +507,10 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     expect(view.text()).not.toContain(en.spending.charts.year_avg_uncounted)
   })
 
-  it('offline with nothing kept for this year, the arrow back reaches the years kept (adversarial Ж)', async () => {
-    moneyChartYear.mockResolvedValueOnce(yearCharts({ year: '2025', running: false }))
+  it('offline with this year not kept, the arrow back reaches the years kept (adversarial Ж)', async () => {
+    moneyChartYear.mockResolvedValueOnce(
+      yearCharts({ year: '2025', running: false, firstMonth: '2025-01' }),
+    )
     ;(await render('/money/charts?mode=year&year=2025')).unmount()
     online(false)
     moneyChartYear.mockRejectedValue(new TypeError('network'))
@@ -519,6 +521,25 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     await flushPromises()
     expect(view.find('.switcher .month').text()).toBe('2025')
     expect(view.find('.strip').text()).toContain('No connection. Charts as of')
+  })
+
+  it('the server failing, the arrow back still reaches the years kept on the phone (adversarial Ж′)', async () => {
+    moneyChartYear.mockResolvedValueOnce(
+      yearCharts({ year: '2025', running: false, firstMonth: '2024-03' }),
+    )
+    ;(await render('/money/charts?mode=year&year=2025')).unmount()
+    moneyChartYear.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+    expect(view.find('.state.bad').exists()).toBe(true)
+    const [back] = view.find('.switcher').findAll('button')
+    expect(back?.attributes('aria-disabled')).toBeUndefined()
+    await back?.trigger('click')
+    await flushPromises()
+    expect(view.find('.switcher .month').text()).toBe('2025')
+    // Bounded by the first year the kept answers name: 2024, and no further.
+    await view.find('.switcher').findAll('button')[0]?.trigger('click')
+    await flushPromises()
+    expect(view.find('.switcher').findAll('button')[0]?.attributes('aria-disabled')).toBe('true')
   })
 
   it('a category chosen in the list chooses its sector, or lets the sector go (owner’s Е)', async () => {

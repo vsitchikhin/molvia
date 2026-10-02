@@ -501,9 +501,11 @@ MOL-74's unless they name MOL-160, and hold for the year.
   MOL-160): the bound is the answer's, so the switcher stands in `ChartsYear`, over its strip.
   **Until an answer names a first year, the bound is this year** — a newcomer's, or before the first
   answer: read as «no bound», the arrow went on to 2025, 2024… on an empty screen, a year read and
-  its months frozen at every tap (adversarial Д). **Offline with nothing kept for this year there is
-  no bound**: the years the phone keeps are behind the arrow, and offline a tap reads nothing — the
-  bound of this year locked them away (adversarial Ж).
+  its months frozen at every tap (adversarial Д). **The first year is read from every year kept on
+  the phone**, not only from the answer shown (`kept` of `useKeptAnswer`): when this year cannot be
+  read — offline, or the server failing — the years kept are behind the arrow, and the bound of
+  this year had locked them away (adversarial Ж, Ж′). A year past what money holds has no sum and
+  so no «≈» of it either (adversarial И).
 
 ## «Графики → Месяц» (MOL-158)
 

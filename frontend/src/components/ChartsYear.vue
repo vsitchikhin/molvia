@@ -247,7 +247,7 @@ export default defineComponent({
     const route = useRoute()
     const router = useRouter()
     const today = useLocalDay()
-    const { phase, charts, stale, fetchedAt, retry } = useMoneyChartYear(toRef(props, 'year'))
+    const { phase, charts, stale, fetchedAt, kept, retry } = useMoneyChartYear(toRef(props, 'year'))
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
     const approx = (value: Money | null) =>
@@ -260,24 +260,18 @@ export default defineComponent({
     const both = computed(() => charts.value?.spendCurrency !== charts.value?.incomeCurrency)
 
     /**
-     * The first year with anything in it, owner-wide: kept from any answer, so the arrow back stays
-     * bounded while another year loads (Р-9). Until an answer names one — a newcomer, or no answer
-     * yet — it is this year: the arrow back went on to 2025, 2024… on an empty screen (adversarial Д).
-     * **Offline with nothing kept for this year there is no bound**: the years kept on the phone are
-     * behind the arrow, and a tap reads nothing from the server (adversarial Ж).
+     * The first year with anything in it, owner-wide, from this answer or any year kept on the phone
+     * (Р-9): so the arrow back is bounded while another year loads, and reaches the years kept when
+     * this one cannot be read — offline or the server failing (adversarial Ж, Ж′). Known from nothing
+     * — a newcomer, or nothing kept and nothing answered yet — it is this year: the arrow back went on
+     * to 2025, 2024… on an empty screen, a year read at every tap (adversarial Д).
      */
-    const known = ref<string | null>(null)
-    watch(
-      () => charts.value?.firstMonth,
-      (first) => {
-        if (first) known.value = first.slice(0, 4)
-      },
-      { immediate: true },
-    )
-    const first = computed(
-      () =>
-        known.value ?? (charts.value === null && phase.value === 'offline' ? null : props.current),
-    )
+    const first = computed(() => {
+      const firsts = [charts.value, ...kept.value].flatMap((one) =>
+        one?.firstMonth ? [one.firstMonth] : [],
+      )
+      return firsts.sort()[0]?.slice(0, 4) ?? props.current
+    })
 
     /** Whether a month runs is the phone's calendar's to say, not the answer's (review 3 of MOL-158). */
     const runningMonth = computed(() => today.value.slice(0, 7))

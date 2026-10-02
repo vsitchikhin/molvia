@@ -428,7 +428,11 @@ export function yearCharts(input: YearChartsInput): YearCharts {
     incomeCurrency: income,
     monthsShown: shown.length,
     spent,
-    spentIncome: spentIncomeSum === null ? null : { minor: spentIncomeSum, currency: income },
+    // The «≈» of no sum is no «≈» (adversarial И): «—» over «≈ 24 000 000 000 000 000 ₽» said two things.
+    spentIncome:
+      spent === null || spentIncomeSum === null
+        ? null
+        : { minor: spentIncomeSum, currency: income },
     uncounted: addedUp(shown.flatMap((month) => month.uncounted)),
     slices,
     months,
