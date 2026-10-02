@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseRate, yerevanMidnight } from '@molvia/model'
 import type {
   ExchangeRate,
@@ -134,6 +134,10 @@ const plain = (text: string | undefined) => text?.replaceAll('\u00a0', ' ')
 
 const reading = (view: ReturnType<typeof chart>['view']) =>
   view.find('.reading').text().replace(/\s+/g, ' ')
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 describe('ExchangeRateChart (MOL-161)', () => {
   it('opens on the latest exchange: its week, the market of the week, the place and the percent', () => {
@@ -748,13 +752,37 @@ describe('ExchangeRateChart by period (MOL-168)', () => {
     expect(view.findAll('.month').map((label) => label.text())).toEqual(['май', 'июн', 'июл'])
   })
 
-  it('centres a name on its day, and lays it from an end only next to it (review 2, Б)', () => {
-    // The month's only Monday, the 2nd of March, is 600 thousandths on: centred.
-    const monday = chart([rouble({}, { 1: month() })], 1).view.find('.month')
-    expect(monday.classes()).toEqual(['month'])
+  it('lays a name from an end only when, centred, it would stand past the line (review 2, Б, Б′)', async () => {
+    // A line of 300 px; a name 6 px a letter, «7 мар.» 36 px — the widths a phone measures.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const width = this.classList.contains('months') ? 300 : this.textContent.trim().length * 6
+      return { left: 0, top: 0, width, height: 20 } as DOMRect
+    })
+    const at = async (x: number) => {
+      const days = ['2026-02-28', '2026-03-01', '2026-03-02', '2026-03-03']
+      const steps = days.map((day, index) => ({
+        day,
+        rate: rate('4.55', day),
+        x: index === 2 ? x : index === 3 ? 1000 : index * 10,
+        level: 500,
+      }))
+      const { view } = chart([rouble({}, { 1: month({ steps, exchanges: [] }) })], 1)
+      await view.vm.$nextTick()
+      const label = view.find('.month')
+      return label.classes().filter((name) => name !== 'month')
+    }
+    // Two days into a month of 29: 20,7 px in, half the name 18 — centred, over its Monday (Б′1).
+    expect(await at(69)).toEqual([])
+    // 12 px in: centred, it would stand 6 px past the line — laid from its start.
+    expect(await at(40)).toEqual(['start'])
+    // 4 px from the end: laid from it.
+    expect(await at(987)).toEqual(['end'])
     // The year's first name stands at its very beginning: laid from it.
-    const february = chart().view.find('.month')
-    expect(february.classes()).toContain('start')
+    const year = chart()
+    await year.view.vm.$nextTick()
+    expect(year.view.find('.month').classes()).toContain('start')
   })
 
   it('a month with no exchange of the pair says there were none in it', () => {

@@ -182,11 +182,13 @@
         </div>
       </div>
       <div class="months-row" aria-hidden="true">
-        <div class="months">
+        <div ref="monthsBox" class="months">
           <span
             v-for="label in axisLabels"
             :key="label.key"
-            :class="['month', label.edge]"
+            :class="['month', edges[label.key]]"
+            :data-key="label.key"
+            :data-x="label.x"
             :style="{ left: `${String(label.x / 10)}%` }"
           >
             {{ label.text }}
@@ -206,7 +208,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, useId, watch } from 'vue'
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -254,11 +256,6 @@ const TICK = 14
  * of half a year begun on the 26th of April stood 10 px apart (review 1, adversarial А).
  */
 const LABEL_GAP = 120
-/**
- * A name this near an end of the line is laid from it, so it does not stand past the chart; any
- * other is centred on its day — «7 сент.» laid from its Monday stood over the 9th (review 2, Б).
- */
-const LABEL_EDGE = 70
 
 /**
  * «Курс рубля за месяц, 6 и 12 месяцев» (MOL-161, MOL-168, handoff MOL-157 05, frames 6c and 6d):
@@ -552,9 +549,46 @@ export default defineComponent({
      * first month, every third after it, and the last; half a year every month; the month its
      * Mondays, «7 сент. · 14 · 21 · 28», the month named again where it turns.
      */
+    const monthsBox = ref<HTMLElement | null>(null)
+    /** The names laid from an end of the line rather than centred on their day, by key. */
+    const edges = ref<Record<string, 'start' | 'end'>>({})
+    let observer: ResizeObserver | undefined
+
+    /**
+     * A name is centred on its day, and laid from an end only when, centred, it would stand past the
+     * line — by its own width and the line's, measured: a threshold in thousandths knows neither,
+     * and laid «7 сент.» from its Monday two days in, over the 9th, while «22 февр.» a little further
+     * stood a pixel past the edge (review 2, adversarial Б, round 2 Б′).
+     */
+    function placeLabels(): void {
+      const box = monthsBox.value
+      if (!box) return
+      const width = box.getBoundingClientRect().width
+      const next: Record<string, 'start' | 'end'> = {}
+      for (const node of box.querySelectorAll<HTMLElement>('.month')) {
+        const key = node.dataset.key
+        if (!key) continue
+        const at = (Number(node.dataset.x) * width) / CHART_LEVEL
+        const half = node.getBoundingClientRect().width / 2
+        if (at - half < 0) next[key] = 'start'
+        else if (at + half > width) next[key] = 'end'
+      }
+      if (JSON.stringify(next) !== JSON.stringify(edges.value)) edges.value = next
+    }
+
+    function observeLabels(): void {
+      observer?.disconnect()
+      placeLabels()
+      if (!monthsBox.value || typeof ResizeObserver === 'undefined') return
+      observer = new ResizeObserver(placeLabels)
+      observer.observe(monthsBox.value)
+    }
+
+    onBeforeUnmount(() => {
+      observer?.disconnect()
+    })
+
     const axisLabels = computed(() => {
-      const edgeOf = (x: number) =>
-        x < LABEL_EDGE ? 'start' : x > CHART_LEVEL - LABEL_EDGE ? 'end' : null
       const steps = period.value?.steps ?? []
       if (period.value?.step === 'day') {
         let named = ''
@@ -564,7 +598,7 @@ export default defineComponent({
             const month = day.slice(0, 7)
             const text = month === named ? String(Number(day.slice(8, 10))) : shortDay(day)
             named = month
-            return { key: day, x, text, edge: edgeOf(x) }
+            return { key: day, x, text }
           })
       }
       const firsts: { month: string; x: number }[] = []
@@ -586,8 +620,14 @@ export default defineComponent({
           key: label.month,
           x: label.x,
           text: shortMonth(label.month, locale.value),
-          edge: edgeOf(label.x),
         }))
+    })
+    // The names change with the period and the pair, the line with the window and the screen; the
+    // face comes after the first frame and widens them.
+    watch([monthsBox, axisLabels], observeLabels, { flush: 'post', immediate: true })
+    onMounted(() => {
+      // Not every engine has it: happy-dom of the component tests has not.
+      if ('fonts' in document) void document.fonts.ready.then(placeLabels)
     })
 
     const periodOptions = computed(() =>
@@ -625,6 +665,8 @@ export default defineComponent({
       lines,
       lone,
       axisLabels,
+      monthsBox,
+      edges,
       pairOptions,
       periodOptions,
       TICK,
