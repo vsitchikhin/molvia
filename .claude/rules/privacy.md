@@ -38,8 +38,11 @@ The detail behind the privacy lines of `CLAUDE.md`.
   session is the whole proof** (В-1): no second confirmation through the bot, one press of
   «Удалить навсегда» in the sheet (В-4); the price is named in `auth.md`. The sheet says the bot's
   words for what goes and what stays, and what the bot cannot: the copies on this device go, on the
-  others they stay. After the `204` the phone does what «Выйти» does, and the login screen says
-  «Ваши данные удалены» once. The owner's fallback is
+  others they stay — and on those, after an erasure, there is no session left to sign out of, so
+  the page names deleting the app or the site's data, and signing out there only beforehand
+  (review 1). After the `204` the phone does what «Выйти» does, and the login screen says
+  «Ваши данные удалены» once; a `401` on a session already gone erases nothing anywhere and says so
+  (`auth.md`). The owner's fallback is
   `dist/forget.js` in the API image (`make forget` in a copy — `TG` reaches the script through the
   environment, never pasted into the recipe, where a value could close a quote and bring its own
   `--yes`, П-3; and only a `TG` typed on that command line — one left in the shell erased that

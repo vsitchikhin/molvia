@@ -43,7 +43,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 
 ## backend · other
 
-- `backend/src/cookie.ts` — The only module that reads or sets a cookie: the session, login and dev-account cookies, each set together with `no-store`.
+- `backend/src/cookie.ts` — The only module that reads or sets a cookie: the session, login and dev-account cookies, each set together with `no-store`; putting the session out takes back a term set earlier in the same answer (MOL-94).
 - `backend/src/device-name.ts` — Derives an «iPhone · Safari»-style device name from a `User-Agent` for session and login rows.
 - `backend/src/login-cleanup.ts` — The minute timer every expired-row cleanup hangs on — login requests, sessions and the undo windows.
 - `backend/src/login-config.ts` — Reads the login's environment — bot username and `BOT_API_SECRET`; neither means no real door, production requires both.
@@ -67,8 +67,8 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 ## frontend · views
 
 - `frontend/src/views/DevicesView.vue` — «Устройства» screen under «Настройки»: every live session, this device first and marked, «Завершить» on the others.
-- `frontend/src/views/LoginView.vue` — The login screen `App.vue` draws in place of any route: «Войти через Telegram», the wait for the bot, the whose-account question, the dev seam; once after «Удалить мои данные», «Ваши данные удалены» (MOL-94).
-- `frontend/src/views/SettingsErase.test.ts` — Component test: «Удалить мои данные» in «Ваши данные» names what goes and what stays, erases the device only after the server's `204` and marks it for the login screen, is inactive offline, settles a lost answer by the server's «nobody» (MOL-94).
+- `frontend/src/views/LoginView.vue` — The login screen `App.vue` draws in place of any route: «Войти через Telegram», the wait for the bot, the whose-account question, the dev seam; once after «Удалить мои данные», what came of it — erased, not known, or not erased (MOL-94).
+- `frontend/src/views/SettingsErase.test.ts` — Component test: «Удалить мои данные» in «Ваши данные» names what goes and what stays, erases the device only after the server's `204` and marks it for the login screen, is inactive offline, settles a lost answer by the server's «nobody», erases nothing on a session already gone, keeps each door's failure to its own sheet (MOL-94).
 - `frontend/src/views/SettingsSignOut.test.ts` — Component test: «Выйти» in «Настройки» asks first, counts what would be lost, erases the device only after the server's answer, is inactive offline.
 
 ## frontend · components
@@ -86,7 +86,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 - `frontend/src/stores/actor.ts` — Store: the identity's state (loading, ready, offline, error, signed-out) — `me()` at start, `verify()` after a refusal, `release` on sign-out.
 - `frontend/src/stores/identity.ts` — The drawer's name on the device: the cached owner id, the `molvia.login` key, the `molvia.leaving` intent and `forgetOwner`, which sweeps an owner's keys.
 - `frontend/src/stores/login.ts` — Store: the login on the device — the started request, the owner the person approved, the `tried` mark that makes the next start a repeat, the poll, and `closed`, the door's one definition.
-- `frontend/src/stores/signOut.ts` — Store: the way out of this device, «Выйти» or «Удалить мои данные» (MOL-94) — the server first, then the drawer erased; keeps the intent until the server's next answer settles it.
+- `frontend/src/stores/signOut.ts` — Store: the way out of this device, «Выйти» or «Удалить мои данные» (MOL-94) — the server first, then the drawer erased; keeps the intent until the server's next answer settles it; for an erasure «no session» is not taken for done.
 
 ## e2e
 
