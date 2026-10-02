@@ -61,7 +61,7 @@
         :name-of="nameOf"
       />
 
-      <AppCard as="section" class="card" :aria-labelledby="`${id}-spent`">
+      <AppCard as="section" class="chart-card" :aria-labelledby="`${id}-spent`">
         <h2 :id="`${id}-spent`" class="caption">{{ t('spending.charts.spent_title') }}</h2>
         <BarChart
           v-model="spentAt"
@@ -79,7 +79,7 @@
         <p class="hint">{{ t('spending.charts.spent_hint') }}</p>
       </AppCard>
 
-      <AppCard as="section" class="card" :aria-labelledby="`${id}-flow`">
+      <AppCard as="section" class="chart-card" :aria-labelledby="`${id}-flow`">
         <div class="head">
           <h2 :id="`${id}-flow`" class="caption">{{ t('spending.charts.income_title') }}</h2>
           <p class="legend" aria-hidden="true">
@@ -122,7 +122,7 @@
         <p class="hint">{{ flowNote }}</p>
       </AppCard>
 
-      <AppCard v-if="series" as="section" class="card" :aria-labelledby="`${id}-category`">
+      <AppCard v-if="series" as="section" class="chart-card" :aria-labelledby="`${id}-category`">
         <h2 :id="`${id}-category`" class="caption">
           {{ t('spending.charts.category_months_title') }}
         </h2>
@@ -594,7 +594,9 @@ export default defineComponent({
   height: 1.125rem;
 }
 
-.card {
+/* Not `.card`: a scoped class of this component reaches the root of a child's too, and the root of
+   `MonthSwitcher` is an `AppCard` — its pill was laid out as a grid of a chart's card. */
+.chart-card {
   display: grid;
   gap: var(--space-1);
   padding: var(--space-4);
@@ -747,7 +749,7 @@ export default defineComponent({
 /* The answer comes in where the skeleton stood, faded only: nothing under the thumb may move
    (MOL-151, review №5 and №7, MOL-138). Here and not on the screen: a component of several roots
    takes no scope of the screen's. */
-.card,
+.chart-card,
 .answer {
   @include appear(0);
 }
