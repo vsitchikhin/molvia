@@ -217,6 +217,41 @@ describe('exchangesResponseCodec', () => {
         { place: null, count: 2, difference: money(122_300n, 'AMD'), percent: 149, level: 207 },
       ],
     },
+    rateChart: {
+      pairs: [
+        {
+          currency: 'RUB',
+          side: 'bankBuys',
+          weeks: [
+            {
+              day: '2026-09-20',
+              rate: { ...rate, scaled: 4_224_000n, source: 'official' },
+              x: 980,
+              level: 160,
+            },
+            { day: '2026-09-27', rate: null, x: 1000, level: null },
+          ],
+          exchanges: [
+            {
+              id: body.id,
+              day: '2026-09-15',
+              week: 0,
+              x: 960,
+              rate: { ...rate, scaled: 4_750_000n },
+              level: 1000,
+              place: 'Ардшинбанк',
+              percent: 1255,
+              market: {
+                rate: { ...rate, scaled: 4_224_000n, source: 'official' },
+                level: 160,
+                basis: 'banksAll',
+              },
+            },
+          ],
+          levels: [{ rate: { ...rate, scaled: 4_500_000n, source: 'official' }, level: 560 }],
+        },
+      ],
+    },
   }
 
   it('crosses the wire and comes back the same', () => {
@@ -229,6 +264,7 @@ describe('exchangesResponseCodec', () => {
     const wire: Record<string, unknown> = { ...z.encode(exchangesResponseCodec, response) }
     delete wire.marketToday
     delete wire.losses
+    delete wire.rateChart
     const [first] = z.encode(exchangesResponseCodec, response).exchanges
     if (!first) throw new Error('no exchange')
     const exchange: Record<string, unknown> = { ...first }
@@ -237,6 +273,7 @@ describe('exchangesResponseCodec', () => {
     const decoded = exchangesResponseCodec.parse({ ...wire, exchanges: [exchange] })
     expect(decoded.marketToday).toEqual([])
     expect(decoded.losses).toBeNull()
+    expect(decoded.rateChart).toBeNull()
     expect(decoded.exchanges[0]?.market).toBeNull()
     expect(decoded.exchanges[0]?.channel).toBeNull()
   })

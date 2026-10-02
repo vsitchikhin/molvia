@@ -1,0 +1,297 @@
+import { CHART_LEVEL, hundredthsOf } from '#model/entities/money-charts'
+import { divideRounded } from '#model/support/decimal'
+import { currencySchema } from '#model/values/money'
+import type { Currency } from '#model/values/money'
+import { marketSideOf } from '#model/values/market-rates'
+import type {
+  ForeignCurrency,
+  MarketChannel,
+  MarketRate,
+  MarketSide,
+} from '#model/values/market-rates'
+import { OFFICIAL_RATE_FRESH_DAYS, RATE_SCALE, yerevanMidnight } from '#model/values/rates'
+import type { ExchangeRate } from '#model/values/rates'
+
+/**
+ * The row the line of «Курс рубля за 12 месяцев» is drawn by (MOL-161, Р-3): all bank clients, the
+ * only one the central bank keeps a history of. People's cash and non-cash are collected from
+ * 30.09.2026 only, and the exchange offices come a week at a time with no archive (MOL-137).
+ */
+export const RATE_CHART_CHANNEL = 'banksAll' satisfies MarketChannel
+
+/** The smallest step of the axis: it prints two digits, and a finer one would print a tick twice. */
+const MIN_STEP = RATE_SCALE / 100n
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function dayAfter(day: string, days = 1): string {
+  return new Date(Date.parse(`${day}T00:00:00.000Z`) + days * DAY_MS).toISOString().slice(0, 10)
+}
+
+function daysFrom(from: string, day: string): number {
+  return Math.round((Date.parse(day) - Date.parse(from)) / DAY_MS)
+}
+
+/** A market figure beside an exchange, as the list of «Обмен денег» already carries it. */
+interface QuoteInput {
+  readonly basis: MarketChannel
+  readonly rate: ExchangeRate
+  readonly difference: { readonly minor: bigint }
+}
+
+/** An exchange as the list of «Обмен денег» carries it — the fields the chart reads. */
+export interface RateChartExchangeInput {
+  readonly id: string
+  readonly exchangedOn: string
+  readonly given: { readonly currency: Currency }
+  readonly received: { readonly minor: bigint; readonly currency: Currency }
+  readonly note: string | null
+  readonly rate: ExchangeRate | null
+  readonly market: { readonly best: QuoteInput; readonly own: QuoteInput | null } | null
+}
+
+/** One currency against the dram, and the bank's side its line is drawn on. */
+export interface RateChartPairKey {
+  readonly currency: ForeignCurrency
+  readonly side: MarketSide
+}
+
+export interface RateChartPair extends RateChartPairKey {
+  /** The end of every week of the window, and today; `rate` null is a gap, never a zero. */
+  readonly weeks: readonly {
+    readonly day: string
+    readonly rate: ExchangeRate | null
+    readonly x: number
+    readonly level: number | null
+  }[]
+  /** The person's exchanges of the pair on the line's side, oldest first, each on its own day. */
+  readonly exchanges: readonly {
+    readonly id: string
+    readonly day: string
+    readonly week: number
+    readonly x: number
+    readonly rate: ExchangeRate
+    readonly level: number
+    readonly place: string | null
+    /** Hundredths of a percent against the market it was measured by; null — no market that day. */
+    readonly percent: number | null
+    /** That market (В-1): where the mark from the point ends. */
+    readonly market: {
+      readonly rate: ExchangeRate
+      readonly level: number
+      readonly basis: MarketChannel
+    } | null
+  }[]
+  /** The ticks of the axis: three round values within the figures, or one. */
+  readonly levels: readonly { readonly rate: ExchangeRate; readonly level: number }[]
+}
+
+export interface RateChart {
+  readonly pairs: readonly RateChartPair[]
+}
+
+/**
+ * The days the line is read on: every Sunday from `from` to `today`, and today itself when it is
+ * not one — the week's last figure, as the owner's sheet reads the pair weekly (Р-14 of MOL-74).
+ */
+export function rateWeeks(from: string, today: string): string[] {
+  const days: string[] = []
+  const weekday = new Date(`${from}T00:00:00.000Z`).getUTCDay()
+  for (let day = dayAfter(from, (7 - weekday) % 7); day <= today; day = dayAfter(day, 7)) {
+    days.push(day)
+  }
+  if (days.at(-1) !== today) days.push(today)
+  return days
+}
+
+/**
+ * A week's figure: the latest row dated no later than its end and fresh for it by the week a rate
+ * stays fresh — the rule every comparison with the market reads by (Р-2 of MOL-137). None — a gap.
+ */
+export function weekRate(rows: readonly MarketRate[], end: string): MarketRate | null {
+  const since = dayAfter(end, -OFFICIAL_RATE_FRESH_DAYS)
+  let latest: MarketRate | null = null
+  for (const row of rows) {
+    if (row.date > end || row.date < since) continue
+    if (!latest || row.date > latest.date) latest = row
+  }
+  return latest
+}
+
+/**
+ * Which pairs the chart offers (Р-5), the currency of conversion first, and the side of each (В-2):
+ * every currency changed against the dram in the window, on the side of its latest exchange — the
+ * list comes newest first, so the first met of a day is the latest. With none, the currency of
+ * conversion on the side of selling it, when it is not the dram: a newcomer sees the line alone.
+ */
+export function rateChartPairs(
+  exchanges: readonly RateChartExchangeInput[],
+  from: string,
+  today: string,
+  income: Currency,
+): RateChartPairKey[] {
+  const sides = new Map<ForeignCurrency, { side: MarketSide; day: string }>()
+  for (const exchange of exchanges) {
+    if (exchange.exchangedOn < from || exchange.exchangedOn > today) continue
+    const pair = marketSideOf(exchange.given.currency, exchange.received.currency)
+    if (!pair) continue
+    const held = sides.get(pair.currency)
+    if (!held || exchange.exchangedOn > held.day) {
+      sides.set(pair.currency, { side: pair.side, day: exchange.exchangedOn })
+    }
+  }
+  if (sides.size === 0) return income === 'AMD' ? [] : [{ currency: income, side: 'bankBuys' }]
+  const order = (currency: Currency) =>
+    currency === income ? -1 : currencySchema.options.indexOf(currency)
+  return [...sides.entries()]
+    .sort(([one], [other]) => order(one) - order(other))
+    .map(([currency, { side }]) => ({ currency, side }))
+}
+
+const STEP_DIGITS = [5n, 3n, 2n, 1n]
+
+/**
+ * The ticks of the axis (handoff 05, Р-8): three values a round step apart — one, two, three or
+ * five of a power of ten, «0,30» for the rouble — each a multiple of that power, all three within
+ * the figures, the widest step that fits. When none does, one tick near the middle.
+ */
+export function rateLevels(lowest: bigint, highest: bigint): bigint[] {
+  const range = highest - lowest
+  let power = MIN_STEP
+  while (power * 10n <= range) power *= 10n
+  for (; power >= MIN_STEP; power /= 10n) {
+    for (const digit of STEP_DIGITS) {
+      const step = digit * power
+      if (step * 2n > range) continue
+      const middle = divideRounded(lowest + highest, 2n * power) * power
+      for (const centre of [middle, middle - power, middle + power]) {
+        if (centre - step >= lowest && centre + step <= highest) {
+          return [centre - step, centre, centre + step]
+        }
+      }
+    }
+  }
+  return [divideRounded(lowest + highest, 2n * MIN_STEP) * MIN_STEP]
+}
+
+/** A rate kept with the dram as its quote — drams per unit, the side every figure here is on. */
+function inDrams(rate: ExchangeRate, currency: ForeignCurrency): bigint | null {
+  if (rate.base === currency && rate.quote === 'AMD') return rate.scaled
+  if (rate.base === 'AMD' && rate.quote === currency) {
+    return divideRounded(RATE_SCALE * RATE_SCALE, rate.scaled)
+  }
+  return null
+}
+
+function drams(currency: ForeignCurrency, scaled: bigint, day: string): ExchangeRate {
+  return { base: currency, quote: 'AMD', scaled, source: 'official', asOf: yerevanMidnight(day) }
+}
+
+/**
+ * «Курс рубля за 12 месяцев» (MOL-161): for each pair the market at the end of every week of the
+ * window, the person's exchanges on it, each with its percent against the market it was measured by
+ * — its own channel when named, else the best of its day, the very comparison of its card and of
+ * «Обмены против рынка» (Р-4) — and the mark at that market (В-1). Exchanges of the other side are
+ * not drawn: their market is another line (В-2). Heights and positions are thousandths, the
+ * server's to say. A pair with no figure in any week is left out; with none left, null — no card.
+ */
+export function rateChart(
+  pairs: readonly (RateChartPairKey & { readonly rows: readonly MarketRate[] })[],
+  exchanges: readonly RateChartExchangeInput[],
+  from: string,
+  today: string,
+): RateChart | null {
+  const ends = rateWeeks(from, today)
+  const span = Math.max(1, daysFrom(from, today))
+  const xOf = (day: string) => Math.round((daysFrom(from, day) * CHART_LEVEL) / span)
+
+  const drawn = pairs.flatMap(({ currency, side, rows }): RateChartPair[] => {
+    const onSide = rows.filter(
+      (row) => row.channel === RATE_CHART_CHANNEL && row.currency === currency && row.side === side,
+    )
+    const weeks = ends.map((day) => ({ day, row: weekRate(onSide, day) }))
+    if (weeks.every(({ row }) => row === null)) return []
+
+    const own = exchanges
+      .flatMap((exchange) => {
+        const pair = marketSideOf(exchange.given.currency, exchange.received.currency)
+        const day = exchange.exchangedOn
+        if (pair?.currency !== currency || pair.side !== side) return []
+        if (day < from || day > today || !exchange.rate) return []
+        const scaled = inDrams(exchange.rate, currency)
+        if (scaled === null) return []
+        const measure = exchange.market?.own ?? exchange.market?.best ?? null
+        const market = measure && inDrams(measure.rate, currency)
+        const { minor } = exchange.received
+        // What the market would have given for the same money, as «Обмены против рынка» has it.
+        const expected = measure ? minor - measure.difference.minor : 0n
+        return [
+          {
+            exchange,
+            scaled,
+            market: measure && market !== null ? { scaled: market, measure } : null,
+            percent: measure ? hundredthsOf(measure.difference.minor, expected) : null,
+          },
+        ]
+      })
+      .sort((one, other) =>
+        one.exchange.exchangedOn !== other.exchange.exchangedOn
+          ? one.exchange.exchangedOn < other.exchange.exchangedOn
+            ? -1
+            : 1
+          : one.exchange.id < other.exchange.id
+            ? -1
+            : 1,
+      )
+
+    const figures = [
+      ...weeks.flatMap(({ row }) => (row ? [row.scaled] : [])),
+      ...own.flatMap((point) => [point.scaled, ...(point.market ? [point.market.scaled] : [])]),
+    ]
+    const ticks = rateLevels(
+      figures.reduce((least, value) => (value < least ? value : least)),
+      figures.reduce((most, value) => (value > most ? value : most)),
+    )
+    const all = [...figures, ...ticks]
+    const lowest = all.reduce((least, value) => (value < least ? value : least))
+    const highest = all.reduce((most, value) => (value > most ? value : most))
+    const levelAt = (scaled: bigint) =>
+      highest === lowest
+        ? CHART_LEVEL / 2
+        : Number(divideRounded((scaled - lowest) * BigInt(CHART_LEVEL), highest - lowest))
+
+    return [
+      {
+        currency,
+        side,
+        weeks: weeks.map(({ day, row }) => ({
+          day,
+          rate: row && drams(currency, row.scaled, row.date),
+          x: xOf(day),
+          level: row && levelAt(row.scaled),
+        })),
+        exchanges: own.map(({ exchange, scaled, market, percent }) => ({
+          id: exchange.id,
+          day: exchange.exchangedOn,
+          week: ends.findIndex((end) => end >= exchange.exchangedOn),
+          x: xOf(exchange.exchangedOn),
+          rate: drams(currency, scaled, exchange.exchangedOn),
+          level: levelAt(scaled),
+          // Named as «Обмены против рынка» names its place.
+          place: exchange.note?.trim() ?? null,
+          percent,
+          market: market && {
+            rate: market.measure.rate,
+            level: levelAt(market.scaled),
+            basis: market.measure.basis,
+          },
+        })),
+        levels: ticks.map((scaled) => ({
+          rate: drams(currency, scaled, today),
+          level: levelAt(scaled),
+        })),
+      },
+    ]
+  })
+  return drawn.length > 0 ? { pairs: drawn } : null
+}

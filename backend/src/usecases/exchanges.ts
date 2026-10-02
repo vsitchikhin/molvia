@@ -11,6 +11,7 @@ import {
   currencySchema,
   exchangeLosses,
   exchangeLossesViewOf,
+  exchangeRateChartViewOf,
   exchangeRateOf,
   exchangersPending,
   heldEstimate,
@@ -25,6 +26,9 @@ import {
   officialDifference,
   ownRates,
   pickOfficialRate,
+  RATE_CHART_CHANNEL,
+  rateChart,
+  rateChartPairs,
   receiptDay,
   resourceIdOf,
   uprightOf,
@@ -515,6 +519,37 @@ export async function ownMoney(
 }
 
 /**
+ * «Курс рубля за 12 месяцев» (MOL-161): the window of «Обмены против рынка», the pairs and their
+ * side from the exchanges of it, the line of all bank clients read once for them, and each point
+ * with the very comparison its card carries (`market` of the list), so the two never disagree.
+ */
+export async function rateChartOf(
+  { marketRates }: Pick<Repositories, 'marketRates'>,
+  views: readonly ExchangeView[],
+  income: Currency,
+  today: string,
+): Promise<ExchangesResponse['rateChart']> {
+  const current = monthOf(today)
+  const from = `${chartMonths(current, EXCHANGE_LOSS_MONTHS)[0] ?? current}-01`
+  const pairs = rateChartPairs(views, from, today, income)
+  if (pairs.length === 0) return null
+  const rows = await marketRates.series(
+    RATE_CHART_CHANNEL,
+    pairs.map(({ currency }) => currency),
+    // The first week's figure may be up to a week older than its end.
+    daysBefore(from, OFFICIAL_RATE_FRESH_DAYS),
+    today,
+  )
+  const chart = rateChart(
+    pairs.map((pair) => ({ ...pair, rows })),
+    views,
+    from,
+    today,
+  )
+  return chart && exchangeRateChartViewOf(chart)
+}
+
+/**
  * «Обмен денег» whole (MOL-40, MOL-42): the preference, the pair a trip started today would convert
  * by, the wallet of that pair and the cost of every other currency held as of today, the hints for
  * the next exchange into each currency, and every exchange, newest first. Everything a figure on
@@ -542,6 +577,7 @@ export async function exchangesOverview(
   )
   const { base, quote, rates } = money
   const views = viewsOf(money.exchanges, money.cached, history, market, exchangersThrough, today)
+  const chart = await rateChartOf(repositories, views, owner.incomeCurrency, today)
   return {
     preference: money.preference,
     pair: base === quote ? null : { base, quote },
@@ -554,6 +590,7 @@ export async function exchangesOverview(
     receipts: [...money.receipts],
     marketToday: marketTodayOf(latest, official, today),
     losses: marketLossesOf(views, money.cached, owner.spendCurrency, today),
+    rateChart: chart,
   }
 }
 

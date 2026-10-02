@@ -5,9 +5,10 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 
 ## packages/model
 
-- `packages/model/src/contracts/exchange.ts` — Wire schemas of «Обмен денег»: the exchange body and amendment, the rate preference, the screen's answer with wallet and costs.
+- `packages/model/src/contracts/exchange.ts` — Wire schemas of «Обмен денег»: the exchange body and amendment, the rate preference, the screen's answer with wallet and costs, «Обмены против рынка» and the line of the rate (MOL-161).
 - `packages/model/src/contracts/income.ts` — Wire schemas of «Доходы»: the income body and amendment, one income's view, the answer grouped by month.
 - `packages/model/src/entities/exchange.ts` — Exchange entity and the wallet: currency costs along the chain, own rates, difference from the official rate, the «сколько было до» hint.
+- `packages/model/src/entities/exchange-rate-chart.ts` — «Курс рубля за 12 месяцев» (MOL-161): the weeks of the window, a week's figure of all bank clients, the pairs and the side of their line, each exchange with its percent and the market it was measured by, the round ticks of the axis.
 - `packages/model/src/entities/income.ts` — Income entity: the closed list of sources, the undo window, and the per-month sums per currency.
 - `packages/model/src/values/market-rates.ts` — Market-rate value (MOL-137): channels, the bank's side of an exchange, a day's figure per channel, the best for the person, «exchange offices still to come», the figures of today, the band of a factor of two.
 - `packages/model/src/values/rates.ts` — Exchange-rate value: six-digit scale, sources and providers, jump rule, Yerevan days, `latestDay` — the latest day on Earth, the bound of «not in the future» (MOL-121) —, freshness, picking the official rate, `formatRate`.
