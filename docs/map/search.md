@@ -28,6 +28,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 
 ## backend · db
 
+- `backend/src/db/kind-word.ts` — `kindAt`: where the word of the kind stands in a name, the one SQL spelling of `kindKey` (MOL-45) — read by the search's synonyms and by «Тут дешевле»'s items of a kind (MOL-92).
 - `backend/src/db/items-repository.ts` — Repository of items: the ranked search (candidates, distance, units, synonyms, picks, `near`) and `createUnlessNamed`. Tests: `backend/tests/search.integration.test.ts`.
 - `backend/src/db/search-picks-repository.ts` — Repository of remembered picks: a query and the item taken after it, and the person's own word (`admits`). Tests: `backend/tests/search-picks.integration.test.ts`.
 - `backend/src/db/seed-repository.ts` — Repository writing the seed in one transaction: adds new names, reports those kept and twins under another spelling. Tests: `backend/tests/seed-catalogue.integration.test.ts`.

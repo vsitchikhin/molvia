@@ -12,6 +12,9 @@ import {
   settingsUpdateSchema,
   adviceResponseSchema,
   adviceSearchResponseSchema,
+  ownNeverResponseSchema,
+  ownPricesQuerySchema,
+  ownPricesResponseSchema,
   addExpenseBodySchema,
   attachBarcodeBodySchema,
   barcodeTakenSchema,
@@ -77,6 +80,9 @@ import type {
   SettingsGeography,
   AdviceResponse,
   AdviceSearchResponse,
+  OwnNeverResponse,
+  OwnPricesQuery,
+  OwnPricesResponse,
   AddExpenseBody,
   AppLocale,
   BarcodeHint,
@@ -419,6 +425,13 @@ export interface MolviaClient {
     query: string,
     options?: { readonly signal?: AbortSignal },
   ): Promise<AdviceSearchResponse>
+  /**
+   * «Тут дешевле» (MOL-92): the person's own last prices of an item in the record's city, and the
+   * other items of its kind. The record by `trip` when the server holds it, else its city.
+   */
+  ownPrices(query: OwnPricesQuery): Promise<OwnPricesResponse>
+  /** One's own «не брать нигде» (MOL-92, adversarial Б′): what «Тут дешевле» lets go of. */
+  ownNever(): Promise<OwnNeverResponse>
 }
 
 const exportEnvelopeSchema = z.looseObject({
@@ -897,5 +910,16 @@ export function createClient(options: ClientOptions): MolviaClient {
         options.signal === undefined ? {} : { signal: options.signal },
       )
     },
+    ownPrices: async (query) => {
+      const parsed = ownPricesQuerySchema.parse(query)
+      const search = new URLSearchParams(
+        'trip' in parsed
+          ? { item: parsed.item, trip: parsed.trip }
+          : { item: parsed.item, country: parsed.country, city: parsed.city },
+      )
+      if (parsed.except !== undefined) search.set('except', parsed.except)
+      return request(`/advice/prices?${search.toString()}`, ownPricesResponseSchema)
+    },
+    ownNever: async () => request('/verdicts/never', ownNeverResponseSchema),
   }
 }

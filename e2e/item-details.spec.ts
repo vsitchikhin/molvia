@@ -81,7 +81,7 @@ const sheet = (page: Page) => page.locator('dialog[open]')
 const addButton = (page: Page) => sheet(page).getByRole('button', { name: 'Record', exact: true })
 
 /** From the trip to the search, the item found and picked, its sheet up. */
-async function pick({ page, word }: Setting): Promise<void> {
+async function pick({ page, word }: Pick<Setting, 'page' | 'word'>): Promise<void> {
   await page.goto('/purchases/manual/add')
   await field(page).fill(word)
   await page.getByRole('option').first().click()
@@ -211,5 +211,216 @@ test.describe('with no connection', () => {
     await expect.poll(queued).toBe(0)
     await page.waitForTimeout(300)
     expect(await setting.rows()).toHaveLength(1)
+  })
+})
+
+/**
+ * «Тут дешевле» (MOL-92): a purchase in one shop, then the same item on the sheet in another — the
+ * hint from the real server, compared as the price is typed, kept on the phone for no signal.
+ */
+test.describe('«Тут дешевле»', () => {
+  /** Milk bought at Зовуни for 540 the litre, in a record already finished, and a record open at Ереван Сити. */
+  async function boughtAtZovuni(
+    page: Page,
+    alternative?: { readonly price: string; readonly score: number },
+    shop = 'Зовуни',
+  ): Promise<{ word: string; itemId: string; other: string | null }> {
+    await signedIn(page)
+    const headers = await asBrowser(page)
+    const word = nonsense()
+    const proposed = await page.request.post('/api/catalogue/items', {
+      headers,
+      data: { kind: 'product', name: `Молоко «${word}»`, defaultUnit: 'l' },
+    })
+    expect([200, 201]).toContain(proposed.status())
+    const { id: itemId } = (await proposed.json()) as { id: string }
+    const context = settingsOf(
+      actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+    )
+
+    const earlier = randomUUID()
+    const start = (id: string, name: string) =>
+      page.request.post('/api/trips', {
+        headers,
+        data: { context, id, place: { kind: 'store', name } },
+      })
+    expect((await start(earlier, shop)).status()).toBe(201)
+    const added = await page.request.post(`/api/trips/${earlier}/expenses`, {
+      headers,
+      data: {
+        id: randomUUID(),
+        itemId,
+        quantity: { value: '1', unit: 'l' },
+        amount: { amount: '540', currency: 'AMD' },
+      },
+    })
+    expect(added.status()).toBe(201)
+    // Another milk of one's own, rated, bought in the same shop (MOL-92, В-3).
+    let other: string | null = null
+    if (alternative) {
+      other = `Молоко «${nonsense()}»`
+      const made = await page.request.post('/api/catalogue/items', {
+        headers,
+        data: { kind: 'product', name: other, defaultUnit: 'l' },
+      })
+      const { id: otherId } = (await made.json()) as { id: string }
+      const bought = await page.request.post(`/api/trips/${earlier}/expenses`, {
+        headers,
+        data: {
+          id: randomUUID(),
+          itemId: otherId,
+          quantity: { value: '1', unit: 'l' },
+          amount: { amount: alternative.price, currency: 'AMD' },
+        },
+      })
+      expect(bought.status()).toBe(201)
+      const rated = await page.request.put(`/api/verdicts/${otherId}`, {
+        headers,
+        data: { score: alternative.score },
+      })
+      expect(rated.status()).toBe(201)
+    }
+    expect(
+      (await page.request.post(`/api/trips/${earlier}/finish`, { headers, data: {} })).status(),
+    ).toBe(204)
+    expect((await start(randomUUID(), 'Ереван Сити')).status()).toBe(201)
+    return { word, itemId, other }
+  }
+
+  const hint = (page: Page) => sheet(page).locator('[data-hint="item"]')
+
+  test('names the cheaper shop once a dearer price is typed, and nothing for «не брать нигде»', async ({
+    page,
+  }) => {
+    const { word, itemId } = await boughtAtZovuni(page)
+    await pick({ page, word })
+
+    // Before a price: the cheapest one, said plainly.
+    await expect(hint(page)).toContainText('Cheapest you paid: Зовуни')
+    await sheet(page).getByLabel('How much').fill('1')
+    await sheet(page).getByLabel('Price as on the tag').fill('620')
+    await expect(hint(page)).toContainText('You paid ֏540.00/l at Зовуни')
+    // The fields stay where they were: the hint is below them.
+    const price = await sheet(page).getByLabel('Price as on the tag').boundingBox()
+    const line = await hint(page).boundingBox()
+    expect(line && price && line.y > price.y).toBe(true)
+
+    await sheet(page).getByRole('button', { name: 'Close' }).click()
+    const headers = await asBrowser(page)
+    expect(
+      (await page.request.put(`/api/verdicts/${itemId}`, { headers, data: { score: 1 } })).status(),
+    ).toBe(201)
+    await pick({ page, word })
+    await sheet(page).getByLabel('How much').fill('1')
+    await sheet(page).getByLabel('Price as on the tag').fill('620')
+    await expect(sheet(page).locator('.per-unit-value')).toContainText('620')
+    await expect(sheet(page).locator('[data-hint]')).toHaveCount(0)
+  })
+
+  test('shows the hint remembered on the phone with no signal', async ({ page, context }) => {
+    const { word } = await boughtAtZovuni(page)
+    await pick({ page, word })
+    await expect(hint(page)).toContainText('Зовуни')
+    await sheet(page).getByRole('button', { name: 'Close' }).click()
+    await expect(sheet(page)).toHaveCount(0)
+
+    await context.setOffline(true)
+    // The search still shows what it found: the same item, picked again with no signal.
+    await page.getByRole('option').first().click()
+    await expect(sheet(page)).toContainText(`Молоко «${word}»`)
+    await expect(hint(page)).toContainText('Cheapest you paid: Зовуни')
+    await context.setOffline(false)
+  })
+
+  test('names a cheaper milk of one’s own rated no worse, second (В-3, review №5)', async ({
+    page,
+  }) => {
+    const { word, other } = await boughtAtZovuni(page, { price: '480', score: 5 })
+    await pick({ page, word })
+    await sheet(page).getByLabel('How much').fill('1')
+    await sheet(page).getByLabel('Price as on the tag').fill('620')
+
+    const line = sheet(page).locator('[data-hint="alternative"]')
+    await expect(line).toContainText(`${other ?? ''} — ֏480.00/l at Зовуни`)
+    await expect(line).toContainText('rated 5.0')
+  })
+
+  /**
+   * The top of the price field, frame by frame, while `act` runs and for a moment after: how far it
+   * went in all, and the largest step between two frames.
+   */
+  async function priceFieldMoves(page: Page, act: () => Promise<void>) {
+    await page.evaluate(() => {
+      const w = window as unknown as { __tops: number[]; __stop: boolean }
+      w.__tops = []
+      w.__stop = false
+      const step = () => {
+        const field = document.querySelector('dialog[open] [data-field="amount"]')
+        if (field) w.__tops.push(field.getBoundingClientRect().top)
+        if (!w.__stop) requestAnimationFrame(step)
+      }
+      requestAnimationFrame(step)
+    })
+    await act()
+    await page.waitForTimeout(600)
+    const tops = await page.evaluate(() => {
+      const w = window as unknown as { __tops: number[]; __stop: boolean }
+      w.__stop = true
+      return w.__tops
+    })
+    const steps = tops.slice(1).map((top, index) => Math.abs(top - (tops[index] ?? top)))
+    return {
+      moved: Math.abs((tops.at(-1) ?? 0) - (tops[0] ?? 0)),
+      moving: steps.filter((step) => step > 0.5).length,
+      largest: Math.max(0, ...steps),
+    }
+  }
+
+  const still = (page: Page) =>
+    expect
+      .poll(() => page.evaluate(() => document.getAnimations().length), { timeout: 10_000 })
+      .toBe(0)
+
+  test('comes in over frames: the fields rise with it, never in one jump (adversarial Е)', async ({
+    page,
+  }) => {
+    const { word } = await boughtAtZovuni(page)
+    // A shelf's connection: the answer comes after the sheet is up and still.
+    await page.route('**/api/advice/prices**', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await route.continue()
+    })
+    await pick({ page, word })
+    await still(page)
+    await expect(hint(page)).toHaveCount(0)
+
+    const motion = await priceFieldMoves(page, () =>
+      expect(hint(page)).toContainText('Зовуни', { timeout: 5000 }),
+    )
+
+    expect(motion.moved).toBeGreaterThan(20)
+    expect(motion.moving).toBeGreaterThan(3)
+    expect(motion.largest).toBeLessThan(motion.moved / 2)
+  })
+
+  test('says something else over frames too: one line to two (adversarial Е′)', async ({
+    page,
+  }) => {
+    const { word } = await boughtAtZovuni(page, undefined, 'Зовуни Плюс')
+    await pick({ page, word })
+    await sheet(page).getByLabel('How much').fill('1')
+    await sheet(page).getByLabel('Price as on the tag').fill('540')
+    await expect(hint(page)).toContainText('Same as at Зовуни Плюс')
+    await still(page)
+
+    const motion = await priceFieldMoves(page, async () => {
+      await sheet(page).getByLabel('Price as on the tag').fill('500')
+      await expect(hint(page)).toContainText('Cheaper here')
+      await still(page)
+    })
+
+    expect(motion.moved).toBeGreaterThan(10)
+    expect(motion.moving).toBeGreaterThan(3)
+    expect(motion.largest).toBeLessThan(motion.moved / 2)
   })
 })

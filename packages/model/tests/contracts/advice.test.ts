@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {
   ADVICE_LIMIT,
+  OWN_ALTERNATIVES_MAX,
   PRICE_MEDIAN_MIN_OBSERVATIONS,
   adviceResponseSchema,
   adviceRowSchema,
+  ownPricesQuerySchema,
+  ownPricesResponseSchema,
+  ownPricesSchema,
 } from '#model/contracts/advice'
 
 const ITEM = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
@@ -190,5 +194,112 @@ describe('adviceResponseSchema', () => {
 describe('the numbers the screen depends on', () => {
   it('needs three purchases before a threshold, as everything else in this project does', () => {
     expect(PRICE_MEDIAN_MIN_OBSERVATIONS).toBe(3)
+  })
+})
+
+describe('ownPricesSchema (MOL-92, «Тут дешевле»)', () => {
+  const zovuni = {
+    ...market,
+    name: 'Зовуни',
+    quantity: { value: '1.000', unit: 'kg' },
+    day: '2026-09-12',
+    observations: 3,
+  }
+  const marianna = {
+    itemId: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d',
+    name: 'Молоко Марианна',
+    level: 'take',
+    rating: '4.5',
+    places: [zovuni],
+  } as const
+  const priced = {
+    itemId: ITEM,
+    level: 'take',
+    rating: '4.0',
+    places: [zovuni],
+    alternatives: [marianna],
+  }
+
+  it('carries the places and the alternatives of a rated item, the unit price decoded', () => {
+    const answer = ownPricesSchema.parse(priced)
+    expect(answer.level === 'take' && answer.places[0]?.unitPrice.unit).toBe('kg')
+  })
+
+  it('has no field for a price on «не брать нигде» — a price there fails to parse (Т-3)', () => {
+    expect(ownPricesSchema.safeParse({ itemId: ITEM, level: 'never' }).success).toBe(true)
+    for (const extra of [{ places: [zovuni] }, { alternatives: [] }, { rating: '1.0' }]) {
+      expect(ownPricesSchema.safeParse({ itemId: ITEM, level: 'never', ...extra }).success).toBe(
+        false,
+      )
+    }
+  })
+
+  it('has no rating on an item not rated, and still its prices', () => {
+    const unrated = { itemId: ITEM, level: 'unrated', places: [zovuni], alternatives: [] }
+    expect(ownPricesSchema.safeParse(unrated).success).toBe(true)
+    expect(ownPricesSchema.safeParse({ ...unrated, rating: '4.0' }).success).toBe(false)
+  })
+
+  it('refuses a day that is not a calendar day', () => {
+    for (const day of ['2026-02-31', '12.09', '2026-9-12']) {
+      const bad = { ...priced, places: [{ ...zovuni, day }] }
+      expect(ownPricesSchema.safeParse(bad).success).toBe(false)
+    }
+  })
+
+  it('refuses an alternative that is «не брать нигде», unrated, or has no place', () => {
+    for (const other of [
+      { ...marianna, level: 'never' },
+      { ...marianna, rating: undefined },
+      { ...marianna, places: [] },
+    ]) {
+      expect(ownPricesSchema.safeParse({ ...priced, alternatives: [other] }).success).toBe(false)
+    }
+  })
+
+  it(`carries at most ${String(OWN_ALTERNATIVES_MAX)} alternatives`, () => {
+    const many = (n: number) => ({
+      ...priced,
+      alternatives: Array.from({ length: n }, () => marianna),
+    })
+    expect(ownPricesSchema.safeParse(many(OWN_ALTERNATIVES_MAX)).success).toBe(true)
+    expect(ownPricesSchema.safeParse(many(OWN_ALTERNATIVES_MAX + 1)).success).toBe(false)
+  })
+
+  it('travels with the city it was counted in, `null` for a record not one’s own', () => {
+    const where = { country: 'AM', city: 'Ереван' }
+    expect(ownPricesResponseSchema.parse({ where, prices: priced }).where).toEqual(where)
+    expect(
+      ownPricesResponseSchema.parse({
+        where: null,
+        prices: { ...priced, places: [], alternatives: [] },
+      }).where,
+    ).toBeNull()
+    expect(ownPricesResponseSchema.safeParse({ prices: priced }).success).toBe(false)
+  })
+})
+
+describe('ownPricesQuerySchema', () => {
+  const city = { item: ITEM, country: 'AM', city: 'Ереван' }
+  const trip = { item: ITEM, trip: PLACE }
+
+  it('names the record the server holds, or the city of one still in the queue; `except` optional', () => {
+    expect(ownPricesQuerySchema.parse(trip)).toEqual(trip)
+    expect(ownPricesQuerySchema.parse(city)).toEqual(city)
+    expect(ownPricesQuerySchema.parse({ ...trip, except: PLACE })).toMatchObject({ except: PLACE })
+  })
+
+  it('refuses both at once, neither, half a city, a malformed id and anything else', () => {
+    for (const query of [
+      { ...trip, country: 'AM', city: 'Ереван' },
+      { item: ITEM },
+      { item: ITEM, city: 'Ереван' },
+      { ...trip, item: 'milk' },
+      { ...trip, trip: 'record' },
+      { ...city, except: 'row' },
+      { ...city, scope: 'shared' },
+    ]) {
+      expect(ownPricesQuerySchema.safeParse(query).success).toBe(false)
+    }
   })
 })

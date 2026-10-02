@@ -37,9 +37,39 @@
         </template>
       </AppField>
 
-      <div class="per-unit">
-        <span class="per-unit-label">{{ t('item.unit_price_label') }}</span>
-        <span class="per-unit-value">{{ perUnit ?? '—' }}</span>
+      <!-- «Тут дешевле» lives in the box of the figure it compares (MOL-92, В-6). The sheet stands
+           on the bottom of the screen, so a line coming in lifts everything above it: it grows over
+           frames, never in one (MOL-151), and follows typing only once it pauses (adversarial Е). -->
+      <div class="per-unit-box">
+        <div class="per-unit">
+          <span class="per-unit-label">{{ t('item.unit_price_label') }}</span>
+          <span class="per-unit-value">{{ perUnit ?? '—' }}</span>
+        </div>
+        <AppReveal>
+          <!-- Keyed by its words: a line that says something else goes and comes rather than changing
+               height in one frame — a second line of it lifted the price by 17 px (adversarial Е′). -->
+          <p
+            v-if="itemHint"
+            :key="itemHint.text"
+            class="hint"
+            :class="`hint-${itemHint.kind}`"
+            data-hint="item"
+          >
+            <component :is="itemHint.icon" class="hint-icon" aria-hidden="true" />
+            <span>{{ itemHint.text }}</span>
+          </p>
+        </AppReveal>
+        <AppReveal>
+          <p
+            v-if="alternativeHint"
+            :key="alternativeHint"
+            class="hint hint-alternative"
+            data-hint="alternative"
+          >
+            <IconSwapHorizontal class="hint-icon" aria-hidden="true" />
+            <span>{{ alternativeHint }}</span>
+          </p>
+        </AppReveal>
       </div>
       <p v-if="!perUnit" class="caption">{{ t('item.unit_price_pending') }}</p>
       <!-- The price of the package needs no quantity: a weight not yet known still has its
@@ -106,7 +136,11 @@
 import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconArrowDown from '~icons/mdi/arrow-down'
+import IconCheck from '~icons/mdi/check'
+import IconEqual from '~icons/mdi/equal'
 import IconMenuDown from '~icons/mdi/menu-down'
+import IconSwapHorizontal from '~icons/mdi/swap-horizontal'
 import { currencySchema, currencySign, formatEstimate, formatUnitPrice } from '@molvia/model'
 import type {
   BaseUnit,
@@ -119,13 +153,18 @@ import type {
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useTripHistoryStore } from '@/stores/tripHistory'
+import { formatRating, unitPriceText } from '@/components/adviceRow'
+import { useCheaperHint } from '@/composables/useCheaperHint'
+import type { HintRecord } from '@/composables/useCheaperHint'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useItemDetails } from '@/composables/useItemDetails'
 import type { DetailsField, RetryPurchase } from '@/composables/useItemDetails'
+import { calendarDay } from '@/days'
 import { useRecentItemsStore } from '@/stores/recentItems'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -147,7 +186,15 @@ const UNITS: readonly BaseUnit[] = ['kg', 'l', 'piece']
  */
 export default defineComponent({
   name: 'ItemDetailsSheet',
-  components: { AppButton, AppField, BottomSheet, IconMenuDown, SegmentedControl },
+  components: {
+    AppButton,
+    AppField,
+    AppReveal,
+    BottomSheet,
+    IconMenuDown,
+    IconSwapHorizontal,
+    SegmentedControl,
+  },
   props: {
     entry: { type: Object as PropType<CatalogueEntry>, required: true },
     /** What was typed before the item was picked; it goes with the purchase (MOL-11). */
@@ -275,16 +322,84 @@ export default defineComponent({
       return money ? formatEstimate(money, locale.value) : null
     })
 
+    /**
+     * «Тут дешевле» (MOL-92): the record written into, by its id once the server holds it — the
+     * server reads its city off its place — and by the city of its start while that start is still
+     * in the queue (review №1). No record, no hint.
+     */
+    const record = computed<HintRecord | null>(() => {
+      const local = current.local.value
+      const into = writeInto.value
+      if (local?.id === into) {
+        const queued = local.context
+        return queued ? { where: { country: queued.country, city: queued.city } } : null
+      }
+      return into === null ? null : { tripId: into }
+    })
+    const { hint } = useCheaperHint({
+      itemId: props.entry.id,
+      record,
+      except: props.expense?.id ?? null,
+      here: () => trip.value?.place.id ?? null,
+      typed: () => details.unitPrice.value,
+      typedQuantity: () => details.typedQuantity.value,
+      currency: () => details.currency.value,
+      unit: () => details.unit.value,
+    })
+    const shortDay = (day: string) =>
+      calendarDay(day, locale.value, { day: '2-digit', month: '2-digit' })
+    const HINT_ICONS = {
+      best: IconArrowDown,
+      there: IconArrowDown,
+      same: IconEqual,
+      cheaper: IconCheck,
+    }
+    const itemHint = computed(() => {
+      const item = hint.value.item
+      if (!item) return null
+      const named = {
+        place: item.place.name,
+        price: unitPriceText(item.place.unitPrice, t, locale.value),
+        day: shortDay(item.place.day),
+      }
+      return {
+        kind: item.kind,
+        icon: HINT_ICONS[item.kind],
+        text: t(`item.cheaper.${item.kind}${item.here ? '_here' : ''}`, named),
+      }
+    })
+    const alternativeHint = computed(() => {
+      const other = hint.value.alternative
+      if (!other) return null
+      return t('item.cheaper.alternative', {
+        name: other.name,
+        price: unitPriceText(other.place.unitPrice, t, locale.value),
+        place: other.place.name,
+        day: shortDay(other.place.day),
+        rating: formatRating(other.rating, locale.value),
+      })
+    })
+
     // Read out through the app's one live region, not a region of its own born with the sheet —
-    // those are often not read (CLAUDE.md, MOL-19). Once typing pauses, not on every keystroke.
+    // those are often not read (CLAUDE.md, MOL-19). Once typing pauses, not on every keystroke;
+    // «Тут дешевле» with the figure it compares (Т-8).
+    const spoken = computed(() =>
+      [
+        perUnit.value ? t('item.unit_price_announced', { value: perUnit.value }) : null,
+        itemHint.value?.text ?? null,
+        alternativeHint.value,
+      ]
+        .filter((line) => line !== null)
+        .join('. '),
+    )
     const announce = useAnnouncer()
     let withdraw: (() => void) | undefined
     let pause: ReturnType<typeof setTimeout> | undefined
-    watch(perUnit, (value) => {
+    watch(spoken, (value) => {
       clearTimeout(pause)
       pause = setTimeout(() => {
         withdraw?.()
-        withdraw = value ? announce?.(t('item.unit_price_announced', { value })) : undefined
+        withdraw = value ? announce?.(value) : undefined
       }, 700)
     })
     onUnmounted(() => {
@@ -455,6 +570,8 @@ export default defineComponent({
       units,
       currencies,
       perUnit,
+      itemHint,
+      alternativeHint,
       converted,
       online,
       writeInto,
@@ -520,6 +637,13 @@ export default defineComponent({
   pointer-events: none;
 }
 
+.per-unit-box {
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--good-tint);
+  color: var(--good-ink);
+}
+
 .per-unit {
   display: flex;
   align-items: baseline;
@@ -527,9 +651,40 @@ export default defineComponent({
   gap: var(--space-3);
   min-height: var(--touch-target-lg);
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius);
-  background: var(--good-tint);
-  color: var(--good-ink);
+}
+
+/* One line under the figure, its tone by what it says: never red — red is «не брать нигде». */
+.hint {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-top: var(--hairline) solid var(--border);
+  font-size: var(--text-callout);
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+.hint-icon {
+  flex-shrink: 0;
+  margin-top: var(--space-1);
+}
+
+.hint-there {
+  background: var(--warn-tint);
+  color: var(--warn-ink);
+}
+
+.hint-best,
+.hint-same,
+.hint-alternative {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.hint-same {
+  color: var(--text-muted);
 }
 
 .per-unit-label {

@@ -6,8 +6,16 @@ import type { Pinia } from 'pinia'
 import { nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { parseMoney, parseQuantity, tripViewCodec } from '@molvia/model'
-import type { CatalogueEntry, TripExpenseView, TripView } from '@molvia/model'
+import type {
+  CatalogueEntry,
+  OwnPrices,
+  OwnPricesQuery,
+  OwnPricesResponse,
+  TripExpenseView,
+  TripView,
+} from '@molvia/model'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
+import { HINT_SETTLE_MS } from '@/composables/useCheaperHint'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useTripStore } from '@/stores/trip'
@@ -19,6 +27,7 @@ const offline = vi.hoisted(() => () => Promise.reject(new Error('Failed to fetch
 const currentTrip = vi.hoisted(() => vi.fn<() => Promise<unknown>>())
 const readTrip = vi.hoisted(() => vi.fn<(id: string) => Promise<unknown>>())
 const detachBarcode = vi.hoisted(() => vi.fn<(itemId: string, code: string) => Promise<void>>())
+const ownPrices = vi.hoisted(() => vi.fn<(query: OwnPricesQuery) => Promise<OwnPricesResponse>>())
 vi.mock('@/api', async () => {
   const { ApiError } = await import('@molvia/client')
   const { ERROR } = await import('@molvia/model')
@@ -32,6 +41,7 @@ vi.mock('@/api', async () => {
       updateExpense: fail,
       removeExpense: fail,
       detachBarcode,
+      ownPrices: (query: OwnPricesQuery) => ownPrices(query),
       currentTrip,
       trip: (id: string) => readTrip(id),
     },
@@ -93,6 +103,8 @@ beforeEach(() => {
   currentTrip.mockResolvedValue(null)
   readTrip.mockReset()
   readTrip.mockRejectedValue(new Error('Failed to fetch'))
+  ownPrices.mockReset()
+  ownPrices.mockRejectedValue(new Error('Failed to fetch'))
 })
 
 afterEach(() => {
@@ -568,5 +580,239 @@ describe('«не этот товар?» (MOL-100)', () => {
     expect(document.activeElement?.textContent.trim()).toBe('Отменить')
     const detach = view.findAll('button').find((button) => button.text() === 'Отвязать')
     expect(detach?.classes()).toContain('danger-ghost')
+  })
+})
+
+describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
+  const ZOVUNI = 'cccccccc-0000-4000-8000-000000000001'
+  const HERE = 'aaaaaaaa-0000-4000-8000-000000000001'
+  const MARIANNA = 'dddddddd-0000-4000-8000-000000000002'
+  const erevan = { country: 'AM' as const, city: 'Ереван' }
+  const litre = (amount: number) => ({
+    scaledMinor: BigInt(amount) * 100_000_000n,
+    currency: 'AMD' as const,
+    unit: 'l' as const,
+  })
+  const place = (placeId: string, amount: number, day = '2026-09-12') => ({
+    placeId,
+    name: placeId === ZOVUNI ? 'Зовуни' : 'Ереван Сити',
+    unitPrice: litre(amount),
+    quantity: { milli: 1000n, unit: 'l' as const },
+    day,
+    observations: 1,
+  })
+  type Alternatives = Extract<OwnPrices, { level: 'take' }>['alternatives']
+  const marianna = {
+    itemId: MARIANNA,
+    name: 'Молоко Марианна',
+    level: 'take' as const,
+    rating: '4.5',
+    places: [place(ZOVUNI, 480, '2026-09-28')],
+  }
+  const history = (
+    places = [place(ZOVUNI, 540)],
+    alternatives: Alternatives = [],
+    itemId = milk.id,
+  ): OwnPrices => ({ itemId, level: 'take', rating: '4.0', places, alternatives })
+  const answered = (prices: OwnPrices): OwnPricesResponse => ({ where: erevan, prices })
+
+  const hint = (view: VueWrapper, which: 'item' | 'alternative' = 'item') =>
+    view.find(`[data-hint="${which}"]`)
+  const spaced = (text: string) => text.replace(/[\u00a0\u202f]/g, ' ')
+  /** Past the pause the hint waits for before following what is typed (adversarial Е). */
+  const settle = () => new Promise((resolve) => setTimeout(resolve, HINT_SETTLE_MS + 20))
+
+  async function priced(prices: OwnPrices, options: Options = {}) {
+    ownPrices.mockResolvedValue(answered(prices))
+    const rendered = await render(options)
+    await flushPromises()
+    return rendered
+  }
+
+  async function typed(view: VueWrapper, amount: string) {
+    await type(view, 'quantity', '1')
+    await type(view, 'amount', amount)
+    await settle()
+  }
+
+  it('asks by the record the server holds, and names the cheapest place before a price is typed (В-1)', async () => {
+    const { view } = await priced(history())
+
+    expect(ownPrices).toHaveBeenCalledWith({ item: milk.id, trip: TRIP })
+    expect(hint(view).classes()).toContain('hint-best')
+    expect(spaced(hint(view).text())).toBe('Дешевле всего брали в Зовуни — 540,00 ֏/л, 12.09')
+  })
+
+  it('asks by the city of a record still in the queue — the server has not seen it (review №1)', async () => {
+    useTripQueueStore().enqueue({
+      kind: 'start',
+      tripId: 'bbbbbbbb-0000-4000-8000-000000000042',
+      place: { kind: 'store', name: 'Зовуни' },
+      context: { ...erevan, spendCurrency: 'AMD', incomeCurrency: 'RUB' },
+      startedAt: new Date('2026-09-19T12:00:00.000Z'),
+    })
+    await priced(history(), { trip: null, server: null })
+
+    expect(ownPrices).toHaveBeenCalledWith({ item: milk.id, country: 'AM', city: 'Ереван' })
+  })
+
+  it('says where it was cheaper once a dearer price is typed and typing pauses', async () => {
+    const { view } = await priced(history())
+    await type(view, 'quantity', '1')
+    await type(view, 'amount', '620')
+    expect(hint(view).classes()).toContain('hint-best')
+
+    await settle()
+    expect(hint(view).classes()).toContain('hint-there')
+    expect(spaced(hint(view).text())).toBe('В Зовуни брали по 540,00 ֏/л — 12.09')
+  })
+
+  it('says «как в …» at the same price and «тут дешевле» below it (В-2)', async () => {
+    const { view } = await priced(history())
+    await typed(view, '540')
+    expect(hint(view).classes()).toContain('hint-same')
+
+    await typed(view, '510')
+    expect(hint(view).classes()).toContain('hint-cheaper')
+    expect(spaced(hint(view).text())).toBe('Тут дешевле — в Зовуни было 540,00 ֏/л, 12.09')
+  })
+
+  it('says «здесь же» when the record’s own place was the cheapest (Р-3)', async () => {
+    const { view } = await priced(history([place(HERE, 600, '2026-09-03')]))
+    await typed(view, '650')
+
+    expect(spaced(hint(view).text())).toBe('Здесь же брали по 600,00 ֏/л — 03.09')
+  })
+
+  it('names a cheaper item of the kind rated no worse, second (В-3)', async () => {
+    const { view } = await priced(history([place(ZOVUNI, 540)], [marianna]))
+    await typed(view, '620')
+
+    expect(spaced(hint(view, 'alternative').text())).toBe(
+      'Молоко Марианна — 480,00 ֏/л в Зовуни, 28.09 · оценка 4,5',
+    )
+  })
+
+  it('says nothing of «не брать нигде» (Т-3)', async () => {
+    const { view } = await priced({ itemId: milk.id, level: 'never' })
+    await typed(view, '620')
+
+    expect(view.find('.hint').exists()).toBe(false)
+  })
+
+  it('stands under the fields, inside the box of the figure (В-6)', async () => {
+    const { view } = await priced(history())
+    const order = view.findAll('[data-field], [data-hint]').map((node) => {
+      const field = node.attributes('data-field')
+      return field ?? `hint:${node.attributes('data-hint') ?? ''}`
+    })
+
+    expect(order).toEqual(['quantity', 'amount', 'hint:item'])
+    expect(hint(view).element.closest('.per-unit-box')).not.toBeNull()
+  })
+
+  describe('with no signal (В-5)', () => {
+    it('shows the answer remembered for this record’s city, asking nothing', async () => {
+      const first = await priced(history())
+      first.view.unmount()
+      ownPrices.mockClear()
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+
+      const { view } = await render()
+      await flushPromises()
+
+      expect(ownPrices).not.toHaveBeenCalled()
+      expect(hint(view).classes()).toContain('hint-best')
+    })
+
+    it('shows it when the connection goes while the answer is on its way (adversarial А)', async () => {
+      const first = await priced(history())
+      first.view.unmount()
+      ownPrices.mockImplementation(() => {
+        vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+        return Promise.reject(new TypeError('Failed to fetch'))
+      })
+
+      const { view } = await render()
+      await flushPromises()
+
+      expect(hint(view).classes()).toContain('hint-best')
+    })
+
+    it('shows it when the request is not answered with the connection said up', async () => {
+      const first = await priced(history())
+      first.view.unmount()
+      ownPrices.mockRejectedValue(new TypeError('Failed to fetch'))
+
+      const { view } = await render()
+      await flushPromises()
+
+      expect(hint(view).exists()).toBe(true)
+    })
+
+    it('shows nothing for a refusal that is the API’s own word, memory or not', async () => {
+      const first = await priced(history())
+      first.view.unmount()
+      const { ApiError } = await import('@molvia/client')
+      ownPrices.mockRejectedValue(new ApiError('error.internal', 'HTTP 500'))
+
+      const { view } = await render()
+      await flushPromises()
+
+      expect(view.find('.hint').exists()).toBe(false)
+    })
+
+    it('shows nothing with nothing remembered — never a loading or an error (Т-5)', async () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const { view } = await render()
+      await flushPromises()
+
+      expect(view.find('.hint').exists()).toBe(false)
+    })
+
+    it('forgets an alternative the server since answered «не брать нигде» (adversarial Б)', async () => {
+      const first = await priced(history([place(ZOVUNI, 540)], [marianna]))
+      first.view.unmount()
+      // The bot's reminder took Марианна to «1»; the phone hears it opening her own sheet.
+      const second = await priced(
+        { itemId: MARIANNA, level: 'never' },
+        { entry: { ...milk, id: MARIANNA, name: 'Молоко Марианна' } },
+      )
+      second.view.unmount()
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+
+      const { view } = await render()
+      await flushPromises()
+      await typed(view, '620')
+
+      expect(hint(view).exists()).toBe(false)
+      expect(hint(view, 'alternative').exists()).toBe(false)
+    })
+
+    it('never answers an amendment from memory, and asks leaving the row out (Т-9)', async () => {
+      const first = await priced(history())
+      first.view.unmount()
+      ownPrices.mockClear()
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const expense: TripExpenseView = {
+        id: 'eeeeeeee-0000-4000-8000-000000000001',
+        createdAt: new Date('2026-09-19T08:10:00.000Z'),
+        item: milk,
+        quantity: parseQuantity('1', 'l'),
+        amount: parseMoney('540', 'AMD'),
+        unitPrice: null,
+      }
+
+      const { view } = await render({ expense })
+      await flushPromises()
+      expect(view.find('.hint').exists()).toBe(false)
+
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+      ownPrices.mockResolvedValue(answered(history([])))
+      const online = await render({ expense })
+      await flushPromises()
+      expect(ownPrices).toHaveBeenLastCalledWith({ item: milk.id, trip: TRIP, except: expense.id })
+      expect(online.view.find('.hint').exists()).toBe(false)
+    })
   })
 })

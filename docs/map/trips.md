@@ -32,7 +32,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 
 ## backend · db
 
-- `backend/src/db/expenses-repository.ts` — Repository of purchases: rows of a trip, unrated ones — for the reminder, by days and not before a withdrawal (MOL-101) — and the price queries (cheapest, median) «Что брать» reads.
+- `backend/src/db/expenses-repository.ts` — Repository of purchases: rows of a trip, unrated ones — for the reminder, by days and not before a withdrawal (MOL-101) — the price queries (cheapest, median) «Что брать» reads, and the person's own last prices and items of a kind «Тут дешевле» reads (MOL-92).
 - `backend/src/db/places-repository.ts` — Repository of places: `ensure` one shop per name, reads by id, and the person's recent places.
 - `backend/src/db/settings-repository.ts` — Repository of the settings: one conditional `UPDATE` of the actor row against the form's base. Tests: `backend/tests/settings.integration.test.ts`.
 - `backend/src/db/trip-money.ts` — A trip's money in SQL (MOL-78): the receipt's sum, else the priced purchases per currency — the one fragment «Записаны», the month and the accounts read. Tests: `backend/tests/trip-receipt.integration.test.ts`.
@@ -61,7 +61,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 
 - `frontend/src/components/ManualEntryButton.vue` — «Записать покупки»: «Где вы?» with no record open, «Уже записываете — продолжить / закончить и начать новую» with one; on «Покупки» and the newcomer's «Что брать».
 - `frontend/src/components/PurchaseRow.vue` — One row of «Покупки»: icon, title, meta, sum and chevron, or «Продолжить» in its place.
-- `frontend/src/components/ItemDetailsSheet.vue` — Sheet «сколько, в чём, почём» every purchase goes through; writes to the trip queue and closes at once.
+- `frontend/src/components/ItemDetailsSheet.vue` — Sheet «сколько, в чём, почём» every purchase goes through; writes to the trip queue and closes at once; «Тут дешевле» in the box of the unit price (MOL-92).
 - `frontend/src/components/ReceiptField.vue` — The field of «Сумма по чеку» (MOL-78): one sum and its currency, shared by the sheet and the question of «Закончить».
 - `frontend/src/components/ReceiptSheet.vue` — Sheet «Сумма по чеку»: typed at any time into a record open or finished, «Убрать сумму»; writes to the trip queue.
 - `frontend/src/components/receipt.ts` — What was typed as «Сумма по чеку» — money above zero or nothing — and a sum put back into the field.

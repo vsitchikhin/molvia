@@ -47,6 +47,8 @@ vi.mock('@/api', () => ({
     // «Деньги», where an empty record is handed over as a spending (MOL-78, В-1).
     moneyMonth: () => new Promise(() => undefined),
     moneyAccounts: () => new Promise(() => undefined),
+    // «Тут дешевле» on the purchase sheet (MOL-92): never answered here.
+    ownPrices: () => new Promise(() => undefined),
   },
 }))
 

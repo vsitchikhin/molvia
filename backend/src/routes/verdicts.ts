@@ -1,12 +1,19 @@
 import { z } from 'zod'
 import {
+  ownNeverResponseSchema,
   pendingVerdictsCodec,
   ratingSchema,
   verdictAmendmentSchema,
   verdictCardCodec,
   verdictCardOf,
 } from '@molvia/model'
-import type { PendingVerdicts, Rating, Verdict, VerdictAmendment } from '@molvia/model'
+import type {
+  OwnNeverResponse,
+  PendingVerdicts,
+  Rating,
+  Verdict,
+  VerdictAmendment,
+} from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { parseBody, resourceId } from '@/parse'
 
@@ -20,6 +27,8 @@ export interface VerdictApi {
   amend(actorId: string, itemId: string, patch: VerdictAmendment): Promise<Verdict>
   withdraw(actorId: string, itemId: string): Promise<void>
   pending(actorId: string): Promise<PendingVerdicts>
+  /** One's own «не брать нигде» (MOL-92, adversarial Б′). */
+  never(actorId: string): Promise<OwnNeverResponse>
 }
 
 /** `no-store`: a verdict is personal, and the owner travels in a header. */
@@ -38,6 +47,15 @@ export function verdictRoutes(app: FastifyInstance, api: VerdictApi): void {
   app.get('/verdicts/pending', { exposeHeadRoute: false }, async (request, reply) => {
     const pending = await api.pending(request.actorId)
     return reply.header('cache-control', 'no-store').send(z.encode(pendingVerdictsCodec, pending))
+  })
+
+  /**
+   * The items this person rated «не брать нигде» themselves (MOL-92, adversarial Б′): what the
+   * phone lets go of in «Тут дешевле» remembered for no signal. Personal, never cached.
+   */
+  app.get('/verdicts/never', { exposeHeadRoute: false }, async (request, reply) => {
+    const never = await api.never(request.actorId)
+    return reply.header('cache-control', 'no-store').send(z.encode(ownNeverResponseSchema, never))
   })
 
   /**

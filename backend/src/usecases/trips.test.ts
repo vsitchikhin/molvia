@@ -144,6 +144,8 @@ function fakeRepositories(
       pendingVerdictsFor: unexpected('expenses.pendingVerdictsFor'),
       cheapestFor: unexpected('expenses.cheapestFor'),
       medianPriceFor: unexpected('expenses.medianPriceFor'),
+      ownLatestFor: unexpected('expenses.ownLatestFor'),
+      ownItemsOfKind: unexpected('expenses.ownItemsOfKind'),
       ...overrides.expenses,
     },
     places: {

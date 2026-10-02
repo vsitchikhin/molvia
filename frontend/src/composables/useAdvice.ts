@@ -7,6 +7,7 @@ import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { read, write } from '@/stores/storage'
+import { forgetOwnPrices } from '@/stores/ownPrices'
 
 /** `idle` — no identity, so there is nobody to advise. */
 export type AdvicePhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'offline'
@@ -87,6 +88,27 @@ function split(rows: readonly AdviceRow[]): AdviceGroups {
     else never.push(row)
   }
   return { take, if_cheap, never }
+}
+
+/**
+ * «Тут дешевле» remembered for no signal must not outlive a «не брать нигде» given anywhere — in the
+ * bot's reminder too, which never speaks to the phone (MOL-92, adversarial Б). The hint reads one's
+ * own verdicts (adversarial Д): in the own mode the list's levels are those, and with access they are
+ * an average of three — so the person's own are asked for (Б′), and a town's «1» over one's own «5»
+ * lets nothing go (review №6). A failure costs only the memory's freshness.
+ */
+function forgetOwnNever(owner: string, fresh: AdviceResponse): void {
+  if (fresh.scope === 'own') {
+    const never = fresh.rows.filter((row) => row.level === 'never').map((row) => row.itemId)
+    forgetOwnPrices(owner, never, { rated: false })
+    return
+  }
+  api
+    .ownNever()
+    .then(({ itemIds }) => {
+      forgetOwnPrices(owner, itemIds, { rated: false })
+    })
+    .catch(() => undefined)
 }
 
 /**
@@ -188,6 +210,7 @@ export function useAdvice(): Advice {
       failure.value = null
       confirmed.value = true
       remember()
+      forgetOwnNever(id, fresh)
     } catch {
       if (owner.value !== id || mine !== latest || location.value !== where) return
       // Decided after the failure, never narrowed from a check before the request: a

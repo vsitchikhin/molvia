@@ -33,6 +33,8 @@ import { verdictRoutes } from '@/routes/verdicts'
 import { sessionRoutes } from '@/routes/sessions'
 import { exchangeRoutes } from '@/routes/exchanges'
 import { advice, adviceSearch } from '@/usecases/advice'
+import { ownNever } from '@/usecases/own-never'
+import { ownPrices } from '@/usecases/own-prices'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
@@ -622,12 +624,26 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           advice({ actors, verdicts, expenses: tripData.expenses, events }, actorId),
         search: (actorId, query) =>
           adviceSearch({ actors, verdicts, expenses: tripData.expenses, items }, actorId, query),
+        prices: (owner, query) =>
+          ownPrices(
+            {
+              actors,
+              verdicts,
+              expenses: tripData.expenses,
+              items,
+              trips: tripData.trips,
+              places: tripData.places,
+            },
+            owner,
+            query,
+          ),
       })
       verdictRoutes(guarded, {
         rate: (actorId, itemId, rating) => rateItem({ items, verdicts }, actorId, itemId, rating),
         amend: (actorId, itemId, patch) => amendVerdict(verdicts, actorId, itemId, patch),
         withdraw: (actorId, itemId) => withdrawVerdict(verdicts, actorId, itemId),
         pending: (actorId) => pendingVerdicts(tripData.expenses, actorId),
+        never: (actorId) => ownNever(verdicts, actorId),
       })
       guardedDone()
     })

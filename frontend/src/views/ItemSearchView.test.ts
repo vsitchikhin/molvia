@@ -52,6 +52,8 @@ vi.mock('@/api', () => ({
     detachBarcode: (itemId: string, code: string) => detachBarcode(itemId, code),
     addExpense: (tripId: string, body: AddExpenseBody) => addExpense(tripId, body),
     currentTrip: () => currentTrip(),
+    // «Тут дешевле» on the purchase sheet (MOL-92): never answered here.
+    ownPrices: () => new Promise(() => undefined),
   },
 }))
 

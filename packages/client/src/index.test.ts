@@ -1201,6 +1201,54 @@ describe('the trip', () => {
 
       await expect(client.adviceSearch('сыр')).rejects.toThrow()
     })
+
+    it('asks «Тут дешевле» by the record, or by the city of one still queued (MOL-92)', async () => {
+      const zovuni = {
+        placeId: MARKET,
+        name: 'Зовуни',
+        unitPrice: { amount: '540.00000000', currency: 'AMD', unit: 'l' },
+        quantity: { value: '1.000', unit: 'l' },
+        day: '2026-09-12',
+        observations: 1,
+      }
+      const { client, calls } = clientReplying(200, {
+        where: { country: 'AM', city: 'Ереван' },
+        prices: { itemId: BEEF, level: 'unrated', places: [zovuni], alternatives: [] },
+      })
+
+      const answer = await client.ownPrices({ item: BEEF, trip: MARKET })
+      await client.ownPrices({ item: BEEF, country: 'AM', city: 'Ереван', except: MARKET })
+
+      const first = new URL(calls[0]?.url ?? '')
+      expect(first.pathname).toBe('/advice/prices')
+      expect(Object.fromEntries(first.searchParams)).toEqual({ item: BEEF, trip: MARKET })
+      expect(Object.fromEntries(new URL(calls[1]?.url ?? '').searchParams)).toEqual({
+        item: BEEF,
+        country: 'AM',
+        city: 'Ереван',
+        except: MARKET,
+      })
+      expect(answer.where?.city).toBe('Ереван')
+      expect(
+        answer.prices.level !== 'never' && answer.prices.places[0]?.unitPrice.scaledMinor,
+      ).toBe(54_000_000_000n)
+    })
+
+    it('asks one’s own «не брать нигде» of the verdicts (MOL-92, Б′)', async () => {
+      const { client, calls } = clientReplying(200, { itemIds: [BEEF] })
+
+      expect(await client.ownNever()).toEqual({ itemIds: [BEEF] })
+      expect(new URL(calls[0]?.url ?? '').pathname).toBe('/verdicts/never')
+    })
+
+    it('refuses a «не брать нигде» that arrived with a price in «Тут дешевле»', async () => {
+      const { client } = clientReplying(200, {
+        where: null,
+        prices: { itemId: BEEF, level: 'never', places: [] },
+      })
+
+      await expect(client.ownPrices({ item: BEEF, trip: MARKET })).rejects.toThrow()
+    })
   })
 })
 

@@ -22,6 +22,7 @@ import { useActorStore } from '@/stores/actor'
 import { useTripHistoryStore } from './tripHistory'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { recallRecordCity } from '@/stores/ownPrices'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import type { QueuedWrite } from '@/stores/tripQueue'
 
@@ -171,6 +172,15 @@ function otherWindow() {
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('trip queue', () => {
+  it('remembers the city a start carries, for «Тут дешевле» with no signal (MOL-92, А′)', () => {
+    const queue = fresh()
+    queue.enqueue(started(TRIP, 'Ереван Сити', here))
+    queue.enqueue(started(OTHER, 'Зовуни'))
+
+    expect(recallRecordCity(ME, TRIP)).toEqual({ country: 'AM', city: 'Гюмри' })
+    expect(recallRecordCity(ME, OTHER)).toBeNull()
+  })
+
   it('does not merge a captured start into a same-named shop without asking', async () => {
     startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_OPEN, 'open trip'))
     currentTrip.mockResolvedValue(answer('0', OTHER, null, 'Ереван Сити'))
