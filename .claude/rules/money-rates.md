@@ -290,7 +290,8 @@ rate exactly as before.
   sets it only beside its own day (review П-5). The server marks it; the phone compares nothing.
 - **On the card the market comes first and the central bank under it, a step quieter** (Р-5).
 - **«Обмены против рынка» sums each exchange as its card measures it** (MOL-152, folded into MOL-159,
-  owner's decisions В-1 «в», В-2 «а», В-3 «а»): the twelve months to today by place, worst first, at
+  owner's decisions В-1 «в», В-2 «а», В-3 «а»): the twelve months to today — from the same day a year
+  back (MOL-168, В-1 «б»), one window with the year of the line below — by place, worst first, at
   the top of «Обмен денег» — the card that stood on «Графики» against the official rate, where every
   rouble exchange read as a loss. **Against its own channel when the person named it, else the best
   of its day** (`market.own ?? market.best`, В-3): a place is compared with the market of its kind,
@@ -365,6 +366,31 @@ rate exactly as before.
   second exchange of a week out of reach of the keys. The scale is never stretched to a tick (review
   3): stretched to a tick rounded off a flat line, the line was pressed to the top. A market that
   would have given nothing has no mark.
+- **The line is read for the last month, half a year and the year, all three in one answer** (MOL-168,
+  owner's decisions of 02.10.2026, В-1 «б», В-2 «а», В-3 «а», В-4 «да»): `rateCharts`, each pair with
+  `periods` by months. **A period is the same day N months back** (`ratePeriodFrom`): the month of 2
+  October from 2 September, the 31st of March from the last of February — the calendar window that
+  was, eleven months and the days of this one, gave a month of two days on the 2nd. **The year is the
+  window of «Обмены против рынка» too**, so a point of it always has the percent of its place.
+  **The month is by days, half a year and the year by weeks** (Р-3): by weeks a month is four or five
+  points, by days half a year is dots 1,5 px apart. **A day is the latest row fresh for it, as a
+  week's end is** (`stepRate`, В-2 «а»): the bank publishes on working days, a Saturday is Friday's
+  figure — the very one an exchange of that Saturday is measured by — and the line steps flat over a
+  weekend rather than leaving it out. **Each period has its own scale and ticks**: a month of 4,20 to
+  4,25 is drawn by its own figures, not pressed under a spring of 4,90. **The pairs and their sides
+  are the year's for every period** (Р-1): a month with no exchange of a pair keeps the pair, its line
+  with no points. **One answer, not a parameter** (Р-2): with a parameter every write's answer must
+  know the period of the screen, and a change of it waits for the server — a skeleton under the switch,
+  nothing offline; the price is three charts in the answer — some 26 KB of JSON for a year of monthly
+  exchanges, before gzip. The series is read once, for the year. **A period with no figure while the
+  year has one is null, and the card stays** with its switches and says so in the height of the chart
+  (Р-6): gone with the card, the switch would have gone too, and the year with it. **The old field
+  `rateChart` is read and never used** (`z.unknown().optional()`, Р-4): the answer is strict, and
+  changed in shape it would refuse the answer of a server before MOL-168 whole; it goes with the next
+  task of money. On the phone the period is the screen's address (`?months=1`, `?months=6`, the year
+  with none, anything else the year, Р-5) and changes by `replace` — not scrolled, not animated,
+  nothing asked; **the switch is always there, under the pairs** (В-3 «а»); an exchange chosen by hand
+  stays chosen in a period that has it.
 
 ## Incomes
 
