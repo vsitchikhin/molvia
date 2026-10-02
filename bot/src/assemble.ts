@@ -1,4 +1,4 @@
-import { Bot } from 'grammy'
+import { Bot, GrammyError, HttpError } from 'grammy'
 import type { BotConfig, Context } from 'grammy'
 import { run, sequentialize } from '@grammyjs/runner'
 import type { RunnerHandle } from '@grammyjs/runner'
@@ -71,6 +71,61 @@ export function assembleBot(
 export const ALLOWED_UPDATES = ['message', 'callback_query', 'my_chat_member'] as const
 
 /**
+ * What a failure of a call to Telegram is, for the log: Telegram's code, or `network` — never the
+ * error itself. grammY's network error carries the request's address, and the bot's token is in it
+ * (MOL-142, adversarial round 2 Г2, round 3 Д2).
+ */
+export function telegramFailure(error: unknown): string {
+  if (error instanceof GrammyError) return String(error.error_code)
+  if (error instanceof HttpError) return 'network'
+  return 'unexpected'
+}
+
+/** The first pause between tries of a call to Telegram, and what it grows by each try. */
+export const RETRY_STEP_MS = 100
+
+/**
+ * Who the bot is, asked of Telegram before the runner starts (MOL-142, adversarial round 3 Д1).
+ * Left to the runner, it is grammY's `bot.init()`: a silent retry whose pause doubles up to twenty
+ * minutes, so a bot started while Telegram was away stayed deaf some seventeen minutes after it came
+ * back. Here the pause grows by a tenth of a second a try, as the runner's does, a 429 waits what
+ * Telegram asks, and every failure is logged by its kind. A 401 — the token revoked — is thrown:
+ * no retry mends it. A stop cuts the wait short and returns without the bot's identity.
+ */
+export async function introduce(bot: Bot, signal?: AbortSignal): Promise<void> {
+  for (let pause = RETRY_STEP_MS; !signal?.aborted; pause += RETRY_STEP_MS) {
+    let wait = pause
+    try {
+      // grammY types its signal by the `abort-controller` package; the platform's is the same thing.
+      bot.botInfo = await bot.api.getMe(signal as Parameters<typeof bot.api.getMe>[0])
+      return
+    } catch (error) {
+      if (signal?.aborted) return
+      if (error instanceof GrammyError && error.error_code === 401) throw error
+      console.error(`[molvia] telegram getMe: ${telegramFailure(error)}`)
+      if (error instanceof GrammyError && error.parameters.retry_after !== undefined) {
+        wait = error.parameters.retry_after * 1000
+      }
+    }
+    await pauseFor(wait, signal)
+  }
+}
+
+/** Waits `ms`, or less if `signal` aborts first. */
+async function pauseFor(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return
+  return new Promise((resolve) => {
+    const done = (): void => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', done)
+      resolve()
+    }
+    const timer = setTimeout(done, ms)
+    signal?.addEventListener('abort', done, { once: true })
+  })
+}
+
+/**
  * Long polling that actually runs handlers concurrently — the whole reason for the runner.
  *
  * A failed `getUpdates` is retried with a pause growing by a tenth of a second a try, not doubling
@@ -81,10 +136,8 @@ export const ALLOWED_UPDATES = ['message', 'callback_query', 'my_chat_member'] a
  * past the thirty seconds compose gives only after hours of Telegram down.
  */
 export function startBot(bot: Bot): RunnerHandle {
-  // The runner logs a failed `getUpdates` whole, and grammY's network error carries the request's
-  // address — the bot's token in it — into journald for fourteen days (MOL-142, adversarial round 2
-  // Г2). So the runner is silent, and the failure is logged here by its kind: Telegram's code, or
-  // `network`. A call cut short by a stop is not a failure.
+  // The runner logs a failed `getUpdates` whole, token and all (Г2), so it is silent and the
+  // failure is logged here by its kind. A call cut short by a stop is not a failure.
   bot.api.config.use(async (prev, method, payload, signal) => {
     if (method !== 'getUpdates') return prev(method, payload, signal)
     try {
@@ -92,7 +145,7 @@ export function startBot(bot: Bot): RunnerHandle {
       if (!result.ok) console.error(`[molvia] telegram getUpdates: ${String(result.error_code)}`)
       return result
     } catch (error) {
-      if (!signal?.aborted) console.error('[molvia] telegram getUpdates: network')
+      if (!signal?.aborted) console.error(`[molvia] telegram getUpdates: ${telegramFailure(error)}`)
       throw error
     }
   })

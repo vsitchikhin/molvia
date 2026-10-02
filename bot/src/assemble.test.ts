@@ -1,10 +1,11 @@
 import { format } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Bot, HttpError } from 'grammy'
 import type { Transformer } from 'grammy'
 import type { Update, UserFromGetMe } from 'grammy/types'
 import type { MolviaBotClient } from '@molvia/client'
 import type { LoginPreview } from '@molvia/model'
-import { assembleBot, startBot } from './assemble'
+import { assembleBot, introduce, startBot, telegramFailure } from './assemble'
 
 const BOT_INFO: UserFromGetMe = {
   id: 42,
@@ -149,5 +150,107 @@ describe('отказ getUpdates в журнале (MOL-142)', () => {
     expect(lines.length).toBeGreaterThanOrEqual(3)
     expect(new Set(lines)).toEqual(new Set(['[molvia] telegram getUpdates: network']))
     expect(lines.join('\n')).not.toContain('secret-token')
+  })
+})
+
+describe('кто бот — до раннера (MOL-142)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  /** A bot whose `getMe` answers by `telegram()`: itself, or a refusal with a code. */
+  function botAsking(telegram: () => 'up' | { code: number; retryAfter?: number }) {
+    const bot = new Bot('42:TEST')
+    const calls: number[] = []
+    const stub: Transformer = (_prev, method) => {
+      calls.push(Date.now())
+      const state = telegram()
+      if (method !== 'getMe' || state === 'up') {
+        return Promise.resolve({ ok: true, result: BOT_INFO }) as never
+      }
+      return Promise.resolve({
+        ok: false,
+        error_code: state.code,
+        description: 'refused',
+        ...(state.retryAfter === undefined
+          ? {}
+          : { parameters: { retry_after: state.retryAfter } }),
+      }) as never
+    }
+    bot.api.config.use(stub)
+    return { bot, calls }
+  }
+
+  it('Telegram лежал полчаса со старта — после возвращения бот знакомится за секунды (адверсариал, раунд 3 Д1)', async () => {
+    vi.useFakeTimers()
+    const lines: string[] = []
+    vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      lines.push(format(...args))
+    })
+    let down = true
+    const { bot, calls } = botAsking(() => (down ? { code: 502 } : 'up'))
+
+    const introduced = introduce(bot)
+    await vi.advanceTimersByTimeAsync(30 * 60_000)
+    expect(bot.isInited()).toBe(false)
+
+    down = false
+    const back = Date.now()
+    await vi.advanceTimersByTimeAsync(30_000)
+    await introduced
+
+    expect(bot.isInited()).toBe(true)
+    // grammY's own retry doubled its pause to twenty minutes; growing by a tenth of a second a
+    // try, half an hour of refusals leaves it at some twenty seconds.
+    expect((calls.at(-1) ?? Infinity) - back).toBeLessThan(30_000)
+    expect(new Set(lines)).toEqual(new Set(['[molvia] telegram getMe: 502']))
+  })
+
+  it('429 ждёт, сколько просит Telegram', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    let tries = 0
+    const { bot, calls } = botAsking(() => (tries++ === 0 ? { code: 429, retryAfter: 7 } : 'up'))
+
+    const introduced = introduce(bot)
+    await vi.advanceTimersByTimeAsync(6_999)
+    expect(calls).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1)
+    await introduced
+
+    expect(bot.isInited()).toBe(true)
+  })
+
+  it('401 — токен отозван: не повторяет, бросает', async () => {
+    const { bot, calls } = botAsking(() => ({ code: 401 }))
+
+    await expect(introduce(bot)).rejects.toMatchObject({ error_code: 401 })
+    expect(calls).toHaveLength(1)
+  })
+
+  it('остановка прерывает ожидание, и бот не представлен', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { bot } = botAsking(() => ({ code: 502 }))
+    const stopping = new AbortController()
+
+    const introduced = introduce(bot, stopping.signal)
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    stopping.abort()
+    await introduced
+
+    expect(bot.isInited()).toBe(false)
+  })
+
+  it('отказ Telegram в журнале — по виду; токен из адреса запроса не печатается (раунд 3 Д2)', () => {
+    const TOKEN = '123456:AAE-secret-token-of-the-bot'
+    const network = new HttpError(
+      "Network request for 'getUpdates' failed!",
+      new Error(`request to https://api.telegram.org/bot${TOKEN}/getUpdates failed`),
+    )
+
+    expect(telegramFailure(network)).toBe('network')
+    expect(telegramFailure(new Error(TOKEN))).toBe('unexpected')
   })
 })
