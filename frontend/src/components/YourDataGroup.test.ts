@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
@@ -24,10 +25,13 @@ const canShare = vi.fn<(data: ShareData) => boolean>()
 const views: VueWrapper[] = []
 
 async function render() {
+  // «Удалить мои данные» shares the store of «Выйти» (MOL-94).
+  const pinia = createPinia()
+  setActivePinia(pinia)
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/settings')
   const view = mount(YourDataGroup, {
-    global: { plugins: [router, createAppI18n('en')] },
+    global: { plugins: [pinia, router, createAppI18n('en')] },
     attachTo: document.body,
   })
   views.push(view)

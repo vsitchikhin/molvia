@@ -1,8 +1,10 @@
 import { z } from 'zod'
 import { DomainError, ERROR, actorCodec, exportFileCodec, yerevanDate } from '@molvia/model'
-import type { Actor, ExportFile } from '@molvia/model'
+import type { Actor, ExportFile, TelegramUserId } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
+import { clearSessionCookie } from '@/cookie'
 import { parseQuery } from '@/parse'
+import { refuseAnyBody } from './empty-body'
 
 /**
  * The entity leaves through its codec rather than as the object the repository built: in the
@@ -61,5 +63,32 @@ export function actorExportRoute(
         `attachment; filename="molvia-${yerevanDate(file.exportedAt)}.json"`,
       )
       .send(z.encode(exportFileCodec, file))
+  })
+}
+
+/**
+ * «Удалить мои данные» in the settings (MOL-94): the second door to the erasure behind the bot's
+ * `/delete`, and the same function behind it — the owner is the session's, and erasure is keyed
+ * by their Telegram id. A path with no owner in it, so IDOR is impossible by its shape.
+ *
+ * The session is the whole proof (owner's decision В-1): it already opens every row and the copy
+ * of them, and a stranger at a forgotten sign-in is answered by «Устройства». `DELETE` cannot be
+ * sent by another site's form, nor by its `fetch` without a preflight this API never grants, and
+ * `SameSite=Lax` withholds the cookie from both anyway.
+ *
+ * Every session goes with the person, so the cookie is put out here; a repeat finds no session and
+ * gets the guard's `401`, which the phone reads through its way-out intent, as after «Выйти».
+ */
+export function actorEraseRoute(
+  app: FastifyInstance,
+  erase: (telegramUserId: TelegramUserId) => Promise<void>,
+): void {
+  app.delete('/actors/me', { onRequest: refuseAnyBody }, async (request, reply) => {
+    parseQuery(z.strictObject({}), request.query)
+    const actor = request.actor
+    if (!actor) throw new DomainError(ERROR.NO_ACTOR)
+    await erase(actor.telegramUserId)
+    clearSessionCookie(reply)
+    return reply.code(204).send()
   })
 }

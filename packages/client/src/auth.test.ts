@@ -229,5 +229,36 @@ describe('устройства и выход (MOL-57)', () => {
       code: ISSUE.RESPONSE_INVALID,
       answered: false,
     })
+    await expect(client.eraseMe()).rejects.toMatchObject({
+      code: ISSUE.RESPONSE_INVALID,
+      answered: false,
+    })
+  })
+})
+
+describe('удаление из настроек (MOL-94)', () => {
+  it('идёт DELETE на /actors/me без тела и без владельца в адресе', async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+    const client = createClient({ baseUrl: '/api', fetch })
+
+    await client.eraseMe()
+
+    const [call] = fetch.mock.calls
+    expect(call?.[0]).toBe('/api/actors/me')
+    expect(call?.[1]?.method).toBe('DELETE')
+    expect(call?.[1]?.body).toBeUndefined()
+    expect(new Headers(call?.[1]?.headers).get('content-type')).toBeNull()
+  })
+
+  it('повтор без сессии приходит кодом no_actor', async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: ERROR.NO_ACTOR }), { status: 401 }),
+      )
+    const client = createClient({ baseUrl: '/api', fetch })
+    await expect(client.eraseMe()).rejects.toMatchObject({ code: ERROR.NO_ACTOR })
   })
 })
