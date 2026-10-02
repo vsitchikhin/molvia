@@ -1197,6 +1197,13 @@
     },
     "group_money": "Money",
     "group_reminders": "Reminders",
+    "group_scheme": "Theme",
+    "scheme": {
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark",
+      "hint": "Applies to this device only"
+    },
     "tap": {
       "offline": "Cannot save without a connection — the switch comes back with it.",
       "save_failed": "Not saved. Check the connection and try again.",

@@ -35,6 +35,42 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `currentColor` — they obey the tokens like anything else. The app icon is different:
   `frontend/public/favicon.svg` is the source, `make icons` rasterises the manifest PNGs,
   and the mark is a placeholder until there is real branding.
+- **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
+  settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
+  `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a
+  property of the screen, not of the account, so «Выйти» and erasure leave it, as they leave the
+  keyboard's height. **The person's choice wins both ways, by selectors, not by specificity** —
+  `:root` and `[data-scheme]` weigh the same, and until this task «Светлая» on a dark system stayed
+  dark, since the system's dark block lay on the root whatever the mark, and «Тёмная» on a light one
+  left `color-scheme` at `light dark` and drew native controls light; the dark block is
+  `:root:not([data-scheme='light'])` and the dark mark sets `color-scheme: dark`. **A script in the
+  head of `index.html` sets the mark before anything is painted** — after the theme colours, which
+  it points, before the styles: `main.ts` is a deferred module and the browser may paint before it,
+  so a dark screen would flash light at every launch. **It is the one reader of storage outside
+  `storage.ts`**, read-only and in `try/catch`, and reads as `read` does — the shared shelf, then
+  the tab's, the first value found; `useColorScheme.test.ts` runs the script itself and holds its
+  answer to the module's for every pair of shelves. **The status bar follows by `media`, not by
+  colour**: the two theme-color tags name their scheme (`data-scheme-of`), the chosen one gets
+  `all`, the other `not all`, «Системная» gives both their queries back — a copy of the colours in a
+  script would be a third place to drift from the tokens. **The manifest does not follow** — it is
+  read at install, iOS ignores its `theme_color`, Android takes it for the splash alone. **Every
+  choice is written, «Системная» too, on every shelf or none** (`writeEverywhere`): the shared shelf
+  is read first, and only an empty one lets a tab's own past through — with «Системная» a removed
+  key, a tab that missed it (unloaded, closed and brought back) came back dark at every reload
+  (adversarial В); and a shared shelf that refused the write but kept its past answered the choice
+  just left, after a reload (Б). **Other windows follow** on `storage`, and bring **only their own
+  shelf** in line (`writeOwn`): written back to the shared one, an event handled late put a stale
+  choice over a newer one and sent it round again (review С-3). **A key gone is not a choice**: it
+  goes when a full shared shelf refused a choice and lost its past, or the storage was cleared, and
+  read as «Системная» it put every other window in a scheme nobody chose (adversarial Б′) — the
+  window keeps its own, as its reload does. The control is `SegmentedControl` with `fit` — each
+  segment the width of its word, the semibold reserved under it so a tap moves nothing; the word
+  lies over its segment's hit area, so a tap on it lands on the label, **inside the track's own
+  stacking context** (`isolation`) — lifted without it, it rose over the pinned header too, drawn
+  through it and taking its taps (adversarial Д); even thirds on a 320 px phone left «Системная» (91
+  px) a pixel of its 92 (owner's В-1: «выбор шире»). Not in a card for the same reason. Taken on the
+  tap, nothing said: the screen is the answer; in every state of the screen, since it asks nothing
+  of the server.
 - **Every screen has four states:** loading, empty, error, offline. The empty state is not
   "no data" but an offer to act. They are drawn by two blocks and nothing else (MOL-19):
   `ScreenSkeleton` for loading, the screen giving the widths of its bars, and `ScreenState`

@@ -65,6 +65,8 @@
     <SalaryShiftGroup class="group" />
     <!-- The same, for the bot's rating reminders (MOL-103, Р-1). -->
     <RemindersGroup class="group" />
+    <!-- This device's own, not the account's: nothing goes to the server (MOL-111). -->
+    <SchemeGroup class="group" />
     <!-- Outside the form's states: the way into the account does not depend on whether its
          settings loaded (MOL-57). -->
     <section class="group">
@@ -159,6 +161,7 @@ import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import RemindersGroup from '@/components/RemindersGroup.vue'
 import SalaryShiftGroup from '@/components/SalaryShiftGroup.vue'
+import SchemeGroup from '@/components/SchemeGroup.vue'
 import SettingsFields from '@/components/SettingsFields.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
@@ -186,6 +189,7 @@ export default defineComponent({
     IconRefresh,
     RemindersGroup,
     SalaryShiftGroup,
+    SchemeGroup,
     ScreenSkeleton,
     ScreenState,
     SettingsFields,
