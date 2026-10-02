@@ -58,6 +58,7 @@
         :title="t('spending.charts.where_year_title')"
         :label="centreLabel"
         :note="both ? t('spending.charts.year_rate_note') : null"
+        :no-rate="noRate"
         :name-of="nameOf"
       />
 
@@ -260,17 +261,22 @@ export default defineComponent({
     const both = computed(() => charts.value?.spendCurrency !== charts.value?.incomeCurrency)
 
     /**
-     * The first year with anything in it, owner-wide, from this answer or any year kept on the phone
-     * (Р-9): so the arrow back is bounded while another year loads, and reaches the years kept when
-     * this one cannot be read — offline or the server failing (adversarial Ж, Ж′). Known from nothing
-     * — a newcomer, or nothing kept and nothing answered yet — it is this year: the arrow back went on
-     * to 2025, 2024… on an empty screen, a year read at every tap (adversarial Д).
+     * The first year with anything in it, as the freshest answer on the phone names it — the one
+     * shown or any year kept (Р-9). Kept years keep the arrow bounded while another year loads, and
+     * reachable when this one cannot be read — offline or the server failing (adversarial Ж, Ж′);
+     * the freshest wins, so a year kept before its data was moved or removed never outranks what the
+     * server says now (adversarial Л). Named by none — a newcomer, or nothing read yet — it is this
+     * year: the arrow back went on to 2025, 2024… on an empty screen (adversarial Д).
      */
     const first = computed(() => {
-      const firsts = [charts.value, ...kept.value].flatMap((one) =>
-        one?.firstMonth ? [one.firstMonth] : [],
+      const shown = charts.value
+      const at = fetchedAt.value
+      const all = [...(shown && at ? [{ answer: shown, fetchedAt: at }] : []), ...kept.value]
+      const freshest = all.reduce<(typeof all)[number] | null>(
+        (best, one) => (best === null || one.fetchedAt > best.fetchedAt ? one : best),
+        null,
       )
-      return firsts.sort()[0]?.slice(0, 4) ?? props.current
+      return freshest?.answer.firstMonth?.slice(0, 4) ?? props.current
     })
 
     /** Whether a month runs is the phone's calendar's to say, not the answer's (review 3 of MOL-158). */
@@ -303,6 +309,20 @@ export default defineComponent({
         categories: shown.categories.map((one) => one.category),
       }
       return data
+    })
+    /**
+     * «нет курса за август»: which months keep the year's «≈» from being counted (review 14), as
+     * «Пришло и ушло» names its own — read off the months, the phone counts nothing.
+     */
+    const noRate = computed(() => {
+      const missing = (charts.value?.months ?? []).filter(
+        (month) => month.kind === 'data' && month.spentIncome === null,
+      )
+      const [one] = missing
+      if (!one) return null
+      return missing.length === 1
+        ? t('spending.charts.year_no_rate_one', { month: monthName(one.month, locale.value) })
+        : t('spending.charts.year_no_rate_many', { n: missing.length }, missing.length)
     })
     const centreLabel = computed(() => {
       const n = charts.value?.monthsShown ?? 0
@@ -574,6 +594,7 @@ export default defineComponent({
       nameOf,
       ring,
       centreLabel,
+      noRate,
       sector,
       monthLabel,
       shortMonth,

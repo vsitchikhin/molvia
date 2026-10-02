@@ -542,6 +542,57 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     expect(view.find('.switcher').findAll('button')[0]?.attributes('aria-disabled')).toBe('true')
   })
 
+  it('the freshest answer names the first year, not a year kept before the data moved (adversarial Л)', async () => {
+    // A spending dated 2025 by mistake: «Год 2025» was read and kept while it stood.
+    vi.setSystemTime(new Date('2026-09-29T08:00:00Z'))
+    moneyChartYear.mockResolvedValueOnce(
+      yearCharts({ year: '2025', running: false, firstMonth: '2025-09' }),
+    )
+    ;(await render('/money/charts?mode=year&year=2025')).unmount()
+    vi.setSystemTime(new Date('2026-09-30T08:00:00Z'))
+
+    moneyChartYear.mockResolvedValue(yearCharts({ firstMonth: '2026-08' }))
+    const fixed = await render()
+    expect(fixed.find('.switcher').findAll('button')[0]?.attributes('aria-disabled')).toBe('true')
+    fixed.unmount()
+
+    moneyChartYear.mockResolvedValue(
+      yearCharts({ firstMonth: null, monthsShown: 0, slices: [], categories: [] }),
+    )
+    const newcomer = await render()
+    const buttons = newcomer.find('.switcher').findAll('button')
+    expect(buttons.map((one) => one.attributes('aria-disabled'))).toEqual(['true', 'true'])
+  })
+
+  it('a year with no sum says nothing under its «—», and blames no rate (adversarial М)', async () => {
+    moneyChartYear.mockResolvedValue(yearCharts({ spent: null, spentIncome: null, slices: [] }))
+    const view = await render()
+    const centre = view.find('.figure .center')
+    expect(centre.text()).toContain('—')
+    expect(centre.find('.center-sub').exists()).toBe(false)
+    expect(centre.text()).not.toContain(en.spending.charts.no_rate)
+  })
+
+  it('names the month that keeps the year’s «≈» from being counted (review 14)', async () => {
+    const base = yearCharts({ spentIncome: null })
+    const months = base.months.map((month) =>
+      month.month === '2026-08'
+        ? { ...month, spentIncome: null, spentIncomeLevel: null, difference: null }
+        : month,
+    )
+    moneyChartYear.mockResolvedValue({ ...base, months })
+    const one = await render()
+    expect(one.find('.figure .center-sub').text()).toBe('no rate for August')
+    one.unmount()
+
+    const both = base.months.map((month) =>
+      month.kind === 'data' ? { ...month, spentIncome: null, spentIncomeLevel: null } : month,
+    )
+    moneyChartYear.mockResolvedValue({ ...base, months: both })
+    const two = await render()
+    expect(two.find('.figure .center-sub').text()).toBe('no rate for 2 months')
+  })
+
   it('a category chosen in the list chooses its sector, or lets the sector go (owner’s Е)', async () => {
     moneyChartYear.mockResolvedValue(
       yearCharts({

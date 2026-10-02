@@ -18,10 +18,10 @@ export interface KeptAnswer<T> {
   readonly stale: ComputedRef<'loading' | 'offline' | 'error' | null>
   readonly fetchedAt: ComputedRef<Date | null>
   /**
-   * Every answer kept on this phone for the owner, of any subject — what the device knows beyond
-   * the subject shown (MOL-160, adversarial Ж′: the first year with data is in each of them).
+   * Every answer kept on this phone for the owner, of any subject, with when it was read — what the
+   * device knows beyond the subject shown (MOL-160, adversarial Ж′), and how fresh (adversarial Л).
    */
-  readonly kept: ComputedRef<readonly T[]>
+  readonly kept: ComputedRef<readonly Remembered<T>[]>
   readonly retry: () => Promise<void>
 }
 
@@ -37,7 +37,7 @@ export interface KeptAnswerOptions<T> {
   readonly kept?: number
 }
 
-interface Remembered<T> {
+export interface Remembered<T> {
   readonly answer: T
   readonly fetchedAt: Date
 }
@@ -99,13 +99,13 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
 
   const shown = shallowRef<Remembered<T> | null>(null)
   /** Every answer kept for the owner, read again whenever what is kept may have changed. */
-  const stored = shallowRef<readonly T[]>([])
+  const stored = shallowRef<readonly Remembered<T>[]>([])
   function recallKept(): void {
     const id = actor.id
     stored.value = id
       ? Object.keys(recallAll(id)).flatMap((name) => {
           const one = recall(id, name)
-          return one ? [one.answer] : []
+          return one ? [one] : []
         })
       : []
   }

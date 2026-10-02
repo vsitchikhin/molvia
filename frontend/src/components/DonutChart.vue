@@ -93,6 +93,8 @@ export default defineComponent({
     title: { type: String as PropType<string | null>, default: null },
     /** A last line under the legend — «Каждый месяц — по курсу того месяца». */
     note: { type: String as PropType<string | null>, default: null },
+    /** Under the total with no «≈»: which month had no rate (MOL-160, review 14); the month's own words if not named. */
+    noRate: { type: String as PropType<string | null>, default: null },
     nameOf: {
       type: Function as PropType<(category: SpendingCategoryView) => string>,
       required: true,
@@ -154,10 +156,14 @@ export default defineComponent({
         }
       }
       const spent = props.charts.spent
+      // No sum is no «≈» and no rate to blame (adversarial М): «нет курса» under «—» was untrue.
       return {
         label: props.label,
         figure: spent ? whole(spent) : '—',
-        sub: both.value ? (approx(props.charts.spentIncome) ?? t('spending.charts.no_rate')) : null,
+        sub:
+          both.value && spent
+            ? (approx(props.charts.spentIncome) ?? props.noRate ?? t('spending.charts.no_rate'))
+            : null,
       }
     })
 

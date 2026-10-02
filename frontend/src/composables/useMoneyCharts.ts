@@ -3,7 +3,7 @@ import { moneyChartMonthCodec, moneyChartYearCodec } from '@molvia/model'
 import type { MoneyChartMonthView, MoneyChartYearView } from '@molvia/model'
 import { api } from '@/api'
 import { useKeptAnswer } from '@/composables/useKeptAnswer'
-import type { KeptPhase } from '@/composables/useKeptAnswer'
+import type { KeptPhase, Remembered } from '@/composables/useKeptAnswer'
 
 export type ChartsPhase = KeptPhase
 
@@ -35,8 +35,8 @@ export interface MoneyChartYearState {
   readonly charts: ComputedRef<MoneyChartYearView | null>
   readonly stale: ComputedRef<'loading' | 'offline' | 'error' | null>
   readonly fetchedAt: ComputedRef<Date | null>
-  /** Every year kept on the phone: the first year with data is known before this one answers. */
-  readonly kept: ComputedRef<readonly MoneyChartYearView[]>
+  /** Every year kept on the phone, with when it was read: the first year is known before this one answers. */
+  readonly kept: ComputedRef<readonly Remembered<MoneyChartYearView>[]>
   readonly retry: () => Promise<void>
 }
 

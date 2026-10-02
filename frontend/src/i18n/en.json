@@ -548,6 +548,8 @@
       "where_year_title": "Where it went this year",
       "year_center": "{year} · {n} month | {year} · {n} months",
       "year_rate_note": "Each month at that month's rate",
+      "year_no_rate_one": "no rate for {month}",
+      "year_no_rate_many": "no rate for {n} month | no rate for {n} months",
       "year_change": "{change} against the average",
       "year_change_running": "{change} against the usual by {day}",
       "year_avg": "{amount} on average, {from} to {to}",
