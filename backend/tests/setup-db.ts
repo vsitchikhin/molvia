@@ -48,7 +48,7 @@ export async function setup(): Promise<void> {
   try {
     await migrate(drizzle(client), { migrationsFolder: MIGRATIONS })
     // A test database is where a skipped stamp shows first: it lives on between branches.
-    await assertEveryMigrationApplied(client, MIGRATIONS)
+    await assertEveryMigrationApplied(client, { migrationsFolder: MIGRATIONS })
   } finally {
     await client.end()
   }
