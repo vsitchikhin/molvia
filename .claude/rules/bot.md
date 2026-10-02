@@ -238,18 +238,23 @@ in `.scratch/tasks/requirements/MOL-103.md`.
 
 - **One column, `actors.reminders_off`, and it says why** (Р-2): empty is on, as every account
   starts; `chosen` — the person turned them off; `blocked` — they blocked the bot. Not a column of
-  `rating_reminders` (review Т-3): a ladder with nothing to ask about deletes its row, and the switch
-  would go with it. The reason is kept because the two end differently, and `switchReminders` in the
-  domain is the whole rule: **blocking does not overwrite «chosen», and unblocking turns on only what
-  blocking turned off** (В-1) — someone who said «не напоминать» and later unblocked the bot to sign
-  in is still not reminded. The person's own «on» clears either.
+  `rating_reminders` (review Т-3): a ladder with nothing to ask about deletes its row, and the
+  switch would go with it. The reason is kept because the two end differently, and `switchReminders`
+  in the domain is the whole rule: **blocking does not overwrite «chosen», and unblocking turns on
+  only what blocking turned off** (В-1) — someone who said «не напоминать» and later unblocked the
+  bot to sign in is still not reminded. The person's own «on» clears either.
 - **Off is off, whoever turned it** (Р-4): `candidates()` leaves them out, so nothing is planned,
   marked or counted; the claim checks it again under the owner's row. **The named price:** a switch
   committed after that check lets one evening go — `for key share` does not wait for it.
 - **Turned on, the ladder starts over** (Р-3): its row is deleted in the same transaction. Kept, a
   ladder switched off at step 1 in October and on in January finds step 2 «overdue» and asks about
-  everything since September; started over, it is a step 1 about yesterday. Under the owner's row
-  first, then the ladder — the order erasure takes them in (`privacy.md`).
+  everything since September; started over, it is a step 1 about yesterday. **Unless it reminded on
+  the person's today** (adversarial А): «Не напоминать» and «Вернуть» pressed by a slip of the
+  finger, or a block lifted ten minutes later, deleted the one row that says «already asked today»,
+  and the next minute asked the same questions again — the «at most once» of MOL-101 broken by its
+  most ordinary path, and the lever counting it twice. So the use case passes `now`, and a ladder
+  whose `reminded_on` is the person's today in their zone stays. Under the owner's row first, then
+  the ladder — the order erasure takes them in (`privacy.md`).
 - **In the app it is its own address, never the settings form** (Р-1):
   `/actors/me/reminders`, read and saved on the tap, as «Зарплата — в следующий месяц» is
   (MOL-134) and for the same two reasons — the form's four fields are also a trip's context, and
@@ -259,18 +264,28 @@ in `.scratch/tasks/requirements/MOL-103.md`.
   in the chat, not three — and once pressed **«Вернуть напоминания» takes its place** (В-3): it sits
   beside the scale, and a slip of the finger is one more press, not a trip to the app. Both are
   `ctx.from.id`'s, only in a private chat, and carry the action alone (`remind:off`, `remind:on`).
-  The API answers `204` for an account it does not know — «off» is true of nobody too — so there is
-  no «gone» to say.
+  The API answers `204` to «off» for an account it does not know — «off» is true of nobody too — and
+  **`404` to «on»** (adversarial В): «Напоминания снова включены» to an erased account was a false
+  statement about its data, so the bot says «аккаунта больше нет» over the message and takes the
+  buttons. **A press of the scale answered «gone» keeps the switch's row** (review №3): it is the
+  evening's only «Не напоминать», and the item gone is not the reminders gone.
 - **Two outcomes share the message and neither erases the other** (Р-7): a rating's after `✓`, the
   switch's from its own 🔕 or 🔔, in that order. The keyboard is rebuilt from the message's own
-  `reply_markup` (`keyboardOf`) — the bot keeps no state — so a press of the scale keeps the switch's
-  row and a press of the switch keeps the digit marked.
+  `reply_markup` (`keyboardOf`) — the bot keeps no state — so a press of the scale keeps the
+  switch's row and a press of the switch keeps the digit marked. **A message handed over without its
+  text** (`InaccessibleMessage`, adversarial Г) is not edited at all — read back as «no question»,
+  it was rewritten into the outcome alone, the question and the scale gone; the outcome goes as a
+  reply.
 - **Telegram says when the bot is blocked** (`my_chat_member` of a private chat): `kicked` turns the
   reminders off at once, `member` passes «unblocked» to the API, which decides what it turns on. **A
   403 while sending is the fallback** (Р-5), for a block the bot did not hear about while it was
-  down; a failure to report it is the log's, by its code — the next evening's 403 asks again. The
-  updates the bot polls for are named (`ALLOWED_UPDATES`): left to «the previous setting» a token
-  keeps, one once polled with a narrower list would never hear of a block.
+  down; a failure to report it is the log's, by its code — the next evening's 403 asks again. **So
+  is `/start`**: whoever writes to the bot has not blocked it, and Telegram keeps an unblock's
+  `my_chat_member` for a day at most — a bot down longer left `blocked` for good under a screen
+  saying «разблокируйте — и вернутся». Not waited for, so the login behind it does not stand in the
+  API's queue; «unblocked» never turns on «chosen». The updates the bot polls for are named
+  (`ALLOWED_UPDATES`): left to «the previous setting» a token keeps, one once polled with a narrower
+  list would never hear of a block.
 - **Turning off is counted** (В-4): `reminder_days` adds `off_button`, `off_settings` and
   `off_blocked` — people whose reminders went from on to off that day, by how, with no id — and
   `make gates` prints them under the lever, as counts and no verdict: whether the reminder annoys.

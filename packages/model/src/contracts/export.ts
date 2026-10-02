@@ -4,6 +4,7 @@ import { isoDate } from './trip'
 import { incomeSourceSchema } from '#model/entities/income'
 import { itemKindSchema } from '#model/entities/item'
 import { placeKindSchema } from '#model/entities/place'
+import { REMINDERS_OFF } from '#model/entities/reminder'
 import { spendingPresetSchema } from '#model/entities/spending-category'
 import { rateChoiceSchema } from '#model/entities/trip'
 import { decimalFromScaled, scaledFromDecimal } from '#model/support/decimal'
@@ -101,7 +102,7 @@ const accountSchema = z.strictObject({
   incomeCurrencySince: isoDate.nullable(),
   ratePreference: ratePreferenceSchema,
   salaryShiftDay: z.int().nullable(),
-  remindersOff: z.string().nullable(),
+  remindersOff: z.enum(REMINDERS_OFF).nullable(),
   sharedUntil: isoDate.nullable(),
   createdAt: isoDate,
   updatedAt: isoDate,
