@@ -186,9 +186,10 @@
           <span
             v-for="label in axisLabels"
             :key="label.key"
-            :class="['month', edges[label.key]]"
+            :class="['month', edges[label.key], { hidden: hidden[label.key] }]"
             :data-key="label.key"
             :data-x="label.x"
+            :data-names="label.names"
             :style="{ left: `${String(label.x / 10)}%` }"
           >
             {{ label.text }}
@@ -251,11 +252,8 @@ const FINGER_PX = 12
 const STACK_PX = 3
 /** Half the end of the mark, in thousandths of the plot's width. */
 const TICK = 14
-/**
- * Two names under the line nearer than this, in thousandths, run into one another — «апр» and «май»
- * of half a year begun on the 26th of April stood 10 px apart (review 1, adversarial А).
- */
-const LABEL_GAP = 120
+/** The least room between two names under the line, in pixels: closer, they read as one word. */
+const LABEL_SPACE_PX = 8
 
 /**
  * «Курс рубля за месяц, 6 и 12 месяцев» (MOL-161, MOL-168, handoff MOL-157 05, frames 6c and 6d):
@@ -552,28 +550,55 @@ export default defineComponent({
     const monthsBox = ref<HTMLElement | null>(null)
     /** The names laid from an end of the line rather than centred on their day, by key. */
     const edges = ref<Record<string, 'start' | 'end'>>({})
+    /** The names that give way to a neighbour they would run into, by key. */
+    const hidden = ref<Record<string, true>>({})
     let observer: ResizeObserver | undefined
 
     /**
      * A name is centred on its day, and laid from an end only when, centred, it would stand past the
      * line — by its own width and the line's, measured: a threshold in thousandths knows neither,
      * and laid «7 сент.» from its Monday two days in, over the 9th, while «22 февр.» a little further
-     * stood a pixel past the edge (review 2, adversarial Б, round 2 Б′).
+     * stood a pixel past the edge (review 2, adversarial Б, round 2 Б′). **Of two names that would
+     * run into each other, one gives way** — measured too, so on a 320 px phone «28 сент.» laid from
+     * the edge no longer lies over «5 окт.» (round 3, Н): the one laid from an end — a month the
+     * window holds the tail of, or today's — unless it alone names its month, which the other then
+     * does not; else the later. A name given way keeps its width (`visibility`), so measuring again
+     * finds the same.
      */
     function placeLabels(): void {
       const box = monthsBox.value
       if (!box) return
       const width = box.getBoundingClientRect().width
-      const next: Record<string, 'start' | 'end'> = {}
-      for (const node of box.querySelectorAll<HTMLElement>('.month')) {
+      const edgeOf: Record<string, 'start' | 'end'> = {}
+      const placed = [...box.querySelectorAll<HTMLElement>('.month')].flatMap((node) => {
         const key = node.dataset.key
-        if (!key) continue
+        if (!key) return []
         const at = (Number(node.dataset.x) * width) / CHART_LEVEL
-        const half = node.getBoundingClientRect().width / 2
-        if (at - half < 0) next[key] = 'start'
-        else if (at + half > width) next[key] = 'end'
+        const wide = node.getBoundingClientRect().width
+        const edge = at - wide / 2 < 0 ? 'start' : at + wide / 2 > width ? 'end' : null
+        if (edge) edgeOf[key] = edge
+        const left = edge === 'start' ? at : edge === 'end' ? at - wide : at - wide / 2
+        return [{ key, left, right: left + wide, edge, names: node.dataset.names === 'true' }]
+      })
+      const gone: Record<string, true> = {}
+      const kept: typeof placed = []
+      for (const label of placed) {
+        for (;;) {
+          const before = kept.at(-1)
+          if (!before || before.right + LABEL_SPACE_PX <= label.left) {
+            kept.push(label)
+            break
+          }
+          let yields = before.edge ? before : label
+          const other = yields === before ? label : before
+          if (yields.names && !other.names) yields = other
+          gone[yields.key] = true
+          if (yields === label) break
+          kept.pop()
+        }
       }
-      if (JSON.stringify(next) !== JSON.stringify(edges.value)) edges.value = next
+      if (JSON.stringify(edgeOf) !== JSON.stringify(edges.value)) edges.value = edgeOf
+      if (JSON.stringify(gone) !== JSON.stringify(hidden.value)) hidden.value = gone
     }
 
     function observeLabels(): void {
@@ -596,9 +621,10 @@ export default defineComponent({
           .filter(({ day }) => new Date(`${day}T00:00:00.000Z`).getUTCDay() === 1)
           .map(({ day, x }) => {
             const month = day.slice(0, 7)
-            const text = month === named ? String(Number(day.slice(8, 10))) : shortDay(day)
+            const names = month !== named
             named = month
-            return { key: day, x, text }
+            const text = names ? shortDay(day) : String(Number(day.slice(8, 10)))
+            return { key: day, x, text, names }
           })
       }
       const firsts: { month: string; x: number }[] = []
@@ -612,15 +638,15 @@ export default defineComponent({
       const named = firsts.filter(
         (_, index) => index % every === 0 || (index === last && last % every === every - 1),
       )
-      // A month the window holds only the tail of gives way to the next when they would touch: half
-      // a year from the same day may begin a week before a month does (review 1, adversarial А).
-      return named
-        .filter((label, index) => (named[index + 1]?.x ?? Infinity) - label.x >= LABEL_GAP)
-        .map((label) => ({
-          key: label.month,
-          x: label.x,
-          text: shortMonth(label.month, locale.value),
-        }))
+      // A month the window holds only the tail of gives way to the next when they would touch —
+      // half a year from the same day may begin a week before a month does (review 1, adversarial
+      // А): measured, in `placeLabels`.
+      return named.map((label) => ({
+        key: label.month,
+        x: label.x,
+        text: shortMonth(label.month, locale.value),
+        names: true,
+      }))
     })
     // The names change with the period and the pair, the line with the window and the screen; the
     // face comes after the first frame and widens them.
@@ -667,6 +693,7 @@ export default defineComponent({
       axisLabels,
       monthsBox,
       edges,
+      hidden,
       pairOptions,
       periodOptions,
       TICK,
@@ -931,6 +958,11 @@ export default defineComponent({
 
   &.end {
     transform: translateX(-100%);
+  }
+
+  /* Given way to a neighbour: still measured, never seen. */
+  &.hidden {
+    visibility: hidden;
   }
 }
 

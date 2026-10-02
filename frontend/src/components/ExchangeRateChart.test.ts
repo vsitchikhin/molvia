@@ -132,6 +132,23 @@ const calendarDayOf = (day: string) => calendarDay(day, 'ru', { day: 'numeric', 
 /** `Intl` puts a no-break space before «%»: read as the eye reads it. */
 const plain = (text: string | undefined) => text?.replaceAll('\u00a0', ' ')
 
+/** A line `line` px wide, a name 6 px a letter — the widths a phone measures, which happy-dom has not. */
+function measured(line = 300): void {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    const width = this.classList.contains('months') ? line : this.textContent.trim().length * 6
+    return { left: 0, top: 0, width, height: 20 } as DOMRect
+  })
+}
+
+/** The names under the line a person sees: those given way are there, unseen. */
+const seen = (view: ReturnType<typeof chart>['view']) =>
+  view
+    .findAll('.month')
+    .filter((label) => !label.classes().includes('hidden'))
+    .map((label) => label.text())
+
 const reading = (view: ReturnType<typeof chart>['view']) =>
   view.find('.reading').text().replace(/\s+/g, ' ')
 
@@ -739,8 +756,9 @@ describe('ExchangeRateChart by period (MOL-168)', () => {
     expect(view.find('.note').exists()).toBe(false)
   })
 
-  it('names no month of half a year whose tail alone the window holds next to the next (review 1, А)', () => {
-    // From Sunday the 26th of April: May begins a week in, 38 thousandths on.
+  it('gives way the month of half a year whose tail alone the window holds (review 1, А)', async () => {
+    measured()
+    // From Sunday the 26th of April: May begins a week in, 38 thousandths — 11 px — on.
     const days = ['2026-04-26', '2026-05-03', '2026-05-31', '2026-06-28', '2026-07-26']
     const steps = days.map((day, index) => ({
       day,
@@ -749,17 +767,57 @@ describe('ExchangeRateChart by period (MOL-168)', () => {
       level: 500,
     }))
     const { view } = chart([rouble({}, { 6: year({ steps, exchanges: [] }) })], 6)
-    expect(view.findAll('.month').map((label) => label.text())).toEqual(['май', 'июн', 'июл'])
+    await view.vm.$nextTick()
+    expect(seen(view)).toEqual(['май', 'июн', 'июл'])
+  })
+
+  it('gives way the name laid from an end when two run into each other (round 3, Н)', async () => {
+    measured(206)
+    // A 320 px phone: «28 сент.» laid from the start, «5 окт.» a week — 49 px — on.
+    const days = ['2026-09-28', '2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26']
+    const steps = days.map((day, index) => ({
+      day,
+      rate: rate('4.50', day),
+      x: index * 241,
+      level: 500,
+    }))
+    const { view } = chart([rouble({}, { 1: month({ steps, exchanges: [] }) })], 1)
+    await view.vm.$nextTick()
+    expect(seen(view)).toEqual(['5 окт.', '12', '19', '26'])
+  })
+
+  it('keeps the name of the month when the plain day beside it is the one in the way', async () => {
+    measured(206)
+    // «7 сент.» laid from the start and «14» 18 px on: the day gives way, the month stays named.
+    const days = ['2026-09-07', '2026-09-14', '2026-09-21']
+    const steps = days.map((day, index) => ({
+      day,
+      rate: rate('4.50', day),
+      x: [0, 87, 500][index] ?? 0,
+      level: 500,
+    }))
+    const { view } = chart([rouble({}, { 1: month({ steps, exchanges: [] }) })], 1)
+    await view.vm.$nextTick()
+    expect(seen(view)).toEqual(['7 сент.', '21'])
+  })
+
+  it("gives way today's month laid from the end of half a year to the one before (round 3, Н2)", async () => {
+    measured(206)
+    const days = ['2026-09-06', '2026-12-06', '2027-02-07', '2027-03-01']
+    const steps = days.map((day, index) => ({
+      day,
+      rate: rate('4.50', day),
+      x: [0, 500, 878, 1000][index] ?? 0,
+      level: 500,
+    }))
+    const { view } = chart([rouble({}, { 6: year({ steps, exchanges: [] }) })], 6)
+    await view.vm.$nextTick()
+    expect(seen(view)).toEqual(['сен', 'дек', 'фев'])
   })
 
   it('lays a name from an end only when, centred, it would stand past the line (review 2, Б, Б′)', async () => {
-    // A line of 300 px; a name 6 px a letter, «7 мар.» 36 px — the widths a phone measures.
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
-      this: HTMLElement,
-    ) {
-      const width = this.classList.contains('months') ? 300 : this.textContent.trim().length * 6
-      return { left: 0, top: 0, width, height: 20 } as DOMRect
-    })
+    // A line of 300 px; «2 мар.» 36 px.
+    measured()
     const at = async (x: number) => {
       const days = ['2026-02-28', '2026-03-01', '2026-03-02', '2026-03-03']
       const steps = days.map((day, index) => ({

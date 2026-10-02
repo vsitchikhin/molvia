@@ -400,11 +400,13 @@ rate exactly as before.
   in a period that has it. **A name under the line is centred on its day**, laid from an end only
   when, centred, it would stand past the line — by its measured width and the line's, never a
   threshold in thousandths, which laid «7 сент.» two days in from its Monday and let «22 февр.»
-  stand a pixel past the edge (round 2, Б′) — and **a month the window holds the tail of gives way
-  to the next within `LABEL_GAP`** (review 1, 2, adversarial А, Б): half a year begun on the 26th of
-  April put «апр» and «май» 10 px apart, and «7 сент.», laid from its Monday as the first name of a
-  year is, stood over the 9th. With no chart in a period the note under it goes too: it speaks of a
-  tap.
+  stand a pixel past the edge (round 2, Б′). **Of two names that would run into each other, one
+  gives way**, measured as well, with `LABEL_SPACE_PX` between them (review 1, 2, adversarial А, Б,
+  round 3 Н): the one laid from an end — a month the window holds the tail of, or today's — unless
+  it alone names its month, else the later; it keeps its width, unseen. Half a year begun on the
+  26th of April put «апр» and «май» 10 px apart; on a 320 px phone «28 сент.» laid from the edge lay
+  over «5 окт.», which a threshold in thousandths, `LABEL_GAP`, knew nothing of. With no chart in a
+  period the note under it goes too: it speaks of a tap.
 
 ## Incomes
 
