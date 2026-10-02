@@ -6,6 +6,7 @@ import { settleColdStart } from '@/navigation'
 import { router } from '@/router'
 import { installArrival, installHeightHold, installViewTransitions } from '@/transitions'
 import { installSheetEntryGuard } from '@/composables/useSheetHistory'
+import { installColorScheme } from '@/composables/useColorScheme'
 import { sessionEnded, useActorStore } from '@/stores/actor'
 import { forgetTheInviteDoor } from '@/stores/identity'
 import { onMissingActor, onServerVersion } from '@/api'
@@ -52,6 +53,10 @@ const app = createApp(App)
 // chosen locale is anything else. Done here rather than as a side effect of importing i18n:
 // a module that rewrites the document on import makes import order matter where it should not.
 applyDocumentLang()
+
+// The script in `index.html` has drawn the stored scheme already; this keeps it, and follows the
+// other windows of the app when one of them changes it (MOL-111).
+installColorScheme()
 
 // Nothing swallows a render error otherwise, and on a phone at a shelf a blank screen
 // is indistinguishable from a slow one. The console is the honest destination until
