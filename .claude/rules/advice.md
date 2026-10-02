@@ -218,9 +218,11 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   with it. **«Ещё» is own city first across pairs too** (Р-26, adversarial Ж′). **At a place of
   one's own, freshness and the last visit are one's own purchases, as its price is** (adversarial М,
   owner's decision): with access, other people's packs made a two-year-old price of mine head the
-  row. The price of Р-27, named (owner's decision on review №10): the first pair also gives the
-  threshold of «только если дёшево», so one pack bought at home over ten kilos in Erevan leaves the
-  row without a threshold until the pack's pair has three purchases.
+  row. **So are the purchases and the visit it votes for its pair with** (adversarial М′, owner's
+  decision): a place opened by others still votes with all of theirs, as Д decided. The price of
+  Р-27, named (owner's decision on review №10): the first pair also gives the threshold of «только
+  если дёшево», so one pack bought at home over ten kilos in Erevan leaves the row without a
+  threshold until the pack's pair has three purchases.
 - **Order is by rating down, then by name, in all three groups.** The handoff asked for
   ascending unit price; that sorts _different products_ by a number — milk at 570 ֏/л above
   beef at 4 790 ֏/кг — and «compare by unit price» is about one item across places.
