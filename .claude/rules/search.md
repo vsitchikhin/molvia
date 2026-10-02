@@ -404,6 +404,11 @@ shows what it moves.
   revision, and one of another model is never read and is written again. One row per item, HNSW by
   cosine on half precision; the query asks the index for sixty neighbours, and `hnsw.ef_search` is
   set as long, locally beside the threshold, or the index answers fewer.
+  **Measured on 20 000 names** (the seed with thirty-four makers each, real vectors, a Mac): the
+  meaning adds 2–8 ms to the statement — «мо» 52 ms against 55, «мясо», the heaviest, 141 against
+  146, «бытовая химия» 22 against 30; the vector of a query not seen before is some 20 ms there and
+  45 on the VPS, and typing letter by letter reads it from the cache. The budget — not to double a
+  two-letter query — holds with room to spare.
 - **Where a name found by meaning stands** (owner's decision В-3): after everything within one edit
   by the mean, before two edits — `MEANING_DISTANCE`, the nearer by meaning first; so nothing the
   letters found within one edit moves, and an answer with such a name is near. «молоко» keeps every
@@ -425,9 +430,15 @@ shows what it moves.
   «молочка» shows «Мука» and «Мочалка» above the milk two edits away, for a keystroke. «молочка»
   reaches the milks and not the kefir or the curd — the name alone goes into the vector (В-4), and
   the kefir stays below the threshold; a section of the seed as data would be a task of its own.
-  **Armenian and Georgian shelf words find almost nothing** — «կաթնամթերք» is «Матнакаш» to the
-  model, below the threshold; Armenian names are still found by their letters through the alphabet
-  above. Borderline words fall either way: «детское питание» reaches its shelf at 0.40 and 0.39.
+  **Armenian and Georgian shelf words find the wrong thing, near** — the model reads them by their
+  spelling: «կաթնամթերք» is «Матнакаш», «ձուկ» «Лук-порей», «ბოსტნეული» «Бастурма», and Serbian
+  «meso» «Пакеты мусорные»; others find nothing. Armenian names are still found by their letters
+  through the alphabet above. Russian words of a shelf with no word of its kind in the names find
+  nothing — «бытовая химия», «гигиена», «приправы». Eight words of the corpus have their nearest
+  name within 0.006 of the threshold, and five of them answer otherwise on x86 — CI and production —
+  than on a Mac's ARM: the model's arithmetic differs in its last digits, so «выпивка» finds «Водка»
+  in production and nothing on a Mac. Those carry both answers seen. All of it is pinned
+  word by word — `SHELF_WORDS` and `SEED_ABSENT` of the corpus, `search-meaning.integration.test.ts`.
 - **The vectors are also the ground the merging of duplicates stands on** (MOL-106): two names close
   by spelling and by meaning, with every number equal.
 
