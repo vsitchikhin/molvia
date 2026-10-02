@@ -308,6 +308,32 @@ rate exactly as before.
   write's answer** (В-2): a written exchange is in the sum at once; defaulted (`null`) for a server
   before it. No «≈ ₽» under the sum (review Р-7 of MOL-157): past differences at today's rate would
   creep with the rate.
+- **«Курс рубля за 12 месяцев» stands under it, and its line is all bank clients** (MOL-161, handoff
+  MOL-157 05, owner's decisions В-1, В-2 of 02.10.2026): the market at the end of every week of the
+  same window as «Обмены против рынка» — Sundays and today, each week the latest row fresh for it by
+  `OFFICIAL_RATE_FRESH_DAYS`, a week with none a gap, never a zero. **Only `banksAll` has a year of
+  history** — people's cash and non-cash are collected from 30.09.2026, the exchange offices come a
+  week at a time with no archive — so the legend names it («Рынок · все клиенты банков», Р-3): for
+  the rouble it runs some 2.6 % above cash, and unnamed it read as the market the person changed at.
+  **A point is the person's exchange on its own day, measured as its card measures it** — `market.own
+?? market.best` of the list, the percent `hundredthsOf` the difference and what the market would
+  have given, as a place of one in «Обмены против рынка» (Р-4) — **and the mark from it ends at that
+  market, never at the line** (В-1): roubles sold for cash at 4,15 when banks bought cash at 4,110 and
+  all clients near 4,22 are «+0,97 %», and a mark to the line said the opposite. The line is the
+  background, where the market went; with no market of the day a point has no mark and says so.
+  **The line is on the side of the pair's latest exchange in the window** (В-2), the others of the
+  pair not drawn: the bank's selling rate is another line, and a purchase of roubles set on the line
+  of their sale looked a windfall. **The pairs are the currencies changed against the dram in the
+  window**, the currency of conversion first; with none, the currency of conversion alone, a line with
+  no points, unless it is the dram; a pair with no figure in any week is left out, and with none left
+  there is no card (`rateChart: null`). **Every height, position, percent and tick is the server's**
+  (`rateChart`, `exchange-rate-chart.ts`): three ticks a step of 1, 2, 3 or 5 × 10ⁿ apart within the
+  figures, multiples of that power — «4,30 · 4,60 · 4,90» — or one when none fit two digits; the phone
+  names the months. It comes with `GET /exchanges` and every write's answer, as `losses` does, and
+  is defaulted for a server before it. The finger chooses as on every chart of the section
+  (`useChartPointer`): the nearest week, and its exchange nearest the finger when it had one; the
+  latest exchange by default. **A hidden radio for each week with no exchange and for each exchange**
+  (Р-6): one per week left the second exchange of a week out of reach of the keys.
 
 ## Incomes
 

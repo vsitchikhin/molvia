@@ -402,8 +402,7 @@ MOL-74's unless they name MOL-160, and hold for the year.
   Compared against what this screen asked for, never the app-wide `lastCategory`.
 - **The rate of the pair is no chart of «Графики» since MOL-160** (Р-11): `RateLine`, the weeks of
   `rate` and `weekEnds` went with the code and the tests; «Обмен денег» draws the rouble's against
-  the market in MOL-161. Until then the app has no line of the rate — the price, named, of a chart
-  the owner had asked to be taken away (MOL-155).
+  the market since MOL-161 (`money-rates.md`).
 - **A bar is the month of «Деньги», never a second count** (requirements 4): every month of the
   year goes through `countMonth` — the function `GET /money/months/:month` counts one by — with
   the same rate of the month (`monthRate`), so reading the charts freezes a closed month exactly as
