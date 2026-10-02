@@ -425,9 +425,13 @@ shows what it moves.
   «молочка» shows «Мука» and «Мочалка» above the milk two edits away, for a keystroke. «молочка»
   reaches the milks and not the kefir or the curd — the name alone goes into the vector (В-4), and
   the kefir stays below the threshold; a section of the seed as data would be a task of its own.
-  **Armenian and Georgian shelf words find almost nothing** — «կաթնամթերք» is «Матнакаш» to the
-  model, below the threshold; Armenian names are still found by their letters through the alphabet
-  above. Borderline words fall either way: «детское питание» reaches its shelf at 0.40 and 0.39.
+  **Armenian and Georgian shelf words find the wrong thing, near** — the model reads them by their
+  spelling: «կաթնամթերք» is «Матнакаш», «ձուկ» «Лук-порей», «ბოსტნეული» «Бастурма», and Serbian
+  «meso» «Пакеты мусорные»; others find nothing. Armenian names are still found by their letters
+  through the alphabet above. Russian words of a shelf with no word of its kind in the names find
+  nothing — «бытовая химия», «гигиена», «приправы». Eight words of the corpus have their nearest
+  name within 0.006 of the threshold and fall either way on another machine. All of it is pinned
+  word by word — `SHELF_WORDS` and `SEED_ABSENT` of the corpus, `search-meaning.integration.test.ts`.
 - **The vectors are also the ground the merging of duplicates stands on** (MOL-106): two names close
   by spelling and by meaning, with every number equal.
 
