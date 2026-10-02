@@ -441,6 +441,8 @@
     "subtitle": "Видите только вы",
     "month_prev": "Предыдущий месяц",
     "month_next": "Следующий месяц",
+    "year_prev": "Предыдущий год",
+    "year_next": "Следующий год",
     "spent": "Потрачено",
     "vs_previous": "{percent} к {month}",
     "month_to": {

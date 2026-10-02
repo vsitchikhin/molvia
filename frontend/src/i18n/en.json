@@ -441,6 +441,8 @@
     "subtitle": "Only you can see this",
     "month_prev": "Previous month",
     "month_next": "Next month",
+    "year_prev": "Previous year",
+    "year_next": "Next year",
     "spent": "Spent",
     "vs_previous": "{percent} vs {month}",
     "month_to": {

@@ -127,6 +127,42 @@ describe('BarChart (MOL-74)', () => {
   })
 })
 
+describe('BarChart — quiet months (MOL-160)', () => {
+  const year: ChartBar[] = ['2026-07', '2026-08', '2026-09'].map((key, index) => ({
+    key,
+    label: ['июл', 'авг', 'сен'][index] ?? '',
+    spoken: key,
+    level: index === 1 ? 1000 : 0,
+    quiet: index !== 1,
+  }))
+
+  it('keeps the label of a month before the data or to come, with no bar and no radio', () => {
+    const view = chart({ bars: year, modelValue: 1 })
+    expect(view.findAll('.label').map((label) => label.text())).toEqual(['июл', 'авг', 'сен'])
+    expect(view.findAll('.bar.quiet')).toHaveLength(2)
+    expect(view.findAll('.fill')).toHaveLength(1)
+    expect(
+      view.findAll('input[type="radio"]').map((radio) => radio.attributes('aria-label')),
+    ).toEqual(['2026-08'])
+  })
+
+  it('a finger lifted over a quiet month chooses nothing', () => {
+    const view = chart({ bars: year, modelValue: 1 })
+    const area = view.find('.area').element
+    area.dispatchEvent(pointer('pointerdown', 250, { pointerType: 'touch', clientY: 50 }))
+    area.dispatchEvent(pointer('pointerup', 250, { pointerType: 'touch', clientY: 50 }))
+    expect(view.emitted('update:modelValue')).toBeUndefined()
+  })
+
+  it('draws the average over the bars, not under them (handoff MOL-157 04)', () => {
+    const view = chart({ average: 500 })
+    const average = view.find('.average')
+    expect(average.attributes('style')).toContain('height: 50%')
+    // First in the area, so only a stacking of its own puts it over the bars that follow.
+    expect(view.find('.area').element.firstElementChild).toBe(average.element)
+  })
+})
+
 describe('RateLine (MOL-74, Р-14)', () => {
   const points = [
     { level: 0, spoken: 'a' },

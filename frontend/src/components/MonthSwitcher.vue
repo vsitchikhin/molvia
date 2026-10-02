@@ -2,16 +2,17 @@
   <AppCard class="switcher">
     <AppButton
       variant="icon"
-      :label="t('spending.month_prev')"
+      :label="t(unit === 'year' ? 'spending.year_prev' : 'spending.month_prev')"
       class="step"
-      @click="$emit('change', previous)"
+      :inactive="!previous"
+      @click="previous && $emit('change', previous)"
     >
       <IconLeft />
     </AppButton>
     <h2 class="month">{{ title }}</h2>
     <AppButton
       variant="icon"
-      :label="t('spending.month_next')"
+      :label="t(unit === 'year' ? 'spending.year_next' : 'spending.month_next')"
       class="step"
       :inactive="!next"
       @click="next && $emit('change', next)"
@@ -23,6 +24,7 @@
 
 <script lang="ts">
 import { computed, defineComponent } from 'vue'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconLeft from '~icons/mdi/chevron-left'
 import IconRight from '~icons/mdi/chevron-right'
@@ -39,8 +41,9 @@ function nextMonth(month: string): string {
 }
 
 /**
- * «‹ Сентябрь 2026 ›» (MOL-82, handoff 01). The future is not a month to look at; the past has no
- * lower bound — the server names no first month, and an empty one says so itself (Р-1). No swipe:
+ * «‹ Сентябрь 2026 ›» (MOL-82, handoff 01), or «‹ 2026 ›» (MOL-160). The future is not a month to
+ * look at; the past of a month has no lower bound — the server names no first month, and an empty one
+ * says so itself (Р-1) — and of a year goes back as far as there is anything (Р-9). No swipe:
  * a gesture here would fight the system «back» on iOS.
  */
 export default defineComponent({
@@ -50,16 +53,34 @@ export default defineComponent({
     month: { type: String, required: true },
     /** This month in Yerevan: the last one there is to see. */
     current: { type: String, required: true },
+    /**
+     * «‹ 2026 ›» (MOL-160, handoff MOL-157 07): `month` and `current` are then years, `YYYY`.
+     */
+    unit: { type: String as PropType<'month' | 'year'>, default: 'month' },
+    /**
+     * The first there is to see; null — no lower bound. The year has one, the first year with
+     * anything in it (Р-9); the month has none, since the server names no first month (Р-1).
+     */
+    first: { type: String as PropType<string | null>, default: null },
   },
   emits: ['change'],
   setup(props) {
     const { t, locale } = useI18n()
     const title = computed(() => {
+      if (props.unit === 'year') return props.month
       const text = monthOf(props.month, locale.value)
       return text.charAt(0).toLocaleUpperCase(locale.value) + text.slice(1)
     })
-    const previous = computed(() => previousMonth(props.month))
-    const next = computed(() => (props.month < props.current ? nextMonth(props.month) : null))
+    const step = (by: number) =>
+      props.unit === 'year'
+        ? String(Number(props.month) + by)
+        : by < 0
+          ? previousMonth(props.month)
+          : nextMonth(props.month)
+    const previous = computed(() =>
+      props.first !== null && props.month <= props.first ? null : step(-1),
+    )
+    const next = computed(() => (props.month < props.current ? step(1) : null))
     return { t, title, previous, next }
   },
 })
