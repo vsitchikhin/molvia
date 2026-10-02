@@ -1,4 +1,4 @@
-import type { OwnPlacePrice, OwnPricesResponse } from '#model/contracts/advice'
+import type { OwnPlacePrice, OwnPrices } from '#model/contracts/advice'
 import type { Currency } from '#model/values/money'
 import { compareUnitPrice } from '#model/values/units'
 import type { BaseUnit, UnitPrice } from '#model/values/units'
@@ -9,7 +9,7 @@ import type { BaseUnit, UnitPrice } from '#model/values/units'
  *
  * - `best` — nothing typed yet: where it was cheapest, said plainly (В-1);
  * - `there` — typed dearer: where it was cheaper;
- * - `same` — typed at that very price (В-2);
+ * - `same` — typed at that price, within `SAME_PRICE_PERMILLE` (В-2);
  * - `cheaper` — typed below every place: «тут дешевле» (В-2).
  *
  * `here` says the place is the record's own (Р-3): «здесь же брали по 600 ֏/л».
@@ -34,7 +34,7 @@ export interface CheaperHint {
 }
 
 export interface CheaperHintInput {
-  readonly answer: OwnPricesResponse
+  readonly answer: OwnPrices
   /**
    * The currency and the unit chosen on the sheet: the one group prices are compared in while
    * nothing is typed (Р-4 of MOL-31). The sheet always has both — the unit from the item, the
@@ -49,6 +49,22 @@ export interface CheaperHintInput {
 }
 
 const NOTHING: CheaperHint = { item: null, alternative: null }
+
+/**
+ * Two unit prices this close are one price, in thousandths of the earlier one (MOL-92, adversarial
+ * Г). Loose goods are weighed and the till rounds the sum to a dram: 690 ֏/кг on the tag came out
+ * 689,63 one time and 690,67 the next, and compared exactly the same tag said «дороже» in yellow, or
+ * «дешевле» in green, by the weight alone. Half a per cent holds that noise — under one dram on a
+ * kilo of 690 even for 0,15 kg — and still tells 543 from 540.
+ */
+export const SAME_PRICE_PERMILLE = 5n
+
+/** Whether `price` is within `SAME_PRICE_PERMILLE` of `earlier` — inside one currency and unit. */
+export function samePrice(price: UnitPrice, earlier: UnitPrice): boolean {
+  compareUnitPrice(price, earlier)
+  const gap = price.scaledMinor - earlier.scaledMinor
+  return (gap < 0n ? -gap : gap) * 1000n <= SAME_PRICE_PERMILLE * earlier.scaledMinor
+}
 
 /** «4.5» → 45: the printed tenth, which decides as it decides the groups (MOL-31, Р-22). */
 function tenths(rating: string): number {
@@ -71,9 +87,8 @@ function cheapestIn(
 
 function kindOf(typed: UnitPrice | null, best: OwnPlacePrice): ItemHint['kind'] {
   if (typed === null) return 'best'
-  const order = compareUnitPrice(typed, best.unitPrice)
-  if (order < 0) return 'cheaper'
-  return order === 0 ? 'same' : 'there'
+  if (samePrice(typed, best.unitPrice)) return 'same'
+  return compareUnitPrice(typed, best.unitPrice) < 0 ? 'cheaper' : 'there'
 }
 
 /**
@@ -110,7 +125,9 @@ export function cheaperHint(input: CheaperHintInput): CheaperHint {
   for (const other of answer.alternatives) {
     if (floor === null ? other.level !== 'take' : tenths(other.rating) < floor) continue
     const place = cheapestIn(other.places, currency, unit)
+    // Cheaper by more than the noise of a scale: at one price there is no reason to change.
     if (!place || compareUnitPrice(place.unitPrice, reference) >= 0) continue
+    if (samePrice(place.unitPrice, reference)) continue
     const better =
       alternative === null ||
       tenths(other.rating) > tenths(alternative.rating) ||

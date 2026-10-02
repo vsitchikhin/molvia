@@ -196,17 +196,22 @@ export const adviceSearchResponseSchema = z.strictObject({
 export type AdviceSearchResponse = z.output<typeof adviceSearchResponseSchema>
 
 /**
- * `GET /advice/prices` — «Тут дешевле» on the sheet of a purchase (MOL-92): the item, and the
- * geography of the record it is bought into. The city is the record's, not the settings' (Т-4): a
- * Gyumri resident shopping in Erevan compares with Erevan. `except` is the purchase the sheet
+ * `GET /advice/prices` — «Тут дешевле» on the sheet of a purchase (MOL-92): the item, and the record
+ * it is bought into. **The city is the record's, never the settings'** (Т-4): a Gyumri resident in an
+ * Erevan shop compares with Erevan. A record the server holds is named by `trip`, and the server
+ * reads the city off its place; a record still in the phone's queue the server has never seen, so
+ * the phone names the country and the city its start carries. `except` is the purchase the sheet
  * amends, so a row is never compared with itself (Т-9).
  */
-export const ownPricesQuerySchema = z.strictObject({
-  item: z.uuid(),
-  country: settingsGeographySchema.shape.country,
-  city: settingsGeographySchema.shape.city,
-  except: z.uuid().optional(),
-})
+export const ownPricesQuerySchema = z.union([
+  z.strictObject({ item: z.uuid(), trip: z.uuid(), except: z.uuid().optional() }),
+  z.strictObject({
+    item: z.uuid(),
+    country: settingsGeographySchema.shape.country,
+    city: settingsGeographySchema.shape.city,
+    except: z.uuid().optional(),
+  }),
+])
 export type OwnPricesQuery = z.output<typeof ownPricesQuerySchema>
 
 /**
@@ -254,15 +259,26 @@ const ownPricedFields = {
 }
 
 /**
- * The answer of `GET /advice/prices` (MOL-92): a union on the level the person sees the item at on
+ * The prices of `GET /advice/prices` (MOL-92): a union on the level the person sees the item at on
  * «Что брать», as `adviceRowSchema` is. **«Не брать нигде» has no field for a price, a place or an
  * alternative** (Т-3): the product's core rule held by the type checker, not by the sheet. An item
  * not rated is `unrated` and still has its prices: the hint is the person's own history.
  */
-export const ownPricesResponseSchema = z.discriminatedUnion('level', [
+export const ownPricesSchema = z.discriminatedUnion('level', [
   z.strictObject({ itemId: z.uuid(), level: z.literal('never') }),
   z.strictObject({ ...ownPricedFields, level: z.literal('take'), rating: ratingSchema }),
   z.strictObject({ ...ownPricedFields, level: z.literal('if_cheap'), rating: ratingSchema }),
   z.strictObject({ ...ownPricedFields, level: z.literal('unrated') }),
 ])
+export type OwnPrices = z.output<typeof ownPricesSchema>
+
+/**
+ * The answer of `GET /advice/prices`: the prices, and the country and city they were counted in —
+ * `null` for a record the person does not hold, whose answer is empty. The phone keeps the city a
+ * record was answered in, so with no signal it knows which remembered answer is that record's.
+ */
+export const ownPricesResponseSchema = z.strictObject({
+  where: settingsGeographySchema.nullable(),
+  prices: ownPricesSchema,
+})
 export type OwnPricesResponse = z.output<typeof ownPricesResponseSchema>

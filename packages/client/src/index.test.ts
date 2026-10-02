@@ -1202,7 +1202,7 @@ describe('the trip', () => {
       await expect(client.adviceSearch('сыр')).rejects.toThrow()
     })
 
-    it('asks «Тут дешевле» with the item and the record’s city, `except` only when named (MOL-92)', async () => {
+    it('asks «Тут дешевле» by the record, or by the city of one still queued (MOL-92)', async () => {
       const zovuni = {
         placeId: MARKET,
         name: 'Зовуни',
@@ -1211,34 +1211,35 @@ describe('the trip', () => {
         observations: 1,
       }
       const { client, calls } = clientReplying(200, {
-        itemId: BEEF,
-        level: 'unrated',
-        places: [zovuni],
-        alternatives: [],
+        where: { country: 'AM', city: 'Ереван' },
+        prices: { itemId: BEEF, level: 'unrated', places: [zovuni], alternatives: [] },
       })
 
-      const answer = await client.ownPrices({ item: BEEF, country: 'AM', city: 'Ереван' })
+      const answer = await client.ownPrices({ item: BEEF, trip: MARKET })
       await client.ownPrices({ item: BEEF, country: 'AM', city: 'Ереван', except: MARKET })
 
       const first = new URL(calls[0]?.url ?? '')
       expect(first.pathname).toBe('/advice/prices')
-      expect(Object.fromEntries(first.searchParams)).toEqual({
+      expect(Object.fromEntries(first.searchParams)).toEqual({ item: BEEF, trip: MARKET })
+      expect(Object.fromEntries(new URL(calls[1]?.url ?? '').searchParams)).toEqual({
         item: BEEF,
         country: 'AM',
         city: 'Ереван',
+        except: MARKET,
       })
-      expect(new URL(calls[1]?.url ?? '').searchParams.get('except')).toBe(MARKET)
-      expect(answer.level !== 'never' && answer.places[0]?.unitPrice.scaledMinor).toBe(
-        54_000_000_000n,
-      )
+      expect(answer.where?.city).toBe('Ереван')
+      expect(
+        answer.prices.level !== 'never' && answer.prices.places[0]?.unitPrice.scaledMinor,
+      ).toBe(54_000_000_000n)
     })
 
     it('refuses a «не брать нигде» that arrived with a price in «Тут дешевле»', async () => {
-      const { client } = clientReplying(200, { itemId: BEEF, level: 'never', places: [] })
+      const { client } = clientReplying(200, {
+        where: null,
+        prices: { itemId: BEEF, level: 'never', places: [] },
+      })
 
-      await expect(
-        client.ownPrices({ item: BEEF, country: 'AM', city: 'Ереван' }),
-      ).rejects.toThrow()
+      await expect(client.ownPrices({ item: BEEF, trip: MARKET })).rejects.toThrow()
     })
   })
 })

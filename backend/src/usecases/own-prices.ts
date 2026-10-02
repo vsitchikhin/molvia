@@ -16,12 +16,16 @@ import type {
   AdviceScope,
   OwnAlternative,
   OwnPlacePrice,
+  OwnPrices,
   OwnPricesQuery,
   OwnPricesResponse,
+  SettingsGeography,
 } from '@molvia/model'
 import type { ActorRepository } from '@/db/actors-repository'
 import type { ExpenseRepository, OwnLatestPrice } from '@/db/expenses-repository'
 import type { ItemRepository } from '@/db/items-repository'
+import type { PlaceRepository } from '@/db/places-repository'
+import type { TripRepository } from '@/db/trips-repository'
 import type { VerdictRepository } from '@/db/verdicts-repository'
 import { dayOfMoment } from '@/usecases/today'
 import type { Today } from '@/usecases/today'
@@ -31,11 +35,13 @@ export interface OwnPricesDeps {
   readonly verdicts: VerdictRepository
   readonly expenses: ExpenseRepository
   readonly items: ItemRepository
+  readonly trips: TripRepository
+  readonly places: PlaceRepository
 }
 
 /**
- * How many products of one kind a person may have bought in one city before the oldest-named are
- * not asked about. Far above a shelf: the seed holds 24 cheeses in all.
+ * How many products of one kind a person may have bought in one city before an arbitrary few, by
+ * id, are not asked about. Far above a shelf: the seed holds 24 cheeses in all.
  */
 const KIND_CANDIDATES = 200
 
@@ -56,7 +62,7 @@ const KIND_CANDIDATES = 200
  * It writes nothing (Т-6): no visit, no pick — the person looks at their own prices.
  */
 export async function ownPrices(
-  { actors, verdicts, expenses, items }: OwnPricesDeps,
+  { actors, verdicts, expenses, items, trips, places }: OwnPricesDeps,
   owner: Today & { readonly actorId: string },
   query: OwnPricesQuery,
 ): Promise<OwnPricesResponse> {
@@ -65,18 +71,19 @@ export async function ownPrices(
   const scope: AdviceScope = hasSharedAccess(actor, new Date()) ? 'shared' : 'own'
 
   const item = await items.byId(query.item)
+  const where = await geographyOf(trips, places, actor.id, query)
   // Answered in lower case whatever the case it was asked in (`resource.ts`, MOL-25).
-  const nothing: OwnPricesResponse = {
+  const nothing: OwnPrices = {
     itemId: item?.id ?? query.item.toLowerCase(),
     level: 'unrated',
     places: [],
     alternatives: [],
   }
-  if (item?.kind !== 'product') return nothing
+  if (item?.kind !== 'product' || where === null) return { where, prices: nothing }
 
-  const where = { actorId: actor.id, country: query.country, city: query.city }
+  const mine = { actorId: actor.id, country: where.country, city: where.city }
   const candidates = await expenses.ownItemsOfKind({
-    ...where,
+    ...mine,
     kind: kindKey(item.name),
     notItem: item.id,
     limit: KIND_CANDIDATES,
@@ -99,7 +106,7 @@ export async function ownPrices(
   }))
 
   const own = rated.find((entry) => entry.row.itemId === item.id)
-  if (own?.level === 'never') return { itemId: item.id, level: 'never' }
+  if (own?.level === 'never') return { where, prices: { itemId: item.id, level: 'never' } }
 
   // Only what is rated and not «не брать нигде» may be an alternative (Р-11): «оценено лучше или
   // так же» cannot be checked without a rating. Best rated first, so the cut keeps the ones the
@@ -110,9 +117,10 @@ export async function ownPrices(
     .slice(0, OWN_ALTERNATIVES_MAX)
 
   const prices = await expenses.ownLatestFor({
-    ...where,
+    ...mine,
     itemIds: [item.id, ...others.map((entry) => entry.row.itemId)],
     ...(query.except === undefined ? {} : { except: query.except }),
+    ...(owner.zone === undefined ? {} : { zone: owner.zone }),
   })
   const placesOf = (itemId: string): OwnPlacePrice[] =>
     prices.filter((price) => price.itemId === itemId).map((price) => placeOf(owner, price))
@@ -124,13 +132,34 @@ export async function ownPrices(
   })
 
   const priced = { itemId: item.id, places: placesOf(item.id), alternatives }
-  const answer: OwnPricesResponse = own
-    ? { ...priced, level: own.level, rating: own.rating }
-    : { ...priced, level: 'unrated' }
+  const answer: OwnPricesResponse = {
+    where,
+    prices: own
+      ? { ...priced, level: own.level, rating: own.rating }
+      : { ...priced, level: 'unrated' },
+  }
 
   // Encoded here, as `advice` does: an answer the wire cannot carry fails beside its data.
   z.encode(ownPricesResponseSchema, answer)
   return answer
+}
+
+/**
+ * The country and city of the record (Т-4, review №1): off the place of a record the person holds,
+ * as the server knows it — the phone knows a record's city only while its start is still queued.
+ * A record not theirs, removed or missing is `null`, and its answer is empty: a guessed id learns
+ * nothing it could tell from a missing one.
+ */
+async function geographyOf(
+  trips: TripRepository,
+  places: PlaceRepository,
+  actorId: string,
+  query: OwnPricesQuery,
+): Promise<SettingsGeography | null> {
+  if (!('trip' in query)) return { country: query.country, city: query.city }
+  const trip = await trips.byId(query.trip, actorId)
+  const place = trip ? await places.byId(trip.placeId) : null
+  return place ? { country: place.country, city: place.city } : null
 }
 
 /**

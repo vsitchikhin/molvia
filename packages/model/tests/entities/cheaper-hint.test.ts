@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { OwnAlternative, OwnPlacePrice, OwnPricesResponse } from '#model/contracts/advice'
+import type { OwnAlternative, OwnPlacePrice, OwnPrices } from '#model/contracts/advice'
 import { cheaperHint } from '#model/entities/cheaper-hint'
 import type { CheaperHintInput } from '#model/entities/cheaper-hint'
-import { UNIT_PRICE_SCALE } from '#model/values/units'
+import { UNIT_PRICE_SCALE, unitPrice } from '#model/values/units'
 import type { BaseUnit, UnitPrice } from '#model/values/units'
 import type { Currency } from '#model/values/money'
 
@@ -53,15 +53,11 @@ function rated(
   places: OwnPlacePrice[],
   alternatives: OwnAlternative[] = [],
   rating = '4.0',
-): OwnPricesResponse {
+): OwnPrices {
   return { itemId: ITEM, level: 'take', rating, places, alternatives }
 }
 
-function hint(
-  answer: OwnPricesResponse,
-  typed: number | null,
-  extra: Partial<CheaperHintInput> = {},
-) {
+function hint(answer: OwnPrices, typed: number | null, extra: Partial<CheaperHintInput> = {}) {
   return cheaperHint({
     answer,
     currency: 'AMD',
@@ -87,10 +83,30 @@ describe('cheaperHint · the item itself', () => {
     expect(hint(history, 620).item).toMatchObject({ kind: 'there', place: { placeId: ZOVUNI } })
   })
 
-  it('says «как в …» at exactly that price, and «тут дешевле» one dram below it (В-2)', () => {
+  it('says «как в …» at that price and within half a per cent of it, else «дешевле» or «дороже» (В-2)', () => {
     expect(hint(history, 540).item?.kind).toBe('same')
-    expect(hint(history, 539).item?.kind).toBe('cheaper')
-    expect(hint(history, 541).item?.kind).toBe('there')
+    // 540 × 1,005 = 542,70: 542 is the same tag, 543 and 537 are not.
+    expect(hint(history, 542).item?.kind).toBe('same')
+    expect(hint(history, 538).item?.kind).toBe('same')
+    expect(hint(history, 543).item?.kind).toBe('there')
+    expect(hint(history, 537).item?.kind).toBe('cheaper')
+  })
+
+  it('reads one tag of loose goods as one price, whatever the till’s rounding (adversarial Г)', () => {
+    const kilo = (amount: number, grams: number): UnitPrice =>
+      unitPrice(
+        { minor: BigInt(amount) * 100n, currency: 'AMD' },
+        { milli: BigInt(grams), unit: 'kg' },
+      )
+    // 690 ֏/кг on the tag; 1,234 kg came to 851 ֏ last time — 689,63 ֏/кг.
+    const tomatoes = rated([{ ...place(CITY, 0, { unit: 'kg' }), unitPrice: kilo(851, 1234) }])
+    for (const [amount, grams] of [
+      [422, 611],
+      [604, 876],
+      [725, 1050],
+    ] as const) {
+      expect(hint(tomatoes, null, { typed: kilo(amount, grams) }).item?.kind).toBe('same')
+    }
   })
 
   it('says «здесь же» when the cheapest was the record’s own place (Р-3), whatever the case of its id', () => {
@@ -151,10 +167,11 @@ describe('cheaperHint · another item of the same kind (В-3, В-7…В-9)', () 
     expect(hint(rated([], [lower], '4.0'), 620).alternative).toBeNull()
   })
 
-  it('does not take one at the same price or dearer — there is no reason to change (Р-12)', () => {
+  it('does not take one at the same price, within the noise, or dearer — there is no reason to change (Р-12)', () => {
     expect(hint(rated([], [marianna]), 480).alternative).toBeNull()
+    expect(hint(rated([], [marianna]), 482).alternative).toBeNull()
     expect(hint(rated([], [marianna]), 470).alternative).toBeNull()
-    expect(hint(rated([], [marianna]), 481).alternative?.itemId).toBe(MARIANNA)
+    expect(hint(rated([], [marianna]), 483).alternative?.itemId).toBe(MARIANNA)
   })
 
   it('names the best rated of those that qualify, the cheapest breaking a tie — «показываем Анелик»', () => {
@@ -180,7 +197,7 @@ describe('cheaperHint · another item of the same kind (В-3, В-7…В-9)', () 
   })
 
   it('for an item not rated, takes only one in «Брать» (В-8)', () => {
-    const unrated = (alternatives: OwnAlternative[]): OwnPricesResponse => ({
+    const unrated = (alternatives: OwnAlternative[]): OwnPrices => ({
       itemId: ITEM,
       level: 'unrated',
       places: [],
@@ -193,7 +210,7 @@ describe('cheaperHint · another item of the same kind (В-3, В-7…В-9)', () 
 
   it('takes an «only if cheap» one beside an item rated as low', () => {
     const ifCheap = alternative(MARIANNA, '3.0', [place(ZOVUNI, 480)])
-    const item: OwnPricesResponse = {
+    const item: OwnPrices = {
       itemId: ITEM,
       level: 'if_cheap',
       rating: '3.0',

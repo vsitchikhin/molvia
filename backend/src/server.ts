@@ -610,7 +610,18 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         search: (actorId, query) =>
           adviceSearch({ actors, verdicts, expenses: tripData.expenses, items }, actorId, query),
         prices: (owner, query) =>
-          ownPrices({ actors, verdicts, expenses: tripData.expenses, items }, owner, query),
+          ownPrices(
+            {
+              actors,
+              verdicts,
+              expenses: tripData.expenses,
+              items,
+              trips: tripData.trips,
+              places: tripData.places,
+            },
+            owner,
+            query,
+          ),
       })
       verdictRoutes(guarded, {
         rate: (actorId, itemId, rating) => rateItem({ items, verdicts }, actorId, itemId, rating),

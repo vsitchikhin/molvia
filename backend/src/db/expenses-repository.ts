@@ -145,6 +145,12 @@ export interface OwnLatestQuery {
   readonly country: string
   readonly city: string
   readonly except?: string
+  /**
+   * The phone's zone (MOL-121): a record from an old queue has no day of its own, and its moment is
+   * read as a day in this zone — the one its printed day is counted in, or the two would disagree
+   * on which purchase was the last (review №3). Yerevan's without one.
+   */
+  readonly zone?: string
 }
 
 /** The candidates for «другое молоко» (MOL-92, В-7): the word of the kind, and whom to leave out. */
@@ -757,7 +763,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           from (select * ${priced.rows}) own
           where nearby
           order by item_id, place_id, currency, unit,
-                   coalesce(started_on, (bought_at at time zone 'Asia/Yerevan')::date::text) desc,
+                   coalesce(started_on, (bought_at at time zone ${query.zone ?? 'Asia/Yerevan'})::date::text) desc,
                    bought_at desc, written_at desc, expense_id desc
         ) latest
         -- Cheapest last price first, inside a currency and unit; names by the collation the

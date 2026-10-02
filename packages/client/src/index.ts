@@ -412,7 +412,7 @@ export interface MolviaClient {
   ): Promise<AdviceSearchResponse>
   /**
    * «Тут дешевле» (MOL-92): the person's own last prices of an item in the record's city, and the
-   * other items of its kind. The item in the query, as every lookup is.
+   * other items of its kind. The record by `trip` when the server holds it, else its city.
    */
   ownPrices(query: OwnPricesQuery): Promise<OwnPricesResponse>
 }
@@ -880,9 +880,13 @@ export function createClient(options: ClientOptions): MolviaClient {
       )
     },
     ownPrices: async (query) => {
-      const { item, country, city, except } = ownPricesQuerySchema.parse(query)
-      const search = new URLSearchParams({ item, country, city })
-      if (except !== undefined) search.set('except', except)
+      const parsed = ownPricesQuerySchema.parse(query)
+      const search = new URLSearchParams(
+        'trip' in parsed
+          ? { item: parsed.item, trip: parsed.trip }
+          : { item: parsed.item, country: parsed.country, city: parsed.city },
+      )
+      if (parsed.except !== undefined) search.set('except', parsed.except)
       return request(`/advice/prices?${search.toString()}`, ownPricesResponseSchema)
     },
   }

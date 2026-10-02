@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import { ZONE_HEADER, ownPricesResponseSchema, toSearchKey, unitPrice } from '@molvia/model'
-import type { Money, OwnPricesResponse, Quantity } from '@molvia/model'
+import type { Money, OwnPrices, OwnPricesResponse, Quantity } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { actors, events, expenses, searchPicks, trips, verdicts } from '@/db/schema'
 import { buildServer } from '@/server'
@@ -40,12 +40,14 @@ afterAll(async () => {
 interface Asked {
   readonly item: string
   readonly city?: string
+  /** A record the server holds, named instead of a city (review №1). */
+  readonly trip?: string
   readonly except?: string
   readonly zone?: string
 }
 
-async function ask(actor: string | null, { item, city = 'Ереван', except, zone }: Asked) {
-  const query = new URLSearchParams({ item, country: 'AM', city })
+async function ask(actor: string | null, { item, city = 'Ереван', trip, except, zone }: Asked) {
+  const query = new URLSearchParams(trip ? { item, trip } : { item, country: 'AM', city })
   if (except) query.set('except', except)
   const headers: Record<string, string> = {}
   if (actor !== null) headers.cookie = await signIn(db, actor)
@@ -59,10 +61,14 @@ async function ask(actor: string | null, { item, city = 'Ереван', except, 
 }
 
 /** Read through the contract the client parses — a server that drifted from it fails here. */
-async function prices(actor: string, asked: Asked): Promise<OwnPricesResponse> {
+async function answered(actor: string, asked: Asked): Promise<OwnPricesResponse> {
   const reply = await ask(actor, asked)
   expect(reply.status).toBe(200)
   return ownPricesResponseSchema.parse(JSON.parse(reply.body))
+}
+
+async function prices(actor: string, asked: Asked): Promise<OwnPrices> {
+  return (await answered(actor, asked)).prices
 }
 
 const item = (name: string, kind: 'product' | 'dish' = 'product') =>
@@ -115,7 +121,7 @@ async function bought(
   return { id, tripId }
 }
 
-function placesOf(answer: OwnPricesResponse) {
+function placesOf(answer: OwnPrices) {
   if (answer.level === 'never') throw new Error('a «never» answer has no places')
   return answer.places.map((place) => ({
     name: place.name,
@@ -263,6 +269,59 @@ describe('GET /advice/prices — the item’s own places', () => {
   })
 })
 
+describe('GET /advice/prices — «last» in the zone of the request (review №3)', () => {
+  it('orders a record from an old queue by its day in the zone its day is printed in', async () => {
+    const me = await insertActor(db)
+    const milk = await item('Молоко Ашхар 1 л')
+    const zovuni = await erevan('Зовуни')
+    // No day of its own: 01:30 of the 13th in Yerevan, 14:30 of the 12th in Los Angeles.
+    await bought(me, milk, zovuni, 540, { on: null, at: new Date('2026-09-12T21:30:00Z') })
+    // The 12th as its phone named it, begun later in the evening.
+    await bought(me, milk, zovuni, 600, { on: '2026-09-12', at: new Date('2026-09-12T23:00:00Z') })
+
+    expect(placesOf(await prices(me, { item: milk }))[0]).toMatchObject({
+      price: perLitre(540),
+      day: '2026-09-13',
+    })
+    expect(
+      placesOf(await prices(me, { item: milk, zone: 'America/Los_Angeles' }))[0],
+    ).toMatchObject({ price: perLitre(600), day: '2026-09-12' })
+  })
+})
+
+describe('GET /advice/prices — the record names the city (review №1)', () => {
+  it('reads the city off the place of a record held on the server, not off the settings', async () => {
+    // Settings say Gyumri; the record is in an Erevan shop.
+    const me = await insertActor(db, { city: 'Гюмри' })
+    const milk = await item('Молоко Ашхар 1 л')
+    await bought(me, milk, await erevan('Зовуни'), 540)
+    await bought(me, milk, await insertPlace(db, { name: 'SAS', city: 'Гюмри' }), 400)
+    const record = await insertTrip(db, { actorId: me, placeId: await erevan('Ереван Сити') })
+
+    const answer = await answered(me, { item: milk, trip: record.toUpperCase() })
+
+    expect(answer.where).toEqual({ country: 'AM', city: 'Ереван' })
+    expect(placesOf(answer.prices).map((place) => place.name)).toEqual(['Зовуни'])
+  })
+
+  it('answers empty, with no city, for a record of someone else’s, a removed one or none', async () => {
+    const me = await insertActor(db)
+    const stranger = await insertActor(db)
+    const milk = await item('Молоко Ашхар 1 л')
+    const zovuni = await erevan('Зовуни')
+    await bought(me, milk, zovuni, 540)
+    const theirs = await insertTrip(db, { actorId: stranger, placeId: zovuni })
+    const removed = await insertTrip(db, { actorId: me, placeId: zovuni, deletedAt: new Date() })
+
+    for (const trip of [theirs, removed, randomUUID()]) {
+      expect(await answered(me, { item: milk, trip })).toEqual({
+        where: null,
+        prices: { itemId: milk, level: 'unrated', places: [], alternatives: [] },
+      })
+    }
+  })
+})
+
 describe('GET /advice/prices — the level', () => {
   it('answers «не брать нигде» with no prices at all (Т-3), and prices again once withdrawn', async () => {
     const me = await insertActor(db)
@@ -271,8 +330,8 @@ describe('GET /advice/prices — the level', () => {
     await rate(me, milk, 1)
 
     expect(JSON.parse((await ask(me, { item: milk })).body)).toEqual({
-      itemId: milk,
-      level: 'never',
+      where: { country: 'AM', city: 'Ереван' },
+      prices: { itemId: milk, level: 'never' },
     })
 
     await db.update(verdicts).set({ deletedAt: new Date() }).where(eq(verdicts.itemId, milk))
@@ -401,6 +460,7 @@ describe('GET /advice/prices — the request', () => {
 
     expect((await ask(me, { item: 'milk' })).status).toBe(400)
     expect((await ask(me, { item: milk, except: 'row' })).status).toBe(400)
+    expect((await ask(me, { item: milk, trip: 'record' })).status).toBe(400)
     expect((await ask(null, { item: milk })).status).toBe(401)
   })
 })
