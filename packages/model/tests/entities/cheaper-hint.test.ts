@@ -171,6 +171,22 @@ describe('cheaperHint · the item itself', () => {
       ).toBe(MARIANNA)
     })
 
+    it('roubles are typed whole: one tag of buckwheat is one price (owner, 02.10.2026)', () => {
+      const rub = (amount: number, milli: number): UnitPrice =>
+        unitPrice({ minor: BigInt(amount) * 100n, currency: 'RUB' }, grams(milli))
+      // 199,90 ₽/кг on the tag: 1,234 kg came to 246,68, typed 247; 0,437 kg to 87,36, typed 87.
+      const buckwheat = rated([
+        {
+          ...place(CITY, 0, { unit: 'kg', currency: 'RUB' }),
+          unitPrice: rub(247, 1234),
+          quantity: grams(1234),
+        },
+      ])
+      expect(
+        hint(buckwheat, null, { typed: rub(87, 437), typedQuantity: grams(437) }).item?.kind,
+      ).toBe('same')
+    })
+
     it('without the quantity typed, half a per cent alone', () => {
       expect(hint(rated([weighed(851, 1234)]), null, { typed: paid(104, 150) }).item?.kind).toBe(
         'there',

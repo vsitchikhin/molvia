@@ -304,8 +304,9 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
   it read «дороже» in yellow or «дешевле» in green by the weight. Half the step a till rounds a sum to
   (`TILL_STEP_MINOR`, a property of the currency like its exponent), on each sum, spread over what was
   bought: the past purchase's quantity travels with its price. A whole dram, since a shop rounds the
-  hundredths away; a kopeck and a cent elsewhere — half a euro on a litre made €1,79 «как» €1,19
-  (adversarial Г″, review №8). Whether people type whole roubles is the owner's to correct. An
+  hundredths away; a whole rouble, since people type roubles without kopecks (owner's decision,
+  02.10.2026); a cent for dollars and euros — half a euro on a litre made €1,79 «как» €1,19
+  (adversarial Г″, review №8). An
   alternative must be cheaper by more than that. «Last» for a record from an old queue is its moment
   read in the request's zone — the zone its printed day is counted in (review №3) — and a zone
   Postgres does not know, though `Intl` does, is read as Yerevan's rather than answering 500
