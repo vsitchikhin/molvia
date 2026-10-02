@@ -184,8 +184,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   own purchases excepted and put own city first (Р-26).
 - **A place's price is its last one, not its lowest** (MOL-166): its last purchase in any currency
   and unit, never the last of a pair; one's own where one bought, by the fragment «Тут дешевле»
-  reads (`latestFirst`); a place opened by others — the lower median of each buyer's last within
-  `SHARED_PRICE_FRESH_DAYS`.
+  reads (`latestFirst`) — with access, while one bought there within `SHARED_PRICE_FRESH_DAYS` or
+  nobody else opened it; a place opened by others — the lower median of each buyer's last within
+  the window.
 - **«Только если дёшево» is the lower median from three purchases**; per item the «currency +
   unit» of most purchases first, the other pairs' places after it, never compared (MOL-166); order
   by rating down, then name.

@@ -119,7 +119,9 @@ export const PRICE_MEDIAN_MIN_OBSERVATIONS = 3
  * the owner's decision on adversarial Б). Older, it is no longer counted towards a place opened by
  * other people: two who bought at a discount in August and never came back held the place at the
  * discount, while the one who still shops there saw today's price on the same screen. One's own
- * last purchase has no such window — it is what the sheet compares with, dated (MOL-166, В-1).
+ * last purchase has no such window — it is what the sheet compares with, dated (MOL-166, В-1) —
+ * but with access a place one has not bought at within it is other people's once three of them
+ * have (adversarial О).
  */
 export const SHARED_PRICE_FRESH_DAYS = 90
 

@@ -168,33 +168,39 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   then by price.
 - **A place's price is the last one paid there, not the lowest ever** (MOL-166, the owner's decision
   of MOL-92, В-3: «цены в магазинах подниматься могут, а вот спускаются редко»). Where this person
-  bought, it is **their own last purchase, in either mode** — by `latestFirst`, the one fragment
-  «Тут дешевле» reads too, and in the phone's zone the request names: under the minimum the sheet
-  said «Зовуни 600» and the home «Дешевле всего: Зовуни 540» of one milk, and an August discount
-  pointed at a shop that no longer sold at it. **A place opened by other people is the lower median
-  of each buyer's own last price there** (В-1): the last purchase of a place is the receipt of
-  whoever bought last, read as it is by anyone looking twice, and the median of three people's
-  figures is a price someone paid without naming who was there yesterday. The moving picture stays
-  the known limit it was under the minimum. Places are ordered by this price, own city first. **Р-4
-  still weighs a pair by every purchase in it, in every place** (`pairObservations`, adversarial Д,
-  owner's decision) — the places a pair names are fewer, and weighed by them one pack in a shop
-  bought by the kilo for ten weeks turned the row to pieces and hid the market where the kilo is
-  cheaper. `observations` of a place is its purchases in the pair. A place whose last purchase is in
-  another pair is not lost: it follows on the row (below). **«Last» is the place's, not the pair's**
-  (adversarial А, owner's decision): a place is named by its last purchase in whatever currency and
-  unit it was made, and a pair it was not made in is not that place's price at all — three August
-  kilos at a discount stood under «Дешевле всего» for a shop where a pack was bought in September,
-  and with access a place one bought packs in was named by strangers' kilos. A buyer's last is
-  decided before the threshold of three filters (`place_last`, `mine_here` in `pricedRows`), and a
-  pair of a place opened by others needs three buyers whose last purchase there is in it. **Other
-  people's last purchases count for `SHARED_PRICE_FRESH_DAYS` (90) days** (adversarial Б, owner's
-  decision), by the record's day in the phone's zone; fewer than three within the window and the
-  place is closed. One's own has no window (В-1). Its «today» is the phone's (`TODAY_HEADER`), as
-  every «today» of the server is. The prices, named: two who bought at a discount fifty days ago and
-  never came back still hold the place at the discount while the one who goes there now sees today's
-  on their own screen (Б1 of the adversarial report — the window closes it only past ninety days); a
-  place one bought at last year shows one's own year-old price over three strangers' of this week
-  (Б2, В-1).
+  bought, it is **their own last purchase — always without access, and with it while they bought
+  there within `SHARED_PRICE_FRESH_DAYS` or nobody else has opened the place** (В-1, adversarial О)
+  — by `latestFirst`, the one fragment «Тут дешевле» reads too, and in the phone's zone the request
+  names: under the minimum the sheet said «Зовуни 600» and the home «Дешевле всего: Зовуни 540» of
+  one milk, and an August discount pointed at a shop that no longer sold at it. **A place opened by
+  other people is the lower median of each buyer's own last price there** (В-1): the last purchase
+  of a place is the receipt of whoever bought last, read as it is by anyone looking twice, and the
+  median of three people's figures is a price someone paid without naming who was there yesterday.
+  The moving picture stays the known limit it was under the minimum. Places are ordered by this
+  price, own city first. **Р-4 still weighs a pair by every purchase in it, in every place**
+  (`pairObservations`, adversarial Д, owner's decision) — the places a pair names are fewer, and
+  weighed by them one pack in a shop bought by the kilo for ten weeks turned the row to pieces and
+  hid the market where the kilo is cheaper. `observations` of a place is its purchases in the pair.
+  A place whose last purchase is in another pair is not lost: it follows on the row (below).
+  **«Last» is the place's, not the pair's** (adversarial А, owner's decision): a place is named by
+  its last purchase in whatever currency and unit it was made, and a pair it was not made in is not
+  that place's price at all — three August kilos at a discount stood under «Дешевле всего» for a
+  shop where a pack was bought in September, and with access a place one bought packs in was named
+  by strangers' kilos. A buyer's last is decided before the threshold of three filters
+  (`place_last`, `mine_here` in `pricedRows`), and a pair of a place opened by others needs three
+  buyers whose last purchase there is in it — **one pair a place**: of two such pairs, the one most
+  of its buyers last bought in (adversarial П; the weight, the visit and the key break a tie), or
+  one place stood twice on a row in two packings. **Other people's last purchases count for
+  `SHARED_PRICE_FRESH_DAYS` (90) days** (adversarial Б, owner's decision), by the record's day in
+  the phone's zone; fewer than three within the window and the place is closed. One's own has none
+  without access; with access, a place one has stopped going to is theirs once three go now (О,
+  below). Its «today» is the phone's (`TODAY_HEADER`), as every «today» of the server is. The
+  prices, named: two who bought at a discount fifty days ago and never came back still hold the
+  place at the discount while the one who goes there now sees today's on their own screen (Б1 of the
+  adversarial report — the window closes it only past ninety days); one's own old price of a place
+  holds only where nobody else goes — without access always, and then the sheet and the home name
+  one price; with access the home may name the town's where the sheet names one's own, dated (Б2,
+  changed by О).
 - **The threshold of «только если дёшево» is the lower median, from three purchases**
   (`PRICE_MEDIAN_MIN_OBSERVATIONS`, MOL-33's answer) — `percentile_disc(0.5)`, a price someone
   actually paid, the same rule `isRateJump` follows. Fewer than three and the field is `null`,
@@ -224,9 +230,9 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   (adversarial О, owner's decision): once one has stopped going and three others go now, it is
   theirs, named by their figure — a single purchase a year ago hid from someone with access a place
   three bought at this week. The price, named: with access the home may then name another price than
-  the sheet, which is one's own history, dated; and Б2 holds only until such a place is opened. The
-  price of Р-27, named (owner's decision on review №10): the first pair also gives the threshold of
-  «только если дёшево», so one pack bought at home over ten kilos in Erevan leaves the row without a
+  the sheet, which is one's own history, dated; and Б2 does not hold there (above). The price of
+  Р-27, named (owner's decision on review №10): the first pair also gives the threshold of «только
+  если дёшево», so one pack bought at home over ten kilos in Erevan leaves the row without a
   threshold until the pack's pair has three purchases.
 - **Order is by rating down, then by name, in all three groups.** The handoff asked for
   ascending unit price; that sorts _different products_ by a number — milk at 570 ֏/л above
