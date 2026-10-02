@@ -335,6 +335,7 @@ function placesOf(places: readonly PlacePrice[]): AdvicePlace[] {
   return places.map((place) => ({
     placeId: place.placeId,
     name: place.placeName,
+    city: place.placeCity,
     unitPrice: {
       scaledMinor: place.scaledMinor,
       currency: place.currency,

@@ -2,9 +2,10 @@ import { GrammyError, InlineKeyboard } from 'grammy'
 import type { Api } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
+import { cityWhereNameRepeats, settingsCityOf } from '@molvia/model'
 import type { Reminder, ReminderItem } from '@molvia/model'
 import type { InlineKeyboardMarkup } from 'grammy/types'
-import { t } from './i18n'
+import { hasMessage, t } from './i18n'
 
 /**
  * What a button of the scale carries: the item and the digit — and never whose verdict it is.
@@ -120,11 +121,29 @@ export function writeText({ question, rated, switched }: ReminderText): string {
 }
 
 /**
+ * «Ереван Сити в Ереване», or the name alone where `city` is `null` (MOL-120). The case is looked
+ * up by the city of the settings the stored spelling folds to — «гюмри» is Gyumri (adversarial А2).
+ */
+function placeText(name: string, city: string | null): string {
+  if (city === null) return name
+  const known = settingsCityOf(city)
+  const key = `remind.in.${known ?? ''}`
+  return known !== null && hasMessage(key)
+    ? t(undefined, 'remind.placeIn', { place: name, where: t(undefined, key) })
+    : t(undefined, 'remind.placeInBrackets', { place: name, city })
+}
+
+/**
  * The words of one message (MOL-101): when and where, the item, the scale's meaning — and under
  * the last one of the day, how many more wait in «Оценки». Always Russian (Р-7): the reminder is
  * sent without an update, and the person's language is not something we keep.
  */
-export function reminderText(item: ReminderItem, more: number, appUrl: string): string {
+export function reminderText(
+  item: ReminderItem,
+  more: number,
+  appUrl: string,
+  city: string | null = null,
+): string {
   const when =
     item.daysAgo === 1
       ? t(undefined, 'remind.yesterday')
@@ -133,7 +152,7 @@ export function reminderText(item: ReminderItem, more: number, appUrl: string): 
         : t(undefined, 'remind.daysAgo', { n: item.daysAgo })
   const question = t(undefined, 'remind.question', {
     when,
-    place: item.placeName,
+    place: placeText(item.placeName, city),
     name: item.name,
   })
   return more > 0
@@ -176,14 +195,23 @@ async function send(
   wait: Wait,
 ): Promise<void> {
   const { telegramUserId, items, total } = reminder
+  // The city of a place, where another item of this reminder names a shop of its name in another
+  // city (MOL-120) — the domain's rule, the one «Оценки» reads.
+  const cityOf = cityWhereNameRepeats(
+    items.map((item) => ({ name: item.placeName, city: item.placeCity })),
+  )
   for (const [index, item] of items.entries()) {
     const last = index === items.length - 1
     const more = last ? total - items.length : 0
     const message = async () =>
-      telegram.sendMessage(telegramUserId, reminderText(item, more, appUrl), {
-        reply_markup: scale(item.itemId, undefined, last ? 'off' : undefined),
-        disable_notification: index > 0,
-      })
+      telegram.sendMessage(
+        telegramUserId,
+        reminderText(item, more, appUrl, cityOf({ name: item.placeName, city: item.placeCity })),
+        {
+          reply_markup: scale(item.itemId, undefined, last ? 'off' : undefined),
+          disable_notification: index > 0,
+        },
+      )
     try {
       try {
         await message()

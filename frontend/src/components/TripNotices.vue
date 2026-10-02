@@ -34,7 +34,7 @@
       class="notice"
       kind="attention"
       inline
-      :title="t('trip.elsewhere.title', { place: queue.elsewhere.place })"
+      :title="t('trip.elsewhere.title', { place: elsewhereOf(queue.elsewhere).open })"
       :body="elsewhereBody(queue.elsewhere)"
     >
       <template #action>
@@ -73,7 +73,9 @@
   <TripContextSheet v-model:open="clarifying" :on-closed="settled" />
 
   <BottomSheet v-model:open="choosing" :on-closed="settled">
-    <template #title>{{ t('trip.elsewhere.title', { place: choice?.place ?? '' }) }}</template>
+    <template #title>{{
+      choice ? t('trip.elsewhere.title', { place: elsewhereOf(choice).open }) : ''
+    }}</template>
     <p class="confirm">{{ choice ? elsewhereBody(choice) : '' }}</p>
     <template #footer>
       <AppButton size="large" block @click="joinTrip">{{ t('trip.elsewhere.join') }}</AppButton>
@@ -100,7 +102,7 @@
 <script lang="ts">
 import { computed, defineComponent, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ERROR, isSamePlaceName } from '@molvia/model'
+import { ERROR, cityWhereNameRepeats, isSamePlaceName } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppReveal from '@/components/AppReveal.vue'
@@ -108,6 +110,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import TripContextSheet from '@/components/TripContextSheet.vue'
+import { placeLabel } from '@/components/placeLabel'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import type { RetryPurchase } from '@/composables/useItemDetails'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -152,7 +155,8 @@ export default defineComponent({
     settled: () => true,
   },
   setup(_props, { emit }) {
-    const { t } = useI18n()
+    const i18n = useI18n()
+    const { t } = i18n
     const queue = useTripQueueStore()
     const { trip, tripId } = useCurrentTrip()
     const choosing = ref(false)
@@ -166,12 +170,29 @@ export default defineComponent({
      * would be untrue, so it is a second key rather than a longer one (З-4).
      *
      * «The same shop» is the database's own answer, not equal strings: a trailing space made the
-     * screen promise damage that the server's own index rules out (В3).
+     * screen promise damage that the server's own index rules out (В3). And the index takes the
+     * city (MOL-120, adversarial Б1): «Ереван Сити» of Gyumri open while the person starts one in
+     * Yerevan is another shop, said with both cities. Without a city on either side the name alone
+     * decides, as before; with different names the city is noise (`cityWhereNameRepeats`).
      */
-    const elsewhereBody = (asked: TripElsewhere): string =>
-      isSamePlaceName(asked.place, asked.mine)
-        ? t('trip.elsewhere.body', { mine: asked.mine })
-        : t('trip.elsewhere.body_other', { mine: asked.mine, place: asked.place })
+    const elsewhereOf = (asked: TripElsewhere) => {
+      const open = { name: asked.place, city: asked.placeCity }
+      const mine = { name: asked.mine, city: asked.mineCity }
+      const cityOf = cityWhereNameRepeats([open, mine])
+      const named = (place: typeof open) =>
+        placeLabel(t('place.quoted', { place: place.name }), cityOf(place), i18n)
+      return {
+        open: named(open),
+        mine: named(mine),
+        same: isSamePlaceName(asked.place, asked.mine) && cityOf(open) === null,
+      }
+    }
+    const elsewhereBody = (asked: TripElsewhere): string => {
+      const { open, mine, same } = elsewhereOf(asked)
+      return same
+        ? t('trip.elsewhere.body', { mine })
+        : t('trip.elsewhere.body_other', { mine, place: open })
+    }
     function chooseTrip(): void {
       choice.value = queue.elsewhere
       choosing.value = choice.value !== null
@@ -305,6 +326,7 @@ export default defineComponent({
       choosing,
       choice,
       clarifying,
+      elsewhereOf,
       elsewhereBody,
       chooseTrip,
       joinTrip,

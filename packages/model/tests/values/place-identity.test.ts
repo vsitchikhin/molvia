@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { isSamePlaceName, placeNameIdentity } from '#model/values/place-identity'
+import {
+  cityWhereNameRepeats,
+  isSamePlaceName,
+  placeNameIdentity,
+} from '#model/values/place-identity'
 
 /**
  * The authority is the unique index over `places`, and an integration test holds this function
@@ -33,5 +37,44 @@ describe('when two spellings name one place', () => {
   it('folds `İ` the way the index does, without the dot its full mapping adds', () => {
     expect(placeNameIdentity('İstanbul Market')).toBe('istanbul market')
     expect(isSamePlaceName('İstanbul Market', 'Istanbul Market')).toBe(true)
+  })
+})
+
+describe('the city a place is printed with (MOL-120)', () => {
+  const gyumri = { name: 'Ереван Сити', city: 'Гюмри' }
+  const yerevan = { name: 'Ереван Сити', city: 'Ереван' }
+  const sas = { name: 'SAS', city: 'Ереван' }
+
+  it('is named where one name stands in two cities', () => {
+    const city = cityWhereNameRepeats([gyumri, sas, yerevan])
+    expect(city(gyumri)).toBe('Гюмри')
+    expect(city(yerevan)).toBe('Ереван')
+  })
+
+  it('is noise where the name is the only one of its kind', () => {
+    expect(cityWhereNameRepeats([gyumri, sas, yerevan])(sas)).toBeNull()
+    expect(cityWhereNameRepeats([yerevan, sas])(yerevan)).toBeNull()
+    expect(cityWhereNameRepeats([yerevan])(yerevan)).toBeNull()
+    expect(cityWhereNameRepeats([])(yerevan)).toBeNull()
+  })
+
+  it('does not count one place twice as a repeat', () => {
+    // Three cards bought in the same shop are one place, however many of them wait.
+    expect(cityWhereNameRepeats([yerevan, { ...yerevan }, yerevan])(yerevan)).toBeNull()
+  })
+
+  it('compares names and cities as the index over `places` does', () => {
+    const other = { name: ' sas', city: 'Гюмри' }
+    const city = cityWhereNameRepeats([sas, other])
+    expect(city(sas)).toBe('Ереван')
+    expect(city(other)).toBe('Гюмри')
+    // One city spelled two ways is one city, and so one place.
+    expect(cityWhereNameRepeats([sas, { name: 'SAS', city: 'ереван ' }])(sas)).toBeNull()
+  })
+
+  it('names no city at all where one place came without it', () => {
+    const city = cityWhereNameRepeats([gyumri, yerevan, { name: 'Ереван Сити' }])
+    expect(city(gyumri)).toBeNull()
+    expect(city(yerevan)).toBeNull()
   })
 })

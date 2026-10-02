@@ -222,12 +222,14 @@ describe('цены', () => {
       {
         placeId: market,
         name: 'Рынок в Гюмри',
+        city: 'Гюмри',
         unitPrice: { scaledMinor: perKilo(490_000), currency: 'AMD', unit: 'kg' },
         observations: 2,
       },
       {
         placeId: sas,
         name: 'SAS',
+        city: 'Гюмри',
         unitPrice: { scaledMinor: perKilo(510_000), currency: 'AMD', unit: 'kg' },
         observations: 1,
       },
@@ -294,6 +296,24 @@ describe('цены', () => {
     ).toEqual([
       ['Рынок', 'piece'],
       ['SAS', 'kg'],
+    ])
+  })
+
+  it('у каждого места — его город: «Ереван Сити» Гюмри и Еревана на одной строке (MOL-120)', async () => {
+    const actorId = await insertActor(db)
+    const gyumri = await insertPlace(db, { name: 'Ереван Сити' })
+    const yerevan = await insertPlace(db, { name: 'Ереван Сити', city: 'Ереван' })
+    const itemId = await insertItem(db)
+    await rate(actorId, itemId, 5)
+    await bought(actorId, itemId, yerevan, amd(54_000), { startedAt: daysAgo(3) })
+    await bought(actorId, itemId, gyumri, amd(58_000), { startedAt: daysAgo(2) })
+
+    const [row] = (await screen(actorId)).rows
+
+    // Own city first (Р-26), though Yerevan's is the cheaper; each place under its own city.
+    expect(row?.level === 'take' && row.places.map(({ name, city }) => [name, city])).toEqual([
+      ['Ереван Сити', 'Гюмри'],
+      ['Ереван Сити', 'Ереван'],
     ])
   })
 

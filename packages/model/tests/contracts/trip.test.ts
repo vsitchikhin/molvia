@@ -259,6 +259,16 @@ describe('tripViewCodec', () => {
     ).toBe(false)
   })
 
+  it('carries the city of its place beside the place, and reads a server before it (MOL-120)', () => {
+    const wire = z.encode(tripViewCodec, view())
+    expect(wire.placeCity).toBe(place.city)
+    // Beside `place`, never inside: the phone's caches of the version before read `place` strictly.
+    expect(Object.keys(wire.place).sort()).toEqual(['id', 'kind', 'name'])
+    const before: Record<string, unknown> = { ...wire }
+    delete before.placeCity
+    expect(tripViewCodec.safeParse(before).success).toBe(true)
+  })
+
   it('«no trip» is a trip of null, not a missing field', () => {
     expect(currentTripResponseSchema.parse({ trip: null })).toEqual({ trip: null })
     expect(currentTripResponseSchema.safeParse({}).success).toBe(false)

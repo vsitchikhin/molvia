@@ -199,6 +199,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
 - **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, **every other reader
   filters `deleted_at IS NULL`**; the reminder skips a purchase made before the withdrawal (MOL-101).
+- **A place is named with its city only where its name stands in two cities of one set** (MOL-120):
+  the queue of «Оценки», a row of «Что брать», one reminder — one rule, `cityWhereNameRepeats` in
+  the domain; the city is optional on the wire, and a place without one leaves its set named as
+  before.
 - **The search on «Что брать» is answered by the server** (`GET /advice/search`, MOL-128): the
   list's own statement and rules for what is found, never glued on the phone; it writes no visit and
   no pick; offline — the remembered list by the start of words.

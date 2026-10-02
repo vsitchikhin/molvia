@@ -82,6 +82,7 @@
             :card="current"
             :draft="drafts.drafts[current.itemId]"
             :focus-on-mount="moved"
+            :city="city"
             @save="save"
             @skip="skip"
             @change="keep"
@@ -118,6 +119,7 @@
 <script lang="ts">
 import { computed, defineComponent, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { cityWhereNameRepeats } from '@molvia/model'
 import IconCheck from '~icons/mdi/check-bold'
 import AppButton from '@/components/AppButton.vue'
 import AppScreen from '@/components/AppScreen.vue'
@@ -154,6 +156,17 @@ export default defineComponent({
     // Only while something is actually waiting: a notice about a rating that has since gone
     // through would be a lie.
     const sending = computed(() => (drafts.waiting.length > 0 ? drafts.held : null))
+    // By the whole queue, as the line «ждут оценки» decides it (MOL-120): a card alone cannot know
+    // that another one names a shop of its name in another city.
+    const city = computed(() => {
+      const card = queue.current.value
+      if (!card) return null
+      const places = queue.cards.value.map(({ placeName, placeCity }) => ({
+        name: placeName,
+        city: placeCity,
+      }))
+      return cityWhereNameRepeats(places)({ name: card.placeName, city: card.placeCity })
+    })
     // Refused and returned, but not the card on screen — the one the person has to be told about.
     const bounced = computed(() =>
       queue.returned.value.find((card) => card.itemId !== queue.current.value?.itemId),
@@ -194,6 +207,7 @@ export default defineComponent({
       drafts,
       phase: queue.phase,
       current: queue.current,
+      city,
       count: queue.count,
       stale: queue.stale,
       fetchedAt: queue.fetchedAt,
