@@ -266,7 +266,13 @@ no memory is offline or a failure, never a newcomer — MOL-56's «no answer is 
 The memory of `useAdvice` is that knowledge, so no flag of its own is kept; `answeredEmpty` stays
 «Покупки»'s. «Ждут оценки» names places, not trips: a card carries the place and the moment the
 server took the purchase, and a purchase made with no signal arrives with the queue hours later, so
-no gap tells one trip from two (round 2, З1). **And it names them, never counts them**: a card
-carries the name without the city, so «Ереван Сити» of Gyumri and of Yerevan are one name — a
-number would claim what the phone does not know (round 3, И2). The handoff's «Из чека «SAS»» is not
-used: the queue of verdicts does not know a source (MOL-124, П-9).
+no gap tells one trip from two (round 2, З1). **And it names them, never counts them** (round 3,
+И2): a number would claim more than the line needs to say. **A place is its name and, where that
+name stands in two cities, its city** (MOL-120, owner's decisions В-1, В-2): «Из «Ереван Сити» в
+Гюмри и «Ереван Сити» в Ереване»; a name of one city reads alone, its city noise. The card of
+«Оценки» takes the same city from the queue — a card alone cannot know there is another shop of its
+name — so a card's city goes once the other card is rated. The rule is the domain's
+`cityWhereNameRepeats`, names and cities folded as the index over `places` folds them; **a card with
+no city** — a server before MOL-120, a card the phone kept from one — **leaves the whole queue named
+as before**, since it may be either shop. The handoff's «Из чека «SAS»» is not used: the queue of
+verdicts does not know a source (MOL-124, П-9).

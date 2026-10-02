@@ -234,6 +234,13 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   Р-27, named (owner's decision on review №10): the first pair also gives the threshold of «только
   если дёшево», so one pack bought at home over ten kilos in Erevan leaves the row without a
   threshold until the pack's pair has three purchases.
+- **A place is printed with its city only where another place of the row shares its name**
+  (MOL-120, owner's decision В-3): «Дешевле всего: Ереван Сити в Гюмри» over «Ещё: Ереван Сити в
+  Ереване» — one's own purchases may be in two cities, own city first (Р-26), and the two read as one
+  shop. Not across rows: milk and bread are never compared. Every place carries its city on the wire
+  (`advicePlaceSchema.city`, optional, so the answer the phone remembered from a server before it
+  still reads — and then no place of the row is given one); whether it is printed is the domain's
+  `cityWhereNameRepeats`, the rule «Оценки» and the reminder read too.
 - **Order is by rating down, then by name, in all three groups.** The handoff asked for
   ascending unit price; that sorts _different products_ by a number — milk at 570 ֏/л above
   beef at 4 790 ֏/кг — and «compare by unit price» is about one item across places.

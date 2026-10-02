@@ -189,6 +189,11 @@ The lever of gate 0.2: the day after a purchase the bot asks «вчера · Е�
   experience and is asked about. The screen is unchanged.
 - **The message is always Russian** (Р-7): it is sent without an update, and the person's language
   is not something we keep (the privacy page). The answer to a press speaks the presser's.
+- **A place is named with its city only where two items of one reminder share its name** (MOL-120)
+  — «Вчера · Ереван Сити в Ереване» beside the Gyumri one, the name alone otherwise. The rule is the
+  domain's `cityWhereNameRepeats`, the one «Оценки» reads, so the bot keeps none of its own; the
+  city's case is a key of the dictionary (`remind.in.<город>`), a city without one is bracketed. An
+  API before MOL-120 sends no city (`placeCity` is optional), and the names stay as they were.
 - **A press is the verdict of whoever pressed** — `ctx.from.id` through
   `PUT /internal/verdicts/:itemId` into the same `rateItem`; the button carries the item and the
   digit and nothing else (43 bytes of 64). Only a score travels, so the review stays (MOL-27). An
