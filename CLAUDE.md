@@ -246,6 +246,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   second count; its third figure is «Разница», since «Остаток» is the money on the accounts.
   **The usual month is the mean of up to twelve closed months before, from three** (MOL-158): the
   running month against it to the same day, and reading it freezes no month but the one shown.
+  **«Год» is the calendar year, the sum of its months** (MOL-160): its dashed line is that same
+  usual month, ending with the year's last closed one, and a month before the data or to come is a
+  label with no bar.
 
 ### Money: accounts — `.claude/rules/money-accounts.md`
 

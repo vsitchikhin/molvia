@@ -1,15 +1,15 @@
 ---
 paths:
-  - 'packages/model/src/{entities,contracts}/{spending,spending-category,money,money-month,money-charts,money-chart-month}.ts'
-  - 'packages/model/tests/{entities,contracts}/{spending,money,money-month,money-charts,money-chart-month}*.test.ts'
+  - 'packages/model/src/{entities,contracts}/{spending,spending-category,money,money-month,money-charts,money-chart-month,money-chart-year}.ts'
+  - 'packages/model/tests/{entities,contracts}/{spending,money,money-month,money-charts,money-chart-month,money-chart-year}*.test.ts'
   - 'backend/src/db/{spendings,spending-categories,money}-repository.ts'
   - 'backend/src/usecases/{spendings,money-month,money-rates,money}*.ts'
   - 'backend/src/routes/spendings.ts'
   - 'backend/tests/spendings*.ts'
-  - 'backend/tests/{salary-shift,month-rest,money-charts,money-chart-month}*.ts'
+  - 'backend/tests/{salary-shift,month-rest,money-chart-month,money-chart-year}*.ts'
   - 'backend/drizzle/*spending*.sql'
   - 'frontend/src/views/Money*'
-  - 'frontend/src/components/{Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*,BarChart*,DonutRing*,DonutChart*,DeviationBars*,PaceLine*,Charts*,RateLine*,ExchangeLosses*,charts*}'
+  - 'frontend/src/components/{Spending*,spending*,Category*,NewCategorySheet*,MoneyEntries*,MonthSwitcher*,UndoStrip*,FloatingDock*,BarChart*,DonutRing*,DonutChart*,DeviationBars*,PaceLine*,Charts*,ExchangeLosses*,charts*}'
   - 'frontend/src/composables/{useMoneyMonth,useMoneyCharts,useKeptAnswer,useChartPointer}*'
   - 'frontend/src/composables/useSalaryShift*'
   - 'frontend/src/components/SalaryShift*'
@@ -330,34 +330,72 @@ nothing up.
   MOL-157 06), however old: the full ring of that month is there, with every category on its
   legend. Before MOL-158 it opened the period's bars on the ring's largest category (review 3 of
   MOL-156); the month tab is that question answered on the month itself. **An empty month keeps
-  the card**, with no ring — still the way into «Графики», where the year is (handoff 01,
-  adversarial Г). Its «В этом месяце трат нет» is said
+  the card, and the card keeps its ring — a grey one** (MOL-160, owner's decision В-4): with no
+  ring every new month was a caption over a hole until its first spending, the card drawn askew;
+  still the way into «Графики», where the year is (handoff 01, adversarial Г). Its «В этом месяце трат нет» is said
   by the card itself since the journal went to «Траты» (MOL-159) — **unless a spending of the month
   still waits on the phone**: «нет трат» over «Ещё не учтено: 1» said two things. A category the month
   does not name is left out, never drawn as a second «Остальные» (review 7). **`slices` defaults to empty so that a month kept on the phone before the
   ring still reads through the strict codec** (review 6): lost, every month kept went with it
   offline. **The phone does not work the ring out for it** (review 9, owner's decision «а»): that
   would be a second exception to «the phone adds nothing up», for three months and one read. **A
-  card with no ring says why, in the ring's place** (adversarial round 2, Е, Ж): categories and no
+  card with no sectors says why, beside its grey ring** (adversarial round 2, Е, Ж): categories and no
   sectors — a month kept before the ring, an answer of a server older than it — «Доли появятся,
   когда месяц обновится»; nothing a rate counted — «Доли появятся, когда у трат будет курс»; an
   empty month says nothing there. The price, named: offline, a month kept before the update has no
   ring until it is read again. Accounts are MOL-115's.
 
-## «Графики» (MOL-74)
+## «Графики» (MOL-74) and «Графики → Год» (MOL-160)
 
-**The months of «Деньги» side by side** (`GET /money/charts?period=6|12`, `/money/charts`): spending
-by month, what came in and went out, a category over time, the rate of the pair by week and the
-exchanges against the central bank. Owner's decisions В-1…В-4 of 29.09.2026, requirements and plan
-in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
+**The months of «Деньги» side by side** — since MOL-160 the calendar year (`GET
+/money/years/:year/charts`, `/money/charts?mode=year&year=`): its ring, spending by month against the
+usual month, what came in and went out, a category by month. MOL-74 built the first screen
+(`GET /money/charts?period=6|12`, owner's decisions В-1…В-4 of 29.09.2026); MOL-155 made the year
+calendar (В-2), as the owner's «Сводка» is, so «Итого за год» can be checked against it. Requirements
+and plans in `.scratch/tasks/{requirements,plans}/MOL-74.md` and `MOL-160.md`. The rules below are
+MOL-74's unless they name MOL-160, and hold for the year.
 
+- **The year is a resource, as the month is** (Р-1 of MOL-160): `GET /money/years/:year/charts`, a
+  year still to come or not a year `404`. **`GET /money/charts?period=` is gone in the same merge**,
+  with no second one: no schema changes, and an installed phone of the old version gets `404`,
+  which its error state answers with «Обновить» while the new version waits (MOL-132) — the
+  «понятный отказ» the task asked for. A bookmark of `?period=` still opens the year (`beforeEnter`).
+- **Every month of the year is counted, the year is their sum, each month by its own rate** (Р-3):
+  the ring's «≈», a sector's «≈» and «2026 · 9 месяцев» are sums of months, never the year's total by
+  today's rate, which would crawl with the rate. A month of the year with spending and no rate takes
+  the «≈» away rather than leaving a sum with a hole; a year past what money holds is no sum and a
+  grey ring, never a failed answer. **The twelve bars are January to December**: a month before the
+  owner's first with anything in it and one still to come are a label with no bar and nothing to
+  choose — quiet months, not zeros (Р-4, `quiet` on `ChartBar`, never `level` null, which is «not
+  known»). A past month after the first with data is a bar of nothing, two pixels high.
+- **The dashed line is the usual month of «Месяц»** (owner's decision В-1 of MOL-160): up to
+  `USUAL_MONTHS` closed months ending with the year's last closed one — December of a past year, the
+  month before today's in the running one — from the first with anything in it and from
+  `USUAL_MIN_CLOSED`. Read only within the year, the line was gone from January to March of every
+  year; read this way, «+53 % к среднему» is the number «Месяц» says. **The running month is
+  compared with the usual to the same day** (owner's decision В-2), as on «Месяц» — a closed one
+  with the whole — in the bars and in «Категория по месяцам» alike. **Below three the line says when
+  it comes, and only if that month is of the year still to come** (Р-6): a past year, or a December
+  whose third closed month is January, says how many of the three there are — a date already gone
+  was the lesson of adversarial Г of MOL-158.
+- **«Разница» of the year is the sum of the months'** (Р-7) only when every month with data has
+  one; otherwise the note names the months that keep it from being counted. A sum with a hole would
+  read as a total.
+- **A sector chosen on the year's ring chooses its category below** (owner's decision В-3 of
+  MOL-160): through the address, like any choice of the category, and nothing scrolls; letting it go
+  changes nothing, and «Остальные» is no category. The «second tap opens the category» of the task
+  was given up by Р-4 of the review of MOL-157 — a second tap lets the sector go.
+- **The rate of the pair is no chart of «Графики» since MOL-160** (Р-11): `RateLine`, the weeks of
+  `rate` and `weekEnds` went with the code and the tests; «Обмен денег» draws the rouble's against
+  the market in MOL-161. Until then the app has no line of the rate — the price, named, of a chart
+  the owner had asked to be taken away (MOL-155).
 - **A bar is the month of «Деньги», never a second count** (requirements 4): every month of the
-  period goes through `countMonth` — the function `GET /money/months/:month` counts one by — with
+  year goes through `countMonth` — the function `GET /money/months/:month` counts one by — with
   the same rate of the month (`monthRate`), so reading the charts freezes a closed month exactly as
   opening it does (Р-4), a change of a past exchange lets it go for both, and the salary moves by
   `budgetMonthOf` in both. An integration test holds every bar equal to its month. The rows of the
-  whole period are read once (`monthRows`, Р-3); the month before the first is counted for «к
-  августу» alone, as on «Деньгах». **A write landing while the months freeze lets them go after**
+  year and of the usual's months before it are read once (`monthRows`, Р-3); those months are
+  counted with no rate and never frozen, as the usual of «Месяц» (Р-2 of MOL-160). **A write landing while the months freeze lets them go after**
   (`settleThaws`, adversarial Ж, Ж2): the exchanges and incomes are read once, by `dayRates`, and the
   months frozen one by one after, so one written in between found nothing frozen to let go and the
   month froze without it for good. Once the read has frozen, it holds the receipts and the rule of
@@ -365,28 +403,28 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   from the day of anything that changed — a snapshot of its own missed a removal and a «Вернуть» both
   inside the read, the row the same before and after. Run in `finally`, so a read that fails after
   freezing still settles. `GET /money/months/:month` does the same for a closed month; the race was
-  MOL-73's, the charts widened it.
+  MOL-73's, the charts widened it, and the test of the year holds it (adversarial Ж).
 - **«Разница», not «Остаток»** (owner's decision В-2): the third figure of «Пришло и ушло» is what
   came in less what went out in the month, signed; «Остаток» is the money on the accounts
   (MOL-134) and one word must not mean two things on neighbouring screens. The price, named: the
   month of the move is deep below zero, since the roubles that bought the dollars were exchanges.
 - **An average is of the closed months from the first with anything in it** (Р-5, Р-15): a person
   who started in August is not averaged over empty months, and the running month, half spent, is
-  in no average. With no closed month of data there is no average. **A month with anything «не
+  in no average. Since MOL-160 only from three (above). **A month with anything «не
   посчитано» has no «Разница» and is not in its average** (adversarial d9 В): a salary in dollars on
   a day with no dollar made the month «−25 000 ₽» and the average negative. **Its spending is
   averaged unless the spending itself is short** (review С-8, d9 round 2 В2): an income changes
   nothing spent. **A category's average leaves out only a month short in that category**
   (`uncountedIn`, d9 round 3 В3): a coffee in dollars with no rate dropped the month's complete
-  «Продукты» from their «в среднем». A category spent nowhere in the period has no average, not
-  «в среднем 0 ֏». The
+  «Продукты» from their «в среднем». A category spent in none of the usual's months has no
+  average, not «в среднем 0 ֏». The
   screen says under «Пришло и ушло» what did not convert, and «Ушло» with no rate of the month is a
   dashed empty bar, never a bar of nothing spent — **while nothing spent is «ушло 0» with or without
   a rate** (`moneyMonth`, review С-7), on «Деньгах» too: a newcomer's empty months with no rate were
   the tallest bars of the card.
 - **Nothing the charts carry can fail the answer** (adversarial d9 А): a category's sum over the
-  period, which may be more than money holds, orders the series and is never sent; a change past 2⁵³
-  per cent — 0,01 ֏ then 10¹⁴ ֏ — is left unsaid. A month «Деньги» can show, the charts can show.
+  year orders the series; a sum past what money holds is no sum (`held`), a change past 2⁵³ per
+  cent — 0,01 ֏ then 10¹⁴ ֏ — is left unsaid. A month «Деньги» can show, the charts can show.
 - **Every height is the server's** (`CHART_LEVEL`, thousandths of the tallest the card shows): the
   phone divides nothing, it turns a level into a percent of the card.
 - **The exchanges are grouped by exchanger** (owner's decision В-1): «Где и заметка» read as
@@ -404,15 +442,8 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   — by the central bank of that day, since nobody named a price for it; without a comparison or
   such a rate the exchange is named («Без сравнения с ЦБ РА: N»), never summed. Twelve months
   whatever the period (handoff 03); nothing measured — no card. **Since MOL-159 the card is «Обмен
-  денег»'s, against the market** (MOL-152, `money-rates.md`); `exchanges` of `GET /money/charts`
-  stays, against the central bank, for the installed phones that read it, until MOL-160 changes that
-  answer (Р-9).
-- **The rate of the pair is the central bank's at the end of each week** (owner's decision В-4,
-  Р-14): `rates.official` of every Sunday of the period and of today, fresh for its day or a gap —
-  a gap is drawn as a break, never as zero. One side for the whole line, the one the newest rate
-  reads at least one on (MOL-81); the person's exchanges of the pair, either way, are dots on their
-  week. No pair — one currency for both — no card. The price, named: a week whose rate came from a
-  fallback provider is not marked; the card says «ЦБ РА» of the whole line.
+  денег»'s, against the market** (MOL-152, `money-rates.md`); the grouping above is still
+  `exchangeLosses`'s, and `exchanges` against the central bank went with `GET /money/charts` (MOL-160).
 - **The geometry is d3-shape's, the components are ours, and there is no charting library**
   (MOL-156, owner's decision В-1, in place of Р-1 of MOL-74 «drawn by hand»). Measured by a build
   of one probe — a ring, twelve bars, a line: `d3-shape` added 3 KB gzip against a whole app of 267;
@@ -422,44 +453,45 @@ in `.scratch/tasks/{requirements,plans}/MOL-74.md`.
   used by other people. Every library brought its own touch, tooltips and accessibility, which
   the rules below already settle, and its own scales, which the server counts. The arcs and the
   curves are the one thing hard to write by hand, and d3-shape draws them from the server's levels.
-  `BarChart` is HTML and tokens, `DonutRing` is d3-shape's arcs with a gap between sectors (none
-  on one too narrow for it), `RateLine` is SVG whose
-  strokes keep their width when stretched (`vector-effect`), a dot is a zero-length round-capped
-  line so it is never an ellipse. The reading stands above the bars, never under the finger; the
+  `BarChart` is HTML and tokens, its dashed average over the bars, `DonutRing` is d3-shape's arcs
+  with a gap between sectors (none on one too narrow for it), `PaceLine` is SVG. The reading stands
+  above the bars, never under the finger; the
   whole area is the target (`touch-action: pan-y` leaves the page its scroll), a mouse passing over
   chooses nothing. **The bars are radios and the weeks a native range**, so arrows move the choice
   and each says its month or week with its figure — **which is why the reading is not a live
   region**: the control already says it, and a drag would chatter.
 - **A finger chooses on lifting, or once it goes sideways** (`useChartPointer`, review): chosen on
   touching, every scroll that started on a chart changed the reading under the thumb; a mouse or a pen
-  chooses on press. **A new answer of the same period keeps the bar chosen** — the sources of the
+  chooses on press. **A new answer of the same year keeps the bar chosen** while it has one; another
+  year opens on its running month, or a past one on its last with data (Р-8) — the sources of the
   watch are compared one by one, since a getter of an array is a new array on every answer.
-- **The category is in the address and moves by `replace`** — the period was too, until MOL-158
-  made «Год» twelve months and `?period=` a way into it; the category chosen is kept for as long as
-  the app is open, for a way in that names none, and the first one is the largest of the period
+- **The category is in the address and moves by `replace`**, as the year is (`?year=`, none is
+  this one, one still to come is this one too); the category chosen is kept for as long as
+  the app is open, for a way in that names none, and the first one is the largest of the year
   (Р-8), not the handoff's «Кафе». **A category in the address comes first** — a link that names one
   leaves the one chosen before behind (MOL-156, owner's decision on adversarial round 2, Д); since
   MOL-158 the ring of «Куда ушли» opens «Месяц» and names none. **Every live category of the owner
-  is offered**, spent in the period or not (adversarial А, d9 Г): a category sent from an older month
+  is offered**, spent in the year or not (adversarial А, d9 Г): a category sent from an older month
   was swapped for the largest, in silence, with its own id still in the address. One
   the answer still lacks — a removed category, a stale link — is named: «Этой категории на графиках
   нет — показаны …». Only
   the person's choice or the address is remembered. **Only the latest read is kept on the phone**
-  (`molvia.charts`, adversarial Б, d9 Д): an earlier one answering late put the charts without the
+  — the last three years (`molvia.chartyears`, Р-10), adversarial Б, d9 Д: an earlier one answering late put the charts without the
   spending just written under a later hour; one whose later read is still on its way or failed is
   the freshest there is, and is kept (d9 round 2 Е2) — under the strip when that later read failed,
   since it is older than a write the phone knows landed (review С-10). Offline is a yellow strip with that hour; the four states
-  are `ScreenSkeleton` and `ScreenState`, the empty one with no button (Р-9) — and the rate and the
-  exchanges stand under it, since they do not wait for spending (adversarial В).
+  are `ScreenSkeleton` and `ScreenState`, the empty one with no button (Р-9), for an owner with
+  nothing at all (`firstMonth` null). **«‹ 2026 ›» is the year's first control** (`MonthSwitcher`,
+  `unit="year"`), back to the first year with anything in it and never past this one (Р-9 of
+  MOL-160): the bound is the answer's, so the switcher stands in `ChartsYear`, over its strip.
 
 ## «Графики → Месяц» (MOL-158)
 
 **«Месяц · Год» on top, and under «Месяц» the month** (owner's decisions В-1, В-6 of MOL-155, handoff
 MOL-157 03 and 06): `?mode=year` and `?month=` in the address, by `replace`; no `mode` is the month,
 no `month` today's on this phone. A bookmark of MOL-74's `?period=` opens the year (`beforeEnter`).
-**«Год» shows the cards of MOL-74 over twelve months until MOL-160** (owner's decision В-1 of
-MOL-158): the period goes, `GET /money/charts?period=` stays as it was — the year reads it, and so
-does an installed phone of the old version. Requirements and plan in
+Until MOL-160 «Год» showed the cards of MOL-74 over twelve months (owner's decision В-1 of
+MOL-158); since, it is the calendar year above. Requirements and plan in
 `.scratch/tasks/{requirements,plans}/MOL-158.md`.
 
 - **The month is the month of «Деньги»** (`GET /money/months/:month/charts`): the same rows through
