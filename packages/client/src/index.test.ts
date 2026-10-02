@@ -1902,3 +1902,60 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     expect(calls.map((call) => call.url)).toEqual(['http://api/actors/me/export'])
   })
 })
+
+describe('«Написать разработчику» (MOL-147)', () => {
+  function clientReplying(status: number, body: unknown) {
+    const calls: { url: string; method: string; body: unknown }[] = []
+    const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      calls.push({
+        url: input instanceof URL ? input.href : typeof input === 'string' ? input : input.url,
+        method: init?.method ?? 'GET',
+        body: typeof init?.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined,
+      })
+      return Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    }
+    return { client: createClient({ baseUrl: 'http://api', fetch }), calls }
+  }
+
+  const message = {
+    kind: 'bug' as const,
+    text: 'Не открывается «Деньги»',
+    locale: 'ru' as const,
+    pageBuild: null,
+    route: 'money',
+    platform: 'ios 18 app',
+    fromError: true,
+    errorCode: 'error.internal',
+    clientKey: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d',
+  }
+
+  it('sends the message as the sheet shows it, and tells a new one from a repeat', async () => {
+    const fresh = clientReplying(201, { number: 42 })
+    expect(await fresh.client.sendFeedback(message)).toEqual({
+      sent: { number: 42 },
+      created: true,
+    })
+    expect(fresh.calls[0]).toEqual({ url: 'http://api/feedback', method: 'POST', body: message })
+
+    const repeat = clientReplying(200, { number: 42 })
+    expect((await repeat.client.sendFeedback(message)).created).toBe(false)
+  })
+
+  it('rejects past the day’s limit with its own code', async () => {
+    const { client } = clientReplying(429, { code: ERROR.FEEDBACK_RATE_LIMITED })
+    expect(await codeOf(client.sendFeedback(message))).toBe(ERROR.FEEDBACK_RATE_LIMITED)
+  })
+
+  it('sends nothing the schema refuses — an empty text', async () => {
+    const { client, calls } = clientReplying(201, { number: 1 })
+    expect(await codeOf(client.sendFeedback({ ...message, text: '  ' }))).toBe(
+      ISSUE.TEXT_NOT_VISIBLE,
+    )
+    expect(calls).toHaveLength(0)
+  })
+})

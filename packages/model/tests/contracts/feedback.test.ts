@@ -37,7 +37,7 @@ describe('feedbackBodySchema', () => {
   it('holds the text to what draws, up to the bound and no further', () => {
     expect(issueOf({ ...body, text: '' })?.path).toEqual(['text'])
     expect(issueOf({ ...body, text: '   \n  ' })?.message).toBe(ISSUE.TEXT_NOT_VISIBLE)
-    expect(issueOf({ ...body, text: '​⁠' })?.message).toBe(ISSUE.TEXT_NOT_VISIBLE)
+    expect(issueOf({ ...body, text: '\u200B\u2060' })?.message).toBe(ISSUE.TEXT_NOT_VISIBLE)
     expect(
       feedbackBodySchema.parse({ ...body, text: 'а'.repeat(FEEDBACK_TEXT_MAX) }).text,
     ).toHaveLength(FEEDBACK_TEXT_MAX)

@@ -32,6 +32,7 @@ import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
 import { sessionRoutes } from '@/routes/sessions'
 import { exchangeRoutes } from '@/routes/exchanges'
+import { feedbackRoutes } from '@/routes/feedback'
 import { advice, adviceSearch } from '@/usecases/advice'
 import { ownNever } from '@/usecases/own-never'
 import { ownPrices } from '@/usecases/own-prices'
@@ -39,6 +40,7 @@ import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
 import { exportMine } from '@/usecases/export-mine'
+import { sendFeedback } from '@/usecases/send-feedback'
 import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
@@ -135,6 +137,7 @@ import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
 import { createExportRepository } from '@/db/export-repository'
+import { createFeedbackRepository } from '@/db/feedback-repository'
 import { createReminderRepository } from '@/db/reminders-repository'
 import { describeFailure } from '@/db/failure'
 import { authTransactOn } from '@/db/auth-unit-of-work'
@@ -150,6 +153,7 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.LOGIN_UNAVAILABLE]: 404,
   [ERROR.LOGIN_FORBIDDEN]: 403,
   [ERROR.LOGIN_RATE_LIMITED]: 429,
+  [ERROR.FEEDBACK_RATE_LIMITED]: 429,
   [ERROR.LOGIN_DISABLED]: 503,
   [ERROR.BOT_UNAUTHORIZED]: 401,
   // The request is well formed; another row already holds what it claims — a barcode that
@@ -537,6 +541,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       )
       actorEraseRoute(guarded, (telegramUserId) =>
         eraseMe(createErasureRepository(db), telegramUserId),
+      )
+      feedbackRoutes(guarded, (actorId, message) =>
+        sendFeedback(createFeedbackRepository(db), actorId, message, VERSION),
       )
       sessionRoutes(guarded, {
         list: (actorId, currentId) => listSessions(sessions, actorId, currentId),
