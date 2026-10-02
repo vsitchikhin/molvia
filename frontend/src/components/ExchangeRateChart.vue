@@ -214,8 +214,6 @@ const MARGIN = 50
 const FINGER_PX = 12
 /** How far from its centre a dot is drawn, its ring included (`.halo`, 14 px wide). */
 const RING_PX = 7
-/** Dots this much nearer or farther from the finger than each other are one spot to the eye. */
-const SAME_SPOT_PX = 3
 /** Half the end of the mark, in thousandths of the plot's width. */
 const TICK = 14
 
@@ -321,16 +319,25 @@ export default defineComponent({
     )
     const cursorX = computed(() => chosen.value?.exchange?.x ?? week.value?.x ?? 0)
 
+    /** The spot taps go round on: where the round began, and its dots in turn. */
+    let round: { x: number; y: number; keys: string[] } | null = null
+
     watch(
       () => pair.value?.currency,
       () => {
         chosenKey.value = null
+        round = null
       },
     )
 
     function choose(index: number): void {
       const item = items.value[index]
       if (item) chosenKey.value = item.key
+    }
+
+    function chooseKey(key: string | undefined): void {
+      const index = items.value.findIndex((item) => item.key === key)
+      if (index !== -1) choose(index)
     }
 
     function choosePair(value: string): void {
@@ -340,13 +347,15 @@ export default defineComponent({
     /**
      * A tap is read by what is drawn, in pixels (adversarial Л, М, Н, review 6). **The dot under the
      * finger is chosen** — the nearest within `FINGER_PX`; measured in thousandths, the left half of a
-     * Monday's dot lay nearer the end of the week before. **A tap on the spot of the dot already
-     * chosen turns, from it, to the next of the dots drawn over that spot** — whose ring covers the
-     * touch (`RING_PX`): one day and one rate, or two days and nearly one (adversarial И). The spot
-     * is the chosen dot's only while it is as near the finger as the nearest, give or take
-     * `SAME_SPOT_PX`: a tap on the middle of three dots 7 px apart chooses the middle one (Н), and
-     * turned from the dot nearest instead, three dots on one spot went round two of them (О, review
-     * 7). **A slide follows the finger**, kept only by a dot drawn right on the one under it.
+     * Monday's dot lay nearer the end of the week before. **Taps again on one spot go round the dots
+     * drawn over it** — whose ring covers the touch (`RING_PX`): one day and one rate, or days nearly
+     * one (adversarial И) — **in order of their distance from where the round began**, so the first
+     * tap is the dot under the finger and every dot of the spot comes in turn. A spot is a touch
+     * within `RING_PX` of the last tap, a finger's jitter. Turned from the one chosen, the middle of
+     * three dots 7 px apart went to the first (Н); turned from the nearest, three dots on one spot
+     * went round two (О, review 7); turned in order of days, a tap on one of three dots 2,7 px apart
+     * showed its neighbour (П). A tap on a new spot right on the dot already chosen goes on to the
+     * next. **A slide follows the finger**, kept only by a dot drawn right on the one under it.
      * **With no dot under the finger, the nearest by x alone**: a week with no exchange by its end,
      * an exchange by its day (review 1) — never by height, which chose a week two ahead over a line
      * of 6 px weeks and left a gap out of reach (review 4, Ж).
@@ -376,6 +385,7 @@ export default defineComponent({
         across.forEach((dx, index) => {
           if (nearest === -1 || dx < (across[nearest] ?? Infinity)) nearest = index
         })
+        round = null
         choose(nearest)
         return
       }
@@ -384,19 +394,31 @@ export default defineComponent({
       const chosen = items.value[chosenIndex.value]?.exchange
       if (!point.tap) {
         // A slide follows the finger; only a dot drawn right on the one under it keeps the choice.
+        round = null
         if (!chosen || !target || apart(chosen, finger) > apart(target, finger)) choose(hit)
         return
       }
-      // A tap on the spot of the dot already chosen turns, from it, to the next drawn over that spot.
-      const covering = items.value.flatMap((item, index) =>
-        item.exchange && apart(item.exchange, finger) <= RING_PX ? [index] : [],
-      )
-      const held = covering.indexOf(chosenIndex.value)
-      const onSpot =
-        chosen && target && apart(chosen, finger) - apart(target, finger) <= SAME_SPOT_PX
-      if (held !== -1 && covering.length > 1 && onSpot) {
-        choose(covering[(held + 1) % covering.length] ?? hit)
-      } else choose(hit)
+      const key = items.value[chosenIndex.value]?.key
+      const last = round
+      if (last && Math.hypot(finger.x - last.x, finger.y - last.y) <= RING_PX) {
+        // Again on the spot: the next of its dots, round, from the one chosen.
+        const held = key === undefined ? -1 : last.keys.indexOf(key)
+        if (held !== -1) {
+          chooseKey(last.keys[(held + 1) % last.keys.length])
+          return
+        }
+      }
+      // A new spot: its dots by their distance from the finger — the one under it first.
+      const keys = items.value
+        .flatMap((item, index) =>
+          item.exchange && (index === hit || apart(item.exchange, finger) <= RING_PX)
+            ? [{ key: item.key, away: apart(item.exchange, finger), index }]
+            : [],
+        )
+        .sort((one, other) => one.away - other.away || one.index - other.index)
+        .map((dot) => dot.key)
+      round = { x: finger.x, y: finger.y, keys }
+      chooseKey(keys[0] === key && keys.length > 1 ? keys[1] : keys[0])
     })
 
     const yOf = (level: number) => 1000 - MARGIN - (level * (1000 - 2 * MARGIN)) / CHART_LEVEL

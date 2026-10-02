@@ -365,6 +365,33 @@ describe('ExchangeRateChart (MOL-161)', () => {
     }
   })
 
+  it('three dots 2,7 px apart: the first tap is the one under the finger, then round them all (П)', async () => {
+    const dots = [
+      ['a0000000-0000-4000-8000-000000000031', '2026-02-21', 2, 562, 'Первый'],
+      ['a0000000-0000-4000-8000-000000000032', '2026-02-24', 3, 571, 'Второй'],
+      ['a0000000-0000-4000-8000-000000000033', '2026-02-27', 3, 580, 'Третий'],
+    ] as const
+    const exchanges = dots.map(([id, day, week, x, place]) => point(id, day, week, x, { place }))
+    const { view, area } = chart([rouble({ exchanges })])
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    const shown = () => view.find('.mine-place').text().split(' · ')[0]
+    expect(shown()).toBe('Третий')
+    // Right on «Второй»: it, then its neighbours, then it again.
+    const round: (string | undefined)[] = []
+    for (let tap = 0; tap < 4; tap += 1) {
+      await at(view, area, 171.3, 106.2)
+      round.push(shown())
+    }
+    // Its two neighbours stand 2,7 px off either way: which comes first is a tie.
+    expect(round[0]).toBe('Второй')
+    expect(new Set(round.slice(0, 3))).toEqual(new Set(['Первый', 'Второй', 'Третий']))
+    expect(round[3]).toBe('Второй')
+    // Away from the spot and back right on «Первый»: a new round, it first.
+    await at(view, area, 20, 20)
+    await at(view, area, 168.6, 106.2)
+    expect(shown()).toBe('Первый')
+  })
+
   it('a chain of dots 7 px apart: a tap and a slide choose the one under the finger (adversarial Н)', async () => {
     // One place, one rate, every eight days: centres 7,2 px apart on 300 px, each overlapping the next.
     const chain = [

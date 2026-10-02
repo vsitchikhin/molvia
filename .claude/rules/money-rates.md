@@ -341,21 +341,25 @@ rate exactly as before.
   server before it. The finger chooses as on every chart of the section (`useChartPointer`), **by
   what is drawn, in pixels** (adversarial Л, М, Н, review 6): **the dot under the finger is chosen**
   — the nearest within `FINGER_PX`; measured in thousandths, the left half of a Monday's dot lay
-  nearer the end of the week before, which was chosen with the dot under the finger. **A tap on the
-  spot of the dot already chosen turns, from it, to the next of the dots drawn over that spot** —
-  whose ring covers the touch (`RING_PX`): one day and one rate, or two days and nearly one
-  (adversarial И). The spot is the chosen dot's only while it is as near the finger as the nearest,
-  give or take `SAME_SPOT_PX`: a tap on the middle of three dots 7 px apart chooses the middle one
-  (Н), and turned from the dot nearest instead, three dots on one spot went round two (О, review 7).
-  **A slide follows the finger** (`tap`), kept only by a dot drawn right on the one under it. **With
-  no dot under the finger, the nearest by x alone** — a week with no exchange by its end, an exchange
-  by its day (review 1), never by height: let into the height, a week was chosen two ahead on a line
-  of 6 px weeks, and a gap could not be chosen at all (review 4, adversarial Ж). The
-  latest exchange by default, two of one day in the order they were made, never by their ids
-  (review 2). **A hidden radio for each week with no exchange and for each exchange** (Р-6): one per
-  week left the second exchange of a week out of reach of the keys. The scale is never stretched to a
-  tick (review 3): stretched to a tick rounded off a flat line, the line was pressed to the top. A
-  market that would have given nothing has no mark.
+  nearer the end of the week before, which was chosen with the dot under the finger. **Taps again on
+  one spot go round the dots drawn over it** — whose ring covers the touch (`RING_PX`): one day and
+  one rate, or days nearly one (adversarial И) — **in order of their distance from where the round
+  began**: the first tap is the dot under the finger, and every dot of the spot comes in turn. A spot
+  is a touch within `RING_PX` of the last tap — a finger's jitter. Turned from the one chosen, the
+  middle of three dots 7 px apart went to the first (Н); turned from the nearest, three dots on one
+  spot went round two (О, review 7); turned in order of days, a tap right on one of three dots 2,7 px
+  apart showed its neighbour (П). **The price, named:** within one spot the round goes on — a tap
+  2,7 px off the last, right on another dot, shows the next of the round, not that dot; a finger
+  cannot tell them apart either. A tap on a new spot right on the dot already chosen goes on to the
+  next. **A slide follows the finger** (`tap`), kept only by a dot drawn right on the one under it.
+  **With no dot under the finger, the nearest by x alone** — a week with no exchange by its end, an
+  exchange by its day (review 1), never by height: let into the height, a week was chosen two ahead
+  on a line of 6 px weeks, and a gap could not be chosen at all (review 4, adversarial Ж). The latest
+  exchange by default, two of one day in the order they were made, never by their ids (review 2).
+  **A hidden radio for each week with no exchange and for each exchange** (Р-6): one per week left the
+  second exchange of a week out of reach of the keys. The scale is never stretched to a tick (review
+  3): stretched to a tick rounded off a flat line, the line was pressed to the top. A market that
+  would have given nothing has no mark.
 
 ## Incomes
 
