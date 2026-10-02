@@ -166,6 +166,17 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   took away the Erevan prices a Gyumri resident could see for free — and leaving it out
   entirely put their own Erevan receipt first, under the word «Дешевле всего». Own city first,
   then by price.
+- **A place's price is the last one paid there, not the lowest ever** (MOL-166, the owner's
+  decision of MOL-92, В-3: «цены в магазинах подниматься могут, а вот спускаются редко»). Where
+  this person bought, it is **their own last purchase, in either mode** — by `latestFirst`, the one
+  fragment «Тут дешевле» reads too, and in the phone's zone the request names: under the minimum
+  the sheet said «Зовуни 600» and the home «Дешевле всего: Зовуни 540» of one milk, and an August
+  discount pointed at a shop that no longer sold at it. **A place opened by other people is the
+  lower median of each buyer's own last price there** (В-1): the last purchase of a place is the
+  receipt of whoever bought last, read as it is by anyone looking twice, and the median of three
+  people's figures is a price someone paid without naming who was there yesterday. The moving
+  picture stays the known limit it was under the minimum. Places are ordered by this price, own
+  city first; `observations` and the latest visit still count every purchase, for Р-4 alone.
 - **The threshold of «только если дёшево» is the lower median, from three purchases**
   (`PRICE_MEDIAN_MIN_OBSERVATIONS`, MOL-33's answer) — `percentile_disc(0.5)`, a price someone
   actually paid, the same rule `isRateJump` follows. Fewer than three and the field is `null`,
@@ -261,8 +272,8 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
 - **A place's price is the last one paid there, not the lowest** (В-3, the owner's comment: «цены в
   магазинах подниматься могут, а вот спускаются редко»). Last by the record's own day as the phone
   named it (MOL-121), then the moment it began, then the moment the row was written; the day printed
-  is that purchase's. **«Что брать» still names the minimum** — moving it is MOL-166, kept apart
-  because the last price of a place in the shared mode is one stranger's receipt.
+  is that purchase's. **«Что брать» names the same price** (MOL-166), by the same fragment
+  (`latestFirst`) — a test asks both about one place.
 - **Only the city of the record** (В-4): a cheaper Erevan receipt is no action at a Gyumri shelf.
   **The server reads it off the record's place** (`trip=`, review №1): `TripView` carries no city,
   and the settings are not the record — a Gyumri resident pressing «Записать покупки» in an Erevan
