@@ -64,7 +64,8 @@ export interface LoginsInWindow {
 /**
  * The rating reminder's lever (MOL-101, В-4) over the days the window touches, in Yerevan, summed
  * from `reminder_days`: how many people got each step, how many items the messages asked about,
- * and how many verdicts a press in the bot gave. Not the gate's cohort — the reminders of those
+ * how many verdicts a press in the bot gave, and how many people turned the reminders off — under a
+ * reminder, in the settings, by blocking the bot (MOL-103). Not the gate's cohort — the reminders of those
  * days, whoever they went to.
  */
 export interface RemindersInWindow {
@@ -75,6 +76,10 @@ export interface RemindersInWindow {
   readonly thirdSteps: number
   readonly items: number
   readonly rated: number
+  /** People whose reminders went from on to off (MOL-103, В-4), by how. */
+  readonly offButton: number
+  readonly offSettings: number
+  readonly offBlocked: number
 }
 
 export interface GatesReader {
@@ -175,6 +180,9 @@ async function remindersIn(tx: Conn, from: Date, to: Date): Promise<RemindersInW
       thirdSteps: sql<number>`coalesce(sum(${reminderDays.thirdSteps}), 0)::int`,
       items: sql<number>`coalesce(sum(${reminderDays.items}), 0)::int`,
       rated: sql<number>`coalesce(sum(${reminderDays.rated}), 0)::int`,
+      offButton: sql<number>`coalesce(sum(${reminderDays.offButton}), 0)::int`,
+      offSettings: sql<number>`coalesce(sum(${reminderDays.offSettings}), 0)::int`,
+      offBlocked: sql<number>`coalesce(sum(${reminderDays.offBlocked}), 0)::int`,
     })
     .from(reminderDays)
     .where(sql`${reminderDays.day} between ${firstDay}::date and ${lastDay}::date`)
@@ -186,5 +194,8 @@ async function remindersIn(tx: Conn, from: Date, to: Date): Promise<RemindersInW
     thirdSteps: sums?.thirdSteps ?? 0,
     items: sums?.items ?? 0,
     rated: sums?.rated ?? 0,
+    offButton: sums?.offButton ?? 0,
+    offSettings: sums?.offSettings ?? 0,
+    offBlocked: sums?.offBlocked ?? 0,
   }
 }

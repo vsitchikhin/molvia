@@ -47,6 +47,9 @@ const REPORT: GatesReport = {
     thirdSteps: 3,
     items: 40,
     rated: 9,
+    offButton: 2,
+    offSettings: 1,
+    offBlocked: 0,
   },
 }
 
@@ -88,12 +91,17 @@ describe('gates — чтение ворот вручную', () => {
         thirdSteps: 0,
         items: 0,
         rated: 0,
+        offButton: 0,
+        offSettings: 0,
+        offBlocked: 0,
       },
     })
     await exit
     const block = lines.slice(lines.findIndex((line) => line.startsWith('remind ')))
     expect(block[1]).toContain('the day 2026-10-05 in Yerevan')
-    expect(block.at(-1)).toBe('     rated by a press in the bot         0 of 0     —')
+    expect(block.find((line) => line.includes('rated by a press'))).toBe(
+      '     rated by a press in the bot         0 of 0     —',
+    )
   })
 
   it('день --from — полночь по Еревану, без --to — до сейчас', async () => {
@@ -207,6 +215,9 @@ describe('gates — чтение ворот вручную', () => {
       '     third step, then the pause          3          silent after it: 6 months',
       '     items asked about                   40',
       '     rated by a press in the bot         9 of 40     22.5 %',
+      '     turned off under a reminder         2          people',
+      '     turned off in the settings          1          people',
+      '     blocked the bot                     0          people, reminders off by it',
     ])
     expect(lines.join('\n')).not.toMatch(/STOP|pass|fail/)
   })

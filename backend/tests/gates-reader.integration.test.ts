@@ -96,7 +96,16 @@ describe('the gates reader', () => {
   })
 
   it('sums the reminder counters of the days the window touches (MOL-101)', async () => {
-    const counts = { firstSteps: 1, secondSteps: 1, thirdSteps: 1, items: 3, rated: 1 }
+    const counts = {
+      firstSteps: 1,
+      secondSteps: 1,
+      thirdSteps: 1,
+      items: 3,
+      rated: 1,
+      offButton: 1,
+      offSettings: 0,
+      offBlocked: 1,
+    }
     await db.insert(reminderDays).values([
       { day: '2026-10-06', ...counts }, // the day before
       { day: '2026-10-07', ...counts },
@@ -117,6 +126,9 @@ describe('the gates reader', () => {
       thirdSteps: 2,
       items: 6,
       rated: 3,
+      offButton: 2,
+      offSettings: 0,
+      offBlocked: 2,
     })
   })
 
@@ -125,7 +137,7 @@ describe('the gates reader', () => {
       from: new Date('2026-10-07T00:00:00+04:00'),
       to: new Date('2026-10-08T00:00:00+04:00'),
     })
-    expect(report.reminders).toMatchObject({ firstSteps: 0, items: 0, rated: 0 })
+    expect(report.reminders).toMatchObject({ firstSteps: 0, items: 0, rated: 0, offBlocked: 0 })
   })
 
   it('reads inside a read-only, repeatable-read transaction', async () => {
