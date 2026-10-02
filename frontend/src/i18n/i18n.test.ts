@@ -196,6 +196,12 @@ describe('словарь: повторяющиеся тексты', () => {
       // её шторки в правке и строка выбора счёта в шторках операций.
       Счета: ['accounts.title', 'privacy.stored.accounts.term'],
       Счёт: ['accounts.picker.row_spending', 'accounts.screen.add', 'accounts.sheet.title_edit'],
+      // Период графика курса (MOL-168): подпись сегмента и та же фраза в «Курс рубля за …»; у
+      // месяца они расходятся регистром. Сам переключатель говорит словами «Графиков».
+      '6 месяцев': ['exchange.rate_chart.period_in.6', 'exchange.rate_chart.period_option.6'],
+      '12 месяцев': ['exchange.rate_chart.period_in.12', 'exchange.rate_chart.period_option.12'],
+      Месяц: ['exchange.rate_chart.period_option.1', 'spending.charts.mode_month'],
+      Период: ['exchange.rate_chart.period', 'spending.charts.mode'],
     })
   })
 
@@ -290,6 +296,11 @@ describe('словарь: повторяющиеся тексты', () => {
         'settings.group_account',
       ],
       Accounts: ['accounts.title', 'privacy.stored.accounts.term'],
+      // The period of the rate chart, as in Russian (MOL-168).
+      '6 months': ['exchange.rate_chart.period_in.6', 'exchange.rate_chart.period_option.6'],
+      '12 months': ['exchange.rate_chart.period_in.12', 'exchange.rate_chart.period_option.12'],
+      Month: ['exchange.rate_chart.period_option.1', 'spending.charts.mode_month'],
+      Period: ['exchange.rate_chart.period', 'spending.charts.mode'],
     })
   })
 })

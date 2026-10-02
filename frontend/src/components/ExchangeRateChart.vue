@@ -1,6 +1,6 @@
 <template>
   <AppCard v-if="pair" as="section" class="rate-chart" :aria-labelledby="headingId">
-    <h2 :id="headingId" class="caption">{{ t(`exchange.rate_chart.title.${pair.currency}`) }}</h2>
+    <h2 :id="headingId" class="caption">{{ title }}</h2>
     <p class="legend" aria-hidden="true">
       <span class="key"
         ><span class="swatch line"></span>{{ t('exchange.rate_chart.legend_market') }}</span
@@ -20,13 +20,27 @@
       hide-legend
       @update:model-value="choosePair"
     />
+    <!-- Always, a pair or several (MOL-168, В-3 «а»): under the pairs, over all of the answer. -->
+    <SegmentedControl
+      class="periods"
+      :model-value="String(months)"
+      :options="periodOptions"
+      :legend="t('exchange.rate_chart.period')"
+      hide-legend
+      @update:model-value="choosePeriod"
+    />
 
     <!-- The reading is not a live region: the radio chosen says the same (Р-6 of MOL-157). -->
     <div class="reading">
-      <template v-if="week">
-        <p class="week">{{ t('exchange.rate_chart.week', { day: shortDay(week.day) }) }}</p>
-        <p v-if="week.rate" class="figure">{{ rateOf(week.rate) }}</p>
-        <p v-else class="figure missing">{{ t('exchange.rate_chart.no_market') }}</p>
+      <p v-if="!period" class="none">
+        {{ t('exchange.rate_chart.no_market_period', { period: periodIn }) }}
+      </p>
+      <template v-if="chosenStep">
+        <p class="week">
+          {{ t(`exchange.rate_chart.${step}`, { day: shortDay(chosenStep.day) }) }}
+        </p>
+        <p v-if="chosenStep.rate" class="figure">{{ rateOf(chosenStep.rate) }}</p>
+        <p v-else class="figure missing">{{ t(words.noMarket) }}</p>
       </template>
       <p v-if="chosen?.exchange" class="mine">
         <span class="mine-dot" aria-hidden="true"></span>
@@ -40,17 +54,17 @@
           <span class="mine-place">{{ placeLineOf(chosen.exchange) }}</span>
         </span>
       </p>
-      <p v-else class="none">
+      <p v-else-if="period" class="none">
         {{
-          pair.exchanges.length === 0
-            ? t('exchange.rate_chart.none_year')
-            : t('exchange.rate_chart.none')
+          period.exchanges.length === 0
+            ? t('exchange.rate_chart.none_period', { period: periodIn })
+            : t(words.none)
         }}
       </p>
     </div>
 
-    <fieldset class="chart">
-      <legend class="unseen">{{ t(`exchange.rate_chart.title.${pair.currency}`) }}</legend>
+    <fieldset v-if="period" class="chart">
+      <legend class="unseen">{{ title }}</legend>
       <div class="plot-row">
         <div
           ref="area"
@@ -62,7 +76,7 @@
         >
           <svg class="plot" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true">
             <line
-              v-for="tick in pair.levels"
+              v-for="tick in period.levels"
               :key="tick.level"
               class="grid"
               x1="0"
@@ -97,21 +111,21 @@
               :y2="spot.y"
               vector-effect="non-scaling-stroke"
             />
-            <template v-if="week && week.level !== null">
+            <template v-if="chosenStep && chosenStep.level !== null">
               <line
                 v-for="part in ['ring', 'hole']"
                 :key="part"
                 :class="part"
-                :x1="week.x"
-                :y1="yOf(week.level)"
-                :x2="week.x"
-                :y2="yOf(week.level)"
+                :x1="chosenStep.x"
+                :y1="yOf(chosenStep.level)"
+                :x2="chosenStep.x"
+                :y2="yOf(chosenStep.level)"
                 vector-effect="non-scaling-stroke"
               />
             </template>
             <!-- The mark ends at the market the exchange was measured by (В-1), never at the line:
                  a cash exchange is set beside cash, which the line of all bank clients is not. -->
-            <template v-for="point in pair.exchanges" :key="`mark-${point.id}`">
+            <template v-for="point in period.exchanges" :key="`mark-${point.id}`">
               <template v-if="point.market">
                 <line
                   class="mark"
@@ -132,7 +146,7 @@
               </template>
             </template>
             <!-- A dot is a zero-length round-capped line: stretched with the plot, still round. -->
-            <template v-for="point in pair.exchanges" :key="point.id">
+            <template v-for="point in period.exchanges" :key="point.id">
               <line
                 v-for="part in ['halo', 'point']"
                 :key="part"
@@ -158,7 +172,7 @@
         </div>
         <div class="axis" aria-hidden="true">
           <span
-            v-for="tick in pair.levels"
+            v-for="tick in period.levels"
             :key="tick.level"
             class="level"
             :style="{ top: `${String(yOf(tick.level) / 10)}%` }"
@@ -170,8 +184,8 @@
       <div class="months-row" aria-hidden="true">
         <div class="months">
           <span
-            v-for="label in monthLabels"
-            :key="label.month"
+            v-for="label in axisLabels"
+            :key="label.key"
             class="month"
             :style="{ left: `${String(label.x / 10)}%` }"
           >
@@ -180,8 +194,13 @@
         </div>
       </div>
     </fieldset>
+    <!-- No market in the period, the year has one (Р-6): the height of the chart, so nothing moves. -->
+    <div v-else class="chart-empty" aria-hidden="true">
+      <div class="area"></div>
+      <div class="months"></div>
+    </div>
 
-    <p class="note">{{ t(`exchange.rate_chart.note_${pair.side}`) }}</p>
+    <p class="note">{{ t(`exchange.rate_chart.note_${step}_${pair.side}`) }}</p>
   </AppCard>
 </template>
 
@@ -189,8 +208,21 @@
 import { computed, defineComponent, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { CHART_LEVEL, RATE_SCALE, currencySign, decimalFromRate, formatRate } from '@molvia/model'
-import type { ExchangeRate, ExchangeRateChartView } from '@molvia/model'
+import {
+  CHART_LEVEL,
+  RATE_CHART_MONTHS,
+  RATE_CHART_STEP,
+  RATE_SCALE,
+  currencySign,
+  decimalFromRate,
+  formatRate,
+} from '@molvia/model'
+import type {
+  ExchangeRate,
+  ExchangeRateChartView,
+  ExchangeRatePeriodView,
+  RateChartMonths,
+} from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { shortMonth, signedPercent } from '@/components/charts'
@@ -198,12 +230,12 @@ import { useChartPointer } from '@/composables/useChartPointer'
 import { calendarDay } from '@/days'
 
 type Pair = ExchangeRateChartView['pairs'][number]
-type Point = Pair['exchanges'][number]
+type Point = ExchangeRatePeriodView['exchanges'][number]
 
-/** What can be chosen: a week with no exchange, or each exchange of a week (Р-6). */
+/** What can be chosen: a step — a day or a week — with no exchange, or each exchange of one (Р-6). */
 interface Item {
   readonly key: string
-  readonly week: number
+  readonly step: number
   readonly exchange: Point | null
   readonly spoken: string
 }
@@ -218,22 +250,28 @@ const STACK_PX = 3
 const TICK = 14
 
 /**
- * «Курс рубля за 12 месяцев» (MOL-161, handoff MOL-157 05, frames 6c and 6d): the market of all
- * bank clients at the end of each week — the only row with a year of history, and the legend says
- * so (Р-3) — the person's exchanges as dots on their own day, and from each a mark to the market it
- * was measured by (В-1), so the mark and the percent always say the same. A choice is made as a bar
- * is — on lifting the finger or once it goes sideways — the nearest exchange by its day or week
- * with none by its end; by default the latest exchange. Hidden radios, one per week with no
- * exchange and one per exchange, give the keyboard and a screen reader every choice. Every height
- * is the server's.
+ * «Курс рубля за месяц, 6 и 12 месяцев» (MOL-161, MOL-168, handoff MOL-157 05, frames 6c and 6d):
+ * the market of all bank clients every day of the month, at the end of each week of half a year and
+ * the year — the only row with a year of history, and the legend says so (Р-3) — the person's
+ * exchanges as dots on their own day, and from each a mark to the market it was measured by (В-1),
+ * so the mark and the percent always say the same. The period is the screen's (its address,
+ * MOL-136): all three come in one answer, and a change of it asks nothing. A choice is made as a bar
+ * is — on lifting the finger or once it goes sideways — the nearest exchange by its day or a step
+ * with none by its end; by default the latest exchange, kept across the periods that have it.
+ * Hidden radios, one per step with no exchange and one per exchange, give the keyboard and a screen
+ * reader every choice. Every height is the server's.
  */
 export default defineComponent({
   name: 'ExchangeRateChart',
   components: { AppCard, SegmentedControl },
   props: {
     chart: { type: Object as PropType<ExchangeRateChartView>, required: true },
+    months: { type: Number as PropType<RateChartMonths>, default: 12 },
   },
-  setup(props) {
+  emits: {
+    'update:months': (months: RateChartMonths) => RATE_CHART_MONTHS.includes(months),
+  },
+  setup(props, { emit }) {
     const { t, locale } = useI18n()
     const area = ref<HTMLElement | null>(null)
     const currency = ref<Pair['currency'] | null>(null)
@@ -244,6 +282,34 @@ export default defineComponent({
         props.chart.pairs.find((one) => one.currency === currency.value) ??
         props.chart.pairs[0] ??
         null,
+    )
+
+    /** The period of the pair, or null — no market in it while the year has one (Р-6). */
+    const period = computed<ExchangeRatePeriodView | null>(
+      () => pair.value?.periods[props.months] ?? null,
+    )
+    const step = computed(() => period.value?.step ?? RATE_CHART_STEP[props.months])
+    const periodIn = computed(() => t(`exchange.rate_chart.period_in.${String(props.months)}`))
+    const title = computed(() =>
+      pair.value
+        ? t(`exchange.rate_chart.title.${pair.value.currency}`, { period: periodIn.value })
+        : '',
+    )
+    /** The words of a step: a day of the month, a week of half a year and of the year. */
+    const words = computed(() =>
+      step.value === 'day'
+        ? {
+            noMarket: 'exchange.rate_chart.no_market_day',
+            none: 'exchange.rate_chart.none_day',
+            spoken: 'exchange.rate_chart.spoken_day',
+            spokenMine: 'exchange.rate_chart.spoken_mine_day',
+          }
+        : {
+            noMarket: 'exchange.rate_chart.no_market',
+            none: 'exchange.rate_chart.none',
+            spoken: 'exchange.rate_chart.spoken',
+            spokenMine: 'exchange.rate_chart.spoken_mine',
+          },
     )
 
     const rateOf = (rate: ExchangeRate) => formatRate(rate, locale.value)
@@ -267,29 +333,29 @@ export default defineComponent({
     }
 
     const items = computed<Item[]>(() => {
-      const shown = pair.value
+      const shown = period.value
       if (!shown) return []
-      return shown.weeks.flatMap((week, index): Item[] => {
-        const market = week.rate
-          ? t('exchange.rate_chart.spoken_market', { rate: rateOf(week.rate) })
+      return shown.steps.flatMap((one, index): Item[] => {
+        const market = one.rate
+          ? t('exchange.rate_chart.spoken_market', { rate: rateOf(one.rate) })
           : t('exchange.rate_chart.spoken_no_market')
-        const day = longDay(week.day)
-        const points = shown.exchanges.filter((point) => point.week === index)
+        const day = longDay(one.day)
+        const points = shown.exchanges.filter((point) => point.step === index)
         if (points.length === 0) {
           return [
             {
-              key: `week-${week.day}`,
-              week: index,
+              key: `step-${one.day}`,
+              step: index,
               exchange: null,
-              spoken: t('exchange.rate_chart.spoken', { day, market }),
+              spoken: t(words.value.spoken, { day, market }),
             },
           ]
         }
         return points.map((point) => ({
           key: point.id,
-          week: index,
+          step: index,
           exchange: point,
-          spoken: t('exchange.rate_chart.spoken_mine', {
+          spoken: t(words.value.spokenMine, {
             day,
             market,
             date: longDay(point.day),
@@ -300,7 +366,7 @@ export default defineComponent({
       })
     })
 
-    /** The latest exchange, or the latest week when there is none. */
+    /** The latest exchange, or the latest step when there is none. */
     function defaultIndex(): number {
       const all = items.value
       for (let index = all.length - 1; index >= 0; index -= 1) {
@@ -309,16 +375,18 @@ export default defineComponent({
       return all.length - 1
     }
 
-    // A new answer keeps the choice while it still has it; another pair starts afresh.
+    // A new answer and another period keep the choice while they still have it — an exchange by its
+    // id, a step by its day (Р-6 of MOL-168); another pair starts afresh.
     const chosenIndex = computed(() => {
       const found = items.value.findIndex((item) => item.key === chosenKey.value)
       return found === -1 ? defaultIndex() : found
     })
     const chosen = computed(() => items.value[chosenIndex.value] ?? null)
-    const week = computed(
-      () => (chosen.value ? pair.value?.weeks[chosen.value.week] : null) ?? null,
+    /** The step chosen: its day, its market and where it is drawn. */
+    const chosenStep = computed(
+      () => (chosen.value ? period.value?.steps[chosen.value.step] : null) ?? null,
     )
-    const cursorX = computed(() => chosen.value?.exchange?.x ?? week.value?.x ?? 0)
+    const cursorX = computed(() => chosen.value?.exchange?.x ?? chosenStep.value?.x ?? 0)
 
     /** The spot taps go round on: the centre of the dot the round began with, and its dots. */
     let round: { x: number; y: number; keys: string[] } | null = null
@@ -330,14 +398,11 @@ export default defineComponent({
         round = null
       },
     )
-    // A new answer moves the dots — a scale grown with a new rate — and a round of the old places
-    // would turn over dots no longer under the finger (adversarial Р).
-    watch(
-      () => props.chart,
-      () => {
-        round = null
-      },
-    )
+    // A new answer or another period moves the dots — a scale grown with a new rate, another span
+    // — and a round of the old places would turn over dots no longer under the finger (adversarial Р).
+    watch([() => props.chart, () => props.months], () => {
+      round = null
+    })
 
     function choose(index: number): void {
       const item = items.value[index]
@@ -351,6 +416,11 @@ export default defineComponent({
 
     function choosePair(value: string): void {
       currency.value = props.chart.pairs.find((one) => one.currency === value)?.currency ?? null
+    }
+
+    function choosePeriod(value: string): void {
+      const months = RATE_CHART_MONTHS.find((one) => String(one) === value)
+      if (months !== undefined) emit('update:months', months)
     }
 
     /**
@@ -372,14 +442,14 @@ export default defineComponent({
      * weeks and left a gap out of reach (review 4, Ж).
      */
     const pointer = useChartPointer(area, (fraction, point) => {
-      const shown = pair.value
+      const shown = period.value
       if (!shown) return
       const xOf = (x: number) => (x * point.width) / 1000
       const yAt = (level: number) => (yOf(level) * point.height) / 1000
       // Where the finger is across, held within the area as the fraction is.
       const fingerX = fraction * point.width
       const across = items.value.map((item) =>
-        Math.abs(xOf(item.exchange?.x ?? shown.weeks[item.week]?.x ?? 0) - fingerX),
+        Math.abs(xOf(item.exchange?.x ?? shown.steps[item.step]?.x ?? 0) - fingerX),
       )
       const apart = (one: Point, other: { x: number; y: number }) =>
         Math.hypot(xOf(one.x) - other.x, point.y === null ? 0 : yAt(one.level) - other.y)
@@ -438,16 +508,16 @@ export default defineComponent({
 
     const yOf = (level: number) => 1000 - MARGIN - (level * (1000 - 2 * MARGIN)) / CHART_LEVEL
 
-    /** The line in runs: a week with no figure is a gap, never a zero. */
+    /** The line in runs: a step with no figure is a gap, never a zero. */
     const runs = computed(() => {
       const all: { x: number; y: number }[][] = [[]]
-      for (const week of pair.value?.weeks ?? []) {
-        if (week.level === null) all.push([])
-        else all.at(-1)?.push({ x: week.x, y: yOf(week.level) })
+      for (const one of period.value?.steps ?? []) {
+        if (one.level === null) all.push([])
+        else all.at(-1)?.push({ x: one.x, y: yOf(one.level) })
       }
       return all.filter((run) => run.length > 0)
     })
-    /** Two weeks and more are a line; one week between two gaps, a dot of it (adversarial Д). */
+    /** Two steps and more are a line; one step between two gaps, a dot of it (adversarial Д). */
     const lines = computed(() =>
       runs.value
         .filter((run) => run.length > 1)
@@ -457,27 +527,56 @@ export default defineComponent({
 
     /** «4,30» — the tick alone; whole when every tick is whole, «386» for the dollar. */
     function tickOf(rate: ExchangeRate): string {
-      const whole = (pair.value?.levels ?? []).every((tick) => tick.rate.scaled % RATE_SCALE === 0n)
+      const whole = (period.value?.levels ?? []).every(
+        (tick) => tick.rate.scaled % RATE_SCALE === 0n,
+      )
       return new Intl.NumberFormat(locale.value, {
         minimumFractionDigits: whole ? 0 : 2,
         maximumFractionDigits: 2,
       }).format(decimalFromRate(rate.scaled))
     }
 
-    /** «окт · янв · апр · июл · сен»: the first, every third month after it, and the last. */
-    const monthLabels = computed(() => {
-      const firsts: { month: string; x: number }[] = []
-      for (const week of pair.value?.weeks ?? []) {
-        const month = week.day.slice(0, 7)
-        if (firsts.at(-1)?.month !== month) firsts.push({ month, x: week.x })
+    /**
+     * The names under the line, at the server's x: the year «окт · янв · апр · июл · окт» — the
+     * first month, every third after it, and the last; half a year every month; the month its
+     * Mondays, «7 сент. · 14 · 21 · 28», the month named again where it turns.
+     */
+    const axisLabels = computed(() => {
+      const steps = period.value?.steps ?? []
+      if (period.value?.step === 'day') {
+        let named = ''
+        return steps
+          .filter(({ day }) => new Date(`${day}T00:00:00.000Z`).getUTCDay() === 1)
+          .map(({ day, x }) => {
+            const month = day.slice(0, 7)
+            const text = month === named ? String(Number(day.slice(8, 10))) : shortDay(day)
+            named = month
+            return { key: day, x, text }
+          })
       }
+      const firsts: { month: string; x: number }[] = []
+      for (const one of steps) {
+        const month = one.day.slice(0, 7)
+        if (firsts.at(-1)?.month !== month) firsts.push({ month, x: one.x })
+      }
+      const every = props.months === 12 ? 3 : 1
       // The last only two months past a label: one month on, the two would run into each other.
       const last = firsts.length - 1
       return firsts
-        .filter((_, index) => index % 3 === 0 || (index === last && last % 3 === 2))
-        .map((label) => ({ ...label, text: shortMonth(label.month, locale.value) }))
+        .filter((_, index) => index % every === 0 || (index === last && last % every === every - 1))
+        .map((label) => ({
+          key: label.month,
+          x: label.x,
+          text: shortMonth(label.month, locale.value),
+        }))
     })
 
+    const periodOptions = computed(() =>
+      RATE_CHART_MONTHS.map((months) => ({
+        value: String(months),
+        label: t(`exchange.rate_chart.period_option.${String(months)}`),
+      })),
+    )
     const pairOptions = computed(() =>
       props.chart.pairs.map((one) => ({
         value: one.currency,
@@ -497,12 +596,18 @@ export default defineComponent({
       items,
       chosen,
       chosenIndex,
-      week,
+      chosenStep,
+      step,
+      period,
+      title,
+      periodIn,
+      words,
       cursorX,
       lines,
       lone,
-      monthLabels,
+      axisLabels,
       pairOptions,
+      periodOptions,
       TICK,
       yOf,
       rateOf,
@@ -511,6 +616,7 @@ export default defineComponent({
       placeLineOf,
       choose,
       choosePair,
+      choosePeriod,
       pointer,
     }
   },

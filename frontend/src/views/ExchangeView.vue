@@ -69,7 +69,12 @@
         <ExchangeLosses v-if="overview.losses" :losses="overview.losses" />
         <!-- Under it (handoff MOL-157 05): when the exchanges of the same twelve months were made,
              against the market of all bank clients week by week (MOL-161). -->
-        <ExchangeRateChart v-if="overview.rateChart" :chart="overview.rateChart" />
+        <ExchangeRateChart
+          v-if="overview.rateCharts"
+          :chart="overview.rateCharts"
+          :months="chartMonths"
+          @update:months="chooseChartMonths"
+        />
 
         <AppCard class="rate">
           <p class="caption">{{ t('exchange.my_rate') }}</p>
@@ -190,13 +195,15 @@
 <script lang="ts">
 import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { currencySign, yerevanDate } from '@molvia/model'
+import { useRoute, useRouter } from 'vue-router'
+import { RATE_CHART_MONTHS, currencySign, yerevanDate } from '@molvia/model'
 import type {
   Currency,
   CurrencyCost,
   ExchangeAmendBody,
   ExchangeView as Row,
   ExchangesResponse,
+  RateChartMonths,
   RatePreference,
   WalletBasis,
 } from '@molvia/model'
@@ -256,6 +263,8 @@ export default defineComponent({
   },
   setup() {
     const { t, locale } = useI18n()
+    const route = useRoute()
+    const router = useRouter()
     const exchanges = useExchanges()
     const { rateOf, day, amountsOf, rateLineOf } = useExchangeWords()
     // «Сегодня» of the cards, asked again when the app comes back into view (MOL-121, adversarial Н).
@@ -404,9 +413,25 @@ export default defineComponent({
       }
     }
 
+    /**
+     * The period of the line of the rate lives in the address (MOL-168, Р-5), as the mode of
+     * «Графики» does: `?months=1` or `6`, the year with none — and anything else is the year. A
+     * change is the screen's own query (MOL-136): not scrolled, not animated, nothing asked.
+     */
+    const chartMonths = computed<RateChartMonths>(
+      () => RATE_CHART_MONTHS.find((months) => String(months) === route.query.months) ?? 12,
+    )
+    function chooseChartMonths(months: RateChartMonths): void {
+      void router.replace({
+        query: { ...route.query, months: months === 12 ? undefined : String(months) },
+      })
+    }
+
     return {
       t,
       ...exchanges,
+      chartMonths,
+      chooseChartMonths,
       today,
       sheetOpen,
       editing,

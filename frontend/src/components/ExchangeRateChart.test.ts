@@ -1,13 +1,19 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import { parseRate, yerevanMidnight } from '@molvia/model'
-import type { ExchangeRate, ExchangeRateChartView } from '@molvia/model'
+import type {
+  ExchangeRate,
+  ExchangeRateChartView,
+  ExchangeRatePeriodView,
+  RateChartMonths,
+} from '@molvia/model'
 import ExchangeRateChart from './ExchangeRateChart.vue'
 import { calendarDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 
 type Pair = ExchangeRateChartView['pairs'][number]
-type Point = Pair['exchanges'][number]
+type Period = ExchangeRatePeriodView
+type Point = Period['exchanges'][number]
 
 function rate(value: string, day: string, base: Pair['currency'] = 'RUB'): ExchangeRate {
   return {
@@ -19,11 +25,11 @@ function rate(value: string, day: string, base: Pair['currency'] = 'RUB'): Excha
   }
 }
 
-function point(id: string, day: string, week: number, x: number, of: Partial<Point> = {}): Point {
+function point(id: string, day: string, step: number, x: number, of: Partial<Point> = {}): Point {
   return {
     id,
     day,
-    week,
+    step,
     x,
     rate: rate('4.58', day),
     level: 400,
@@ -35,14 +41,22 @@ function point(id: string, day: string, week: number, x: number, of: Partial<Poi
 }
 
 /**
- * Four weeks from 8 February to 8 March, a day 1000 / 28 of the card — every x by its day, as the
- * server lays it — the third week with no figure, two exchanges in the second.
+ * The year of the rouble: four weeks from 8 February to 8 March, a day 1000 / 28 of the card — every
+ * x by its day, as the server lays it — the third week with no figure, two exchanges in the second.
+ * The month and half a year are the test's to give; none — no market in them.
  */
-function rouble(of: Partial<Pair> = {}): Pair {
+function rouble(of: Partial<Period> = {}, periods: Partial<Pair['periods']> = {}): Pair {
   return {
     currency: 'RUB',
     side: 'bankBuys',
-    weeks: [
+    periods: { 1: null, 6: null, 12: year(of), ...periods },
+  }
+}
+
+function year(of: Partial<Period> = {}): Period {
+  return {
+    step: 'week',
+    steps: [
       { day: '2026-02-08', rate: rate('4.90', '2026-02-06'), x: 0, level: 1000 },
       { day: '2026-02-15', rate: rate('4.80', '2026-02-13'), x: 250, level: 800 },
       { day: '2026-02-22', rate: null, x: 500, level: null },
@@ -69,17 +83,24 @@ function rouble(of: Partial<Pair> = {}): Pair {
 const dollar: Pair = {
   currency: 'USD',
   side: 'bankBuys',
-  weeks: [
-    { day: '2026-02-08', rate: rate('386', '2026-02-06', 'USD'), x: 0, level: 0 },
-    { day: '2026-03-04', rate: rate('392', '2026-03-04', 'USD'), x: 1000, level: 1000 },
-  ],
-  exchanges: [],
-  levels: [{ rate: rate('389', '2026-03-04', 'USD'), level: 500 }],
+  periods: {
+    1: null,
+    6: null,
+    12: {
+      step: 'week',
+      steps: [
+        { day: '2026-02-08', rate: rate('386', '2026-02-06', 'USD'), x: 0, level: 0 },
+        { day: '2026-03-04', rate: rate('392', '2026-03-04', 'USD'), x: 1000, level: 1000 },
+      ],
+      exchanges: [],
+      levels: [{ rate: rate('389', '2026-03-04', 'USD'), level: 500 }],
+    },
+  },
 }
 
-function chart(pairs: Pair[] = [rouble()]) {
+function chart(pairs: Pair[] = [rouble()], months: RateChartMonths = 12) {
   const view = mount(ExchangeRateChart, {
-    props: { chart: { pairs } },
+    props: { chart: { pairs }, months },
     global: { plugins: [createAppI18n('ru')] },
   })
   const area = view.find('.area').element
@@ -227,7 +248,7 @@ describe('ExchangeRateChart (MOL-161)', () => {
         ? { day, rate: null, x: index * 20, level: null }
         : { day, rate: rate('4.50', day), x: index * 20, level: index * 20 }
     })
-    const { view, area } = chart([rouble({ weeks, exchanges: [] })])
+    const { view, area } = chart([rouble({ steps: weeks, exchanges: [] })])
     area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
     const weekAt = async (index: number, y: number) => {
       await at(view, area, index * 6, y)
@@ -303,7 +324,7 @@ describe('ExchangeRateChart (MOL-161)', () => {
     const monday = point('a0000000-0000-4000-8000-000000000010', weeks[20]?.day ?? '', 20, 403, {
       level: 900,
     })
-    const { view, area } = chart([rouble({ weeks, exchanges: [monday] })])
+    const { view, area } = chart([rouble({ steps: weeks, exchanges: [monday] })])
     area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
     // The dot's centre: 403 × 0.3 = 120.9 px across, (1000 − 50 − 810) × 0.18 = 25.2 px down.
     for (const dx of [-4.5, -2, 0, 2, 4.5]) {
@@ -543,7 +564,7 @@ describe('ExchangeRateChart (MOL-161)', () => {
 
   it('a radio for every week with no exchange and for every exchange, each saying itself (Р-6)', async () => {
     const { view } = chart()
-    const radios = view.findAll('input[type="radio"]')
+    const radios = view.findAll('.chart input[type="radio"]')
     // Weeks 1, 3 and 5 have none; the second has two, the fourth one.
     expect(radios).toHaveLength(6)
     expect(radios[0]?.attributes('aria-label')).toBe('Неделя по 8 февраля: рынок 4,90 ֏/₽')
@@ -569,12 +590,12 @@ describe('ExchangeRateChart (MOL-161)', () => {
 
   it('draws a week with a figure between two gaps as a dot of the line (adversarial Д)', () => {
     // Figures in the first, the third and the last week, a gap between each.
-    const weeks = rouble().weeks.map((week, index) =>
+    const weeks = year().steps.map((week, index) =>
       index % 2 === 1
         ? { ...week, rate: null, level: null }
         : { ...week, rate: rate('4.70', week.day), level: 600 },
     )
-    const { view } = chart([rouble({ weeks, exchanges: [] })])
+    const { view } = chart([rouble({ steps: weeks, exchanges: [] })])
     expect(view.findAll('polyline.line')).toHaveLength(0)
     expect(view.findAll('.lone').map((dot) => dot.attributes('x1'))).toEqual(['0', '500', '1000'])
   })
@@ -619,6 +640,102 @@ describe('ExchangeRateChart (MOL-161)', () => {
   it('a line with no exchanges says there were none in twelve months', () => {
     const { view } = chart([rouble({ exchanges: [] })])
     expect(view.find('.none').text()).toBe('Обменов за 12 месяцев не было')
+    expect(view.findAll('.point')).toHaveLength(0)
+  })
+})
+
+/**
+ * The month by days, 27 February to 4 March — a weekend at Friday's figure — with the exchange of
+ * 28 February the year has too, and one of 3 March the year was not given.
+ */
+function month(of: Partial<Period> = {}): Period {
+  const days = ['2026-02-27', '2026-02-28', '2026-03-01', '2026-03-02', '2026-03-03', '2026-03-04']
+  const friday = rate('4.62', '2026-02-27')
+  return {
+    step: 'day',
+    steps: days.map((day, index) => ({
+      day,
+      rate: index < 3 ? friday : rate('4.55', day),
+      x: index * 200,
+      level: index < 3 ? 700 : 300,
+    })),
+    exchanges: [
+      point('a0000000-0000-4000-8000-000000000003', '2026-02-28', 1, 200),
+      point('a0000000-0000-4000-8000-000000000099', '2026-03-03', 4, 800, { place: 'Обменник' }),
+    ],
+    levels: [{ rate: rate('4.60', '2026-03-04'), level: 500 }],
+    ...of,
+  }
+}
+
+describe('ExchangeRateChart by period (MOL-168)', () => {
+  it('offers the three periods even for one pair, the year by default, the title following', () => {
+    const { view } = chart()
+    expect(view.find('.pairs').exists()).toBe(false)
+    expect(view.findAll('.periods label').map((label) => label.text())).toEqual([
+      'Месяц',
+      '6 месяцев',
+      '12 месяцев',
+    ])
+    expect(view.find<HTMLInputElement>('.periods input:checked').element.value).toBe('12')
+    expect(view.find('h2').text()).toBe('Курс рубля за 12 месяцев')
+  })
+
+  it('asks the screen for a period and draws none of it itself: the period is the address', async () => {
+    const { view } = chart([rouble({}, { 1: month() })])
+    await view.findAll('.periods input')[0]?.setValue(true)
+    expect(view.emitted('update:months')).toEqual([[1]])
+    expect(view.find('h2').text()).toBe('Курс рубля за 12 месяцев')
+  })
+
+  it('reads the month by days, and keeps the exchange chosen in the year (Р-6)', async () => {
+    const { view, area } = chart([rouble({}, { 1: month() })])
+    // 28 February chosen by hand in the year: 714 × 0.3 px across.
+    await tap(view, area, 214)
+    expect(view.find('.mine-rate').text()).toContain('28 февр.')
+    await view.setProps({ months: 1 })
+    expect(view.find('h2').text()).toBe('Курс рубля за месяц')
+    expect(reading(view)).toContain(`${calendarDayOf('2026-02-28')} · рынок`)
+    expect(view.find('.figure').text()).toBe('4,62 ֏/₽')
+    expect(view.find('.mine-rate').text()).toContain('28 февр.')
+    expect(view.find('.note').text()).toContain('Коснитесь графика — покажем день')
+    // Four days with no exchange and two exchanges: a radio each.
+    expect(view.findAll('.chart input[type="radio"]')).toHaveLength(6)
+  })
+
+  it('opens a period that lacks the chosen exchange on its own latest', () => {
+    const { view } = chart([rouble({}, { 1: month() })], 1)
+    expect(view.find('.mine-place').text()).toContain('Обменник')
+  })
+
+  it('says a day of the month with no exchange is a day, and speaks it so', async () => {
+    const { view, area } = chart([rouble({}, { 1: month() })], 1)
+    await tap(view, area, 0)
+    expect(reading(view)).toContain(`${calendarDayOf('2026-02-27')} · рынок`)
+    expect(view.find('.none').text()).toBe('В этот день обменов не было')
+    const spoken = view.findAll('.chart input').map((radio) => radio.attributes('aria-label'))
+    expect(spoken[0]).toBe(`${calendarDay('2026-02-27', 'ru')}: рынок 4,62 ֏/₽`)
+  })
+
+  it('names the Mondays of the month under the line, and half a year every month', () => {
+    const days = chart([rouble({}, { 1: month() })], 1).view.findAll('.month')
+    expect(days.map((label) => label.text())).toEqual([calendarDayOf('2026-03-02')])
+    const months = chart([rouble({}, { 6: year() })], 6).view.findAll('.month')
+    expect(months.map((label) => label.text())).toEqual(['фев', 'мар'])
+  })
+
+  it('keeps the card and its controls in a period with no market, and says so (Р-6)', () => {
+    const { view } = chart([rouble()], 6)
+    expect(view.find('h2').text()).toBe('Курс рубля за 6 месяцев')
+    expect(view.find('.none').text()).toBe('Рынка за 6 месяцев нет')
+    expect(view.find('.periods').exists()).toBe(true)
+    expect(view.find('fieldset.chart').exists()).toBe(false)
+    expect(view.find('.chart-empty').exists()).toBe(true)
+  })
+
+  it('a month with no exchange of the pair says there were none in it', () => {
+    const { view } = chart([rouble({}, { 1: month({ exchanges: [] }) })], 1)
+    expect(view.find('.none').text()).toBe('Обменов за месяц не было')
     expect(view.findAll('.point')).toHaveLength(0)
   })
 })
