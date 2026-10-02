@@ -240,9 +240,10 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   shop. Not across rows: milk and bread are never compared. Every place carries its city on the wire
   (`advicePlaceSchema.city`, optional, so the answer the phone remembered from a server before it
   still reads — and then no place of the row is given one); whether it is printed is the domain's
-  `cityWhereNameRepeats`, the rule «Оценки» and the reminder read too, and its case is looked up by the
-  city of the settings it folds to (`settingsCityOf`). The price, named: the memory of «Что брать»
-  written by MOL-120 is not read by the version before, so a rollback forgets it until the next answer.
+  `cityWhereNameRepeats`, the rule «Оценки» and the reminder read too, and its case is looked up
+  by the city of the settings it folds to (`settingsCityOf`). The price, named: the memory of «Что
+  брать» written by MOL-120 is not read by the version before, so a rollback forgets it until the
+  next answer.
 - **Order is by rating down, then by name, in all three groups.** The handoff asked for
   ascending unit price; that sorts _different products_ by a number — milk at 570 ֏/л above
   beef at 4 790 ֏/кг — and «compare by unit price» is about one item across places.

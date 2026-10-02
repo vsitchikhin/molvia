@@ -281,5 +281,6 @@ folded — «Ереван Сити» and «ЕРЕВАН СИТИ» may be the sh
 «(гюмри)». **A draft of a verdict keeps the city beside its card, never inside** (А4): the version
 before reads the card strictly, and a rollback dropped a verdict saved with no signal. The queue the
 phone remembers and the memory of «Что брать» keep the city inside the answer — **the price, named**:
-a rollback of MOL-120 forgets those two, which are caches, and the next answer brings them back. The handoff's «Из чека «SAS»» is not used: the queue of
-verdicts does not know a source (MOL-124, П-9).
+a rollback of MOL-120 forgets those two, which are caches, and the next answer brings them back.
+The handoff's «Из чека «SAS»» is not used: the queue of verdicts does not know a source (MOL-124,
+П-9).
