@@ -731,6 +731,30 @@ describe('ExchangeRateChart by period (MOL-168)', () => {
     expect(view.find('.periods').exists()).toBe(true)
     expect(view.find('fieldset.chart').exists()).toBe(false)
     expect(view.find('.chart-empty').exists()).toBe(true)
+    // The note speaks of the line and a tap on it: with no chart it goes (review 3).
+    expect(view.find('.note').exists()).toBe(false)
+  })
+
+  it('names no month of half a year whose tail alone the window holds next to the next (review 1, А)', () => {
+    // From Sunday the 26th of April: May begins a week in, 38 thousandths on.
+    const days = ['2026-04-26', '2026-05-03', '2026-05-31', '2026-06-28', '2026-07-26']
+    const steps = days.map((day, index) => ({
+      day,
+      rate: rate('4.50', day),
+      x: [0, 38, 191, 344, 497][index] ?? 0,
+      level: 500,
+    }))
+    const { view } = chart([rouble({}, { 6: year({ steps, exchanges: [] }) })], 6)
+    expect(view.findAll('.month').map((label) => label.text())).toEqual(['май', 'июн', 'июл'])
+  })
+
+  it('centres a name on its day, and lays it from an end only next to it (review 2, Б)', () => {
+    // The month's only Monday, the 2nd of March, is 600 thousandths on: centred.
+    const monday = chart([rouble({}, { 1: month() })], 1).view.find('.month')
+    expect(monday.classes()).toEqual(['month'])
+    // The year's first name stands at its very beginning: laid from it.
+    const february = chart().view.find('.month')
+    expect(february.classes()).toContain('start')
   })
 
   it('a month with no exchange of the pair says there were none in it', () => {

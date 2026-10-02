@@ -296,9 +296,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'settings.group_account',
       ],
       Accounts: ['accounts.title', 'privacy.stored.accounts.term'],
-      // The period of the rate chart, as in Russian (MOL-168).
-      '6 months': ['exchange.rate_chart.period_in.6', 'exchange.rate_chart.period_option.6'],
-      '12 months': ['exchange.rate_chart.period_in.12', 'exchange.rate_chart.period_option.12'],
+      // The period of the rate chart: its switch says it in the words of «Графики» (MOL-168).
       Month: ['exchange.rate_chart.period_option.1', 'spending.charts.mode_month'],
       Period: ['exchange.rate_chart.period', 'spending.charts.mode'],
     })

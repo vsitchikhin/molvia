@@ -290,8 +290,8 @@ rate exactly as before.
   sets it only beside its own day (review П-5). The server marks it; the phone compares nothing.
 - **On the card the market comes first and the central bank under it, a step quieter** (Р-5).
 - **«Обмены против рынка» sums each exchange as its card measures it** (MOL-152, folded into MOL-159,
-  owner's decisions В-1 «в», В-2 «а», В-3 «а»): the twelve months to today — from the same day a year
-  back (MOL-168, В-1 «б»), one window with the year of the line below — by place, worst first, at
+  owner's decisions В-1 «в», В-2 «а», В-3 «а»): the twelve months to today — from the day after the same
+  day a year back (MOL-168, В-1 «б»), one window with the year of the line below — by place, worst first, at
   the top of «Обмен денег» — the card that stood on «Графики» against the official rate, where every
   rouble exchange read as a loss. **Against its own channel when the person named it, else the best
   of its day** (`market.own ?? market.best`, В-3): a place is compared with the market of its kind,
@@ -331,7 +331,7 @@ rate exactly as before.
   of their sale looked a windfall. **The pairs are the currencies changed against the dram in the
   window**, the currency of conversion first; with none, the currency of conversion alone, a line with
   no points, unless it is the dram; a pair with no figure in any week is left out, and with none left
-  there is no card (`rateChart: null`). **Every height, position, percent and tick is the server's**
+  there is no card (`rateCharts: null`). **Every height, position, percent and tick is the server's**
   (`rateChart`, `exchange-rate-chart.ts`): three ticks a step of 1, 2, 3 or 5 × 10ⁿ apart within the
   scale, multiples of that power — «4,30 · 4,60 · 4,90» — or one when none fit two digits; the phone
   names the months. **The scale is the figures, and no narrower than a hundredth of their middle**
@@ -368,9 +368,12 @@ rate exactly as before.
   would have given nothing has no mark.
 - **The line is read for the last month, half a year and the year, all three in one answer** (MOL-168,
   owner's decisions of 02.10.2026, В-1 «б», В-2 «а», В-3 «а», В-4 «да»): `rateCharts`, each pair with
-  `periods` by months. **A period is the same day N months back** (`ratePeriodFrom`): the month of 2
-  October from 2 September, the 31st of March from the last of February — the calendar window that
-  was, eleven months and the days of this one, gave a month of two days on the 2nd. **The year is the
+  `periods` by months. **A period begins the day after the same day N months back** (`ratePeriodFrom`):
+  the month of 2 October from 3 September, the 31st of March from the 1st, the year 365 days — the
+  calendar window that was, eleven months and the days of this one, gave a month of two days on the
+  2nd. **Taken from the same day itself it was a day too long** (adversarial В): on the day of a
+  monthly exchange «Месяц» held the last one too, and «Обмены против рынка», «за 12 месяцев», summed
+  thirteen exchanges — twelve the next day, with nothing written. **The year is the
   window of «Обмены против рынка» too**, so a point of it always has the percent of its place.
   **The month is by days, half a year and the year by weeks** (Р-3): by weeks a month is four or five
   points, by days half a year is dots 1,5 px apart. **A day is the latest row fresh for it, as a
@@ -390,7 +393,11 @@ rate exactly as before.
   task of money. On the phone the period is the screen's address (`?months=1`, `?months=6`, the year
   with none, anything else the year, Р-5) and changes by `replace` — not scrolled, not animated,
   nothing asked; **the switch is always there, under the pairs** (В-3 «а»); an exchange chosen by hand
-  stays chosen in a period that has it.
+  stays chosen in a period that has it. **A name under the line is centred on its day**, laid from an
+  end only within `LABEL_EDGE` of it, and **a month the window holds the tail of gives way to the next
+  within `LABEL_GAP`** (review 1, 2, adversarial А, Б): half a year begun on the 26th of April put
+  «апр» and «май» 10 px apart, and «7 сент.», laid from its Monday as the first name of a year is,
+  stood over the 9th. With no chart in a period the note under it goes too: it speaks of a tap.
 
 ## Incomes
 

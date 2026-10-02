@@ -67,8 +67,8 @@
              the market, by place — moved here from «Графики» (MOL-159, MOL-152). No card when
              nothing of the twelve months was measured. -->
         <ExchangeLosses v-if="overview.losses" :losses="overview.losses" />
-        <!-- Under it (handoff MOL-157 05): when the exchanges of the same twelve months were made,
-             against the market of all bank clients week by week (MOL-161). -->
+        <!-- Under it (handoff MOL-157 05): when the exchanges were made, against the market of all
+             bank clients by day or week (MOL-161), the period from the address (MOL-168). -->
         <ExchangeRateChart
           v-if="overview.rateCharts"
           :chart="overview.rateCharts"

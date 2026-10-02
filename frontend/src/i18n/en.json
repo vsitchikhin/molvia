@@ -907,8 +907,8 @@
       },
       "period_in": {
         "1": "the last month",
-        "6": "6 months",
-        "12": "12 months"
+        "6": "the last 6 months",
+        "12": "the last 12 months"
       },
       "legend_market": "Market · all bank clients",
       "legend_mine": "My exchanges",

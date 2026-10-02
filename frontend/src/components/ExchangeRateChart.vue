@@ -186,7 +186,7 @@
           <span
             v-for="label in axisLabels"
             :key="label.key"
-            class="month"
+            :class="['month', label.edge]"
             :style="{ left: `${String(label.x / 10)}%` }"
           >
             {{ label.text }}
@@ -200,7 +200,8 @@
       <div class="months"></div>
     </div>
 
-    <p class="note">{{ t(`exchange.rate_chart.note_${step}_${pair.side}`) }}</p>
+    <!-- It speaks of the line, the dots and a tap on them: with no chart, nothing to speak of. -->
+    <p v-if="period" class="note">{{ t(`exchange.rate_chart.note_${step}_${pair.side}`) }}</p>
   </AppCard>
 </template>
 
@@ -248,6 +249,16 @@ const FINGER_PX = 12
 const STACK_PX = 3
 /** Half the end of the mark, in thousandths of the plot's width. */
 const TICK = 14
+/**
+ * Two names under the line nearer than this, in thousandths, run into one another — «апр» and «май»
+ * of half a year begun on the 26th of April stood 10 px apart (review 1, adversarial А).
+ */
+const LABEL_GAP = 120
+/**
+ * A name this near an end of the line is laid from it, so it does not stand past the chart; any
+ * other is centred on its day — «7 сент.» laid from its Monday stood over the 9th (review 2, Б).
+ */
+const LABEL_EDGE = 70
 
 /**
  * «Курс рубля за месяц, 6 и 12 месяцев» (MOL-161, MOL-168, handoff MOL-157 05, frames 6c and 6d):
@@ -542,6 +553,8 @@ export default defineComponent({
      * Mondays, «7 сент. · 14 · 21 · 28», the month named again where it turns.
      */
     const axisLabels = computed(() => {
+      const edgeOf = (x: number) =>
+        x < LABEL_EDGE ? 'start' : x > CHART_LEVEL - LABEL_EDGE ? 'end' : null
       const steps = period.value?.steps ?? []
       if (period.value?.step === 'day') {
         let named = ''
@@ -551,7 +564,7 @@ export default defineComponent({
             const month = day.slice(0, 7)
             const text = month === named ? String(Number(day.slice(8, 10))) : shortDay(day)
             named = month
-            return { key: day, x, text }
+            return { key: day, x, text, edge: edgeOf(x) }
           })
       }
       const firsts: { month: string; x: number }[] = []
@@ -562,12 +575,18 @@ export default defineComponent({
       const every = props.months === 12 ? 3 : 1
       // The last only two months past a label: one month on, the two would run into each other.
       const last = firsts.length - 1
-      return firsts
-        .filter((_, index) => index % every === 0 || (index === last && last % every === every - 1))
+      const named = firsts.filter(
+        (_, index) => index % every === 0 || (index === last && last % every === every - 1),
+      )
+      // A month the window holds only the tail of gives way to the next when they would touch: half
+      // a year from the same day may begin a week before a month does (review 1, adversarial А).
+      return named
+        .filter((label, index) => (named[index + 1]?.x ?? Infinity) - label.x >= LABEL_GAP)
         .map((label) => ({
           key: label.month,
           x: label.x,
           text: shortMonth(label.month, locale.value),
+          edge: edgeOf(label.x),
         }))
     })
 
@@ -864,11 +883,11 @@ export default defineComponent({
   position: absolute;
   transform: translateX(-50%);
 
-  &:first-child {
+  &.start {
     transform: none;
   }
 
-  &:last-child {
+  &.end {
     transform: translateX(-100%);
   }
 }
