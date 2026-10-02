@@ -5,6 +5,7 @@
  * Postgres would.
  */
 import { randomUUID } from 'node:crypto'
+import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import { catalogueEntryCodec, catalogueSearchResponseSchema, newItemSchema } from '@molvia/model'
@@ -149,6 +150,10 @@ it('a pick on «овощи» lifts the tomatoes taken, as over any name found (M
   expect((await search('овощи', actorId)).names[0]).not.toBe('Помидоры')
   await createSearchPickRepository(db).remember(actorId, 'овощи', await idOf('Помидоры'))
   expect((await search('овощи', actorId)).names[0]).toBe('Помидоры')
+})
+
+it('loads onnxruntime with its telemetry switched off (privacy.md)', () => {
+  expect(process.env.ORT_DISABLE_TELEMETRY).toBe('1')
 })
 
 it('walks the HNSW index for the nearest names, not the whole table', async () => {
