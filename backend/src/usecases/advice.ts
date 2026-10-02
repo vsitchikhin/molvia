@@ -271,10 +271,15 @@ function groupPrices(places: readonly PlacePrice[]): Map<string, Map<GroupKey, P
  * last purchase is in another pair is still where one buys — weighed into kilos by its own ten
  * kilos, a shop of packs left the row naming a market bought at once a year ago, and the shop of
  * every week nowhere. Its places come after the first pair's, each with its own unit.
+ *
+ * **A pair with a place in the asker's own city comes before any without** (Р-26 across pairs,
+ * adversarial Ж): «cheaper elsewhere» is not somewhere one can go, and weighed alone, three kilos
+ * in an Erevan shop put it at the head of a Gyumri resident's row over the market of their city.
  */
 function ranked(groups: Map<GroupKey, PlacePrice[]>): [GroupKey, PlacePrice[]][] {
   // The same on every row of one pair; the largest, should a caller ever hand two apart.
   const weight = (places: readonly PlacePrice[]) => ({
+    nearby: places.some((place) => place.nearby) ? 1 : 0,
     observations: Math.max(...places.map((place) => place.pairObservations)),
     latestVisitAt: Math.max(...places.map((place) => place.pairLatestVisitAt.getTime())),
   })
@@ -282,6 +287,7 @@ function ranked(groups: Map<GroupKey, PlacePrice[]>): [GroupKey, PlacePrice[]][]
     const [a, b] = [weight(aPlaces), weight(bPlaces)]
     // Both equal: the key itself decides, so two loads of one screen cannot disagree.
     return (
+      b.nearby - a.nearby ||
       b.observations - a.observations ||
       b.latestVisitAt - a.latestVisitAt ||
       (aKey < bKey ? -1 : aKey > bKey ? 1 : 0)

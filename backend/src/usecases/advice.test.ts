@@ -56,6 +56,7 @@ function price(patch: Partial<PlacePrice> & { scaledMinor: bigint }): PlacePrice
     latestVisitAt,
     pairObservations: observations,
     pairLatestVisitAt: latestVisitAt,
+    nearby: true,
     ...patch,
   }
 }
@@ -274,6 +275,25 @@ describe('места и порог', () => {
     ).toEqual([
       ['Рынок в Гюмри', 'kg'],
       ['SAS', 'piece'],
+    ])
+  })
+
+  it('ставит первой пару с местом своего города, хоть она и легче (Р-26, адверсариальный Ж)', async () => {
+    const prices = [
+      price({
+        placeName: 'SAS Ереван',
+        scaledMinor: perKilo(260_000),
+        observations: 3,
+        nearby: false,
+      }),
+      price({ placeId: SAS, placeName: 'Рынок', unit: 'piece', scaledMinor: 120_000n }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
+      'Рынок',
+      'SAS Ереван',
     ])
   })
 

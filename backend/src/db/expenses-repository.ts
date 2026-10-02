@@ -233,6 +233,11 @@ export interface PlacePrice {
    */
   readonly pairObservations: number
   readonly pairLatestVisitAt: Date
+  /**
+   * Whether the place is in the asker's own city (Р-26): the statement orders by it inside a pair,
+   * and the use case puts a pair with such a place first among pairs (MOL-166, adversarial Ж).
+   */
+  readonly nearby: boolean
 }
 
 /**
@@ -292,6 +297,7 @@ interface PlacePriceShape extends Record<string, unknown> {
   latestVisitAt: Date | string
   pairObservations: string
   pairLatestVisitAt: Date | string
+  nearby: boolean
 }
 
 interface PriceMedianShape extends Record<string, unknown> {
@@ -762,7 +768,8 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
 
       const found = await db.execute<PlacePriceShape>(sql`
         select "itemId", "placeId", "placeName", currency, unit, price::text as "scaledMinor",
-               observations::text, "latestVisitAt", "pairObservations"::text, "pairLatestVisitAt"
+               observations::text, "latestVisitAt", "pairObservations"::text, "pairLatestVisitAt",
+               nearby
         from (
           -- What a pair weighs is every purchase of the item in it, in every place — counted
           -- before the places a pair does not name are left out (adversarial Д, owner's decision):
@@ -842,6 +849,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
             latestVisitAt: asDate(row.latestVisitAt),
             pairObservations: Number(row.pairObservations),
             pairLatestVisitAt: asDate(row.pairLatestVisitAt),
+            nearby: row.nearby,
           },
         ]
       })

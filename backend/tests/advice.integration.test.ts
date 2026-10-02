@@ -271,6 +271,30 @@ describe('цены', () => {
     expect(row?.level === 'take' && row.places).toEqual([])
   })
 
+  it('свой город первым и между парами: рынок Гюмри в штуках — над тремя кило ереванского SAS', async () => {
+    // Р-26 и через пары (MOL-166, адверсариальный Ж): «дешевле в другом городе» — не место у полки.
+    const actorId = await insertActor(db)
+    const sas = await insertPlace(db, { name: 'SAS', city: 'Ереван' })
+    const market = await insertPlace(db, { name: 'Рынок', city: 'Гюмри' })
+    const itemId = await insertItem(db, { name: 'Сыр чанах' })
+    await rate(actorId, itemId, 5)
+    for (const day of ['2026-08-01', '2026-08-15', '2026-09-01']) {
+      await bought(actorId, itemId, sas, amd(260_000), { startedAt: new Date(day) })
+    }
+    await bought(actorId, itemId, market, amd(120_000), {
+      startedAt: new Date('2026-09-28'),
+      quantity: { milli: 1000n, unit: 'piece' },
+    })
+
+    const [row] = (await screen(actorId)).rows
+    expect(
+      row?.level === 'take' && row.places.map((place) => [place.name, place.unitPrice.unit]),
+    ).toEqual([
+      ['Рынок', 'piece'],
+      ['SAS', 'kg'],
+    ])
+  })
+
   it('не смешивает валюты: первой — та, в которой покупали чаще, другая — следом', async () => {
     // Two places: a place is named by its last purchase alone (MOL-166, А), so the pairs are
     // weighed across places.
