@@ -246,6 +246,12 @@ export function dropErasureNote(): void {
   forget(ERASED_KEY)
 }
 
+/** The note as it stands, left in place — for a tap that may have to put it back. */
+export function erasureNote(): ErasureNote | null {
+  const note = read(ERASED_KEY, true)
+  return isNote(note) ? note : null
+}
+
 /** What the login screen has to say about an erasure — once: the note goes as it is read. */
 export function takeErasureNote(): ErasureNote | null {
   const note = read(ERASED_KEY, true)

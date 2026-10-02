@@ -538,6 +538,31 @@ describe('«Удалить мои данные» в настройках (MOL-94
     expect(sessionStorage.getItem('molvia.erased')).toBeNull()
   })
 
+  it('З: «Выйти» после «сессии нет» ответил портал — отметка удаления возвращается вместе с намерением', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToErase(view)
+    eraseMe.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch', false))
+    confirmButton().click()
+    await flushPromises()
+    sheet().querySelector<HTMLButtonElement>('button[aria-label]')?.click()
+    await flushPromises()
+
+    await view.get('button.leave').trigger('click')
+    await flushPromises()
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    logout.mockRejectedValue(portal())
+    ;[...sheet().querySelectorAll('button')]
+      .find((button) => button.textContent.trim() === en.sign_out.confirm)
+      ?.click()
+    await flushPromises()
+
+    expect(localStorage.getItem('molvia.leaving')).toBeNull()
+    expect(sessionStorage.getItem('molvia.erased')).toBe('kept')
+  })
+
   it('шторку закрыли после сбоя, а сессии уже нет — стирание доделано, экран входа скажет «не знаем»', async () => {
     fillTheDrawer()
     const view = await render()

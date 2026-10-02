@@ -378,7 +378,8 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   нажатие ничего не удалило» after a first-tap `401` once the door closes. The note goes as it is
   read, whenever the server names somebody, and **on a tap of «Выйти»** — the last thing done
   was not an erasure, however that way out ends, its own `204` or the server's «nobody» (round 3
-  Ж, round 4 Ж′). **An erasure whose answer was lost stays unknown through a «Выйти»** (round 4,
+  Ж, round 4 Ж′) — unless it never reached the server: then the note comes back with the intent
+  (round 5, З). **An erasure whose answer was lost stays unknown through a «Выйти»** (round 4,
   № 11): neither its `204` nor «nobody» says anything of the person, so `molvia.erasing` is kept
   and either ending says «не знаем». **A failure keeps its door** (Б): a failed erasure
   is not shown in the sheet of «Выйти», nor the other way; and it does not outlive the session it

@@ -7,6 +7,7 @@ import { useActorStore } from '@/stores/actor'
 import {
   clearLeaving,
   dropErasureNote,
+  erasureNote,
   erasingOwner,
   forgetOwner,
   leavingOwner,
@@ -144,11 +145,15 @@ export const useSignOutStore = defineStore('signOut', () => {
     // lost — which this tap is about to write over. A tap that settles nothing puts it back.
     const wasLeaving = leavingOwner() === owner
     const wasErasing = erasingOwner() === owner
+    const noteBefore = erasureNote()
     // An erasure tried before, its answer lost: a `401` now may be that erasure done.
     const unsettled = way === 'erase' && wasErasing
     const putBack = (): void => {
       if (wasLeaving) markLeaving(owner, wasErasing)
       else clearLeaving()
+      // And the note it took away: a «Выйти» that never reached the server was not the last thing
+      // done (round 5, З).
+      if (noteBefore) noteErasure(noteBefore)
     }
     leaving.value = true
     failure.value = null
