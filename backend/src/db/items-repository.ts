@@ -153,20 +153,22 @@ const NEAR_DISTANCE = ACCEPTED_DISTANCE - 1
  * The lowest cosine similarity at which a name is found by meaning (MOL-105). Measured for
  * EmbeddingGemma q4 with its prompts of retrieval, on the seed's thirty shelves and words that
  * name a shelf — «молочка», «овощи», «бытовая химия» — against twenty-five things the seed does
- * not carry (`.scratch/tasks/selftests/MOL-105-measure.md`). At 0.38 the first row is of the
- * shelf for 59 % of the Russian words, and three words of the twenty-five find something: «кружка»
- * the dried apricot, «цветы» the greens, «игрушка» the rabbit. At 0.40 — 52 % and one; the
- * measure is strict, «фрукты» → «Сухофрукты» counts as a miss. Another model is measured anew:
- * the scale of a cosine is the model's.
+ * not carry (`.scratch/tasks/selftests/MOL-105-measure.md`): at 0.40 the first row is of the shelf
+ * for 52 % of the Russian words, and one word of the twenty-five finds something («цветы» the
+ * greens). 0.38 won 59 % and lost to the model's own sense of spelling: «малако» found «Малина» at
+ * 0.381 above the milk two edits away, «кружка» the dried apricot at 0.394, «молочн» on its way to
+ * «молочный» a sponge. The measure is strict — «фрукты» → «Сухофрукты» counts as a miss. Another
+ * model is measured anew: the scale of a cosine is the model's.
  */
-const MEANING_THRESHOLD = 0.38
+const MEANING_THRESHOLD = 0.4
 
 /**
  * Where a name found by meaning stands among the names found by letters (owner's decision В-3):
- * after every one within one edit by the mean, before those at two — «овощи» puts the potato
+ * after every one within one edit by the mean, before those at two — «овощи» puts the carrot
  * above the flour two edits away, and «молоко» keeps every milk above the kefir. As a distance, so
- * the order of what the letters found does not move; a name found both ways takes the nearer of
- * the two — «малако» lifts «Молоко» from two edits to here.
+ * nothing the letters found within one edit moves. A name found both ways takes the nearer of the
+ * two: «собачий корм» finds «Корм для собак» two edits away by its letters and near by its meaning,
+ * and kept at two it stood below the treat the meaning alone found.
  */
 const MEANING_DISTANCE = NEAR_DISTANCE + 0.5
 
@@ -491,6 +493,11 @@ export function rankedCandidates(
             order by ${itemEmbeddings.embedding} <=> ${vectorLiteral(meaning.vector)}::halfvec
             limit ${MEANING_NEIGHBOURS}`
 
+  // Placed by its meaning: found by it and not within one edit by its letters — the row that takes
+  // \`MEANING_DISTANCE\` and makes the answer near. Over the final select's \`r\` and \`mg\`.
+  const byMeaning = sql`coalesce(mg.sim >= ${MEANING_THRESHOLD}
+                               and not coalesce(r.distance <= ${NEAR_DISTANCE}, false), false)`
+
   return sql`
     with query_words as (
       -- Cut to 255 here, once: levenshtein refuses longer arguments, and the prefix arm below
@@ -747,16 +754,15 @@ export function rankedCandidates(
     -- A name found by meaning is near (owner's decision В-3 of MOL-105): «овощи» that finds the
     -- potato is a find, not «не нашли» over it.
     select r.id,
-           coalesce(r.words_worst <= ${NEAR_DISTANCE} or r.admitted or m.item_id is not null
-                      or mg.sim >= ${MEANING_THRESHOLD}, false)
-             as near
+           coalesce(r.words_worst <= ${NEAR_DISTANCE} or r.admitted or m.item_id is not null, false)
+             or ${byMeaning} as near
     from ranked r
     left join remembered m on m.item_id = r.id
     left join meaning mg on mg.id = r.id
     -- The filter stays on the distance: a pick lifts what the search found and never lets in
     -- what it did not, or memory would become a second search with rules of its own. The one
     -- exception is the person's own word (MOL-45), and it is let in, not lifted.
-    where r.distance <= ${ACCEPTED_DISTANCE} or r.admitted or mg.sim >= ${MEANING_THRESHOLD}
+    where r.distance <= ${ACCEPTED_DISTANCE} or r.admitted or ${byMeaning}
     -- What only a learnt word let in stands below what the search found by its words or the
     -- person took before, and above what it found by a typo (owner's decisions on review,
     -- MOL-45 И, О and Т): «кефир» learnt as the milk taken in its place stops standing above the
@@ -774,8 +780,8 @@ export function rankedCandidates(
     -- with it — «молоко 1 л» to «Молоко 1,5%», «рис 1 кг» to «Рис круглозёрный» (review А, Б).
     -- The similarity then orders one length, and \`id\` keeps two loads of one screen in one order.
     --
-    -- A name found by meaning and not within one edit stands at \`MEANING_DISTANCE\`, the nearer by
-    -- meaning first; every other key is null or equal there, so nothing found by letters moves.
+    -- A name placed by its meaning stands at \`MEANING_DISTANCE\`, the nearer by meaning first;
+    -- every other key is null or equal there, so nothing found within one edit moves.
     order by case when not coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) and r.admitted then 1
                   when m.item_id is not null or r.words_distance = 0 then 0
                   else 2
@@ -783,15 +789,8 @@ export function rankedCandidates(
              m.item_id is null,
              m.last_picked_at desc nulls last,
              m.picks desc nulls last,
-             case when coalesce(mg.sim >= ${MEANING_THRESHOLD}, false)
-                       and not coalesce(r.distance <= ${NEAR_DISTANCE}, false)
-                  then ${sql.raw(String(MEANING_DISTANCE))}
-                  else r.distance
-             end,
-             case when coalesce(mg.sim >= ${MEANING_THRESHOLD}, false)
-                       and not coalesce(r.distance <= ${NEAR_DISTANCE}, false)
-                  then mg.sim
-             end desc nulls last,
+             case when ${byMeaning} then ${sql.raw(String(MEANING_DISTANCE))} else r.distance end,
+             case when ${byMeaning} then mg.sim end desc nulls last,
              r.by_synonym, r.by_prefix, r.fat_hits desc, r.key_length,
              r.ws desc, r.id
     limit ${limit}

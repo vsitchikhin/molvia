@@ -87,10 +87,15 @@ interface Loaded {
 
 /**
  * Starts loading the model from `dir` and answers at once; until it is loaded it has no vectors.
+ * `queryWaitMs` is for the tests, which pin answers and cannot leave one to the machine's load.
  * One run of the model at a time, queries ahead of names: the writer filling a fresh catalogue
  * must not keep a search waiting for more than one name.
  */
-export function startEmbedder(dir: string, log: EmbeddingLog): Embedder {
+export function startEmbedder(
+  dir: string,
+  log: EmbeddingLog,
+  { queryWaitMs = QUERY_WAIT_MS } = {},
+): Embedder {
   let current: Loaded | null = null
   const cache = new Map<string, readonly number[]>()
   const urgent: (() => Promise<void>)[] = []
@@ -159,7 +164,7 @@ export function startEmbedder(dir: string, log: EmbeddingLog): Embedder {
       const late = new Promise<null>((resolve) => {
         timer = setTimeout(() => {
           resolve(null)
-        }, QUERY_WAIT_MS)
+        }, queryWaitMs)
       })
       try {
         return await Promise.race([vector, late])
