@@ -11,7 +11,8 @@
           @toggle="toggle"
         />
       </label>
-      <AppReveal>
+      <!-- Drawn once the answer is known, so the first answer only appears (MOL-151). -->
+      <AppReveal v-if="day !== undefined">
         <AppField
           v-if="day"
           :model-value="String(day)"

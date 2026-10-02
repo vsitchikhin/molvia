@@ -26,3 +26,11 @@ it('takes disabled and a description from its owner', () => {
   expect(input.attributes('disabled')).toBeDefined()
   expect(input.attributes('aria-describedby')).toBe('hint')
 })
+
+it('moves by itself only after a finger moved it: an answer read is not played (review №1)', async () => {
+  const view = mount(AppSwitch, { props: { checked: false } })
+  await view.setProps({ checked: true })
+  expect(view.get('input').classes()).not.toContain('live')
+  await view.get('input').setValue(false)
+  expect(view.get('input').classes()).toContain('live')
+})

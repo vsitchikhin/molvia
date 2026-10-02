@@ -5,16 +5,19 @@
       <label class="row">
         <span class="label">{{ t('settings.reminders.label') }}</span>
         <AppSwitch
-          :checked="off === null"
+          :checked="!off"
           :disabled="off === undefined || saving || !online"
           :aria-describedby="described"
           @toggle="toggle"
         />
       </label>
       <p :id="`${id}-hint`" class="hint">{{ t('settings.reminders.hint') }}</p>
-      <p v-if="off === 'blocked'" :id="`${id}-blocked`" class="blocked">
-        {{ t('settings.reminders.blocked') }}
-      </p>
+      <!-- Drawn once the answer is known, so the first answer only appears (MOL-151). -->
+      <AppReveal v-if="off !== undefined">
+        <p v-if="off === 'blocked'" :id="`${id}-blocked`" class="blocked">
+          {{ t('settings.reminders.blocked') }}
+        </p>
+      </AppReveal>
       <p v-if="!online" :id="`${id}-offline`" class="hint">
         {{ t('settings.tap.offline') }}
       </p>
@@ -36,17 +39,19 @@ import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppReveal from '@/components/AppReveal.vue'
 import AppSwitch from '@/components/AppSwitch.vue'
 import { useReminders } from '@/composables/useReminders'
 
 /**
  * «Напоминать об оценке в Telegram» (MOL-103): its own group under «Деньги», saved on the tap and
- * never part of the form (Р-1). Off by a blocked bot, it says so — the person may not know the
+ * never part of the form (Р-1). Until the answer comes it shows «on», as nearly everyone has it, so
+ * the switch does not cross over on every opening (review №1). Off by a blocked bot, it says so — the person may not know the
  * block turned the reminders off, and unblocking brings them back (В-1).
  */
 export default defineComponent({
   name: 'RemindersGroup',
-  components: { AppButton, AppCard, AppSwitch, IconAlert },
+  components: { AppButton, AppCard, AppReveal, AppSwitch, IconAlert },
   setup() {
     const { t } = useI18n()
     const id = useId()

@@ -59,10 +59,19 @@ it('is on by default and says how the reminders work', async () => {
   expect(view.text()).not.toContain(en.settings.reminders.blocked)
 })
 
-it('waits for the server before it can be moved', async () => {
+it('waits for the server before it can be moved, showing «on» as nearly everyone has it (review №1)', async () => {
   read.mockReturnValue(new Promise(() => undefined))
   const view = await render()
   expect(switchOf(view).attributes('disabled')).toBeDefined()
+  expect(switchOf(view).element.checked).toBe(true)
+  expect(view.text()).not.toContain(en.settings.reminders.blocked)
+})
+
+it('an answer read moves nothing: the switch is not live until a finger moved it', async () => {
+  read.mockResolvedValue({ off: 'chosen' })
+  const view = await render()
+  expect(switchOf(view).element.checked).toBe(false)
+  expect(switchOf(view).classes()).not.toContain('live')
 })
 
 it('turns off on the tap and saves at once; on again the same way', async () => {

@@ -1,14 +1,26 @@
 <template>
-  <input class="switch" type="checkbox" role="switch" :checked="checked" @change="toggle" />
+  <input
+    class="switch"
+    :class="{ live }"
+    type="checkbox"
+    role="switch"
+    :checked="checked"
+    @change="toggle"
+  />
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 
 /**
  * Kit switch (MOL-103): a native checkbox read out as a switch, for a setting saved on the tap. The
  * browser moves it under the finger and the owner answers with `checked` — what the server holds —
  * so a save that failed puts it back. `disabled`, `aria-describedby` and the rest fall through.
+ *
+ * **It moves only once a finger has moved it** (review №1): until then a change of `checked` is an
+ * answer read — the setting as the server holds it, arriving after the screen — and an answer read
+ * is not played (MOL-151). A switch drawn before its answer slid across on every opening of the
+ * settings.
  */
 export default defineComponent({
   name: 'AppSwitch',
@@ -17,10 +29,12 @@ export default defineComponent({
   },
   emits: { toggle: (on: boolean) => typeof on === 'boolean' },
   setup(_props, { emit }) {
+    const live = ref(false)
     function toggle(event: Event): void {
+      live.value = true
       emit('toggle', (event.target as HTMLInputElement).checked)
     }
-    return { toggle }
+    return { live, toggle }
   },
 })
 </script>
@@ -35,7 +49,6 @@ export default defineComponent({
   border-radius: var(--radius-pill);
   background: var(--border-strong);
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease);
   appearance: none;
 
   &::before {
@@ -47,8 +60,15 @@ export default defineComponent({
     border-radius: 50%;
     background: var(--surface);
     box-shadow: var(--shadow-sm);
-    transition: transform var(--dur-fast) var(--ease);
     content: '';
+  }
+
+  &.live {
+    transition: background var(--dur-fast) var(--ease);
+  }
+
+  &.live::before {
+    transition: transform var(--dur-fast) var(--ease);
   }
 
   &:checked {
@@ -70,8 +90,8 @@ export default defineComponent({
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .switch,
-  .switch::before {
+  .switch.live,
+  .switch.live::before {
     transition: none;
   }
 }
