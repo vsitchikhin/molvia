@@ -85,6 +85,7 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
     receipts: [],
     marketToday: [],
     losses: null,
+    rateChart: null,
     ...patch,
   }
 }
@@ -1057,5 +1058,39 @@ describe('ExchangeView: «Обмены против рынка» on top (MOL-152
     exchanges.mockResolvedValue(overview({ losses: null }))
     const view = await render()
     expect(view.find('.losses').exists()).toBe(false)
+  })
+})
+
+describe('ExchangeView: «Курс рубля за 12 месяцев» (MOL-161)', () => {
+  const rateChart = {
+    pairs: [
+      {
+        currency: 'RUB' as const,
+        side: 'bankBuys' as const,
+        weeks: [
+          { day: '2026-09-20', rate: rate('4.22', '2026-09-18', 'official'), x: 0, level: 0 },
+          { day: '2026-09-27', rate: rate('4.25', '2026-09-25', 'official'), x: 1000, level: 1000 },
+        ],
+        exchanges: [],
+        levels: [{ rate: rate('4.24', '2026-09-27', 'official'), level: 600 }],
+      },
+    ],
+  }
+
+  it('stands under «Обмены против рынка» and above «my rate» (handoff 05)', async () => {
+    exchanges.mockResolvedValue(overview({ rateChart }))
+    const view = await render()
+    const chart = view.get('.rate-chart')
+    expect(chart.text()).toContain(en.exchange.rate_chart.title.RUB)
+    expect(
+      chart.element.compareDocumentPosition(view.get('.rate').element) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('must not fire: no market in the window — no card', async () => {
+    exchanges.mockResolvedValue(overview({ rateChart: null }))
+    const view = await render()
+    expect(view.find('.rate-chart').exists()).toBe(false)
   })
 })

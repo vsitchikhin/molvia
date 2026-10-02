@@ -67,6 +67,9 @@
              the market, by place — moved here from «Графики» (MOL-159, MOL-152). No card when
              nothing of the twelve months was measured. -->
         <ExchangeLosses v-if="overview.losses" :losses="overview.losses" />
+        <!-- Under it (handoff MOL-157 05): when the exchanges of the same twelve months were made,
+             against the market of all bank clients week by week (MOL-161). -->
+        <ExchangeRateChart v-if="overview.rateChart" :chart="overview.rateChart" />
 
         <AppCard class="rate">
           <p class="caption">{{ t('exchange.my_rate') }}</p>
@@ -207,6 +210,7 @@ import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ExchangeCard from '@/components/ExchangeCard.vue'
 import ExchangeLosses from '@/components/ExchangeLosses.vue'
+import ExchangeRateChart from '@/components/ExchangeRateChart.vue'
 import MarketRatesCard from '@/components/MarketRatesCard.vue'
 import ExchangeRemoveSheet from '@/components/ExchangeRemoveSheet.vue'
 import ExchangeSheet from '@/components/ExchangeSheet.vue'
@@ -237,6 +241,7 @@ export default defineComponent({
     AppScreen,
     ExchangeCard,
     ExchangeLosses,
+    ExchangeRateChart,
     ExchangeRemoveSheet,
     ExchangeSheet,
     FloatingDock,

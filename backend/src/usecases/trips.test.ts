@@ -183,6 +183,7 @@ function fakeRepositories(
     marketRates: {
       upsert: unexpected('marketRates.upsert'),
       between: unexpected('marketRates.between'),
+      series: unexpected('marketRates.series'),
       latest: unexpected('marketRates.latest'),
       through: unexpected('marketRates.through'),
     },
