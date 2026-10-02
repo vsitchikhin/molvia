@@ -289,25 +289,26 @@ rate exactly as before.
   fresh today — an exchange office of last week is shown, not starred beside today's banks, as a card
   sets it only beside its own day (review П-5). The server marks it; the phone compares nothing.
 - **On the card the market comes first and the central bank under it, a step quieter** (Р-5).
-- **«Обмены против рынка» sums each exchange as its card measures it** (MOL-152, folded into MOL-159,
-  owner's decisions В-1 «в», В-2 «а», В-3 «а»): the twelve months to today by place, worst first, at
-  the top of «Обмен денег» — the card that stood on «Графики» against the official rate, where every
-  rouble exchange read as a loss. **Against its own channel when the person named it, else the best
-  of its day** (`market.own ?? market.best`, В-3): a place is compared with the market of its kind,
-  cash with cash, as the handoff and MOL-161 have it. **One comparison per exchange** (Р-15): the sum
-  is made of the `market` the list already carries (`marketLossesOf`), so the card and the sum never
-  disagree and the market is not read twice. The difference is in the received currency and comes
-  into the spending one by the official rate of that day (`officialAcross`, the one «Деньги» count
-  by); **with no market — a pair without the dram, a day with no figure — or no such rate, the
-  exchange is named under «Без сравнения», never set beside the central bank instead** (handoff 05),
-  in words that name no single cause — «рынка или курса того дня нет» (Р-13, adversarial Д): the
-  bank never quotes a pair without the dram, and a market of the day with no fresh official rate to
-  bring the difference into drams is the other way an exchange goes uncounted. An exchange of a day the
-  exchange offices' file has not reached is measured among the banks, and the sum moves by itself
-  when the file comes (Р-14), as the card does. **`losses` comes with `GET /exchanges` and with every
-  write's answer** (В-2): a written exchange is in the sum at once; defaulted (`null`) for a server
-  before it. No «≈ ₽» under the sum (review Р-7 of MOL-157): past differences at today's rate would
-  creep with the rate.
+- **«Обмены против рынка» sums each exchange as its card measures it** (MOL-152, folded into
+  MOL-159, owner's decisions В-1 «в», В-2 «а», В-3 «а»): the twelve months to today — from the day
+  after the same day a year back (MOL-168, В-1 «б»), one window with the year of the line below — by
+  place, worst first, at the top of «Обмен денег» — the card that stood on «Графики» against the
+  official rate, where every rouble exchange read as a loss. **Against its own channel when the
+  person named it, else the best of its day** (`market.own ?? market.best`, В-3): a place is
+  compared with the market of its kind, cash with cash, as the handoff and MOL-161 have it. **One
+  comparison per exchange** (Р-15): the sum is made of the `market` the list already carries
+  (`marketLossesOf`), so the card and the sum never disagree and the market is not read twice. The
+  difference is in the received currency and comes into the spending one by the official rate of
+  that day (`officialAcross`, the one «Деньги» count by); **with no market — a pair without the
+  dram, a day with no figure — or no such rate, the exchange is named under «Без сравнения», never
+  set beside the central bank instead** (handoff 05), in words that name no single cause — «рынка
+  или курса того дня нет» (Р-13, adversarial Д): the bank never quotes a pair without the dram, and
+  a market of the day with no fresh official rate to bring the difference into drams is the other
+  way an exchange goes uncounted. An exchange of a day the exchange offices' file has not reached is
+  measured among the banks, and the sum moves by itself when the file comes (Р-14), as the card
+  does. **`losses` comes with `GET /exchanges` and with every write's answer** (В-2): a written
+  exchange is in the sum at once; defaulted (`null`) for a server before it. No «≈ ₽» under the sum
+  (review Р-7 of MOL-157): past differences at today's rate would creep with the rate.
 - **«Курс рубля за 12 месяцев» stands under it, and its line is all bank clients** (MOL-161, handoff
   MOL-157 05, owner's decisions В-1, В-2 of 02.10.2026): the market at the end of every week of the
   same window as «Обмены против рынка» — Sundays and today, each week the latest row fresh for it by
@@ -330,7 +331,7 @@ rate exactly as before.
   of their sale looked a windfall. **The pairs are the currencies changed against the dram in the
   window**, the currency of conversion first; with none, the currency of conversion alone, a line with
   no points, unless it is the dram; a pair with no figure in any week is left out, and with none left
-  there is no card (`rateChart: null`). **Every height, position, percent and tick is the server's**
+  there is no card (`rateCharts: null`). **Every height, position, percent and tick is the server's**
   (`rateChart`, `exchange-rate-chart.ts`): three ticks a step of 1, 2, 3 or 5 × 10ⁿ apart within the
   scale, multiples of that power — «4,30 · 4,60 · 4,90» — or one when none fit two digits; the phone
   names the months. **The scale is the figures, and no narrower than a hundredth of their middle**
@@ -365,6 +366,49 @@ rate exactly as before.
   second exchange of a week out of reach of the keys. The scale is never stretched to a tick (review
   3): stretched to a tick rounded off a flat line, the line was pressed to the top. A market that
   would have given nothing has no mark.
+- **The line is read for the last month, half a year and the year, all three in one answer**
+  (MOL-168, owner's decisions of 02.10.2026, В-1 «б», В-2 «а», В-3 «а», В-4 «да»): `rateCharts`,
+  each pair with `periods` by months. **A period begins the day after the same day N months back**
+  (`ratePeriodFrom`): the month of 2 October from 3 September, the 31st of March from the 1st, the
+  year 365 days — the calendar window that was, eleven months and the days of this one, gave a month
+  of two days on the 2nd. **Taken from the same day itself it was a day too long** (adversarial В):
+  on the day of a monthly exchange «Месяц» held the last one too, and «Обмены против рынка», «за 12
+  месяцев», summed thirteen exchanges — twelve the next day, with nothing written. **On the last day
+  of a month the period is whole months**, from the 1st of the month N − 1 back (adversarial round
+  2, В′): the day after the 30th of October is still October, its 31st, and an exchange of the last
+  day of every month came into «Месяц» twice on the 30th of November, into the year thirteen times
+  on the 28th of February 2029. **The year is the window of «Обмены против рынка» too**, so a point
+  of it always has the percent of its place. **The month is by days, half a year and the year by
+  weeks** (Р-3): by weeks a month is four or five points, by days half a year is dots 1,5 px apart.
+  **A day is the latest row fresh for it, as a week's end is** (`stepRate`, В-2 «а»): the bank
+  publishes on working days, a Saturday is Friday's figure — the very one an exchange of that
+  Saturday is measured by — and the line steps flat over a weekend rather than leaving it out.
+  **Each period has its own scale and ticks**: a month of 4,20 to 4,25 is drawn by its own figures,
+  not pressed under a spring of 4,90. **The pairs and their sides are the year's for every period**
+  (Р-1): a month with no exchange of a pair keeps the pair, its line with no points. **One answer,
+  not a parameter** (Р-2): with a parameter every write's answer must know the period of the screen,
+  and a change of it waits for the server — a skeleton under the switch, nothing offline; the price
+  is three charts in the answer — some 26 KB of JSON for a year of monthly exchanges, before gzip.
+  The series is read once, for the year. **A period with no figure while the year has one is null,
+  and the card stays** with its switches and says so in the height of the chart (Р-6): gone with the
+  card, the switch would have gone too, and the year with it. **The old field `rateChart` is read
+  and never used** (`z.unknown().optional()`, Р-4): the answer is strict, and changed in shape it
+  would refuse the answer of a server before MOL-168 whole; it goes with the next task of money. On
+  the phone the period is the screen's address (`?months=1`, `?months=6`, the year with none,
+  anything else the year, Р-5) and changes by `replace` — not scrolled, not animated, nothing asked;
+  **the switch is always there, under the pairs** (В-3 «а»); an exchange chosen by hand stays chosen
+  in a period that has it. **A name under the line is centred on its day**, laid from an end only
+  when, centred, it would stand past the line — by its measured width and the line's, never a
+  threshold in thousandths, which laid «7 сент.» two days in from its Monday and let «22 февр.»
+  stand a pixel past the edge (round 2, Б′). **Of two names that would run into each other, one
+  gives way**, measured as well, with `LABEL_SPACE_PX` between them (review 1, 2, adversarial А, Б,
+  round 3 Н): the one laid from an end — a month the window holds the tail of, or today's — unless
+  it alone names its month, or days of its month follow it — of two names the earlier then gives
+  way, having none to leave under the month before (round 5, Т: «29 марта · 12 · 19» in WebKit at
+  320 px) — else the later; it keeps its width, unseen. Half a year begun on the 26th of April put
+  «апр» and «май» 10 px apart; on a 320 px phone «28 сент.» laid from the edge lay over «5 окт.»,
+  which a threshold in thousandths, `LABEL_GAP`, knew nothing of. With no chart in a period the note
+  under it goes too: it speaks of a tap.
 
 ## Incomes
 

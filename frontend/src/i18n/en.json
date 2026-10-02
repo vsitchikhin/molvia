@@ -895,29 +895,48 @@
     },
     "rate_chart": {
       "title": {
-        "RUB": "Rouble rate over 12 months",
-        "USD": "Dollar rate over 12 months",
-        "EUR": "Euro rate over 12 months"
+        "RUB": "Rouble rate over {period}",
+        "USD": "Dollar rate over {period}",
+        "EUR": "Euro rate over {period}"
+      },
+      "period": "Period",
+      "period_option": {
+        "1": "Month",
+        "6": "6 months",
+        "12": "12 months"
+      },
+      "period_in": {
+        "1": "the last month",
+        "6": "the last 6 months",
+        "12": "the last 12 months"
       },
       "legend_market": "Market · all bank clients",
       "legend_mine": "My exchanges",
       "pair": "Pair",
       "pair_option": "{currency} and {dram}",
       "week": "Week to {day} · market",
+      "day": "{day} · market",
       "no_market": "No market that week",
+      "no_market_day": "No market that day",
+      "no_market_period": "No market in {period}",
       "mine": "My exchange {day} · {rate}",
       "mine_place": "{place} · {change} against the market",
       "mine_no_market": "{place} · no market that day",
       "mine_no_rate": "{place} · not compared: no central bank rate that day",
       "no_change": "not compared",
       "none": "No exchanges that week",
-      "none_year": "No exchanges in 12 months",
+      "none_day": "No exchanges that day",
+      "none_period": "No exchanges in {period}",
       "spoken_market": "market {rate}",
       "spoken_no_market": "no market",
       "spoken": "Week to {day}: {market}",
+      "spoken_day": "{day}: {market}",
       "spoken_mine": "Week to {day}: {market}; my exchange {date}: {mine}, {change}",
-      "note_bankBuys": "The line is the market: what banks paid all clients for the currency at the end of each week, by the Central Bank of Armenia. Dots are your exchanges: above the line — you got more drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a week",
-      "note_bankSells": "The line is the market: what banks charged all clients for the currency at the end of each week, by the Central Bank of Armenia. Dots are your exchanges: below the line — you gave fewer drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a week"
+      "spoken_mine_day": "{day}: {market}; my exchange: {mine}, {change}",
+      "note_week_bankBuys": "The line is the market: what banks paid all clients for the currency at the end of each week, by the Central Bank of Armenia. Dots are your exchanges: above the line — you got more drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a week",
+      "note_day_bankBuys": "The line is the market: what banks paid all clients for the currency that day, by the Central Bank of Armenia; at weekends, Friday's. Dots are your exchanges: above the line — you got more drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a day",
+      "note_week_bankSells": "The line is the market: what banks charged all clients for the currency at the end of each week, by the Central Bank of Armenia. Dots are your exchanges: below the line — you gave fewer drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a week",
+      "note_day_bankSells": "The line is the market: what banks charged all clients for the currency that day, by the Central Bank of Armenia; at weekends, Friday's. Dots are your exchanges: below the line — you gave fewer drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a day"
     }
   },
   "income": {

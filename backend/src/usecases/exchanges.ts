@@ -5,7 +5,6 @@ import {
   OFFICIAL_RATE_FRESH_DAYS,
   RATE_SCALE,
   bestQuote,
-  chartMonths,
   convertAcross,
   convertSigned,
   currencySchema,
@@ -22,13 +21,13 @@ import {
   marketQuotesToday,
   marketRateOf,
   marketSideOf,
-  monthOf,
   officialDifference,
   ownRates,
   pickOfficialRate,
   RATE_CHART_CHANNEL,
   rateChart,
   rateChartPairs,
+  ratePeriodFrom,
   receiptDay,
   resourceIdOf,
   uprightOf,
@@ -275,10 +274,13 @@ export function marketLossesOf(
   return losses && exchangeLossesViewOf(losses)
 }
 
-/** The first day of the twelve months «Обмены против рынка» and the line of the rate look back on. */
+/**
+ * The first day of the twelve months «Обмены против рынка» and the year of the line of the rate look
+ * back on: from the day after the same day a year ago (MOL-168, В-1 «б», adversarial В) — one window,
+ * so a point of the year always has the percent of its place.
+ */
 function windowFrom(today: string): string {
-  const current = monthOf(today)
-  return `${chartMonths(current, EXCHANGE_LOSS_MONTHS)[0] ?? current}-01`
+  return ratePeriodFrom(today, EXCHANGE_LOSS_MONTHS)
 }
 
 /**
@@ -540,9 +542,10 @@ export async function ownMoney(
 }
 
 /**
- * «Курс рубля за 12 месяцев» (MOL-161): the window of «Обмены против рынка», the pairs and their
- * side from the exchanges of it, the line of all bank clients read once for them, and each point
- * with the very comparison its card carries (`market` of the list), so the two never disagree.
+ * «Курс рубля за месяц, 6 и 12 месяцев» (MOL-161, MOL-168): the pairs and their side from the
+ * exchanges of the year — the window of «Обмены против рынка» — the line of all bank clients read
+ * once for the year and drawn for each period, and each point with the very comparison its card
+ * carries (`market` of the list), so the two never disagree.
  */
 export async function rateChartOf(
   { marketRates }: Pick<Repositories, 'marketRates'>,
@@ -550,7 +553,7 @@ export async function rateChartOf(
   measures: ReadonlyMap<string, ExchangeLossInput>,
   income: Currency,
   today: string,
-): Promise<ExchangesResponse['rateChart']> {
+): Promise<ExchangesResponse['rateCharts']> {
   const from = windowFrom(today)
   const pairs = rateChartPairs(views, from, today, income)
   if (pairs.length === 0) return null
@@ -571,7 +574,6 @@ export async function rateChartOf(
           : null
       return { ...view, measured }
     }),
-    from,
     today,
   )
   return chart && exchangeRateChartViewOf(chart)
@@ -619,7 +621,7 @@ export async function exchangesOverview(
     receipts: [...money.receipts],
     marketToday: marketTodayOf(latest, official, today),
     losses: marketLossesOf(measures, owner.spendCurrency),
-    rateChart: chart,
+    rateCharts: chart,
   }
 }
 

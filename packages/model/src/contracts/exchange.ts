@@ -7,7 +7,7 @@ import {
   lostCostReasonSchema,
   walletBasisSchema,
 } from '#model/entities/exchange'
-import type { RateChart } from '#model/entities/exchange-rate-chart'
+import type { RateChart, RateChartPeriod } from '#model/entities/exchange-rate-chart'
 import { CHART_LEVEL } from '#model/entities/money-charts'
 import type { ExchangeLosses } from '#model/entities/money-charts'
 import { ERROR, ISSUE } from '#model/support/errors'
@@ -269,9 +269,47 @@ export function exchangeLossesViewOf(losses: ExchangeLosses): ExchangeLossesView
 const chartLevel = z.int().min(0).max(CHART_LEVEL)
 
 /**
- * «Курс рубля за 12 месяцев» (MOL-161): per pair against the dram, the market of all bank clients at
- * the end of every week, the person's exchanges on the line's side with their percent and the market
- * they were measured by, and the ticks of the axis. Every height and position is the server's.
+ * One period of a pair (MOL-168): the market of all bank clients at every step — a day of the month,
+ * the end of a week of half a year and of the year — the person's exchanges on the line's side with
+ * their percent and the market they were measured by, and the ticks of the axis of its own figures.
+ */
+const ratePeriodCodec = z.strictObject({
+  step: z.enum(['day', 'week']),
+  steps: z.array(
+    z.strictObject({
+      day: exchangeDaySchema,
+      rate: rateCodec.nullable(),
+      x: chartLevel,
+      level: chartLevel.nullable(),
+    }),
+  ),
+  exchanges: z.array(
+    z.strictObject({
+      id: z.uuid(),
+      day: exchangeDaySchema,
+      step: z.int().min(0),
+      x: chartLevel,
+      rate: rateCodec,
+      level: chartLevel,
+      place: z.string().nullable(),
+      /** Hundredths of a percent: −40 is «−0,40 %». */
+      percent: z.int().nullable(),
+      market: z
+        .strictObject({ rate: rateCodec, level: chartLevel, basis: marketChannelSchema })
+        .nullable(),
+    }),
+  ),
+  levels: z
+    .array(z.strictObject({ rate: rateCodec, level: chartLevel }))
+    .min(1)
+    .max(3),
+})
+
+/**
+ * «Курс рубля за месяц, 6 и 12 месяцев» (MOL-161, MOL-168): per pair against the dram, each period
+ * by its months — all three in one answer, so a change of the period asks the server nothing (Р-2).
+ * Null for a month or half a year with no figure of the market while the year has one (Р-6). Every
+ * height and position is the server's.
  */
 export const exchangeRateChartCodec = z.strictObject({
   pairs: z
@@ -279,51 +317,41 @@ export const exchangeRateChartCodec = z.strictObject({
       z.strictObject({
         currency: currencySchema.exclude(['AMD']),
         side: marketSideSchema,
-        weeks: z.array(
-          z.strictObject({
-            day: exchangeDaySchema,
-            rate: rateCodec.nullable(),
-            x: chartLevel,
-            level: chartLevel.nullable(),
-          }),
-        ),
-        exchanges: z.array(
-          z.strictObject({
-            id: z.uuid(),
-            day: exchangeDaySchema,
-            week: z.int().min(0),
-            x: chartLevel,
-            rate: rateCodec,
-            level: chartLevel,
-            place: z.string().nullable(),
-            /** Hundredths of a percent: −40 is «−0,40 %». */
-            percent: z.int().nullable(),
-            market: z
-              .strictObject({ rate: rateCodec, level: chartLevel, basis: marketChannelSchema })
-              .nullable(),
-          }),
-        ),
-        levels: z
-          .array(z.strictObject({ rate: rateCodec, level: chartLevel }))
-          .min(1)
-          .max(3),
+        periods: z.strictObject({
+          1: ratePeriodCodec.nullable(),
+          6: ratePeriodCodec.nullable(),
+          12: ratePeriodCodec,
+        }),
       }),
     )
     .min(1),
 })
 export type ExchangeRateChartView = z.output<typeof exchangeRateChartCodec>
+export type ExchangeRatePeriodView = z.output<typeof ratePeriodCodec>
+
+function ratePeriodViewOf(period: RateChartPeriod): ExchangeRatePeriodView {
+  return {
+    ...period,
+    steps: period.steps.map((step) => ({ ...step })),
+    exchanges: period.exchanges.map((point) => ({
+      ...point,
+      market: point.market && { ...point.market },
+    })),
+    levels: period.levels.map((level) => ({ ...level })),
+  }
+}
 
 /** The chart as it goes on the wire. */
 export function exchangeRateChartViewOf(chart: RateChart): ExchangeRateChartView {
   return {
-    pairs: chart.pairs.map((pair) => ({
-      ...pair,
-      weeks: pair.weeks.map((week) => ({ ...week })),
-      exchanges: pair.exchanges.map((point) => ({
-        ...point,
-        market: point.market && { ...point.market },
-      })),
-      levels: pair.levels.map((level) => ({ ...level })),
+    pairs: chart.pairs.map(({ currency, side, periods }) => ({
+      currency,
+      side,
+      periods: {
+        1: periods[1] && ratePeriodViewOf(periods[1]),
+        6: periods[6] && ratePeriodViewOf(periods[6]),
+        12: ratePeriodViewOf(periods[12]),
+      },
     })),
   }
 }
@@ -387,9 +415,16 @@ export const exchangesResponseCodec = z.strictObject({
    */
   losses: exchangeLossesCodec.nullable().default(null),
   /**
-   * «Курс рубля за 12 месяцев» (MOL-161): null — no figure of the market in any week of the window,
-   * or no pair to draw. Defaulted so that an answer of the server before it still reads.
+   * «Курс рубля за месяц, 6 и 12 месяцев» (MOL-161, MOL-168): null — no figure of the market in any
+   * week of the year, or no pair to draw. Defaulted so that an answer of the server before it still
+   * reads.
    */
-  rateChart: exchangeRateChartCodec.nullable().default(null),
+  rateCharts: exchangeRateChartCodec.nullable().default(null),
+  /**
+   * The chart of the year alone, as the server before MOL-168 sent it (Р-4): read so that its answer
+   * is not refused whole, and never used — a new page against it shows no chart. Goes with the next
+   * task of money.
+   */
+  rateChart: z.unknown().optional(),
 })
 export type ExchangesResponse = z.output<typeof exchangesResponseCodec>

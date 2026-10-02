@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import type { Router } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { ERROR, parseRate, yerevanMidnight } from '@molvia/model'
@@ -85,18 +86,19 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
     receipts: [],
     marketToday: [],
     losses: null,
-    rateChart: null,
+    rateCharts: null,
     ...patch,
   }
 }
 
 const views: VueWrapper[] = []
-async function render(): Promise<VueWrapper> {
+let router: Router
+async function render(path = '/money/exchange'): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
   useActorStore().id = ACTOR
-  const router = createRouter({ history: createMemoryHistory(), routes })
-  await router.push('/money/exchange')
+  router = createRouter({ history: createMemoryHistory(), routes })
+  await router.push(path)
   const view = mount(ExchangeView, {
     attachTo: document.body,
     global: { plugins: [pinia, router, createAppI18n('en')] },
@@ -1061,35 +1063,75 @@ describe('ExchangeView: «Обмены против рынка» on top (MOL-152
   })
 })
 
-describe('ExchangeView: «Курс рубля за 12 месяцев» (MOL-161)', () => {
-  const rateChart = {
+describe('ExchangeView: «Курс рубля за месяц, 6 и 12 месяцев» (MOL-161, MOL-168)', () => {
+  const period = (step: 'day' | 'week', from: string) => ({
+    step,
+    steps: [
+      { day: from, rate: rate('4.22', from, 'official'), x: 0, level: 0 },
+      { day: '2026-09-27', rate: rate('4.25', '2026-09-25', 'official'), x: 1000, level: 1000 },
+    ],
+    exchanges: [],
+    levels: [{ rate: rate('4.24', '2026-09-27', 'official'), level: 600 }],
+  })
+  const rateCharts = {
     pairs: [
       {
         currency: 'RUB' as const,
         side: 'bankBuys' as const,
-        weeks: [
-          { day: '2026-09-20', rate: rate('4.22', '2026-09-18', 'official'), x: 0, level: 0 },
-          { day: '2026-09-27', rate: rate('4.25', '2026-09-25', 'official'), x: 1000, level: 1000 },
-        ],
-        exchanges: [],
-        levels: [{ rate: rate('4.24', '2026-09-27', 'official'), level: 600 }],
+        periods: {
+          1: period('day', '2026-09-02'),
+          6: period('week', '2026-04-05'),
+          12: period('week', '2025-10-05'),
+        },
       },
     ],
   }
+  const title = (months: '1' | '6' | '12') =>
+    en.exchange.rate_chart.title.RUB.replace('{period}', en.exchange.rate_chart.period_in[months])
 
   it('stands under «Обмены против рынка» and above «my rate» (handoff 05)', async () => {
-    exchanges.mockResolvedValue(overview({ rateChart }))
+    exchanges.mockResolvedValue(overview({ rateCharts }))
     const view = await render()
     const chart = view.get('.rate-chart')
-    expect(chart.text()).toContain(en.exchange.rate_chart.title.RUB)
+    expect(chart.text()).toContain(title('12'))
     expect(
       chart.element.compareDocumentPosition(view.get('.rate').element) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
   })
 
-  it('must not fire: no market in the window — no card', async () => {
-    exchanges.mockResolvedValue(overview({ rateChart: null }))
+  it('reads the period from the address, anything but 1 and 6 the year (Р-5)', async () => {
+    exchanges.mockResolvedValue(overview({ rateCharts }))
+    for (const [path, months] of [
+      ['/money/exchange?months=1', '1'],
+      ['/money/exchange?months=6', '6'],
+      ['/money/exchange?months=7', '12'],
+      ['/money/exchange?months=abc', '12'],
+    ] as const) {
+      const view = await render(path)
+      expect(view.get('.rate-chart h2').text()).toBe(title(months))
+    }
+  })
+
+  it('moves the period by replace, the year with no query, and asks the server nothing (Р-2)', async () => {
+    exchanges.mockResolvedValue(overview({ rateCharts }))
+    const view = await render()
+    const asked = exchanges.mock.calls.length
+    const replace = vi.spyOn(router, 'replace')
+    await view.findAll('.periods input')[0]?.setValue(true)
+    await flushPromises()
+    expect(replace).toHaveBeenCalled()
+    expect(router.currentRoute.value.query).toEqual({ months: '1' })
+    expect(view.get('.rate-chart h2').text()).toBe(title('1'))
+    await view.findAll('.periods input')[2]?.setValue(true)
+    await flushPromises()
+    expect(router.currentRoute.value.query).toEqual({})
+    expect(view.get('.rate-chart h2').text()).toBe(title('12'))
+    expect(exchanges.mock.calls.length).toBe(asked)
+  })
+
+  it('must not fire: no market in the year — no card', async () => {
+    exchanges.mockResolvedValue(overview({ rateCharts: null }))
     const view = await render()
     expect(view.find('.rate-chart').exists()).toBe(false)
   })
