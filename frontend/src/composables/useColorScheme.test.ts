@@ -245,22 +245,26 @@ describe('installColorScheme', () => {
     expect(document.documentElement.dataset.scheme).toBeUndefined()
   })
 
-  it('takes a key removed elsewhere for the system', () => {
+  // Adversarial Б′: a full shared shelf refused another window's choice and lost its past; the key
+  // gone, read as «Системная», put this window in a scheme nobody chose.
+  it('keeps its own scheme when the key goes elsewhere, as its reload does', () => {
     useColorScheme().choose('dark')
     installColorScheme()
     localStorage.removeItem(SCHEME_KEY)
     heard(SCHEME_KEY, null)
-    expect(useColorScheme().scheme.value).toBe('system')
-    expect(storedScheme()).toBe('system')
+    expect(useColorScheme().scheme.value).toBe('dark')
+    expect(document.documentElement.dataset.scheme).toBe('dark')
+    expect(sessionStorage.getItem(SCHEME_KEY)).toBe('dark')
+    expect(storedScheme()).toBe('dark')
   })
 
-  it('takes a storage cleared elsewhere for the system', () => {
+  it('keeps its own scheme when the storage is cleared elsewhere, as its reload does', () => {
     useColorScheme().choose('light')
     installColorScheme()
     localStorage.clear()
     heard(null, null)
-    expect(useColorScheme().scheme.value).toBe('system')
-    expect(storedScheme()).toBe('system')
+    expect(useColorScheme().scheme.value).toBe('light')
+    expect(storedScheme()).toBe('light')
   })
 
   it('does not hear another key', () => {

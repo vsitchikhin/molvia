@@ -60,17 +60,21 @@ const current = ref<Scheme>('system')
 
 /**
  * Takes the stored choice and follows the other windows of the app: `storage` fires in each of them
- * but the one that wrote, and a cleared storage arrives with no key at all. The value is the event's
- * — the shared shelf's — and only this window's own shelf is brought in line with it: written back
- * to the shared one, an event handled late put a stale choice over a newer one and sent it round
- * again (review С-3, adversarial А).
+ * but the one that wrote. The value is the event's — the shared shelf's — and only this window's own
+ * shelf is brought in line with it: written back to the shared one, an event handled late put a stale
+ * choice over a newer one and sent it round again (review С-3, adversarial А).
+ *
+ * **A key gone is not a choice** — every choice is written, «Системная» too. It goes when a full
+ * shared shelf refused a choice and lost its past (`writeEverywhere`), or the storage was cleared:
+ * read as «Системная», it put every other window in a scheme nobody chose (adversarial Б′). The
+ * window keeps its own, which is also what its reload reads — from its own shelf.
  */
 export function installColorScheme(): void {
   current.value = storedScheme()
   applyScheme(current.value)
   window.addEventListener('storage', (event) => {
-    if (event.key !== SCHEME_KEY && event.key !== null) return
-    const scheme = event.key === null ? 'system' : schemeOf(event.newValue)
+    if (event.key !== SCHEME_KEY || event.newValue === null) return
+    const scheme = schemeOf(event.newValue)
     writeOwn(SCHEME_KEY, scheme)
     current.value = scheme
     applyScheme(scheme)
