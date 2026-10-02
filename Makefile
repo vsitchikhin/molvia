@@ -95,6 +95,9 @@ gates: ## Read gates 0.2 and 0.3: make gates FROM=<day|moment> [TO=<day|moment>]
 	$(NEED_SCAFFOLD)
 	$(if $(filter command line,$(origin FROM)),,unset FROM;) $(if $(filter command line,$(origin TO)),,unset TO;) ./bin/gates.sh "$${FROM:-}" "$${TO:-}"
 
+model: ## Fetch the embedding model of catalogue search into .models, checked by sha256 (MOL-105)
+	node bin/fetch-model.mjs
+
 dev: ## Run api, pwa and bot for this copy
 	$(NEED_SCAFFOLD)
 	npm run dev
