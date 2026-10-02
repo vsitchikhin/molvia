@@ -345,7 +345,9 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   and not from our API, is not unknown** (round 4, Ж1): a captive portal's page or a stranger's
   `4xx` (`answered === false`, anything but `error.internal`) means the request never reached the
   server, and the intent goes at once — kept, a portal at the till locked the app further into the
-  shop. **The way out succeeds on `204` and on nothing else**: a portal answers a redirected
+  shop. **Only this tap's intent goes** (MOL-94, round 3, Д′): one the tap wrote over — a «Выйти»
+  landed earlier, an erasure whose answer was lost — is put back as it was; dropped with it, the
+  next launch offline opened the app of the person who left. **The way out succeeds on `204` and on nothing else**: a portal answers a redirected
   request with `200` and a page of its own, which read as «no body», and the phone erased a drawer
   for a session the server never heard about. **Somebody else signing in settles the intent too**
   (self-review Р3-2): the cookie of the owner who left is gone, so their drawer is erased there and
@@ -374,7 +376,8 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   (`molvia.erased`, owner's decision В-3, on this tab's own shelf, review 4): «Ваши данные удалены»
   on the erasure's own `204`; «не знаем, удалились ли» on an intent finished by «nobody»; «это
   нажатие ничего не удалило» after a first-tap `401` once the door closes. The note goes as it is
-  read, and whenever the server names somebody. **A failure keeps its door** (Б): a failed erasure
+  read, whenever the server names somebody, and on «Выйти»'s own `204` — the last thing done was
+  not an erasure (round 3, Ж). **A failure keeps its door** (Б): a failed erasure
   is not shown in the sheet of «Выйти», nor the other way; and it does not outlive the session it
   was about — the server's «nobody» takes it away, since the door closes over the sheet without
   closing it, and a login on the same page found the old words there (round 2, Г). The session is the whole proof (В-1): it

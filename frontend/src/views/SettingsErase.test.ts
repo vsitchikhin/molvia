@@ -96,6 +96,25 @@ function fillTheDrawer(): void {
   localStorage.setItem(`molvia.recent.${OWNER}`, '[]')
 }
 
+/** «Выйти» landed, its answer was lost, and the server could not be asked when the sheet closed. */
+async function aLogoutLeftWaiting(view: VueWrapper): Promise<void> {
+  await view.get('button.leave').trigger('click')
+  await flushPromises()
+  clock += 1000
+  await new Promise((resolve) => setTimeout(resolve, 5))
+  logout.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'timeout', false))
+  me.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'Failed to fetch', false))
+  ;[...sheet().querySelectorAll('button')]
+    .find((button) => button.textContent.trim() === en.sign_out.confirm)
+    ?.click()
+  await flushPromises()
+  sheet().querySelector<HTMLButtonElement>('button[aria-label]')?.click()
+  await flushPromises()
+  expect(localStorage.getItem('molvia.leaving')).toBe(OWNER)
+}
+
+const portal = () => new ApiError(ISSUE.RESPONSE_INVALID, 'HTTP 200', false)
+
 beforeEach(() => {
   vi.restoreAllMocks()
   me.mockReset()
@@ -331,20 +350,7 @@ describe('«Удалить мои данные» в настройках (MOL-94
     fillTheDrawer()
     localStorage.setItem(`molvia.trip-queue.${OWNER}`, '[]')
     const view = await render()
-    // «Выйти» landed, its answer was lost, and the server could not be asked when the sheet closed.
-    await view.get('button.leave').trigger('click')
-    await flushPromises()
-    clock += 1000
-    await new Promise((resolve) => setTimeout(resolve, 5))
-    logout.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'timeout', false))
-    me.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'Failed to fetch', false))
-    ;[...sheet().querySelectorAll('button')]
-      .find((button) => button.textContent.trim() === en.sign_out.confirm)
-      ?.click()
-    await flushPromises()
-    sheet().querySelector<HTMLButtonElement>('button[aria-label]')?.click()
-    await flushPromises()
-    expect(localStorage.getItem('molvia.leaving')).toBe(OWNER)
+    await aLogoutLeftWaiting(view)
 
     await askToErase(view)
     eraseMe.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
@@ -363,6 +369,90 @@ describe('«Удалить мои данные» в настройках (MOL-94
     expect(replaced).toEqual(['/'])
     // The tap was the last thing done here, and the login screen says what is known of it.
     expect(sessionStorage.getItem('molvia.erased')).toBe('kept')
+  })
+
+  it('Д′: ждущий «Выйти», «Удалить навсегда» ответил портал — «Выйти» на месте и доделывается «никого»', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await aLogoutLeftWaiting(view)
+
+    await askToErase(view)
+    eraseMe.mockRejectedValue(portal())
+    confirmButton().click()
+    await flushPromises()
+    expect(localStorage.getItem('molvia.leaving')).toBe(OWNER)
+    expect(localStorage.getItem('molvia.erasing')).toBeNull()
+
+    me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(ownersKeys()).toEqual([])
+    expect(replaced).toEqual(['/'])
+  })
+
+  it('Д′: удаление с потерянным ответом, повтор ответил портал — «не знаем» не теряется', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToErase(view)
+    eraseMe
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'timeout', false))
+      .mockRejectedValueOnce(portal())
+    confirmButton().click()
+    await flushPromises()
+    confirmButton().click()
+    await flushPromises()
+    expect(localStorage.getItem('molvia.leaving')).toBe(OWNER)
+    expect(localStorage.getItem('molvia.erasing')).toBe(OWNER)
+
+    me.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    sessionEnded()
+    await flushPromises()
+    expect(ownersKeys()).toEqual([])
+    expect(sessionStorage.getItem('molvia.erased')).toBe('unknown')
+  })
+
+  it('Д′0: ждущий «Выйти», его повтор ответил портал — намерение на месте (MOL-57, Ж1)', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await aLogoutLeftWaiting(view)
+
+    await view.get('button.leave').trigger('click')
+    await flushPromises()
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    logout.mockRejectedValueOnce(portal())
+    ;[...sheet().querySelectorAll('button')]
+      .find((button) => button.textContent.trim() === en.sign_out.confirm)
+      ?.click()
+    await flushPromises()
+
+    expect(localStorage.getItem('molvia.leaving')).toBe(OWNER)
+  })
+
+  it('Ж: «сессии нет» на удаление, затем «Выйти» с 204 — экран входа не говорит об удалении', async () => {
+    fillTheDrawer()
+    const view = await render()
+    await askToErase(view)
+    eraseMe.mockRejectedValue(new ApiError(ERROR.NO_ACTOR))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch', false))
+    confirmButton().click()
+    await flushPromises()
+    expect(sessionStorage.getItem('molvia.erased')).toBe('kept')
+    sheet().querySelector<HTMLButtonElement>('button[aria-label]')?.click()
+    await flushPromises()
+
+    await view.get('button.leave').trigger('click')
+    await flushPromises()
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    logout.mockResolvedValue(undefined)
+    ;[...sheet().querySelectorAll('button')]
+      .find((button) => button.textContent.trim() === en.sign_out.confirm)
+      ?.click()
+    await flushPromises()
+
+    expect(replaced).toEqual(['/'])
+    expect(sessionStorage.getItem('molvia.erased')).toBeNull()
   })
 
   it('шторку закрыли после сбоя, а сессии уже нет — стирание доделано, экран входа скажет «не знаем»', async () => {

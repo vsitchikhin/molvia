@@ -123,7 +123,7 @@ export const useSignOutStore = defineStore('signOut', () => {
     })
     // «Удалены» only on the erasure's own `204` (В-3); the screen says nothing it does not know. A
     // note written by this tab's last tap stays: a «Выйти» it found waiting finishes here (round 2,
-    // Д), and the tap is still the last thing the person did.
+    // Д), and the tap is still the last thing the person did. «Выйти»'s own `204` takes it away.
     if (note) noteErasure(note)
     window.location.replace('/')
   }
@@ -139,10 +139,16 @@ export const useSignOutStore = defineStore('signOut', () => {
       failure.value = { way, kind: 'offline' }
       return
     }
-    // An erasure of this owner tried before, its answer lost: a `401` now may be that erasure done.
-    const unsettled = way === 'erase' && erasingOwner() === owner
-    // A «Выйти» of this owner waiting for the server's word, which this tap is about to write over.
-    const waiting = !unsettled && leavingOwner() === owner
+    // The way out this owner was already waiting on — a «Выйти» or an erasure whose answer was
+    // lost — which this tap is about to write over. A tap that settles nothing puts it back.
+    const wasLeaving = leavingOwner() === owner
+    const wasErasing = erasingOwner() === owner
+    // An erasure tried before, its answer lost: a `401` now may be that erasure done.
+    const unsettled = way === 'erase' && wasErasing
+    const putBack = (): void => {
+      if (wasLeaving) markLeaving(owner, wasErasing)
+      else clearLeaving()
+    }
     leaving.value = true
     failure.value = null
     markLeaving(owner, way === 'erase')
@@ -161,15 +167,11 @@ export const useSignOutStore = defineStore('signOut', () => {
           // tap deleted nothing, and an empty account on signing in means it was deleted before.
           noteErasure('kept')
           failure.value = { way, kind: 'signed_out' }
-          if (!waiting) {
-            clearLeaving()
-            return
-          }
-          // A «Выйти» was waiting (round 2, Д): «no session» is the very word that completes it, so
-          // it is put back as it was, and the server's next «nobody» finishes it — never dropped,
-          // or the next launch offline would open the app of the person who left.
-          markLeaving(owner)
-          if (actor.heard !== before && actor.nobody) void finish(owner, null)
+          // A «Выйти» that was waiting (round 2, Д): «no session» is the very word that completes
+          // it, so it is put back as it was, and the server's next «nobody» finishes it — never
+          // dropped, or the next launch offline would open the app of the person who left.
+          putBack()
+          if (wasLeaving && actor.heard !== before && actor.nobody) void finish(owner, null)
           return
         }
         // A repeat after a lost answer: the first tap may have erased everything, or the session
@@ -179,8 +181,12 @@ export const useSignOutStore = defineStore('signOut', () => {
         // Decided after the failure (MOL-19, A1).
         failure.value = { way, kind: connected() ? 'error' : 'offline' }
       }
+      // The request never reached the server (round 4 of MOL-57, Ж1): this tap's intent goes, and
+      // the one it wrote over comes back — a «Выйти» landed earlier, an erasure whose answer was
+      // lost (MOL-94, round 3, Д′). Dropped with it, the next launch offline opened the app of the
+      // person who left, and a «nobody» later finished nothing.
       if (notReached(error)) {
-        clearLeaving()
+        putBack()
         return
       }
       // The server may have said «nobody» while this was in flight — its settling was skipped
@@ -189,6 +195,8 @@ export const useSignOutStore = defineStore('signOut', () => {
       if (actor.heard !== before && actor.nobody) void finish(owner, noteOfWaiting(owner))
       return
     }
+    // A note of an earlier tap of «Удалить» is not about this way out (round 3, Ж).
+    if (way === 'logout') dropErasureNote()
     await finish(owner, way === 'erase' ? 'erased' : null)
   }
 
