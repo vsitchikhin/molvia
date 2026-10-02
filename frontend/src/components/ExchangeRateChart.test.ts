@@ -411,6 +411,45 @@ describe('ExchangeRateChart (MOL-161)', () => {
     expect(shown()).toBe('Первый')
   })
 
+  it('three on one spot go round all three wherever on the spot the finger lands (review 8)', async () => {
+    const exchanges = [1, 2, 3].map((n) =>
+      point(`a0000000-0000-4000-8000-00000000005${String(n)}`, '2026-02-24', 3, 571, {
+        place: `Касса ${String(n)}`,
+      }),
+    )
+    const { view, area } = chart([rouble({ exchanges })])
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    const seen = new Set<string>()
+    // Five pixels off the centre (171,3; 106,2), a little elsewhere every time.
+    for (const [x, y] of [
+      [176.3, 106.2],
+      [171.3, 111.2],
+      [167.3, 103.2],
+      [175.3, 109.2],
+      [168.3, 102.2],
+      [171.3, 101.2],
+    ]) {
+      await at(view, area, x ?? 0, y ?? 0)
+      seen.add(view.find('.mine-place').text().split(' · ')[0] ?? '')
+    }
+    expect([...seen].sort()).toEqual(['Касса 1', 'Касса 2', 'Касса 3'])
+  })
+
+  it('must not fire: taps again on a dot seen apart keep it (adversarial Т)', async () => {
+    const dots = [
+      ['a0000000-0000-4000-8000-000000000061', '2026-02-17', 2, 550, 'Первый'],
+      ['a0000000-0000-4000-8000-000000000062', '2026-02-24', 3, 571, 'Второй'],
+      ['a0000000-0000-4000-8000-000000000063', '2026-03-03', 4, 592, 'Третий'],
+    ] as const
+    const exchanges = dots.map(([id, day, week, x, place]) => point(id, day, week, x, { place }))
+    const { view, area } = chart([rouble({ exchanges })])
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    for (let tap = 0; tap < 3; tap += 1) {
+      await at(view, area, 171.3, 106.2)
+      expect(view.find('.mine-place').text()).toContain('Второй')
+    }
+  })
+
   it('a new answer begins the round afresh: the dot now under the finger (adversarial Р)', async () => {
     const one = point('a0000000-0000-4000-8000-000000000044', '2026-02-24', 3, 571, {
       place: 'Касса 1',

@@ -21,7 +21,7 @@
       @update:model-value="choosePair"
     />
 
-    <!-- The reading is not a live region: the radio chosen says the same (MOL-74, Р-6 of MOL-157). -->
+    <!-- The reading is not a live region: the radio chosen says the same (Р-6 of MOL-157). -->
     <div class="reading">
       <template v-if="week">
         <p class="week">{{ t('exchange.rate_chart.week', { day: shortDay(week.day) }) }}</p>
@@ -131,7 +131,7 @@
                 />
               </template>
             </template>
-            <!-- A dot is a zero-length round-capped line: stretched with the plot, it stays round. -->
+            <!-- A dot is a zero-length round-capped line: stretched with the plot, still round. -->
             <template v-for="point in pair.exchanges" :key="point.id">
               <line
                 v-for="part in ['halo', 'point']"
@@ -212,9 +212,7 @@ interface Item {
 const MARGIN = 50
 /** How far from the touch a dot is still under the finger — its own radius and some. */
 const FINGER_PX = 12
-/** How far from its centre a dot is drawn, its ring included (`.halo`, 14 px wide). */
-const RING_PX = 7
-/** Dots whose centres are this close are drawn as one: a round goes on over them. */
+/** Dots whose centres are this close are drawn as one: a round of taps goes over them. */
 const STACK_PX = 3
 /** Half the end of the mark, in thousandths of the plot's width. */
 const TICK = 14
@@ -224,9 +222,10 @@ const TICK = 14
  * bank clients at the end of each week — the only row with a year of history, and the legend says
  * so (Р-3) — the person's exchanges as dots on their own day, and from each a mark to the market it
  * was measured by (В-1), so the mark and the percent always say the same. A choice is made as a bar
- * is — on lifting the finger or once it goes sideways — the nearest exchange by its day or week with
- * none by its end; by default the latest exchange. Hidden radios, one per week with no exchange and one per
- * exchange, give the keyboard and a screen reader every choice. Every height is the server's.
+ * is — on lifting the finger or once it goes sideways — the nearest exchange by its day or week
+ * with none by its end; by default the latest exchange. Hidden radios, one per week with no
+ * exchange and one per exchange, give the keyboard and a screen reader every choice. Every height
+ * is the server's.
  */
 export default defineComponent({
   name: 'ExchangeRateChart',
@@ -256,7 +255,7 @@ export default defineComponent({
         ? t('exchange.rate_chart.no_change')
         : signedPercent(point.percent, locale.value, true)
 
-    /** With a market and no percent, it is the central bank's rate of the day that is missing (К). */
+    /** A market and no percent: it is the central bank's rate of the day that is missing (К). */
     function placeLineOf(point: Point): string {
       const place = point.place ?? t('exchange.vs_market.no_place')
       if (point.percent !== null) {
@@ -321,7 +320,7 @@ export default defineComponent({
     )
     const cursorX = computed(() => chosen.value?.exchange?.x ?? week.value?.x ?? 0)
 
-    /** The spot taps go round on: where the round began, and its dots in turn. */
+    /** The spot taps go round on: the centre of the dot the round began with, and its dots. */
     let round: { x: number; y: number; keys: string[] } | null = null
 
     watch(
@@ -355,21 +354,22 @@ export default defineComponent({
     }
 
     /**
-     * A tap is read by what is drawn, in pixels (adversarial Л, М, Н, review 6). **The dot under the
-     * finger is chosen** — the nearest within `FINGER_PX`; measured in thousandths, the left half of a
-     * Monday's dot lay nearer the end of the week before. **Taps again on one spot go round the dots
-     * drawn over it** — whose ring covers the touch (`RING_PX`): one day and one rate, or days nearly
-     * one (adversarial И) — **in order of their distance from where the round began**, so the first
-     * tap is the dot under the finger and every dot of the spot comes in turn. A tap is on the spot
-     * while it is within `RING_PX` of where the round began — a finger's jitter — and the dot under it
-     * is drawn there, within `STACK_PX` (adversarial С); a new answer begins afresh (Р). Turned from the one chosen, the middle of
-     * three dots 7 px apart went to the first (Н); turned from the nearest, three dots on one spot
-     * went round two (О, review 7); turned in order of days, a tap on one of three dots 2,7 px apart
-     * showed its neighbour (П). A tap on a new spot right on the dot already chosen goes on to the
-     * next. **A slide follows the finger**, kept only by a dot drawn right on the one under it.
-     * **With no dot under the finger, the nearest by x alone**: a week with no exchange by its end,
-     * an exchange by its day (review 1) — never by height, which chose a week two ahead over a line
-     * of 6 px weeks and left a gap out of reach (review 4, Ж).
+     * A tap is read by what is drawn, in pixels (adversarial Л, М, Н, review 6). **The dot under
+     * the finger is chosen** — the nearest within `FINGER_PX`; measured in thousandths, the left
+     * half of a Monday's dot lay nearer the end of the week before. **Taps again on one spot go
+     * round the dots drawn on it** — centres within `STACK_PX` of the dot the round began with: one
+     * day and one rate, or days nearly one (adversarial И) — **in order of their distance from the
+     * first tap**, so the first tap is the dot under the finger and every dot of the spot comes in
+     * turn. A tap is on the spot while the dot under it is drawn there, wherever on it the finger
+     * lands (review 8); a neighbour seen apart is a new spot, however near (adversarial С, Т), and
+     * a new answer begins afresh (Р). Turned from the one chosen, the middle of three dots 7 px
+     * apart went to the first (Н); turned from the nearest, three dots on one spot went round two
+     * (О, review 7); turned in order of days, a tap on one of three dots 2,7 px apart showed its
+     * neighbour (П). A tap on a new spot right on the dot already chosen goes on to the next. **A
+     * slide follows the finger**, kept only by a dot drawn right on the one under it. **With no dot
+     * under the finger, the nearest by x alone**: a week with no exchange by its end, an exchange
+     * by its day (review 1) — never by height, which chose a week two ahead over a line of 6 px
+     * weeks and left a gap out of reach (review 4, Ж).
      */
     const pointer = useChartPointer(area, (fraction, point) => {
       const shown = pair.value
@@ -412,30 +412,27 @@ export default defineComponent({
       const key = items.value[chosenIndex.value]?.key
       const last = round
       const under = items.value[hit]?.exchange
-      // Again on the spot: the finger near where the round began, and the dot under it drawn there —
-      // a neighbour seen apart is a new spot, however near (adversarial С).
-      if (
-        last &&
-        under &&
-        Math.hypot(finger.x - last.x, finger.y - last.y) <= RING_PX &&
-        apart(under, last) <= STACK_PX
-      ) {
+      // Again on the spot: the dot under the finger is one drawn on the dot the round began with.
+      if (last && under && apart(under, last) <= STACK_PX) {
         const held = key === undefined ? -1 : last.keys.indexOf(key)
         if (held !== -1) {
           chooseKey(last.keys[(held + 1) % last.keys.length])
           return
         }
       }
-      // A new spot: its dots by their distance from the finger — the one under it first.
+      // A new spot, the dot under the finger: it and the dots drawn on it, by their distance from
+      // the finger — it first.
+      const centre = under && { x: xOf(under.x), y: point.y === null ? 0 : yAt(under.level) }
+      if (!centre) return
       const keys = items.value
         .flatMap((item, index) =>
-          item.exchange && (index === hit || apart(item.exchange, finger) <= RING_PX)
+          item.exchange && apart(item.exchange, centre) <= STACK_PX
             ? [{ key: item.key, away: apart(item.exchange, finger), index }]
             : [],
         )
         .sort((one, other) => one.away - other.away || one.index - other.index)
         .map((dot) => dot.key)
-      round = { x: finger.x, y: finger.y, keys }
+      round = { ...centre, keys }
       chooseKey(keys[0] === key && keys.length > 1 ? keys[1] : keys[0])
     })
 
@@ -450,7 +447,7 @@ export default defineComponent({
       }
       return all.filter((run) => run.length > 0)
     })
-    /** A run of two weeks and more is a line; one week between two gaps, a dot of the line (adversarial Д). */
+    /** Two weeks and more are a line; one week between two gaps, a dot of it (adversarial Д). */
     const lines = computed(() =>
       runs.value
         .filter((run) => run.length > 1)
