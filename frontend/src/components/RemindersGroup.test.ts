@@ -102,7 +102,7 @@ it('puts the switch back where the server holds it when the answer does not come
   await switchOf(view).setValue(false)
   await flushPromises()
   expect(switchOf(view).element.checked).toBe(true)
-  expect(view.get('[role="alert"]').text()).toContain(en.settings.reminders.save_failed)
+  expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
 })
 
 it('waits offline: the switch is inactive and says why, to a screen reader too', async () => {
@@ -110,18 +110,18 @@ it('waits offline: the switch is inactive and says why, to a screen reader too',
   read.mockRejectedValue(new TypeError('network'))
   const view = await render()
   expect(switchOf(view).attributes('disabled')).toBeDefined()
-  expect(view.text()).toContain(en.settings.reminders.offline)
+  expect(view.text()).toContain(en.settings.tap.offline)
   expect(view.text()).not.toContain(en.state.retry)
-  expect(describedBy(view)).toContain(en.settings.reminders.offline)
+  expect(describedBy(view)).toContain(en.settings.tap.offline)
 })
 
 it('offers «Try again» after a server failure, and reads again on it', async () => {
   read.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
   const view = await render()
-  expect(view.text()).toContain(en.settings.reminders.load_error)
+  expect(view.text()).toContain(en.settings.tap.load_error)
   read.mockResolvedValue({ off: 'chosen' })
   await view.get('button').trigger('click')
   await flushPromises()
   expect(switchOf(view).element.checked).toBe(false)
-  expect(view.text()).not.toContain(en.settings.reminders.load_error)
+  expect(view.text()).not.toContain(en.settings.tap.load_error)
 })

@@ -16,14 +16,14 @@
         {{ t('settings.reminders.blocked') }}
       </p>
       <p v-if="!online" :id="`${id}-offline`" class="hint">
-        {{ t('settings.reminders.offline') }}
+        {{ t('settings.tap.offline') }}
       </p>
       <p v-else-if="saveFailed" class="failed" role="alert">
-        <IconAlert aria-hidden="true" />{{ t('settings.reminders.save_failed') }}
+        <IconAlert aria-hidden="true" />{{ t('settings.tap.save_failed') }}
       </p>
       <div v-else-if="failure === 'error'" class="failed">
         <IconAlert aria-hidden="true" />
-        <span>{{ t('settings.reminders.load_error') }}</span>
+        <span>{{ t('settings.tap.load_error') }}</span>
         <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
       </div>
     </AppCard>

@@ -24,14 +24,14 @@
       </AppReveal>
       <p :id="`${id}-hint`" class="hint">{{ t('settings.salary_shift.hint') }}</p>
       <p v-if="!online" :id="`${id}-offline`" class="hint">
-        {{ t('settings.salary_shift.offline') }}
+        {{ t('settings.tap.offline') }}
       </p>
       <p v-else-if="saveFailed" class="failed" role="alert">
-        <IconAlert aria-hidden="true" />{{ t('settings.salary_shift.save_failed') }}
+        <IconAlert aria-hidden="true" />{{ t('settings.tap.save_failed') }}
       </p>
       <div v-else-if="failure === 'error'" class="failed">
         <IconAlert aria-hidden="true" />
-        <span>{{ t('settings.salary_shift.load_error') }}</span>
+        <span>{{ t('settings.tap.load_error') }}</span>
         <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
       </div>
     </AppCard>
