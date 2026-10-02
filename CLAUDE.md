@@ -321,7 +321,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 ### Privacy: erasure, trackers, logs — `.claude/rules/privacy.md`
 
-- **Erasure is one function**, `ErasureRepository.erase`, in one transaction; catalogue items stay
+- **Erasure is one function**, `ErasureRepository.erase`, behind two doors — `/delete` in the bot
+  and «Удалить мои данные» in the settings (`DELETE /actors/me`, MOL-94) — in one transaction; catalogue items stay
   with `created_by` nulled, every place stays, and one is added to `erasures` — a count by week of
   arrival, no id (MOL-91). **A new table that points at `actors` must join
   erasure** — a test holds `ACTOR_REFERENCES` to every foreign key.

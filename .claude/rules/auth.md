@@ -9,7 +9,7 @@ paths:
   - 'packages/model/src/{entities,contracts}/{auth,session,actor}.ts'
   - 'packages/model/tests/{entities,contracts}/{auth,session,actor}.test.ts'
   - 'packages/client/src/**'
-  - 'frontend/src/views/{LoginView,DevicesView,SettingsSignOut}*'
+  - 'frontend/src/views/{LoginView,DevicesView,SettingsSignOut,SettingsErase}*'
   - 'frontend/src/components/{SignOutSheet,SessionEndSheet,IdentityNotice}*'
   - 'frontend/src/stores/{identity,login,actor,signOut}*'
   - 'frontend/src/composables/useSessions*'
@@ -349,11 +349,25 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   a connection lost while the request was on its way leaves the outcome unknown, and a launch with
   no connection then shows the login screen until the server can be asked — the drawer of someone
   who may have left is not opened on a guess.
+- **«Удалить мои данные» leaves through the same door** (MOL-94): `leave('erase')` of the same
+  store, one intent and one ending, only the request is `DELETE /actors/me` instead of the logout —
+  two stores with two intents would drift, and the lost answer, the portal, offline and another
+  person signing in are the same cases. Two things differ. **A repeat finds no session**: the
+  erasure took every session, so the second tap after a lost answer is `401 error.no_actor`, never
+  the logout's `204`; that refusal is not the word that settles it — `me()` is, which the seam in
+  `api.ts` asks — so the sheet shows no error and waits for it. **Only the erasure's own `204`
+  marks the login screen** (`molvia.erased`, owner's decision В-3): «Ваши данные удалены» is said
+  once and the mark goes as it is read. An intent finished by the server's «nobody» after a lost
+  answer says nothing there — it may be a session that ended by itself, and the screen says nothing
+  it does not know. The session is the whole proof (В-1): it already opens every row and the copy
+  of them, and a stranger at a forgotten sign-in is answered by «Устройства»; **the price, named:**
+  whoever holds a live session can erase the person.
 - **What would be lost is counted aloud** (owner's decision Q2) — everything the erasure takes
   that the server does not hold: the trip queue and the purchases it refused, every rating draft,
   saved or still being typed, and an unsaved settings form (adversarial Б3). The app is asked to
   send first when the sheet opens. Both «Выйти» and «Завершить» ask before acting, because
-  neither can be undone — there is no «Вернуть» for a deleted key.
+  neither can be undone — there is no «Вернуть» for a deleted key. «Удалить мои данные» counts
+  nothing (MOL-94): everything goes, so the number would help no decision.
 - **Another window lets the owner go by the drawer's disappearing, and erases its own shelves**
   (adversarial А1). `sessionStorage` belongs to one tab, so the window where «Выйти» was pressed
   cannot clear its neighbours' — and `read` falls back to it, so a neighbour's reload opened the
