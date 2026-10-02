@@ -84,7 +84,7 @@ it('answers exactly what the unique index over places computes', async () => {
  * the twin would merge what the database keeps apart, and the screen would then keep quiet about
  * prices moving into another shop. The residue is knowingly accepted — a shop named with a
  * medievalist's letter is not a case this product meets — and the price is a softer sentence on
- * one sheet, never a write. Widening this sweep means owning the database image.
+ * one sheet, never a write. Widening it waits for a glibc that knows those letters — a new tag.
  */
 const SCRIPTS: readonly [number, number][] = [
   [0x20, 0x24f], // ASCII, Latin-1, Latin Extended-A and -B
