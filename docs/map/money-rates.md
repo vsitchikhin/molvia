@@ -62,12 +62,13 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 
 ## frontend · views
 
-- `frontend/src/views/ExchangeView.vue` — «Обмен денег» screen under «Деньги»: the own rate, which rate trips take, and the list of exchanges beside the central bank.
+- `frontend/src/views/ExchangeView.vue` — «Обмен денег» screen under «Деньги»: «Обмены против рынка» and the line of the rate on top, the own rate, which rate trips take, and the list of exchanges beside the market.
 - `frontend/src/views/IncomesView.vue` — «Доходы» screen under «Деньги»: incomes by month with the per-currency sums, recording, amending and «Вернуть».
 
 ## frontend · components
 
 - `frontend/src/components/ExchangeCard.vue` — Card of one exchange: the day, what was given and received, the rate plate against the market of its day and the central bank, the note.
+- `frontend/src/components/ExchangeRateChart.vue` — «Курс рубля за 12 месяцев» on «Обмен денег» (MOL-161): the market of all bank clients by week, the exchanges as dots with a mark to the market each was measured by, the reading above, the pairs, hidden radios.
 - `frontend/src/components/ExchangeRemoveSheet.vue` — «Удалить обмен?» sheet: the exchange's amounts and day, and what removing does to the rate of new trips.
 - `frontend/src/components/ExchangeSheet.vue` — «Записать обмен» sheet: given, received, day, how it was changed, «сколько было до» where it weighs; also amends an exchange with its versions.
 - `frontend/src/components/IncomeCard.vue` — Card of one income: the day, the source and amount, the note on a plate below.
