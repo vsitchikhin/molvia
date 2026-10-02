@@ -597,4 +597,23 @@ describe('своё место в общем режиме — свежесть п
     expect(row?.recent).toBe(false)
     expect(Date.now() - (row?.latestVisitAt.getTime() ?? 0)).toBeGreaterThan(700 * 86_400_000)
   })
+  it('за пару своего места голосуют только мои покупки (адверсариальный М′)', async () => {
+    const me = await insertActor(db)
+    const cheese = await insertItem(db)
+    const sas = await insertPlace(db, { name: 'SAS', city: 'Ереван' })
+    const shop = await insertPlace(db, { name: 'Магазин у дома' })
+    for (const days of [30, 20, 10]) {
+      await bought(me, cheese, sas, amd(260_000), kilo, { on: ago(days) })
+    }
+    await bought(me, cheese, shop, amd(80_000), piece, { on: ago(730) })
+    for (const days of [6, 5, 4]) {
+      await bought(await insertActor(db), cheese, shop, amd(90_000), piece, { on: ago(days) })
+    }
+
+    const rows = await expenses.placePricesFor(sharedPrices(me, [cheese]))
+    expect(rows.map((row) => [row.unit, row.pairObservations])).toEqual([
+      ['piece', 1],
+      ['kg', 3],
+    ])
+  })
 })

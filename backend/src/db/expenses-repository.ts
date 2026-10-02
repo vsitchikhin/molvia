@@ -229,8 +229,8 @@ export interface PlacePrice {
   /**
    * What the pair this row is in weighs for Р-4: every purchase of the item in this currency and
    * unit, in every place, and the latest visit among them — including places the pair does not
-   * name because their last purchase was made in another (MOL-166, adversarial Д). The same on
-   * every row of one pair.
+   * name because their last purchase was made in another (MOL-166, adversarial Д); at a place of
+   * one's own, one's own purchases alone (adversarial М′). The same on every row of one pair.
    */
   readonly pairObservations: number
   readonly pairLatestVisitAt: Date
@@ -785,7 +785,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           -- weighed by what remained, one pack in a shop bought by the kilo for ten weeks turned
           -- the whole row to pieces and hid the market where the kilo is cheaper.
           select places.*,
-            sum(observations) over pair as "pairObservations",
+            sum(weight) over pair as "pairObservations",
             max(visited) over pair as "pairLatestVisitAt"
           from (
           select
@@ -809,7 +809,13 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
             -- of mine head the row of someone with access, and hid a pack of mine fresher than it.
             case when bool_or(mine_here) then max(bought_at) filter (where mine)
                  else max(bought_at) end as "latestVisitAt",
-            max(bought_at) as visited,
+            -- What the place votes for its pair with (Р-4): at a place of one's own, one's own
+            -- purchases and visit alone, as its price (adversarial М′, owner's decision) — with
+            -- access, other people's packs at a shop of mine put my two-year-old price at the head.
+            case when bool_or(mine_here) then count(*) filter (where mine)
+                 else count(*) end as weight,
+            case when bool_or(mine_here) then max(bought_at) filter (where mine)
+                 else max(bought_at) end as visited,
             bool_or(nearby) as nearby,
             -- Whether the place's last purchase is within the window — what a place of a pair
             -- other than the row's first must be to stand on the row (adversarial И); one's own
