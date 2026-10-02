@@ -107,6 +107,10 @@ export default defineComponent({
 }
 
 .track {
+  /* Its own stacking context: the word is lifted over its segment's hit area (below), and without
+     this it rose over everything of the same level — the pinned header too, which a segment
+     scrolled under it then drew through and took the taps of («‹ Деньги» on «Графики»). */
+  isolation: isolate;
   display: flex;
   gap: var(--segment-inset);
   min-height: var(--touch-target);
@@ -146,7 +150,7 @@ export default defineComponent({
 }
 
 /* Over the segment's own hit area (`::after`), so a tap on the word lands on the word — and on the
-   label through it — rather than on the box laid over it. */
+   label through it — rather than on the box laid over it. Within the track alone (`isolation`). */
 .word {
   position: relative;
   z-index: 1;
