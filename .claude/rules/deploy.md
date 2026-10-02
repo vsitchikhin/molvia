@@ -38,6 +38,12 @@ The shape worth knowing here:
   the code deployed against it is the worse of the two failures. `make migrate`, the test
   setup and the boot path all go through the same code, so a migration cannot behave one
   way locally and another in production.
+- **Every migration of the journal is applied, or the boot stops** (MOL-105, adversarial Б).
+  drizzle runs a migration only if its stamp is later than the last applied: two branches whose
+  stamps lie in another order than they merge in, and the second is skipped while the log says
+  «migrated». `stampsOutOfOrder` holds the journal in order in a test, and after every chain —
+  boot, `make migrate`, the tests' setup — `assertEveryMigrationApplied` finds each entry's row by
+  its stamp. A migration renumbered behind another branch's is stamped anew before its merge.
 - **A merged migration is never rewritten.** drizzle decides what to run by the journal's
   `created_at` alone and never compares a file with what was applied: a rewritten migration is
   skipped silently if its stamp is older, and fails on its first `CREATE` if newer — then the
@@ -60,8 +66,12 @@ The shape worth knowing here:
   answers wrongly under another and says nothing, so the move off `postgres:17-alpine` came with
   migration `0038_pgvector` that rebuilds every index whose key is text or an expression and gives
   the ICU collations the new version; a later tag that moves glibc or ICU comes with the same.
-  The database's own collation stays without a version — Postgres refuses a change from none to
-  one. Procedure: `deploy/README.md`, «The Postgres image is part of the contract».
+  On a volume moved off alpine the database's own collation stays without a version — Postgres
+  refuses a change from none to one; a database created under glibc records it and is warned on.
+  **The move is done with writes stopped** (adversarial А, В): the new image under an API that has
+  not run the migration, or a deploy rolled back after it failed, leaves musl's indexes answering
+  under glibc in silence. Procedure: `deploy/README.md`, «The Postgres image is part of the
+  contract».
 - **Postgres publishes no port.** It is reachable only over the compose network.
 - **The PWA calls `/api/...`** and Caddy strips the prefix — the same shape the Vite dev
   proxy has, so nothing about the origin differs between development and production.

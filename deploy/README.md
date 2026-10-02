@@ -346,20 +346,46 @@ migration that rebuilds the text indexes and refreshes the ICU collations' versi
 ### The move off `postgres:17-alpine` (MOL-105)
 
 Until MOL-105 the image was `postgres:17-alpine`: musl and no `vector`. The data directory of the
-same Postgres 17 needs no dump, so the move is the merge itself:
+same Postgres 17 needs no dump. What needs care is the order, because two states are wrong and say
+nothing (adversarial review of MOL-105, А and В, measured):
 
-1. **Before the merge, the drill on the new image**: `deploy/backup/restore.sh --drill`, run from the
-   branch, restores last night's copy into the image the script now names, building every index under glibc; a unique key
-   that glibc folds into a duplicate fails the restore there, not in production. The row counts
-   must match.
-2. **The merge.** The deploy's `up -d` sees a new image for `postgres` and recreates the container
-   on the same volume; the entrypoint takes the files over for its own `postgres` user.
-3. **The API migrates at boot**: `0038_pgvector` creates `vector`, rebuilds every index of the
-   schema whose key is text or an expression, and gives the ICU collations the version of the new
-   ICU (`und-x-icu` warned on every query until it did). The database's own collation stays without
-   a version, as musl left it: Postgres refuses a change from none to one.
-4. **Check**: `/api/health`, «Что брать» in the app, and the journal of `postgres` for
+- **the new image under an API that has not run `0038`** — the indexes musl built answer by glibc's
+  rules: the unique key of a place lets a duplicate in, and a merge join over it fails;
+- **`0038` failing** — a pair of place names glibc folds into one and musl did not (`Ⱟ` and `ⱟ`) —
+  after which the deploy's rollback brings the previous API up on the new image: the first state,
+  and every later deploy fails on the same `REINDEX`.
+
+So nothing writes from the last copy to the end, and a failure goes back to alpine by hand. The app
+is down meanwhile — minutes, accepted while production is the owner's alone.
+
+1. **Stop writes, take a copy**:
+   `ssh molvia 'cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod stop backend bot && sudo -n systemctl start molvia-backup.service'`.
+2. **The drill on that copy**, from the branch: `deploy/backup/restore.sh --drill` restores it into
+   the image the script now names and builds every index under glibc — the very uniqueness `0038`'s
+   `REINDEX` asks for. A pair glibc folds into one fails the restore here; it is settled by hand —
+   the two places made one — and the steps start over. The row counts must match. Nothing was
+   written since the copy, so the drill saw everything the migration will.
+3. **The merge.** The release job stops red: `docker-compose.prod.yml` differs from the machine's
+   («Deploys» above).
+4. **Copy the files and re-run the job at once**:
+   `scp docker-compose.prod.yml deploy/deploy.sh molvia:molvia/`, then «Re-run failed jobs». No
+   `up -d` by hand in between: it would recreate `postgres` on the new image under the old API. The
+   job's `up -d` recreates `postgres` on the same volume (the entrypoint takes the files over for its
+   own `postgres` user) and starts the new API, which migrates: `0038_pgvector` creates `vector`,
+   rebuilds every index whose key is text or an expression, and gives the ICU collations the
+   version of the new ICU (`und-x-icu` warned on every query until it did).
+5. **Check**: `/api/health`, «Что брать» in the app, and the journal of `postgres` for
    `collation … version mismatch` — there must be none.
+6. **If the job rolled back** («rolling back to …» in its log): `0038` failed, and its transaction
+   left every index as musl built it — the data is whole and agrees with alpine, so alpine goes back
+   before anything else writes: stop `backend` and `bot` as in step 1, copy the previous compose file
+   (`git show <the master before the merge>:docker-compose.prod.yml`, `scp` it to `~/molvia/`), and
+   `up -d`. The API's journal names the statement that failed (`describeMigrationFailure`); the
+   duplicate is settled by hand, then from step 1 again.
 
-A working copy does the same with `make up`: the container is recreated on its volume and the
-migration rebuilds the indexes. `make db-reset` is not needed.
+On a volume moved off alpine the database's own collation stays without a version: Postgres refuses
+a change from none to one. A database created under glibc — CI, a new copy, the drill, a restore —
+records its version, and Postgres warns on it when glibc moves.
+
+A working copy needs none of this: `make up` recreates the container on its volume and migrates at
+once; `make db-reset` is not needed.
