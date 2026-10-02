@@ -1,7 +1,7 @@
 import process from 'node:process'
 import { createBotClient } from '@molvia/client'
 import { assembleBot, startBot } from './assemble'
-import { createPulse } from './pulse'
+import { createPulse, hearTelegram } from './pulse'
 import { REMIND_EVERY_MS, startReminders } from './remind'
 import { botToken, readEnvironment, refusedNames } from './env'
 import type { BotEnvironment } from './env'
@@ -69,9 +69,10 @@ const api = createBotClient({
   timeoutMs: API_TIMEOUT_MS,
 })
 const bot = assembleBot(botToken, { api, appUrl: environment.appBaseUrl })
+// The pulse (MOL-142) beats on a claim that went through while the runner hears Telegram; without
+// a URL it never goes out. The listener goes in before the runner's first `getUpdates`.
+const pulse = createPulse(environment.pulseUrl, { listening: hearTelegram(bot) })
 const runner = startBot(bot)
-// The pulse (MOL-142) beats on a claim that went through; without a URL it never goes out.
-const pulse = createPulse(environment.pulseUrl)
 // The rating reminders (MOL-101): every minute the API is asked who is due, and they are sent.
 const stopReminders = startReminders(
   createBotClient({

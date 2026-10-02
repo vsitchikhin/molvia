@@ -70,7 +70,18 @@ export function assembleBot(
  */
 export const ALLOWED_UPDATES = ['message', 'callback_query', 'my_chat_member'] as const
 
-/** Long polling that actually runs handlers concurrently — the whole reason for the runner. */
+/**
+ * Long polling that actually runs handlers concurrently — the whole reason for the runner.
+ *
+ * A failed `getUpdates` is retried with a pause growing by a tenth of a second a try, not doubling
+ * (MOL-142, adversarial А1): the runner's default left the pause at some 27 minutes after half an
+ * hour of Telegram down, and nobody could sign in for that long after Telegram was back. Grown
+ * this way it is 19 seconds after half an hour and about a minute after five hours. The pause is
+ * a timer no stop cuts short, so a stop during an outage still waits it out — seconds now, and
+ * past the thirty seconds compose gives only after hours of Telegram down.
+ */
 export function startBot(bot: Bot): RunnerHandle {
-  return run(bot, { runner: { fetch: { allowed_updates: ALLOWED_UPDATES } } })
+  return run(bot, {
+    runner: { fetch: { allowed_updates: ALLOWED_UPDATES }, retryInterval: 'quadratic' },
+  })
 }
