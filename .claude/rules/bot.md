@@ -4,9 +4,13 @@ paths:
   - 'packages/client/src/bot.ts'
   - 'backend/src/routes/internal-auth.ts'
   - 'backend/src/usecases/bot-login.ts'
-  - 'backend/src/usecases/{remind-ratings,rate-from-bot}.ts'
+  - 'backend/src/usecases/{remind-ratings,rate-from-bot,reminders-switch}.ts'
+  - 'backend/src/routes/reminders.ts'
   - 'backend/src/db/reminders-repository.ts'
+  - 'backend/tests/reminders*.ts'
   - 'packages/model/src/{entities,contracts}/reminder.ts'
+  - 'frontend/src/components/RemindersGroup*'
+  - 'frontend/src/composables/useReminders*'
 ---
 
 # The bot, and what it is allowed to know (MOL-55, MOL-58, MOL-101)

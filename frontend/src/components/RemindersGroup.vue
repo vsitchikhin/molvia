@@ -1,37 +1,29 @@
 <template>
   <section class="group">
-    <h2 class="caption">{{ t('settings.group_money') }}</h2>
+    <h2 class="caption">{{ t('settings.group_reminders') }}</h2>
     <AppCard class="card">
       <label class="row">
-        <span class="label">{{ t('settings.salary_shift.label') }}</span>
+        <span class="label">{{ t('settings.reminders.label') }}</span>
         <AppSwitch
-          :checked="!!day"
-          :disabled="day === undefined || saving || !online"
-          :aria-describedby="online ? `${id}-hint` : `${id}-hint ${id}-offline`"
+          :checked="off === null"
+          :disabled="off === undefined || saving || !online"
+          :aria-describedby="described"
           @toggle="toggle"
         />
       </label>
-      <AppReveal>
-        <AppField
-          v-if="day"
-          :model-value="String(day)"
-          :label="t('settings.salary_shift.day')"
-          kind="select"
-          :options="days"
-          :disabled="saving || !online"
-          @update:model-value="choose(Number($event))"
-        />
-      </AppReveal>
-      <p :id="`${id}-hint`" class="hint">{{ t('settings.salary_shift.hint') }}</p>
+      <p :id="`${id}-hint`" class="hint">{{ t('settings.reminders.hint') }}</p>
+      <p v-if="off === 'blocked'" :id="`${id}-blocked`" class="blocked">
+        {{ t('settings.reminders.blocked') }}
+      </p>
       <p v-if="!online" :id="`${id}-offline`" class="hint">
-        {{ t('settings.salary_shift.offline') }}
+        {{ t('settings.reminders.offline') }}
       </p>
       <p v-else-if="saveFailed" class="failed" role="alert">
-        <IconAlert aria-hidden="true" />{{ t('settings.salary_shift.save_failed') }}
+        <IconAlert aria-hidden="true" />{{ t('settings.reminders.save_failed') }}
       </p>
       <div v-else-if="failure === 'error'" class="failed">
         <IconAlert aria-hidden="true" />
-        <span>{{ t('settings.salary_shift.load_error') }}</span>
+        <span>{{ t('settings.reminders.load_error') }}</span>
         <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
       </div>
     </AppCard>
@@ -39,35 +31,39 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, useId } from 'vue'
+import { computed, defineComponent, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { SALARY_SHIFT_DAY_MAX } from '@molvia/model'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
-import AppField from '@/components/AppField.vue'
-import AppReveal from '@/components/AppReveal.vue'
 import AppSwitch from '@/components/AppSwitch.vue'
-import { SALARY_SHIFT_DEFAULT, useSalaryShift } from '@/composables/useSalaryShift'
+import { useReminders } from '@/composables/useReminders'
 
 /**
- * «Зарплата с … числа — в следующий месяц» (MOL-134, В-3): its own group under the form, saved on
- * the tap (В-5) — the switch turns it on at the owner's 25th, the native select moves the day.
+ * «Напоминать об оценке в Telegram» (MOL-103): its own group under «Деньги», saved on the tap and
+ * never part of the form (Р-1). Off by a blocked bot, it says so — the person may not know the
+ * block turned the reminders off, and unblocking brings them back (В-1).
  */
 export default defineComponent({
-  name: 'SalaryShiftGroup',
-  components: { AppButton, AppCard, AppField, AppReveal, AppSwitch, IconAlert },
+  name: 'RemindersGroup',
+  components: { AppButton, AppCard, AppSwitch, IconAlert },
   setup() {
     const { t } = useI18n()
-    const shift = useSalaryShift()
-    const days = Array.from({ length: SALARY_SHIFT_DAY_MAX }, (_, index) => ({
-      value: String(index + 1),
-      label: t('settings.salary_shift.day_option', { day: index + 1 }),
-    }))
+    const id = useId()
+    const reminders = useReminders()
+    const described = computed(() =>
+      [
+        `${id}-hint`,
+        reminders.off.value === 'blocked' ? `${id}-blocked` : null,
+        reminders.online.value ? null : `${id}-offline`,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    )
     function toggle(on: boolean): void {
-      void shift.choose(on ? SALARY_SHIFT_DEFAULT : null)
+      void reminders.choose(on ? null : 'chosen')
     }
-    return { t, id: useId(), days, toggle, ...shift }
+    return { t, id, described, toggle, ...reminders }
   },
 })
 </script>
@@ -106,6 +102,15 @@ export default defineComponent({
 .hint {
   margin: 0;
   color: var(--text-muted);
+  font-size: var(--text-footnote);
+}
+
+.blocked {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--warn-tint);
+  color: var(--warn-ink);
   font-size: var(--text-footnote);
 }
 
