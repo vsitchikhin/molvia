@@ -265,7 +265,7 @@ export function createReminderRepository(db: Conn): ReminderRepository {
           reminders_off: RemindersOff | null
         }>(sql`select id, country, reminders_off from actors where ${where} for no key update`)
         if (!row) return undefined
-        const next = switchReminders(row.reminders_off, change)
+        const next = switchReminders(row.reminders_off, change, via)
         if (next === row.reminders_off) return next
 
         await tx.execute(sql`update actors set reminders_off = ${next} where id = ${row.id}::uuid`)

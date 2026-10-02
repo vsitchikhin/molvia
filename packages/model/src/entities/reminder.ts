@@ -154,16 +154,22 @@ export type ReminderSwitch = (typeof REMINDER_SWITCHES)[number]
  * blocking does not make «chosen» into «blocked», and unblocking turns on only what blocking
  * turned off — someone who said «не напоминать» and later unblocked the bot to sign in is still
  * not reminded (В-1).
+ *
+ * **«On» from the settings does not lift a block** (В-5): the app cannot know the bot was unblocked,
+ * and turned on over a blocked bot, the next evening's 403 turned it off again — a switch that
+ * promised what nothing could keep, and one block counted as many. Only Telegram's word does, or a
+ * press in the bot itself: whoever presses «Вернуть напоминания» there has not blocked it.
  */
 export function switchReminders(
   current: RemindersOff | null,
   change: ReminderSwitch,
+  from: 'settings' | 'bot',
 ): RemindersOff | null {
   switch (change) {
     case 'off':
       return 'chosen'
     case 'on':
-      return null
+      return from === 'settings' && current === 'blocked' ? 'blocked' : null
     case 'blocked':
       return current ?? 'blocked'
     case 'unblocked':

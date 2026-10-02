@@ -17,7 +17,8 @@ export async function remindersSettingOf(
 
 /**
  * `PUT /actors/me/reminders`, saved on the tap as «Зарплата — в следующий месяц» is (Р-1). Turned
- * on, whatever turned it off — a blocked bot included, which the next 403 will report again.
+ * on over a blocked bot it stays `blocked` (В-5): only an unblock lifts that, and the screen does not
+ * offer it.
  */
 export async function chooseReminders(
   reminders: Pick<ReminderRepository, 'switchReminders'>,

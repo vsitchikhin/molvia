@@ -389,10 +389,19 @@ describe('бот: кнопки, блокировка и разблокировк
     expect(await offOf(boris)).toBe('chosen')
   })
 
-  it('включение в настройках снимает и блокировку', async () => {
+  it('включение в настройках блокировку не снимает и ничего не считает (В-5)', async () => {
     const anna = await person()
     await bot(anna, 'blocked')
-    expect((await choose(anna, { on: true })).json()).toEqual({ off: null })
+    expect((await choose(anna, { on: true })).json()).toEqual({ off: 'blocked' })
+    expect(await offOf(anna)).toBe('blocked')
+    expect(await turnedOff()).toEqual({ button: 0, settings: 0, blocked: 1 })
+  })
+
+  it('«Вернуть напоминания» в боте снимает и блокировку: нажавший бота не заблокировал', async () => {
+    const anna = await person()
+    await bot(anna, 'blocked')
+    await bot(anna, 'on')
+    expect(await offOf(anna)).toBeNull()
   })
 
   it('«Вернуть» для незнакомого Telegram-id — 404: включать некого (адверсариальный В)', async () => {

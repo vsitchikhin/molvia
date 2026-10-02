@@ -111,27 +111,33 @@ describe('daysBetween', () => {
 })
 
 describe('switchReminders — the switch of MOL-103', () => {
-  it('turns off and on by the person whatever stood before', () => {
-    expect(switchReminders(null, 'off')).toBe('chosen')
-    expect(switchReminders('blocked', 'off')).toBe('chosen')
-    expect(switchReminders('chosen', 'on')).toBeNull()
-    expect(switchReminders('blocked', 'on')).toBeNull()
+  it('turns off and on by the person whatever stood before — from either side', () => {
+    for (const from of ['settings', 'bot'] as const) {
+      expect(switchReminders(null, 'off', from)).toBe('chosen')
+      expect(switchReminders('blocked', 'off', from)).toBe('chosen')
+      expect(switchReminders('chosen', 'on', from)).toBeNull()
+    }
+  })
+
+  it('«on» from the settings does not lift a block; a press in the bot does (В-5)', () => {
+    expect(switchReminders('blocked', 'on', 'settings')).toBe('blocked')
+    expect(switchReminders('blocked', 'on', 'bot')).toBeNull()
   })
 
   it('a blocked bot turns off only what was on', () => {
-    expect(switchReminders(null, 'blocked')).toBe('blocked')
-    expect(switchReminders('chosen', 'blocked')).toBe('chosen')
+    expect(switchReminders(null, 'blocked', 'bot')).toBe('blocked')
+    expect(switchReminders('chosen', 'blocked', 'bot')).toBe('chosen')
   })
 
   it('an unblocked bot turns on only what blocking turned off (В-1)', () => {
-    expect(switchReminders('blocked', 'unblocked')).toBeNull()
-    expect(switchReminders('chosen', 'unblocked')).toBe('chosen')
-    expect(switchReminders(null, 'unblocked')).toBeNull()
+    expect(switchReminders('blocked', 'unblocked', 'bot')).toBeNull()
+    expect(switchReminders('chosen', 'unblocked', 'bot')).toBe('chosen')
+    expect(switchReminders(null, 'unblocked', 'bot')).toBeNull()
   })
 
   it('a repeat changes nothing', () => {
-    expect(switchReminders('chosen', 'off')).toBe('chosen')
-    expect(switchReminders(null, 'on')).toBeNull()
-    expect(switchReminders('blocked', 'blocked')).toBe('blocked')
+    expect(switchReminders('chosen', 'off', 'bot')).toBe('chosen')
+    expect(switchReminders(null, 'on', 'settings')).toBeNull()
+    expect(switchReminders('blocked', 'blocked', 'bot')).toBe('blocked')
   })
 })

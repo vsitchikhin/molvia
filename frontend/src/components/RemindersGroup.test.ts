@@ -86,16 +86,13 @@ it('turns off on the tap and saves at once; on again the same way', async () => 
   expect(switchOf(view).element.checked).toBe(true)
 })
 
-it('off by a blocked bot: says so, and the switch turns it back on (В-1)', async () => {
+it('off by a blocked bot: says so, and the switch is inactive — only an unblock brings them back (В-5)', async () => {
   read.mockResolvedValue({ off: 'blocked' })
   const view = await render()
   expect(switchOf(view).element.checked).toBe(false)
+  expect(switchOf(view).attributes('disabled')).toBeDefined()
   expect(view.text()).toContain(en.settings.reminders.blocked)
   expect(describedBy(view)).toContain(en.settings.reminders.blocked)
-  await switchOf(view).setValue(true)
-  await flushPromises()
-  expect(choose).toHaveBeenCalledWith(true)
-  expect(view.text()).not.toContain(en.settings.reminders.blocked)
 })
 
 it('off by the person: no word about a block', async () => {

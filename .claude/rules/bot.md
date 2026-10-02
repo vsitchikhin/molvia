@@ -243,6 +243,12 @@ in `.scratch/tasks/requirements/MOL-103.md`.
   in the domain is the whole rule: **blocking does not overwrite «chosen», and unblocking turns on
   only what blocking turned off** (В-1) — someone who said «не напоминать» and later unblocked the
   bot to sign in is still not reminded. The person's own «on» clears either.
+- **The settings cannot lift a block** (В-5, owner's decision 02.10.2026): `switchReminders` takes
+  where a change came from, and «on» from the settings leaves `blocked` as it is — the group shows
+  the switch inactive and says to unblock the bot. Turned on over a blocked bot, the next evening's
+  403 turned it off again: a switch promising what nothing could keep, a step counted that never
+  went out, and one block counted as many in `make gates` (adversarial Б). A press in the bot does
+  lift it: whoever presses «Вернуть напоминания» there has not blocked it.
 - **Off is off, whoever turned it** (Р-4): `candidates()` leaves them out, so nothing is planned,
   marked or counted; the claim checks it again under the owner's row. **The named price:** a switch
   committed after that check lets one evening go — `for key share` does not wait for it.
