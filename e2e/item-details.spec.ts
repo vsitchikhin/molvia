@@ -223,6 +223,7 @@ test.describe('«Тут дешевле»', () => {
   async function boughtAtZovuni(
     page: Page,
     alternative?: { readonly price: string; readonly score: number },
+    shop = 'Зовуни',
   ): Promise<{ word: string; itemId: string; other: string | null }> {
     await signedIn(page)
     const headers = await asBrowser(page)
@@ -243,7 +244,7 @@ test.describe('«Тут дешевле»', () => {
         headers,
         data: { context, id, place: { kind: 'store', name } },
       })
-    expect((await start(earlier, 'Зовуни')).status()).toBe(201)
+    expect((await start(earlier, shop)).status()).toBe(201)
     const added = await page.request.post(`/api/trips/${earlier}/expenses`, {
       headers,
       data: {
@@ -344,22 +345,11 @@ test.describe('«Тут дешевле»', () => {
     await expect(line).toContainText('rated 5.0')
   })
 
-  test('comes in over frames: the fields rise with it, never in one jump (adversarial Е)', async ({
-    page,
-  }) => {
-    const { word } = await boughtAtZovuni(page)
-    // A shelf's connection: the answer comes after the sheet is up and still.
-    await page.route('**/api/advice/prices**', async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      await route.continue()
-    })
-    await pick({ page, word })
-    await expect
-      .poll(() => page.evaluate(() => document.getAnimations().length), { timeout: 10_000 })
-      .toBe(0)
-    await expect(hint(page)).toHaveCount(0)
-
-    // The top of the price field, frame by frame, until the hint is in and still.
+  /**
+   * The top of the price field, frame by frame, while `act` runs and for a moment after: how far it
+   * went in all, and the largest step between two frames.
+   */
+  async function priceFieldMoves(page: Page, act: () => Promise<void>) {
     await page.evaluate(() => {
       const w = window as unknown as { __tops: number[]; __stop: boolean }
       w.__tops = []
@@ -371,7 +361,7 @@ test.describe('«Тут дешевле»', () => {
       }
       requestAnimationFrame(step)
     })
-    await expect(hint(page)).toContainText('Зовуни', { timeout: 5000 })
+    await act()
     await page.waitForTimeout(600)
     const tops = await page.evaluate(() => {
       const w = window as unknown as { __tops: number[]; __stop: boolean }
@@ -379,10 +369,58 @@ test.describe('«Тут дешевле»', () => {
       return w.__tops
     })
     const steps = tops.slice(1).map((top, index) => Math.abs(top - (tops[index] ?? top)))
-    const moved = Math.abs((tops.at(-1) ?? 0) - (tops[0] ?? 0))
+    return {
+      moved: Math.abs((tops.at(-1) ?? 0) - (tops[0] ?? 0)),
+      moving: steps.filter((step) => step > 0.5).length,
+      largest: Math.max(0, ...steps),
+    }
+  }
 
-    expect(moved).toBeGreaterThan(20)
-    expect(steps.filter((step) => step > 0.5).length).toBeGreaterThan(3)
-    expect(Math.max(...steps)).toBeLessThan(moved / 2)
+  const still = (page: Page) =>
+    expect
+      .poll(() => page.evaluate(() => document.getAnimations().length), { timeout: 10_000 })
+      .toBe(0)
+
+  test('comes in over frames: the fields rise with it, never in one jump (adversarial Е)', async ({
+    page,
+  }) => {
+    const { word } = await boughtAtZovuni(page)
+    // A shelf's connection: the answer comes after the sheet is up and still.
+    await page.route('**/api/advice/prices**', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await route.continue()
+    })
+    await pick({ page, word })
+    await still(page)
+    await expect(hint(page)).toHaveCount(0)
+
+    const motion = await priceFieldMoves(page, () =>
+      expect(hint(page)).toContainText('Зовуни', { timeout: 5000 }),
+    )
+
+    expect(motion.moved).toBeGreaterThan(20)
+    expect(motion.moving).toBeGreaterThan(3)
+    expect(motion.largest).toBeLessThan(motion.moved / 2)
+  })
+
+  test('says something else over frames too: one line to two (adversarial Е′)', async ({
+    page,
+  }) => {
+    const { word } = await boughtAtZovuni(page, undefined, 'Зовуни Плюс')
+    await pick({ page, word })
+    await sheet(page).getByLabel('How much').fill('1')
+    await sheet(page).getByLabel('Price as on the tag').fill('540')
+    await expect(hint(page)).toContainText('Same as at Зовуни Плюс')
+    await still(page)
+
+    const motion = await priceFieldMoves(page, async () => {
+      await sheet(page).getByLabel('Price as on the tag').fill('500')
+      await expect(hint(page)).toContainText('Cheaper here')
+      await still(page)
+    })
+
+    expect(motion.moved).toBeGreaterThan(10)
+    expect(motion.moving).toBeGreaterThan(3)
+    expect(motion.largest).toBeLessThan(motion.moved / 2)
   })
 })
