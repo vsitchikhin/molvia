@@ -43,6 +43,8 @@ import {
   monthSchema,
   yearSchema,
   salaryShiftSchema,
+  chooseRemindersSchema,
+  remindersSettingSchema,
   spendingAmendBodySchema,
   spendingBodySchema,
   spendingCategoriesResponseCodec,
@@ -101,6 +103,7 @@ import type {
   MoneyChartMonthView,
   MoneyChartYearView,
   MoneyMonthView,
+  RemindersSetting,
   SalaryShift,
   SpendingAmendBody,
   SpendingBody,
@@ -329,6 +332,10 @@ export interface MolviaClient {
   salaryShift(): Promise<SalaryShift>
   /** Saved on the tap, whole each time: safe to repeat. */
   chooseSalaryShift(day: number | null): Promise<SalaryShift>
+  /** «Напоминать об оценке в Telegram» (MOL-103): `off` null is on, else why it is off. */
+  remindersSetting(): Promise<RemindersSetting>
+  /** Saved on the tap; turned on, the reminders start over. Safe to repeat. */
+  chooseReminders(on: boolean): Promise<RemindersSetting>
   /**
    * «Сохранить» a new spending. Named by the device, so safe to repeat: `created` is `false` for
    * the same one again, `error.conflict` for the same identifier with anything else — or while it
@@ -739,6 +746,14 @@ export function createClient(options: ClientOptions): MolviaClient {
       request('/actors/me/salary-shift', salaryShiftSchema, {
         method: 'PUT',
         body: encode(salaryShiftSchema, { day }),
+      }),
+
+    remindersSetting: () => request('/actors/me/reminders', remindersSettingSchema),
+
+    chooseReminders: async (on) =>
+      request('/actors/me/reminders', remindersSettingSchema, {
+        method: 'PUT',
+        body: encode(chooseRemindersSchema, { on }),
       }),
 
     recordSpending: async (body) => {

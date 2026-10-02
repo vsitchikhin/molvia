@@ -253,6 +253,13 @@
       "when": 1790840868956,
       "tag": "0035_open_food_facts",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790923898731,
+      "tag": "0036_reminders_switch",
+      "breakpoints": true
     }
   ]
 }

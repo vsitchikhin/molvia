@@ -44,7 +44,10 @@ function harness(api: Partial<MolviaBotClient>): { bot: Bot; calls: Call[] } {
   let shown: unknown
   const bot = assembleBot(
     '42:TEST',
-    { api: api as MolviaBotClient, appUrl: 'https://molvia.test' },
+    {
+      api: { switchReminders: () => Promise.resolve(), ...api } as MolviaBotClient,
+      appUrl: 'https://molvia.test',
+    },
     { botInfo: BOT_INFO },
   )
   const transformer: Transformer = (_prev, method, payload) => {
@@ -74,7 +77,8 @@ function press(
     from = FROM,
     text = QUESTION,
     chat = CHAT,
-  }: { from?: object; text?: string; chat?: object } = {},
+    markup = scale(MILK),
+  }: { from?: object; text?: string; chat?: object; markup?: object } = {},
 ): Update {
   return {
     update_id: 2,
@@ -89,7 +93,7 @@ function press(
         chat: chat as never,
         from: { ...FROM, id: 42, is_bot: true },
         text,
-        reply_markup: scale(MILK),
+        reply_markup: markup as never,
       },
     },
   }
@@ -201,6 +205,62 @@ describe('кнопки 1–5 под напоминанием (MOL-101)', () => {
       expect(rateFromBot).not.toHaveBeenCalled()
     },
   )
+
+  it('строка выключателя и его итог остаются после оценки (MOL-103, Р-7)', async () => {
+    const rateFromBot = vi.fn(() => Promise.resolve())
+    const { bot, calls } = harness({ rateFromBot })
+    const stopped = `${QUESTION}\n\n${t('ru', 'remind.stopped')}`
+
+    await bot.handleUpdate(
+      press(`rate:${MILK}:5`, { text: stopped, markup: scale(MILK, undefined, 'on') }),
+    )
+
+    expect(edits(calls)).toEqual([
+      {
+        method: 'editMessageText',
+        payload: expect.objectContaining({
+          text: `${QUESTION}\n\n✓ ${t('ru', 'rate.done', { score: 5 })}\n\n${t('ru', 'remind.stopped')}`,
+          reply_markup: scale(MILK, 5, 'on'),
+        }) as unknown,
+      },
+    ])
+  })
+
+  it('под последним сообщением «Не напоминать» после оценки на месте', async () => {
+    const rateFromBot = vi.fn(() => Promise.resolve())
+    const { bot, calls } = harness({ rateFromBot })
+
+    await bot.handleUpdate(press(`rate:${MILK}:3`, { markup: scale(MILK, undefined, 'off') }))
+
+    expect(edits(calls)[0]?.payload.reply_markup).toEqual(scale(MILK, 3, 'off'))
+  })
+
+  it('товара или аккаунта нет — шкала уходит, а «Не напоминать» остаётся (ревью №3)', async () => {
+    const rateFromBot = vi.fn(() => Promise.reject(new ApiError(ERROR.NOT_FOUND)))
+    const { bot, calls } = harness({ rateFromBot })
+
+    await bot.handleUpdate(press(`rate:${MILK}:4`, { markup: scale(MILK, undefined, 'off') }))
+
+    expect(calls.find((call) => call.method === 'editMessageReplyMarkup')?.payload).toMatchObject({
+      reply_markup: scale(undefined, undefined, 'off'),
+    })
+  })
+
+  it('сообщение без текста не переписывается — итог уходит ответом (адверсариальный Г)', async () => {
+    const rateFromBot = vi.fn(() => Promise.resolve())
+    const { bot, calls } = harness({ rateFromBot })
+    const update = press(`rate:${MILK}:4`)
+    const query = update.callback_query as unknown as { message: Record<string, unknown> }
+    query.message = { chat: CHAT, message_id: 10, date: 0 }
+
+    await bot.handleUpdate(update)
+
+    expect(rateFromBot).toHaveBeenCalledWith(777, MILK, 4)
+    expect(edits(calls)).toEqual([])
+    expect(calls.find((call) => call.method === 'sendMessage')?.payload.text).toBe(
+      t('ru', 'rate.done', { score: 4 }),
+    )
+  })
 
   it('в группе не оценивает', async () => {
     const rateFromBot = vi.fn(() => Promise.resolve())

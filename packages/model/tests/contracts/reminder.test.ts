@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { dueRemindersSchema, rateFromBotSchema, reminderSchema } from '#model/contracts/reminder'
+import {
+  chooseRemindersSchema,
+  dueRemindersSchema,
+  rateFromBotSchema,
+  reminderSchema,
+  remindersSettingSchema,
+  switchRemindersFromBotSchema,
+} from '#model/contracts/reminder'
 import { REMINDER_ITEMS } from '#model/entities/reminder'
 
 const ITEM = {
@@ -58,5 +65,35 @@ describe('rateFromBotSchema', () => {
       rateFromBotSchema.safeParse({ telegramUserId: 777, score: 4, review: 'ok' }).success,
     ).toBe(false)
     expect(rateFromBotSchema.safeParse({ telegramUserId: 0, score: 4 }).success).toBe(false)
+  })
+})
+
+describe('the switch of MOL-103', () => {
+  it('answers on, or off with its reason', () => {
+    expect(remindersSettingSchema.safeParse({ off: null }).success).toBe(true)
+    expect(remindersSettingSchema.safeParse({ off: 'chosen' }).success).toBe(true)
+    expect(remindersSettingSchema.safeParse({ off: 'blocked' }).success).toBe(true)
+    expect(remindersSettingSchema.safeParse({ off: 'paused' }).success).toBe(false)
+    expect(remindersSettingSchema.safeParse({}).success).toBe(false)
+  })
+
+  it('is chosen by a yes or a no and nothing else', () => {
+    expect(chooseRemindersSchema.safeParse({ on: false }).success).toBe(true)
+    expect(chooseRemindersSchema.safeParse({ on: 'false' }).success).toBe(false)
+    expect(chooseRemindersSchema.safeParse({ on: true, off: 'blocked' }).success).toBe(false)
+  })
+
+  it('takes from the bot one of four changes for one account', () => {
+    for (const change of ['off', 'on', 'blocked', 'unblocked']) {
+      expect(switchRemindersFromBotSchema.safeParse({ telegramUserId: 777, change }).success).toBe(
+        true,
+      )
+    }
+    expect(
+      switchRemindersFromBotSchema.safeParse({ telegramUserId: 777, change: 'chosen' }).success,
+    ).toBe(false)
+    expect(
+      switchRemindersFromBotSchema.safeParse({ telegramUserId: 0, change: 'off' }).success,
+    ).toBe(false)
   })
 })

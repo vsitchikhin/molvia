@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import { actorCodec, salaryShiftSchema, settingsOf } from '@molvia/model'
+import { actorCodec, remindersSettingSchema, salaryShiftSchema, settingsOf } from '@molvia/model'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -279,4 +279,31 @@ test('«зарплата — в следующий месяц» saves on the tap
   await expect(day).toHaveValue('28')
   await toggle.uncheck()
   await expect(day).toHaveCount(0)
+})
+
+test('«напоминать об оценке» turns off on the tap and stays off after a reload (MOL-103)', async ({
+  page,
+}) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  const toggle = page.getByRole('switch', { name: 'Напоминать об оценке в Telegram' })
+  await expect(toggle).toBeChecked()
+  await expect(toggle).toBeEnabled()
+  await toggle.uncheck()
+  const headers = await asBrowser(page)
+  const setting = async () =>
+    remindersSettingSchema.parse(
+      await (await page.request.get('/api/actors/me/reminders', { headers })).json(),
+    )
+  await expect.poll(setting).toEqual({ off: 'chosen' })
+  // Saved by the tap, not by the form: nothing waits under «Сохранить».
+  await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
+  await page.reload()
+  await expect(toggle).not.toBeChecked()
+  await expect(page.getByText('Бот заблокирован в Telegram', { exact: false })).toHaveCount(0)
+  await toggle.check()
+  await expect.poll(setting).toEqual({ off: null })
 })
