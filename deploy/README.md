@@ -351,9 +351,10 @@ ps bot` — is it running, how often did it restart — and `logs --tail 50 bot`
   the bot does not hear Telegram: the machine's way to `api.telegram.org`, or Telegram itself. The
   second is a bot that started while Telegram was away and has not yet learnt who it is. The
   runner's own log is off: it printed the request whole, the bot's token in it;
-- `[molvia] telegram: <code | network>, stopping`, and the container restarting — a revoked token
-  (`401`), a token Telegram cannot read (`404`: a space or a quote left in `.env.prod`), another
-  process on the same token (`409`), or fifteen hours of Telegram away;
+- `[molvia] telegram: <code | network>, stopping`, and the container restarting — the token in
+  `.env.prod` is wrong (`401`: revoked, cut short, or a stray character after it; `404`: a space or
+  a quote before it), another process on the same token (`409`), or fifteen hours of Telegram away.
+  A `401` or a `404` — compare the line with the token BotFather gives;
 - `[molvia] remind claim: <code>` — the API refuses the claim;
 - `[molvia] pulse: <kind>` — the ping did not go out: `network`, `timeout` or healthchecks.io's status.
 

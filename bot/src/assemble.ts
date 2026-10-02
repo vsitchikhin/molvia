@@ -91,8 +91,8 @@ export const RETRY_STEP_MS = 100
  * back. Here the pause grows by a tenth of a second a try, as the runner's does, a 429 waits what
  * Telegram asks, and every failure is logged by its kind. Only what may pass is retried — the
  * network, a 5xx, a 429 — as grammY does; any other code is thrown, since no retry mends it: a 401
- * is a revoked token, a 404 one Telegram cannot read (a space or a quote left in `.env.prod`), and
- * retried they kept a live, silent process where a crash loop is what the rollout and the guide
+ * is a token revoked or cut short, a 404 one Telegram cannot read at all (a space or a quote
+ * before it in `.env.prod`), and retried they kept a live, silent process where a crash loop is what the rollout and the guide
  * look for (adversarial round 4 Е1). A stop cuts the wait short and returns without the bot's
  * identity.
  */
