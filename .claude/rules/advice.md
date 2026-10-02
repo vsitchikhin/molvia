@@ -205,7 +205,12 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   the threshold and the superlative stay inside the first pair. **The places of the other pairs
   follow it, each with its own unit** (MOL-166, adversarial Е, owner's decision) — before, they
   were never shown at all, and once a place is named by its last purchase alone that hid the shop
-  of every week behind one pack while the row named a market bought at once a year ago.
+  of every week behind one pack while the row named a market bought at once a year ago. **A pair
+  with a place in the asker's own city comes first, whatever it weighs** (Р-26 across pairs,
+  adversarial Ж): three kilos in an Erevan shop headed a Gyumri resident's row over the market of
+  their own city. **Any place of another pair on the row takes «Дешевле всего» away** (adversarial
+  З, owner's decision): «Дешевле всего: Рынок 2 400 ֏/кг» over «Пятёрочка 300 ₽/кг» read as a lie,
+  whatever the word compared.
 - **Order is by rating down, then by name, in all three groups.** The handoff asked for
   ascending unit price; that sorts _different products_ by a number — milk at 570 ֏/л above
   beef at 4 790 ֏/кг — and «compare by unit price» is about one item across places.
