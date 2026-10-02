@@ -7,13 +7,18 @@ import {
   lostCostReasonSchema,
   walletBasisSchema,
 } from '#model/entities/exchange'
+import type { RateChart } from '#model/entities/exchange-rate-chart'
 import { CHART_LEVEL } from '#model/entities/money-charts'
 import type { ExchangeLosses } from '#model/entities/money-charts'
 import { ERROR, ISSUE } from '#model/support/errors'
 import { currencySchema, moneyCodec, signedMoneyCodec } from '#model/values/money'
 import type { Money } from '#model/values/money'
 import { rateCodec, rateProviderSchema } from '#model/values/rates'
-import { exchangeChannelSchema, marketChannelSchema } from '#model/values/market-rates'
+import {
+  exchangeChannelSchema,
+  marketChannelSchema,
+  marketSideSchema,
+} from '#model/values/market-rates'
 
 /**
  * Which rate a new trip takes (MOL-40, В-3): `personal` — the person's own when they have an
@@ -261,6 +266,68 @@ export function exchangeLossesViewOf(losses: ExchangeLosses): ExchangeLossesView
   }
 }
 
+const chartLevel = z.int().min(0).max(CHART_LEVEL)
+
+/**
+ * «Курс рубля за 12 месяцев» (MOL-161): per pair against the dram, the market of all bank clients at
+ * the end of every week, the person's exchanges on the line's side with their percent and the market
+ * they were measured by, and the ticks of the axis. Every height and position is the server's.
+ */
+export const exchangeRateChartCodec = z.strictObject({
+  pairs: z
+    .array(
+      z.strictObject({
+        currency: currencySchema.exclude(['AMD']),
+        side: marketSideSchema,
+        weeks: z.array(
+          z.strictObject({
+            day: exchangeDaySchema,
+            rate: rateCodec.nullable(),
+            x: chartLevel,
+            level: chartLevel.nullable(),
+          }),
+        ),
+        exchanges: z.array(
+          z.strictObject({
+            id: z.uuid(),
+            day: exchangeDaySchema,
+            week: z.int().min(0),
+            x: chartLevel,
+            rate: rateCodec,
+            level: chartLevel,
+            place: z.string().nullable(),
+            /** Hundredths of a percent: −40 is «−0,40 %». */
+            percent: z.int().nullable(),
+            market: z
+              .strictObject({ rate: rateCodec, level: chartLevel, basis: marketChannelSchema })
+              .nullable(),
+          }),
+        ),
+        levels: z
+          .array(z.strictObject({ rate: rateCodec, level: chartLevel }))
+          .min(1)
+          .max(3),
+      }),
+    )
+    .min(1),
+})
+export type ExchangeRateChartView = z.output<typeof exchangeRateChartCodec>
+
+/** The chart as it goes on the wire. */
+export function exchangeRateChartViewOf(chart: RateChart): ExchangeRateChartView {
+  return {
+    pairs: chart.pairs.map((pair) => ({
+      ...pair,
+      weeks: pair.weeks.map((week) => ({ ...week })),
+      exchanges: pair.exchanges.map((point) => ({
+        ...point,
+        market: point.market && { ...point.market },
+      })),
+      levels: pair.levels.map((level) => ({ ...level })),
+    })),
+  }
+}
+
 /**
  * «Обмен денег» whole: the preference, the pair a trip would convert by today — the currency of
  * conversion into the spending one, or null when the two are one — the wallet of that pair, what
@@ -319,5 +386,10 @@ export const exchangesResponseCodec = z.strictObject({
    * before it still reads.
    */
   losses: exchangeLossesCodec.nullable().default(null),
+  /**
+   * «Курс рубля за 12 месяцев» (MOL-161): null — no figure of the market in any week of the window,
+   * or no pair to draw. Defaulted so that an answer of the server before it still reads.
+   */
+  rateChart: exchangeRateChartCodec.nullable().default(null),
 })
 export type ExchangesResponse = z.output<typeof exchangesResponseCodec>

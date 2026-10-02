@@ -456,3 +456,122 @@ describe('«Обмены против рынка» на «Обмене дене�
     expect((await read(stranger.cookie)).losses).toBeNull()
   })
 })
+
+describe('«Курс рубля за 12 месяцев» на «Обмене денег» (MOL-161)', () => {
+  const day = daysAgo(1)
+  const weekAgo = daysAgo(8)
+
+  beforeEach(async () => {
+    await rates.upsert([official('4.3187', day)])
+    await market.upsert([
+      figure('bankCash', '4.110180', day),
+      figure('bankNoncash', '4.221606', day),
+      figure('banksAll', '4.230000', day),
+      figure('banksAll', '4.250000', weekAgo),
+      figure('banksAll', '4.600000', day, 'bankSells'),
+    ])
+  })
+
+  const read = async (cookie: string) =>
+    overviewOf((await app.inject({ method: 'GET', url: '/exchanges', headers: { cookie } })).json())
+
+  it('линия — «все клиенты банков» своей стороны, нал и безнал на неё не попадают (Р-3)', async () => {
+    const { cookie } = await owner()
+    const { rateChart } = await read(cookie)
+    // No exchanges yet: the currency of conversion alone, a line with no points (Р-5).
+    expect(rateChart?.pairs.map(({ currency, side }) => [currency, side])).toEqual([
+      ['RUB', 'bankBuys'],
+    ])
+    const [pair] = rateChart?.pairs ?? []
+    const figures = pair?.weeks.flatMap(({ rate }) => (rate ? [rate.scaled] : []))
+    expect(new Set(figures)).toEqual(new Set([parseRate('4.25'), parseRate('4.23')]))
+    expect(pair?.weeks.at(-1)?.day).toBe(yerevanDate(new Date()))
+    expect(pair?.exchanges).toEqual([])
+  })
+
+  it('точка в ответе записи сразу, и её процент — тот же, что в «Обменах против рынка» (В-1)', async () => {
+    const { cookie } = await owner()
+    const answer = overviewOf(
+      (await record(cookie, { channel: 'bankCash', note: 'Ардшинбанк' })).json(),
+    )
+    const point = answer.rateChart?.pairs[0]?.exchanges[0]
+    expect(point).toMatchObject({
+      day,
+      place: 'Ардшинбанк',
+      percent: answer.losses?.groups[0]?.percent,
+      market: { basis: 'bankCash' },
+    })
+    expect(point?.percent).toBe(121)
+    expect(point?.rate.scaled).toBe(parseRate('4.16'))
+    expect(point?.market?.rate.scaled).toBe(parseRate('4.11018'))
+    // The mark ends under the point: cash bought cheaper than the exchange gave.
+    expect(point?.market?.level).toBeLessThan(point?.level ?? 0)
+  })
+
+  it('купил рубли за драмы последним — линия стороны продажи, сданные рубли не рисуются (В-2)', async () => {
+    const { cookie } = await owner()
+    await record(cookie, { exchangedOn: weekAgo })
+    await record(cookie, {
+      given: { amount: '46000', currency: 'AMD' },
+      received: { amount: '10000', currency: 'RUB' },
+    })
+    const [pair] = (await read(cookie)).rateChart?.pairs ?? []
+    expect(pair?.side).toBe('bankSells')
+    expect(pair?.exchanges.map(({ rate }) => rate.scaled)).toEqual([parseRate('4.6')])
+  })
+
+  it('купил рубли за драмы — процент точки тот же, что у места в «Обменах против рынка» (adversarial В)', async () => {
+    await market.upsert([figure('bankCash', '4.350000', day, 'bankSells')])
+    const { cookie } = await owner()
+    const answer = overviewOf(
+      (
+        await record(cookie, {
+          given: { amount: '437.91', currency: 'AMD' },
+          received: { amount: '100', currency: 'RUB' },
+          note: 'Ардшинбанк',
+        })
+      ).json(),
+    )
+    // −0,67 ₽ of 100,67 ₽ is −0,6655 %; in drams by the bank of the day, −2,89 ֏ of 434,76 ֏ — −0,66 %.
+    expect(answer.exchanges[0]?.market?.best.difference).toEqual({ minor: -67n, currency: 'RUB' })
+    const [group] = answer.losses?.groups ?? []
+    const [point] = answer.rateChart?.pairs[0]?.exchanges ?? []
+    expect(group?.percent).toBe(-66)
+    expect(point?.percent).toBe(group?.percent)
+  })
+
+  it('чужие обмены не видны; удалённый уходит с графика, «Вернуть» его возвращает', async () => {
+    const { cookie } = await owner()
+    const stranger = await owner()
+    const id = randomUUID()
+    await record(cookie, { id })
+    expect((await read(stranger.cookie)).rateChart?.pairs[0]?.exchanges).toEqual([])
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: `/exchanges/${id}`,
+      headers: { cookie },
+    })
+    expect(overviewOf(removed.json()).rateChart?.pairs[0]?.exchanges).toEqual([])
+    const back = await app.inject({
+      method: 'POST',
+      url: `/exchanges/${id}/restore`,
+      headers: { cookie },
+    })
+    expect(overviewOf(back.json()).rateChart?.pairs[0]?.exchanges.map((one) => one.id)).toEqual([
+      id,
+    ])
+  })
+
+  it('рынка за окно нет или считать не в чем — графика нет', async () => {
+    const { cookie } = await owner()
+    await db.delete(marketRates)
+    expect((await read(cookie)).rateChart).toBeNull()
+    const dram = await insertActor(db, { incomeCurrency: 'AMD' })
+    const answer = await app.inject({
+      method: 'GET',
+      url: '/exchanges',
+      headers: { cookie: await signIn(db, dram) },
+    })
+    expect(overviewOf(answer.json()).rateChart).toBeNull()
+  })
+})
