@@ -404,6 +404,11 @@ shows what it moves.
   revision, and one of another model is never read and is written again. One row per item, HNSW by
   cosine on half precision; the query asks the index for sixty neighbours, and `hnsw.ef_search` is
   set as long, locally beside the threshold, or the index answers fewer.
+  **Measured on 20 000 names** (the seed with thirty-four makers each, real vectors, a Mac): the
+  meaning adds 2–8 ms to the statement — «мо» 52 ms against 55, «мясо», the heaviest, 141 against
+  146, «бытовая химия» 22 against 30; the vector of a query not seen before is some 20 ms there and
+  45 on the VPS, and typing letter by letter reads it from the cache. The budget — not to double a
+  two-letter query — holds with room to spare.
 - **Where a name found by meaning stands** (owner's decision В-3): after everything within one edit
   by the mean, before two edits — `MEANING_DISTANCE`, the nearer by meaning first; so nothing the
   letters found within one edit moves, and an answer with such a name is near. «молоко» keeps every
