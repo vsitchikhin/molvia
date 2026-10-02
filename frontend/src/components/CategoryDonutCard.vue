@@ -11,9 +11,9 @@
           {{ t('spending.summary.charts') }}<IconChevron class="chevron" aria-hidden="true" />
         </span>
       </span>
-      <span v-if="top.length > 0" class="figure">
+      <span class="figure">
         <DonutRing class="ring" :sectors="sectors" :thickness="16" />
-        <span class="named">
+        <span v-if="top.length > 0" class="named">
           <span v-for="row in top" :key="row.key" class="sector">
             <span class="dot" :style="{ background: row.colour }"></span>
             <span class="sector-name">{{ row.name }}</span>
@@ -21,14 +21,14 @@
             <span class="sector-amount">{{ row.amount }}</span>
           </span>
         </span>
+        <span v-else-if="waiting === 'read'" class="why">{{
+          t('spending.summary.donut_later')
+        }}</span>
+        <span v-else-if="waiting === 'rate'" class="why">
+          {{ t('spending.summary.donut_uncounted') }}
+        </span>
+        <span v-else-if="empty" class="why">{{ t('spending.month_empty') }}</span>
       </span>
-      <span v-else-if="waiting === 'read'" class="why">{{
-        t('spending.summary.donut_later')
-      }}</span>
-      <span v-else-if="waiting === 'rate'" class="why">
-        {{ t('spending.summary.donut_uncounted') }}
-      </span>
-      <span v-else-if="empty" class="why">{{ t('spending.month_empty') }}</span>
       <span v-if="hidden > 0" class="rest">
         {{ t('spending.summary.donut_more', { n: hidden }, hidden) }}
       </span>
@@ -41,7 +41,7 @@ import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconChevron from '~icons/mdi/chevron-right'
-import { formatEstimate, shareOf } from '@molvia/model'
+import { CHART_LEVEL, formatEstimate, shareOf } from '@molvia/model'
 import type { MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import DonutRing from '@/components/DonutRing.vue'
@@ -53,9 +53,9 @@ const NAMED = 3
 
 /**
  * «Куда ушли» on «Деньги» (MOL-156, handoff MOL-157 01): the month's ring and its three largest
- * sectors, the whole card one way into «Графики» — an empty month's too, with no ring and «В этом
- * месяце трат нет» in its place (handoff MOL-157 01), unless a spending of it still waits on the
- * phone. A month spent in with no ring says why in the ring's place. The sectors and their levels are the
+ * sectors, the whole card one way into «Графики» — an empty month's too, a grey ring with «В этом
+ * месяце трат нет» beside it (handoff MOL-157 01, MOL-160 В-4), unless a spending of it still waits
+ * on the phone. A month spent in with no sectors says why beside its grey ring. The sectors and their levels are the
  * server's (`slices`) — the phone adds nothing up, not even for a month kept before the ring; the
  * share printed is the model's `shareOf`, as the bars before it printed.
  */
@@ -109,8 +109,14 @@ export default defineComponent({
       }),
     )
     const rows = computed(() => all.value.filter((row) => row.named))
+    /**
+     * A month with no sector drawn is a grey ring, as on «Графики» (MOL-160, owner's decision В-4):
+     * with none, the card of every new month was a caption over a hole until its first spending.
+     */
     const sectors = computed<RingSector[]>(() =>
-      all.value.map(({ key, colour, level }) => ({ key, colour, level })),
+      all.value.some(({ level }) => level > 0)
+        ? all.value.map(({ key, colour, level }) => ({ key, colour, level }))
+        : [{ key: 'empty', colour: 'var(--surface-2)', level: CHART_LEVEL }],
     )
     const top = computed(() => rows.value.slice(0, NAMED))
     /** Sectors past the three that the ring draws: one of no level is on no ring (adversarial Б). */
@@ -123,7 +129,7 @@ export default defineComponent({
       }),
     )
     /**
-     * No ring, and yet the month was spent in: said in the ring's place, never left a caption over
+     * No sectors, and yet the month was spent in: said beside the grey ring, never left a caption over
      * nothing (adversarial round 2, Е, Ж). Categories and no sectors — a month kept before the ring,
      * or an answer of a server older than it — waits for the next read; nothing a rate counted —
      * everything in a currency with no rate — waits for a rate. An empty month says nothing here.
@@ -239,5 +245,10 @@ export default defineComponent({
 .why {
   color: var(--text-muted);
   font-size: var(--text-footnote);
+}
+
+.why {
+  flex: 1;
+  min-width: 0;
 }
 </style>

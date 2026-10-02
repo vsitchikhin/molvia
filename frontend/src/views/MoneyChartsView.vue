@@ -12,7 +12,7 @@
         <MonthSwitcher :month="month" :current="currentMonth" @change="chooseMonth" />
         <ChartsMonth :month="month" />
       </template>
-      <ChartsYear v-else />
+      <ChartsYear v-else :year="year" :current="currentYear" @change="chooseYear" />
     </div>
   </AppScreen>
 </template>
@@ -21,7 +21,7 @@
 import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { monthSchema } from '@molvia/model'
+import { monthSchema, yearSchema } from '@molvia/model'
 import AppScreen from '@/components/AppScreen.vue'
 import ChartsMonth from '@/components/ChartsMonth.vue'
 import ChartsYear from '@/components/ChartsYear.vue'
@@ -30,10 +30,10 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useLocalDay } from '@/composables/useLocalDay'
 
 /**
- * «Графики» (MOL-74, MOL-158, handoff MOL-157 03 and 06): «Месяц · Год» on top and, under «Месяц»,
- * the month — both in the address, moved by `replace`, so a switch is no step «back». No `mode` is
- * the month, no `month` today's on this phone. «Год» shows the cards of MOL-74 until MOL-160. The
- * answer of each tab draws itself under the controls, never above them (MOL-138).
+ * «Графики» (MOL-74, MOL-158, MOL-160, handoff MOL-157 03, 04 and 06): «Месяц · Год» on top and,
+ * under it, the month or the calendar year — all in the address, moved by `replace`, so a switch is
+ * no step «back». No `mode` is the month, no `month` or `year` today's on this phone. The answer of
+ * each tab draws itself under the controls, never above them (MOL-138).
  */
 export default defineComponent({
   name: 'MoneyChartsView',
@@ -74,7 +74,34 @@ export default defineComponent({
       })
     }
 
-    return { t, mode, modes, chooseMode, month, currentMonth, chooseMonth }
+    const currentYear = computed(() => today.value.slice(0, 4))
+    /** A year the address names, else this one; one still to come or not a year is this one too. */
+    const year = computed(() => {
+      const asked = route.query.year
+      return typeof asked === 'string' &&
+        yearSchema.safeParse(asked).success &&
+        asked <= currentYear.value
+        ? asked
+        : currentYear.value
+    })
+    function chooseYear(value: string): void {
+      void router.replace({
+        query: { ...route.query, year: value === currentYear.value ? undefined : value },
+      })
+    }
+
+    return {
+      t,
+      mode,
+      modes,
+      chooseMode,
+      month,
+      currentMonth,
+      chooseMonth,
+      year,
+      currentYear,
+      chooseYear,
+    }
   },
 })
 </script>

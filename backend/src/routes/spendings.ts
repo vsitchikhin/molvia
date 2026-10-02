@@ -3,8 +3,7 @@ import {
   DomainError,
   ERROR,
   moneyChartMonthCodec,
-  moneyChartsCodec,
-  moneyChartsQuerySchema,
+  moneyChartYearCodec,
   moneyMonthCodec,
   moneyMonthQuerySchema,
   monthSchema,
@@ -14,12 +13,12 @@ import {
   spendingCategoriesResponseCodec,
   spendingCategoryBodySchema,
   spendingViewCodec,
+  yearSchema,
 } from '@molvia/model'
 import type {
-  ChartPeriod,
   JournalKey,
   MoneyChartMonthView,
-  MoneyChartsView,
+  MoneyChartYearView,
   MoneyMonthView,
   SalaryShift,
   SpendingAmendBody,
@@ -46,8 +45,8 @@ export interface SpendingsApi {
   ): Promise<{ list: SpendingCategoriesResponse; created: boolean }>
   archiveCategory(actor: Asking, id: string, archived: boolean): Promise<SpendingCategoriesResponse>
   month(actor: Asking, month: string, cursor?: JournalKey): Promise<MoneyMonthView>
-  charts(actor: Asking, period: ChartPeriod): Promise<MoneyChartsView>
   chartMonth(actor: Asking, month: string): Promise<MoneyChartMonthView>
+  chartYear(actor: Asking, year: string): Promise<MoneyChartYearView>
   salaryShift(actor: Asking): Promise<SalaryShift>
   setSalaryShift(actor: Asking, body: SalaryShift): Promise<SalaryShift>
 }
@@ -162,13 +161,6 @@ export function spendingRoutes(app: FastifyInstance, api: SpendingsApi): void {
     },
   )
 
-  /** «Графики» (MOL-74): the months of the period side by side, the exchanges and the rate. */
-  app.get('/money/charts', { exposeHeadRoute: false }, async (request, reply) => {
-    const { period } = parseQuery(moneyChartsQuerySchema, request.query)
-    const view = await api.charts(ownerOf(request), period)
-    return privately(reply).send(z.encode(moneyChartsCodec, view))
-  })
-
   /** «Графики → Месяц» (MOL-158): the ring, the categories against the usual, the pace. */
   app.get<{ Params: { month: string } }>(
     '/money/months/:month/charts',
@@ -179,6 +171,19 @@ export function spendingRoutes(app: FastifyInstance, api: SpendingsApi): void {
       parseQuery(z.strictObject({}), request.query)
       const view = await api.chartMonth(ownerOf(request), month.data)
       return privately(reply).send(z.encode(moneyChartMonthCodec, view))
+    },
+  )
+
+  /** «Графики → Год» (MOL-160): the calendar year's ring, months, flow and categories. */
+  app.get<{ Params: { year: string } }>(
+    '/money/years/:year/charts',
+    { exposeHeadRoute: false },
+    async (request, reply) => {
+      const year = yearSchema.safeParse(request.params.year)
+      if (!year.success) throw new DomainError(ERROR.NOT_FOUND)
+      parseQuery(z.strictObject({}), request.query)
+      const view = await api.chartYear(ownerOf(request), year.data)
+      return privately(reply).send(z.encode(moneyChartYearCodec, view))
     },
   )
 

@@ -2,7 +2,6 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import BarChart from './BarChart.vue'
 import type { ChartBar } from './BarChart.vue'
-import RateLine from './RateLine.vue'
 
 const bars: ChartBar[] = ['2026-07', '2026-08', '2026-09'].map((key, index) => ({
   key,
@@ -127,47 +126,38 @@ describe('BarChart (MOL-74)', () => {
   })
 })
 
-describe('RateLine (MOL-74, Р-14)', () => {
-  const points = [
-    { level: 0, spoken: 'a' },
-    { level: 500, spoken: 'b' },
-    { level: null, spoken: 'c' },
-    { level: 1000, spoken: 'd' },
-  ]
+describe('BarChart — quiet months (MOL-160)', () => {
+  const year: ChartBar[] = ['2026-07', '2026-08', '2026-09'].map((key, index) => ({
+    key,
+    label: ['июл', 'авг', 'сен'][index] ?? '',
+    spoken: key,
+    level: index === 1 ? 1000 : 0,
+    quiet: index !== 1,
+  }))
 
-  function line(modelValue = 3) {
-    const view = mount(RateLine, {
-      props: {
-        points,
-        marks: [{ week: 1, level: 200 }],
-        modelValue,
-        legend: 'Курс',
-        first: 'x',
-        last: 'y',
-      },
-    })
-    view.find('.area').element.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect
-    return view
-  }
-
-  it('breaks the line where there was no rate: a stretch and a lone dot, never a zero', () => {
-    const view = line()
-    expect(view.findAll('polyline')).toHaveLength(1)
-    expect(view.find('polyline').attributes('points')).toBe('0,900 333.3333333333333,500')
-    // The lone week after the gap, and the chosen one on it.
-    expect(view.findAll('line.dot')).toHaveLength(2)
-    expect(view.findAll('line.mark')).toHaveLength(1)
+  it('keeps the label of a month before the data or to come, with no bar and no radio', () => {
+    const view = chart({ bars: year, modelValue: 1 })
+    expect(view.findAll('.label').map((label) => label.text())).toEqual(['июл', 'авг', 'сен'])
+    expect(view.findAll('.bar.quiet')).toHaveLength(2)
+    expect(view.findAll('.fill')).toHaveLength(1)
+    expect(
+      view.findAll('input[type="radio"]').map((radio) => radio.attributes('aria-label')),
+    ).toEqual(['2026-08'])
   })
 
-  it('chooses the nearest week by finger and by the range, which says the week', async () => {
-    const view = line()
-    view
-      .find('.area')
-      .element.dispatchEvent(new PointerEvent('pointerdown', { clientX: 90, pointerType: 'mouse' }))
-    expect(view.emitted('update:modelValue')?.at(-1)).toEqual([1])
-    const range = view.find('input[type="range"]')
-    expect(range.attributes('aria-valuetext')).toBe('d')
-    await range.setValue('2')
-    expect(view.emitted('update:modelValue')?.at(-1)).toEqual([2])
+  it('a finger lifted over a quiet month chooses nothing', () => {
+    const view = chart({ bars: year, modelValue: 1 })
+    const area = view.find('.area').element
+    area.dispatchEvent(pointer('pointerdown', 250, { pointerType: 'touch', clientY: 50 }))
+    area.dispatchEvent(pointer('pointerup', 250, { pointerType: 'touch', clientY: 50 }))
+    expect(view.emitted('update:modelValue')).toBeUndefined()
+  })
+
+  it('draws the average over the bars, not under them (handoff MOL-157 04)', () => {
+    const view = chart({ average: 500 })
+    const average = view.find('.average')
+    expect(average.attributes('style')).toContain('height: 50%')
+    // First in the area, so only a stacking of its own puts it over the bars that follow.
+    expect(view.find('.area').element.firstElementChild).toBe(average.element)
   })
 })

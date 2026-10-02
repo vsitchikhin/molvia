@@ -1,6 +1,6 @@
 <template>
   <AppCard as="section" class="card" :aria-labelledby="`${id}-title`">
-    <h2 :id="`${id}-title`" class="caption">{{ t('spending.charts.where_title') }}</h2>
+    <h2 :id="`${id}-title`" class="caption">{{ heading }}</h2>
     <div class="figure">
       <!-- A tap on the ring chooses the sector under it; the legend's radios say the same. -->
       <div ref="ringBox" class="ring-box" @click="tapRing">
@@ -14,7 +14,7 @@
       </p>
     </div>
     <fieldset v-if="rows.length > 0" class="legend">
-      <legend class="unseen">{{ t('spending.charts.where_title') }}</legend>
+      <legend class="unseen">{{ heading }}</legend>
       <label
         v-for="row in rows"
         :key="row.key"
@@ -39,6 +39,7 @@
     <p v-if="uncounted" class="note">{{ uncounted }}</p>
     <p v-if="restNames" class="note">{{ restNames }}</p>
     <p v-if="rows.length > 1" class="note">{{ t('spending.charts.donut_order') }}</p>
+    <p v-if="note" class="note">{{ note }}</p>
   </AppCard>
 </template>
 
@@ -47,12 +48,25 @@ import { computed, defineComponent, ref, useId } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { CHART_LEVEL, formatEstimate, shareOf } from '@molvia/model'
-import type { Money, MoneyChartMonthView, SpendingCategoryView } from '@molvia/model'
+import type { Currency, Money, MoneyChartMonthView, SpendingCategoryView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import DonutRing, { CHOSEN_THICKER } from '@/components/DonutRing.vue'
 import type { RingSector } from '@/components/DonutRing.vue'
-import { longMonth } from '@/components/charts'
 import { categoryColour } from '@/components/spending'
+
+/**
+ * What a ring draws: the month's answer as it is, or the year's with its categories named (MOL-160,
+ * Р-13). Every figure is the server's; `spent` null is a sum past what money holds.
+ */
+export interface DonutData {
+  readonly spendCurrency: Currency
+  readonly incomeCurrency: Currency
+  readonly spent: Money | null
+  readonly spentIncome: Money | null
+  readonly uncounted: readonly Money[]
+  readonly slices: MoneyChartMonthView['slices']
+  readonly categories: readonly SpendingCategoryView[]
+}
 
 /** The key of «Остальные» among the sectors: a category's is its id. */
 const REST = 'rest'
@@ -60,8 +74,9 @@ const REST = 'rest'
 const THICKNESS = 12
 
 /**
- * «Куда ушло» of «Графики → Месяц» (MOL-158, handoff MOL-157 03): the month's ring at full size, the
- * month's total in its centre, and a legend that is a radio group. A tap on a sector or a row
+ * «Куда ушло» of «Графики» (MOL-158, MOL-160, handoff MOL-157 03 and 04): the ring of a month or a
+ * year at full size, its total in the centre under the words the screen gives, and a legend that is a
+ * radio group. A tap on a sector or a row
  * chooses it — thicker, the others dimmed, its row on a ground of its own, so the choice is seen by
  * more than colour — and **a second tap lets it go** (review Р-4). The sectors, their sums in both
  * currencies and who is in «Остальные» are the server's; the phone turns levels into angles and a
@@ -71,7 +86,18 @@ export default defineComponent({
   name: 'DonutChart',
   components: { AppCard, DonutRing },
   props: {
-    charts: { type: Object as PropType<MoneyChartMonthView>, required: true },
+    charts: { type: Object as PropType<DonutData>, required: true },
+    /** Over the total in the centre: «Сентябрь · идёт», «2026 · 9 месяцев». */
+    label: { type: String, required: true },
+    /** The card's caption; «Куда ушло» unless named. */
+    title: { type: String as PropType<string | null>, default: null },
+    /** A last line under the legend — «Каждый месяц — по курсу того месяца». */
+    note: { type: String as PropType<string | null>, default: null },
+    /**
+     * Under the total with no «≈»: which month had no rate (MOL-160, review 14); an empty string
+     * says nothing — a sum past money (adversarial М′); null — the month's own words.
+     */
+    noRate: { type: String as PropType<string | null>, default: null },
     nameOf: {
       type: Function as PropType<(category: SpendingCategoryView) => string>,
       required: true,
@@ -98,7 +124,8 @@ export default defineComponent({
           slice.categoryId === null
             ? null
             : props.charts.categories.find((one) => one.id === slice.categoryId)
-        const share = shareOf(slice.amount, props.charts.spent)
+        const spent = props.charts.spent
+        const share = spent && shareOf(slice.amount, spent)
         return {
           key: slice.categoryId ?? REST,
           name: category ? props.nameOf(category) : t('spending.charts.rest'),
@@ -131,11 +158,15 @@ export default defineComponent({
             : row.share,
         }
       }
-      const month = longMonth(props.charts.month, locale.value).replace(/\s\S+$/, '')
+      const spent = props.charts.spent
+      // No sum is no «≈» and no rate to blame (adversarial М): «нет курса» under «—» was untrue.
       return {
-        label: props.charts.running ? t('spending.charts.center_running', { month }) : month,
-        figure: whole(props.charts.spent),
-        sub: both.value ? (approx(props.charts.spentIncome) ?? t('spending.charts.no_rate')) : null,
+        label: props.label,
+        figure: spent ? whole(spent) : '—',
+        sub:
+          both.value && spent
+            ? (approx(props.charts.spentIncome) ?? props.noRate ?? t('spending.charts.no_rate'))
+            : null,
       }
     })
 
@@ -196,9 +227,12 @@ export default defineComponent({
       }
     }
 
+    const heading = computed(() => props.title ?? t('spending.charts.where_title'))
+
     return {
       t,
       id: useId(),
+      heading,
       THICKNESS,
       ringBox,
       rows,

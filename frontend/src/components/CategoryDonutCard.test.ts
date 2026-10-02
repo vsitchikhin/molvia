@@ -55,6 +55,12 @@ function card(value: string, slices = SEPTEMBER) {
   })
 }
 
+/** One sector of the whole ring, in the colour of an empty one. */
+function greyRing(wrapper: ReturnType<typeof card>): boolean {
+  const fills = wrapper.findAll('.ring path').map((path) => path.attributes('fill'))
+  return fills.length === 1 && fills[0] === 'var(--surface-2)'
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-09-27T08:00:00Z'))
@@ -144,7 +150,7 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
     ])
   })
 
-  it('says why there is no ring when the month has categories and no sectors (round 2, Е)', () => {
+  it('says beside a grey ring why there are no sectors when the month has categories (round 2, Е)', () => {
     // A month kept before the ring, or an answer of a server older than it: the phone adds nothing up.
     const kept = {
       ...month('2026-09', []),
@@ -156,12 +162,12 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
       props: { month: kept, nameOf: () => '' },
       global: { plugins: [router, createAppI18n('ru')] },
     })
-    expect(wrapper.find('.ring').exists()).toBe(false)
-    expect(wrapper.find('.why').text()).toBe('Доли появятся, когда месяц обновится')
+    expect(greyRing(wrapper)).toBe(true)
+    expect(wrapper.find('.figure .why').text()).toBe('Доли появятся, когда месяц обновится')
     expect(wrapper.find('a').attributes('href')).toBe('/money/charts?month=2026-09')
   })
 
-  it('says why there is no ring when nothing spent was counted by a rate (round 2, Ж)', () => {
+  it('says beside a grey ring why there are no sectors when nothing was counted (round 2, Ж)', () => {
     const coffee = {
       ...month('2026-09', []),
       byCategory: [],
@@ -172,10 +178,11 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
       props: { month: coffee, nameOf: () => '' },
       global: { plugins: [router, createAppI18n('ru')] },
     })
-    expect(wrapper.find('.why').text()).toBe('Доли появятся, когда у трат будет курс')
+    expect(greyRing(wrapper)).toBe(true)
+    expect(wrapper.find('.figure .why').text()).toBe('Доли появятся, когда у трат будет курс')
   })
 
-  it('stays a way into «Графики» on an empty month, with no ring (handoff 01, adversarial Г)', () => {
+  it('stays a way into «Графики» on an empty month, a grey ring (handoff 01, adversarial Г, MOL-160 В-4)', () => {
     const empty = { ...month('2026-09', []), byCategory: [], uncounted: [], days: [], remaining: 0 }
     const router = createRouter({ history: createMemoryHistory(), routes })
     const wrapper = mount(CategoryDonutCard, {
@@ -183,9 +190,26 @@ describe('CategoryDonutCard — «Куда ушли» на «Деньгах» (M
       global: { plugins: [router, createAppI18n('ru')] },
     })
     expect(wrapper.find('a').attributes('href')).toBe('/money/charts?month=2026-09')
-    expect(wrapper.find('.ring').exists()).toBe(false)
+    // Every new month is empty until its first spending: a caption over a hole drew the card askew.
+    expect(greyRing(wrapper)).toBe(true)
     // With the journal gone to «Траты», the card says it, once (MOL-159, handoff MOL-157 01).
-    expect(wrapper.find('.why').text()).toBe('В этом месяце трат нет')
+    expect(wrapper.find('.figure .why').text()).toBe('В этом месяце трат нет')
     expect(wrapper.find('.rest').exists()).toBe(false)
+  })
+
+  it("keeps the grey ring and says nothing while the month's only spending waits on the phone", () => {
+    const waiting = { ...month('2026-09', []), byCategory: [], uncounted: [], days: [] }
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    const wrapper = mount(CategoryDonutCard, {
+      props: { month: waiting, nameOf: () => '', unsent: 1 },
+      global: { plugins: [router, createAppI18n('ru')] },
+    })
+    expect(greyRing(wrapper)).toBe(true)
+    expect(wrapper.find('.why').exists()).toBe(false)
+  })
+
+  it('draws a grey ring when every sector of the month has no level', () => {
+    const wrapper = card('2026-09', [{ categoryId: TELECOM, amount: amd('0'), count: 1, level: 0 }])
+    expect(greyRing(wrapper)).toBe(true)
   })
 })
