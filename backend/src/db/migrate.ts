@@ -4,7 +4,9 @@ import type { MigrationConfig } from 'drizzle-orm/migrator'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import postgres from 'postgres'
+import type { Sql } from 'postgres'
 import { env } from '@/env'
+import { journalOf } from './journal'
 
 /**
  * The folder sits at a different depth depending on how the code is being run: from
@@ -38,5 +40,29 @@ export const MIGRATIONS = resolveMigrations()
 export async function migrateToLatest(config: Partial<MigrationConfig> = {}): Promise<void> {
   const client = postgres(env.DATABASE_URL, { max: 1, onnotice: () => undefined })
   await migrate(drizzle(client), { migrationsFolder: MIGRATIONS, ...config })
+  await assertEveryMigrationApplied(client, config.migrationsFolder ?? MIGRATIONS)
   await client.end()
+}
+
+/**
+ * drizzle runs a migration only if its stamp, the journal's `when`, is later than the last one
+ * applied, and never compares the files with what ran (MOL-105, adversarial Б). Two branches whose
+ * stamps lie in another order than they merge in — MOL-147's `0038` two minutes after MOL-105's,
+ * merged first — and the earlier is skipped: «migrated», the API up, `vector` missing, the indexes
+ * of musl answering under glibc. So after the chain every entry of the journal must have its row,
+ * found by the stamp drizzle writes as its `created_at`; one missing stops the boot, `make migrate`
+ * and the tests' setup, naming the file.
+ */
+export async function assertEveryMigrationApplied(client: Sql, folder: string): Promise<void> {
+  const rows = await client<{ created_at: string }[]>`
+    select created_at::text from drizzle.__drizzle_migrations`
+  const applied = new Set(rows.map((row) => row.created_at))
+  const skipped = journalOf(folder).filter((entry) => !applied.has(String(entry.when)))
+  if (skipped.length > 0) {
+    throw new Error(
+      `migrations skipped, their stamp is older than one applied after them: ${skipped
+        .map((entry) => entry.tag)
+        .join(', ')}`,
+    )
+  }
 }
