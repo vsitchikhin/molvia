@@ -222,6 +222,17 @@
     "unit_price_pending": "Worked out for you — nothing to type",
     "unit_price_value": "{amount}/{unit}",
     "unit_price_announced": "Per unit: {value}",
+    "cheaper": {
+      "best": "Cheapest you paid: {place} — {price}, {day}",
+      "best_here": "You paid {price} here — {day}",
+      "there": "You paid {price} at {place} — {day}",
+      "there_here": "It was {price} right here — {day}",
+      "same": "Same as at {place} — {price}, {day}",
+      "same_here": "Same as here on {day} — {price}",
+      "cheaper": "Cheaper here — {place} was {price}, {day}",
+      "cheaper_here": "Cheaper than here on {day} — it was {price}",
+      "alternative": "{name} — {price} at {place}, {day} · rated {rating}"
+    },
     "save": "Record",
     "save_edit": "Save",
     "delete": "Remove the item",

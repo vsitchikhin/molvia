@@ -222,6 +222,17 @@
     "unit_price_pending": "Считается само, вводить не надо",
     "unit_price_value": "{amount}/{unit}",
     "unit_price_announced": "За единицу: {value}",
+    "cheaper": {
+      "best": "Дешевле всего брали в {place} — {price}, {day}",
+      "best_here": "Здесь брали по {price} — {day}",
+      "there": "В {place} брали по {price} — {day}",
+      "there_here": "Здесь же брали по {price} — {day}",
+      "same": "Как в {place} — {price}, {day}",
+      "same_here": "Как здесь {day} — {price}",
+      "cheaper": "Тут дешевле — в {place} было {price}, {day}",
+      "cheaper_here": "Дешевле, чем здесь {day} — было {price}",
+      "alternative": "{name} — {price} в {place}, {day} · оценка {rating}"
+    },
     "save": "Записать",
     "save_edit": "Сохранить",
     "delete": "Удалить позицию",

@@ -1201,6 +1201,45 @@ describe('the trip', () => {
 
       await expect(client.adviceSearch('сыр')).rejects.toThrow()
     })
+
+    it('asks «Тут дешевле» with the item and the record’s city, `except` only when named (MOL-92)', async () => {
+      const zovuni = {
+        placeId: MARKET,
+        name: 'Зовуни',
+        unitPrice: { amount: '540.00000000', currency: 'AMD', unit: 'l' },
+        day: '2026-09-12',
+        observations: 1,
+      }
+      const { client, calls } = clientReplying(200, {
+        itemId: BEEF,
+        level: 'unrated',
+        places: [zovuni],
+        alternatives: [],
+      })
+
+      const answer = await client.ownPrices({ item: BEEF, country: 'AM', city: 'Ереван' })
+      await client.ownPrices({ item: BEEF, country: 'AM', city: 'Ереван', except: MARKET })
+
+      const first = new URL(calls[0]?.url ?? '')
+      expect(first.pathname).toBe('/advice/prices')
+      expect(Object.fromEntries(first.searchParams)).toEqual({
+        item: BEEF,
+        country: 'AM',
+        city: 'Ереван',
+      })
+      expect(new URL(calls[1]?.url ?? '').searchParams.get('except')).toBe(MARKET)
+      expect(answer.level !== 'never' && answer.places[0]?.unitPrice.scaledMinor).toBe(
+        54_000_000_000n,
+      )
+    })
+
+    it('refuses a «не брать нигде» that arrived with a price in «Тут дешевле»', async () => {
+      const { client } = clientReplying(200, { itemId: BEEF, level: 'never', places: [] })
+
+      await expect(
+        client.ownPrices({ item: BEEF, country: 'AM', city: 'Ереван' }),
+      ).rejects.toThrow()
+    })
   })
 })
 

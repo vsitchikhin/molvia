@@ -61,7 +61,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 
 - `frontend/src/components/ManualEntryButton.vue` — «Записать покупки»: «Где вы?» with no record open, «Уже записываете — продолжить / закончить и начать новую» with one; on «Покупки» and the newcomer's «Что брать».
 - `frontend/src/components/PurchaseRow.vue` — One row of «Покупки»: icon, title, meta, sum and chevron, or «Продолжить» in its place.
-- `frontend/src/components/ItemDetailsSheet.vue` — Sheet «сколько, в чём, почём» every purchase goes through; writes to the trip queue and closes at once.
+- `frontend/src/components/ItemDetailsSheet.vue` — Sheet «сколько, в чём, почём» every purchase goes through; writes to the trip queue and closes at once; «Тут дешевле» in the box of the unit price (MOL-92).
 - `frontend/src/components/ReceiptField.vue` — The field of «Сумма по чеку» (MOL-78): one sum and its currency, shared by the sheet and the question of «Закончить».
 - `frontend/src/components/ReceiptSheet.vue` — Sheet «Сумма по чеку»: typed at any time into a record open or finished, «Убрать сумму»; writes to the trip queue.
 - `frontend/src/components/receipt.ts` — What was typed as «Сумма по чеку» — money above zero or nothing — and a sum put back into the field.
