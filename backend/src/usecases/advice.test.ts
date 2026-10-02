@@ -57,6 +57,7 @@ function price(patch: Partial<PlacePrice> & { scaledMinor: bigint }): PlacePrice
     pairObservations: observations,
     pairLatestVisitAt: latestVisitAt,
     nearby: true,
+    recent: true,
     ...patch,
   }
 }
@@ -293,6 +294,49 @@ describe('места и порог', () => {
 
     expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
       'Рынок',
+      'SAS Ереван',
+    ])
+  })
+
+  it('место другой пары — на строке, только пока брали там в окне (адверсариальный И)', async () => {
+    const prices = [
+      price({ scaledMinor: perKilo(240_000), observations: 3 }),
+      price({ placeId: SAS, placeName: 'SAS', scaledMinor: perKilo(260_000) }),
+      price({
+        placeId: CHEESE,
+        placeName: 'Пятёрочка',
+        currency: 'RUB',
+        scaledMinor: 1n,
+        nearby: false,
+        recent: false,
+      }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
+      'Рынок в Гюмри',
+      'SAS',
+    ])
+  })
+
+  it('«Ещё» — свой город первым и через пары (Р-26, адверсариальный Ж′)', async () => {
+    const prices = [
+      price({ scaledMinor: perKilo(240_000), observations: 3 }),
+      price({
+        placeId: SAS,
+        placeName: 'SAS Ереван',
+        scaledMinor: perKilo(260_000),
+        nearby: false,
+      }),
+      price({ placeId: CHEESE, placeName: 'Магазин у дома', unit: 'piece', scaledMinor: 120_000n }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
+      'Рынок в Гюмри',
+      'Магазин у дома',
       'SAS Ереван',
     ])
   })

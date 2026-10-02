@@ -295,6 +295,32 @@ describe('цены', () => {
     ])
   })
 
+  it('давний чек другой пары не стоит на строке: московский сыр двухлетней давности (адверсариальный И)', async () => {
+    const actorId = await insertActor(db)
+    const market = await insertPlace(db, { name: 'Рынок', city: 'Гюмри' })
+    const sas = await insertPlace(db, { name: 'SAS', city: 'Гюмри' })
+    const moscow = await insertPlace(db, { name: 'Пятёрочка', country: 'RU', city: 'Москва' })
+    const itemId = await insertItem(db, { name: 'Сыр чанах' })
+    await rate(actorId, itemId, 5)
+    const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    for (const days of [20, 10, 3]) {
+      await bought(actorId, itemId, market, amd(240_000), { startedAt: daysAgo(days) })
+    }
+    await bought(actorId, itemId, sas, amd(260_000), { startedAt: daysAgo(5) })
+    await bought(
+      actorId,
+      itemId,
+      moscow,
+      { minor: 45_000n, currency: 'RUB' },
+      {
+        startedAt: daysAgo(730),
+      },
+    )
+
+    const [row] = (await screen(actorId)).rows
+    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual(['Рынок', 'SAS'])
+  })
+
   it('не смешивает валюты: первой — та, в которой покупали чаще, другая — следом', async () => {
     // Two places: a place is named by its last purchase alone (MOL-166, А), so the pairs are
     // weighed across places.

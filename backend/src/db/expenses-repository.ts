@@ -238,6 +238,13 @@ export interface PlacePrice {
    * and the use case puts a pair with such a place first among pairs (MOL-166, adversarial Ж).
    */
   readonly nearby: boolean
+  /**
+   * Whether the place's last purchase was made within `freshDays` of the phone's today. A place
+   * whose pair is not the row's first stands on the row only while it is (MOL-166, adversarial И):
+   * a cheese bought once in Moscow two years ago stayed under «Ещё» for good, and took «Дешевле
+   * всего» away from the market of every week with it.
+   */
+  readonly recent: boolean
 }
 
 /**
@@ -298,6 +305,7 @@ interface PlacePriceShape extends Record<string, unknown> {
   pairObservations: string
   pairLatestVisitAt: Date | string
   nearby: boolean
+  recent: boolean
 }
 
 interface PriceMedianShape extends Record<string, unknown> {
@@ -769,7 +777,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
       const found = await db.execute<PlacePriceShape>(sql`
         select "itemId", "placeId", "placeName", currency, unit, price::text as "scaledMinor",
                observations::text, "latestVisitAt", "pairObservations"::text, "pairLatestVisitAt",
-               nearby
+               nearby, recent
         from (
           -- What a pair weighs is every purchase of the item in it, in every place — counted
           -- before the places a pair does not name are left out (adversarial Д, owner's decision):
@@ -797,6 +805,9 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
             count(*) as observations,
             max(bought_at) as "latestVisitAt",
             bool_or(nearby) as nearby,
+            -- Whether the place's last purchase is within the window — what a place of a pair
+            -- other than the row's first must be to stand on the row (adversarial И).
+            bool_or(place_last and fresh) as recent,
             -- A pair is the place's only where its last purchase was made in it (adversarial А):
             -- an August kilo is not what a shop charges once packs were bought there since. Where
             -- this person bought, that is their own last purchase, and nobody else's figure stands
@@ -850,6 +861,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
             pairObservations: Number(row.pairObservations),
             pairLatestVisitAt: asDate(row.pairLatestVisitAt),
             nearby: row.nearby,
+            recent: row.recent,
           },
         ]
       })

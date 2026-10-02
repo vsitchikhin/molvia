@@ -295,6 +295,24 @@ function ranked(groups: Map<GroupKey, PlacePrice[]>): [GroupKey, PlacePrice[]][]
   })
 }
 
+/**
+ * The places a row names, in the order it names them. The first is the first pair's first — own
+ * city, then price (Р-26, Р-27). The rest are the rest of that pair and the places of the other
+ * pairs bought at within the window (adversarial И, owner's decision: the first pair has none, В-1),
+ * **own city first across all of them** (Р-26, adversarial Ж′): pairs laid end to end put an Erevan
+ * shop of the first pair over the shop next door in the second. Otherwise in the order of the pairs
+ * and of the server.
+ */
+function rowPlaces(pairs: readonly [GroupKey, PlacePrice[]][]): PlacePrice[] {
+  const [first, ...others] = pairs
+  if (!first) return []
+  const [head, ...tail] = first[1]
+  if (!head) return []
+  const rest = [...tail, ...others.flatMap(([, inPair]) => inPair.filter((place) => place.recent))]
+  // A stable sort: only «own city or not» moves anything.
+  return [head, ...rest.sort((a, b) => Number(b.nearby) - Number(a.nearby))]
+}
+
 function placesOf(places: readonly PlacePrice[]): AdvicePlace[] {
   // Already cheapest first: the statement ordered them, and it ordered the rows of the answer
   // by the same collation. Sorting again here used another alphabet, so one answer came back
@@ -331,7 +349,7 @@ function rowOf(
 
   const pairs = groups ? ranked(groups) : []
   const chosen = pairs[0]
-  const places = placesOf(pairs.flatMap(([, inPair]) => inPair))
+  const places = placesOf(rowPlaces(pairs))
   if (level === 'take') return { ...rated, level, places }
 
   const median = chosen ? medians.get(`${row.itemId}${chosen[0]}`) : undefined
