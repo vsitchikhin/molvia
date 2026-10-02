@@ -58,15 +58,15 @@
           <dl class="trio">
             <div>
               <dt>{{ t('budget.total.planned') }}</dt>
-              <dd>{{ budget.total.planned ? whole(budget.total.planned) : '—' }}</dd>
+              <dd>{{ plannedWords }}</dd>
             </div>
             <div>
               <dt>{{ t('spending.spent') }}</dt>
-              <dd>{{ whole(budget.total.spent) }}</dd>
+              <dd>{{ amount(budget.total.spent) }}</dd>
             </div>
             <div>
               <dt>{{ t('budget.total.unplanned') }}</dt>
-              <dd>{{ whole(budget.total.unplanned) }}</dd>
+              <dd>{{ amount(budget.total.unplanned) }}</dd>
             </div>
           </dl>
         </AppCard>
@@ -166,7 +166,7 @@ import { useRoute, useRouter } from 'vue-router'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconPlus from '~icons/mdi/plus'
 import IconTarget from '~icons/mdi/target'
-import { formatEstimate, monthSchema } from '@molvia/model'
+import { monthSchema } from '@molvia/model'
 import type { BudgetPlanValue, Money, SpendingCategoryView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -252,7 +252,6 @@ export default defineComponent({
       return category ? categoryColour(category) : 'var(--text-muted)'
     }
 
-    const whole = (value: Money) => formatEstimate(value, locale.value)
     /** A figure without its sign — the words around it say which way (Р-7, adversarial Г). */
     const amount = (value: Money) => budgetAmount(value, locale.value)
     const percent = (value: number) =>
@@ -265,6 +264,17 @@ export default defineComponent({
       if (!left) return { over: false, figure: '—' }
       return { over: left.minor < 0n, figure: amount(left) }
     })
+    /**
+     * «План» of the total, and «и ещё» while some row with a plan is in no figure of it — its spending
+     * is in «Потрачено», so the three are not one sum (review 12, adversarial Л).
+     */
+    const plannedWords = computed(() => {
+      const total = budget.value?.total
+      if (!total?.planned) return '—'
+      return total.planShort
+        ? t('budget.total.planned_more', { amount: amount(total.planned) })
+        : amount(total.planned)
+    })
     /** Some share waits for «Пришло»: the total says that, not «нет курса» (review 1). */
     const awaiting = computed(() => (budget.value?.rows ?? []).some((row) => row.awaitingIncome))
 
@@ -273,7 +283,7 @@ export default defineComponent({
         const over = row.left !== null && row.left.minor < 0n
         // «≈» before a plan the server converted by the month's rate (review 2, adversarial Б, Р-4).
         const planned =
-          row.planned === null ? '—' : `${row.estimated ? '≈ ' : ''}${whole(row.planned)}`
+          row.planned === null ? '—' : `${row.estimated ? '≈ ' : ''}${amount(row.planned)}`
         const notes = [
           ...(row.plan.kind === 'share'
             ? [t('budget.row.share', { percent: row.plan.percent })]
@@ -292,7 +302,7 @@ export default defineComponent({
           over,
           // Over the plan is said by the words beside it, never by a minus (Р-7, review 5).
           left: row.left === null ? '—' : amount(row.left),
-          of: [t('budget.row.of', { spent: whole(row.spent), planned }), ...notes].join(' · '),
+          of: [t('budget.row.of', { spent: amount(row.spent), planned }), ...notes].join(' · '),
           used: over ? t('budget.row.over') : row.used === null ? '' : percent(row.used),
           // The share is the server's; the phone only stops the bar at the card's edge.
           width: `${String(Math.min(row.used ?? (over ? 100 : 0), 100))}%`,
@@ -307,8 +317,8 @@ export default defineComponent({
         colour: colourOf(row.categoryId),
         archived: categoryOf(row.categoryId)?.archived === true,
         spent: row.spentWhole
-          ? whole(row.spent)
-          : `${whole(row.spent)} · ${t('spending.charts.difference_uncounted')}`,
+          ? amount(row.spent)
+          : `${amount(row.spent)} · ${t('spending.charts.difference_uncounted')}`,
       })),
     )
 
@@ -340,7 +350,7 @@ export default defineComponent({
                 value.difference.minor < 0n
                   ? `−${amount(value.difference)}`
                   : amount(value.difference),
-              income: whole(value.income),
+              income: amount(value.income),
             })
           : value.income.minor === 0n
             ? t('budget.savings.no_income')
@@ -391,10 +401,10 @@ export default defineComponent({
       retry,
       save,
       online,
-      whole,
       amount,
       when,
       overall,
+      plannedWords,
       awaiting,
       rows,
       unplanned,

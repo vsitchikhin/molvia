@@ -363,6 +363,7 @@ describe('monthBudget — the total', () => {
       planned: cash('482200 AMD'),
       spent: cash('363500 AMD'),
       left: cash('118700 AMD'),
+      planShort: false,
       unplanned: cash('9700 AMD'),
       leftIncome: cash('27604.65 RUB'),
       whole: true,
@@ -536,5 +537,51 @@ describe('monthBudget — round 2 of the review', () => {
     )
     expect(budget.rows[0]?.used).toBeNull()
     expect(budget.savings.actual).toBeNull()
+  })
+})
+
+describe('monthBudget — round 3 of the review', () => {
+  it('says the total is over when a spending short of a rate is already past a whole plan (13, К)', () => {
+    const budget = monthBudget(
+      month({ byCategory: spentIn({ rent: '12000 AMD' }), uncountedIn: [id('rent')] }),
+      [plan('rent', '2026-10', amount('10000 AMD'))],
+      categories,
+    )
+    expect(budget.total).toMatchObject({ left: cash('-2000 AMD'), whole: false })
+  })
+
+  it('keeps the total over beside a share that waits for «Пришло» (13)', () => {
+    const budget = monthBudget(
+      month({
+        income: cash('0 RUB'),
+        byCategory: spentIn({ rent: '260000 AMD', groceries: '52300 AMD' }),
+      }),
+      [plan('rent', '2026-10', amount('250000 AMD')), plan('groceries', '2026-10', share(10))],
+      categories,
+    )
+    expect(budget.total).toMatchObject({
+      planned: cash('250000 AMD'),
+      spent: cash('312300 AMD'),
+      left: cash('-10000 AMD'),
+      planShort: true,
+    })
+  })
+
+  it('says the plan is short while a row with a plan is in no figure of it (12, Л)', () => {
+    const counted = monthBudget(
+      month({ byCategory: spentIn({ rent: '1 AMD' }) }),
+      [plan('rent', '2026-10', amount('250000 AMD'))],
+      categories,
+    )
+    expect(counted.total?.planShort).toBe(false)
+    const overflow = monthBudget(
+      month(),
+      [
+        plan('cafe', '2026-10', amount('1000 AMD')),
+        plan('rent', '2026-10', { kind: 'amount', amount: money(INT8_MAX, 'AMD') }),
+      ],
+      categories,
+    )
+    expect(overflow.total?.planShort).toBe(true)
   })
 })

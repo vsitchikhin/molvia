@@ -622,9 +622,13 @@ task did not: five plans of six there are a percent of the month's income — «
   plan, no «сверх плана» on all that was spent, out of «осталось» but **in «Потрачено» of the total**:
   its category is planned, and its spending is no «вне плана» (adversarial З of round 2). The total
   says «доля появится», the way in has no figure, and **with no row counted the plan and «осталось»
-  are a dash, never «0 ֏»** (review 9). **A plan known in part claims no «сверх плана»** (review
-  10): a share of a «Пришло» short of a rate is a floor, and past it the row's and the total's
-  `left` are null. Read as a plan of zero, every share was over its plan in every month
+  are a dash, never «0 ֏»** (review 9), **and while some row with a plan is in no figure of «План» it
+  reads «250 000 ֏ и ещё»** (`planShort`, review 12, adversarial Л of round 3): «Потрачено» holds that
+  row's spending, so the three figures are not one sum, and the card says so in one word. **A plan
+  known in part claims no «сверх плана»** (review 10): a share of a «Пришло» short of a rate is a
+  floor, and past it the row's and the total's `left` are null. **A spending short of a rate does
+  not hide one** (review 13, adversarial К): what was spent is a floor too, so past a whole plan it
+  is over; within it «осталось» stays a figure under «не всё посчитано». Read as a plan of zero, every share was over its plan in every month
   until the salary; the price — a month with only shares says no «осталось» until something comes
   in. A sum typed in another currency is refused (`CURRENCY_MISMATCH`); one kept from before a move
   is converted by the month's rate and printed «≈» (Р-4), and **its sheet never puts it in the field
@@ -648,8 +652,9 @@ task did not: five plans of six there are a percent of the month's income — «
 - **Over the plan is a warning, never red, and said in words, never by a minus** (Р-7, review 5):
   «сверх плана» in `--warn`, the figure without its sign, the bar to the edge — with no mark of the
   plan on it, which would be a division the phone does not make. Red is an error, and spending past a
-  plan is a fact. **A figure is whole units unless that prints a nought for money that is there**
-  (`budgetAmount`, adversarial Г): 0,40 ֏ over is «0,40 ֏». **The share of a plan is rounded as a
+  plan is a fact. **Every figure of the screen is whole units unless that prints a nought for money
+  that is there** (`budgetAmount`, adversarial Г, Г6): 0,40 ֏ over, or spent, is «0,40 ֏» — under half
+  a unit of the currency's own exponent. **The share of a plan is rounded as a
   person rounds, but «100 %» only once the plan is spent**: 248 800 of 250 000 is «99 %». **«≈» of the
   total in the income currency only when that is another currency** (review 4).
 - **The savings target is a plan with no category** (В-4): a whole percent of «Пришло», never a sum —

@@ -101,6 +101,12 @@ export interface BudgetTotal {
    */
   readonly spent: Money
   readonly left: Money | null
+  /**
+   * Some row with a plan is in no figure of «План» — a share waiting for «Пришло», one with no rate,
+   * one past what money holds — while its spending is in «Потрачено»: the screen says «и ещё» beside
+   * the plan, so the three figures are not read as one sum (review 12, adversarial Л of round 3).
+   */
+  readonly planShort: boolean
   /** What was spent in categories with no plan, apart (Р-6): it is no part of «осталось». */
   readonly unplanned: Money
   /**
@@ -262,16 +268,20 @@ function totalOf(
   let planned = 0n
   let spentCounted = 0n
   let counted = 0
+  // A plan counted and known only in part is a floor: spent past it, «over» is not known (review 10).
+  // A spending short of a rate is a floor of what was spent, so over it is over (review 13, К).
+  let floor = false
   for (const row of rows) {
     if (row.planned === null || planned + row.planned.minor > INT8_MAX) continue
     planned += row.planned.minor
     spentCounted += row.spent.minor
     counted += 1
+    if (!row.plannedWhole) floor = true
   }
   const whole = counted === rows.length && rows.every((row) => row.plannedWhole && row.spentWhole)
   const remaining = planned - spentCounted
   const left: Money | null =
-    counted === 0 || (!whole && remaining < 0n) ? null : { minor: remaining, currency: spend }
+    counted === 0 || (floor && remaining < 0n) ? null : { minor: remaining, currency: spend }
   const leftIncome =
     left === null || month.incomeCurrency === spend || month.rate === null
       ? null
@@ -281,6 +291,7 @@ function totalOf(
     // Every row's spending is of the month's, which money holds.
     spent: { minor: rows.reduce((sum, row) => sum + row.spent.minor, 0n), currency: spend },
     left,
+    planShort: counted < rows.length,
     unplanned: {
       minor: unplanned.reduce((sum, row) => sum + row.spent.minor, 0n),
       currency: spend,

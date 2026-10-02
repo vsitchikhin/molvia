@@ -77,6 +77,7 @@ function budget(patch: Partial<MoneyBudgetView> = {}): MoneyBudgetView {
       planned: amd('366100'),
       spent: amd('343500'),
       left: amd('22600'),
+      planShort: false,
       unplanned: amd('6500'),
       leftIncome: rub('5256'),
       whole: true,
@@ -248,6 +249,7 @@ describe('MoneyBudgetView: the month counted by the server', () => {
       planned: amd('250000'),
       spent: amd('260000'),
       left: below('10000'),
+      planShort: false,
       unplanned: amd('0'),
       leftIncome: null,
       whole: true,
@@ -515,6 +517,7 @@ describe('MoneyBudgetView: round 2 of the review (MOL-117)', () => {
           planned: null,
           spent: amd('52300'),
           left: null,
+          planShort: true,
           unplanned: amd('6500'),
           leftIncome: null,
           whole: false,
@@ -545,5 +548,33 @@ describe('MoneyBudgetView: round 2 of the review (MOL-117)', () => {
     await view.find('li .row.still').trigger('click')
     await flushPromises()
     expect(document.querySelector('dialog[open]')).toBeNull()
+  })
+})
+
+describe('MoneyBudgetView: round 3 of the review (MOL-117)', () => {
+  it('says «и ещё» beside a plan some row with a plan is not in (review 12, Л)', async () => {
+    moneyBudget.mockResolvedValue(
+      budget({ total: { ...total(), planned: amd('250000'), planShort: true } }),
+    )
+    const shown = plain((await render()).find('.total').text())
+    expect(shown).toContain(`${en.budget.total.planned}֏250,000 and more`)
+  })
+
+  it('says the lumas of what was spent too, never «֏0» (Г6)', async () => {
+    const [groceries] = budget().rows
+    if (!groceries) throw new Error('no row')
+    moneyBudget.mockResolvedValue(
+      budget({
+        rows: [
+          { ...groceries, spent: { minor: 40n, currency: 'AMD' }, left: amd('77399.60'), used: 0 },
+        ],
+        unplanned: [
+          { categoryId: TRANSPORT, spent: { minor: 40n, currency: 'AMD' }, spentWhole: true },
+        ],
+      }),
+    )
+    const view = await render()
+    expect(rowTexts(view)[0]).toContain('֏0.40 of')
+    expect(rowTexts(view)[1]).toBe('Transport֏0.40')
   })
 })

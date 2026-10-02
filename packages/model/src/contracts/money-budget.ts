@@ -60,6 +60,7 @@ export const moneyBudgetCodec = z.strictObject({
       planned: moneyCodec.nullable(),
       spent: moneyCodec,
       left: signedMoneyCodec.nullable(),
+      planShort: z.boolean(),
       unplanned: moneyCodec,
       leftIncome: signedMoneyCodec.nullable(),
       whole: z.boolean(),

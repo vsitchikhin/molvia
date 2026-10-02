@@ -1557,7 +1557,8 @@
       "planned": "Plan",
       "unplanned": "Outside the plan",
       "not_whole": "Not all counted: some spendings or incomes have no rate",
-      "awaiting": "A share of income comes once something comes in this month"
+      "awaiting": "A share of income comes once something comes in this month",
+      "planned_more": "{amount} and more"
     },
     "row": {
       "of": "{spent} of {planned}",
