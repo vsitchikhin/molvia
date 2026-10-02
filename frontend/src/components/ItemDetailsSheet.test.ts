@@ -718,7 +718,7 @@ describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
     expect(view.find('.hint').exists()).toBe(false)
   })
 
-  it('keeps the remembered answer when the server fails', async () => {
+  it('with a signal waits for the server — a failure shows nothing, memory or not (Т-5)', async () => {
     const first = await priced(history())
     first.view.unmount()
     ownPrices.mockRejectedValue(new Error('Failed to fetch'))
@@ -726,7 +726,7 @@ describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
     const { view } = await render()
     await flushPromises()
 
-    expect(hint(view).exists()).toBe(true)
+    expect(view.find('.hint').exists()).toBe(false)
   })
 
   it('leaves the row being amended out, and never answers it from memory (Т-9)', async () => {

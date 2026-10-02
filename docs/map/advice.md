@@ -76,13 +76,13 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 ## frontend · composables
 
 - `frontend/src/composables/useAdvice.ts` — Composable: the «Что брать» answer split into groups, remembered on the phone, with stale and city-change states.
-- `frontend/src/composables/useCheaperHint.ts` — Composable: «Тут дешевле» on the sheet of a purchase (MOL-92) — the server asked once as the sheet opens, the answer remembered for no signal, `cheaperHint` of the domain on every keystroke; never a loading or an error.
+- `frontend/src/composables/useCheaperHint.ts` — Composable: «Тут дешевле» on the sheet of a purchase (MOL-92) — the server asked once as the sheet opens and waited for, the answer remembered for no signal only, `cheaperHint` of the domain on every keystroke; never a loading or an error.
 - `frontend/src/composables/useAdviceSearch.ts` — Composable: the search on «Что брать» as it is typed — the server's answer, the rhythm of the catalogue search, the remembered list searched offline.
 - `frontend/src/composables/useVerdictQueue.ts` — Composable: the queue of «Оценки» as the phone sees it — server order, saved drafts hidden, refusals first, «Не сейчас».
 
 ## frontend · stores
 
-- `frontend/src/stores/ownPrices.ts` — Store: the last answer of «Тут дешевле» per item and city, up to `OWN_PRICES_REMEMBERED`, per identity (MOL-92, В-5).
+- `frontend/src/stores/ownPrices.ts` — Store: the last answer of «Тут дешевле» per item and city, up to `OWN_PRICES_REMEMBERED`, per identity, read only with no signal and let go of an item rated on this phone (MOL-92, В-5).
 - `frontend/src/stores/verdictDrafts.ts` — Store: verdicts saved on the phone and not yet confirmed, a map by item, sent at start, online and on return.
 
 ## e2e

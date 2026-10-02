@@ -35,19 +35,23 @@ const NOTHING: CheaperHint = { item: null, alternative: null }
  *
  * **A hint, not a screen** (Т-5): it never shows a loading state or an error. With no signal, the
  * last answer for this item in this city remembered on the device; with none remembered, nothing
- * (В-5). A failed request keeps whatever it had. An amendment is never answered from memory: the
+ * (В-5). A failed request shows nothing. An amendment is never answered from memory: the
  * remembered answer may hold the very row being changed, and a row compared with itself says
  * «как в …» about itself (Т-9).
  */
 export function useCheaperHint(input: CheaperHintInput): { hint: ComputedRef<CheaperHint> } {
   const owner = currentIdentity()
   const where = input.where
-  const answer = ref<OwnPricesResponse | null>(
-    where && input.except === null ? recallOwnPrices(owner, input.itemId, where) : null,
-  )
+  const answer = ref<OwnPricesResponse | null>(null)
 
   onMounted(() => {
-    if (!where || !navigator.onLine) return
+    if (!where) return
+    // Memory is for no signal, not instead of asking: with one, the hint waits for the server's
+    // answer — a remembered one may predate a verdict given since on another device.
+    if (!navigator.onLine) {
+      if (input.except === null) answer.value = recallOwnPrices(owner, input.itemId, where)
+      return
+    }
     const query = {
       item: input.itemId,
       country: where.country,

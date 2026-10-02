@@ -67,3 +67,25 @@ export function rememberOwnPrices(
   const fresh = { slot, answer: z.encode(ownPricesResponseSchema, answer) }
   write(keyOf(owner), JSON.stringify([fresh, ...kept]))
 }
+
+/**
+ * Every remembered answer that names `itemId` — as the item asked about or as another of its kind —
+ * let go when the person rates it on this phone. A memory older than a verdict of «не брать нигде»
+ * would otherwise put a price beside it with no signal (Т-3), or offer it as the cheaper milk.
+ */
+export function forgetOwnPrices(owner: string | null, itemId: string): void {
+  if (owner === null) return
+  const id = itemId.toLowerCase()
+  const stored = load(owner)
+  const kept = stored.filter(
+    ({ answer }) =>
+      answer.itemId !== id &&
+      (answer.level === 'never' || answer.alternatives.every((other) => other.itemId !== id)),
+  )
+  if (kept.length === stored.length) return
+  const encoded = kept.map((entry) => ({
+    slot: entry.slot,
+    answer: z.encode(ownPricesResponseSchema, entry.answer),
+  }))
+  write(keyOf(owner), JSON.stringify(encoded))
+}

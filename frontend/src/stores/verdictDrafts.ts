@@ -7,6 +7,7 @@ import { api } from '@/api'
 import type { Score } from '@/components/rating'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
+import { forgetOwnPrices } from '@/stores/ownPrices'
 import { HOLDS, isRecord } from '@/stores/queueing'
 import type { Loose } from '@/stores/queueing'
 import { read, write } from '@/stores/storage'
@@ -179,6 +180,8 @@ export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
   /** «Сохранить оценку»: kept first, sent after — the card never waits for the network. */
   function save(card: PendingVerdict, score: Score, review: string): void {
     put({ card, score, review, state: 'saved', error: null })
+    // «Тут дешевле» remembered before this verdict no longer says what the item is (MOL-92).
+    forgetOwnPrices(actor.id, card.itemId)
     void flush()
   }
 

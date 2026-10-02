@@ -55,6 +55,8 @@ import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import RatingScale from '@/components/RatingScale.vue'
 import type { Score } from '@/components/rating'
+import { currentIdentity } from '@/stores/identity'
+import { forgetOwnPrices } from '@/stores/ownPrices'
 
 /** The review's own bound (`newVerdictSchema`), kept by the field so it cannot be passed. */
 const REVIEW_MAX = 500
@@ -160,6 +162,8 @@ export default defineComponent({
     async function send(run: () => Promise<unknown>): Promise<void> {
       sending.value = true
       failure.value = null
+      // «Тут дешевле» remembered before this verdict no longer says what the item is (MOL-92).
+      forgetOwnPrices(currentIdentity(), props.itemId)
       try {
         await run()
         emit('saved')
