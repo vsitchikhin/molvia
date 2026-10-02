@@ -336,7 +336,10 @@ describe('GET /verdicts/never — one’s own «не брать нигде» (ad
     await rate(me, two, 2)
     await rate(me, three, 3)
     await rate(me, withdrawn, 1)
-    await db.update(verdicts).set({ deletedAt: new Date() }).where(eq(verdicts.itemId, withdrawn))
+    await db
+      .update(verdicts)
+      .set({ deletedAt: sql`clock_timestamp()` })
+      .where(eq(verdicts.itemId, withdrawn))
     await rate(stranger, theirs, 1)
 
     expect(await never(me)).toEqual([one, two].sort())
@@ -401,7 +404,10 @@ describe('GET /advice/prices — the level', () => {
       prices: { itemId: milk, level: 'never' },
     })
 
-    await db.update(verdicts).set({ deletedAt: new Date() }).where(eq(verdicts.itemId, milk))
+    await db
+      .update(verdicts)
+      .set({ deletedAt: sql`clock_timestamp()` })
+      .where(eq(verdicts.itemId, milk))
     expect(await prices(me, { item: milk })).toMatchObject({
       level: 'unrated',
       places: [{ name: 'Зовуни' }],
