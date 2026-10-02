@@ -219,9 +219,14 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   one's own, freshness and the last visit are one's own purchases, as its price is** (adversarial М,
   owner's decision): with access, other people's packs made a two-year-old price of mine head the
   row. **So are the purchases and the visit it votes for its pair with** (adversarial М′, owner's
-  decision): a place opened by others still votes with all of theirs, as Д decided. The price of
-  Р-27, named (owner's decision on review №10): the first pair also gives the threshold of «только
-  если дёшево», so one pack bought at home over ten kilos in Erevan leaves the row without a
+  decision): a place opened by others still votes with all of theirs, as Д decided. **A place is
+  one's own while one bought there within the window, or while nobody else has opened it**
+  (adversarial О, owner's decision): once one has stopped going and three others go now, it is
+  theirs, named by their figure — a single purchase a year ago hid from someone with access a place
+  three bought at this week. The price, named: with access the home may then name another price than
+  the sheet, which is one's own history, dated; and Б2 holds only until such a place is opened. The
+  price of Р-27, named (owner's decision on review №10): the first pair also gives the threshold of
+  «только если дёшево», so one pack bought at home over ten kilos in Erevan leaves the row without a
   threshold until the pack's pair has three purchases.
 - **Order is by rating down, then by name, in all three groups.** The handoff asked for
   ascending unit price; that sorts _different products_ by a number — milk at 570 ֏/л above
