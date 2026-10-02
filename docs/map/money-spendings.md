@@ -75,7 +75,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/components/SpendingRow.vue` — One row of the month's journal: a spending or a finished trip's purchases in one currency, with what the server counted.
 - `frontend/src/components/SpendingSheet.vue` — Spending sheet: «Новая трата», amending one's own, or reading a trip's line; writes go to the queue and it closes at once.
 - `frontend/src/components/charts.ts` — Words of «Графики»: the month long, in three letters and by name, «после октября», a span of months, the closed ones named, a signed percent, «−8 % к августу».
-- `frontend/src/components/spending.ts` — Helpers of «Деньги» drawing: category icon and colour, rate words, journal rows from the month and the queue, page merge.
+- `frontend/src/components/spending.ts` — Helpers of «Деньги» drawing: category icon and colour, rate words, journal rows from the month and the queue, page merge, a figure of «Бюджет» (`budgetAmount`).
 
 ## frontend · composables
 
@@ -84,7 +84,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/composables/useChartPointer.ts` — Composable: a choice made on a chart by the whole area — a mouse on press, a finger on lifting or going sideways, a scroll never.
 - `frontend/src/composables/useMoneyBudget.ts` — Composable: «Бюджет» of a month from the server through `useKeptAnswer`, the last three months kept per owner.
 - `frontend/src/composables/useMoneyCharts.ts` — Composable: «Графики» of a month (MOL-158) and of a year (MOL-160) from the server, through `useKeptAnswer`.
-- `frontend/src/composables/useKeptAnswer.ts` — Composable: an answer of «Графики» kept per owner and subject, only the latest read, offline or error decided after the failure, re-read when a write lands.
+- `frontend/src/composables/useKeptAnswer.ts` — Composable: an answer of «Графики» or «Бюджет» kept per owner and subject, only the latest read, offline or error decided after the failure, re-read when a write lands, or taken from a write's own answer (`accept`).
 - `frontend/src/composables/useSalaryShift.ts` — Composable: the «Зарплата — в следующий месяц» setting through `useTapSetting`, read and saved on the tap.
 
 ## frontend · stores

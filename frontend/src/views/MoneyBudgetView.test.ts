@@ -54,6 +54,7 @@ function budget(patch: Partial<MoneyBudgetView> = {}): MoneyBudgetView {
     categoryId,
     plan,
     planned: amd(planned),
+    awaitingIncome: false,
     estimated: plan.kind === 'share',
     plannedWhole: true,
     spent: amd(spent),
@@ -94,6 +95,12 @@ function budget(patch: Partial<MoneyBudgetView> = {}): MoneyBudgetView {
     ],
     ...patch,
   }
+}
+
+function total(): NonNullable<MoneyBudgetView['total']> {
+  const value = budget().total
+  if (!value) throw new Error('no total')
+  return value
 }
 
 let router: Router
@@ -203,7 +210,14 @@ describe('MoneyBudgetView: the four states (MOL-117)', () => {
   })
 
   it('with no plan offers one, and «Задать план» stands under it', async () => {
-    moneyBudget.mockResolvedValue(budget({ rows: [], total: null, unplanned: [] }))
+    moneyBudget.mockResolvedValue(
+      budget({
+        rows: [],
+        total: null,
+        unplanned: [],
+        savings: { target: null, income: rub('0'), difference: null, actual: null },
+      }),
+    )
     const view = await render()
     expect(view.text()).toContain(en.budget.empty.title)
     expect(view.text()).toContain(en.budget.add)
@@ -219,8 +233,8 @@ describe('MoneyBudgetView: the month counted by the server', () => {
     expect(total).toContain('֏22,600')
     expect(total).toContain('≈ ₽5,256')
     expect(rowTexts(view).slice(0, 3)).toEqual([
-      'Groceries֏25,100֏52,300 of ֏77,400 · 10 % of income68%',
-      'Cafés and restaurants−֏2,500֏41,200 of ֏38,700 · 5 % of incomeover the plan',
+      'Groceries֏25,100֏52,300 of ≈ ֏77,400 · 10 % of income68%',
+      'Cafés and restaurants֏2,500֏41,200 of ≈ ֏38,700 · 5 % of incomeover the plan',
       'Rent֏0֏250,000 of ֏250,000100%',
     ])
     expect(view.findAll('.fill.over')).toHaveLength(1)
@@ -265,6 +279,8 @@ describe('MoneyBudgetView: a plan written from the month on (В-1)', () => {
       'From September on. August stays as it was',
     )
     type('input[inputmode=decimal]', '270 000')
+    const written = budget({ total: { ...total(), left: amd('2600') } })
+    setBudgetPlan.mockResolvedValue(written)
     await pressUntil(en.budget.sheet.save, () => {
       expect(setBudgetPlan).toHaveBeenCalledWith({
         categoryId: RENT,
@@ -272,8 +288,11 @@ describe('MoneyBudgetView: a plan written from the month on (В-1)', () => {
         plan: { kind: 'amount', amount: amd('270000') },
       })
     })
-    await flushPromises()
-    expect(moneyBudget.mock.calls.length).toBeGreaterThan(1)
+    // The write's own answer is shown, with no second read (review 6).
+    await vi.waitFor(() => {
+      expect(plain(view.find('.total').text())).toContain('֏2,600')
+    })
+    expect(moneyBudget).toHaveBeenCalledTimes(1)
   })
 
   it('a share is a whole percent; past a hundred is refused under the field', async () => {
@@ -348,5 +367,93 @@ describe('MoneyBudgetView: a plan written from the month on (В-1)', () => {
     )
     expect(save?.hasAttribute('disabled')).toBe(true)
     expect(setBudgetPlan).not.toHaveBeenCalled()
+  })
+})
+
+describe('MoneyBudgetView: what the review found (MOL-117)', () => {
+  it('a share of an empty «Пришло» waits for it: no minus, nothing over, the total says why', async () => {
+    const [groceries] = budget().rows
+    if (!groceries) throw new Error('no row')
+    moneyBudget.mockResolvedValue(
+      budget({
+        rows: [
+          {
+            ...groceries,
+            planned: null,
+            awaitingIncome: true,
+            estimated: false,
+            left: null,
+            used: null,
+          },
+        ],
+        total: { ...total(), whole: false },
+      }),
+    )
+    const view = await render()
+    expect(rowTexts(view)[0]).toBe('Groceries—֏52,300 of — · 10 % of income · nothing came in yet')
+    expect(view.findAll('.over')).toHaveLength(0)
+    expect(view.find('.total').text()).toContain(en.budget.total.awaiting)
+  })
+
+  it('a spending short of a rate is said on its row (review 3)', async () => {
+    const [groceries] = budget().rows
+    if (!groceries) throw new Error('no row')
+    moneyBudget.mockResolvedValue(
+      budget({ rows: [{ ...groceries, spentWhole: false, used: null }] }),
+    )
+    const view = await render()
+    expect(rowTexts(view)[0]).toContain('not all counted')
+  })
+
+  it('a removed category with no plan is shown, and no plan is offered for it (review 7)', async () => {
+    moneyBudget.mockResolvedValue(
+      budget({
+        unplanned: [{ categoryId: PETS, spent: amd('1000'), spentWhole: true }],
+        categories: budget().categories.map((one) =>
+          one.id === PETS ? { ...one, archived: true } : one,
+        ),
+      }),
+    )
+    const view = await render()
+    expect(view.find('.row.still').text()).toContain('Pets')
+    expect(view.find('button.row.still').exists()).toBe(false)
+  })
+
+  it('the savings target alone is a plan: no «No plan yet» over it (adversarial Д)', async () => {
+    moneyBudget.mockResolvedValue(budget({ rows: [], unplanned: [], total: null }))
+    const view = await render()
+    expect(view.text()).not.toContain(en.budget.empty.title)
+    expect(view.text()).toContain('Target — 25 % of income')
+  })
+
+  it('a plan kept from another currency is said, never put in the field as this one (adversarial Б)', async () => {
+    const [, , rent] = budget().rows
+    if (!rent) throw new Error('no row')
+    moneyBudget.mockResolvedValue(
+      budget({
+        spendCurrency: 'RUB',
+        rows: [{ ...rent, plan: { kind: 'amount', amount: amd('250000') }, estimated: true }],
+      }),
+    )
+    const view = await render()
+    expect(rowTexts(view)[0]).toContain('of ≈ ')
+    await view.findAll('li .row')[0]?.trigger('click')
+    await flushPromises()
+    const sheet = document.querySelector('dialog[open]')
+    expect(sheet?.querySelector<HTMLInputElement>('input[inputmode=decimal]')?.value).toBe('')
+    expect(sheet?.textContent).toContain('The plan was ֏250,000.00')
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(sheet?.textContent).toContain('Enter a sum')
+    })
+    expect(setBudgetPlan).not.toHaveBeenCalled()
+  })
+
+  it('a total over by less than a dram says the lumas, never «֏0» (adversarial Г)', async () => {
+    moneyBudget.mockResolvedValue(
+      budget({ total: { ...total(), left: { minor: -40n, currency: 'AMD' }, leftIncome: null } }),
+    )
+    const shown = plain((await render()).find('.total').text())
+    expect(shown).toContain(en.budget.total.over)
+    expect(shown).toContain('֏0.40')
   })
 })

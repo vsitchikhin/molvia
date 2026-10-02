@@ -11,12 +11,14 @@ export interface MoneyBudgetState {
   readonly stale: ComputedRef<'loading' | 'offline' | 'error' | null>
   readonly fetchedAt: ComputedRef<Date | null>
   readonly retry: () => Promise<void>
+  /** The budget a plan's write came back with: shown, with no second read (review 6). */
+  readonly accept: (month: string, budget: MoneyBudgetView) => void
 }
 
 /**
  * «Бюджет» (MOL-117) of a month, counted by the server: the last three months read are kept per
  * owner, as «Графики» keep theirs, so offline is a strip over the month last seen. Read again when a
- * spending or a trip lands, and by the screen after a plan is written.
+ * spending or a trip lands; a plan written shows the answer of its write.
  */
 export function useMoneyBudget(month: Ref<string>): MoneyBudgetState {
   const kept = useKeptAnswer({

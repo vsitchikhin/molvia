@@ -23,6 +23,11 @@ export interface KeptAnswer<T> {
    */
   readonly kept: ComputedRef<readonly Remembered<T>[]>
   readonly retry: () => Promise<void>
+  /**
+   * An answer a write came back with (MOL-117, review 6): the latest there is for its subject, kept
+   * and shown as a read's would be — no second read for what the write already said.
+   */
+  readonly accept: (subject: string, answer: T) => void
 }
 
 export interface KeptAnswerOptions<T> {
@@ -155,6 +160,20 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
     }
   }
 
+  function accept(asked: string, answer: T): void {
+    const id = actor.id
+    if (!id) return
+    const mine = ++latest
+    answered.set(asked, mine)
+    const fetchedAt = new Date()
+    remember(id, asked, answer, fetchedAt)
+    recallKept()
+    if (subject.value !== asked) return
+    shown.value = { answer, fetchedAt }
+    failure.value = null
+    confirmed.value = true
+  }
+
   adopt()
   watch([() => actor.id, subject], () => {
     adopt()
@@ -181,5 +200,6 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
     fetchedAt: computed(() => shown.value?.fetchedAt ?? null),
     kept: computed(() => stored.value),
     retry: load,
+    accept,
   }
 }

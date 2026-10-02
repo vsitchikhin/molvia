@@ -452,3 +452,14 @@ export interface Removed {
   readonly title: string
   readonly amount: string
 }
+
+/**
+ * A figure of «Бюджет» (MOL-117) with its sign left to the words around it — «сверх плана», «осталось»:
+ * whole units, as every figure of «Деньги», unless that prints a nought for money that is there —
+ * 0,40 ֏ over the plan is «0,40 ֏», never «0 ֏» (adversarial Г).
+ */
+export function budgetAmount(value: Money, locale: string): string {
+  const size = { ...value, minor: value.minor < 0n ? -value.minor : value.minor }
+  const whole = formatEstimate(size, locale)
+  return size.minor !== 0n && !/[1-9]/.test(whole) ? formatMoney(size, locale) : whole
+}

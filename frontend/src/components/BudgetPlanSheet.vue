@@ -35,6 +35,7 @@
         >
           <template #suffix>{{ kind === 'share' ? '%' : sign }}</template>
         </AppField>
+        <p v-if="before" class="hint before">{{ before }}</p>
         <p class="hint">
           {{
             subject.kind === 'savings'
@@ -82,10 +83,16 @@ import {
   ERROR,
   currencySign,
   decimalFromMinor,
+  formatMoney,
   parseMoney,
   previousMonth,
 } from '@molvia/model'
-import type { BudgetPlanValue, Currency, SpendingCategoryView } from '@molvia/model'
+import type {
+  BudgetPlanValue,
+  Currency,
+  MoneyBudgetView,
+  SpendingCategoryView,
+} from '@molvia/model'
 import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
@@ -100,10 +107,11 @@ export type BudgetSubject =
   | { readonly kind: 'choose' }
   | { readonly kind: 'savings' }
 
-/** What the sheet hands the screen once it has closed. */
+/** What the sheet hands the screen once it has closed: and the month's budget the write came back with. */
 export interface BudgetOutcome {
   readonly kind: 'saved' | 'removed'
   readonly name: string
+  readonly budget: MoneyBudgetView
 }
 
 /**
@@ -159,10 +167,12 @@ export default defineComponent({
         if (!open) return
         const plan = props.plan
         kind.value = props.subject.kind === 'savings' || plan?.kind === 'share' ? 'share' : 'amount'
+        // A sum kept from another currency of spending — a move — is never put in the field as if it
+        // were in this one: «Сохранить» would have made 250 000 ֏ into 250 000 ₽ (adversarial Б).
         value.value =
           plan?.kind === 'share'
             ? String(plan.percent)
-            : plan?.kind === 'amount'
+            : plan?.kind === 'amount' && plan.amount.currency === props.spendCurrency
               ? shown(decimalFromMinor(plan.amount), locale.value === 'ru' ? ',' : '.')
               : ''
         chosen.value = props.categories[0]?.id ?? ''
@@ -198,6 +208,15 @@ export default defineComponent({
       { value: 'share', label: t('budget.sheet.kind_share') },
     ])
     const sign = computed(() => currencySign(props.spendCurrency, locale.value))
+    /** «Был 250 000 ֏ — введите сумму в ₽»: the plan of another currency, said and not typed. */
+    const before = computed(() => {
+      const plan = props.plan
+      if (plan?.kind !== 'amount' || plan.amount.currency === props.spendCurrency) return null
+      return t('budget.sheet.other_currency', {
+        amount: formatMoney(plan.amount, locale.value),
+        sign: sign.value,
+      })
+    })
     /** «С октября и дальше. Сентябрь не меняется.» — what the plan is of in time (Р-9). */
     const fromWords = computed(() => {
       const before = monthName(previousMonth(props.month), locale.value)
@@ -250,10 +269,11 @@ export default defineComponent({
       }
       sending.value = true
       try {
-        await api.setBudgetPlan({ categoryId: id, from: props.month, plan })
+        const budget = await api.setBudgetPlan({ categoryId: id, from: props.month, plan })
         finished({
           kind: plan ? 'saved' : 'removed',
           name: id === null ? t('budget.savings.title') : props.nameOf(id),
+          budget,
         })
       } catch (caught) {
         const code = caught instanceof ApiError ? caught.code : null
@@ -287,6 +307,7 @@ export default defineComponent({
       valueField,
       title,
       sign,
+      before,
       fromWords,
       afterClose,
       submit,
@@ -339,5 +360,9 @@ export default defineComponent({
   margin: 0 0 var(--space-2);
   color: var(--bad-ink);
   font-size: var(--text-footnote);
+}
+
+.hint.before {
+  color: var(--warn-ink);
 }
 </style>

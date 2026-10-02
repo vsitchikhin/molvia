@@ -242,7 +242,7 @@ import SpendingSheet from '@/components/SpendingSheet.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { pageOrder } from '@/components/accounts'
-import { rateWords } from '@/components/spending'
+import { budgetAmount, rateWords } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
 import { useReconnect } from '@/composables/useReconnect'
 import { calendarDay } from '@/days'
@@ -339,11 +339,10 @@ export default defineComponent({
       if (!budget) return null
       if (!budget.planned) return t('budget.entry.none')
       if (!budget.left) return null
+      const amount = budgetAmount(budget.left, locale.value)
       return budget.left.minor < 0n
-        ? t('budget.entry.over', {
-            amount: formatEstimate({ ...budget.left, minor: -budget.left.minor }, locale.value),
-          })
-        : t('budget.entry.left', { amount: formatEstimate(budget.left, locale.value) })
+        ? t('budget.entry.over', { amount })
+        : t('budget.entry.left', { amount })
     }
 
     const whole = (value: Money) => formatEstimate(value, locale.value)

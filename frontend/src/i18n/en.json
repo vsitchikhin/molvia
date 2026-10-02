@@ -1556,12 +1556,14 @@
       "over": "Over the plan",
       "planned": "Plan",
       "unplanned": "Outside the plan",
-      "not_whole": "Not all counted: some spendings or incomes have no rate"
+      "not_whole": "Not all counted: some spendings or incomes have no rate",
+      "awaiting": "A share of income comes once something comes in this month"
     },
     "row": {
       "of": "{spent} of {planned}",
       "share": "{percent} % of income",
-      "over": "over the plan"
+      "over": "over the plan",
+      "awaiting": "nothing came in yet"
     },
     "unplanned": "No plan",
     "add": "Set a category plan",
@@ -1600,7 +1602,8 @@
       "offline": "No connection. A plan is saved only online",
       "save": "Save",
       "wait_online": "Waiting for connection",
-      "remove": "Remove the plan"
+      "remove": "Remove the plan",
+      "other_currency": "The plan was {amount}, before the spending currency changed. Enter a sum in {sign}"
     }
   }
 }

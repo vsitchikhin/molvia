@@ -53,7 +53,8 @@ test('a plan from this month on: «осталось» on the screen and on «Д�
   await expect(sheet).toBeHidden()
   await expect(page.getByRole('link', { name: /^Бюджет, осталось 150\s000\s֏$/ })).toBeVisible()
 
-  // A share of «Пришло»: nothing came in this month, so the plan is nothing and all of it is over.
+  // A share of «Пришло»: nothing came in this month, so the share waits for it — no «сверх плана»
+  // on all that was spent, and the total says why it has no figure (review 1).
   await openBudget(page)
   await page.getByRole('button', { name: /Аренда жилья/ }).click()
   await expect(sheet).toContainText('С ')
@@ -63,9 +64,11 @@ test('a plan from this month on: «осталось» on the screen and on «Д�
   await sheet.getByLabel('Доля пришедшего').fill('10')
   await sheet.getByRole('button', { name: 'Сохранить' }).click()
   await expect(sheet).toBeHidden()
-  await expect(page.locator('.total')).toContainText('Сверх плана')
-  await expect(page.locator('.total .figure')).toHaveText(/100\s000\s֏/)
-  await expect(page.getByRole('button', { name: /Аренда жилья/ })).toContainText('10 % пришедшего')
+  const rent = page.getByRole('button', { name: /Аренда жилья/ })
+  await expect(rent).toContainText('10 % пришедшего')
+  await expect(rent).toContainText('пока ничего не пришло')
+  await expect(page.locator('.total')).toContainText('Доля пришедшего появится')
+  await expect(page.locator('.total')).not.toContainText('Сверх плана')
 })
 
 test('must not fire: with no connection a plan is not sent, and the button waits', async ({

@@ -617,10 +617,15 @@ task did not: five plans of six there are a percent of the month's income — «
 - **A plan is a sum in the spending currency or a whole percent of «Пришло»** (В-2, Р-1): the share is
   of «Пришло» as the month counts it — the salary moved by `budgetMonthOf`, as the sheet's «месяц
   бюджета» is (Р-3) — brought into the spending currency **by the month's rate**, frozen for a closed
-  month, the rate «≈ потрачено» is counted by. No rate, and a share is no plan, never a zero; nothing
-  came in, and it is zero with a rate or without. A sum typed in another currency is refused
-  (`CURRENCY_MISMATCH`); one kept from before a move is converted by the month's rate and marked «≈»
-  (Р-4).
+  month, the rate «≈ потрачено» is counted by. No rate, and a share is no plan, never a zero.
+  **Nothing come in yet, and the share waits for it** (`awaitingIncome`, review 1, adversarial В): no
+  plan, no «сверх плана» on all that was spent, out of «осталось» — the total says «доля появится»,
+  the way in has no figure. Read as a plan of zero, every share was over its plan in every month
+  until the salary; the price — a month with only shares says no «осталось» until something comes
+  in. A sum typed in another currency is refused (`CURRENCY_MISMATCH`); one kept from before a move
+  is converted by the month's rate and printed «≈» (Р-4), and **its sheet never puts it in the field
+  as a sum of this currency** (adversarial Б): «Сохранить» untouched made 250 000 ֏ into 250 000 ₽.
+  The sheet says what it was and asks for a sum anew.
 - **What was spent is the month's `byCategory`, never a second count** (Р-2): the budget is
   `monthBudget` over the very `countMonth` and `monthRate` of `GET /money/months/:month`, frozen and
   settled as it is (`settleThaws`); a trip is in «Продукты»; an integration test holds every row
@@ -631,11 +636,21 @@ task did not: five plans of six there are a percent of the month's income — «
   a row does not move under the finger. **What was spent with no plan stands apart** (Р-6), «Без
   плана», and is no part of «осталось» — the sheet's ИТОГО counts so. **A removed category keeps its
   plan** (Р-5, MOL-73 В-3): it has a row in a month something was spent in it, and none where it is
-  only removed; «Вернуть» brings the plan back with it.
-- **Over the plan is a warning, never red** (Р-7): «сверх плана» in `--warn`, the bar to the edge. Red
-  is an error, and spending past a plan is a fact.
+  only removed; «Вернуть» brings the plan back with it. Its «Без плана» row is no button (review 7): a
+  plan is offered for the live categories only. **A row whose plan would carry the total past what
+  money holds is left out of it** (adversarial А), as a spending is from «Потрачено»: the answer that
+  failed to encode was a 500 for good, with no screen to take the plan back from.
+- **Over the plan is a warning, never red, and said in words, never by a minus** (Р-7, review 5):
+  «сверх плана» in `--warn`, the figure without its sign, the bar to the edge — with no mark of the
+  plan on it, which would be a division the phone does not make. Red is an error, and spending past a
+  plan is a fact. **A figure is whole units unless that prints a nought for money that is there**
+  (`budgetAmount`, adversarial Г): 0,40 ֏ over is «0,40 ֏». **The share of a plan is rounded as a
+  person rounds, but «100 %» only once the plan is spent**: 248 800 of 250 000 is «99 %». **«≈» of the
+  total in the income currency only when that is another currency** (review 4).
 - **The savings target is a plan with no category** (В-4): a whole percent of «Пришло», never a sum —
   putting aside is no spending, and in the app savings are an account (MOL-115), not a category.
+  **Set alone, it is a plan of the month** (adversarial Д): no «Плана пока нет» over it, and no «не
+  задан» on the way in.
   Against it, «Разница» of «Пришло» (`savings.actual`), only for whole sums; «пока» while the month
   runs. There is no starting capital and no «Остаток» on this screen (Р-11): «Остаток» is the money on
   the accounts, on «Деньгах».
@@ -645,7 +660,8 @@ task did not: five plans of six there are a percent of the month's income — «
   `/money/budget`, the month in the address by `replace`, its last three answers kept per owner
   (`molvia.budget`), built from the kit after the plan artifact's frames — the newer handoffs of
   «Деньги» are later work (owner's note on В-5). **A plan is written with a connection only** (Р-8),
-  as an account is: it is set at home, not at the shelf; the answer is read again after the write.
+  as an account is: it is set at home, not at the shelf; **the write's own answer is the month's
+  budget and is shown** (`accept` of `useKeptAnswer`, review 6) — no second count of the month.
   The sheet works no plan out of «Пришло» — what a percent comes to is the server's, on the row.
 - **Private, and it goes with its owner** (Р-13): erasure takes `budget_plans` before the categories
   they point at, and the copy of one's data has them (`budgetPlans`, version 7).

@@ -36,23 +36,25 @@
       />
 
       <template v-else-if="budget">
+        <!-- The savings target alone is a plan too (adversarial Д): no «Плана пока нет» over it. -->
         <ScreenState
-          v-if="!budget.total"
+          v-if="!budget.total && budget.savings.target === null"
           kind="empty"
           tone="accent"
           :icon="IconTarget"
           :title="t('budget.empty.title')"
           :body="t('budget.empty.body')"
         />
-        <AppCard v-else class="total">
+        <AppCard v-else-if="budget.total" class="total">
           <p class="caption">
             {{ overall.over ? t('budget.total.over') : t('budget.total.left') }}
           </p>
           <p class="figure" :class="{ over: overall.over }">{{ overall.figure }}</p>
           <p v-if="budget.total.leftIncome" class="approx">
-            ≈ {{ whole(magnitude(budget.total.leftIncome)) }}
+            ≈ {{ amount(budget.total.leftIncome) }}
           </p>
-          <p v-if="!budget.total.whole" class="footnote">{{ t('budget.total.not_whole') }}</p>
+          <p v-if="awaiting" class="footnote">{{ t('budget.total.awaiting') }}</p>
+          <p v-else-if="!budget.total.whole" class="footnote">{{ t('budget.total.not_whole') }}</p>
           <dl class="trio">
             <div>
               <dt>{{ t('budget.total.planned') }}</dt>
@@ -92,7 +94,15 @@
           <h2 class="group">{{ t('budget.unplanned') }}</h2>
           <AppCard as="ul" list>
             <li v-for="row in unplanned" :key="row.categoryId">
-              <button type="button" class="row" @click="edit(row.categoryId, null)">
+              <!-- A removed category is no choice (review 7): its spending is shown, a plan is not offered. -->
+              <div v-if="row.archived" class="row still">
+                <span class="head">
+                  <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
+                  <span class="name">{{ row.name }}</span>
+                  <span class="left">{{ row.spent }}</span>
+                </span>
+              </div>
+              <button v-else type="button" class="row" @click="edit(row.categoryId, null)">
                 <span class="head">
                   <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
                   <span class="name">{{ row.name }}</span>
@@ -159,7 +169,7 @@ import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen } from '@/components/accounts'
-import { categoryColour } from '@/components/spending'
+import { budgetAmount, categoryColour } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyBudget } from '@/composables/useMoneyBudget'
@@ -207,7 +217,7 @@ export default defineComponent({
       })
     }
 
-    const { phase, budget, stale, fetchedAt, retry } = useMoneyBudget(month)
+    const { phase, budget, stale, fetchedAt, retry, accept } = useMoneyBudget(month)
 
     const online = ref(navigator.onLine)
     const onLine = () => (online.value = true)
@@ -235,10 +245,8 @@ export default defineComponent({
     }
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
-    const magnitude = (value: Money): Money => ({
-      ...value,
-      minor: value.minor < 0n ? -value.minor : value.minor,
-    })
+    /** A figure without its sign — the words around it say which way (Р-7, adversarial Г). */
+    const amount = (value: Money) => budgetAmount(value, locale.value)
     const percent = (value: number) =>
       new Intl.NumberFormat(locale.value, { style: 'percent' }).format(value / 100)
     const when = (at: Date) => countedWhen(at, locale.value)
@@ -246,27 +254,35 @@ export default defineComponent({
     const overall = computed(() => {
       const left = budget.value?.total?.left
       if (!left) return { over: false, figure: '' }
-      return { over: left.minor < 0n, figure: whole(magnitude(left)) }
+      return { over: left.minor < 0n, figure: amount(left) }
     })
+    /** Some share waits for «Пришло»: the total says that, not «нет курса» (review 1). */
+    const awaiting = computed(() => (budget.value?.rows ?? []).some((row) => row.awaitingIncome))
 
     const rows = computed(() =>
       (budget.value?.rows ?? []).map((row) => {
         const over = row.left !== null && row.left.minor < 0n
-        const planned = row.planned === null ? '—' : whole(row.planned)
-        const share =
-          row.plan.kind === 'share'
-            ? ` · ${t('budget.row.share', { percent: row.plan.percent })}`
-            : ''
+        // «≈» before a plan the server converted by the month's rate (review 2, adversarial Б, Р-4).
+        const planned =
+          row.planned === null ? '—' : `${row.estimated ? '≈ ' : ''}${whole(row.planned)}`
+        const notes = [
+          ...(row.plan.kind === 'share'
+            ? [t('budget.row.share', { percent: row.plan.percent })]
+            : []),
+          ...(row.awaitingIncome ? [t('budget.row.awaiting')] : []),
+          ...(!row.plannedWhole || !row.spentWhole
+            ? [t('spending.charts.difference_uncounted')]
+            : []),
+        ]
         return {
           categoryId: row.categoryId,
           plan: row.plan,
           name: nameOf(row.categoryId),
           colour: colourOf(row.categoryId),
           over,
-          left: row.left === null ? '—' : over ? `−${whole(magnitude(row.left))}` : whole(row.left),
-          of: `${t('budget.row.of', { spent: whole(row.spent), planned })}${share}${
-            row.plannedWhole ? '' : ` · ${t('spending.charts.difference_uncounted')}`
-          }`,
+          // Over the plan is said by the words beside it, never by a minus (Р-7, review 5).
+          left: row.left === null ? '—' : amount(row.left),
+          of: [t('budget.row.of', { spent: whole(row.spent), planned }), ...notes].join(' · '),
           used: over ? t('budget.row.over') : row.used === null ? '' : percent(row.used),
           // The share is the server's; the phone only stops the bar at the card's edge.
           width: `${String(Math.min(row.used ?? (over ? 100 : 0), 100))}%`,
@@ -279,6 +295,7 @@ export default defineComponent({
         categoryId: row.categoryId,
         name: nameOf(row.categoryId),
         colour: colourOf(row.categoryId),
+        archived: categoryOf(row.categoryId)?.archived === true,
         spent: row.spentWhole
           ? whole(row.spent)
           : `${whole(row.spent)} · ${t('spending.charts.difference_uncounted')}`,
@@ -311,8 +328,8 @@ export default defineComponent({
           ? t('budget.savings.of', {
               difference:
                 value.difference.minor < 0n
-                  ? `−${whole(magnitude(value.difference))}`
-                  : whole(value.difference),
+                  ? `−${amount(value.difference)}`
+                  : amount(value.difference),
               income: whole(value.income),
             })
           : value.income.minor === 0n
@@ -343,11 +360,12 @@ export default defineComponent({
       plan.value = target == null ? null : { kind: 'share', percent: target }
       sheetOpen.value = true
     }
+    /** The write's own answer is the month's budget now: shown, with no second read (review 6). */
     function done(outcome: BudgetOutcome): void {
+      accept(outcome.budget.month, outcome.budget)
       announce?.(
         t(outcome.kind === 'saved' ? 'budget.saved' : 'budget.removed', { name: outcome.name }),
       )
-      void retry()
     }
 
     return {
@@ -364,9 +382,10 @@ export default defineComponent({
       retry,
       online,
       whole,
-      magnitude,
+      amount,
       when,
       overall,
+      awaiting,
       rows,
       unplanned,
       choosable,
@@ -558,6 +577,14 @@ li + li {
 
 .over {
   color: var(--warn-ink);
+}
+
+.still {
+  cursor: default;
+
+  &:hover {
+    background: none;
+  }
 }
 
 .fill.over {
