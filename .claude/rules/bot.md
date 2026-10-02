@@ -294,10 +294,15 @@ in `.scratch/tasks/requirements/MOL-103.md`.
   alone was not enough: an unblock from Telegram's list sends none, and a chat with its history
   shows no «START»; a word typed or a digit pressed under an old reminder is what such a person
   does. Not waited for, so the login or the rating behind it does not stand in the API's queue;
-  «unblocked» writes nothing on anyone not blocked. **The named price:** a press followed at once by
-  a block may let its «unblocked» arrive after the block and turn the reminders on until that
-  evening's 403. The updates the bot polls for are named (`ALLOWED_UPDATES`): left to «the previous
-  setting» a token keeps, one once polled with a narrower list would never hear of a block.
+  «unblocked» writes nothing on anyone not blocked. **Not for a press of the switch** (adversarial
+  round 3, О): «Не напоминать» and «Вернуть» tell the API themselves, and two words of one press
+  arrived in no order — the count of the button and the ladder hung on which came first. What stays
+  unordered is a press of the scale and its verdict, which the switch does not touch. **The named
+  prices:** a press followed at once by a block may let its «unblocked» arrive after the block and
+  turn the reminders on until that evening's 403; and if Telegram hands a bot the presses of someone
+  who blocked it — not checked on live Telegram — a digit pressed under an old reminder turns them
+  on until the same 403. The updates the bot polls for are named (`ALLOWED_UPDATES`): left to «the
+  previous setting» a token keeps, one once polled with a narrower list would never hear of a block.
 - **Turning off is counted** (В-4): `reminder_days` adds `off_button`, `off_settings` and
   `off_blocked` — people whose reminders went from on to off that day, by how, with no id — and
   `make gates` prints them under the lever, as counts and no verdict: whether the reminder annoys.

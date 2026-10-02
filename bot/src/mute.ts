@@ -97,13 +97,24 @@ export function muteComposer({ api }: MuteDeps): Composer<Context> {
  *
  * Installed first, before every composer, since each of them may end the update. Not waited for:
  * the login or the rating behind it must not stand in the API's queue, and «unblocked» changes only
- * `blocked` — on anyone else it writes nothing. The named price: a press followed at once by a block
- * may let its «unblocked» arrive after the block's word and turn the reminders on for one evening,
- * until that evening's 403 turns them off again.
+ * `blocked` — on anyone else it writes nothing. **Not for a press of the switch**: «Не напоминать»
+ * and «Вернуть» tell the API themselves, and the two words of one press would arrive in no order
+ * (round 3, О). What stays unordered is a press of the scale and its verdict, which the switch does
+ * not touch. The named price: a press followed at once by a block may let its «unblocked» arrive
+ * after the block's word and turn the reminders on for one evening, until that evening's 403 turns
+ * them off again.
  */
 export function heardFrom({ api }: MuteDeps): MiddlewareFn {
   return async (ctx, next) => {
-    if (ctx.chat?.type === 'private' && ctx.from && (ctx.message || ctx.callbackQuery)) {
+    // A press of the switch itself says its own word, waited for: a second one beside it, unordered,
+    // made the count of «Не напоминать» and the ladder depend on which arrived first (round 3, О).
+    const switchPress = SWITCH_DATA.test(ctx.callbackQuery?.data ?? '')
+    if (
+      ctx.chat?.type === 'private' &&
+      ctx.from &&
+      (ctx.message || ctx.callbackQuery) &&
+      !switchPress
+    ) {
       const telegramUserId = ctx.from.id
       // A promise first: a client that throws at once must not take the update with it.
       void Promise.resolve()

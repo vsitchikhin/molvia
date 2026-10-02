@@ -280,15 +280,16 @@ describe('кто пишет боту, тот его не заблокирова�
     expect(rateFromBot).toHaveBeenCalledWith(777, MILK, 4)
   })
 
-  it('«Не напоминать» после «разблокирован» остаётся «выключить»', async () => {
+  it('нажатие выключателя шлёт одно своё слово, без «разблокирован» рядом (адверсариальный раунд 3, О)', async () => {
     const switchReminders = vi.fn(() => Promise.resolve())
     const { bot } = harness({ switchReminders })
 
     await bot.handleUpdate(press('remind:off'))
+    await bot.handleUpdate(press('remind:on', { markup: scale(MILK, undefined, 'on') }))
 
     expect(switchReminders.mock.calls).toEqual([
-      [777, 'unblocked'],
       [777, 'off'],
+      [777, 'on'],
     ])
   })
 
