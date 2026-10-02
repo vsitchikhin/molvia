@@ -220,7 +220,10 @@ test.describe('with no connection', () => {
  */
 test.describe('«Тут дешевле»', () => {
   /** Milk bought at Зовуни for 540 the litre, in a record already finished, and a record open at Ереван Сити. */
-  async function boughtAtZovuni(page: Page): Promise<{ word: string; itemId: string }> {
+  async function boughtAtZovuni(
+    page: Page,
+    alternative?: { readonly price: string; readonly score: number },
+  ): Promise<{ word: string; itemId: string; other: string | null }> {
     await signedIn(page)
     const headers = await asBrowser(page)
     const word = nonsense()
@@ -251,11 +254,36 @@ test.describe('«Тут дешевле»', () => {
       },
     })
     expect(added.status()).toBe(201)
+    // Another milk of one's own, rated, bought in the same shop (MOL-92, В-3).
+    let other: string | null = null
+    if (alternative) {
+      other = `Молоко «${nonsense()}»`
+      const made = await page.request.post('/api/catalogue/items', {
+        headers,
+        data: { kind: 'product', name: other, defaultUnit: 'l' },
+      })
+      const { id: otherId } = (await made.json()) as { id: string }
+      const bought = await page.request.post(`/api/trips/${earlier}/expenses`, {
+        headers,
+        data: {
+          id: randomUUID(),
+          itemId: otherId,
+          quantity: { value: '1', unit: 'l' },
+          amount: { amount: alternative.price, currency: 'AMD' },
+        },
+      })
+      expect(bought.status()).toBe(201)
+      const rated = await page.request.put(`/api/verdicts/${otherId}`, {
+        headers,
+        data: { score: alternative.score },
+      })
+      expect(rated.status()).toBe(201)
+    }
     expect(
       (await page.request.post(`/api/trips/${earlier}/finish`, { headers, data: {} })).status(),
     ).toBe(204)
     expect((await start(randomUUID(), 'Ереван Сити')).status()).toBe(201)
-    return { word, itemId }
+    return { word, itemId, other }
   }
 
   const hint = (page: Page) => sheet(page).locator('[data-hint="item"]')
@@ -301,5 +329,60 @@ test.describe('«Тут дешевле»', () => {
     await expect(sheet(page)).toContainText(`Молоко «${word}»`)
     await expect(hint(page)).toContainText('Cheapest you paid: Зовуни')
     await context.setOffline(false)
+  })
+
+  test('names a cheaper milk of one’s own rated no worse, second (В-3, review №5)', async ({
+    page,
+  }) => {
+    const { word, other } = await boughtAtZovuni(page, { price: '480', score: 5 })
+    await pick({ page, word })
+    await sheet(page).getByLabel('How much').fill('1')
+    await sheet(page).getByLabel('Price as on the tag').fill('620')
+
+    const line = sheet(page).locator('[data-hint="alternative"]')
+    await expect(line).toContainText(`${other ?? ''} — ֏480.00/l at Зовуни`)
+    await expect(line).toContainText('rated 5.0')
+  })
+
+  test('comes in over frames: the fields rise with it, never in one jump (adversarial Е)', async ({
+    page,
+  }) => {
+    const { word } = await boughtAtZovuni(page)
+    // A shelf's connection: the answer comes after the sheet is up and still.
+    await page.route('**/api/advice/prices**', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await route.continue()
+    })
+    await pick({ page, word })
+    await expect
+      .poll(() => page.evaluate(() => document.getAnimations().length), { timeout: 10_000 })
+      .toBe(0)
+    await expect(hint(page)).toHaveCount(0)
+
+    // The top of the price field, frame by frame, until the hint is in and still.
+    await page.evaluate(() => {
+      const w = window as unknown as { __tops: number[]; __stop: boolean }
+      w.__tops = []
+      w.__stop = false
+      const step = () => {
+        const field = document.querySelector('dialog[open] [data-field="amount"]')
+        if (field) w.__tops.push(field.getBoundingClientRect().top)
+        if (!w.__stop) requestAnimationFrame(step)
+      }
+      requestAnimationFrame(step)
+    })
+    await expect(hint(page)).toContainText('Зовуни', { timeout: 5000 })
+    await page.waitForTimeout(600)
+    const tops = await page.evaluate(() => {
+      const w = window as unknown as { __tops: number[]; __stop: boolean }
+      w.__stop = true
+      return w.__tops
+    })
+    const steps = tops.slice(1).map((top, index) => Math.abs(top - (tops[index] ?? top)))
+    const moved = Math.abs((tops.at(-1) ?? 0) - (tops[0] ?? 0))
+
+    expect(moved).toBeGreaterThan(20)
+    expect(steps.filter((step) => step > 0.5).length).toBeGreaterThan(3)
+    expect(Math.max(...steps)).toBeLessThan(moved / 2)
   })
 })
