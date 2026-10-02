@@ -5,9 +5,10 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 ## packages/model
 
-- `packages/model/src/contracts/advice.ts` — Wire contract of «Что брать»: `scope`, the row as a union on `level`, places with unit prices, limits, the answer, and the search's answer (an item found with its row or `null`, MOL-128).
+- `packages/model/src/contracts/advice.ts` — Wire contract of «Что брать»: `scope`, the row as a union on `level`, places with unit prices, limits, the answer, the search's answer (an item found with its row or `null`, MOL-128), and «Тут дешевле» — the person's own last prices and alternatives, a union on `level` (MOL-92).
 - `packages/model/src/contracts/events.ts` — Contract of the event log: the event types, `advice_viewed` among them, each with the payload tied to its type.
 - `packages/model/src/contracts/verdict.ts` — Wire contract of verdicts: the path by item, the rating and amendment bodies, the verdict card and the pending list.
+- `packages/model/src/entities/cheaper-hint.ts` — «Тут дешевле» (MOL-92): `cheaperHint` — what the sheet of a purchase says of the item's own last prices and of another item of its kind, against the price typed.
 - `packages/model/src/entities/catalogue.ts` — Frozen mapping of item kinds and place kinds onto the two halves of the 0.3 gate, product and venue.
 - `packages/model/src/entities/verdict.ts` — Entity: a verdict, one per item, plus `verdictLevel`, `averageScore`, the level thresholds and `AGGREGATE_MIN_CONTRIBUTIONS`.
 - `packages/model/src/values/gate.ts` — Values of the gates: the product/venue subject, five ratings in two weeks, the stop percentages of 0.2 and 0.3, and the login's line for a second way in.

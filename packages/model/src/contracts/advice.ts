@@ -4,6 +4,7 @@ import { ISSUE } from '#model/support/errors'
 import { itemSchema } from '#model/entities/item'
 import { placeSchema } from '#model/entities/place'
 import { verdictFields } from '#model/entities/verdict'
+import { isCalendarDay } from '#model/values/rates'
 import { unitPriceCodec } from '#model/values/units'
 
 /**
@@ -31,6 +32,13 @@ export const advicePlaceSchema = z.strictObject({
 })
 export type AdvicePlace = z.output<typeof advicePlaceSchema>
 
+// The shape and the ceiling are two rules: `^[1-5]\.\d$` alone lets «5.1» through, which is a
+// number no scale of one to five has and which the screen would print as «5,1 из 5».
+const ratingSchema = z
+  .string()
+  .regex(/^[1-5]\.\d$/)
+  .refine((value) => Number(value) <= 5)
+
 /**
  * What every row carries whatever its verdict is.
  *
@@ -42,12 +50,7 @@ export type AdvicePlace = z.output<typeof advicePlaceSchema>
 const ratedFields = {
   itemId: z.uuid(),
   name: itemSchema.shape.name,
-  // The shape and the ceiling are two rules: `^[1-5]\.\d$` alone lets «5.1» through, which
-  // is a number no scale of one to five has and which the screen would print as «5,1 из 5».
-  rating: z
-    .string()
-    .regex(/^[1-5]\.\d$/)
-    .refine((value) => Number(value) <= 5),
+  rating: ratingSchema,
   ratingsCount: z.int().positive(),
   review: verdictFields.shape.review,
   /**
@@ -191,3 +194,75 @@ export const adviceSearchResponseSchema = z.strictObject({
   items: z.array(adviceFoundSchema),
 })
 export type AdviceSearchResponse = z.output<typeof adviceSearchResponseSchema>
+
+/**
+ * `GET /advice/prices` — «Тут дешевле» on the sheet of a purchase (MOL-92): the item, and the
+ * geography of the record it is bought into. The city is the record's, not the settings' (Т-4): a
+ * Gyumri resident shopping in Erevan compares with Erevan. `except` is the purchase the sheet
+ * amends, so a row is never compared with itself (Т-9).
+ */
+export const ownPricesQuerySchema = z.strictObject({
+  item: z.uuid(),
+  country: settingsGeographySchema.shape.country,
+  city: settingsGeographySchema.shape.city,
+  except: z.uuid().optional(),
+})
+export type OwnPricesQuery = z.output<typeof ownPricesQuerySchema>
+
+/**
+ * A place and the price **last** paid there for one item, by the person asking (MOL-92, В-3: «цены
+ * в магазинах подниматься могут, а вот спускаются редко»). `day` is the day of that purchase — the
+ * day of its record as the phone named it (MOL-121) — and what the sheet prints beside the price.
+ * `observations` is how many purchases there are in the place, in this currency and unit.
+ */
+export const ownPlacePriceSchema = z.strictObject({
+  placeId: z.uuid(),
+  name: placeSchema.shape.name,
+  unitPrice: unitPriceCodec,
+  day: z.string().refine(isCalendarDay, { error: ISSUE.RESPONSE_INVALID }),
+  observations: z.int().positive(),
+})
+export type OwnPlacePrice = z.output<typeof ownPlacePriceSchema>
+
+/**
+ * At most so many other items of the same kind travel with an answer (MOL-92, В-9). Which one the
+ * sheet names depends on the price typed, so the server cannot pick it; it sends the best rated
+ * first, and the one the sheet would pick is among them unless a person has bought more than this
+ * many rated kinds of one thing in one city.
+ */
+export const OWN_ALTERNATIVES_MAX = 20
+
+/**
+ * Another item of the same kind (`kindKey`, MOL-45, В-7) the person has bought in this city, with
+ * the rating they see for it on «Что брать». Only what is rated and not «не брать нигде» comes:
+ * «оценено лучше или так же» cannot be checked without a rating (Р-11).
+ */
+export const ownAlternativeSchema = z.strictObject({
+  itemId: z.uuid(),
+  name: itemSchema.shape.name,
+  level: z.enum(['take', 'if_cheap']),
+  rating: ratingSchema,
+  places: z.array(ownPlacePriceSchema).min(1),
+})
+export type OwnAlternative = z.output<typeof ownAlternativeSchema>
+
+const ownPricedFields = {
+  itemId: z.uuid(),
+  /** The person's own places in the record's city, cheapest last price first in each currency and unit. */
+  places: z.array(ownPlacePriceSchema),
+  alternatives: z.array(ownAlternativeSchema).max(OWN_ALTERNATIVES_MAX),
+}
+
+/**
+ * The answer of `GET /advice/prices` (MOL-92): a union on the level the person sees the item at on
+ * «Что брать», as `adviceRowSchema` is. **«Не брать нигде» has no field for a price, a place or an
+ * alternative** (Т-3): the product's core rule held by the type checker, not by the sheet. An item
+ * not rated is `unrated` and still has its prices: the hint is the person's own history.
+ */
+export const ownPricesResponseSchema = z.discriminatedUnion('level', [
+  z.strictObject({ itemId: z.uuid(), level: z.literal('never') }),
+  z.strictObject({ ...ownPricedFields, level: z.literal('take'), rating: ratingSchema }),
+  z.strictObject({ ...ownPricedFields, level: z.literal('if_cheap'), rating: ratingSchema }),
+  z.strictObject({ ...ownPricedFields, level: z.literal('unrated') }),
+])
+export type OwnPricesResponse = z.output<typeof ownPricesResponseSchema>

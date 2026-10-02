@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import {
   ADVICE_LIMIT,
+  OWN_ALTERNATIVES_MAX,
   PRICE_MEDIAN_MIN_OBSERVATIONS,
   adviceResponseSchema,
   adviceRowSchema,
+  ownPricesQuerySchema,
+  ownPricesResponseSchema,
 } from '#model/contracts/advice'
 
 const ITEM = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
@@ -190,5 +193,86 @@ describe('adviceResponseSchema', () => {
 describe('the numbers the screen depends on', () => {
   it('needs three purchases before a threshold, as everything else in this project does', () => {
     expect(PRICE_MEDIAN_MIN_OBSERVATIONS).toBe(3)
+  })
+})
+
+describe('ownPricesResponseSchema (MOL-92, «Тут дешевле»)', () => {
+  const zovuni = { ...market, name: 'Зовуни', day: '2026-09-12', observations: 3 }
+  const marianna = {
+    itemId: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d',
+    name: 'Молоко Марианна',
+    level: 'take',
+    rating: '4.5',
+    places: [zovuni],
+  } as const
+  const priced = {
+    itemId: ITEM,
+    level: 'take',
+    rating: '4.0',
+    places: [zovuni],
+    alternatives: [marianna],
+  }
+
+  it('carries the places and the alternatives of a rated item, the unit price decoded', () => {
+    const answer = ownPricesResponseSchema.parse(priced)
+    expect(answer.level === 'take' && answer.places[0]?.unitPrice.unit).toBe('kg')
+  })
+
+  it('has no field for a price on «не брать нигде» — a price there fails to parse (Т-3)', () => {
+    expect(ownPricesResponseSchema.safeParse({ itemId: ITEM, level: 'never' }).success).toBe(true)
+    for (const extra of [{ places: [zovuni] }, { alternatives: [] }, { rating: '1.0' }]) {
+      expect(
+        ownPricesResponseSchema.safeParse({ itemId: ITEM, level: 'never', ...extra }).success,
+      ).toBe(false)
+    }
+  })
+
+  it('has no rating on an item not rated, and still its prices', () => {
+    const unrated = { itemId: ITEM, level: 'unrated', places: [zovuni], alternatives: [] }
+    expect(ownPricesResponseSchema.safeParse(unrated).success).toBe(true)
+    expect(ownPricesResponseSchema.safeParse({ ...unrated, rating: '4.0' }).success).toBe(false)
+  })
+
+  it('refuses a day that is not a calendar day', () => {
+    for (const day of ['2026-02-31', '12.09', '2026-9-12']) {
+      const bad = { ...priced, places: [{ ...zovuni, day }] }
+      expect(ownPricesResponseSchema.safeParse(bad).success).toBe(false)
+    }
+  })
+
+  it('refuses an alternative that is «не брать нигде», unrated, or has no place', () => {
+    for (const other of [
+      { ...marianna, level: 'never' },
+      { ...marianna, rating: undefined },
+      { ...marianna, places: [] },
+    ]) {
+      expect(ownPricesResponseSchema.safeParse({ ...priced, alternatives: [other] }).success).toBe(
+        false,
+      )
+    }
+  })
+
+  it(`carries at most ${String(OWN_ALTERNATIVES_MAX)} alternatives`, () => {
+    const many = (n: number) => ({
+      ...priced,
+      alternatives: Array.from({ length: n }, () => marianna),
+    })
+    expect(ownPricesResponseSchema.safeParse(many(OWN_ALTERNATIVES_MAX)).success).toBe(true)
+    expect(ownPricesResponseSchema.safeParse(many(OWN_ALTERNATIVES_MAX + 1)).success).toBe(false)
+  })
+})
+
+describe('ownPricesQuerySchema', () => {
+  const query = { item: ITEM, country: 'AM', city: 'Ереван' }
+
+  it('takes the item and the record’s geography, `except` optional', () => {
+    expect(ownPricesQuerySchema.parse(query).except).toBeUndefined()
+    expect(ownPricesQuerySchema.parse({ ...query, except: PLACE }).except).toBe(PLACE)
+  })
+
+  it('refuses a malformed item and anything beside the four', () => {
+    expect(ownPricesQuerySchema.safeParse({ ...query, item: 'milk' }).success).toBe(false)
+    expect(ownPricesQuerySchema.safeParse({ ...query, scope: 'shared' }).success).toBe(false)
+    expect(ownPricesQuerySchema.safeParse({ item: ITEM }).success).toBe(false)
   })
 })
