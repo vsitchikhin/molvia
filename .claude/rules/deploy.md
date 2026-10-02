@@ -82,19 +82,31 @@ The shape worth knowing here:
   `v0.1.1-3-g1a2b3c4`.
 - **Production is watched from outside, never from the machine (MOL-142; MOL-149, В-4).** A watch on
   the same machine does not notice the machine is down. `.github/workflows/watch.yml` asks every
-  five minutes for `/api/health`, the page and the certificate's term, and pings the healthchecks.io
-  check `molvia-up` — or its `/fail`, saying what; the bot pings `molvia-bot` after a claim of
-  reminders went through. The alarm is healthchecks.io's own Telegram integration, never our bot,
+  five minutes for `/api/health` and the page and pings the healthchecks.io check `molvia-up` — or
+  its `/fail`, saying what; the certificate's term goes to a check of its own, `molvia-cert`; the
+  bot pings `molvia-bot`. The alarm is healthchecks.io's own Telegram integration, never our bot,
   which lies down with the machine. **`/health` is `503` whenever it is not `ok`**, with the same
   body: a 200 saying «degraded» is a database down that a watch reading the status never sees. The
-  rollout reads the body and is unchanged by it. **A `/fail` waits for four checks half a minute
-  apart**, since it raises the alarm with no grace and every merge leaves the API silent for seconds;
-  a run is red only when it could not report, or GitHub's e-mail would come on top of Telegram.
-  **The bot is not in `/health`**: after a rollout the API knows nothing of it for a minute, and the
-  rollout would roll back. Both ping URLs are kept like secrets — whoever has one can say «alive» —
-  and printed nowhere. The prices, accepted by the owner: a fall is noticed within twenty minutes,
-  not five, since GitHub's cron runs late; GitHub down is a false alarm. `deploy/README.md`,
-  «Signals».
+  rollout reads the body and is unchanged by it.
+  - **A `/fail` is three failures in four tries half a minute apart**: it raises the alarm with no
+    grace, and every merge leaves the API silent for seconds — a rollout fails one or two. All four
+    had to fail at first, and a site failing three requests in four passed as well (adversarial
+    Б1). Failing every second request still passes: the share of 5xx is MOL-145's, a named price.
+  - **One check, one state that can last.** healthchecks.io speaks only when a check flips, and a
+    certificate «expiring in 13 days» is down for days: on `molvia-up` it kept a fall of the API
+    silent the whole time (Б2). An unreadable certificate is the site's matter and pings nothing.
+  - **A run is red only when it could not report**, or GitHub's e-mail would come on top of
+    Telegram.
+  - **A check that never got a ping never raises an alarm** — it stays «new» (В1). So
+    `BOT_PULSE_URL` is required in `.env.prod` (`${…?}` in compose) and only empty on purpose, and
+    a check set up is seen turning green.
+  - **The bot is not in `/health`**: after a rollout the API knows nothing of it for a minute, and
+    the rollout would roll back. What its pulse proves is in `bot.md`.
+  - The periods sit a little above the pings' rhythm, so «late» does not light the panel all day;
+    period plus grace is the time to an alarm. Every ping URL is kept like a secret — whoever has
+    one can say «alive» — and printed nowhere. The prices, accepted by the owner: a fall is noticed
+    within twenty minutes, not five, since GitHub's cron runs late; GitHub down is a false alarm.
+    `deploy/README.md`, «Signals».
 - **A failed deploy puts the previous image back, not the schema.** Pending migrations run in
   one transaction, so a migration that fails leaves the schema as it was and the old image
   finds what it knew. One that succeeded while something else failed stays applied, and the

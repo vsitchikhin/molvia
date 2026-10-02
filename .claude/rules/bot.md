@@ -51,14 +51,24 @@ press — the only channel people are given, because there Telegram already says
 - **The bot keeps no state of its own.** The login code rides in the button's `callback_data`,
   which is Telegram's memory rather than ours, and everything else is asked of the API — the
   only write path there is. So nothing survives a restart, because nothing needs to.
-- **The pulse is the one thing the bot holds in memory** (MOL-142, `pulse.ts`): when its last ping
-  to healthchecks.io succeeded. A claim of reminders that went through — an empty one too — beats,
-  at most once in five minutes, counted from the last ping that succeeded, so a failed one is tried a
-  claim later; a ping on its way is not doubled, and none waits for an evening's messages. It proves
-  the bot reached the API and the internet, which «the process runs» does not. A restart forgets it
-  and costs one early ping. Without `BOT_PULSE_URL` — every copy and the end-to-end run — not one
-  request leaves; the URL is never logged, since whoever has it can say «alive» for the bot, and a
-  failure is logged by its kind. It is not in the API's `/health`: `deploy.md` says why.
+- **The pulse holds two moments in memory and nothing else** (MOL-142, `pulse.ts`): when its last
+  ping succeeded and when a `getUpdates` last did. A claim of reminders that went through beats at
+  most once in five minutes, by a monotonic clock — a wall clock stepped back an hour kept it silent
+  for an hour (adversarial А3) — and only while **the bot hears Telegram**: a `getUpdates` succeeded
+  within two minutes (`hearTelegram`, a transformer on the bot's own API). The claim alone proved
+  the API, not the sign-in: the runner retries a failing `getUpdates` for up to fifteen hours with
+  the process alive, and half an hour of Telegram down kept the pulse «alive» over a sign-in that
+  was dead (А1). **The first beat comes five minutes into the process**, never at once: a bot dying
+  on a revoked token or a second poller (`401`, `409`) beat on every restart of its crash loop
+  (А2). A failed ping is tried a claim later; one on its way is not doubled; none waits for an
+  evening's messages. Without `BOT_PULSE_URL` — every copy and the end-to-end run — not one request
+  leaves; the URL is never logged, and a failure is logged by its kind. It is not in the API's
+  `/health`: `deploy.md` says why.
+- **A failed `getUpdates` is retried at a pause growing by a tenth of a second a try**
+  (`retryInterval: 'quadratic'` in `startBot`), not the runner's doubling: after half an hour of
+  Telegram down the doubled pause had grown to some 27 minutes, and the sign-in stayed dead that
+  long after Telegram was back. Now it is seconds — and a stop during an outage waits out at most
+  that pause, since no stop cuts it short.
 - **Updates of different people are handled at once; updates of one person, in order** — and
   both halves are load-bearing (MOL-55, О-4). `bot.start()` handles updates strictly one after
   another, which is grammY's ordering guarantee and was measured costing the next person their
