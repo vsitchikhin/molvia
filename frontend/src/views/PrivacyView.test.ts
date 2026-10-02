@@ -74,6 +74,9 @@ it('names what stays after erasure in full — the items and the shops (adversar
   expect(text).toContain(ru.privacy.stored.places.term)
   // Selfreview 3: copies on the phone are out of the server's reach, and the page says so.
   expect(ru.privacy.erase.text).toMatch(/телефоне/)
+  // Both doors are named (MOL-94): the row in the settings and the bot's command.
+  expect(ru.privacy.erase.text).toMatch(/«Удалить мои данные»/)
+  expect(ru.privacy.erase.text).toMatch(/\/delete/)
 })
 
 it('names the country and the copies, and what a restore would undo (MOL-70)', async () => {

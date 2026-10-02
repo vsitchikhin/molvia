@@ -5,6 +5,9 @@
     </div>
 
     <div class="content">
+      <!-- Said once, right after «Удалить мои данные» (MOL-94, В-3): the same screen with no word
+           left «did it work?» open. -->
+      <p v-if="erased" class="erased"><IconCheck aria-hidden="true" />{{ t('login.erased') }}</p>
       <ScreenSkeleton v-if="phase === 'loading'" :groups="[70, 45]" />
 
       <ScreenState
@@ -125,15 +128,18 @@
 <script lang="ts">
 import { computed, defineComponent, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconCheck from '~icons/mdi/check'
 import IconSend from '~icons/mdi/send'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import UpdateBand from '@/components/UpdateBand.vue'
+import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
 import { purchaseDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
+import { takeErased } from '@/stores/identity'
 import { POLL_INTERVAL_MS, useLoginStore } from '@/stores/login'
 
 /**
@@ -151,7 +157,7 @@ import { POLL_INTERVAL_MS, useLoginStore } from '@/stores/login'
  */
 export default defineComponent({
   name: 'LoginView',
-  components: { AppButton, AppCard, ScreenSkeleton, ScreenState, UpdateBand },
+  components: { AppButton, AppCard, IconCheck, ScreenSkeleton, ScreenState, UpdateBand },
   setup() {
     const { t, locale } = useI18n()
     const login = useLoginStore()
@@ -200,11 +206,17 @@ export default defineComponent({
     // The tab is named by the screen that is actually shown. `installArrival` names it by the
     // route, and behind this door the route is a screen nobody can see yet.
     const before = document.title
+    // Taken as the screen is made: the mark goes as it is read, and a reload says nothing again.
+    const erased = takeErased()
+    const announce = useAnnouncer()
+    let withdraw: (() => void) | undefined
     onMounted(() => {
       document.title = `${t('login.title')} · ${t('app.name')}`
+      if (erased) withdraw = announce?.(t('login.erased'))
     })
     onBeforeUnmount(() => {
       document.title = before
+      withdraw?.()
     })
 
     return {
@@ -213,6 +225,7 @@ export default defineComponent({
       seam,
       insecure,
       account,
+      erased,
       IconSend,
       starting: computed(() => login.starting),
       begin: () => void login.begin(),
@@ -262,6 +275,24 @@ export default defineComponent({
   flex-direction: column;
   padding: var(--space-4) calc(var(--space-4) + var(--safe-right))
     calc(var(--space-4) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
+}
+
+.erased {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  background: var(--good-tint);
+  color: var(--good-ink);
+  font-size: var(--text-callout);
+
+  svg {
+    flex: none;
+    width: var(--space-6);
+    height: var(--space-6);
+  }
 }
 
 .account {

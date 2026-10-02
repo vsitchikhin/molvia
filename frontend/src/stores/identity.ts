@@ -31,6 +31,12 @@ export const LOGIN_KEY = 'molvia.login'
 /** «Выйти» was pressed for this owner and has not been confirmed yet (MOL-57, adversarial Б2). */
 const LEAVING_KEY = 'molvia.leaving'
 
+/**
+ * The server has just erased the person who used this device (MOL-94, В-3): the login screen says
+ * so once and takes the mark away. It names nobody — the drawer it would point at is gone.
+ */
+const ERASED_KEY = 'molvia.erased'
+
 /** What this browser is right now. `null` until `/actors/me` has answered once. */
 let current: string | null = null
 
@@ -202,3 +208,15 @@ export function forgetTheInviteDoor(): void {
 }
 
 export const IDENTITY_KEY = KEY
+
+/** Written right before the page is loaded afresh after «Удалить мои данные». */
+export function markErased(): void {
+  write(ERASED_KEY, '1')
+}
+
+/** Whether the login screen has to say the data is gone — once: the mark goes as it is read. */
+export function takeErased(): boolean {
+  const erased = read(ERASED_KEY) === '1'
+  if (erased) forget(ERASED_KEY)
+  return erased
+}

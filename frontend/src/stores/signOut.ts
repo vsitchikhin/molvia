@@ -4,7 +4,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import { api } from '@/api'
 import { useActorStore } from '@/stores/actor'
-import { clearLeaving, forgetOwner, leavingOwner, markLeaving } from '@/stores/identity'
+import { clearLeaving, forgetOwner, leavingOwner, markErased, markLeaving } from '@/stores/identity'
 import { whileQueueIsStill } from '@/stores/tripQueue'
 import { whileSpendingsAreStill } from '@/stores/spendingQueue'
 
@@ -36,7 +36,15 @@ function whileQueuesAreStill(owner: string, work: () => void): Promise<void> {
 }
 
 /**
- * «Выйти» on this device (MOL-57, owner's decisions Q1–Q3).
+ * The two doors out of this device: «Выйти» ends the session, «Удалить мои данные» erases the
+ * person and every session of theirs with them (MOL-94). Past the request they are one way out.
+ */
+export type WayOut = 'logout' | 'erase'
+
+/**
+ * «Выйти» on this device (MOL-57, owner's decisions Q1–Q3), and since MOL-94 «Удалить мои данные»
+ * through the same door: one intent — «this owner leaves this device» — and one ending, so the two
+ * cannot drift apart. Only the request differs, and what the login screen says after the reload.
  *
  * **The order is the whole of it: the server first, the phone after.** A session is ended by the
  * `204` of `POST /auth/logout`, and only then is anything erased — a tap whose request never
@@ -72,18 +80,21 @@ export const useSignOutStore = defineStore('signOut', () => {
    * queue's lock so a window sending it cannot write it back; then the page is loaded afresh at
    * `/`, the one sweep that forgets the stores' memory as well.
    */
-  async function finish(owner: string): Promise<void> {
+  async function finish(owner: string, way: WayOut = 'logout'): Promise<void> {
     if (finishing) return
     finishing = true
     actor.release()
     await whileQueuesAreStill(owner, () => {
       forgetOwner(owner)
     })
+    // Only the erasure's own `204` says it (В-3). One settled by the server's «nobody» after a lost
+    // answer may be a session that ended by itself, and the screen says nothing it does not know.
+    if (way === 'erase') markErased()
     window.location.replace('/')
   }
 
   /** Resolves only if it failed: on success the page is replaced and nothing after it runs. */
-  async function leave(): Promise<void> {
+  async function leave(way: WayOut = 'logout'): Promise<void> {
     const owner = actor.id
     if (leaving.value || !owner) return
     // Known offline before anything is sent — the approved plan's «only with a connection» — so
@@ -98,11 +109,15 @@ export const useSignOutStore = defineStore('signOut', () => {
     markLeaving(owner)
     const before = actor.heard
     try {
-      await api.logout()
+      await (way === 'erase' ? api.eraseMe() : api.logout())
     } catch (error) {
-      // Decided after the failure (MOL-19, A1).
-      failure.value = connected() ? 'error' : 'offline'
       leaving.value = false
+      // A repeat of the erasure after a lost answer finds no session: the server did its part the
+      // first time. That refusal is not the word that settles it — `me()` is, and the seam in
+      // `api.ts` has asked it — so the sheet waits for it rather than say that nothing happened.
+      const gone = way === 'erase' && error instanceof ApiError && error.code === ERROR.NO_ACTOR
+      // Decided after the failure (MOL-19, A1).
+      if (!gone) failure.value = connected() ? 'error' : 'offline'
       if (notReached(error)) {
         clearLeaving()
         return
@@ -113,7 +128,7 @@ export const useSignOutStore = defineStore('signOut', () => {
       if (actor.heard !== before && actor.nobody) void finish(owner)
       return
     }
-    await finish(owner)
+    await finish(owner, way)
   }
 
   /**

@@ -254,3 +254,25 @@ it('leads to «Data and privacy», which opens without a session', async () => {
   expect(router.currentRoute.value.name).toBe('privacy')
   expect(router.currentRoute.value.meta.public).toBe(true)
 })
+
+describe('после «Удалить мои данные» (MOL-94, В-3)', () => {
+  it('говорит, что данные удалены, один раз — и убирает отметку', async () => {
+    localStorage.setItem('molvia.erased', '1')
+    sessionStorage.setItem('molvia.erased', '1')
+
+    const first = await render()
+    expect(first.view.text()).toContain(en.login.erased)
+    expect(first.view.text()).toContain(en.login.offer.title)
+    expect(localStorage.getItem('molvia.erased')).toBeNull()
+    expect(sessionStorage.getItem('molvia.erased')).toBeNull()
+    first.view.unmount()
+
+    const again = await render()
+    expect(again.view.text()).not.toContain(en.login.erased)
+  })
+
+  it('без отметки — обычный экран входа: «Выйти» ничего такого не говорит', async () => {
+    const { view } = await render()
+    expect(view.text()).not.toContain(en.login.erased)
+  })
+})

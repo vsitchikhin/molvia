@@ -17,7 +17,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 ## backend · routes
 
 - `backend/src/routes/actor.ts` — `withActor`: the hook of the guarded scope that turns the session cookie into `actorId`, `actor` and `sessionId`, and re-sets a slid cookie. Tests: `backend/tests/sessions-auth.integration.test.ts`.
-- `backend/src/routes/actors.ts` — Route `GET /actors/me` («who am I»), and `answerWithActor`, the one way an owner leaves the server; `GET /actors/me/export`, «Скачать мои данные» (MOL-93, `export-route.integration.test.ts`). Tests: `backend/tests/actors.integration.test.ts`.
+- `backend/src/routes/actors.ts` — Route `GET /actors/me` («who am I»), and `answerWithActor`, the one way an owner leaves the server; `GET /actors/me/export`, «Скачать мои данные» (MOL-93, `export-route.integration.test.ts`); `DELETE /actors/me`, «Удалить мои данные» (MOL-94, `erase-route.integration.test.ts`). Tests: `backend/tests/actors.integration.test.ts`.
 - `backend/src/routes/auth.ts` — Routes of the browser's login: start `POST /auth/login` (with `?again=1` from a device repeating a login), poll `GET /auth/login/:id`, and the way out `POST /auth/logout`. Tests: `backend/tests/login.integration.test.ts`.
 - `backend/src/routes/dev-login.ts` — Route `POST /dev/login`: the development sign-in seam with no Telegram, absent from the production bundle. Tests: `backend/tests/identity-hardening.integration.test.ts`.
 - `backend/src/routes/internal-auth.ts` — The bot's internal routes behind `BOT_API_SECRET`: preview, confirm and decline a login, `POST /internal/actors/erase`, and the rating reminder's `POST /internal/reminders/claim` and `PUT /internal/verdicts/:itemId` (MOL-101). Tests: `backend/tests/login.integration.test.ts`.
@@ -67,7 +67,8 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 ## frontend · views
 
 - `frontend/src/views/DevicesView.vue` — «Устройства» screen under «Настройки»: every live session, this device first and marked, «Завершить» on the others.
-- `frontend/src/views/LoginView.vue` — The login screen `App.vue` draws in place of any route: «Войти через Telegram», the wait for the bot, the whose-account question, the dev seam.
+- `frontend/src/views/LoginView.vue` — The login screen `App.vue` draws in place of any route: «Войти через Telegram», the wait for the bot, the whose-account question, the dev seam; once after «Удалить мои данные», «Ваши данные удалены» (MOL-94).
+- `frontend/src/views/SettingsErase.test.ts` — Component test: «Удалить мои данные» in «Ваши данные» names what goes and what stays, erases the device only after the server's `204` and marks it for the login screen, is inactive offline, settles a lost answer by the server's «nobody» (MOL-94).
 - `frontend/src/views/SettingsSignOut.test.ts` — Component test: «Выйти» in «Настройки» asks first, counts what would be lost, erases the device only after the server's answer, is inactive offline.
 
 ## frontend · components
@@ -85,7 +86,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 - `frontend/src/stores/actor.ts` — Store: the identity's state (loading, ready, offline, error, signed-out) — `me()` at start, `verify()` after a refusal, `release` on sign-out.
 - `frontend/src/stores/identity.ts` — The drawer's name on the device: the cached owner id, the `molvia.login` key, the `molvia.leaving` intent and `forgetOwner`, which sweeps an owner's keys.
 - `frontend/src/stores/login.ts` — Store: the login on the device — the started request, the owner the person approved, the `tried` mark that makes the next start a repeat, the poll, and `closed`, the door's one definition.
-- `frontend/src/stores/signOut.ts` — Store: «Выйти» — the server first, then the drawer erased; keeps the intent until the server's next answer settles it.
+- `frontend/src/stores/signOut.ts` — Store: the way out of this device, «Выйти» or «Удалить мои данные» (MOL-94) — the server first, then the drawer erased; keeps the intent until the server's next answer settles it.
 
 ## e2e
 

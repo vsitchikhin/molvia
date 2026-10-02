@@ -40,6 +40,16 @@
           </div>
         </AppReveal>
       </li>
+      <!-- Under the copy, so the copy is one row above it (MOL-94, owner's decision В-2). -->
+      <li>
+        <button class="entry erase" type="button" @click="eraseOpen = true">
+          <IconDelete class="entry-icon" aria-hidden="true" />
+          <span class="entry-text">
+            <span class="entry-label">{{ t('settings.erase.label') }}</span>
+            <span class="entry-hint">{{ t('settings.erase.hint') }}</span>
+          </span>
+        </button>
+      </li>
       <li>
         <RouterLink class="entry" :to="{ name: 'privacy' }">
           <IconShield class="entry-icon" aria-hidden="true" />
@@ -48,6 +58,13 @@
         </RouterLink>
       </li>
     </AppCard>
+    <EraseSheet
+      v-model:open="eraseOpen"
+      :busy="signOut.leaving"
+      :offline="!online"
+      :failure="signOut.failure"
+      @confirm="signOut.leave('erase')"
+    />
   </section>
 </template>
 
@@ -57,17 +74,20 @@ import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconChevron from '~icons/mdi/chevron-right'
 import IconCloud from '~icons/mdi/cloud-off-outline'
+import IconDelete from '~icons/mdi/delete-outline'
 import IconDownload from '~icons/mdi/tray-arrow-down'
 import IconShield from '~icons/mdi/shield-account-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
+import EraseSheet from '@/components/EraseSheet.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExport } from '@/composables/useExport'
+import { useSignOutStore } from '@/stores/signOut'
 
 /**
- * «Ваши данные» (MOL-93, В-2): the copy of everything kept, and the page that says what is kept.
- * Turning off the log (MOL-96) and erasing the account join them here.
+ * «Ваши данные» (MOL-93, В-2): the copy of everything kept, erasing all of it (MOL-94) and the page
+ * that says what is kept. Turning off the log (MOL-96) joins them here.
  */
 export default defineComponent({
   name: 'YourDataGroup',
@@ -75,9 +95,11 @@ export default defineComponent({
     AppButton,
     AppCard,
     AppReveal,
+    EraseSheet,
     IconAlert,
     IconChevron,
     IconCloud,
+    IconDelete,
     IconDownload,
     IconShield,
   },
@@ -105,7 +127,14 @@ export default defineComponent({
       exporting.handOver()
       row.value?.focus()
     }
-    return { t, id: useId(), row, ...exporting, retry, handOverFromCard }
+    // «Удалить мои данные» leaves through the door «Выйти» does (MOL-94): closing the sheet after a
+    // failure asks the server rather than drop the intent, as there.
+    const signOut = useSignOutStore()
+    const eraseOpen = ref(false)
+    watch(eraseOpen, (open) => {
+      if (!open) signOut.stay()
+    })
+    return { t, id: useId(), row, ...exporting, retry, handOverFromCard, signOut, eraseOpen }
   },
 })
 </script>
@@ -169,6 +198,14 @@ export default defineComponent({
 .entry-hint {
   color: var(--text-muted);
   font-size: var(--text-footnote);
+}
+
+// The colour of an action that ends something, as «Выйти» beside it (MOL-57).
+.erase {
+  &,
+  .entry-icon {
+    color: var(--bad-ink);
+  }
 }
 
 .failed,
