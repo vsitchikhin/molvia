@@ -19,6 +19,7 @@ import {
   moneyAccountChecks,
   moneyAccounts,
   moneyMonthRates,
+  budgetPlans,
   places,
   searchPicks,
   spendingCategories,
@@ -77,6 +78,7 @@ async function snapshot(actorId: string) {
       .from(spendingCategories)
       .where(eq(spendingCategories.actorId, actorId)),
     monthRates: await db.select().from(moneyMonthRates).where(eq(moneyMonthRates.actorId, actorId)),
+    plans: await db.select().from(budgetPlans).where(eq(budgetPlans.actorId, actorId)),
     accounts: await db.select().from(moneyAccounts).where(eq(moneyAccounts.actorId, actorId)),
     checks: await db
       .select()
@@ -119,6 +121,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
         exchanges: 2,
         incomes: 2,
         spendings: 2,
+        budget_plans: 1,
         spending_categories: 1,
         money_month_rates: 1,
         money_account_checks: 1,

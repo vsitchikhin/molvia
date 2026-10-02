@@ -2,6 +2,8 @@ import { z } from 'zod'
 import {
   DomainError,
   ERROR,
+  budgetPlanBodySchema,
+  moneyBudgetCodec,
   moneyChartMonthCodec,
   moneyChartYearCodec,
   moneyMonthCodec,
@@ -16,7 +18,9 @@ import {
   yearSchema,
 } from '@molvia/model'
 import type {
+  BudgetPlanBody,
   JournalKey,
+  MoneyBudgetView,
   MoneyChartMonthView,
   MoneyChartYearView,
   MoneyMonthView,
@@ -47,6 +51,8 @@ export interface SpendingsApi {
   month(actor: Asking, month: string, cursor?: JournalKey): Promise<MoneyMonthView>
   chartMonth(actor: Asking, month: string): Promise<MoneyChartMonthView>
   chartYear(actor: Asking, year: string): Promise<MoneyChartYearView>
+  budget(actor: Asking, month: string): Promise<MoneyBudgetView>
+  setBudgetPlan(actor: Asking, body: BudgetPlanBody): Promise<MoneyBudgetView>
   salaryShift(actor: Asking): Promise<SalaryShift>
   setSalaryShift(actor: Asking, body: SalaryShift): Promise<SalaryShift>
 }
@@ -186,6 +192,26 @@ export function spendingRoutes(app: FastifyInstance, api: SpendingsApi): void {
       return privately(reply).send(z.encode(moneyChartYearCodec, view))
     },
   )
+
+  /** «Бюджет» (MOL-117): the month's plans against what was spent, counted by the server. */
+  app.get<{ Params: { month: string } }>(
+    '/money/months/:month/budget',
+    { exposeHeadRoute: false },
+    async (request, reply) => {
+      const month = monthSchema.safeParse(request.params.month)
+      if (!month.success) throw new DomainError(ERROR.NOT_FOUND)
+      parseQuery(z.strictObject({}), request.query)
+      const view = await api.budget(ownerOf(request), month.data)
+      return privately(reply).send(z.encode(moneyBudgetCodec, view))
+    },
+  )
+
+  /** A plan from a month on (В-1), answered with that month's budget; 404 for a category not one's own. */
+  app.put('/budget/plans', async (request, reply) => {
+    const body = parseBody(budgetPlanBodySchema, request.body)
+    const view = await api.setBudgetPlan(ownerOf(request), body)
+    return privately(reply).send(z.encode(moneyBudgetCodec, view))
+  })
 
   /** «Зарплата с … числа — в следующий месяц» (MOL-134, В-3): the month's rule of «Пришло». */
   app.get('/actors/me/salary-shift', { exposeHeadRoute: false }, async (request, reply) =>

@@ -12,6 +12,7 @@ import {
   moneyAccountChecks,
   moneyAccounts,
   moneyMonthRates,
+  budgetPlans,
   ratingReminders,
   searchPicks,
   spendingCategories,
@@ -137,6 +138,14 @@ export async function aLife(
     scaled: 4_100_000n,
     source: 'personal',
     asOf: new Date('2026-08-30T20:00:00Z'),
+  })
+  // What the person plans a month at (MOL-117): one plan of the category, theirs too.
+  await db.insert(budgetPlans).values({
+    actorId,
+    categoryId,
+    fromMonth: '2026-09',
+    amountMinor: 3_000_000n,
+    currency: 'AMD',
   })
   // Where the money lay (MOL-115): an account, a check of it, and operations of every kind on it.
   const accountId = randomUUID()

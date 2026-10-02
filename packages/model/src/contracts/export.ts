@@ -26,8 +26,8 @@ export const EXPORT_FORMAT = 'molvia-export'
 // the sum typed from the receipt, when it last changed and when it was first typed (MOL-78). 4: an
 // exchange's `channel` (MOL-137). 5: `addedBarcodes`, the codes the person wrote to items of the
 // catalogue (MOL-100). 6: the account's `remindersOff`, whether and why the bot does not remind
-// (MOL-103).
-export const EXPORT_VERSION = 6
+// (MOL-103). 7: `budgetPlans`, what the person plans a month of «Бюджет» at (MOL-117).
+export const EXPORT_VERSION = 7
 
 const day = z.iso.date()
 
@@ -276,6 +276,18 @@ const monthRateSchema = z.strictObject({
   rate: rateCodec,
 })
 
+const budgetPlanSchema = z.strictObject({
+  categoryId: z.uuid().nullable(),
+  from: z.string().regex(/^\d{4}-\d{2}$/),
+  plan: z
+    .discriminatedUnion('kind', [
+      z.strictObject({ kind: z.literal('amount'), amount: signedMoneyCodec }),
+      z.strictObject({ kind: z.literal('share'), percent: z.int() }),
+    ])
+    .nullable(),
+  updatedAt: isoDate,
+})
+
 const moneyAccountSchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
@@ -351,6 +363,7 @@ export const exportContentCodec = z.strictObject({
   spendings: z.array(spendingSchema),
   spendingCategories: z.array(spendingCategorySchema),
   monthRates: z.array(monthRateSchema),
+  budgetPlans: z.array(budgetPlanSchema),
   moneyAccounts: z.array(moneyAccountSchema),
   accountChecks: z.array(accountCheckSchema),
   proposedItems: z.array(proposedItemSchema),

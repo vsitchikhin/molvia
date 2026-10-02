@@ -170,6 +170,16 @@ const file: ExportFile = {
     { id: id(14), preset: null, name: 'Такси', colour: 0, archivedAt: null, createdAt: at },
   ],
   monthRates: [{ month: '2026-08', rate: { ...rate, source: 'personal' } }],
+  budgetPlans: [
+    {
+      categoryId: id(14),
+      from: '2026-09',
+      plan: { kind: 'amount', amount: money(25_000_000n, 'AMD') },
+      updatedAt: at,
+    },
+    { categoryId: null, from: '2026-09', plan: { kind: 'share', percent: 25 }, updatedAt: at },
+    { categoryId: id(14), from: '2026-11', plan: null, updatedAt: at },
+  ],
   moneyAccounts: [
     {
       id: id(6),
@@ -232,7 +242,11 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(6)
+    expect(wire.version).toBe(7)
+    expect(wire.budgetPlans[0]?.plan).toEqual({
+      kind: 'amount',
+      amount: { amount: '250000.00', currency: 'AMD' },
+    })
   })
 
   it('reads its own file back into the same values', () => {

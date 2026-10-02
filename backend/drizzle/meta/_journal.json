@@ -260,6 +260,13 @@
       "when": 1790923898731,
       "tag": "0036_reminders_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1790939087549,
+      "tag": "0037_budget_plans",
+      "breakpoints": true
     }
   ]
 }

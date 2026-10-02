@@ -223,6 +223,9 @@ function repositoriesOf(world: World) {
       firstSpentDay: () =>
         Promise.resolve((world.spendings ?? []).map((one) => one.spentOn).sort()[0] ?? null),
     }),
+    budgetPlans: fake<TripRepositories['budgetPlans']>('budgetPlans', {
+      list: () => Promise.resolve([]),
+    }),
   }
   return { repositories, asked, frozen, written }
 }

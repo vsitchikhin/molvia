@@ -63,6 +63,7 @@ function month(spentOn: string): MoneyMonthView {
     rest: null,
     accountsFrom: null,
     accountsRemoved: false,
+    budget: null,
     rate: { base: 'RUB', quote: 'AMD', scaled: 4_620_000n, source: 'personal', asOf: new Date() },
     rateKind: 'live',
     previousSpent: amd('345620'),

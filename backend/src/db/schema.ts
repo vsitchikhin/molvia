@@ -22,6 +22,7 @@ import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import {
+  BUDGET_PERCENT_MAX,
   DEVICE_NAME_MAX,
   EVENT,
   LOGIN_CODE_MAX,
@@ -1359,6 +1360,62 @@ export const moneyMonthRates = pgTable(
     check('money_month_rates_quote_known', oneOf(table.quote, currencySchema.options)),
     check('money_month_rates_source_known', oneOf(table.source, rateSourceSchema.options)),
     check('money_month_rates_month_shape', sql`${table.month} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+  ],
+)
+
+/**
+ * A person's budget of a month (MOL-117): what a category is planned at — a sum in the spending
+ * currency or a whole percent of «Пришло» — **from a month on** (В-1), until a later row of the same
+ * category takes over, so a plan set once carries over and a change leaves the months before it as
+ * they were. Neither a sum nor a percent is «no plan from this month». `category_id` null is the
+ * savings target (В-4), a percent only. Private as a spending; it goes with its owner.
+ */
+export const budgetPlans = pgTable(
+  'budget_plans',
+  {
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    categoryId: uuid('category_id'),
+    fromMonth: char('from_month', { length: 7 }).notNull(),
+    amountMinor: bigint('amount_minor', { mode: 'bigint' }),
+    currency: char('currency', { length: 3 }).$type<Currency>(),
+    percent: smallint('percent'),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    // One plan of a category a month; the savings target, `category_id` null, is one too.
+    unique('budget_plans_actor_category_month_key')
+      .on(table.actorId, table.categoryId, table.fromMonth)
+      .nullsNotDistinct(),
+    // The category is the owner's own, as a spending's is: the pair, not the id alone.
+    foreignKey({
+      name: 'budget_plans_category_is_owners',
+      columns: [table.categoryId, table.actorId],
+      foreignColumns: [spendingCategories.id, spendingCategories.actorId],
+    }),
+    check('budget_plans_month_shape', sql`${table.fromMonth} ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'`),
+    check(
+      'budget_plans_one_kind',
+      sql`(${table.amountMinor} is null) = (${table.currency} is null)
+        and not (${table.amountMinor} is not null and ${table.percent} is not null)`,
+    ),
+    check(
+      'budget_plans_amount_non_negative',
+      sql`${table.amountMinor} is null or ${table.amountMinor} >= 0`,
+    ),
+    check('budget_plans_currency_known', currencyKnownOrNull(table.currency)),
+    check(
+      'budget_plans_percent_range',
+      sql`${table.percent} is null or ${table.percent} between 0 and ${sql.raw(String(BUDGET_PERCENT_MAX))}`,
+    ),
+    // Putting aside is no spending: the savings target is a percent, never a sum.
+    check(
+      'budget_plans_savings_is_share',
+      sql`${table.categoryId} is not null or ${table.amountMinor} is null`,
+    ),
   ],
 )
 

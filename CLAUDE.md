@@ -244,7 +244,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   (`ZONE_HEADER`), and every «today» of money and every day of a moment the server stamped is
   counted by them; a write is «in the future» only past `latestDay`; a trip keeps
   the phone's day of its taps. The frontend's tests run in UTC.
-- **«Деньги» is the month's summary, «Траты» its journal** (MOL-159): five ways out with one figure
+- **«Деньги» is the month's summary, «Траты» its journal** (MOL-159): six ways out with one figure
   each, every figure from an answer the screen already has — the counts are the server's (`count`,
   `incomeCount`); the tiles are figures, not buttons; a spending of another month moves «Траты»,
   never the summary.
@@ -255,6 +255,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   **«Год» is the calendar year, the sum of its months** (MOL-160): its dashed line is that same
   usual month, ending with the year's last closed one, and a month before the data or to come is a
   label with no bar.
+- **«Бюджет» is the month of «Деньги» against plans** (MOL-117): a plan holds from its month on and a
+  write replaces the later ones of its category; a sum in the spending currency or a whole percent
+  of «Пришло» by the month's rate; what was spent is `byCategory`, never a second count; over the
+  plan is a warning, never red; written with a connection only.
 
 ### Money: accounts — `.claude/rules/money-accounts.md`
 
