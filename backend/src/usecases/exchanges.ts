@@ -268,40 +268,61 @@ export function officialAcross(
  * the central bank instead (handoff 05).
  */
 export function marketLossesOf(
+  measures: ReadonlyMap<string, ExchangeLossInput>,
+  spend: Currency,
+): ExchangesResponse['losses'] {
+  const losses = exchangeLosses([...measures.values()], spend)
+  return losses && exchangeLossesViewOf(losses)
+}
+
+/** The first day of the twelve months «Обмены против рынка» and the line of the rate look back on. */
+function windowFrom(today: string): string {
+  const current = monthOf(today)
+  return `${chartMonths(current, EXCHANGE_LOSS_MONTHS)[0] ?? current}-01`
+}
+
+/**
+ * Each exchange of the twelve months as «Обмены против рынка» measures it, by its id: the sum is
+ * made of these, and a point of the line of the rate takes its percent from the very same drams
+ * (MOL-161, adversarial В) — counted apart, the two rounded at different places and «−0,67 %» stood
+ * beside «−0,66 %» for one exchange.
+ */
+export function marketMeasuresOf(
   views: readonly ExchangeView[],
   cached: ReadonlyMap<string, readonly CachedRate[]>,
   spend: Currency,
   today: string,
-): ExchangesResponse['losses'] {
-  const current = monthOf(today)
-  const from = `${chartMonths(current, EXCHANGE_LOSS_MONTHS)[0] ?? current}-01`
-  const inputs = views
-    .filter(({ exchangedOn }) => exchangedOn >= from && exchangedOn <= today)
-    .map((view): ExchangeLossInput => {
-      const { note, exchangedOn, received } = view
-      const unknown = { note, exchangedOn, difference: null, expected: null }
-      const measure = view.market?.own ?? view.market?.best
-      if (!measure) return unknown
-      const { difference } = measure
-      // What the market would have given for the same money: what came, less what came beyond it.
-      const expected = { minor: received.minor - difference.minor, currency: received.currency }
-      if (received.currency === spend) return { note, exchangedOn, difference, expected }
-      const rate = officialAcross(
-        received.currency,
-        spend,
-        cached.get(exchangedOn) ?? [],
-        exchangedOn,
-      )
-      const inSpend = rate && {
-        difference: convertSigned(difference, rate),
-        expected: convertAcross(expected, rate),
-      }
-      return inSpend?.difference && inSpend.expected
-        ? { note, exchangedOn, difference: inSpend.difference, expected: inSpend.expected }
-        : unknown
-    })
-  const losses = exchangeLosses(inputs, spend)
-  return losses && exchangeLossesViewOf(losses)
+): ReadonlyMap<string, ExchangeLossInput> {
+  const from = windowFrom(today)
+  return new Map(
+    views
+      .filter(({ exchangedOn }) => exchangedOn >= from && exchangedOn <= today)
+      .map((view) => [view.id, marketMeasureOf(view, cached, spend)]),
+  )
+}
+
+/** One exchange against its market, in the spending currency, or unknown — «без сравнения». */
+function marketMeasureOf(
+  view: ExchangeView,
+  cached: ReadonlyMap<string, readonly CachedRate[]>,
+  spend: Currency,
+): ExchangeLossInput {
+  const { note, exchangedOn, received } = view
+  const unknown = { note, exchangedOn, difference: null, expected: null }
+  const measure = view.market?.own ?? view.market?.best
+  if (!measure) return unknown
+  const { difference } = measure
+  // What the market would have given for the same money: what came, less what came beyond it.
+  const expected = { minor: received.minor - difference.minor, currency: received.currency }
+  if (received.currency === spend) return { note, exchangedOn, difference, expected }
+  const rate = officialAcross(received.currency, spend, cached.get(exchangedOn) ?? [], exchangedOn)
+  const inSpend = rate && {
+    difference: convertSigned(difference, rate),
+    expected: convertAcross(expected, rate),
+  }
+  return inSpend?.difference && inSpend.expected
+    ? { note, exchangedOn, difference: inSpend.difference, expected: inSpend.expected }
+    : unknown
 }
 
 /**
@@ -526,11 +547,11 @@ export async function ownMoney(
 export async function rateChartOf(
   { marketRates }: Pick<Repositories, 'marketRates'>,
   views: readonly ExchangeView[],
+  measures: ReadonlyMap<string, ExchangeLossInput>,
   income: Currency,
   today: string,
 ): Promise<ExchangesResponse['rateChart']> {
-  const current = monthOf(today)
-  const from = `${chartMonths(current, EXCHANGE_LOSS_MONTHS)[0] ?? current}-01`
+  const from = windowFrom(today)
   const pairs = rateChartPairs(views, from, today, income)
   if (pairs.length === 0) return null
   const rows = await marketRates.series(
@@ -542,7 +563,14 @@ export async function rateChartOf(
   )
   const chart = rateChart(
     pairs.map((pair) => ({ ...pair, rows })),
-    views,
+    views.map((view) => {
+      const measure = measures.get(view.id)
+      const measured =
+        measure?.difference && measure.expected
+          ? { difference: measure.difference.minor, expected: measure.expected.minor }
+          : null
+      return { ...view, measured }
+    }),
     from,
     today,
   )
@@ -577,7 +605,8 @@ export async function exchangesOverview(
   )
   const { base, quote, rates } = money
   const views = viewsOf(money.exchanges, money.cached, history, market, exchangersThrough, today)
-  const chart = await rateChartOf(repositories, views, owner.incomeCurrency, today)
+  const measures = marketMeasuresOf(views, money.cached, owner.spendCurrency, today)
+  const chart = await rateChartOf(repositories, views, measures, owner.incomeCurrency, today)
   return {
     preference: money.preference,
     pair: base === quote ? null : { base, quote },
@@ -589,7 +618,7 @@ export async function exchangesOverview(
     exchanges: views,
     receipts: [...money.receipts],
     marketToday: marketTodayOf(latest, official, today),
-    losses: marketLossesOf(views, money.cached, owner.spendCurrency, today),
+    losses: marketLossesOf(measures, owner.spendCurrency),
     rateChart: chart,
   }
 }

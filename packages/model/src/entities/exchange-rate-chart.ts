@@ -48,6 +48,13 @@ export interface RateChartExchangeInput {
   readonly note: string | null
   readonly rate: ExchangeRate | null
   readonly market: { readonly best: QuoteInput; readonly own: QuoteInput | null } | null
+  /**
+   * The exchange as «Обмены против рынка» measures it — what it gave beyond the market and what the
+   * market would have given, both in the spending currency — so a point's percent is the very
+   * number of a place of one there, rounded from the same drams (adversarial В). Null: it is
+   * «без сравнения» there, and the point has no percent.
+   */
+  readonly measured: { readonly difference: bigint; readonly expected: bigint } | null
 }
 
 /** One currency against the dram, and the bank's side its line is drawn on. */
@@ -125,7 +132,7 @@ export function weekRate(rows: readonly MarketRate[], end: string): MarketRate |
  * conversion on the side of selling it, when it is not the dram: a newcomer sees the line alone.
  */
 export function rateChartPairs(
-  exchanges: readonly RateChartExchangeInput[],
+  exchanges: readonly Pick<RateChartExchangeInput, 'exchangedOn' | 'given' | 'received'>[],
   from: string,
   today: string,
   income: Currency,
@@ -172,6 +179,24 @@ export function rateLevels(lowest: bigint, highest: bigint): bigint[] {
     }
   }
   return [divideRounded(lowest + highest, 2n * MIN_STEP) * MIN_STEP]
+}
+
+/** The narrowest scale, in hundredths of the middle figure (adversarial Г2). */
+const SCALE_PERCENT = 1n
+
+/**
+ * The figures the card's height spans: the lowest to the highest, and no narrower than a hundredth
+ * of their middle — and two steps of the axis — around it (adversarial Г2). Stretched over the
+ * figures alone, a year of one rate with an exchange 0,07 % off it drew that 0,07 % the whole height
+ * of the card; a year of the market spans ten percent and more, and is drawn as it is.
+ */
+export function rateScale(lowest: bigint, highest: bigint): [bigint, bigint] {
+  const middle = (lowest + highest) / 2n
+  const least = (middle * SCALE_PERCENT) / 100n
+  const span = least > 2n * MIN_STEP ? least : 2n * MIN_STEP
+  if (highest - lowest >= span) return [lowest, highest]
+  const from = middle - span / 2n
+  return [from, from + span]
 }
 
 /** A rate kept with the dram as its quote — drams per unit, the side every figure here is on. */
@@ -229,17 +254,20 @@ export function rateChart(
         const scaled = inDrams(exchange.rate, currency)
         if (scaled === null) return []
         const offered = exchange.market?.own ?? exchange.market?.best ?? null
-        // What the market would have given for the same money, as «Обмены против рынка» has it —
-        // and where that is nothing, no comparison, as it leaves such an exchange out of its sum.
+        // A market that would have given nothing for the money is no market to draw a mark to.
         const expected = offered ? exchange.received.minor - offered.difference.minor : 0n
         const measure = expected > 0n ? offered : null
         const market = measure && inDrams(measure.rate, currency)
+        const { measured } = exchange
         return [
           {
             exchange,
             scaled,
             market: measure && market !== null ? { scaled: market, measure } : null,
-            percent: measure ? hundredthsOf(measure.difference.minor, expected) : null,
+            percent:
+              measured && measured.expected > 0n
+                ? hundredthsOf(measured.difference, measured.expected)
+                : null,
           },
         ]
       })
@@ -255,19 +283,15 @@ export function rateChart(
       ...weeks.flatMap(({ row }) => (row ? [row.scaled] : [])),
       ...own.flatMap((point) => [point.scaled, ...(point.market ? [point.market.scaled] : [])]),
     ]
-    const ticks = rateLevels(
+    // The heights span the scale, never stretched to a tick: every tick lies within it — a single
+    // one is rounded off the middle by half a step at most, and the scale is two steps wide.
+    const [lowest, highest] = rateScale(
       figures.reduce((least, value) => (value < least ? value : least)),
       figures.reduce((most, value) => (value > most ? value : most)),
     )
-    // The heights are of the figures alone: a single tick rounded to two digits may fall outside
-    // them, and stretching the scale to it pressed a flat line to the top of the card.
-    const lowest = figures.reduce((least, value) => (value < least ? value : least))
-    const highest = figures.reduce((most, value) => (value > most ? value : most))
+    const ticks = rateLevels(lowest, highest)
     const levelAt = (scaled: bigint) =>
-      highest === lowest
-        ? CHART_LEVEL / 2
-        : Number(divideRounded((scaled - lowest) * BigInt(CHART_LEVEL), highest - lowest))
-    const tickAt = (scaled: bigint) => Math.min(CHART_LEVEL, Math.max(0, levelAt(scaled)))
+      Number(divideRounded((scaled - lowest) * BigInt(CHART_LEVEL), highest - lowest))
 
     return [
       {
@@ -298,7 +322,7 @@ export function rateChart(
         })),
         levels: ticks.map((scaled) => ({
           rate: drams(currency, scaled, today),
-          level: tickAt(scaled),
+          level: levelAt(scaled),
         })),
       },
     ]

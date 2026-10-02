@@ -520,6 +520,26 @@ describe('«Курс рубля за 12 месяцев» на «Обмене д�
     expect(pair?.exchanges.map(({ rate }) => rate.scaled)).toEqual([parseRate('4.6')])
   })
 
+  it('купил рубли за драмы — процент точки тот же, что у места в «Обменах против рынка» (adversarial В)', async () => {
+    await market.upsert([figure('bankCash', '4.350000', day, 'bankSells')])
+    const { cookie } = await owner()
+    const answer = overviewOf(
+      (
+        await record(cookie, {
+          given: { amount: '437.91', currency: 'AMD' },
+          received: { amount: '100', currency: 'RUB' },
+          note: 'Ардшинбанк',
+        })
+      ).json(),
+    )
+    // −0,67 ₽ of 100,67 ₽ is −0,6655 %; in drams by the bank of the day, −2,89 ֏ of 434,76 ֏ — −0,66 %.
+    expect(answer.exchanges[0]?.market?.best.difference).toEqual({ minor: -67n, currency: 'RUB' })
+    const [group] = answer.losses?.groups ?? []
+    const [point] = answer.rateChart?.pairs[0]?.exchanges ?? []
+    expect(group?.percent).toBe(-66)
+    expect(point?.percent).toBe(group?.percent)
+  })
+
   it('чужие обмены не видны; удалённый уходит с графика, «Вернуть» его возвращает', async () => {
     const { cookie } = await owner()
     const stranger = await owner()

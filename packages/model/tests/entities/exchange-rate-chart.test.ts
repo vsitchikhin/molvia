@@ -3,6 +3,7 @@ import {
   rateChart,
   rateChartPairs,
   rateLevels,
+  rateScale,
   rateWeeks,
   weekRate,
 } from '#model/entities/exchange-rate-chart'
@@ -51,6 +52,8 @@ interface ExchangeOf {
   /** The market measured by: rate and difference in whole drams. */
   best?: { rate: string; difference: number; basis?: MarketChannel }
   own?: { rate: string; difference: number; basis?: MarketChannel }
+  /** As «Обмены против рынка» measured it, in minor units of the spending currency. */
+  measured?: { difference: bigint; expected: bigint } | null
 }
 
 function exchange(day: string, of: ExchangeOf = {}): RateChartExchangeInput {
@@ -70,7 +73,16 @@ function exchange(day: string, of: ExchangeOf = {}): RateChartExchangeInput {
     rate:
       of.rate === null ? null : drams(of.rate ?? '4.15', day, given === 'AMD' ? received : given),
     market: of.best ? { best: quote(of.best), own: of.own ? quote(of.own) : null } : null,
+    // Drams received: the measure of «Обмены против рынка» is the market's own difference.
+    measured:
+      of.measured === undefined ? measuredOf(of.own ?? of.best, of.amount ?? 41_500) : of.measured,
   }
+}
+
+function measuredOf(quote: { difference: number } | undefined, amount: number) {
+  if (!quote) return null
+  const difference = BigInt(quote.difference) * 100n
+  return { difference, expected: BigInt(amount) * 100n - difference }
 }
 
 describe('rateWeeks', () => {
@@ -132,6 +144,29 @@ describe('rateLevels', () => {
   it('gives one tick when three of two digits do not fit', () => {
     expect(rateLevels(parseRate('4.123'), parseRate('4.13'))).toEqual([parseRate('4.13')])
     expect(rateLevels(parseRate('4.150001'), parseRate('4.150001'))).toEqual([parseRate('4.15')])
+  })
+})
+
+describe('rateScale', () => {
+  it('spans the figures as they are when they are wider than a hundredth of their middle', () => {
+    expect(rateScale(parseRate('4.25'), parseRate('4.95'))).toEqual([
+      parseRate('4.25'),
+      parseRate('4.95'),
+    ])
+  })
+
+  it('widens a narrow span to a hundredth of its middle, around it', () => {
+    expect(rateScale(parseRate('4.60'), parseRate('4.6034'))).toEqual([
+      parseRate('4.578692'),
+      parseRate('4.624709'),
+    ])
+  })
+
+  it('never narrower than two steps of the axis', () => {
+    expect(rateScale(parseRate('1.00'), parseRate('1.00'))).toEqual([
+      parseRate('0.99'),
+      parseRate('1.01'),
+    ])
   })
 })
 
@@ -266,6 +301,39 @@ describe('rateChart', () => {
     expect(points[0]?.x).toBeLessThan(points[1]?.x ?? 0)
   })
 
+  it('takes the percent from the measure of «Обмены против рынка», drams and all (adversarial В)', () => {
+    // 100 ₽ bought for 437,91 ֏: −0,67 ₽ against the market, −2,89 ֏ of 434,76 ֏ once in drams.
+    const chart = rateChart(
+      [{ ...rub, side: 'bankSells', rows: [row('2026-09-25', '4.40', { side: 'bankSells' })] }],
+      [
+        exchange('2026-09-29', {
+          given: 'AMD',
+          received: 'RUB',
+          amount: 100,
+          rate: '4.3791',
+          best: { rate: '4.35', difference: 0 },
+          measured: { difference: -289n, expected: 43_476n },
+        }),
+      ],
+      FROM,
+      TODAY,
+    )
+    expect(chart?.pairs[0]?.exchanges[0]?.percent).toBe(-66)
+  })
+
+  it('has no percent where «Обмены против рынка» has no comparison', () => {
+    const chart = rateChart(
+      [rub],
+      [exchange('2026-09-29', { best: { rate: '4.11', difference: 400 }, measured: null })],
+      FROM,
+      TODAY,
+    )
+    expect(chart?.pairs[0]?.exchanges[0]).toMatchObject({
+      percent: null,
+      market: { basis: 'bankCash' },
+    })
+  })
+
   it('keeps two exchanges of one day in the order they were made, whatever their ids', () => {
     // The list comes newest first: the evening's exchange, then the morning's.
     const chart = rateChart(
@@ -322,7 +390,7 @@ describe('rateChart', () => {
     expect(pair?.exchanges[0]?.market?.level).toBe(0)
   })
 
-  it('stands at half height when every figure is one', () => {
+  it('stands at half height when every figure is one, on a scale of a hundredth of it', () => {
     const chart = rateChart(
       [{ ...rub, rows: [row('2026-09-25', '4.15')] }],
       [exchange('2026-09-29')],
@@ -330,11 +398,15 @@ describe('rateChart', () => {
       TODAY,
     )
     const pair = chart?.pairs[0]
-    expect(pair?.levels).toEqual([{ rate: drams('4.15', TODAY), level: CHART_LEVEL / 2 }])
+    expect(pair?.levels).toEqual([
+      { rate: drams('4.13', TODAY), level: 18 },
+      { rate: drams('4.15', TODAY), level: CHART_LEVEL / 2 },
+      { rate: drams('4.17', TODAY), level: 982 },
+    ])
     expect(pair?.exchanges[0]?.level).toBe(CHART_LEVEL / 2)
   })
 
-  it('keeps a flat line at half height when its one tick rounds off the figures', () => {
+  it('keeps a flat line off a round figure at half height, its ticks round within the scale', () => {
     const chart = rateChart(
       [{ ...rub, rows: [row('2026-09-25', '4.152')] }],
       [exchange('2026-09-29', { rate: '4.152' })],
@@ -342,20 +414,31 @@ describe('rateChart', () => {
       TODAY,
     )
     const pair = chart?.pairs[0]
-    expect(pair?.levels.map(({ rate }) => rate.scaled)).toEqual([parseRate('4.15')])
+    expect(pair?.levels.map(({ rate }) => rate.scaled)).toEqual(
+      ['4.14', '4.15', '4.16'].map(parseRate),
+    )
     expect(pair?.weeks.at(-1)?.level).toBe(CHART_LEVEL / 2)
     expect(pair?.exchanges[0]?.level).toBe(CHART_LEVEL / 2)
   })
 
-  it('gives each tick a height within the card when the figures are not flat', () => {
+  it('draws 0,07 % off a flat year as 0,07 %, not the whole height (adversarial Г2)', () => {
+    // A year of 4,60, and 10 000 ₽ changed for 46 034 ֏ on a day the market gave 46 000 ֏.
     const chart = rateChart(
-      [{ ...rub, rows: [row('2026-09-25', '4.152'), row('2026-10-01', '4.156')] }],
-      [],
+      [{ ...rub, rows: [row('2026-09-25', '4.60')] }],
+      [
+        exchange('2026-09-29', {
+          rate: '4.6034',
+          amount: 46_034,
+          best: { rate: '4.60', difference: 34 },
+        }),
+      ],
       FROM,
       TODAY,
     )
-    // 4,15 lies under the lowest figure: at the bottom, never below the card.
-    expect(chart?.pairs[0]?.levels).toEqual([{ rate: drams('4.15', TODAY), level: 0 }])
+    const point = chart?.pairs[0]?.exchanges[0]
+    expect(point?.percent).toBe(7)
+    // A scale of 0,046 around 4,6017: the point and its mark some 74 thousandths apart.
+    expect((point?.level ?? 0) - (point?.market?.level ?? 0)).toBe(74)
   })
 
   it("says the exchange's own rate is the person's", () => {

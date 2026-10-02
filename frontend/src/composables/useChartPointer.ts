@@ -3,6 +3,18 @@ import type { Ref } from 'vue'
 /** How far a finger goes before it has said which way — sideways chooses, down scrolls. */
 const INTENT_PX = 8
 
+/**
+ * Where on the area the pointer is, in pixels from its top left corner: a chart whose marks differ
+ * by height too — two exchanges of one day on the line of the rate (MOL-161, adversarial Б) — tells
+ * them apart by it. `y` is null where the area has no height to measure by.
+ */
+export interface ChartPoint {
+  readonly x: number
+  readonly y: number | null
+  readonly width: number
+  readonly height: number
+}
+
 export interface ChartPointer {
   readonly down: (event: PointerEvent) => void
   readonly move: (event: PointerEvent) => void
@@ -19,14 +31,21 @@ export interface ChartPointer {
  */
 export function useChartPointer(
   area: Ref<HTMLElement | null>,
-  pick: (fraction: number) => void,
+  pick: (fraction: number, point: ChartPoint) => void,
 ): ChartPointer {
   let touch: { x: number; y: number; sideways: boolean } | null = null
 
   function at(event: PointerEvent): void {
     const box = area.value?.getBoundingClientRect()
     if (!box || box.width <= 0) return
-    pick(Math.min(1, Math.max(0, (event.clientX - box.left) / box.width)))
+    const x = event.clientX - box.left
+    const height = box.height > 0 ? box.height : 0
+    pick(Math.min(1, Math.max(0, x / box.width)), {
+      x,
+      y: height > 0 ? event.clientY - box.top : null,
+      width: box.width,
+      height,
+    })
   }
 
   return {

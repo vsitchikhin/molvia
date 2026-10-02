@@ -140,6 +140,70 @@ describe('ExchangeRateChart (MOL-161)', () => {
     expect(view.find('.mine-rate').text()).toContain('23 февр.')
   })
 
+  it('of two exchanges of one day, the one the finger is on — by its height (adversarial Б)', async () => {
+    const morning = point('a0000000-0000-4000-8000-000000000005', '2026-02-24', 3, 571, {
+      place: 'Утро',
+      level: 200,
+    })
+    const evening = point('a0000000-0000-4000-8000-000000000006', '2026-02-24', 3, 571, {
+      place: 'Вечер',
+      level: 800,
+    })
+    const { view, area } = chart([rouble({ exchanges: [morning, evening] })])
+    // 300 × 180 px: a level is drawn at 1000 − 50 − level × 0.9 thousandths of the height.
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    const at = async (x: number, y: number) => {
+      area.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          clientX: x,
+          clientY: y,
+          pointerType: 'touch',
+          bubbles: true,
+        }),
+      )
+      area.dispatchEvent(
+        new PointerEvent('pointerup', {
+          clientX: x,
+          clientY: y,
+          pointerType: 'touch',
+          bubbles: true,
+        }),
+      )
+      await view.vm.$nextTick()
+    }
+    // «Утро» at level 200: y = (1000 − 50 − 180) × 0.18 = 138.6 px; «Вечер» at 800: 30.6 px.
+    await at(171, 139)
+    expect(view.find('.mine-place').text()).toContain('Утро')
+    await at(171, 31)
+    expect(view.find('.mine-place').text()).toContain('Вечер')
+    await at(171, 139)
+    expect(view.find('.mine-place').text()).toContain('Утро')
+  })
+
+  it('with a finger far across, the height does not take a mark from another week', async () => {
+    const { view, area } = chart()
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+    // Right at the first week's end, at the height of the exchange of 28 February far away.
+    area.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        clientX: 1,
+        clientY: 102,
+        pointerType: 'touch',
+        bubbles: true,
+      }),
+    )
+    area.dispatchEvent(
+      new PointerEvent('pointerup', {
+        clientX: 1,
+        clientY: 102,
+        pointerType: 'touch',
+        bubbles: true,
+      }),
+    )
+    await view.vm.$nextTick()
+    expect(view.find('.none').text()).toBe('Обменов на этой неделе не было')
+  })
+
   it('must not fire: a scroll that started on the chart chooses nothing', async () => {
     const { view, area } = chart()
     area.dispatchEvent(touch('pointerdown', 3, 50))
@@ -174,6 +238,18 @@ describe('ExchangeRateChart (MOL-161)', () => {
       '0,50 250,230',
       '750,545 1000,950',
     ])
+  })
+
+  it('draws a week with a figure between two gaps as a dot of the line (adversarial Д)', () => {
+    // Figures in the first, the third and the last week, a gap between each.
+    const weeks = rouble().weeks.map((week, index) =>
+      index % 2 === 1
+        ? { ...week, rate: null, level: null }
+        : { ...week, rate: rate('4.70', week.day), level: 600 },
+    )
+    const { view } = chart([rouble({ weeks, exchanges: [] })])
+    expect(view.findAll('polyline.line')).toHaveLength(0)
+    expect(view.findAll('.lone').map((dot) => dot.attributes('x1'))).toEqual(['0', '500', '1000'])
   })
 
   it('draws a mark to the market of the exchange only where it had one (В-1)', () => {

@@ -81,10 +81,20 @@
               vector-effect="non-scaling-stroke"
             />
             <polyline
-              v-for="(run, index) in runs"
+              v-for="(run, index) in lines"
               :key="index"
               class="line"
               :points="run"
+              vector-effect="non-scaling-stroke"
+            />
+            <line
+              v-for="spot in lone"
+              :key="`lone-${String(spot.x)}`"
+              class="line lone"
+              :x1="spot.x"
+              :y1="spot.y"
+              :x2="spot.x"
+              :y2="spot.y"
               vector-effect="non-scaling-stroke"
             />
             <template v-if="week && week.level !== null">
@@ -200,6 +210,8 @@ interface Item {
 
 /** The line keeps a twentieth of the plot clear above and below, so no dot is cut. */
 const MARGIN = 50
+/** How far across two marks may lie and still be one finger's choice, decided by height. */
+const FINGER_PX = 12
 /** Half the end of the mark, in thousandths of the plot's width. */
 const TICK = 14
 
@@ -319,36 +331,56 @@ export default defineComponent({
 
     /**
      * The nearest of what can be chosen, each by its own place on the line: an exchange by its day,
-     * a week with none by its end (review 1). Found through the week first, a tap right on an
-     * exchange of a Monday chose the week before, whose end lies nearer.
+     * a week with none by its end (review 1) — found through the week first, a tap right on an
+     * exchange of a Monday chose the week before. **Among those within a finger across, the height
+     * decides** (adversarial Б): two exchanges of one day stand at one x, and by x alone the finger
+     * reached only one of them. A week with no figure has no height and gives way to any mark.
      */
-    const pointer = useChartPointer(area, (fraction) => {
+    const pointer = useChartPointer(area, (fraction, point) => {
       const shown = pair.value
       if (!shown) return
-      const x = fraction * 1000
-      let nearest = -1
-      let distance = Infinity
-      items.value.forEach((item, index) => {
-        const away = Math.abs((item.exchange?.x ?? shown.weeks[item.week]?.x ?? 0) - x)
-        if (away < distance) {
-          nearest = index
-          distance = away
+      const across = items.value.map((item) => {
+        const week = shown.weeks[item.week]
+        const x = item.exchange?.x ?? week?.x ?? 0
+        const level = item.exchange?.level ?? week?.level ?? null
+        return {
+          dx: (Math.abs(x - fraction * 1000) * point.width) / 1000,
+          dy:
+            point.y === null
+              ? 0
+              : level === null
+                ? Infinity
+                : Math.abs((yOf(level) * point.height) / 1000 - point.y),
         }
       })
-      choose(nearest)
+      const nearest = Math.min(...across.map(({ dx }) => dx))
+      let chosenAt = -1
+      across.forEach(({ dx, dy }, index) => {
+        if (dx > nearest + FINGER_PX) return
+        const best = across[chosenAt]
+        if (!best || dy < best.dy || (dy === best.dy && dx < best.dx)) chosenAt = index
+      })
+      choose(chosenAt)
     })
 
     const yOf = (level: number) => 1000 - MARGIN - (level * (1000 - 2 * MARGIN)) / CHART_LEVEL
 
     /** The line in runs: a week with no figure is a gap, never a zero. */
     const runs = computed(() => {
-      const all: string[][] = [[]]
+      const all: { x: number; y: number }[][] = [[]]
       for (const week of pair.value?.weeks ?? []) {
         if (week.level === null) all.push([])
-        else all.at(-1)?.push(`${String(week.x)},${String(yOf(week.level))}`)
+        else all.at(-1)?.push({ x: week.x, y: yOf(week.level) })
       }
-      return all.filter((run) => run.length > 1).map((run) => run.join(' '))
+      return all.filter((run) => run.length > 0)
     })
+    /** A run of two weeks and more is a line; one week between two gaps, a dot of the line (adversarial Д). */
+    const lines = computed(() =>
+      runs.value
+        .filter((run) => run.length > 1)
+        .map((run) => run.map(({ x, y }) => `${String(x)},${String(y)}`).join(' ')),
+    )
+    const lone = computed(() => runs.value.flatMap((run) => (run.length === 1 ? run : [])))
 
     /** «4,30» — the tick alone; whole when every tick is whole, «386» for the dollar. */
     function tickOf(rate: ExchangeRate): string {
@@ -394,7 +426,8 @@ export default defineComponent({
       chosenIndex,
       week,
       cursorX,
-      runs,
+      lines,
+      lone,
       monthLabels,
       pairOptions,
       TICK,
@@ -574,6 +607,11 @@ export default defineComponent({
   stroke-width: 2;
   stroke-linejoin: round;
   stroke-linecap: round;
+}
+
+/* A week with a figure between two gaps: the line's own colour, a dot a little wider than it. */
+.lone {
+  stroke-width: 5;
 }
 
 .mark {
