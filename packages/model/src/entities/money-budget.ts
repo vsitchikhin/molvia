@@ -153,12 +153,10 @@ function plannedOf(
     if (plan.amount.currency === spend)
       return { planned: plan.amount, estimated: false, whole: true, awaitingIncome: false }
     const converted = month.rate === null ? null : convertAcross(plan.amount, month.rate)
-    return {
-      planned: converted?.currency === spend ? converted : null,
-      estimated: true,
-      whole: true,
-      awaitingIncome: false,
-    }
+    const planned = converted?.currency === spend ? converted : null
+    // Nothing to convert it by is a plan no rate counted — «не всё посчитано», as a share's with no
+    // rate is (review 14, adversarial Н of round 5): marked whole, it was said by no footnote at all.
+    return { planned, estimated: true, whole: planned !== null, awaitingIncome: false }
   }
   // Nothing has come in yet, and none of it short of a rate: the share waits for the income.
   if (month.income.minor === 0n && month.incomeUncounted.length === 0) {

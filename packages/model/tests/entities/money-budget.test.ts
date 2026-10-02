@@ -585,3 +585,39 @@ describe('monthBudget — round 3 of the review', () => {
     expect(overflow.total?.planShort).toBe(true)
   })
 })
+
+describe('monthBudget — round 5 of the review', () => {
+  it('marks a sum of another currency with nothing to convert it by as not whole (14, Н)', () => {
+    const budget = monthBudget(
+      month({
+        spendCurrency: 'RUB',
+        incomeCurrency: 'RUB',
+        income: cash('100000 RUB'),
+        rate: null,
+        byCategory: spentIn({ cafe: '3000 RUB' }),
+      }),
+      [plan('rent', '2026-10', amount('250000 AMD')), plan('cafe', '2026-10', amount('10000 RUB'))],
+      categories,
+    )
+    expect(budget.rows.find((row) => row.categoryId === id('rent'))).toMatchObject({
+      planned: null,
+      plannedWhole: false,
+      estimated: true,
+    })
+    expect(budget.total).toMatchObject({
+      planned: cash('10000 RUB'),
+      left: cash('7000 RUB'),
+      planShort: true,
+      whole: false,
+    })
+  })
+
+  it('must not fire: a sum of another currency the rate of the month converts is whole', () => {
+    const [row] = monthBudget(
+      month(),
+      [plan('rent', '2026-10', amount('1000 RUB'))],
+      categories,
+    ).rows
+    expect(row).toMatchObject({ planned: cash('4300 AMD'), plannedWhole: true })
+  })
+})

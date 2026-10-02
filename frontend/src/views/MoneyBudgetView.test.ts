@@ -640,3 +640,35 @@ describe('MoneyBudgetView: round 4 of the review (MOL-117)', () => {
     expect(shown).not.toContain(en.budget.total.not_whole)
   })
 })
+
+describe('MoneyBudgetView: round 5 of the review (MOL-117)', () => {
+  it('a plan of another currency no rate converts is said on its row and under the total (14, Н)', async () => {
+    const [, , rent] = budget().rows
+    if (!rent) throw new Error('no row')
+    moneyBudget.mockResolvedValue(
+      budget({
+        rows: [
+          {
+            ...rent,
+            planned: null,
+            estimated: true,
+            plannedWhole: false,
+            spent: amd('0'),
+            left: null,
+            used: null,
+          },
+        ],
+        total: {
+          ...total(),
+          planned: amd('10000'),
+          left: amd('7000'),
+          planShort: true,
+          whole: false,
+        },
+      }),
+    )
+    const view = await render()
+    expect(rowTexts(view)[0]).toContain('not all counted')
+    expect(view.find('.total').text()).toContain(en.budget.total.not_whole)
+  })
+})

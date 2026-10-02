@@ -633,7 +633,9 @@ task did not: five plans of six there are a percent of the month's income — «
   «не всё посчитано» by a row whose plan or spending some rate did not count — the rows' own flags. Read as a plan of zero, every share was over its plan in every month
   until the salary; the price — a month with only shares says no «осталось» until something comes
   in. A sum typed in another currency is refused (`CURRENCY_MISMATCH`); one kept from before a move
-  is converted by the month's rate and printed «≈» (Р-4), and **its sheet never puts it in the field
+  is converted by the month's rate and printed «≈» (Р-4) — with no rate to convert it by it is no
+  plan and «не всё посчитано», never a plan marked whole that no footnote speaks of (review 14,
+  adversarial Н of round 5) — and **its sheet never puts it in the field
   as a sum of this currency** (adversarial Б): «Сохранить» untouched made 250 000 ֏ into 250 000 ₽.
   The sheet says what it was and asks for a sum anew.
 - **What was spent is the month's `byCategory`, never a second count** (Р-2): the budget is
