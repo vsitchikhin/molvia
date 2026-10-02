@@ -5,8 +5,9 @@
 --
 --   ssh molvia 'cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres psql -U molvia -d molvia -v ON_ERROR_STOP=1' < deploy/reindex-text.sql
 --
--- One transaction: a unique key that refuses — two rows one place under these rules — names the
--- pair and leaves every index as it was; the pair is settled by hand and the file run again.
+-- After a rolled-back deploy, deploy/window-duplicates.sql comes first: it settles or names what
+-- the window wrote twice. One transaction: a unique key that still refuses names the pair and
+-- leaves every index as it was; the pair is settled by hand and the file run again.
 BEGIN;
 DO $$
 DECLARE

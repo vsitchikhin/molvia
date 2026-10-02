@@ -48,4 +48,5 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 - `deploy/backup/restore.sh` — Restore from the owner's machine: list copies, drill into a throwaway Postgres, or replace production under a deploy hold.
 - `deploy/deploy.sh` — The deploy key's forced command: rolls out one published image tag, checks health, rolls back on failure; honours `deploy.hold`.
 - `deploy/reindex-text.sql` — Rebuilds every index whose key is text or an expression by the rules of the libc the database now runs under — the block of `0038` for a move a migration cannot make (MOL-105).
+- `deploy/window-duplicates.sql` — After a rolled-back deploy (MOL-105): what the old API wrote twice into indexes of another libc — search picks merged, a login code dropped, every other pair of a unique text key named; index scans off.
 - `docker-compose.prod.yml` — Production stack: Postgres, API, bot and Caddy-served PWA on one network, logging to journald.

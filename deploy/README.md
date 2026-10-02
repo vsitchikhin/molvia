@@ -388,16 +388,22 @@ is down meanwhile — minutes, accepted while production is the owner's alone.
    - **`0` — `0038` failed**, and its transaction left every index as musl built it — but the old
      API the rollback brought up may have written meanwhile, by glibc's rules into musl's indexes:
      the phone's queue sends the moment the API answers (round 3, Ж — one place is enough). So alpine
-     comes back with the indexes rebuilt before anything else starts. Copy the previous compose file
-     (`git show <the master before the merge>:docker-compose.prod.yml`, `scp` it to `~/molvia/`),
-     `up -d postgres` alone, then rebuild under musl:
-     `ssh molvia 'cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres psql -U molvia -d molvia -v ON_ERROR_STOP=1' < deploy/reindex-text.sql`.
-     A unique key that refuses names one pair the window let in, and leaves every index as it was.
-     All the pairs at once are a `group by` on the key of `places_identity_key` with index scans
-     off (`set enable_indexscan = off; set enable_bitmapscan = off`) — the index itself is the broken
-     one. A pair is settled by hand — the trips and verdicts of one row moved to the other, a verdict
-     of one person on one item in both kept once — and the file run again. Then `up -d`. The API's journal names the statement `0038` failed on
+     comes back with the window's duplicates settled and the indexes rebuilt before anything else
+     starts. Copy the previous compose file (`git show <the master before the merge>:docker-compose.prod.yml`,
+     `scp` it to `~/molvia/`) and `up -d postgres` alone. Then, with
+     `psql='cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres psql -U molvia -d molvia -v ON_ERROR_STOP=1'`:
+     - `ssh molvia "$psql" < deploy/window-duplicates.sql` — what the window wrote twice (round 5,
+       З): search picks merged as their upsert merges a repeat, a login code written twice deleted,
+       and every other pair of a unique text key named (`twice in …`), index scans off — the index
+       itself is the broken one. A pair of places is settled by hand: the trips and verdicts of one
+       row moved to the other, a verdict of one person on one item in both kept once, the row
+       deleted; the file run again until it names nothing;
+     - `ssh molvia "$psql" < deploy/reindex-text.sql` — every text index rebuilt under musl, one
+       transaction; a refusal names a pair the first file did not settle.
+
+     Then `up -d`. The API's journal names the statement `0038` failed on
      (`describeMigrationFailure`); that duplicate is settled by hand too, then from step 1 again.
+
    - **`1` — `0038` ran**: the indexes are glibc's, and **alpine must not come back** — under musl
      they would answer wrongly, and `0038`, recorded as applied, would never rebuild them again. Stay
      on the new image: `up -d` as the machine stands runs the previous API on it, which needs nothing
