@@ -45,6 +45,7 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 - `deploy/backup/backup.sh` — Nightly backup: `pg_dump` in the container, encrypted to the owner's age key, streamed to R2, pinged to healthchecks.io.
 - `deploy/backup/molvia-backup.service` — systemd unit running the nightly backup script as the deploy user.
 - `deploy/backup/molvia-backup.timer` — systemd timer: the backup at 04:00 Yerevan time, catching up a night the machine was off.
+- `deploy/reindex-text.sql` — Rebuilds every index whose key is text or an expression by the rules of the libc the database now runs under — the block of `0038` for a move a migration cannot make (MOL-105).
 - `deploy/backup/restore.sh` — Restore from the owner's machine: list copies, drill into a throwaway Postgres, or replace production under a deploy hold.
 - `deploy/deploy.sh` — The deploy key's forced command: rolls out one published image tag, checks health, rolls back on failure; honours `deploy.hold`.
 - `docker-compose.prod.yml` — Production stack: Postgres, API, bot and Caddy-served PWA on one network, logging to journald.

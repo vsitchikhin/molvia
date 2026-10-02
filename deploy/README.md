@@ -385,11 +385,16 @@ is down meanwhile — minutes, accepted while production is the owner's alone.
    committed:
    `echo "select count(*) from pg_extension where extname = 'vector'" | ssh molvia 'cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres psql -U molvia -d molvia -At'`.
    `vector` is created in the transaction that rebuilds the indexes, so it answers for both.
-   - **`0` — `0038` failed**, and its transaction left every index as musl built it: the data is
-     whole and agrees with alpine, so alpine goes back before anything writes. Copy the previous
-     compose file (`git show <the master before the merge>:docker-compose.prod.yml`, `scp` it to
-     `~/molvia/`) and `up -d`. The API's journal names the statement that failed
-     (`describeMigrationFailure`); the duplicate is settled by hand, then from step 1 again.
+   - **`0` — `0038` failed**, and its transaction left every index as musl built it — but the old
+     API the rollback brought up may have written meanwhile, by glibc's rules into musl's indexes:
+     the phone's queue sends the moment the API answers (round 3, Ж — one place is enough). So alpine
+     comes back with the indexes rebuilt before anything else starts. Copy the previous compose file
+     (`git show <the master before the merge>:docker-compose.prod.yml`, `scp` it to `~/molvia/`),
+     `up -d postgres` alone, then rebuild under musl:
+     `ssh molvia 'cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres psql -U molvia -d molvia -v ON_ERROR_STOP=1' < deploy/reindex-text.sql`.
+     A unique key that refuses names a pair the window let in; it is settled by hand and the file
+     run again. Then `up -d`. The API's journal names the statement `0038` failed on
+     (`describeMigrationFailure`); that duplicate is settled by hand too, then from step 1 again.
    - **`1` — `0038` ran**: the indexes are glibc's, and **alpine must not come back** — under musl
      they would answer wrongly, and `0038`, recorded as applied, would never rebuild them again. Stay
      on the new image: `up -d` as the machine stands runs the previous API on it, which needs nothing
