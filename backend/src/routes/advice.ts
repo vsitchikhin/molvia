@@ -15,6 +15,13 @@ import type {
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { parseQuery } from '@/parse'
 
+/** Who asks, with the phone's today and zone (`TODAY_HEADER`, `ZONE_HEADER`, MOL-121). */
+interface Owner {
+  readonly actorId: string
+  readonly today?: string
+  readonly zone?: string
+}
+
 export interface AdviceApi {
   /**
    * The use case, already bound to its repositories by the composition point. The zone and the
@@ -24,23 +31,13 @@ export interface AdviceApi {
   advice(owner: Owner): Promise<AdviceResponse>
   search(owner: Owner, query: string): Promise<AdviceSearchResponse>
   /** «Тут дешевле» (MOL-92); the zone is the phone's, for the day of a record from an old queue. */
-  prices(
-    owner: { readonly actorId: string; readonly zone?: string },
-    query: OwnPricesQuery,
-  ): Promise<OwnPricesResponse>
+  prices(owner: Owner, query: OwnPricesQuery): Promise<OwnPricesResponse>
 }
 
 /**
  * «Что брать» (MOL-31). One route, the whole screen, and no parameters at all: whose figures
  * the answer carries follows from the person's access and never from the request.
  */
-/** Who asks, with the phone's today and zone (`TODAY_HEADER`, `ZONE_HEADER`, MOL-121). */
-interface Owner {
-  readonly actorId: string
-  readonly today?: string
-  readonly zone?: string
-}
-
 export function adviceRoutes(app: FastifyInstance, api: AdviceApi): void {
   const ownerOf = (request: FastifyRequest): Owner => ({
     actorId: request.actorId,
