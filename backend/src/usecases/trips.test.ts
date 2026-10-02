@@ -142,7 +142,7 @@ function fakeRepositories(
       remove: unexpected('expenses.remove'),
       unratedFor: unexpected('expenses.unratedFor'),
       pendingVerdictsFor: unexpected('expenses.pendingVerdictsFor'),
-      cheapestFor: unexpected('expenses.cheapestFor'),
+      placePricesFor: unexpected('expenses.placePricesFor'),
       medianPriceFor: unexpected('expenses.medianPriceFor'),
       ownLatestFor: unexpected('expenses.ownLatestFor'),
       ownItemsOfKind: unexpected('expenses.ownItemsOfKind'),

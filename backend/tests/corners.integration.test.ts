@@ -50,7 +50,7 @@ describe('вторая цена за ту же пару', () => {
     })
 
     expect(await expenses.forTrip(trip.id, actorId)).toHaveLength(2)
-    expect((await expenses.cheapestFor(ownPrices(actorId, [itemId])))[0]?.observations).toBe(2)
+    expect((await expenses.placePricesFor(ownPrices(actorId, [itemId])))[0]?.observations).toBe(2)
   })
 })
 

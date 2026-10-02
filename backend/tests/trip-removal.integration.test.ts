@@ -360,7 +360,7 @@ describe('помеченный поход не видит ни один чита
       pendingRoute: JSON.stringify((await call(me, 'GET', '/verdicts/pending')).json()).includes(
         removed.item,
       ),
-      cheapest: (await expensesRepo.cheapestFor(ownPrices(me.id, [removed.item]))).length > 0,
+      cheapest: (await expensesRepo.placePricesFor(ownPrices(me.id, [removed.item]))).length > 0,
       median: (await expensesRepo.medianPriceFor(ownPrices(me.id, [removed.item]))).length > 0,
       rows: (await expensesRepo.forTrip(removed.trip, me.id)).length > 0,
       month: (await createMoneyRepository(db).tripLines(me.id, from, to)).some(
@@ -417,10 +417,10 @@ describe('помеченный поход не видит ни один чита
     const asker = await owner()
     const shared = { ...ownPrices(asker.id, [item]), scope: 'shared' as const }
     const repo = createExpenseRepository(db)
-    expect(await repo.cheapestFor(shared)).toHaveLength(1)
+    expect(await repo.placePricesFor(shared)).toHaveLength(1)
 
     await call(first, 'DELETE', `/trips/${firstTrip}`)
     // Two buyers are no aggregate: the place closes again.
-    expect(await repo.cheapestFor(shared)).toEqual([])
+    expect(await repo.placePricesFor(shared)).toEqual([])
   })
 })

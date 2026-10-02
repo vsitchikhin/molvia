@@ -136,7 +136,7 @@ describe('предел выборки', () => {
     expect(await trips.listFor(actorId, 2.5)).toHaveLength(2)
   })
 
-  it('у cheapestFor предел есть и соблюдается', async () => {
+  it('у placePricesFor предел есть и соблюдается', async () => {
     const actorId = await insertActor(db)
     const itemId = await insertItem(db)
     for (let index = 0; index < 4; index += 1) {
@@ -152,8 +152,8 @@ describe('предел выборки', () => {
       })
     }
 
-    expect(await expenses.cheapestFor(ownPrices(actorId, [itemId], 2))).toHaveLength(2)
-    expect(await expenses.cheapestFor(ownPrices(actorId, [itemId]))).toHaveLength(4)
+    expect(await expenses.placePricesFor(ownPrices(actorId, [itemId], 2))).toHaveLength(2)
+    expect(await expenses.placePricesFor(ownPrices(actorId, [itemId]))).toHaveLength(4)
   })
 })
 
@@ -169,7 +169,7 @@ describe('негодный идентификатор', () => {
     expect(await catalogue.byIds(['не-uuid'])).toEqual([])
     expect(await places.byIds(['не-uuid'])).toEqual([])
     expect(await expenses.forTrip('не-uuid', actorId)).toEqual([])
-    expect(await expenses.cheapestFor(ownPrices(actorId, ['не-uuid']))).toEqual([])
+    expect(await expenses.placePricesFor(ownPrices(actorId, ['не-uuid']))).toEqual([])
   })
 
   it('на правке и удалении — тем же, чем чужое', async () => {

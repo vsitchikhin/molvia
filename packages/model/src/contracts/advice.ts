@@ -20,8 +20,8 @@ export const adviceScopeSchema = z.enum(['own', 'shared'])
 export type AdviceScope = z.infer<typeof adviceScopeSchema>
 
 /**
- * A place and the lowest unit price seen there for one item. `observations` is how many
- * purchases stand behind it — the same honesty the rating count carries: one purchase is a
+ * A place and what it charges for one item — its last unit price, not the lowest ever seen
+ * (MOL-166). `observations` is how many purchases stand behind it — the same honesty the rating count carries: one purchase is a
  * number, not a history.
  */
 export const advicePlaceSchema = z.strictObject({

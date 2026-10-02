@@ -41,7 +41,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 ## backend · tests
 
-- `backend/tests/advice-prices.integration.test.ts` — Integration test: the price side of «Что брать» — the lower median, three buyers to open a place, city filter and own city first.
+- `backend/tests/advice-prices.integration.test.ts` — Integration test: the price side of «Что брать» — a place's last price rather than its lowest (MOL-166), the lower median, three buyers to open a place, city filter and own city first.
 - `backend/tests/advice-verdicts.integration.test.ts` — Integration test: the verdict rows of «Что брать» — own versus shared, three people for an aggregate, order and limit.
 - `backend/tests/advice-search-seed.integration.test.ts` — Integration test: the search on «Что брать» over the real seed — a rated item past the limit of twenty is found, its «не брать нигде» too.
 - `backend/tests/advice-search.integration.test.ts` — Integration test: `GET /advice/search` — transliteration and typos, a row past `ADVICE_LIMIT`, the threshold of three, no price on «не брать нигде», nothing written.

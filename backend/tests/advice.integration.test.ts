@@ -205,23 +205,24 @@ describe('три группы', () => {
 })
 
 describe('цены', () => {
-  it('отдаёт места по возрастанию цены за единицу с названием и числом наблюдений', async () => {
+  it('отдаёт места по возрастанию последней цены за единицу с названием и числом наблюдений', async () => {
     const actorId = await insertActor(db)
     const market = await insertPlace(db, { name: 'Рынок в Гюмри' })
     const sas = await insertPlace(db, { name: 'SAS' })
     const itemId = await insertItem(db, { name: 'Говядина' })
     await rate(actorId, itemId, 5)
     await bought(actorId, itemId, sas, amd(510_000))
-    await bought(actorId, itemId, market, amd(479_000))
-    await bought(actorId, itemId, market, amd(490_000))
+    await bought(actorId, itemId, market, amd(479_000), { startedAt: new Date('2026-09-01') })
+    await bought(actorId, itemId, market, amd(490_000), { startedAt: new Date('2026-09-20') })
 
     const [row] = (await screen(actorId)).rows
 
+    // Цена места — последняя, а не минимум (MOL-166).
     expect(row?.level === 'take' && row.places).toEqual([
       {
         placeId: market,
         name: 'Рынок в Гюмри',
-        unitPrice: { scaledMinor: perKilo(479_000), currency: 'AMD', unit: 'kg' },
+        unitPrice: { scaledMinor: perKilo(490_000), currency: 'AMD', unit: 'kg' },
         observations: 2,
       },
       {
@@ -304,7 +305,7 @@ describe('чужое', () => {
     expect(row?.level === 'take' && row.places).toEqual([])
   })
 
-  it('с доступом — средняя по троим и общая цена', async () => {
+  it('с доступом — средняя по троим, а у места, где брал сам, — своя цена (MOL-166, В-1)', async () => {
     const me = await insertActor(db)
     await grantAccess(me)
     const placeId = await insertPlace(db)
@@ -323,7 +324,8 @@ describe('чужое', () => {
     expect(answer.scope).toBe('shared')
     expect(row?.rating).toBe('4.3')
     expect(row?.ratingsCount).toBe(3)
-    expect(row?.level === 'take' && row.places[0]?.unitPrice.scaledMinor).toBe(perKilo(479_000))
+    // Как на листе покупки: место открыто троими, но я там брал — моя последняя, а не чужая.
+    expect(row?.level === 'take' && row.places[0]?.unitPrice.scaledMinor).toBe(perKilo(510_000))
   })
 
   it('на двоих отдаёт мои цифры: из средней вычиталась бы чужая оценка', async () => {

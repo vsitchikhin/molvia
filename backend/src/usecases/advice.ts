@@ -217,7 +217,7 @@ async function describe(
   // «только если дёшево», so asking for the medians of everything else was half the work of
   // every screen spent on a number nobody would read.
   const [places, medians] = await Promise.all([
-    expenses.cheapestFor({ ...query, itemIds: asked('take', 'if_cheap') }),
+    expenses.placePricesFor({ ...query, itemIds: asked('take', 'if_cheap') }),
     expenses.medianPriceFor({ ...query, itemIds: asked('if_cheap') }),
   ])
 

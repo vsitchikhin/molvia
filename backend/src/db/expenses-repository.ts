@@ -74,14 +74,20 @@ export interface ExpenseRepository {
     bought?: { readonly from: Date; readonly to: Date },
   ): Promise<PendingVerdicts>
   /**
-   * Where it was cheaper: one row per place, currency and unit.
+   * «Что брать»: what each place charges, one row per place, currency and unit — the **last**
+   * price paid there, not the lowest ever (MOL-166; the owner's decision of MOL-92, В-3: «цены в
+   * магазинах подниматься могут, а вот спускаются редко»). Where this person bought, their own
+   * last purchase, in either mode, by the rule «Тут дешевле» reads (`latestFirst`): the home and
+   * the sheet name one price for one milk. A place opened by other people (the shared mode, Р-17)
+   * is the lower median of each buyer's own last price there (В-1) — three people's figure, never
+   * the receipt of whoever bought last, which anyone looking twice would read as it changed.
    *
    * The limit has a default rather than being required, because the number of rows follows
    * the number of places a person shopped in — a handful in 0.1 — and every caller today
    * wants all of them. It is still an argument: in the shared mode the same aggregate counts
    * other people's data, and then the caller, not the data, decides how much comes back.
    */
-  cheapestFor(query: PriceQuery): Promise<PlacePrice[]>
+  placePricesFor(query: PriceQuery): Promise<PlacePrice[]>
   /**
    * The lower median of the unit prices seen for an item, one row per currency and unit
    * (MOL-31, Р-2 — the answer to MOL-33). «Стоит брать дешевле …» is that number, and the
@@ -136,6 +142,12 @@ export interface PriceQuery {
   readonly limit?: number
   /** A purchase left out — the one the sheet amends, never compared with itself (MOL-92, Т-9). */
   readonly except?: string
+  /**
+   * The phone's zone (MOL-121), for the day of a record from an old queue — the same one «Тут
+   * дешевле» reads it in, or the two would disagree about which purchase was the last (MOL-166).
+   * Read by `placePricesFor` alone; Yerevan's without one.
+   */
+  readonly zone?: string
 }
 
 /** What «Тут дешевле» asks for (MOL-92): this person's own purchases, in the city of the record. */
@@ -166,7 +178,7 @@ export interface OwnKindQuery {
 
 /**
  * How many priced places one call brings back by default. A person shops in a handful of
- * places, and «Что брать» shows the cheapest plus a short «ещё здесь» — so this is generous
+ * places, and «Что брать» shows the first plus a short «ещё здесь» — so this is generous
  * rather than tight, and it exists to bound the answer, not to shape the screen.
  */
 const PLACES_PER_ITEM = 50
@@ -175,8 +187,8 @@ const PLACES_PER_ITEM = 50
 const YEREVAN = 'Asia/Yerevan'
 
 /**
- * Not a domain entity but the result of an aggregate: a place and the lowest unit price
- * observed there. Currency and unit are part of the key rather than of the value — two
+ * Not a domain entity but the result of an aggregate: a place and what it charges — its last
+ * unit price (MOL-166). Currency and unit are part of the key rather than of the value — two
  * prices in different currencies have no common ground without a rate, and the rate is a
  * snapshot of one trip.
  */
@@ -376,7 +388,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
    *
    * It has to be the row. The first version decided per aggregate — «everyone's, or this
    * person's own» — and the two aggregates group differently: a place at a time for the
-   * minimum, a whole «currency + unit» for the median. Three strangers in three shops then
+   * place's price, a whole «currency + unit» for the median. Three strangers in three shops then
    * made the median «enough» although no shop of theirs passed the threshold, and
    * `percentile_disc` handed back an exact price someone paid in a shop the same answer had
    * just refused to show (adversarial round 1, F1). One `showable` per row, read by both, is
@@ -697,22 +709,41 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
       }
     },
 
-    async cheapestFor(query) {
+    async placePricesFor(query) {
       const priced = pricedRows(query)
       if (!priced) return []
 
       const found = await db.execute<PlacePriceShape>(sql`
-        select
-          item_id as "itemId",
-          place_id as "placeId",
-          place_name as "placeName",
-          currency,
-          unit,
-          min(unit_price)::text as "scaledMinor",
-          count(*)::text as observations,
-          max(bought_at) as "latestVisitAt"
-        ${priced.rows}
-        group by item_id, place_id, place_name, currency, unit
+        select "itemId", "placeId", "placeName", currency, unit, price::text as "scaledMinor",
+               observations, "latestVisitAt"
+        from (
+          select
+            item_id as "itemId",
+            place_id as "placeId",
+            place_name as "placeName",
+            currency,
+            unit,
+            -- One's own last price wherever one bought (every own row has one buyer, so their
+            -- last is one row); otherwise the place was opened by other people, and its price is
+            -- the lower median of each buyer's last — \`percentile_disc\`, a price someone paid,
+            -- as the threshold of «только если дёшево» is (MOL-166, В-1).
+            coalesce(
+              min(unit_price) filter (where mine and buyer_last),
+              percentile_disc(0.5) within group (order by unit_price) filter (where buyer_last)
+            ) as price,
+            count(*)::text as observations,
+            max(bought_at) as "latestVisitAt",
+            bool_or(nearby) as nearby
+          from (
+            select *,
+              row_number() over (
+                partition by item_id, place_id, currency, unit, actor_id
+                order by ${latestFirst(await zoneFor(query.zone))}
+              ) = 1 as buyer_last
+            from (select * ${priced.rows}) showable
+          ) bought
+          group by item_id, place_id, place_name, currency, unit
+        ) places
         -- Ordered here rather than after, and by the price itself: the screen shows the
         -- places of one item cheapest first, and a second sort in JavaScript would compare
         -- names by another alphabet than the one that ordered the rows of the answer (F7).
@@ -723,8 +754,8 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
         -- rather than «cheaper», which is the whole reason Р-10 exists; since the shared mode
         -- shows «mine or my city», without this a Gyumri resident's own Erevan receipt stood
         -- above a Gyumri place and took the superlative with it (adversarial round 2, G4).
-        order by item_id, bool_or(nearby) desc, min(unit_price),
-                 place_name collate "und-x-icu", currency, unit, place_id
+        order by "itemId", nearby desc, price,
+                 "placeName" collate "und-x-icu", currency, unit, "placeId"
         ${priced.limit}
       `)
 
