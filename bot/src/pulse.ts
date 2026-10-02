@@ -12,8 +12,16 @@ import type { Bot } from 'grammy'
  * roll back.
  */
 
-/** At most this often — and never sooner than this after the process started. */
+/** At most this often. */
 export const PULSE_EVERY_MS = 5 * 60_000
+
+/**
+ * The first beat comes no sooner than this into the process (adversarial А2, round 2 Г1). A crash
+ * loop never says «alive»: a process dying on a revoked token or a second poller does not hear
+ * Telegram anyway, and this is the margin on top. Five minutes here made rollouts a few minutes
+ * apart add up into a false alarm — every new process stayed silent for five.
+ */
+export const PULSE_FIRST_AFTER_MS = 60_000
 
 /** One ping is given up on after this, and the next claim tries again. */
 export const PULSE_TIMEOUT_MS = 10_000
@@ -35,6 +43,7 @@ export interface PulseOptions {
   readonly fetch?: typeof globalThis.fetch
   readonly now?: () => number
   readonly everyMs?: number
+  readonly firstAfterMs?: number
   readonly timeoutMs?: number
   /** Whether the bot hears Telegram right now (`hearTelegram`); a beat without it is skipped. */
   readonly listening?: () => boolean
@@ -42,11 +51,10 @@ export interface PulseOptions {
 
 /**
  * Returns the beat: a call that pings unless less than `everyMs` passed since the last ping that
- * succeeded — or since the pulse was made, so a process in a crash loop never says «alive»
- * (adversarial А2: one that died on a revoked token beat on every start) — unless one is still on
- * its way, or the bot does not hear Telegram. A failed ping is tried again a claim later rather
- * than five minutes later. Claims come a minute apart and take their own time, so the beats land
- * five to six minutes apart; after a rollout the first comes five to six minutes in.
+ * succeeded, or less than `firstAfterMs` since the pulse was made — unless one is still on its
+ * way, or the bot does not hear Telegram. A failed ping is tried again a claim later rather than
+ * five minutes later. Claims come a minute apart and take their own time, so the beats land five
+ * to six minutes apart; after a rollout the first comes one to two minutes in.
  *
  * Without a URL — every working copy and the end-to-end run — the beat does nothing at all. The
  * URL is never printed: whoever has it can say «alive» for us. A failure is logged by its kind.
@@ -61,10 +69,12 @@ export function createPulse(
     fetch = globalThis.fetch,
     now = monotonic,
     everyMs = PULSE_EVERY_MS,
+    firstAfterMs = PULSE_FIRST_AFTER_MS,
     timeoutMs = PULSE_TIMEOUT_MS,
     listening = () => true,
   } = options
-  let last = now()
+  // As if a ping had succeeded just long enough ago for the next to be due `firstAfterMs` in.
+  let last = now() - everyMs + firstAfterMs
   let pending: Promise<void> | undefined
 
   const ping = async (): Promise<void> => {

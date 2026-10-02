@@ -4,7 +4,13 @@ import type { Transformer } from 'grammy'
 import type { UserFromGetMe } from 'grammy/types'
 import type { MolviaBotClient } from '@molvia/client'
 import { startBot } from './assemble'
-import { HEARD_WITHIN_MS, PULSE_EVERY_MS, createPulse, hearTelegram } from './pulse'
+import {
+  HEARD_WITHIN_MS,
+  PULSE_EVERY_MS,
+  PULSE_FIRST_AFTER_MS,
+  createPulse,
+  hearTelegram,
+} from './pulse'
 import { startReminders } from './remind'
 
 const PING = 'https://hc-ping.com/0f1e2d3c-secret'
@@ -80,12 +86,12 @@ describe('пульс бота (MOL-142)', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it('первый удар — не раньше пяти минут жизни процесса, и на тот самый URL', async () => {
-    // A process in a crash loop never lives that long, so it never says «alive» (adversarial А2).
+  it('первый удар — не раньше минуты жизни процесса, и на тот самый URL', async () => {
+    // A process in a crash loop does not live that long, so it never says «alive» (adversarial А2).
     const { beat, fetch, later } = rig()
 
     await beat()
-    later(PULSE_EVERY_MS - 1)
+    later(PULSE_FIRST_AFTER_MS - 1)
     await beat()
     expect(fetch).not.toHaveBeenCalled()
 
@@ -93,6 +99,31 @@ describe('пульс бота (MOL-142)', () => {
     await beat()
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(fetch.mock.calls[0]?.[0]).toBe(PING)
+  })
+
+  it('выкатки подряд не складываются в тревогу (адверсариал, раунд 2 Г1)', async () => {
+    // The last ping at 0, the bot recreated at +3, +7 and +11 minutes, a claim a minute: no
+    // silence reaches the check's fifteen minutes (6 + 9). With five minutes before the first beat
+    // the next ping came at +16.
+    let time = 0
+    const pings: number[] = []
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => {
+      pings.push(time)
+      return Promise.resolve(new Response('OK'))
+    })
+    let beat = createPulse(PING, { fetch, now: () => time })
+    time = PULSE_EVERY_MS
+    await beat()
+    const restarts = [3, 7, 11].map((minutes) => PULSE_EVERY_MS + minutes * MINUTE)
+
+    for (let t = PULSE_EVERY_MS + MINUTE; t <= PULSE_EVERY_MS + 25 * MINUTE; t += MINUTE) {
+      time = t
+      if (restarts.includes(t)) beat = createPulse(PING, { fetch, now: () => time })
+      else await beat()
+    }
+
+    const gaps = pings.slice(1).map((at, index) => at - (pings[index] ?? at))
+    expect(Math.max(...gaps)).toBeLessThan(15 * MINUTE)
   })
 
   it('не чаще раза в пять минут: без миллисекунды — нет, ровно пять — да', async () => {

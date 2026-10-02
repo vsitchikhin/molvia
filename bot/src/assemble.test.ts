@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { format } from 'node:util'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Transformer } from 'grammy'
 import type { Update, UserFromGetMe } from 'grammy/types'
 import type { MolviaBotClient } from '@molvia/client'
@@ -118,5 +119,35 @@ describe('как бот разбирает апдейты', () => {
     const lag = await lagBetween([start(1, 1001, 'a'.repeat(43)), start(2, 1001, 'b'.repeat(43))])
 
     expect(lag).toBeGreaterThanOrEqual(HELD_MS - 20)
+  })
+})
+
+describe('отказ getUpdates в журнале (MOL-142)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('пишется по виду, и токена бота в нём нет (адверсариал, раунд 2 Г2)', async () => {
+    // grammY's network error carries the request's address, and the token is in it; the runner
+    // used to print it whole on every failed try.
+    const TOKEN = '123456:AAE-secret-token-of-the-bot'
+    const lines: string[] = []
+    vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      lines.push(format(...args))
+    })
+    // Nothing listens on port 9: every getUpdates fails at the network, as with Telegram away.
+    const bot = assembleBot(TOKEN, {} as never, {
+      botInfo: BOT_INFO,
+      client: { apiRoot: 'http://127.0.0.1:9' },
+    })
+    const runner = startBot(bot)
+    for (let waited = 0; lines.length < 3 && waited < 5_000; waited += 50) {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    await runner.stop()
+
+    expect(lines.length).toBeGreaterThanOrEqual(3)
+    expect(new Set(lines)).toEqual(new Set(['[molvia] telegram getUpdates: network']))
+    expect(lines.join('\n')).not.toContain('secret-token')
   })
 })

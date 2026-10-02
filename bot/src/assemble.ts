@@ -81,7 +81,26 @@ export const ALLOWED_UPDATES = ['message', 'callback_query', 'my_chat_member'] a
  * past the thirty seconds compose gives only after hours of Telegram down.
  */
 export function startBot(bot: Bot): RunnerHandle {
+  // The runner logs a failed `getUpdates` whole, and grammY's network error carries the request's
+  // address — the bot's token in it — into journald for fourteen days (MOL-142, adversarial round 2
+  // Г2). So the runner is silent, and the failure is logged here by its kind: Telegram's code, or
+  // `network`. A call cut short by a stop is not a failure.
+  bot.api.config.use(async (prev, method, payload, signal) => {
+    if (method !== 'getUpdates') return prev(method, payload, signal)
+    try {
+      const result = await prev(method, payload, signal)
+      if (!result.ok) console.error(`[molvia] telegram getUpdates: ${String(result.error_code)}`)
+      return result
+    } catch (error) {
+      if (!signal?.aborted) console.error('[molvia] telegram getUpdates: network')
+      throw error
+    }
+  })
   return run(bot, {
-    runner: { fetch: { allowed_updates: ALLOWED_UPDATES }, retryInterval: 'quadratic' },
+    runner: {
+      fetch: { allowed_updates: ALLOWED_UPDATES },
+      retryInterval: 'quadratic',
+      silent: true,
+    },
   })
 }
