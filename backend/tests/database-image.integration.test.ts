@@ -6,8 +6,8 @@ const { db, close } = connectDrizzle()
 afterAll(close)
 
 /**
- * The database image is part of the contract (MOL-105, `deploy/README.md`): each of these fails
- * a query or the boot, never a test of its own, when an image without it is pinned by mistake.
+ * The database image is part of the contract (MOL-105, `deploy/README.md`). Without these, an image
+ * missing any of it is found by a failed query or a failed boot, never by a test.
  */
 
 it('carries pgvector, with the HNSW index the embeddings need', async () => {
@@ -33,7 +33,8 @@ it('sorts by ICU, as «Что брать» does (MOL-31)', async () => {
 /**
  * A collation whose recorded version is not the library's warns on every query that uses it and
  * may order otherwise than its indexes were built: a database carried over to another image
- * without the rebuild of `0038_pgvector`.
+ * without the rebuild of `0038_pgvector`. On CI's fresh database these hold by construction; they
+ * catch a working copy's volume carried over, and a tag moved without its migration.
  */
 it('has no collation built by another version of ICU', async () => {
   const rows = await db.execute<{ name: string }>(
@@ -41,4 +42,14 @@ it('has no collation built by another version of ICU', async () => {
         where collprovider = 'i' and collversion is distinct from pg_collation_actual_version(oid)`,
   )
   expect(rows.map((row) => row.name)).toEqual([])
+})
+
+it('has its own collation of the libc it runs on, where a version was recorded', async () => {
+  const [row] = await db.execute<{ recorded: string | null; actual: string | null }>(
+    sql`select datcollversion as recorded,
+               pg_database_collation_actual_version(oid) as actual
+        from pg_database where datname = current_database()`,
+  )
+  // A volume moved off alpine records none (`deploy/README.md`): nothing to compare there.
+  expect(row?.recorded ?? row?.actual).toBe(row?.actual)
 })

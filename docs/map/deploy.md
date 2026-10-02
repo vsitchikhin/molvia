@@ -14,7 +14,13 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 ## backend · db
 
 - `backend/src/db/migrate-cli.ts` — CLI entry for `make migrate` and `make up`: the same migrator the API runs at boot, and a failure printed as the API logs it (MOL-153).
-- `backend/src/db/migrate.ts` — Migrator: finds the migrations folder from source or from the bundle and applies pending migrations; run at API start. A failure leaves the client to the caller's exit, so «migrations failed» is logged first (MOL-153).
+- `backend/src/db/journal.ts` — drizzle's journal of migrations read as entries, and `stampsOutOfOrder`: a stamp not later than the one before is skipped by drizzle in silence (MOL-105). Tests: `backend/src/db/journal.test.ts`.
+- `backend/src/db/migrate.ts` — Migrator: finds the migrations folder from source or from the bundle and applies pending migrations; run at API start. A failure leaves the client to the caller's exit, so «migrations failed» is logged first (MOL-153); then `assertEveryMigrationApplied` stops the boot on a migration drizzle skipped by its stamp (MOL-105). Tests: `backend/tests/migration-stamps.integration.test.ts`.
+
+## backend · tests
+
+- `backend/src/db/journal.test.ts` — Unit test: the journal of migrations is numbered in order and every stamp is later than the one before it.
+- `backend/tests/migration-stamps.integration.test.ts` — Integration test: a migration drizzle skipped because its stamp is older than one applied is named, and stops the chain.
 
 ## backend · other
 
