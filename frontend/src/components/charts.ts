@@ -1,4 +1,3 @@
-import { previousMonth } from '@molvia/model'
 import { monthOf } from '@/days'
 
 /**
@@ -36,20 +35,6 @@ export function signedPercent(value: number, locale: string, hundredths = false)
     maximumFractionDigits: digits,
   }).format(Math.abs(value) / (hundredths ? 10_000 : 100))
   return value < 0 ? `${MINUS}${text}` : value > 0 ? `+${text}` : text
-}
-
-/** «−8 % к августу»: how a month compares with the one before it, or null with nothing to compare. */
-export function versusPrevious(
-  change: number | null,
-  month: string,
-  locale: string,
-  t: (key: string, named?: Record<string, unknown>) => string,
-): string | null {
-  if (change === null) return null
-  return t('spending.vs_previous', {
-    percent: signedPercent(change, locale),
-    month: t(`spending.month_to.${previousMonth(month).slice(5)}`),
-  })
 }
 
 /** «сентябрь» — the month's name alone, as it stands in a sentence. */

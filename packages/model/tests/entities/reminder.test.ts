@@ -6,6 +6,7 @@ import {
   isReminderHour,
   localClock,
   planReminder,
+  switchReminders,
 } from '#model/entities/reminder'
 import type { ReminderLadder } from '#model/entities/reminder'
 
@@ -106,5 +107,37 @@ describe('daysBetween', () => {
   it('counts the person’s days, yesterday being one', () => {
     expect(daysBetween('2026-10-13', '2026-10-14')).toBe(1)
     expect(daysBetween('2026-12-29', '2027-01-02')).toBe(4)
+  })
+})
+
+describe('switchReminders — the switch of MOL-103', () => {
+  it('turns off and on by the person whatever stood before — from either side', () => {
+    for (const from of ['settings', 'bot'] as const) {
+      expect(switchReminders(null, 'off', from)).toBe('chosen')
+      expect(switchReminders('blocked', 'off', from)).toBe('chosen')
+      expect(switchReminders('chosen', 'on', from)).toBeNull()
+    }
+  })
+
+  it('«on» from the settings does not lift a block; a press in the bot does (В-5)', () => {
+    expect(switchReminders('blocked', 'on', 'settings')).toBe('blocked')
+    expect(switchReminders('blocked', 'on', 'bot')).toBeNull()
+  })
+
+  it('a blocked bot turns off only what was on', () => {
+    expect(switchReminders(null, 'blocked', 'bot')).toBe('blocked')
+    expect(switchReminders('chosen', 'blocked', 'bot')).toBe('chosen')
+  })
+
+  it('an unblocked bot turns on only what blocking turned off (В-1)', () => {
+    expect(switchReminders('blocked', 'unblocked', 'bot')).toBeNull()
+    expect(switchReminders('chosen', 'unblocked', 'bot')).toBe('chosen')
+    expect(switchReminders(null, 'unblocked', 'bot')).toBeNull()
+  })
+
+  it('a repeat changes nothing', () => {
+    expect(switchReminders('chosen', 'off', 'bot')).toBe('chosen')
+    expect(switchReminders(null, 'on', 'settings')).toBeNull()
+    expect(switchReminders('blocked', 'blocked', 'bot')).toBe('blocked')
   })
 })

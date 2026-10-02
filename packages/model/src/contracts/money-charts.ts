@@ -1,134 +1,25 @@
 import { z } from 'zod'
-import { exchangeLossesCodec, exchangeLossesViewOf } from './exchange'
 import { monthSchema } from './money'
 import { spendingCategoryViewCodec, spendingCategoryViewOf } from './spending'
 import { exchangeDaySchema } from '#model/entities/exchange'
 import { CHART_LEVEL } from '#model/entities/money-charts'
-import type { ExchangeLosses, MoneyCharts, RateLine } from '#model/entities/money-charts'
 import type { MonthCharts } from '#model/entities/money-chart-month'
+import type { YearCharts } from '#model/entities/money-chart-year'
 import { categoryOrder } from '#model/entities/spending-category'
 import type { SpendingCategory } from '#model/entities/spending-category'
 import { currencySchema, moneyCodec, signedMoneyCodec } from '#model/values/money'
-import { rateCodec } from '#model/values/rates'
-
-/** `?period=6|12`, six when not named (handoff 03); anything else is refused by its name. */
-export const moneyChartsQuerySchema = z.strictObject({
-  period: z
-    .enum(['6', '12'])
-    .default('6')
-    .transform((period) => (period === '12' ? 12 : 6)),
-})
 
 const level = z.int().min(0).max(CHART_LEVEL)
 
-/**
- * `GET /money/charts` (MOL-74): the months of «Графики» side by side, the exchanges against the
- * central bank by exchanger and the rate of the pair by week — counted by the server, every height
- * included, so the phone only draws. A month here is the month of `GET /money/months/:month`.
- */
-export const moneyChartsCodec = z.strictObject({
-  period: z.union([z.literal(6), z.literal(12)]),
-  spendCurrency: currencySchema,
-  incomeCurrency: currencySchema,
-  since: monthSchema.nullable(),
-  months: z.array(
-    z.strictObject({
-      month: monthSchema,
-      spent: moneyCodec,
-      uncounted: z.array(moneyCodec),
-      spentIncome: moneyCodec.nullable(),
-      income: moneyCodec,
-      incomeUncounted: z.array(moneyCodec),
-      difference: signedMoneyCodec.nullable(),
-      change: z.int().nullable(),
-      spentLevel: level,
-      incomeLevel: level,
-      spentIncomeLevel: level.nullable(),
-    }),
-  ),
-  spentAverage: moneyCodec.nullable(),
-  differenceAverage: signedMoneyCodec.nullable(),
-  categories: z.array(
-    z.strictObject({
-      category: spendingCategoryViewCodec,
-      average: moneyCodec.nullable(),
-      averageLevel: level.nullable(),
-      points: z.array(
-        z.strictObject({
-          month: monthSchema,
-          amount: moneyCodec,
-          change: z.int().nullable(),
-          level,
-        }),
-      ),
-    }),
-  ),
-  /** Null — no exchange of the twelve months could be measured: no card (handoff 03). */
-  exchanges: exchangeLossesCodec.nullable(),
-  /** Null — one currency for both, or nothing known of the pair in the period (Р-14). */
-  rate: z
-    .strictObject({
-      points: z.array(
-        z.strictObject({
-          day: exchangeDaySchema,
-          rate: rateCodec.nullable(),
-          level: level.nullable(),
-        }),
-      ),
-      exchanges: z.array(
-        z.strictObject({
-          day: exchangeDaySchema,
-          week: z.int().min(0),
-          rate: rateCodec,
-          level,
-        }),
-      ),
-    })
-    .nullable(),
+/** A sector of a ring, «Остальные» with its members — the month's and the year's alike. */
+const sliceCodec = z.strictObject({
+  categoryId: z.uuid().nullable(),
+  amount: moneyCodec,
+  income: moneyCodec.nullable(),
+  count: z.int().min(1),
+  level,
+  members: z.array(z.uuid()),
 })
-export type MoneyChartsView = z.output<typeof moneyChartsCodec>
-
-/** The charts as they go on the wire, each series of a category named by its category. */
-export function moneyChartsViewOf(
-  period: 6 | 12,
-  charts: MoneyCharts,
-  categories: readonly SpendingCategory[],
-  exchanges: ExchangeLosses | null,
-  rate: RateLine | null,
-): MoneyChartsView {
-  const named = new Map(categoryOrder(categories).map((category) => [category.id, category]))
-  return {
-    period,
-    spendCurrency: charts.spendCurrency,
-    incomeCurrency: charts.incomeCurrency,
-    since: charts.since,
-    months: charts.months.map((month) => ({
-      ...month,
-      uncounted: [...month.uncounted],
-      incomeUncounted: [...month.incomeUncounted],
-    })),
-    spentAverage: charts.spentAverage,
-    differenceAverage: charts.differenceAverage,
-    categories: charts.categories.flatMap((series) => {
-      const category = named.get(series.categoryId)
-      return category
-        ? [
-            {
-              category: spendingCategoryViewOf(category),
-              average: series.average,
-              averageLevel: series.averageLevel,
-              points: series.points.map((point) => ({ ...point })),
-            },
-          ]
-        : []
-    }),
-    exchanges: exchanges && exchangeLossesViewOf(exchanges),
-    rate: rate && {
-      points: rate.points.map((point) => ({ ...point })),
-      exchanges: rate.exchanges.map((exchange) => ({ ...exchange })),
-    },
-  }
-}
 
 /**
  * `GET /money/months/:month/charts` (MOL-158): «Графики → Месяц» — the ring of the month, the
@@ -144,16 +35,7 @@ export const moneyChartMonthCodec = z.strictObject({
   spent: moneyCodec,
   spentIncome: moneyCodec.nullable(),
   uncounted: z.array(moneyCodec),
-  slices: z.array(
-    z.strictObject({
-      categoryId: z.uuid().nullable(),
-      amount: moneyCodec,
-      income: moneyCodec.nullable(),
-      count: z.int().min(1),
-      level,
-      members: z.array(z.uuid()),
-    }),
-  ),
+  slices: z.array(sliceCodec),
   /** Null below three closed months; `comparedFrom` is then the first month that has one. */
   usual: z.strictObject({ from: monthSchema, to: monthSchema, months: z.int().min(1) }).nullable(),
   comparedFrom: monthSchema.nullable(),
@@ -205,5 +87,124 @@ export function moneyChartMonthViewOf(
     },
     usual: charts.usual && { ...charts.usual },
     categories: categoryOrder(categories).map(spendingCategoryViewOf),
+  }
+}
+
+/** A calendar year as `YYYY`, one whose January a rate may be dated by — as a month is (`monthSchema`). */
+export const yearSchema = z
+  .string()
+  .regex(/^\d{4}$/)
+  .refine((year) => monthSchema.safeParse(`${year}-01`).success)
+
+/**
+ * `GET /money/years/:year/charts` (MOL-160): «Графики → Год» — the ring of the calendar year, its
+ * twelve months with the usual month as a dashed line, what came in and went out, and every category
+ * by month. Each month is the month of `GET /money/months/:month`, and the year is their sum.
+ */
+export const moneyChartYearCodec = z.strictObject({
+  year: yearSchema,
+  running: z.boolean(),
+  spendCurrency: currencySchema,
+  incomeCurrency: currencySchema,
+  monthsShown: z.int().min(0).max(12),
+  /** Null past what money holds: the ring is grey, the answer never fails for it. */
+  spent: moneyCodec.nullable(),
+  spentIncome: moneyCodec.nullable(),
+  /** Why there is no «≈»: a month with no rate, or a sum past money. */
+  spentIncomeMissing: z.enum(['rate', 'beyond']).nullable(),
+  /** The months spent in with no rate of their own. */
+  rateMissing: z.array(monthSchema),
+  uncounted: z.array(moneyCodec),
+  slices: z.array(sliceCodec),
+  months: z
+    .array(
+      z.strictObject({
+        month: monthSchema,
+        kind: z.enum(['data', 'before', 'future']),
+        spent: moneyCodec,
+        uncounted: z.array(moneyCodec),
+        spentIncome: moneyCodec.nullable(),
+        income: moneyCodec,
+        incomeUncounted: z.array(moneyCodec),
+        difference: signedMoneyCodec.nullable(),
+        change: z.int().nullable(),
+        spentLevel: level,
+        incomeLevel: level,
+        spentIncomeLevel: level.nullable(),
+      }),
+    )
+    .length(12),
+  /** Null below three closed months; `averageFrom` is then the first month that has one, if any. */
+  average: z
+    .strictObject({
+      amount: moneyCodec,
+      level,
+      from: monthSchema,
+      to: monthSchema,
+      months: z.int().min(1),
+    })
+    .nullable(),
+  averageFrom: monthSchema.nullable(),
+  closedCount: z.int().min(0),
+  /** Why there is no average: too few closed months, each short, or a sum past money. */
+  averageMissing: z.enum(['few', 'uncounted', 'beyond']).nullable(),
+  /** The day the running month is compared to the usual by; null — no running month. */
+  comparedTo: exchangeDaySchema.nullable(),
+  differenceTotal: signedMoneyCodec.nullable(),
+  differenceMissing: z.array(monthSchema),
+  /** The owner's first month with anything in it; null — a newcomer, offered a start. */
+  firstMonth: monthSchema.nullable(),
+  /** Every category of the year's sectors and every live one, largest first (Р-8 of the review). */
+  categories: z.array(
+    z.strictObject({
+      category: spendingCategoryViewCodec,
+      average: moneyCodec.nullable(),
+      averageLevel: level.nullable(),
+      points: z
+        .array(
+          z.strictObject({
+            month: monthSchema,
+            amount: moneyCodec,
+            change: z.int().nullable(),
+            level,
+          }),
+        )
+        .length(12),
+    }),
+  ),
+})
+export type MoneyChartYearView = z.output<typeof moneyChartYearCodec>
+
+/** The year's charts as they go on the wire, each series named by its category. */
+export function moneyChartYearViewOf(
+  charts: YearCharts,
+  categories: readonly SpendingCategory[],
+): MoneyChartYearView {
+  const named = new Map(categories.map((category) => [category.id, category]))
+  return {
+    ...charts,
+    uncounted: [...charts.uncounted],
+    slices: charts.slices.map((slice) => ({ ...slice, members: [...slice.members] })),
+    months: charts.months.map((month) => ({
+      ...month,
+      uncounted: [...month.uncounted],
+      incomeUncounted: [...month.incomeUncounted],
+    })),
+    average: charts.average && { ...charts.average },
+    differenceMissing: [...charts.differenceMissing],
+    rateMissing: [...charts.rateMissing],
+    categories: charts.categories.flatMap((series) => {
+      const category = named.get(series.categoryId)
+      return category
+        ? [
+            {
+              category: spendingCategoryViewOf(category),
+              average: series.average,
+              averageLevel: series.averageLevel,
+              points: series.points.map((point) => ({ ...point })),
+            },
+          ]
+        : []
+    }),
   }
 }

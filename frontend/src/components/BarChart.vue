@@ -21,34 +21,33 @@
         :style="{ height: heightOf(average) }"
         aria-hidden="true"
       ></span>
-      <label
-        v-for="(bar, index) in bars"
-        :key="bar.key"
-        class="bar"
-        :class="{ chosen: index === modelValue }"
-      >
-        <input
-          type="radio"
-          class="radio"
-          :name="name"
-          :value="index"
-          :checked="index === modelValue"
-          :aria-label="bar.spoken"
-          @change="choose(index)"
-        />
-        <span
-          v-if="paired"
-          class="fill outline"
-          :style="{ height: heightOf(bar.outline ?? 0) }"
-          aria-hidden="true"
-        ></span>
-        <span
-          class="fill"
-          :class="{ unknown: bar.level === null }"
-          :style="{ height: bar.level === null ? '100%' : heightOf(bar.level) }"
-          aria-hidden="true"
-        ></span>
-      </label>
+      <template v-for="(bar, index) in bars" :key="bar.key">
+        <!-- A month before the first with data or still to come: a label, no bar, no choice. -->
+        <span v-if="bar.quiet" class="bar quiet" aria-hidden="true"></span>
+        <label v-else class="bar" :class="{ chosen: index === modelValue }">
+          <input
+            type="radio"
+            class="radio"
+            :name="name"
+            :value="index"
+            :checked="index === modelValue"
+            :aria-label="bar.spoken"
+            @change="choose(index)"
+          />
+          <span
+            v-if="paired"
+            class="fill outline"
+            :style="{ height: heightOf(bar.outline ?? 0) }"
+            aria-hidden="true"
+          ></span>
+          <span
+            class="fill"
+            :class="{ unknown: bar.level === null }"
+            :style="{ height: bar.level === null ? '100%' : heightOf(bar.level) }"
+            aria-hidden="true"
+          ></span>
+        </label>
+      </template>
     </div>
     <div class="labels" aria-hidden="true">
       <span
@@ -83,6 +82,11 @@ export interface ChartBar {
   readonly level: number | null
   /** The bar before it in a pair, drawn as an outline — «Пришло» beside «Ушло». */
   readonly outline?: number | null
+  /**
+   * A month with no bar (MOL-160, handoff MOL-157 04): before the first with data, or still to
+   * come — its label stays, and there is nothing to choose. Not `level` null, which is «not known».
+   */
+  readonly quiet?: boolean
 }
 
 /** Six bars and fewer stand apart; twelve stand close (handoff 03). */
@@ -107,7 +111,7 @@ export default defineComponent({
     paired: { type: Boolean, default: false },
     /** One colour for every bar, the chosen one full — a category's (handoff 03). */
     colour: { type: String as PropType<string | null>, default: null },
-    /** A dashed line at this level — the average of the period. */
+    /** A dashed line at this level, drawn over the bars — the average (handoff MOL-157 04). */
     average: { type: Number as PropType<number | null>, default: null },
     /** 120 px of bars rather than 150 (handoff 03, «Категория во времени»). */
     short: { type: Boolean, default: false },
@@ -125,7 +129,8 @@ export default defineComponent({
     /** The bar under the pointer: the area is cut into as many columns as there are bars. */
     const pointer = useChartPointer(area, (fraction) => {
       const n = props.bars.length
-      if (n > 0) choose(Math.min(n - 1, Math.floor(fraction * n)))
+      const index = Math.min(n - 1, Math.floor(fraction * n))
+      if (n > 0 && !props.bars[index]?.quiet) choose(index)
     })
 
     const heightOf = (level: number) => `${String((level * 100) / CHART_LEVEL)}%`
@@ -174,10 +179,11 @@ export default defineComponent({
 
 .average {
   position: absolute;
+  z-index: 1;
   right: 0;
   bottom: 0;
   left: 0;
-  border-top: 1.5px dashed var(--border-strong);
+  border-top: 2px dashed var(--text-muted);
   pointer-events: none;
   transition: height var(--dur) var(--ease);
 }
@@ -197,6 +203,10 @@ export default defineComponent({
     @include focus-ring;
 
     border-radius: var(--radius-sm);
+  }
+
+  &.quiet {
+    cursor: default;
   }
 }
 

@@ -8,8 +8,15 @@ import {
   eraseMeSchema,
   loginPreviewCodec,
   rateFromBotSchema,
+  switchRemindersFromBotSchema,
 } from '@molvia/model'
-import type { DueReminders, LoginPreview, RateFromBot, TelegramUserId } from '@molvia/model'
+import type {
+  DueReminders,
+  LoginPreview,
+  RateFromBot,
+  SwitchRemindersFromBot,
+  TelegramUserId,
+} from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { parseBody, parseQuery, resourceId } from '@/parse'
 import { refuseAnyBody } from './empty-body'
@@ -24,6 +31,7 @@ export function internalAuthRoutes(
     erase(telegramUserId: TelegramUserId): Promise<void>
     claimReminders(): Promise<DueReminders>
     rateFromBot(itemId: string, body: RateFromBot): Promise<void>
+    switchReminders(body: SwitchRemindersFromBot): Promise<void>
   },
 ): void {
   const digest = (value: string): Buffer => createHash('sha256').update(value).digest()
@@ -85,6 +93,13 @@ export function internalAuthRoutes(
         return reply.code(204).send()
       },
     )
+    // The switch (MOL-103): a button under a reminder, or Telegram saying the bot was blocked or
+    // unblocked. `204` whether there was anyone or not — «off» is true of nobody too.
+    scope.post('/internal/reminders/switch', async (request, reply) => {
+      parseQuery(z.strictObject({}), request.query)
+      await api.switchReminders(parseBody(switchRemindersFromBotSchema, request.body))
+      return reply.code(204).send()
+    })
     done()
   })
 }

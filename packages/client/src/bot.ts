@@ -9,9 +9,10 @@ import {
   loginCodeSchema,
   loginPreviewCodec,
   rateFromBotSchema,
+  switchRemindersFromBotSchema,
   verdictPathSchema,
 } from '@molvia/model'
-import type { DueReminders, LoginPreview, TelegramUserId } from '@molvia/model'
+import type { DueReminders, LoginPreview, ReminderSwitch, TelegramUserId } from '@molvia/model'
 import { ApiError, createTransport } from './transport'
 import type { ClientOptions } from './transport'
 
@@ -28,6 +29,11 @@ export interface MolviaBotClient {
   claimReminders(): Promise<DueReminders>
   /** A press of 1–5 under a reminder: the verdict of whoever pressed. Repeats are harmless. */
   rateFromBot(telegramUserId: TelegramUserId, itemId: string, score: number): Promise<void>
+  /**
+   * The switch of the reminders (MOL-103): a button pressed, or the bot blocked or unblocked. The
+   * same answer whether there was anyone or not; repeats are harmless.
+   */
+  switchReminders(telegramUserId: TelegramUserId, change: ReminderSwitch): Promise<void>
 }
 
 /** An internal client has no session and cannot attach its secret to an arbitrary API path. */
@@ -62,6 +68,14 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
       if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'score')
       await request(`/internal/verdicts/${path.data.itemId}`, z.undefined(), {
         method: 'PUT',
+        body: body.data,
+      })
+    },
+    switchReminders: async (telegramUserId, change) => {
+      const body = switchRemindersFromBotSchema.safeParse({ telegramUserId, change })
+      if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'telegramUserId')
+      await request('/internal/reminders/switch', z.undefined(), {
+        method: 'POST',
         body: body.data,
       })
     },

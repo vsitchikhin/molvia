@@ -109,13 +109,13 @@ function dayOf(month: Month, day: number): string {
  * The month's spending by day, added up from the first: `[0]` is nothing, `[d]` is everything to the
  * end of day `d` — in all and per category. Only what a rate counted, as every sum of the month.
  */
-interface Running {
+export interface Running {
   readonly length: number
   readonly total: readonly bigint[]
   readonly byCategory: ReadonlyMap<string, readonly bigint[]>
 }
 
-function runningOf(month: MoneyMonth, groceries: string | undefined): Running {
+export function runningOf(month: MoneyMonth, groceries: string | undefined): Running {
   const length = lengthOf(month.month)
   const daily = Array.from({ length: length + 1 }, () => 0n)
   const byCategory = new Map<string, bigint[]>()
@@ -143,7 +143,7 @@ function runningOf(month: MoneyMonth, groceries: string | undefined): Running {
 }
 
 /** To the end of day `day`, or of the month when it is shorter — February has no 31st. */
-function upTo(list: readonly bigint[] | undefined, length: number, day: number): bigint {
+export function upTo(list: readonly bigint[] | undefined, length: number, day: number): bigint {
   return list?.[Math.min(day, length)] ?? 0n
 }
 

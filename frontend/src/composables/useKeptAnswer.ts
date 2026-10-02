@@ -17,6 +17,11 @@ export interface KeptAnswer<T> {
   /** Why the answer on screen is not one of this visit — the last one kept, and its age. */
   readonly stale: ComputedRef<'loading' | 'offline' | 'error' | null>
   readonly fetchedAt: ComputedRef<Date | null>
+  /**
+   * Every answer kept on this phone for the owner, of any subject, with when it was read — what the
+   * device knows beyond the subject shown (MOL-160, adversarial Ж′), and how fresh (adversarial Л).
+   */
+  readonly kept: ComputedRef<readonly Remembered<T>[]>
   readonly retry: () => Promise<void>
 }
 
@@ -32,7 +37,7 @@ export interface KeptAnswerOptions<T> {
   readonly kept?: number
 }
 
-interface Remembered<T> {
+export interface Remembered<T> {
   readonly answer: T
   readonly fetchedAt: Date
 }
@@ -93,6 +98,17 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
   }
 
   const shown = shallowRef<Remembered<T> | null>(null)
+  /** Every answer kept for the owner, read again whenever what is kept may have changed. */
+  const stored = shallowRef<readonly Remembered<T>[]>([])
+  function recallKept(): void {
+    const id = actor.id
+    stored.value = id
+      ? Object.keys(recallAll(id)).flatMap((name) => {
+          const one = recall(id, name)
+          return one ? [one] : []
+        })
+      : []
+  }
   const failure = ref<'offline' | 'error' | null>(null)
   const confirmed = ref(false)
   let latest = 0
@@ -103,6 +119,7 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
   function adopt(): void {
     const id = actor.id
     shown.value = id ? recall(id, subject.value) : null
+    recallKept()
     failure.value = null
     confirmed.value = false
   }
@@ -120,7 +137,10 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
       // still on its way, or failed, is the freshest there is and is kept (d9 round 2 Е2).
       if (mine < (answered.get(asked) ?? 0)) return
       answered.set(asked, mine)
-      if (actor.id === id) remember(id, asked, answer, fetchedAt)
+      if (actor.id === id) {
+        remember(id, asked, answer, fetchedAt)
+        recallKept()
+      }
       if (actor.id !== id || subject.value !== asked) return
       shown.value = { answer, fetchedAt }
       // A later read already failed: this answer is older than what the phone knows it wrote, so it
@@ -159,6 +179,7 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
       return failure.value ?? 'loading'
     }),
     fetchedAt: computed(() => shown.value?.fetchedAt ?? null),
+    kept: computed(() => stored.value),
     retry: load,
   }
 }

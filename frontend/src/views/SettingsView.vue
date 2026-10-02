@@ -63,6 +63,8 @@
     <!-- Saved on the tap, beside the form and never under its «Сохранить»: the form's four fields
          are also a trip's context (MOL-134, Н-1, В-5). -->
     <SalaryShiftGroup class="group" />
+    <!-- The same, for the bot's rating reminders (MOL-103, Р-1). -->
+    <RemindersGroup class="group" />
     <!-- Outside the form's states: the way into the account does not depend on whether its
          settings loaded (MOL-57). -->
     <section class="group">
@@ -155,6 +157,7 @@ import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
+import RemindersGroup from '@/components/RemindersGroup.vue'
 import SalaryShiftGroup from '@/components/SalaryShiftGroup.vue'
 import SettingsFields from '@/components/SettingsFields.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
@@ -181,6 +184,7 @@ export default defineComponent({
     IconLogout,
     IconPencil,
     IconRefresh,
+    RemindersGroup,
     SalaryShiftGroup,
     ScreenSkeleton,
     ScreenState,
