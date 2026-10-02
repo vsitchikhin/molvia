@@ -77,8 +77,9 @@ export interface ExpenseRepository {
    * «Что брать»: what each place charges, one row per place, currency and unit — the **last**
    * price paid there, not the lowest ever (MOL-166; the owner's decision of MOL-92, В-3: «цены в
    * магазинах подниматься могут, а вот спускаются редко»). Where this person bought, their own
-   * last purchase, in either mode, by the rule «Тут дешевле» reads (`latestFirst`): the home and
-   * the sheet name one price for one milk. A place opened by other people (the shared mode, Р-17)
+   * last purchase, by the rule «Тут дешевле» reads (`latestFirst`): the home and the sheet name one
+   * price for one milk — with access, while they bought there within `freshDays` or nobody else has
+   * opened the place (adversarial О). A place opened by other people (the shared mode, Р-17)
    * is the lower median of each buyer's own last price there (В-1) — three people's figure, never
    * the receipt of whoever bought last, which anyone looking twice would read as it changed — and
    * only of last purchases within `freshDays` (adversarial Б).
@@ -144,7 +145,8 @@ export interface PriceQuery {
   /**
    * How long another person's last purchase still counts towards a place opened by other people —
    * the domain's `SHARED_PRICE_FRESH_DAYS` (MOL-166, adversarial Б). Read by `placePricesFor`
-   * alone; one's own last purchase has no window.
+   * alone; one's own last purchase has none, but a place one has stopped going to within it is
+   * other people's once three of them go now (adversarial О).
    */
   readonly freshDays: number
   /** Where this person is. Read only in the shared mode. */
@@ -786,11 +788,20 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           -- the whole row to pieces and hid the market where the kilo is cheaper.
           select chosen.*,
             sum(weight) over pair as "pairObservations",
-            max(visited) over pair as "pairLatestVisitAt"
+            max(visited) over pair as "pairLatestVisitAt",
+            -- One pair a place (adversarial А, «one row a place»): a place opened by others in two
+            -- packings named itself twice on one row (adversarial П). The pair most of its buyers
+            -- last bought in; the weight, the visit and the key break a tie. A place of one's own
+            -- names one pair anyway — the one's own last purchase was made in.
+            row_number() over (
+              partition by "itemId", "placeId"
+              order by named desc, their_buyers desc, weight desc, visited desc nulls last,
+                       currency, unit
+            ) = 1 as place_pair
           from (
             -- Each figure as the place's own or as other people's, by whose place it is.
             select
-              "itemId", "placeId", "placeName", currency, unit, observations, nearby,
+              "itemId", "placeId", "placeName", currency, unit, observations, nearby, their_buyers,
               case when own then own_price else their_price end as price,
               -- A place of one's own is as fresh as one's own last purchase there, and votes for
               -- its pair with one's own purchases and visit, as its price is (adversarial М, М′):
@@ -839,6 +850,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
                   bool_or(mine and place_last and fresh) as own_recent,
                   bool_or(place_last and fresh) as their_recent,
                   bool_or(mine and place_last) as own_named,
+                  count(distinct actor_id) filter (where place_last and fresh) as their_buyers,
                   count(distinct actor_id) filter (where place_last and fresh)
                     >= ${query.minBuyers} as their_named
                 from (
@@ -856,7 +868,7 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
           ) chosen
           window pair as (partition by "itemId", currency, unit)
         ) weighed
-        where named
+        where named and place_pair
         -- Ordered here rather than after, and by the price itself: the screen shows the
         -- places of one item cheapest first, and a second sort in JavaScript would compare
         -- names by another alphabet than the one that ordered the rows of the answer (F7).

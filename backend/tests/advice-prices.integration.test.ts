@@ -659,3 +659,22 @@ describe('своё место, где давно не брал, — по цен�
     )
   })
 })
+
+describe('у места, открытого другими, — одна пара (MOL-166, адверсариальный П)', () => {
+  it('трое в кило и трое в пачках — место названо один раз, парой большинства', async () => {
+    const me = await insertActor(db)
+    const cheese = await insertItem(db)
+    const market = await insertPlace(db, { name: 'Рынок' })
+    for (const minor of [250_000, 260_000, 270_000, 280_000]) {
+      await bought(await insertActor(db), cheese, market, amd(minor), kilo, { on: ago(3) })
+    }
+    for (const minor of [110_000, 120_000, 130_000]) {
+      await bought(await insertActor(db), cheese, market, amd(minor), piece, { on: ago(2) })
+    }
+
+    const rows = await expenses.placePricesFor(sharedPrices(me, [cheese]))
+    expect(rows.map((row) => [row.placeName, row.unit])).toEqual([['Рынок', 'kg']])
+    // Пачки по-прежнему голосуют за свою пару (Д), хоть место ею и не названо.
+    expect(rows[0]?.pairObservations).toBe(4)
+  })
+})
