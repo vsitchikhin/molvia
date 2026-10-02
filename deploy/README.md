@@ -323,12 +323,43 @@ is 0.2's question, with the lawyer («Персональные данные», s
 database password and `BOT_API_SECRET` are generated anew, BotFather shows the bot's token
 (`/mybots` → API Token), the GHCR token is issued anew. Images are in GHCR, code in git.
 
-## The Postgres image has to carry ICU
+## The Postgres image is part of the contract
 
-«Что брать» orders names with `collate "und-x-icu"` (MOL-31): the database is created with
-`en_US.utf8`, where «Ёжик» sorts before «Ежевика» and a name typed in lower case falls below
-every capitalised one, and one answer must not come back in two alphabets. `postgres:17-alpine`
-carries the ICU collations, and the compose file pins that image — but an image built without
-ICU would make those queries **fail**, not degrade: `ORDER BY` on a collation the server does
-not know is an error. So the image is part of the contract, and swapping it is a migration-sized
-decision rather than a version bump.
+The database runs `pgvector/pgvector:0.8.7-pg17-bookworm` — the exact tag, in `docker-compose.yml`,
+`docker-compose.prod.yml`, both services of CI and the drill of `restore.sh`. Three things depend on
+what the image carries, and none of them degrades quietly:
+
+- **ICU.** «Что брать» orders names with `collate "und-x-icu"` (MOL-31): the database is created
+  with `en_US.utf8`, where «Ёжик» sorts before «Ежевика» and a name typed in lower case falls below
+  every capitalised one, and one answer must not come back in two alphabets. An image without ICU
+  makes those queries **fail**: `ORDER BY` on a collation the server does not know is an error.
+- **`vector`** (MOL-105): the embeddings of the catalogue. An image without it fails migration
+  `0038_pgvector` at boot, and the API does not start.
+- **The libc**, which orders and folds text. Every index whose key is text — the primary keys of
+  codes, the trigram index of `search_key`, the unique `lower()` of a place's name — is built by the
+  rules of the libc it was built under, and answers by the rules of the one it runs under. Swapped
+  under it, an index answers wrongly and says nothing.
+
+So a new tag is a decision, never a version bump. A tag that moves glibc or ICU comes with a
+migration that rebuilds the text indexes and refreshes the ICU collations' versions, as `0038` does.
+
+### The move off `postgres:17-alpine` (MOL-105)
+
+Until MOL-105 the image was `postgres:17-alpine`: musl and no `vector`. The data directory of the
+same Postgres 17 needs no dump, so the move is the merge itself:
+
+1. **Before the merge, the drill on the new image**: `deploy/backup/restore.sh --drill`, run from the
+   branch, restores last night's copy into the image the script now names, building every index under glibc; a unique key
+   that glibc folds into a duplicate fails the restore there, not in production. The row counts
+   must match.
+2. **The merge.** The deploy's `up -d` sees a new image for `postgres` and recreates the container
+   on the same volume; the entrypoint takes the files over for its own `postgres` user.
+3. **The API migrates at boot**: `0038_pgvector` creates `vector`, rebuilds every index of the
+   schema whose key is text or an expression, and gives the ICU collations the version of the new
+   ICU (`und-x-icu` warned on every query until it did). The database's own collation stays without
+   a version, as musl left it: Postgres refuses a change from none to one.
+4. **Check**: `/api/health`, «Что брать» in the app, and the journal of `postgres` for
+   `collation … version mismatch` — there must be none.
+
+A working copy does the same with `make up`: the container is recreated on its volume and the
+migration rebuilds the indexes. `make db-reset` is not needed.

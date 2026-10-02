@@ -53,6 +53,15 @@ The shape worth knowing here:
   three databases with the very statement the file now carries. After the merge the file is
   frozen and a change to the schema is a new migration, always.
 
+- **The Postgres image is an exact tag, and part of the contract** (MOL-105):
+  `pgvector/pgvector:0.8.7-pg17-bookworm` in both compose files, both CI services and the drill of
+  `restore.sh`. It carries ICU, which «Что брать» sorts by (MOL-31), `vector`, which the embeddings
+  need, and glibc, by whose rules every text index is built. A text index built under one libc
+  answers wrongly under another and says nothing, so the move off `postgres:17-alpine` came with
+  migration `0038_pgvector` that rebuilds every index whose key is text or an expression and gives
+  the ICU collations the new version; a later tag that moves glibc or ICU comes with the same.
+  The database's own collation stays without a version — Postgres refuses a change from none to
+  one. Procedure: `deploy/README.md`, «The Postgres image is part of the contract».
 - **Postgres publishes no port.** It is reachable only over the compose network.
 - **The PWA calls `/api/...`** and Caddy strips the prefix — the same shape the Vite dev
   proxy has, so nothing about the origin differs between development and production.

@@ -423,6 +423,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   line by hand.
 - **A merge is a deploy** (MOL-90); a failed deploy puts the previous image back, not the schema,
   **so a migration that drops or renames goes out in two merges**.
+- **The Postgres image is an exact tag and part of the contract** (MOL-105): ICU, `vector` and
+  glibc; a tag that moves a libc comes with a migration that rebuilds the text indexes, as `0038`.
 
 ## Tracker and documentation
 

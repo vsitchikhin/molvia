@@ -34,7 +34,7 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 - `.github/workflows/release.yml` — Release workflow: after green CI on master builds the three images and rolls them out over ssh; a version tag names built images.
 - `bin/bundle.mjs` — esbuild bundler for the API and bot images; the API also gets its forget, seed-catalogue and gates tools.
 - `deploy/Caddyfile` — Caddy config: TLS for the domain, `/api` stripped and proxied to the API, internal routes closed, SPA fallback, headers, no access log.
-- `deploy/README.md` — Operations guide: new machine, deploys and the deploy key, login setup, local prod stack, erasure, seeding, gates, backups and restore.
+- `deploy/README.md` — Operations guide: new machine, deploys and the deploy key, login setup, local prod stack, erasure, seeding, gates, backups and restore, the Postgres image and its move off alpine.
 - `deploy/backup/backup.env.example` — Template of the server's `backup.env`: age recipient, R2 remote, healthchecks.io URL, retention days.
 - `deploy/backup/backup.sh` — Nightly backup: `pg_dump` in the container, encrypted to the owner's age key, streamed to R2, pinged to healthchecks.io.
 - `deploy/backup/molvia-backup.service` — systemd unit running the nightly backup script as the deploy user.
