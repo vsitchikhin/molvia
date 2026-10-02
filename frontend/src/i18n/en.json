@@ -1298,6 +1298,10 @@
         "term": "Rating reminders",
         "text": "When the bot last reminded you to rate your purchases, and which reminder in a row it was — so that it writes less often if you do not answer. And whether the reminders are off — by you, or because you blocked the bot. The message itself carries the item and the shop to Telegram: otherwise the question would not say what it is about."
       },
+      "feedback": {
+        "term": "Messages to the developer",
+        "text": "What you wrote in «Write to the developer», its kind, and what goes with the text: the app version, the screen, the phone’s system and whether it is the app or a browser, the language, and from an error screen its code. And the developer’s replies. Only the developer reads them. A copy of the message reaches the developer in Telegram without your name or account number, and stays in that chat even after the message is deleted here. Kept for a year from the last message of the conversation."
+      },
       "search": {
         "term": "Search picks",
         "text": "What you took for which query, so that next time it comes first. And a query that found nothing, if you then found the item by another word — so that next time your word finds it. Only you see this."
