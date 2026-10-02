@@ -20,9 +20,10 @@ export const adviceScopeSchema = z.enum(['own', 'shared'])
 export type AdviceScope = z.infer<typeof adviceScopeSchema>
 
 /**
- * A place and the lowest unit price seen there for one item. `observations` is how many
- * purchases stand behind it — the same honesty the rating count carries: one purchase is a
- * number, not a history.
+ * A place and what it charges for one item — its last unit price, not the lowest ever seen
+ * (MOL-166): one's own last purchase there, or the lower median of each buyer's last. It does not
+ * stand on `observations`, which is how many purchases there are in the place, in this currency
+ * and unit — what the server weighs to choose one «currency + unit» per item (Р-4).
  */
 export const advicePlaceSchema = z.strictObject({
   placeId: z.uuid(),
@@ -83,7 +84,9 @@ export const adviceRowSchema = z.discriminatedUnion('level', [
      * price alone**, and the difference is the screen's to carry: a cheaper receipt from
      * another city stands below a dearer place at home, because «cheaper elsewhere» is not
      * somewhere one can go. So the first place is not always the cheapest, and only a screen
-     * that compares the prices may call it so (MOL-32, А1). Empty when the item was rated but
+     * that compares the prices may call it so (MOL-32, А1). The row's own «currency + unit»
+     * comes first; places whose last purchase was in another pair follow it, each in its own,
+     * and are never compared with it (MOL-166, adversarial Е). Empty when the item was rated but
      * never bought.
      */
     places: z.array(advicePlaceSchema),
@@ -110,6 +113,17 @@ export type AdviceRow = z.output<typeof adviceRowSchema>
  * their mean and one odd price moves it as far as it likes.
  */
 export const PRICE_MEDIAN_MIN_OBSERVATIONS = 3
+
+/**
+ * How long another person's last purchase in a place still says what the place charges (MOL-166,
+ * the owner's decision on adversarial Б). Older, it is no longer counted towards a place opened by
+ * other people: two who bought at a discount in August and never came back held the place at the
+ * discount, while the one who still shops there saw today's price on the same screen. One's own
+ * last purchase has no such window — it is what the sheet compares with, dated (MOL-166, В-1) —
+ * but with access a place one has not bought at within it is other people's once three of them
+ * have (adversarial О).
+ */
+export const SHARED_PRICE_FRESH_DAYS = 90
 
 /**
  * How many rows one answer carries. It bounds the answer, not the screen: in the own mode a

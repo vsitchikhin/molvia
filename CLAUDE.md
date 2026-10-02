@@ -182,8 +182,14 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **An aggregate needs three people** (`AGGREGATE_MIN_CONTRIBUTIONS`); a stranger's lone verdict
   does not appear at all. **Prices are stricter**, filtered by the asker's country and city, one's
   own purchases excepted and put own city first (Р-26).
-- **«Только если дёшево» is the lower median from three purchases**; one «currency + unit» per
-  item; order by rating down, then name.
+- **A place's price is its last one, not its lowest** (MOL-166): its last purchase in any currency
+  and unit, never the last of a pair; one's own where one bought, by the fragment «Тут дешевле»
+  reads (`latestFirst`) — with access, while one bought there within `SHARED_PRICE_FRESH_DAYS` or
+  nobody else opened it; a place opened by others — the lower median of each buyer's last within
+  the window.
+- **«Только если дёшево» is the lower median from three purchases**; per item the «currency +
+  unit» of most purchases first, the other pairs' places after it, never compared (MOL-166); order
+  by rating down, then name.
 - **The limit never cuts one's own rows or the warnings** (Р-23, Р-25:
   `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
 - **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, **every other reader
@@ -636,16 +642,16 @@ database access. In a product about data integrity, two write paths will silentl
   aggregate, and an aggregate is not shown until it holds several independent
   contributions — three of them, and a contribution is a person, not a row
   (`AGGREGATE_MIN_CONTRIBUTIONS`). Otherwise someone's basket can be derived from the
-  "average price". **An open place discloses exact prices, not blurred ones:** once three
-  buyers open it, the minimum is one person's actual receipt and the median of three is a
-  second — and the median's is in no list of places. Both are accepted: the number of three is
-  argued from the arithmetic of an _average_, and neither of these averages anything. Closing
-  it means giving up the threshold, since a middle built from what is already shown almost
-  never has three places behind it. **The threshold closes the still picture, not the moving
-  one:** a row that
-  read «4.3 · 3 оценки» yesterday and «4.5 · 4 оценки» today hands the fourth person's score
-  to whoever looked twice, and the same holds for prices. Closing that needs noise or delayed
-  publication, neither of which 0.1 has — a known limit, not an oversight.
+  "average price". **An open place discloses exact prices, not blurred ones:** once three buyers
+  open it, its price — the lower median of each buyer's last there (MOL-166) — is one person's
+  actual receipt, and the threshold of «только если дёшево», the lower median of every purchase in
+  the city, is another — or the same one, where each buyer bought once. Both are accepted: the
+  number of three is argued from the arithmetic of an _average_, and neither of these averages
+  anything. Closing it means giving up the threshold, since a middle built from what is already
+  shown almost never has three places behind it. **The threshold closes the still picture, not the
+  moving one:** a row that read «4.3 · 3 оценки» yesterday and «4.5 · 4 оценки» today hands the
+  fourth person's score to whoever looked twice, and the same holds for prices. Closing that needs
+  noise or delayed publication, neither of which 0.1 has — a known limit, not an oversight.
 - Country and city are part of the key from the start, not "we'll add it later".
 
 ## Frontend and styling rules

@@ -106,7 +106,7 @@ describe('трата', () => {
     })
 
     expect(await expenses.unratedFor(stranger, 10)).toEqual([])
-    expect(await expenses.cheapestFor(ownPrices(stranger, [itemId]))).toEqual([])
+    expect(await expenses.placePricesFor(ownPrices(stranger, [itemId]))).toEqual([])
   })
 })
 

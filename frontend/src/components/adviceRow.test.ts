@@ -60,6 +60,19 @@ describe('placesView', () => {
 
     expect(placesView([market, inRubles])).toMatchObject({ cheapest: false })
   })
+
+  it('another pair on the row takes the word away (MOL-166, Е, З)', () => {
+    // The server puts a place whose last purchase is in another pair after the row's own pair;
+    // beside a number it cannot be compared with, «Дешевле всего» reads as a lie.
+    const pack = {
+      ...sas,
+      unitPrice: { ...sas.unitPrice, unit: 'piece' as const, scaledMinor: 1n },
+    }
+
+    expect(placesView([market, pack])).toMatchObject({ rest: [pack], cheapest: false })
+    expect(whereKey(placesView([market, sas, pack]))).toBe('advice.bought_at')
+    expect(whereKey(placesView([market, sas]))).toBe('advice.cheapest_at')
+  })
 })
 
 describe('ownScore', () => {

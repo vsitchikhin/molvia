@@ -17,8 +17,9 @@ export type NeverRow = Extract<AdviceRow, { level: 'never' }>
  *
  * The server returns the places **own city first, then by price** (MOL-31, Р-26), not by price
  * alone: a cheaper receipt from another city stands below a dearer place at home, because
- * «cheaper elsewhere» is not somewhere one can go. So the first place is the one to name — and
- * it is not always the cheapest.
+ * «cheaper elsewhere» is not somewhere one can go. The first place is of the row's own «currency +
+ * unit»; the others may be of another pair, a place whose last purchase was made in it (MOL-166,
+ * adversarial Е, Ж′). So the first place is the one to name — and it is not always the cheapest.
  *
  * `cheapest` says whether it happens to be. **The superlative is said only when it is true**
  * (MOL-32, А1): «Дешевле всего: Рынок в Гюмри — 4 000 ֏/кг» over a line reading «Ещё: SAS
@@ -45,15 +46,24 @@ export function placesView(places: readonly AdvicePlace[]): PlacesView {
     best,
     rest,
     // One place is no comparison at all, so there is nothing to be cheapest among. Prices of
-    // two currencies or two units are no comparison either — the server sends one pair per
-    // item (Р-4), and if that ever stops being true the word goes rather than the screen.
-    cheapest: rest.length > 0 && rest.every((place) => dearer(place, best)),
+    // two currencies or two units are no comparison either, and since the row also lists the
+    // places whose last purchase was in another pair (MOL-166, adversarial Е), any of them on
+    // the row takes the word away: «Дешевле всего» over 2 400 ֏/кг beside 300 ₽/кг read as a
+    // lie whatever it compared (adversarial З, owner's decision).
+    cheapest:
+      rest.length > 0 && rest.every((place) => samePair(place, best) && dearer(place, best)),
   }
 }
 
+function samePair(place: AdvicePlace, best: AdvicePlace): boolean {
+  return (
+    place.unitPrice.currency === best.unitPrice.currency &&
+    place.unitPrice.unit === best.unitPrice.unit
+  )
+}
+
 function dearer(place: AdvicePlace, best: AdvicePlace): boolean {
-  const [a, b] = [place.unitPrice, best.unitPrice]
-  return a.currency === b.currency && a.unit === b.unit && a.scaledMinor >= b.scaledMinor
+  return place.unitPrice.scaledMinor >= best.unitPrice.scaledMinor
 }
 
 /** The key of the word over the named place: a superlative only where it is the truth. */

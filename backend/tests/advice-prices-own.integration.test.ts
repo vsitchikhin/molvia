@@ -8,6 +8,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import {
   ZONE_HEADER,
+  yerevanDate,
+  adviceResponseSchema,
+  adviceSearchResponseSchema,
   ownNeverResponseSchema,
   ownPricesResponseSchema,
   toSearchKey,
@@ -27,6 +30,12 @@ let app: FastifyInstance
 const litre: Quantity = { milli: 1000n, unit: 'l' }
 const amd = (minor: number): Money => ({ minor: BigInt(minor), currency: 'AMD' })
 const perLitre = (amount: number) => unitPrice(amd(amount * 100), litre).scaledMinor
+
+/** A record `days` before today — the window of a row's other pairs counts from today (MOL-166, И). */
+const daysAgo = (days: number) => {
+  const at = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  return { on: yerevanDate(at), at }
+}
 
 beforeAll(async () => {
   app = buildServer({ db })
@@ -244,19 +253,28 @@ describe('GET /advice/prices — the item’s own places', () => {
     ])
   })
 
-  it('keeps currencies and units apart, each its own row', async () => {
+  it('names a place by its last purchase, in that purchase’s currency and unit (MOL-166, А)', async () => {
     const me = await insertActor(db)
     const milk = await item('Молоко Ашхар 1 л')
     const zovuni = await erevan('Зовуни')
-    await bought(me, milk, zovuni, 540)
-    await bought(me, milk, zovuni, 0, { amount: { minor: 15_000n, currency: 'RUB' } })
-    await bought(me, milk, zovuni, 600, { quantity: { milli: 1000n, unit: 'piece' } })
+    await bought(me, milk, zovuni, 540, { on: '2026-09-10' })
+    await bought(me, milk, zovuni, 0, {
+      on: '2026-09-11',
+      amount: { minor: 15_000n, currency: 'RUB' },
+    })
+    await bought(me, milk, zovuni, 600, {
+      on: '2026-09-12',
+      quantity: { milli: 1000n, unit: 'piece' },
+    })
+    await bought(me, milk, await erevan('SAS'), 580, { on: '2026-09-01' })
 
     const answer = await prices(me, { item: milk })
     expect(
       answer.level !== 'never' &&
-        answer.places.map((place) => place.unitPrice.currency + place.unitPrice.unit),
-    ).toEqual(['AMDl', 'AMDpiece', 'RUBl'])
+        answer.places.map(
+          (place) => `${place.name} ${place.unitPrice.currency}${place.unitPrice.unit}`,
+        ),
+    ).toEqual(['SAS AMDl', 'Зовуни AMDpiece'])
   })
 
   it('dates a record from an old queue by its moment in the zone of the request (MOL-121)', async () => {
@@ -310,6 +328,120 @@ describe('GET /advice/prices — a zone Postgres does not know (adversarial Ж)'
     expect(reply.status).toBe(200)
     const answer = ownPricesResponseSchema.parse(JSON.parse(reply.body))
     expect(placesOf(answer.prices)).toHaveLength(1)
+  })
+})
+
+describe('«Что брать» and the sheet name one price for one place (MOL-166)', () => {
+  /** What the home says of an item, read through the contract the client parses. */
+  async function home(actor: string, zone?: string, q?: string) {
+    const headers: Record<string, string> = { cookie: await signIn(db, actor) }
+    if (zone) headers[ZONE_HEADER] = zone
+    const url = q === undefined ? '/advice' : `/advice/search?q=${encodeURIComponent(q)}`
+    const response = await app.inject({ method: 'GET', url, headers })
+    expect(response.statusCode).toBe(200)
+    const rows =
+      q === undefined
+        ? adviceResponseSchema.parse(JSON.parse(response.body)).rows
+        : adviceSearchResponseSchema
+            .parse(JSON.parse(response.body))
+            .items.flatMap((found) => (found.advice ? [found.advice] : []))
+    const [row] = rows
+    if (row?.level !== 'take') throw new Error('expected one row in «Брать»')
+    return row.places.map((place) => ({ name: place.name, price: place.unitPrice.scaledMinor }))
+  }
+
+  const sheet = async (actor: string, milk: string, zone?: string) =>
+    placesOf(await prices(actor, { item: milk, ...(zone ? { zone } : {}) })).map(
+      ({ name, price }) => ({ name, price }),
+    )
+
+  it('names the last price of each place, as the sheet does — not the lowest ever', async () => {
+    const me = await insertActor(db)
+    const milk = await item('Молоко Ашхар 1 л')
+    await rate(me, milk, 5)
+    const zovuni = await erevan('Зовуни')
+    await bought(me, milk, zovuni, 540, { on: '2026-08-12' })
+    await bought(me, milk, zovuni, 600, { on: '2026-09-20' })
+    await bought(me, milk, await erevan('SAS'), 580, { on: '2026-09-15' })
+
+    const named = [
+      { name: 'SAS', price: perLitre(580) },
+      { name: 'Зовуни', price: perLitre(600) },
+    ]
+    expect(await home(me)).toEqual(named)
+    expect(await sheet(me, milk)).toEqual(named)
+  })
+
+  it('names a place where a pack was bought last by the pack, and keeps the row in kilos (adversarial А, Д)', async () => {
+    const me = await insertActor(db)
+    const cheese = await item('Сыр Чанах')
+    await rate(me, cheese, 5)
+    const sas = await erevan('SAS')
+    const kilo: Quantity = { milli: 1000n, unit: 'kg' }
+    for (const days of [62, 55, 48]) {
+      await bought(me, cheese, sas, 2400, { ...daysAgo(days), quantity: kilo })
+    }
+    await bought(me, cheese, sas, 1200, {
+      ...daysAgo(12),
+      quantity: { milli: 1000n, unit: 'piece' },
+    })
+    await bought(me, cheese, await erevan('Ереван Сити'), 2800, {
+      ...daysAgo(14),
+      quantity: kilo,
+    })
+
+    // The kilo weighs four purchases and the pack one (Р-4 by every purchase, adversarial Д), so
+    // the row is in kilos first; SAS, whose last purchase was the pack, follows with its own unit
+    // (adversarial Е).
+    const kilos = { name: 'Ереван Сити', price: unitPrice(amd(280_000), kilo).scaledMinor }
+    const pack = {
+      name: 'SAS',
+      price: unitPrice(amd(120_000), { milli: 1000n, unit: 'piece' }).scaledMinor,
+    }
+    expect(await home(me)).toEqual([kilos, pack])
+    expect(await sheet(me, cheese)).toEqual([kilos, pack])
+  })
+
+  it('keeps the shop of every week on the row when the kilo is a market of a year ago (adversarial Е)', async () => {
+    const me = await insertActor(db)
+    const cheese = await item('Сыр Чанах')
+    await rate(me, cheese, 5)
+    const sas = await erevan('SAS')
+    const kilo: Quantity = { milli: 1000n, unit: 'kg' }
+    for (let week = 1; week <= 10; week += 1) {
+      await bought(me, cheese, sas, 2600, { ...daysAgo(83 - week), quantity: kilo })
+    }
+    await bought(me, cheese, sas, 1200, {
+      ...daysAgo(1),
+      quantity: { milli: 1000n, unit: 'piece' },
+    })
+    await bought(me, cheese, await erevan('Рынок'), 2400, {
+      ...daysAgo(400),
+      quantity: kilo,
+    })
+
+    expect(await home(me)).toEqual([
+      { name: 'Рынок', price: unitPrice(amd(240_000), kilo).scaledMinor },
+      { name: 'SAS', price: unitPrice(amd(120_000), { milli: 1000n, unit: 'piece' }).scaledMinor },
+    ])
+  })
+
+  it('reads a record from an old queue in the zone the request names, on the list and in its search', async () => {
+    // No day of its own: 01:30 of the 13th in Yerevan, 14:30 of the 12th in Los Angeles.
+    const me = await insertActor(db)
+    const milk = await item('Молоко Ашхар 1 л')
+    await rate(me, milk, 5)
+    const zovuni = await erevan('Зовуни')
+    await bought(me, milk, zovuni, 540, { on: null, at: new Date('2026-09-12T21:30:00Z') })
+    await bought(me, milk, zovuni, 600, { on: '2026-09-12', at: new Date('2026-09-12T23:00:00Z') })
+
+    const yerevan = [{ name: 'Зовуни', price: perLitre(540) }]
+    const losAngeles = [{ name: 'Зовуни', price: perLitre(600) }]
+    expect(await home(me)).toEqual(yerevan)
+    expect(await sheet(me, milk)).toEqual(yerevan)
+    expect(await home(me, 'America/Los_Angeles')).toEqual(losAngeles)
+    expect(await home(me, 'America/Los_Angeles', 'молоко')).toEqual(losAngeles)
+    expect(await sheet(me, milk, 'America/Los_Angeles')).toEqual(losAngeles)
   })
 })
 

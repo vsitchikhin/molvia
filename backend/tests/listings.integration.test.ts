@@ -44,7 +44,7 @@ describe('пустые выборки', () => {
     expect(await trips.listFor(actorId, 10)).toEqual([])
     expect(await trips.latestUnfinishedFor(actorId)).toBeNull()
     expect(await expenses.unratedFor(actorId, 10)).toEqual([])
-    expect(await expenses.cheapestFor(ownPrices(actorId, []))).toEqual([])
+    expect(await expenses.placePricesFor(ownPrices(actorId, []))).toEqual([])
     expect(await verdicts.listFor(actorId, 10)).toEqual([])
     expect(await places.recentFor(actorId, 10)).toEqual([])
   })
@@ -196,17 +196,30 @@ describe('где дешевле', () => {
       amount: price,
     })
 
-    const [row] = await expenses.cheapestFor(ownPrices(actorId, [itemId]))
+    const [row] = await expenses.placePricesFor(ownPrices(actorId, [itemId]))
     expect(row?.scaledMinor).toBe(unitPrice(price, litre).scaledMinor)
   })
 
-  it('берёт минимум по месту и не смешивает валюты', async () => {
+  it('берёт последнюю покупку места и не смешивает валюты (MOL-166)', async () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
+    const market = await insertPlace(db, { name: 'Рынок' })
     const itemId = await insertItem(db)
     const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
+    // Written straight in: a second open record would be refused (one open at a time).
+    const elsewhere = await insertTrip(db, { actorId, placeId: market })
 
     const cheaper: Money = { minor: 49_000n, currency: 'AMD' }
+    await expenses.add(actorId, {
+      id: randomUUID(),
+      tripId: trip.id,
+      itemId,
+      quantity: litre,
+      amount: cheaper,
+    })
+    // Две пачки одной записи — по поздней строке, хотя ранняя дешевле; без паузы их моменты могут
+    // совпасть.
+    await db.execute(sql`select pg_sleep(0.01)`)
     await expenses.add(actorId, {
       id: randomUUID(),
       tripId: trip.id,
@@ -216,34 +229,29 @@ describe('где дешевле', () => {
     })
     await expenses.add(actorId, {
       id: randomUUID(),
-      tripId: trip.id,
-      itemId,
-      quantity: litre,
-      amount: cheaper,
-    })
-    await expenses.add(actorId, {
-      id: randomUUID(),
-      tripId: trip.id,
+      tripId: elsewhere,
       itemId,
       quantity: litre,
       amount: { minor: 50_000n, currency: 'RUB' },
     })
 
-    const rows = await expenses.cheapestFor(ownPrices(actorId, [itemId]))
+    const rows = await expenses.placePricesFor(ownPrices(actorId, [itemId]))
     const drams = rows.find((row) => row.currency === 'AMD')
 
     expect(rows).toHaveLength(2)
-    expect(drams?.scaledMinor).toBe(unitPrice(cheaper, litre).scaledMinor)
+    expect(drams?.scaledMinor).toBe(unitPrice(price, litre).scaledMinor)
     expect(drams?.observations).toBe(2)
   })
 
-  it('порядок задан полным ключом: валюты одного места не меняются местами', async () => {
+  it('у места одна строка — валюта его последней покупки (MOL-166, адверсариальный А)', async () => {
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
     const itemId = await insertItem(db)
     const trip = (await trips.start(actorId, { id: randomUUID(), placeId }, 'AMD', null)).trip
 
     for (const currency of ['USD', 'AMD', 'EUR', 'RUB'] as const) {
+      // Без паузы моменты строк могут совпасть, и последнюю решал бы uuid.
+      await db.execute(sql`select pg_sleep(0.01)`)
       await expenses.add(actorId, {
         id: randomUUID(),
         tripId: trip.id,
@@ -253,11 +261,9 @@ describe('где дешевле', () => {
       })
     }
 
-    // Сортировки по позиции и месту мало: строки одного места остаются связанными, а
-    // связанные строки планировщик вправе отдать в любом порядке.
     for (let load = 0; load < 4; load += 1) {
-      const rows = await expenses.cheapestFor(ownPrices(actorId, [itemId]))
-      expect(rows.map((row) => row.currency)).toEqual(['AMD', 'EUR', 'RUB', 'USD'])
+      const rows = await expenses.placePricesFor(ownPrices(actorId, [itemId]))
+      expect(rows.map((row) => row.currency)).toEqual(['RUB'])
     }
   })
 
@@ -271,7 +277,7 @@ describe('где дешевле', () => {
     await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId, amount: price })
     await expenses.add(actorId, { id: randomUUID(), tripId: trip.id, itemId, quantity: litre })
 
-    expect(await expenses.cheapestFor(ownPrices(actorId, [itemId]))).toEqual([])
+    expect(await expenses.placePricesFor(ownPrices(actorId, [itemId]))).toEqual([])
   })
 })
 

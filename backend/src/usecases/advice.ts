@@ -8,6 +8,7 @@ import {
   EVENT,
   NEVER_BELOW_TENTHS,
   PRICE_MEDIAN_MIN_OBSERVATIONS,
+  SHARED_PRICE_FRESH_DAYS,
   adviceResponseSchema,
   adviceSearchResponseSchema,
   averageScore,
@@ -28,6 +29,7 @@ import type { ExpenseRepository, PlacePrice, PriceMedian } from '@/db/expenses-r
 import type { ItemRepository } from '@/db/items-repository'
 import type { AdviceVerdictRow, VerdictRepository } from '@/db/verdicts-repository'
 import { SEARCH_LIMIT } from '@/usecases/search-catalogue'
+import type { Today } from '@/usecases/today'
 
 export interface AdviceDeps {
   readonly actors: ActorRepository
@@ -61,6 +63,11 @@ const groupKeyOf = (price: { currency: string; unit: string }): GroupKey =>
 export async function advice(
   { actors, verdicts, expenses, events }: AdviceDeps,
   actorId: string,
+  /**
+   * The phone's day and zone (MOL-121): which purchase of a place is its last, as «Тут дешевле»
+   * reads it, and the today other people's last purchases are counted back from.
+   */
+  phone: Today = {},
 ): Promise<AdviceResponse> {
   const actor = await actors.byId(actorId)
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
@@ -78,7 +85,7 @@ export async function advice(
     limit: ADVICE_LIMIT,
   })
 
-  const rows = await describe(expenses, actor, scope, rated.rows)
+  const rows = await describe(expenses, actor, scope, rated.rows, phone)
 
   // Encoded here rather than only in the route, the way `tripViewFor` is: an answer the wire
   // cannot carry has to fail where it was built, beside the data that made it.
@@ -145,6 +152,7 @@ export async function adviceSearch(
   { actors, verdicts, expenses, items }: AdviceSearchDeps,
   actorId: string,
   query: string,
+  phone: Today = {},
 ): Promise<AdviceSearchResponse> {
   const actor = await actors.byId(actorId)
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
@@ -169,7 +177,7 @@ export async function adviceSearch(
             itemIds,
           })
         ).rows
-  const rows = await describe(expenses, actor, scope, rated)
+  const rows = await describe(expenses, actor, scope, rated, phone)
   const byItem = new Map(rows.map((row) => [row.itemId, row]))
   const answered = [...first, ...past.filter((item) => byItem.has(item.id))]
 
@@ -200,6 +208,7 @@ async function describe(
   actor: { readonly id: string; readonly country: string; readonly city: string },
   scope: AdviceScope,
   rated: readonly AdviceVerdictRow[],
+  { today, zone }: Today,
 ): Promise<AdviceRow[]> {
   const levelled = rated.map((row) => ({ row, level: verdictLevel(row.sum, row.count) }))
   const asked = (...levels: readonly VerdictLevel[]) =>
@@ -209,6 +218,7 @@ async function describe(
     actorId: actor.id,
     scope,
     minBuyers: AGGREGATE_MIN_CONTRIBUTIONS,
+    freshDays: SHARED_PRICE_FRESH_DAYS,
     country: actor.country,
     city: actor.city,
   }
@@ -217,7 +227,12 @@ async function describe(
   // «только если дёшево», so asking for the medians of everything else was half the work of
   // every screen spent on a number nobody would read.
   const [places, medians] = await Promise.all([
-    expenses.cheapestFor({ ...query, itemIds: asked('take', 'if_cheap') }),
+    expenses.placePricesFor({
+      ...query,
+      itemIds: asked('take', 'if_cheap'),
+      ...(today === undefined ? {} : { today }),
+      ...(zone === undefined ? {} : { zone }),
+    }),
     expenses.medianPriceFor({ ...query, itemIds: asked('if_cheap') }),
   ])
 
@@ -242,32 +257,66 @@ function groupPrices(places: readonly PlacePrice[]): Map<string, Map<GroupKey, P
 }
 
 /**
- * Which «currency + unit» an item's prices are shown in (Р-4). The one with the most
- * observations, and the most recent visit breaks a tie — the day of the trip, never the hour
- * an offline queue delivered it: a single trip abroad must not replace a year of buying the
- * same thing at home. Two prices from different groups cannot be
- * compared without a rate, and a rate belongs to one trip and one day.
+ * The «currency + unit» pairs of an item, the one its row is shown in first (Р-4). The one with
+ * the most observations, and the most recent visit breaks a tie — the day of the trip, never the
+ * hour an offline queue delivered it: a single trip abroad must not replace a year of buying the
+ * same thing at home. Two prices from different pairs cannot be compared without a rate, and a
+ * rate belongs to one trip and one day: the threshold and the superlative stay inside the first.
+ *
+ * Weighed by every purchase in the pair, the server's `pairObservations` — not by the places the
+ * pair still names (MOL-166, adversarial Д): a place is named by its last purchase alone, and one
+ * pack in a shop bought by the kilo for ten weeks turned the row to pieces and hid the market.
+ *
+ * **The other pairs follow, not vanish** (MOL-166, adversarial Е, owner's decision): a place whose
+ * last purchase is in another pair is still where one buys — weighed into kilos by its own ten
+ * kilos, a shop of packs left the row naming a market bought at once a year ago, and the shop of
+ * every week nowhere. Its places come after the first pair's, each with its own unit.
+ *
+ * **A pair with a place in the asker's own city comes before any without** (Р-26 across pairs,
+ * adversarial Ж): «cheaper elsewhere» is not somewhere one can go, and weighed alone, three kilos
+ * in an Erevan shop put it at the head of a Gyumri resident's row over the market of their city —
+ * a place of the own city bought at within the window, as a place of another pair must be (И).
  */
-function dominant(groups: Map<GroupKey, PlacePrice[]>): [GroupKey, PlacePrice[]] | undefined {
-  let best: [GroupKey, PlacePrice[]] | undefined
-  let bestWeight = { observations: 0, latestVisitAt: 0 }
-  for (const [key, places] of groups) {
-    const observations = places.reduce((sum, place) => sum + place.observations, 0)
-    const latestVisitAt = Math.max(...places.map((place) => place.latestVisitAt.getTime()))
-    const better =
-      observations > bestWeight.observations ||
-      (observations === bestWeight.observations && latestVisitAt > bestWeight.latestVisitAt) ||
-      // Both equal: the key itself decides, so two loads of one screen cannot disagree.
-      (observations === bestWeight.observations &&
-        latestVisitAt === bestWeight.latestVisitAt &&
-        best !== undefined &&
-        key < best[0])
-    if (better) {
-      best = [key, places]
-      bestWeight = { observations, latestVisitAt }
-    }
-  }
-  return best
+function ranked(groups: Map<GroupKey, PlacePrice[]>): [GroupKey, PlacePrice[]][] {
+  // The same on every row of one pair; the largest, should a caller ever hand two apart.
+  const weight = (places: readonly PlacePrice[]) => ({
+    // Only a place bought at within the window (review №12): one pack at home two years ago put
+    // its pair over thirty kilos in Erevan, and named a price nobody has seen since.
+    nearby: places.some((place) => place.nearby && place.recent) ? 1 : 0,
+    observations: Math.max(...places.map((place) => place.pairObservations)),
+    latestVisitAt: Math.max(...places.map((place) => place.pairLatestVisitAt.getTime())),
+  })
+  return [...groups].sort(([aKey, aPlaces], [bKey, bPlaces]) => {
+    const [a, b] = [weight(aPlaces), weight(bPlaces)]
+    // Both equal: the key itself decides, so two loads of one screen cannot disagree.
+    return (
+      b.nearby - a.nearby ||
+      b.observations - a.observations ||
+      b.latestVisitAt - a.latestVisitAt ||
+      (aKey < bKey ? -1 : aKey > bKey ? 1 : 0)
+    )
+  })
+}
+
+/**
+ * The places a row names, in the order it names them. The first is the first pair's first — own
+ * city, then price (Р-26, Р-27). The rest are the rest of that pair and the places of the other
+ * pairs bought at within the window (adversarial И, owner's decision: the first pair has none, В-1)
+ * or no earlier than the place the row names (adversarial К of round 6, owner's decision Н): a row
+ * never hides a place fresher than the one it names, **own city first across all of them** (Р-26,
+ * adversarial Ж′): pairs laid end to end put an Erevan shop of the first pair over the shop next
+ * door in the second. Otherwise in the order of the pairs and of the server.
+ */
+function rowPlaces(pairs: readonly [GroupKey, PlacePrice[]][]): PlacePrice[] {
+  const [first, ...others] = pairs
+  if (!first) return []
+  const [head, ...tail] = first[1]
+  if (!head) return []
+  const shown = (place: PlacePrice) =>
+    place.recent || place.latestVisitAt.getTime() >= head.latestVisitAt.getTime()
+  const rest = [...tail, ...others.flatMap(([, inPair]) => inPair.filter(shown))]
+  // A stable sort: only «own city or not» moves anything.
+  return [head, ...rest.sort((a, b) => Number(b.nearby) - Number(a.nearby))]
 }
 
 function placesOf(places: readonly PlacePrice[]): AdvicePlace[] {
@@ -304,8 +353,9 @@ function rowOf(
   // нигде» gets no price, no place and no threshold — the row has no field to put them in.
   if (level === 'never') return { ...rated, level }
 
-  const chosen = groups ? dominant(groups) : undefined
-  const places = placesOf(chosen?.[1] ?? [])
+  const pairs = groups ? ranked(groups) : []
+  const chosen = pairs[0]
+  const places = placesOf(rowPlaces(pairs))
   if (level === 'take') return { ...rated, level, places }
 
   const median = chosen ? medians.get(`${row.itemId}${chosen[0]}`) : undefined

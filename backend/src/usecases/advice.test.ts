@@ -3,7 +3,12 @@ import { ERROR, actorSchema, itemSchema, unitPrice } from '@molvia/model'
 import type { Actor, Item, Money, Quantity } from '@molvia/model'
 import type { ActorRepository } from '@/db/actors-repository'
 import type { EventRepository, RecordedEvent } from '@/db/events-repository'
-import type { ExpenseRepository, PlacePrice, PriceMedian } from '@/db/expenses-repository'
+import type {
+  ExpenseRepository,
+  PlacePrice,
+  PriceMedian,
+  PriceQuery,
+} from '@/db/expenses-repository'
 import type { ItemRepository } from '@/db/items-repository'
 import type { AdviceQuery, AdviceVerdictRow, VerdictRepository } from '@/db/verdicts-repository'
 import { ADVICE_SEARCH_CANDIDATES, advice, adviceSearch } from './advice'
@@ -37,15 +42,22 @@ function rated(patch: Partial<AdviceVerdictRow> & { sum: number }): AdviceVerdic
   return { itemId: BEEF, name: 'Говядина, вырезка', count: 1, review: null, isMine: true, ...patch }
 }
 
+/** A place alone in its pair unless the pair's weight is named. */
 function price(patch: Partial<PlacePrice> & { scaledMinor: bigint }): PlacePrice {
+  const observations = patch.observations ?? 1
+  const latestVisitAt = patch.latestVisitAt ?? new Date('2026-09-18T10:00:00.000Z')
   return {
     itemId: BEEF,
     placeId: MARKET,
     placeName: 'Рынок в Гюмри',
     currency: 'AMD',
     unit: 'kg',
-    observations: 1,
-    latestVisitAt: new Date('2026-09-18T10:00:00.000Z'),
+    observations,
+    latestVisitAt,
+    pairObservations: observations,
+    pairLatestVisitAt: latestVisitAt,
+    nearby: true,
+    recent: true,
     ...patch,
   }
 }
@@ -96,7 +108,7 @@ function deps(world: World = {}) {
     remove: () => Promise.reject(new Error('remove was not expected')),
     unratedFor: () => Promise.reject(new Error('unratedFor was not expected')),
     pendingVerdictsFor: () => Promise.reject(new Error('pendingVerdictsFor was not expected')),
-    cheapestFor: (query) => {
+    placePricesFor: (query) => {
       pricedItems.push([...query.itemIds])
       return Promise.resolve(world.prices ?? [])
     },
@@ -222,7 +234,7 @@ describe('места и порог', () => {
     expect(row?.level === 'take' && row.places).toEqual([])
   })
 
-  it('берёт группу с бóльшим числом наблюдений, а не последнюю покупку', async () => {
+  it('ставит первой группу с бóльшим числом наблюдений, а не последнюю покупку', async () => {
     const prices = [
       price({ scaledMinor: perKilo(479_000), observations: 8 }),
       price({
@@ -235,8 +247,150 @@ describe('места и порог', () => {
 
     const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
 
-    expect(row?.level === 'take' && row.places).toHaveLength(1)
-    expect(row?.level === 'take' && row.places[0]?.unitPrice.currency).toBe('AMD')
+    // Другая пара не пропадает, а идёт следом (адверсариальный Е).
+    expect(row?.level === 'take' && row.places.map((place) => place.unitPrice.currency)).toEqual([
+      'AMD',
+      'RUB',
+    ])
+  })
+
+  it('взвешивает пару всеми её покупками, а не местами, которые она называет (адверсариальный Д)', async () => {
+    // SAS: десять кило, потом пачка — место названо пачкой; рынок: одно кило. Пара «кг» весит 11.
+    const prices = [
+      price({ scaledMinor: perKilo(240_000), observations: 1, pairObservations: 11 }),
+      price({
+        placeId: SAS,
+        placeName: 'SAS',
+        unit: 'piece',
+        scaledMinor: 120_000n,
+        observations: 1,
+        latestVisitAt: new Date('2026-10-01T10:00:00.000Z'),
+      }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    // Строка в кило; SAS, чья последняя покупка — пачка, — следом, со своей единицей (Е).
+    expect(
+      row?.level === 'take' && row.places.map((place) => [place.name, place.unitPrice.unit]),
+    ).toEqual([
+      ['Рынок в Гюмри', 'kg'],
+      ['SAS', 'piece'],
+    ])
+  })
+
+  it('ставит первой пару с местом своего города, хоть она и легче (Р-26, адверсариальный Ж)', async () => {
+    const prices = [
+      price({
+        placeName: 'SAS Ереван',
+        scaledMinor: perKilo(260_000),
+        observations: 3,
+        nearby: false,
+      }),
+      price({ placeId: SAS, placeName: 'Рынок', unit: 'piece', scaledMinor: 120_000n }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
+      'Рынок',
+      'SAS Ереван',
+    ])
+  })
+
+  it('давнее место своего города не ставит свою пару первой (селфревью №12)', async () => {
+    const prices = [
+      price({
+        placeName: 'SAS Ереван',
+        scaledMinor: perKilo(260_000),
+        observations: 30,
+        nearby: false,
+      }),
+      price({
+        placeId: SAS,
+        placeName: 'Рынок',
+        unit: 'piece',
+        scaledMinor: 120_000n,
+        recent: false,
+        latestVisitAt: new Date('2024-10-02T09:00:00.000Z'),
+      }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    // Пара кило первой; двухлетняя пачка — место другой пары вне окна — со строки уходит (И).
+    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual(['SAS Ереван'])
+  })
+
+  it('место другой пары — на строке, только пока брали там в окне (адверсариальный И)', async () => {
+    const prices = [
+      price({ scaledMinor: perKilo(240_000), observations: 3 }),
+      price({ placeId: SAS, placeName: 'SAS', scaledMinor: perKilo(260_000) }),
+      price({
+        placeId: CHEESE,
+        placeName: 'Пятёрочка',
+        currency: 'RUB',
+        scaledMinor: 1n,
+        nearby: false,
+        recent: false,
+        latestVisitAt: new Date('2024-10-02T09:00:00.000Z'),
+      }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
+      'Рынок в Гюмри',
+      'SAS',
+    ])
+  })
+
+  it('не прячет место другой пары, свежее первого места строки (раунд 6, К; решение Н)', async () => {
+    const prices = [
+      price({
+        scaledMinor: perKilo(240_000),
+        pairObservations: 11,
+        latestVisitAt: new Date('2025-08-28T09:00:00.000Z'),
+        recent: false,
+      }),
+      price({
+        placeId: SAS,
+        placeName: 'SAS',
+        unit: 'piece',
+        scaledMinor: 120_000n,
+        latestVisitAt: new Date('2026-06-24T09:00:00.000Z'),
+        recent: false,
+      }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    // Окно SAS не держит, но рынок, который строка называет, ещё старше.
+    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
+      'Рынок в Гюмри',
+      'SAS',
+    ])
+  })
+
+  it('«Ещё» — свой город первым и через пары (Р-26, адверсариальный Ж′)', async () => {
+    const prices = [
+      price({ scaledMinor: perKilo(240_000), observations: 3 }),
+      price({
+        placeId: SAS,
+        placeName: 'SAS Ереван',
+        scaledMinor: perKilo(260_000),
+        nearby: false,
+      }),
+      price({ placeId: CHEESE, placeName: 'Магазин у дома', unit: 'piece', scaledMinor: 120_000n }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
+      'Рынок в Гюмри',
+      'Магазин у дома',
+      'SAS Ереван',
+    ])
   })
 
   it('при равном числе наблюдений решает последняя покупка', async () => {
@@ -482,5 +636,48 @@ describe('поиск «Что брать» (MOL-128)', () => {
     await expect(adviceSearch(world.deps, ACTOR, 'сыр')).rejects.toThrow(
       expect.objectContaining({ code: ERROR.NO_ACTOR }),
     )
+  })
+})
+
+describe('зона телефона (MOL-166)', () => {
+  function asking(rows: AdviceVerdictRow[]) {
+    const all = deps({ rows })
+    const queries: PriceQuery[] = []
+    const expenses: ExpenseRepository = {
+      ...all.expenses,
+      placePricesFor: (query) => {
+        queries.push(query)
+        return Promise.resolve([])
+      },
+    }
+    return { deps: { ...all, expenses }, queries }
+  }
+
+  it('доходит до цен мест: «последняя» читается в той же зоне, что на листе', async () => {
+    const { deps: withZone, queries } = asking([rated({ itemId: BEEF, sum: 5 })])
+
+    await advice(withZone, ACTOR, { zone: 'Asia/Tokyo' })
+
+    expect(queries.map((query) => query.zone)).toEqual(['Asia/Tokyo'])
+  })
+
+  it('несёт и сегодня телефона — от него окно чужих цен', async () => {
+    const { deps: withToday, queries } = asking([rated({ itemId: BEEF, sum: 5 })])
+
+    await advice(withToday, ACTOR, { today: '2026-10-02', zone: 'Asia/Yerevan' })
+
+    expect(queries.map(({ today, zone }) => ({ today, zone }))).toEqual([
+      { today: '2026-10-02', zone: 'Asia/Yerevan' },
+    ])
+  })
+
+  it('без зоны поля нет вовсе — репозиторий берёт Ереван', async () => {
+    const { deps: withoutZone, queries } = asking([rated({ itemId: BEEF, sum: 5 })])
+
+    await advice(withoutZone, ACTOR)
+
+    expect(queries).toHaveLength(1)
+    expect(queries[0]).not.toHaveProperty('zone')
+    expect(queries[0]).not.toHaveProperty('today')
   })
 })

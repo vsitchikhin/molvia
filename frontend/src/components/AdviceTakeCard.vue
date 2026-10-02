@@ -63,8 +63,9 @@ export default defineComponent({
       unitPriceText(place.unitPrice, t, locale.value)
 
     // The word is «Дешевле всего» only where that is true: the places come own city first,
-    // then by price (Р-26), so the named one is not always the cheapest (MOL-32, А1). How many
-    // there are, and which of them is dearest, is visible to the screen alone (MOL-34).
+    // then by price (Р-26), and may include another pair (MOL-166, Е), so the named one is not
+    // always the cheapest nor comparable with all (MOL-32, А1; adversarial З). How many there
+    // are, and which of them is dearest, is visible to the screen alone (MOL-34).
     const where = computed(() => {
       const view = places.value
       if (view.kind === 'none') return ''

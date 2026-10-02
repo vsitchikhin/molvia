@@ -205,23 +205,24 @@ describe('три группы', () => {
 })
 
 describe('цены', () => {
-  it('отдаёт места по возрастанию цены за единицу с названием и числом наблюдений', async () => {
+  it('отдаёт места по возрастанию последней цены за единицу с названием и числом наблюдений', async () => {
     const actorId = await insertActor(db)
     const market = await insertPlace(db, { name: 'Рынок в Гюмри' })
     const sas = await insertPlace(db, { name: 'SAS' })
     const itemId = await insertItem(db, { name: 'Говядина' })
     await rate(actorId, itemId, 5)
     await bought(actorId, itemId, sas, amd(510_000))
-    await bought(actorId, itemId, market, amd(479_000))
-    await bought(actorId, itemId, market, amd(490_000))
+    await bought(actorId, itemId, market, amd(479_000), { startedAt: new Date('2026-09-01') })
+    await bought(actorId, itemId, market, amd(490_000), { startedAt: new Date('2026-09-20') })
 
     const [row] = (await screen(actorId)).rows
 
+    // Цена места — последняя, а не минимум (MOL-166).
     expect(row?.level === 'take' && row.places).toEqual([
       {
         placeId: market,
         name: 'Рынок в Гюмри',
-        unitPrice: { scaledMinor: perKilo(479_000), currency: 'AMD', unit: 'kg' },
+        unitPrice: { scaledMinor: perKilo(490_000), currency: 'AMD', unit: 'kg' },
         observations: 2,
       },
       {
@@ -270,18 +271,76 @@ describe('цены', () => {
     expect(row?.level === 'take' && row.places).toEqual([])
   })
 
-  it('не смешивает валюты: показывает ту, в которой покупали чаще', async () => {
+  it('свой город первым и между парами: рынок Гюмри в штуках — над тремя кило ереванского SAS', async () => {
+    // Р-26 и через пары (MOL-166, адверсариальный Ж): «дешевле в другом городе» — не место у полки.
+    const actorId = await insertActor(db)
+    const sas = await insertPlace(db, { name: 'SAS', city: 'Ереван' })
+    const market = await insertPlace(db, { name: 'Рынок', city: 'Гюмри' })
+    const itemId = await insertItem(db, { name: 'Сыр чанах' })
+    await rate(actorId, itemId, 5)
+    // Days from today: SAS is a pair other than the first, shown only within the window (И).
+    const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    for (const days of [62, 48, 31]) {
+      await bought(actorId, itemId, sas, amd(260_000), { startedAt: daysAgo(days) })
+    }
+    await bought(actorId, itemId, market, amd(120_000), {
+      startedAt: daysAgo(4),
+      quantity: { milli: 1000n, unit: 'piece' },
+    })
+
+    const [row] = (await screen(actorId)).rows
+    expect(
+      row?.level === 'take' && row.places.map((place) => [place.name, place.unitPrice.unit]),
+    ).toEqual([
+      ['Рынок', 'piece'],
+      ['SAS', 'kg'],
+    ])
+  })
+
+  it('давний чек другой пары не стоит на строке: московский сыр двухлетней давности (адверсариальный И)', async () => {
+    const actorId = await insertActor(db)
+    const market = await insertPlace(db, { name: 'Рынок', city: 'Гюмри' })
+    const sas = await insertPlace(db, { name: 'SAS', city: 'Гюмри' })
+    const moscow = await insertPlace(db, { name: 'Пятёрочка', country: 'RU', city: 'Москва' })
+    const itemId = await insertItem(db, { name: 'Сыр чанах' })
+    await rate(actorId, itemId, 5)
+    const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    for (const days of [20, 10, 3]) {
+      await bought(actorId, itemId, market, amd(240_000), { startedAt: daysAgo(days) })
+    }
+    await bought(actorId, itemId, sas, amd(260_000), { startedAt: daysAgo(5) })
+    await bought(
+      actorId,
+      itemId,
+      moscow,
+      { minor: 45_000n, currency: 'RUB' },
+      {
+        startedAt: daysAgo(730),
+      },
+    )
+
+    const [row] = (await screen(actorId)).rows
+    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual(['Рынок', 'SAS'])
+  })
+
+  it('не смешивает валюты: первой — та, в которой покупали чаще, другая — следом', async () => {
+    // Two places: a place is named by its last purchase alone (MOL-166, А), so the pairs are
+    // weighed across places.
     const actorId = await insertActor(db)
     const placeId = await insertPlace(db)
+    const other = await insertPlace(db, { name: 'Рынок' })
     const itemId = await insertItem(db)
     await rate(actorId, itemId, 5)
     await bought(actorId, itemId, placeId, amd(479_000))
     await bought(actorId, itemId, placeId, amd(490_000))
-    await bought(actorId, itemId, placeId, { minor: 50_000n, currency: 'RUB' })
+    await bought(actorId, itemId, other, { minor: 50_000n, currency: 'RUB' })
 
     const [row] = (await screen(actorId)).rows
-    expect(row?.level === 'take' && row.places).toHaveLength(1)
-    expect(row?.level === 'take' && row.places[0]?.unitPrice.currency).toBe('AMD')
+    // Место в рублях не пропадает, а идёт следом со своей валютой (MOL-166, адверсариальный Е).
+    expect(row?.level === 'take' && row.places.map((place) => place.unitPrice.currency)).toEqual([
+      'AMD',
+      'RUB',
+    ])
   })
 })
 
@@ -304,7 +363,7 @@ describe('чужое', () => {
     expect(row?.level === 'take' && row.places).toEqual([])
   })
 
-  it('с доступом — средняя по троим и общая цена', async () => {
+  it('с доступом — средняя по троим, а у места, где брал сам, — своя цена (MOL-166, В-1)', async () => {
     const me = await insertActor(db)
     await grantAccess(me)
     const placeId = await insertPlace(db)
@@ -323,7 +382,8 @@ describe('чужое', () => {
     expect(answer.scope).toBe('shared')
     expect(row?.rating).toBe('4.3')
     expect(row?.ratingsCount).toBe(3)
-    expect(row?.level === 'take' && row.places[0]?.unitPrice.scaledMinor).toBe(perKilo(479_000))
+    // Как на листе покупки: место открыто троими, но я там брал — моя последняя, а не чужая.
+    expect(row?.level === 'take' && row.places[0]?.unitPrice.scaledMinor).toBe(perKilo(510_000))
   })
 
   it('на двоих отдаёт мои цифры: из средней вычиталась бы чужая оценка', async () => {
