@@ -4,6 +4,7 @@ import type { BudgetPlan, BudgetPlanValue } from '#model/entities/money-budget'
 import type { MoneyMonth } from '#model/entities/money-month'
 import { SPENDING_PRESETS } from '#model/entities/spending-category'
 import type { SpendingCategory } from '#model/entities/spending-category'
+import { INT8_MAX } from '#model/support/decimal'
 import { money } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
 import { parseRate, yerevanMidnight } from '#model/values/rates'
@@ -125,6 +126,7 @@ describe('monthBudget — the rows', () => {
         categoryId: id('groceries'),
         plan: amount('77400 AMD'),
         planned: cash('77400 AMD'),
+        awaitingIncome: false,
         estimated: false,
         plannedWhole: true,
         spent: cash('52300 AMD'),
@@ -161,24 +163,37 @@ describe('monthBudget — the rows', () => {
     expect(row?.planned).toEqual(cash('0.02 AMD'))
   })
 
-  it('plans nothing of nothing: «Пришло» empty is a plan of zero, never a failure', () => {
-    const [row] = monthBudget(
-      month({ income: cash('0 RUB'), byCategory: spentIn({ cafe: '1000 AMD' }) }),
-      [plan('cafe', '2026-10', share(5))],
+  it('waits for «Пришло» while it is empty: no plan, nothing over, out of «осталось» (review 1, В)', () => {
+    const budget = monthBudget(
+      month({ income: cash('0 RUB'), byCategory: spentIn({ cafe: '5000 AMD', rent: '1 AMD' }) }),
+      [plan('cafe', '2026-10', share(5)), plan('rent', '2026-10', amount('250000 AMD'))],
       categories,
-    ).rows
-    expect(row?.planned).toEqual(cash('0 AMD'))
-    expect(row?.left).toEqual(cash('-1000 AMD'))
-    expect(row?.used).toBeNull()
+    )
+    expect(budget.rows[0]).toMatchObject({
+      awaitingIncome: true,
+      planned: null,
+      left: null,
+      used: null,
+      estimated: false,
+      plannedWhole: true,
+    })
+    expect(budget.total).toMatchObject({ planned: cash('250000 AMD'), whole: false })
+    expect(budgetFigure(budget)).toEqual({ planned: true, left: null })
   })
 
-  it('plans nothing of nothing with no rate of the month either', () => {
-    const [row] = monthBudget(
+  it('waits for «Пришло» with no rate of the month either, and not once something came in', () => {
+    const empty = monthBudget(
       month({ income: cash('0 RUB'), rate: null }),
       [plan('cafe', '2026-10', share(5))],
       categories,
-    ).rows
-    expect(row).toMatchObject({ planned: cash('0 AMD'), plannedWhole: true })
+    )
+    expect(empty.rows[0]).toMatchObject({ awaitingIncome: true, planned: null })
+    const short = monthBudget(
+      month({ income: cash('0 RUB'), incomeUncounted: [cash('100 USD')] }),
+      [plan('cafe', '2026-10', share(5))],
+      categories,
+    )
+    expect(short.rows[0]).toMatchObject({ awaitingIncome: false, plannedWhole: false })
   })
 
   it('cannot count a share with no rate of the month — no plan, never a zero', () => {
@@ -218,7 +233,13 @@ describe('monthBudget — the rows', () => {
 
   it.each([
     ['exactly the plan', '250000 AMD', '0 AMD', 100],
-    ['a dram short of it', '249999 AMD', '1 AMD', 100],
+    [
+      'a dram short of it — rounded down, never «100 %» beside what is left',
+      '249999 AMD',
+      '1 AMD',
+      99,
+    ],
+    ['1 200 ֏ short of it (adversarial Г)', '248800 AMD', '1200 AMD', 99],
     ['a dram past it', '250001 AMD', '-1 AMD', 100],
     ['a tenth past it', '275000 AMD', '-25000 AMD', 110],
   ])('%s', (_, spent, left, used) => {
@@ -362,6 +383,32 @@ describe('monthBudget — the total', () => {
     expect(budget.total?.leftIncome).toEqual(cash('-2325.58 RUB'))
   })
 
+  it('says no «≈» when the income currency is the spending one (review 4, adversarial Е)', () => {
+    const budget = monthBudget(
+      month({ incomeCurrency: 'AMD', income: cash('500000 AMD'), rate: null }),
+      [plan('rent', '2026-10', amount('250000 AMD'))],
+      categories,
+    )
+    expect(budget.total).toMatchObject({ left: cash('250000 AMD'), leftIncome: null, whole: true })
+  })
+
+  it('leaves out of the sum a plan that would carry it past what money holds (adversarial А)', () => {
+    const budget = monthBudget(
+      month({ byCategory: spentIn({ cafe: '100 AMD' }) }),
+      [
+        plan('cafe', '2026-10', amount('1000 AMD')),
+        plan('rent', '2026-10', { kind: 'amount', amount: money(INT8_MAX, 'AMD') }),
+      ],
+      categories,
+    )
+    expect(budget.total).toMatchObject({
+      planned: cash('1000 AMD'),
+      spent: cash('100 AMD'),
+      left: cash('900 AMD'),
+      whole: false,
+    })
+  })
+
   it('has no figure in the income currency with no rate of the month', () => {
     const budget = monthBudget(
       month({ rate: null, byCategory: spentIn({ rent: '1 AMD' }) }),
@@ -373,6 +420,12 @@ describe('monthBudget — the total', () => {
 })
 
 describe('monthBudget — savings (В-4)', () => {
+  it('is a plan of the month by itself: the way in is no «не задан» (adversarial Д)', () => {
+    const budget = monthBudget(month(), [plan(null, '2026-10', share(25))], categories)
+    expect(budget.total).toBeNull()
+    expect(budgetFigure(budget)).toEqual({ planned: true, left: null })
+  })
+
   it('sets «Разница» of «Пришло» beside the target', () => {
     const budget = monthBudget(
       month({ spentIncome: cash('86800 RUB') }),

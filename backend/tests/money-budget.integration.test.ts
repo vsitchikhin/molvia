@@ -13,10 +13,10 @@ import {
 import type { CachedRate, MoneyBudgetView, MoneyMonthView } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
-import { budgetPlans, moneyMonthRates } from '@/db/schema'
+import { budgetPlans, expenses, moneyMonthRates } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, signIn } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
@@ -182,7 +182,13 @@ describe('«Бюджет» (MOL-117)', () => {
     await cacheRates()
     const me = await owner()
     await receive(me, '100000', `${m1}-10`)
-    await plan(me, await presetId(me, 'groceries'), m1, share(10))
+    // Set from the month before, so the write freezes that month and the read alone freezes m1.
+    await plan(me, await presetId(me, 'groceries'), m2, share(10))
+    const written = await db
+      .select()
+      .from(moneyMonthRates)
+      .where(eq(moneyMonthRates.actorId, me.id))
+    expect(written.map((row) => row.month)).toEqual([m2])
 
     const view = await budget(me, m1)
     expect(view.rows[0]).toMatchObject({
@@ -192,7 +198,56 @@ describe('«Бюджет» (MOL-117)', () => {
       plannedWhole: true,
     })
     const frozen = await db.select().from(moneyMonthRates).where(eq(moneyMonthRates.actorId, me.id))
-    expect(frozen.map((row) => row.month)).toEqual([m1])
+    expect(frozen.map((row) => row.month).sort()).toEqual([m2, m1])
+  })
+
+  it('процент — от зарплаты, перенесённой в следующий месяц, а месяц без дохода ждёт его (Р-3)', async () => {
+    await cacheRates()
+    const me = await owner()
+    const shift = await call(me, 'PUT', '/actors/me/salary-shift', { day: 25 })
+    expect(shift.statusCode).toBe(200)
+    await receive(me, '100000', `${m2}-26`)
+    await spend(me, '5000', `${m2}-27`, 'groceries')
+    await plan(me, await presetId(me, 'groceries'), m2, share(10))
+
+    expect((await budget(me, m1)).rows[0]).toMatchObject({
+      planned: amd(40000),
+      awaitingIncome: false,
+    })
+    const waiting = await budget(me, m2)
+    expect(waiting.rows[0]).toMatchObject({
+      awaitingIncome: true,
+      planned: null,
+      left: null,
+      spent: amd(5000),
+    })
+    expect(waiting.total).toMatchObject({ whole: false })
+    expect((await month(me, m2)).budget).toEqual({ planned: true, left: null })
+  })
+
+  it('поход — в «Продуктах»: строка плана видит его деньги, как месяц «Денег»', async () => {
+    const me = await owner()
+    const tripId = await insertTrip(db, {
+      actorId: me.id,
+      placeId: await insertPlace(db),
+      startedAt: new Date(`${m1}-12T09:00:00Z`),
+      finishedAt: new Date(`${m1}-12T09:30:00Z`),
+      finishedOn: `${m1}-12`,
+    })
+    await db.insert(expenses).values({
+      id: randomUUID(),
+      tripId,
+      itemId: await insertItem(db),
+      amountMinor: 1_250_000n,
+      amountCurrency: 'AMD',
+    })
+    await plan(me, await presetId(me, 'groceries'), m1, sum('50000'))
+
+    const [row] = (await budget(me, m1)).rows
+    expect(row).toMatchObject({ spent: amd(12500), left: amd(37500), used: 25 })
+    expect((await month(me, m1)).byCategory).toEqual([
+      { categoryId: await presetId(me, 'groceries'), amount: amd(12500) },
+    ])
   })
 
   it('цель накоплений — процент против «Разницы» месяца (В-4)', async () => {

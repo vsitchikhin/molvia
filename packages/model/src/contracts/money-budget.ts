@@ -43,6 +43,7 @@ export const moneyBudgetCodec = z.strictObject({
       categoryId: z.uuid(),
       plan: budgetPlanValueCodec,
       planned: moneyCodec.nullable(),
+      awaitingIncome: z.boolean(),
       estimated: z.boolean(),
       plannedWhole: z.boolean(),
       spent: moneyCodec,

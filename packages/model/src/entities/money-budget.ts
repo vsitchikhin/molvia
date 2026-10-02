@@ -1,6 +1,5 @@
 import { z } from 'zod'
 import { convertSigned } from '#model/entities/money-account'
-import { shareOf } from '#model/entities/money-month'
 import type { MoneyMonth, Month } from '#model/entities/money-month'
 import { categoryOrder } from '#model/entities/spending-category'
 import type { SpendingCategory } from '#model/entities/spending-category'
@@ -52,8 +51,16 @@ export function planIn(
 export interface BudgetRow {
   readonly categoryId: string
   readonly plan: BudgetPlanValue
-  /** The plan in the spending currency; null — nothing to count it by (a share with no rate). */
+  /**
+   * The plan in the spending currency; null — nothing to count it by: a share with no rate, or a
+   * share of a «Пришло» nothing has come into yet (`awaitingIncome`).
+   */
   readonly planned: Money | null
+  /**
+   * A share of a «Пришло» still empty (review 1, adversarial В): the plan is not zero, it is not known
+   * yet — the salary has not come — so the row is no «сверх плана» and no part of «осталось».
+   */
+  readonly awaitingIncome: boolean
   /** Converted from another currency by the month's rate: the screen prints «≈» (Р-4). */
   readonly estimated: boolean
   /** A share of a «Пришло» some of which no rate counted: the plan is short by it. */
@@ -63,7 +70,11 @@ export interface BudgetRow {
   readonly spentWhole: boolean
   /** The plan less what was spent, signed — below zero is «сверх плана» (Р-7). */
   readonly left: Money | null
-  /** What was spent of the plan, in whole percent; null where either side is not whole or nothing. */
+  /**
+   * What was spent of the plan, in whole percent rounded as a person rounds — but «100 %» only once
+   * the plan is spent: 248 800 of 250 000 is «99 %», never «100 %» beside 1 200 ֏ still left
+   * (adversarial Г). Null where either side is not whole, or the plan is nothing.
+   */
   readonly used: number | null
 }
 
@@ -80,9 +91,16 @@ export interface BudgetTotal {
   readonly left: Money
   /** What was spent in categories with no plan, apart (Р-6): it is no part of «осталось». */
   readonly unplanned: Money
-  /** `left` in the income currency by the month's rate; null with no rate. */
+  /**
+   * `left` in the income currency by the month's rate; null with no rate, and null when the two
+   * currencies are one — the same figure again under «≈» says nothing (review 4, adversarial Е).
+   */
   readonly leftIncome: Money | null
-  /** Every row's plan and spending counted whole — else «осталось» is not said as a figure. */
+  /**
+   * Every row's plan and spending counted whole — else «осталось» is not said as a figure. A row
+   * whose plan would carry the sum past what money holds is left out of it, as a spending is from
+   * «Потрачено» (adversarial А): an answer that fails to encode would be a 500 for good.
+   */
   readonly whole: boolean
 }
 
@@ -102,7 +120,7 @@ export interface MonthBudget {
   readonly month: Month
   readonly rows: readonly BudgetRow[]
   readonly unplanned: readonly BudgetUnplanned[]
-  /** Null while no category of the month has a plan. */
+  /** Null while no category of the month has a plan; the savings target alone has none. */
   readonly total: BudgetTotal | null
   readonly savings: BudgetSavings
 }
@@ -111,30 +129,37 @@ export interface MonthBudget {
 function plannedOf(
   plan: BudgetPlanValue,
   month: MoneyMonth,
-): { planned: Money | null; estimated: boolean; whole: boolean } {
+): { planned: Money | null; estimated: boolean; whole: boolean; awaitingIncome: boolean } {
   const spend = month.spendCurrency
   if (plan.kind === 'amount') {
     if (plan.amount.currency === spend)
-      return { planned: plan.amount, estimated: false, whole: true }
+      return { planned: plan.amount, estimated: false, whole: true, awaitingIncome: false }
     const converted = month.rate === null ? null : convertAcross(plan.amount, month.rate)
     return {
       planned: converted?.currency === spend ? converted : null,
       estimated: true,
       whole: true,
+      awaitingIncome: false,
     }
   }
-  // Nothing came in is nothing in any currency, with or without a rate — as `spentIncome` is.
+  // Nothing has come in yet, and none of it short of a rate: the share waits for the income.
+  if (month.income.minor === 0n && month.incomeUncounted.length === 0) {
+    return { planned: null, estimated: false, whole: true, awaitingIncome: true }
+  }
   const income =
-    month.income.currency === spend || month.income.minor === 0n
-      ? { minor: month.income.minor, currency: spend }
+    month.income.currency === spend
+      ? month.income
       : month.rate === null
         ? null
         : convertAcross(month.income, month.rate)
-  if (income?.currency !== spend) return { planned: null, estimated: true, whole: false }
+  if (income?.currency !== spend) {
+    return { planned: null, estimated: true, whole: false, awaitingIncome: false }
+  }
   return {
     planned: { minor: divideRounded(income.minor * BigInt(plan.percent), 100n), currency: spend },
     estimated: month.income.currency !== spend,
     whole: month.incomeUncounted.length === 0,
+    awaitingIncome: false,
   }
 }
 
@@ -167,21 +192,19 @@ export function monthBudget(
       continue
     }
     if (category.archivedAt !== null && !touched) continue
-    const { planned, estimated, whole } = plannedOf(plan, month)
+    const { planned, estimated, whole, awaitingIncome } = plannedOf(plan, month)
     const left = planned === null ? null : { minor: planned.minor - spent.minor, currency: spend }
     rows.push({
       categoryId: category.id,
       plan,
       planned,
+      awaitingIncome,
       estimated,
       plannedWhole: whole,
       spent,
       spentWhole,
       left,
-      used:
-        planned === null || !whole || !spentWhole
-          ? null
-          : (shareOf(spent, planned)?.percent ?? null),
+      used: planned === null || !whole || !spentWhole ? null : usedOf(spent, planned),
     })
   }
 
@@ -194,28 +217,33 @@ export function monthBudget(
   }
 }
 
+function usedOf(spent: Money, planned: Money): number | null {
+  if (planned.minor <= 0n) return null
+  const rounded = Number(divideRounded(spent.minor * 100n, planned.minor))
+  return spent.minor < planned.minor ? Math.min(rounded, 99) : rounded
+}
+
 function totalOf(
   rows: readonly BudgetRow[],
   unplanned: readonly BudgetUnplanned[],
   month: MoneyMonth,
 ): BudgetTotal {
   const spend = month.spendCurrency
-  const counted = rows.filter((row) => row.planned !== null)
-  // Each sum is of amounts money holds, and at most a few dozen of them: within what a bigint holds,
-  // and kept within what money does by the checks below — a sum past it is no figure.
-  const planned = counted.reduce((sum, row) => sum + (row.planned?.minor ?? 0n), 0n)
-  const spent = counted.reduce((sum, row) => sum + row.spent.minor, 0n)
+  // A row whose plan would carry the sum past what money holds is left out, as a spending is from
+  // «Потрачено» (adversarial А); what was spent is at most the month's, which money holds.
+  let planned = 0n
+  let spent = 0n
+  let counted = 0
+  for (const row of rows) {
+    if (row.planned === null || planned + row.planned.minor > INT8_MAX) continue
+    planned += row.planned.minor
+    spent += row.spent.minor
+    counted += 1
+  }
   const left: Money = { minor: planned - spent, currency: spend }
-  const whole =
-    counted.length === rows.length &&
-    rows.every((row) => row.plannedWhole && row.spentWhole) &&
-    planned <= INT8_MAX
+  const whole = counted === rows.length && rows.every((row) => row.plannedWhole && row.spentWhole)
   const leftIncome =
-    month.incomeCurrency === spend
-      ? { ...left, currency: month.incomeCurrency }
-      : month.rate === null
-        ? null
-        : convertSigned(left, month.rate)
+    month.incomeCurrency === spend || month.rate === null ? null : convertSigned(left, month.rate)
   return {
     planned: { minor: planned, currency: spend },
     spent: { minor: spent, currency: spend },
@@ -255,7 +283,8 @@ function savingsOf(month: MoneyMonth, plan: BudgetPlanValue | null): BudgetSavin
  */
 export function budgetFigure(budget: MonthBudget): { planned: boolean; left: Money | null } {
   return {
-    planned: budget.total !== null,
+    // The savings target is a plan too (adversarial Д): set alone, the month is no «не задан».
+    planned: budget.total !== null || budget.savings.target !== null,
     left: budget.total?.whole ? budget.total.left : null,
   }
 }
