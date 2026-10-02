@@ -75,7 +75,9 @@ The shape worth knowing here:
   indexes glibc built, the same corruption the other way round, and the migration, recorded as
   applied, would never run again — **and comes back rebuilt** (round 3, Ж): the old API the rollback
   brought up writes by glibc's rules into musl's indexes until it is stopped, so the database alone
-  goes up on alpine and `deploy/reindex-text.sql` rebuilds every text index before the API starts.
+  goes up on alpine, `deploy/window-duplicates.sql` settles what the window wrote twice — search
+  picks merged as their upsert merges, a login code dropped, a pair of places named for the hand
+  (round 5, З) — and `deploy/reindex-text.sql` rebuilds every text index before the API starts.
   Procedure: `deploy/README.md`, «The Postgres image is part of the
   contract».
 - **Postgres publishes no port.** It is reachable only over the compose network.
