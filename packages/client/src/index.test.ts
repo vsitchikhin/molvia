@@ -1536,6 +1536,16 @@ describe('«Деньги» (MOL-82)', () => {
     await expect(late.moneyCharts(6)).rejects.toThrow()
   })
 
+  it('reads «Графики → Год» (MOL-160) by the year in the path, and asks nothing for no year', async () => {
+    const { client, calls } = clientReplying(200, {})
+    await expect(client.moneyChartYear('2026')).rejects.toThrow()
+    expect(new URL(calls[0]?.url ?? '').pathname).toBe('/money/years/2026/charts')
+
+    const { client: none, calls: asked } = clientReplying(200, {})
+    await expect(none.moneyChartYear('26')).rejects.toMatchObject({ code: 'error.not_found' })
+    expect(asked).toHaveLength(0)
+  })
+
   it('reads and saves «зарплата с … числа» (MOL-134) at its own address, off as null', async () => {
     const { client, calls } = clientReplying(200, { day: 25 })
     expect(await client.salaryShift()).toEqual({ day: 25 })

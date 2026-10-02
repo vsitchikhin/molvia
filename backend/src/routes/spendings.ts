@@ -3,6 +3,7 @@ import {
   DomainError,
   ERROR,
   moneyChartMonthCodec,
+  moneyChartYearCodec,
   moneyChartsCodec,
   moneyChartsQuerySchema,
   moneyMonthCodec,
@@ -14,11 +15,13 @@ import {
   spendingCategoriesResponseCodec,
   spendingCategoryBodySchema,
   spendingViewCodec,
+  yearSchema,
 } from '@molvia/model'
 import type {
   ChartPeriod,
   JournalKey,
   MoneyChartMonthView,
+  MoneyChartYearView,
   MoneyChartsView,
   MoneyMonthView,
   SalaryShift,
@@ -48,6 +51,7 @@ export interface SpendingsApi {
   month(actor: Asking, month: string, cursor?: JournalKey): Promise<MoneyMonthView>
   charts(actor: Asking, period: ChartPeriod): Promise<MoneyChartsView>
   chartMonth(actor: Asking, month: string): Promise<MoneyChartMonthView>
+  chartYear(actor: Asking, year: string): Promise<MoneyChartYearView>
   salaryShift(actor: Asking): Promise<SalaryShift>
   setSalaryShift(actor: Asking, body: SalaryShift): Promise<SalaryShift>
 }
@@ -179,6 +183,19 @@ export function spendingRoutes(app: FastifyInstance, api: SpendingsApi): void {
       parseQuery(z.strictObject({}), request.query)
       const view = await api.chartMonth(ownerOf(request), month.data)
       return privately(reply).send(z.encode(moneyChartMonthCodec, view))
+    },
+  )
+
+  /** «Графики → Год» (MOL-160): the calendar year's ring, months, flow and categories. */
+  app.get<{ Params: { year: string } }>(
+    '/money/years/:year/charts',
+    { exposeHeadRoute: false },
+    async (request, reply) => {
+      const year = yearSchema.safeParse(request.params.year)
+      if (!year.success) throw new DomainError(ERROR.NOT_FOUND)
+      parseQuery(z.strictObject({}), request.query)
+      const view = await api.chartYear(ownerOf(request), year.data)
+      return privately(reply).send(z.encode(moneyChartYearCodec, view))
     },
   )
 
