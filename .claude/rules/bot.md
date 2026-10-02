@@ -297,12 +297,16 @@ in `.scratch/tasks/requirements/MOL-103.md`.
   «unblocked» writes nothing on anyone not blocked. **Not for a press of the switch** (adversarial
   round 3, О): «Не напоминать» and «Вернуть» tell the API themselves, and two words of one press
   arrived in no order — the count of the button and the ladder hung on which came first. What stays
-  unordered is a press of the scale and its verdict, which the switch does not touch. **The named
-  prices:** a press followed at once by a block may let its «unblocked» arrive after the block and
-  turn the reminders on until that evening's 403; and if Telegram hands a bot the presses of someone
-  who blocked it — not checked on live Telegram — a digit pressed under an old reminder turns them
-  on until the same 403. The updates the bot polls for are named (`ALLOWED_UPDATES`): left to «the
-  previous setting» a token keeps, one once polled with a narrower list would never hear of a block.
+  unordered is the «unblocked» of a press of the scale — with its verdict, which the switch does not
+  touch, and with a press of the switch right after it (round 4, О4): over a stuck `blocked`, one
+  unit of «turned off under a reminder» and the ladder hang on which arrives first. Accepted rather
+  than waited for: the slower request has to lose to a verdict, an edit and a whole next update, and
+  waiting would put the rating back in the API's queue. **The named prices:** a press followed at
+  once by a block may let its «unblocked» arrive after the block and turn the reminders on until
+  that evening's 403; and if Telegram hands a bot the presses of someone who blocked it — not
+  checked on live Telegram — a digit pressed under an old reminder turns them on until the same 403.
+  The updates the bot polls for are named (`ALLOWED_UPDATES`): left to «the previous setting» a
+  token keeps, one once polled with a narrower list would never hear of a block.
 - **Turning off is counted** (В-4): `reminder_days` adds `off_button`, `off_settings` and
   `off_blocked` — people whose reminders went from on to off that day, by how, with no id — and
   `make gates` prints them under the lever, as counts and no verdict: whether the reminder annoys.

@@ -96,13 +96,16 @@ export function muteComposer({ api }: MuteDeps): Composer<Context> {
  * «START» — a word typed or a digit pressed under an old reminder is what such a person does.
  *
  * Installed first, before every composer, since each of them may end the update. Not waited for:
- * the login or the rating behind it must not stand in the API's queue, and «unblocked» changes only
- * `blocked` — on anyone else it writes nothing. **Not for a press of the switch**: «Не напоминать»
- * and «Вернуть» tell the API themselves, and the two words of one press would arrive in no order
- * (round 3, О). What stays unordered is a press of the scale and its verdict, which the switch does
- * not touch. The named price: a press followed at once by a block may let its «unblocked» arrive
- * after the block's word and turn the reminders on for one evening, until that evening's 403 turns
- * them off again.
+ * the login or the rating behind it must not stand in the API's queue, and «unblocked» changes
+ * only `blocked` — on anyone else it writes nothing. **Not for a press of the switch**: «Не
+ * напоминать» and «Вернуть» tell the API themselves, and the two words of one press would arrive
+ * in no order (round 3, О). What stays unordered is the «unblocked» of a press of the scale — with
+ * its verdict, which the switch does not touch, and with a press of the switch right after it
+ * (round 4, О4): over a stuck `blocked`, the count of «Не напоминать» and the ladder then hang on
+ * which arrives first. Accepted: it needs the slower request to lose to a verdict, an edit and a
+ * whole next update, and waiting for it would put the rating back in the API's queue. The named
+ * price: a press followed at once by a block may let its «unblocked» arrive after the block's word
+ * and turn the reminders on for one evening, until that evening's 403 turns them off again.
  */
 export function heardFrom({ api }: MuteDeps): MiddlewareFn {
   return async (ctx, next) => {
