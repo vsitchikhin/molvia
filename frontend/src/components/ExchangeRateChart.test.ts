@@ -334,6 +334,37 @@ describe('ExchangeRateChart (MOL-161)', () => {
     expect([...seen].sort()).toEqual(['Вторник', 'Среда'])
   })
 
+  it('three exchanges on one spot go round all three by taps (adversarial О, review 7)', async () => {
+    // One day at one rate — one centre; three days running — centres within 2 px.
+    const spots = {
+      'one day': [
+        ['2026-02-24', 571],
+        ['2026-02-24', 571],
+        ['2026-02-24', 571],
+      ],
+      'three days running': [
+        ['2026-02-23', 568],
+        ['2026-02-24', 571],
+        ['2026-02-25', 574],
+      ],
+    } as const
+    for (const [label, spot] of Object.entries(spots)) {
+      const exchanges = spot.map(([day, x], index) =>
+        point(`a0000000-0000-4000-8000-00000000002${String(index)}`, day, 3, x, {
+          place: `Касса ${String(index + 1)}`,
+        }),
+      )
+      const { view, area } = chart([rouble({ exchanges })])
+      area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 180 }) as DOMRect
+      const seen = new Set<string>()
+      for (let tap = 0; tap < 6; tap += 1) {
+        await at(view, area, 171.3, 106.2)
+        seen.add(view.find('.mine-place').text().split(' · ')[0] ?? '')
+      }
+      expect([...seen].sort(), label).toEqual(['Касса 1', 'Касса 2', 'Касса 3'])
+    }
+  })
+
   it('a chain of dots 7 px apart: a tap and a slide choose the one under the finger (adversarial Н)', async () => {
     // One place, one rate, every eight days: centres 7,2 px apart on 300 px, each overlapping the next.
     const chain = [

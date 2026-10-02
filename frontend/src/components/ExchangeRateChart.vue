@@ -214,6 +214,8 @@ const MARGIN = 50
 const FINGER_PX = 12
 /** How far from its centre a dot is drawn, its ring included (`.halo`, 14 px wide). */
 const RING_PX = 7
+/** Dots this much nearer or farther from the finger than each other are one spot to the eye. */
+const SAME_SPOT_PX = 3
 /** Half the end of the mark, in thousandths of the plot's width. */
 const TICK = 14
 
@@ -338,11 +340,13 @@ export default defineComponent({
     /**
      * A tap is read by what is drawn, in pixels (adversarial Л, М, Н, review 6). **The dot under the
      * finger is chosen** — the nearest within `FINGER_PX`; measured in thousandths, the left half of a
-     * Monday's dot lay nearer the end of the week before. **A tap on the dot already chosen turns to
-     * the next of the dots drawn over the same spot** — whose ring covers the touch (`RING_PX`): one
-     * day and one rate, or two days and nearly one (adversarial И). Turned from the one chosen
-     * rather than the one touched, a tap on the middle of three dots a few pixels apart went to the
-     * first (Н). **A slide follows the finger**, kept only by a dot drawn right on the one under it.
+     * Monday's dot lay nearer the end of the week before. **A tap on the spot of the dot already
+     * chosen turns, from it, to the next of the dots drawn over that spot** — whose ring covers the
+     * touch (`RING_PX`): one day and one rate, or two days and nearly one (adversarial И). The spot
+     * is the chosen dot's only while it is as near the finger as the nearest, give or take
+     * `SAME_SPOT_PX`: a tap on the middle of three dots 7 px apart chooses the middle one (Н), and
+     * turned from the dot nearest instead, three dots on one spot went round two of them (О, review
+     * 7). **A slide follows the finger**, kept only by a dot drawn right on the one under it.
      * **With no dot under the finger, the nearest by x alone**: a week with no exchange by its end,
      * an exchange by its day (review 1) — never by height, which chose a week two ahead over a line
      * of 6 px weeks and left a gap out of reach (review 4, Ж).
@@ -383,16 +387,16 @@ export default defineComponent({
         if (!chosen || !target || apart(chosen, finger) > apart(target, finger)) choose(hit)
         return
       }
-      if (chosenIndex.value !== hit) {
-        choose(hit)
-        return
-      }
-      // A tap on the dot already chosen turns to the next of those drawn over the same spot.
+      // A tap on the spot of the dot already chosen turns, from it, to the next drawn over that spot.
       const covering = items.value.flatMap((item, index) =>
         item.exchange && apart(item.exchange, finger) <= RING_PX ? [index] : [],
       )
-      const held = covering.indexOf(hit)
-      if (held !== -1 && covering.length > 1) choose(covering[(held + 1) % covering.length] ?? hit)
+      const held = covering.indexOf(chosenIndex.value)
+      const onSpot =
+        chosen && target && apart(chosen, finger) - apart(target, finger) <= SAME_SPOT_PX
+      if (held !== -1 && covering.length > 1 && onSpot) {
+        choose(covering[(held + 1) % covering.length] ?? hit)
+      } else choose(hit)
     })
 
     const yOf = (level: number) => 1000 - MARGIN - (level * (1000 - 2 * MARGIN)) / CHART_LEVEL
