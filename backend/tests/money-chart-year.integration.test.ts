@@ -236,13 +236,16 @@ describe('«Графики → Год» (MOL-160)', () => {
     expect((await chartYear(me, thisYear)).spent).toEqual({ minor: 100_000n, currency: 'AMD' })
   })
 
-  it('чужие траты не видны', async () => {
+  it('чужие траты не видны; без сессии — 401', async () => {
     const me = await owner()
     const other = await owner()
     await spend(other, '1000', 'AMD', today, 'other')
     const charts = await chartYear(me, thisYear)
     expect(charts.spent).toEqual({ minor: 0n, currency: 'AMD' })
     expect(charts.firstMonth).toBeNull()
+    // Without a session the year is nobody's (review 5).
+    const nobody = await app.inject({ method: 'GET', url: `/money/years/${thisYear}/charts` })
+    expect(nobody.statusCode).toBe(401)
   })
 
   it('год, который не наступил, и не год — 404; лишний параметр — отказ по имени', async () => {

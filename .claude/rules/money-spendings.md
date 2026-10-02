@@ -372,19 +372,32 @@ MOL-74's unless they name MOL-160, and hold for the year.
   `USUAL_MONTHS` closed months ending with the year's last closed one — December of a past year, the
   month before today's in the running one — from the first with anything in it and from
   `USUAL_MIN_CLOSED`. Read only within the year, the line was gone from January to March of every
-  year; read this way, «+53 % к среднему» is the number «Месяц» says. **The running month is
-  compared with the usual to the same day** (owner's decision В-2), as on «Месяц» — a closed one
-  with the whole — in the bars and in «Категория по месяцам» alike. **Below three the line says when
-  it comes, and only if that month is of the year still to come** (Р-6): a past year, or a December
-  whose third closed month is January, says how many of the three there are — a date already gone
-  was the lesson of adversarial Г of MOL-158.
+  year. **«% к среднему» is against the line drawn, one for every bar** (owner's decision Г of the
+  review): so the running month's is the number «Месяц» says, and a closed one's is not — August
+  of «Год» is measured by the year's line, which holds August itself, and on «Месяц» by the months
+  before it (+75 % against +100 % in the adversarial case). A bar measured by its own window would
+  agree with «Месяц» and not with the line beside it. **The running month is compared with the usual
+  to the same day** (owner's decision В-2), as on «Месяц» — a closed one with the whole — in the
+  bars and in «Категория по месяцам» alike, **and the day is the server's** (`comparedTo`): today,
+  or the last day spent on when later — a rent dated tomorrow — named so on the screen, never the
+  phone's day (adversarial В). **A sum not whole is compared with nothing** (adversarial А): a
+  month with «не посчитано», and a category short in it, has no «%», as «Против обычного» has no
+  row. **Below three the line says when it comes, and only if the month it comes after is of the
+  year** (Р-6) — «после декабря» too, read in January (review 3): a past year with fewer, or a
+  December whose third closed month is January, says how many of the three there are — a date
+  already gone was the lesson of adversarial Г of MOL-158. **Three and more, each short, is no «3
+  из 3»** (adversarial Б): the line says spending in each had no rate.
 - **«Разница» of the year is the sum of the months'** (Р-7) only when every month with data has
   one; otherwise the note names the months that keep it from being counted. A sum with a hole would
   read as a total.
 - **A sector chosen on the year's ring chooses its category below** (owner's decision В-3 of
   MOL-160): through the address, like any choice of the category, and nothing scrolls; letting it go
   changes nothing, and «Остальные» is no category. The «second tap opens the category» of the task
-  was given up by Р-4 of the review of MOL-157 — a second tap lets the sector go.
+  was given up by Р-4 of the review of MOL-157 — a second tap lets the sector go. **And back: a
+  category chosen in the list chooses its sector**, or lets the sector go when the ring has none of
+  its own (owner's decision Е of the review): one picked on the ring and another in the list showed
+  two choices, and a tap on the sector shown let go of a category the card no longer showed.
+  Compared against what this screen asked for, never the app-wide `lastCategory`.
 - **The rate of the pair is no chart of «Графики» since MOL-160** (Р-11): `RateLine`, the weeks of
   `rate` and `weekEnds` went with the code and the tests; «Обмен денег» draws the rouble's against
   the market in MOL-161. Until then the app has no line of the rate — the price, named, of a chart
@@ -484,6 +497,9 @@ MOL-74's unless they name MOL-160, and hold for the year.
   nothing at all (`firstMonth` null). **«‹ 2026 ›» is the year's first control** (`MonthSwitcher`,
   `unit="year"`), back to the first year with anything in it and never past this one (Р-9 of
   MOL-160): the bound is the answer's, so the switcher stands in `ChartsYear`, over its strip.
+  **Until an answer names a first year, the bound is this year** — a newcomer's, or before the first
+  answer: read as «no bound», the arrow went on to 2025, 2024… on an empty screen, a year read and
+  its months frozen at every tap (adversarial Д).
 
 ## «Графики → Месяц» (MOL-158)
 
