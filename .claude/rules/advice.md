@@ -176,7 +176,10 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   receipt of whoever bought last, read as it is by anyone looking twice, and the median of three
   people's figures is a price someone paid without naming who was there yesterday. The moving
   picture stays the known limit it was under the minimum. Places are ordered by this price, own
-  city first; `observations` and the latest visit still count every purchase, for Р-4 alone.
+  city first. **Р-4 still weighs a pair by every purchase in it, in every place**
+  (`pairObservations`, adversarial Д, owner's decision) — the places a pair names are fewer, and
+  weighed by them one pack in a shop bought by the kilo for ten weeks turned the row to pieces and
+  hid the market where the kilo is cheaper. `observations` of a place is its purchases in the pair.
   **«Last» is the place's, not the pair's** (adversarial А, owner's decision): a place is named
   by its last purchase in whatever currency and unit it was made, and a pair it was not made in is
   not that place's price at all — three August kilos at a discount stood under «Дешевле всего»
@@ -186,7 +189,8 @@ type checker rather than by a reader, the way `bad` is not a tone a screen can a
   buyers whose last purchase there is in it. **Other people's last purchases count for
   `SHARED_PRICE_FRESH_DAYS` (90) days** (adversarial Б, owner's decision), by the record's day in
   the phone's zone; fewer than three within the window and the place is closed. One's own has no
-  window (В-1). The prices, named: two who bought at a discount fifty days ago and never came back
+  window (В-1). Its «today» is the phone's (`TODAY_HEADER`), as every «today» of the server is.
+  The prices, named: two who bought at a discount fifty days ago and never came back
   still hold the place at the discount while the one who goes there now sees today's on their own
   screen (Б1 of the adversarial report — the window closes it only past ninety days); a place one
   bought at last year shows one's own year-old price over three strangers' of this week (Б2, В-1).
@@ -287,8 +291,11 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
   named it (MOL-121), then the moment it began, then the moment the row was written; the day printed
   is that purchase's. **One row a place, in the currency and unit of that last purchase** (MOL-166,
   adversarial А): a price typed by the kilo is compared only with places whose last purchase was by
-  the kilo — the August kilo of a shop where a pack was bought since is no longer said. **«Что брать» names the same price** (MOL-166), by the same fragment
-  (`latestFirst`) — a test asks both about one place.
+  the kilo — the August kilo of a shop where a pack was bought since is no longer said. The price,
+  named (adversarial Д2): a pack typed first in a record and the kilo after it — the kilo of this
+  very shop is no longer said either, until a kilo is its last purchase again. **«Что брать» names
+  the same price** (MOL-166), by the same fragment (`latestFirst`) — a test asks both about one
+  place.
 - **Only the city of the record** (В-4): a cheaper Erevan receipt is no action at a Gyumri shelf.
   **The server reads it off the record's place** (`trip=`, review №1): `TripView` carries no city,
   and the settings are not the record — a Gyumri resident pressing «Записать покупки» in an Erevan
