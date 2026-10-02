@@ -37,7 +37,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
   and the mark is a placeholder until there is real branding.
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
-  `molvia.scheme` (`light` / `dark`; «Системная» is no key, anything else reads as it), never sent:
+  `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent:
   a property of the screen, not of the account, so «Выйти» and erasure leave it, as they leave the
   keyboard's height. **The person's choice wins both ways, by selectors, not by specificity** —
   `:root` and `[data-scheme]` weigh the same, and until this task «Светлая» on a dark system stayed
@@ -53,11 +53,17 @@ The detail behind the frontend lines of `CLAUDE.md`.
   two theme-color tags name their scheme (`data-scheme-of`), the chosen one gets `all`, the other
   `not all`, «Системная» gives both their queries back — a copy of the colours in a script would be a
   third place to drift from the tokens. **The manifest does not follow** — it is read at install, iOS
-  ignores its `theme_color`, Android takes it for the splash alone. **Other windows follow** on
-  `storage`, and bring their own shelf in line with the shared one: `write` puts the choice on both,
-  and a tab that kept its old one read it back at the next reload. The control is `SegmentedControl`
+  ignores its `theme_color`, Android takes it for the splash alone. **Every choice is written, «Системная» too, on every shelf
+  or none** (`writeEverywhere`): the shared shelf is read first, and only an empty one lets a tab's own
+  past through — with «Системная» a removed key, a tab that missed it (unloaded, closed and brought
+  back) came back dark at every reload (adversarial В); and a shared shelf that refused the write but
+  kept its past answered the choice just left, after a reload (Б). **Other windows follow** on
+  `storage`, and bring **only their own shelf** in line (`writeOwn`): written back to the shared one,
+  an event handled late put a stale choice over a newer one and sent it round again (review С-3). The control is `SegmentedControl`
   with `fit` — each segment the width of its word, the semibold reserved under it so a tap moves
-  nothing; even thirds on a 320 px phone left «Системная» (91 px) a pixel of its 92 (owner's В-1:
+  nothing; the word lies over its segment's hit area, so a tap on it lands on the label, **inside the
+  track's own stacking context** (`isolation`) — lifted without it, it rose over the pinned header too,
+  drawn through it and taking its taps (adversarial Д); even thirds on a 320 px phone left «Системная» (91 px) a pixel of its 92 (owner's В-1:
   «выбор шире»). Not in a card for the same reason. Taken on the tap, nothing said: the screen is the
   answer; in every state of the screen, since it asks nothing of the server.
 - **Every screen has four states:** loading, empty, error, offline. The empty state is not
