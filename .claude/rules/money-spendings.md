@@ -628,7 +628,9 @@ task did not: five plans of six there are a percent of the month's income — «
   known in part claims no «сверх плана»** (review 10): a share of a «Пришло» short of a rate is a
   floor, and past it the row's and the total's `left` are null. **A spending short of a rate does
   not hide one** (review 13, adversarial К): what was spent is a floor too, so past a whole plan it
-  is over; within it «осталось» stays a figure under «не всё посчитано». Read as a plan of zero, every share was over its plan in every month
+  is over; within it «осталось» stays a figure under «не всё посчитано». **The two footnotes are two
+  unknowns, each said on its own** (adversarial М of round 4): «доля появится» by a row that waits,
+  «не всё посчитано» by a row whose plan or spending some rate did not count — the rows' own flags. Read as a plan of zero, every share was over its plan in every month
   until the salary; the price — a month with only shares says no «осталось» until something comes
   in. A sum typed in another currency is refused (`CURRENCY_MISMATCH`); one kept from before a move
   is converted by the month's rate and printed «≈» (Р-4), and **its sheet never puts it in the field

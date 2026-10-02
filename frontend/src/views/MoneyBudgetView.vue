@@ -53,8 +53,10 @@
           <p v-if="budget.total.leftIncome" class="approx">
             ≈ {{ amount(budget.total.leftIncome) }}
           </p>
+          <!-- Two unknowns, each said on its own: a share waiting for «Пришло», and a plan or a
+               spending some rate did not count (adversarial М of round 4). -->
           <p v-if="awaiting" class="footnote">{{ t('budget.total.awaiting') }}</p>
-          <p v-else-if="!budget.total.whole" class="footnote">{{ t('budget.total.not_whole') }}</p>
+          <p v-if="short" class="footnote">{{ t('budget.total.not_whole') }}</p>
           <dl class="trio">
             <div>
               <dt>{{ t('budget.total.planned') }}</dt>
@@ -277,6 +279,13 @@ export default defineComponent({
     })
     /** Some share waits for «Пришло»: the total says that, not «нет курса» (review 1). */
     const awaiting = computed(() => (budget.value?.rows ?? []).some((row) => row.awaitingIncome))
+    /**
+     * A plan or a spending some rate did not count — the server's flags of the rows; a share waiting
+     * for «Пришло» is whole in both and says its own words above (adversarial М of round 4).
+     */
+    const short = computed(() =>
+      (budget.value?.rows ?? []).some((row) => !row.plannedWhole || !row.spentWhole),
+    )
 
     const rows = computed(() =>
       (budget.value?.rows ?? []).map((row) => {
@@ -406,6 +415,7 @@ export default defineComponent({
       overall,
       plannedWords,
       awaiting,
+      short,
       rows,
       unplanned,
       choosable,

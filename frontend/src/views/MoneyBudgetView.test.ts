@@ -578,3 +578,65 @@ describe('MoneyBudgetView: round 3 of the review (MOL-117)', () => {
     expect(rowTexts(view)[1]).toBe('Transport֏0.40')
   })
 })
+
+describe('MoneyBudgetView: round 4 of the review (MOL-117)', () => {
+  it('says a share waits and a spending is short, both, never one over the other (М)', async () => {
+    const [groceries, , rent] = budget().rows
+    if (!groceries || !rent) throw new Error('no row')
+    moneyBudget.mockResolvedValue(
+      budget({
+        rows: [
+          {
+            ...groceries,
+            planned: null,
+            awaitingIncome: true,
+            estimated: false,
+            left: null,
+            used: null,
+          },
+          {
+            ...rent,
+            planned: amd('10000'),
+            spent: amd('5000'),
+            left: amd('5000'),
+            spentWhole: false,
+            used: null,
+          },
+        ],
+        total: {
+          ...total(),
+          planned: amd('10000'),
+          left: amd('5000'),
+          planShort: true,
+          whole: false,
+        },
+      }),
+    )
+    const shown = (await render()).find('.total').text()
+    expect(shown).toContain(en.budget.total.awaiting)
+    expect(shown).toContain(en.budget.total.not_whole)
+  })
+
+  it('must not fire: a share that only waits says no «не всё посчитано»', async () => {
+    const [groceries] = budget().rows
+    if (!groceries) throw new Error('no row')
+    moneyBudget.mockResolvedValue(
+      budget({
+        rows: [
+          {
+            ...groceries,
+            planned: null,
+            awaitingIncome: true,
+            estimated: false,
+            left: null,
+            used: null,
+          },
+        ],
+        total: { ...total(), planned: null, left: null, planShort: true, whole: false },
+      }),
+    )
+    const shown = (await render()).find('.total').text()
+    expect(shown).toContain(en.budget.total.awaiting)
+    expect(shown).not.toContain(en.budget.total.not_whole)
+  })
+})
