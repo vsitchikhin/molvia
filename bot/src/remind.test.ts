@@ -388,6 +388,42 @@ describe('рассылка (MOL-101)', () => {
     expect(calls).toEqual([])
   })
 
+  it('удачный забор — пульс, даже пустой, и раньше рассылки; неудачный — нет (MOL-142)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api, calls } = telegram()
+    const order: string[] = []
+    const claimed = vi.fn(() => {
+      order.push(`pulse after ${String(calls.length)} messages`)
+    })
+
+    await remindDue(claiming([]) as MolviaBotClient, api, APP, undefined, claimed)
+    await remindDue(
+      claiming([{ telegramUserId: 777, items: [item('Кефир')], total: 1 }]) as MolviaBotClient,
+      api,
+      APP,
+      undefined,
+      claimed,
+    )
+    const failing = { claimReminders: vi.fn(() => Promise.reject(new ApiError(ERROR.INTERNAL))) }
+    await remindDue(failing as unknown as MolviaBotClient, api, APP, undefined, claimed)
+
+    expect(claimed).toHaveBeenCalledTimes(2)
+    expect(order).toEqual(['pulse after 0 messages', 'pulse after 0 messages'])
+    expect(calls).toHaveLength(1)
+  })
+
+  it('таймер передаёт пульс каждому забору', async () => {
+    vi.useFakeTimers()
+    const { api } = telegram()
+    const claimed = vi.fn()
+
+    const stop = startReminders(claiming([]) as MolviaBotClient, api, APP, 60_000, claimed)
+    await vi.advanceTimersByTimeAsync(60_000)
+    await stop()
+
+    expect(claimed).toHaveBeenCalledTimes(2)
+  })
+
   it('спрашивает сразу и потом раз в минуту, прогоны не накладываются', async () => {
     vi.useFakeTimers()
     const { api } = telegram()

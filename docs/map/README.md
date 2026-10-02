@@ -89,6 +89,7 @@ support types, the shared integration tests, the migrations.
 
 - `backend/tests/bundle-seam.integration.test.ts` — Integration test: the production bundle carries no development login seam.
 - `backend/tests/corners.integration.test.ts` — Integration test: repository corners — a second price for one pair, a third currency in a trip, barcodes, dangling refs, bad rows.
+- `backend/tests/database-image.integration.test.ts` — Integration test: the database image carries what the contract needs — pgvector with HNSW, ICU sorting, no collation of another ICU version.
 - `backend/tests/db.ts` — Test support: the test database's URL and short-lived connections to it, raw and through drizzle.
 - `backend/tests/error-handler.integration.test.ts` — Integration test: a body that did not parse is a 400 naming the field, and a unique clash is a conflict, not a 500.
 - `backend/tests/version-header.integration.test.ts` — Integration test: every answer names its build in `X-Molvia-Version` — refusals, missing routes and framework errors too.

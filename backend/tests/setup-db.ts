@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { migrate } from 'drizzle-orm/postgres-js/migrator'
 import postgres from 'postgres'
-import { MIGRATIONS } from '@/db/migrate'
+import { MIGRATIONS, assertEveryMigrationApplied } from '@/db/migrate'
 import { testDatabaseUrl } from './db'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
@@ -47,6 +47,8 @@ export async function setup(): Promise<void> {
   const client = postgres(url.toString(), { max: 1, onnotice: () => undefined })
   try {
     await migrate(drizzle(client), { migrationsFolder: MIGRATIONS })
+    // A test database is where a skipped stamp shows first: it lives on between branches.
+    await assertEveryMigrationApplied(client, { migrationsFolder: MIGRATIONS })
   } finally {
     await client.end()
   }

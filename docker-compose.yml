@@ -13,7 +13,11 @@ name: ${COMPOSE_PROJECT:-molvia_0}
 
 services:
   postgres:
-    image: postgres:17-alpine
+    # pgvector for the embeddings (MOL-105), on Debian: ICU for `collate "und-x-icu"` (MOL-31) and
+    # glibc for text. The tag is exact — the image is part of the contract, and a move of libc
+    # rebuilds every text index (migration 0038). Changed here, it changes in docker-compose.prod.yml,
+    # CI and the restore drill too.
+    image: pgvector/pgvector:0.8.7-pg17-bookworm
     container_name: ${COMPOSE_PROJECT:-molvia_0}-postgres
     restart: unless-stopped
     environment:

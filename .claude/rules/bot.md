@@ -51,6 +51,41 @@ press — the only channel people are given, because there Telegram already says
 - **The bot keeps no state of its own.** The login code rides in the button's `callback_data`,
   which is Telegram's memory rather than ours, and everything else is asked of the API — the
   only write path there is. So nothing survives a restart, because nothing needs to.
+- **The pulse holds two moments in memory and nothing else** (MOL-142, `pulse.ts`): when its last
+  ping succeeded and when a `getUpdates` last did. A claim of reminders that went through beats at
+  most once in five minutes, by a monotonic clock — a wall clock stepped back an hour kept it silent
+  for an hour (adversarial А3) — and only while **the bot hears Telegram**: a `getUpdates` succeeded
+  within two minutes (`hearTelegram`, a transformer on the bot's own API). The claim alone proved
+  the API, not the sign-in: the runner retries a failing `getUpdates` for up to fifteen hours with
+  the process alive, and half an hour of Telegram down kept the pulse «alive» over a sign-in that
+  was dead (А1). **The first beat comes a minute into the process**, never at once: a bot dying
+  on a revoked token or a second poller (`401`, `409`) beat on every restart of its crash loop
+  (А2) — such a process does not hear Telegram anyway, and the minute is the margin on top. Five
+  minutes made rollouts a few minutes apart add up into a false alarm (round 2, Г1). A failed ping is tried a claim later; one on its way is not doubled; none waits for an
+  evening's messages. Without `BOT_PULSE_URL` — every copy and the end-to-end run — not one request
+  leaves; the URL is never logged, and a failure is logged by its kind. It is not in the API's
+  `/health`: `deploy.md` says why.
+- **A failed `getUpdates` is retried at a pause growing by a tenth of a second a try**
+  (`retryInterval: 'quadratic'` in `startBot`), not the runner's doubling: after half an hour of
+  Telegram down the doubled pause had grown to some 27 minutes, and the sign-in stayed dead that
+  long after Telegram was back. Now it is seconds — and a stop during an outage waits out at most
+  that pause, since no stop cuts it short.
+- **The runner's own log is off** (`silent: true`, round 2 Г2): it printed a failed `getUpdates`
+  whole, and grammY's network error carries the request's address — the bot's token in it — into
+  journald, on every try. A failure of a call to Telegram is logged by its kind, `telegramFailure`
+  — Telegram's code or `network` — and so is the one the runner gives up on (a revoked token, a
+  second poller, fifteen hours away): `index.ts` catches it, says
+  `[molvia] telegram: <kind>, stopping` and exits 1 for compose — left unhandled, Node printed it
+  whole, token and all (round 3 Д2).
+- **Who the bot is, it asks itself, before the runner starts** (`introduce`, round 3 Д1). Left to the
+  runner, `getMe` was grammY's `bot.init()`: a silent retry doubling its pause up to twenty minutes,
+  so a bot started while Telegram was away stayed deaf some seventeen minutes after it came back and
+  said nothing in the log. Now the pause grows as the runner's does, a 429 waits what Telegram asks,
+  each failure is `[molvia] telegram getMe: <kind>`, and a stop cuts the wait short. **Only what may
+  pass is retried** — the network, a 5xx, a 429 — as grammY did; any other code ends the process:
+  a 401 is a token revoked or cut short, a 404 one Telegram cannot read at all — a stray character
+  before it or after it gives one or the other — and retried forever they made a
+  live, silent bot where the rollout and the guide look for a crash loop (round 4 Е1).
 - **Updates of different people are handled at once; updates of one person, in order** — and
   both halves are load-bearing (MOL-55, О-4). `bot.start()` handles updates strictly one after
   another, which is grammY's ordering guarantee and was measured costing the next person their

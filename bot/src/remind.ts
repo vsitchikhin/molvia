@@ -249,12 +249,17 @@ async function blocked(api: MolviaBotClient, telegramUserId: number): Promise<vo
   }
 }
 
-/** Asks the API what is due and sends it — one claim, everybody in it. */
+/**
+ * Asks the API what is due and sends it — one claim, everybody in it. `claimed` is told the claim
+ * went through, an empty one included, before anything is sent: it is the bot's pulse (MOL-142),
+ * and it must not wait for an evening's messages.
+ */
 export async function remindDue(
   api: MolviaBotClient,
   telegram: Api,
   appUrl: string,
   wait: Wait = async (ms) => sleep(ms),
+  claimed: () => void = () => undefined,
 ): Promise<void> {
   let due: Reminder[]
   try {
@@ -265,6 +270,7 @@ export async function remindDue(
     )
     return
   }
+  claimed()
   for (const [index, reminder] of due.entries()) {
     try {
       await send(api, telegram, reminder, appUrl, wait)
@@ -307,6 +313,7 @@ export function startReminders(
   telegram: Api,
   appUrl: string,
   everyMs = REMIND_EVERY_MS,
+  claimed: () => void = () => undefined,
 ): () => Promise<void> {
   let running: Promise<void> | undefined
   // A stop cuts every wait short (adversarial З): the messages left are sent at once, without the
@@ -314,11 +321,15 @@ export function startReminders(
   const stopping = new AbortController()
   const tick = (): void => {
     if (running) return
-    running = remindDue(api, telegram, appUrl, async (ms) => sleep(ms, stopping.signal)).finally(
-      () => {
-        running = undefined
-      },
-    )
+    running = remindDue(
+      api,
+      telegram,
+      appUrl,
+      async (ms) => sleep(ms, stopping.signal),
+      claimed,
+    ).finally(() => {
+      running = undefined
+    })
   }
   tick()
   const timer = setInterval(tick, everyMs)
