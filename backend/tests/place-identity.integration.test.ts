@@ -78,12 +78,13 @@ it('answers exactly what the unique index over places computes', async () => {
  *
  * **Not the whole of Unicode, and the reason is named.** `lower()` folds by the tables of the
  * libc the database image was built with, and `toLowerCase` by the ones in this runtime; the
- * image is `postgres:17-alpine`, whose musl is older than V8's ICU, so letters added to Unicode
- * recently — `Ᲊ`, `Ⱟ`, `Ꟁ` — are folded here and left alone there. That is the unsafe direction:
+ * image is pgvector's on Debian bookworm (MOL-105), whose glibc 2.36 is older than V8's ICU, so
+ * letters added to Unicode recently — `Ᲊ` of Unicode 16 — are folded here and left alone there.
+ * (musl, before it, left `Ⱟ` and `Ꟁ` alone as well.) That is the unsafe direction:
  * the twin would merge what the database keeps apart, and the screen would then keep quiet about
  * prices moving into another shop. The residue is knowingly accepted — a shop named with a
  * medievalist's letter is not a case this product meets — and the price is a softer sentence on
- * one sheet, never a write. Widening this sweep means owning the database image.
+ * one sheet, never a write. Widening it waits for a glibc that knows those letters — a new tag.
  */
 const SCRIPTS: readonly [number, number][] = [
   [0x20, 0x24f], // ASCII, Latin-1, Latin Extended-A and -B

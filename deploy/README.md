@@ -427,12 +427,97 @@ is 0.2's question, with the lawyer («Персональные данные», s
 database password and `BOT_API_SECRET` are generated anew, BotFather shows the bot's token
 (`/mybots` → API Token), the GHCR token is issued anew. Images are in GHCR, code in git.
 
-## The Postgres image has to carry ICU
+## The Postgres image is part of the contract
 
-«Что брать» orders names with `collate "und-x-icu"` (MOL-31): the database is created with
-`en_US.utf8`, where «Ёжик» sorts before «Ежевика» and a name typed in lower case falls below
-every capitalised one, and one answer must not come back in two alphabets. `postgres:17-alpine`
-carries the ICU collations, and the compose file pins that image — but an image built without
-ICU would make those queries **fail**, not degrade: `ORDER BY` on a collation the server does
-not know is an error. So the image is part of the contract, and swapping it is a migration-sized
-decision rather than a version bump.
+The database runs `pgvector/pgvector:0.8.7-pg17-bookworm` — the exact tag, in `docker-compose.yml`,
+`docker-compose.prod.yml`, both services of CI and the drill of `restore.sh`. Three things depend on
+what the image carries, and none of them degrades quietly:
+
+- **ICU.** «Что брать» orders names with `collate "und-x-icu"` (MOL-31): the database is created
+  with `en_US.utf8`, where «Ёжик» sorts before «Ежевика» and a name typed in lower case falls below
+  every capitalised one, and one answer must not come back in two alphabets. An image without ICU
+  makes those queries **fail**: `ORDER BY` on a collation the server does not know is an error.
+- **`vector`** (MOL-105): the embeddings of the catalogue. An image without it fails migration
+  `0038_pgvector` at boot, and the API does not start.
+- **The libc**, which orders and folds text. Every index whose key is text — the primary keys of
+  codes, the trigram index of `search_key`, the unique `lower()` of a place's name — is built by the
+  rules of the libc it was built under, and answers by the rules of the one it runs under. Swapped
+  under it, an index answers wrongly and says nothing.
+
+So a new tag is a decision, never a version bump. A tag that moves glibc or ICU comes with a
+migration that rebuilds the text indexes and refreshes the ICU collations' versions, as `0038` does.
+
+### The move off `postgres:17-alpine` (MOL-105)
+
+Until MOL-105 the image was `postgres:17-alpine`: musl and no `vector`. The data directory of the
+same Postgres 17 needs no dump. What needs care is the order, because two states are wrong and say
+nothing (adversarial review of MOL-105, А and В, measured):
+
+- **the new image under an API that has not run `0038`** — the indexes musl built answer by glibc's
+  rules: the unique key of a place lets a duplicate in, and a merge join over it fails;
+- **`0038` failing** — a pair of place names glibc folds into one and musl did not (`Ⱟ` and `ⱟ`) —
+  after which the deploy's rollback brings the previous API up on the new image: the first state,
+  and every later deploy fails on the same `REINDEX`.
+
+So nothing writes from the last copy to the end, and a failure goes back to alpine by hand. The app
+is down meanwhile — minutes, accepted while production is the owner's alone.
+
+1. **Stop writes, take a copy** — two commands, so a copy that fails is seen as one:
+   `ssh molvia 'cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod stop backend bot'`,
+   then `ssh -t molvia 'sudo systemctl start molvia-backup.service'` — it returns once the copy is
+   made (`Type=oneshot`).
+2. **The drill on that copy**, from the branch: `deploy/backup/restore.sh --drill` restores it into
+   the image the script now names and builds every index under glibc — the very uniqueness `0038`'s
+   `REINDEX` asks for. A pair glibc folds into one fails the restore here; it is settled by hand —
+   the two places made one — and the steps start over. The row counts must match. Nothing was
+   written since the copy, so the drill saw everything the migration will.
+3. **The merge.** The release job stops red: `docker-compose.prod.yml` differs from the machine's
+   («Deploys» above).
+4. **Copy the files and re-run the job at once**:
+   `scp docker-compose.prod.yml deploy/deploy.sh molvia:molvia/`, then «Re-run failed jobs». No
+   `up -d` by hand in between: it would recreate `postgres` on the new image under the old API. The
+   job's `up -d` recreates `postgres` on the same volume (the entrypoint takes the files over for its
+   own `postgres` user) and starts the new API, which migrates: `0038_pgvector` creates `vector`,
+   rebuilds every index whose key is text or an expression, and gives the ICU collations the
+   version of the new ICU (`und-x-icu` warned on every query until it did).
+5. **Check**: `/api/health`, «Что брать» in the app, and the journal of `postgres` for
+   `collation … version mismatch` — there must be none.
+6. **If the job rolled back** («rolling back to …» in its log), the rollback has brought the old API
+   and bot up again on the new image: stop them as in step 1 first. Then **ask the database whether
+   `0038` ran, never the rollback** (round 2 of the adversarial review, Г) — the job rolls back on
+   anything its 90 seconds of health did not see, and much of that comes after the migration
+   committed:
+   `echo "select count(*) from pg_extension where extname = 'vector'" | ssh molvia 'cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres psql -U molvia -d molvia -At'`.
+   `vector` is created in the transaction that rebuilds the indexes, so it answers for both.
+   - **`0` — `0038` failed**, and its transaction left every index as musl built it — but the old
+     API the rollback brought up may have written meanwhile, by glibc's rules into musl's indexes:
+     the phone's queue sends the moment the API answers (round 3, Ж — one place is enough). So alpine
+     comes back with the window's duplicates settled and the indexes rebuilt before anything else
+     starts. Copy the previous compose file (`git show <the master before the merge>:docker-compose.prod.yml`,
+     `scp` it to `~/molvia/`) and `up -d postgres` alone. Then, with
+     `psql='cd ~/molvia && docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres psql -U molvia -d molvia -v ON_ERROR_STOP=1'`:
+     - `ssh molvia "$psql" < deploy/window-duplicates.sql` — what the window wrote twice (round 5,
+       З): search picks merged as their upsert merges a repeat, a login code written twice deleted,
+       and every other pair of a unique text key named (`twice in …`), index scans off — the index
+       itself is the broken one. A pair of places is settled by hand: the trips and verdicts of one
+       row moved to the other, a verdict of one person on one item in both kept once, the row
+       deleted; the file run again until it names nothing;
+     - `ssh molvia "$psql" < deploy/reindex-text.sql` — every text index rebuilt under musl, one
+       transaction; a refusal names a pair the first file did not settle.
+
+     Then `up -d`. The API's journal names the statement `0038` failed on
+     (`describeMigrationFailure`); that duplicate is settled by hand too, then from step 1 again.
+
+   - **`1` — `0038` ran**: the indexes are glibc's, and **alpine must not come back** — under musl
+     they would answer wrongly, and `0038`, recorded as applied, would never rebuild them again. Stay
+     on the new image: `up -d` as the machine stands runs the previous API on it, which needs nothing
+     of `vector` and agrees with the indexes. The reason of the rollback is in `deploy.log` and the
+     API's journal — health, the bot, a migration skipped by its stamp — and the next deploy is an
+     ordinary one.
+
+On a volume moved off alpine the database's own collation stays without a version: Postgres refuses
+a change from none to one. A database created under glibc — CI, a new copy, the drill, a restore —
+records its version, and Postgres warns on it when glibc moves.
+
+A working copy needs none of this: `make up` recreates the container on its volume and migrates at
+once; `make db-reset` is not needed.

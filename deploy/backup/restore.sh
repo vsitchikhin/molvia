@@ -54,7 +54,7 @@ case "$mode" in
     echo "drill: $copy"
     trap 'ssh -o BatchMode=yes "$host" "docker rm -f $drill" >/dev/null 2>&1 || true' EXIT
     ssh -o BatchMode=yes "$host" "docker run -d --rm --name $drill --network none \
-      -e POSTGRES_USER=molvia -e POSTGRES_DB=molvia -e POSTGRES_PASSWORD=drill postgres:17-alpine >/dev/null \
+      -e POSTGRES_USER=molvia -e POSTGRES_DB=molvia -e POSTGRES_PASSWORD=drill pgvector/pgvector:0.8.7-pg17-bookworm >/dev/null \
       && until docker logs $drill 2>&1 | grep -q 'init process complete'; do sleep 1; done \
       && until docker exec $drill pg_isready -U molvia -d molvia -q; do sleep 1; done"
     fetch "$copy" | ssh -o BatchMode=yes "$host" \
