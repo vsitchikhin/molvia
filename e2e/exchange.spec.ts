@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { actorCodec, settingsOf } from '@molvia/model'
+import { standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -271,6 +272,90 @@ function wireRate(value: string, day: string) {
   }
 }
 
+/** The year of the rouble as the server lays it: four weeks of February and March, one exchange. */
+function rateYear(id: string) {
+  return {
+    step: 'week',
+    steps: [
+      { day: '2026-02-08', rate: wireRate('4.900000', '2026-02-06'), x: 0, level: 1000 },
+      { day: '2026-02-15', rate: wireRate('4.800000', '2026-02-13'), x: 250, level: 800 },
+      { day: '2026-02-22', rate: null, x: 500, level: null },
+      { day: '2026-03-01', rate: wireRate('4.600000', '2026-02-27'), x: 750, level: 450 },
+      { day: '2026-03-04', rate: wireRate('4.300000', '2026-03-04'), x: 1000, level: 0 },
+    ],
+    exchanges: [
+      {
+        id,
+        day: '2026-02-28',
+        step: 3,
+        x: 760,
+        rate: wireRate('4.160000', '2026-02-28'),
+        level: 300,
+        place: 'Ардшинбанк',
+        percent: 121,
+        market: { rate: wireRate('4.110180', '2026-02-28'), level: 200, basis: 'bankCash' },
+      },
+    ],
+    levels: [
+      { rate: wireRate('4.300000', '2026-03-04'), level: 0 },
+      { rate: wireRate('4.600000', '2026-03-04'), level: 500 },
+      { rate: wireRate('4.900000', '2026-03-04'), level: 1000 },
+    ],
+  }
+}
+
+/** The month by days, 27 February to 4 March, the weekend at Friday's figure (MOL-168, В-2 «а»). */
+function rateMonth(id: string) {
+  const days = ['2026-02-27', '2026-02-28', '2026-03-01', '2026-03-02', '2026-03-03', '2026-03-04']
+  return {
+    step: 'day',
+    steps: days.map((day, index) => ({
+      day,
+      rate: wireRate(index < 3 ? '4.620000' : '4.550000', index < 3 ? '2026-02-27' : day),
+      x: index * 200,
+      level: index < 3 ? 900 : 100,
+    })),
+    exchanges: [{ ...rateYear(id).exchanges[0], step: 1, x: 200, level: 500 }],
+    levels: [{ rate: wireRate('4.600000', '2026-03-04'), level: 500 }],
+  }
+}
+
+/** Puts the line into the answer on its way (`page.route`): this run has no market of its own. */
+async function withRateCharts(page: Page, id: string): Promise<void> {
+  await page.route('**/api/exchanges', async (route) => {
+    if (route.request().method() !== 'GET') return route.continue()
+    const response = await route.fetch()
+    const json = (await response.json()) as Record<string, unknown>
+    json.rateCharts = {
+      pairs: [
+        {
+          currency: 'RUB',
+          side: 'bankBuys',
+          periods: { 1: rateMonth(id), 6: null, 12: rateYear(id) },
+        },
+      ],
+    }
+    await route.fulfill({ response, json })
+  })
+}
+
+/** An exchange of 28 February, written as the screen writes one. */
+async function exchangeOfFebruary(page: Page): Promise<string> {
+  const headers = await asBrowser(page)
+  const id = randomUUID()
+  const recorded = await page.request.post('/api/exchanges', {
+    headers,
+    data: {
+      id,
+      given: { amount: '20000', currency: 'RUB' },
+      received: { amount: '83200', currency: 'AMD' },
+      exchangedOn: '2026-02-28',
+    },
+  })
+  expect(recorded.status()).toBe(201)
+  return id
+}
+
 /**
  * «Курс рубля за 12 месяцев» (MOL-161) on a phone. This run has no market — the refresh is off —
  * so the server answers with no chart, and that is the first thing held. The line itself is put
@@ -282,62 +367,14 @@ test('the rate of twelve months: no market — no card; the latest exchange firs
   page,
 }) => {
   await signedIn(page)
-  const headers = await asBrowser(page)
-  const recorded = await page.request.post('/api/exchanges', {
-    headers,
-    data: {
-      id: randomUUID(),
-      given: { amount: '20000', currency: 'RUB' },
-      received: { amount: '83200', currency: 'AMD' },
-      exchangedOn: '2026-02-28',
-    },
-  })
-  expect(recorded.status()).toBe(201)
+  const id = await exchangeOfFebruary(page)
 
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   await page.getByRole('link', { name: 'Обмен денег' }).click()
   await expect(page.getByText('Мой курс', { exact: true })).toBeVisible()
   await expect(page.locator('.rate-chart')).toHaveCount(0)
 
-  await page.route('**/api/exchanges', async (route) => {
-    if (route.request().method() !== 'GET') return route.continue()
-    const response = await route.fetch()
-    const json = (await response.json()) as Record<string, unknown>
-    json.rateChart = {
-      pairs: [
-        {
-          currency: 'RUB',
-          side: 'bankBuys',
-          weeks: [
-            { day: '2026-02-08', rate: wireRate('4.900000', '2026-02-06'), x: 0, level: 1000 },
-            { day: '2026-02-15', rate: wireRate('4.800000', '2026-02-13'), x: 250, level: 800 },
-            { day: '2026-02-22', rate: null, x: 500, level: null },
-            { day: '2026-03-01', rate: wireRate('4.600000', '2026-02-27'), x: 750, level: 450 },
-            { day: '2026-03-04', rate: wireRate('4.300000', '2026-03-04'), x: 1000, level: 0 },
-          ],
-          exchanges: [
-            {
-              id: randomUUID(),
-              day: '2026-02-28',
-              week: 3,
-              x: 760,
-              rate: wireRate('4.160000', '2026-02-28'),
-              level: 300,
-              place: 'Ардшинбанк',
-              percent: 121,
-              market: { rate: wireRate('4.110180', '2026-02-28'), level: 200, basis: 'bankCash' },
-            },
-          ],
-          levels: [
-            { rate: wireRate('4.300000', '2026-03-04'), level: 0 },
-            { rate: wireRate('4.600000', '2026-03-04'), level: 500 },
-            { rate: wireRate('4.900000', '2026-03-04'), level: 1000 },
-          ],
-        },
-      ],
-    }
-    await route.fulfill({ response, json })
-  })
+  await withRateCharts(page, id)
   await page.reload()
 
   const card = page.locator('.rate-chart')
@@ -362,4 +399,56 @@ test('the rate of twelve months: no market — no card; the latest exchange firs
   await expect(card.locator('.figure')).toHaveText('4,80 ֏/₽')
   await page.keyboard.press('ArrowRight')
   await expect(card.locator('.figure')).toHaveText('Рынка за эту неделю нет')
+})
+
+/**
+ * The period of the line (MOL-168) on a phone: «Месяц» is the screen's own query — the page and the
+ * switch stay where they were, nothing is asked of the server — the month is read by days, and
+ * «back» and «forward» bring the period chosen back with the screen.
+ */
+test('the month of the rate by days: the switch and the page stay put, the address keeps it', async ({
+  page,
+}) => {
+  await signedIn(page)
+  const id = await exchangeOfFebruary(page)
+  await withRateCharts(page, id)
+
+  await page.getByRole('link', { name: 'Деньги', exact: true }).click()
+  await page.getByRole('link', { name: 'Обмен денег' }).click()
+  const card = page.locator('.rate-chart')
+  await expect(card.getByRole('heading', { name: 'Курс рубля за 12 месяцев' })).toBeVisible()
+
+  const periods = card.locator('.periods')
+  await standAt(periods, 120)
+  const down = await page.evaluate(() => window.scrollY)
+  const at = await topOf(periods)
+  let asked = 0
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/exchanges') && request.method() === 'GET') asked += 1
+  })
+
+  await periods.getByText('Месяц', { exact: true }).tap()
+  await expect(card.getByRole('heading', { name: 'Курс рубля за месяц' })).toBeVisible()
+  await expect(page).toHaveURL(/\/money\/exchange\?months=1$/)
+  expect(await topOf(periods)).toBe(at)
+  expect(await page.evaluate(() => window.scrollY)).toBe(down)
+  expect(asked).toBe(0)
+
+  // The exchange chosen in the year is the one of the month too; its day, at Friday's figure.
+  await expect(card.locator('.reading')).toContainText('28 февр. · рынок')
+  await expect(card.locator('.figure')).toHaveText('4,62 ֏/₽')
+  await expect(card.locator('.mine-rate')).toHaveText('Мой обмен 28 февр. · 4,16 ֏/₽')
+  await expect(card.locator('.month')).toHaveText(['2 мар.'])
+  await card.locator('.area').tap({ position: { x: 2, y: 60 } })
+  await expect(card.locator('.none')).toHaveText('В этот день обменов не было')
+
+  await page.goBack()
+  await expect(page).toHaveURL(/\/money$/)
+  await page.goForward()
+  await expect(card.getByRole('heading', { name: 'Курс рубля за месяц' })).toBeVisible()
+
+  // Half a year has no market here: the card and its switch stay, and say so.
+  await periods.getByText('6 месяцев', { exact: true }).tap()
+  await expect(card.locator('.none')).toHaveText('Рынка за 6 месяцев нет')
+  await expect(periods).toBeVisible()
 })
