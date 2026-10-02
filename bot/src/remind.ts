@@ -3,6 +3,7 @@ import type { Api } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
 import type { Reminder, ReminderItem } from '@molvia/model'
+import type { InlineKeyboardMarkup } from 'grammy/types'
 import { t } from './i18n'
 
 /**
@@ -13,16 +14,109 @@ import { t } from './i18n'
 const PREFIX = 'rate:'
 export const SCALE_DATA = new RegExp(`^${PREFIX}([0-9a-f-]{36}):([1-5])$`)
 
-/** The scale 1–5 under an item, with the digit already pressed marked. */
-export function scale(itemId: string, pressed?: number): InlineKeyboard {
+/**
+ * The switch under the last reminder of the evening (MOL-103, В-2): «Не напоминать», and once it is
+ * pressed, «Вернуть напоминания» in its place (В-3). Only the action travels — whose reminders they
+ * are is `ctx.from.id`, as with the scale.
+ */
+export type Offer = 'off' | 'on'
+const SWITCH_PREFIX = 'remind:'
+export const SWITCH_DATA = new RegExp(`^${SWITCH_PREFIX}(off|on)$`)
+
+/**
+ * The scale 1–5 under an item, with the digit already pressed marked — and under it, on the last
+ * message of the evening, the switch it offers. Without an item, the switch alone: a message whose
+ * scale could not be read back is still given its other button.
+ */
+export function scale(itemId: string | undefined, pressed?: number, offer?: Offer): InlineKeyboard {
   const keyboard = new InlineKeyboard()
-  for (const score of [1, 2, 3, 4, 5]) {
+  if (itemId) {
+    for (const score of [1, 2, 3, 4, 5]) {
+      keyboard.text(
+        score === pressed ? `${String(score)} ✓` : String(score),
+        `${PREFIX}${itemId}:${String(score)}`,
+      )
+    }
+  }
+  if (offer) {
+    if (itemId) keyboard.row()
     keyboard.text(
-      score === pressed ? `${String(score)} ✓` : String(score),
-      `${PREFIX}${itemId}:${String(score)}`,
+      t(undefined, offer === 'off' ? 'remind.stop' : 'remind.resume'),
+      `${SWITCH_PREFIX}${offer}`,
     )
   }
   return keyboard
+}
+
+/**
+ * What a reminder's keyboard holds, read back off the message: the bot keeps no state, and
+ * Telegram's copy of the message is the only memory there is. A press of one row rebuilds the
+ * keyboard whole, so the other row has to be read here or it would be lost (Р-7).
+ */
+export function keyboardOf(markup: InlineKeyboardMarkup | undefined): {
+  readonly itemId?: string
+  readonly pressed?: number
+  readonly offer?: Offer
+} {
+  let itemId: string | undefined
+  let pressed: number | undefined
+  let offer: Offer | undefined
+  for (const button of (markup?.inline_keyboard ?? []).flat()) {
+    const data = 'callback_data' in button ? button.callback_data : undefined
+    const digit = SCALE_DATA.exec(data ?? '')
+    if (digit) {
+      itemId = digit[1]
+      if (button.text.endsWith('✓')) pressed = Number(digit[2])
+    }
+    const action = SWITCH_DATA.exec(data ?? '')
+    if (action) offer = action[1] as Offer
+  }
+  return {
+    ...(itemId ? { itemId } : {}),
+    ...(pressed ? { pressed } : {}),
+    ...(offer ? { offer } : {}),
+  }
+}
+
+/**
+ * Where each outcome begins in a reminder's text. The text is Telegram's memory of the question
+ * (the bot keeps none), so a press finds the earlier outcomes there and replaces its own: the
+ * rating's after `✓`, the switch's — which begins with its own 🔕 or 🔔 — after it, and neither
+ * erases the other (Р-7). Marks rather than line counts, because the last message of the day carries
+ * one more line.
+ */
+const RATED = '\n\n✓ '
+const SWITCHED = /\n\n(?=🔕 |🔔 )/u
+
+export interface ReminderText {
+  readonly question: string
+  readonly rated?: string
+  readonly switched?: string
+}
+
+/**
+ * The text of the message a press came under, or `null` when Telegram handed it over without one —
+ * an `InaccessibleMessage`: then there is nothing to read back, and nothing may be written over it.
+ */
+export function shownText(message: { readonly text?: string } | undefined): string | null {
+  return message?.text ?? null
+}
+
+export function readText(text: string): ReminderText {
+  const [head = '', switched] = text.split(SWITCHED)
+  const [question = '', rated] = head.split(RATED)
+  return {
+    question,
+    ...(rated === undefined ? {} : { rated }),
+    ...(switched === undefined ? {} : { switched }),
+  }
+}
+
+export function writeText({ question, rated, switched }: ReminderText): string {
+  const parts = [question]
+  if (rated !== undefined) parts.push(`${RATED}${rated}`)
+  if (switched !== undefined) parts.push(`\n\n${switched}`)
+  return parts.join('').replace(/^\n\n/, '')
 }
 
 /**
@@ -63,23 +157,31 @@ class Flooded extends Error {}
 
 /**
  * One reminder: a message an item, the freshest first (В-1). Only the first one rings; the others
- * arrive silently, so an evening of three questions is one notification.
+ * arrive silently, so an evening of three questions is one notification. «Не напоминать» goes under
+ * the last one alone (MOL-103, В-2): one line in the chat, not three.
  *
  * A failure is logged by its code and nothing else — no chat, no name (the privacy page). The
  * reminder is already marked as sent by the API (Р-2), so what fails here is not claimed again:
  * **Too Many Requests (429) is waited out once**, as Telegram asks, since at 19:00 everybody in
  * Armenia is one batch — unless it asks for longer than `RETRY_AFTER_CAP_SECONDS`, which ends the
  * run (`Flooded`), or a stop cuts the wait short, which gives that message up. Anything else is
- * given up. Blocked (403) ends this person's messages: the next ones would fail the same way.
- * Turning the reminders off for them is MOL-103.
+ * given up. **Blocked (403) ends this person's messages and turns their reminders off** (MOL-103,
+ * Р-5): without it the API handed them out again every evening, to fail the same way.
  */
-async function send(telegram: Api, reminder: Reminder, appUrl: string, wait: Wait): Promise<void> {
+async function send(
+  api: MolviaBotClient,
+  telegram: Api,
+  reminder: Reminder,
+  appUrl: string,
+  wait: Wait,
+): Promise<void> {
   const { telegramUserId, items, total } = reminder
   for (const [index, item] of items.entries()) {
-    const more = index === items.length - 1 ? total - items.length : 0
+    const last = index === items.length - 1
+    const more = last ? total - items.length : 0
     const message = async () =>
       telegram.sendMessage(telegramUserId, reminderText(item, more, appUrl), {
-        reply_markup: scale(item.itemId),
+        reply_markup: scale(item.itemId, undefined, last ? 'off' : undefined),
         disable_notification: index > 0,
       })
     try {
@@ -96,8 +198,26 @@ async function send(telegram: Api, reminder: Reminder, appUrl: string, wait: Wai
       if (error instanceof Flooded) throw error
       const code = error instanceof GrammyError ? String(error.error_code) : 'unexpected failure'
       console.error(`[molvia] remind: ${code}`)
-      if (error instanceof GrammyError && error.error_code === 403) return
+      if (error instanceof GrammyError && error.error_code === 403) {
+        await blocked(api, telegramUserId)
+        return
+      }
     }
+  }
+}
+
+/**
+ * The bot was blocked: the person's reminders go off (MOL-103). Telegram's `my_chat_member` usually
+ * says so first; this is for a block the bot did not hear about, while it was down. A failure is
+ * the log's, by its code — the next evening's 403 asks again.
+ */
+async function blocked(api: MolviaBotClient, telegramUserId: number): Promise<void> {
+  try {
+    await api.switchReminders(telegramUserId, 'blocked')
+  } catch (error) {
+    console.error(
+      `[molvia] remind blocked: ${error instanceof ApiError ? error.code : 'unexpected failure'}`,
+    )
   }
 }
 
@@ -119,7 +239,7 @@ export async function remindDue(
   }
   for (const [index, reminder] of due.entries()) {
     try {
-      await send(telegram, reminder, appUrl, wait)
+      await send(api, telegram, reminder, appUrl, wait)
     } catch (error) {
       if (!(error instanceof Flooded)) throw error
       // The rest of the run would be refused the same way: given up at once, and said how many.

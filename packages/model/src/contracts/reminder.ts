@@ -3,7 +3,7 @@ import { ISSUE } from '#model/support/errors'
 import { telegramUserIdSchema } from '#model/entities/actor'
 import { itemSchema } from '#model/entities/item'
 import { placeSchema } from '#model/entities/place'
-import { REMINDER_ITEMS } from '#model/entities/reminder'
+import { REMINDERS_OFF, REMINDER_ITEMS, REMINDER_SWITCHES } from '#model/entities/reminder'
 import { newVerdictSchema } from '#model/entities/verdict'
 
 /**
@@ -55,3 +55,30 @@ export const rateFromBotSchema = z.strictObject({
   score: newVerdictSchema.shape.score,
 })
 export type RateFromBot = z.infer<typeof rateFromBotSchema>
+
+/**
+ * `GET` and the answer of `PUT /actors/me/reminders` (MOL-103): whether the bot reminds, and if not,
+ * why — `blocked` is what the screen explains. Its own address beside the settings and never a field
+ * of their form or of `/actors/me` (Р-1): those four fields are also a trip's context, and an
+ * installed app reads `/actors/me` strictly.
+ */
+export const remindersSettingSchema = z.strictObject({
+  off: z.enum(REMINDERS_OFF).nullable(),
+})
+export type RemindersSetting = z.infer<typeof remindersSettingSchema>
+
+/** The body of `PUT /actors/me/reminders`, saved on the tap. */
+export const chooseRemindersSchema = z.strictObject({ on: z.boolean() })
+export type ChooseReminders = z.infer<typeof chooseRemindersSchema>
+
+/**
+ * The body of `POST /internal/reminders/switch` (MOL-103): «Не напоминать» or «Вернуть напоминания»
+ * pressed under a reminder, or Telegram saying the bot was blocked or unblocked. Whose reminders they
+ * are is `ctx.from.id` — or the chat a message failed to reach, which in a private chat is the same
+ * person — and never anything in a button.
+ */
+export const switchRemindersFromBotSchema = z.strictObject({
+  telegramUserId: telegramUserIdSchema,
+  change: z.enum(REMINDER_SWITCHES),
+})
+export type SwitchRemindersFromBot = z.infer<typeof switchRemindersFromBotSchema>

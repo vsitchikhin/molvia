@@ -1,6 +1,13 @@
 import { sql } from 'drizzle-orm'
-import { PENDING_VERDICTS_LIMIT } from '@molvia/model'
-import type { PendingVerdict, ReminderLadder, ReminderPlan, ReminderStep } from '@molvia/model'
+import { PENDING_VERDICTS_LIMIT, localClock, switchReminders, timeZoneOf } from '@molvia/model'
+import type {
+  PendingVerdict,
+  ReminderLadder,
+  ReminderPlan,
+  ReminderStep,
+  ReminderSwitch,
+  RemindersOff,
+} from '@molvia/model'
 import { createExpenseRepository } from './expenses-repository'
 import type { Conn } from './index'
 import { yerevanDay } from './yerevan-week'
@@ -73,12 +80,37 @@ export interface ReminderRepository {
   ): Promise<ClaimedReminder | null>
   /** One more verdict given by a press under a reminder, on today's row of `reminder_days`. */
   countRated(): Promise<void>
+  /** Why the person's reminders are off (MOL-103); null — they are on. */
+  remindersOff(actorId: string): Promise<RemindersOff | null>
+  /**
+   * Moves the switch (MOL-103) as `switchReminders` says, in one transaction under the owner's row,
+   * and answers where it stands now — `undefined` when there is no such owner. **Turned on, the
+   * ladder starts over** (Р-3): its row goes, so the next reminder is a step 1 about yesterday, never
+   * a step 2 «overdue» since the switch went off, asking about months of purchases — **unless it was
+   * reminded on the person's today** (`now` in their zone, adversarial А): then it stays, or a slip
+   * of the finger on «Не напоминать» and «Вернуть» brought the same questions again the next minute.
+   * **Turned off from on, it is counted** on today's row of `reminder_days` (В-4), by how: `blocked`
+   * for a blocked bot, otherwise the settings or the bot's button, as `via` says.
+   */
+  switchReminders(
+    owner: { readonly actorId: string } | { readonly telegramUserId: number },
+    change: ReminderSwitch,
+    via: 'settings' | 'bot',
+    now: Date,
+  ): Promise<RemindersOff | null | undefined>
 }
 
 const STEP_COLUMN: Readonly<Record<ReminderStep, string>> = {
   1: 'first_steps',
   2: 'second_steps',
   3: 'third_steps',
+}
+
+/** Where a turning off is counted (В-4): by how it came. */
+const OFF_COLUMN: Readonly<Record<'blocked' | 'settings' | 'bot', string>> = {
+  blocked: 'off_blocked',
+  settings: 'off_settings',
+  bot: 'off_button',
 }
 
 export function createReminderRepository(db: Conn): ReminderRepository {
@@ -124,6 +156,8 @@ export function createReminderRepository(db: Conn): ReminderRepository {
               where v.actor_id = a.id and v.item_id = e.item_id and v.deleted_at is null
             )
         ) unrated on true
+        -- Off is off, whoever turned it (MOL-103): nothing is planned, marked or counted for them.
+        where a.reminders_off is null
         order by a.id
       `)
       return rows.map((row) => ({
@@ -144,9 +178,11 @@ export function createReminderRepository(db: Conn): ReminderRepository {
     async claim({ actorId, timeZone, plan, today, previous, now }, limit, sendable) {
       return db.transaction(async (tx) => {
         // The owner first, as erasure takes it (privacy.md): an erasure under way is waited for,
-        // and then the owner is gone and there is no one to remind.
+        // and then the owner is gone and there is no one to remind. Reminders turned off since
+        // the candidates were read are off here too (MOL-103); a switch committed after this read
+        // lets this one evening go — the lock does not wait for it, and that is the named price.
         const owner = await tx.execute(
-          sql`select 1 from actors where id = ${actorId}::uuid for key share`,
+          sql`select 1 from actors where id = ${actorId}::uuid and reminders_off is null for key share`,
         )
         if (owner.length === 0) return null
 
@@ -207,6 +243,48 @@ export function createReminderRepository(db: Conn): ReminderRepository {
       await db.execute(sql`
         insert into reminder_days (day, rated) values (${yerevanDay(sql`now()`)}, 1)
         on conflict (day) do update set rated = reminder_days.rated + 1`)
+    },
+
+    async remindersOff(actorId) {
+      const [row] = await db.execute<{ reminders_off: RemindersOff | null }>(
+        sql`select reminders_off from actors where id = ${actorId}::uuid`,
+      )
+      return row?.reminders_off ?? null
+    },
+
+    async switchReminders(owner, change, via, now) {
+      return db.transaction(async (tx) => {
+        const where =
+          'actorId' in owner
+            ? sql`id = ${owner.actorId}::uuid`
+            : sql`telegram_user_id = ${owner.telegramUserId}`
+        // The owner's row first, as erasure locks it (privacy.md), and the ladder after it.
+        const [row] = await tx.execute<{
+          id: string
+          country: string
+          reminders_off: RemindersOff | null
+        }>(sql`select id, country, reminders_off from actors where ${where} for no key update`)
+        if (!row) return undefined
+        const next = switchReminders(row.reminders_off, change, via)
+        if (next === row.reminders_off) return next
+
+        await tx.execute(sql`update actors set reminders_off = ${next} where id = ${row.id}::uuid`)
+        if (next === null) {
+          // A country with no zone is never reminded, so it has no today to keep.
+          const zone = timeZoneOf(row.country.trim())
+          const today = zone === null ? null : localClock(now, zone).day
+          await tx.execute(sql`
+            delete from rating_reminders
+            where actor_id = ${row.id}::uuid
+              and (${today}::date is null or reminded_on < ${today}::date)`)
+        } else if (row.reminders_off === null) {
+          const column = sql.raw(OFF_COLUMN[change === 'blocked' ? 'blocked' : via])
+          await tx.execute(sql`
+            insert into reminder_days (day, ${column}) values (${yerevanDay(sql`now()`)}, 1)
+            on conflict (day) do update set ${column} = reminder_days.${column} + 1`)
+        }
+        return next
+      })
     },
   }
 }

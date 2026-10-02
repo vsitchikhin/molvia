@@ -81,7 +81,7 @@ it('puts the switch back where the server holds it when the answer does not come
   await switchOf(view).setValue(true)
   await flushPromises()
   expect(switchOf(view).element.checked).toBe(false)
-  expect(view.get('[role="alert"]').text()).toContain(en.settings.salary_shift.save_failed)
+  expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
 })
 
 it('waits offline: the switch is inactive and says why', async () => {
@@ -89,19 +89,19 @@ it('waits offline: the switch is inactive and says why', async () => {
   read.mockRejectedValue(new TypeError('network'))
   const view = await render()
   expect(switchOf(view).attributes('disabled')).toBeDefined()
-  expect(view.text()).toContain(en.settings.salary_shift.offline)
+  expect(view.text()).toContain(en.settings.tap.offline)
   expect(view.text()).not.toContain(en.state.retry)
 })
 
 it('offers «Try again» after a server failure, and reads again on it', async () => {
   read.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
   const view = await render()
-  expect(view.text()).toContain(en.settings.salary_shift.load_error)
+  expect(view.text()).toContain(en.settings.tap.load_error)
   read.mockResolvedValue({ day: 25 })
   await view.get('button').trigger('click')
   await flushPromises()
   expect(switchOf(view).element.checked).toBe(true)
-  expect(view.text()).not.toContain(en.settings.salary_shift.load_error)
+  expect(view.text()).not.toContain(en.settings.tap.load_error)
 })
 
 it('a connection lost while saving is «without a connection», not a red failure (self-review 7)', async () => {
@@ -114,7 +114,7 @@ it('a connection lost while saving is «without a connection», not a red failur
   await flushPromises()
   expect(switchOf(view).element.checked).toBe(false)
   expect(view.find('[role="alert"]').exists()).toBe(false)
-  expect(view.text()).toContain(en.settings.salary_shift.offline)
+  expect(view.text()).toContain(en.settings.tap.offline)
 })
 
 it('tells a screen reader why the switch is inactive offline (self-review 8)', async () => {
@@ -123,5 +123,5 @@ it('tells a screen reader why the switch is inactive offline (self-review 8)', a
   const view = await render()
   const described = (switchOf(view).attributes('aria-describedby') ?? '').split(' ')
   const texts = described.map((id) => view.find(`[id="${id}"]`).text())
-  expect(texts).toContain(en.settings.salary_shift.offline)
+  expect(texts).toContain(en.settings.tap.offline)
 })

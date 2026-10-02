@@ -1162,19 +1162,27 @@
       "hand_over": "Save or send"
     },
     "group_money": "Money",
+    "group_reminders": "Reminders",
+    "tap": {
+      "offline": "Cannot save without a connection — the switch comes back with it.",
+      "save_failed": "Not saved. Check the connection and try again.",
+      "load_error": "The setting could not be loaded."
+    },
     "salary_shift": {
       "label": "Salary counts in the next month",
       "day": "From which day",
       "day_option": "from day {day}",
-      "hint": "A salary received on this day or later counts in «Came in» of the next month. The day it came in and the account balances stay as they are.",
-      "offline": "Cannot save without a connection — the switch comes back with it.",
-      "save_failed": "Not saved. Check the connection and try again.",
-      "load_error": "The setting could not be loaded."
+      "hint": "A salary received on this day or later counts in «Came in» of the next month. The day it came in and the account balances stay as they are."
+    },
+    "reminders": {
+      "label": "Remind me to rate in Telegram",
+      "hint": "The evening after a purchase the bot asks how it was. Leave it unanswered and it asks less often, then keeps quiet for half a year.",
+      "blocked": "The bot is blocked in Telegram, so the reminders turned off by themselves. Unblock the bot and they come back."
     }
   },
   "privacy": {
     "title": "Data and privacy",
-    "revised": "Revised 1 October 2026",
+    "revised": "Revised 2 October 2026",
     "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
@@ -1216,7 +1224,7 @@
       },
       "reminders": {
         "term": "Rating reminders",
-        "text": "When the bot last reminded you to rate your purchases, and which reminder in a row it was — so that it writes less often if you do not answer. The message itself carries the item and the shop to Telegram: otherwise the question would not say what it is about."
+        "text": "When the bot last reminded you to rate your purchases, and which reminder in a row it was — so that it writes less often if you do not answer. And whether the reminders are off — by you, or because you blocked the bot. The message itself carries the item and the shop to Telegram: otherwise the question would not say what it is about."
       },
       "search": {
         "term": "Search picks",

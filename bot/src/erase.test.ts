@@ -48,7 +48,12 @@ function harness(
   let buttons = true
   const bot = assembleBot(
     '42:TEST',
-    { api: api as MolviaBotClient, appUrl: 'https://molvia.test', now: () => now },
+    {
+      // Every press also says the bot is not blocked (MOL-103); not this file's concern.
+      api: { switchReminders: () => Promise.resolve(), ...api } as MolviaBotClient,
+      appUrl: 'https://molvia.test',
+      now: () => now,
+    },
     { botInfo: BOT_INFO },
   )
   const transformer: Transformer = (_prev, method, payload) => {

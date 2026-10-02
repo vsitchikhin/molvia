@@ -4,6 +4,7 @@ import { isoDate } from './trip'
 import { incomeSourceSchema } from '#model/entities/income'
 import { itemKindSchema } from '#model/entities/item'
 import { placeKindSchema } from '#model/entities/place'
+import { REMINDERS_OFF } from '#model/entities/reminder'
 import { spendingPresetSchema } from '#model/entities/spending-category'
 import { rateChoiceSchema } from '#model/entities/trip'
 import { decimalFromScaled, scaledFromDecimal } from '#model/support/decimal'
@@ -24,8 +25,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // change of what goes in is a new version (privacy.md). 3: a trip's `receipt` and `receiptSetAt`,
 // the sum typed from the receipt, when it last changed and when it was first typed (MOL-78). 4: an
 // exchange's `channel` (MOL-137). 5: `addedBarcodes`, the codes the person wrote to items of the
-// catalogue (MOL-100).
-export const EXPORT_VERSION = 5
+// catalogue (MOL-100). 6: the account's `remindersOff`, whether and why the bot does not remind
+// (MOL-103).
+export const EXPORT_VERSION = 6
 
 const day = z.iso.date()
 
@@ -100,6 +102,7 @@ const accountSchema = z.strictObject({
   incomeCurrencySince: isoDate.nullable(),
   ratePreference: ratePreferenceSchema,
   salaryShiftDay: z.int().nullable(),
+  remindersOff: z.enum(REMINDERS_OFF).nullable(),
   sharedUntil: isoDate.nullable(),
   createdAt: isoDate,
   updatedAt: isoDate,
