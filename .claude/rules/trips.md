@@ -274,5 +274,12 @@ name stands in two cities, its city** (MOL-120, owner's decisions В-1, В-2): �
 name — so a card's city goes once the other card is rated. The rule is the domain's
 `cityWhereNameRepeats`, names and cities folded as the index over `places` folds them; **a card with
 no city** — a server before MOL-120, a card the phone kept from one — **leaves the whole queue named
-as before**, since it may be either shop. The handoff's «Из чека «SAS»» is not used: the queue of
+as before**, since it may be either shop: no city printed, and the names kept apart as written, not
+folded — «Ереван Сити» and «ЕРЕВАН СИТИ» may be the shops of two cities, and folded they read as one
+(adversarial А1). **The case is looked up by the city of the settings a spelling folds to**
+(`settingsCityOf`, А2): a place keeps its city as first written, and «гюмри» is «в Гюмри», never
+«(гюмри)». **A draft of a verdict keeps the city beside its card, never inside** (А4): the version
+before reads the card strictly, and a rollback dropped a verdict saved with no signal. The queue the
+phone remembers and the memory of «Что брать» keep the city inside the answer — **the price, named**:
+a rollback of MOL-120 forgets those two, which are caches, and the next answer brings them back. The handoff's «Из чека «SAS»» is not used: the queue of
 verdicts does not know a source (MOL-124, П-9).
