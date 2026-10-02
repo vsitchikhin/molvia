@@ -93,7 +93,10 @@ export default defineComponent({
     title: { type: String as PropType<string | null>, default: null },
     /** A last line under the legend — «Каждый месяц — по курсу того месяца». */
     note: { type: String as PropType<string | null>, default: null },
-    /** Under the total with no «≈»: which month had no rate (MOL-160, review 14); the month's own words if not named. */
+    /**
+     * Under the total with no «≈»: which month had no rate (MOL-160, review 14); an empty string
+     * says nothing — a sum past money (adversarial М′); null — the month's own words.
+     */
     noRate: { type: String as PropType<string | null>, default: null },
     nameOf: {
       type: Function as PropType<(category: SpendingCategoryView) => string>,

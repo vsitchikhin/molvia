@@ -508,8 +508,9 @@ MOL-74's unless they name MOL-160, and hold for the year.
   data was moved or removed never outranks what the server says now — the earliest of all brought
   the newcomer's live arrow back (adversarial Л). A year past what money holds has no sum, so no
   «≈» of it, and nothing under its «—» — «нет курса» there blamed a rate that was there (adversarial
-  И, М). **A year's «≈» missing names the month without a rate** («нет курса за август», review 14), as
-  «Пришло и ушло» names its own.
+  И, М). **Why the year has no «≈» is the server's word too** (`spentIncomeMissing`, adversarial
+  М′), as the average's is: a month without a rate is named — «нет курса за август», review 14, as
+  «Пришло и ушло» names its own — and a sum of «≈» past money says nothing, never «нет курса».
 
 ## «Графики → Месяц» (MOL-158)
 

@@ -522,11 +522,40 @@ describe('yearCharts — round 2 of the adversarial pass', () => {
     )
     const charts = year('2026', beyond, '2026-10-02', '2026-07')
     expect(charts.months[6]?.uncounted).toEqual([])
-    // No sum, and no «≈» of it under the «—» (adversarial И).
-    expect([charts.spent, charts.spentIncome]).toEqual([null, null])
+    // No sum, and no «≈» of it under the «—» (adversarial И), for a reason that is no rate's.
+    expect([charts.spent, charts.spentIncome, charts.spentIncomeMissing]).toEqual([
+      null,
+      null,
+      'beyond',
+    ])
     expect([charts.average, charts.averageMissing]).toEqual([null, 'beyond'])
 
     const whole = year('2026', run('2026-07', '2026-10', monthly(1000)), '2026-10-02', '2026-07')
     expect(whole.averageMissing).toBeNull()
+  })
+})
+
+describe('yearCharts — round 5 of the adversarial pass', () => {
+  it('says why the year has no «≈»: a month with no rate, or a sum past money (М′)', () => {
+    const rate = [
+      counted('2026-01', [spending(5000, '2026-01-10')], '5'),
+      counted('2026-02', [spending(4000, '2026-02-10')], null),
+    ]
+    const missing = year('2026', rate, '2026-02-20', '2026-01')
+    expect([missing.spentIncome, missing.spentIncomeMissing]).toEqual([null, 'rate'])
+
+    // Every month has its «≈», each within money, and the year's sum too — but not the sum of «≈»:
+    // a rate of 0,1 ֏ for a rouble makes the roubles ten times the drams.
+    const big = 4n * 10n ** 15n
+    const beyond = ['2026-07', '2026-08', '2026-09'].map((month) =>
+      counted(month, [spending(big, `${month}-05`)], '0.1'),
+    )
+    const charts = year('2026', beyond, '2026-09-20', '2026-07')
+    expect(charts.spent).not.toBeNull()
+    expect(charts.months[6]?.spentIncome).not.toBeNull()
+    expect([charts.spentIncome, charts.spentIncomeMissing]).toEqual([null, 'beyond'])
+
+    const whole = year('2026', run('2026-07', '2026-09', monthly(1000)), '2026-09-20', '2026-07')
+    expect(whole.spentIncomeMissing).toBeNull()
   })
 })

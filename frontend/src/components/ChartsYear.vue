@@ -315,7 +315,11 @@ export default defineComponent({
      * «Пришло и ушло» names its own — read off the months, the phone counts nothing.
      */
     const noRate = computed(() => {
-      const missing = (charts.value?.months ?? []).filter(
+      const shown = charts.value
+      // The server says why there is no «≈» (adversarial М′): a sum past money is no rate's fault,
+      // and nothing is said under it.
+      if (shown?.spentIncomeMissing !== 'rate') return shown?.spentIncomeMissing ? '' : null
+      const missing = shown.months.filter(
         (month) => month.kind === 'data' && month.spentIncome === null,
       )
       const [one] = missing

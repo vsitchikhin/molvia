@@ -93,6 +93,7 @@ function yearCharts(patch: Partial<MoneyChartYearView> = {}): MoneyChartYearView
     monthsShown: 2,
     spent: amd('586483'),
     spentIncome: rub('135187'),
+    spentIncomeMissing: null,
     uncounted: [],
     slices: [
       {
@@ -565,7 +566,9 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
   })
 
   it('a year with no sum says nothing under its «—», and blames no rate (adversarial М)', async () => {
-    moneyChartYear.mockResolvedValue(yearCharts({ spent: null, spentIncome: null, slices: [] }))
+    moneyChartYear.mockResolvedValue(
+      yearCharts({ spent: null, spentIncome: null, spentIncomeMissing: 'beyond', slices: [] }),
+    )
     const view = await render()
     const centre = view.find('.figure .center')
     expect(centre.text()).toContain('—')
@@ -573,8 +576,18 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
     expect(centre.text()).not.toContain(en.spending.charts.no_rate)
   })
 
+  it('says nothing under a sum whose «≈» is past money, and blames no rate (adversarial М′)', async () => {
+    moneyChartYear.mockResolvedValue(
+      yearCharts({ spentIncome: null, spentIncomeMissing: 'beyond' }),
+    )
+    const view = await render()
+    const centre = view.find('.figure .center')
+    expect(centre.text()).toContain('֏586,483')
+    expect(centre.find('.center-sub').exists()).toBe(false)
+  })
+
   it('names the month that keeps the year’s «≈» from being counted (review 14)', async () => {
-    const base = yearCharts({ spentIncome: null })
+    const base = yearCharts({ spentIncome: null, spentIncomeMissing: 'rate' })
     const months = base.months.map((month) =>
       month.month === '2026-08'
         ? { ...month, spentIncome: null, spentIncomeLevel: null, difference: null }

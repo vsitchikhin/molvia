@@ -110,6 +110,8 @@ export const moneyChartYearCodec = z.strictObject({
   /** Null past what money holds: the ring is grey, the answer never fails for it. */
   spent: moneyCodec.nullable(),
   spentIncome: moneyCodec.nullable(),
+  /** Why there is no «≈»: a month with no rate, or a sum past money. */
+  spentIncomeMissing: z.enum(['rate', 'beyond']).nullable(),
   uncounted: z.array(moneyCodec),
   slices: z.array(sliceCodec),
   months: z
