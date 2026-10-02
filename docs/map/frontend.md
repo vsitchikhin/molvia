@@ -17,9 +17,10 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/components/AppScreen.vue` — The frame every screen sits in: pinned row, collapsing large title, back chevron with its label, docked strip, identity notice.
 - `frontend/src/components/BottomSheet.vue` — The sheet: a native modal `<dialog>` rising from the bottom, closed through its history entry; stacks with «‹» instead of ×.
 - `frontend/src/components/FloatingDock.vue` — Floating spot for the main action of a «Деньги» screen («Трата», «Обмен», «Доход») or «Вернуть» after a removal.
+- `frontend/src/components/SchemeGroup.vue` — «Тема» on the settings screen: «Системная · Светлая · Тёмная» of this device, taken on the tap, in every state of the screen.
 - `frontend/src/components/ScreenSkeleton.vue` — Loading state: bars in the geometry the screen gives, announcing «Loading…» through the live region.
 - `frontend/src/components/ScreenState.vue` — Every non-loading screen state (empty, error, offline, attention): icon circle by tone, texts, «Try again» and actions; «Обновить» first while a version waits.
-- `frontend/src/components/SegmentedControl.vue` — Kit segmented control: a radio fieldset drawn as segments, for one choice out of up to four (unit, rate).
+- `frontend/src/components/SegmentedControl.vue` — Kit segmented control: a radio fieldset drawn as segments, for one choice out of up to four (unit, rate); `fit` gives each segment the width of its word.
 - `frontend/src/components/TabBar.vue` — The tab bar of the five sections («Что брать», «Покупки», «Оценки», «Деньги», «Настройки»), moving through `useNavigation`.
 - `frontend/src/components/UndoStrip.vue` — «Удалено · Вернуть» strip: ten seconds to take back a removal, paused under a finger or focus.
 - `frontend/src/components/UpdateBand.vue` — «Вышла новая версия · Обновить»: the top row of the screen's pinned strip while a version waits, and the words when it did not take.
@@ -28,6 +29,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 
 - `frontend/src/composables/useAnnouncer.ts` — Composable: the app's one polite live region — provided in `App.vue`, used by blocks to say and take back words.
 - `frontend/src/composables/useBackLabel.ts` — Composable: which back label fits the row (parent's title, «Back», or the chevron alone), measured by a resize observer.
+- `frontend/src/composables/useColorScheme.ts` — Composable: the scheme of this device (`molvia.scheme`) — kept, drawn on the root and in the status bar's theme colours, followed from other windows; the script in `index.html` reads it before the first paint (MOL-111).
 - `frontend/src/composables/useCollapsed.ts` — Composable: whether the large title has scrolled past the pinned row (sentinel observer), and an element's live height.
 - `frontend/src/composables/useKeyboardInset.ts` — Composable: lifts an open sheet above the iOS on-screen keyboard from the box it is pinned in and sizes it by the visual viewport (`--keyboard-inset`, `--viewport-height`), taking the height the keys left last time before they come (`molvia.keyboard`); scrolls the sheet to the field typed in when the sheet moves; hides the page under the keys (`data-under-keys`).
 - `frontend/src/composables/useLocalDay.ts` — Composable: the phone's today as a screen holds it, asked again when the app comes back into view or online (MOL-121).
@@ -44,7 +46,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 
 - `frontend/.stylelintrc.json` — Stylelint config: no literal colours, spacing only from the token scale, safe areas only through tokens.
 - `frontend/env.d.ts` — Ambient type references for Vite and the PWA plugin's client.
-- `frontend/index.html` — The PWA's HTML shell: viewport with keyboard resizing, per-scheme theme colours, icons, the app mount.
+- `frontend/index.html` — The PWA's HTML shell: viewport with keyboard resizing, per-scheme theme colours, the device's scheme set before the first paint, icons, the app mount.
 - `frontend/public/` — Static assets served as is: `favicon.svg` (the icon source), the rasterised app icons and the self-hosted font files.
 - `frontend/src/App.vue` — The app's root: the login screen in place of any non-public route, the live region, and the occasions on which the queues send.
 - `frontend/src/api.ts` — The PWA's one API client, wrapped so that any `error.no_actor` raises the login screen.
