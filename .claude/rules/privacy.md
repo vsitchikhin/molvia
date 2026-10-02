@@ -6,12 +6,12 @@ paths:
   - 'backend/drizzle/*.sql'
   - 'backend/tests/{erasure,erase-route,export,export-route,life,forget-bundle,request-log,login-log,compose-logging}*.ts'
   - 'packages/model/src/contracts/export.ts'
-  - 'frontend/src/{components/YourDataGroup,composables/useExport}*'
+  - 'frontend/src/{components/YourDataGroup,components/EraseSheet,composables/useExport}*'
   - 'bin/forget-actor.sh'
   - 'bot/src/erase*.ts'
   - 'frontend/src/views/PrivacyView*'
   - 'backend/src/open-food-facts/**'
-  - 'e2e/{privacy,export}.spec.ts'
+  - 'e2e/{privacy,export,erase}.spec.ts'
   - 'deploy/Caddyfile'
   - 'docker-compose.prod.yml'
 ---
@@ -29,7 +29,20 @@ The detail behind the privacy lines of `CLAUDE.md`.
   — they carry no foreign key, so no cascade reaches them — and the owner, adding one to
   `erasures` for the week they appeared (MOL-91). Catalogue items the
   person added stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
-  nulled (MOL-100), and **every place stays** (owner's decision 24.09.2026). People erase themselves with `/delete` in the bot; the owner's fallback is
+  nulled (MOL-100), and **every place stays** (owner's decision 24.09.2026). People erase
+  themselves through **two doors and one function**: `/delete` in the bot, and since MOL-94
+  «Удалить мои данные» in the settings' group «Ваши данные», under «Скачать мои данные» (owner's
+  decision В-2: the copy is one row above it). The second is `DELETE /actors/me` in the guarded
+  scope — a path with no owner, the session's owner erased by their Telegram id through the same
+  `eraseMe`, every session with them and the cookie put out; a repeat is the guard's `401`. **The
+  session is the whole proof** (В-1): no second confirmation through the bot, one press of
+  «Удалить навсегда» in the sheet (В-4); the price is named in `auth.md`. The sheet says the bot's
+  words for what goes and what stays, and what the bot cannot: the copies on this device go, on the
+  others they stay — and on those, after an erasure, there is no session left to sign out of, so
+  the page names deleting the app or the site's data, and signing out there only beforehand
+  (review 1). After the `204` the phone does what «Выйти» does, and the login screen says
+  «Ваши данные удалены» once; a `401` on a session already gone erases nothing anywhere and says so
+  (`auth.md`). The owner's fallback is
   `dist/forget.js` in the API image (`make forget` in a copy — `TG` reaches the script through the
   environment, never pasted into the recipe, where a value could close a quote and bring its own
   `--yes`, П-3; and only a `TG` typed on that command line — one left in the shell erased that

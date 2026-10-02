@@ -10,7 +10,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 ## backend · usecases
 
 - `backend/src/usecases/export-mine.ts` — Use case of «Скачать мои данные» (MOL-93): the owner's own snapshot, dated with the file's format and version; an owner erased meanwhile is «no owner».
-- `backend/src/usecases/erase-me.ts` — Use case of the bot's `/delete`: erase the owner behind a Telegram id; nobody to erase is not an error. Tests: `backend/tests/erase-route.integration.test.ts`.
+- `backend/src/usecases/erase-me.ts` — Use case of erasing oneself, behind the bot's `/delete` and «Удалить мои данные» (MOL-94): erase the owner behind a Telegram id; nobody to erase is not an error. Tests: `backend/tests/erase-route.integration.test.ts`.
 
 ## backend · db
 
@@ -26,7 +26,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 ## backend · tests
 
 - `backend/tests/compose-logging.integration.test.ts` — Integration test: every service of `docker-compose.prod.yml` logs to the journal, and Postgres keeps row values out of its own log.
-- `backend/tests/erase-route.integration.test.ts` — Integration test: `POST /internal/actors/erase` erases the owner with their sessions, answers a repeat and a stranger with the same 204, needs the bot secret.
+- `backend/tests/erase-route.integration.test.ts` — Integration test: `POST /internal/actors/erase` erases the owner with their sessions, answers a repeat and a stranger with the same 204, needs the bot secret; `DELETE /actors/me` erases the session's owner with every session and puts the cookie out, a repeat is `401`, nobody else is touched (MOL-94).
 - `backend/tests/erasure.integration.test.ts` — Integration test: erasure leaves no row of the person anywhere, keeps items and places, counts the week, and orders its locks against a login.
 - `backend/tests/export-route.integration.test.ts` — Integration test: `GET /actors/me/export` answers the owner's own file with `no-store` and `attachment`, refuses a named owner, and needs a session.
 - `backend/tests/export.integration.test.ts` — Integration test: the export covers every key to `actors` and every column, counts what a dry run of erasure counts, leaks nobody else's row and no secret, keeps the removed marked.
@@ -41,7 +41,8 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 
 ## frontend · components
 
-- `frontend/src/components/YourDataGroup.vue` — «Ваши данные» on the settings (MOL-93, В-2): «Скачать мои данные» with its states and «Сохранить или отправить» for a second tap, and the link to «Данные и приватность».
+- `frontend/src/components/EraseSheet.vue` — Sheet «Удалить все ваши данные?» (MOL-94): the bot's words for what goes and what stays, what happens to the copies on the devices, one press «Удалить навсегда»; inactive offline.
+- `frontend/src/components/YourDataGroup.vue` — «Ваши данные» on the settings (MOL-93, В-2): «Скачать мои данные» with its states and «Сохранить или отправить» for a second tap, «Удалить мои данные» under it (MOL-94), and the link to «Данные и приватность».
 
 ## frontend · composables
 
@@ -49,6 +50,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 
 ## e2e
 
+- `e2e/erase.spec.ts` — End-to-end: «Удалить мои данные» from the settings erases the person and this device, says so once on the login screen, and the next sign-in is a new account; on a session ended meanwhile it erases nothing and says so (MOL-94).
 - `e2e/export.spec.ts` — End-to-end: «Скачать мои данные» downloads the file of one's own where no sheet can take it, and hands it over on a second tap where the phone refused the first.
 - `e2e/privacy.spec.ts` — End-to-end: «Данные и приватность» opens by its address without a session, from the login screen and from the settings.
 

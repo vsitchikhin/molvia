@@ -298,6 +298,18 @@ describe('DELETE /sessions/:id', () => {
     expect(setCookie(ended.headers)).toContain(`${SESSION_COOKIE}=; Max-Age=0`)
     expect((await inject('GET', '/actors/me', only.cookie)).statusCode).toBe(401)
   })
+
+  it('первый запрос дня: срок сдвинут и тут же погашен — одна строка Set-Cookie (MOL-94, ревью 3)', async () => {
+    const owner = await insertActor(db)
+    const only = await device(owner, null, 30)
+
+    const ended = await inject('DELETE', `/sessions/${only.id}`, only.cookie)
+
+    expect(ended.statusCode).toBe(204)
+    expect(ended.headers['set-cookie']).toBe(
+      `${SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`,
+    )
+  })
 })
 
 describe('POST /auth/logout', () => {

@@ -9,7 +9,7 @@ paths:
   - 'packages/model/src/{entities,contracts}/{auth,session,actor}.ts'
   - 'packages/model/tests/{entities,contracts}/{auth,session,actor}.test.ts'
   - 'packages/client/src/**'
-  - 'frontend/src/views/{LoginView,DevicesView,SettingsSignOut}*'
+  - 'frontend/src/views/{LoginView,DevicesView,SettingsSignOut,SettingsErase}*'
   - 'frontend/src/components/{SignOutSheet,SessionEndSheet,IdentityNotice}*'
   - 'frontend/src/stores/{identity,login,actor,signOut}*'
   - 'frontend/src/composables/useSessions*'
@@ -122,6 +122,11 @@ is in `bot.md`.
   cached» holds without anyone remembering it, and a test asserts that no second module writes
   `set-cookie`. The one price, named: over plain http on the LAN (`PWA_EXPOSE=1 make dev`)
   `Secure` means no session — the same place the camera already needs `make certs`.
+  **One `Set-Cookie` of the session per answer** (RFC 6265 §4.1.1; MOL-94, review 3): the guard
+  slides the term on the first request of a day, and a way out answering that request —
+  `DELETE /actors/me`, ending one's own session — used to send the fresh term and the clearing line
+  after it. Fastify appends, so `clearSessionCookie` takes back the session's line set earlier in
+  the same answer and keeps any other cookie's.
 - **What a secret may look like is one rule, in `backend/src/secret.ts`** — RFC 6265's
   `cookie-octet`, because the only thing a session token or a login request's secret ever travels
   in is a cookie. It was two rules once, and they drifted by four characters: a token holding
@@ -340,7 +345,9 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   and not from our API, is not unknown** (round 4, Ж1): a captive portal's page or a stranger's
   `4xx` (`answered === false`, anything but `error.internal`) means the request never reached the
   server, and the intent goes at once — kept, a portal at the till locked the app further into the
-  shop. **The way out succeeds on `204` and on nothing else**: a portal answers a redirected
+  shop. **Only this tap's intent goes** (MOL-94, round 3, Д′): one the tap wrote over — a «Выйти»
+  landed earlier, an erasure whose answer was lost — is put back as it was; dropped with it, the
+  next launch offline opened the app of the person who left. **The way out succeeds on `204` and on nothing else**: a portal answers a redirected
   request with `200` and a page of its own, which read as «no body», and the phone erased a drawer
   for a session the server never heard about. **Somebody else signing in settles the intent too**
   (self-review Р3-2): the cookie of the owner who left is gone, so their drawer is erased there and
@@ -349,11 +356,45 @@ put out, the login screen through the seam of MOL-56. Nothing reaches it sooner,
   a connection lost while the request was on its way leaves the outcome unknown, and a launch with
   no connection then shows the login screen until the server can be asked — the drawer of someone
   who may have left is not opened on a guess.
+- **«Удалить мои данные» leaves through the same door** (MOL-94): `leave('erase')` of the same
+  store, one intent and one ending, only the request is `DELETE /actors/me` instead of the logout —
+  two stores with two intents would drift, and the lost answer, the portal, offline and another
+  person signing in are the same cases. **What differs is what «no session» means** (adversarial
+  А): for «Выйти» it is the goal reached, whoever ended the session; for an erasure it says the
+  session is gone and nothing about the person. So the intent says which door it is
+  (`molvia.erasing` beside `molvia.leaving`), and a `401 error.no_actor` on the erasure is read by
+  what came before it. **On a first tap the session was gone before it** — ended from
+  «Устройства», run out in a tab left open, or the person erased through another door: the `401` is
+  all of them at once, so **the words say only what is known** (self-review 8, round 2 Е) — this
+  tap deleted nothing, and an empty account on signing in means the data went before. The device
+  erases nothing (MOL-56's «a `401` erases nothing» — the queue may hold a purchase of an account
+  still there) and the intent goes — **unless a «Выйти» was waiting** (round 2, Д): «no session» is
+  what completes it, so it is put back, and the server's next «nobody» finishes it. **On a repeat after a lost
+  answer** nobody can tell whether the first tap erased everything; the sheet says that, and the
+  server's next «nobody» finishes the intent as «Выйти» does. A refusal never leaves the sheet as
+  it was before the tap (В). **The login screen of this tab says what came of it, once**
+  (`molvia.erased`, owner's decision В-3, on this tab's own shelf, review 4): «Ваши данные удалены»
+  on the erasure's own `204`; «не знаем, удалились ли» on an intent finished by «nobody»; «это
+  нажатие ничего не удалило» after a first-tap `401` once the door closes. The note goes as it is
+  read, whenever the server names somebody, and **on a tap of «Выйти»** — the last thing done
+  was not an erasure, however that way out ends, its own `204` or the server's «nobody» (round 3
+  Ж, round 4 Ж′) — unless it never reached the server: then the note comes back with the intent
+  (round 5, З). **An erasure whose answer was lost stays unknown through a «Выйти»** (round 4,
+  № 11): neither its `204` nor «nobody» says anything of the person, so `molvia.erasing` is kept
+  and either ending says «не знаем». **A failure keeps its door** (Б): a failed erasure
+  is not shown in the sheet of «Выйти», nor the other way; and it does not outlive the session it
+  was about — the server's «nobody» takes it away, since the door closes over the sheet without
+  closing it, and a login on the same page found the old words there (round 2, Г). The session is the whole proof (В-1): it
+  already opens every row and the copy of them, and a stranger at a forgotten sign-in is answered
+  by «Устройства»; **the price, named:** whoever holds a live session can erase the person, and an
+  intent finished by «nobody» after a lost answer erases the drawer even where the session merely
+  ran out — as for «Выйти».
 - **What would be lost is counted aloud** (owner's decision Q2) — everything the erasure takes
   that the server does not hold: the trip queue and the purchases it refused, every rating draft,
   saved or still being typed, and an unsaved settings form (adversarial Б3). The app is asked to
   send first when the sheet opens. Both «Выйти» and «Завершить» ask before acting, because
-  neither can be undone — there is no «Вернуть» for a deleted key.
+  neither can be undone — there is no «Вернуть» for a deleted key. «Удалить мои данные» counts
+  nothing (MOL-94): everything goes, so the number would help no decision.
 - **Another window lets the owner go by the drawer's disappearing, and erases its own shelves**
   (adversarial А1). `sessionStorage` belongs to one tab, so the window where «Выйти» was pressed
   cannot clear its neighbours' — and `read` falls back to it, so a neighbour's reload opened the

@@ -12,6 +12,32 @@ function sink() {
       headers.set(name, value)
       return this
     },
+    getHeader(name: string) {
+      return headers.get(name)
+    },
+    removeHeader(name: string) {
+      headers.delete(name)
+      return this
+    },
+  }
+}
+
+/** A reply that appends `set-cookie` as Fastify does, rather than replacing it. */
+function appending() {
+  const cookies: string[] = []
+  return {
+    cookies,
+    header(name: string, value: string) {
+      if (name === 'set-cookie') cookies.push(value)
+      return this
+    },
+    getHeader(name: string) {
+      return name === 'set-cookie' && cookies.length > 0 ? [...cookies] : undefined
+    },
+    removeHeader(name: string) {
+      if (name === 'set-cookie') cookies.length = 0
+      return this
+    },
   }
 }
 
@@ -161,5 +187,18 @@ describe('putting the cookie out', () => {
     const cookie = reply.headers.get('set-cookie') ?? ''
     expect(cookie).toBe(`${SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`)
     expect(reply.headers.get('cache-control')).toBe('no-store')
+  })
+
+  it('takes back the term set earlier in the same answer, and keeps any other cookie (MOL-94)', () => {
+    const reply = appending()
+    reply.header('set-cookie', 'other=1; Path=/')
+    setSessionCookie(reply, TOKEN, new Date(Date.now() + 3_600_000))
+
+    clearSessionCookie(reply)
+
+    expect(reply.cookies).toEqual([
+      'other=1; Path=/',
+      `${SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`,
+    ])
   })
 })

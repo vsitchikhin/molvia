@@ -26,6 +26,12 @@ export interface HeaderSink {
   header(name: string, value: string): unknown
 }
 
+/** A reply that can also say and take back what it has set — Fastify's, for the way out. */
+export interface CookieReply extends HeaderSink {
+  getHeader(name: string): unknown
+  removeHeader(name: string): unknown
+}
+
 /**
  * **Every** value the `Cookie:` header carries under one name, in the order it sent them.
  *
@@ -156,8 +162,22 @@ export function setDevAccountCookie(reply: HeaderSink, telegramUserId: number): 
  * Called only where **this** server said «no such session» — a 401 from Caddy, from a gateway
  * or from a shop's captive portal never reaches this code, so nothing outside can talk a
  * browser into dropping a live session.
+ *
+ * **One `Set-Cookie` of the name per answer** (RFC 6265 §4.1.1; MOL-94, review 3). The guard
+ * moves the sliding term on the first request of a day and sets the cookie anew; a way out
+ * answering that very request — `DELETE /actors/me`, ending one's own session — then sent the
+ * fresh term and the clearing one after it. Fastify appends rather than replaces, so the session's
+ * own line set earlier in this reply is taken back first, and any other cookie's is kept.
  */
-export function clearSessionCookie(reply: HeaderSink): void {
+export function clearSessionCookie(reply: CookieReply): void {
+  const set = reply.getHeader('set-cookie')
+  if (set !== undefined) {
+    const others = (Array.isArray(set) ? set : [set])
+      .map(String)
+      .filter((line) => !line.startsWith(`${SESSION_COOKIE}=`))
+    reply.removeHeader('set-cookie')
+    for (const line of others) reply.header('set-cookie', line)
+  }
   reply.header('cache-control', 'no-store')
   reply.header('set-cookie', `${SESSION_COOKIE}=; Max-Age=0; ${FLAGS}`)
 }

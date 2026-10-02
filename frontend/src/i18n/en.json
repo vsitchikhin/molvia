@@ -994,6 +994,18 @@
     "offline": "Signing out needs a connection: without one the session on the server cannot be ended.",
     "error": "Could not sign out: the server did not answer. Try again."
   },
+  "erase": {
+    "title": "Delete all your data?",
+    "goes": "Everything Molvia knows about you goes: purchases, spendings and their categories, currency exchanges, incomes, accounts and checks, ratings and reviews, search picks, visit marks, settings and sign-ins on every device.",
+    "stays": "The items, shops and barcodes you added to the shared catalogue stay, without your name. One number stays too: how many people who came in the same week deleted their data.",
+    "devices": "What is saved on this device is erased. Copies on other devices stay until the app or the site data is deleted there.",
+    "final": "This cannot be undone. You can download a copy first: «Download my data».",
+    "confirm": "Delete for good",
+    "offline": "Deleting needs a connection.",
+    "error": "Could not delete: the server did not answer. Try again.",
+    "signed_out": "This sign-in has already ended, and this tap deleted nothing. If you have already deleted your data — here, in the bot or on another device — it is gone; if not, sign in and delete it again.",
+    "unknown": "We do not know whether the data was deleted: the answer to the last tap was lost, and the sign-in is gone."
+  },
   "identity": {
     "error": {
       "title": "Could not check the sign-in",
@@ -1043,7 +1055,10 @@
     "offline": {
       "title": "No internet, no sign-in",
       "body": "We will try by ourselves once the connection is back."
-    }
+    },
+    "erased": "Your data has been deleted. You can sign in again, and it will be a new, empty account.",
+    "erase_unknown": "We do not know whether your data was deleted: the server's answer was lost. Sign in: if the account is empty, it was deleted; if not, delete it again.",
+    "erase_kept": "The sign-in on this device had already ended, and this tap deleted nothing. Sign in: if the account is empty, the data is already deleted; if not, delete it again."
   },
   "dev": {
     "kit": {
@@ -1186,6 +1201,10 @@
       "label": "Remind me to rate in Telegram",
       "hint": "The evening after a purchase the bot asks how it was. Leave it unanswered and it asks less often, then keeps quiet for half a year.",
       "blocked": "The bot is blocked in Telegram, so the reminders turned off by themselves. Unblock the bot and they come back."
+    },
+    "erase": {
+      "label": "Delete my data",
+      "hint": "Everything, for good"
     }
   },
   "privacy": {
@@ -1273,7 +1292,7 @@
     },
     "erase": {
       "title": "Delete everything",
-      "text": "Send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they, the items you added to the shared catalogue and the barcodes you linked stay, without your name. Saved copies may remain on your phone: to remove them, sign out in Settings, delete the app or clear the site's data. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data. It is there so that whether Molvia gets used is counted honestly."
+      "text": "In Settings, «Delete my data», or send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they, the items you added to the shared catalogue and the barcodes you linked stay, without your name. Deleting from Settings also erases the copies on the phone you deleted from; on other devices, and after /delete, they may remain: to remove them, delete the app there or clear the site's data — or sign out there in Settings beforehand. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data. It is there so that whether Molvia gets used is counted honestly."
     }
   },
   "accounts": {

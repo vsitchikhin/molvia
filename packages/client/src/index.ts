@@ -190,6 +190,11 @@ export interface MolviaClient {
    * Safe to send again after a lost answer — a session already gone answers the same 204.
    */
   logout(): Promise<void>
+  /**
+   * «Удалить мои данные» (MOL-94): the owner of this session is erased, with every session of
+   * theirs. A repeat after a lost answer has no session left and is refused `error.no_actor`.
+   */
+  eraseMe(): Promise<void>
   saveSettings(input: SettingsUpdate): Promise<ActorView>
   /**
    * The catalogue lookup behind «что взяли?», ranked by the server — the query goes as typed.
@@ -527,6 +532,9 @@ export function createClient(options: ClientOptions): MolviaClient {
           headers: new Headers({ [LOGIN_HEADER]: '1' }),
         }),
       )
+    },
+    eraseMe: async () => {
+      noContent(await exchange('/actors/me', z.undefined(), { method: 'DELETE' }))
     },
     saveSettings: async (input) =>
       request('/actors/me/settings', actorCodec, {

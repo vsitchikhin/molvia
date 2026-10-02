@@ -93,7 +93,7 @@
       :unsent="unsent"
       :busy="signOut.leaving"
       :offline="!online"
-      :failure="signOut.failure"
+      :failure="signOut.logoutFailure"
       @confirm="signOut.leave"
     />
     <template #docked>
