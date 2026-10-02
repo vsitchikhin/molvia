@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import {
   ZONE_HEADER,
+  yerevanDate,
   adviceResponseSchema,
   adviceSearchResponseSchema,
   ownNeverResponseSchema,
@@ -29,6 +30,12 @@ let app: FastifyInstance
 const litre: Quantity = { milli: 1000n, unit: 'l' }
 const amd = (minor: number): Money => ({ minor: BigInt(minor), currency: 'AMD' })
 const perLitre = (amount: number) => unitPrice(amd(amount * 100), litre).scaledMinor
+
+/** A record `days` before today — the window of a row's other pairs counts from today (MOL-166, И). */
+const daysAgo = (days: number) => {
+  const at = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  return { on: yerevanDate(at), at }
+}
 
 beforeAll(async () => {
   app = buildServer({ db })
@@ -371,17 +378,15 @@ describe('«Что брать» and the sheet name one price for one place (MOL-
     await rate(me, cheese, 5)
     const sas = await erevan('SAS')
     const kilo: Quantity = { milli: 1000n, unit: 'kg' }
-    for (const on of ['2026-08-01', '2026-08-08', '2026-08-15']) {
-      await bought(me, cheese, sas, 2400, { on, at: new Date(`${on}T09:00:00Z`), quantity: kilo })
+    for (const days of [62, 55, 48]) {
+      await bought(me, cheese, sas, 2400, { ...daysAgo(days), quantity: kilo })
     }
     await bought(me, cheese, sas, 1200, {
-      on: '2026-09-20',
-      at: new Date('2026-09-20T09:00:00Z'),
+      ...daysAgo(12),
       quantity: { milli: 1000n, unit: 'piece' },
     })
     await bought(me, cheese, await erevan('Ереван Сити'), 2800, {
-      on: '2026-09-18',
-      at: new Date('2026-09-18T09:00:00Z'),
+      ...daysAgo(14),
       quantity: kilo,
     })
 
@@ -404,17 +409,14 @@ describe('«Что брать» and the sheet name one price for one place (MOL-
     const sas = await erevan('SAS')
     const kilo: Quantity = { milli: 1000n, unit: 'kg' }
     for (let week = 1; week <= 10; week += 1) {
-      const on = `2026-07-${String(week + 10).padStart(2, '0')}`
-      await bought(me, cheese, sas, 2600, { on, at: new Date(`${on}T09:00:00Z`), quantity: kilo })
+      await bought(me, cheese, sas, 2600, { ...daysAgo(83 - week), quantity: kilo })
     }
     await bought(me, cheese, sas, 1200, {
-      on: '2026-10-01',
-      at: new Date('2026-10-01T09:00:00Z'),
+      ...daysAgo(1),
       quantity: { milli: 1000n, unit: 'piece' },
     })
     await bought(me, cheese, await erevan('Рынок'), 2400, {
-      on: '2025-08-28',
-      at: new Date('2025-08-28T09:00:00Z'),
+      ...daysAgo(400),
       quantity: kilo,
     })
 

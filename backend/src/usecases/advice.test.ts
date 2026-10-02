@@ -298,6 +298,30 @@ describe('места и порог', () => {
     ])
   })
 
+  it('давнее место своего города не ставит свою пару первой (селфревью №12)', async () => {
+    const prices = [
+      price({
+        placeName: 'SAS Ереван',
+        scaledMinor: perKilo(260_000),
+        observations: 30,
+        nearby: false,
+      }),
+      price({
+        placeId: SAS,
+        placeName: 'Рынок',
+        unit: 'piece',
+        scaledMinor: 120_000n,
+        recent: false,
+        latestVisitAt: new Date('2024-10-02T09:00:00.000Z'),
+      }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    // Пара кило первой; двухлетняя пачка — место другой пары вне окна — со строки уходит (И).
+    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual(['SAS Ереван'])
+  })
+
   it('место другой пары — на строке, только пока брали там в окне (адверсариальный И)', async () => {
     const prices = [
       price({ scaledMinor: perKilo(240_000), observations: 3 }),
@@ -309,11 +333,39 @@ describe('места и порог', () => {
         scaledMinor: 1n,
         nearby: false,
         recent: false,
+        latestVisitAt: new Date('2024-10-02T09:00:00.000Z'),
       }),
     ]
 
     const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
 
+    expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
+      'Рынок в Гюмри',
+      'SAS',
+    ])
+  })
+
+  it('не прячет место другой пары, свежее первого места строки (раунд 6, К; решение Н)', async () => {
+    const prices = [
+      price({
+        scaledMinor: perKilo(240_000),
+        pairObservations: 11,
+        latestVisitAt: new Date('2025-08-28T09:00:00.000Z'),
+        recent: false,
+      }),
+      price({
+        placeId: SAS,
+        placeName: 'SAS',
+        unit: 'piece',
+        scaledMinor: 120_000n,
+        latestVisitAt: new Date('2026-06-24T09:00:00.000Z'),
+        recent: false,
+      }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    // Окно SAS не держит, но рынок, который строка называет, ещё старше.
     expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
       'Рынок в Гюмри',
       'SAS',

@@ -278,11 +278,13 @@ describe('цены', () => {
     const market = await insertPlace(db, { name: 'Рынок', city: 'Гюмри' })
     const itemId = await insertItem(db, { name: 'Сыр чанах' })
     await rate(actorId, itemId, 5)
-    for (const day of ['2026-08-01', '2026-08-15', '2026-09-01']) {
-      await bought(actorId, itemId, sas, amd(260_000), { startedAt: new Date(day) })
+    // Days from today: SAS is a pair other than the first, shown only within the window (И).
+    const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    for (const days of [62, 48, 31]) {
+      await bought(actorId, itemId, sas, amd(260_000), { startedAt: daysAgo(days) })
     }
     await bought(actorId, itemId, market, amd(120_000), {
-      startedAt: new Date('2026-09-28'),
+      startedAt: daysAgo(4),
       quantity: { milli: 1000n, unit: 'piece' },
     })
 

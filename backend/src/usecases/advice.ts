@@ -274,12 +274,15 @@ function groupPrices(places: readonly PlacePrice[]): Map<string, Map<GroupKey, P
  *
  * **A pair with a place in the asker's own city comes before any without** (Р-26 across pairs,
  * adversarial Ж): «cheaper elsewhere» is not somewhere one can go, and weighed alone, three kilos
- * in an Erevan shop put it at the head of a Gyumri resident's row over the market of their city.
+ * in an Erevan shop put it at the head of a Gyumri resident's row over the market of their city —
+ * a place of the own city bought at within the window, as a place of another pair must be (И).
  */
 function ranked(groups: Map<GroupKey, PlacePrice[]>): [GroupKey, PlacePrice[]][] {
   // The same on every row of one pair; the largest, should a caller ever hand two apart.
   const weight = (places: readonly PlacePrice[]) => ({
-    nearby: places.some((place) => place.nearby) ? 1 : 0,
+    // Only a place bought at within the window (review №12): one pack at home two years ago put
+    // its pair over thirty kilos in Erevan, and named a price nobody has seen since.
+    nearby: places.some((place) => place.nearby && place.recent) ? 1 : 0,
     observations: Math.max(...places.map((place) => place.pairObservations)),
     latestVisitAt: Math.max(...places.map((place) => place.pairLatestVisitAt.getTime())),
   })
@@ -298,7 +301,9 @@ function ranked(groups: Map<GroupKey, PlacePrice[]>): [GroupKey, PlacePrice[]][]
 /**
  * The places a row names, in the order it names them. The first is the first pair's first — own
  * city, then price (Р-26, Р-27). The rest are the rest of that pair and the places of the other
- * pairs bought at within the window (adversarial И, owner's decision: the first pair has none, В-1),
+ * pairs bought at within the window (adversarial И, owner's decision: the first pair has none, В-1)
+ * or no earlier than the place the row names (adversarial К of round 6, owner's decision Н): a row
+ * never hides a place fresher than the one it names,
  * **own city first across all of them** (Р-26, adversarial Ж′): pairs laid end to end put an Erevan
  * shop of the first pair over the shop next door in the second. Otherwise in the order of the pairs
  * and of the server.
@@ -308,7 +313,9 @@ function rowPlaces(pairs: readonly [GroupKey, PlacePrice[]][]): PlacePrice[] {
   if (!first) return []
   const [head, ...tail] = first[1]
   if (!head) return []
-  const rest = [...tail, ...others.flatMap(([, inPair]) => inPair.filter((place) => place.recent))]
+  const shown = (place: PlacePrice) =>
+    place.recent || place.latestVisitAt.getTime() >= head.latestVisitAt.getTime()
+  const rest = [...tail, ...others.flatMap(([, inPair]) => inPair.filter(shown))]
   // A stable sort: only «own city or not» moves anything.
   return [head, ...rest.sort((a, b) => Number(b.nearby) - Number(a.nearby))]
 }
