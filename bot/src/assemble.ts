@@ -89,8 +89,12 @@ export const RETRY_STEP_MS = 100
  * Left to the runner, it is grammY's `bot.init()`: a silent retry whose pause doubles up to twenty
  * minutes, so a bot started while Telegram was away stayed deaf some seventeen minutes after it came
  * back. Here the pause grows by a tenth of a second a try, as the runner's does, a 429 waits what
- * Telegram asks, and every failure is logged by its kind. A 401 — the token revoked — is thrown:
- * no retry mends it. A stop cuts the wait short and returns without the bot's identity.
+ * Telegram asks, and every failure is logged by its kind. Only what may pass is retried — the
+ * network, a 5xx, a 429 — as grammY does; any other code is thrown, since no retry mends it: a 401
+ * is a revoked token, a 404 one Telegram cannot read (a space or a quote left in `.env.prod`), and
+ * retried they kept a live, silent process where a crash loop is what the rollout and the guide
+ * look for (adversarial round 4 Е1). A stop cuts the wait short and returns without the bot's
+ * identity.
  */
 export async function introduce(bot: Bot, signal?: AbortSignal): Promise<void> {
   for (let pause = RETRY_STEP_MS; !signal?.aborted; pause += RETRY_STEP_MS) {
@@ -101,7 +105,9 @@ export async function introduce(bot: Bot, signal?: AbortSignal): Promise<void> {
       return
     } catch (error) {
       if (signal?.aborted) return
-      if (error instanceof GrammyError && error.error_code === 401) throw error
+      if (error instanceof GrammyError && error.error_code < 500 && error.error_code !== 429) {
+        throw error
+      }
       console.error(`[molvia] telegram getMe: ${telegramFailure(error)}`)
       if (error instanceof GrammyError && error.parameters.retry_after !== undefined) {
         wait = error.parameters.retry_after * 1000

@@ -352,7 +352,8 @@ ps bot` — is it running, how often did it restart — and `logs --tail 50 bot`
   second is a bot that started while Telegram was away and has not yet learnt who it is. The
   runner's own log is off: it printed the request whole, the bot's token in it;
 - `[molvia] telegram: <code | network>, stopping`, and the container restarting — a revoked token
-  (`401`), another process on the same token (`409`), or fifteen hours of Telegram away;
+  (`401`), a token Telegram cannot read (`404`: a space or a quote left in `.env.prod`), another
+  process on the same token (`409`), or fifteen hours of Telegram away;
 - `[molvia] remind claim: <code>` — the API refuses the claim;
 - `[molvia] pulse: <kind>` — the ping did not go out: `network`, `timeout` or healthchecks.io's status.
 

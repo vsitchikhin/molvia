@@ -222,11 +222,30 @@ describe('кто бот — до раннера (MOL-142)', () => {
     expect(bot.isInited()).toBe(true)
   })
 
-  it('401 — токен отозван: не повторяет, бросает', async () => {
-    const { bot, calls } = botAsking(() => ({ code: 401 }))
+  it('4xx, кроме 429, не повторяет — бросает: 401 — токен отозван, 404 — токен не того вида (раунд 4 Е1)', async () => {
+    for (const code of [400, 401, 403, 404]) {
+      const { bot, calls } = botAsking(() => ({ code }))
 
-    await expect(introduce(bot)).rejects.toMatchObject({ error_code: 401 })
-    expect(calls).toHaveLength(1)
+      await expect(introduce(bot)).rejects.toMatchObject({ error_code: code })
+      expect(calls).toHaveLength(1)
+    }
+  })
+
+  it('5xx повторяет', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const codes = [500, 503]
+    const { bot, calls } = botAsking(() => {
+      const code = codes.shift()
+      return code === undefined ? 'up' : { code }
+    })
+
+    const introduced = introduce(bot)
+    await vi.advanceTimersByTimeAsync(1_000)
+    await introduced
+
+    expect(calls).toHaveLength(3)
+    expect(bot.isInited()).toBe(true)
   })
 
   it('остановка прерывает ожидание, и бот не представлен', async () => {

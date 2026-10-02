@@ -81,8 +81,10 @@ press — the only channel people are given, because there Telegram already says
   runner, `getMe` was grammY's `bot.init()`: a silent retry doubling its pause up to twenty minutes,
   so a bot started while Telegram was away stayed deaf some seventeen minutes after it came back and
   said nothing in the log. Now the pause grows as the runner's does, a 429 waits what Telegram asks,
-  each failure is `[molvia] telegram getMe: <kind>`, a 401 ends the process, and a stop cuts the
-  wait short.
+  each failure is `[molvia] telegram getMe: <kind>`, and a stop cuts the wait short. **Only what may
+  pass is retried** — the network, a 5xx, a 429 — as grammY did; any other code ends the process:
+  a 401 is a revoked token, a 404 a token Telegram cannot read, and retried forever they made a
+  live, silent bot where the rollout and the guide look for a crash loop (round 4 Е1).
 - **Updates of different people are handled at once; updates of one person, in order** — and
   both halves are load-bearing (MOL-55, О-4). `bot.start()` handles updates strictly one after
   another, which is grammY's ordering guarantee and was measured costing the next person their
