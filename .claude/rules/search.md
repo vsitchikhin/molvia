@@ -5,11 +5,14 @@ paths:
   - 'packages/model/tests/support/{search-*,synonyms*,text*,name-identity*}.ts'
   - 'packages/model/tests/entities/item.test.ts'
   - 'packages/model/tests/contracts/catalogue.test.ts'
-  - 'backend/src/db/{items,search-picks,seed}-repository.ts'
+  - 'backend/src/db/{items,item-embeddings,search-picks,seed}-repository.ts'
+  - 'backend/src/embeddings/**'
+  - 'backend/src/usecases/{embed-items,query-meaning}*.ts'
   - 'backend/src/{catalogue-seed,seed-catalogue,seed-catalogue-cli}*.ts'
   - 'backend/src/usecases/{search-catalogue,propose-item}*.ts'
   - 'backend/src/routes/catalogue.ts'
   - 'backend/tests/{search,seed,catalogue}*.ts'
+  - 'bin/fetch-model.mjs'
   - 'backend/drizzle/*{catalogue,search}*.sql'
   - 'frontend/src/views/ItemSearchView*'
   - 'frontend/src/components/{CatalogueCombobox,ProposeItemSheet}*'
@@ -265,7 +268,7 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   expanding into a maker would be a place in the results handed out by hand; the other way round
   is fine («памперсы» → «подгузники» of every maker), and «белизна» is let in as the common name
   of a kind. **No categories** — «овощи», «специи», «сладости» name a shelf, and reaching kefir
-  from «молочка» is what embeddings are for in 0.2. The forms people type are written out —
+  from «молочка» is the search by meaning's (MOL-105, below). The forms people type are written out —
   nominative, genitive and accusative, singular and plural; a form left out is a miss. Measured on
   MOL-14's corpus: the six misses found, «макароны» finds the spaghetti the shelf carries, nothing
   else moved; the words come from the owner's expense log plus the usual pairs of a grocery. The
@@ -370,11 +373,63 @@ picks measure it again (MOL-47). The corpus pins every answer whole — the shel
 words, Latin and Cyrillic brand spellings, Armenian labels — so a change of either threshold
 shows what it moves.
 
-**Embeddings are a 0.2 question, not a 0.1 one.** They answer what trigrams cannot —
-«молочка» reaching kefir and curd, and the duplicate merging the canonical catalogue needs.
-They are not the answer to typos or transliteration, both of which are already solved
-deterministically above. The image carries `vector` since MOL-105 (`deploy.md`); the cost left
-is a model resident in memory on a cheap VPS.
+## By meaning (MOL-105)
+
+- **What it answers.** A word that names a shelf — «молочка», «овощи», «спиртное», «для кошки» —
+  shares no letters with what the shelf holds: the dictionary keeps no categories (MOL-45), and the
+  absolute budget made those words a far answer, «Мука высший сорт» first under «овощи» (MOL-46).
+  Every name has a vector of a multilingual model, so has the query, and the names nearest it in
+  meaning are **added** to what the letters found. Typos and transliteration stay the letters':
+  the model is no better at them, and its own sense of spelling is the noise below.
+- **The model** (owner's decisions В-1, В-2 of 02.10.2026): EmbeddingGemma-300m, quantised to four
+  bits, resident in the API — `onnxruntime-node` and the tokenizer of `@huggingface/tokenizers`,
+  not transformers.js, whose `sharp` and runtime the API does not need. Its revision and the
+  sha256 of every file are pinned in `backend/src/embeddings/model.json`; `make model` puts it into
+  `.models/`, shared by the copies, CI caches it, the image carries it. Measured on the seed against
+  e5-small and granite-311m, at the same number of false finds: the first row of the shelf for 59 %
+  of Russian shelf words, against 36 % and 18 %; on the VPS 45 ms a query at the median, 70 at p95,
+  two threads, some 460 MB (`.scratch/tasks/selftests/MOL-105-measure.md`). Its prompts are
+  retrieval's — `task: search result | query:` and `title: none | text:`; those of clustering were
+  worse. **Its terms are Gemma's**, not an open licence: the notice they ask a copy to carry is
+  written beside the files. **onnxruntime 1.30 carries Microsoft's telemetry**, switched off in the
+  code before the library loads and in the image's environment (`privacy.md`).
+- **An addition, never a condition.** While it loads, without its files, failed, or slower than
+  150 ms for a query, the search answers by the letters as it always did; end-to-end runs without
+  it (`EMBEDDINGS=off`) to prove that. A query that missed the wait is still computed and kept:
+  typed letter by letter, the next cut finds it ready. The query goes to the model as typed, lower
+  case, at most a hundred characters; a thousand are remembered.
+- **One writer** of `item_embeddings`: the API's minute timer, nudged by «Предложить товар» and by
+  the model's load. Nothing that writes an item waits for the model or fails with it — a proposal is
+  found by its letters at once and by its meaning seconds later. A vector carries its model and
+  revision, and one of another model is never read and is written again. One row per item, HNSW by
+  cosine on half precision; the query asks the index for sixty neighbours, and `hnsw.ef_search` is
+  set as long, locally beside the threshold, or the index answers fewer.
+- **Where a name found by meaning stands** (owner's decision В-3): after everything within one edit
+  by the mean, before two edits — `MEANING_DISTANCE`, the nearer by meaning first; so nothing the
+  letters found within one edit moves, and an answer with such a name is near. «молоко» keeps every
+  milk above the kefir; «овощи» puts the carrot above the flour. **A name found both ways takes the
+  nearer place**: «собачий корм» finds the dog food two edits away by its letters and close by its
+  meaning, and left at two it stood under the treat the meaning alone found — so «собачий корм» and
+  «корм собакам» are near now, MOL-46's price taken back. The person's own word keeps its rank; a
+  pick lifts a name found by meaning as any found name (MOL-11) — and lets in none the meaning did
+  not reach.
+- **The thresholds were measured** on the seed's thirty shelves — 84 shelf words in Russian,
+  Armenian, Georgian and Serbian, 25 things the seed does not carry, and every cut of a shelf word
+  typed letter by letter. **Similarity 0.40**: 0.38 won seven points of first rows and lost to the
+  model's sense of spelling inside the search — «малако» found «Малина» at 0.381 above the milk,
+  «кружка» the dried apricot. **From four letters** (`MEANING_MIN_LETTERS`): below, a cut finds
+  nearly two names by meaning that are not of its shelf. `search-meaning.integration.test.ts` pins
+  the shelf words, the owner's words of `seed-words.ts` — the first row the letters gave, unmoved —
+  and the things that must find nothing near.
+- **The prices, named.** A word still being typed finds by its spelling: «молоч» on its way to
+  «молочка» shows «Мука» and «Мочалка» above the milk two edits away, for a keystroke. «молочка»
+  reaches the milks and not the kefir or the curd — the name alone goes into the vector (В-4), and
+  the kefir stays below the threshold; a section of the seed as data would be a task of its own.
+  **Armenian and Georgian shelf words find almost nothing** — «կաթնամթերք» is «Матнакаш» to the
+  model, below the threshold; Armenian names are still found by their letters through the alphabet
+  above. Borderline words fall either way: «детское питание» reaches its shelf at 0.40 and 0.39.
+- **The vectors are also the ground the merging of duplicates stands on** (MOL-106): two names close
+  by spelling and by meaning, with every number equal.
 
 ## How the catalogue grows
 

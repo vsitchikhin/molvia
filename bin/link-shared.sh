@@ -22,7 +22,7 @@ else
   target_prefix="$shared"
 fi
 
-mkdir -p "$shared/scratch/docs" "$shared/scratch/tasks/plans" "$shared/lavish"
+mkdir -p "$shared/scratch/docs" "$shared/scratch/tasks/plans" "$shared/lavish" "$shared/models"
 
 link() {
   local name="$1" target="$target_prefix/$1" path="$repo_root/.$1"
@@ -54,3 +54,5 @@ link() {
 echo "общий каталог: $shared"
 link scratch
 link lavish
+# Модель поиска по смыслу (MOL-105): 200 МБ, одна на все копии, кладёт её `make model`.
+link models

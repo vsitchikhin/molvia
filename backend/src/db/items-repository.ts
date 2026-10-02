@@ -20,7 +20,8 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { kindAt } from './kind-word'
 import { idOrNull, rowLimit, theRow } from './rows'
-import { itemBarcodes, items, searchPicks } from './schema'
+import { vectorLiteral } from './item-embeddings-repository'
+import { itemBarcodes, itemEmbeddings, items, searchPicks } from './schema'
 
 export interface ItemRepository {
   /** `createdBy` is null for a seeded item — it belongs to nobody. */
@@ -64,9 +65,15 @@ export interface ItemRepository {
    * The catalogue lookup behind «что взяли?». The catalogue is shared by everyone, so the
    * owner filters nothing: it only chooses whose remembered picks take part in the order.
    * Required rather than optional — a forgotten argument would switch the lift off silently,
-   * and no test of the results would notice.
+   * and no test of the results would notice. So is the meaning of the query (MOL-105): `null`
+   * is said, never assumed.
    */
-  search(query: string, limit: number, actorId: string): Promise<SearchAnswer>
+  search(
+    query: string,
+    limit: number,
+    actorId: string,
+    meaning: QueryMeaning | null,
+  ): Promise<SearchAnswer>
   /**
    * The item holding the first of these codes that any item holds (MOL-99), or `null`. The codes
    * come in the order they are wanted — the code as read, then its twins — and one code belongs to
@@ -101,6 +108,15 @@ export interface SearchAnswer {
 }
 
 /**
+ * The vector of a query and the model that made it (MOL-105), for the candidates by meaning.
+ * Only the vectors of that model are read: a vector of another one is noise to it.
+ */
+export interface QueryMeaning {
+  readonly model: string
+  readonly vector: readonly number[]
+}
+
+/**
  * The lowest `word_similarity` a candidate may score. Not 0.3, which the plan once said: a
  * two-vowel typo — «малако» against «Молоко Ашхар» — scores 0.167 and at 0.3 never even
  * becomes a candidate, so ranking has nothing to rank. Measured in MOL-10 and kept by MOL-14:
@@ -132,6 +148,36 @@ const ACCEPTED_DISTANCE = 2
  * over «Кефир 0,5 л» — where MOL-45 already calls that the kefir asked for in another size.
  */
 const NEAR_DISTANCE = ACCEPTED_DISTANCE - 1
+
+/**
+ * The lowest cosine similarity at which a name is found by meaning (MOL-105). Measured for
+ * EmbeddingGemma q4 with its prompts of retrieval, on the seed's thirty shelves and words that
+ * name a shelf — «молочка», «овощи», «бытовая химия» — against twenty-five things the seed does
+ * not carry (`.scratch/tasks/selftests/MOL-105-measure.md`): at 0.40 the first row is of the shelf
+ * for 52 % of the Russian words, and one word of the twenty-five finds something («цветы» the
+ * greens). 0.38 won 59 % and lost to the model's own sense of spelling: «малако» found «Малина» at
+ * 0.381 above the milk two edits away, «кружка» the dried apricot at 0.394, «молочн» on its way to
+ * «молочный» a sponge. The measure is strict — «фрукты» → «Сухофрукты» counts as a miss. Another
+ * model is measured anew: the scale of a cosine is the model's.
+ */
+const MEANING_THRESHOLD = 0.4
+
+/**
+ * Where a name found by meaning stands among the names found by letters (owner's decision В-3):
+ * after every one within one edit by the mean, before those at two — «овощи» puts the carrot
+ * above the flour two edits away, and «молоко» keeps every milk above the kefir. As a distance, so
+ * nothing the letters found within one edit moves. A name found both ways takes the nearer of the
+ * two: «собачий корм» finds «Корм для собак» two edits away by its letters and near by its meaning,
+ * and kept at two it stood below the treat the meaning alone found.
+ */
+const MEANING_DISTANCE = NEAR_DISTANCE + 0.5
+
+/**
+ * How many nearest names the index is asked for. Not the answer's limit: a shelf word finds a few
+ * above the threshold, «молочка» some twenty of the seed's milks; and the index's search list,
+ * `hnsw.ef_search`, has to be at least this long or it answers fewer.
+ */
+const MEANING_NEIGHBOURS = 60
 
 /**
  * A word grounds a match only if it has this many characters and no digit. Short words and
@@ -333,6 +379,7 @@ export function rankedCandidates(
   limit: number,
   actorId: string | null,
   fat: readonly string[] = [],
+  meaning: QueryMeaning | null = null,
 ): SQL {
   // What else each word of the query stands for (MOL-45): «картошка» is also «картофель». Two
   // parallel lists rather than an array parameter — words of a key never hold a space.
@@ -433,6 +480,24 @@ export function rankedCandidates(
              ))`
     : sql`select null::uuid as id, null::int as n where false`
 
+  // The names nearest the query by meaning (MOL-105). The order is the distance of the operator
+  // itself, ascending, and the model is a filter after it: that is the one form the HNSW index
+  // serves. Materialized, so the index is walked once.
+  const nearest =
+    meaning === null
+      ? sql`select null::uuid as id, null::float8 as sim where false`
+      : sql`select ${itemEmbeddings.itemId} as id,
+               1 - (${itemEmbeddings.embedding} <=> ${vectorLiteral(meaning.vector)}::halfvec) as sim
+            from ${itemEmbeddings}
+            where ${itemEmbeddings.model} = ${meaning.model}
+            order by ${itemEmbeddings.embedding} <=> ${vectorLiteral(meaning.vector)}::halfvec
+            limit ${MEANING_NEIGHBOURS}`
+
+  // Placed by its meaning: found by it and not within one edit by its letters — the row that takes
+  // \`MEANING_DISTANCE\` and makes the answer near. Over the final select's \`r\` and \`mg\`.
+  const byMeaning = sql`coalesce(mg.sim >= ${MEANING_THRESHOLD}
+                               and not coalesce(r.distance <= ${NEAR_DISTANCE}, false), false)`
+
   return sql`
     with query_words as (
       -- Cut to 255 here, once: levenshtein refuses longer arguments, and the prefix arm below
@@ -492,6 +557,9 @@ export function rankedCandidates(
       from ${searchPicks} sp
       where sp.actor_id = ${actorId} and sp.query_key = ${key} and sp.admits
     ),
+    meaning as materialized (
+      ${nearest}
+    ),
     candidates as (
       -- The column goes first, and that is not style: \`search_key %> $1\` is the only form
       -- the GIN index serves. \`$1 %> search_key\`, \`search_key <% $1\` and
@@ -529,6 +597,17 @@ export function rankedCandidates(
              ${fatHits}
       from ${items}
       join admitted a on a.id = ${items.id}
+      -- What the meaning found (MOL-105), measured by the letters like the rest: a name found both
+      -- ways keeps its distance, and only the order decides which of the two places it takes.
+      union all
+      select ${items.id}, ${items.searchKey},
+             word_similarity(${key}, ${items.searchKey}),
+             (${items.searchKey} %> ${key} or ${items.searchKey} = ${key}),
+             ${kindAtName},
+             ${fatHits}
+      from ${items}
+      join meaning mg on mg.id = ${items.id}
+      where mg.sim >= ${MEANING_THRESHOLD}
     ),
     slipped as materialized (
       -- A slip is a size only against a name that prints the unit it slipped from, after the
@@ -671,15 +750,19 @@ export function rankedCandidates(
     -- out (owner's decision on review, В-4): the order is by the mean and the size, nearness by the
     -- worst word, so a near row can rank below twenty far ones — and then the screen says «не
     -- нашли» over what it shows, rather than «нашли» over a list with nothing near in it.
+    --
+    -- A name found by meaning is near (owner's decision В-3 of MOL-105): «овощи» that finds the
+    -- potato is a find, not «не нашли» over it.
     select r.id,
            coalesce(r.words_worst <= ${NEAR_DISTANCE} or r.admitted or m.item_id is not null, false)
-             as near
+             or ${byMeaning} as near
     from ranked r
     left join remembered m on m.item_id = r.id
+    left join meaning mg on mg.id = r.id
     -- The filter stays on the distance: a pick lifts what the search found and never lets in
     -- what it did not, or memory would become a second search with rules of its own. The one
     -- exception is the person's own word (MOL-45), and it is let in, not lifted.
-    where r.distance <= ${ACCEPTED_DISTANCE} or r.admitted
+    where r.distance <= ${ACCEPTED_DISTANCE} or r.admitted or ${byMeaning}
     -- What only a learnt word let in stands below what the search found by its words or the
     -- person took before, and above what it found by a typo (owner's decisions on review,
     -- MOL-45 И, О and Т): «кефир» learnt as the milk taken in its place stops standing above the
@@ -696,14 +779,19 @@ export function rankedCandidates(
     -- size in the query otherwise handed the row to a variety that shares a digit or a letter
     -- with it — «молоко 1 л» to «Молоко 1,5%», «рис 1 кг» to «Рис круглозёрный» (review А, Б).
     -- The similarity then orders one length, and \`id\` keeps two loads of one screen in one order.
-    order by case when not coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) then 1
+    --
+    -- A name placed by its meaning stands at \`MEANING_DISTANCE\`, the nearer by meaning first;
+    -- every other key is null or equal there, so nothing found within one edit moves.
+    order by case when not coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) and r.admitted then 1
                   when m.item_id is not null or r.words_distance = 0 then 0
                   else 2
              end,
              m.item_id is null,
              m.last_picked_at desc nulls last,
              m.picks desc nulls last,
-             r.distance, r.by_synonym, r.by_prefix, r.fat_hits desc, r.key_length,
+             case when ${byMeaning} then ${sql.raw(String(MEANING_DISTANCE))} else r.distance end,
+             case when ${byMeaning} then mg.sim end desc nulls last,
+             r.by_synonym, r.by_prefix, r.fat_hits desc, r.key_length,
              r.ws desc, r.id
     limit ${limit}
   `
@@ -969,7 +1057,7 @@ export function createItemRepository(db: Conn): ItemRepository {
       })
     },
 
-    async search(query, limit, actorId) {
+    async search(query, limit, actorId, meaning) {
       const key = searchQueryKey(query)
       if (key === null) return { items: [], near: false, nearIds: [] }
 
@@ -996,22 +1084,33 @@ export function createItemRepository(db: Conn): ItemRepository {
          * million and answers in 0.45 s — and past `jit_above_cost` Postgres spent 2.2 s
          * compiling it first. A search typed at a shelf never runs long enough to pay that back.
          */
-        const [previous] = await tx.execute<{ threshold: string | null; jit: string }>(
+        //
+        // And the search list of the HNSW index (MOL-105), read with `missing_ok` for the same
+        // reason: the setting is pgvector's, defined once its library loads. Shorter than the
+        // neighbours asked for, the index answers fewer of them.
+        const [previous] = await tx.execute<{
+          threshold: string | null
+          jit: string
+          efSearch: string | null
+        }>(
           sql`select current_setting('pg_trgm.word_similarity_threshold', true) as threshold,
-                     current_setting('jit') as jit`,
+                     current_setting('jit') as jit,
+                     current_setting('hnsw.ef_search', true) as "efSearch"`,
         )
         await tx.execute(
           sql`select set_config('pg_trgm.word_similarity_threshold', ${String(CANDIDATE_THRESHOLD)}, true),
-                     set_config('jit', 'off', true)`,
+                     set_config('jit', 'off', true),
+                     set_config('hnsw.ef_search', ${String(MEANING_NEIGHBOURS)}, true)`,
         )
 
         const ranked = await tx.execute<{ id: string; near: boolean }>(
-          rankedCandidates(key, rowLimit(limit), idOrNull(actorId), percentNumbers(query)),
+          rankedCandidates(key, rowLimit(limit), idOrNull(actorId), percentNumbers(query), meaning),
         )
 
         await tx.execute(
           sql`select set_config('pg_trgm.word_similarity_threshold', ${previous?.threshold ?? '0.6'}, true),
-                     set_config('jit', ${previous?.jit ?? 'on'}, true)`,
+                     set_config('jit', ${previous?.jit ?? 'on'}, true),
+                     set_config('hnsw.ef_search', ${previous?.efSearch ?? '40'}, true)`,
         )
         return ranked
       })

@@ -144,6 +144,12 @@ The detail behind the privacy lines of `CLAUDE.md`.
   (MOL-54); what the phone keeps in its storage is the queue and the drafts the app needs to work.
   **Any third-party script that sees data is a decision, not a dependency** — it changes what the
   privacy page says and is discussed before it lands.
+  **A dependency can carry a tracker of its own** (MOL-105): onnxruntime-node 1.30, the runtime of
+  the search's model, starts Microsoft's telemetry with its first session — an identifier of the
+  device kept on disk and an upload over HTTPS. What it would send was not read through: it is
+  switched off, twice: `ORT_DISABLE_TELEMETRY=1` in the code before the library loads and in the image's
+  environment. Measured on the VPS: without it the library logs its telemetry starting, with it
+  nothing.
 - **A third party learns of a code only from the server, never from the phone** (MOL-162, the owner's
   decision on the task): a code the catalogue missed is asked of Open Food Facts by the API, so the base
   sees the code, the server's address and our User-Agent — `Molvia/<build> (<contact>)`, the contact

@@ -36,7 +36,7 @@ const repo = createItemRepository(db)
 const nobody = randomUUID()
 
 async function names(query: string): Promise<string[]> {
-  return (await repo.search(query, 20, nobody)).items.map((item) => item.name)
+  return (await repo.search(query, 20, nobody, null)).items.map((item) => item.name)
 }
 
 /**
@@ -709,7 +709,7 @@ describe("the shelf of MOL-14: the owner's own words, through the search", () =>
     ]
     const far: string[] = []
     for (const query of queries) {
-      const { items: found, near } = await repo.search(query, 20, nobody)
+      const { items: found, near } = await repo.search(query, 20, nobody, null)
       if (found.length > 0 && !near) far.push(query)
     }
     expect(far.sort()).toEqual(

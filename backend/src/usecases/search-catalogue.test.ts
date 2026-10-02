@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { itemSchema } from '@molvia/model'
 import type { Item } from '@molvia/model'
 import type { ItemRepository } from '@/db/items-repository'
+import { NO_EMBEDDER } from '@/embeddings/embedder'
 import { SEARCH_LIMIT, searchCatalogue } from './search-catalogue'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
@@ -49,10 +50,10 @@ describe('searchCatalogue', () => {
         return Promise.resolve({ items: [], near: false, nearIds: [] })
       },
     })
-    await searchCatalogue({ items }, ACTOR, '  Молоко ')
+    await searchCatalogue({ items, embedder: NO_EMBEDDER }, ACTOR, '  Молоко ')
 
     // Untrimmed on purpose: the key is taken by the same function a name went through.
-    expect(calls).toEqual([['  Молоко ', SEARCH_LIMIT, ACTOR]])
+    expect(calls).toEqual([['  Молоко ', SEARCH_LIMIT, ACTOR, null]])
   })
 
   it('answers in the order the repository ranked, without reshuffling', async () => {
@@ -60,7 +61,9 @@ describe('searchCatalogue', () => {
       search: () => Promise.resolve({ items: [first, second], near: true, nearIds: [] }),
     })
 
-    await expect(searchCatalogue({ items }, ACTOR, 'молоко')).resolves.toEqual({
+    await expect(
+      searchCatalogue({ items, embedder: NO_EMBEDDER }, ACTOR, 'молоко'),
+    ).resolves.toEqual({
       items: [first, second],
       near: true,
       nearIds: [],
@@ -72,7 +75,9 @@ describe('searchCatalogue', () => {
       search: () => Promise.resolve({ items: [first], near: false, nearIds: [] }),
     })
 
-    await expect(searchCatalogue({ items }, ACTOR, 'малако')).resolves.toEqual({
+    await expect(
+      searchCatalogue({ items, embedder: NO_EMBEDDER }, ACTOR, 'малако'),
+    ).resolves.toEqual({
       items: [first],
       near: false,
       nearIds: [],
@@ -87,10 +92,62 @@ describe('searchCatalogue', () => {
       search: () => Promise.resolve({ items: [first], near: true, nearIds: [] }),
     })
 
-    await expect(searchCatalogue({ items }, ACTOR, 'молоко')).resolves.toEqual({
+    await expect(
+      searchCatalogue({ items, embedder: NO_EMBEDDER }, ACTOR, 'молоко'),
+    ).resolves.toEqual({
       items: [first],
       near: true,
       nearIds: [],
+    })
+  })
+
+  describe('by meaning (MOL-105)', () => {
+    function asking(vector: readonly number[] | null) {
+      const queries: string[] = []
+      const calls: unknown[][] = []
+      const embedder = {
+        model: 'model@1',
+        query: (text: string) => {
+          queries.push(text)
+          return Promise.resolve(vector)
+        },
+      }
+      const items = fakeItems({
+        search: (...args) => {
+          calls.push(args)
+          return Promise.resolve({ items: [], near: false, nearIds: [] })
+        },
+      })
+      return { deps: { items, embedder }, queries, calls }
+    }
+
+    it('hands the repository the vector of the query and the model that made it', async () => {
+      const world = asking([0.6, 0.8])
+      await searchCatalogue(world.deps, ACTOR, 'овощи')
+      expect(world.queries).toEqual(['овощи'])
+      expect(world.calls).toEqual([
+        ['овощи', SEARCH_LIMIT, ACTOR, { model: 'model@1', vector: [0.6, 0.8] }],
+      ])
+    })
+
+    it('does not ask the model below four letters: «мол» is a start of a word, not a meaning', async () => {
+      const world = asking([1, 0])
+      await searchCatalogue(world.deps, ACTOR, 'мол')
+      await searchCatalogue(world.deps, ACTOR, '1 л 2')
+      expect(world.queries).toEqual([])
+      expect(world.calls.map((call) => call[3])).toEqual([null, null])
+    })
+
+    it('counts letters, not characters: «к чаю» has four', async () => {
+      const world = asking([1, 0])
+      await searchCatalogue(world.deps, ACTOR, 'к чаю')
+      expect(world.queries).toEqual(['к чаю'])
+    })
+
+    it('searches by the letters alone when no vector came in time', async () => {
+      const world = asking(null)
+      await searchCatalogue(world.deps, ACTOR, 'молочка')
+      expect(world.calls.map((call) => call[3])).toEqual([null])
     })
   })
 })

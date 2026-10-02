@@ -2,6 +2,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import { UNNAMED_BUILD } from '@molvia/model'
+import model from '@/embeddings/model.json'
 import { loginConfiguration } from './login-config'
 
 // One .env at the repository root holds this working copy's ports and database,
@@ -40,6 +41,21 @@ const envSchema = z.object({
     .regex(/^[\x20-\x7e]*$/)
     .optional()
     .transform((contact) => (contact === '' ? undefined : contact)),
+  /**
+   * The search by meaning (MOL-105): its model is loaded at boot and the writer fills the vectors.
+   * On by default, so production cannot forget it; end-to-end switches it off — the search must
+   * hold without it, and that run is the proof.
+   */
+  EMBEDDINGS: z.enum(['on', 'off']).default('on'),
+  /**
+   * Where the model's files are. In a working copy `.models/` beside the repository, which
+   * `make model` fills; the image names its own. Files missing are not an error: the search is
+   * by letters then, and the boot says so once.
+   */
+  EMBEDDINGS_DIR: z
+    .string()
+    .min(1)
+    .default(fileURLToPath(new URL(`../../.models/${model.name}`, import.meta.url))),
   /** Where the base is asked; end-to-end points it at a fake of its own. */
   OPEN_FOOD_FACTS_URL: z.url({ protocol: /^https?$/ }).optional(),
   /**
