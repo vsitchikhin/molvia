@@ -92,7 +92,8 @@
       "pending": {
         "one_place": "From {place}, the latest {when}",
         "two_places": "From {a} and {b}",
-        "more_places": "From {a}, {b} and other places"
+        "more_places": "From {a}, {b} and other places",
+        "place": "{place}"
       }
     },
     "quantity": "{amount} {unit}",
@@ -1639,6 +1640,14 @@
       "remove": "Remove the plan",
       "other_currency": "The plan was {amount}, before the spending currency changed. Enter a sum in {sign}",
       "too_big": "Too large a sum for a month's plan"
+    }
+  },
+  "place": {
+    "in_city": "{place} {where}",
+    "in_unknown_city": "{place} ({city})",
+    "cities_in": {
+      "Гюмри": "in Gyumri",
+      "Ереван": "in Yerevan"
     }
   }
 }

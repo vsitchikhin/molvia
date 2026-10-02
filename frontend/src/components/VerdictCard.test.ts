@@ -14,9 +14,9 @@ const milk: PendingVerdict = {
   boughtAt: new Date(2026, 8, 12, 17, 40),
 }
 
-function render(draft?: VerdictDraft) {
+function render(draft?: VerdictDraft, city: string | null = null) {
   return mount(VerdictCard, {
-    props: { card: milk, draft },
+    props: { card: milk, draft, city },
     global: { plugins: [createAppI18n('en')] },
     attachTo: document.body,
   })
@@ -39,6 +39,16 @@ describe('VerdictCard', () => {
     expect(view.get('h2').text()).toContain(en.verdict.question_tail)
     expect(view.get('.context').text()).toBe('Sep 12 · Ереван Сити')
     view.unmount()
+  })
+
+  it('MOL-120: names the city the queue gives it, in brackets when the dictionary has no case', () => {
+    const known = render(undefined, 'Ереван')
+    expect(known.get('.context').text()).toBe('Sep 12 · Ереван Сити in Yerevan')
+    known.unmount()
+
+    const unknown = render(undefined, 'Ванадзор')
+    expect(unknown.get('.context').text()).toBe('Sep 12 · Ереван Сити (Ванадзор)')
+    unknown.unmount()
   })
 
   it('five digits, each named for a screen reader; a second tap takes the choice back', async () => {

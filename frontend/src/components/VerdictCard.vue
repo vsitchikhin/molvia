@@ -1,6 +1,6 @@
 <template>
   <AppCard as="section" class="verdict" :aria-labelledby="titleId">
-    <p class="context">{{ t('verdict.context', { when: day, place: card.placeName }) }}</p>
+    <p class="context">{{ t('verdict.context', { when: day, place }) }}</p>
     <h2 :id="titleId" ref="title" class="question" tabindex="-1">
       {{ card.name }}<br />{{ t('verdict.question_tail') }}
     </h2>
@@ -38,6 +38,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
 import RatingScale from '@/components/RatingScale.vue'
+import { placeLabel } from '@/components/placeLabel'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { purchaseDay } from '@/days'
 import { SCORES } from '@/components/rating'
@@ -77,6 +78,11 @@ export default defineComponent({
     draft: { type: Object as PropType<VerdictDraft | undefined>, default: undefined },
     /** Take the focus on arrival — after the previous card was saved or put off. */
     focusOnMount: { type: Boolean, default: false },
+    /**
+     * The city of the place, where another card of the queue names a shop of that name in another
+     * city (MOL-120) — the queue decides, since the card alone cannot know.
+     */
+    city: { type: String as PropType<string | null>, default: null },
   },
   emits: {
     save: (score: Score, review: string) =>
@@ -87,7 +93,8 @@ export default defineComponent({
       typeof review === 'string',
   },
   setup(props, { emit }) {
-    const { t, locale } = useI18n()
+    const i18n = useI18n()
+    const { t, locale } = i18n
     const announce = useAnnouncer()
     const titleId = useId()
     const title = ref<HTMLElement | null>(null)
@@ -104,6 +111,7 @@ export default defineComponent({
     let saved = false
 
     const day = computed(() => purchaseDay(props.card.boughtAt, locale.value))
+    const place = computed(() => placeLabel(props.card.placeName, props.city, i18n))
 
     // Synchronous, so an error set right after an edit in `save` is not cleared by it later.
     watch(
@@ -149,6 +157,7 @@ export default defineComponent({
       error,
       unsupported,
       day,
+      place,
       save,
     }
   },

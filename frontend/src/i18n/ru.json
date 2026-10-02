@@ -90,9 +90,10 @@
     },
     "home": {
       "pending": {
-        "one_place": "Из «{place}», последняя — {when}",
-        "two_places": "Из «{a}» и «{b}»",
-        "more_places": "Из «{a}», «{b}» и других мест"
+        "one_place": "Из {place}, последняя — {when}",
+        "two_places": "Из {a} и {b}",
+        "more_places": "Из {a}, {b} и других мест",
+        "place": "«{place}»"
       }
     },
     "quantity": "{amount} {unit}",
@@ -1639,6 +1640,14 @@
       "remove": "Убрать план",
       "other_currency": "План был {amount}, до смены валюты трат. Введите сумму в {sign}",
       "too_big": "Слишком большая сумма для плана на месяц"
+    }
+  },
+  "place": {
+    "in_city": "{place} {where}",
+    "in_unknown_city": "{place} ({city})",
+    "cities_in": {
+      "Гюмри": "в Гюмри",
+      "Ереван": "в Ереване"
     }
   }
 }

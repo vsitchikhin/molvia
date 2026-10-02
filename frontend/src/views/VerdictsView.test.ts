@@ -137,6 +137,26 @@ describe('VerdictsView', () => {
     expect(router.currentRoute.value.name).toBe('advice')
   })
 
+  it('MOL-120: a city where another card names a shop of that name, gone once that one is rated', async () => {
+    rateItem.mockImplementation((itemId) => Promise.resolve(answered(itemId)))
+    const sas = { ...card(3, 'Сыр'), placeCity: 'Ереван' }
+    pendingVerdicts.mockResolvedValue({
+      items: [
+        { ...milk, placeCity: 'Гюмри' },
+        { ...bread, placeCity: 'Ереван' },
+        { ...sas, placeName: 'Зовуни' },
+      ],
+      total: 3,
+    })
+    const { view } = await render()
+
+    expect(view.get('.context').text()).toBe('Sep 12 · SAS in Gyumri')
+    await rate(view, 4)
+    // The bread's shop is now the only SAS of the queue: its city is noise again.
+    expect(view.get('.question').text()).toContain('Хлеб')
+    expect(view.get('.context').text()).toBe('Sep 12 · SAS')
+  })
+
   it('«Не сейчас» shows the next card, and the counter does not change', async () => {
     pendingVerdicts.mockResolvedValue({ items: [milk, bread], total: 2 })
     const { view } = await render()
