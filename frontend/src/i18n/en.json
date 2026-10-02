@@ -1143,7 +1143,8 @@
     "barcode_shape": "A barcode has 8, 12 or 13 digits",
     "barcode_check_digit": "The digits don't add up — check the code",
     "barcodes_full": "This item already holds twenty codes — no more can be added",
-    "barcode_in_store": "This is a shop's own label — such a code is not saved to the catalogue"
+    "barcode_in_store": "This is a shop's own label — such a code is not saved to the catalogue",
+    "feedback_rate_limited": "That is a lot of messages for today. Your text is saved — send it tomorrow"
   },
   "settings": {
     "title": "Settings",
