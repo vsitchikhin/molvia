@@ -14,7 +14,9 @@
 //
 // A mixin that includes the role is the role (В1): its name is learnt from styles/_mixins.scss when
 // the plugin loads, and from the file being linted, through any number of wrappers. Names are
-// compared as Sass compares them — a hyphen and an underscore are one character (Г1).
+// compared as Sass compares them — a hyphen and an underscore are one character (Г1) — and found
+// however the include names them: through a namespace (`m.display-type`, Д1) or `sass:meta`
+// (`meta.apply(meta.get-mixin('display-type'))`, Д2).
 
 import { readFileSync } from 'node:fs'
 import stylelint from 'stylelint'
@@ -35,9 +37,19 @@ const SET_BY_THE_MIXIN = new Set([
 ])
 
 const MIXIN = /@mixin\s+([\w-]+)[^{]*\{/g
-const INCLUDE = /@include\s+([\w-]+)/g
+const INCLUDE = /@include\s+([^;{]+)/g
 
 const sassName = (name) => name.replaceAll('_', '-')
+
+// The mixin an `@include` draws in: the name after a namespace, or the one `meta.get-mixin` names.
+function includedName(params) {
+  const viaMeta = /get-mixin\(\s*['"]([\w-]+)['"]/.exec(params)
+  if (viaMeta) return viaMeta[1]
+  return /^(?:[\w-]+\.)?([\w-]+)/.exec(params)?.[1]
+}
+
+// A placeholder anywhere in a selector — first, after a combinator or inside a pseudo-class (Г2, Д3).
+const PLACEHOLDER = /(^|[\s>+~(,])%/
 
 // The names of the mixins that include the role, directly or through another of them; comments are
 // taken out first, so neither a word nor a brace in one changes what a mixin includes.
@@ -58,7 +70,8 @@ export function roleMixins(source, known = new Set(['display-type'])) {
     grew = false
     for (const [name, body] of bodies) {
       if (roles.has(name)) continue
-      if ([...body.matchAll(INCLUDE)].some(([, included]) => roles.has(sassName(included)))) {
+      const included = [...body.matchAll(INCLUDE)].map(([, params]) => includedName(params))
+      if (included.some((name) => name && roles.has(sassName(name)))) {
         roles.add(name)
         grew = true
       }
@@ -103,10 +116,10 @@ function rule(primary) {
     }
 
     root.walkAtRules('include', (include) => {
-      const name = /^[\w-]+/.exec(include.params)?.[0]
+      const name = includedName(include.params)
       if (!name || !roles.has(sassName(name)) || !include.parent) return
       const parent = include.parent
-      if (parent.type === 'rule' && parent.selectors.some((s) => s.trim().startsWith('%'))) {
+      if (parent.type === 'rule' && PLACEHOLDER.test(parent.selector.trim())) {
         report({ ruleName, result, node: include, message: messages.placeholder() })
         return
       }

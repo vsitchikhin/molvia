@@ -118,4 +118,25 @@ describe('molvia/display-type-whole', () => {
       ...roleMixins('@mixin row {\n  // @include display-type }\n  min-height: 1px;\n}'),
     ]).toEqual(['display-type'])
   })
+
+  it('finds the role through a namespace and through sass:meta', async () => {
+    expect(
+      await refused(
+        '.a { @include m.display-type; font-weight: var(--weight-regular); }\n' +
+          ".b { @include meta.apply(meta.get-mixin('display-type')); font-weight: var(--weight-bold); }",
+      ),
+    ).toEqual(['font-weight', 'font-weight'])
+    expect([...roleMixins('@mixin figure { @include m.display-type; }')]).toEqual([
+      'display-type',
+      'figure',
+    ])
+  })
+
+  it('finds a placeholder that is not first in its selector', async () => {
+    expect(await refused('.x %display { @include display-type; }')).toEqual(['display-type'])
+  })
+
+  it('does not take a percentage in a selector for a placeholder', async () => {
+    expect(await refused('@keyframes k { 50% { @include display-type; margin: 0; } }')).toEqual([])
+  })
 })
