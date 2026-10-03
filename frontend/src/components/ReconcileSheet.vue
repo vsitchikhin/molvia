@@ -741,9 +741,9 @@ export default defineComponent({
 }
 
 .strip-icon {
-  flex: none;
-  width: 1.125rem;
-  height: 1.125rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 
 .field {
@@ -809,9 +809,9 @@ export default defineComponent({
 }
 
 .alert {
-  flex: none;
-  width: 1.125rem;
-  height: 1.125rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 
 .hint,
@@ -844,8 +844,9 @@ export default defineComponent({
 }
 
 .circle-icon {
-  width: 2rem;
-  height: 2rem;
+  @include icon;
+
+  font-size: var(--state-glyph);
 }
 
 .matched-title,
@@ -919,9 +920,9 @@ export default defineComponent({
 }
 
 .none-icon {
-  flex: none;
-  width: 1.5rem;
-  height: 1.5rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
   color: var(--text-muted);
 }
 

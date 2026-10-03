@@ -32,7 +32,7 @@
           v-if="form.dirty && !form.unknown && (form.returned || form.conflict || !form.stored)"
           class="draft"
         >
-          <IconPencil class="pencil" aria-hidden="true" />
+          <span class="pencil" aria-hidden="true"><IconPencil class="pencil-icon" /></span>
           <div>
             <p class="draft-title">{{ t('settings.draft.title') }}</p>
             <p v-if="!form.stored" class="note">{{ t('settings.draft.volatile') }}</p>
@@ -311,9 +311,9 @@ export default defineComponent({
   font-size: var(--text-footnote);
 
   svg {
-    flex: none;
-    width: var(--space-6);
-    height: var(--space-6);
+    @include icon;
+
+    font-size: var(--icon-sm);
   }
 }
 
@@ -329,13 +329,20 @@ export default defineComponent({
 }
 
 .pencil {
+  display: grid;
   flex: none;
+  place-items: center;
   width: var(--space-8);
   height: var(--space-8);
-  padding: var(--space-2);
   border-radius: 50%;
   background: var(--warn-tint);
   color: var(--warn-ink);
+}
+
+.pencil-icon {
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 
 .draft-title,
@@ -394,10 +401,17 @@ export default defineComponent({
 
 .entry-icon,
 .entry-chevron {
-  flex: none;
-  width: var(--space-6);
-  height: var(--space-6);
+  @include icon;
+
   color: var(--text-muted);
+}
+
+.entry-icon {
+  font-size: var(--icon-md);
+}
+
+.entry-chevron {
+  font-size: var(--icon);
 }
 
 .entry-label {

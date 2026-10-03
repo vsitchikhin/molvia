@@ -91,7 +91,7 @@
               <span class="unassigned-text">
                 {{ t('accounts.unassigned', { n: overview.unassigned }, overview.unassigned) }}
               </span>
-              <IconChevron class="unassigned-icon" aria-hidden="true" />
+              <IconChevron class="unassigned-chevron" aria-hidden="true" />
             </button>
           </AppCard>
 
@@ -448,9 +448,9 @@ export default defineComponent({
 }
 
 .strip-icon {
-  flex: none;
-  width: 1.125rem;
-  height: 1.125rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 
 .total {
@@ -550,9 +550,9 @@ export default defineComponent({
 }
 
 .removed-icon {
-  flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon);
 }
 
 /* One chevron turned rather than two swapped: it is seen to open the list (MOL-151). */
@@ -631,9 +631,15 @@ export default defineComponent({
 }
 
 .unassigned-icon {
-  flex: none;
-  width: 1.125rem;
-  height: 1.125rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
+}
+
+.unassigned-chevron {
+  @include icon;
+
+  font-size: var(--icon);
 }
 
 /* The answer comes in where the skeleton stood, faded only: the screen keeps it in one block of its

@@ -413,9 +413,9 @@ export default defineComponent({
 }
 
 .strip-icon {
-  flex: none;
-  width: 1.125rem;
-  height: 1.125rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 
 .total {

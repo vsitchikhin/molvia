@@ -211,9 +211,9 @@ export default defineComponent({
 }
 
 .check {
-  flex: none;
-  width: 1.5rem;
-  height: 1.5rem;
+  @include icon;
+
+  font-size: var(--icon-md);
   color: var(--accent-ink);
 }
 </style>

@@ -965,9 +965,9 @@ export default defineComponent({
 }
 
 .alert {
-  flex: none;
-  width: 1.125rem;
-  height: 1.125rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 
 .conversion {
@@ -1030,6 +1030,12 @@ export default defineComponent({
   border-radius: var(--radius-pill);
   background: var(--accent-tint);
   color: var(--accent-ink);
+
+  svg {
+    @include icon;
+
+    font-size: var(--state-glyph);
+  }
 }
 
 .shop-text {
@@ -1141,8 +1147,8 @@ export default defineComponent({
 }
 
 .info-icon {
-  flex: none;
-  width: 1.125rem;
-  height: 1.125rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 </style>
