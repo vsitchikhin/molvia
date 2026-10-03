@@ -33,6 +33,20 @@ describe('platformLine', () => {
     expect(platformLine(WINDOWS, false, false)).toBe('windows browser')
   })
 
+  it('says no number for an iOS that names only its frozen `OS 18_…` (adversarial В6)', () => {
+    // iOS 26 from the home screen, and Chrome on it: neither carries `Version/`.
+    const app =
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148'
+    const chrome =
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/129.0 Mobile/15E148 Safari/604.1'
+    const ipad =
+      'Mozilla/5.0 (iPad; CPU OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148'
+
+    expect(platformLine(app, true, true)).toBe('ios app')
+    expect(platformLine(chrome, true, false)).toBe('ios browser')
+    expect(platformLine(ipad, true, true)).toBe('ipados app')
+  })
+
   it('calls what it does not know «other», and anything it says passes the domain’s check', () => {
     expect(platformLine(CHROMEBOOK, false, false)).toBe('other browser')
     expect(platformLine('', false, false)).toBe('other browser')

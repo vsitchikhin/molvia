@@ -11,22 +11,33 @@ export function standalone(): boolean {
   )
 }
 
+/** The `OS` the iPhone and the iPad have said since iOS 26, whatever they run. */
+const FROZEN_OS = 18
+
+/** The major version after `prefix`, only below the frozen one: from it on, any iOS says the same. */
+function trueOs(agent: string, prefix: RegExp): string | undefined {
+  const major = prefix.exec(agent)?.[1]
+  return major !== undefined && Number(major) < FROZEN_OS ? major : undefined
+}
+
 /**
  * The system and its major version, from what the browser says of itself — read once, here, and
  * never sent whole (MOL-147, Р-4). A version is named only where the browser still tells it:
  * Safari's `Version/` is the system's since iOS 26 froze the `OS 18_6` beside it, and an app from
- * the home screen has only the `OS 18_0`; Chrome on Android says `Android 10; K` whatever it runs
- * on, and Windows and macOS froze theirs long ago — those go without a number rather than a wrong one.
+ * the home screen or another browser has only the `OS 18_…` — so an `OS` of 18 and later goes without
+ * a number: iOS 18 and iOS 26 say the same there (adversarial В6). Chrome on Android says
+ * `Android 10; K` whatever it runs on, and Windows and macOS froze theirs long ago — those go without
+ * a number rather than a wrong one.
  */
 function systemOf(agent: string, touch: boolean): { system: System; major?: string } {
   const safari = /Version\/(\d+)/.exec(agent)?.[1]
   if (/iPhone|iPod/.test(agent)) {
-    const major = safari ?? /OS (\d+)_\d/.exec(agent)?.[1]
+    const major = safari ?? trueOs(agent, /OS (\d+)_\d/)
     return { system: 'ios', ...(major ? { major } : {}) }
   }
   // An iPad asks for the desktop site and calls itself a Mac; a Mac has no touch.
   if (agent.includes('iPad') || (agent.includes('Macintosh') && touch)) {
-    const major = safari ?? /iPad.*OS (\d+)_\d/.exec(agent)?.[1]
+    const major = safari ?? trueOs(agent, /iPad.*OS (\d+)_\d/)
     return { system: 'ipados', ...(major ? { major } : {}) }
   }
   if (agent.includes('Android')) {
