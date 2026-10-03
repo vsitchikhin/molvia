@@ -7,19 +7,25 @@ import {
   confirmLoginSchema,
   dueRemindersSchema,
   eraseMeSchema,
+  feedbackFromBotAnswerSchema,
+  feedbackFromBotSchema,
   loginCodeSchema,
   loginPreviewCodec,
   ownerNoticesSchema,
   rateFromBotSchema,
+  replyDeliveredSchema,
   switchRemindersFromBotSchema,
   verdictPathSchema,
 } from '@molvia/model'
 import type {
   BotFailure,
   DueReminders,
+  FeedbackFromBot,
+  FeedbackFromBotAnswer,
   LoginPreview,
   OwnerNotices,
   ReminderSwitch,
+  ReplyDelivered,
   TelegramUserId,
 } from '@molvia/model'
 import { ApiError, createTransport } from './transport'
@@ -50,6 +56,13 @@ export interface MolviaBotClient {
    * wait short — the bot's stop has a deadline of its own.
    */
   claimOwnerNotices(signal?: AbortSignal): Promise<OwnerNotices>
+  /**
+   * A text written to the bot as a reply to one of its messages (MOL-148): the API says what it was
+   * — the owner's reply, a person's word in a thread — or `404`, nothing of ours.
+   */
+  feedbackFromBot(message: FeedbackFromBot): Promise<FeedbackFromBotAnswer>
+  /** What became of the owner's reply once sent: the message it went out as, or blocked. */
+  replyDelivered(delivery: ReplyDelivered): Promise<void>
 }
 
 /** An internal client has no session and cannot attach its secret to an arbitrary API path. */
@@ -99,6 +112,22 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
       const body = botFailureSchema.safeParse(failure)
       if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'failure')
       await request('/internal/failures', z.undefined(), { method: 'POST', body: body.data })
+    },
+    feedbackFromBot: async (message) => {
+      const body = feedbackFromBotSchema.safeParse(message)
+      if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'message')
+      return request('/internal/feedback/reply', feedbackFromBotAnswerSchema, {
+        method: 'POST',
+        body: body.data,
+      })
+    },
+    replyDelivered: async (delivery) => {
+      const body = replyDeliveredSchema.safeParse(delivery)
+      if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'delivery')
+      await request('/internal/feedback/delivered', z.undefined(), {
+        method: 'POST',
+        body: body.data,
+      })
     },
     claimOwnerNotices: async (signal) =>
       request('/internal/owner/claim', ownerNoticesSchema, {

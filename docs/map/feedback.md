@@ -9,21 +9,22 @@ Rules: `.claude/rules/feedback.md`. A test beside its source, or mirroring it un
 
 ## backend · routes
 
-- `backend/src/routes/feedback.ts` — Route `POST /feedback` (MOL-147): the session's owner writes; 201 for a new message, 200 for the same one again, `no-store`.
+- `backend/src/routes/feedback.ts` — Route `POST /feedback` (MOL-147): the session's owner writes; 201 for a new message, 200 for the same one again, `no-store`. The bot's two routes of it — `POST /internal/feedback/reply` and `/delivered` — stand beside the bot's others in `internal-auth.ts` (MOL-148).
 
 ## backend · usecases
 
-- `backend/src/usecases/send-feedback.ts` — Use case of «Написать разработчику» (MOL-147): the session's owner, the API's own build, the day's limit of the domain; past it `error.feedback_rate_limited`.
+- `backend/src/usecases/send-feedback.ts` — Use case of «Написать разработчику» (MOL-147): the session's owner, the API's own build, the day's limit of the domain; past it `error.feedback_rate_limited`; a new message queued for the owner when there is one (MOL-148).
+- `backend/src/usecases/feedback-from-bot.ts` — Use case of a text written to the bot as a reply (MOL-148): the owner's reply on a tagged notice, else a person's word on a reply they were sent, else `404`; the length by who writes, and the key of a Telegram message.
 
 ## backend · db
 
-- `backend/src/db/feedback-repository.ts` — Repository of messages to the developer (MOL-147): a write under a lock of its author — a repeat by the phone's key, the rolling day's count, the row — and `purgeStale`, a thread a year past its last message, run by the minute timer.
+- `backend/src/db/feedback-repository.ts` — Repository of messages to the developer (MOL-147): a write under a lock of its author — a repeat by the phone's key, the rolling day's count, the row, the owner's notice — and `purgeStale`, a thread a year past its last message, run by the minute timer; the owner's reply under the person's latest word, the reply a Telegram message answers, a word continuing a thread, and what became of a reply sent (MOL-148).
 
 ## backend · tests
 
 - `backend/tests/feedback.integration.test.ts` — Integration test: `POST /feedback` writes the session's owner with the API's build; no session, an author named, an empty or invisible text, a code without an error screen are refused; a repeat is the same number, another content under the key a 409; the tenth of a rolling day is taken, the eleventh a 429, a burst stops at the limit; a thread goes whole a year past its last message, the person's or the owner's.
 
-- `backend/tests/feedback-bot.integration.test.ts` — Integration test of the bot's half (MOL-148): a new message queues one notice for the owner with nothing of the person, a repeat and a copy without an owner none, the bot's claim reads it; erasure and a thread's year take the notice along, a day unclaimed does not.
+- `backend/tests/feedback-bot.integration.test.ts` — Integration test of the bot's half (MOL-148): a new message queues one notice for the owner with nothing of the person, a repeat and a copy without an owner none, the bot's claim reads it; erasure and a thread's year take the notice along, a day unclaimed does not; the owner's reply — a stranger's tag, no owner, an erased author, a lapsed thread, too long, the outcome of a send; a thread continued — its keys, a reply under it, the same update twice, another's chat, the form's limit, erasure.
 
 ## frontend · components
 

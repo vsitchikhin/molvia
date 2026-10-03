@@ -20,7 +20,7 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 
 ## packages/client
 
-- `packages/client/src/bot.ts` — The bot's API client: preview, confirm and decline a login, erase a person, claim the rating reminders due, rate by a press (MOL-101) and switch them (MOL-103), report a failure of its own and claim the owner's notices (MOL-143), over the internal channel with the bot secret. Tests: `packages/client/src/auth.test.ts`.
+- `packages/client/src/bot.ts` — The bot's API client: preview, confirm and decline a login, erase a person, claim the rating reminders due, rate by a press (MOL-101) and switch them (MOL-103), report a failure of its own and claim the owner's notices (MOL-143), hand over a text written as a reply and say what became of a reply sent (MOL-148), over the internal channel with the bot secret. Tests: `packages/client/src/auth.test.ts`.
 
 ## bot
 
