@@ -41,7 +41,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   weight (Б1). A mixin that includes the role is the role, through any number of wrappers, and it
   is written in `_mixins.scss` alone — the one place the plugin reads at load — and refused where it is
   defined anywhere else, so the place a wrapper may live and the place it is looked for are one (Ж2,
-  З1). It is read with comments taken out, names compared as Sass compares them —
+  З1) — that file told by its whole path, not by a `styles/_mixins.scss` ending another one (И2), and
+  `@forward … as prefix-*` refused, since it renames the role with no `@mixin` to catch (И1). It is read with comments taken out, names compared as Sass compares them —
   `display_type` is `display-type` (В1, Г1), whether included by name, through a namespace
   (`m.display-type`) or `sass:meta` (Д1, Д2). Another rule for the same element elsewhere is beyond
   what a linter can match (Б3), so the role is never put in a placeholder, anywhere in a selector,
