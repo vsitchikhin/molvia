@@ -52,6 +52,8 @@ describe('handlerOf — где случилось, без того, кто и ч
     [message('/delete'), 'command:delete'],
     [message('/start@molvia_test_bot login_abc'), 'command:start'],
     [message('/Удалить'), 'message'],
+    [message('/ivan_petrov'), 'command:other'],
+    [press('anya:1'), 'callback:other'],
     [message('мой адрес: ул. Ширакаци 12'), 'message'],
   ])('%#', (update, handler) => {
     expect(handlerOf(context(update))).toBe(handler)
@@ -162,5 +164,51 @@ describe('сбой обработчика уходит в API без апдей�
     const reportFailure = vi.fn(() => Promise.resolve())
     reportDefect({ reportFailure } as unknown as MolviaBotClient, telegramRefusal(429), 'message')
     expect(reportFailure).not.toHaveBeenCalled()
+  })
+})
+
+describe('ответ API, который контракт не читает, — дефект и из обработчика, который ловит сам', () => {
+  const MILK = '5b0e7c0e-6d3e-4a53-9c4a-1f1f0b7e2a11'
+
+  async function pressScale(refusal: ApiError) {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const reportFailure = vi.fn(() => Promise.resolve())
+    const bot = assembleBot(
+      '42:TEST',
+      {
+        api: {
+          switchReminders: () => Promise.resolve(),
+          rateFromBot: () => Promise.reject(refusal),
+          reportFailure,
+        } as unknown as MolviaBotClient,
+        appUrl: 'https://molvia.test',
+      },
+      { botInfo: BOT_INFO },
+    )
+    const transformer: Transformer = () => Promise.resolve({ ok: true, result: true }) as never
+    bot.api.config.use(transformer)
+    await bot.handleUpdate({
+      update_id: 1,
+      callback_query: {
+        id: 'cb',
+        from: FROM,
+        chat_instance: 'ci',
+        data: `rate:${MILK}:4`,
+        message: { message_id: 10, date: 0, chat: CHAT, text: 'Вчера · SAS\nМолоко — как вам?' },
+      },
+    })
+    return reportFailure
+  }
+
+  it('RESPONSE_INVALID у оценки — в API как callback:rate', async () => {
+    const reportFailure = await pressScale(new ApiError(ISSUE.RESPONSE_INVALID))
+    expect(reportFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ errorName: 'ApiError', handler: 'callback:rate' }),
+    )
+    expect(JSON.stringify(reportFailure.mock.calls)).not.toMatch(new RegExp(MILK))
+  })
+
+  it('отказ из реестра — не дефект', async () => {
+    expect(await pressScale(new ApiError(ERROR.NOT_FOUND))).not.toHaveBeenCalled()
   })
 })

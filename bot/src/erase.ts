@@ -4,6 +4,7 @@ import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
 import { dropKeyboard, refuse, settle, stopSpinner } from './answer'
 import { t } from './i18n'
+import { handlerOf, reportDefect } from './failure'
 
 /**
  * How long a «Удалить навсегда» button means yes. A prompt found in the chat a week later, and
@@ -137,6 +138,7 @@ export function eraseComposer({
       console.error(
         `[molvia] erase: ${error instanceof ApiError ? error.code : 'unexpected failure'}`,
       )
+      reportDefect(api, error, handlerOf(ctx))
     }
 
     if (failed) {

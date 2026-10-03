@@ -5,6 +5,7 @@ import type { MolviaBotClient } from '@molvia/client'
 import type { OwnerNotice } from '@molvia/model'
 import { t } from './i18n'
 import { telegramFailure } from './assemble'
+import { reportDefect } from './failure'
 
 /**
  * The words of one notice to the owner (MOL-143). Always Russian: the owner's language is not
@@ -57,6 +58,7 @@ export async function tellOwner(
     claimed = await api.claimOwnerNotices()
   } catch (error) {
     console.error(`[molvia] owner claim: ${error instanceof ApiError ? error.code : 'unexpected'}`)
+    reportDefect(api, error, 'owner:claim')
     return
   }
   const { to, notices } = claimed

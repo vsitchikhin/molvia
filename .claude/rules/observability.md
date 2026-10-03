@@ -34,7 +34,11 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
 - **A row is a fingerprint** (Р-2): sha256 of the source, the kind, the code, the top frame
   **without its line and column**, and the place. The API ships as one bundled file, so a frame's
   position moves with every build; kept, every rollout would have made every failure new. The frames
-  themselves are kept whole, for the owner to read.
+  themselves are kept whole, for the owner to read. **The named price** (adversarial review 5): the
+  file is always `dist/index.js`, so the top frame is the function's name and nothing more — two
+  different throws in two anonymous callbacks of one route are one fingerprint, the second silent
+  until the count crosses a threshold, its frames written over the first's. Accepted: a fingerprint
+  wide enough to tell them apart would also tell apart one defect reached by two callers.
 - **A failure is an answer of 500 or more** (Р-3). A `DomainError`, a body or a path refused — the
   caller's — is not, and is logged as before. **The place is the method and the route's template,
   never the address**: a path carries uuids and, decoded, a person's text; with no route matched
@@ -42,7 +46,10 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
 - **One path writes the log and the table** (`failureReporter`): every failure the log hears of is
   in the table, by the same summary. **The answer does not wait for the table** (Р-4): a recording
   that fails — the database down, which may be the very failure — is one more line of the log,
-  `failure not recorded`, never a second failure and never a retry. The tests wait on
+  `failure not recorded`, never a second failure and never a retry. **At most four recordings wait
+  at once** (`RECORDINGS_AT_ONCE`, adversarial review 4): a failure that is the database itself —
+  slow, out of connections — would otherwise queue one per request on the pool of the live ones;
+  past four, the failure is the log's alone, and a burst may count short. The tests wait on
   `failureRecorded`, never on a timer.
 - **The jobs of the API's timers are failures too** (В-1): the seven cleanups, the vectors of the
   catalogue, the rating reminders and the rates' refresh, as `job:<name>`. The cleanups' runner hands
@@ -55,8 +62,13 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   answers — those are availability, which MOL-142 watches, or the API's own failure, which it
   records itself. **The place is the kind of update and the prefix of its button or command**
   (`handlerOf`: `callback:rate`, `command:delete`, `message`, `my_chat_member`) — never the
-  button's data, the text or the sender; a prefix that is not a plain word is `other`, since a
-  forged button is anybody's text. `bot.catch` logs by kind too: it printed the message before. The
+  button's data, the text or the sender. **Only the bot's own commands and button prefixes are
+  names** (`start`, `delete`; `login`, `erase`, `rate`, `remind`), anything else is `other`: a word
+  typed after `/` or a forged button is anybody's text, and as a place it would reach the table and
+  the owner's message, a new fingerprint a word (adversarial review 2). **A handler that catches its
+  own error reports it too** — the API's answer the contract does not read, from a press of the
+  scale, a login, an erasure, the switch, either claim (`remind:claim`, `owner:claim`); before the
+  review only `bot.catch` and `remind:send` did, and the third class of defects was nowhere. `bot.catch` logs by kind too: it printed the message before. The
   bot has no build of its own and is rolled out from the API's commit, so the API stamps its build.
 - **The owner hears of a fingerprint the first time in a build** (В-2) — after a rollout a failure
   still alive says so once more, which is «the fix did not help» — **and when it reaches 10, 100 and

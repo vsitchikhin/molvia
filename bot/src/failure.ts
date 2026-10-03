@@ -12,25 +12,33 @@ import {
 import type { BotFailure } from '@molvia/model'
 
 /**
- * Where in the bot a failure happened (MOL-143, Р-5): the kind of update and the prefix of its
- * button or command — `callback:rate`, `command:delete`, `message`, `my_chat_member` — and never
- * the button's data whole, the text, or who sent it. A prefix that is not a plain word is `other`:
- * a button's data is Telegram's memory of what we wrote, but a forged one is anybody's text.
+ * The commands and the prefixes of buttons the bot has: what a handler may be named by. Anything
+ * else is `other` — a word a person typed after `/`, or a forged button, is anybody's text, and as a
+ * place it would land in the table and in the owner's message, a new fingerprint for every word
+ * (adversarial review 1).
+ */
+const COMMANDS = new Set(['start', 'delete'])
+const BUTTONS = new Set(['login', 'erase', 'rate', 'remind'])
+
+/**
+ * Where in the bot a failure happened (MOL-143, Р-5): the kind of update and the bot's own name of
+ * its button or command — `callback:rate`, `command:delete`, `message`, `my_chat_member` — and never
+ * the button's data whole, the text, or who sent it.
  */
 export function handlerOf(ctx: Context): string {
   const data = ctx.callbackQuery?.data
-  if (data !== undefined) return `callback:${word(data.split(':', 1)[0] ?? '')}`
+  if (data !== undefined) return `callback:${known(BUTTONS, data.split(':', 1)[0] ?? '')}`
   const text = ctx.message?.text
   if (text !== undefined) {
     const command = /^\/([A-Za-z_]+)(?:@\w+)?(?:\s|$)/.exec(text)?.[1]
-    return command === undefined ? 'message' : `command:${word(command.toLowerCase())}`
+    return command === undefined ? 'message' : `command:${known(COMMANDS, command.toLowerCase())}`
   }
   if (ctx.myChatMember !== undefined) return 'my_chat_member'
   return 'update'
 }
 
-function word(value: string): string {
-  return /^[a-z_]{1,32}$/.test(value) ? value : 'other'
+function known(names: ReadonlySet<string>, name: string): string {
+  return names.has(name) ? name : 'other'
 }
 
 /**

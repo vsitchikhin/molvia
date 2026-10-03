@@ -7,6 +7,7 @@ import { dropKeyboard, refuse, settle, stopSpinner } from './answer'
 import { t } from './i18n'
 import type { MessageKey } from './i18n'
 import { timeAgo } from './when'
+import { handlerOf, reportDefect } from './failure'
 
 /** Telegram's limit on `callback_data`, in bytes. */
 const CALLBACK_DATA_MAX = 64
@@ -123,6 +124,7 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
         { reply_markup: keyboard(code, language) },
       )
     } catch (error) {
+      reportDefect(api, error, handlerOf(ctx))
       await ctx.reply(t(language, refusal(error, 'preview login')))
     }
   })
@@ -161,6 +163,7 @@ export function loginComposer({ api, appUrl }: LoginDeps): Composer<Context> {
         await api.declineLogin(code)
       }
     } catch (error) {
+      reportDefect(api, error, handlerOf(ctx))
       refused = refusal(error, confirming ? 'confirm login' : 'decline login')
     }
 

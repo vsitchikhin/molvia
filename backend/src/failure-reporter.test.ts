@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { FastifyBaseLogger } from 'fastify'
-import { failureReporter } from './failure-reporter'
+import { RECORDINGS_AT_ONCE, failureReporter } from './failure-reporter'
 
 function fakeLog() {
   const error = vi.fn()
@@ -52,5 +52,27 @@ describe('failureReporter — лог и таблица одним путём (MO
       'failure not recorded',
     )
     expect(error).toHaveBeenCalledTimes(2)
+  })
+
+  it('не больше четырёх записей разом: лишний сбой — строка в логе, а не очередь к базе', async () => {
+    const { log, error } = fakeLog()
+    let release: () => void = () => undefined
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const record = vi.fn(() => held)
+    const recordings: Promise<void>[] = []
+    const reporter = failureReporter(record, log, (recording) => recordings.push(recording))
+
+    for (let index = 0; index <= RECORDINGS_AT_ONCE; index += 1) {
+      reporter.report(new Error('x'), { source: 'api' }, 'request failed')
+    }
+    expect(record).toHaveBeenCalledTimes(RECORDINGS_AT_ONCE)
+    expect(error).toHaveBeenLastCalledWith({ reason: 'busy' }, 'failure not recorded')
+
+    release()
+    await Promise.all(recordings)
+    reporter.report(new Error('x'), { source: 'api' }, 'request failed')
+    expect(record).toHaveBeenCalledTimes(RECORDINGS_AT_ONCE + 1)
   })
 })

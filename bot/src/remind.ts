@@ -270,6 +270,7 @@ export async function remindDue(
     console.error(
       `[molvia] remind claim: ${error instanceof ApiError ? error.code : 'unexpected failure'}`,
     )
+    reportDefect(api, error, 'remind:claim')
     return
   }
   claimed()

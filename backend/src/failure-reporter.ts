@@ -27,17 +27,32 @@ export function failureReporter(
   log: FastifyBaseLogger,
   recorded?: (recording: Promise<void>) => void,
 ): FailureReporter {
+  let inFlight = 0
   return {
     report(error, place, message) {
       const summary = describeFailure(error)
       log.error(summary, message)
-      const recording = record(summary, place).catch((failure: unknown) => {
-        log.error(describeFailure(failure), 'failure not recorded')
-      })
+      // A failure that is the database itself, slow or out of connections, would otherwise queue a
+      // recording per request on the same pool as the live ones (adversarial review 4).
+      if (inFlight >= RECORDINGS_AT_ONCE) {
+        log.error({ reason: 'busy' }, 'failure not recorded')
+        return
+      }
+      inFlight += 1
+      const recording = record(summary, place)
+        .catch((failure: unknown) => {
+          log.error(describeFailure(failure), 'failure not recorded')
+        })
+        .finally(() => {
+          inFlight -= 1
+        })
       recorded?.(recording)
     },
   }
 }
+
+/** How many recordings may wait on the database at once; past them a failure is the log's alone. */
+export const RECORDINGS_AT_ONCE = 4
 
 /**
  * The API's reporter: into this build's table, queued for `owner`. The connection is asked for at
