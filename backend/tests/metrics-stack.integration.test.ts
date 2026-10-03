@@ -100,6 +100,11 @@ describe('the compose file', () => {
     // one capability it reads the OOM-killer with (review №1).
     expect(compose).not.toMatch(/network_mode: host|privileged: true/)
     expect(services().get('cadvisor')).toMatch(/^ {4}cap_add:\n {6}- SYSLOG$/m)
+    // Docker 29's containers are containerd's: without its socket cAdvisor's docker factory fails
+    // and the server shows the machine alone (production, 04.10.2026).
+    expect(services().get('cadvisor')).toContain(
+      '- /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro',
+    )
   })
 
   it('scrapes the API on the port the API is given, and not through Caddy', () => {
@@ -235,6 +240,16 @@ describe('the alarms', () => {
     expect(restart.expr).not.toMatch(/\bchanges\(/)
   })
 
+  it('say when cAdvisor sees no container — a blind restart alarm is silence', () => {
+    const blind = ruleOf('molvia-containers')
+    expect([blind.expr, blind.evaluator, blind.threshold, blind.rule.for]).toEqual([
+      'absent(container_cpu_usage_seconds_total{container_label_com_docker_compose_service="backend"}) or on() vector(0)',
+      'gt',
+      0,
+      '5m',
+    ])
+  })
+
   it('read p95 of a person’s requests, the photo of a receipt left out by a route the API still has', () => {
     const slow = `route!~"unmatched|/health|/internal/.*|${PHOTO_ROUTE}"`
     expect(ruleOf('molvia-p95').expr.match(/molvia_http_\w+\{[^}]*\}/g)).toEqual([
@@ -275,6 +290,7 @@ const SHIPPED_RULES = [
   'molvia-restart',
   'molvia-targets',
   'molvia-pulse',
+  'molvia-containers',
 ]
 
 describe('a rule removed (adversarial А6 а)', () => {

@@ -53,8 +53,9 @@ The shape worth knowing here:
   the metrics started, a failure of theirs — Grafana's port held, a device missing — said and the
   rollout standing. `up -d` of everything judged them, and a metrics container that could not start
   rolled a healthy API back. A rollback leaves them as they run — a tag from before MOL-145 has none of
-  their images. Each has a limit of memory, together under a gigabyte (Р-9), measured once production
-  ran them. `GRAFANA_ADMIN_PASSWORD`, `ALERTS_BOT_TOKEN`, `ALERTS_PULSE_URL` and `OWNER_TELEGRAM_ID` are
+  their images. Each has a limit of memory (Р-9): measured on production, Grafana took 142 MB idle and
+  was killed at 384 on the first login, so it has 768; VictoriaMetrics 40 of 256, cAdvisor 18 of 192,
+  the exporters 7 of 64. `GRAFANA_ADMIN_PASSWORD`, `ALERTS_BOT_TOKEN`, `ALERTS_PULSE_URL` and `OWNER_TELEGRAM_ID` are
   required and filled — empty is no longer a way to tell nobody of the failures (review №3). **The
   first rollout recreates Postgres** too: its networks changed. The rules of what they measure are
   `observability.md`; `deploy/README.md`, «Metrics».
