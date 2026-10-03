@@ -103,11 +103,15 @@ a screenshot with it MOL-167 (В-1…В-5, Р-1…Р-13 in `.scratch/tasks/requi
   100…4 000 and no more than twenty times as long as wide (Telegram's limit for a photo), and **nothing
   but the picture** (`withoutMetadata`, review 1, adversarial А2): every segment is walked — between
   the scans of a progressive JPEG too, the entropy-coded data skipped by its stuffed bytes and restarts —
-  every APP segment but a plain JFIF without its thumbnail and every comment is cut wherever it stands,
+  every APP segment but a plain JFIF without its thumbnail and Adobe's twelve bytes of colour transform
+  (review 9: cut, a JPEG saved as RGB or CMYK comes out in the wrong colours), and every comment, is cut
+  wherever it stands,
   and whatever follows the end of the picture is cut — a second JPEG of MPF or Ultra HDR with its own
   EXIF, any tail. A client changed by hand must not carry where a photo was taken. **More than 256
-  segments is no picture** (А3): a real one has a few dozen, and two megabytes of empty segments held
-  the API's thread for a hundred milliseconds a picture. Not one — `error.feedback_picture_invalid`,
+  markers outside the scans is no picture** (А3, Б1), one with no length counted as one with — and a
+  restart or a TEM before the first scan is none at all: a real picture has a few dozen, and two
+  megabytes of empty segments, or of two-byte markers, held the API's thread for a hundred
+  milliseconds a picture. Not one — `error.feedback_picture_invalid`,
   `415`; too heavy — `error.feedback_picture_too_large`, `413`; the text and the other pictures stay on
   the phone. **The price, named** (А3): a body of eight megabytes is read — JSON, base64 — before
   anything is counted, some fifty milliseconds of the thread, and a refused one is not counted in the
@@ -122,9 +126,10 @@ a screenshot with it MOL-167 (В-1…В-5, Р-1…Р-13 in `.scratch/tasks/requi
   `feedback_picture_files` — the phone's bytes or Telegram's id — and its row goes with the bot's word
   that the notice went, in that transaction, or after `FEEDBACK_PICTURE_KEPT_DAYS` (7) the bot never
   took it — the bot away, or a copy with no owner. What stays is the line in `feedback_pictures`:
-  place, source, sides, size, and `sent_at` **only for a picture that was there to send and the bot
-  did not name as missed** (adversarial А4) — one the timer let go or Telegram refused never reached
-  the owner, and the copy must not say it did. The copy shows the line and never a picture. **The
+  place, source, sides, size, and `sent_at` **for every picture the bot did not name as missed**
+  (adversarial А4, Б4) — one the timer let go before the bot came, or Telegram refused, never reached
+  the owner, and the bot, which found it gone or saw the refusal, is what knows it; a file the timer
+  let go while its picture was on its way still went. The copy shows the line and never a picture. **The
   nightly copy leaves out the files, not the lines** (`backup.sh`, А5): a restored message still says
   what it had, and its repeat is still the same message. The copy in the owner's chat stays, as the
   text's does (В-3 of MOL-150), and `/privacy` says Telegram sees it.
@@ -144,14 +149,17 @@ a screenshot with it MOL-167 (В-1…В-5, Р-1…Р-13 in `.scratch/tasks/requi
   tried on its own, and the first refusal said (adversarial А6). **The pictures live in the page's
   memory**, the draft keeps their number: megabytes on the shelf would push out the queue of purchases
   kept there. Where the draft has more than the page holds — a reload, or another window that holds
-  them — the sheet says «Снимки не сохранились» **and nothing more**: a new key at the opening kept
-  the other window's draft from going when that window sent it (review 7); the next change takes a
-  key, as any does. **The price**: a message whose answer was lost with its pictures, sent again
-  without them, meets `409`, takes a new key and is a second message. A picture the API refused is
+  them — the sheet says «Снимки не сохранились». **A draft that never left keeps its key**: a new key at
+  the opening kept the other window's draft from going when that window sent it (review 7); the next
+  change takes a key, as any does. **One that has begun to leave takes a new key at once** (Б3): the
+  server may hold it with its pictures, and the same key without them was a sure `409` and «Не
+  получилось». **The price**: a message whose answer was lost with its pictures, sent again without
+  them, is a second message. A picture the API refused is
   said under the pictures, never as a failure of the message. **The pictures go with the message
   sent, the sheet open or not** (adversarial А1): kept, the next message opened with a screenshot
-  already sent, one kind away from sending it again; pictures changed while it was on its way are
-  another message's and stay. The body is read at the press, never with every letter (review 6).
+  already sent, one kind away from sending it again. **«Another message» is the key's**, for the draft
+  and the pictures alike (Б2): a word or a picture changed while it was on its way makes another
+  message, and its pictures stay — never taken from under the finger. The body is read at the press, never with every letter (review 6).
 
 ## Threads, replies, the term
 
