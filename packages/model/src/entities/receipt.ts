@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { EXCHANGE_UNDO_MINUTES } from '#model/entities/exchange'
 import type { ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
 import { MINOR_EXPONENT } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
@@ -26,6 +27,15 @@ export const RECEIPT_SIDE_MIN = 200
  * reader (MOL-169) leave this many days after the receipt was recorded.
  */
 export const RECEIPT_KEEP_DAYS = 28
+
+/** «Удалить чек · Вернуть» (П-8): the ten minutes every removal of one's own money has (MOL-73). */
+export const RECEIPT_UNDO_MINUTES = EXCHANGE_UNDO_MINUTES
+
+/**
+ * How many times a reading is begun before the receipt fails: one cut short by a restart of the API
+ * is begun again, and a receipt that takes the reader down every time does not take it forever.
+ */
+export const RECEIPT_READ_ATTEMPTS = 2
 
 /**
  * Where a receipt is:

@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./testing/search-corpus": "./tests/support/search-corpus.ts"
+    "./testing/search-corpus": "./tests/support/search-corpus.ts",
+    "./testing/receipt-text.am-05.json": "./tests/entities/receipt-text.am-05.json"
   },
   "types": "./src/index.ts",
   "dependencies": {

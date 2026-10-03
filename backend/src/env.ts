@@ -56,6 +56,14 @@ const envSchema = z.object({
     .string()
     .min(1)
     .default(fileURLToPath(new URL(`../../.models/${model.name}`, import.meta.url))),
+  /**
+   * The receipt reader's address (MOL-125): `services/receipt-reader` on the compose network, a copy's
+   * own on its band with `make reader`. Unset or empty, receipts are taken and wait in the queue.
+   */
+  RECEIPT_READER_URL: z
+    .union([z.literal(''), z.url({ protocol: /^https?$/ })])
+    .optional()
+    .transform((url) => (url === '' ? undefined : url)),
   /** Where the base is asked; end-to-end points it at a fake of its own. */
   OPEN_FOOD_FACTS_URL: z.url({ protocol: /^https?$/ }).optional(),
   /**

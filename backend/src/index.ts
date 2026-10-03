@@ -14,13 +14,22 @@ import { erapiFeed } from '@/rates/erapi'
 import { refreshAtBoot, startSchedule } from '@/rates/schedule'
 import { marketRatesRefresh } from '@/usecases/refresh-market-rates'
 import { officialRatesRefresh } from '@/usecases/refresh-official-rates'
+import { receiptReader } from '@/receipts/reader'
 import { buildServer } from './server'
 
 // The model of the search by meaning loads in the background (MOL-105): the API answers by the
-// letters until it is ready, and without its files, for good.
-const app = buildServer(
-  env.EMBEDDINGS === 'on' ? { embedder: (log) => startEmbedder(env.EMBEDDINGS_DIR, log) } : {},
-)
+// letters until it is ready, and without its files, for good. The receipt reader is asked only
+// where it is named (MOL-125).
+const app = buildServer({
+  ...(env.EMBEDDINGS === 'on'
+    ? {
+        embedder: (log: Parameters<typeof startEmbedder>[1]) =>
+          startEmbedder(env.EMBEDDINGS_DIR, log),
+      }
+    : {}),
+  receiptReader:
+    env.RECEIPT_READER_URL === undefined ? null : receiptReader(env.RECEIPT_READER_URL),
+})
 
 // Migrations run at boot rather than as a separate deploy step: there is one instance,
 // and a schema that lags the code it is deployed with is the worse failure of the two.
