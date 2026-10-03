@@ -434,5 +434,7 @@ storage is `feedback.md`.
   `GET /internal/feedback/:number/pictures/:position`, goes as a file; a person's photo by its id —
   never forwarded, so no sender is shown. «Sent» is said after the last picture: a picture Telegram
   refuses (400) or no longer there is the log's and the rest go on — a notice that could never go
-  whole would be handed for good — while a broken connection or a 429 says nothing, and the notice
-  comes again whole: the owner reads its text twice, the price a lost mark already has.
+  whole would be handed for good — and it is named to the API as `missed`, which marks it never sent
+  (adversarial А4). A broken connection says nothing, and the notice comes again whole: the owner
+  reads its text twice, the price a lost mark already has. **A 429 on a picture ends the run** as it
+  does on a text, with the same line of what was given up (review 4).

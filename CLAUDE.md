@@ -385,9 +385,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   is read; only `OWNER_TELEGRAM_ID` makes it a reply, and a person's word finds its thread by the
   message the reply went out as. Delivered is 👌 — ✅ is not a reaction Telegram takes.
 - **A screenshot only by the person's own act, from the gallery, seen before sending** (MOL-167): the
-  phone draws it anew and the API cuts every APP segment but JFIF's whatever the phone did; its bytes
-  live only until the owner's Telegram has them, a week at most, never in the nightly copy or the
-  person's copy — a line of it stays. Words, a picture, or both.
+  phone draws it anew and the API keeps nothing but the picture whatever the phone did — every segment
+  walked, metadata cut wherever it stands, nothing after the end; the picture lives only until the
+  owner's Telegram has it, a week at most, never in the nightly copy or the person's copy — its line
+  stays, «sent» only if it reached the owner. Words, a picture, or both.
 - **One sheet, two ways in** (MOL-147): «О приложении» in the settings and «Сообщить о проблеме» drawn
   by `ScreenState` — only a full-screen error, somebody known, not in a `<dialog>`; the draft is the
   device's with no queue, and what goes with the text is read from the body it sends.

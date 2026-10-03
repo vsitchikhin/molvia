@@ -66,7 +66,8 @@ const ATTEMPTS = [
 /**
  * A picture from the gallery drawn anew as a JPEG (MOL-167, Р-1): its longest side at most
  * `FEEDBACK_PICTURE_SIDE` — Telegram shrinks a photo anyway — and nothing of the file but the pixels.
- * A canvas writes no EXIF, no place of shooting, no profile; the API strips them again regardless.
+ * A canvas writes only its own — WebKit an EXIF of the colour space and the sides, Chromium an ICC
+ * profile — nothing of the file chosen, never where it was taken; the API cuts those too (review 3).
  * A PNG screenshot comes out a few times lighter. What it returns is what the sheet shows before
  * sending and what goes — never the file as chosen.
  */
