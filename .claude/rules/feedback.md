@@ -80,11 +80,14 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
 - **A thread is its first message and what follows** (В-1): `thread_id` is empty on the first and
   names it on a continuation, of the same person — a composite key holds that — and `in_reply_to`
   names the owner's reply a continuation answers. Continuations and replies are written by the bot's
-  half (MOL-148); a continuation from Telegram has no screen, platform or key. **Two things the schema
-  does not hold yet, and MOL-148 must, with its writer** (adversarial В5): that `thread_id` names a
-  first message and never a continuation — else `purgeStale` groups a fresh word under the wrong
-  head and takes the thread with it — and that `in_reply_to` is a reply in the same person's thread —
-  else erasing one person cascades into another's row. No row of either exists before MOL-148.
+  half (MOL-148); a continuation from Telegram has no screen, platform or page build. **The database
+  holds the thread, not the writer** (MOL-148, adversarial В5 of MOL-147): `thread_id` names a first
+  message of the same person and never a continuation — else `purgeStale` grouped a fresh word under
+  the wrong head and took the thread with it — by a key on the generated `head` / `thread_head`, since
+  a key cannot compare with a constant; `in_reply_to` names a reply to the same person — else erasing
+  one person cascaded into another's row — by `(in_reply_to, actor_id)`, so a reply carries its
+  message's `actor_id`; and a continuation, and only a continuation, answers a reply. The migration
+  came with the writer, `0042`, before the first row of either.
 - **The owner's replies are kept** (`feedback_replies`, Р-1) so the copy is whole and a continuation
   shows the owner what is answered; they go with their message by the cascade.
 - **A thread lives a year from its last message, the person's or the owner's** (В-4): `purgeStale`

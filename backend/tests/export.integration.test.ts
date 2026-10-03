@@ -341,7 +341,13 @@ async function aFullLife(actorId: string, telegramUserId: number) {
   if (message === undefined) throw new Error('no message')
   const [reply] = await db
     .insert(feedbackReplies)
-    .values({ feedbackId: message.id, text: 'Починили', delivered: 'sent', createdAt: at(26) })
+    .values({
+      feedbackId: message.id,
+      actorId,
+      text: 'Починили',
+      delivered: 'sent',
+      createdAt: at(26),
+    })
     .returning({ id: feedbackReplies.id })
   await db.insert(feedback).values({
     actorId,

@@ -292,11 +292,18 @@ export const EXPORT_COLUMNS: Readonly<
     omitted: {
       actor_id: OWNER,
       client_key: 'the phone’s key against sending one message twice, not what was said',
+      head: 'said by `thread`: a first message has none',
+      thread_head: 'said by `thread`: the key that holds a continuation to its first message',
     },
   },
   feedback_replies: {
     exported: ['id', 'text', 'delivered', 'created_at'],
-    omitted: { feedback_id: 'said by where the reply sits: under the message it answers' },
+    omitted: {
+      feedback_id: 'said by where the reply sits: under the message it answers',
+      actor_id: OWNER,
+      telegram_message_id:
+        'which message the reply went out as in your chat, so your answer to it finds its thread; it means nothing outside that chat',
+    },
   },
   budget_plans: {
     exported: ['category_id', 'from_month', 'amount_minor', 'currency', 'percent', 'updated_at'],

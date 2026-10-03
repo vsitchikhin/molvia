@@ -21,7 +21,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
-import type { AnyPgColumn } from 'drizzle-orm/pg-core'
+import type { AnyPgColumn, PgTableExtraConfigValue } from 'drizzle-orm/pg-core'
 import {
   BUDGET_PERCENT_MAX,
   DEVICE_NAME_MAX,
@@ -1685,8 +1685,13 @@ export const reminderDays = pgTable(
  * A thread is its first message and what follows it (MOL-150, В-1): `thread_id` names the first
  * message on a continuation and is empty on the first, `in_reply_to` the owner's reply a continuation
  * answers. The continuations come from the bot (MOL-148), and so do the empty `route`, `platform`
- * and `client_key`: Telegram has no screen and no key to repeat by. A thread lives a year from its
- * last message (В-4).
+ * and `page_build`: Telegram has no screen. A thread lives a year from its last message (В-4).
+ *
+ * **The database holds the thread, not the writer** (MOL-148, adversarial В5 of MOL-147): a
+ * continuation names only a first message, and only its own person's — `head` and `thread_head` are
+ * there for that key alone, since a key cannot compare with a constant — or `purgeStale`, grouping
+ * by `coalesce(thread_id, id)`, took a thread with a fresh word in it. And `in_reply_to` names only a
+ * reply to the same person, or erasing one person cascaded into another's row.
  */
 export const feedback = pgTable(
   'feedback',
@@ -1705,24 +1710,36 @@ export const feedback = pgTable(
     errorCode: text('error_code'),
     fromError: boolean('from_error').notNull().default(false),
     threadId: bigint('thread_id', { mode: 'number' }),
-    inReplyTo: bigint('in_reply_to', { mode: 'number' }).references(
-      (): AnyPgColumn => feedbackReplies.id,
-      { onDelete: 'cascade' },
+    inReplyTo: bigint('in_reply_to', { mode: 'number' }),
+    head: boolean('head')
+      .notNull()
+      .generatedAlwaysAs((): SQL => sql`thread_id is null`),
+    // True on a continuation and empty on a first message, so the key below is checked only there.
+    threadHead: boolean('thread_head').generatedAlwaysAs(
+      (): SQL => sql`case when thread_id is not null then true end`,
     ),
     clientKey: uuid('client_key'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .default(sql`clock_timestamp()`),
   },
-  (table) => [
+  // Typed by hand: `feedback` and `feedback_replies` name each other, and inference goes round.
+  (table): PgTableExtraConfigValue[] => [
     // A repeat of the same content is found by its key, within one person (MOL-150, Р-4).
     unique('feedback_actor_client_key').on(table.actorId, table.clientKey),
     unique('feedback_id_actor_key').on(table.id, table.actorId),
-    // A continuation belongs to a thread of the same person, and goes with its first message.
+    unique('feedback_id_actor_head_key').on(table.id, table.actorId, table.head),
+    // A continuation names a first message of the same person, and goes with it.
     foreignKey({
       name: 'feedback_thread_is_owners',
-      columns: [table.threadId, table.actorId],
-      foreignColumns: [table.id, table.actorId],
+      columns: [table.threadId, table.actorId, table.threadHead],
+      foreignColumns: [table.id, table.actorId, table.head],
+    }).onDelete('cascade'),
+    // A continuation answers the owner's reply to the same person, never another's.
+    foreignKey({
+      name: 'feedback_answers_own_reply',
+      columns: [table.inReplyTo, table.actorId],
+      foreignColumns: [feedbackReplies.id, feedbackReplies.actorId],
     }).onDelete('cascade'),
     // The day's limit counts one person's messages over a window.
     index('feedback_actor_created_idx').on(table.actorId, table.createdAt),
@@ -1735,27 +1752,44 @@ export const feedback = pgTable(
       'feedback_thread_not_itself',
       sql`${table.threadId} is null or ${table.threadId} < ${table.id}`,
     ),
+    // A continuation, and only a continuation, answers a reply (В-1): the person replies in Telegram.
+    check(
+      'feedback_continuation_answers',
+      sql`(${table.threadId} is null) = (${table.inReplyTo} is null)`,
+    ),
   ],
 )
 
 /**
  * The owner's replies (MOL-150, Р-1), written by the bot's half (MOL-148). Kept so the copy is whole
- * and a continuation shows the owner what is answered; they go with their message.
+ * and a continuation shows the owner what is answered; they go with their message. `actor_id` is the
+ * message's author, there for the key a continuation answers by (adversarial В5).
+ *
+ * `telegram_message_id` is the message the reply went out as in the person's chat (MOL-148, В-2): a
+ * person answering it in Telegram is how their word finds its thread, with no number shown to them.
+ * Message ids are per chat, so it is looked up beside the person, never alone.
  */
 export const feedbackReplies = pgTable(
   'feedback_replies',
   {
     id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
-    feedbackId: bigint('feedback_id', { mode: 'number' })
-      .notNull()
-      .references(() => feedback.id, { onDelete: 'cascade' }),
+    feedbackId: bigint('feedback_id', { mode: 'number' }).notNull(),
+    actorId: uuid('actor_id').notNull(),
     text: text('text').notNull(),
     delivered: text('delivered').$type<FeedbackDelivery>(),
+    telegramMessageId: bigint('telegram_message_id', { mode: 'number' }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .default(sql`clock_timestamp()`),
   },
   (table) => [
+    foreignKey({
+      name: 'feedback_replies_message_is_owners',
+      columns: [table.feedbackId, table.actorId],
+      foreignColumns: [feedback.id, feedback.actorId],
+    }).onDelete('cascade'),
+    unique('feedback_replies_id_actor_key').on(table.id, table.actorId),
+    unique('feedback_replies_telegram_message_key').on(table.actorId, table.telegramMessageId),
     index('feedback_replies_feedback_idx').on(table.feedbackId),
     check(
       'feedback_replies_delivered_known',

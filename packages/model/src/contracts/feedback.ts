@@ -24,10 +24,11 @@ export const FEEDBACK_DAY_LIMIT = 10
 export const FEEDBACK_KEPT_YEARS = 1
 
 /**
- * What became of the owner's reply (MOL-150, Р-11): reached the person, the bot was blocked, or the
- * message was gone by then. Written by the bot's half (MOL-148).
+ * What became of the owner's reply (MOL-150, Р-11): reached the person, or the bot was blocked.
+ * Empty is «unknown» — the bot stopped between the send and the mark. A message gone has no reply to
+ * mark: the bot is told so before anything is written (MOL-148, Р-4).
  */
-export const FEEDBACK_DELIVERY = ['sent', 'blocked', 'gone'] as const
+export const FEEDBACK_DELIVERY = ['sent', 'blocked'] as const
 export type FeedbackDelivery = (typeof FEEDBACK_DELIVERY)[number]
 
 export const FEEDBACK_SYSTEMS = [
