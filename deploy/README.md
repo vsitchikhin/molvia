@@ -141,6 +141,21 @@ only a successful CI of a push to master of this repository builds, and only a b
    Then delete `deploy_key`: GitHub holds the only copy it needs, and a new pair is cheaper than
    guarding an old one.
 
+## The receipt reader (MOL-125)
+
+`receipt-reader` is Tesseract behind a small HTTP server, an image of its own built by the release
+beside the other three and pulled by `deploy.sh` with them. It has no database, no port outside the
+compose network, nothing to configure: the API finds it at `http://receipt-reader:8080`
+(`RECEIPT_READER_URL` in `docker-compose.prod.yml`). Three cores and a gigabyte; a receipt takes
+them for half a minute.
+
+- **While it is down, receipts wait in the queue** — the API logs «receipt reader unavailable» once
+  and «receipt reader back» when it answers again. Nothing is lost; nothing is in `/health`.
+- **A rollback leaves it as it runs**: `deploy.sh` starts the backend, the bot and the frontend of
+  the previous tag, never the reader — a tag from before MOL-125 has no reader image.
+- **Checking it by hand**: `docker compose -f docker-compose.prod.yml exec receipt-reader python3
+selftest.py` reads a receipt the test draws, the same check CI runs on every push.
+
 ## Login configuration (MOL-54, MOL-55)
 
 The API supports Telegram login and the bot confirms it. The PWA login screen (MOL-56) still
@@ -402,6 +417,10 @@ key never comes to this machine — a compromised server cannot read old copies.
   a day of that, so the privacy page's «fourteen days» holds; `backup.sh` deletes by the same number
   as a fallback. Longer is not a setting to raise quietly: an erased person lives in the copies
   exactly that long, and the page says so.
+- **No receipt photo is in a copy** (MOL-125, В-2): `receipt_parts` and `receipt_line_images` are
+  dumped without their data. A photo carries a customer's name and lives until its receipt is
+  recorded; a copy would keep it fourteen days. After a restore those tables are empty — a receipt
+  still queued fails as unreadable, one read keeps its lines.
 - **A missing copy is an alarm.** Each run pings healthchecks.io with its exit code; no ping for 25
   hours, or a failed one, reaches the owner in Telegram. The service sees when the server pinged and
   from where — no data.

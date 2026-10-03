@@ -145,6 +145,9 @@ export default defineConfig({
         OPEN_FOOD_FACTS_CONTACT: 'e2e@molvia.test',
         // The fake has no limit, and every spec of a missed code asks it once (adversarial Е).
         OPEN_FOOD_FACTS_PER_MINUTE: '600',
+        // No receipt reader (MOL-125, review А14): the copy's `.env` names its own, and a run must not
+        // read with a Tesseract the copy happens to run. Empty is unset — receipts wait in the queue.
+        RECEIPT_READER_URL: '',
       },
       // Never reuse: on these ports there is nothing of ours to reuse, and a server left by
       // a crashed run must fail loudly instead of quietly answering with old code.

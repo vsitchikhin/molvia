@@ -53,6 +53,10 @@ import {
   salaryShiftSchema,
   chooseRemindersSchema,
   remindersSettingSchema,
+  receiptBodySchema,
+  receiptDetailCodec,
+  receiptSummaryCodec,
+  receiptsResponseCodec,
   spendingAmendBodySchema,
   spendingBodySchema,
   spendingCategoriesResponseCodec,
@@ -121,6 +125,10 @@ import type {
   MoneyMonthView,
   RemindersSetting,
   SalaryShift,
+  ReceiptBody,
+  ReceiptDetail,
+  ReceiptSummary,
+  ReceiptsResponse,
   SpendingAmendBody,
   SpendingBody,
   SpendingCategoriesResponse,
@@ -144,6 +152,9 @@ import type {
 } from '@molvia/model'
 import { ApiError, createTransport } from './transport'
 import type { ClientOptions } from './transport'
+
+/** How long a part of a receipt's photo may take to go up (MOL-125). */
+const RECEIPT_PART_TIMEOUT_MS = 60_000
 
 export { ApiError } from './transport'
 export type { ClientOptions } from './transport'
@@ -390,6 +401,26 @@ export interface MolviaClient {
   removeSpending(id: string): Promise<void>
   /** «Вернуть»: `error.not_found` once the removal is final. */
   restoreSpending(id: string): Promise<SpendingView>
+  /**
+   * «Отправить чек» (MOL-125), named by the device: `created` is `false` for the same receipt sent
+   * again. The parts follow with `putReceiptPart`.
+   */
+  sendReceipt(body: ReceiptBody): Promise<{ receipt: ReceiptSummary; created: boolean }>
+  /**
+   * A part of the photo, numbered from 1, as a JPEG: the same part again is the same answer.
+   * `error.receipt_not_photo` and `error.receipt_too_large` are «не принят», never to be retried.
+   */
+  putReceiptPart(
+    id: string,
+    part: number,
+    photo: Blob | Uint8Array<ArrayBuffer>,
+  ): Promise<ReceiptSummary>
+  receipts(): Promise<ReceiptsResponse>
+  /** One receipt with its lines; `error.not_found` for a missing, removed or someone else's one. */
+  receipt(id: string): Promise<ReceiptDetail>
+  removeReceipt(id: string): Promise<void>
+  /** «Вернуть» within ten minutes of «Удалить чек». */
+  restoreReceipt(id: string): Promise<ReceiptSummary>
   /**
    * «Счета» (MOL-115): the accounts, their totals and how many operations fell out of them. Every
    * write below answers with the page whole — which of «удалить» and «убрать» it was is the server's.
@@ -855,6 +886,33 @@ export function createClient(options: ClientOptions): MolviaClient {
       request(`/spendings/${segment(id)}/restore`, spendingViewCodec, { method: 'POST' }),
 
     spending: (id) => request(`/spendings/${segment(id)}`, spendingViewCodec),
+
+    sendReceipt: async (body) => {
+      const { status, data } = await exchange('/receipts', receiptSummaryCodec, {
+        method: 'POST',
+        body: encode(receiptBodySchema, body),
+      })
+      return { receipt: data, created: status === 201 }
+    },
+
+    // A part is up to megabytes over a shop's mobile signal: a minute, not the default seconds.
+    putReceiptPart: (id, part, photo) =>
+      request(`/receipts/${segment(id)}/parts/${String(part)}`, receiptSummaryCodec, {
+        method: 'PUT',
+        raw: { body: photo, type: 'image/jpeg' },
+        timeout: RECEIPT_PART_TIMEOUT_MS,
+      }),
+
+    receipts: () => request('/receipts', receiptsResponseCodec),
+
+    receipt: (id) => request(`/receipts/${segment(id)}`, receiptDetailCodec),
+
+    removeReceipt: async (id) => {
+      noContent(await exchange(`/receipts/${segment(id)}`, z.undefined(), { method: 'DELETE' }))
+    },
+
+    restoreReceipt: async (id) =>
+      request(`/receipts/${segment(id)}/restore`, receiptSummaryCodec, { method: 'POST' }),
 
     moneyAccounts: () => request('/money/accounts', moneyAccountsCodec),
 

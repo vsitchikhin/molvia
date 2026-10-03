@@ -87,6 +87,13 @@ export const ERROR = {
   /** A code added to an item that already holds `ITEM_BARCODES_MAX` of them (MOL-100). */
   BARCODES_FULL: 'error.barcodes_full',
   /**
+   * A part of a receipt that is not a photo the reader can take (MOL-125): not a JPEG, or one too
+   * small to hold a receipt's print. Answered at once — «не принят» on the phone, never retried.
+   */
+  RECEIPT_NOT_PHOTO: 'error.receipt_not_photo',
+  /** A part of a receipt whose sides pass `RECEIPT_SIDE_MAX`: the phone sends at most 3 200 px. */
+  RECEIPT_TOO_LARGE: 'error.receipt_too_large',
+  /**
    * A message to the developer past `FEEDBACK_DAY_LIMIT` in a rolling day (MOL-147). The sheet keeps
    * the text and says to send it tomorrow.
    */

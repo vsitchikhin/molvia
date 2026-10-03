@@ -128,6 +128,11 @@ interface RequestOptions<A = never> {
   readonly timeout?: number | null
   /** Sent as JSON. Already on the wire's side: the caller encodes through the schema. */
   readonly body?: unknown
+  /** Sent as it is, with its own type: a part of a receipt's photo, a JPEG (MOL-125). */
+  readonly raw?: {
+    readonly body: Blob | ArrayBuffer | Uint8Array<ArrayBuffer>
+    readonly type: string
+  }
   /** The caller's own cancellation, on top of the timeout. */
   readonly signal?: AbortSignal
   /**
@@ -168,6 +173,7 @@ export function createTransport({
     if (today) headers.set(TODAY_HEADER, today())
     if (zone) headers.set(ZONE_HEADER, zone())
     if (options.body !== undefined) headers.set('content-type', 'application/json')
+    if (options.raw !== undefined) headers.set('content-type', options.raw.type)
 
     // `AbortController` and a timer rather than `AbortSignal.timeout`, which Safari only
     // learned in 16.0: on iOS 15 the call itself threw, inside the try below, and turned
@@ -202,6 +208,7 @@ export function createTransport({
         response = await fetch(`${baseUrl}${path}`, {
           ...(options.method === undefined ? {} : { method: options.method }),
           ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+          ...(options.raw === undefined ? {} : { body: options.raw.body }),
           credentials,
           ...(botSecret ? { redirect: 'error' as const } : {}),
           headers,

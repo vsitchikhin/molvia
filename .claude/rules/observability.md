@@ -72,8 +72,10 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   the same gate** and are answered at once; past it they had taken the whole pool. Past 200
   fingerprints waiting a failure is the log's alone; what waits when the process stops is lost. The
   tests wait on `failureRecorded`, never on a timer.
-- **The jobs of the API's timers are failures too** (В-1): the seven cleanups, the vectors of the
-  catalogue, the rating reminders and the rates' refresh, as `job:<name>`. The cleanups' runner
+- **The jobs of the API's timers are failures too** (В-1): the cleanups, the vectors of the
+  catalogue, the rating reminders, the rates' refresh and the receipts' queue and its readings
+  (MOL-125), as `job:<name>`. A receipt reader that does not answer is availability, logged as a
+  warning, not a failure. The cleanups' runner
   hands the error on — before, they logged «cleanup failed» without it. **A source of rates that
   does not answer is not a failure**: it is logged inside as a warning and has its fallbacks; what
   escapes the refresh is ours.
