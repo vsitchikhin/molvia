@@ -61,9 +61,11 @@ export function occurrenceOf(
   // `:line:column` and keep the rest, and every rollout would make its failure new (adversarial А6).
   const top = framePlace(summary.frames?.[0] ?? '')
   const parts = [place.source, errorName, summary.code ?? '', top, route ?? '']
-  // The phone's system, not its version or mode: «only on iOS» is seen at once (MOL-144, В-2). Left
-  // out where there is none, so no fingerprint of the API or the bot moved.
-  if (place.platform !== undefined) parts.push(place.platform.split(' ')[0] ?? '')
+  // The phone's system, not its version or mode: «only on iOS» is seen at once (MOL-144, В-2) — and
+  // its build: a phone's fingerprint lives within a build (Р-10), and one row shared by an old page
+  // and a new one during a rollout was «new in this build» at every turn (review №1). Left out where
+  // there is no platform, so no fingerprint of the API or the bot moved.
+  if (place.platform !== undefined) parts.push(place.platform.split(' ')[0] ?? '', build)
   const fingerprint = createHash('sha256').update(parts.join('\u0000')).digest('hex')
   return {
     fingerprint,
@@ -120,18 +122,57 @@ export interface FailureRecording {
   readonly failures: FailureRepository
   /** The owner's Telegram id — `null` in every copy and in end-to-end, where nothing is queued. */
   readonly owner: TelegramUserId | null
+  /** What of the phone's notices the owner hears; all of them where none is given. */
+  readonly phoneNotices?: PhoneNoticeBudget
 }
 
 /** «Сбой» — `times` occurrences of one fingerprint into the table, and what the owner should hear. */
 export async function recordFailure(
-  { failures, owner }: FailureRecording,
+  { failures, owner, phoneNotices }: FailureRecording,
   occurrence: FailureOccurrence,
   times: number,
   at: Date,
 ): Promise<void> {
-  await failures.record(occurrence, times, at, (count) =>
-    noticesFor(occurrence, count, times, owner),
-  )
+  await failures.record(occurrence, times, at, (count) => {
+    const notices = noticesFor(occurrence, count, times, owner)
+    return occurrence.source === 'phone' && phoneNotices ? phoneNotices(notices, at) : notices
+  })
+}
+
+/** How many notices about the phone's failures the owner hears in an hour (MOL-144, review №1). */
+export const PHONE_NOTICES_PER_HOUR = 10
+const HOUR_MS = 60 * 60 * 1000
+
+/** Lets through what of the phone's notices fits the hour, and says how many it held back. */
+export type PhoneNoticeBudget = (notices: readonly OwnerNotice[], at: Date) => OwnerNotice[]
+
+/**
+ * The phone's notices, at most `PHONE_NOTICES_PER_HOUR` an hour (review №1, adversarial А5). The
+ * endpoint is open with no session and a build is the phone's word, so anyone could make every report
+ * «new in this build» — twenty messages a minute in the owner's chat, the API's own drowned behind
+ * them. Past the hour's ten a notice is held back and counted, never queued, and the next one let
+ * through says how many were (`muted`): «и ещё M — make failures». The table counts all of them. In the
+ * process's memory: a restart starts the hour over, and the API's and the bot's notices are not
+ * touched.
+ */
+export function phoneNoticeBudget(perHour = PHONE_NOTICES_PER_HOUR): PhoneNoticeBudget {
+  let told: number[] = []
+  let muted = 0
+  return (notices, at) => {
+    const now = at.getTime()
+    told = told.filter((moment) => now - moment < HOUR_MS)
+    const out: OwnerNotice[] = []
+    for (const notice of notices) {
+      if (told.length >= perHour) {
+        muted += 1
+        continue
+      }
+      told.push(now)
+      out.push(muted > 0 ? { ...notice, muted } : notice)
+      muted = 0
+    }
+    return out
+  }
 }
 
 /** A failure the bot reports of its own (Р-5): its summary, and its handler as its place. */
@@ -178,8 +219,12 @@ export function phoneFailure({
   }
 }
 
-/** The phone's reports an address may send in a minute: its whole buffer at once (MOL-144, Р-6). */
-export const PHONE_REPORTS_PER_ADDRESS = 20
+/**
+ * The phone's reports an address may send in a minute (MOL-144, Р-6): three whole buffers. One was
+ * too few for a mobile operator's address, which thousands of phones share (adversarial А6) — and a
+ * phone told «too many» keeps its buffer for later now (review №2).
+ */
+export const PHONE_REPORTS_PER_ADDRESS = 60
 /** The phone's reports everybody together may send in a minute. */
 export const PHONE_REPORTS_PER_MINUTE = 200
 const MINUTE_MS = 60 * 1000

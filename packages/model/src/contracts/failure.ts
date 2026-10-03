@@ -147,6 +147,11 @@ const failureFacts = {
     .max(FAILURE_NAME_MAX * 2),
   /** The phone's platform, `ios 18 app` (MOL-144, В-2); none for the API and the bot. */
   platform: feedbackPlatformSchema.optional(),
+  /**
+   * The phone's notices held back since the last one let through — past ten an hour (MOL-144,
+   * review №1): «и ещё M». The table counts every one of them.
+   */
+  muted: z.int().positive().optional(),
 }
 
 /** A fingerprint seen for the first time in this build (MOL-143, В-2): the frame it was thrown at. */

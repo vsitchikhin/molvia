@@ -2,14 +2,16 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type { FailureOccurrence } from '@/db/failures-repository'
 import { ERROR } from '@molvia/model'
-import type { PhoneFailure } from '@molvia/model'
+import type { OwnerNotice, PhoneFailure } from '@molvia/model'
 import {
   PHONE_REPORTS_PER_ADDRESS,
+  PHONE_NOTICES_PER_HOUR,
   PHONE_REPORTS_PER_MINUTE,
   framePlace,
   noticesFor,
   occurrenceOf,
   phoneFailure,
+  phoneNoticeBudget,
   phoneReportLimit,
   takePhoneFailures,
 } from './record-failure'
@@ -252,5 +254,43 @@ describe('takePhoneFailures', () => {
       )
     }).toThrow(expect.objectContaining({ code: ERROR.CLIENT_ERRORS_RATE_LIMITED }))
     expect(taken).toEqual([])
+  })
+})
+
+describe('отпечаток телефона живёт в своей сборке (MOL-144, Р-10, ревью №1)', () => {
+  it('та же ошибка в другой сборке — другой отпечаток: старая и новая страница не сбрасывают счёт друг другу', () => {
+    const fingerprint = (build: string) => {
+      // No frame, as a registration's DOMException: nothing of the build in the top frame.
+      const { frames, ...bare } = REPORT
+      expect(frames).toHaveLength(1)
+      const { summary, place } = phoneFailure(bare)
+      return occurrenceOf(summary, place, build).fingerprint
+    }
+    expect(fingerprint('index-OldBuild1')).not.toBe(fingerprint('index-NewBuild2'))
+  })
+})
+
+describe('phoneNoticeBudget — уведомления о телефоне, не больше десяти в час (ревью №1)', () => {
+  const notice = (index: number): OwnerNotice => ({
+    kind: 'failure',
+    source: 'phone',
+    errorName: `E${String(index)}`,
+    build: 'index-BTCsHrpw',
+    platform: 'ios 18 app',
+    fingerprint: 'abcdef',
+  })
+  const at = (minutes: number) => new Date(Date.UTC(2026, 9, 3, 12, minutes))
+
+  it(`${String(PHONE_NOTICES_PER_HOUR)} в час проходят, остальные молча считаются и названы со следующим`, () => {
+    const budget = phoneNoticeBudget()
+    const told = Array.from({ length: PHONE_NOTICES_PER_HOUR + 3 }, (_, index) =>
+      budget([notice(index)], at(index)),
+    ).flat()
+    expect(told).toHaveLength(PHONE_NOTICES_PER_HOUR)
+    expect(told.some((one) => 'muted' in one)).toBe(false)
+
+    const next = budget([notice(99)], at(PHONE_NOTICES_PER_HOUR + 60))
+    expect(next).toEqual([{ ...notice(99), muted: 3 }])
+    expect(budget([notice(100)], at(PHONE_NOTICES_PER_HOUR + 61))).toEqual([notice(100)])
   })
 })

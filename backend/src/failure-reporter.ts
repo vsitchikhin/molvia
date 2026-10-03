@@ -5,7 +5,7 @@ import { createFailureRepository } from '@/db/failures-repository'
 import type { FailureOccurrence } from '@/db/failures-repository'
 import type { Conn } from '@/db'
 import { VERSION } from '@/env'
-import { occurrenceOf, recordFailure } from '@/usecases/record-failure'
+import { occurrenceOf, phoneNoticeBudget, recordFailure } from '@/usecases/record-failure'
 import type { FailurePlace } from '@/usecases/record-failure'
 
 export interface FailureReporter {
@@ -30,6 +30,14 @@ export const RECORDINGS_AT_ONCE = 4
  * different failures at once is the process itself breaking, and the memory has to stop somewhere.
  */
 export const FINGERPRINTS_WAITING = 200
+
+/**
+ * How many of the waiting may be the phone's (MOL-144, adversarial А5): its endpoint is open, and a
+ * stream of invented failures while the database is slow — exactly when the API's own failures come —
+ * filled the whole queue, and the API's next failure was the log's alone. Past this a phone's report
+ * is dropped, with a warning, and the API's always has room; the API's are written first, too.
+ */
+export const PHONE_FINGERPRINTS_WAITING = 50
 
 interface Waiting {
   occurrence: FailureOccurrence
@@ -64,7 +72,12 @@ export function failureReporter(
   const writing = new Set<string>()
 
   function pump(): void {
-    for (const [fingerprint, entry] of waiting) {
+    // The API's and the bot's first: a stream of the phone's does not hold the API's back.
+    const order = [...waiting].sort(
+      ([, a], [, b]) =>
+        Number(a.occurrence.source === 'phone') - Number(b.occurrence.source === 'phone'),
+    )
+    for (const [fingerprint, entry] of order) {
       if (writing.size >= RECORDINGS_AT_ONCE) return
       if (writing.has(fingerprint)) continue
       waiting.delete(fingerprint)
@@ -84,6 +97,14 @@ export function failureReporter(
   function take(summary: FailureSummary, place: FailurePlace, named = build): void {
     const occurrence = occurrenceOf(summary, place, named)
     const known = waiting.get(occurrence.fingerprint)
+    if (known === undefined && place.source === 'phone') {
+      const phones = [...waiting.values()].filter((entry) => entry.occurrence.source === 'phone')
+      if (phones.length >= PHONE_FINGERPRINTS_WAITING || waiting.size >= FINGERPRINTS_WAITING) {
+        // The phone's word about itself, not a failure of ours: a warning, not an error.
+        log.warn({ reason: 'phone busy' }, 'phone failure not recorded')
+        return
+      }
+    }
     if (known === undefined && waiting.size >= FINGERPRINTS_WAITING) {
       log.error({ reason: 'busy' }, 'failure not recorded')
       return
@@ -121,11 +142,13 @@ export function apiFailureReporter(
   log: FastifyBaseLogger,
   recorded?: (recording: Promise<void>) => void,
 ): FailureReporter {
+  // One hour of the phone's notices for the process (review №1).
+  const phoneNotices = phoneNoticeBudget()
   return failureReporter(
     VERSION,
     (occurrence, times) =>
       recordFailure(
-        { failures: createFailureRepository(db()), owner },
+        { failures: createFailureRepository(db()), owner, phoneNotices },
         occurrence,
         times,
         new Date(),

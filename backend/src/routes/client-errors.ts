@@ -1,3 +1,4 @@
+import { isIPv6 } from 'node:net'
 import { z } from 'zod'
 import { clientErrorsSchema } from '@molvia/model'
 import type { ClientErrors } from '@molvia/model'
@@ -20,7 +21,27 @@ const INTERNAL =
 function addressOf(request: FastifyRequest): string {
   const forwarded = request.headers['x-forwarded-for']
   const last = typeof forwarded === 'string' ? forwarded.split(',').at(-1)?.trim() : undefined
-  return last !== undefined && last !== '' && INTERNAL.test(request.ip) ? last : request.ip
+  return networkOf(
+    last !== undefined && last !== '' && INTERNAL.test(request.ip) ? last : request.ip,
+  )
+}
+
+/**
+ * An IPv6 address counts by its `/64` (review №2): one home connection has 2^64 of them, each its own
+ * minute otherwise. An IPv4 address, or anything else, counts as it is.
+ */
+export function networkOf(address: string): string {
+  if (!isIPv6(address) || /^::ffff:[\d.]+$/i.test(address)) return address
+  const [head = '', tail = ''] = address.split('::')
+  const left = head === '' ? [] : head.split(':')
+  const right = tail === '' ? [] : tail.split(':')
+  const groups = address.includes('::')
+    ? [...left, ...Array<string>(8 - left.length - right.length).fill('0'), ...right]
+    : left
+  return `${groups
+    .slice(0, 4)
+    .map((group) => Number.parseInt(group, 16).toString(16))
+    .join(':')}::/64`
 }
 
 /**

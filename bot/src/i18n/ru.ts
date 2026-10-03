@@ -168,6 +168,8 @@ export const ru = {
   'owner.failure.nowhere': 'без маршрута',
   /** The phone's platform, `ios 18 app`, as `platformLine` writes it (MOL-144). */
   'owner.failure.platform': 'Платформа {platform}',
+  /** The phone's notices held back past ten an hour, said with the next one (MOL-144, review №1). */
+  'owner.failure.muted': 'И ещё {muted} о сбоях телефона за час — в make failures',
   'owner.failure.build': 'Сборка {build}',
   'owner.failure.buildPrint': 'Сборка {build} · {fingerprint}',
   'owner.failure.more': 'Подробности — make failures',

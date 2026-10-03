@@ -16,8 +16,9 @@ export interface OwnerNoticeRepository {
   /**
    * Hands out the oldest waiting notices and marks them handed in the same statement — at most
    * once, as the rating reminders are (MOL-101): a second claim at the same moment skips the rows
-   * the first one holds rather than waiting to hand them out again. Their payloads, oldest first,
-   * as stored: the caller reads them through `ownerNoticeSchema`.
+   * the first one holds rather than waiting to hand them out again. Their payloads, the API's and the
+   * bot's before the phone's and oldest first within each, as stored: the caller reads them through
+   * `ownerNoticeSchema`.
    */
   claim(limit: number, at: Date): Promise<readonly unknown[]>
 
@@ -27,6 +28,13 @@ export interface OwnerNoticeRepository {
    */
   purgeStale(now: Date): Promise<void>
 }
+
+/**
+ * The phone's notices after the API's and the bot's (MOL-144, adversarial А5): its endpoint is open,
+ * and a stream of invented failures queued ahead of the API's own put that one a day back in a queue
+ * of twenty a minute — and the day's purge took it unheard.
+ */
+const phoneLast = sql`coalesce(${ownerNotices.payload} ->> 'source' = 'phone', false)`
 
 export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
   return {
@@ -38,12 +46,18 @@ export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
           sql`${ownerNotices.id} in (
             select ${ownerNotices.id} from ${ownerNotices}
             where ${ownerNotices.handedAt} is null
-            order by ${ownerNotices.id}
+            order by ${phoneLast}, ${ownerNotices.id}
             limit ${rowLimit(limit)}
             for update skip locked)`,
         )
-        .returning({ id: ownerNotices.id, payload: ownerNotices.payload })
-      return rows.sort((a, b) => a.id - b.id).map((row) => row.payload)
+        .returning({
+          id: ownerNotices.id,
+          payload: ownerNotices.payload,
+          phone: sql<boolean>`${phoneLast}`,
+        })
+      return rows
+        .sort((a, b) => Number(a.phone) - Number(b.phone) || a.id - b.id)
+        .map((row) => row.payload)
     },
 
     async purgeStale(now) {

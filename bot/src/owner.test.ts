@@ -105,6 +105,10 @@ describe('ownerText — что прочитает владелец (MOL-143)', (
     expect(ownerText({ ...phone, kind: 'failure_count', count: 10 })).toContain(
       'Платформа ios 18 app\nСборка index-BTCsHrpw',
     )
+    // Held back past ten an hour, said with the next one (review №1).
+    expect(ownerText({ ...phone, muted: 37 })).toContain(
+      'Платформа ios 18 app\nИ ещё 37 о сбоях телефона за час — в make failures\nСборка',
+    )
   })
 
   it('без маршрута и без кадра — так и сказано, пустых строк нет', () => {
