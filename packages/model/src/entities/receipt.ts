@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { EXCHANGE_UNDO_MINUTES } from '#model/entities/exchange'
-import type { ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
+import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
+import type { SettingsCity } from '#model/contracts/settings'
 import { MINOR_EXPONENT } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
 import type { Quantity } from '#model/values/units'
@@ -80,6 +81,58 @@ export type ReceiptCountry = z.infer<typeof receiptCountrySchema>
 
 export const RECEIPT_LANGUAGES: Readonly<Record<ReceiptCountry, string>> = { AM: 'hye+rus+eng' }
 export const RECEIPT_CURRENCY: Readonly<Record<ReceiptCountry, Currency>> = { AM: 'AMD' }
+
+/**
+ * The language a country's tills print names in, and the language of the catalogue's names a line is
+ * matched against (MOL-126): an item is a node, reached by its barcodes, the shops' articles, its
+ * customs headings and its names in the countries' languages.
+ */
+export const itemNameLanguageSchema = z.enum(['hy'])
+export type ItemNameLanguage = z.infer<typeof itemNameLanguageSchema>
+export const RECEIPT_NAME_LANGUAGE: Readonly<Record<ReceiptCountry, ItemNameLanguage>> = {
+  AM: 'hy',
+}
+
+/**
+ * How a line found its item (MOL-126, the handoff's four): `memory` — the shop's memory; `search` — the
+ * catalogue's names or its search, near; `weak` — found far, or by the customs heading alone, «проверьте»
+ * (MOL-124 В-4); `new` — nothing: a new item named by the gloss. The memory is laid over on every reading
+ * of the receipt; the other three are kept from the parse.
+ */
+export const receiptMatchSchema = z.enum(['memory', 'search', 'weak', 'new'])
+export type ReceiptMatch = z.infer<typeof receiptMatchSchema>
+export const receiptParsedMatchSchema = receiptMatchSchema.exclude(['memory'])
+export type ReceiptParsedMatch = z.infer<typeof receiptParsedMatchSchema>
+
+/**
+ * The key of the shop's memory (MOL-126): `sku` — the till's own article, read reliably and the same
+ * every time; `text` — the line as printed, for a till that prints no article (Dog City), by its search
+ * key so that OCR's ե/է and ու do not split it.
+ */
+export const storeMemoryKindSchema = z.enum(['sku', 'text'])
+export type StoreMemoryKind = z.infer<typeof storeMemoryKindSchema>
+
+/**
+ * The cities of the settings as a receipt's address prints them, at the start of a row of the head
+ * («ԳՅՈՒՄՐԻ Գորկու 62»): a place is the shop in its city (Р-6). «ԵՐԵՎԱՆ-ՍԻԹԻ» is the chain's name, not
+ * the city, and an item named after the capital is a line, not the head.
+ */
+export const RECEIPT_CITIES: Readonly<Record<SettingsCity, RegExp>> = {
+  Гюмри: /^[^\p{L}]*(?:գյումրի|gyumri)(?![\p{L}-])/iu,
+  Ереван: /^[^\p{L}]*(?:երևան|երե[վւ]ան|yerevan)(?![\p{L}-])(?!\s*սիթի)/iu,
+}
+
+/** Rows of the head a city is looked for in: the address stands above the first item line. */
+const HEAD_ROWS = 15
+
+/** The city a receipt's address prints, if it is one of the settings'; read in the first part only. */
+export function receiptCityOf(rows: readonly TextRow[]): SettingsCity | null {
+  const head = rows.filter((row) => row.part === 0).slice(0, HEAD_ROWS)
+  for (const [city, pattern] of Object.entries(RECEIPT_CITIES) as [SettingsCity, RegExp][]) {
+    if (head.some((row) => pattern.test(row.text))) return city
+  }
+  return null
+}
 
 /** Tesseract's page modes the reading is tried in; the one whose lines add up is kept. */
 export const RECEIPT_PAGE_MODES = [4, 6] as const

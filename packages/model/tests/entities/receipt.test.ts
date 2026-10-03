@@ -4,6 +4,7 @@ import {
   moneyOfHundredths,
   needsReshoot,
   receiptDateOf,
+  receiptCityOf,
   receiptLineOf,
   receiptTimeOf,
 } from '#model/entities/receipt'
@@ -153,5 +154,26 @@ describe('the time a receipt prints (review Р12)', () => {
     expect(receiptTimeOf({ ...receipt([]), time: '99:99' })).toBeNull()
     expect(receiptTimeOf({ ...receipt([]), time: '24:00' })).toBeNull()
     expect(receiptTimeOf(receipt([]))).toBeNull()
+  })
+})
+
+describe('the city of the address (MOL-126, Р-6)', () => {
+  const rows = (...texts: string[]) => texts.map((text, line) => ({ text, part: 0, line }))
+
+  it('reads the city that opens a row of the head', () => {
+    expect(receiptCityOf(rows(': ԵՐԵՎԱՆ-ՍԻԹԻ', 'ԳՅՈՒՄՐԻ Գորկու 62 2.'))).toBe('Гюмри')
+    expect(receiptCityOf(rows('DOG CITY', 'Gyumri Sayat-Nova Street, 42'))).toBe('Гюмри')
+    expect(receiptCityOf(rows('ԵՐԵՎԱՆ Կոմիտասի 5'))).toBe('Ереван')
+  })
+
+  it('does not take the chain «Ереван Сити» or an item named after the capital for the city', () => {
+    expect(receiptCityOf(rows(': ԵՐԵՎԱՆ-ՍԻԹԻ', 'ԵՐԵՎԱՆ ՍԻԹԻ'))).toBeNull()
+    expect(receiptCityOf(rows('3.Յոգուրտ երեւան Փրոդաքթս 2%'))).toBeNull()
+  })
+
+  it('looks in the head of the first part only', () => {
+    const late = [...rows(...Array.from({ length: 15 }, () => 'ՏՆՏԵՍԱԿԱՆ')), ...rows('ԳՅՈՒՄՐԻ')]
+    expect(receiptCityOf(late)).toBeNull()
+    expect(receiptCityOf([{ text: 'ԳՅՈՒՄՐԻ Գորկու 62', part: 1, line: 0 }])).toBeNull()
   })
 })

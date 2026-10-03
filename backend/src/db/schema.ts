@@ -44,6 +44,7 @@ import {
   exchangeChannelSchema,
   incomeSourceSchema,
   itemKindSchema,
+  itemNameLanguageSchema,
   itemOriginSchema,
   marketChannelSchema,
   marketSideSchema,
@@ -52,18 +53,22 @@ import {
   rateProviderSchema,
   ratePreferenceSchema,
   SALARY_SHIFT_DAY_MAX,
+  SETTINGS_CITIES,
   rateSourceSchema,
   RECEIPT_PARTS_MAX,
   RECEIPT_PART_BYTES_MAX,
   receiptCountrySchema,
   receiptFailureSchema,
+  receiptParsedMatchSchema,
   receiptStatusSchema,
+  storeMemoryKindSchema,
   SPENDING_CATEGORY_COLOURS,
   spendingPresetSchema,
 } from '@molvia/model'
 import type {
   BaseUnit,
   Currency,
+  ItemNameLanguage,
   EventPayload,
   FeedbackDelivery,
   FeedbackKind,
@@ -83,7 +88,10 @@ import type {
   AppLocale,
   ReceiptCountry,
   ReceiptFailure,
+  ReceiptParsedMatch,
   ReceiptStatus,
+  SettingsCity,
+  StoreMemoryKind,
   SpendingPreset,
 } from '@molvia/model'
 
@@ -396,6 +404,47 @@ export const itemBarcodes = pgTable(
 )
 
 /**
+ * An item's names in the languages the countries' tills print (MOL-126): «կաթ 3.2%» is «Молоко 3,2%».
+ * A receipt line is matched against the names of its country's language; the person's own search is
+ * not (yet) — it reads `items.name`. Written by the seed alone: nobody types an Armenian name, and
+ * the shop's memory learns the rest.
+ */
+export const itemNames = pgTable(
+  'item_names',
+  {
+    itemId: uuid('item_id')
+      .notNull()
+      .references(() => items.id, { onDelete: 'cascade' }),
+    language: text('language').$type<ItemNameLanguage>().notNull(),
+    name: varchar('name', { length: 200 }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.itemId, table.language, table.name] }),
+    index('item_names_language_idx').on(table.language),
+    check('item_names_language_known', oneOf(table.language, itemNameLanguageSchema.options)),
+  ],
+)
+
+/**
+ * The customs headings (ТН ВЭД, four digits) an item may be sold under (MOL-126): an Armenian till
+ * prints the heading on the line («0401/1163909»), and it rules out what the line cannot be — no glue
+ * is a baby porridge. Written by the seed alone.
+ */
+export const itemHeadings = pgTable(
+  'item_hs',
+  {
+    itemId: uuid('item_id')
+      .notNull()
+      .references(() => items.id, { onDelete: 'cascade' }),
+    hs: char('hs', { length: 4 }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.itemId, table.hs] }),
+    check('item_hs_four_digits', sql`${table.hs} ~ '^[0-9]{4}$'`),
+  ],
+)
+
+/**
  * The vector of an item's name, by which search finds it by meaning (MOL-105): «молочка» reaches
  * milk, «овощи» the potato. Made by the API's own model from the name alone, written by one writer
  * — the API's timer, nudged by «Предложить товар» — and never on the way of a write of an item:
@@ -483,9 +532,18 @@ export const places = pgTable(
     name: varchar('name', { length: 200 }).notNull(),
     country: char('country', { length: 2 }).notNull(),
     city: varchar('city', { length: 120 }).notNull(),
+    /**
+     * The seller's tax number its receipts print (MOL-126): a receipt finds its place by it, in its city
+     * — one chain, one number, a place in each city. Set by the first receipt recorded at the place,
+     * never rewritten. Not the place's identity: a place exists without one.
+     */
+    tin: text('tin'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index('places_tin_idx')
+      .on(table.tin)
+      .where(sql`${table.tin} is not null`),
     /**
      * Identity, not spelling. Exact uniqueness let «SAS» and «sas» — and «Ёлки» written
      * with U+0401 against the same word with U+0415 U+0308 — become two places that look
@@ -1895,7 +1953,11 @@ export const receipts = pgTable(
     // In the receipt's own currency.
     totalMinor: bigint('total_minor', { mode: 'bigint' }),
     balanced: boolean('balanced').notNull().default(false),
+    // The city of the settings its address prints (MOL-126, Р-6), where its place is looked for.
+    city: text('city').$type<SettingsCity>(),
     recordedAt: timestamp('recorded_at', { withTimezone: true }),
+    // The purchases it was recorded as (MOL-126); gone with the trip's final removal.
+    tripId: uuid('trip_id').references(() => trips.id, { onDelete: 'set null' }),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (table) => [
@@ -1926,6 +1988,10 @@ export const receipts = pgTable(
       sql`${table.status} = 'uploading' or ${table.queuedAt} is not null`,
     ),
     check('receipts_attempts_non_negative', sql`${table.attempts} >= 0`),
+    check(
+      'receipts_city_known',
+      sql`${table.city} is null or ${oneOf(table.city, SETTINGS_CITIES)}`,
+    ),
     check(
       'receipts_layout_known',
       sql`${table.layout} is null or ${table.layout} in ('card', 'table')`,
@@ -1992,6 +2058,14 @@ export const receiptLines = pgTable(
     sumMinor: bigint('sum_minor', { mode: 'bigint' }),
     discountMinor: bigint('discount_minor', { mode: 'bigint' }),
     settled: boolean('settled').notNull(),
+    // The item the parse found (MOL-126): by the catalogue's names or its search; null — a new one,
+    // named by `translation`. The shop's memory is laid over it on every reading of the receipt.
+    itemId: uuid('item_id').references(() => items.id, { onDelete: 'set null' }),
+    match: text('match').$type<ReceiptParsedMatch>(),
+    // The line word by word in the language of the receipt, by the dictionary of till words.
+    translation: text('translation'),
+    // The purchase the line was recorded as: a change of its item later teaches the memory (Р-2).
+    expenseId: uuid('expense_id').references(() => expenses.id, { onDelete: 'set null' }),
   },
   (table) => [
     primaryKey({ columns: [table.receiptId, table.position] }),
@@ -2007,6 +2081,11 @@ export const receiptLines = pgTable(
     check(
       'receipt_lines_unit_known',
       sql`${table.qtyUnit} is null or ${oneOf(table.qtyUnit, baseUnitSchema.options)}`,
+    ),
+    uniqueIndex('receipt_lines_expense_key').on(table.expenseId),
+    check(
+      'receipt_lines_match_known',
+      sql`${table.match} is null or ${oneOf(table.match, receiptParsedMatchSchema.options)}`,
     ),
     check(
       'receipt_lines_amounts_non_negative',
@@ -2046,6 +2125,51 @@ export const receiptLineImages = pgTable(
     check(
       'receipt_line_images_confirmed_whole',
       sql`(${table.confirmedText} is null) = (${table.confirmedAt} is null)`,
+    ),
+  ],
+)
+
+/**
+ * The shop's memory (MOL-126): «01282006 + 1163909 — молоко 3,2 %» is a fact about the shop, not the
+ * person (owner, 30.09.2026), so it is shared. A row is one person's word on one key: recording a
+ * receipt writes it, a change of a recorded line's item rewrites it. Read: the person's own word first,
+ * else the item most people said, the later on a tie. Erasure leaves the row without its author — the
+ * word still counts, as an item outlives its author (MOL-58). The price is the shelf price per unit the
+ * article had, the memory's argument when a figure reads two ways (В-1).
+ */
+export const storeMemory = pgTable(
+  'store_memory',
+  {
+    id: uuid('id').primaryKey(),
+    tin: text('tin').notNull(),
+    kind: text('kind').$type<StoreMemoryKind>().notNull(),
+    key: text('key').notNull(),
+    actorId: uuid('actor_id').references((): AnyPgColumn => actors.id, { onDelete: 'set null' }),
+    itemId: uuid('item_id')
+      .notNull()
+      .references(() => items.id, { onDelete: 'cascade' }),
+    priceMinor: bigint('price_minor', { mode: 'bigint' }),
+    priceCurrency: char('price_currency', { length: 3 }).$type<Currency>(),
+    writtenAt: timestamp('written_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    // one word per person and key; the erased are many words of nobody
+    uniqueIndex('store_memory_word_key').on(table.tin, table.kind, table.key, table.actorId),
+    index('store_memory_actor_idx').on(table.actorId),
+    check('store_memory_kind_known', oneOf(table.kind, storeMemoryKindSchema.options)),
+    check(
+      'store_memory_price_whole',
+      sql`(${table.priceMinor} is null) = (${table.priceCurrency} is null)`,
+    ),
+    check(
+      'store_memory_price_non_negative',
+      sql`${table.priceMinor} is null or ${table.priceMinor} >= 0`,
+    ),
+    check(
+      'store_memory_currency_known',
+      sql`${table.priceCurrency} is null or ${oneOf(table.priceCurrency, currencySchema.options)}`,
     ),
   ],
 )

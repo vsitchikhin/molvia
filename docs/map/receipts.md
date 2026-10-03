@@ -48,4 +48,7 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 
 The tables are in the skeleton's schema: `receipts`, `receipt_parts`, `receipt_lines`,
 `receipt_line_images`, migration `0042_receipts`. Erasure takes them through `receipts`; the copy
-carries receipts and their lines, never a photo.
+carries receipts and their lines, never a photo. MOL-126 (`0043_receipt_lines_bound`) binds a line to
+its item and purchase and adds the item as a node — `item_names` (names in the tills' languages) and
+`item_hs` (customs headings), both the seed's — `places.tin`, and `store_memory`, the shops' shared
+memory: erasure leaves its words without an author, the copy carries the person's own.
