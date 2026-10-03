@@ -49,8 +49,9 @@ export interface OwnerNoticeRepository {
   /**
    * The bot sent the notices about these messages: they are not handed again, and their pictures go
    * in the same transaction — the owner's Telegram has them now (MOL-167, В-1). What is left of each
-   * is its line, `sent_at` set only for a picture that was there to send and not among `missed`
-   * (adversarial А4): one the timer let go, or Telegram refused, never reached the owner.
+   * is its line, `sent_at` set for every picture but those the bot names in `missed` (adversarial А4,
+   * Б4): one the timer let go before the bot came, or Telegram refused, never reached the owner — and
+   * the bot's word is what knows it. A file let go while its picture was on its way still went.
    */
   markSent(
     messages: readonly number[],
@@ -127,9 +128,6 @@ export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
             and(
               inArray(feedbackPictures.feedbackId, [...messages]),
               isNull(feedbackPictures.sentAt),
-              sql`exists (select 1 from ${feedbackPictureFiles}
-                where ${feedbackPictureFiles.feedbackId} = ${feedbackPictures.feedbackId}
-                  and ${feedbackPictureFiles.position} = ${feedbackPictures.position})`,
               ...notMissed,
             ),
           )

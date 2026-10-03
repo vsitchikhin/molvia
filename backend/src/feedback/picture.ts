@@ -24,10 +24,22 @@ function isMetadata(marker: number): boolean {
   return (marker >= 0xe1 && marker <= 0xef) || marker === 0xfe
 }
 
+const ADOBE = [0x41, 0x64, 0x6f, 0x62, 0x65]
+
 /**
- * How many marker segments a picture may have. A real JPEG has a dozen or two — a progressive one,
- * scans and tables, a few dozen; two megabytes of empty four-byte segments held the API's thread for
- * a hundred milliseconds a picture (adversarial А3).
+ * Adobe's APP14 as it tells the decoder how to read the colours — RGB as it is, YCbCr or YCCK — and
+ * nothing else: `Adobe`, a version, two flags and the transform, twelve bytes (review 9). Cut out, a
+ * JPEG saved as RGB or CMYK comes out in the wrong colours; it says nothing of a person.
+ */
+function isAdobeTransform(payload: Uint8Array): boolean {
+  return payload.length === 12 && ADOBE.every((byte, at) => payload[at] === byte)
+}
+
+/**
+ * How many markers a picture may have outside its scans, a marker with no length counted as one with
+ * (adversarial Б1). A real JPEG has a dozen or two — a progressive one, scans and tables, a few dozen;
+ * two megabytes of empty four-byte segments, or of two-byte markers, held the API's thread for a
+ * hundred milliseconds a picture (А3, Б1).
  */
 const SEGMENTS_MAX = 256
 
@@ -56,7 +68,8 @@ function scanEnd(bytes: Uint8Array, from: number): number {
 /**
  * The JPEG with nothing but the picture (MOL-167, Р-2): every segment is walked — between the scans
  * of a progressive JPEG too, the entropy-coded data skipped by its stuffed bytes and restarts — and
- * every APP segment but a plain JFIF and every comment is left out wherever it stands; whatever comes
+ * every APP segment but a plain JFIF and Adobe's colour transform, and every comment, is left out
+ * wherever it stands; whatever comes
  * after the end of the picture — a second JPEG of MPF or Ultra HDR with its own EXIF, any tail — is
  * cut (review 1, adversarial А2). The phone draws a new JPEG, but the API does not take its word: a
  * client changed by hand must not carry where a photo was taken. `null` for what is not a JPEG to
@@ -84,21 +97,27 @@ export function withoutMetadata(bytes: Uint8Array): Buffer | null {
     }
     // a second start inside the first is no picture to walk
     if (marker === 0xd8) return null
-    // markers that stand alone, with no length
+    segments += 1
+    if (segments > SEGMENTS_MAX) return null
+    // markers that stand alone, with no length: a restart belongs inside a scan, and a TEM nowhere in a
+    // real picture — before the first scan neither is one (Б1)
     if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      if (!scanned) return null
       kept.push(bytes.subarray(at, at + 2))
       at += 2
       continue
     }
-    segments += 1
-    if (segments > SEGMENTS_MAX || at + 4 > bytes.length) return null
+    if (at + 4 > bytes.length) return null
     const length = ((bytes[at + 2] ?? 0) << 8) | (bytes[at + 3] ?? 0)
     const end = at + 2 + length
     if (length < 2 || end > bytes.length) return null
     if (marker === 0xe0) {
       const jfif = plainJfif(bytes.subarray(at + 4, end))
       if (jfif !== null) kept.push(jfif)
-    } else if (!isMetadata(marker)) {
+    } else if (
+      !isMetadata(marker) ||
+      (marker === 0xee && isAdobeTransform(bytes.subarray(at + 4, end)))
+    ) {
       kept.push(bytes.subarray(at, end))
     }
     at = end

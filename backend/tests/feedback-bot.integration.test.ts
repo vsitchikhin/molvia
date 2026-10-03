@@ -1144,10 +1144,14 @@ describe('ревью и адверсариальное MOL-167', () => {
       .delete(feedbackPictureFiles)
       .where(and(eq(feedbackPictureFiles.feedbackId, number), eq(feedbackPictureFiles.position, 3)))
 
-    // The second Telegram refused.
+    // The second Telegram refused; the third the bot found gone (a 404) — both named by the bot.
+    expect((await pictureOf(app, number, 3)).statusCode).toBe(404)
     const said = await sentBy(app, {
       messages: [number],
-      missed: [{ message: number, position: 2 }],
+      missed: [
+        { message: number, position: 2 },
+        { message: number, position: 3 },
+      ],
     })
 
     expect(said.statusCode).toBe(204)
@@ -1177,5 +1181,31 @@ describe('ревью и адверсариальное MOL-167', () => {
     const again = await send(app, cookie, body)
     expect(again.statusCode).toBe(200)
     expect(again.json()).toEqual(first.json())
+  })
+})
+
+describe('раунд 2 MOL-167', () => {
+  it('снимок, который бот взял и отправил, «дошёл», даже если таймер отпустил файл до слова бота (Б4)', async () => {
+    const app = await serverFor(OWNER)
+    const cookie = await signIn(db, await insertActor(db))
+    const { number } = (await send(app, cookie, message({ pictures: [aScreenshot()] }))).json<{
+      number: number
+    }>()
+    // The bot took it; meanwhile the week's timer let the file go.
+    await db.delete(feedbackPictureFiles)
+
+    const said = await app.inject({
+      method: 'POST',
+      url: '/internal/owner/sent',
+      payload: { messages: [number] },
+      headers: asBot,
+    })
+
+    expect(said.statusCode).toBe(204)
+    const [line] = await db
+      .select()
+      .from(feedbackPictures)
+      .where(eq(feedbackPictures.feedbackId, number))
+    expect(line?.sentAt).toBeInstanceOf(Date)
   })
 })

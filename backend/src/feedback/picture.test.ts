@@ -247,3 +247,77 @@ describe('потолок разбора (адверсариальное А3)', (
     expect(Math.min(...Array.from({ length: 5 }, timed))).toBeLessThan(15)
   })
 })
+
+describe('раунд 2 MOL-167', () => {
+  const sof = segment(0xc0, [0x08, 0x03, 0xe8, 0x03, 0xe8, 0x01])
+  const sos = segment(0xda, [0x01, 0x01, 0, 0, 0x3f, 0])
+
+  it('маркеры без длины до первого скана — не JPEG, и потолок их считает (Б1)', () => {
+    for (const marker of [0x01, 0xd0, 0xd7]) {
+      expect(
+        withoutMetadata(Buffer.from([0xff, 0xd8, 0xff, marker, ...sof, ...sos, 0x55, 0xff, 0xd9])),
+      ).toBeNull()
+    }
+    const head = [0xff, 0xd8, ...sof, ...sos, 0x55]
+    const restarts = (count: number) =>
+      Buffer.from([
+        ...head,
+        ...Array.from({ length: count }, () => [0xff, 0xd0]).flat(),
+        0xff,
+        0xd9,
+      ])
+    // Restarts after a scan are part of it: the scan's data runs through them.
+    expect(withoutMetadata(restarts(300))).not.toBeNull()
+    // A TEM after a scan stands alone between segments, and is counted: past the ceiling, no picture.
+    const tems = (count: number) =>
+      Buffer.from([
+        ...head,
+        ...Array.from({ length: count }, () => [0xff, 0x01]).flat(),
+        0xff,
+        0xd9,
+      ])
+    expect(withoutMetadata(tems(250))).not.toBeNull()
+    expect(withoutMetadata(tems(260))).toBeNull()
+  })
+
+  it('два мегабайта TEM — «не подошёл» быстрее 15 мс (Б1)', () => {
+    const tail = [...sof, ...sos, 0x55, 0xff, 0xd9]
+    const count = Math.floor((FEEDBACK_PICTURE_BYTES_MAX - 2 - tail.length) / 2)
+    const bytes = Buffer.alloc(2 + count * 2 + tail.length)
+    bytes.set([0xff, 0xd8], 0)
+    for (let at = 0; at < count; at++) bytes.set([0xff, 0x01], 2 + at * 2)
+    bytes.set(tail, 2 + count * 2)
+    const encoded = bytes.toString('base64')
+    const timed = () => {
+      const started = performance.now()
+      expect(() => pictureOf(encoded)).toThrow(
+        expect.objectContaining({ code: ERROR.FEEDBACK_PICTURE_INVALID }),
+      )
+      return performance.now() - started
+    }
+    expect(Math.min(...Array.from({ length: 5 }, timed))).toBeLessThan(15)
+  })
+
+  it('APP14 Adobe с цветовым преобразованием остаётся, иной APP14 — вон (ревью 9)', () => {
+    const adobe = segment(0xee, [...ascii('Adobe'), 0x00, 0x64, 0, 0, 0, 0, 0x02])
+    const longer = segment(0xee, [
+      ...ascii('Adobe'),
+      0x00,
+      0x64,
+      0,
+      0,
+      0,
+      0,
+      0x02,
+      ...ascii('Gyumri'),
+    ])
+    const body = [...sof, ...sos, 0x55, 0xff, 0xd9]
+
+    expect(withoutMetadata(Buffer.from([0xff, 0xd8, ...adobe, ...body]))).toEqual(
+      Buffer.from([0xff, 0xd8, ...adobe, ...body]),
+    )
+    expect(withoutMetadata(Buffer.from([0xff, 0xd8, ...longer, ...body]))).toEqual(
+      Buffer.from([0xff, 0xd8, ...body]),
+    )
+  })
+})
