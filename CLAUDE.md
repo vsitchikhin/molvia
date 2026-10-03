@@ -438,9 +438,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   radius, a colour function or a custom property no file defines fails Stylelint; the token block
   of DESIGN.md is `make format`'s to write and `make lint`'s to check.
 - **An icon's size is a step of `--icon-*` by its role** (MOL-173): `@include icon` with the step as
-  `font-size`; the row's chevron is 20 everywhere. `molvia/icon-size` holds it: an icon with a class
-  has both lines, its font-size is a step of `--icon-*`, and a width, a height, a padding or a scale
-  on it is refused, in the template too.
+  `font-size`; the row's chevron is 20 everywhere. `molvia/icon-size` holds it: every icon is sized
+  by the pair without a condition — by its class or a rule on `svg` above it — its font-size is a
+  step of `--icon-*`, and a width, a padding, a border or a scale on it is refused, in the template
+  too.
 - **Colours that can meet are held apart by `tokens.test.ts`** (MOL-172): two steps of different roles
   and a category against a role 0.08 OKLab apart, marks 3:1, text 4.5:1, both schemes; a value that
   fails is changed, never excused. Data without a colour of its own is `--graphic`. **Any two
