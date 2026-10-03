@@ -7,6 +7,7 @@ import type { ReminderSwitch } from '@molvia/model'
 import { dropKeyboard, refuse, settleKeeping, stopSpinner } from './answer'
 import { t } from './i18n'
 import { SWITCH_DATA, keyboardOf, readText, scale, shownText, writeText } from './remind'
+import { handlerOf, reportDefect } from './failure'
 
 export interface MuteDeps {
   readonly api: MolviaBotClient
@@ -48,6 +49,7 @@ export function muteComposer({ api }: MuteDeps): Composer<Context> {
         return
       }
       logged('remind switch', error)
+      reportDefect(api, error, handlerOf(ctx))
       // The buttons stay: «press again» must leave something to press.
       await refuse(ctx, 'remind.switchFailed')
       return
@@ -81,6 +83,7 @@ export function muteComposer({ api }: MuteDeps): Composer<Context> {
     } catch (error) {
       // Nobody to tell: a blocked bot cannot write, and the next evening's 403 asks again.
       logged('remind block', error)
+      reportDefect(api, error, handlerOf(ctx))
     }
   })
 
@@ -124,6 +127,7 @@ export function heardFrom({ api }: MuteDeps): MiddlewareFn {
         .then(async () => api.switchReminders(telegramUserId, 'unblocked'))
         .catch((error: unknown) => {
           logged('remind unblock', error)
+          reportDefect(api, error, handlerOf(ctx))
         })
     }
     await next()

@@ -35,5 +35,7 @@ it('retries a failed cleanup at the next minute without an unhandled rejection',
   await vi.advanceTimersByTimeAsync(60_000)
   expect(clean).toHaveBeenCalledTimes(2)
   expect(failed).toHaveBeenCalledTimes(2)
+  // The job's failure goes to the table by its kind (MOL-143, В-1), so it has to be handed on.
+  expect(failed).toHaveBeenCalledWith(expect.objectContaining({ message: 'database down' }))
   await stop()
 })

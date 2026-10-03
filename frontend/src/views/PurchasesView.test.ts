@@ -88,7 +88,8 @@ function openTrip(bought = 0): TripViewModel {
 }
 
 // One moment for the whole file: two cards «bought yesterday» are bought at the same instant —
-// read anew, the second was now and then a millisecond newer, and the order of places turned (CI).
+// read anew, the second was now and then a millisecond newer, and the order of places turned on CI
+// (MOL-143 gave most tests one call; the one MOL-120 test it missed failed on MOL-171's CI).
 const NOW = new Date()
 
 function yesterday(): Date {
@@ -277,8 +278,9 @@ describe('PurchasesView (MOL-128)', () => {
 
     it('покупки ждут оценки — значит, не пусто', async () => {
       tripHistory.mockReturnValue(new Promise(() => undefined))
+      const day = yesterday()
       pendingVerdicts.mockResolvedValue({
-        items: [card(1, 'Ереван Сити', yesterday()), card(2, 'Ереван Сити', yesterday())],
+        items: [card(1, 'Ереван Сити', day), card(2, 'Ереван Сити', day)],
         total: 2,
       })
       const { view } = await render({
@@ -527,8 +529,9 @@ describe('PurchasesView (MOL-128)', () => {
     })
 
     it('одно имя в одном городе — одно место, без города (MOL-120)', async () => {
+      const day = yesterday()
       pendingVerdicts.mockResolvedValue({
-        items: [card(1, 'SAS', yesterday(), 'Ереван'), card(2, 'sas', yesterday(), 'ереван')],
+        items: [card(1, 'SAS', day, 'Ереван'), card(2, 'sas', day, 'ереван')],
         total: 2,
       })
       const { view } = await render()
@@ -536,8 +539,9 @@ describe('PurchasesView (MOL-128)', () => {
     })
 
     it('город не из словаря — в скобках (MOL-120)', async () => {
+      const day = yesterday()
       pendingVerdicts.mockResolvedValue({
-        items: [card(1, 'SAS', yesterday(), 'Ванадзор'), card(2, 'SAS', yesterday(), 'Гюмри')],
+        items: [card(1, 'SAS', day, 'Ванадзор'), card(2, 'SAS', day, 'Гюмри')],
         total: 2,
       })
       const { view } = await render()
@@ -546,8 +550,9 @@ describe('PurchasesView (MOL-128)', () => {
 
     it('город настроек в другом написании — падеж по городу настроек (адверсариальный А2)', async () => {
       // A place keeps the spelling its city was first written in: «гюмри» is Gyumri.
+      const day = yesterday()
       pendingVerdicts.mockResolvedValue({
-        items: [card(1, 'SAS', yesterday(), 'гюмри'), card(2, 'SAS', yesterday(), 'Ереван')],
+        items: [card(1, 'SAS', day, 'гюмри'), card(2, 'SAS', day, 'Ереван')],
         total: 2,
       })
       const { view } = await render()
@@ -557,8 +562,9 @@ describe('PurchasesView (MOL-128)', () => {
     it('без городов два написания — два места, как до MOL-120 (адверсариальный А1)', async () => {
       // Two rows of `places` the phone cannot tell apart without their cities: the queue
       // remembered by the version before, or a card refused before the update among new ones.
+      const day = yesterday()
       pendingVerdicts.mockResolvedValue({
-        items: [card(1, 'Ереван Сити', yesterday()), card(2, 'ЕРЕВАН СИТИ', yesterday())],
+        items: [card(1, 'Ереван Сити', day), card(2, 'ЕРЕВАН СИТИ', day)],
         total: 2,
       })
       const { view } = await render()
@@ -566,8 +572,9 @@ describe('PurchasesView (MOL-128)', () => {
     })
 
     it('карточка без города — подпись по именам, как до MOL-120 (Р-6)', async () => {
+      const day = yesterday()
       pendingVerdicts.mockResolvedValue({
-        items: [card(1, 'Ереван Сити', yesterday(), 'Гюмри'), card(2, 'Ереван Сити', yesterday())],
+        items: [card(1, 'Ереван Сити', day, 'Гюмри'), card(2, 'Ереван Сити', day)],
         total: 2,
       })
       const { view } = await render()
