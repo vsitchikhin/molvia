@@ -553,6 +553,13 @@ The detail behind the frontend lines of `CLAUDE.md`.
     `visibility`, so nothing is laid out anew and nothing scrolls; the open sheets and the live
     region stay. The page under a modal sheet takes nothing anyway; above the sheet the scrim now
     dims the sheet's colour instead of the screen — the price.
+  - **An open sheet stays wherever it is mounted** (MOL-219): it is left out of what is hidden in the
+    selector itself, `#app > :not([role='status'], dialog[open])`. A rule giving it back its
+    visibility outweighs only what a sheet inside a screen inherits; on a sheet mounted in `#app`
+    itself — «Написать разработчику» — the rule with the id won, the sheet hid as the keys came up,
+    the browser took the focus from its field and the keys went down at once, over and over. An
+    end-to-end test sets the mark by hand — no test browser has the keys — for that sheet and for a
+    screen's.
 - **`interactive-widget=resizes-content` is Android's alone** (hotfix-bottom-menu): set by a script
   in the head of `index.html` for an Android user agent, before the page is laid out. iOS ignored it
   until Safari 27, which began to honour it: the window shrank to the part left visible under the
