@@ -236,8 +236,8 @@ describe('поток выдуманных сбоев не топит канал 
     await recorded()
     const payloads = (await db.select().from(ownerNotices)).map((notice) => notice.payload)
     expect(payloads).toContainEqual(expect.objectContaining({ errorName: 'RealDefect' }))
-    // The table: the sender's new rows of the hour, and the real one.
-    expect(await recorded()).toHaveLength(PHONE_ROWS_PER_SENDER + 1)
+    // The table counts every one of them: twenty fit the sender's new rows of the hour.
+    expect(await recorded()).toHaveLength(PHONE_FAILURES_KEPT + 1)
   })
 
   it(`всем вместе — ${String(PHONE_NOTICES_PER_HOUR)} уведомлений в час`, async () => {
@@ -261,20 +261,40 @@ describe('поток выдуманных сбоев не топит канал 
     expect(await failureNotices()).toHaveLength(PHONE_NOTICES_PER_SENDER)
   })
 
-  it(`новых строк с одного адреса — ${String(PHONE_ROWS_PER_SENDER)} в час, чужой настоящий сбой записан (ревью №8, В1)`, async () => {
-    expect((await send(buffer('Liar'), '203.0.113.9')).statusCode).toBe(204)
-    await recorded()
+  it(`новых строк с одного отправителя — ${String(PHONE_ROWS_PER_SENDER)} в час, чужой настоящий сбой записан (ревью №8, В1)`, async () => {
+    // Through the reporter: a sender's sixty are a minute of its limit, so the route alone cannot
+    // pass them within the hour.
+    const reporter = apiFailureReporter(
+      () => db,
+      OWNER,
+      app.log,
+      (recording) => recordings.push(recording),
+    )
+    const phone = { source: 'phone', route: 'screen:advice', platform: 'ios 18 app' } as const
+    const frames = ['at Xe (/assets/index-BTCsHrpw.js:1:1)']
+    for (let index = 0; index <= PHONE_ROWS_PER_SENDER; index += 1) {
+      reporter.take({ errorName: `Liar${String(index)}`, frames }, phone, 'index-BTCsHrpw', 'liar')
+      await recorded()
+    }
     expect(await recorded()).toHaveLength(PHONE_ROWS_PER_SENDER)
-    expect(lines.join('\n')).toContain('phone rows')
-
-    const real = { reports: [{ ...REPORT, errorName: 'RealDefect' }] }
-    expect((await send(real, '198.51.100.7')).statusCode).toBe(204)
+    reporter.take({ errorName: 'RealDefect', frames }, phone, 'index-BTCsHrpw', 'phone')
     // A fingerprint already there still counts, past the sender's new rows.
-    const again = { reports: [{ ...REPORT, errorName: 'Liar0' }] }
-    expect((await send(again, '203.0.113.9')).statusCode).toBe(204)
+    reporter.take({ errorName: 'Liar0', frames }, phone, 'index-BTCsHrpw', 'liar')
     const rows = await recorded()
     expect(rows.map((row) => row.errorName)).toContain('RealDefect')
     expect(rows.find((row) => row.errorName === 'Liar0')?.count).toBe(2)
+  })
+
+  it('волна одного сбоя у абонентов одного оператора — все отпечатки в таблице (Г1)', async () => {
+    const wave = ['advice', 'purchases', 'verdicts', 'money', 'settings', 'exchange'].flatMap(
+      (screen) =>
+        ['ios 18 app', 'android 14 browser'].map((platform) => ({ ...REPORT, screen, platform })),
+    )
+    for (const one of wave) {
+      expect((await send({ reports: [one] }, '100.64.12.34')).statusCode).toBe(204)
+      await recorded()
+    }
+    expect(await recorded()).toHaveLength(wave.length)
   })
 
   it('скрытое сказано таймером одним уведомлением, когда в часе есть место (ревью №7)', async () => {

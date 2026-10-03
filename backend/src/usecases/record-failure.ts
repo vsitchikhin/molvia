@@ -144,17 +144,26 @@ export async function recordFailure(
   const phone = occurrence.source === 'phone'
   // Taken before the write, given back if the row was there: four writes run at once, and each
   // asking first and taking after let the hour's rows run past by three.
-  const fresh = !phone || phoneRows === undefined || phoneRows.claim(at, sender)
-  const count = await failures.record(
-    occurrence,
-    times,
-    at,
-    (written) => {
-      const notices = noticesFor(occurrence, written, times, owner)
-      return phone && phoneNotices ? phoneNotices.take(notices, at, sender) : notices
-    },
-    { fresh },
-  )
+  const claimed = phone && phoneRows !== undefined
+  const fresh = !claimed || phoneRows.claim(at, sender)
+  let count: FailureCount | null
+  try {
+    count = await failures.record(
+      occurrence,
+      times,
+      at,
+      (written) => {
+        const notices = noticesFor(occurrence, written, times, owner)
+        return phone && phoneNotices ? phoneNotices.take(notices, at, sender) : notices
+      },
+      { fresh },
+    )
+  } catch (error) {
+    // A write that failed — the database down — wrote no row: its place goes back, or every report
+    // of the outage held one for the hour (review №9).
+    if (claimed && fresh) phoneRows.refund(at, sender)
+    throw error
+  }
   // Not a new row after all — its count is more than what was written now: the place goes back.
   if (phone && fresh && count !== null && count.count !== times) phoneRows?.refund(at, sender)
   // A new fingerprint past the hour's rows: not in the table, so the summary says so (round 3, В1).
@@ -250,8 +259,12 @@ export function phoneNoticeBudget(
 
 /** How many new rows the phone's reports may add to the table in an hour (review №6, №8). */
 export const PHONE_ROWS_PER_HOUR = 1000
-/** And how many of them one sender may add (review №8, adversarial В1 of round 3). */
-export const PHONE_ROWS_PER_SENDER = 10
+/**
+ * And how many of them one sender may add (review №8, adversarial В1 of round 3): a minute of its
+ * limit. Ten were too few for a mobile operator's address, which thousands of phones share — one
+ * failure of a rollout is a dozen fingerprints, its screens times its systems (adversarial Г1).
+ */
+export const PHONE_ROWS_PER_SENDER = 60
 
 export interface PhoneRowBudget {
   /** Takes a place for a new row, if the hour has one for the sender and for everybody. */
@@ -267,8 +280,11 @@ export interface PhoneRowBudget {
  * thirty days and copied every night. Past the budget a known fingerprint still counts and a new one
  * is not written, and the hour's summary says how many. A cap shared by everybody alone was spent by
  * two addresses in two minutes, and every real new failure after a rollout was written nowhere for the
- * hour (adversarial В1); a sender's ten leave the rest to the others. **The price, named:** a hundred
- * networks fill the hour; some 720 000 rows in thirty days at most.
+ * hour (adversarial В1); a sender's sixty leave the rest to the others. **The prices, named:**
+ * seventeen networks fill the hour, some 720 000 rows in thirty days at most; and the sender is an
+ * address, so one subscriber of a mobile operator sending sixty invented reports an hour takes the
+ * new rows of every phone behind the same address (adversarial Г1) — telling phones apart would need
+ * a mark of the device, which is tracking.
  */
 export function phoneRowBudget(
   perHour = PHONE_ROWS_PER_HOUR,

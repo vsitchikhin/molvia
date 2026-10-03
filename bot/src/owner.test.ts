@@ -111,12 +111,16 @@ describe('ownerText — что прочитает владелец (MOL-143)', (
     expect(ownerText({ kind: 'failure_muted', source: 'phone', count: 37 })).toBe(
       ['🔕 Скрыто уведомлений о сбоях телефона: 37', 'Подробности — make failures'].join('\n'),
     )
-    expect(ownerText({ kind: 'failure_muted', source: 'phone', count: 0, unwritten: 5 })).toBe(
+    expect(ownerText({ kind: 'failure_muted', source: 'phone', count: 2, unwritten: 5 })).toBe(
       [
-        '🔕 Скрыто уведомлений о сбоях телефона: 0',
-        'Не записано новых сбоев телефона: 5 — предел строк часа',
+        '🔕 Скрыто уведомлений о сбоях телефона: 2',
+        '🔕 Не записано новых сбоев телефона: 5 — предел строк часа',
         'Подробности — make failures',
       ].join('\n'),
+    )
+    // Only the unwritten: no «скрыто: 0», and nothing to look for in `make failures` (review №10).
+    expect(ownerText({ kind: 'failure_muted', source: 'phone', count: 0, unwritten: 3 })).toBe(
+      '🔕 Не записано новых сбоев телефона: 3 — предел строк часа',
     )
   })
 

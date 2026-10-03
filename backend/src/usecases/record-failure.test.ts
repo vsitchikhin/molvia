@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import type { FailureOccurrence } from '@/db/failures-repository'
+import type { FailureOccurrence, FailureRepository } from '@/db/failures-repository'
 import { ERROR } from '@molvia/model'
 import type { OwnerNotice, PhoneFailure } from '@molvia/model'
 import {
@@ -17,6 +17,7 @@ import {
   phoneNoticeBudget,
   phoneReportLimit,
   phoneRowBudget,
+  recordFailure,
   takePhoneFailures,
 } from './record-failure'
 
@@ -351,6 +352,24 @@ describe('phoneRowBudget — новые строки телефона (ревь�
     expect(rows.claim(now, 'liar')).toBe(false)
     expect(rows.claim(now, 'phone')).toBe(true)
     expect(rows.claim(new Date(now.getTime() + 60 * 60 * 1000), 'liar')).toBe(true)
+  })
+
+  it('запись, которая упала, возвращает своё место (ревью №9)', async () => {
+    const rows = phoneRowBudget(10, 1)
+    const { summary, place, build } = phoneFailure(REPORT)
+    const broken = {
+      record: () => Promise.reject(new Error('connection refused')),
+    } as unknown as FailureRepository
+    await expect(
+      recordFailure(
+        { failures: broken, owner: null, phoneRows: rows },
+        occurrenceOf(summary, place, build),
+        1,
+        now,
+        'one',
+      ),
+    ).rejects.toThrow('connection refused')
+    expect(rows.claim(now, 'one')).toBe(true)
   })
 
   it('место, взятое под строку, которая уже была, возвращается', () => {

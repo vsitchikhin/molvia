@@ -15,12 +15,15 @@ import { reportDefect } from './failure'
  */
 export function ownerText(notice: OwnerNotice): string {
   if (notice.kind === 'failure_muted') {
+    // Said only what is so (review №10, adversarial Г2): no «скрыто: 0», and `make failures` only for
+    // the held ones — the unwritten are in no table.
+    const held = notice.count > 0
     return [
-      t(undefined, 'owner.failure.muted', { count: notice.count }),
+      ...(held ? [t(undefined, 'owner.failure.muted', { count: notice.count })] : []),
       ...(notice.unwritten === undefined
         ? []
         : [t(undefined, 'owner.failure.unwritten', { unwritten: notice.unwritten })]),
-      t(undefined, 'owner.failure.more'),
+      ...(held ? [t(undefined, 'owner.failure.more')] : []),
     ].join('\n')
   }
   const kind = notice.code === undefined ? notice.errorName : `${notice.errorName} ${notice.code}`
