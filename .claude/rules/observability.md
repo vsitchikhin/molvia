@@ -99,16 +99,33 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   column that starts over when the build changes, moved by the same upsert that takes the row's
   lock, so each threshold is crossed by exactly one write.
 - **The owner's channel is one** (Р-9 of MOL-149): `owner_notices`, a kind and its fields as
-  `ownerNoticeSchema` reads them — a union by `kind` the feedback of MOL-148 joins as a branch. The
+  `ownerNoticeSchema` reads them — a union by `kind`, the feedback of MOL-148 two branches of it
+  (`feedback`, `feedback_continued`). **A notice about a message names it by `feedback_id`** and goes
+  with it (`feedback.md`); a notice about a failure cannot carry one — a check holds both — so the
+  failures still belong to nobody. The
   bot claims them every minute (`POST /internal/owner/claim`), the API marks them handed in the same
-  statement and skips rows another claim holds: **at most once**, as the reminders are (MOL-101) —
-  a bot that dies between the claim and the message loses it, and the count stays in the table.
+  statement and skips rows another claim holds: **a failure's at most once**, as the reminders are
+  (MOL-101) — a bot that dies between the claim and the message loses it, and the count stays in
+  the table. **A message's until the bot says it went** (MOL-148, adversarial В1): the table holds
+  nothing else of it, so the bot names the messages it sent (`POST /internal/owner/sent`), and one
+  not named is handed again `OWNER_NOTICE_RESEND_MS` (ten minutes) after the first time, **each pause
+  twice the one before**, at most `OWNER_NOTICE_TRIES` (eight) times — some 21 hours (round 2, Г2): a
+  hand counts whether the bot tried the notice or not, a 429 or a stop giving up the rest of a run,
+  so the tries are spread over a day rather than spent in an hour. **A notice Telegram refuses for
+  what it is** (a 400) is the bot's failure, `owner:send` — the owner hears that something did not go.
+  **The named prices:** the word lost after a send that went, the owner reads it twice; Telegram away
+  longer than a day, the message is the table's alone again. **A stored notice the contract no longer
+  reads is a message lost, so it is a failure of the API's** (MOL-148): `OwnerNoticeUnreadable`, code
+  `OWNER_NOTICE_UNREADABLE`, placed as the request it came in, `POST /internal/owner/claim`, while the
+  claim still answers `200` with the rest. So a notice's payload changes only so the stored ones still
+  read — a field added is optional, a bound only widens — or the notices waiting at a rollout go.
   Whom to write is `OWNER_TELEGRAM_ID` in the API's environment, never in the bot and never in a
   row. Without it nothing is queued at all: every working copy and end-to-end keep their failures in
   their table. In production the line is required, as `BOT_PULSE_URL` is: a forgotten one would
   leave every failure silent.
 - **A notice about a failure not taken within a day is dropped** (Р-7): after a day without the bot
-  the owner would get a heap, and `make failures` has the count. A handed notice is kept 30 days,
+  the owner would get a heap, and `make failures` has the count. A notice about a message is not: it
+  is what the owner waits for, and the table holds nothing else of it. A handed notice is kept 30 days,
   and so is a failure after it last happened — both by the minute runner of the cleanups.
 - **The messages are Russian, keys of the bot's dictionary** (`owner.failure.*`), plain text: a
   frame or a route is shown as it is, and no markup can break on it. A 429 ends the minute's run

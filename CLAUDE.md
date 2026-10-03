@@ -378,7 +378,12 @@ that are easiest to break; the file holds every rule of the area and the reason 
   changes** (MOL-147, Р-2): the same key with another content is a `409`; at most ten a rolling day,
   under the author's lock, `429`.
 - **A thread lives a year from its last message, the owner's reply included** (В-4), and goes with the
-  person.
+  person. **The database holds the thread** (MOL-148): a continuation names its first message, of the
+  same person, and answers a reply to that person — never another's.
+- **The bot passes, the API decides** (MOL-148): a text written as a reply to the bot goes with
+  `ctx.from.id`, the message answered and the tag `#fb42` of its first line — the only place the tag
+  is read; only `OWNER_TELEGRAM_ID` makes it a reply, and a person's word finds its thread by the
+  message the reply went out as. Delivered is 👌 — ✅ is not a reaction Telegram takes.
 - **One sheet, two ways in** (MOL-147): «О приложении» in the settings and «Сообщить о проблеме» drawn
   by `ScreenState` — only a full-screen error, somebody known, not in a `<dialog>`; the draft is the
   device's with no queue, and what goes with the text is read from the body it sends.
@@ -388,11 +393,13 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A failure belongs to nobody** (MOL-143): `failures` holds the fingerprint — source, kind, code,
   top frame without its position, the route's template — and nothing of a person, so no key to
   `actors`, no erasure, no copy; a new column is a decision about privacy.
-- **A failure is an answer of 500 or more, a job of the API's timers, or a defect of the bot**; one
-  path writes the log and the table (`failureReporter`), and the answer never waits for the table.
+- **A failure is an answer of 500 or more, a job of the API's timers, a defect of the bot, or an owner's
+  notice the contract no longer reads** (MOL-148, placed as the claim's route); one path writes the log
+  and the table (`failureReporter`), and the answer never waits for the table.
 - **The owner hears of a fingerprint the first time in a build and at 10, 100, 1000 there** —
   no daily summary; through `owner_notices`, claimed by the bot every minute, at most once, written
-  to `OWNER_TELEGRAM_ID` of the API's environment — empty in every copy. MOL-148 joins as a kind.
+  to `OWNER_TELEGRAM_ID` of the API's environment — empty in every copy. MOL-148 joins as a kind,
+  **handed again until the bot says it went**: a message's notice is all there is of it.
 - **The API runs without `--enable-source-maps`** (В-6, +70…80 MB measured): `make failures` reads
   the API's frames back through the image's map.
 

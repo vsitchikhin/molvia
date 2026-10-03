@@ -55,6 +55,11 @@ it('says who reads a message to the developer, what goes with it and for how lon
   // What the sheet attaches is named whole, and the Telegram copy that erasure cannot reach (В-3).
   expect(ru.privacy.stored.feedback.text).toMatch(/версия приложения, экран, система телефона/)
   expect(ru.privacy.stored.feedback.text).toMatch(/Читает только разработчик/)
+  // The bot's half (MOL-148): a word written in Telegram, and the message a reply went out as.
+  expect(ru.privacy.stored.feedback.text).toMatch(/ответом на его ответ в боте Molvia/)
+  expect(ru.privacy.stored.feedback.text).toMatch(
+    /номер сообщения, которым он пришёл вам в Telegram/,
+  )
   expect(ru.privacy.stored.feedback.text).toMatch(/без вашего имени и номера аккаунта/)
   expect(ru.privacy.stored.feedback.text).toMatch(/остаётся в его чате/)
   expect(ru.privacy.stored.feedback.text).toMatch(/год от последнего сообщения/)

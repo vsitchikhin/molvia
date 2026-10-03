@@ -48,6 +48,7 @@ import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
 import { exportMine } from '@/usecases/export-mine'
 import { sendFeedback } from '@/usecases/send-feedback'
+import { feedbackFromBot } from '@/usecases/feedback-from-bot'
 import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
@@ -690,8 +691,19 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       },
       claimOwnerNotices: () =>
         claimOwnerNotices(createOwnerNoticeRepository(db), owner, new Date(), (issue) => {
-          instance.log.error(describeFailure(issue), 'owner notice unreadable')
+          // A failure of ours, recorded as one (MOL-148, round 3 Д1): a message's notice the contract
+          // no longer reads is the message lost, and the owner hears of the failure at least. Placed
+          // as the request it happened in, not as a timer's job (review №13).
+          failures.report(
+            issue,
+            { source: 'api', route: 'POST /internal/owner/claim' },
+            'owner notice unreadable',
+          )
         }),
+      ownerNoticesSent: (body) =>
+        createOwnerNoticeRepository(db).markSent(body.messages, new Date()),
+      feedbackFromBot: (body) => feedbackFromBot(messages, owner, body, VERSION),
+      replyDelivered: (body) => messages.markDelivered(body),
     })
 
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).
@@ -724,7 +736,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         eraseMe(createErasureRepository(db), telegramUserId),
       )
       feedbackRoutes(guarded, (actorId, message) =>
-        sendFeedback(messages, actorId, message, VERSION),
+        sendFeedback(messages, actorId, message, VERSION, owner),
       )
       sessionRoutes(guarded, {
         list: (actorId, currentId) => listSessions(sessions, actorId, currentId),
