@@ -149,17 +149,21 @@ a screenshot with it MOL-167 (В-1…В-5, Р-1…Р-13 in `.scratch/tasks/requi
   tried on its own, and the first refusal said (adversarial А6). **The pictures live in the page's
   memory**, the draft keeps their number: megabytes on the shelf would push out the queue of purchases
   kept there. Where the draft has more than the page holds — a reload, or another window that holds
-  them — the sheet says «Снимки не сохранились». **A draft that never left keeps its key**: a new key at
-  the opening kept the other window's draft from going when that window sent it (review 7); the next
-  change takes a key, as any does. **One that has begun to leave takes a new key at once** (Б3): the
-  server may hold it with its pictures, and the same key without them was a sure `409` and «Не
-  получилось». **The price**: a message whose answer was lost with its pictures, sent again without
-  them, is a second message. A picture the API refused is
+  them — the sheet says «Снимки не сохранились» **and keeps the key**: the opening decides nothing for
+  another window, which may be sending that very draft (review 7, 10; adversarial В2). The next change
+  takes a key, as any does. **What a `409` means is decided by the answer** (Б3, В2): under a key whose
+  draft had begun to leave with pictures this page lost, and with nothing changed since, the server
+  holds that very message, pictures and all — the sheet says «sent» and lets the draft go, never «Не
+  получилось» and a second message. Changed since, a `409` is the phone's own defect again. **The
+  price**: a message sent without its pictures under a new key after one of them already left with
+  them is a second message. A picture the API refused is
   said under the pictures, never as a failure of the message. **The pictures go with the message
   sent, the sheet open or not** (adversarial А1): kept, the next message opened with a screenshot
   already sent, one kind away from sending it again. **«Another message» is the key's**, for the draft
   and the pictures alike (Б2): a word or a picture changed while it was on its way makes another
-  message, and its pictures stay — never taken from under the finger. The body is read at the press, never with every letter (review 6).
+  message, and its pictures stay — never taken from under the finger. **The same key is the same
+  message in any opening** (В1): closed and opened again untouched, the sheet says «sent» when the
+  answer comes, rather than lose its pictures under a button that still says «Отправить». The body is read at the press, never with every letter (review 6).
 
 ## Threads, replies, the term
 
