@@ -44,7 +44,7 @@ const STORED = [
   'devices',
   'settings',
 ]
-const PARTS = ['logs', 'backups', 'barcodes', 'storage', 'copy', 'erase']
+const PARTS = ['logs', 'failures', 'backups', 'barcodes', 'storage', 'copy', 'erase']
 
 /**
  * «Данные и приватность» (MOL-58): what is kept, why, for how long, and how to have it erased.

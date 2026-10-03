@@ -1411,6 +1411,10 @@
       "title": "Server logs",
       "text": "Kept for no longer than 14 days. Requests are written to them without your IP address and without what you searched for. An IP address can reach only the server's error log — and it too lives there no longer than 14 days."
     },
+    "failures": {
+      "title": "App failures",
+      "text": "When something in the app breaks, the phone sends the developer the kind of error, the screen it happened on, the app version and the phone’s system — none of your data: not what you typed, not your purchases, not your account. The phone’s address is not recorded. With no connection it waits on the phone. Kept for 30 days."
+    },
     "backups": {
       "title": "Where the data and its copies are",
       "text": "The server is in Germany, with the host Contabo. Once a day the database is copied, encrypted, to Cloudflare storage in the EU; only the owner of Molvia can decrypt a copy. Copies live 14 days — fourteen days after erasure your data is gone from them too. If the server ever has to be restored from a copy, an erasure made less than a day before the failure may need repeating."
