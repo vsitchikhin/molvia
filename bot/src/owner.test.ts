@@ -6,7 +6,7 @@ import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { OwnerNotice, OwnerNotices } from '@molvia/model'
-import { ownerText, startOwnerNotices, tellOwner } from './owner'
+import { OWNER_STOP_BUDGET_MS, ownerText, startOwnerNotices, tellOwner } from './owner'
 
 const OWNER = 4242
 const NEW: OwnerNotice = {
@@ -139,7 +139,7 @@ describe('tellOwner — забрать и отправить', () => {
 })
 
 describe('startOwnerNotices — таймер раз в минуту', () => {
-  it('остановка посреди пачки досылает остаток без пауз — они уже выданы (А4)', async () => {
+  it('остановка посреди пачки досылает остаток в прежнем темпе — они уже выданы (А4, Б3)', async () => {
     const { api, sent } = telegram()
     const claim = vi.fn(() =>
       Promise.resolve<OwnerNotices>({ to: OWNER, notices: [NEW, AGAIN, NEW, AGAIN, NEW] }),
@@ -177,5 +177,26 @@ describe('startOwnerNotices — таймер раз в минуту', () => {
     await stop()
     await vi.advanceTimersByTimeAsync(120_000)
     expect(claim).toHaveBeenCalledTimes(3)
+  })
+
+  it('время остановки кончилось — остаток назван в логе, а не отправлен скопом', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api, sent } = telegram()
+    const claim = vi.fn(() =>
+      Promise.resolve<OwnerNotices>({ to: OWNER, notices: [NEW, AGAIN, NEW] }),
+    )
+    // A pause longer than the whole budget: after the stop not one more fits.
+    const stop = startOwnerNotices(
+      { claimOwnerNotices: claim } as unknown as MolviaBotClient,
+      api,
+      60_000,
+      OWNER_STOP_BUDGET_MS + 1,
+    )
+    await vi.waitFor(() => {
+      expect(sent).toHaveLength(1)
+    })
+    await stop()
+    expect(sent).toHaveLength(1)
+    expect(log).toHaveBeenCalledWith('[molvia] owner: stopping, 2 notices given up')
   })
 })

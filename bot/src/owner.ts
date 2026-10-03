@@ -53,6 +53,7 @@ export async function tellOwner(
   api: MolviaBotClient,
   telegram: Api,
   wait: Wait = async (ms) => sleep(ms),
+  pauseMs = OWNER_PAUSE_MS,
 ): Promise<void> {
   let claimed
   try {
@@ -65,9 +66,13 @@ export async function tellOwner(
   const { to, notices } = claimed
   if (to === null) return
   for (const [index, notice] of notices.entries()) {
-    // A stop cuts the pause short and the rest goes without it: they are marked handed already,
-    // and a rollout — every stop — is when there is a batch (adversarial А4).
-    if (index > 0) await wait(OWNER_PAUSE_MS)
+    // The rest is marked handed already, and a rollout — every stop — is when there is a batch
+    // (adversarial А4): a stop keeps Telegram's pace while its time lasts, and says what it left.
+    if (index > 0 && !(await wait(pauseMs))) {
+      const left = notices.length - index
+      console.error(`[molvia] owner: stopping, ${String(left)} notices given up`)
+      return
+    }
     try {
       await telegram.sendMessage(to, ownerText(notice))
     } catch (error) {
@@ -85,20 +90,37 @@ export async function tellOwner(
 export const OWNER_EVERY_MS = 60_000
 
 /**
+ * How long a stop goes on sending the notices already handed, at Telegram's pace: a third of the
+ * bot's thirty seconds of `stop_grace_period` is left to the reminders and the runner beside it.
+ * Sent without the pauses, nineteen messages in a hundred milliseconds met a 429 (adversarial Б3).
+ */
+export const OWNER_STOP_BUDGET_MS = 20_000
+
+/**
  * The owner's timer, the twin of the reminders' (MOL-101): every minute the API is asked, a run
- * still going is not doubled, the timer keeps no process alive, and a stop cuts the pauses short and
- * waits for the rest.
+ * still going is not doubled, the timer keeps no process alive, and a stop waits for the rest —
+ * sent at the same pace while `OWNER_STOP_BUDGET_MS` lasts, then given up and said so.
  */
 export function startOwnerNotices(
   api: MolviaBotClient,
   telegram: Api,
   everyMs = OWNER_EVERY_MS,
+  pauseMs = OWNER_PAUSE_MS,
 ): () => Promise<void> {
   let running: Promise<void> | undefined
   const stopping = new AbortController()
+  let stoppedAt: number | undefined
+  const wait: Wait = async (ms) => {
+    if (stoppedAt === undefined && (await sleep(ms, stopping.signal))) return true
+    // The stop came during the pause, or before it: the time left decides.
+    const since = performance.now() - (stoppedAt ?? performance.now())
+    if (since + ms > OWNER_STOP_BUDGET_MS) return false
+    await sleep(ms)
+    return true
+  }
   const tick = (): void => {
     if (running) return
-    running = tellOwner(api, telegram, async (ms) => sleep(ms, stopping.signal)).finally(() => {
+    running = tellOwner(api, telegram, wait, pauseMs).finally(() => {
       running = undefined
     })
   }
@@ -107,6 +129,7 @@ export function startOwnerNotices(
   timer.unref()
   return async () => {
     clearInterval(timer)
+    stoppedAt = performance.now()
     stopping.abort()
     await running
   }

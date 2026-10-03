@@ -41,7 +41,10 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   **without its line and column**, and the place. The API ships as one bundled file, so a frame's
   position moves with every build; kept, every rollout would have made every failure new. The frames
   themselves are kept whole, for the owner to read, cut to 300 — the fingerprint is taken from the
-  frame before the cut (adversarial А6). **The named price** (adversarial review 5): the
+  frame before the cut (adversarial А6). **So a report carries longer frames than are kept**
+  (`FAILURE_WIRE_FRAME_MAX`, 1000, adversarial Б2): cut by the bot to 300 first, a frame reached the
+  API as `…index.js:48213:`, and the position was in the fingerprint again. The phone (MOL-144)
+  sends by the same schema. **The named price** (adversarial review 5): the
   file is always `dist/index.js`, so the top frame is the function's name and nothing more — two
   different throws in two anonymous callbacks of one route are one fingerprint, the second silent
   until the count crosses a threshold, its frames written over the first's. Accepted: a fingerprint
@@ -107,8 +110,11 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   and so is a failure after it last happened — both by the minute runner of the cleanups.
 - **The messages are Russian, keys of the bot's dictionary** (`owner.failure.*`), plain text: a
   frame or a route is shown as it is, and no markup can break on it. A 429 ends the minute's run
-  and says how many went with it; **a stop sends the rest without the pauses** (adversarial А4) —
-  they are marked handed, and a rollout, every stop, is when there is a batch.
+  and says how many went with it. **A stop sends the rest at the same pace** (adversarial А4, Б3) —
+  they are marked handed, and a rollout, every stop, is when there is a batch — while
+  `OWNER_STOP_BUDGET_MS` (20 s of the bot's 30 of `stop_grace_period`) lasts, then gives up the rest
+  and says how many. Without the pauses nineteen messages went in a hundred milliseconds into one
+  chat, where Telegram allows about one a second.
 - **`make failures`** (`dist/failures.js` in the API's image, as `gates`): the latest fingerprints,
   read only, the first six characters of each beside it — the message names a fingerprint by them.
 - **The API runs without `--enable-source-maps`** (В-6, measured): Node parses the whole map of
