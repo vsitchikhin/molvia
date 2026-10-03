@@ -75,11 +75,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   В-13, MOL-118): the handoff checked chosen pairs and missed more than it named, among them the
   light `graphic` 0.071 from `good` and the dark tints of accent and warn 0.030; a value that fails
   is changed. «Any two steps of different roles» is one rule rather than a list of pairs, since a
-  tint against another role's mark passes by lightness alone. `--graphic` is the colour of data without
-  one of its own; `--border-strong` is decoration and the edge of a field (Ф-3: `--border` there was
-  1.29:1 on the well). The math — WCAG luminance and Ottosson's OKLab — is the test's own thirty
-  lines, no dependency. **A tint stands 0.08 from `--surface`** (adversarial А3): a fill with no
-  edge — a notice in a sheet — that the eye cannot tell from the sheet is no fill; the dark
+  tint against another role's mark passes by lightness alone. `--graphic` is the colour of data
+  without one of its own; `--border-strong` is decoration and the edge of a field (Ф-3: `--border`
+  there was 1.29:1 on the well). The math — WCAG luminance and Ottosson's OKLab — is the test's own
+  thirty lines, no dependency. **A tint stands 0.08 from `--surface`** (adversarial А3): a fill with
+  no edge — a notice in a sheet — that the eye cannot tell from the sheet is no fill; the dark
   `bad-tint` of 157 v2 was 0.038. **Not from `--sunken`** (review 5, way «а»): on the page ground
   the light good, warn and bad tints stand 0.071, 0.070 and 0.040 — a strip under the month's
   switcher, a state's circle — held by icon and word; to hold them too the light `bad-tint` turns
