@@ -124,54 +124,132 @@ export interface FailureRecording {
   readonly owner: TelegramUserId | null
   /** What of the phone's notices the owner hears; all of them where none is given. */
   readonly phoneNotices?: PhoneNoticeBudget
+  /** How many new rows the phone may add in an hour; any number where none is given. */
+  readonly phoneRows?: PhoneRowBudget
 }
 
-/** «Сбой» — `times` occurrences of one fingerprint into the table, and what the owner should hear. */
+/**
+ * «Сбой» — `times` occurrences of one fingerprint into the table, and what the owner should hear.
+ * `sender` is whose report it was — the phone's network, the key of the limit — for the hour of its
+ * notices, and nothing else: it is in no row and no notice. Answers whether the occurrence was
+ * written: a phone's new fingerprint past the hour's new rows is not (review №6).
+ */
 export async function recordFailure(
-  { failures, owner, phoneNotices }: FailureRecording,
+  { failures, owner, phoneNotices, phoneRows }: FailureRecording,
   occurrence: FailureOccurrence,
   times: number,
   at: Date,
-): Promise<void> {
-  await failures.record(occurrence, times, at, (count) => {
-    const notices = noticesFor(occurrence, count, times, owner)
-    return occurrence.source === 'phone' && phoneNotices ? phoneNotices(notices, at) : notices
-  })
+  sender?: string,
+): Promise<boolean> {
+  const phone = occurrence.source === 'phone'
+  const fresh = !phone || phoneRows === undefined || phoneRows.room(at)
+  const count = await failures.record(
+    occurrence,
+    times,
+    at,
+    (written) => {
+      const notices = noticesFor(occurrence, written, times, owner)
+      return phone && phoneNotices ? phoneNotices.take(notices, at, sender) : notices
+    },
+    { fresh },
+  )
+  // A new row: its count is exactly what was written now.
+  if (phone && count?.count === times) phoneRows?.take(at)
+  return count !== null
 }
 
 /** How many notices about the phone's failures the owner hears in an hour (MOL-144, review №1). */
-export const PHONE_NOTICES_PER_HOUR = 10
+export const PHONE_NOTICES_PER_HOUR = 20
+/** And how many of them one sender's reports may bring (adversarial Б1 of round 2). */
+export const PHONE_NOTICES_PER_SENDER = 3
 const HOUR_MS = 60 * 60 * 1000
 
-/** Lets through what of the phone's notices fits the hour, and says how many it held back. */
-export type PhoneNoticeBudget = (notices: readonly OwnerNotice[], at: Date) => OwnerNotice[]
+export interface PhoneNoticeBudget {
+  /** What of the phone's notices fits the hour — the sender's and everybody's. */
+  take(notices: readonly OwnerNotice[], at: Date, sender?: string): OwnerNotice[]
+  /** How many were held back, once the hour has room to say so, and only once. */
+  held(at: Date): OwnerNotice | null
+}
 
 /**
- * The phone's notices, at most `PHONE_NOTICES_PER_HOUR` an hour (review №1, adversarial А5). The
- * endpoint is open with no session and a build is the phone's word, so anyone could make every report
- * «new in this build» — twenty messages a minute in the owner's chat, the API's own drowned behind
- * them. Past the hour's ten a notice is held back and counted, never queued, and the next one let
- * through says how many were (`muted`): «и ещё M — make failures». The table counts all of them. In the
- * process's memory: a restart starts the hour over, and the API's and the bot's notices are not
- * touched.
+ * The phone's notices (review №1, adversarial А5, Б1): at most `PHONE_NOTICES_PER_SENDER` an hour
+ * from one sender and `PHONE_NOTICES_PER_HOUR` from everybody. The endpoint is open with no session
+ * and a build is the phone's word, so anyone could make every report «new in this build» — twenty
+ * messages a minute in the owner's chat, the API's own drowned behind them. A cap shared by everybody
+ * alone was spent by ten invented reports at the start of an hour, and a real failure after the
+ * rollout was told to nobody; a sender's own three leave the rest to the others. **What is held back
+ * is counted, never queued, and told once the hour has room** (`held`, review №7): «скрыто M — make
+ * failures» comes by the minute timer, not with the next failure, which may never come. The table
+ * counts all of them. In the process's memory: a restart starts the hour over and forgets what was
+ * held — a rollout is a restart, the price named.
  */
-export function phoneNoticeBudget(perHour = PHONE_NOTICES_PER_HOUR): PhoneNoticeBudget {
+export function phoneNoticeBudget(
+  perHour = PHONE_NOTICES_PER_HOUR,
+  perSender = PHONE_NOTICES_PER_SENDER,
+): PhoneNoticeBudget {
   let told: number[] = []
+  const bySender = new Map<string, number[]>()
   let muted = 0
-  return (notices, at) => {
-    const now = at.getTime()
-    told = told.filter((moment) => now - moment < HOUR_MS)
-    const out: OwnerNotice[] = []
-    for (const notice of notices) {
-      if (told.length >= perHour) {
-        muted += 1
-        continue
+  const recent = (moments: readonly number[], now: number) =>
+    moments.filter((moment) => now - moment < HOUR_MS)
+
+  return {
+    take(notices, at, sender) {
+      const now = at.getTime()
+      told = recent(told, now)
+      const theirs = sender === undefined ? [] : recent(bySender.get(sender) ?? [], now)
+      const out: OwnerNotice[] = []
+      for (const notice of notices) {
+        if (told.length >= perHour || theirs.length >= perSender) {
+          muted += 1
+          continue
+        }
+        told.push(now)
+        theirs.push(now)
+        out.push(notice)
       }
+      if (sender !== undefined) bySender.set(sender, theirs)
+      return out
+    },
+    held(at) {
+      const now = at.getTime()
+      told = recent(told, now)
+      for (const [sender, moments] of bySender) {
+        if (recent(moments, now).length === 0) bySender.delete(sender)
+      }
+      if (muted === 0 || told.length >= perHour) return null
       told.push(now)
-      out.push(muted > 0 ? { ...notice, muted } : notice)
+      const notice: OwnerNotice = { kind: 'failure_muted', source: 'phone', count: muted }
       muted = 0
-    }
-    return out
+      return notice
+    },
+  }
+}
+
+/** How many new rows the phone's reports may add to the table in an hour (review №6). */
+export const PHONE_ROWS_PER_HOUR = 100
+
+export interface PhoneRowBudget {
+  room(at: Date): boolean
+  take(at: Date): void
+}
+
+/**
+ * The phone's new fingerprints, at most `PHONE_ROWS_PER_HOUR` an hour (review №6): a fingerprint is
+ * all the phone's words — the kind, the frames, the build — so every invented report could be a new
+ * row, two hundred a minute kept thirty days and copied every night. Past the hour a known
+ * fingerprint still counts, and a new one is not written: some 72 000 rows in thirty days at most.
+ */
+export function phoneRowBudget(perHour = PHONE_ROWS_PER_HOUR): PhoneRowBudget {
+  let added: number[] = []
+  return {
+    room(at) {
+      added = added.filter((moment) => at.getTime() - moment < HOUR_MS)
+      return added.length < perHour
+    },
+    take(at) {
+      added.push(at.getTime())
+    },
   }
 }
 
@@ -262,7 +340,12 @@ export function takePhoneFailures(
     take,
   }: {
     readonly limit: PhoneReportLimit
-    readonly take: (summary: FailureSummary, place: FailurePlace, build: string) => void
+    readonly take: (
+      summary: FailureSummary,
+      place: FailurePlace,
+      build: string,
+      sender: string,
+    ) => void
   },
   { reports }: ClientErrors,
   address: string,
@@ -271,6 +354,6 @@ export function takePhoneFailures(
   if (!limit(address, reports.length, now)) throw new DomainError(ERROR.CLIENT_ERRORS_RATE_LIMITED)
   for (const report of reports) {
     const { summary, place, build } = phoneFailure(report)
-    take(summary, place, build)
+    take(summary, place, build, address)
   }
 }

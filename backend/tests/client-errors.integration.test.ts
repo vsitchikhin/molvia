@@ -15,9 +15,12 @@ import { createFailureRepository } from '@/db/failures-repository'
 import { createOwnerNoticeRepository } from '@/db/owner-notices-repository'
 import { failures, ownerNotices } from '@/db/schema'
 import { buildServer } from '@/server'
+import { apiFailureReporter } from '@/failure-reporter'
 import {
   PHONE_NOTICES_PER_HOUR,
+  PHONE_NOTICES_PER_SENDER,
   PHONE_REPORTS_PER_ADDRESS,
+  PHONE_ROWS_PER_HOUR,
   occurrenceOf,
   recordFailure,
 } from '@/usecases/record-failure'
@@ -84,6 +87,11 @@ function send(body: unknown, address: string, headers: Record<string, string> = 
     headers: { 'x-forwarded-for': address, ...headers },
     payload: body as object,
   })
+}
+
+/** The notices about failures themselves — the minute timer may have told what was held, too. */
+async function failureNotices() {
+  return (await db.select().from(ownerNotices)).filter((notice) => notice.kind !== 'failure_muted')
 }
 
 async function recorded() {
@@ -182,14 +190,15 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
     expect((await send({ reports: [REPORT] }, '100.64.12.34')).statusCode).toBe(204)
   })
 
-  it('IPv6 считается по /64: адреса одного подключения делят минуту (ревью №2)', async () => {
+  it('IPv6 считается по /56: сети одного роутера делят минуту (ревью №2, Б4)', async () => {
     for (let host = 1; host <= PHONE_REPORTS_PER_ADDRESS / PHONE_FAILURES_KEPT; host += 1) {
       expect(
-        (await send(buffer(`H${String(host)}_`), `2001:db8:1:2::${String(host)}`)).statusCode,
+        (await send(buffer(`H${String(host)}_`), `2001:db8:1:2${String(host).padStart(2, '0')}::1`))
+          .statusCode,
       ).toBe(204)
     }
-    expect((await send({ reports: [REPORT] }, '2001:db8:1:2::ff')).statusCode).toBe(429)
-    expect((await send({ reports: [REPORT] }, '2001:db8:1:3::1')).statusCode).toBe(204)
+    expect((await send({ reports: [REPORT] }, '2001:db8:1:2ff::9')).statusCode).toBe(429)
+    expect((await send({ reports: [REPORT] }, '2001:db8:1:300::1')).statusCode).toBe(204)
   })
 
   it('X-Forwarded-For не от внутренней сети не верится: счёт идёт по пиру', async () => {
@@ -217,19 +226,29 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
 })
 
 describe('поток выдуманных сбоев не топит канал владельца (ревью №1, адверсариальный А5)', () => {
-  it(`о телефоне — не больше ${String(PHONE_NOTICES_PER_HOUR)} уведомлений в час, таблица считает всё`, async () => {
-    // Two buffers: past four in flight and fifty waiting, a burst of the phone's is dropped (А5).
-    for (let host = 1; host <= 2; host += 1) {
-      expect(
-        (await send(buffer(`F${String(host)}_`), `198.51.100.${String(host)}`)).statusCode,
-      ).toBe(204)
-    }
-    const rows = await recorded()
-    expect(rows).toHaveLength(2 * PHONE_FAILURES_KEPT)
-    expect(await db.select().from(ownerNotices)).toHaveLength(PHONE_NOTICES_PER_HOUR)
+  it(`одному адресу — ${String(PHONE_NOTICES_PER_SENDER)} уведомления в час, настоящий сбой с другого слышен (Б1)`, async () => {
+    expect((await send(buffer('Invented'), '203.0.113.9')).statusCode).toBe(204)
+    await recorded()
+    expect(await failureNotices()).toHaveLength(PHONE_NOTICES_PER_SENDER)
+    const real = { reports: [{ ...REPORT, errorName: 'RealDefect' }] }
+    expect((await send(real, '198.51.100.7')).statusCode).toBe(204)
+    await recorded()
+    const payloads = (await db.select().from(ownerNotices)).map((notice) => notice.payload)
+    expect(payloads).toContainEqual(expect.objectContaining({ errorName: 'RealDefect' }))
+    // The table counts every one of them.
+    expect(await recorded()).toHaveLength(PHONE_FAILURES_KEPT + 1)
   })
 
-  it('новая сборка на каждый отчёт одного отпечатка не делает каждый «новым» сверх часа', async () => {
+  it(`всем вместе — ${String(PHONE_NOTICES_PER_HOUR)} уведомлений в час`, async () => {
+    for (let host = 1; host <= PHONE_NOTICES_PER_HOUR + 5; host += 1) {
+      const one = { reports: [{ ...REPORT, errorName: `Wide${String(host)}` }] }
+      expect((await send(one, `198.51.100.${String(host)}`)).statusCode).toBe(204)
+      await recorded()
+    }
+    expect(await failureNotices()).toHaveLength(PHONE_NOTICES_PER_HOUR)
+  })
+
+  it('новая сборка на каждый отчёт одного отпечатка не делает каждый «новым» сверх бюджета', async () => {
     const builds = {
       reports: Array.from({ length: PHONE_FAILURES_KEPT }, (_, index) => ({
         ...REPORT,
@@ -238,7 +257,48 @@ describe('поток выдуманных сбоев не топит канал 
     }
     expect((await send(builds, '198.51.100.40')).statusCode).toBe(204)
     await recorded()
-    expect(await db.select().from(ownerNotices)).toHaveLength(PHONE_NOTICES_PER_HOUR)
+    expect(await failureNotices()).toHaveLength(PHONE_NOTICES_PER_SENDER)
+  })
+
+  it(`новых строк телефона — не больше ${String(PHONE_ROWS_PER_HOUR)} в час, известный отпечаток считается дальше (ревью №6)`, async () => {
+    const hosts = Math.ceil((PHONE_ROWS_PER_HOUR + 10) / PHONE_FAILURES_KEPT)
+    for (let host = 1; host <= hosts; host += 1) {
+      expect(
+        (await send(buffer(`Row${String(host)}_`), `192.0.2.${String(host)}`)).statusCode,
+      ).toBe(204)
+      await recorded()
+    }
+    expect(await recorded()).toHaveLength(PHONE_ROWS_PER_HOUR)
+    expect(lines.join('\n')).toContain('phone rows')
+    // The first one is known: it still counts past the hour's new rows.
+    const again = { reports: [{ ...REPORT, errorName: 'Row1_0' }] }
+    expect((await send(again, '192.0.2.200')).statusCode).toBe(204)
+    const rows = await recorded()
+    expect(rows.find((row) => row.errorName === 'Row1_0')?.count).toBe(2)
+  })
+
+  it('скрытое сказано таймером одним уведомлением, когда в часе есть место (ревью №7)', async () => {
+    const reporter = apiFailureReporter(
+      () => db,
+      OWNER,
+      app.log,
+      (recording) => recordings.push(recording),
+    )
+    const summary = { errorName: 'Held', frames: ['at Xe (/assets/index-BTCsHrpw.js:1:1)'] }
+    for (let index = 0; index <= PHONE_NOTICES_PER_SENDER; index += 1) {
+      reporter.take(
+        { ...summary, errorName: `Held${String(index)}` },
+        { source: 'phone', route: 'screen:advice', platform: 'ios 18 app' },
+        'index-BTCsHrpw',
+        'one',
+      )
+    }
+    await recorded()
+    await reporter.tellHeld(new Date())
+    const kinds = (await db.select().from(ownerNotices)).map((notice) => notice.payload)
+    expect(kinds).toContainEqual({ kind: 'failure_muted', source: 'phone', count: 1 })
+    await reporter.tellHeld(new Date())
+    expect(await db.select().from(ownerNotices)).toHaveLength(PHONE_NOTICES_PER_SENDER + 1)
   })
 
   it('сбой API после потока — в первой выдаче бота, раньше телефона', async () => {

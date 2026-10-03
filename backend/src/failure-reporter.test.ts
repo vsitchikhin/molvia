@@ -45,6 +45,7 @@ describe('failureReporter — лог и таблица одним путём (MO
     expect(write).toHaveBeenCalledWith(
       expect.objectContaining({ errorName: 'TypeError', route: 'GET /x', build: 'b1' }),
       1,
+      undefined,
     )
     expect(JSON.stringify([error.mock.calls, write.mock.calls])).not.toContain('сыр')
   })
@@ -169,5 +170,21 @@ describe('сбои телефона не вытесняют сбои API (MOL-14
       expect(writes).toHaveLength(RECORDINGS_AT_ONCE + 1)
     })
     expect(writes.at(-1)?.occurrence.source).toBe('api')
+  })
+})
+
+describe('чей отчёт — идёт с записью, но не в неё (MOL-144, адверсариальный Б1)', () => {
+  it('сеть отправителя доходит до записи рядом с отпечатком, в самом отпечатке её нет', () => {
+    const { log } = fakeLog()
+    const { write } = heldWrites()
+    const reporter = failureReporter('b1', write, log)
+    reporter.take(
+      { errorName: 'TypeError', frames: ['at Xe (/assets/index-BTCsHrpw.js:1:1)'] },
+      { source: 'phone', route: 'screen:advice', platform: 'ios 18 app' },
+      'index-BTCsHrpw',
+      '198.51.100.7',
+    )
+    expect(write).toHaveBeenCalledWith(expect.anything(), 1, '198.51.100.7')
+    expect(JSON.stringify(write.mock.calls[0]?.[0])).not.toContain('198.51.100.7')
   })
 })

@@ -14,6 +14,12 @@ import { reportDefect } from './failure'
  * markup — a frame or a route is shown as it is, and nothing in it can break a parse.
  */
 export function ownerText(notice: OwnerNotice): string {
+  if (notice.kind === 'failure_muted') {
+    return [
+      t(undefined, 'owner.failure.muted', { count: notice.count }),
+      t(undefined, 'owner.failure.more'),
+    ].join('\n')
+  }
   const kind = notice.code === undefined ? notice.errorName : `${notice.errorName} ${notice.code}`
   const what = t(undefined, 'owner.failure.what', {
     kind,
@@ -24,9 +30,6 @@ export function ownerText(notice: OwnerNotice): string {
     ...(notice.platform === undefined
       ? []
       : [t(undefined, 'owner.failure.platform', { platform: notice.platform })]),
-    ...(notice.muted === undefined
-      ? []
-      : [t(undefined, 'owner.failure.muted', { muted: notice.muted })]),
   ]
   if (notice.kind === 'failure_count') {
     return [

@@ -549,6 +549,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           const now = new Date()
           await createFailureRepository(db).purgeStale(now)
           await createOwnerNoticeRepository(db).purgeStale(now)
+          // The phone's notices held back, told once the hour has room (MOL-144, review №7).
+          await failures.tellHeld(now)
         },
         (error) => {
           failures.report(error, job('failure-cleanup'), 'failure cleanup failed')
@@ -702,8 +704,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       takePhoneFailures(
         {
           limit: phoneLimit,
-          take: (summary, place, build) => {
-            failures.take(summary, place, build)
+          take: (summary, place, build, sender) => {
+            failures.take(summary, place, build, sender)
           },
         },
         body,

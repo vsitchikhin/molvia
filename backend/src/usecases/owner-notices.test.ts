@@ -14,7 +14,11 @@ const NOTICE: OwnerNotice = {
 
 function repository(payloads: unknown[]) {
   const claim = vi.fn<OwnerNoticeRepository['claim']>(() => Promise.resolve(payloads))
-  const notices: OwnerNoticeRepository = { claim, purgeStale: () => Promise.resolve() }
+  const notices: OwnerNoticeRepository = {
+    claim,
+    purgeStale: () => Promise.resolve(),
+    queue: () => Promise.resolve(),
+  }
   return { notices, claim }
 }
 

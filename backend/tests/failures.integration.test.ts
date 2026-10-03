@@ -84,7 +84,7 @@ describe('failures — строка на отпечаток', () => {
     const seen = await Promise.all(
       Array.from({ length: 10 }, () => failureRows.record(failure, 1, AT, none)),
     )
-    expect(seen.map((count) => count.buildCount).sort((a, b) => a - b)).toEqual([
+    expect(seen.map((count) => count?.buildCount ?? 0).sort((a, b) => a - b)).toEqual([
       1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
     ])
   })

@@ -1,4 +1,4 @@
-import { desc, lt, sql } from 'drizzle-orm'
+import { desc, eq, lt, sql } from 'drizzle-orm'
 import { FAILURE_KEEP_DAYS } from '@molvia/model'
 import type { FailureSource, OwnerNotice } from '@molvia/model'
 import type { Conn } from './index'
@@ -48,13 +48,17 @@ export interface FailureRepository {
    * queues what the owner should hear of them, in one transaction. The row is written by one
    * `insert … on conflict do update`, which takes the row's lock: two writes at once are counted one
    * after the other, so each threshold in a build is crossed by exactly one of them (Р-8).
+   *
+   * `fresh: false` writes to a fingerprint already there and adds none (MOL-144, review №6): `null`
+   * when there was none, and nothing queued.
    */
   record(
     occurrence: FailureOccurrence,
     times: number,
     at: Date,
     notices: (count: FailureCount) => readonly OwnerNotice[],
-  ): Promise<FailureCount>
+    options?: { readonly fresh?: boolean },
+  ): Promise<FailureCount | null>
 
   /** Fingerprints not seen for `FAILURE_KEEP_DAYS` go. */
   purgeStale(now: Date): Promise<void>
@@ -65,40 +69,58 @@ export interface FailureRepository {
 
 export function createFailureRepository(db: Conn): FailureRepository {
   return {
-    async record(occurrence, times, at, notices) {
+    async record(occurrence, times, at, notices, options = {}) {
       return db.transaction(async (tx) => {
-        const [row] = await tx
-          .insert(failures)
-          .values({
-            fingerprint: occurrence.fingerprint,
-            source: occurrence.source,
-            errorName: occurrence.errorName,
-            code: occurrence.code ?? null,
-            route: occurrence.route ?? null,
-            frames: [...occurrence.frames],
-            build: occurrence.build,
-            platform: occurrence.platform ?? null,
-            firstSeenAt: at,
-            lastSeenAt: at,
-            count: times,
-            buildCount: times,
-          })
-          .onConflictDoUpdate({
-            target: failures.fingerprint,
-            set: {
-              // The latest frames and build: the line numbers are the ones of the build it is in now.
-              frames: sql`excluded.frames`,
-              lastSeenAt: sql`greatest(${failures.lastSeenAt}, excluded.last_seen_at)`,
-              // Summed in bigint: in integer the sum overflows before `least` can cap it (adversarial Б1).
-              count: sql`least(${failures.count}::bigint + excluded.count, ${COUNT_CEILING})::integer`,
-              buildCount: sql`case when ${failures.build} = excluded.build
+        // A phone's report past the hour's new rows: only a fingerprint already there is counted.
+        const known = options.fresh === false
+        const [row] = await (known
+          ? tx
+              .update(failures)
+              .set({
+                frames: [...occurrence.frames],
+                lastSeenAt: sql`greatest(${failures.lastSeenAt}, ${at.toISOString()}::timestamptz)`,
+                count: sql`least(${failures.count}::bigint + ${times}, ${COUNT_CEILING})::integer`,
+                buildCount: sql`case when ${failures.build} = ${occurrence.build}
+                  then least(${failures.buildCount}::bigint + ${times}, ${COUNT_CEILING})::integer
+                  else ${times} end`,
+                build: occurrence.build,
+                platform: occurrence.platform ?? null,
+              })
+              .where(eq(failures.fingerprint, occurrence.fingerprint))
+              .returning({ count: failures.count, buildCount: failures.buildCount })
+          : tx
+              .insert(failures)
+              .values({
+                fingerprint: occurrence.fingerprint,
+                source: occurrence.source,
+                errorName: occurrence.errorName,
+                code: occurrence.code ?? null,
+                route: occurrence.route ?? null,
+                frames: [...occurrence.frames],
+                build: occurrence.build,
+                platform: occurrence.platform ?? null,
+                firstSeenAt: at,
+                lastSeenAt: at,
+                count: times,
+                buildCount: times,
+              })
+              .onConflictDoUpdate({
+                target: failures.fingerprint,
+                set: {
+                  // The latest frames and build: the line numbers are the ones of the build it is in now.
+                  frames: sql`excluded.frames`,
+                  lastSeenAt: sql`greatest(${failures.lastSeenAt}, excluded.last_seen_at)`,
+                  // Summed in bigint: in integer the sum overflows before `least` can cap it (adversarial Б1).
+                  count: sql`least(${failures.count}::bigint + excluded.count, ${COUNT_CEILING})::integer`,
+                  buildCount: sql`case when ${failures.build} = excluded.build
                 then least(${failures.buildCount}::bigint + excluded.build_count, ${COUNT_CEILING})::integer
                 else excluded.build_count end`,
-              build: sql`excluded.build`,
-              platform: sql`excluded.platform`,
-            },
-          })
-          .returning({ count: failures.count, buildCount: failures.buildCount })
+                  build: sql`excluded.build`,
+                  platform: sql`excluded.platform`,
+                },
+              })
+              .returning({ count: failures.count, buildCount: failures.buildCount }))
+        if (known && row === undefined) return null
         const count = theRow(row, 'failures')
         const queued = notices(count)
         if (queued.length > 0) {

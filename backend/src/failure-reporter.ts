@@ -2,10 +2,16 @@ import { describeFailure } from '@molvia/model'
 import type { FailureSummary, TelegramUserId } from '@molvia/model'
 import type { FastifyBaseLogger } from 'fastify'
 import { createFailureRepository } from '@/db/failures-repository'
+import { createOwnerNoticeRepository } from '@/db/owner-notices-repository'
 import type { FailureOccurrence } from '@/db/failures-repository'
 import type { Conn } from '@/db'
 import { VERSION } from '@/env'
-import { occurrenceOf, phoneNoticeBudget, recordFailure } from '@/usecases/record-failure'
+import {
+  occurrenceOf,
+  phoneNoticeBudget,
+  phoneRowBudget,
+  recordFailure,
+} from '@/usecases/record-failure'
 import type { FailurePlace } from '@/usecases/record-failure'
 
 export interface FailureReporter {
@@ -19,7 +25,7 @@ export interface FailureReporter {
    * A failure somebody else has logged — the bot's or the phone's report of its own — into the table
    * alone. `build` is the reporter's own unless named: the phone names its page's (MOL-144, В-1).
    */
-  take(summary: FailureSummary, place: FailurePlace, build?: string): void
+  take(summary: FailureSummary, place: FailurePlace, build?: string, sender?: string): void
 }
 
 /** How many fingerprints may be written at once; one write a fingerprint at a time. */
@@ -42,6 +48,8 @@ export const PHONE_FINGERPRINTS_WAITING = 50
 interface Waiting {
   occurrence: FailureOccurrence
   times: number
+  /** Whose report the first of them was: the phone's network, for the hour of its notices. */
+  readonly sender: string | undefined
   readonly settled: (() => void)[]
 }
 
@@ -64,7 +72,7 @@ interface Waiting {
  */
 export function failureReporter(
   build: string,
-  write: (occurrence: FailureOccurrence, times: number) => Promise<void>,
+  write: (occurrence: FailureOccurrence, times: number, sender?: string) => Promise<void>,
   log: FastifyBaseLogger,
   recorded?: (recording: Promise<void>) => void,
 ): FailureReporter {
@@ -82,7 +90,7 @@ export function failureReporter(
       if (writing.has(fingerprint)) continue
       waiting.delete(fingerprint)
       writing.add(fingerprint)
-      void write(entry.occurrence, entry.times)
+      void write(entry.occurrence, entry.times, entry.sender)
         .catch((failure: unknown) => {
           log.error(describeFailure(failure), 'failure not recorded')
         })
@@ -94,7 +102,12 @@ export function failureReporter(
     }
   }
 
-  function take(summary: FailureSummary, place: FailurePlace, named = build): void {
+  function take(
+    summary: FailureSummary,
+    place: FailurePlace,
+    named = build,
+    sender?: string,
+  ): void {
     const occurrence = occurrenceOf(summary, place, named)
     const known = waiting.get(occurrence.fingerprint)
     if (known === undefined && place.source === 'phone') {
@@ -109,7 +122,7 @@ export function failureReporter(
       log.error({ reason: 'busy' }, 'failure not recorded')
       return
     }
-    const entry = known ?? { occurrence, times: 0, settled: [] }
+    const entry = known ?? { occurrence, times: 0, sender, settled: [] }
     // The latest frames, as one write of one occurrence keeps them.
     entry.occurrence = occurrence
     entry.times += 1
@@ -132,28 +145,50 @@ export function failureReporter(
   }
 }
 
+/** The API's reporter, and what it has held back of the phone's notices. */
+export interface ApiFailureReporter extends FailureReporter {
+  /**
+   * Queues «скрыто M» once the hour has room for it (MOL-144, review №7) — by the minute timer, since
+   * the next failure that would carry it may never come. Nothing where no owner is set.
+   */
+  tellHeld(at: Date): Promise<void>
+}
+
 /**
  * The API's reporter: into this build's table, queued for `owner`. The connection is asked for at
- * the moment of a write, so building a server opens nothing.
+ * the moment of a write, so building a server opens nothing. The phone's notices and new rows have
+ * an hour of their own for the process (review №1, №6).
  */
 export function apiFailureReporter(
   db: () => Conn,
   owner: TelegramUserId | null,
   log: FastifyBaseLogger,
   recorded?: (recording: Promise<void>) => void,
-): FailureReporter {
-  // One hour of the phone's notices for the process (review №1).
+): ApiFailureReporter {
   const phoneNotices = phoneNoticeBudget()
-  return failureReporter(
+  const phoneRows = phoneRowBudget()
+  const reporter = failureReporter(
     VERSION,
-    (occurrence, times) =>
-      recordFailure(
-        { failures: createFailureRepository(db()), owner, phoneNotices },
+    async (occurrence, times, sender) => {
+      const written = await recordFailure(
+        { failures: createFailureRepository(db()), owner, phoneNotices, phoneRows },
         occurrence,
         times,
         new Date(),
-      ),
+        sender,
+      )
+      // The phone's word, not a failure of ours: a warning.
+      if (!written) log.warn({ reason: 'phone rows' }, 'phone failure not recorded')
+    },
     log,
     recorded,
   )
+  return {
+    ...reporter,
+    async tellHeld(at) {
+      if (owner === null) return
+      const held = phoneNotices.held(at)
+      if (held !== null) await createOwnerNoticeRepository(db()).queue(held, at)
+    },
+  }
 }

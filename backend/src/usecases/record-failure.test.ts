@@ -6,13 +6,16 @@ import type { OwnerNotice, PhoneFailure } from '@molvia/model'
 import {
   PHONE_REPORTS_PER_ADDRESS,
   PHONE_NOTICES_PER_HOUR,
+  PHONE_NOTICES_PER_SENDER,
   PHONE_REPORTS_PER_MINUTE,
+  PHONE_ROWS_PER_HOUR,
   framePlace,
   noticesFor,
   occurrenceOf,
   phoneFailure,
   phoneNoticeBudget,
   phoneReportLimit,
+  phoneRowBudget,
   takePhoneFailures,
 } from './record-failure'
 
@@ -270,7 +273,7 @@ describe('отпечаток телефона живёт в своей сбор�
   })
 })
 
-describe('phoneNoticeBudget — уведомления о телефоне, не больше десяти в час (ревью №1)', () => {
+describe('phoneNoticeBudget — уведомления о телефоне (ревью №1, №7, адверсариальный Б1)', () => {
   const notice = (index: number): OwnerNotice => ({
     kind: 'failure',
     source: 'phone',
@@ -281,16 +284,48 @@ describe('phoneNoticeBudget — уведомления о телефоне, не
   })
   const at = (minutes: number) => new Date(Date.UTC(2026, 9, 3, 12, minutes))
 
-  it(`${String(PHONE_NOTICES_PER_HOUR)} в час проходят, остальные молча считаются и названы со следующим`, () => {
+  it(`одному отправителю — ${String(PHONE_NOTICES_PER_SENDER)} в час: выдуманные с одного адреса не глушат чужой сбой (Б1)`, () => {
+    const budget = phoneNoticeBudget()
+    const invented = Array.from({ length: 10 }, (_, index) =>
+      budget.take([notice(index)], at(0), 'liar'),
+    ).flat()
+    expect(invented).toHaveLength(PHONE_NOTICES_PER_SENDER)
+    expect(budget.take([notice(99)], at(5), 'phone')).toEqual([notice(99)])
+  })
+
+  it(`всем вместе — ${String(PHONE_NOTICES_PER_HOUR)} в час, сверх — молча считаются`, () => {
     const budget = phoneNoticeBudget()
     const told = Array.from({ length: PHONE_NOTICES_PER_HOUR + 3 }, (_, index) =>
-      budget([notice(index)], at(index)),
+      budget.take([notice(index)], at(1), `sender${String(index)}`),
     ).flat()
     expect(told).toHaveLength(PHONE_NOTICES_PER_HOUR)
-    expect(told.some((one) => 'muted' in one)).toBe(false)
+    expect(budget.held(at(2))).toBeNull()
+  })
 
-    const next = budget([notice(99)], at(PHONE_NOTICES_PER_HOUR + 60))
-    expect(next).toEqual([{ ...notice(99), muted: 3 }])
-    expect(budget([notice(100)], at(PHONE_NOTICES_PER_HOUR + 61))).toEqual([notice(100)])
+  it('скрытое названо таймером, как только в часе есть место, — один раз (ревью №7, Б1б)', () => {
+    const budget = phoneNoticeBudget(PHONE_NOTICES_PER_HOUR, 1)
+    budget.take([notice(1), notice(2), notice(3)], at(0), 'one')
+    expect(budget.held(at(1))).toEqual({ kind: 'failure_muted', source: 'phone', count: 2 })
+    expect(budget.held(at(2))).toBeNull()
+  })
+
+  it('волна сверх часа и тишина: скрытые сказаны, когда час освободился, без нового сбоя', () => {
+    const budget = phoneNoticeBudget(10, 10)
+    for (let index = 0; index <= 10; index += 1) budget.take([notice(index)], at(index), 'same')
+    expect(budget.held(at(30))).toBeNull()
+    expect(budget.held(at(125))).toEqual({ kind: 'failure_muted', source: 'phone', count: 1 })
+  })
+})
+
+describe('phoneRowBudget — новые строки телефона, не больше ста в час (ревью №6)', () => {
+  it(`${String(PHONE_ROWS_PER_HOUR)} в час, дальше места нет, через час — снова есть`, () => {
+    const rows = phoneRowBudget()
+    const now = new Date(Date.UTC(2026, 9, 3, 12, 0))
+    for (let index = 0; index < PHONE_ROWS_PER_HOUR; index += 1) {
+      expect(rows.room(now)).toBe(true)
+      rows.take(now)
+    }
+    expect(rows.room(now)).toBe(false)
+    expect(rows.room(new Date(now.getTime() + 60 * 60 * 1000))).toBe(true)
   })
 })

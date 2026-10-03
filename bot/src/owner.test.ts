@@ -105,9 +105,11 @@ describe('ownerText — что прочитает владелец (MOL-143)', (
     expect(ownerText({ ...phone, kind: 'failure_count', count: 10 })).toContain(
       'Платформа ios 18 app\nСборка index-BTCsHrpw',
     )
-    // Held back past ten an hour, said with the next one (review №1).
-    expect(ownerText({ ...phone, muted: 37 })).toContain(
-      'Платформа ios 18 app\nИ ещё 37 о сбоях телефона за час — в make failures\nСборка',
+  })
+
+  it('скрытые уведомления о телефоне — сколько и где смотреть (MOL-144, ревью №7)', () => {
+    expect(ownerText({ kind: 'failure_muted', source: 'phone', count: 37 })).toBe(
+      ['🔕 Скрыто уведомлений о сбоях телефона: 37', 'Подробности — make failures'].join('\n'),
     )
   })
 

@@ -76,7 +76,7 @@ export const en: Dictionary = {
   'owner.failure.what': '{kind} · {place}',
   'owner.failure.nowhere': 'no route',
   'owner.failure.platform': 'Platform {platform}',
-  'owner.failure.muted': 'And {muted} more about the phone in the hour — in make failures',
+  'owner.failure.muted': '🔕 Notices about the phone held back: {count}',
   'owner.failure.build': 'Build {build}',
   'owner.failure.buildPrint': 'Build {build} · {fingerprint}',
   'owner.failure.more': 'Details — make failures',

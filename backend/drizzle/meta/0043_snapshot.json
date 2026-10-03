@@ -1,5 +1,5 @@
 {
-  "id": "61edc5d3-c664-4ebb-9c53-aee374b7d883",
+  "id": "385a7748-42ea-4e82-a354-753cde031e62",
   "prevId": "07c254f8-c190-403f-9814-b472360e9dba",
   "version": "7",
   "dialect": "postgresql",
@@ -2623,7 +2623,7 @@
       "checkConstraints": {
         "owner_notices_kind_known": {
           "name": "owner_notices_kind_known",
-          "value": "\"owner_notices\".\"kind\" in ('failure', 'failure_count')"
+          "value": "\"owner_notices\".\"kind\" in ('failure', 'failure_count', 'failure_muted')"
         },
         "owner_notices_payload_object": {
           "name": "owner_notices_payload_object",

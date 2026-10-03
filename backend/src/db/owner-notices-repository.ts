@@ -1,6 +1,6 @@
 import { and, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { FAILURE_KEEP_DAYS } from '@molvia/model'
-import type { OwnerNoticeKind } from '@molvia/model'
+import type { OwnerNotice, OwnerNoticeKind } from '@molvia/model'
 import type { Conn } from './index'
 import { rowLimit } from './rows'
 import { ownerNotices } from './schema'
@@ -9,6 +9,7 @@ import { ownerNotices } from './schema'
 const FAILURE_NOTICE_KINDS = [
   'failure',
   'failure_count',
+  'failure_muted',
 ] as const satisfies readonly OwnerNoticeKind[]
 const UNHANDED_FAILURE_NOTICE_MS = 24 * 60 * 60 * 1000
 
@@ -27,6 +28,9 @@ export interface OwnerNoticeRepository {
    * did not take within a day: after a day without the bot the owner would get them in a heap.
    */
   purgeStale(now: Date): Promise<void>
+
+  /** One notice queued by itself, not with a failure: the phone's held back, told (MOL-144). */
+  queue(notice: OwnerNotice, at: Date): Promise<void>
 }
 
 /**
@@ -58,6 +62,10 @@ export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
       return rows
         .sort((a, b) => Number(a.phone) - Number(b.phone) || a.id - b.id)
         .map((row) => row.payload)
+    },
+
+    async queue(notice, at) {
+      await db.insert(ownerNotices).values({ kind: notice.kind, payload: notice, createdAt: at })
     },
 
     async purgeStale(now) {

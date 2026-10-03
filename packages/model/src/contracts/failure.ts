@@ -147,11 +147,6 @@ const failureFacts = {
     .max(FAILURE_NAME_MAX * 2),
   /** The phone's platform, `ios 18 app` (MOL-144, В-2); none for the API and the bot. */
   platform: feedbackPlatformSchema.optional(),
-  /**
-   * The phone's notices held back since the last one let through — past ten an hour (MOL-144,
-   * review №1): «и ещё M». The table counts every one of them.
-   */
-  muted: z.int().positive().optional(),
 }
 
 /** A fingerprint seen for the first time in this build (MOL-143, В-2): the frame it was thrown at. */
@@ -171,18 +166,30 @@ export const failureCountNoticeSchema = z.strictObject({
 })
 
 /**
+ * The phone's notices held back past the hour's budget, told once the hour has room (MOL-144, review
+ * №1, №7): how many, and that `make failures` has them. The table counts every one.
+ */
+export const failureMutedNoticeSchema = z.strictObject({
+  kind: z.literal('failure_muted'),
+  source: z.literal('phone'),
+  count: z.int().positive(),
+})
+
+/**
  * One message the API has queued for the owner (MOL-143, Р-9 of MOL-149) and handed to the bot. A
  * union by `kind`, so the feedback of MOL-148 joins as one more branch rather than a second channel.
  */
 export const ownerNoticeSchema = z.discriminatedUnion('kind', [
   failureNoticeSchema,
   failureCountNoticeSchema,
+  failureMutedNoticeSchema,
 ])
 export type OwnerNotice = z.infer<typeof ownerNoticeSchema>
 export type OwnerNoticeKind = OwnerNotice['kind']
 export const OWNER_NOTICE_KINDS = [
   'failure',
   'failure_count',
+  'failure_muted',
 ] as const satisfies readonly OwnerNoticeKind[]
 
 /** The most notices one claim hands over: a minute of them, sent one by one. */
