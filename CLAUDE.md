@@ -865,6 +865,11 @@ the catalogue`. The tracker is a separate system, and the key in the subject is 
   thing linking a commit to the task it belongs to. After the subject, a blank line, then
   an optional bullet list of what was done — points, not prose.
 - **Branches:** `MOL-<n>-<short-description>`, e.g. `MOL-6-schema`.
+- **Never a force push — no exceptions, under no circumstances** (owner's absolute rule, MOL-220):
+  no `--force`, no `--force-with-lease`, no `+refspec`, no amend or rebase of anything already
+  pushed. A pushed commit is corrected by a new one, a branch is brought up to date by a merge, and
+  the push is a plain `git push`. `.claude/hooks/no-force-push.py` refuses the command before it
+  runs; it is never worked around. GitHub refuses it too (ruleset «no force push» on every branch).
 
 ### Estimating (story points)
 
