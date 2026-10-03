@@ -11,7 +11,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 
 - `frontend/src/components/AppButton.vue` — Kit button in five variants (primary, secondary, ghost, danger-ghost, icon), with busy, inactive and an icon slot.
 - `frontend/src/components/AppCard.vue` — Kit card: the surface of lists and blocks, with a chosen tag, the green «take» tone and an edge-to-edge list mode.
-- `frontend/src/components/AppField.vue` — Kit field: a native input, textarea, select or date with its label (or one only read out), error code, a mark before and a suffix after, and the right phone keyboard.
+- `frontend/src/components/AppField.vue` — Kit field: a native input, textarea, select or date with its label (or one only read out), error code, a mark before and a suffix after, the right phone keyboard, and the count of the last characters left when asked.
 - `frontend/src/components/AppReveal.vue` — Grows from nothing and shrinks back what pushes its neighbours — rows of a list, an error under a field, a block of a sheet; still for an answer read, a screen move, reduced motion.
 - `frontend/src/components/AppSwitch.vue` — Kit switch: a native checkbox read out as a switch, showing what the server holds and saying which way it was moved — for a setting saved on the tap.
 - `frontend/src/components/AppScreen.vue` — The frame every screen sits in: pinned row, collapsing large title, back chevron with its label, docked strip, identity notice.
@@ -19,7 +19,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/components/FloatingDock.vue` — Floating spot for the main action of a «Деньги» screen («Трата», «Обмен», «Доход») or «Вернуть» after a removal.
 - `frontend/src/components/SchemeGroup.vue` — «Тема» on the settings screen: «Системная · Светлая · Тёмная» of this device, taken on the tap, in every state of the screen.
 - `frontend/src/components/ScreenSkeleton.vue` — Loading state: bars in the geometry the screen gives, announcing «Loading…» through the live region.
-- `frontend/src/components/ScreenState.vue` — Every non-loading screen state (empty, error, offline, attention): icon circle by tone, texts, «Try again» and actions; «Обновить» first while a version waits.
+- `frontend/src/components/ScreenState.vue` — Every non-loading screen state (empty, error, offline, attention): icon circle by tone, texts, «Try again» and actions; «Обновить» first while a version waits; «Сообщить о проблеме» last under a full-screen error (MOL-147).
 - `frontend/src/components/SegmentedControl.vue` — Kit segmented control: a radio fieldset drawn as segments, for one choice out of up to four (unit, rate); `fit` gives each segment the width of its word.
 - `frontend/src/components/TabBar.vue` — The tab bar of the five sections («Что брать», «Покупки», «Оценки», «Деньги», «Настройки»), moving through `useNavigation`.
 - `frontend/src/components/UndoStrip.vue` — «Удалено · Вернуть» strip: ten seconds to take back a removal, paused under a finger or focus.
@@ -58,7 +58,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/index.html` — The PWA's HTML shell: viewport with keyboard resizing, per-scheme theme colours, the device's scheme set before the first paint, icons, the app mount.
 - `frontend/public/` — Static assets served as is: `favicon.svg` (the icon source), the rasterised app icons and the self-hosted font files.
 - `frontend/src/App.vue` — The app's root: the login screen in place of any non-public route, the live region, and the occasions on which the queues send.
-- `frontend/src/api.ts` — The PWA's one API client, wrapped so that any `error.no_actor` raises the login screen.
+- `frontend/src/api.ts` — The PWA's one API client, wrapped so that any `error.no_actor` raises the login screen, and the last refusal's code is kept a minute for an error screen's message to the developer (`lastRefusal`, MOL-147).
 - `frontend/src/days.ts` — Day words for the screen: «сегодня»/«вчера» of a purchase, a month's name, `calendarDay` for calendar days, `shiftDay`, `localDay` — the phone's today — and `dayWords` for a card's head (MOL-121).
 - `frontend/src/i18n.ts` — The i18n factory for the app and tests alike: locale from the model, Russian plural rule, English fallback, the document's `lang`.
 - `frontend/src/i18n/` — The dictionaries, `ru.json` and `en.json`: every text of the PWA by key, error-registry codes included.
@@ -67,7 +67,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/ids.ts` — `newId`: a lower-case uuid for rows the device names, with a fallback outside a secure context.
 - `frontend/src/main.ts` — The PWA's entry: router, i18n, the update worker and the `401` seam installed, the app mounted, the identity started.
 - `frontend/src/navigation.ts` — Navigation rules: how a tab tap is written into history (home — «Что брать»), where the back chevron leads, up to the parent, cold-start parent laying, guarded step back and `afterStep`.
-- `frontend/src/pwaUpdate.ts` — Service-worker registration and update: quietly while hidden with no sheet, or by «Обновить»; looks every 15 min and on a new server build; `phase` for the app.
+- `frontend/src/pwaUpdate.ts` — Service-worker registration and update: quietly while hidden with no sheet, or by «Обновить»; looks every 15 min and on a new server build; `phase` for the app, `build` — the first build the API named to the page (MOL-147).
 - `frontend/src/router.ts` — The router: every route with its title key, tab and parent, redirects of old addresses (`/trip*`, `/advice`), the dev-only kit route, and the scroll behaviour.
 - `frontend/src/styles/_fonts.scss` — Font faces: self-hosted Nunito (800 only) and Onest subsets, and the dram sign's own face.
 - `frontend/src/styles/_mixins.scss` — SCSS mixins injected into every component: display type (Nunito at its one weight), touch target, wider-than-phone, pinned bar, visually hidden, focus ring, appear (a fade-in with a short rise on insertion).

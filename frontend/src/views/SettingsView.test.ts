@@ -2,7 +2,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { beforeEach, afterEach, expect, it, vi } from 'vitest'
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { actorCodec, ERROR } from '@molvia/model'
 import type { ActorView, SettingsUpdate } from '@molvia/model'
@@ -10,6 +10,7 @@ import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
+import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import SettingsView from './SettingsView.vue'
 
 const me = vi.fn<() => Promise<ActorView>>()
@@ -220,4 +221,39 @@ it('«Тема» stands in every state, under «Напоминания» and ove
   const at = loaded.indexOf(en.settings.group_scheme)
   expect(loaded[at - 1]).toBe(en.settings.group_reminders)
   expect(loaded[at + 1]).toBe(en.settings.group_account)
+})
+
+describe('«Write to the developer» (MOL-147)', () => {
+  const row = (view: VueWrapper) =>
+    view.findAll('button').find((button) => button.text().startsWith(en.settings.feedback.label))
+
+  it('stands in «About the app», between the account and your data', async () => {
+    const view = await render()
+    const captions = view.findAll('h2.caption').map((caption) => caption.text())
+
+    expect(captions.slice(captions.indexOf(en.settings.group_account))).toEqual([
+      en.settings.group_account,
+      en.settings.group_app,
+      en.settings.group_data,
+    ])
+    expect(row(view)?.text()).toContain(en.settings.feedback.hint)
+    expect(row(view)?.attributes('aria-haspopup')).toBe('dialog')
+  })
+
+  it("opens the sheet with no kind and no code — the kind is the person's", async () => {
+    const view = await render()
+
+    await row(view)?.trigger('click')
+
+    expect(useFeedbackSheetStore().shown).toBe(true)
+    expect(useFeedbackSheetStore().entry).toEqual({ from: 'settings' })
+  })
+
+  it('opens it offline all the same: written now, sent with a connection', async () => {
+    const view = await render(true, false)
+
+    await row(view)?.trigger('click')
+
+    expect(useFeedbackSheetStore().shown).toBe(true)
+  })
 })

@@ -86,6 +86,11 @@ export const ERROR = {
   BARCODE_IN_STORE: 'error.barcode_in_store',
   /** A code added to an item that already holds `ITEM_BARCODES_MAX` of them (MOL-100). */
   BARCODES_FULL: 'error.barcodes_full',
+  /**
+   * A message to the developer past `FEEDBACK_DAY_LIMIT` in a rolling day (MOL-147). The sheet keeps
+   * the text and says to send it tomorrow.
+   */
+  FEEDBACK_RATE_LIMITED: 'error.feedback_rate_limited',
 } as const
 
 export type ErrorCode = (typeof ERROR)[keyof typeof ERROR]

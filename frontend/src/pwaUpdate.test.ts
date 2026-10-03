@@ -604,6 +604,18 @@ describe('a new version taken by the button (MOL-132)', () => {
   })
 
   describe('the build an answer names (Т-3)', () => {
+    it('keeps the first build named as the page’s own, never a later one or a copy’s name (MOL-147)', async () => {
+      const { update } = await installed()
+      expect(update.build()).toBeNull()
+
+      update.serverVersion('dev')
+      expect(update.build()).toBeNull()
+      update.serverVersion('v0.1.4-1-g3a00000')
+      update.serverVersion('v0.1.4-2-g9f00000')
+
+      expect(update.build()).toBe('v0.1.4-1-g3a00000')
+    })
+
     it('looks again while nothing is found, but not more often than every half a minute (С-8)', async () => {
       const { update, registration } = await installed()
       update.serverVersion('v0.1.4-1-g3a00000')

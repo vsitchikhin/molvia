@@ -9,6 +9,8 @@ import {
   exchangeRevisions,
   exchanges,
   expenses,
+  feedback,
+  feedbackReplies,
   incomeRevisions,
   incomes,
   itemBarcodes,
@@ -37,6 +39,7 @@ export const EXPORT_SECTION_OF: Readonly<Record<ErasedTable, keyof ExportContent
   rating_reminders: 'ratingReminders',
   verdicts: 'verdicts',
   events: 'events',
+  feedback: 'feedback',
   expenses: 'expenses',
   trips: 'trips',
   exchanges: 'exchanges',
@@ -60,7 +63,12 @@ const OWNER = 'whose it is is said once, in `account`'
  */
 export const EXPORT_COLUMNS: Readonly<
   Record<
-    ErasedTable | 'exchange_revisions' | 'income_revisions' | 'items' | 'item_barcodes',
+    | ErasedTable
+    | 'exchange_revisions'
+    | 'income_revisions'
+    | 'feedback_replies'
+    | 'items'
+    | 'item_barcodes',
     { readonly exported: readonly string[]; readonly omitted?: Readonly<Record<string, string>> }
   >
 > = {
@@ -265,6 +273,31 @@ export const EXPORT_COLUMNS: Readonly<
     exported: ['month', 'base', 'quote', 'scaled', 'source', 'as_of'],
     omitted: { actor_id: OWNER },
   },
+  feedback: {
+    exported: [
+      'id',
+      'kind',
+      'text',
+      'locale',
+      'page_build',
+      'api_build',
+      'route',
+      'platform',
+      'error_code',
+      'from_error',
+      'thread_id',
+      'in_reply_to',
+      'created_at',
+    ],
+    omitted: {
+      actor_id: OWNER,
+      client_key: 'the phone’s key against sending one message twice, not what was said',
+    },
+  },
+  feedback_replies: {
+    exported: ['id', 'text', 'delivered', 'created_at'],
+    omitted: { feedback_id: 'said by where the reply sits: under the message it answers' },
+  },
   budget_plans: {
     exported: ['category_id', 'from_month', 'amount_minor', 'currency', 'percent', 'updated_at'],
     omitted: { actor_id: OWNER },
@@ -323,8 +356,8 @@ function cash(minor: bigint | null, currency: Currency | null): Money | null {
   return minor === null || currency === null ? null : { minor, currency }
 }
 
-function grouped<T>(rows: readonly T[], keyOf: (row: T) => string): Map<string, T[]> {
-  const groups = new Map<string, T[]>()
+function grouped<T, K>(rows: readonly T[], keyOf: (row: T) => K): Map<K, T[]> {
+  const groups = new Map<K, T[]>()
   for (const row of rows) {
     const group = groups.get(keyOf(row))
     if (group) group.push(row)
@@ -371,6 +404,17 @@ export function createExportRepository(db: Db): ExportRepository {
             .from(events)
             .where(eq(events.actorId, actorId))
             .orderBy(asc(events.id))
+          const feedbackRows = await tx
+            .select()
+            .from(feedback)
+            .where(eq(feedback.actorId, actorId))
+            .orderBy(asc(feedback.id))
+          const replyRows = await tx
+            .select({ reply: feedbackReplies })
+            .from(feedbackReplies)
+            .innerJoin(feedback, eq(feedback.id, feedbackReplies.feedbackId))
+            .where(eq(feedback.actorId, actorId))
+            .orderBy(asc(feedbackReplies.id))
           const exchangeRows = await tx
             .select()
             .from(exchanges)
@@ -527,6 +571,10 @@ export function createExportRepository(db: Db): ExportRepository {
             (version) => version.incomeId,
           )
           const barcodesOf = grouped(barcodeRows, (barcode) => barcode.itemId)
+          const repliesOf = grouped(
+            replyRows.map((row) => row.reply),
+            (reply) => reply.feedbackId,
+          )
 
           return {
             account: {
@@ -786,6 +834,27 @@ export function createExportRepository(db: Db): ExportRepository {
               createdAt: row.createdAt,
             })),
             addedBarcodes: addedCodeRows,
+            feedback: feedbackRows.map((row) => ({
+              number: row.id,
+              kind: row.kind,
+              text: row.text,
+              locale: row.locale,
+              pageBuild: row.pageBuild,
+              apiBuild: row.apiBuild,
+              route: row.route,
+              platform: row.platform,
+              errorCode: row.errorCode,
+              fromError: row.fromError,
+              thread: row.threadId,
+              inReplyTo: row.inReplyTo,
+              createdAt: row.createdAt,
+              replies: (repliesOf.get(row.id) ?? []).map((reply) => ({
+                number: reply.id,
+                text: reply.text,
+                delivered: reply.delivered,
+                createdAt: reply.createdAt,
+              })),
+            })),
             catalogue: { items: namedItems, places: namedPlaces },
           }
         },

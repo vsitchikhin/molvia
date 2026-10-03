@@ -17,7 +17,7 @@ const DELAY_MS = 100
 
 // Then they go. The region is hidden but in the reading order, and words left in it are read
 // in browse mode as if they were still true — «Loading…» under an error (C3).
-const LINGER_MS = 7000
+export const LINGER_MS = 7000
 
 /**
  * The app's one polite live region, there from the first frame and through every screen —

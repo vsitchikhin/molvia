@@ -142,7 +142,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   live region in `App.vue`, above the router, since a region born with its words is often not
   read. Each announcement is a node added a task later, taken back when its block goes and
   gone by itself after seconds — a hidden region is still read in browse mode. Only an error
-  or «attention» on the screen interrupts; anything inline is polite.
+  or «attention» on the screen interrupts; anything inline is polite. **A full-screen error also
+  offers «Сообщить о проблеме»** (MOL-147), drawn by `ScreenState` and by nothing else, last and
+  quietest: not `inline`, not for nobody known, not inside a `<dialog>` — `feedback.md` says why.
 - **An installed app takes a new version only when nobody can lose anything to it: hidden, and
   holding no typing** (`pwaUpdate.ts`, MOL-46). The client reads every answer strictly, so an old page
   against a new API breaks — and nothing reloaded it: an iOS app frozen in the background came back

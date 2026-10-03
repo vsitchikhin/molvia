@@ -28,6 +28,7 @@ entry; a data file (`sql`, `json`, fonts, icons) by an entry for a directory abo
 | `money-accounts.md`  | accounts, balances, «Списано со счёта», the check                              |
 | `auth.md`            | sessions, the login request, the cookie, the login screen, «Выйти», devices    |
 | `privacy.md`         | erasure, the privacy page, logs                                                |
+| `feedback.md`        | «Написать разработчику»: the message, its sheet and its two ways in            |
 | `bot.md`             | the bot: its half of the login, `/delete`                                      |
 | `observability.md`   | failures of the API and the bot, the owner's channel in Telegram (MOL-143)     |
 | `frontend.md`        | the app shell and kit: `App.vue`, the screen frame, the sheet, states, styles  |

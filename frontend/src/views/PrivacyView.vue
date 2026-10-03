@@ -38,6 +38,7 @@ const STORED = [
   'barcodes',
   'ratings',
   'reminders',
+  'feedback',
   'search',
   'visits',
   'devices',

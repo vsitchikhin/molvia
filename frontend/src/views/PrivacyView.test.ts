@@ -49,6 +49,18 @@ it('names the copy by the words of the settings row that makes it (MOL-93)', asy
   expect(ru.privacy.copy.text).toContain(`«${ru.settings.export.label}»`)
 })
 
+it('says who reads a message to the developer, what goes with it and for how long (MOL-147)', async () => {
+  const text = (await render()).text()
+  expect(text).toContain(ru.privacy.stored.feedback.text)
+  // What the sheet attaches is named whole, and the Telegram copy that erasure cannot reach (В-3).
+  expect(ru.privacy.stored.feedback.text).toMatch(/версия приложения, экран, система телефона/)
+  expect(ru.privacy.stored.feedback.text).toMatch(/Читает только разработчик/)
+  expect(ru.privacy.stored.feedback.text).toMatch(/без вашего имени и номера аккаунта/)
+  expect(ru.privacy.stored.feedback.text).toMatch(/остаётся в его чате/)
+  expect(ru.privacy.stored.feedback.text).toMatch(/год от последнего сообщения/)
+  expect(ru.privacy.stored.feedback.text).not.toMatch(/отзыв/i)
+})
+
 it('asks nothing of the server: no skeleton and no state, whatever the connection', async () => {
   const view = await render()
   expect(view.find('.skeleton').exists()).toBe(false)
