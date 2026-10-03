@@ -144,7 +144,8 @@ export default defineComponent({
   background: var(--surface-2);
   color: var(--text-muted);
 
-  .glyph {
+  // Its own glyph only: `.icon .glyph` would take any ancestor wearing `icon`.
+  & > .glyph {
     font-size: var(--icon-md);
   }
 }

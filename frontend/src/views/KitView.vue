@@ -50,12 +50,18 @@
       </div>
     </section>
 
-    <!-- The icon scale (Ф-9, MOL-173): one chevron at every step, for a screen to be checked by. -->
+    <!-- The icon scale (Ф-9, MOL-173): one chevron at every step, for a screen to be checked by. The
+         step's class is on the wrapper: a class of this page on a child's root would reach AppButton's
+         own `.icon`. -->
     <section class="group">
       <h2 class="caption">{{ t('dev.kit.icons') }}</h2>
       <div class="row">
-        <span v-for="step in iconSteps" :key="step.token" class="icon-step">
-          <IconChevronRight class="sample" :class="step.token" aria-hidden="true" />
+        <span
+          v-for="step in iconSteps"
+          :key="step.token"
+          :class="['icon-step', `step-${step.token}`]"
+        >
+          <IconChevronRight class="sample" aria-hidden="true" />
           <span class="px">{{ step.px }}</span>
         </span>
       </div>
@@ -254,35 +260,35 @@ export default defineComponent({
   @include icon;
 }
 
-.icon-xs {
+.step-icon-xs .sample {
   font-size: var(--icon-xs);
 }
 
-.icon-sm {
+.step-icon-sm .sample {
   font-size: var(--icon-sm);
 }
 
-.icon {
+.step-icon .sample {
   font-size: var(--icon);
 }
 
-.icon-button {
+.step-icon-button .sample {
   font-size: var(--icon-button);
 }
 
-.state-glyph {
+.step-state-glyph .sample {
   font-size: var(--state-glyph);
 }
 
-.icon-md {
+.step-icon-md .sample {
   font-size: var(--icon-md);
 }
 
-.icon-back {
+.step-icon-back .sample {
   font-size: var(--icon-back);
 }
 
-.icon-tab {
+.step-icon-tab .sample {
   font-size: var(--icon-tab);
 }
 
