@@ -178,11 +178,14 @@ const CITY_ANYWHERE: Readonly<Record<SettingsCity, RegExp>> = {
 const HEAD_ROWS = 15
 
 /**
- * A row of an item, where the head ends (round 4, Р4-В1): a table's customs heading «(2203) ԳՅՈՒՄՐԻ
- * ԳԱՐԵՋՈՒՐ» — Dog City's items begin at its ninth row — a card's article «0401/1163909», or a card's
- * item number before its name «3.Գյումրի …». An item named after a city is a line, not the address.
+ * A row of an item, where the head ends (round 4, Р4-В1): a table's customs heading opening the row,
+ * then the name — «(2203) ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ», or «| |824) ՏՈՏՈՒՀՈՂ» as OCR reads it with the bracket
+ * and a digit lost (round 5, Р5-В1); a card's article «0401/1163909»; a card's item number with its
+ * dot before the name, «3.Գյումրի …». Dog City's items begin at its ninth row, and an item named after
+ * a city is a line, not the address. Not a phone's area code «Հեռ. (0312) 5-55-55», which neither opens
+ * the row nor has a name after it, nor a house number «62, Գորկու …» (round 5, Р5-В2, review 16).
  */
-const ITEM_ROW = /\(\d{4}\)|\d{4}\s*\/\s*\d{5,}|^\s*\d{1,3}\s*[.,]\s*\p{L}/u
+const ITEM_ROW = /^[^\p{L}\d]*\(?\d{2,4}\)\s*\p{L}|\d{4}\s*\/\s*\d{5,}|^\s*\d{1,3}\.\s*\p{L}/u
 
 /**
  * The city a receipt's address prints, if it is one of the settings'; read in the first part only. A

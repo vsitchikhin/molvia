@@ -209,6 +209,26 @@ describe('the city of the address (MOL-126, Р-6)', () => {
     ).toBe('Ереван')
   })
 
+  // round 5, Р5-В1: a table's heading OCR read with its bracket and a digit lost still ends the head
+  it('ends the head at an item row whose heading OCR read in part', () => {
+    expect(
+      receiptCityOf(
+        rows('DOG CITY', 'ՀՀ, ք. Երևան, Շիրազի 57', 'Բաժին 1', '| |203) ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ'),
+      ),
+    ).toBe('Ереван')
+    expect(receiptCityOf(rows('ԳՅՈՒՄՐԻ Շիրազի 57', '| |208) ԵՐԵՎԱՆ ԿՈՆՅԱԿ'))).toBe('Гюмри')
+  })
+
+  // round 5, Р5-В2, review 16: must not fire — a phone's area code and a house number are the head
+  it('does not end the head at a phone’s area code or a house number', () => {
+    expect(receiptCityOf(rows('DOG CITY', 'Հեռ. (0312) 5-55-55', 'ԳՅՈՒՄՐԻ Շիրազի 57'))).toBe(
+      'Гюмри',
+    )
+    expect(receiptCityOf(rows('DOG CITY', '62, Գորկու փ., ք. Գյումրի', 'ՀՎՀՀ 02615412'))).toBe(
+      'Гюмри',
+    )
+  })
+
   // round 3, Р3-В2: a chain's legal address beside its shop's — two cities are no answer
   it('takes no city after «ք.» when another one is named in the head', () => {
     const chain = rows('"ԵՐԵՎԱՆ ՍԻԹԻ" ՍՊԸ', 'ՀՀ, ք. Երևան, Արշակունյաց 34', 'Գորկու 62, Գյումրի')
