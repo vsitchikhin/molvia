@@ -147,8 +147,10 @@ export async function recordFailure(
   const claimed = phone && phoneRows !== undefined
   const fresh = !claimed || phoneRows.claim(at, sender)
   let count: FailureCount | null
-  // What of the hour's notices this write took: the budget is spent inside its transaction.
-  let told: readonly OwnerNotice[] = []
+  // What of the hour's notices this write took, and how many it held back: the budget is spent
+  // inside its transaction.
+  let told = 0
+  let held = 0
   try {
     count = await failures.record(
       occurrence,
@@ -157,17 +159,20 @@ export async function recordFailure(
       (written) => {
         const notices = noticesFor(occurrence, written, times, owner)
         if (!phone || phoneNotices === undefined) return notices
-        told = phoneNotices.take(notices, at, sender)
-        return told
+        const taken = phoneNotices.take(notices, at, sender)
+        told = taken.length
+        held = notices.length - taken.length
+        return taken
       },
       { fresh },
     )
   } catch (error) {
     // A write that failed — the database down — wrote no row: its place goes back, or every report
     // of the outage held one for the hour (review №9) — and so do the notices it took, if the
-    // transaction failed after the budget gave them (round 5).
+    // transaction failed after the budget gave them (round 5), and the ones it held back are not
+    // «скрыто» of a failure that is in no table (adversarial Е1 of round 6).
     if (claimed && fresh) phoneRows.refund(at, sender)
-    if (told.length > 0) phoneNotices?.refund(told.length, at, sender)
+    if (told + held > 0) phoneNotices?.refund(told, held, at, sender)
     throw error
   }
   // Not a new row after all — its count is more than what was written now: the place goes back.
@@ -186,8 +191,11 @@ const HOUR_MS = 60 * 60 * 1000
 export interface PhoneNoticeBudget {
   /** What of the phone's notices fits the hour — the sender's and everybody's. */
   take(notices: readonly OwnerNotice[], at: Date, sender?: string): OwnerNotice[]
-  /** Gives back `count` notices taken at `at` by a write that then failed. */
-  refund(count: number, at: Date, sender?: string): void
+  /**
+   * A write that then failed: gives back the `told` notices it took at `at`, and takes the `held`
+   * ones it held back off the count of the held.
+   */
+  refund(told: number, held: number, at: Date, sender?: string): void
   /** A new fingerprint of the phone the hour's rows had no room for: not in the table at all. */
   unwritten(): void
   /** How many were held back and how many not written, at most once an hour. */
@@ -240,9 +248,10 @@ export function phoneNoticeBudget(
       if (sender !== undefined) bySender.set(sender, theirs)
       return out
     },
-    refund(count, at, sender) {
+    refund(given, kept, at, sender) {
+      muted = Math.max(0, muted - kept)
       const now = at.getTime()
-      for (let index = 0; index < count; index += 1) {
+      for (let index = 0; index < given; index += 1) {
         const mine = told.lastIndexOf(now)
         if (mine >= 0) told.splice(mine, 1)
         const theirs = sender === undefined ? undefined : bySender.get(sender)

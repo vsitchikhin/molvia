@@ -388,6 +388,32 @@ describe('phoneRowBudget — новые строки телефона (ревь�
     expect(budget.take([notice], now, 'one')).toEqual([notice])
   })
 
+  it('придержанное уведомление упавшей записи не попадает в «скрыто» (адверсариальный Е1)', async () => {
+    const budget = phoneNoticeBudget(10, 0)
+    const { summary, place, build } = phoneFailure(REPORT)
+    const failsAfter = {
+      record: (
+        _occurrence: unknown,
+        _times: number,
+        _at: Date,
+        notices: (count: { count: number; buildCount: number }) => unknown,
+      ) => {
+        notices({ count: 1, buildCount: 1 })
+        return Promise.reject(new Error('could not insert the notice'))
+      },
+    } as unknown as FailureRepository
+    await expect(
+      recordFailure(
+        { failures: failsAfter, owner: OWNER, phoneNotices: budget },
+        occurrenceOf(summary, place, build),
+        1,
+        now,
+        'one',
+      ),
+    ).rejects.toThrow('could not insert the notice')
+    expect(budget.held(now)).toBeNull()
+  })
+
   it('запись, которая упала, возвращает своё место (ревью №9)', async () => {
     const rows = phoneRowBudget(10, 1)
     const { summary, place, build } = phoneFailure(REPORT)
