@@ -117,7 +117,7 @@ the load is I/O-bound, with three orders of magnitude of headroom.
 | DB                | PostgreSQL + Drizzle                                    | schema in TS, generated migrations, honest drop into raw SQL                               |
 | Bot               | grammY + `@grammyjs/runner`                             | distribution, auth, rating reminders; the runner is what makes it serve two people at once |
 | Search by meaning | EmbeddingGemma q4 on `onnxruntime-node`, in the API     | a pinned model, no service of its own; 45 ms a query on the VPS (MOL-105)                  |
-| Receipt OCR (1.0) | separate Python service                                 | the TS ecosystem has nothing here                                                          |
+| Receipt reader    | Tesseract 5 behind Python's own HTTP server             | no model reads a receipt on the server's CPU in time (MOL-114); the parse is TS            |
 | Tests             | Vitest (domain, use case, component) + Playwright (e2e) | three vitest projects, so the domain keeps running without a DOM                           |
 | Lint              | ESLint 9 type-aware + Stylelint + Prettier              | strictest tier; SFCs go through the same type checker as `.ts`                             |
 
@@ -418,6 +418,18 @@ that are easiest to break; the file holds every rule of the area and the reason 
   «reduce motion», never for an answer read (more than three rows at once), and never the sheet's
   own height or a change of a screen's own query beyond its answer.
 
+### Receipts — `.claude/rules/receipts.md`
+
+- **No model reads a receipt** (MOL-114): Tesseract in `services/receipt-reader`, a container with no
+  database and no disk; the API holds the queue, the photos and the parse, one receipt at a time.
+- **The parse is MOL-114's prototype, held line for line** (`receipt-text.ts`, its fixtures): a rule
+  changed is measured on the bench before and after; amounts in hundredths, never floats.
+- **«Переснимите» is «too little read»** (`needsReshoot`, В-4) — never «the total did not match» alone.
+- **The reader away leaves a receipt queued; a photo it cannot read fails it** — never lost, never
+  read forever.
+- **A photo lives until the receipt is recorded, a receipt not recorded 28 days, a cut-out item line
+  28 days after recording** (В-3); **photos never enter the nightly copy** (В-2), never the log.
+
 ### End-to-end — `.claude/rules/e2e.md`
 
 - **End-to-end has a database and ports of its own**, and the database is dropped before every run.
@@ -492,6 +504,7 @@ make seed        # the common names into the catalogue; YES=1 writes, without it
 make gates FROM=2026-10-05  # read gates 0.2 and 0.3; TO= optional, a day taken in whole
 make dev         # run api, pwa and bot
 make e2e         # end-to-end tests in a phone-sized browser
+make reader      # this copy's receipt reader (Tesseract), on the API's band +3
 make icons       # regenerate the app icons from favicon.svg
 make certs       # locally trusted dev certificate, for the camera on a real phone
 make prod-build  # build the production images without deploying them
@@ -547,7 +560,7 @@ packages/
     tests/          mirrors src, so src holds only what ships
   client/       typed API client built on the model schemas
 services/                 anything that is not a TypeScript workspace
-  receipt-ocr/  Python, 1.0, not started
+  receipt-reader/  Tesseract behind Python's HTTP server, no database (MOL-125)
 ```
 
 `services/` is separate from `apps/` on purpose: a different runtime is a different
@@ -846,8 +859,9 @@ per «actor + item + place», references that lead somewhere. Everything else �
 bands, «no more than twenty barcodes», visible text, `search_key = toSearchKey(name)` —
 stays in `packages/model`, because a second place that decides is a second place to drift.
 
-`docker-compose.yml` runs Postgres only; the applications run natively in development,
-because HMR and a debugger attached to a host process beat a rebuild inside a container.
+`docker-compose.yml` runs Postgres, and the receipt reader only when asked (`make reader`); the
+applications run natively in development, because HMR and a debugger attached to a host process
+beat a rebuild inside a container.
 The production stack is a separate file. Extensions are deliberately not created by an init
 script: the schema belongs to migrations, and a second source of truth for it would drift.
 
