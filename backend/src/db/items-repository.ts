@@ -14,7 +14,14 @@ import {
   synonymPairedKinds,
   toSearchKey,
 } from '@molvia/model'
-import type { Item, ItemKind, ItemOrigin, NewItem } from '@molvia/model'
+import type {
+  CatalogueNode,
+  Item,
+  ItemKind,
+  ItemNameLanguage,
+  ItemOrigin,
+  NewItem,
+} from '@molvia/model'
 import { quantityFrom, quantityTo } from './columns'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -80,6 +87,12 @@ export interface ItemRepository {
    * one item, so the answer is one item at most.
    */
   byBarcode(codes: readonly string[]): Promise<Item | null>
+  /**
+   * The items a receipt line can reach by name (MOL-126): those with names in the till's language,
+   * with those names and their customs headings, ordered by name bytewise — the matcher takes the
+   * first of a tie, so the order is the same on every database.
+   */
+  nodes(language: ItemNameLanguage): Promise<CatalogueNode[]>
 }
 
 /**
@@ -983,6 +996,29 @@ export function createItemRepository(db: Conn): ItemRepository {
       if (!held) return null
       const [item] = await load([held.itemId])
       return item ?? null
+    },
+
+    async nodes(language) {
+      const rows = await db.execute<{
+        id: string
+        name: string
+        names: string[]
+        headings: string[]
+      }>(sql`
+        select i.id, i.name,
+          array(select n.name from item_names n
+                where n.item_id = i.id and n.language = ${language}
+                order by n.name collate "C") as names,
+          array(select h.hs from item_hs h where h.item_id = i.id order by h.hs) as headings
+        from items i
+        where exists (select 1 from item_names n where n.item_id = i.id and n.language = ${language})
+        order by i.name collate "C", i.id`)
+      return rows.map((row) => ({
+        itemId: row.id,
+        name: row.name,
+        names: row.names,
+        headings: row.headings,
+      }))
     },
 
     createUnlessNamed(input, createdBy, origin = null) {

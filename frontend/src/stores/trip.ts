@@ -43,6 +43,7 @@ function recall(actorId: string | null): TripView | null {
  */
 export const TRIP_FIELDS = [
   'id',
+  'receiptId',
   'startedAt',
   'finishedAt',
   'finishedOnDeviceAt',

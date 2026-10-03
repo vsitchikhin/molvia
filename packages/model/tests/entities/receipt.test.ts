@@ -4,7 +4,11 @@ import {
   moneyOfHundredths,
   needsReshoot,
   receiptDateOf,
+  STORE_MEMORY_KEY_MAX_OCTETS,
+  receiptCityOf,
   receiptLineOf,
+  receiptMomentOf,
+  storeMemoryWords,
   receiptTimeOf,
 } from '#model/entities/receipt'
 import type { ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
@@ -153,5 +157,366 @@ describe('the time a receipt prints (review Р12)', () => {
     expect(receiptTimeOf({ ...receipt([]), time: '99:99' })).toBeNull()
     expect(receiptTimeOf({ ...receipt([]), time: '24:00' })).toBeNull()
     expect(receiptTimeOf(receipt([]))).toBeNull()
+  })
+})
+
+describe('the city of the address (MOL-126, Р-6)', () => {
+  const rows = (...texts: string[]) => texts.map((text, line) => ({ text, part: 0, line }))
+
+  it('reads the city that opens a row of the head', () => {
+    expect(receiptCityOf(rows(': ԵՐԵՎԱՆ-ՍԻԹԻ', 'ԳՅՈՒՄՐԻ Գորկու 62 2.'))).toBe('Гюмри')
+    expect(receiptCityOf(rows('DOG CITY', 'Gyumri Sayat-Nova Street, 42'))).toBe('Гюмри')
+    expect(receiptCityOf(rows('ԵՐԵՎԱՆ Կոմիտասի 5'))).toBe('Ереван')
+  })
+
+  it('reads past one stray letter OCR puts at the paper’s edge, never past a word', () => {
+    // am-08 of the bench, page mode 6
+    expect(receiptCityOf(rows('— ԵՐԵՎԱՆ-ՍԻԹԻ :', 'է ԳՅՈՒՄՐԻ Գորկու 62 շ.'))).toBe('Гюмри')
+    expect(receiptCityOf(rows('Մանրածախ ԳՅՈՒՄՐԻ'))).toBeNull()
+  })
+
+  it('reads the city after «ք.», the word for «город»', () => {
+    expect(receiptCityOf(rows('ք. Երևան, Արշակունյաց 34'))).toBe('Ереван')
+    expect(receiptCityOf(rows('Ք.ԳՅՈՒՄՐԻ ԳՈՐԿՈՒ 62'))).toBe('Гюмри')
+    // after the country or the province (round 2, Р2-В4)
+    expect(receiptCityOf(rows('ՀՀ, ք. Երևան, Արշակունյաց 34'))).toBe('Ереван')
+    expect(receiptCityOf(rows('Շիրակի մարզ, ք. Գյումրի, Գորկու 62'))).toBe('Гюмри')
+    // a word ending in «ք» is no «ք.» before a city
+    expect(receiptCityOf(rows('Սուրճ ք.Երևանյան'))).toBeNull()
+  })
+
+  // round 4, Р4-В1: the head ends at the first item — an item named after a city is no address
+  it('reads no city off an item line, a table’s or a card’s', () => {
+    const table = (address: string, item: string) =>
+      rows('Կտրոն 000018827', 'ԷԴԳԱՐ ԳԵՎՈ', address, 'DOG CITY', 'Թան:', item, 'ԴԵՂՁ 1')
+    expect(receiptCityOf(table('ԵՐԵՎԱՆ Արշակունյաց 34', '(2203) ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ 0.5լ'))).toBe(
+      'Ереван',
+    )
+    expect(receiptCityOf(table('ՀՀ, ք. Երևան, Արշակունյաց 34', '(2203) ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ'))).toBe(
+      'Ереван',
+    )
+    expect(receiptCityOf(table('ԳՅՈՒՄՐԻ Շիրազի 57', '(2208) ԵՐԵՎԱՆ ԿՈՆՅԱԿ 0.5լ'))).toBe('Гюмри')
+    // a card: the item's number before its name, its article on the next row
+    expect(
+      receiptCityOf(
+        rows(
+          'ԵՐԵՎԱՆ-ՍԻԹԻ',
+          'Երևան, Կոմիտասի 5',
+          '1.Գյումրի գարեջուր 0.5լ',
+          '2203/1100001 1Հտ 450 450',
+        ),
+      ),
+    ).toBe('Ереван')
+  })
+
+  // round 5, Р5-В1: a table's heading OCR read with its bracket and a digit lost still ends the head
+  it('ends the head at an item row whose heading OCR read in part', () => {
+    expect(
+      receiptCityOf(
+        rows('DOG CITY', 'ՀՀ, ք. Երևան, Շիրազի 57', 'Բաժին 1', '| |203) ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ'),
+      ),
+    ).toBe('Ереван')
+    expect(receiptCityOf(rows('ԳՅՈՒՄՐԻ Շիրազի 57', '| |208) ԵՐԵՎԱՆ ԿՈՆՅԱԿ'))).toBe('Гюмри')
+  })
+
+  // round 6, Р6-В1: the stray letter forgiven before a city is forgiven before an item's heading too
+  it('ends the head at an item row behind a stray letter at the paper’s edge', () => {
+    expect(
+      receiptCityOf(rows('ՀՀ, ք. Երևան, Շիրազի 57', 'Բաժին 1', 'Ն (2203) ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ')),
+    ).toBe('Ереван')
+    expect(receiptCityOf(rows('ԳՅՈՒՄՐԻ Շիրազի 57', 'Ն (2208) ԵՐԵՎԱՆ ԿՈՆՅԱԿ'))).toBe('Гюмри')
+  })
+
+  // round 6, Р6-В2: the head is the rows above the first item, however many — «Ереван Сити» runs to 17
+  it('reads the address past the fifteenth row when the items begin below it', () => {
+    const banner = Array.from({ length: 16 }, () => 'ՏՆՏԵՍԱԿԱՆ ԱՊՐԱՆՔՆԵՐ')
+    expect(
+      receiptCityOf(
+        rows(
+          ...banner,
+          'ԳՅՈՒՄՐԻ Գորկու 62 2.',
+          '1.Պոլիէթիլենային տոպրակ',
+          '3923/1122223 1Հտ 50 50',
+        ),
+      ),
+    ).toBe('Гюмри')
+  })
+
+  // round 7, Р7-В1: a card's first item's name stands above its article, its number often without a
+  // dot — the head ends above the name; an article cut by OCR still ends it
+  it('ends a card’s head above its first item’s name, its article whole or cut', () => {
+    const banner = Array.from({ length: 6 }, () => 'ՏՆՏԵՍԱԿԱՆ ԱՊՐԱՆՔՆԵՐ')
+    const card = (article: string) =>
+      rows(...banner, 'ԵՐԵՎԱՆ Արշակունյաց 34', 'ՀՎՀՀ:01282006', '1 ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ 0.5լ', article)
+    expect(receiptCityOf(card('2203/1100001 1Հտ 450 450'))).toBe('Ереван')
+    expect(receiptCityOf(card('2203/1100 1Հտ 450 450'))).toBe('Ереван')
+  })
+
+  // round 8, Р8-В1: a number with a dot is an item only right above the first article — a banner with
+  // «9.» OCR read at its edge stands above the address (R-dwtrim-psm6 am-10 of the bench)
+  it('does not end the head at a numbered row far above the first article', () => {
+    const card = rows(
+      'Ակցիան գործում է միայն բարտապան',
+      '9. հաճախորդների համար` ապան',
+      '= 4 - ԳՅՈՒՄՐԻ Գորկու 62 2.',
+      '/ԱԱՀ-ով հարկվող/',
+      'Որից ԱԱՀ',
+      '1.Դդմի սերմեր',
+      '2008/149263 1Հտ 640 640',
+    )
+    expect(receiptCityOf(card)).toBe('Гюмри')
+  })
+
+  // round 5, Р5-В2, review 16: must not fire — a phone's area code and a house number are the head
+  it('does not end the head at a phone’s area code or a house number', () => {
+    expect(receiptCityOf(rows('DOG CITY', 'Հեռ. (0312) 5-55-55', 'ԳՅՈՒՄՐԻ Շիրազի 57'))).toBe(
+      'Гюмри',
+    )
+    expect(
+      receiptCityOf(rows('DOG CITY', '62, Գորկու փ.', 'ք. Գյումրի, Գորկու 62', 'ՀՎՀՀ 02615412')),
+    ).toBe('Гюмри')
+    // the house first on the city's own row, «ք.» naming the city (round 12, №19)
+    expect(receiptCityOf(rows('DOG CITY', '62, Գորկու փ., ք. Գյումրի', 'ՀՎՀՀ 02615412'))).toBe(
+      'Гюмри',
+    )
+  })
+
+  // round 3, Р3-В2: a chain's legal address beside its shop's — two cities are no answer
+  it('takes no city after «ք.» when another one is named in the head', () => {
+    const chain = rows('"ԵՐԵՎԱՆ ՍԻԹԻ" ՍՊԸ', 'ՀՀ, ք. Երևան, Արշակունյաց 34', 'Գորկու 62, Գյումրի')
+    expect(receiptCityOf(chain)).toBeNull()
+    // the legal address of one city beside a shop's of another: two cities, no answer (round 10) —
+    // the place is looked for in the person's own city, never in a city the head may have misnamed
+    expect(receiptCityOf(rows('ՀՀ, ք. Երևան, Արշակունյաց 34', 'Գյումրի, Գորկու 62'))).toBeNull()
+    // two shops' addresses opening rows — no answer
+    expect(receiptCityOf(rows('Գյումրի, Գորկու 62', 'Երևան, Կոմիտասի 5'))).toBeNull()
+  })
+
+  it('does not take the chain in Latin or Cyrillic letters for the city either', () => {
+    expect(receiptCityOf(rows('YEREVAN CITY', 'Yerevan-City'))).toBeNull()
+    expect(receiptCityOf(rows('Ереван Сити'))).toBeNull()
+  })
+
+  it('does not take the chain «Ереван Сити» or an item named after the capital for the city', () => {
+    expect(receiptCityOf(rows(': ԵՐԵՎԱՆ-ՍԻԹԻ', 'ԵՐԵՎԱՆ ՍԻԹԻ'))).toBeNull()
+    expect(receiptCityOf(rows('3.Յոգուրտ երեւան Փրոդաքթս 2%'))).toBeNull()
+  })
+
+  it('looks in the head of the first part only', () => {
+    const late = [...rows(...Array.from({ length: 40 }, () => 'ՏՆՏԵՍԱԿԱՆ')), ...rows('ԳՅՈՒՄՐԻ')]
+    expect(receiptCityOf(late)).toBeNull()
+    expect(receiptCityOf([{ text: 'ԳՅՈՒՄՐԻ Գորկու 62', part: 1, line: 0 }])).toBeNull()
+  })
+})
+
+describe('what the shop’s memory knows a line by (MOL-126)', () => {
+  it('knows it by the article first, then by the line’s search key', () => {
+    const words = storeMemoryWords({ printed: 'Կաթ «Իգիթ» 3.2% 1լ', sku: '1163909' })
+    expect(words.map((word) => word.kind)).toEqual(['sku', 'text'])
+    expect(words[0]?.key).toBe('1163909')
+  })
+
+  it('folds what OCR reads two ways into one key, and knows a line with no article by text', () => {
+    const [one] = storeMemoryWords({ printed: 'ԵՐԵՎԱՆ', sku: null })
+    const [other] = storeMemoryWords({ printed: 'Երեւան', sku: null })
+    expect(one).toEqual(other)
+    expect(one?.kind).toBe('text')
+  })
+
+  it('remembers nothing of a line with no letters, and no text past the key’s length', () => {
+    expect(storeMemoryWords({ printed: '— ·', sku: '' })).toEqual([])
+    // the search key folds a doubled letter, so words rather than one letter over and over
+    const long = 'կաթ '.repeat(STORE_MEMORY_KEY_MAX_OCTETS / 3)
+    expect(storeMemoryWords({ printed: long, sku: '1' })).toEqual([{ kind: 'sku', key: '1' }])
+  })
+})
+
+describe('the moment a receipt prints', () => {
+  it('is its day and time on the till’s clock, +4 in Armenia', () => {
+    expect(receiptMomentOf('2026-09-26', '19:42', 'AM')).toEqual(
+      new Date('2026-09-26T15:42:00.000Z'),
+    )
+  })
+
+  it('is none without a time a clock shows', () => {
+    expect(receiptMomentOf('2026-09-26', null, 'AM')).toBeNull()
+    expect(receiptMomentOf('2026-09-26', '25:00', 'AM')).toBeNull()
+  })
+})
+
+// round 9 and before: the city is read off an address, never off an item named after a city — the
+// shapes OCR made of either on the bench, crossed every way, and no head may name the item's city
+describe('an item named after a city never names the receipt’s city (MOL-126)', () => {
+  const words = new Set(['գարեջուր', 'կոնյակ', 'սպիտակ', 'հնգամյա', 'lager', 'brandy'])
+  const rows = (...texts: string[]) => texts.map((text, line) => ({ text, part: 0, line }))
+  const marks = [
+    '',
+    '1.',
+    '1. ',
+    '1 ',
+    '1',
+    '10,',
+    '10, ',
+    '| |203) ',
+    '(2203) ',
+    'Ն (2203) ',
+    '| | ',
+    '= ',
+    'Ն ',
+    '2 1.',
+    '= 4 - ',
+    '9. ',
+    '2..1 ',
+  ]
+  const items = {
+    Гюмри: [
+      'ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ',
+      'Գարեջուր «Գյումրի»',
+      'Գարեջուր Գյումրի',
+      'Գյումրի գարեջուր',
+      'ԳԱՐԵՋՈՒՐ ԳՅՈՒՄՐԻ ՍՊԻՏԱԿ',
+      'ԳՅՈՒՄՐԻ ԳԱՐԵՋՈԻՐ',
+      'GYUMRI LAGER',
+      'Գարեջուր "Գյումրի"',
+    ],
+    Ереван: [
+      'ԵՐԵՎԱՆ ԿՈՆՅԱԿ',
+      'Կոնյակ «Երևան»',
+      'Կոնյակ Երևան',
+      'Երեւան կոնյակ',
+      'YEREVAN կոնյակ',
+      'Կոնյակ «Երեւան» 5տ',
+      'ԵՐԵՎԱՆ ԿՈՆՅԱԿ ՀՆԳԱՄՅԱ',
+      'YEREVAN BRANDY',
+    ],
+  }
+  const tails = [
+    '',
+    ' 0.5լ',
+    ' 500գ',
+    ' 1 450 450',
+    ' 2 450 900',
+    ' 5տ. 0.5լ',
+    ' 3.2%',
+    ' 1Հտ 450 450',
+    ' 0,5',
+    ' 1 450',
+    ' 1 50 50',
+    ' 1 120',
+    ' 450',
+    ' 12',
+    ' 62 2.',
+  ]
+  const addresses = {
+    Гюмри: ['ԳՅՈՒՄՐԻ Գորկու 62 2.', 'ՀՀ, ք. Գյումրի, Գորկու 62', null],
+    Ереван: ['ԵՐԵՎԱՆ Արշակունյաց 34', 'ՀՀ, ք. Երևան, Արշակունյաց 34', null],
+  } as const
+
+  it.each([
+    ['Ереван', 'Гюмри'],
+    ['Гюмри', 'Ереван'],
+  ] as const)('on a receipt of %s, never %s', (home, other) => {
+    const wrong: string[] = []
+    for (const address of addresses[home])
+      for (const mark of marks)
+        for (const name of items[other])
+          for (const tail of tails) {
+            const item = `${mark}${name}${tail}`
+            const shop = address === null ? [] : [address]
+            for (const head of [
+              [
+                'ЧЕК',
+                ...shop,
+                'ՀՎՀՀ:01282006',
+                '/ԱԱՀ-ով հարկվող/',
+                item,
+                '2203/1100001 1Հտ 450 450',
+              ],
+              ['DOG CITY', ...shop, 'Թան:', item, '(3824) ՏՈՏՈՒՀՈՂ'],
+              [item, ...shop, 'ՀՎՀՀ:01282006'],
+              [...shop, item],
+            ]) {
+              if (receiptCityOf(rows(...head), words) === other)
+                wrong.push(`«${item}» ${String(address)}`)
+            }
+          }
+    expect(wrong).toEqual([])
+  })
+
+  // the strong half: an address read in any form names its city, and any other city named in the head is
+  // no answer — so even a bare brand, a kind OCR cut mid-word, never names another city beside it
+  it.each([
+    ['Ереван', 'Гюмри'],
+    ['Гюмри', 'Ереван'],
+  ] as const)('with the address of %s read, nothing names %s', (home, other) => {
+    const bare = {
+      Гюмри: ['Գյումրի', 'ԳՅՈՒՄՐԻ ԳԱ ուր.', 'GYUMRI', 'Գյումրի 62 2.', 'ԳՅՈՒՄՐԻ ԳԱՐ.'],
+      Ереван: ['Երևան', 'ԵՐԵՎԱՆ ԿՈ ակ.', 'YEREVAN', 'Երևան 34', 'ԵՐԵՎԱՆ ԿՈՆ.'],
+    }
+    const wrong: string[] = []
+    for (const address of addresses[home])
+      if (address !== null)
+        for (const mark of marks)
+          for (const name of [...items[other], ...bare[other]])
+            for (const tail of tails) {
+              const item = `${mark}${name}${tail}`
+              for (const head of [
+                ['ЧЕК', address, 'ՀՎՀՀ:01282006', item, '2203/1100001 1Հտ 450 450'],
+                [item, address],
+                [address, item],
+              ]) {
+                if (receiptCityOf(rows(...head), words) === other)
+                  wrong.push(`«${item}» ${address}`)
+              }
+            }
+    expect(wrong).toEqual([])
+  })
+
+  // round 11: the city and the street on two rows; the chain's site however OCR read it
+  it('reads a city whose street stands on the next row, and no city off the chain’s site', () => {
+    expect(receiptCityOf(rows('ք. Գյումրի,', 'Գորկու 62', 'ՀՎՀՀ:01282006'), words)).toBe('Гюмри')
+    // a shop named after a city over a street without one is no address (round 12, Р12-В1)
+    expect(receiptCityOf(rows('ԵՐԵՎԱՆ ՄԹԵՐՔ', 'Գորկու 62', 'ԳՀ:31025350'), words)).toBeNull()
+    expect(receiptCityOf(rows('ԳՅՈՒՄՐԻ ՄԱՐԿԵՏ', 'Կոմիտասի 35', 'ԳՀ:31025350'), words)).toBeNull()
+    // a country's code and OCR's noise on an address are not a site (round 12, Р12-В2)
+    for (const address of [
+      'ԳՅՈՒՄՐԻ Գորկու 62, AM',
+      'Gyumri, Gorki 62, AM',
+      'ԳՅՈՒՄՐԻ Գորկու 62 ат',
+      'Ww ԳՅՈՒՄՐԻ Գորկու 62',
+    ]) {
+      expect(receiptCityOf(rows('DOG CITY', address, 'ԳՀ:31025350'), words)).toBe('Гюмри')
+    }
+    for (const site of ['Ww Yerevan: СПу. ат', 'www.yerevan.city.am', 'www yerevan—city am']) {
+      expect(receiptCityOf(rows('ԵՐԵՎԱՆ-ՍԻԹԻ', site, 'ԳՅՈՒՄՐԻ Գորկու 62 2.'), words)).toBe('Гюмри')
+    }
+    // a tax number under a city is no street
+    expect(receiptCityOf(rows('Գյումրի', 'ՀՎՀՀ:01282006'), words)).toBeNull()
+  })
+
+  it('still reads the address beside a street, whatever OCR put at its edge', () => {
+    for (const address of [
+      'ыы ԳՅՈՒՄՐԻ Գորկու 62 2 --',
+      'Se .»ԳՅՈՒՄՐԻ Գորկու 62 2.',
+      '«ՀԱՎԵՏ ԳՅՈՒՄՐԻ Գորկու 62 2 .-',
+      'ԳՅՈՒՄՐԻ Գորկու 62 տ.',
+      'ք. Գյումրի, Գորկու 62 տ. 3',
+      'Գյումրի 3101, Ռիժկովի 104',
+      'ԳՅՈՒՄՐԻ Գորկու 62 02.10.2026',
+      'ԳՅՈՒՄՐԻ Գորկու 162/105',
+      'ԳՅՈՒՄՐԻ Գորկու 62գ',
+      'ԳՅՈՒՄՐԻ Շիր. 57',
+      'ԳՅՈՒՄՐԻ Գոր. 62',
+      'ԳՅՈՒՄՐԻ Վարդ. 12',
+      'ԳՅՈՒՄՐԻ Գորկու 62 2.',
+      '9. ԳՅՈՒՄՐԻ Գորկու 62 2.',
+      '2..1 ԳՅՈՒՄՐԻ Գորկու 62 2,',
+      '= 4 - ԳՅՈՒՄՐԻ Գորկու 62 2.',
+      'ԳՅՈՒՄՐԻ Գորկուծ22. _',
+      'ԳՅՈՒՄՐԻ Գորկու 62.2',
+      'ԳՅՈՒՄՐԻ Շիրազի 57',
+    ]) {
+      expect(receiptCityOf(rows('ԵՐԵՎԱՆ-ՍԻԹԻ', address, 'ՀՎՀՀ:01282006'), words)).toBe('Гюмри')
+    }
   })
 })

@@ -1327,6 +1327,7 @@ describe('TripView', () => {
           finishedOnDeviceAt: null,
           itemCount: null,
           total: null,
+          fromReceipt: false,
         },
       ],
       nextCursor: null,

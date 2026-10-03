@@ -3,7 +3,10 @@ import type { TripView } from '@molvia/model'
 import type { TripRepositories } from '@/db/unit-of-work'
 import { tripViewFor } from './trip-view'
 
-export type CurrentTripDeps = Pick<TripRepositories, 'trips' | 'places' | 'expenses' | 'items'>
+export type CurrentTripDeps = Pick<
+  TripRepositories,
+  'trips' | 'places' | 'expenses' | 'items' | 'receipts'
+>
 
 /**
  * The trip the screen opens on: the latest one not finished, whole. None is an ordinary state

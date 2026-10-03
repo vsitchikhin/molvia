@@ -52,6 +52,7 @@ function trip(n: number, name = 'Ереван Сити'): TripHistoryEntry {
     finishedOnDeviceAt: null,
     itemCount: null,
     total: null,
+    fromReceipt: false,
   }
 }
 

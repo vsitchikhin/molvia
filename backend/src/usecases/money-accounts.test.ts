@@ -150,6 +150,9 @@ describe('payTrip (Р-18, Д2)', () => {
       }),
       places: fake<TripRepositories['places']>('places', { byId: () => Promise.resolve(place) }),
       items: fake<TripRepositories['items']>('items', { byIds: () => Promise.resolve([]) }),
+      receipts: fake<TripRepositories['receipts']>('receipts', {
+        sourceOf: () => Promise.resolve(null),
+      }),
       moneyAccounts: fake<TripRepositories['moneyAccounts']>('moneyAccounts', {
         known: () => Promise.resolve(accounts),
         setTripPayment: (_, __, accountId, debited) => {

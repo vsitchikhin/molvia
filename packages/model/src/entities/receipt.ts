@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { EXCHANGE_UNDO_MINUTES } from '#model/entities/exchange'
-import type { ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
+import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
+import type { SettingsCity } from '#model/contracts/settings'
+import { toSearchKey } from '#model/support/search-key'
 import { MINOR_EXPONENT } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
 import type { Quantity } from '#model/values/units'
@@ -80,6 +82,279 @@ export type ReceiptCountry = z.infer<typeof receiptCountrySchema>
 
 export const RECEIPT_LANGUAGES: Readonly<Record<ReceiptCountry, string>> = { AM: 'hye+rus+eng' }
 export const RECEIPT_CURRENCY: Readonly<Record<ReceiptCountry, Currency>> = { AM: 'AMD' }
+
+/**
+ * The language a country's tills print names in, and the language of the catalogue's names a line is
+ * matched against (MOL-126): an item is a node, reached by its barcodes, the shops' articles, its
+ * customs headings and its names in the countries' languages.
+ */
+export const itemNameLanguageSchema = z.enum(['hy'])
+export type ItemNameLanguage = z.infer<typeof itemNameLanguageSchema>
+export const RECEIPT_NAME_LANGUAGE: Readonly<Record<ReceiptCountry, ItemNameLanguage>> = {
+  AM: 'hy',
+}
+
+/**
+ * How a line found its item (MOL-126, the handoff's four): `memory` — the shop's memory; `search` — the
+ * catalogue's names or its search, near; `weak` — found far, or by the customs heading alone, «проверьте»
+ * (MOL-124 В-4); `new` — nothing: a new item named by the gloss. The memory is laid over on every reading
+ * of the receipt; the other three are kept from the parse.
+ */
+export const receiptMatchSchema = z.enum(['memory', 'search', 'weak', 'new'])
+export type ReceiptMatch = z.infer<typeof receiptMatchSchema>
+export const receiptParsedMatchSchema = receiptMatchSchema.exclude(['memory'])
+export type ReceiptParsedMatch = z.infer<typeof receiptParsedMatchSchema>
+
+/**
+ * The key of the shop's memory (MOL-126): `sku` — the till's own article, read reliably and the same
+ * every time; `text` — the line as printed, for a till that prints no article (Dog City), by its search
+ * key so that OCR's ե/է and ու do not split it.
+ */
+export const storeMemoryKindSchema = z.enum(['sku', 'text'])
+export type StoreMemoryKind = z.infer<typeof storeMemoryKindSchema>
+
+/** The longest key the shop's memory keeps, in octets: a line's search key past it is not remembered. */
+export const STORE_MEMORY_KEY_MAX_OCTETS = 600
+
+/** A key of the shop's memory: the till's article, or the line as printed by its search key. */
+export interface StoreMemoryWord {
+  readonly kind: StoreMemoryKind
+  readonly key: string
+}
+
+/**
+ * What the shop's memory knows a line by, the article first (MOL-126): it reads the same every time,
+ * where OCR reads a name differently each time (MOL-114: 4 of 4 against 0 of 43). A line with no
+ * article — Dog City prints none — is known by its text alone.
+ */
+export function storeMemoryWords(line: {
+  readonly printed: string
+  readonly sku: string | null
+}): StoreMemoryWord[] {
+  const words: StoreMemoryWord[] = []
+  if (line.sku !== null && line.sku !== '') words.push({ kind: 'sku', key: line.sku })
+  const text = toSearchKey(line.printed)
+  // a key with no letter is a rule or a dash: every such line would be one item
+  if (/\p{L}/u.test(text) && new TextEncoder().encode(text).length <= STORE_MEMORY_KEY_MAX_OCTETS) {
+    words.push({ kind: 'text', key: text })
+  }
+  return words
+}
+
+/**
+ * The cities of the settings as a receipt prints them, as a word (Р-6): a place is the shop in its city.
+ * «ԵՐԵՎԱՆ-ՍԻԹԻ», «YEREVAN CITY» is the chain's name, not the city.
+ */
+const CITY_WORDS: Readonly<Record<SettingsCity, string>> = {
+  Гюмри: '(?:գյումրի|gyumri)(?![\\p{L}-])',
+  Ереван: '(?:երևան|երե[վւ]ան|yerevan)(?![\\p{L}-])(?!\\s*[-–]?\\s*(?:սիթի|city|сити))',
+}
+
+/** A city named anywhere in a row of the head, a word of its own: an address, or an item's name. */
+const CITY_ANYWHERE: Readonly<Record<SettingsCity, RegExp>> = {
+  Гюмри: new RegExp(`(?<!\\p{L})${CITY_WORDS.Гюмри}`, 'iu'),
+  Ереван: new RegExp(`(?<!\\p{L})${CITY_WORDS.Ереван}`, 'iu'),
+}
+
+/** The city after «ք.», քաղաք — a mark an address has and an item's name never does. */
+const CITY_MARKED: Readonly<Record<SettingsCity, RegExp>> = {
+  Гюмри: new RegExp(`(?<!\\p{L})ք\\.\\s*${CITY_WORDS.Гюмри}`, 'iu'),
+  Ереван: new RegExp(`(?<!\\p{L})ք\\.\\s*${CITY_WORDS.Ереван}`, 'iu'),
+}
+
+/**
+ * The head is the rows above the first item (round 6, Р6-В2): a fixed window of fifteen left the address
+ * of «Ереван Сити» past it on six readings of the bench — its head runs to the 17th row. Where no item
+ * row is read at all, this many rows stand for the head: past them the items begin (round 7, Р7-В1).
+ */
+const HEAD_ROWS = 20
+
+/**
+ * A table's item row, where the head ends (round 4, Р4-В1): its customs heading opening the row, then the
+ * name — «(2203) ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ», or «| |824) ՏՈՏՈՒՀՈՂ» as OCR reads it with the bracket and a digit
+ * lost (round 5, Р5-В1), a stray letter at the edge before it forgiven (round 6, Р6-В1). Dog City's items
+ * begin at its ninth row, and an item named after a city is a line, not the address. Not a phone's area
+ * code «Հեռ. (0312) 5-55-55», which neither opens the row nor has a name after it (round 5, Р5-В2).
+ */
+const TABLE_ITEM_ROW = /^[^\p{L}\d]*(?:\p{L}[^\p{L}\s]*\s+[^\p{L}\d]*)?\(?\d{2,4}\)\s*\p{L}/u
+
+/**
+ * A card's article row, «0401/1163909», or cut by OCR, «1906/9000» (round 7, Р7-В1): the item's name stands
+ * above it — one row, or two when it is split — and its number «1 …», «1…» is read without a dot as often
+ * as with one. So the head of a card ends two rows above its first article, or at the item's number with
+ * its dot «3.Գյումրի …» in those two rows — only there: a banner's row with «9.» OCR read at its edge
+ * stands above the address (round 8, Р8-В1), and a house number «62, Գորկու …» is no item (review 16).
+ */
+const CARD_ARTICLE_ROW = /\d{4}\s*\/\s*\d{3,}/u
+const CARD_NUMBER_ROW = /^\s*\d{1,3}\.\s*\p{L}/u
+const CARD_NAME_ROWS = 2
+
+/** Where a receipt's head ends: before its first item, or `HEAD_ROWS` where no item is read. */
+function headEnd(rows: readonly TextRow[]): number {
+  const ends: number[] = []
+  const table = rows.findIndex((row) => TABLE_ITEM_ROW.test(row.text))
+  if (table >= 0) ends.push(table)
+  const article = rows.findIndex((row) => CARD_ARTICLE_ROW.test(row.text))
+  if (article >= 0) {
+    // the name above the article: its number with a dot marks where it begins, else two rows up
+    const above = Math.max(0, article - CARD_NAME_ROWS)
+    const numbered = rows.slice(above, article).findIndex((row) => CARD_NUMBER_ROW.test(row.text))
+    ends.push(numbered < 0 ? above : above + numbered)
+  }
+  return ends.length === 0 ? Math.min(rows.length, HEAD_ROWS) : Math.min(...ends)
+}
+
+/**
+ * The city a receipt's address prints, if it is one of the settings'; read in the first part only. A
+ * city opening a row is the shop's address and decides. Else a city after «ք.» anywhere in a row —
+ * «ՀՀ, ք. Երևան, …», «Շիրակի մարզ, ք. Գյումրի, …» (round 2, Р2-В4) — decides only when no other city
+ * is named in the head at all: a chain prints its own legal address beside the shop's, «ՀՀ, ք.
+ * Երևան» on a receipt of its Gyumri shop whose address is «Գորկու 62, Գյումրի» (round 3, Р3-В2).
+ * Two cities are no answer — the place is then looked for in the person's own city.
+ */
+export function receiptCityOf(
+  rows: readonly TextRow[],
+  productWords: ReadonlySet<string> = NO_WORDS,
+): SettingsCity | null {
+  const first = rows.filter((row) => row.part === 0)
+  const head = first.slice(0, headEnd(first))
+  // the chain's site, «www.yerevan-city.am», however OCR read it — «Ww Yerevan: СПу. ат» — names no city
+  const lines = head.filter((row) => !isSiteRow(row.text))
+  const cities = Object.keys(CITY_ANYWHERE) as SettingsCity[]
+  // the city an address names — the one city named in the head at all: an item named after another
+  // city, or a chain's legal address beside its shop's, is two cities and no answer (rounds 3–10)
+  const named = cities.filter((city) => lines.some((row) => CITY_ANYWHERE[city].test(row.text)))
+  if (named.length !== 1) return null
+  const [city] = named
+  if (city === undefined) return null
+  return lines.some((row, i) => {
+    if (!CITY_ANYWHERE[city].test(row.text)) return false
+    // «ք.», a city's own mark, never stands in an item's name: after it the house may come first,
+    // «62, Գորկու փ., ք. Գյումրի», or on the next row, «ք. Գյումրի,» / «Գորկու 62» — a shop named after a
+    // city, «ԵՐԵՎԱՆ ՄԹԵՐՔ» over «Գորկու 62», has no mark and is no address (round 12, Р12-В1)
+    const marked = CITY_MARKED[city].test(row.text)
+    return (
+      isAddressRow(row.text, productWords, marked) ||
+      (marked &&
+        !itemShaped(row.text, productWords) &&
+        isAddressRow(lines[i + 1]?.text ?? '', productWords, false))
+    )
+  })
+    ? city
+    : null
+}
+
+/**
+ * A site's row: «www.…», «….am», and how OCR reads them, «Ww …», «… ат» (round 11, Р11-В1) — with no
+ * digit, since an address has its house: «ԳՅՈՒՄՐԻ Գորկու 62, AM» is the country's code (round 12, Р12-В2).
+ */
+function isSiteRow(text: string): boolean {
+  return !/\d/u.test(text) && /(?<!\p{L})w{2,}(?!\p{L})|(?:\.|\s)(?:am|ат)\s*$|https?:/iu.test(text)
+}
+
+const NO_WORDS: ReadonlySet<string> = new Set()
+
+/** The cities as a word of a row, lower case: what an address or an item's name says beside it. */
+const CITY_WORD = /^(?:գյումրի|gyumri|երևան|երե[վւ]ան|yerevan)$/u
+
+/**
+ * What an item's row has and an address never does (round 9, Р9-В1): a table's customs heading opening
+ * it; a card's article; an amount with its unit — a volume, a weight, a count, a fat — «0.5լ», «500գ»,
+ * «5տ», «3.2%»; a sum with its hundredths «450.00»; a price and a sum, two numbers in the hundreds.
+ */
+const ITEM_SHAPED = [
+  TABLE_ITEM_ROW,
+  CARD_ARTICLE_ROW,
+  // a unit ends its word: «500գ», never «1 ԳՅՈՒՄՐԻ», whose first letter is a gram's; a one-letter unit
+  // stands right after its number, «5տ», «0.5լ» — «Գորկու 62 տ.» is a house, տուն (round 10, Р10-В2) —
+  // and a gram is a hundred and more, or a fraction: «62գ» is a house's third building (round 11, Р11-В2)
+  /\d\s*(?:%|(?:մլ|կգ|գր|հտ|հատ|ml|kg|pcs)(?![\p{L}\d]))|\d(?:լ|տ|l)(?![\p{L}\d])|(?:\d{3,}|\d[.,]\d+)(?:գ|g)(?![\p{L}\d])/iu,
+  // a sum's hundredths «450.00», never a day «02.10.2026»
+  /\d[.,]\d{2}(?![\d.,])/u,
+]
+
+/**
+ * A row an address may be read off. An item named after a city — the beer «Գյումրի», the cognac
+ * «Երևան» — names its kind beside the city, «ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ», «Կոնյակ Երևան», a word of the till's
+ * dictionary, or puts the city in quotes as a brand, «Գարեջուր «Գյումրի»»; an address puts a street
+ * beside it, «ԳՅՈՒՄՐԻ Գորկու 62». What OCR adds at the paper's edge — «9.», «2..1», «= 4 -» — stands
+ * before an address as before an item and decides nothing.
+ */
+function isAddressRow(text: string, productWords: ReadonlySet<string>, marked: boolean): boolean {
+  if (itemShaped(text, productWords)) return false
+  // an address names its house after its first word: «Գորկու 62», «Գորկուծ22» as OCR glued it; a row
+  // with no number there — «1.ԳՅՈՒՄՐԻ ԳԱ ուր.», a name OCR cut — is no address (round 10, Р10-В1),
+  // unless «ք.» names the city: «62, Գորկու փ., ք. Գյումրի» (round 12)
+  const letter = text.search(/\p{L}/u)
+  if (letter < 0 || !/\d/u.test(marked ? text : text.slice(letter))) return false
+  // a house is four digits at most; five and more are a tax number, a till's, a receipt's (round 11)
+  if (/\d{5,}/u.test(text)) return false
+  // a price and a sum stand at the row's end, in the hundreds; a postal code and a house are not there
+  // both, «Գյումրի 3101, Ռիժկովի 104», nor is a house and its flat «162/105» (round 10, Р10-В2)
+  const tail = /(?:\s+\d+)+\s*$/u.exec(text.replace(/[^\p{L}\d\s/]+$/u, ''))?.[0] ?? ''
+  const prices = (tail.match(/(?<![\d/])\d+(?![\d/])/gu) ?? []).filter(
+    (number) => Number(number) >= 100,
+  )
+  if (prices.length >= 2) return false
+  return true
+}
+
+/** The marks of an item's row (rounds 9–11): its shapes, the city in quotes, a kind beside the city. */
+function itemShaped(text: string, productWords: ReadonlySet<string>): boolean {
+  if (ITEM_SHAPED.some((shape) => shape.test(text))) return true
+  if (/[«“"„']\s*(?:գյումրի|gyumri|երևան|երե[վւ]ան|yerevan)/iu.test(text)) return true
+  // a word cut with a dot is an abbreviation, a street's as often as a kind's — «Վարդ.» is Վարդանանց, not
+  // «վարդ», a rose — and decides nothing (round 11, Р11-В2)
+  const words = [...text.toLowerCase().matchAll(/(\p{L}{2,})(\.?)/gu)].map(
+    ([, word = '', dot]) => ({
+      word,
+      cut: dot === '.',
+    }),
+  )
+  return words.some(
+    ({ word }, i) =>
+      CITY_WORD.test(word) &&
+      [words[i - 1], words[i + 1]].some(
+        (beside) => beside !== undefined && !beside.cut && isProductWord(beside.word, productWords),
+      ),
+  )
+}
+
+/**
+ * A word of the till's dictionary, or a long one OCR read a letter off («ԳԱՐԵՋՈԻՐ»). A short word must be
+ * the word itself: the street «Շիրազի» is a letter off «շիրակի», «ширакский» of the dictionary. A word
+ * cut with a dot is not a kind's start: «Գոր.», «Շիր.» are streets as often (round 11, Р11-В2).
+ */
+function isProductWord(word: string, productWords: ReadonlySet<string>): boolean {
+  if (productWords.has(word)) return true
+  if (Array.from(word).length < FUZZY_LETTERS) return false
+  for (const known of productWords) {
+    if (Math.abs(known.length - word.length) <= 1 && withinOneEdit(known, word)) return true
+  }
+  return false
+}
+
+/** From this many letters a word one letter off the dictionary's is still the dictionary's. */
+const FUZZY_LETTERS = 7
+
+function withinOneEdit(a: string, b: string): boolean {
+  if (a === b) return true
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a]
+  let i = 0
+  let j = 0
+  let edits = 0
+  while (i < short.length && j < long.length) {
+    if (short[i] === long[j]) {
+      i++
+      j++
+      continue
+    }
+    if (++edits > 1) return false
+    if (short.length === long.length) i++
+    j++
+  }
+  return edits + (long.length - j) + (short.length - i) <= 1
+}
 
 /** Tesseract's page modes the reading is tried in; the one whose lines add up is kept. */
 export const RECEIPT_PAGE_MODES = [4, 6] as const
@@ -170,6 +445,23 @@ export function receiptDateOf(text: ReceiptText, latest: string): string | null 
   const day = new Date(`${text.date}T00:00:00Z`)
   if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== text.date) return null
   return text.date >= '2000-01-01' && text.date <= latest ? text.date : null
+}
+
+/** Where a country's tills keep their clocks: Armenia is at +4 the year round. */
+export const RECEIPT_UTC_OFFSET: Readonly<Record<ReceiptCountry, string>> = { AM: '+04:00' }
+
+/**
+ * The moment a receipt prints, its day and time read on the till's clock (MOL-126): what a trip
+ * recorded from it is placed by among the person's purchases. `null` without a time.
+ */
+export function receiptMomentOf(
+  day: string,
+  time: string | null,
+  country: ReceiptCountry,
+): Date | null {
+  if (time === null || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return null
+  const moment = new Date(`${day}T${time}:00${RECEIPT_UTC_OFFSET[country]}`)
+  return Number.isNaN(moment.getTime()) ? null : moment
 }
 
 /** The time a receipt prints, if it is one a clock shows: `HH:MM` (review Р12). */

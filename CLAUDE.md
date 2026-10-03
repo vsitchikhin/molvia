@@ -487,7 +487,21 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Every search of the parse has a ceiling, measured in time** — a line's, a reading's, the
   total's (`*_COMBINATIONS_*`, `RECONCILE_*`): it runs in the API's process; half a second at worst.
 - **A photo lives until the receipt is recorded, a receipt not recorded 28 days, a cut-out item line
-  28 days after recording** (В-3); **photos never enter the nightly copy** (В-2), never the log.
+  28 days after recording, of a line recorded as read only** (В-3, В-4); **photos never enter the
+  nightly copy** (В-2), never the log.
+- **A line finds its item: the shop's memory by article, by the line, the country's names with the
+  heading, the search by the gloss, else new** (MOL-126); names and search once in the queue, the memory
+  on every reading. The matcher is MOL-114's `dict-match.mjs`, held to the bench.
+- **The shops' memory is shared** (owner, 30.09.2026): the person's own word first, else the item most
+  people said, the later on a tie; the erased still count; nobody's word is shown as someone's, and
+  another person's shelf price only with access and from three prices, their lower median.
+- **A place keeps no tax number**: the place of a seller is where its receipts were recorded, read as
+  the memory is; a recorded receipt is not removed while its trip is there — its row dates the trip.
+- **«Записать» is the whole receipt in one transaction** (`recordReceipt`): a trip finished on the
+  receipt's day at its rate, its money the total the phone sends, else the printed one not below the
+  lines, else the lines; the owner's lock first; the same trip again is the
+  same answer, the same receipt recorded before a 409; a trip from a receipt is dated by its day on the
+  accounts too.
 
 ### End-to-end — `.claude/rules/e2e.md`
 

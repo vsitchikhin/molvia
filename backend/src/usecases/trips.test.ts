@@ -122,6 +122,8 @@ function fakeRepositories(
   return {
     trips: {
       start: unexpected('trips.start'),
+      recordFinished: unexpected('trips.recordFinished'),
+      lockOwner: unexpected('trips.lockOwner'),
       byId: unexpected('trips.byId'),
       lock: unexpected('trips.lock'),
       latestUnfinishedFor: unexpected('trips.latestUnfinishedFor'),
@@ -162,6 +164,7 @@ function fakeRepositories(
       createUnlessNamed: unexpected('items.createUnlessNamed'),
       search: unexpected('items.search'),
       byBarcode: unexpected('items.byBarcode'),
+      nodes: unexpected('items.nodes'),
       attachBarcode: unexpected('items.attachBarcode'),
       detachBarcode: unexpected('items.detachBarcode'),
       ...overrides.items,
@@ -258,6 +261,29 @@ function fakeRepositories(
     budgetPlans: {
       list: unexpected('budgetPlans.list'),
       set: unexpected('budgetPlans.set'),
+    },
+    receipts: {
+      create: unexpected('receipts.create'),
+      putPart: unexpected('receipts.putPart'),
+      list: unexpected('receipts.list'),
+      one: unexpected('receipts.one'),
+      recordedTwin: unexpected('receipts.recordedTwin'),
+      placesOfTins: unexpected('receipts.placesOfTins'),
+      lockForRecord: unexpected('receipts.lockForRecord'),
+      markRecorded: unexpected('receipts.markRecorded'),
+      sourceOf: () => Promise.resolve(null),
+      remove: unexpected('receipts.remove'),
+      restore: unexpected('receipts.restore'),
+      purgeStale: unexpected('receipts.purgeStale'),
+      requeueInterrupted: unexpected('receipts.requeueInterrupted'),
+      claimNext: unexpected('receipts.claimNext'),
+      release: unexpected('receipts.release'),
+      retry: unexpected('receipts.retry'),
+      finish: unexpected('receipts.finish'),
+    },
+    storeMemory: {
+      recall: unexpected('storeMemory.recall'),
+      remember: unexpected('storeMemory.remember'),
     },
   }
 }

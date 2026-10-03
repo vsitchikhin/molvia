@@ -25,6 +25,7 @@ function entry(id: string, finishedOnDeviceAt = '2026-09-01T10:30:00Z'): TripHis
     finishedOnDeviceAt: new Date(finishedOnDeviceAt),
     itemCount: null,
     total: null,
+    fromReceipt: false,
   }
 }
 const cursor = (id: string) => ({ at: '2026-09-01T00:00:00.123456Z', id })

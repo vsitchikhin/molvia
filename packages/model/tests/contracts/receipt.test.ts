@@ -51,6 +51,8 @@ describe('a receipt on the wire', () => {
     balanced: true,
     lineCount: 1,
     unsettled: 0,
+    place: null,
+    tripId: null,
   }
 
   it('reads back what the server writes', () => {
@@ -84,6 +86,12 @@ describe('a receipt on the wire', () => {
           sum: { amount: '608.86', currency: 'AMD' },
           discount: { amount: '0', currency: 'AMD' },
           settled: true,
+          itemId: '00000000-0000-4000-8000-000000000001',
+          itemName: 'Инжир',
+          match: 'memory',
+          translation: 'инжир',
+          amount: { amount: '608.86', currency: 'AMD' },
+          rememberedPrice: null,
         },
         {
           printed: '?',
@@ -94,11 +102,47 @@ describe('a receipt on the wire', () => {
           sum: null,
           discount: null,
           settled: false,
+          itemId: null,
+          itemName: null,
+          match: 'new',
+          translation: null,
+          amount: null,
+          rememberedPrice: null,
         },
       ],
+      rate: null,
+      duplicateOf: null,
     }
     const decoded = receiptDetailCodec.decode(detail)
     expect(decoded.lines[0]?.quantity).toEqual({ milli: 902n, unit: 'kg' })
     expect(decoded.lines[1]?.sum).toBeNull()
+  })
+
+  // MOL-126: a recorded receipt names its place and purchases; one recorded before is named too
+  it('carries the place, the purchases, the rate of the day and the receipt recorded before', () => {
+    const recorded: z.input<typeof receiptSummaryCodec> = {
+      ...view,
+      status: 'recorded',
+      place: { id: body.id, name: 'Ереван Сити', city: 'Гюмри', tin: '01282006' },
+      tripId: body.id,
+    }
+    expect(receiptSummaryCodec.safeParse(recorded).success).toBe(true)
+    const detail: z.input<typeof receiptDetailCodec> = {
+      receipt: view,
+      lines: [],
+      rate: {
+        base: 'RUB',
+        quote: 'AMD',
+        rate: '4.2417',
+        source: 'official',
+        asOf: '2026-09-26T00:00:00.000Z',
+      },
+      duplicateOf: { receiptId: body.id, tripId: body.id, recordedAt: body.capturedAt },
+    }
+    expect(receiptDetailCodec.safeParse(detail).success).toBe(true)
+    expect(
+      receiptDetailCodec.safeParse({ ...detail, lines: [{ printed: 'x', match: 'later' }] })
+        .success,
+    ).toBe(false)
   })
 })

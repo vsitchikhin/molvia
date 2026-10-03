@@ -29,7 +29,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // (MOL-103). 7: `budgetPlans`, what the person plans a month of «Бюджет» at (MOL-117). 8: `feedback`,
 // what the person wrote to the developer and the owner's replies (MOL-147). 9: `receipts`,
 // the receipts photographed and what the reader laid them out into — never the photo (MOL-125).
-export const EXPORT_VERSION = 9
+// 10: a receipt's `city` and `tripId`, a line's item, `match`, `translation` and purchase, and
+// `storeMemory`, the words the person gave the shops' memory (MOL-126).
+export const EXPORT_VERSION = 10
 
 const day = z.iso.date()
 
@@ -290,7 +292,9 @@ const receiptSchema = z.strictObject({
   receiptNo: z.string().nullable(),
   total: signedMoneyCodec.nullable(),
   balanced: z.boolean(),
+  city: z.string().nullable(),
   recordedAt: isoDate.nullable(),
+  tripId: z.uuid().nullable(),
   removedAt: isoDate.nullable(),
   lines: z.array(
     z.strictObject({
@@ -303,6 +307,10 @@ const receiptSchema = z.strictObject({
       sum: signedMoneyCodec.nullable(),
       discount: signedMoneyCodec.nullable(),
       settled: z.boolean(),
+      itemId: z.uuid().nullable(),
+      match: z.string().nullable(),
+      translation: z.string().nullable(),
+      expenseId: z.uuid().nullable(),
     }),
   ),
 })
@@ -379,6 +387,20 @@ const addedBarcodeSchema = z.strictObject({
 })
 
 /**
+ * A word the person gave a shop's memory (MOL-126): this article, or this line as printed, at the
+ * seller with this tax number is this item, at this shelf price. Shared — others read the item, never
+ * who said it — and kept without its author after erasure.
+ */
+const storeMemorySchema = z.strictObject({
+  tin: z.string(),
+  kind: z.string(),
+  key: z.string(),
+  itemId: z.uuid(),
+  price: signedMoneyCodec.nullable(),
+  writtenAt: isoDate,
+})
+
+/**
  * A message to the developer (MOL-147), a thread's continuation too, with the owner's replies to it.
  * `thread` is the number of the thread's first message, `inReplyTo` the reply a continuation answers.
  */
@@ -442,6 +464,7 @@ export const exportContentCodec = z.strictObject({
   accountChecks: z.array(accountCheckSchema),
   proposedItems: z.array(proposedItemSchema),
   addedBarcodes: z.array(addedBarcodeSchema),
+  storeMemory: z.array(storeMemorySchema),
   feedback: z.array(feedbackSchema),
   catalogue: catalogueSchema,
 })

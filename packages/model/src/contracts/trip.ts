@@ -106,6 +106,12 @@ const tripExpenseCodec = z.strictObject({
   amount: moneyCodec.nullable(),
   /** Computed, never entered and never stored — null until both the amount and the quantity are there. */
   unitPrice: unitPriceCodec.nullable(),
+  /**
+   * A purchase recorded from a receipt (MOL-126): its line as printed, shown under it, and the line's
+   * discount — the amount is what was paid, the discount is beside it (owner, 30.09.2026).
+   */
+  printed: z.string().nullable().default(null),
+  discount: moneyCodec.nullable().default(null),
 })
 export type TripExpenseView = z.output<typeof tripExpenseCodec>
 
@@ -126,6 +132,8 @@ const receiptGapCodec = z.strictObject({
  */
 export const tripViewCodec = z.strictObject({
   id: z.uuid(),
+  /** The receipt the trip was recorded from (MOL-126), `null` for one typed by hand. */
+  receiptId: z.uuid().nullable().default(null),
   startedAt: isoDate,
   finishedAt: isoDate.nullable(),
   finishedOnDeviceAt: isoDate.nullable().optional(),
@@ -223,6 +231,12 @@ export function tripPlaceOf(place: Place): TripPlace {
   return { id: place.id, kind: place.kind, name: place.name }
 }
 
+/** The receipt a trip was recorded from (MOL-126): its id, and each purchase's line as printed. */
+export interface TripReceiptSource {
+  readonly receiptId: string
+  readonly lines: ReadonlyMap<string, { readonly printed: string; readonly discount: Money | null }>
+}
+
 /**
  * Assembles the trip the screen shows. Pure: the rows are read by the caller, and every number
  * here comes from a rule the domain already owns — `unitPrice`, `tripTotal`, `convertMoney`.
@@ -237,6 +251,7 @@ export function tripViewOf(
   place: Place,
   expenses: readonly Expense[],
   items: readonly Item[],
+  source: TripReceiptSource | null = null,
 ): TripView {
   const byId = new Map(items.map((item) => [item.id, item]))
 
@@ -251,6 +266,8 @@ export function tripViewOf(
       amount: expense.amount,
       unitPrice:
         expense.amount && expense.quantity ? unitPrice(expense.amount, expense.quantity) : null,
+      printed: source?.lines.get(expense.id)?.printed ?? null,
+      discount: source?.lines.get(expense.id)?.discount ?? null,
     }
   })
 
@@ -261,6 +278,7 @@ export function tripViewOf(
 
   return {
     id: trip.id,
+    receiptId: source?.receiptId ?? null,
     startedAt: trip.startedAt,
     finishedAt: trip.finishedAt,
     finishedOnDeviceAt: trip.finishedOnDeviceAt ?? null,
@@ -402,6 +420,8 @@ export const tripHistoryEntryCodec = z.strictObject({
    */
   itemCount: z.int().nonnegative().nullable().default(null),
   total: z.array(moneyCodec).nullable().default(null),
+  /** Recorded from a receipt (MOL-126): «· из чека» beside the row. */
+  fromReceipt: z.boolean().default(false),
 })
 export type TripHistoryEntry = z.output<typeof tripHistoryEntryCodec>
 export const tripHistoryCodec = z.strictObject({
