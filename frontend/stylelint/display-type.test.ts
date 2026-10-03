@@ -98,4 +98,24 @@ describe('molvia/display-type-whole', () => {
   it('refuses the role in a placeholder, where @extend would carry it out of sight', async () => {
     expect(await refused('%display { @include display-type; }')).toEqual(['display-type'])
   })
+
+  it('reads the role as Sass does: display_type is display-type', async () => {
+    expect(
+      await refused('.a { @include display_type; font-weight: var(--weight-regular); }'),
+    ).toEqual(['font-weight'])
+    expect([...roleMixins('@mixin figure_type { @include display-type; }')]).toEqual([
+      'display-type',
+      'figure-type',
+    ])
+  })
+
+  it('finds a placeholder anywhere in a list of selectors', async () => {
+    expect(await refused('.b,\n%display { @include display-type; }')).toEqual(['display-type'])
+  })
+
+  it('takes no role from a comment inside a mixin', () => {
+    expect([
+      ...roleMixins('@mixin row {\n  // @include display-type }\n  min-height: 1px;\n}'),
+    ]).toEqual(['display-type'])
+  })
 })

@@ -13,7 +13,8 @@
 // placeholder, where `@extend` would carry it into such a rule (В3).
 //
 // A mixin that includes the role is the role (В1): its name is learnt from styles/_mixins.scss when
-// the plugin loads, and from the file being linted, through any number of wrappers.
+// the plugin loads, and from the file being linted, through any number of wrappers. Names are
+// compared as Sass compares them — a hyphen and an underscore are one character (Г1).
 
 import { readFileSync } from 'node:fs'
 import stylelint from 'stylelint'
@@ -36,8 +37,12 @@ const SET_BY_THE_MIXIN = new Set([
 const MIXIN = /@mixin\s+([\w-]+)[^{]*\{/g
 const INCLUDE = /@include\s+([\w-]+)/g
 
-// The names of the mixins that include the role, directly or through another of them.
-export function roleMixins(code, known = new Set(['display-type'])) {
+const sassName = (name) => name.replaceAll('_', '-')
+
+// The names of the mixins that include the role, directly or through another of them; comments are
+// taken out first, so neither a word nor a brace in one changes what a mixin includes.
+export function roleMixins(source, known = new Set(['display-type'])) {
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[\s;{}])\/\/[^\n]*/g, '$1')
   const bodies = []
   for (const match of code.matchAll(MIXIN)) {
     let depth = 0
@@ -46,14 +51,14 @@ export function roleMixins(code, known = new Set(['display-type'])) {
       if (code[end] === '{') depth++
       if (code[end] === '}' && --depth === 0) break
     }
-    bodies.push([match[1], code.slice(match.index + match[0].length, end)])
+    bodies.push([sassName(match[1]), code.slice(match.index + match[0].length, end)])
   }
-  const roles = new Set(known)
+  const roles = new Set([...known].map(sassName))
   for (let grew = true; grew;) {
     grew = false
     for (const [name, body] of bodies) {
       if (roles.has(name)) continue
-      if ([...body.matchAll(INCLUDE)].some(([, included]) => roles.has(included))) {
+      if ([...body.matchAll(INCLUDE)].some(([, included]) => roles.has(sassName(included)))) {
         roles.add(name)
         grew = true
       }
@@ -99,12 +104,13 @@ function rule(primary) {
 
     root.walkAtRules('include', (include) => {
       const name = /^[\w-]+/.exec(include.params)?.[0]
-      if (!name || !roles.has(name) || !include.parent) return
-      if (include.parent.type === 'rule' && include.parent.selector.trim().startsWith('%')) {
+      if (!name || !roles.has(sassName(name)) || !include.parent) return
+      const parent = include.parent
+      if (parent.type === 'rule' && parent.selectors.some((s) => s.trim().startsWith('%'))) {
         report({ ruleName, result, node: include, message: messages.placeholder() })
         return
       }
-      check(include.parent)
+      check(parent)
     })
   }
 }
