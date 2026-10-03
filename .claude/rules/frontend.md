@@ -77,7 +77,23 @@ The detail behind the frontend lines of `CLAUDE.md`.
   different roles» is one rule rather than a list of pairs, since a tint against another role's mark
   passes by lightness alone. `--graphic` is the colour of data without one of its own; `--border-strong` is
   decoration and the edge of a field (Ф-3: `--border` there was 1.29:1 on the well). The math —
-  WCAG luminance and Ottosson's OKLab — is the test's own thirty lines, no dependency.
+  WCAG luminance and Ottosson's OKLab — is the test's own thirty lines, no dependency. **A tint stands
+  0.08 from `--surface`** (adversarial А3): a fill with no edge — a notice in a sheet — that the eye
+  cannot tell from the sheet is no fill; the dark `bad-tint` of 157 v2 was 0.038. **Not from
+  `--sunken`** (review 5, way «а»): on the page ground the light good, warn and bad tints stand 0.071,
+  0.070 and 0.040 — a strip under the month's switcher, a state's circle — held by icon and word; to
+  hold them too the light `bad-tint` turns pink (`#fec5c7`, hue 28° → 16°), and that was not bought. **`--text-muted` is
+  for the three grounds, never a tint** (А1): under 4.5:1 there in both schemes, and the tints cannot
+  be lifted for it — in the dark they would have to sink to OKLab L 0.32 and part by saturation alone,
+  the accent's turning brick; on a tint a secondary line is `--text` (the chosen account, the active
+  catalogue row, the hint of Open Food Facts, the account's row under the pointer). **The file is read as Sass reads it**: both kinds of
+  comment out in one pass — a `/*` inside a line comment opens nothing (round 2, Б3) — every declaration taken whatever its value, a short or upper-case hex expanded —
+  Stylelint asks for the short form and `--fix` writes it — and a colour of the lists that is no hex
+  (`oklch()`) fails by name: read by a pattern of six lower-case digits, such a category left the test
+  green (А4, А5). The dot of a category on the chosen chip is under 3:1 on `--accent-tint` for ten
+  light and three dark categories (А2; six and one before the palette of MOL-218) — not held: the tint
+  cannot be made lighter without meeting `bad-tint`, the categories cannot all be darkened and stay
+  0.07 apart, and the chip's form is MOL-198's.
 - **Any two categories stand 0.07 apart, and a category keeps its hue in both schemes** (MOL-218,
   the same test). **Every pair, not a list** (owner's В-1): the ring orders its sectors by sum, not by
   category, so its neighbours change from month to month; every account has all thirteen presets; and
@@ -580,6 +596,13 @@ The detail behind the frontend lines of `CLAUDE.md`.
     `visibility`, so nothing is laid out anew and nothing scrolls; the open sheets and the live
     region stay. The page under a modal sheet takes nothing anyway; above the sheet the scrim now
     dims the sheet's colour instead of the screen — the price.
+  - **An open sheet stays wherever it is mounted** (MOL-219): it is left out of what is hidden in the
+    selector itself, `#app > :not([role='status'], dialog[open])`. A rule giving it back its
+    visibility outweighs only what a sheet inside a screen inherits; on a sheet mounted in `#app`
+    itself — «Написать разработчику» — the rule with the id won, the sheet hid as the keys came up,
+    the browser took the focus from its field and the keys went down at once, over and over. An
+    end-to-end test sets the mark by hand — no test browser has the keys — for that sheet and for a
+    screen's.
 - **`interactive-widget=resizes-content` is Android's alone** (hotfix-bottom-menu): set by a script
   in the head of `index.html` for an Android user agent, before the page is laid out. iOS ignored it
   until Safari 27, which began to honour it: the window shrank to the part left visible under the

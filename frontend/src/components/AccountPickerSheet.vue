@@ -161,6 +161,12 @@ export default defineComponent({
 
   &[aria-checked='true'] {
     background: var(--accent-tint);
+
+    /* Muted text is under 4.5:1 on a tint (MOL-172): on the chosen row its lines are ink. */
+    .sub,
+    .balance:not(.negative) {
+      color: var(--text);
+    }
   }
 
   &:focus-visible {

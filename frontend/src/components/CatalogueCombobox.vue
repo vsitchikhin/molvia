@@ -317,6 +317,11 @@ export default defineComponent({
     .name {
       font-weight: var(--weight-bold);
     }
+
+    /* Muted text is under 4.5:1 on a tint (MOL-172). */
+    .meta {
+      color: var(--text);
+    }
   }
 }
 

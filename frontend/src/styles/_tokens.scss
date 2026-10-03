@@ -172,7 +172,8 @@
 
   /* Every pair that can meet is held by tokens.test.ts, in both schemes (MOL-172): two steps of
      different roles and a category against a role at least 0.08 apart in OKLab, a mark 3:1 and text
-     4.5:1 on its ground. A value that fails there is changed, never excused. */
+     4.5:1 on its ground, a tint 0.08 from --surface (not --sunken). A value that fails there is changed, never
+     excused. --text-muted is for the three grounds, never a tint (under 4.5:1 there). */
   --sunken: #f3e8d6; /* the page ground; cards sit on it */
   --surface: #fffaf2;
   --surface-2: #f7efe1; /* input wells, sunken rows inside a card */
@@ -190,7 +191,7 @@
   --accent: #b2622d; /* non-text use only: rules, active chrome, indicators */
   --accent-solid: #8c491a; /* filled controls that carry text — 6.5:1 with --on-accent */
   --accent-ink: #8c491a; /* the accent at body-text size — 4.5:1 on --surface */
-  --accent-tint: #ffce91; /* only under something pressable */
+  --accent-tint: #ffce8c; /* only under something pressable */
 
   --good: #5d7239;
   --good-ink: #3f4f24;
@@ -198,11 +199,11 @@
 
   --warn: #9d7d13;
   --warn-ink: #533302;
-  --warn-tint: #fff4b9;
+  --warn-tint: #fef4ad;
 
   --bad: #ab2b2a;
   --bad-ink: #742018;
-  --bad-tint: #f8ddd6;
+  --bad-tint: #f9d8d3;
 
   /* ── Categories of spending (MOL-82) ──────────────────────────────────── */
 
@@ -275,11 +276,11 @@
 
   --warn: #daac35;
   --warn-ink: #f7ca6a;
-  --warn-tint: #392905;
+  --warn-tint: #3c2900;
 
   --bad: #e47696;
   --bad-ink: #f4a3b7;
-  --bad-tint: #2f171e;
+  --bad-tint: #400d25;
 
   --cat-groceries: #5fb8aa;
   --cat-cafe: #d09bd6;
