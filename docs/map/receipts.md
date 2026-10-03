@@ -61,3 +61,27 @@ carries receipts and their lines, never a photo. MOL-126 (`0045_receipt_lines_bo
 its item and purchase and adds the item as a node — `item_names` (names in the tills' languages) and
 `item_hs` (customs headings), both the seed's — `receipts_trip_key` (one trip, one receipt), and `store_memory`, the shops' shared
 memory: erasure leaves its words without an author, the copy carries the person's own.
+
+## frontend · the phone (MOL-127)
+
+- `frontend/src/receipts/photoShelf.ts` — `photoShelf`: the bytes of the parts in IndexedDB, a database per owner, kept until the receipt is recorded, removed or gone (Т-4) — the server gives no photo back; `keepOnly` spares the last ten minutes; `forgetPhotos` for «Выйти» and erasure.
+- `frontend/src/receipts/photo.ts` — `preparePhoto`: a file upright by its EXIF, drawn under the 16 Mp a canvas of iOS takes (Р-11), brought to `RECEIPT_PHOTO_SIDE` (3 200, П-7) and encoded as JPEG without EXIF; what the server would refuse is «файл не открылся» here.
+- `frontend/src/receipts/review.ts` — The review as it stands: each line the server's reading with the person's edit over it, «Строки» and the difference by `receiptBalance` of the model (В-6), the place and the day, and the body of «Записать» — every line once.
+- `frontend/src/stores/receiptQueue.ts` — The receipts' queue by the rules of MOL-24: the receipt, its parts in order, removal and «Вернуть», «Записать» under a trip the phone names; 413/415 and a lost photo «не принят»; «Выйти» waits for it (`whileReceiptsAreStill`).
+- `frontend/src/stores/receiptDrafts.ts` — The edits of a receipt before it is recorded, on the phone and with no connection (Т-9): lines, the place and day, a corrected total.
+- `frontend/src/composables/useReceipts.ts` — The receipts of «Покупки»: the queue and `GET /receipts` as one row each, the phone's state first; asked every five seconds while one is read (Р-4); every list lets the photos and drafts of what it no longer names go.
+- `frontend/src/composables/useReceipt.ts` — One receipt for the review, kept on the phone for offline; `gone` when the server has none for this person.
+- `frontend/src/composables/useReceiptCapture.ts` — The version «с чеком» (Д-3): the country of the settings, if the server reads it (Р-1).
+- `frontend/src/composables/useOnline.ts` — Whether the browser believes it is online, now and on every change — for words said ahead of time, never for a failure.
+- `frontend/src/components/CaptureButton.vue` — «Сфотографировать чек»: the strip's main action with receipts; from «Что брать» it opens «Покупки».
+- `frontend/src/components/CaptureSheet.vue` — «Сфотографировать чек» (handoff 04): the system camera or the gallery, up to four parts, the part's own sheet «Переснять / Убрать часть», «Отправить чек» into the queue; «Переснять» a receipt (П-3).
+- `frontend/src/components/ReceiptWorkSheet.vue` — The sheet of a receipt in work (3f): where it is, its parts from this phone, «Удалить чек».
+- `frontend/src/components/ReceiptUndoStrip.vue` — «Чек удалён вместе с фото · Вернуть»: ten seconds on the screen, the queue's removal.
+- `frontend/src/components/ReceiptSentLine.vue` — «Чек отправлен» for a moment where «Вернуть» stands (3d).
+- `frontend/src/components/ReceiptLineRow.vue` — A line on the review: item, as printed in the system's face, «кол-во × цена», «≠ напечатанное», the marks, what it is recorded at.
+- `frontend/src/components/ReceiptTotal.vue` — The foot of the review: «Строки», the total as a button (Р-8), «≈» by the rate of the receipt's day, the difference and its line.
+- `frontend/src/components/ReceiptLineSheet.vue` — «Строка чека»: as printed, the item or a new one's name, how much, «цена за всё», «За единицу» with «Тут дешевле», «Не записывать»; into the draft, never the network.
+- `frontend/src/components/ItemPickSheet.vue` — «Выбрать товар» over the line's sheet: the catalogue's search from the gloss, «Оставить новым товаром».
+- `frontend/src/components/ReceiptPlaceSheet.vue` — «Где купили?»: the place read, the shops of this phone or a new one, and the day; «Записать» with no place opens it.
+- `frontend/src/components/ReceiptTotalSheet.vue` — «Итог чека» put right, in the receipt's currency, into the draft.
+- `frontend/src/views/ReceiptView.vue` — `/purchases/receipts/:id`: the review, «не разобран» with its photos, «уже записан», gone; «Записать N» through the queue, then `router.replace` to the purchases.

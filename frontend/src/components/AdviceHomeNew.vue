@@ -4,18 +4,22 @@
          over a queue not yet answered told a person with twelve purchases they had none
          (adversarial В) — so until it answers, the skeleton; with no answer to be had, nothing. -->
     <div v-if="variant !== 'unknown'" class="intro">
-      <h2 class="intro-title">
-        {{ variant === 'pending' ? t('advice.home.pending.title') : t('advice.home.new.title') }}
-      </h2>
-      <p class="intro-body">
-        {{
-          variant === 'pending'
-            ? t('advice.home.pending.body')
-            : t('advice.home.new.body', { app: t('app.name') })
-        }}
-      </p>
+      <h2 class="intro-title">{{ t(INTRO[variant].title) }}</h2>
+      <p class="intro-body">{{ t(INTRO[variant].body, { app: t('app.name') }) }}</p>
     </div>
     <ScreenSkeleton v-else-if="asking" :groups="[70]" />
+
+    <!-- (б): the first receipt is being read (MOL-127) — its row, which leads to «Покупки». -->
+    <AppReveal>
+      <AppCard v-if="variant === 'parsing' && reading" class="pending" list>
+        <PurchaseRow
+          :icon="IconSync"
+          :title="t('purchases.group_working')"
+          :meta="t('purchases.parsing_unknown')"
+          @open="goTab('purchases')"
+        />
+      </AppCard>
+    </AppReveal>
 
     <!-- (в): purchases recorded and none rated — the one thing left to do, and where. -->
     <AppReveal>
@@ -38,8 +42,20 @@
         <button class="line link" type="button" @click="goTab('purchases')">
           <IconCart class="icon" aria-hidden="true" />
           <span class="text">
-            <span class="title">{{ t('advice.home.step_purchases_title') }}</span>
-            <span class="sub">{{ t('advice.home.step_purchases_body') }}</span>
+            <span class="title">{{
+              t(
+                country
+                  ? 'advice.home.step_purchases_capture_title'
+                  : 'advice.home.step_purchases_title',
+              )
+            }}</span>
+            <span class="sub">{{
+              t(
+                country
+                  ? 'advice.home.step_purchases_capture_body'
+                  : 'advice.home.step_purchases_body',
+              )
+            }}</span>
           </span>
           <IconChevronRight class="chevron" aria-hidden="true" />
         </button>
@@ -63,6 +79,13 @@
       </li>
     </AppCard>
 
+    <!-- With receipts the strip holds the camera, and the record typed by hand is a row of its own
+         under the cycle (2a): at the market, or with the receipt lost. -->
+    <div v-if="country" class="by-hand">
+      <ManualEntryButton by-hand />
+      <p class="by-hand-note">{{ t('advice.home.manual_body') }}</p>
+    </div>
+
     <p class="trust">{{ t('advice.home.trust') }}</p>
   </div>
 </template>
@@ -74,11 +97,15 @@ import IconCart from '~icons/mdi/cart-outline'
 import IconChevronRight from '~icons/mdi/chevron-right'
 import IconLightbulb from '~icons/mdi/lightbulb-on-outline'
 import IconStar from '~icons/mdi/star-outline'
+import IconSync from '~icons/mdi/sync'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
+import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import PurchaseRow from '@/components/PurchaseRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import { usePendingFrom } from '@/composables/usePendingFrom'
+import { useReceiptCapture } from '@/composables/useReceiptCapture'
+import { WORKING, useReceipts } from '@/composables/useReceipts'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
 import { useNavigation } from '@/navigation'
 
@@ -87,9 +114,10 @@ import { useNavigation } from '@/navigation'
  * new person meets, and an offer to act rather than «no data». Moved here from «Поход» (MOL-77):
  * the cycle is the same, and it starts where the app now opens.
  *
- * Without a receipt yet (В-7): (а) «Запишите первые покупки», or (в) «Осталось оценить» once
- * purchases wait for a verdict. The receipt's (б) comes with MOL-127. «Записать покупки» is not
- * here: it stands in the strip above the tab bar, under the thumb.
+ * With receipts (MOL-127, handoff v2 02): (а) «Сфотографируйте первый чек», (б) «Первый чек
+ * разбираем» while one is read, (в) «Осталось оценить» once purchases wait for a verdict; the camera
+ * stands in the strip, «Записать вручную» is a row under the cycle. Without (Д-3): (а) «Запишите
+ * первые покупки» or (в), and «Записать покупки» in the strip.
  *
  * Only the person's own data: other people's figures are behind access (MOL-31).
  */
@@ -102,6 +130,7 @@ export default defineComponent({
     IconChevronRight,
     IconLightbulb,
     IconStar,
+    ManualEntryButton,
     PurchaseRow,
     ScreenSkeleton,
   },
@@ -110,12 +139,30 @@ export default defineComponent({
     const { goTab } = useNavigation()
     const queue = useVerdictQueue()
     const pending = computed(() => queue.count.value)
+    const { country } = useReceiptCapture()
+    const receipts = useReceipts()
+    const reading = computed(
+      () =>
+        country.value !== null && receipts.rows.value.some((row) => WORKING.includes(row.state)),
+    )
+    const INTRO = computed(() => ({
+      pending: { title: 'advice.home.pending.title', body: 'advice.home.pending.body' },
+      parsing: { title: 'advice.home.parsing.title', body: 'advice.home.parsing.body' },
+      new: country.value
+        ? { title: 'advice.home.new_capture.title', body: 'advice.home.new_capture.body' }
+        : { title: 'advice.home.new.title', body: 'advice.home.new.body' },
+    }))
     return {
       t,
       IconStar,
+      IconSync,
       pending,
-      variant: computed<'pending' | 'new' | 'unknown'>(() => {
+      country,
+      reading,
+      INTRO,
+      variant: computed<'pending' | 'parsing' | 'new' | 'unknown'>(() => {
         if (pending.value > 0) return 'pending'
+        if (reading.value) return 'parsing'
         return queue.phase.value === 'empty' ? 'new' : 'unknown'
       }),
       asking: computed(() => queue.phase.value === 'loading'),
@@ -228,6 +275,17 @@ export default defineComponent({
   width: 1.25rem;
   height: 1.25rem;
   color: var(--text-muted);
+}
+
+.by-hand {
+  margin-top: var(--space-2);
+}
+
+.by-hand-note {
+  margin: 0 var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+  text-align: center;
 }
 
 .trust {

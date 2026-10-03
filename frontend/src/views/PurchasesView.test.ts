@@ -35,6 +35,7 @@ vi.mock('@/api', () => ({
     finishTrip: () => new Promise(() => undefined),
     removeTrip: () => new Promise(() => undefined),
     addExpense: () => addExpense(),
+    receipts: () => Promise.resolve({ receipts: [] }),
   },
 }))
 
@@ -172,6 +173,19 @@ function remember(trips: TripHistoryEntry[] = []) {
 }
 
 const rows = (view: VueWrapper) => view.findAll('.recorded .purchase-row')
+
+/**
+ * «Записать вручную» — the second button of the strip: a person in Armenia takes receipts (MOL-127,
+ * Р-1), and the camera is the first.
+ */
+function byHand(view: VueWrapper) {
+  // In the strip of «Покупки», and a row under the cycle on the newcomer's «Что брать» (2a).
+  const found = view
+    .findAll('button')
+    .find((button) => button.text().includes(ru.purchases.manual_by_hand))
+  if (!found) throw new Error('нет «Записать вручную»')
+  return found
+}
 const openSheet = () => document.body.querySelector('dialog[open]')
 
 function inside(sheet: Element | null, text: string): HTMLButtonElement {
@@ -217,7 +231,8 @@ describe('PurchasesView (MOL-128)', () => {
       const { view } = await render()
       expect(view.text()).toContain(ru.purchases.empty.title)
       expect(view.find('.circle').exists()).toBe(false)
-      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).toContain(ru.purchases.capture)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
     })
 
     it('до ответа — скелет, а не «пусто»; кнопка внизу уже есть', async () => {
@@ -225,7 +240,7 @@ describe('PurchasesView (MOL-128)', () => {
       const { view } = await render()
       expect(view.find('.skeleton').exists()).toBe(true)
       expect(view.text()).not.toContain(ru.purchases.empty.title)
-      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).toContain(ru.purchases.capture)
     })
 
     it('ошибка без памяти — красное с одной «Повторить», «пусто» нет', async () => {
@@ -631,7 +646,7 @@ describe('PurchasesView (MOL-128)', () => {
 
     it('без открытой — «Где вы?», и после старта открывается сама запись', async () => {
       const { view, router, queue } = await render()
-      await view.get('.dock button').trigger('click')
+      await byHand(view).trigger('click')
       await flushPromises()
       clock += 1000
       const sheet = openSheet()
@@ -657,7 +672,7 @@ describe('PurchasesView (MOL-128)', () => {
     it('есть открытая — спрашивает; «Продолжить» ведёт в неё и ничего не пишет', async () => {
       currentTrip.mockResolvedValue(openTrip())
       const { view, router, queue } = await render()
-      await view.get('.dock button').trigger('click')
+      await byHand(view).trigger('click')
       await flushPromises()
       clock += 1000
       const sheet = openSheet()
@@ -673,7 +688,7 @@ describe('PurchasesView (MOL-128)', () => {
     it('«Закончить и начать новую» puts nothing away until the new one starts (Р-2)', async () => {
       currentTrip.mockResolvedValue(openTrip())
       const { view, queue } = await render()
-      await view.get('.dock button').trigger('click')
+      await byHand(view).trigger('click')
       await flushPromises()
       clock += 1000
 
@@ -702,7 +717,7 @@ describe('PurchasesView (MOL-128)', () => {
     it('«Где вы?» dismissed after «Закончить и начать новую» — the open record stays', async () => {
       currentTrip.mockResolvedValue(openTrip())
       const { view, queue } = await render()
-      await view.get('.dock button').trigger('click')
+      await byHand(view).trigger('click')
       await flushPromises()
       clock += 1000
       inside(openSheet(), ru.purchases.manual_ask.finish).click()
@@ -724,7 +739,7 @@ describe('PurchasesView (MOL-128)', () => {
 
     /** «Записать покупки» → «Закончить и начать новую» → «Где вы?» at `place`. */
     async function replaceWith(view: VueWrapper, place: string, asked?: () => void): Promise<void> {
-      await view.get('.dock button').trigger('click')
+      await byHand(view).trigger('click')
       await flushPromises()
       clock += 1000
       expect(openSheet()?.textContent).toContain('Уже записываете «Рынок»')

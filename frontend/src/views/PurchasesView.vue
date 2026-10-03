@@ -19,10 +19,60 @@
     </AppReveal>
 
     <AppReveal>
-      <AppCard v-if="pending > 0" class="block pending" list>
+      <AppCard v-if="pending > 0 && !country" class="block pending" list>
         <PurchaseRow
           :icon="IconStar"
           accent
+          :title="t('verdict.pending_count', { n: pending }, pending)"
+          :meta="pendingFrom"
+          @open="goTab('verdicts')"
+        />
+      </AppCard>
+    </AppReveal>
+
+    <!-- Receipts (MOL-127, handoff 03): in work, then to look at and record — each section only
+         when it has a row. -->
+    <template v-if="working.length > 0">
+      <p class="caption">{{ t('purchases.group_working') }}</p>
+      <AppCard class="block" list>
+        <AppReveal group>
+          <PurchaseRow
+            v-for="row in working"
+            :key="row.id"
+            :icon="iconOf(row)"
+            :class="{ breathing: row.state === 'parsing' && receipts.online.value }"
+            :warn="row.state === 'rejected'"
+            :title="receiptTitle(row)"
+            :meta="receiptMeta(row)"
+            :tag="row.state === 'rejected' ? t('purchases.remove') : null"
+            @open="openReceipt(row)"
+          />
+        </AppReveal>
+      </AppCard>
+    </template>
+    <template v-if="review.length > 0">
+      <p class="caption">{{ t('purchases.group_review') }}</p>
+      <AppCard class="block" list>
+        <AppReveal group>
+          <PurchaseRow
+            v-for="row in review"
+            :key="row.id"
+            :icon="iconOf(row)"
+            :warn="row.state === 'failed'"
+            :title="receiptTitle(row)"
+            :meta="receiptMeta(row)"
+            :note="receiptNote(row)"
+            :sum="receiptSum(row)"
+            @open="openReceipt(row)"
+          />
+        </AppReveal>
+      </AppCard>
+    </template>
+
+    <AppReveal>
+      <AppCard v-if="pending > 0 && country" class="block pending" list>
+        <PurchaseRow
+          :icon="IconStar"
           :title="t('verdict.pending_count', { n: pending }, pending)"
           :meta="pendingFrom"
           @open="goTab('verdicts')"
@@ -39,22 +89,22 @@
       kind="empty"
       tone="accent"
       :title="t('purchases.empty.title')"
-      :body="t('purchases.empty.body')"
+      :body="t(country ? 'purchases.empty_capture.body' : 'purchases.empty.body')"
     />
 
     <ScreenState
       v-if="trouble === 'error'"
       kind="error"
-      :inline="rows.length > 0 || !!open"
+      :inline="rows.length > 0 || !!open || receiptRows.length > 0"
       :title="t('purchases.error.title')"
-      :body="t('purchases.error.body')"
+      :body="t(country ? 'purchases.error_capture' : 'purchases.error.body')"
       @retry="retry"
     />
     <ScreenState
       v-else-if="trouble === 'offline'"
       kind="offline"
       tone="warn"
-      :inline="rows.length > 0 || !!open"
+      :inline="rows.length > 0 || !!open || receiptRows.length > 0"
       :title="t('trip.history.offline_title')"
       :body="t('trip.history.offline_body')"
     />
@@ -85,13 +135,26 @@
       >
     </template>
 
+    <ReceiptWorkSheet
+      v-model:open="working_open"
+      :row="workRow"
+      :title="workRow ? receiptTitle(workRow) : ''"
+      :meta="workRow ? receiptMeta(workRow) : null"
+    />
+
     <!-- The action under the thumb in every state, loading and failure included: a record goes
          through the queue and needs neither the list nor the network (MOL-77). «Вернуть» of a
          record removed from its own screen stands above it (MOL-76). -->
     <template #docked>
       <div class="strip">
         <TripUndoStrip class="undo" />
-        <ManualEntryButton />
+        <template v-if="country">
+          <ReceiptUndoStrip class="undo" />
+          <ReceiptSentLine class="undo" />
+          <CaptureButton :country="country" />
+          <ManualEntryButton by-hand class="by-hand" />
+        </template>
+        <ManualEntryButton v-else />
       </div>
     </template>
   </AppScreen>
@@ -103,27 +166,39 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconPencil from '~icons/mdi/pencil-outline'
 import IconStar from '~icons/mdi/star-outline'
+import IconCloudUpload from '~icons/mdi/cloud-upload-outline'
+import IconFileAlert from '~icons/mdi/file-alert-outline'
+import IconReceipt from '~icons/mdi/receipt-text-outline'
+import IconSync from '~icons/mdi/sync'
 import { formatMoney } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import CaptureButton from '@/components/CaptureButton.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import PurchaseRow from '@/components/PurchaseRow.vue'
+import ReceiptSentLine from '@/components/ReceiptSentLine.vue'
+import ReceiptUndoStrip from '@/components/ReceiptUndoStrip.vue'
+import ReceiptWorkSheet from '@/components/ReceiptWorkSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import TripNotices from '@/components/TripNotices.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { usePendingFrom } from '@/composables/usePendingFrom'
+import { useReceiptCapture } from '@/composables/useReceiptCapture'
+import { WORKING, rejectedReason, useReceipts } from '@/composables/useReceipts'
+import type { ReceiptRow } from '@/composables/useReceipts'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTripHistory } from '@/composables/useTripHistory'
 import type { HistoryRow } from '@/composables/useTripHistory'
 import { useTripRows } from '@/composables/useTripRows'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
-import { dayOfAnyYear } from '@/days'
+import { dayOfAnyYear, purchaseDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
+import { useReceiptQueueStore } from '@/stores/receiptQueue'
 import { useTripStore } from '@/stores/trip'
 
 /**
@@ -142,8 +217,12 @@ export default defineComponent({
     AppCard,
     AppReveal,
     AppScreen,
+    CaptureButton,
     ManualEntryButton,
     PurchaseRow,
+    ReceiptSentLine,
+    ReceiptUndoStrip,
+    ReceiptWorkSheet,
     ScreenSkeleton,
     ScreenState,
     TripNotices,
@@ -175,11 +254,100 @@ export default defineComponent({
      * else is on the screen: purchases waiting for a verdict were made somewhere, and a record open
      * on the phone is a purchase on its way.
      */
+    // Receipts (MOL-127): the version «с чеком» for a person whose country the server reads (Р-1).
+    const { country } = useReceiptCapture()
+    const receipts = useReceipts()
+    const receiptQueue = useReceiptQueueStore()
+    const receiptRows = computed(() => (country.value ? receipts.rows.value : []))
+    const working = computed(() => receiptRows.value.filter((row) => WORKING.includes(row.state)))
+    const review = computed(() => receiptRows.value.filter((row) => !WORKING.includes(row.state)))
+    const workRow = ref<ReceiptRow | null>(null)
+    const workingOpen = ref(false)
+
     const shown = computed<'list' | 'loading' | 'empty'>(() => {
-      if (rows.value.length > 0 || trouble.value !== null) return 'list'
+      if (rows.value.length > 0 || receiptRows.value.length > 0 || trouble.value !== null)
+        return 'list'
       if (history.answeredEmpty) return open.value || pending.value > 0 ? 'list' : 'empty'
       return loading.value ? 'loading' : 'list'
     })
+
+    const when = (at: Date) => ({
+      day: purchaseDay(at, locale.value),
+      time: timeOfDay(at, locale.value),
+    })
+    const readDay = (row: ReceiptRow): string => {
+      const printed = row.summary?.header?.date
+      return printed
+        ? dayOfAnyYear(new Date(`${printed}T12:00:00Z`), locale.value)
+        : when(row.capturedAt).day
+    }
+    function receiptTitle(row: ReceiptRow): string {
+      if (row.state === 'rejected') return t('purchases.rejected_title', when(row.capturedAt))
+      const place = row.summary?.place?.name
+      if (place && row.state !== 'waiting' && row.state !== 'sending') return place
+      if (row.state === 'parsed' || row.state === 'recording' || row.state === 'failed')
+        return t('receipt.review.title_no_place', { day: readDay(row) })
+      return t('purchases.receipt_from', when(row.capturedAt))
+    }
+    function receiptMeta(row: ReceiptRow): string {
+      const parts = t('receipt.capture.parts', { n: row.parts }, row.parts)
+      switch (row.state) {
+        case 'waiting':
+          return t('purchases.waiting', { parts })
+        case 'sending':
+          return t('purchases.sending', { parts })
+        case 'rejected':
+          return t('purchases.rejected_meta', {
+            reason: t(
+              `purchases.reasons.${rejectedReason(row.rejected?.code ?? 'error.internal')}`,
+            ),
+          })
+        case 'parsing':
+          return t('purchases.parsing_unknown')
+        case 'failed':
+          return t(
+            row.summary?.failure === 'reshoot' ? 'purchases.reshoot_meta' : 'purchases.failed_meta',
+          )
+        case 'recording':
+          return t('purchases.recording_meta')
+        case 'parsed': {
+          const count = row.summary?.lineCount ?? 0
+          return t('purchases.recorded', { count: positions(count), day: readDay(row) })
+        }
+      }
+    }
+    function receiptNote(row: ReceiptRow): string | null {
+      const unsettled = row.summary?.unsettled ?? 0
+      return row.state === 'parsed' && unsettled > 0
+        ? t('purchases.issues_mismatch', { n: unsettled }, unsettled)
+        : null
+    }
+    function iconOf(row: ReceiptRow) {
+      switch (row.state) {
+        case 'waiting':
+        case 'sending':
+          return IconCloudUpload
+        case 'parsing':
+          return IconSync
+        case 'rejected':
+        case 'failed':
+          return IconFileAlert
+        default:
+          return IconReceipt
+      }
+    }
+    function openReceipt(row: ReceiptRow): void {
+      if (row.state === 'rejected') {
+        if (row.rejected) receiptQueue.dismiss(row.rejected)
+        return
+      }
+      if (WORKING.includes(row.state)) {
+        workRow.value = row
+        workingOpen.value = true
+        return
+      }
+      void router.push({ name: 'purchase-receipt', params: { receiptId: row.id } })
+    }
 
     /**
      * The record going on is the server's to name; asked once per showing, and a failure is the
@@ -224,10 +392,29 @@ export default defineComponent({
       positions,
       recordedMeta: (row: HistoryRow): string => {
         const day = dayOfAnyYear(row.at, locale.value)
-        return row.itemCount === null
-          ? day
-          : t('purchases.recorded', { count: positions(row.itemCount), day })
+        if (row.itemCount === null) return day
+        const count = positions(row.itemCount)
+        return t(row.fromReceipt ? 'purchases.recorded_receipt' : 'purchases.recorded', {
+          count,
+          day,
+        })
       },
+      country,
+      receipts,
+      receiptRows,
+      working,
+      review,
+      workRow,
+      working_open: workingOpen,
+      receiptTitle,
+      receiptMeta,
+      receiptNote,
+      receiptSum: (row: ReceiptRow): string | null => {
+        const total = row.state === 'parsed' ? receipts.total(row) : null
+        return total ? formatMoney(total, locale.value) : null
+      },
+      iconOf,
+      openReceipt,
       sum: (row: HistoryRow): string | null =>
         row.total && row.total.length > 0
           ? row.total.map((amount) => formatMoney(amount, locale.value)).join(' · ')
@@ -243,6 +430,7 @@ export default defineComponent({
       retry: () => {
         screen.load()
         void loadTrip()
+        void receipts.retry()
       },
     }
   },
@@ -281,5 +469,27 @@ export default defineComponent({
 
 .undo {
   margin-bottom: var(--space-3);
+}
+
+.by-hand {
+  margin-top: var(--space-1);
+}
+
+// A receipt being read «breathes» (handoff 03): no percent, no timer — work that takes a while.
+// Still under «reduce motion» and with no connection, when nothing is being read anyway.
+.breathing :deep(.icon) {
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .breathing :deep(.icon) {
+    animation: none;
+  }
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.35;
+  }
 }
 </style>

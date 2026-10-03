@@ -1,6 +1,6 @@
 <template>
   <button class="purchase-row" type="button" @click="$emit('open')">
-    <component :is="icon" v-if="icon" class="icon" :class="{ accent }" aria-hidden="true" />
+    <component :is="icon" v-if="icon" class="icon" :class="{ accent, warn }" aria-hidden="true" />
     <span class="text">
       <span class="title">{{ title }}</span>
       <span v-if="meta" class="meta">{{ meta }}</span>
@@ -39,6 +39,8 @@ export default defineComponent({
     icon: { type: Object as PropType<Component | null>, default: null },
     /** The icon in the accent: a row that asks for something to be done. */
     accent: { type: Boolean, default: false },
+    /** The icon in the warning's ink: a receipt not accepted or not read (MOL-127, Ф-4). */
+    warn: { type: Boolean, default: false },
     /** A word in place of the chevron, drawn as a secondary button. */
     tag: { type: String as PropType<string | null>, default: null },
   },
@@ -78,6 +80,10 @@ export default defineComponent({
 
   &.accent {
     color: var(--accent-ink);
+  }
+
+  &.warn {
+    color: var(--warn-ink);
   }
 }
 

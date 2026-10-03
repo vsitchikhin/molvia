@@ -249,11 +249,16 @@ describe('какие ключи приложение пишет на устро�
       'molvia.recent',
       // Коды, по которым найдены недавние позиции, — поиск по коду офлайн (MOL-99).
       'molvia.recent-codes',
+      // Последний ответ чека и списка чеков — для просмотра без связи (MOL-127).
+      'molvia.receipt',
+      // Правки строк чека до записи — на телефоне, без связи (MOL-127, Т-9).
+      'molvia.receipt-drafts',
       // Фото чеков — база IndexedDB, а не ключ полки: `forgetOwner` удаляет её по имени (MOL-127).
       'molvia.receipt-photos',
       // Очередь чеков и её отказы (MOL-127).
       'molvia.receipt-queue',
       'molvia.receipt-rejected',
+      'molvia.receipts',
       // Набранный поиск и промах — пережить перезагрузку этого окна (MOL-46).
       'molvia.search-draft',
       'molvia.settings',

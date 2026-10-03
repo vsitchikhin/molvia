@@ -22,6 +22,7 @@ const adviceSearch = vi.fn<(query: string) => Promise<AdviceSearchResponse>>()
 const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
 vi.mock('@/api', () => ({
   api: {
+    receipts: () => Promise.resolve({ receipts: [] }),
     advice: () => advice(),
     adviceSearch: (query: string) => adviceSearch(query),
     pendingVerdicts: () => pendingVerdicts(),
@@ -187,19 +188,19 @@ describe('AdviceView', () => {
       advice.mockResolvedValue(answer([]))
       const { view, router } = await render()
 
-      expect(view.text()).toContain(en.advice.home.new.title)
-      expect(view.text()).toContain(en.advice.home.new.body.replace('{app}', en.app.name))
+      expect(view.text()).toContain(en.advice.home.new_capture.title)
+      expect(view.text()).toContain(en.advice.home.new_capture.body.replace('{app}', en.app.name))
       expect(view.text()).toContain(en.advice.home.trust)
       // No search before the first verdict, and nobody's data to speak of in a subtitle.
       expect(view.find('input[type="search"]').exists()).toBe(false)
       expect(view.text()).not.toContain(en.advice.own_data_only)
-      expect(view.get('.dock').text()).toContain(en.purchases.manual)
+      expect(view.get('.dock').text()).toContain(en.purchases.capture)
       // No circle anywhere: a «+» in one read as a button (MOL-77).
       expect(view.find('.circle').exists()).toBe(false)
 
       const step = view
         .findAll('button')
-        .find((button) => button.text().includes(en.advice.home.step_purchases_title))
+        .find((button) => button.text().includes(en.advice.home.step_purchases_capture_title))
       await step?.trigger('click')
       await flushPromises()
       expect(router.currentRoute.value.name).toBe('purchases')
@@ -230,7 +231,7 @@ describe('AdviceView', () => {
       const { view, router } = await render()
 
       expect(view.text()).toContain(en.advice.home.pending.title)
-      expect(view.text()).not.toContain(en.advice.home.new.title)
+      expect(view.text()).not.toContain(en.advice.home.new_capture.title)
       await view.get('.pending .purchase-row').trigger('click')
       await flushPromises()
       expect(router.currentRoute.value.name).toBe('verdicts')
@@ -240,7 +241,7 @@ describe('AdviceView', () => {
       online(false)
       advice.mockRejectedValue(broke())
       const { view } = await render()
-      expect(view.text()).not.toContain(en.advice.home.new.title)
+      expect(view.text()).not.toContain(en.advice.home.new_capture.title)
     })
   })
 
@@ -265,7 +266,9 @@ describe('AdviceView', () => {
 
     expect(view.text()).toContain(en.advice.offline.title)
     expect(view.text()).not.toContain(en.advice.error.title)
-    expect(view.findAll('button')).toHaveLength(0)
+    // Nothing to press about the list; the camera stands in the strip, a receipt needs no list
+    // (handoff v2, 1l — MOL-127).
+    expect(view.findAll('button').map((button) => button.text())).toEqual([en.purchases.capture])
   })
 
   it('offline with a remembered list shows the rows and names their age exactly', async () => {
@@ -371,7 +374,7 @@ describe('AdviceView', () => {
     advice.mockRejectedValue(broke())
     const { view } = await render()
 
-    expect(view.text()).toContain(en.advice.home.new.title)
+    expect(view.text()).toContain(en.advice.home.new_capture.title)
     expect(view.text()).toContain('The list as of today at')
   })
 
@@ -593,11 +596,11 @@ describe('AdviceView after the review', () => {
       pendingVerdicts.mockReturnValue(new Promise(() => undefined))
       const view = await renderIn('Гюмри')
 
-      expect(view.text()).not.toContain(en.advice.home.new.title)
+      expect(view.text()).not.toContain(en.advice.home.new_capture.title)
       expect(view.text()).not.toContain(en.advice.home.pending.title)
       expect(view.find('.skeleton').exists()).toBe(true)
       // The action is there all the same.
-      expect(view.get('.dock').text()).toContain(en.purchases.manual)
+      expect(view.get('.dock').text()).toContain(en.purchases.capture)
     })
 
     it('offline with no queue remembered — no headline at all, the cycle still there', async () => {
@@ -611,14 +614,14 @@ describe('AdviceView after the review', () => {
       pendingVerdicts.mockRejectedValue(broke())
       const view = await renderIn('Гюмри')
 
-      expect(view.text()).not.toContain(en.advice.home.new.title)
+      expect(view.text()).not.toContain(en.advice.home.new_capture.title)
       expect(view.text()).toContain(en.advice.home.step_verdicts_title)
     })
 
     it('the queue answered empty — «record your first»', async () => {
       advice.mockResolvedValue(answer([]))
       const view = await renderIn('Гюмри')
-      expect(view.text()).toContain(en.advice.home.new.title)
+      expect(view.text()).toContain(en.advice.home.new_capture.title)
     })
   })
 

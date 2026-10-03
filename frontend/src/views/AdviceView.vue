@@ -53,7 +53,7 @@
         v-if="phase === 'error'"
         kind="error"
         :title="t('advice.error.title')"
-        :body="t('advice.error.body')"
+        :body="t(country ? 'advice.error.body_capture' : 'advice.error.body')"
         @retry="retry"
       />
 
@@ -64,7 +64,7 @@
         kind="offline"
         tone="warn"
         :title="t('advice.offline.title')"
-        :body="t('advice.offline.body')"
+        :body="t(country ? 'advice.offline.body_capture' : 'advice.offline.body')"
       />
 
       <!-- The most important empty state of the product, and only for a list known to be empty —
@@ -115,11 +115,15 @@
       </template>
     </template>
 
-    <!-- The newcomer's one action, under the thumb (MOL-128, В-5); with receipts (MOL-127) this
-         strip holds «Сфотографировать чек». -->
-    <!-- Kept while a sheet of its own is up: an answer with rows arriving under «Где вы?» took
-         the strip and the sheet with it (review Р-15). -->
-    <template v-if="phase === 'empty' || entering" #docked>
+    <!-- With receipts (MOL-127, handoff v2 01, 02): «Сфотографировать чек» under the thumb in every
+         state, for a person with ratings as for a newcomer — at home a receipt is the way in. -->
+    <template v-if="country" #docked>
+      <div class="strip"><CaptureButton :country="country" /></div>
+    </template>
+    <!-- Without (Д-3): the newcomer's one action, under the thumb (MOL-128, В-5). Kept while a
+         sheet of its own is up: an answer with rows arriving under «Где вы?» took the strip and
+         the sheet with it (review Р-15). -->
+    <template v-else-if="phase === 'empty' || entering" #docked>
       <div class="strip"><ManualEntryButton @busy="entering = $event" /></div>
     </template>
 
@@ -149,6 +153,7 @@ import IconSync from '~icons/mdi/sync'
 import AdviceCheapRow from '@/components/AdviceCheapRow.vue'
 import AdviceGroup from '@/components/AdviceGroup.vue'
 import AdviceHomeNew from '@/components/AdviceHomeNew.vue'
+import CaptureButton from '@/components/CaptureButton.vue'
 import AdviceNeverRow from '@/components/AdviceNeverRow.vue'
 import AdviceSearch from '@/components/AdviceSearch.vue'
 import AdviceTakeCard from '@/components/AdviceTakeCard.vue'
@@ -162,6 +167,7 @@ import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
 import { ownScore } from '@/components/adviceRow'
 import type { Score } from '@/components/rating'
 import { useAdvice } from '@/composables/useAdvice'
+import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { purchaseDay, timeOfDay } from '@/days'
 
 /**
@@ -199,6 +205,7 @@ export default defineComponent({
     AdviceCheapRow,
     AdviceGroup,
     AdviceHomeNew,
+    CaptureButton,
     AdviceNeverRow,
     AdviceSearch,
     AdviceTakeCard,
@@ -223,6 +230,7 @@ export default defineComponent({
     const refreshes = ref(0)
     /** A sheet of «Записать покупки» is up. */
     const entering = ref(false)
+    const { country } = useReceiptCapture()
     /** The row whose verdict is being amended, as the last answer described it. */
     const editing = ref<{
       itemId: string
@@ -273,6 +281,7 @@ export default defineComponent({
       query,
       searching,
       entering,
+      country,
       refreshes,
       remembered: advice.answer,
       phase: advice.phase,
