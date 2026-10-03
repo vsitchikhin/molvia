@@ -422,6 +422,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **`frontend/DESIGN.md` is the style, and the linter holds it** (MOL-171): a weight, a size, a
   radius, a colour function or a custom property no file defines fails Stylelint; the token block
   of DESIGN.md is `make format`'s to write and `make lint`'s to check.
+- **An icon's size is a step of `--icon-*` by its role** (MOL-173): `@include icon` with the step as
+  `font-size`; the row's chevron is 20 everywhere; on an icon a width or a height is refused but 1em
+  (`molvia/icon-size`).
 - **Colours that can meet are held apart by `tokens.test.ts`** (MOL-172): two steps of different roles
   and a category against a role 0.08 OKLab apart, marks 3:1, text 4.5:1, both schemes; a value that
   fails is changed, never excused. Data without a colour of its own is `--graphic`. **Any two

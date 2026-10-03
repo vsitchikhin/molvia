@@ -60,8 +60,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `--sheet-drag`), where a false alarm is fixed, never by a disable comment in the component. A name
   the dark scheme alone declares is undefined in the light one and is refused in `_tokens.scss` (А5);
   a name in a comment is no declaration (А9); a fallback does not make a name known; a name Sass builds
-  by interpolation (`var(--space-#{$n})`) is not checked. Besides the mixin's two lines, the one
-  disable comment is `AppButton`'s icon size, until the icon scale (MOL-173). **A branch red after
+  by interpolation (`var(--space-#{$n})`) is not checked. Besides the mixin's two lines there is no
+  disable comment — `AppButton`'s icon size went with the icon scale (MOL-173). **A branch red after
   master took this:**
   Nunito is `@include display-type` in place of the `font-family`/`font-weight` pair, a literal is a
   token, and `npm run lint:style -w @molvia/frontend` names every place.
@@ -141,6 +141,23 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `currentColor` — they obey the tokens like anything else. The app icon is different:
   `frontend/public/favicon.svg` is the source, `make icons` rasterises the manifest PNGs,
   and the mark is a placeholder until there is real branding.
+- **An icon's size is a step of `--icon-*`, by role** (MOL-173, Ф-9): 14 in a pill of 13, 18 in a
+  strip, a note and a field's error, 20 the row's chevron — always — and the magnifier and a select's
+  arrow, 22 before the word in a button, 24 a row's own icon and the glyph of a button that is only
+  an icon (owner's В-15), 26 «back», 27 the tab bar; a state's circle holds `--state-glyph` 22. The
+  chevron had stood in five sizes, 18 to 26, a strip's cloud in three, and `--space-6` was 24 in
+  23 places. **An icon is `@include icon` (1em both ways, `flex: none`) with its step written
+  beside it as `font-size`** — never an argument of the mixin: `font-size: $size` in `_mixins.scss`
+  is checked by nothing, while the line in the component goes through the allowed-list, which takes
+  `var(--icon*)` and `--state-glyph`. **On an icon a width or a height is refused but 1em**
+  (`molvia/icon-size`, `frontend/stylelint/icon-size.mjs`, owner's В-1 «а»): an icon is a selector
+  ending in `svg` (`:deep` opened) or holding a class the SFC's own template puts on an `<Icon…>` or
+  a self-closing `<component :is>`, or `&` under such a rule. Width and height are no allowed-list's,
+  since a dot, a circle and a chart are sized there too; the rule reads the template instead, and
+  on master before it found all 142 literals. It cannot see a class bound by `:class` or an icon
+  styled from another file — a parent's scoped `svg {}` covers the second. A circle around an icon
+  is sized as a shape; the glyph in it is the icon (the pencil of «Настройки» was a 32 svg with
+  padding, now 18 in a 32 circle).
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
   `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a
