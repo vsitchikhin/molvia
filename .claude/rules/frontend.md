@@ -38,8 +38,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   left the figures at 800 and drew the dram sign at 400, Dram having three weights (А3). A nested rule
   sets them only with the text face of its own — a sentence in a figure's place (`&.missing`) is
   `font-family: var(--font)`; `inherit` keeps Nunito (В2); a variant that stays in Nunito keeps its one
-  weight (Б1). A mixin that includes the role is the role, learnt from every partial of `styles/` (Ж2)
-  and the file itself through any number of wrappers, comments taken out, names compared as Sass compares them —
+  weight (Б1). A mixin that includes the role is the role, through any number of wrappers, and it
+  is written in `_mixins.scss` alone — the one place the plugin reads at load — and refused where it is
+  defined anywhere else, so the place a wrapper may live and the place it is looked for are one (Ж2,
+  З1). It is read with comments taken out, names compared as Sass compares them —
   `display_type` is `display-type` (В1, Г1), whether included by name, through a namespace
   (`m.display-type`) or `sass:meta` (Д1, Д2). Another rule for the same element elsewhere is beyond
   what a linter can match (Б3), so the role is never put in a placeholder, anywhere in a selector,
