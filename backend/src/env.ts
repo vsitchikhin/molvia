@@ -65,6 +65,15 @@ const envSchema = z.object({
     (value) => (value === '' ? undefined : value),
     z.coerce.number().pipe(telegramUserIdSchema).optional(),
   ),
+  /**
+   * Where the PWA is served — production's site — for `make failures` to read the phone's frames
+   * through the maps published beside the build (MOL-144). Unset in a copy: its frames are the
+   * development server's, already the source's.
+   */
+  APP_BASE_URL: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.url({ protocol: /^https?$/ }).optional(),
+  ),
   /** Where the base is asked; end-to-end points it at a fake of its own. */
   OPEN_FOOD_FACTS_URL: z.url({ protocol: /^https?$/ }).optional(),
   /**

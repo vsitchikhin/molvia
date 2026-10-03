@@ -64,6 +64,8 @@ services:
       # as BOT_PULSE_URL is: a forgotten one would leave every failure silent and nobody would know.
       # Empty, on purpose, keeps the failures in their table and tells nobody.
       OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID?set OWNER_TELEGRAM_ID in .env.prod, or leave it empty to tell nobody}
+      # Where `make failures` reads the phone's maps from, beside the PWA's build (MOL-144).
+      APP_BASE_URL: https://${DOMAIN:?set DOMAIN}
     depends_on:
       postgres:
         condition: service_healthy

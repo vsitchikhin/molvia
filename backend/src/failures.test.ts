@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { FailureRow } from '@/db/failures-repository'
-import { FAILURES_USAGE, bundleDecoder, failures, formatFailures } from './failures'
+import { FAILURES_USAGE, bundleDecoder, failures, formatFailures, phoneDecoder } from './failures'
 
 const ROW: FailureRow = {
   fingerprint: '3f9a1c'.padEnd(64, '0'),
@@ -109,5 +109,68 @@ describe('кадры бандла по карте образа (В-6)', () => {
     expect(formatFailures([api], { build: 'v0.2.0-9-gfffffff', decode })).toEqual(plain)
     const bot = { ...api, source: 'bot' }
     expect(formatFailures([bot], { build: ROW.build, decode })).toEqual(formatFailures([bot]))
+  })
+})
+
+describe('кадры телефона по карте с сайта (MOL-144, Р-9)', () => {
+  // Line 1 of the phone's script is line 1 of `AdviceView.vue`, line 2 — line 5 of `useAdvice.ts`.
+  const MAP = {
+    version: 3,
+    sources: ['../../src/views/AdviceView.vue', '../../src/composables/useAdvice.ts'],
+    names: [],
+    mappings: 'AAAA;ACIA',
+  }
+  const frame = (file: string, line: number) => `at Xe (/assets/${file}.js:${String(line)}:1)`
+  const phone = {
+    ...ROW,
+    source: 'phone',
+    route: 'screen:advice',
+    build: 'index-BTCsHrpw',
+    platform: 'ios 18 app',
+    frames: [frame('index-BTCsHrpw', 1), frame('index-BTCsHrpw', 2), frame('index-Gone0000', 1)],
+  }
+  const asked: string[] = []
+  const site = (url: URL) => {
+    asked.push(url.href)
+    return Promise.resolve(
+      url.pathname === '/assets/index-BTCsHrpw.js.map'
+        ? new Response(JSON.stringify(MAP))
+        : new Response('not found', { status: 404 }),
+    )
+  }
+
+  it('карта — по имени файла кадра, одна на файл; без карты кадр как есть', async () => {
+    asked.length = 0
+    const decode = await phoneDecoder([phone, ROW], 'https://molvia.net', site)
+    expect(asked).toEqual([
+      'https://molvia.net/assets/index-BTCsHrpw.js.map',
+      'https://molvia.net/assets/index-Gone0000.js.map',
+    ])
+    expect(decode(frame('index-BTCsHrpw', 1))).toBe('src/views/AdviceView.vue:1:1')
+    expect(decode(frame('index-BTCsHrpw', 2))).toBe('src/composables/useAdvice.ts:5:1')
+    expect(decode(frame('index-Gone0000', 1))).toBeUndefined()
+  })
+
+  it('сайт не ответил — кадры как есть, без сбоя', async () => {
+    const decode = await phoneDecoder([phone], 'https://molvia.net', () =>
+      Promise.reject(new TypeError('fetch failed')),
+    )
+    expect(decode(frame('index-BTCsHrpw', 1))).toBeUndefined()
+  })
+
+  it('make failures: платформа рядом со сборкой, строки исходника под кадрами телефона', async () => {
+    const decode = await phoneDecoder([phone], 'https://molvia.net', site)
+    expect(formatFailures([phone], undefined, decode).slice(1, 6)).toEqual([
+      '  37 in all since 2026-10-13 08:00:00Z, 12 in index-BTCsHrpw · ios 18 app',
+      `    ${frame('index-BTCsHrpw', 1)}`,
+      '      → src/views/AdviceView.vue:1:1',
+      `    ${frame('index-BTCsHrpw', 2)}`,
+      '      → src/composables/useAdvice.ts:5:1',
+    ])
+  })
+
+  it('расшифровщик телефона не трогает кадры API', async () => {
+    const decode = await phoneDecoder([phone], 'https://molvia.net', site)
+    expect(formatFailures([ROW], undefined, decode)).toEqual(formatFailures([ROW]))
   })
 })
