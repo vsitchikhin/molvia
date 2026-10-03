@@ -51,18 +51,42 @@
     </section>
 
     <!-- The icon scale (Ф-9, MOL-173): one chevron at every step, for a screen to be checked by. The
-         step's class is on the wrapper: a class of this page on a child's root would reach AppButton's
-         own `.icon`. -->
+         step's class is on the wrapper — a class of this page on a child's root would reach
+         AppButton's own `.icon` — and written out: a class from `:class` sizes nothing to the linter. -->
     <section class="group">
       <h2 class="caption">{{ t('dev.kit.icons') }}</h2>
       <div class="row">
-        <span
-          v-for="step in iconSteps"
-          :key="step.token"
-          :class="['icon-step', `step-${step.token}`]"
-        >
+        <span class="icon-step step-icon-xs">
           <IconChevronRight class="sample" aria-hidden="true" />
-          <span class="px">{{ step.px }}</span>
+          <span class="px">{{ iconPx['icon-xs'] }}</span>
+        </span>
+        <span class="icon-step step-icon-sm">
+          <IconChevronRight class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['icon-sm'] }}</span>
+        </span>
+        <span class="icon-step step-icon">
+          <IconChevronRight class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['icon'] }}</span>
+        </span>
+        <span class="icon-step step-icon-button">
+          <IconChevronRight class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['icon-button'] }}</span>
+        </span>
+        <span class="icon-step step-state-glyph">
+          <IconChevronRight class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['state-glyph'] }}</span>
+        </span>
+        <span class="icon-step step-icon-md">
+          <IconChevronRight class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['icon-md'] }}</span>
+        </span>
+        <span class="icon-step step-icon-back">
+          <IconChevronRight class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['icon-back'] }}</span>
+        </span>
+        <span class="icon-step step-icon-tab">
+          <IconChevronRight class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['icon-tab'] }}</span>
         </span>
       </div>
     </section>
@@ -170,16 +194,16 @@ export default defineComponent({
       t,
       ERROR,
       levels: Object.values(VERDICT_LEVEL),
-      iconSteps: [
-        { token: 'icon-xs', px: 14 },
-        { token: 'icon-sm', px: 18 },
-        { token: 'icon', px: 20 },
-        { token: 'icon-button', px: 22 },
-        { token: 'state-glyph', px: 22 },
-        { token: 'icon-md', px: 24 },
-        { token: 'icon-back', px: 26 },
-        { token: 'icon-tab', px: 27 },
-      ],
+      iconPx: {
+        'icon-xs': 14,
+        'icon-sm': 18,
+        icon: 20,
+        'icon-button': 22,
+        'state-glyph': 22,
+        'icon-md': 24,
+        'icon-back': 26,
+        'icon-tab': 27,
+      },
       units,
       // The handoff's real receipt, through the formatters: the sign belongs to the currency.
       figures: { price: formatMoney(money(57000n, 'AMD')) },

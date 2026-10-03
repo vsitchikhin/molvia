@@ -155,15 +155,21 @@ The detail behind the frontend lines of `CLAUDE.md`.
   draw it**: a rule that reaches it has `@include icon`, and its font-size is a step — the
   font-size of the last rule of the file that reaches it, or, if none does, of its nearest
   ancestor's. A rule reaches an element when its selector matches the template — tags, static
-  classes, the descendant and the child combinator, `:is()` and `:where()` as alternatives (В3: a
-  pair under `.card` with no `.card` above the icon, or `button svg` for an icon in a `<p>`, sizes
-  nothing) — and counts only without a condition: not under an at-rule, with no pseudo-class,
-  attribute or sibling (Б2, В3: under `:hover`, `[aria-expanded]` or `:first-child` the pair is
-  not there at rest). The order of the file stands in for specificity (В5: a later
-  `.note { font-size: var(--text-display) }` wins). Adversarial А1: a step alone is drawn at the 1.2em
-  unplugin-icons writes — 24 for a chevron of 20, the next step up, which looks meant — and the
-  mixin alone at the text it stands in. A rule on `svg` has the pair or neither, and then only
-  colours. **`font-size` on an icon is a step of the icon scale**, never `--text-*`, `1em` or
+  classes and ids, the descendant and the child combinator, `:is()` and `:where()` as
+  alternatives, `:not()` of classes as their absence, `:root` as the page (review 17) (В3: a pair
+  under `.card` with no `.card` above the icon, or `button svg` for an icon in a `<p>`, sizes
+  nothing) — and counts only without a condition: not under an at-rule, with no pseudo-class
+  (inside `:is()` too), attribute or sibling, and with no class the element wears only by `:class`
+  (Б2, В3, Г3: under `:hover`, `[aria-expanded]`, `:first-child` or an `is-open` the template
+  binds, the pair is not there at rest). Every font-size of the element the step is taken from —
+  under a condition too — is a step (Г4: `wider-than-phone` turning the wrapper's font-size into
+  text made the icon 34 on a wide screen). The order of the file stands in for specificity (В5: a
+  later `.note { font-size: var(--text-display) }` wins). Adversarial А1: a step alone is drawn at
+  the 1.2em unplugin-icons writes — 24 for a chevron of 20, the next step up, which looks meant —
+  and the mixin alone at the text it stands in. A rule on `svg` has the pair or neither, and then
+  only colours. A rule styles an icon when its last compound is `svg`, a part of it (`path`) or an
+  icon's class, or when it reaches an icon by any other means (Г2: `.row > *` sized it past every
+  check). **`font-size` on an icon is a step of the icon scale**, never `--text-*`, `1em` or
   `inherit`. **Width and height are 1em; there is no padding or border width, no scale, zoom,
   translate in depth or transform but a turn or a shift, nor an `@include` but `icon` and
   `wider-than-phone`** (А4, Б4: the old pencil was a 32 box with a 16 glyph, and a border does the
@@ -173,24 +179,26 @@ The detail behind the frontend lines of `CLAUDE.md`.
   else wears too is refused (В2 — a size in `.strip .big`, `big` on the text beside the icon,
   reached the icon unchecked; review 11 had made a shared class no icon's, which left that door).
   **The steps are declared in `_tokens.scss` alone** (В1): `--icon: 2rem` in a component makes
-  every line above right and the icon 32. **Nor in the template**: a size or a font-size off the
-  scale in `style`, any `:style` or `v-bind="…"`, a `width=`/`height=` (А5, Б3). An icon is a
-  tag imported from `~icons/` under any name or registered under another in `components` (Б5), or
-  written `Icon…`/`icon-…`, or a `<component :is>` of an `icon` or a `glyph` that holds nothing —
-  the name of its expression tells it from a card's `<component :is="as" />` (Б6), so one named
-  otherwise (`row.symbol`) is no icon to the rule. The template is read with its attributes'
-  quotes, so `v-if="n > 0"` ends no tag (А3); `<Transition>` and the like render nothing of their
-  own, so an icon in one stands in its parent (В4). A rule styles an icon when, the nesting
-  resolved — `&` replaced, `&-chevron` glued to its parent (А7) — the last compound of a selector
-  is the tag `svg` (`:deep` opened, `:not()` left out; a class named `svg` is no tag) or holds an
-  icon's class. Width and height are no allowed-list's, since a dot, a circle and a chart are sized
-  there too; the rule reads the template instead. **Out of its sight, by design:** a class bound by
-  `:class`, which the element is taken to may wear; an icon styled from another file, or put
-  straight into the slot of a component that sizes its slot itself — `AppButton`, the one in
-  `SIZED_SLOTS`, where a new component with an icon slot goes with its own `:deep(svg)` (review 15:
-  `RouterLink` or `AppCard` size nothing); specificity; an SFC with no `<style>` block, which gives
-  the rule no root to run on. A circle around an icon is sized as a shape; the glyph in it is the
-  icon (the pencil of «Настройки» was a 32 svg with padding, now 18 in a 32 circle).
+  every line above right and the icon 32 — nor set by a `:style` of any tag, nor under a name Sass
+  interpolates (Г1). **Nor in the template**: a size or a font-size off the scale in `style`, any
+  `:style` or `v-bind="…"`, a `width=`/`height=` (А5, Б3). An icon is a tag imported from
+  `~icons/` under any name or registered under another in `components` (Б5), or written
+  `Icon…`/`icon-…`, or a `<component :is>` of an `icon` or a `glyph` that holds nothing — the name
+  of its expression tells it from a card's `<component :is="as" />` (Б6), so one named otherwise
+  (`row.symbol`) is no icon to the rule. The template is read with its attributes' quotes, so
+  `v-if="n > 0"` ends no tag (А3); `<Transition>` and the like render nothing of their own, so an
+  icon in one stands in its parent (В4), and so does `<slot>` (review 18). The nesting is resolved
+  first — `&` replaced, `&-chevron` glued to its parent (А7); `svg` is the tag, a class named
+  `svg` none. Width and height are no allowed-list's, since a dot, a circle and a chart are sized
+  there too; the rule reads the template instead. **Out of its sight, by design:** a class from
+  `:class` — the keys and quoted strings of its expression are read, checked as the element's and
+  never counted for a size; one from a variable is named nowhere; an icon styled from another
+  file, or put straight into the slot of a component that sizes its slot itself — `AppButton`, the
+  one in `SIZED_SLOTS`, where a new component with an icon slot goes with its own `:deep(svg)`
+  (review 15: `RouterLink` or `AppCard` size nothing); a step inherited through a component, which
+  may set a font-size of its own; specificity; an SFC with no `<style>` block, which gives the
+  rule no root to run on. A circle around an icon is sized as a shape; the glyph in it is the icon
+  (the pencil of «Настройки» was a 32 svg with padding, now 18 in a 32 circle).
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
   `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a

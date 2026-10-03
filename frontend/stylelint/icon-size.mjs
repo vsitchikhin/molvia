@@ -8,12 +8,17 @@
 //     font-size is a step — the font-size the last rule of the file that reaches it sets, or, if none
 //     does, the one of its nearest ancestor that a rule sets (adversarial А1: a step alone draws the
 //     1.2em unplugin-icons writes, 24 for a chevron of 20; the mixin alone draws the text around it).
-//     A rule reaches an element when its selector matches the template — tags, static classes, the
-//     descendant and the child combinator (В3) — and counts only without a condition: not under an
-//     at-rule, with no pseudo-class, attribute or sibling in it (Б2, В3: at rest the pair is not there);
+//     A rule reaches an element when its selector matches the template — tags, static classes and
+//     ids, the descendant and the child combinator, `:is()`/`:where()` as alternatives, `:not()` of
+//     classes as their absence (В3, review 17) — and counts only without a condition: not under an
+//     at-rule, with no pseudo-class (inside `:is()` too), attribute or sibling, and with no class the
+//     element wears only by `:class` (Б2, В3, Г3: at rest the pair is not there). Every font-size of
+//     the element the step is taken from, under a condition too, is a step (Г4);
 //   - a rule on `svg` has both lines or neither; with the mixin, the nearest font-size around it is a
 //     step — the last rule of the file for the same element (Б2, В5);
-//   - on a rule that styles an icon: `font-size` only `var(--icon*)` or `var(--state-glyph)`; width,
+//   - on a rule that styles an icon — one whose last compound is `svg`, an icon's class, or that
+//     reaches an icon by any other means (`.row > *`, Г2), and one on a part of it (`path`) —
+//     `font-size` only `var(--icon*)` or `var(--state-glyph)`; width,
 //     height, their logical and min-/max- forms only 1em; no padding or border width (the old pencil
 //     was a box of 32 with a glyph of 16, А4, Б4), no scale, zoom, translate in depth, or transform but
 //     a turn or a shift; no `@include` but `icon` and `wider-than-phone`, whose body is read like the
@@ -21,7 +26,8 @@
 //   - in the template: an icon's class is its own, worn by nothing else (В2); no `style` with a size,
 //     no `:style` or `v-bind="…"`, no `width=` or `height=` (А5, Б3);
 //   - the steps themselves are declared in `_tokens.scss` alone: `--icon: 2rem` in a component would
-//     make every line above right and the icon 32 (В1).
+//     make every line above right and the icon 32 (В1) — nor set by a `:style` of any tag, nor under
+//     a name Sass interpolates (Г1).
 //
 // An icon is a tag imported from `~icons/` under any name or registered under another in
 // `components` (Б5), a tag written `Icon…`/`icon-…`, or a `<component :is>` of an `icon` or a `glyph`
@@ -29,10 +35,11 @@
 // A rule styles one when, its nesting resolved (`&`, `&-suffix`), the last compound of a selector is
 // the tag `svg` (`:deep(svg)` opened, `:is()`/`:where()` read inside, `:not()` left out) or holds an
 // icon's class.
-// Out of its sight, by design: a class bound by `:class`, which an element is taken to may wear; an
-// icon styled from another file or put straight into the slot of a component that sizes its slot
-// itself — `AppButton`, the one in `SIZED_SLOTS`; specificity, which the order of the file stands
-// in for; an SFC with no `<style>` block, which gives the rule no root to run on.
+// Out of its sight, by design: a class bound by `:class` — a rule needs it for a condition, never for
+// a size; an icon styled from another file or put into the slot of a component that sizes its slot
+// itself — `AppButton`, the one in `SIZED_SLOTS`; a step inherited through a component, which may set
+// a font-size of its own; specificity, which the order of the file stands in for; a `<component :is>`
+// named neither icon nor glyph; an SFC with no `<style>` block, which gives the rule no root.
 
 import stylelint from 'stylelint'
 
@@ -48,6 +55,7 @@ const SIZED_SLOTS = new Set(['AppButton', 'app-button'])
 // What renders no element of its own: an icon in it stands in its parent.
 const TRANSPARENT = new Set([
   'template',
+  'slot',
   'Transition',
   'TransitionGroup',
   'KeepAlive',
@@ -65,6 +73,18 @@ const STEP = /^var\(--(icon(-[a-z0-9]+)*|state-glyph)\)$/
 const STEP_NAME = /^--(icon(-[a-z0-9]+)*|state-glyph)$/
 const TURN = new Set(['rotate', 'rotatez', 'translate', 'translatex', 'translatey'])
 const ALLOWED_INCLUDES = new Set(['icon', 'wider-than-phone'])
+// The parts of an icon's svg: a rule on one is a rule on the icon's glyph (Г2).
+const SVG_PARTS = new Set([
+  'path',
+  'g',
+  'use',
+  'circle',
+  'rect',
+  'polygon',
+  'polyline',
+  'line',
+  'ellipse',
+])
 const VOID = new Set([
   'area',
   'base',
@@ -113,7 +133,10 @@ const messages = ruleMessages(ruleName, {
 // A tag, opening or closing, the attributes' quotes kept: a `>` inside them ends no tag (А3).
 const TAG = /<(\/?)([A-Za-z][\w-]*)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>/g
 const CLASS = /(?:^|\s)class=(?:"([^"]*)"|'([^']*)')/
-const BOUND_CLASS = /(?:^|\s)(?::|v-bind:)class=/
+const BOUND_CLASS = /(?:^|\s)(?::|v-bind:)class=(?:"([^"]*)"|'([^']*)')/
+const ID = /(?:^|\s)id=(?:"([^"]*)"|'([^']*)')/
+const BOUND_STEP =
+  /(?:^|\s)(?::style|v-bind:style|v-bind)=(?:"[^"]*--(?:icon|state-glyph)|'[^']*--(?:icon|state-glyph))/
 const SIZE_ATTRIBUTE = /(?:^|\s)(?::|v-bind:)?(width|height)=/
 const BOUND_STYLE = /(?:^|\s)(?::style|v-bind:style|v-bind)=/
 const IMPORT = /import\s+(\w+)\s+from\s+['"]~icons\/[^'"]+['"]/g
@@ -130,6 +153,16 @@ function iconNames(sfc) {
       if (names.has(value)) names.add(key)
   }
   for (const name of [...names]) names.add(kebab(name))
+  return names
+}
+
+// The classes a `:class` names: the keys of an object and the strings in quotes. A class built from a
+// variable or a template string is named nowhere, and no rule reaches it.
+function boundClasses(match) {
+  const expression = match?.[1] ?? match?.[2] ?? ''
+  const names = new Set()
+  for (const [, quoted, key] of expression.matchAll(/'([\w-]+)'|([A-Za-z_][\w-]*)\s*:/g))
+    names.add(quoted ?? key)
   return names
 }
 
@@ -160,13 +193,16 @@ export function templateTags(sfc) {
       /^icon-/.test(name) ||
       (name === 'component' && empty && /\s(?::|v-bind:)is="[^"]*(icon|glyph)/i.test(attributes))
     const quoted = attributes.match(CLASS)
+    const id = attributes.match(ID)
     const tag = {
       name,
       start: m.index,
       end: m.index + whole.length,
       line: sfc.slice(0, m.index).split('\n').length,
       classes: (quoted?.[1] ?? quoted?.[2] ?? '').split(/\s+/).filter(Boolean),
-      boundClass: BOUND_CLASS.test(attributes),
+      boundClasses: boundClasses(attributes.match(BOUND_CLASS)),
+      id: id?.[1] ?? id?.[2],
+      boundStep: BOUND_STEP.test(attributes),
       parent: stack[stack.length - 1],
       icon,
       sizeAttribute: icon ? attributes.match(SIZE_ATTRIBUTE)?.[1] : undefined,
@@ -257,6 +293,11 @@ function parse(selector) {
     part += char
   }
   push()
+  // `:root` is the page itself: an ancestor of everything, no condition.
+  while (compounds.length > 1 && compounds[0] === ':root') {
+    compounds.shift()
+    combinators.shift()
+  }
   const last = compounds[compounds.length - 1] ?? ''
   return {
     text: compounds
@@ -268,34 +309,61 @@ function parse(selector) {
     combinators,
     svg: /(^|[(,]\s*)svg(?![\w-])/.test(last.replace(/:not\([^()]*\)/g, '')),
     classes: classesOf(last),
-    // `:is()` and `:where()` are alternatives, not a condition: they are matched inside.
-    condition:
-      compounds.some((c) => /[[:]/.test(c.replace(/:(is|where)\([^()]*\)/g, ''))) ||
-      combinators.some((c) => c === '+' || c === '~'),
+    condition: compounds.some(conditionIn) || combinators.some((c) => c === '+' || c === '~'),
   }
 }
 
-// Whether a compound — no condition in it — matches an element of the template.
-function compoundMatches(compound, tag) {
+// A condition in a compound: a pseudo-class or an attribute — inside `:is()`/`:where()` too (Г3). A
+// `:not()` of classes, tags and ids and `:root` are none: the template answers them (review 17).
+function conditionIn(compound) {
+  const plain = /^[\w.#*-]*$/
+  const rest = compound
+    .replace(/:not\(([^()]*)\)/g, (all, inner) =>
+      split(inner, /,/).every((one) => plain.test(one)) ? '' : all,
+    )
+    .replace(/:(is|where)\(([^()]*)\)/g, (all, kind, inner) => (/[[:]/.test(inner) ? all : ''))
+    .replace(/^:root$/, '')
+  return /[[:]/.test(rest)
+}
+
+// Whether a compound matches an element of the template. A class the element wears only by `:class`
+// counts when `bound` allows it — to know which rules style an icon, never for its size (Г3).
+function compoundMatches(compound, tag, bound) {
   const alternatives = compound.match(/:(is|where)\(([^()]*)\)/)
   if (alternatives) {
     const rest = compound.replace(alternatives[0], '')
-    return split(alternatives[2], /,/).some((one) => compoundMatches(`${rest}${one}`, tag))
+    return split(alternatives[2], /,/).some((one) => compoundMatches(`${rest}${one}`, tag, bound))
   }
-  const type = compound.match(/^[a-zA-Z][\w-]*|^\*/)?.[0]
+  const negated = compound.match(/:not\(([^()]*)\)/)
+  if (negated) {
+    const rest = compound.replace(negated[0], '')
+    const absent = split(negated[1], /,/).every(
+      (one) =>
+        !compoundMatches(one, tag, false) &&
+        (bound || !classesOf(one).some((name) => tag.boundClasses.has(name))),
+    )
+    return absent && compoundMatches(rest, tag, bound)
+  }
+  const structure = compound.replace(/:[\w-]+(\([^()]*\))?/g, '').replace(/\[[^\]]*\]/g, '')
+  const type = structure.match(/^[a-zA-Z][\w-]*|^\*/)?.[0]
   if (type && type !== '*') {
     if (tag.icon) {
       if (type !== 'svg') return false
     } else if (isComponent(tag) || tag.name.toLowerCase() !== type.toLowerCase()) return false
   }
-  return classesOf(compound).every((name) => tag.classes.includes(name) || tag.boundClass)
+  const ids = [...structure.matchAll(/#([\w-]+)/g)].map((m) => m[1])
+  if (ids.some((id) => id !== tag.id)) return false
+  return classesOf(structure).every(
+    (name) => tag.classes.includes(name) || (bound && tag.boundClasses.has(name)),
+  )
 }
 
-// Whether a selector — no condition in it — reaches an element of the template.
-function reaches(selector, tag) {
+// Whether a selector reaches an element of the template: by its structure, a class from `:class`
+// counted only when `bound` allows it.
+function reaches(selector, tag, bound = false) {
   const { compounds, combinators } = selector
   const at = (i, element) => {
-    if (!compoundMatches(compounds[i], element)) return false
+    if (!compoundMatches(compounds[i], element, bound)) return false
     if (i === 0) return true
     if (combinators[i - 1] === '>') {
       const parent = up(element)
@@ -362,7 +430,8 @@ function rule(primary) {
     // The steps are the scale's: declared in _tokens.scss alone (В1).
     if (!root.source?.input.file?.endsWith('/styles/_tokens.scss')) {
       root.walkDecls((decl) => {
-        if (STEP_NAME.test(decl.prop)) flag(decl, messages.token(decl.prop))
+        if (STEP_NAME.test(decl.prop) || /#\{[^}]*(icon|state-glyph)/.test(decl.prop))
+          flag(decl, messages.token(decl.prop))
       })
     }
 
@@ -394,7 +463,13 @@ function rule(primary) {
         rules.push({
           node,
           selectors,
-          icon: selectors.some((s) => s.svg || s.classes.some((name) => iconClasses.has(name))),
+          icon: selectors.some(
+            (s) =>
+              s.svg ||
+              s.classes.some((name) => iconClasses.has(name)) ||
+              SVG_PARTS.has(s.compounds[s.compounds.length - 1]?.match(/^[a-z]+/)?.[0] ?? '') ||
+              icons.some((tag) => reaches(s, tag, true)),
+          ),
           svg: selectors.some((s) => s.svg),
           // Counted for a size only without a condition (Б2, В3).
           plain: !inAtRule(node),
@@ -410,10 +485,16 @@ function rule(primary) {
         (entry) => entry.plain && entry.selectors.some((s) => !s.condition && reaches(s, tag)),
       )
 
-    // The font-size an element ends with: the last rule of the file that reaches it and sets one.
+    // The font-size an element ends with: the last rule of the file that reaches it and sets one —
+    // and, if any rule under a condition gives it another, one that is no step (Г4).
     const ownSize = (tag) => {
       const set = reaching(tag).flatMap((entry) => direct(entry.node).filter(fontSize))
-      return set[set.length - 1]?.value
+      const last = set[set.length - 1]?.value
+      if (last === undefined) return undefined
+      const any = all
+        .filter((entry) => entry.selectors.some((s) => reaches(s, tag, true)))
+        .flatMap((entry) => ownNodes(entry.node).filter(fontSize))
+      return any.find((decl) => !isStep(decl.value))?.value ?? last
     }
 
     // The step around a rule on svg no element of the template stands for (a slot's icon): the last
@@ -423,10 +504,14 @@ function rule(primary) {
       return entry.selectors.some((selector) => {
         for (let k = selector.compounds.length - 1; k > 0; k--) {
           const prefix = parse(selector.compounds.slice(0, k).join(' ')).text
-          const set = all
-            .filter((other) => other.plain && other.selectors.some((s) => s.text === prefix))
+          const same = all.filter((other) => other.selectors.some((s) => s.text === prefix))
+          const set = same
+            .filter((other) => other.plain)
             .flatMap((other) => direct(other.node).filter(fontSize))
-          if (set.length) return isStep(set[set.length - 1].value)
+          if (set.length)
+            return same
+              .flatMap((other) => ownNodes(other.node).filter(fontSize))
+              .every((d) => isStep(d.value))
         }
         return false
       })
@@ -459,6 +544,10 @@ function rule(primary) {
     // The template is the document's: read once, with its first style block.
     if (blocks[0] !== root) return
 
+    for (const tag of tags.filter((t) => t.boundStep)) {
+      flag(root, messages.token(`--icon in a bound style (line ${tag.line})`))
+    }
+
     for (const tag of tags.filter((t) => !t.icon)) {
       for (const name of tag.classes) {
         if (iconClasses.has(name)) flag(root, messages.shared(name, tag.name, tag.line))
@@ -471,12 +560,17 @@ function rule(primary) {
 
       // An icon put straight into the slot of a component that sizes it is the component's.
       const parent = up(tag)
-      if (tag.classes.length === 0 && parent && SIZED_SLOTS.has(parent.name)) continue
+      const rules = reaching(tag)
+      if (
+        parent &&
+        SIZED_SLOTS.has(parent.name) &&
+        !rules.some((entry) => direct(entry.node).some((n) => isMixin(n) || fontSize(n)))
+      )
+        continue
 
       const where = tag.classes.length
         ? `The icon «.${tag.classes.join('.')}» (line ${tag.line})`
         : `<${tag.name}> (line ${tag.line})`
-      const rules = reaching(tag)
       const anchor =
         all.find((entry) =>
           entry.selectors.some((s) => s.classes.some((c) => tag.classes.includes(c))),

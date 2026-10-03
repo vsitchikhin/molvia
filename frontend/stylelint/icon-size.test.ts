@@ -361,7 +361,7 @@ describe('molvia/icon-size', () => {
     ).toEqual(['width: 1rem'])
   })
 
-  it('does not see a class bound by :class — a named limit: the width passes, the icon is unsized', async () => {
+  it('a class from :class is checked as the icon’s, and sizes nothing', async () => {
     expect(
       await refused(
         sfc(
@@ -369,7 +369,7 @@ describe('molvia/icon-size', () => {
           '.chevron { width: 1.25rem; }',
         ),
       ),
-    ).toEqual(['<IconChevron> (line 2)'])
+    ).toEqual(['width: 1.25rem', '<IconChevron> (line 2)'])
   })
 })
 
@@ -420,7 +420,7 @@ describe('molvia/icon-size, round 3', () => {
     ).toEqual(['The icon «.a» (line 2)', 'The icon «.b» (line 3)', 'The icon «.c» (line 4)'])
   })
 
-  it('reaches through tags and the child combinator, and a class bound by :class may be worn', async () => {
+  it('reaches through tags and the child combinator; a class from a variable is named nowhere', async () => {
     expect(
       await refused(
         sfc(
@@ -428,7 +428,7 @@ describe('molvia/icon-size, round 3', () => {
           `.note > svg { ${ICON} }\n.warn svg { ${ICON} }\nbutton svg { ${ICON} }`,
         ),
       ),
-    ).toEqual([])
+    ).toEqual(['<IconInfo> (line 3)'])
   })
 
   it('leaves to the component only the slot of one that sizes it; Transition renders nothing (В4, замечание 15)', async () => {
@@ -475,6 +475,93 @@ describe('molvia/icon-size, round 3', () => {
         ),
       ),
     ).toEqual(['translate: 0 0 3.75rem'])
+  })
+})
+
+describe('molvia/icon-size, round 4', () => {
+  it('takes :not() of classes, :root and :is() of no state for no condition (review 17, Г5)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<li class="row"><IconX class="a" /></li><p><IconX class="b" /><IconX class="c" /></p>',
+          `.row:not(.gone) .a { ${ICON} }\n:root .b { ${ICON} }\n:is(p, li) .c { ${ICON} }`,
+        ),
+      ),
+    ).toEqual([])
+  })
+
+  it('takes a state inside :is(), :not(:hover) and a class from :class for a condition (Г3)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<button class="row"><IconX class="a" /></button>\n<button class="row"><IconX class="b" /></button>\n' +
+            '<button class="row" :class="{ \'is-open\': open }"><IconX class="c" /></button>',
+          `.row:is(:hover) .a { ${ICON} }\n.row:not(:hover) .b { ${ICON} }\n.row.is-open .c { ${ICON} }`,
+        ),
+      ),
+    ).toEqual(['The icon «.a» (line 2)', 'The icon «.b» (line 3)', 'The icon «.c» (line 4)'])
+  })
+
+  it('refuses a step set from the template or under a name Sass builds (Г1)', async () => {
+    expect(
+      await refused(
+        sfc(
+          `<p class="row" :style="{ '--icon': big }"><IconX class="a" /></p>`,
+          `.a { ${ICON} }\n.row { #{"--icon"}: 2rem; }`,
+        ),
+      ),
+    ).toEqual(['#{"--icon"}', '--icon in a bound style (line 2)'])
+  })
+
+  it('checks any rule that reaches an icon, and one on a part of its svg (Г2)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<ul class="list"><li class="row"><IconX class="a" /></li></ul>',
+          `.a { ${ICON} }\n.row > * { width: 2rem; }\n.list .row * { font-size: var(--text-display); }\n` +
+            '.a path { transform: scale(1.6); }',
+        ),
+      ),
+    ).toEqual([
+      'width: 2rem',
+      'font-size: var(--text-display)',
+      'transform: scale(1.6)',
+      'The icon «.a» (line 2)',
+    ])
+  })
+
+  it('refuses a step around an icon that a condition turns into text (Г4)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="note"><IconInfo /></p>',
+          '.note { font-size: var(--icon-sm); svg { @include icon; } ' +
+            '@include wider-than-phone { font-size: var(--text-display); } }',
+        ),
+      ),
+    ).toEqual(['«svg»', '<IconInfo> (line 2)'])
+  })
+
+  it('leaves to AppButton an icon whose class only colours it (Г5)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<AppButton><IconPlus class="plus" /></AppButton>',
+          '.plus { color: var(--accent-ink); }',
+        ),
+      ),
+    ).toEqual([])
+  })
+
+  it('takes <slot> for no element, and matches an id (review 18)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<span class="wrap"><slot><IconX /></slot></span>\n<p id="z"><IconY /></p>',
+          `.wrap > svg { ${ICON} }\n#other svg { ${ICON} }`,
+        ),
+      ),
+    ).toEqual(['<IconY> (line 3)'])
   })
 })
 
