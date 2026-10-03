@@ -21,7 +21,7 @@ import { VERSION, env, loginConfig } from '@/env'
 import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
 import { apiFailureReporter } from '@/failure-reporter'
-import { botFailure } from '@/usecases/record-failure'
+import { botFailure, phoneReportLimit, takePhoneFailures } from '@/usecases/record-failure'
 import { claimOwnerNotices } from '@/usecases/owner-notices'
 import type { FailurePlace } from '@/usecases/record-failure'
 import { createFailureRepository } from '@/db/failures-repository'
@@ -39,6 +39,7 @@ import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
 import { sessionRoutes } from '@/routes/sessions'
 import { exchangeRoutes } from '@/routes/exchanges'
+import { clientErrorsRoute } from '@/routes/client-errors'
 import { feedbackRoutes } from '@/routes/feedback'
 import { advice, adviceSearch } from '@/usecases/advice'
 import { ownNever } from '@/usecases/own-never'
@@ -164,6 +165,7 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.LOGIN_FORBIDDEN]: 403,
   [ERROR.LOGIN_RATE_LIMITED]: 429,
   [ERROR.FEEDBACK_RATE_LIMITED]: 429,
+  [ERROR.CLIENT_ERRORS_RATE_LIMITED]: 429,
   [ERROR.LOGIN_DISABLED]: 503,
   [ERROR.BOT_UNAUTHORIZED]: 401,
   // The request is well formed; another row already holds what it claims — a barcode that
@@ -612,6 +614,22 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         claimOwnerNotices(createOwnerNoticeRepository(db), owner, new Date(), (issue) => {
           instance.log.error(describeFailure(issue), 'owner notice unreadable')
         }),
+    })
+
+    // The phone's failures (MOL-144): no session, a limit in memory, the page's own build.
+    const phoneLimit = phoneReportLimit()
+    clientErrorsRoute(instance, (body, address) => {
+      takePhoneFailures(
+        {
+          limit: phoneLimit,
+          take: (summary, place, build) => {
+            failures.take(summary, place, build)
+          },
+        },
+        body,
+        address,
+        Date.now(),
+      )
     })
 
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).

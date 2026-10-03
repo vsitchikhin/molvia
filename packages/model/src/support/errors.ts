@@ -91,6 +91,11 @@ export const ERROR = {
    * the text and says to send it tomorrow.
    */
   FEEDBACK_RATE_LIMITED: 'error.feedback_rate_limited',
+  /**
+   * Failures of the phone past the limit of an address or of everybody's minute (MOL-144, Р-6). The
+   * phone shows nothing: it forgets what it kept, since sending it again would change nothing.
+   */
+  CLIENT_ERRORS_RATE_LIMITED: 'error.client_errors_rate_limited',
 } as const
 
 export type ErrorCode = (typeof ERROR)[keyof typeof ERROR]

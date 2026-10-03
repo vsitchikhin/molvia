@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 import {
+  DomainError,
+  ERROR,
   FAILURE_COUNT_NOTICES,
   FAILURE_FRAMES,
   FAILURE_FRAME_MAX,
@@ -8,9 +10,11 @@ import {
 } from '@molvia/model'
 import type {
   BotFailure,
+  ClientErrors,
   FailureSource,
   FailureSummary,
   OwnerNotice,
+  PhoneFailure,
   TelegramUserId,
 } from '@molvia/model'
 import type { FailureCount, FailureOccurrence, FailureRepository } from '@/db/failures-repository'
@@ -19,6 +23,8 @@ import type { FailureCount, FailureOccurrence, FailureRepository } from '@/db/fa
 export interface FailurePlace {
   readonly source: FailureSource
   readonly route?: string
+  /** The phone's platform, `ios 18 app` (MOL-144, В-2); none for the API and the bot. */
+  readonly platform?: string
 }
 
 /**
@@ -54,9 +60,11 @@ export function occurrenceOf(
   // The top frame as it came, before the cut: cut at 300 first, a frame could lose half its
   // `:line:column` and keep the rest, and every rollout would make its failure new (adversarial А6).
   const top = framePlace(summary.frames?.[0] ?? '')
-  const fingerprint = createHash('sha256')
-    .update([place.source, errorName, summary.code ?? '', top, route ?? ''].join('\u0000'))
-    .digest('hex')
+  const parts = [place.source, errorName, summary.code ?? '', top, route ?? '']
+  // The phone's system, not its version or mode: «only on iOS» is seen at once (MOL-144, В-2). Left
+  // out where there is none, so no fingerprint of the API or the bot moved.
+  if (place.platform !== undefined) parts.push(place.platform.split(' ')[0] ?? '')
+  const fingerprint = createHash('sha256').update(parts.join('\u0000')).digest('hex')
   return {
     fingerprint,
     source: place.source,
@@ -65,6 +73,7 @@ export function occurrenceOf(
     ...(route === undefined || route === '' ? {} : { route }),
     frames,
     build,
+    ...(place.platform === undefined ? {} : { platform: place.platform }),
   }
 }
 
@@ -87,6 +96,7 @@ export function noticesFor(
     ...(occurrence.code === undefined ? {} : { code: occurrence.code }),
     ...(occurrence.route === undefined ? {} : { route: occurrence.route }),
     build: occurrence.build,
+    ...(occurrence.platform === undefined ? {} : { platform: occurrence.platform }),
   }
   const notices: OwnerNotice[] = []
   const before = count.buildCount - times
@@ -136,5 +146,82 @@ export function botFailure({ handler, errorName, code, frames }: BotFailure): {
       ...(frames === undefined ? {} : { frames }),
     },
     place: { source: 'bot', route: handler },
+  }
+}
+
+/**
+ * A failure the phone reports of its own (MOL-144): its summary, its place — where it was caught and
+ * on which screen, `screen:advice` (Р-3) — with the platform, and the build it names, which is the
+ * page's and not the API's (В-1).
+ */
+export function phoneFailure({
+  errorName,
+  code,
+  frames,
+  catcher,
+  screen,
+  build,
+  platform,
+}: PhoneFailure): {
+  readonly summary: FailureSummary
+  readonly place: FailurePlace
+  readonly build: string
+} {
+  return {
+    summary: { errorName, ...(code === undefined ? {} : { code }), frames },
+    place: { source: 'phone', route: `${catcher}:${screen}`, platform },
+    build,
+  }
+}
+
+/** The phone's reports an address may send in a minute: its whole buffer at once (MOL-144, Р-6). */
+export const PHONE_REPORTS_PER_ADDRESS = 20
+/** The phone's reports everybody together may send in a minute. */
+export const PHONE_REPORTS_PER_MINUTE = 200
+const MINUTE_MS = 60 * 1000
+
+/**
+ * Whether `count` more reports from `address` fit the minute (MOL-144, Р-6), and if they do, counted.
+ * In the process's memory, for a minute, and nowhere else: the address is the limit's key and never
+ * written down — no log, no table. What was refused is not counted, so the memory holds at most the
+ * minute's `PHONE_REPORTS_PER_MINUTE`.
+ */
+export type PhoneReportLimit = (address: string, count: number, now: number) => boolean
+
+export function phoneReportLimit(
+  perAddress = PHONE_REPORTS_PER_ADDRESS,
+  perMinute = PHONE_REPORTS_PER_MINUTE,
+): PhoneReportLimit {
+  let taken: { readonly address: string; readonly at: number; readonly count: number }[] = []
+  return (address, count, now) => {
+    taken = taken.filter((entry) => now - entry.at < MINUTE_MS)
+    const sum = (entries: typeof taken) => entries.reduce((total, entry) => total + entry.count, 0)
+    const mine = sum(taken.filter((entry) => entry.address === address))
+    if (mine + count > perAddress || sum(taken) + count > perMinute) return false
+    taken.push({ address, at: now, count })
+    return true
+  }
+}
+
+/**
+ * «Сбой телефона» — `POST /client-errors` (MOL-144): within the limit every report goes to the table
+ * through `take`, which is not waited on; past it the whole body is refused, and the phone forgets it.
+ */
+export function takePhoneFailures(
+  {
+    limit,
+    take,
+  }: {
+    readonly limit: PhoneReportLimit
+    readonly take: (summary: FailureSummary, place: FailurePlace, build: string) => void
+  },
+  { reports }: ClientErrors,
+  address: string,
+  now: number,
+): void {
+  if (!limit(address, reports.length, now)) throw new DomainError(ERROR.CLIENT_ERRORS_RATE_LIMITED)
+  for (const report of reports) {
+    const { summary, place, build } = phoneFailure(report)
+    take(summary, place, build)
   }
 }

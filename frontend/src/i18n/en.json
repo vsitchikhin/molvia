@@ -1164,7 +1164,8 @@
     "barcode_check_digit": "The digits don't add up — check the code",
     "barcodes_full": "This item already holds twenty codes — no more can be added",
     "barcode_in_store": "This is a shop's own label — such a code is not saved to the catalogue",
-    "feedback_rate_limited": "That is a lot of messages for today. Your text is saved — send it tomorrow"
+    "feedback_rate_limited": "That is a lot of messages for today. Your text is saved — send it tomorrow",
+    "client_errors_rate_limited": "Too many failure reports. Try again in a minute"
   },
   "settings": {
     "title": "Settings",

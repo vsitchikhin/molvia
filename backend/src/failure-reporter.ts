@@ -15,8 +15,11 @@ export interface FailureReporter {
    * of is missing from the table.
    */
   report(error: unknown, place: FailurePlace, message: string): void
-  /** A failure somebody else has logged — the bot's report of its own — into the table alone. */
-  take(summary: FailureSummary, place: FailurePlace): void
+  /**
+   * A failure somebody else has logged — the bot's or the phone's report of its own — into the table
+   * alone. `build` is the reporter's own unless named: the phone names its page's (MOL-144, В-1).
+   */
+  take(summary: FailureSummary, place: FailurePlace, build?: string): void
 }
 
 /** How many fingerprints may be written at once; one write a fingerprint at a time. */
@@ -78,8 +81,8 @@ export function failureReporter(
     }
   }
 
-  function take(summary: FailureSummary, place: FailurePlace): void {
-    const occurrence = occurrenceOf(summary, place, build)
+  function take(summary: FailureSummary, place: FailurePlace, named = build): void {
+    const occurrence = occurrenceOf(summary, place, named)
     const known = waiting.get(occurrence.fingerprint)
     if (known === undefined && waiting.size >= FINGERPRINTS_WAITING) {
       log.error({ reason: 'busy' }, 'failure not recorded')

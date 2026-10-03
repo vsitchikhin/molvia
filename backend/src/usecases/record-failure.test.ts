@@ -1,6 +1,18 @@
+import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type { FailureOccurrence } from '@/db/failures-repository'
-import { framePlace, noticesFor, occurrenceOf } from './record-failure'
+import { ERROR } from '@molvia/model'
+import type { PhoneFailure } from '@molvia/model'
+import {
+  PHONE_REPORTS_PER_ADDRESS,
+  PHONE_REPORTS_PER_MINUTE,
+  framePlace,
+  noticesFor,
+  occurrenceOf,
+  phoneFailure,
+  phoneReportLimit,
+  takePhoneFailures,
+} from './record-failure'
 
 const BUILD = 'v0.2.0-4-gabc1234'
 const OWNER = 4242
@@ -141,5 +153,104 @@ describe('noticesFor — что услышит владелец (В-2, В-5)', (
   it('без владельца — ничего, даже впервые', () => {
     expect(noticesFor(occurrence, { count: 1, buildCount: 1 }, 1, null)).toEqual([])
     expect(noticesFor(occurrence, { count: 10, buildCount: 10 }, 1, null)).toEqual([])
+  })
+})
+
+const REPORT: PhoneFailure = {
+  errorName: 'TypeError',
+  frames: ['at Xe (/assets/index-BTCsHrpw.js:1:48213)'],
+  catcher: 'screen',
+  screen: 'advice',
+  build: 'index-BTCsHrpw',
+  platform: 'ios 18 app',
+}
+
+describe('phoneFailure — сбой телефона (MOL-144)', () => {
+  it('место — ловушка и экран, сборка — страницы, платформа — с местом', () => {
+    expect(phoneFailure(REPORT)).toEqual({
+      summary: { errorName: 'TypeError', frames: REPORT.frames },
+      place: { source: 'phone', route: 'screen:advice', platform: 'ios 18 app' },
+      build: 'index-BTCsHrpw',
+    })
+  })
+
+  it('система входит в отпечаток, версия и вид запуска — нет (В-2)', () => {
+    const fingerprint = (platform: string) => {
+      const { summary, place, build } = phoneFailure({ ...REPORT, platform })
+      return occurrenceOf(summary, place, build).fingerprint
+    }
+    expect(fingerprint('ios 26 browser')).toBe(fingerprint('ios 18 app'))
+    expect(fingerprint('android app')).not.toBe(fingerprint('ios 18 app'))
+  })
+
+  it('отпечаток API без платформы прежний: строки MOL-143 не стали новыми', () => {
+    const summary = { errorName: 'TypeError', frames: ['at f (file:///app/dist/index.js:1:1)'] }
+    const before = occurrenceOf(summary, { source: 'api', route: 'GET /x' }, BUILD)
+    const formula = ['api', 'TypeError', '', 'at f (file:///app/dist/index.js)', 'GET /x']
+    expect(before.fingerprint).toBe(
+      createHash('sha256').update(formula.join('\u0000')).digest('hex'),
+    )
+    expect(before).not.toHaveProperty('platform')
+  })
+
+  it('уведомление владельцу называет платформу', () => {
+    const { summary, place, build } = phoneFailure(REPORT)
+    const occurrence = occurrenceOf(summary, place, build)
+    expect(noticesFor(occurrence, { count: 1, buildCount: 1 }, 1, OWNER)).toEqual([
+      expect.objectContaining({ source: 'phone', build: 'index-BTCsHrpw', platform: 'ios 18 app' }),
+    ])
+  })
+})
+
+describe('phoneReportLimit — предел в памяти (MOL-144, Р-6)', () => {
+  it(`с адреса — ${String(PHONE_REPORTS_PER_ADDRESS)} в минуту, ровно и на один больше`, () => {
+    const limit = phoneReportLimit()
+    expect(limit('a', PHONE_REPORTS_PER_ADDRESS - 1, 0)).toBe(true)
+    expect(limit('a', 1, 1)).toBe(true)
+    expect(limit('a', 1, 2)).toBe(false)
+    expect(limit('b', 1, 2)).toBe(true)
+    expect(limit('a', 1, 60_000)).toBe(true)
+  })
+
+  it(`со всех — ${String(PHONE_REPORTS_PER_MINUTE)} в минуту`, () => {
+    const limit = phoneReportLimit(PHONE_REPORTS_PER_ADDRESS, 30)
+    expect(limit('a', 20, 0)).toBe(true)
+    expect(limit('b', 10, 0)).toBe(true)
+    expect(limit('c', 1, 0)).toBe(false)
+  })
+
+  it('отказ не считается', () => {
+    const limit = phoneReportLimit(5, 100)
+    expect(limit('a', 6, 0)).toBe(false)
+    expect(limit('a', 5, 0)).toBe(true)
+  })
+})
+
+describe('takePhoneFailures', () => {
+  it('в пределе каждый отчёт уходит со своей сборкой', () => {
+    const taken: string[] = []
+    takePhoneFailures(
+      {
+        limit: () => true,
+        take: (_summary, place, build) => taken.push(`${place.route ?? ''} ${build}`),
+      },
+      { reports: [REPORT, { ...REPORT, catcher: 'vue', build: 'index-OldBuild1' }] },
+      'a',
+      0,
+    )
+    expect(taken).toEqual(['screen:advice index-BTCsHrpw', 'vue:advice index-OldBuild1'])
+  })
+
+  it('сверх предела — отказ целиком, в таблицу ничего', () => {
+    const taken: unknown[] = []
+    expect(() => {
+      takePhoneFailures(
+        { limit: () => false, take: (...args) => taken.push(args) },
+        { reports: [REPORT] },
+        'a',
+        0,
+      )
+    }).toThrow(expect.objectContaining({ code: ERROR.CLIENT_ERRORS_RATE_LIMITED }))
+    expect(taken).toEqual([])
   })
 })

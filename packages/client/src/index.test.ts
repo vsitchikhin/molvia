@@ -1975,3 +1975,39 @@ describe('«Написать разработчику» (MOL-147)', () => {
     expect(calls).toHaveLength(0)
   })
 })
+
+describe('сбои телефона (MOL-144)', () => {
+  const report = {
+    errorName: 'TypeError',
+    frames: ['at Xe (/assets/index-BTCsHrpw.js:1:48213)'],
+    catcher: 'screen' as const,
+    screen: 'advice',
+    build: 'index-BTCsHrpw',
+    platform: 'ios 18 app',
+  }
+
+  it('шлёт сохранённое одним телом и ждёт 204', async () => {
+    const { client, calls } = clientRecording()
+    await client.reportClientErrors({ reports: [report] }).catch(() => undefined)
+    expect(calls.map((call) => [call.url, call.method])).toEqual([
+      ['http://api/client-errors', 'POST'],
+    ])
+    await expect(
+      clientServing(null, { status: 204 }).reportClientErrors({ reports: [report] }),
+    ).resolves.toBeUndefined()
+  })
+
+  it('сверх предела — свой код', async () => {
+    const client = clientAnswering(429, { code: ERROR.CLIENT_ERRORS_RATE_LIMITED })
+    expect(await codeOf(client.reportClientErrors({ reports: [report] }))).toBe(
+      ERROR.CLIENT_ERRORS_RATE_LIMITED,
+    )
+  })
+
+  it('портал с 200 вместо 204 — не успех', async () => {
+    const client = clientAnswering(200, { welcome: 'wifi' })
+    expect(await codeOf(client.reportClientErrors({ reports: [report] }))).toBe(
+      ISSUE.RESPONSE_INVALID,
+    )
+  })
+})
