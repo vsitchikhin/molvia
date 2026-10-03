@@ -10,8 +10,14 @@ const config = {
   rules: { 'molvia/display-type-whole': true },
 }
 
-async function refused(code: string): Promise<string[]> {
-  const { results } = await stylelint.lint({ code, config })
+const MIXINS = fileURLToPath(new URL('../src/styles/_mixins.scss', import.meta.url))
+
+async function refused(code: string, codeFilename?: string): Promise<string[]> {
+  const { results } = await stylelint.lint({
+    code,
+    config,
+    ...(codeFilename ? { codeFilename } : {}),
+  })
   return (results[0]?.warnings ?? []).map((warning) => warning.text.split(' ')[0] ?? '')
 }
 
@@ -70,13 +76,13 @@ describe('molvia/display-type-whole', () => {
     expect(await refused('.a { @include display-type; all: unset; }')).toEqual(['all'])
   })
 
-  it('reads a mixin that wraps the role as the role, in the same file', async () => {
+  it('refuses a wrapper of the role outside _mixins.scss, and still reads it as the role', async () => {
     expect(
       await refused(
         '@mixin figure-type { @include display-type; font-variant-numeric: tabular-nums; }\n' +
           '.a { @include figure-type; font-weight: var(--weight-regular); }',
       ),
-    ).toEqual(['font-weight'])
+    ).toEqual(['figure-type', 'font-weight'])
   })
 
   it('learns the wrappers of the role through any number of them', () => {
@@ -157,10 +163,11 @@ describe('molvia/display-type-whole', () => {
     ).toEqual(['font-weight'])
   })
 
-  it('keeps a wrapper in a mixin its own place: the body of the mixin, not the file', async () => {
+  it('takes a wrapper in _mixins.scss, and keeps it its own place: the body, not the file', async () => {
     expect(
       await refused(
         '@mixin figure-type { @include display-type; }\n.b { font-weight: var(--weight-bold); }',
+        MIXINS,
       ),
     ).toEqual([])
   })

@@ -13,14 +13,15 @@
 // elsewhere in the file is beyond what a linter can match (Б3), and so the role is never put in a
 // placeholder, where `@extend` would carry it into such a rule (В3).
 //
-// A mixin that includes the role is the role (В1): its name is learnt from every partial of styles/
-// when the plugin loads (Ж2), and from the file being linted, through any number of wrappers. Names are
+// A mixin that includes the role is the role (В1), through any number of wrappers. It may be written
+// in styles/_mixins.scss alone — the one place the plugin reads when it loads, so the place a wrapper
+// can live and the place it is looked for are one (Ж2, З1); written anywhere else it is refused. Names are
 // compared as Sass compares them — a hyphen and an underscore are one character (Г1) — and found
 // however the include names them: through a namespace (`m.display-type`, Д1) or `sass:meta`
 // (`meta.apply(meta.get-mixin('display-type'))`, Д2). `sass:meta` itself is refused — a mixin kept in
 // a variable carries the role under no name at all (Е2) — and so is `@extend`, by the config (Е3).
 
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import stylelint from 'stylelint'
 
 const {
@@ -82,13 +83,8 @@ export function roleMixins(source, known = new Set(['display-type'])) {
   return roles
 }
 
-const STYLES = new URL('../src/styles/', import.meta.url)
-
 const SHARED = roleMixins(
-  readdirSync(STYLES)
-    .filter((file) => /^_.+\.scss$/.test(file))
-    .map((file) => readFileSync(new URL(file, STYLES), 'utf8'))
-    .join('\n'),
+  readFileSync(new URL('../src/styles/_mixins.scss', import.meta.url), 'utf8'),
 )
 
 const messages = ruleMessages(ruleName, {
@@ -96,6 +92,9 @@ const messages = ruleMessages(ruleName, {
     `${prop} beside @include display-type: a display role is Nunito at its one weight, whole.`,
   placeholder: () =>
     `display-type in a placeholder: @extend would carry the role into a rule this check cannot see.`,
+  wrapper: (name) =>
+    `${name} wraps the display role: a wrapper lives in styles/_mixins.scss only, where this check ` +
+    `learns it.`,
   meta: () =>
     `sass:meta applies a mixin under any name, a display role among them, past this check. Include it.`,
 })
@@ -122,6 +121,15 @@ function rule(primary) {
           check(node)
         }
       }
+    }
+
+    if (!root.source?.input.file?.endsWith('/styles/_mixins.scss')) {
+      root.walkAtRules('mixin', (mixin) => {
+        const name = sassName(/^[\w-]+/.exec(mixin.params)?.[0] ?? '')
+        if (roles.has(name) && !SHARED.has(name)) {
+          report({ ruleName, result, node: mixin, message: messages.wrapper(name), word: name })
+        }
+      })
     }
 
     root.walkAtRules('use', (use) => {
