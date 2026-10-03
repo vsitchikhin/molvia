@@ -49,7 +49,7 @@ import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
 import { exportMine } from '@/usecases/export-mine'
-import { sendFeedback } from '@/usecases/send-feedback'
+import { heavyFeedbackLimit, sendFeedback } from '@/usecases/send-feedback'
 import { feedbackFromBot } from '@/usecases/feedback-from-bot'
 import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
@@ -182,6 +182,8 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.LOGIN_FORBIDDEN]: 403,
   [ERROR.LOGIN_RATE_LIMITED]: 429,
   [ERROR.FEEDBACK_RATE_LIMITED]: 429,
+  [ERROR.FEEDBACK_PICTURE_INVALID]: 415,
+  [ERROR.FEEDBACK_PICTURE_TOO_LARGE]: 413,
   [ERROR.CLIENT_ERRORS_RATE_LIMITED]: 429,
   [ERROR.LOGIN_DISABLED]: 503,
   [ERROR.BOT_UNAUTHORIZED]: 401,
@@ -607,8 +609,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       )
       // A message to the developer lives a year from the last word of its thread (MOL-147, В-4 of
       // MOL-150), whether or not anyone writes again.
+      // A picture's bytes live until the owner's bot took them, a week at most (MOL-167, В-1).
       stopFeedbackCleanup = startLoginCleanup(
-        () => messages.purgeStale(),
+        async () => {
+          await messages.purgeStale()
+          await messages.forgetPictures()
+        },
         (error) => {
           failures.report(error, job('feedback-cleanup'), 'stale feedback cleanup failed')
         },
@@ -768,9 +774,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           )
         }),
       ownerNoticesSent: (body) =>
-        createOwnerNoticeRepository(db).markSent(body.messages, new Date()),
+        createOwnerNoticeRepository(db).markSent(body.messages, new Date(), body.missed),
       feedbackFromBot: (body) => feedbackFromBot(messages, owner, body, VERSION),
       replyDelivered: (body) => messages.markDelivered(body),
+      feedbackPicture: (number, position) => messages.picture(number, position),
     })
 
     // The phone's failures (MOL-144): no session, a limit in memory, the page's own build.
@@ -818,8 +825,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       actorEraseRoute(guarded, (telegramUserId) =>
         eraseMe(createErasureRepository(db), telegramUserId),
       )
-      feedbackRoutes(guarded, (actorId, message) =>
-        sendFeedback(messages, actorId, message, VERSION, owner),
+      const heavyFeedback = heavyFeedbackLimit()
+      feedbackRoutes(
+        guarded,
+        (actorId, message) => sendFeedback(messages, actorId, message, VERSION, owner),
+        (actorId) => heavyFeedback(actorId, Date.now()),
       )
       sessionRoutes(guarded, {
         list: (actorId, currentId) => listSessions(sessions, actorId, currentId),

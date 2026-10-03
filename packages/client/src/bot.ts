@@ -9,6 +9,7 @@ import {
   eraseMeSchema,
   feedbackFromBotAnswerSchema,
   feedbackFromBotSchema,
+  feedbackPictureSchema,
   loginCodeSchema,
   loginPreviewCodec,
   ownerNoticesSchema,
@@ -23,6 +24,7 @@ import type {
   DueReminders,
   FeedbackFromBot,
   FeedbackFromBotAnswer,
+  FeedbackPicture,
   LoginPreview,
   OwnerNotices,
   ReminderSwitch,
@@ -61,7 +63,11 @@ export interface MolviaBotClient {
    * The notices about these messages went to the owner (MOL-148): they are not handed again. Until
    * this is said, the API hands them again ten minutes on.
    */
-  ownerNoticesSent(messages: readonly number[], signal?: AbortSignal): Promise<void>
+  ownerNoticesSent(
+    messages: readonly number[],
+    signal?: AbortSignal,
+    missed?: readonly { readonly message: number; readonly position: number }[],
+  ): Promise<void>
   /**
    * A text written to the bot as a reply to one of its messages (MOL-148): the API says what it was
    * — the owner's reply, a person's word in a thread — or `404`, nothing of ours.
@@ -69,6 +75,15 @@ export interface MolviaBotClient {
   feedbackFromBot(message: FeedbackFromBot): Promise<FeedbackFromBotAnswer>
   /** What became of the owner's reply once sent: the message it went out as, or blocked. */
   replyDelivered(delivery: ReplyDelivered): Promise<void>
+  /**
+   * A picture of message `number`, to send the owner after its notice (MOL-167): the phone's JPEG or
+   * Telegram's id of a photo. `null` where there is none any more — delivered, or past its week.
+   */
+  feedbackPicture(
+    number: number,
+    position: number,
+    signal?: AbortSignal,
+  ): Promise<FeedbackPicture | null>
 }
 
 /** An internal client has no session and cannot attach its secret to an arbitrary API path. */
@@ -135,14 +150,34 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
         body: body.data,
       })
     },
-    ownerNoticesSent: async (messages, signal) => {
-      const body = ownerNoticesSentSchema.safeParse({ messages })
+    ownerNoticesSent: async (messages, signal, missed) => {
+      const body = ownerNoticesSentSchema.safeParse({
+        messages,
+        ...(missed === undefined || missed.length === 0 ? {} : { missed }),
+      })
       if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'messages')
       await request('/internal/owner/sent', z.undefined(), {
         method: 'POST',
         body: body.data,
         ...(signal === undefined ? {} : { signal }),
       })
+    },
+    feedbackPicture: async (number, position, signal) => {
+      if (!Number.isSafeInteger(number) || number < 1)
+        throw new ApiError(ISSUE.PATH_INVALID, 'number')
+      if (!Number.isSafeInteger(position) || position < 1) {
+        throw new ApiError(ISSUE.PATH_INVALID, 'position')
+      }
+      try {
+        return await request(
+          `/internal/feedback/${String(number)}/pictures/${String(position)}`,
+          feedbackPictureSchema,
+          signal === undefined ? {} : { signal },
+        )
+      } catch (error) {
+        if (error instanceof ApiError && error.code === ERROR.NOT_FOUND) return null
+        throw error
+      }
     },
     claimOwnerNotices: async (signal) =>
       request('/internal/owner/claim', ownerNoticesSchema, {

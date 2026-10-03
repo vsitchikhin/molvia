@@ -30,8 +30,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // what the person wrote to the developer and the owner's replies (MOL-147). 9: `receipts`,
 // the receipts photographed and what the reader laid them out into — never the photo (MOL-125).
 // 10: a receipt's `city` and `tripId`, a line's item, `match`, `translation` and purchase, and
-// `storeMemory`, the words the person gave the shops' memory (MOL-126).
-export const EXPORT_VERSION = 10
+// `storeMemory`, the words the person gave the shops' memory (MOL-126). 11: a message's `pictures`,
+// what is left of each once it reached the owner (MOL-167).
+export const EXPORT_VERSION = 11
 
 const day = z.iso.date()
 
@@ -424,6 +425,21 @@ const feedbackSchema = z.strictObject({
       text: z.string(),
       delivered: z.string().nullable(),
       createdAt: isoDate,
+    }),
+  ),
+  /**
+   * The pictures that went with it (MOL-167): never the picture — its bytes are kept only until the
+   * owner's Telegram has them (В-1) — but its place, where it came from, its size and when it went.
+   */
+  pictures: z.array(
+    z.strictObject({
+      position: z.int(),
+      source: z.string(),
+      width: z.int(),
+      height: z.int(),
+      bytes: z.int().nullable(),
+      createdAt: isoDate,
+      sentAt: isoDate.nullable(),
     }),
   ),
 })

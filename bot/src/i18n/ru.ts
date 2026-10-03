@@ -195,6 +195,8 @@ export const ru = {
     'Нечего отправить: в тексте одни невидимые знаки или пустые строки подряд. Ничего не отправлено.',
   'feedback.limited': 'Сегодня сообщений уже много. Напишите завтра.',
   'feedback.textOnly': 'Отвечать можно только текстом.',
+  'feedback.photoOnly':
+    'Пришлите картинку как фото, а не файлом: в файле остаётся, где и когда он снят.',
   'feedback.failed': 'Не получилось: сервер не ответил. Ответьте ещё раз через минуту.',
   'feedback.notSent': 'Не отправлено: Telegram не принял сообщение. Ответьте ещё раз.',
   'feedback.unknown':
@@ -216,6 +218,11 @@ export const ru = {
   'owner.feedback.noCode': 'С экрана ошибки, без кода',
   'owner.feedback.builds': 'Страница {page} · API {api}',
   'owner.feedback.noBuild': '—',
+  // MOL-167: the pictures follow the notice as photos replying to it; the tag ends the caption's
+  // first line, so the owner's reply to a picture finds the thread.
+  'owner.feedback.pictures': 'Снимков: {count}',
+  'owner.feedback.pictureCaption': 'Снимок {position} из {count} · #fb{thread}',
+  'owner.feedback.noText': '(без текста, только снимок)',
 } as const
 
 /**
