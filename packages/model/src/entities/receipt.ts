@@ -193,8 +193,9 @@ const TABLE_ITEM_ROW = /^[^\p{L}\d]*(?:\p{L}[^\p{L}\s]*\s+[^\p{L}\d]*)?\(?\d{2,4
 /**
  * A card's article row, «0401/1163909», or cut by OCR, «1906/9000» (round 7, Р7-В1): the item's name stands
  * above it — one row, or two when it is split — and its number «1 …», «1…» is read without a dot as often
- * as with one. So the head of a card ends two rows above its first article. A card's item number with its
- * dot, «3.Գյումրի …», ends it where it stands; a house number «62, Գորկու …» does not (review 16).
+ * as with one. So the head of a card ends two rows above its first article, or at the item's number with
+ * its dot «3.Գյումրի …» in those two rows — only there: a banner's row with «9.» OCR read at its edge
+ * stands above the address (round 8, Р8-В1), and a house number «62, Գորկու …» is no item (review 16).
  */
 const CARD_ARTICLE_ROW = /\d{4}\s*\/\s*\d{3,}/u
 const CARD_NUMBER_ROW = /^\s*\d{1,3}\.\s*\p{L}/u
@@ -212,8 +213,6 @@ function headEnd(rows: readonly TextRow[]): number {
     const numbered = rows.slice(above, article).findIndex((row) => CARD_NUMBER_ROW.test(row.text))
     ends.push(numbered < 0 ? above : above + numbered)
   }
-  const number = rows.findIndex((row) => CARD_NUMBER_ROW.test(row.text))
-  if (number >= 0) ends.push(number)
   return ends.length === 0 ? Math.min(rows.length, HEAD_ROWS) : Math.min(...ends)
 }
 

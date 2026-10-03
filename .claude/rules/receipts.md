@@ -240,7 +240,8 @@ beside its shop's («ՀՀ, ք. Երևան» on a Gyumri receipt whose shop is «
 Р3-В2), and two cities are no answer; never the chain's name «ԵՐԵՎԱՆ-ՍԻԹԻ» or «YEREVAN CITY». **The head
 ends at the first item** (rounds 4–7): a table's heading opening the row with the name after it —
 «(2203) ԳՅՈՒՄՐԻ …», «| |824) …» as OCR reads it with the bracket lost, a stray letter at the edge
-before it forgiven; a card's item number with a dot «3.…»; and two rows above a card's first article
+before it forgiven; a card's item number with a dot «3.…» in the two rows above its first article — anywhere else it is a
+banner's «9.» read at its edge above the address (round 8, Р8-В1); else two rows above that article
 «0401/…» — whole or cut by OCR, «1906/9000» — since the item's name stands above it, its number read
 without a dot as often as with one (round 7, Р7-В1). An item named after a city, the beer «Գյումրի», is
 a line, not the address. A phone's area code «Հեռ. (0312) …» and a house number «62, Գորկու …» are

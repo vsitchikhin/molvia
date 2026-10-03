@@ -252,6 +252,21 @@ describe('the city of the address (MOL-126, Р-6)', () => {
     expect(receiptCityOf(card('2203/1100 1Հտ 450 450'))).toBe('Ереван')
   })
 
+  // round 8, Р8-В1: a number with a dot is an item only right above the first article — a banner with
+  // «9.» OCR read at its edge stands above the address (R-dwtrim-psm6 am-10 of the bench)
+  it('does not end the head at a numbered row far above the first article', () => {
+    const card = rows(
+      'Ակցիան գործում է միայն բարտապան',
+      '9. հաճախորդների համար` ապան',
+      '= 4 - ԳՅՈՒՄՐԻ Գորկու 62 2.',
+      '/ԱԱՀ-ով հարկվող/',
+      'Որից ԱԱՀ',
+      '1.Դդմի սերմեր',
+      '2008/149263 1Հտ 640 640',
+    )
+    expect(receiptCityOf(card)).toBe('Гюмри')
+  })
+
   // round 5, Р5-В2, review 16: must not fire — a phone's area code and a house number are the head
   it('does not end the head at a phone’s area code or a house number', () => {
     expect(receiptCityOf(rows('DOG CITY', 'Հեռ. (0312) 5-55-55', 'ԳՅՈՒՄՐԻ Շիրազի 57'))).toBe(
