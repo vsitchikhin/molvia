@@ -13,18 +13,23 @@ const FAILURE_NOTICE_KINDS = [
 const UNHANDED_FAILURE_NOTICE_MS = 24 * 60 * 60 * 1000
 
 /**
- * How long a notice about a message waits for the bot's word that it went before it is handed again
- * (MOL-148, adversarial В1): a minute's run sends twenty at Telegram's pace in under half a minute,
- * and a rollout's stop gives up the rest — the next bot takes them ten minutes on.
+ * How long a notice about a message waits for the bot's word that it went before it is handed the
+ * second time (MOL-148, adversarial В1): a minute's run sends twenty at Telegram's pace in under half
+ * a minute, and a rollout's stop gives up the rest — the next bot takes them ten minutes on. **Each
+ * time after waits twice as long** (round 2, Г2): a hand counts whether the bot tried the notice or
+ * not — a 429 or a stop gives up the rest of a run — so the tries are spread over a day rather than
+ * spent in an hour.
  */
 export const OWNER_NOTICE_RESEND_MS = 10 * 60 * 1000
 
 /**
- * How many times a notice about a message is handed at most: an hour of Telegram away or of failed
- * rollouts. Past it, something refuses that very notice for good, and the bot's report of the
- * refusal is what says so.
+ * How many times a notice about a message is handed at most: with the pause doubling from ten
+ * minutes, the last some 21 hours after the first — a day of Telegram away. Past it, what is left is
+ * a notice Telegram refuses for good, and the bot has reported each refusal as a failure of its own
+ * (`owner:send`), so the owner hears that something did not go. **The named price:** Telegram away for
+ * longer than that, and the message is the table's alone again.
  */
-export const OWNER_NOTICE_TRIES = 6
+export const OWNER_NOTICE_TRIES = 8
 
 export interface OwnerNoticeRepository {
   /**
@@ -32,7 +37,8 @@ export interface OwnerNoticeRepository {
    * at the same moment skips the rows the first one holds rather than waiting to hand them out again.
    * A notice about a failure is handed at most once, as the rating reminders are (MOL-101) — the
    * table keeps its count. **A notice about a message is handed again** until the bot says it went
-   * (`markSent`), `OWNER_NOTICE_RESEND_MS` after the last time, at most `OWNER_NOTICE_TRIES` times
+   * (`markSent`), `OWNER_NOTICE_RESEND_MS` after the first time and twice the pause each time after,
+   * at most `OWNER_NOTICE_TRIES` times
    * (MOL-148, adversarial В1): the table holds nothing else of it. Their payloads, oldest first, as
    * stored: the caller reads them through `ownerNoticeSchema`.
    */
@@ -61,7 +67,9 @@ export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
                or (${inArray(ownerNotices.kind, [...FEEDBACK_NOTICE_KINDS])}
                    and ${ownerNotices.sentAt} is null
                    and ${ownerNotices.tries} < ${OWNER_NOTICE_TRIES}
-                   and ${lt(ownerNotices.handedAt, new Date(at.getTime() - OWNER_NOTICE_RESEND_MS))})
+                   and ${ownerNotices.handedAt} < ${at.toISOString()}::timestamptz
+                     - make_interval(secs => ${OWNER_NOTICE_RESEND_MS / 1000}
+                         * power(2, greatest(${ownerNotices.tries}, 1) - 1)))
             order by ${ownerNotices.id}
             limit ${rowLimit(limit)}
             for update skip locked)`,

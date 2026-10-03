@@ -54,6 +54,7 @@ function claiming(answer: OwnerNotices | Error): MolviaBotClient {
     claimOwnerNotices: vi.fn(() =>
       answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer),
     ),
+    reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as MolviaBotClient
 }
 
@@ -200,6 +201,24 @@ describe('tellOwner — уведомление о сообщении ушло, �
     await tellOwner(api, telegramApi, noWait)
 
     expect(ownerNoticesSent.mock.calls.map((call) => call[0] as unknown)).toEqual([[42], [57]])
+  })
+
+  it('Telegram отказал как есть (400) — отчёт о сбое owner:send; погода (502) — без отчёта', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    for (const [code, reported] of [
+      [400, true],
+      [502, false],
+    ] as const) {
+      const { api: telegramApi } = telegram(code)
+      const { api } = client([MESSAGE])
+
+      await tellOwner(api, telegramApi, noWait)
+
+      const reports = (api.reportFailure as ReturnType<typeof vi.fn>).mock.calls
+      expect(reports.length > 0).toBe(reported)
+      if (reported)
+        expect(reports[0]?.[0]).toMatchObject({ handler: 'owner:send', code: 'TELEGRAM_400' })
+    }
   })
 
   it('Telegram не принял (502, 429) — не названо: API выдаст его снова', async () => {

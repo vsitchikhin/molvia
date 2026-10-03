@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { HttpError } from 'grammy'
 import type { Bot, Transformer } from 'grammy'
 import type { Update, UserFromGetMe } from 'grammy/types'
 import { ApiError } from '@molvia/client'
@@ -38,9 +39,10 @@ interface Call {
   readonly payload: Record<string, unknown>
 }
 
-/** Telegram's code for a call it refuses — by method, or by method and chat. */
+/** Telegram's code for a call it refuses, or a connection broken — by method, or method and chat. */
 type Refuse =
-  Partial<Record<string, number>> | ((method: string, chat: unknown) => number | undefined)
+  | Partial<Record<string, number>>
+  | ((method: string, chat: unknown) => number | 'network' | undefined)
 
 function harness(api: Partial<MolviaBotClient>, refuse: Refuse = {}): { bot: Bot; calls: Call[] } {
   const calls: Call[] = []
@@ -63,6 +65,7 @@ function harness(api: Partial<MolviaBotClient>, refuse: Refuse = {}): { bot: Bot
       typeof refuse === 'function'
         ? refuse(method, (payload as { chat_id?: unknown }).chat_id)
         : refuse[method]
+    if (code === 'network') return Promise.reject(new HttpError('network', new Error('reset')))
     if (code !== undefined) {
       return Promise.resolve({ ok: false, error_code: code, description: 'refused' }) as never
     }
@@ -214,6 +217,21 @@ describe('ответ владельца на уведомление (MOL-148, Р
     expect(replyDelivered).toHaveBeenCalledWith({ reply: 17, outcome: 'failed' })
     expect(sent(calls, 'setMessageReaction')).toEqual([])
     expect(replies(calls)).toContain(t('ru', 'feedback.notSent'))
+  })
+
+  it('связь с Telegram оборвалась — ничего не отмечено, владельцу «не знаю, дошло ли» (ревью №8)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const replyDelivered = vi.fn(() => Promise.resolve())
+    const { bot, calls } = harness(
+      { feedbackFromBot: answering(answered), replyDelivered },
+      (method, chat) =>
+        method === 'sendMessage' && chat === ANNA_TELEGRAM ? 'network' : undefined,
+    )
+
+    await bot.handleUpdate(replyTo({ text: ownerText(NOTICE) }, { text: 'Починили' }))
+
+    expect(replyDelivered).not.toHaveBeenCalled()
+    expect(replies(calls)).toContain(t('ru', 'feedback.unknown'))
   })
 
   it('отметка об отправке не дошла до API — владелец всё равно видит 👌', async () => {

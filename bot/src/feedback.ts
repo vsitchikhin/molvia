@@ -39,12 +39,23 @@ export function replyFrame(text: string, day: string, locale: AppLocale): string
 }
 
 /**
+ * The last lines frames were sent with before the wording of `feedback.howToAnswer` changed (round 2,
+ * Г3): a frame stays in a person's chat for good, and their answer to it must still be known as one.
+ * A new wording moves the old one here, in every language.
+ */
+export const FRAME_LAST_LINES: readonly string[] = []
+
+/**
  * Whether a message of the bot's is the frame of a reply (MOL-148): its last line is the frame's own,
- * in any language the bot speaks. The bot reads its message back, as it reads a notice's tag.
+ * in any language the bot speaks, now or in a wording it was sent with before. The bot reads its
+ * message back, as it reads a notice's tag.
  */
 export function isReplyFrame(text: string): boolean {
   const last = text.slice(text.lastIndexOf('\n') + 1)
-  return LOCALES.some((locale) => last === t(locale, 'feedback.howToAnswer'))
+  return (
+    LOCALES.some((locale) => last === t(locale, 'feedback.howToAnswer')) ||
+    FRAME_LAST_LINES.includes(last)
+  )
 }
 
 /**
@@ -165,10 +176,16 @@ async function deliver(
     }
     console.error(`[molvia] feedback reply: ${telegramFailure(error)}`)
     reportDefect(api, error, handlerOf(ctx))
-    // The reply is written and never reached the person: the copy says so, and «ответьте ещё раз»
-    // writes another (adversarial В4).
-    await mark(api, ctx, () => api.replyDelivered({ reply: answer.reply, outcome: 'failed' }))
-    await say('feedback.notSent')
+    if (error instanceof GrammyError) {
+      // Telegram said no: the reply never reached the person, the copy says so, and «ответьте ещё
+      // раз» writes another (adversarial В4).
+      await mark(api, ctx, () => api.replyDelivered({ reply: answer.reply, outcome: 'failed' }))
+      await say('feedback.notSent')
+      return
+    }
+    // The connection broke: Telegram may have taken the message before it did, so nothing is marked
+    // — empty is «unknown» (Р-4) — and the owner is told it may go twice (review №8).
+    await say('feedback.unknown')
     return
   }
   await mark(api, ctx, () =>

@@ -8,7 +8,7 @@ import type {
   FeedbackRepository,
   ReplyWritten,
 } from '@/db/feedback-repository'
-import { feedbackFromBot, telegramKey } from './feedback-from-bot'
+import { feedbackFromBot } from './feedback-from-bot'
 
 const OWNER = 4242
 const ANNA = 1001
@@ -133,7 +133,6 @@ describe('feedbackFromBot — продолжение нити (MOL-148, В-2)', 
       {
         reply: answered,
         text: 'Обновил, работает',
-        key: telegramKey(ANNA, 9031, 'Обновил, работает'),
         apiBuild: 'v0.2.0',
         limit: FEEDBACK_DAY_LIMIT,
         notify: true,
@@ -182,16 +181,5 @@ describe('feedbackFromBot — продолжение нити (MOL-148, В-2)', 
     await expect(feedbackFromBot(fake({}), OWNER, long, 'dev')).rejects.toMatchObject({
       code: ERROR.NOT_FOUND,
     })
-  })
-})
-
-describe('telegramKey', () => {
-  it('uuid по форме; один чат, ответ и текст — один ключ; другое в любом из трёх — другой', () => {
-    const key = telegramKey(ANNA, 9031, 'Спасибо')
-    expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
-    expect(telegramKey(ANNA, 9031, 'Спасибо')).toBe(key)
-    expect(telegramKey(ANNA, 9031, 'Спасибо!')).not.toBe(key)
-    expect(telegramKey(ANNA, 9040, 'Спасибо')).not.toBe(key)
-    expect(telegramKey(ANNA + 1, 9031, 'Спасибо')).not.toBe(key)
   })
 })

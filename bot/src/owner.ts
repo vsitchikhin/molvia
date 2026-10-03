@@ -168,6 +168,9 @@ export async function tellOwner(
         return
       }
       console.error(`[molvia] owner notice: ${telegramFailure(error)}`)
+      // A notice Telegram refuses for what it is — a 400, not the weather — is a failure of ours,
+      // and the one way the owner hears that a message's notice keeps not going (round 2, Г2).
+      reportDefect(api, error, 'owner:send')
       if (error instanceof GrammyError && error.error_code === 429) {
         const left = notices.length - index - 1
         if (left > 0) console.error(`[molvia] owner: 429 flood, ${String(left)} notices given up`)

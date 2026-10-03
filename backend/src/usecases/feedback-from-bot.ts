@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import {
   DomainError,
   ERROR,
@@ -24,24 +23,6 @@ function readText(text: string, max: number): string | Refused {
   return read.error.issues.some((issue) => issue.code === 'too_big')
     ? { outcome: 'too_long', max }
     : { outcome: 'invisible' }
-}
-
-/**
- * The key a person's word from Telegram is written under (MOL-148, Р-7): the chat, the reply it
- * answers and the words as kept — so Telegram handing the same update over twice writes one row and
- * sends the owner one notice, and so does the same word sent again after the bot said «ответьте ещё
- * раз» over an answer that was lost (adversarial В3): a new Telegram message, the same content, as the
- * phone's key is the content's. A uuid in shape; the prefix keeps it from ever meeting a phone's.
- */
-export function telegramKey(
-  telegramUserId: TelegramUserId,
-  repliedMessageId: number,
-  text: string,
-): string {
-  const hex = createHash('sha256')
-    .update(`telegram:${String(telegramUserId)}:${String(repliedMessageId)}:${text}`)
-    .digest('hex')
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`
 }
 
 /**
@@ -83,7 +64,6 @@ export async function feedbackFromBot(
   const write = await repository.continueThread({
     reply: answered,
     text,
-    key: telegramKey(message.telegramUserId, message.repliedMessageId, text),
     apiBuild,
     limit: FEEDBACK_DAY_LIMIT,
     notify: owner !== null,

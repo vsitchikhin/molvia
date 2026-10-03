@@ -175,6 +175,8 @@ export const ru = {
    * written as a reply to the bot, in the writer's language, under their message.
    */
   'feedback.frame': 'Ответ на ваше сообщение от {date}:',
+  // The bot knows a frame by this very line (`isReplyFrame`, round 2 Г3): a new wording keeps the old
+  // one in `FRAME_LAST_LINES` (`feedback.ts`), or every frame already sent stops being one and its answers greet.
   'feedback.howToAnswer': 'Чтобы ответить, ответьте на это сообщение.',
   'feedback.passed': 'Передали разработчику.',
   'feedback.delivered': 'Доставлено.',
@@ -187,6 +189,8 @@ export const ru = {
   'feedback.textOnly': 'Отвечать можно только текстом.',
   'feedback.failed': 'Не получилось: сервер не ответил. Ответьте ещё раз через минуту.',
   'feedback.notSent': 'Не отправлено: Telegram не принял сообщение. Ответьте ещё раз.',
+  'feedback.unknown':
+    'Не знаю, дошло ли: связь с Telegram оборвалась. Ответите ещё раз — человек может получить ответ дважды.',
   /**
    * A message to the developer, told to the owner (MOL-148, Р-9 of MOL-150). The kind in the sheet's
    * own words; the tag `#fb{thread}` ends the first line and nothing else may stand after it — the

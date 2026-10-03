@@ -91,6 +91,8 @@ export const en: Dictionary = {
   'feedback.textOnly': 'Only text can be sent as an answer.',
   'feedback.failed': 'That did not work: the server did not answer. Reply again in a minute.',
   'feedback.notSent': 'Not sent: Telegram refused the message. Reply again.',
+  'feedback.unknown':
+    'Not sure it arrived: the connection to Telegram broke. Reply again and the person may get it twice.',
   'owner.feedback.bug': '🐞 Broken · #fb{thread}',
   'owner.feedback.idea': '💡 Idea · #fb{thread}',
   'owner.feedback.other': '💬 Other · #fb{thread}',

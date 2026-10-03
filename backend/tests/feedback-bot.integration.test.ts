@@ -646,18 +646,23 @@ describe('уведомление о сообщении выдаётся, пок�
     expect(await notices.claim(20, new Date(now + 60 * MINUTE))).toEqual([])
   })
 
-  it('не больше шести раз: дальше его не принимает сам Telegram, и об этом говорит отчёт бота', async () => {
+  it('пауза удваивается: 10, 20, 40… минут, восемь выдач за сутки, потом — нет (раунд 2, Г2)', async () => {
     const app = await serverFor(OWNER)
     await aThread(app)
     const notices = createOwnerNoticeRepository(db)
-    const now = Date.now()
+    const start = Date.now()
+    const at = (minutes: number) => new Date(start + minutes * MINUTE)
 
-    const handed = []
-    for (let step = 0; step < 10; step += 1) {
-      handed.push((await notices.claim(20, new Date(now + step * 11 * MINUTE))).length)
+    expect(await notices.claim(20, at(0))).toHaveLength(1)
+    let last = 0
+    for (const pause of [10, 20, 40, 80, 160, 320, 640]) {
+      expect(await notices.claim(20, at(last + pause - 1))).toEqual([])
+      expect(await notices.claim(20, at(last + pause + 1))).toHaveLength(1)
+      last += pause + 1
     }
-
-    expect(handed).toEqual([1, 1, 1, 1, 1, 1, 0, 0, 0, 0])
+    expect(await notices.claim(20, at(last + 100_000))).toEqual([])
+    const [row] = await db.select({ tries: ownerNotices.tries }).from(ownerNotices)
+    expect(row?.tries).toBe(8)
   })
 
   it('уведомление о сбое по-прежнему выдаётся один раз', async () => {
@@ -771,5 +776,52 @@ describe('ответ знает свою нить (адверсариально�
 
     const rows = await db.select({ thread: feedbackReplies.threadId }).from(feedbackReplies)
     expect(rows.map((row) => row.thread)).toEqual([thread, thread])
+  })
+})
+
+describe('то же слово на тот же ответ позже суток — новое слово (раунд 2, Г1)', () => {
+  it('«Не работает» через три дня снова записано и снова у владельца; в те же сутки — повтор', async () => {
+    const app = await serverFor(OWNER)
+    const { telegram, thread } = await aThread(app)
+    await answer(app, thread, 9031)
+    const word = () =>
+      fromBot(app, {
+        telegramUserId: telegram,
+        repliedMessageId: 9031,
+        thread: null,
+        text: 'Не работает',
+      })
+
+    expect((await word()).json()).toEqual({ outcome: 'continued' })
+    expect((await word()).json()).toEqual({ outcome: 'continued' })
+    expect(await db.select().from(feedback).where(eq(feedback.threadId, thread))).toHaveLength(1)
+
+    await db
+      .update(feedback)
+      .set({ createdAt: new Date(Date.now() - 3 * 86_400_000) })
+      .where(eq(feedback.threadId, thread))
+    expect((await word()).json()).toEqual({ outcome: 'continued' })
+
+    expect(await db.select().from(feedback).where(eq(feedback.threadId, thread))).toHaveLength(2)
+    expect(
+      await db.select().from(ownerNotices).where(eq(ownerNotices.kind, 'feedback_continued')),
+    ).toHaveLength(2)
+  })
+
+  it('то же слово на другой ответ той же нити — новое слово', async () => {
+    const app = await serverFor(OWNER)
+    const { telegram, thread } = await aThread(app)
+    await answer(app, thread, 9031)
+    await answer(app, thread, 9040, 'Ещё раз')
+    for (const replied of [9031, 9040]) {
+      await fromBot(app, {
+        telegramUserId: telegram,
+        repliedMessageId: replied,
+        thread: null,
+        text: 'Ок',
+      })
+    }
+
+    expect(await db.select().from(feedback).where(eq(feedback.threadId, thread))).toHaveLength(2)
   })
 })

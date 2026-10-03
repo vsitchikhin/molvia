@@ -42,8 +42,6 @@ export type ContinueWrite = 'written' | 'repeated' | 'limited' | 'gone'
 export interface ContinueThread {
   readonly reply: AnsweredReply
   readonly text: string
-  /** The key a repeat of the same Telegram message is found by. */
-  readonly key: string
   readonly apiBuild: string
   readonly limit: number
   readonly notify: boolean
@@ -87,8 +85,11 @@ export interface FeedbackRepository {
 
   /**
    * A person's word in the thread of `reply` (В-1 of MOL-150), under their lock, as a message from
-   * the sheet is: the same Telegram message again is written once, the day's limit is the form's,
-   * and the owner's notice is queued in the same transaction. `gone` if the reply went meanwhile.
+   * the sheet is: the day's limit is the form's, and the owner's notice is queued in the same
+   * transaction. **The same words to the same reply within a rolling day are a repeat** (adversarial
+   * В3, round 2 Г1): Telegram handing an update over twice, or the word sent again after the bot said
+   * «ответьте ещё раз» over a lost answer, is written once; the same «Не работает» a week on is a new
+   * word. A repeat is looked for before the count, as the form's. `gone` if the reply went meanwhile.
    */
   continueThread(continuation: ContinueThread): Promise<ContinueWrite>
 
@@ -240,7 +241,7 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
       return row ?? null
     },
 
-    continueThread({ reply, text, key, apiBuild, limit, notify }) {
+    continueThread({ reply, text, apiBuild, limit, notify }) {
       return translateFailures(() =>
         db.transaction(async (tx): Promise<ContinueWrite> => {
           await tx.execute(lockAuthor(reply.actorId))
@@ -258,7 +259,14 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
           const [same] = await tx
             .select({ id: feedback.id })
             .from(feedback)
-            .where(and(eq(feedback.actorId, reply.actorId), eq(feedback.clientKey, key)))
+            .where(
+              and(
+                eq(feedback.actorId, reply.actorId),
+                eq(feedback.inReplyTo, reply.reply),
+                eq(feedback.text, text),
+                sql`${feedback.createdAt} > clock_timestamp() - interval '24 hours'`,
+              ),
+            )
           if (same !== undefined) return 'repeated'
           const [today] = await tx.execute<{ n: number }>(sql`
             select count(*)::int as n from feedback
@@ -281,7 +289,6 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
               apiBuild,
               threadId: answered.thread,
               inReplyTo: reply.reply,
-              clientKey: key,
             })
             .returning({ id: feedback.id, createdAt: feedback.createdAt })
           const row = theRow(written, 'feedback')
