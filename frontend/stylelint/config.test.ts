@@ -48,6 +48,21 @@ describe('frontend/.stylelintrc.json', () => {
     ).toEqual([ALLOWED, ALLOWED])
   })
 
+  it('lets an icon take a step of its scale, the circle glyph among them (MOL-173)', async () => {
+    expect(
+      await rules(
+        '.a {\n  @include icon;\n\n  font-size: var(--icon-sm);\n}\n\n' +
+          '.b {\n  font-size: var(--icon);\n}\n\n.c {\n  font-size: var(--state-glyph);\n}\n',
+      ),
+    ).toEqual([])
+  })
+
+  it('refuses an icon sized by a literal or by a step of spacing', async () => {
+    expect(
+      await rules('.a {\n  font-size: 1.125rem;\n}\n\n.b {\n  font-size: var(--space-6);\n}\n'),
+    ).toEqual([ALLOWED, ALLOWED])
+  })
+
   it('refuses a radius made of a token and a number', async () => {
     expect(await rules('.a {\n  border-radius: calc(var(--radius-mark) * 13);\n}\n')).toEqual([
       ALLOWED,

@@ -121,9 +121,9 @@ export default defineComponent({
 }
 
 .icon {
-  /* 27 — the handoff's tab icon */
-  width: 1.6875rem;
-  height: 1.6875rem;
+  @include icon;
+
+  font-size: var(--icon-tab);
 }
 
 @media (prefers-reduced-motion: reduce) {

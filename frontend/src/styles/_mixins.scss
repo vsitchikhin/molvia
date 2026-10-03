@@ -22,6 +22,15 @@
   font-weight: var(--weight-display);
 }
 
+/// An icon, drawn at its font-size (Ф-9, MOL-173). The step of --icon-* is written beside the include
+/// as `font-size`, where the linter checks it — an argument here would pass unchecked; on an icon a
+/// width or a height is refused but this 1em (molvia/icon-size).
+@mixin icon {
+  flex: none;
+  width: 1em;
+  height: 1em;
+}
+
 /// The target device is a phone; anything wider is the exception, so it is opt-in.
 @mixin wider-than-phone {
   @media (width >= 40rem) {

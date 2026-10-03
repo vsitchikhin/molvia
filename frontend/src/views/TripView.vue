@@ -612,9 +612,9 @@ export default defineComponent({
 }
 
 .add-icon {
-  flex: none;
-  width: 1.375rem;
-  height: 1.375rem;
+  @include icon;
+
+  font-size: var(--icon-button);
 }
 
 .remove {

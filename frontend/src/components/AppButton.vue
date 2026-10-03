@@ -130,23 +130,24 @@ export default defineComponent({
 .glyph {
   display: inline-flex;
   flex: none;
-
-  /* 22 — the handoff's icon inside a button */
-  /* stylelint-disable-next-line declaration-property-value-allowed-list -- its token comes with the icon scale, MOL-173 */
-  font-size: 1.375rem;
+  font-size: var(--icon-button);
 
   :deep(svg) {
-    width: 1em;
-    height: 1em;
+    @include icon;
   }
 }
 
-/* Only an icon: a 44px circle. */
+/* Only an icon: a 44px circle, its glyph a step larger than one beside a word (MOL-118 В-15). */
 .icon {
   padding: 0;
   border-radius: 50%;
   background: var(--surface-2);
   color: var(--text-muted);
+
+  // Its own glyph only: `.icon .glyph` would take any ancestor wearing `icon`.
+  & > .glyph {
+    font-size: var(--icon-md);
+  }
 }
 
 .large {

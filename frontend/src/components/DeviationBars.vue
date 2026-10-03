@@ -217,8 +217,9 @@ export default defineComponent({
 }
 
 .arrow {
-  width: 1.125rem;
-  height: 1.125rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 
 .meta {
@@ -276,9 +277,9 @@ export default defineComponent({
 }
 
 .few-icon {
-  flex: none;
-  width: 1.375rem;
-  height: 1.375rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
   color: var(--text-muted);
 }
 

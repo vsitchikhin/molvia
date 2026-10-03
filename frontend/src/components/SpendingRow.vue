@@ -158,8 +158,9 @@ export default defineComponent({
 }
 
 .glyph {
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon);
 }
 
 .text {
@@ -209,8 +210,9 @@ export default defineComponent({
 }
 
 .mark-icon {
-  width: 0.875rem;
-  height: 0.875rem;
+  @include icon;
+
+  font-size: var(--icon-xs);
 }
 
 .sums {
@@ -234,9 +236,9 @@ export default defineComponent({
 }
 
 .chevron {
-  flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon);
   color: var(--text-muted);
 }
 </style>

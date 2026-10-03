@@ -178,8 +178,9 @@ thead th {
 }
 
 .star {
-  width: var(--space-3);
-  height: var(--space-3);
+  @include icon;
+
+  font-size: var(--icon-sm);
   margin-right: var(--space-1);
   color: var(--accent-ink);
   vertical-align: -0.1em;
