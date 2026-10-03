@@ -37,6 +37,13 @@ TypeScript, and on the bench's readings it gives what the prototype gave — the
 measured on the bench before and after, never fitted to one receipt: the rules were picked looking at
 the first four receipts, and the honest figure is the one on receipts the rules never saw.
 
+**The search for a line's figures has a ceiling** (review, MOL-125): it grows as a power of the digits
+OCR can confuse in every field, and it runs in the API's process — twelve glued twelve-digit lines
+held every request for half a minute. A line past `LINE_COMBINATIONS_MAX` (200 000), or past what is
+left of `READING_COMBINATIONS_MAX` (500 000 a reading), is taken as read, unsettled. The bench's worst
+line tries 55 176 and its busiest reading 122 161 (am-03); the worst case now costs about half a
+second.
+
 **Amounts are counted in hundredths, not in minor units.** A till prints hundredths whatever the
 currency; `moneyOfHundredths` turns them into the currency's minor units by its exponent. Quantities
 are thousandths. A float is a ratio that ranks candidates, never money.
@@ -76,11 +83,21 @@ and `up -d` of everything would stop with the API left broken. The reader answer
 part. Before each round a reading left unfinished is begun again; a receipt fails after
 `RECEIPT_READ_ATTEMPTS` readings begun.
 
-**Who is at fault decides what happens.** The reader away (`ReaderUnavailable`) leaves the receipt in
-the queue, its attempt uncounted — a receipt is never failed for our own outage. A photo the reader
-cannot read (`PhotoUnreadable`: it did not open, ran out of time, the answer was no reading) fails as
-`unreadable`; so does anything unexpected, logged by its kind. A receipt is never lost and never read
-forever.
+**Who is at fault decides what happens.** Three outcomes, by what `fetch` saw:
+
+|                     | What                                                                                       | The receipt                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `ReaderUnavailable` | nothing answered: refused, not resolved, not there                                         | stays where it is in the queue, its attempt uncounted; the round stops                          |
+| `ReaderDropped`     | reached, then lost on this photo: the connection dropped, the answer cut off, our time out | its attempt counted, to the end of the queue; `failed/unreadable` after `RECEIPT_READ_ATTEMPTS` |
+| `PhotoUnreadable`   | the reader answered that it could not: 422, 504, 500                                       | `failed/unreadable`                                                                             |
+
+A photo that fells the reader every time would otherwise have gone back to the head of the queue each
+minute and held everyone behind it, looking like a reader that is down (review 1). A reading the table
+refuses fails at once rather than read twice; the lines are checked against the wire's contract before
+they are written (Т-5). A receipt is never lost and never read forever.
+
+**People in turn** (review А10): the next receipt is of the person read least in the last hour, then
+the oldest — fifty receipts of one person do not hold another's behind them.
 
 **Without a reader the queue does not run** (`RECEIPT_READER_URL` unset): receipts are taken and wait.
 Tests hand in a fake; no test reads with a Tesseract a copy happens to run.
@@ -93,8 +110,12 @@ write sent again, another photo in its place a 409; the last part puts the recei
 
 **A part is a raw JPEG**, the API's one body that is not JSON, taken in the receipts' scope only — every
 other route keeps a megabyte. **What is not a photo is refused at once** — not a JPEG by its frame
-header, a side under 200 px (`error.receipt_not_photo`, 415), a side over 4 000 px
-(`error.receipt_too_large`, 413): «не принят» on the phone, set aside by its queue, never retried.
+header, no scan with data after it (a head alone, review А9), a side under 200 px
+(`error.receipt_not_photo`, 415); a side over 6 000 px, or a `Content-Length` over 8 MB said before the
+body is read (`error.receipt_too_large`, 413, review А7): «не принят» on the phone, set aside by its
+queue, never retried. **The ceiling of a side lets a phone's whole frame through** — 4 032 px of a
+12-megapixel camera, 5 712 of a 24-megapixel one (review А8): the phone crops to 3 200, and one that did
+not would otherwise be refused for good. Whether the data decodes is the reader's to find out.
 
 ## What lives how long
 
@@ -105,9 +126,12 @@ header, a side under 200 px (`error.receipt_not_photo`, 415), a side over 4 000 
 | The photo              | until the receipt is recorded (MOL-126 deletes it; the timer holds the promise if it does not) |
 | An item line cut out   | 28 days after the receipt is recorded (owner, 02.10.2026)                                      |
 
-**Cut-out lines are item rows only** — a line's name and its figures, never the head where a
-customer's name is printed, never the total. They are cut when the receipt is read, since the boxes
-are the reading's; recording writes the text a person confirmed (MOL-126).
+**Cut-out lines are item rows only** — a line's figures, and its name row only when the item's number
+was read on it; a table's heading row only. Never the head where a customer's name is printed, never
+the total (review А5, А6): above the first item whose name OCR lost stands the head — the VAT, a
+buyer — and a table's last row runs on into a total whose word OCR misread. They are cut when the
+receipt is read, since the boxes are the reading's; recording writes the text a person confirmed
+(MOL-126).
 
 ## Privacy
 
@@ -120,4 +144,9 @@ go by the cascade. **The copy carries receipts and their lines, never a photo** 
 why for every column left out).
 
 **The log carries counts, never a receipt**: status, parts, lines, milliseconds. No text, no tax
-number, no photo — not in the API's log, not in the reader's, which logs nothing at all.
+number, no photo — not in the API's log, not in the reader's, which logs nothing at all: whatever
+breaks in it answers 500 with no traceback, and a connection broken under a request is not printed
+(review А12).
+
+**A head is what a reading found**: a receipt failed before any reading answers `header: null`, not
+four nulls (review А11). What the phone reads as «read» is the `status`, never `header !== null`.

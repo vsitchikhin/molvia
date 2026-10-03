@@ -425,8 +425,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The parse is MOL-114's prototype, held line for line** (`receipt-text.ts`, its fixtures): a rule
   changed is measured on the bench before and after; amounts in hundredths, never floats.
 - **«Переснимите» is «too little read»** (`needsReshoot`, В-4) — never «the total did not match» alone.
-- **The reader away leaves a receipt queued; a photo it cannot read fails it** — never lost, never
-  read forever.
+- **The reader away leaves a receipt queued; a photo it drops goes to the end with its attempt
+  counted; a photo it cannot read fails** — never lost, never read forever; people read in turn.
+- **The search for a line's figures has a ceiling** (`LINE_COMBINATIONS_MAX`, a budget a reading):
+  it runs in the API's process.
 - **A photo lives until the receipt is recorded, a receipt not recorded 28 days, a cut-out item line
   28 days after recording** (В-3); **photos never enter the nightly copy** (В-2), never the log.
 

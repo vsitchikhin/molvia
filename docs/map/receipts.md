@@ -21,8 +21,8 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 
 ## backend · receipts
 
-- `backend/src/receipts/jpeg.ts` — `jpegSize`: the sides of a JPEG from its frame header, without decoding — what is not a photo is refused before it is kept.
-- `backend/src/receipts/reader.ts` — The client of the receipt reader: a part read in a page mode, item lines cut out; `ReaderUnavailable` (the receipt waits) against `PhotoUnreadable` (it fails).
+- `backend/src/receipts/jpeg.ts` — `jpegSize`: the sides of a JPEG from its frame header, and a scan with data after it, without decoding — what is not a photo is refused before it is kept.
+- `backend/src/receipts/reader.ts` — The client of the receipt reader: a part read in a page mode, item lines cut out; `ReaderUnavailable` (nothing answered: the receipt waits), `ReaderDropped` (lost on the photo: counted, to the end), `PhotoUnreadable` (it fails).
 
 ## backend · usecases
 
@@ -31,7 +31,7 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 
 ## backend · db
 
-- `backend/src/db/receipts-repository.ts` — Repository of receipts: the receipt and its parts named by the phone, the summary and the lines, removal with «Вернуть», the timer's purge (10 minutes, 28 days, a recorded receipt's photo), and the queue — claim, release, finish, a reading cut short begun again.
+- `backend/src/db/receipts-repository.ts` — Repository of receipts: the receipt and its parts named by the phone, the summary and the lines, removal with «Вернуть», the timer's purge (10 minutes, 28 days, a recorded receipt's photo), and the queue — people in turn, claim, release, retry at the end, finish, a reading cut short begun again.
 
 ## backend · tests
 
