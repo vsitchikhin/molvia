@@ -191,7 +191,7 @@
     {
       "type": "stat",
       "id": 5,
-      "title": "Цикл событий p99",
+      "title": "Цикл событий · минута",
       "datasource": {
         "type": "prometheus",
         "uid": "victoria"
@@ -203,8 +203,17 @@
             "type": "prometheus",
             "uid": "victoria"
           },
+          "expr": "nodejs_eventloop_lag_max_seconds{job=\"api\"}",
+          "legendFormat": "max"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria"
+          },
           "expr": "nodejs_eventloop_lag_p99_seconds{job=\"api\"}",
-          "legendFormat": ""
+          "legendFormat": "p99"
         }
       ],
       "gridPos": {
@@ -244,9 +253,9 @@
         },
         "colorMode": "value",
         "graphMode": "area",
-        "textMode": "auto"
+        "textMode": "value_and_name"
       },
-      "description": "Насколько опаздывал цикл событий API с прошлого опроса. Секунды — значит, API стоял."
+      "description": "Насколько опаздывал цикл событий API за последнюю минуту: max — самое долгое, p99 — обычное. Блок в секунды — один поздний тик, его видно в max, а не в p99. Секунды в max — API стоял."
     },
     {
       "type": "timeseries",

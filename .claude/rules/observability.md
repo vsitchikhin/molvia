@@ -311,7 +311,8 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   the client left is in `failures` all the same.
 - **The event loop is measured by a timer of our own, over a sliding minute** (adversarial А2, А2b, А3):
   a tick every 100 ms writes how late it came, and a render reads the minute behind it, resetting
-  nothing. Node's `monitorEventLoopDelay` was reset by every reader — a scrape VictoriaMetrics gave up
+  nothing. **A block of seconds is one late tick**, so it is the minute's max and never its p99, which
+  six hundred ticks on time keep low: the dashboard shows the max (review №13). Node's `monitorEventLoopDelay` was reset by every reader — a scrape VictoriaMetrics gave up
   on during a long block was still served once the loop freed and took the block with it, as did a
   `curl` by hand — a block starting right after a reset was never recorded, and an idle loop read its
   timer's resolution, 20 ms, as delay.
@@ -335,7 +336,10 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   a test holds each setting. No sign-up, no anonymous view. **The admin's password is
   `GRAFANA_ADMIN_PASSWORD` at every start** (adversarial А6): Grafana reads it only when it creates its
   database, so `start.sh` resets it before Grafana runs — a password changed after a leak changed
-  nothing, and the old one kept opening it.
+  nothing, and the old one kept opening it. Through stdin, never the arguments every user of the
+  machine reads in `ps` (review №14), whatever it begins with; **a password the reset refuses stops
+  Grafana** (round 2, Б2) — `-…` read as a flag, one too short — rather than leave the old one open:
+  the pulse goes quiet and healthchecks.io says so.
 - **What runs is what the repository says** (В-2, Р-10): the scrape config is baked into
   `molvia-victoria`, the dashboard, the alarms and their contact point into `molvia-grafana`, both built
   by the release with the others; the dashboard is read-only — a panel changed in the interface cannot
@@ -357,8 +361,15 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   The rules that need traffic (5xx, p95, restarts) end in `or on() vector(0)`, so a quiet night is not
   «no data».
 - **The alarms themselves have a pulse** (adversarial А5): Grafana is the one that sends, and nothing
-  watched it. «Тревоги живы» fires while Grafana counts and VictoriaMetrics answers itself
-  (`min(up{job="victoria"})`, no data and errors are OK — the pulse stopping), and goes to a webhook
+  watched it. «Тревоги живы» fires while Grafana counts, VictoriaMetrics answers and reads Grafana's own
+  figures, **and no alarm failed on its way to Telegram within the hour with none delivered beside it**
+  (round 2, Б1, review №15: a revoked token, a bot blocked or never given `/start`, Telegram unreachable
+  — every alarm undelivered and the pulse green). Grafana counts its deliveries by integration
+  (`grafana_alerting_notifications_total`, `…_failed_total`), VictoriaMetrics scrapes them, and the
+  pulse is read against them — a delivery broken is the pulse stopping within the hour of the first
+  alarm that did not go, a delivery that went again clears it. **The price:** a token revoked while
+  nothing fires is unseen until something does; after changing it, the contact point's Test. No data
+  and errors are OK — the pulse stopping. It goes to a webhook
   alone — `ALERTS_PULSE_URL`, the healthchecks.io check `molvia-alerts`, every five minutes, never a
   resolved message, which would say «alive» the moment it stopped. Its silence is healthchecks.io's own
   Telegram, as for the machine (MOL-142). The line is required: Grafana refuses a webhook with no URL.

@@ -44,9 +44,9 @@ Rules: `.claude/rules/observability.md`. A test beside its source, or mirroring 
 ## deploy · metrics
 
 - `deploy/victoria/Dockerfile` — Image `molvia-victoria` (MOL-145, В-2): VictoriaMetrics of an exact tag with its scrape config baked in.
-- `deploy/victoria/scrape.yml` — What VictoriaMetrics scrapes every fifteen seconds: the API's own metrics port, node_exporter, cAdvisor, postgres_exporter and itself.
+- `deploy/victoria/scrape.yml` — What VictoriaMetrics scrapes every fifteen seconds: the API's own metrics port, node_exporter, cAdvisor, postgres_exporter, Grafana's deliveries and itself.
 - `deploy/grafana/Dockerfile` — Image `molvia-grafana` (MOL-145, В-2): Grafana of an exact tag with the dashboard, the alarms and their contact point baked in, started through `start.sh`.
-- `deploy/grafana/start.sh` — Grafana's entry: writes `OWNER_TELEGRAM_ID` into the contact point as text, refusing anything but digits, the API's rule — Grafana 13.0 makes a number of what it reads from the environment — and sets the admin's password from `GRAFANA_ADMIN_PASSWORD` at every start.
+- `deploy/grafana/start.sh` — Grafana's entry: writes `OWNER_TELEGRAM_ID` into the contact point as text, refusing anything but digits, the API's rule — Grafana 13.0 makes a number of what it reads from the environment — and sets the admin's password from `GRAFANA_ADMIN_PASSWORD` at every start, through stdin, stopping on a refusal.
 - `deploy/grafana/provisioning/datasources/victoria.yaml` — The one source of the dashboard and the alarms: VictoriaMetrics, read as Prometheus, not editable.
 - `deploy/grafana/provisioning/dashboards/molvia.yaml` — The provider of the dashboard: read-only, a change in the interface is not kept (Р-10), and a file removed takes its dashboard with it.
 - `deploy/grafana/provisioning/alerting/` — The alarms (`rules.json`: every threshold in one file — memory, disk, 5xx and p95 of a person's requests, a restart, figures gone silent, and the pulse) and where they go (`notify.json`: the Telegram contact point of the alarms' own bot, the message in Russian, the pulse's webhook to healthchecks.io, the policy).

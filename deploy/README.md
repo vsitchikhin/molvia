@@ -466,11 +466,14 @@ Every rule also fires when it cannot be counted — VictoriaMetrics down — and
 `✅ Прошло` comes when it is over. A firing alarm is repeated every six hours.
 
 **The alarms' pulse**: Grafana is the one that sends, so it is watched from outside too. «Тревоги
-живы» fires while Grafana counts its rules and VictoriaMetrics answers, and pings the healthchecks.io
-check `molvia-alerts` every five minutes — never Telegram. Set the check at **period 5 min, grace 10
-min**, with the Telegram integration, as the others of «Signals». Its alarm means Grafana or
-VictoriaMetrics is down — and so is every other alarm: `docker compose … ps grafana victoria`, then their
-`logs --tail 50`.
+живы» fires while Grafana counts its rules, VictoriaMetrics answers and reads Grafana's own figures,
+and no alarm failed on its way to Telegram within the hour with none delivered beside it; it pings the
+healthchecks.io check `molvia-alerts` every five or six minutes — never Telegram. Set the check at
+**period 5 min, grace 10 min**, with the Telegram integration, as the others of «Signals», and see it
+turn green after the first rollout: a check that never got a ping never raises an alarm. Its alarm
+means Grafana or VictoriaMetrics is down, or **the alarms do not reach Telegram** — the token revoked,
+the bot blocked or never given `/start`: `docker compose … logs --tail 50 grafana | grep -i notify`,
+then the contact point's Test. A token revoked while nothing fires is seen only once something does.
 
 **Removing an alarm** is `deleteRules` with its uid in the same merge: provisioning never deletes a rule
 by itself, and the old one would keep alarming from Grafana's volume.
@@ -489,7 +492,9 @@ node-exporter`, and `✅ Прошло` follows.
 - `GRAFANA_ADMIN_PASSWORD`, `ALERTS_BOT_TOKEN`, `ALERTS_PULSE_URL` and `OWNER_TELEGRAM_ID` (digits
   only) in `~/molvia/.env.prod`; compose refuses to start without any of them. **The password is the
   line's at every start** — change it there and restart Grafana
-  (`docker compose … up -d --force-recreate grafana`); Grafana itself keeps only the first.
+  (`docker compose … up -d --force-recreate grafana`); Grafana itself keeps only the first. One it
+  refuses — shorter than four characters — stops Grafana rather than leave the old one open; take it
+  from `openssl rand -base64 24`.
 - The images `molvia-grafana` and `molvia-victoria` are built by the release with the others. **The
   metrics never judge a rollout**: pulled before anything changes, a refusal of the registry a
   warning; started only once the API answers healthy, a failure of theirs a warning in

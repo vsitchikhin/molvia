@@ -321,7 +321,7 @@
               "datasourceUid": "victoria",
               "model": {
                 "refId": "A",
-                "expr": "min(up{job=\"victoria\"})",
+                "expr": "(min(up{job=\"victoria\"}) and on() (min(up{job=\"grafana\"}) > 0)) unless on() ((sum(increase(grafana_alerting_notifications_failed_total{integration=\"telegram\"}[1h])) > 0) unless on() ((sum(increase(grafana_alerting_notifications_total{integration=\"telegram\"}[1h])) - sum(increase(grafana_alerting_notifications_failed_total{integration=\"telegram\"}[1h]))) > 0))",
                 "instant": true,
                 "range": false
               }
@@ -352,7 +352,7 @@
           "execErrState": "OK",
           "for": "0s",
           "annotations": {
-            "summary": "Пульс тревог: Grafana считает правила, VictoriaMetrics отвечает. Идёт на healthchecks.io, не в Telegram."
+            "summary": "Пульс тревог: Grafana считает правила, VictoriaMetrics отвечает, и за последний час ни одна тревога не упала на пути в Telegram без удачной рядом. Идёт на healthchecks.io, не в Telegram."
           },
           "labels": {
             "pulse": "true"

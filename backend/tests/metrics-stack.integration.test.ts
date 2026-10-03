@@ -161,6 +161,11 @@ describe('the compose file', () => {
       ])
     }
     expect(ownerTelegramIdSchema.parse('123456789')).toBe(123456789)
+    // The admin's password goes through stdin, never the arguments every user sees in `ps`, and a
+    // refusal stops Grafana rather than leave the old password open (review №14, round 2, Б2).
+    const script = read('deploy/grafana/start.sh')
+    expect(script).toContain('admin reset-admin-password --password-from-stdin')
+    expect(script).not.toMatch(/reset-admin-password\s+"\$/)
     // The same value passes start.sh's check: what stops it then is the image's file, absent here.
     const start = spawnSync(
       'sh',
@@ -259,11 +264,23 @@ describe('the alarms', () => {
 describe('the pulse of the alarms (adversarial А5)', () => {
   it('fires while Grafana counts and VictoriaMetrics answers, and goes nowhere but its ping', () => {
     const pulse = ruleOf('molvia-pulse')
-    expect([pulse.expr, pulse.evaluator, pulse.threshold]).toEqual([
-      'min(up{job="victoria"})',
-      'gt',
-      0,
-    ])
+    expect([pulse.evaluator, pulse.threshold]).toEqual(['gt', 0])
+    // VictoriaMetrics answers and reads Grafana's own figures — without them a failed delivery is
+    // nothing to read, and the pulse went on.
+    expect(
+      pulse.expr.startsWith(
+        '(min(up{job="victoria"}) and on() (min(up{job="grafana"}) > 0)) unless on() ',
+      ),
+    ).toBe(true)
+    // And not while an alarm failed on its way to Telegram with none delivered beside it (round 2,
+    // Б1): a revoked token or a bot never started left every alarm undelivered and the pulse green.
+    const failed = 'grafana_alerting_notifications_failed_total{integration="telegram"}'
+    const tried = 'grafana_alerting_notifications_total{integration="telegram"}'
+    expect(pulse.expr).toContain(`(sum(increase(${failed}[1h])) > 0) unless on()`)
+    expect(pulse.expr).toContain(
+      `((sum(increase(${tried}[1h])) - sum(increase(${failed}[1h]))) > 0)`,
+    )
+    expect(read('deploy/victoria/scrape.yml')).toContain("- targets: ['grafana:3000']")
     // VictoriaMetrics down or no figure is the pulse stopping — the silence healthchecks.io tells of.
     expect([pulse.rule.noDataState, pulse.rule.execErrState]).toEqual(['OK', 'OK'])
 
@@ -304,6 +321,13 @@ describe('the pulse of the alarms (adversarial А5)', () => {
 })
 
 describe('the dashboard', () => {
+  it('shows the longest late tick of the loop — a block of seconds is one tick, never in p99 (review №13)', () => {
+    const exprs = dashboard.panels.flatMap((panel) =>
+      (panel.targets ?? []).map((target) => target.expr),
+    )
+    expect(exprs).toContain('nodejs_eventloop_lag_max_seconds{job="api"}')
+  })
+
   it('reads the API’s process figures by its job — the exporters write the same names', () => {
     const exprs = dashboard.panels.flatMap((panel) =>
       (panel.targets ?? []).map((target) => target.expr),
@@ -336,6 +360,8 @@ describe('every figure read', () => {
     'pg_long_running_transactions_oldest_timestamp_seconds',
     'pg_stat_database_deadlocks',
     'pg_stat_database_xact_rollback',
+    'grafana_alerting_notifications_total',
+    'grafana_alerting_notifications_failed_total',
   ])
 
   const running = processMetrics()
@@ -359,7 +385,7 @@ describe('every figure read', () => {
     ]
     const names = new Set(
       exprs.flatMap((expr) =>
-        [...expr.matchAll(/\b(?:molvia|nodejs|process|node|container|pg)_\w+|\bup\b/g)].map(
+        [...expr.matchAll(/\b(?:molvia|nodejs|process|node|container|pg|grafana)_\w+|\bup\b/g)].map(
           (match) => match[0],
         ),
       ),

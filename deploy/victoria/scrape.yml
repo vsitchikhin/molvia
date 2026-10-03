@@ -17,6 +17,10 @@ scrape_configs:
   - job_name: postgres
     static_configs:
       - targets: ['postgres-exporter:9187']
+  # Grafana's own figures: whether its alarms reached Telegram, which the pulse is read against.
+  - job_name: grafana
+    static_configs:
+      - targets: ['grafana:3000']
   # Itself: an empty dashboard because VictoriaMetrics is down is told apart from one because a target is.
   - job_name: victoria
     static_configs:
