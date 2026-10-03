@@ -93,10 +93,11 @@ function yesterday(): Date {
   return at
 }
 
-const card = (n: number, placeName: string, boughtAt: Date) => ({
+const card = (n: number, placeName: string, boughtAt: Date, placeCity?: string) => ({
   itemId: `cccccccc-0000-4000-8000-00000000000${String(n)}`,
   name: `Товар ${String(n)}`,
   placeName,
+  ...(placeCity === undefined ? {} : { placeCity }),
   boughtAt,
 })
 
@@ -485,6 +486,88 @@ describe('PurchasesView (MOL-128)', () => {
       })
       const { view } = await render()
       expect(view.get('.pending .meta').text()).toBe('Из «SAS» и «Ереван Сити»')
+    })
+
+    it('одно имя в двух городах — два места, у обоих город (MOL-120)', async () => {
+      const earlier = yesterday()
+      earlier.setHours(earlier.getHours() - 2)
+      pendingVerdicts.mockResolvedValue({
+        items: [
+          card(1, 'Ереван Сити', earlier, 'Ереван'),
+          card(2, 'Ереван Сити', yesterday(), 'Гюмри'),
+        ],
+        total: 2,
+      })
+      const { view } = await render()
+      expect(view.get('.pending .meta').text()).toBe(
+        'Из «Ереван Сити» в Гюмри и «Ереван Сити» в Ереване',
+      )
+    })
+
+    it('город — только у повторяющегося имени, повтор — по всей очереди (MOL-120)', async () => {
+      const earlier = yesterday()
+      earlier.setHours(earlier.getHours() - 2)
+      pendingVerdicts.mockResolvedValue({
+        items: [
+          card(1, 'Ереван Сити', yesterday(), 'Гюмри'),
+          card(2, 'SAS', yesterday(), 'Ереван'),
+          card(3, 'Ереван Сити', earlier, 'Ереван'),
+        ],
+        total: 3,
+      })
+      const { view } = await render()
+      // The third place is «and others», yet the first is still told from it by its city.
+      expect(view.get('.pending .meta').text()).toBe(
+        'Из «Ереван Сити» в Гюмри, «SAS» и других мест',
+      )
+    })
+
+    it('одно имя в одном городе — одно место, без города (MOL-120)', async () => {
+      pendingVerdicts.mockResolvedValue({
+        items: [card(1, 'SAS', yesterday(), 'Ереван'), card(2, 'sas', yesterday(), 'ереван')],
+        total: 2,
+      })
+      const { view } = await render()
+      expect(view.get('.pending .meta').text()).toBe('Из «SAS», последняя — вчера')
+    })
+
+    it('город не из словаря — в скобках (MOL-120)', async () => {
+      pendingVerdicts.mockResolvedValue({
+        items: [card(1, 'SAS', yesterday(), 'Ванадзор'), card(2, 'SAS', yesterday(), 'Гюмри')],
+        total: 2,
+      })
+      const { view } = await render()
+      expect(view.get('.pending .meta').text()).toBe('Из «SAS» (Ванадзор) и «SAS» в Гюмри')
+    })
+
+    it('город настроек в другом написании — падеж по городу настроек (адверсариальный А2)', async () => {
+      // A place keeps the spelling its city was first written in: «гюмри» is Gyumri.
+      pendingVerdicts.mockResolvedValue({
+        items: [card(1, 'SAS', yesterday(), 'гюмри'), card(2, 'SAS', yesterday(), 'Ереван')],
+        total: 2,
+      })
+      const { view } = await render()
+      expect(view.get('.pending .meta').text()).toBe('Из «SAS» в Гюмри и «SAS» в Ереване')
+    })
+
+    it('без городов два написания — два места, как до MOL-120 (адверсариальный А1)', async () => {
+      // Two rows of `places` the phone cannot tell apart without their cities: the queue
+      // remembered by the version before, or a card refused before the update among new ones.
+      pendingVerdicts.mockResolvedValue({
+        items: [card(1, 'Ереван Сити', yesterday()), card(2, 'ЕРЕВАН СИТИ', yesterday())],
+        total: 2,
+      })
+      const { view } = await render()
+      expect(view.get('.pending .meta').text()).toBe('Из «Ереван Сити» и «ЕРЕВАН СИТИ»')
+    })
+
+    it('карточка без города — подпись по именам, как до MOL-120 (Р-6)', async () => {
+      pendingVerdicts.mockResolvedValue({
+        items: [card(1, 'Ереван Сити', yesterday(), 'Гюмри'), card(2, 'Ереван Сити', yesterday())],
+        total: 2,
+      })
+      const { view } = await render()
+      expect(view.get('.pending .meta').text()).toBe('Из «Ереван Сити», последняя — вчера')
     })
 
     it('больше двух мест — «и других мест», без числа (И2)', async () => {

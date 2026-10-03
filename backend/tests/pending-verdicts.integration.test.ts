@@ -78,11 +78,34 @@ describe('GET /verdicts/pending', () => {
           itemId: milk,
           name: 'Молоко «Ашхар»',
           placeName: 'Ереван Сити',
+          placeCity: 'Гюмри',
           boughtAt: new Date('2026-09-18T17:40:00.000Z'),
         },
       ],
       total: 1,
     })
+  })
+
+  it('город — места последней покупки, у одноимённых мест двух городов свой (MOL-120)', async () => {
+    const actor = await insertActor(db)
+    const milk = await insertItem(db)
+    const bread = await insertItem(db, { name: 'Хлеб', searchKey: 'hleb', defaultUnit: 'piece' })
+    const gyumri = await insertPlace(db, { name: 'Ереван Сити' })
+    const yerevan = await insertPlace(db, { name: 'Ереван Сити', city: 'Ереван' })
+    // The milk was bought in both; the latest purchase, and with it the city, is Yerevan's.
+    await bought(actor, milk, gyumri, '2026-09-15T10:00:00.000Z')
+    await bought(actor, milk, yerevan, '2026-09-17T10:00:00.000Z')
+    await bought(actor, bread, gyumri, '2026-09-18T10:00:00.000Z')
+
+    const { items } = await queue(actor)
+
+    expect(items.map(({ name, placeName, placeCity }) => [name, placeName, placeCity])).toEqual([
+      ['Хлеб', 'Ереван Сити', 'Гюмри'],
+      ['Молоко «Ашхар»', 'Ереван Сити', 'Ереван'],
+    ])
+    // On the wire as it is in the answer: the field is optional to the reader, never to the server.
+    const wire = JSON.parse((await pending(actor)).body) as { items: { placeCity?: string }[] }
+    expect(wire.items.map((card) => card.placeCity)).toEqual(['Гюмри', 'Ереван'])
   })
 
   it('новые покупки сверху, по последней покупке позиции', async () => {

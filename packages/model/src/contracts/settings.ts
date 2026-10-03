@@ -2,8 +2,21 @@ import { z } from 'zod'
 import { countrySchema, citySchema } from '#model/values/geo'
 import { currencySchema } from '#model/values/money'
 import { ISSUE } from '#model/support/errors'
+import { placeNameIdentity } from '#model/values/place-identity'
 
 export const SETTINGS_CITIES = ['Гюмри', 'Ереван'] as const
+export type SettingsCity = (typeof SETTINGS_CITIES)[number]
+
+/**
+ * The city of the settings a stored spelling is (MOL-120, adversarial А2), or `null` for one the
+ * settings do not offer. A place keeps its city as it was first written (`ensure`), so a row of
+ * «гюмри» is Gyumri to the index over `places` and to `cityWhereNameRepeats` — and must be Gyumri
+ * to the words a screen or the bot prints it with, which are keyed by the settings' spelling.
+ */
+export function settingsCityOf(city: string): SettingsCity | null {
+  const folded = placeNameIdentity(city)
+  return SETTINGS_CITIES.find((known) => placeNameIdentity(known) === folded) ?? null
+}
 
 /** Also reads historical settings outside today's choices. */
 export const actorSettingsSchema = z.strictObject({

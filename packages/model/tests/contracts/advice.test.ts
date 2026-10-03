@@ -51,6 +51,16 @@ describe('adviceRowSchema', () => {
     expect(z.encode(adviceRowSchema, row)).toEqual(take)
   })
 
+  it('carries the city of a place, and reads a place remembered without one (MOL-120)', () => {
+    const there = { ...take, places: [{ ...market, city: 'Гюмри' }] }
+
+    expect(z.encode(adviceRowSchema, adviceRowSchema.parse(there))).toEqual(there)
+    expect(adviceRowSchema.safeParse(take).success).toBe(true)
+    expect(adviceRowSchema.safeParse({ ...take, places: [{ ...market, city: '' }] }).success).toBe(
+      false,
+    )
+  })
+
   it('carries a threshold on «if_cheap», and null while there is nothing to build one from', () => {
     const base = { ...take, level: 'if_cheap' as const, rating: '3.0', places: [market] }
 

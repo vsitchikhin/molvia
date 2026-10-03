@@ -50,6 +50,23 @@ describe('reminderSchema', () => {
     ).toBe(false)
   })
 
+  it('carries the city of the place, and reads an item of the API before it (MOL-120)', () => {
+    const there = { ...ITEM, placeCity: 'Ереван' }
+    expect(reminderSchema.parse({ telegramUserId: 777, items: [there], total: 1 }).items).toEqual([
+      there,
+    ])
+    expect(reminderSchema.safeParse({ telegramUserId: 777, items: [ITEM], total: 1 }).success).toBe(
+      true,
+    )
+    expect(
+      reminderSchema.safeParse({
+        telegramUserId: 777,
+        items: [{ ...ITEM, placeCity: ' ' }],
+        total: 1,
+      }).success,
+    ).toBe(false)
+  })
+
   it('is carried in a list', () => {
     expect(dueRemindersSchema.safeParse({ reminders: [] }).success).toBe(true)
   })

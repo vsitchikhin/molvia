@@ -1,4 +1,4 @@
-import { Bot } from 'grammy'
+import { Bot, GrammyError, HttpError } from 'grammy'
 import type { BotConfig, Context } from 'grammy'
 import { run, sequentialize } from '@grammyjs/runner'
 import type { RunnerHandle } from '@grammyjs/runner'
@@ -70,7 +70,96 @@ export function assembleBot(
  */
 export const ALLOWED_UPDATES = ['message', 'callback_query', 'my_chat_member'] as const
 
-/** Long polling that actually runs handlers concurrently — the whole reason for the runner. */
+/**
+ * What a failure of a call to Telegram is, for the log: Telegram's code, or `network` — never the
+ * error itself. grammY's network error carries the request's address, and the bot's token is in it
+ * (MOL-142, adversarial round 2 Г2, round 3 Д2).
+ */
+export function telegramFailure(error: unknown): string {
+  if (error instanceof GrammyError) return String(error.error_code)
+  if (error instanceof HttpError) return 'network'
+  return 'unexpected'
+}
+
+/** The first pause between tries of a call to Telegram, and what it grows by each try. */
+export const RETRY_STEP_MS = 100
+
+/**
+ * Who the bot is, asked of Telegram before the runner starts (MOL-142, adversarial round 3 Д1).
+ * Left to the runner, it is grammY's `bot.init()`: a silent retry whose pause doubles up to twenty
+ * minutes, so a bot started while Telegram was away stayed deaf some seventeen minutes after it came
+ * back. Here the pause grows by a tenth of a second a try, as the runner's does, a 429 waits what
+ * Telegram asks, and every failure is logged by its kind. Only what may pass is retried — the
+ * network, a 5xx, a 429 — as grammY does; any other code is thrown, since no retry mends it: a 401
+ * is a token revoked or cut short, a 404 one Telegram cannot read at all (a space or a quote
+ * before it in `.env.prod`), and retried they kept a live, silent process where a crash loop is what the rollout and the guide
+ * look for (adversarial round 4 Е1). A stop cuts the wait short and returns without the bot's
+ * identity.
+ */
+export async function introduce(bot: Bot, signal?: AbortSignal): Promise<void> {
+  for (let pause = RETRY_STEP_MS; !signal?.aborted; pause += RETRY_STEP_MS) {
+    let wait = pause
+    try {
+      // grammY types its signal by the `abort-controller` package; the platform's is the same thing.
+      bot.botInfo = await bot.api.getMe(signal as Parameters<typeof bot.api.getMe>[0])
+      return
+    } catch (error) {
+      if (signal?.aborted) return
+      if (error instanceof GrammyError && error.error_code < 500 && error.error_code !== 429) {
+        throw error
+      }
+      console.error(`[molvia] telegram getMe: ${telegramFailure(error)}`)
+      if (error instanceof GrammyError && error.parameters.retry_after !== undefined) {
+        wait = error.parameters.retry_after * 1000
+      }
+    }
+    await pauseFor(wait, signal)
+  }
+}
+
+/** Waits `ms`, or less if `signal` aborts first. */
+async function pauseFor(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return
+  return new Promise((resolve) => {
+    const done = (): void => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', done)
+      resolve()
+    }
+    const timer = setTimeout(done, ms)
+    signal?.addEventListener('abort', done, { once: true })
+  })
+}
+
+/**
+ * Long polling that actually runs handlers concurrently — the whole reason for the runner.
+ *
+ * A failed `getUpdates` is retried with a pause growing by a tenth of a second a try, not doubling
+ * (MOL-142, adversarial А1): the runner's default left the pause at some 27 minutes after half an
+ * hour of Telegram down, and nobody could sign in for that long after Telegram was back. Grown
+ * this way it is 19 seconds after half an hour and about a minute after five hours. The pause is
+ * a timer no stop cuts short, so a stop during an outage still waits it out — seconds now, and
+ * past the thirty seconds compose gives only after hours of Telegram down.
+ */
 export function startBot(bot: Bot): RunnerHandle {
-  return run(bot, { runner: { fetch: { allowed_updates: ALLOWED_UPDATES } } })
+  // The runner logs a failed `getUpdates` whole, token and all (Г2), so it is silent and the
+  // failure is logged here by its kind. A call cut short by a stop is not a failure.
+  bot.api.config.use(async (prev, method, payload, signal) => {
+    if (method !== 'getUpdates') return prev(method, payload, signal)
+    try {
+      const result = await prev(method, payload, signal)
+      if (!result.ok) console.error(`[molvia] telegram getUpdates: ${String(result.error_code)}`)
+      return result
+    } catch (error) {
+      if (!signal?.aborted) console.error(`[molvia] telegram getUpdates: ${telegramFailure(error)}`)
+      throw error
+    }
+  })
+  return run(bot, {
+    runner: {
+      fetch: { allowed_updates: ALLOWED_UPDATES },
+      retryInterval: 'quadratic',
+      silent: true,
+    },
+  })
 }

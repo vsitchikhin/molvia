@@ -10,6 +10,7 @@ import type {
   PriceQuery,
 } from '@/db/expenses-repository'
 import type { ItemRepository } from '@/db/items-repository'
+import { NO_EMBEDDER } from '@/embeddings/embedder'
 import type { AdviceQuery, AdviceVerdictRow, VerdictRepository } from '@/db/verdicts-repository'
 import { ADVICE_SEARCH_CANDIDATES, advice, adviceSearch } from './advice'
 import { SEARCH_LIMIT } from './search-catalogue'
@@ -50,6 +51,7 @@ function price(patch: Partial<PlacePrice> & { scaledMinor: bigint }): PlacePrice
     itemId: BEEF,
     placeId: MARKET,
     placeName: 'Рынок в Гюмри',
+    placeCity: 'Гюмри',
     currency: 'AMD',
     unit: 'kg',
     observations,
@@ -200,6 +202,26 @@ describe('места и порог', () => {
     expect(row?.level === 'take' && row.places.map((place) => place.name)).toEqual([
       'Рынок в Гюмри',
       'SAS',
+    ])
+  })
+
+  it('несёт город каждого места — экран назовёт его, где имя повторяется (MOL-120)', async () => {
+    const prices = [
+      price({ placeId: MARKET, placeName: 'Ереван Сити', scaledMinor: perKilo(479_000) }),
+      price({
+        placeId: SAS,
+        placeName: 'Ереван Сити',
+        placeCity: 'Ереван',
+        nearby: false,
+        scaledMinor: perKilo(450_000),
+      }),
+    ]
+
+    const [row] = (await advice(deps({ rows: [rated({ sum: 5 })], prices }), ACTOR)).rows
+
+    expect(row?.level === 'take' && row.places.map(({ name, city }) => [name, city])).toEqual([
+      ['Ереван Сити', 'Гюмри'],
+      ['Ереван Сити', 'Ереван'],
     ])
   })
 
@@ -526,7 +548,7 @@ describe('поиск «Что брать» (MOL-128)', () => {
       },
     }
     const { actors, expenses } = all
-    return { deps: { actors, verdicts, expenses, items }, asked, searched }
+    return { deps: { actors, verdicts, expenses, items, embedder: NO_EMBEDDER }, asked, searched }
   }
 
   it('отвечает в порядке поиска: у оценённого — его строка, у неоценённого — null', async () => {
@@ -541,7 +563,7 @@ describe('поиск «Что брать» (MOL-128)', () => {
       ['Сыр косичка', null],
       ['Сыр Лори', 'take'],
     ])
-    expect(world.searched).toEqual([['syr', ADVICE_SEARCH_CANDIDATES, ACTOR]])
+    expect(world.searched).toEqual([['syr', ADVICE_SEARCH_CANDIDATES, ACTOR, null]])
   })
 
   // Adversarial А: «сыр» is 24 names in the seed. Cut at twenty before the verdicts, the one rated

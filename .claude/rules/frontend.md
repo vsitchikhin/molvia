@@ -203,7 +203,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   it through the history like everything else (below). Only the page scrolls, never an inner
   container: iOS hides its address bar and the router restores positions only for the window. **A move that changes only the query of the
   screen is the screen's own state, not another screen** (`sameScreen` in `transitions.ts`,
-  MOL-136): the category and the period of «Графики», the month of «Деньги» live in the address and
+  MOL-136): the category and the period of «Графики», the month of «Деньги», the period of the line
+  of the rate on «Обмен денег» (MOL-168) live in the address and
   change by `replace`. **It is not scrolled, not animated and not an arrival** — three readers of
   one move, and a fourth below, all going by the one definition. Read as a new screen, it took the
   page to the top — the category card is the third, and the chart the person chose it for was gone;

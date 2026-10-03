@@ -155,6 +155,13 @@ export interface TripElsewhere {
   /** Where the open trip is, and where the person thinks they are. */
   readonly place: string
   readonly mine: string
+  /**
+   * The cities of both (MOL-120, adversarial Б1): «Ереван Сити» of Gyumri is not the one of
+   * Yerevan. Absent where unknown — a server before MOL-120, a start the old queue kept without a
+   * context — and then the two are told apart by the name alone, as before.
+   */
+  readonly placeCity?: string
+  readonly mineCity?: string
 }
 
 /**
@@ -1166,7 +1173,13 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     if (chosen?.owner !== owner || chosen.key !== head.key || chosen.tripId !== open.id) {
       decision = null
       conflict = { owner, key: head.key, tripId: open.id }
-      elsewhere.value = { tripId: open.id, place: open.place.name, mine: head.write.place.name }
+      elsewhere.value = {
+        tripId: open.id,
+        place: open.place.name,
+        mine: head.write.place.name,
+        ...(open.placeCity === undefined ? {} : { placeCity: open.placeCity }),
+        ...(head.write.context ? { mineCity: head.write.context.city } : {}),
+      }
       retry.cancel()
       return false
     }

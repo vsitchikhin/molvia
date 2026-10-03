@@ -23,7 +23,7 @@ jobs:
     # credentials match what bin/init-env.sh writes, so CI and a working copy agree.
     services:
       postgres:
-        image: postgres:17-alpine
+        image: pgvector/pgvector:0.8.7-pg17-bookworm
         env:
           POSTGRES_DB: molvia_0
           POSTGRES_USER: molvia
@@ -42,10 +42,23 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      # onnxruntime-node fetches CUDA and TensorRT on linux/x64 by default (MOL-105): the API runs
+      # on the CPU, and the package carries the CPU build in itself.
       - run: npm ci
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
 
       # The same generator every working copy uses, so CI cannot drift from local setup.
       - run: ./bin/init-env.sh 0
+
+      # The model of the search by meaning (MOL-105), which its integration tests read as a copy
+      # does: cached by its specification, fetched and checked by sha256 when that changes.
+      - name: Cache the embedding model
+        uses: actions/cache@v6
+        with:
+          path: .models
+          key: models-${{ hashFiles('backend/src/embeddings/model.json') }}
+      - run: node bin/fetch-model.mjs
 
       # `make format` mutates files, so CI checks instead of fixing: a diff must fail,
       # not be silently repaired.
@@ -63,7 +76,7 @@ jobs:
     # with it, /health reports ok rather than degraded, which is what a user would see.
     services:
       postgres:
-        image: postgres:17-alpine
+        image: pgvector/pgvector:0.8.7-pg17-bookworm
         env:
           POSTGRES_DB: molvia_0
           POSTGRES_USER: molvia
@@ -82,7 +95,10 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      # End-to-end runs without the model (MOL-105): the search must hold without it.
       - run: npm ci
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
       - run: ./bin/init-env.sh 0
 
       - name: Cache Playwright browsers

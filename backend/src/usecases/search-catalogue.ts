@@ -1,4 +1,6 @@
 import type { ItemRepository, SearchAnswer } from '@/db/items-repository'
+import type { Embedder } from '@/embeddings/embedder'
+import { queryMeaning } from '@/usecases/query-meaning'
 
 /**
  * How many rows a search answers with. A product decision rather than a parameter: a phone
@@ -9,6 +11,8 @@ export const SEARCH_LIMIT = 20
 
 export interface CatalogueSearchDeps {
   readonly items: ItemRepository
+  /** The model of the search by meaning (MOL-105); without one, letters alone. */
+  readonly embedder: Pick<Embedder, 'model' | 'query'>
 }
 
 /**
@@ -27,9 +31,9 @@ export interface CatalogueSearchDeps {
  * The rows already written stay where they are. The log is append-only, and they were true.
  */
 export async function searchCatalogue(
-  { items }: CatalogueSearchDeps,
+  { items, embedder }: CatalogueSearchDeps,
   actorId: string,
   query: string,
 ): Promise<SearchAnswer> {
-  return items.search(query, SEARCH_LIMIT, actorId)
+  return items.search(query, SEARCH_LIMIT, actorId, await queryMeaning(embedder, query))
 }

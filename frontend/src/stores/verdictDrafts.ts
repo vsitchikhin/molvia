@@ -1,7 +1,13 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { ApiError } from '@molvia/client'
-import { ERROR, isWireCode, pendingVerdictCodec, ratingSchema } from '@molvia/model'
+import {
+  ERROR,
+  isWireCode,
+  pendingVerdictCodec,
+  pendingVerdictSchema,
+  ratingSchema,
+} from '@molvia/model'
 import type { PendingVerdict, Rating, WireCode } from '@molvia/model'
 import { api } from '@/api'
 import type { Score } from '@/components/rating'
@@ -38,13 +44,26 @@ export type Held = 'offline' | 'failed'
 const KEY = 'molvia.verdict-drafts'
 const CONFIRMED_KEY = 'molvia.verdict-confirmed'
 
+/**
+ * The city of the card is kept beside it, never inside (MOL-120, adversarial А4): the version before
+ * reads the card with a strict codec, and a card that grew a field was dropped as a broken entry —
+ * a verdict saved with no signal, lost by a rollback that neither side refused. Beside the card it
+ * is a field that version never looks at, and the words go through.
+ */
 function encode(draft: VerdictDraft): Loose {
-  return { ...draft, card: pendingVerdictCodec.encode(draft.card) }
+  const { placeCity, ...card } = draft.card
+  return {
+    ...draft,
+    card: pendingVerdictCodec.encode(card),
+    ...(placeCity === undefined ? {} : { placeCity }),
+  }
 }
 
 function decode(raw: unknown): VerdictDraft | null {
   if (!isRecord(raw)) return null
   const card = pendingVerdictCodec.safeParse(raw.card)
+  // A city that does not read is lost alone: the words are what this memory is for.
+  const city = pendingVerdictSchema.shape.placeCity.safeParse(raw.placeCity).data
   const score = raw.score === null ? null : ratingSchema.shape.score.safeParse(raw.score).data
   const { review, state, error } = raw
   if (!card.success || score === undefined || typeof review !== 'string') return null
@@ -52,7 +71,8 @@ function decode(raw: unknown): VerdictDraft | null {
   if (error !== null && !isWireCode(error)) return null
   // A saved draft without a score could never be sent, and would hide its card for good.
   if (state === 'saved' && score === null) return null
-  return { card: card.data, score, review, state, error }
+  const kept = city === undefined ? card.data : { ...card.data, placeCity: city }
+  return { card: kept, score, review, state, error }
 }
 
 /** A broken entry is dropped alone: the ones beside it are somebody's words. */

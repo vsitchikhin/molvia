@@ -85,6 +85,17 @@ describe('текст напоминания', () => {
     expect(reminderText(item('Сыр', 11), 0, APP)).toMatch(/^11 дн\. назад · /)
   })
 
+  it('город места — в предложном падеже, город не из словаря — в скобках (MOL-120)', () => {
+    expect(reminderText(item('Молоко'), 0, APP, 'Ереван')).toMatch(
+      /^Вчера · Ереван Сити в Ереване\n/,
+    )
+    // A place keeps the spelling its city was first written in: «гюмри» is Gyumri (adversarial А2).
+    expect(reminderText(item('Молоко'), 0, APP, 'гюмри')).toMatch(/^Вчера · Ереван Сити в Гюмри\n/)
+    expect(reminderText(item('Молоко'), 0, APP, 'Ванадзор')).toMatch(
+      /^Вчера · Ереван Сити \(Ванадзор\)\n/,
+    )
+  })
+
   it('адрес приложения со слешем на конце не даёт двойного слеша', () => {
     expect(reminderText(item('Молоко'), 1, `${APP}/`)).toContain(`${APP}/verdicts`)
     expect(reminderText(item('Молоко'), 1, `${APP}/`)).not.toContain('//verdicts')
@@ -175,6 +186,38 @@ describe('рассылка (MOL-101)', () => {
       reminderText(item('Хлеб'), 2, APP),
     ])
     expect(calls[0]?.payload.reply_markup).toEqual(scale(MILK))
+  })
+
+  it('город — только где два места напоминания носят одно имя (MOL-120)', async () => {
+    const { api, calls } = telegram()
+    const at = (name: string, placeName: string, placeCity?: string) => ({
+      ...item(name),
+      placeName,
+      ...(placeCity === undefined ? {} : { placeCity }),
+    })
+    const reminders = [
+      {
+        telegramUserId: 777,
+        items: [
+          at('Кефир', 'Ереван Сити', 'Ереван'),
+          at('Сыр', 'SAS', 'Ереван'),
+          at('Хлеб', 'Ереван Сити', 'Гюмри'),
+        ],
+        total: 3,
+      },
+      // An API before MOL-120 sends no city: the names stay as they were.
+      { telegramUserId: 778, items: [at('Кефир', 'SAS'), at('Хлеб', 'SAS', 'Гюмри')], total: 2 },
+    ]
+
+    await remindDue(claiming(reminders) as MolviaBotClient, api, APP)
+
+    expect(calls.map((call) => String(call.payload.text).split('\n')[0])).toEqual([
+      'Вчера · Ереван Сити в Ереване',
+      'Вчера · SAS',
+      'Вчера · Ереван Сити в Гюмри',
+      'Вчера · SAS',
+      'Вчера · SAS',
+    ])
   })
 
   it('«Не напоминать» — только под последним сообщением вечера (MOL-103, В-2)', async () => {
@@ -343,6 +386,42 @@ describe('рассылка (MOL-101)', () => {
     await remindDue(client as unknown as MolviaBotClient, api, APP)
 
     expect(calls).toEqual([])
+  })
+
+  it('удачный забор — пульс, даже пустой, и раньше рассылки; неудачный — нет (MOL-142)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api, calls } = telegram()
+    const order: string[] = []
+    const claimed = vi.fn(() => {
+      order.push(`pulse after ${String(calls.length)} messages`)
+    })
+
+    await remindDue(claiming([]) as MolviaBotClient, api, APP, undefined, claimed)
+    await remindDue(
+      claiming([{ telegramUserId: 777, items: [item('Кефир')], total: 1 }]) as MolviaBotClient,
+      api,
+      APP,
+      undefined,
+      claimed,
+    )
+    const failing = { claimReminders: vi.fn(() => Promise.reject(new ApiError(ERROR.INTERNAL))) }
+    await remindDue(failing as unknown as MolviaBotClient, api, APP, undefined, claimed)
+
+    expect(claimed).toHaveBeenCalledTimes(2)
+    expect(order).toEqual(['pulse after 0 messages', 'pulse after 0 messages'])
+    expect(calls).toHaveLength(1)
+  })
+
+  it('таймер передаёт пульс каждому забору', async () => {
+    vi.useFakeTimers()
+    const { api } = telegram()
+    const claimed = vi.fn()
+
+    const stop = startReminders(claiming([]) as MolviaBotClient, api, APP, 60_000, claimed)
+    await vi.advanceTimersByTimeAsync(60_000)
+    await stop()
+
+    expect(claimed).toHaveBeenCalledTimes(2)
   })
 
   it('спрашивает сразу и потом раз в минуту, прогоны не накладываются', async () => {

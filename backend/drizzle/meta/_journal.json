@@ -271,8 +271,22 @@
     {
       "idx": 38,
       "version": "7",
-      "when": 1790957897629,
-      "tag": "0038_feedback",
+      "when": 1790957781466,
+      "tag": "0038_pgvector",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1790959221765,
+      "tag": "0039_item_embeddings",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791011852711,
+      "tag": "0040_feedback",
       "breakpoints": true
     }
   ]

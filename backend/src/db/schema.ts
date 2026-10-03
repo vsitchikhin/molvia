@@ -5,6 +5,7 @@ import {
   check,
   date,
   foreignKey,
+  halfvec,
   index,
   integer,
   jsonb,
@@ -376,6 +377,34 @@ export const itemBarcodes = pgTable(
     // The four lengths a GTIN has — EAN-8, UPC-A, EAN-13, GTIN-14, the same shape the
     // domain schema checks. A range of 8..14 quietly accepts a mistyped nine digits.
     check('item_barcodes_gtin_shape', sql`${table.code} ~ '^([0-9]{8}|[0-9]{12,14})$'`),
+  ],
+)
+
+/**
+ * The vector of an item's name, by which search finds it by meaning (MOL-105): «молочка» reaches
+ * milk, «овощи» the potato. Made by the API's own model from the name alone, written by one writer
+ * — the API's timer, nudged by «Предложить товар» — and never on the way of a write of an item:
+ * creating one does not wait for the model and does not fail with it.
+ *
+ * `model` names the model and its revision (`EMBEDDING_MODEL`): a vector of another model is noise
+ * to this one, so a row of another model is computed again and never read meanwhile. One row per
+ * item, so the index holds the catalogue once. Nothing here is a person's — neither erasure nor the
+ * copy reaches it; the item's own row decides its life.
+ */
+export const itemEmbeddings = pgTable(
+  'item_embeddings',
+  {
+    itemId: uuid('item_id')
+      .primaryKey()
+      .references(() => items.id, { onDelete: 'cascade' }),
+    model: varchar('model', { length: 100 }).notNull(),
+    // Half precision: a sixth digit of a cosine is not what decides a shelf word, and the index is
+    // half the size.
+    embedding: halfvec('embedding', { dimensions: 768 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('item_embeddings_hnsw_idx').using('hnsw', table.embedding.op('halfvec_cosine_ops')),
   ],
 )
 

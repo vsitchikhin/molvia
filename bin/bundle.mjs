@@ -46,6 +46,11 @@ await build({
   format: 'esm',
   sourcemap: true,
   minify: false, // a readable stack trace is worth more than the kilobytes
+  // A class esbuild renames to dodge a global keeps its own `name` (MOL-142). node-fetch, under
+  // grammY, takes a signal only if its constructor is called `AbortSignal`: the bot's first use
+  // of the global one (`AbortSignal.timeout`) renamed abort-controller's class `AbortSignal2`, and
+  // every call to Telegram failed in production while every test, run unbundled, passed.
+  keepNames: true,
   // What keeps the development login seam out of production (MOL-52, Р-14). Substituted here
   // rather than trusted at runtime: a variable can be set wrong and nobody finds out, whereas
   // a literal folds the condition in `server.ts` to `false`, the branch goes, and the module
@@ -67,6 +72,10 @@ await build({
   // `bundle-seam.integration.test.ts` checks the built file rather than taking any of this on
   // trust: every step here fails silently, and what ships if one does is an open route.
   minifySyntax: true,
+  // The one module left beside the file (MOL-105): onnxruntime carries a native library, which no
+  // bundle can hold. The API's image copies it next to `dist/` as `node_modules/onnxruntime-node`,
+  // the linux build alone; the API loads it only when the model is there, and runs without it.
+  external: ['onnxruntime-node'],
   // ESM output cannot use require(); a few dependencies still reach for it.
   banner: {
     js: [

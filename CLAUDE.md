@@ -116,6 +116,7 @@ the load is I/O-bound, with three orders of magnitude of headroom.
 | API               | Fastify + Zod                                           | Zod schemas shared with the frontend and the bot                                           |
 | DB                | PostgreSQL + Drizzle                                    | schema in TS, generated migrations, honest drop into raw SQL                               |
 | Bot               | grammY + `@grammyjs/runner`                             | distribution, auth, rating reminders; the runner is what makes it serve two people at once |
+| Search by meaning | EmbeddingGemma q4 on `onnxruntime-node`, in the API     | a pinned model, no service of its own; 45 ms a query on the VPS (MOL-105)                  |
 | Receipt OCR (1.0) | separate Python service                                 | the TS ecosystem has nothing here                                                          |
 | Tests             | Vitest (domain, use case, component) + Playwright (e2e) | three vitest projects, so the domain keeps running without a DOM                           |
 | Lint              | ESLint 9 type-aware + Stylelint + Prettier              | strictest tier; SFCs go through the same type checker as `.ts`                             |
@@ -167,7 +168,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **At one distance the order is fixed** (MOL-112): found by the word before by a synonym, whole
   word before a start, fats typed with «%», then the shorter name, then the similarity, the uuid.
 - **The thresholds were measured and kept** (MOL-14); a change of either is checked against the
-  pinned corpus. **Embeddings are a 0.2 question.**
+  pinned corpus.
+- **The meaning is an addition, never a condition** (MOL-105): EmbeddingGemma in the API, one
+  writer of `item_embeddings`; without the model the search is the letters'. A name found by meaning
+  stands after one edit and before two, near; nothing within one edit moves. Similarity 0.40, from
+  four letters — measured, and a vector of another model is never read.
 - **The catalogue grows by «Предложить товар» and the seed** (MOL-112): the seed only adds, is
   not a migration, never stays in `_test` or `_e2e`, and holds no brands.
 
@@ -194,6 +199,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
 - **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, **every other reader
   filters `deleted_at IS NULL`**; the reminder skips a purchase made before the withdrawal (MOL-101).
+- **A place is named with its city only where its name stands in two cities of one set** (MOL-120):
+  the queue of «Оценки», a row of «Что брать», one reminder — one rule, `cityWhereNameRepeats` in
+  the domain; the city is optional on the wire, and a place without one leaves its set named as
+  before.
 - **The search on «Что брать» is answered by the server** (`GET /advice/search`, MOL-128): the
   list's own statement and rules for what is found, never glued on the phone; it writes no visit and
   no pick; offline — the remembered list by the start of words.
@@ -225,8 +234,12 @@ that are easiest to break; the file holds every rule of the area and the reason 
   channel, else the best; no market — «Без сравнения», never the central bank instead. **The
   official cache holds the bank's history since 2022**, only missing days written.
 - **«Курс рубля за 12 месяцев» is the line of all bank clients, the one row with a year of history,
-  named so** (MOL-161); a point's percent and its mark are its card's own market, never the line (В-1),
-  and the line is on the side of the pair's latest exchange (В-2).
+  named so** (MOL-161); a point's percent and its mark are its card's own market, never the line
+  (В-1), and the line is on the side of the pair's latest exchange (В-2). **The month, half a year
+  and the year come in one answer** (MOL-168): each from the day after the same day N months back,
+  whole months on a month's last day — the year is the window of «Обмены против рынка» — the month
+  by days, a weekend at Friday's figure; the pairs are the year's, and the period is the screen's
+  address.
 
 ### Money: spendings and «Деньги» — `.claude/rules/money-spendings.md`
 
@@ -350,6 +363,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   (`EXPORT_COLUMNS`); stored, never counted; the removed marked; no secret.
 - **Locks are taken in one order everywhere**: the account, then the request rows, then the owner.
 - **No third-party trackers or analytics**; any third-party script that sees data is a decision.
+  onnxruntime's telemetry is off (`ORT_DISABLE_TELEMETRY`, MOL-105).
 - **Logs live fourteen days and carry no address and no query**; a failure is logged by its kind
   through `describeFailure`, never by its message.
 
@@ -429,13 +443,21 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 ### Deployment — `.claude/rules/deploy.md`
 
-- **`api` and `bot` ship as a single bundled file each**; every container logs to journald for
+- **`api` and `bot` ship as a single bundled file each** — beside the API's only `onnxruntime-node`
+  and the model (MOL-105); every container logs to journald for
   fourteen days; the database is copied every night, encrypted, off the machine.
 - **Migrations run when the API starts. A merged migration is never rewritten**; before the merge
   a task's migrations may be folded, and every database that ran the old file is brought into
   line by hand.
 - **A merge is a deploy** (MOL-90); a failed deploy puts the previous image back, not the schema,
   **so a migration that drops or renames goes out in two merges**.
+- **The Postgres image is an exact tag and part of the contract** (MOL-105): ICU, `vector` and
+  glibc; a tag that moves glibc or ICU comes with a migration that rebuilds the text indexes, as
+  `0038`. **A migration skipped by its stamp stops the boot** (`assertEveryMigrationApplied`).
+- **Production is watched from outside** (MOL-142): `watch.yml` every five minutes and the bot's
+  pulse — after a claim, while it hears Telegram, never in its first minute — to healthchecks.io
+  and its own Telegram, never our bot; **`/health` is `503` whenever it is not `ok`**, and the bot
+  is not in it; a check that never got a ping never alarms, so `BOT_PULSE_URL` is required.
 
 ## Tracker and documentation
 

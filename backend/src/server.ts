@@ -44,6 +44,7 @@ import { sendFeedback } from '@/usecases/send-feedback'
 import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
+import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
 import { recentPlaces } from '@/usecases/recent-places'
 import { rateFromBot } from '@/usecases/rate-from-bot'
 import { rateItem } from '@/usecases/rate-item'
@@ -133,6 +134,9 @@ import { createExchangeRepository } from '@/db/exchanges-repository'
 import { createEventRepository } from '@/db/events-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { createOpenFoodFactsRepository } from '@/db/open-food-facts-repository'
+import { createItemEmbeddingRepository } from '@/db/item-embeddings-repository'
+import { NO_EMBEDDER } from '@/embeddings/embedder'
+import type { Embedder, EmbeddingLog } from '@/embeddings/embedder'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
@@ -249,6 +253,12 @@ export interface ServerOptions {
    * production ever asks the real base.
    */
   readonly openFoodFacts?: OpenFoodFacts | null
+  /**
+   * The model of the search by meaning (MOL-105), made with the server's log. Absent, there is
+   * none and the search is by letters: the API's entry starts the real one from the environment,
+   * and a test that needs it hands it in — every other test would load 200 MB for nothing.
+   */
+  readonly embedder?: (log: EmbeddingLog) => Embedder
 }
 
 /**
@@ -407,6 +417,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopAccountCleanup: (() => Promise<void>) | undefined
     let stopSessionCleanup: (() => Promise<void>) | undefined
     let stopFeedbackCleanup: (() => Promise<void>) | undefined
+    const embedder = options.embedder?.(instance.log) ?? NO_EMBEDDER
+    let itemEmbedding: ReturnType<typeof startItemEmbedding> | undefined
     instance.addHook('onReady', (ready) => {
       stopCleanup = startLoginCleanup(
         () => loginRequests.removeExpired(),
@@ -468,6 +480,18 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           instance.log.error('stale feedback cleanup failed')
         },
       )
+      // The vectors of the catalogue (MOL-105): a minute timer of their own, nudged after a
+      // proposal and once the model has loaded — a fresh catalogue does not wait for the minute.
+      const writer = startItemEmbedding(
+        () => embedMissing({ embeddings: createItemEmbeddingRepository(db), embedder }),
+        (error) => {
+          instance.log.error(describeFailure(error), 'item embedding failed')
+        },
+      )
+      itemEmbedding = writer
+      void embedder.loaded.then(() => {
+        writer.nudge()
+      })
       ready()
     })
     instance.addHook('onClose', async () => {
@@ -479,6 +503,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopAccountCleanup?.()
       await stopSessionCleanup?.()
       await stopFeedbackCleanup?.()
+      await itemEmbedding?.stop()
     })
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
@@ -568,8 +593,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         choose: (owner, body) => chooseReminders(reminders, { id: owner }, body, new Date()),
       })
       catalogueRoutes(guarded, {
-        search: (actorId, query) => searchCatalogue({ items }, actorId, query),
-        propose: (actorId, input) => proposeItem(items, hints, actorId, input),
+        search: (actorId, query) => searchCatalogue({ items, embedder }, actorId, query),
+        propose: async (actorId, input) => {
+          const proposal = await proposeItem(items, hints, actorId, input)
+          if ('created' in proposal && proposal.created) itemEmbedding?.nudge()
+          return proposal
+        },
         byBarcode: (code) => findByBarcode(items, code),
         hint: (actorId, code, locale) =>
           hintByBarcode({ cache: hints, off }, actorId, code, locale),
@@ -645,7 +674,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           advice({ actors, verdicts, expenses: tripData.expenses, events }, actorId, phone),
         search: ({ actorId, ...phone }, query) =>
           adviceSearch(
-            { actors, verdicts, expenses: tripData.expenses, items },
+            { actors, verdicts, expenses: tripData.expenses, items, embedder },
             actorId,
             query,
             phone,

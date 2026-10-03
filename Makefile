@@ -95,6 +95,9 @@ gates: ## Read gates 0.2 and 0.3: make gates FROM=<day|moment> [TO=<day|moment>]
 	$(NEED_SCAFFOLD)
 	$(if $(filter command line,$(origin FROM)),,unset FROM;) $(if $(filter command line,$(origin TO)),,unset TO;) ./bin/gates.sh "$${FROM:-}" "$${TO:-}"
 
+model: ## Fetch the embedding model of catalogue search into .models, checked by sha256 (MOL-105)
+	node bin/fetch-model.mjs
+
 dev: ## Run api, pwa and bot for this copy
 	$(NEED_SCAFFOLD)
 	npm run dev
@@ -134,7 +137,8 @@ prod-build: ## Build the production images without deploying them
 	@# right at deploy time and pointless when only building. Placeholders satisfy the
 	@# interpolation; nothing here reaches an image.
 	DOMAIN=localhost POSTGRES_DB=molvia POSTGRES_USER=molvia POSTGRES_PASSWORD=build \
-	TELEGRAM_BOT_TOKEN=build TELEGRAM_BOT_USERNAME=build_bot BOT_API_SECRET=build docker compose -f docker-compose.prod.yml build
+	TELEGRAM_BOT_TOKEN=build TELEGRAM_BOT_USERNAME=build_bot BOT_API_SECRET=build BOT_PULSE_URL= \
+	docker compose -f docker-compose.prod.yml build
 
 certs: ## Issue a locally trusted dev certificate, for testing the camera on a phone
 	@command -v mkcert >/dev/null || { \

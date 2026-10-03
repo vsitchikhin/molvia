@@ -8,7 +8,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 - `packages/model/src/contracts/exchange.ts` — Wire schemas of «Обмен денег»: the exchange body and amendment, the rate preference, the screen's answer with wallet and costs, «Обмены против рынка» and the line of the rate (MOL-161).
 - `packages/model/src/contracts/income.ts` — Wire schemas of «Доходы»: the income body and amendment, one income's view, the answer grouped by month.
 - `packages/model/src/entities/exchange.ts` — Exchange entity and the wallet: currency costs along the chain, own rates, difference from the official rate, the «сколько было до» hint.
-- `packages/model/src/entities/exchange-rate-chart.ts` — «Курс рубля за 12 месяцев» (MOL-161): the weeks of the window, a week's figure of all bank clients, the pairs and the side of their line, each exchange with its percent and the market it was measured by, the round ticks of the axis.
+- `packages/model/src/entities/exchange-rate-chart.ts` — «Курс рубля за месяц, 6 и 12 месяцев» (MOL-161, MOL-168): the periods and their first day, the days of the month and the weeks of half a year and the year, a step's figure of all bank clients, the pairs and the side of their line, each exchange with its percent and the market it was measured by, the round ticks of each period's axis.
 - `packages/model/src/entities/income.ts` — Income entity: the closed list of sources, the undo window, and the per-month sums per currency.
 - `packages/model/src/values/market-rates.ts` — Market-rate value (MOL-137): channels, the bank's side of an exchange, a day's figure per channel, the best for the person, «exchange offices still to come», the figures of today, the band of a factor of two.
 - `packages/model/src/values/rates.ts` — Exchange-rate value: six-digit scale, sources and providers, jump rule, Yerevan days, `latestDay` — the latest day on Earth, the bound of «not in the future» (MOL-121) —, freshness, picking the official rate, `formatRate`.
@@ -68,7 +68,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 ## frontend · components
 
 - `frontend/src/components/ExchangeCard.vue` — Card of one exchange: the day, what was given and received, the rate plate against the market of its day and the central bank, the note.
-- `frontend/src/components/ExchangeRateChart.vue` — «Курс рубля за 12 месяцев» on «Обмен денег» (MOL-161): the market of all bank clients by week, the exchanges as dots with a mark to the market each was measured by, the reading above, the pairs, hidden radios.
+- `frontend/src/components/ExchangeRateChart.vue` — «Курс рубля за месяц, 6 и 12 месяцев» on «Обмен денег» (MOL-161, MOL-168): the market of all bank clients by day or week, the exchanges as dots with a mark to the market each was measured by, the reading above, the pairs and the period, hidden radios.
 - `frontend/src/components/ExchangeRemoveSheet.vue` — «Удалить обмен?» sheet: the exchange's amounts and day, and what removing does to the rate of new trips.
 - `frontend/src/components/ExchangeSheet.vue` — «Записать обмен» sheet: given, received, day, how it was changed, «сколько было до» where it weighs; also amends an exchange with its versions.
 - `frontend/src/components/IncomeCard.vue` — Card of one income: the day, the source and amount, the note on a plate below.
@@ -86,5 +86,5 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 
 ## e2e
 
-- `e2e/exchange.spec.ts` — End-to-end: an exchange recorded on screen becomes the next trip's rate, the chain carries through, amendments and long amounts hold.
+- `e2e/exchange.spec.ts` — End-to-end: an exchange recorded on screen becomes the next trip's rate, the chain carries through, amendments and long amounts hold; the line of the rate by the finger and by period.
 - `e2e/incomes.spec.ts` — End-to-end: an income lands in its month, is amended with a trace, comes back after removal, and an unknown cost is said.

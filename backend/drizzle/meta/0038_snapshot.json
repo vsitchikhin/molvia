@@ -1,5 +1,5 @@
 {
-  "id": "f9325922-85f0-4e67-96b5-ad59e234c195",
+  "id": "404b1372-f881-468d-9aa4-51f96519ff59",
   "prevId": "c64d4344-7757-4a8d-bdea-eb5a68732015",
   "version": "7",
   "dialect": "postgresql",
@@ -96,8 +96,8 @@
       "uniqueConstraints": {
         "actors_telegram_user_id_key": {
           "name": "actors_telegram_user_id_key",
-          "nullsNotDistinct": false,
-          "columns": ["telegram_user_id"]
+          "columns": ["telegram_user_id"],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -190,28 +190,28 @@
         "budget_plans_actor_id_actors_id_fk": {
           "name": "budget_plans_actor_id_actors_id_fk",
           "tableFrom": "budget_plans",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "budget_plans_category_is_owners": {
           "name": "budget_plans_category_is_owners",
           "tableFrom": "budget_plans",
-          "tableTo": "spending_categories",
           "columnsFrom": ["category_id", "actor_id"],
+          "tableTo": "spending_categories",
           "columnsTo": ["id", "actor_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "budget_plans_actor_category_month_key": {
           "name": "budget_plans_actor_category_month_key",
-          "nullsNotDistinct": true,
-          "columns": ["actor_id", "category_id", "from_month"]
+          "columns": ["actor_id", "category_id", "from_month"],
+          "nullsNotDistinct": true
         }
       },
       "policies": {},
@@ -287,15 +287,15 @@
           "primaryKey": true,
           "notNull": true,
           "identity": {
-            "type": "always",
             "name": "events_id_seq",
-            "schema": "public",
             "increment": "1",
-            "startWith": "1",
             "minValue": "1",
             "maxValue": "9223372036854775807",
+            "startWith": "1",
             "cache": "1",
-            "cycle": false
+            "cycle": false,
+            "schema": "public",
+            "type": "always"
           }
         },
         "occurred_at": {
@@ -343,9 +343,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "events_type_occurred_idx": {
           "name": "events_type_occurred_idx",
@@ -364,20 +364,20 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "events_actor_id_actors_id_fk": {
           "name": "events_actor_id_actors_id_fk",
           "tableFrom": "events",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -476,11 +476,11 @@
         "exchange_revisions_exchange_id_exchanges_id_fk": {
           "name": "exchange_revisions_exchange_id_exchanges_id_fk",
           "tableFrom": "exchange_revisions",
-          "tableTo": "exchanges",
           "columnsFrom": ["exchange_id"],
+          "tableTo": "exchanges",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {
@@ -648,38 +648,38 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "exchanges_actor_id_actors_id_fk": {
           "name": "exchanges_actor_id_actors_id_fk",
           "tableFrom": "exchanges",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "exchanges_given_account_is_owners": {
           "name": "exchanges_given_account_is_owners",
           "tableFrom": "exchanges",
-          "tableTo": "money_accounts",
           "columnsFrom": ["given_account_id", "actor_id", "given_currency"],
+          "tableTo": "money_accounts",
           "columnsTo": ["id", "actor_id", "currency"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "exchanges_received_account_is_owners": {
           "name": "exchanges_received_account_is_owners",
           "tableFrom": "exchanges",
-          "tableTo": "money_accounts",
           "columnsFrom": ["received_account_id", "actor_id", "received_currency"],
+          "tableTo": "money_accounts",
           "columnsTo": ["id", "actor_id", "currency"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -787,9 +787,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "expenses_item_idx": {
           "name": "expenses_item_idx",
@@ -802,29 +802,29 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "expenses_trip_id_trips_id_fk": {
           "name": "expenses_trip_id_trips_id_fk",
           "tableFrom": "expenses",
-          "tableTo": "trips",
           "columnsFrom": ["trip_id"],
+          "tableTo": "trips",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "expenses_item_id_items_id_fk": {
           "name": "expenses_item_id_items_id_fk",
           "tableFrom": "expenses",
-          "tableTo": "items",
           "columnsFrom": ["item_id"],
+          "tableTo": "items",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -858,301 +858,6 @@
         "expenses_amount_currency_known": {
           "name": "expenses_amount_currency_known",
           "value": "\"expenses\".\"amount_currency\" is null or \"expenses\".\"amount_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.feedback": {
-      "name": "feedback",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "bigint",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "always",
-            "name": "feedback_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "9223372036854775807",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "actor_id": {
-          "name": "actor_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "text": {
-          "name": "text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "locale": {
-          "name": "locale",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "page_build": {
-          "name": "page_build",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "api_build": {
-          "name": "api_build",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "route": {
-          "name": "route",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "error_code": {
-          "name": "error_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "from_error": {
-          "name": "from_error",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "thread_id": {
-          "name": "thread_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "in_reply_to": {
-          "name": "in_reply_to",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "client_key": {
-          "name": "client_key",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "clock_timestamp()"
-        }
-      },
-      "indexes": {
-        "feedback_actor_created_idx": {
-          "name": "feedback_actor_created_idx",
-          "columns": [
-            {
-              "expression": "actor_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "feedback_thread_idx": {
-          "name": "feedback_thread_idx",
-          "columns": [
-            {
-              "expression": "thread_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "feedback_actor_id_actors_id_fk": {
-          "name": "feedback_actor_id_actors_id_fk",
-          "tableFrom": "feedback",
-          "tableTo": "actors",
-          "columnsFrom": ["actor_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "feedback_in_reply_to_feedback_replies_id_fk": {
-          "name": "feedback_in_reply_to_feedback_replies_id_fk",
-          "tableFrom": "feedback",
-          "tableTo": "feedback_replies",
-          "columnsFrom": ["in_reply_to"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "feedback_thread_is_owners": {
-          "name": "feedback_thread_is_owners",
-          "tableFrom": "feedback",
-          "tableTo": "feedback",
-          "columnsFrom": ["thread_id", "actor_id"],
-          "columnsTo": ["id", "actor_id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "feedback_actor_client_key": {
-          "name": "feedback_actor_client_key",
-          "nullsNotDistinct": false,
-          "columns": ["actor_id", "client_key"]
-        },
-        "feedback_id_actor_key": {
-          "name": "feedback_id_actor_key",
-          "nullsNotDistinct": false,
-          "columns": ["id", "actor_id"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "feedback_kind_known": {
-          "name": "feedback_kind_known",
-          "value": "\"feedback\".\"kind\" in ('bug', 'idea', 'other')"
-        },
-        "feedback_locale_known": {
-          "name": "feedback_locale_known",
-          "value": "\"feedback\".\"locale\" in ('ru', 'en')"
-        },
-        "feedback_code_from_error": {
-          "name": "feedback_code_from_error",
-          "value": "\"feedback\".\"error_code\" is null or \"feedback\".\"from_error\""
-        },
-        "feedback_thread_not_itself": {
-          "name": "feedback_thread_not_itself",
-          "value": "\"feedback\".\"thread_id\" is null or \"feedback\".\"thread_id\" < \"feedback\".\"id\""
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.feedback_replies": {
-      "name": "feedback_replies",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "bigint",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "always",
-            "name": "feedback_replies_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "9223372036854775807",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "feedback_id": {
-          "name": "feedback_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "text": {
-          "name": "text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "delivered": {
-          "name": "delivered",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "clock_timestamp()"
-        }
-      },
-      "indexes": {
-        "feedback_replies_feedback_idx": {
-          "name": "feedback_replies_feedback_idx",
-          "columns": [
-            {
-              "expression": "feedback_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "feedback_replies_feedback_id_feedback_id_fk": {
-          "name": "feedback_replies_feedback_id_feedback_id_fk",
-          "tableFrom": "feedback_replies",
-          "tableTo": "feedback",
-          "columnsFrom": ["feedback_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "feedback_replies_delivered_known": {
-          "name": "feedback_replies_delivered_known",
-          "value": "\"feedback_replies\".\"delivered\" is null or \"feedback_replies\".\"delivered\" in ('sent', 'blocked', 'gone')"
         }
       },
       "isRLSEnabled": false
@@ -1222,11 +927,11 @@
         "income_revisions_income_id_incomes_id_fk": {
           "name": "income_revisions_income_id_incomes_id_fk",
           "tableFrom": "income_revisions",
-          "tableTo": "incomes",
           "columnsFrom": ["income_id"],
+          "tableTo": "incomes",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {
@@ -1368,29 +1073,29 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "incomes_actor_id_actors_id_fk": {
           "name": "incomes_actor_id_actors_id_fk",
           "tableFrom": "incomes",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "incomes_account_is_owners": {
           "name": "incomes_account_is_owners",
           "tableFrom": "incomes",
-          "tableTo": "money_accounts",
           "columnsFrom": ["account_id", "actor_id", "currency"],
+          "tableTo": "money_accounts",
           "columnsTo": ["id", "actor_id", "currency"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1462,29 +1167,29 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "item_barcodes_item_id_items_id_fk": {
           "name": "item_barcodes_item_id_items_id_fk",
           "tableFrom": "item_barcodes",
-          "tableTo": "items",
           "columnsFrom": ["item_id"],
+          "tableTo": "items",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "item_barcodes_added_by_actors_id_fk": {
           "name": "item_barcodes_added_by_actors_id_fk",
           "tableFrom": "item_barcodes",
-          "tableTo": "actors",
           "columnsFrom": ["added_by"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "set null"
         }
       },
       "compositePrimaryKeys": {},
@@ -1583,28 +1288,28 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "gin",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "items_created_by_actors_id_fk": {
           "name": "items_created_by_actors_id_fk",
           "tableFrom": "items",
-          "tableTo": "actors",
           "columnsFrom": ["created_by"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "set null"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "items_id_kind_key": {
           "name": "items_id_kind_key",
-          "nullsNotDistinct": false,
-          "columns": ["id", "kind"]
+          "columns": ["id", "kind"],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -1788,8 +1493,8 @@
       "uniqueConstraints": {
         "login_requests_code_key": {
           "name": "login_requests_code_key",
-          "nullsNotDistinct": false,
-          "columns": ["code"]
+          "columns": ["code"],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -1955,29 +1660,29 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "money_account_checks_actor_id_actors_id_fk": {
           "name": "money_account_checks_actor_id_actors_id_fk",
           "tableFrom": "money_account_checks",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "money_account_checks_account_is_owners": {
           "name": "money_account_checks_account_is_owners",
           "tableFrom": "money_account_checks",
-          "tableTo": "money_accounts",
           "columnsFrom": ["account_id", "actor_id"],
+          "tableTo": "money_accounts",
           "columnsTo": ["id", "actor_id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2078,33 +1783,33 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "money_accounts_actor_id_actors_id_fk": {
           "name": "money_accounts_actor_id_actors_id_fk",
           "tableFrom": "money_accounts",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "money_accounts_id_actor_unique": {
           "name": "money_accounts_id_actor_unique",
-          "nullsNotDistinct": false,
-          "columns": ["id", "actor_id"]
+          "columns": ["id", "actor_id"],
+          "nullsNotDistinct": false
         },
         "money_accounts_id_actor_currency_unique": {
           "name": "money_accounts_id_actor_currency_unique",
-          "nullsNotDistinct": false,
-          "columns": ["id", "actor_id", "currency"]
+          "columns": ["id", "actor_id", "currency"],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -2172,11 +1877,11 @@
         "money_month_rates_actor_id_actors_id_fk": {
           "name": "money_month_rates_actor_id_actors_id_fk",
           "tableFrom": "money_month_rates",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {
@@ -2421,21 +2126,21 @@
             },
             {
               "expression": "btrim(lower(regexp_replace(normalize(\"city\", NFKC), E'[\\uFE00-\\uFE0F\\U000E0100-\\U000E01EF]', '', 'g')), E' \\t\\r\\n\\u00A0\\u200B\\u200C\\u200D\\uFEFF')",
-              "asc": true,
               "isExpression": true,
+              "asc": true,
               "nulls": "last"
             },
             {
               "expression": "btrim(lower(regexp_replace(normalize(\"name\", NFKC), E'[\\uFE00-\\uFE0F\\U000E0100-\\U000E01EF]', '', 'g')), E' \\t\\r\\n\\u00A0\\u200B\\u200C\\u200D\\uFEFF')",
-              "asc": true,
               "isExpression": true,
+              "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {},
@@ -2494,11 +2199,11 @@
         "rating_reminders_actor_id_actors_id_fk": {
           "name": "rating_reminders_actor_id_actors_id_fk",
           "tableFrom": "rating_reminders",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2645,20 +2350,20 @@
         "search_picks_actor_id_actors_id_fk": {
           "name": "search_picks_actor_id_actors_id_fk",
           "tableFrom": "search_picks",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "search_picks_item_id_items_id_fk": {
           "name": "search_picks_item_id_items_id_fk",
           "tableFrom": "search_picks",
-          "tableTo": "items",
           "columnsFrom": ["item_id"],
+          "tableTo": "items",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -2742,28 +2447,28 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "sessions_actor_id_actors_id_fk": {
           "name": "sessions_actor_id_actors_id_fk",
           "tableFrom": "sessions",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "sessions_token_hash_key": {
           "name": "sessions_token_hash_key",
-          "nullsNotDistinct": false,
-          "columns": ["token_hash"]
+          "columns": ["token_hash"],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -2845,29 +2550,29 @@
             }
           ],
           "isUnique": true,
-          "where": "\"spending_categories\".\"preset\" is not null",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"spending_categories\".\"preset\" is not null",
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "spending_categories_actor_id_actors_id_fk": {
           "name": "spending_categories_actor_id_actors_id_fk",
           "tableFrom": "spending_categories",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "spending_categories_id_actor_unique": {
           "name": "spending_categories_id_actor_unique",
-          "nullsNotDistinct": false,
-          "columns": ["id", "actor_id"]
+          "columns": ["id", "actor_id"],
+          "nullsNotDistinct": false
         }
       },
       "policies": {},
@@ -3044,47 +2749,47 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "spendings_actor_id_actors_id_fk": {
           "name": "spendings_actor_id_actors_id_fk",
           "tableFrom": "spendings",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "spendings_category_is_owners": {
           "name": "spendings_category_is_owners",
           "tableFrom": "spendings",
-          "tableTo": "spending_categories",
           "columnsFrom": ["category_id", "actor_id"],
+          "tableTo": "spending_categories",
           "columnsTo": ["id", "actor_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "spendings_account_is_owners": {
           "name": "spendings_account_is_owners",
           "tableFrom": "spendings",
-          "tableTo": "money_accounts",
           "columnsFrom": ["account_id", "actor_id"],
+          "tableTo": "money_accounts",
           "columnsTo": ["id", "actor_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "spendings_debited_of_account_currency": {
           "name": "spendings_debited_of_account_currency",
           "tableFrom": "spendings",
-          "tableTo": "money_accounts",
           "columnsFrom": ["account_id", "actor_id", "debited_currency"],
+          "tableTo": "money_accounts",
           "columnsTo": ["id", "actor_id", "currency"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3347,9 +3052,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "trips_actor_finished_idx": {
           "name": "trips_actor_finished_idx",
@@ -3362,22 +3067,22 @@
             },
             {
               "expression": "coalesce(\"finished_on_device_at\", \"finished_at\") desc",
-              "asc": true,
               "isExpression": true,
+              "asc": true,
               "nulls": "last"
             },
             {
               "expression": "\"id\" desc",
-              "asc": true,
               "isExpression": true,
+              "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": false,
-          "where": "\"trips\".\"finished_at\" is not null",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"trips\".\"finished_at\" is not null",
+          "concurrently": false
         },
         "trips_place_idx": {
           "name": "trips_place_idx",
@@ -3390,47 +3095,47 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "trips_actor_id_actors_id_fk": {
           "name": "trips_actor_id_actors_id_fk",
           "tableFrom": "trips",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "trips_place_id_places_id_fk": {
           "name": "trips_place_id_places_id_fk",
           "tableFrom": "trips",
-          "tableTo": "places",
           "columnsFrom": ["place_id"],
+          "tableTo": "places",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "trips_account_is_owners": {
           "name": "trips_account_is_owners",
           "tableFrom": "trips",
-          "tableTo": "money_accounts",
           "columnsFrom": ["account_id", "actor_id"],
+          "tableTo": "money_accounts",
           "columnsTo": ["id", "actor_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "trips_debited_of_account_currency": {
           "name": "trips_debited_of_account_currency",
           "tableFrom": "trips",
-          "tableTo": "money_accounts",
           "columnsFrom": ["account_id", "actor_id", "debited_currency"],
+          "tableTo": "money_accounts",
           "columnsTo": ["id", "actor_id", "currency"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3615,46 +3320,46 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "verdicts_actor_id_actors_id_fk": {
           "name": "verdicts_actor_id_actors_id_fk",
           "tableFrom": "verdicts",
-          "tableTo": "actors",
           "columnsFrom": ["actor_id"],
+          "tableTo": "actors",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "verdicts_place_id_places_id_fk": {
           "name": "verdicts_place_id_places_id_fk",
           "tableFrom": "verdicts",
-          "tableTo": "places",
           "columnsFrom": ["place_id"],
+          "tableTo": "places",
           "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "verdicts_item_id_kind_fk": {
           "name": "verdicts_item_id_kind_fk",
           "tableFrom": "verdicts",
-          "tableTo": "items",
           "columnsFrom": ["item_id", "item_kind"],
+          "tableTo": "items",
           "columnsTo": ["id", "kind"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "verdicts_actor_item_place_key": {
           "name": "verdicts_actor_item_place_key",
-          "nullsNotDistinct": true,
-          "columns": ["actor_id", "item_id", "place_id"]
+          "columns": ["actor_id", "item_id", "place_id"],
+          "nullsNotDistinct": true
         }
       },
       "policies": {},
@@ -3685,10 +3390,10 @@
   },
   "enums": {},
   "schemas": {},
+  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
-  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

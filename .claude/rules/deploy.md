@@ -8,6 +8,7 @@ paths:
   - 'backend/drizzle/**'
   - 'backend/src/db/migrate*.ts'
   - 'backend/src/routes/health.ts'
+  - 'bot/src/pulse.ts'
   - '.env.prod.example'
 ---
 
@@ -23,6 +24,16 @@ The shape worth knowing here:
   carries three more files, `dist/forget.js` — the owner's fallback for erasure (MOL-58) —,
   `dist/seed-catalogue.js` (MOL-112) and `dist/gates.js` (MOL-91), since the machine has neither
   the source nor a published database port.
+  **One module beside the file, and the model** (MOL-105, owner's decision В-1): onnxruntime's
+  native library cannot be bundled, so `bin/bundle.mjs` leaves `onnxruntime-node` out and the image
+  copies it — its JavaScript, `onnxruntime-common`, and the native build of the image's machine
+  only, 45 MB of 288 — into `node_modules`; the model, fetched and checked by sha256 in the build,
+  into `model/`. The runtime is `node:22-bookworm-slim`, since that build is for glibc. The image is
+  some 520 MB, the API's memory some 460 MB with the model loaded.
+  **Names survive the bundle** (`keepNames`, MOL-142): node-fetch under grammY takes a signal only
+  from a constructor called `AbortSignal`, and the bot's first use of the global one had esbuild
+  rename abort-controller's class — every call to Telegram failed in production, every unbundled
+  test passed. `bot/src/bundle.test.ts` builds the bot and checks the name.
 - **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
   exists only for trying the stack on a laptop, where Docker Desktop has no journald.
 - **The database is copied every night, encrypted, off the machine** (MOL-70): `pg_dump` inside the
@@ -38,6 +49,12 @@ The shape worth knowing here:
   the code deployed against it is the worse of the two failures. `make migrate`, the test
   setup and the boot path all go through the same code, so a migration cannot behave one
   way locally and another in production.
+- **Every migration of the journal is applied, or the boot stops** (MOL-105, adversarial Б).
+  drizzle runs a migration only if its stamp is later than the last applied: two branches whose
+  stamps lie in another order than they merge in, and the second is skipped while the log says
+  «migrated». `stampsOutOfOrder` holds the journal in order in a test, and after every chain —
+  boot, `make migrate`, the tests' setup — `assertEveryMigrationApplied` finds each entry's row by
+  its stamp. A migration renumbered behind another branch's is stamped anew before its merge.
 - **A merged migration is never rewritten.** drizzle decides what to run by the journal's
   `created_at` alone and never compares a file with what was applied: a rewritten migration is
   skipped silently if its stamp is older, and fails on its first `CREATE` if newer — then the
@@ -53,6 +70,27 @@ The shape worth knowing here:
   three databases with the very statement the file now carries. After the merge the file is
   frozen and a change to the schema is a new migration, always.
 
+- **The Postgres image is an exact tag, and part of the contract** (MOL-105):
+  `pgvector/pgvector:0.8.7-pg17-bookworm` in both compose files, both CI services and the drill of
+  `restore.sh`. It carries ICU, which «Что брать» sorts by (MOL-31), `vector`, which the embeddings
+  need, and glibc, by whose rules every text index is built. A text index built under one libc
+  answers wrongly under another and says nothing, so the move off `postgres:17-alpine` came with
+  migration `0038_pgvector` that rebuilds every index whose key is text or an expression and gives
+  the ICU collations the new version; a later tag that moves glibc or ICU comes with the same.
+  On a volume moved off alpine the database's own collation stays without a version — Postgres
+  refuses a change from none to one; a database created under glibc records it and is warned on.
+  **The move is done with writes stopped** (adversarial А, В): the new image under an API that has
+  not run the migration, or a deploy rolled back after it failed, leaves musl's indexes answering
+  under glibc in silence. **After a rollback the database says whether the migration ran, never the
+  rollback** (round 2, Г): `vector` is there or not. Alpine comes back only if it is not — back over
+  indexes glibc built, the same corruption the other way round, and the migration, recorded as
+  applied, would never run again — **and comes back rebuilt** (round 3, Ж): the old API the rollback
+  brought up writes by glibc's rules into musl's indexes until it is stopped, so the database alone
+  goes up on alpine, `deploy/window-duplicates.sql` settles what the window wrote twice — search
+  picks merged as their upsert merges, a login code dropped, a pair of places named for the hand
+  (round 5, З) — and `deploy/reindex-text.sql` rebuilds every text index before the API starts.
+  Procedure: `deploy/README.md`, «The Postgres image is part of the
+  contract».
 - **Postgres publishes no port.** It is reachable only over the compose network.
 - **The PWA calls `/api/...`** and Caddy strips the prefix — the same shape the Vite dev
   proxy has, so nothing about the origin differs between development and production.
@@ -79,6 +117,33 @@ The shape worth knowing here:
   a form the copied grammar missed each time. `v0.2.0`
   starts the 0.2 cohort. **`/api/health` names the build** — `git describe --long`,
   `v0.1.1-3-g1a2b3c4`.
+- **Production is watched from outside, never from the machine (MOL-142; MOL-149, В-4).** A watch on
+  the same machine does not notice the machine is down. `.github/workflows/watch.yml` asks every
+  five minutes for `/api/health` and the page and pings the healthchecks.io check `molvia-up` — or
+  its `/fail`, saying what; the certificate's term goes to a check of its own, `molvia-cert`; the
+  bot pings `molvia-bot`. The alarm is healthchecks.io's own Telegram integration, never our bot,
+  which lies down with the machine. **`/health` is `503` whenever it is not `ok`**, with the same
+  body: a 200 saying «degraded» is a database down that a watch reading the status never sees. The
+  rollout reads the body and is unchanged by it.
+  - **A `/fail` is three failures in four tries half a minute apart**: it raises the alarm with no
+    grace, and every merge leaves the API silent for seconds — a rollout fails one or two. All four
+    had to fail at first, and a site failing three requests in four passed as well (adversarial
+    Б1). Failing every second request still passes: the share of 5xx is MOL-145's, a named price.
+  - **One check, one state that can last.** healthchecks.io speaks only when a check flips, and a
+    certificate «expiring in 13 days» is down for days: on `molvia-up` it kept a fall of the API
+    silent the whole time (Б2). An unreadable certificate is the site's matter and pings nothing.
+  - **A run is red only when it could not report**, or GitHub's e-mail would come on top of
+    Telegram.
+  - **A check that never got a ping never raises an alarm** — it stays «new» (В1). So
+    `BOT_PULSE_URL` is required in `.env.prod` (`${…?}` in compose) and only empty on purpose, and
+    a check set up is seen turning green.
+  - **The bot is not in `/health`**: after a rollout the API knows nothing of it for a minute, and
+    the rollout would roll back. What its pulse proves is in `bot.md`.
+  - The periods sit a little above the pings' rhythm, so «late» does not light the panel all day;
+    period plus grace is the time to an alarm. Every ping URL is kept like a secret — whoever has
+    one can say «alive» — and printed nowhere. The prices, accepted by the owner: a fall is noticed
+    within twenty minutes, not five, since GitHub's cron runs late; GitHub down is a false alarm.
+    `deploy/README.md`, «Signals».
 - **A failed deploy puts the previous image back, not the schema.** Pending migrations run in
   one transaction, so a migration that fails leaves the schema as it was and the old image
   finds what it knew. One that succeeded while something else failed stays applied, and the

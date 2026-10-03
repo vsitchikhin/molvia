@@ -18,10 +18,12 @@
     "test:attack": "vitest run -c vitest.attack.config.ts"
   },
   "dependencies": {
+    "@huggingface/tokenizers": "0.2.0",
     "@molvia/model": "*",
     "drizzle-orm": "^0.45.3",
     "exceljs": "^4.4.0",
     "fastify": "^5.12.5",
+    "onnxruntime-node": "1.30.0",
     "postgres": "^3.4.9",
     "zod": "^4.6.5"
   },

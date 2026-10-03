@@ -6,6 +6,11 @@ import type { Dictionary } from '@/i18n/ru'
 
 export type MessageKey = keyof Dictionary
 
+/** Whether the dictionary holds a key made at run time — a city's case, say. */
+export function hasMessage(key: string): key is MessageKey {
+  return Object.hasOwn(ru, key)
+}
+
 const DICTIONARIES: Readonly<Record<AppLocale, Dictionary>> = { ru, en }
 
 /**

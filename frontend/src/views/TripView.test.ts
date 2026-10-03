@@ -681,6 +681,52 @@ describe('TripView', () => {
       expect(queue.elsewhere).toBeNull()
     })
 
+    it('MOL-120, Б1: одно имя в двух городах — другой магазин, оба названы с городом', async () => {
+      // Вчера в Гюмри открыта запись в «Ереван Сити»; сегодня в Ереване начата запись в «Ереван
+      // Сити». Индекс мест берёт город: это два магазина, и перенос цен говорится словами.
+      const open = trip([], { id: 'bbbbbbbb-0000-4000-8000-000000000037' })
+      currentTrip.mockResolvedValue(null)
+      startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_OPEN, undefined, true))
+      const { view, queue } = await render()
+      currentTrip.mockResolvedValue({
+        ...open,
+        place: { ...open.place, name: 'Ереван Сити' },
+        placeCity: 'Гюмри',
+      })
+      queue.enqueue({
+        kind: 'start',
+        tripId: 'bbbbbbbb-0000-4000-8000-000000000038',
+        place: { kind: 'store', name: 'Ереван Сити' },
+        context: { country: 'AM', city: 'Ереван', spendCurrency: 'AMD', incomeCurrency: 'RUB' },
+        startedAt: new Date(),
+      })
+      await flushPromises()
+
+      expect(view.text()).toContain('Уже открыта запись в «Ереван Сити» в Гюмри')
+      expect(view.text()).toContain('Покупки новой записи («Ереван Сити» в Ереване)')
+      expect(view.text()).toContain('цены одного магазина нельзя записывать другому')
+    })
+
+    it('MOL-120, Б1: тот же город в другом написании — тот же магазин; без города — по имени', async () => {
+      currentTrip.mockResolvedValue(null)
+      const { view } = await render()
+      const body = (
+        view.findComponent(TripNotices).vm as unknown as { elsewhereBody: (a: unknown) => string }
+      ).elsewhereBody
+      const warning = 'цены одного магазина нельзя записывать другому'
+      const asked = { tripId: TRIP, place: 'Ереван Сити', mine: 'Ереван Сити' }
+
+      // A place keeps its city as first written: «гюмри» is Gyumri.
+      expect(body({ ...asked, placeCity: 'гюмри', mineCity: 'Гюмри' })).not.toContain(warning)
+      // A server before MOL-120, or a start the old queue kept without a context: as before.
+      expect(body({ ...asked, mineCity: 'Ереван' })).not.toContain(warning)
+      expect(body({ ...asked, placeCity: 'Гюмри' })).not.toContain(warning)
+      // Different names: another shop, and the city is noise.
+      expect(body({ ...asked, mine: 'SAS', placeCity: 'Гюмри', mineCity: 'Ереван' })).toContain(
+        'Покупки новой записи («SAS»)',
+      )
+    })
+
     it('тот же вопрос, заданный заново, не теряет ответ из уже открытой шторки', async () => {
       const open = trip([], { id: 'bbbbbbbb-0000-4000-8000-000000000033' })
       currentTrip.mockResolvedValue(null)

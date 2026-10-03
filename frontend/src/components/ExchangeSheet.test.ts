@@ -74,7 +74,7 @@ function overview(patch: Partial<ExchangesResponse> = {}): ExchangesResponse {
     receipts: receiptsOf(exchanges),
     marketToday: [],
     losses: null,
-    rateChart: null,
+    rateCharts: null,
     ...patch,
     exchanges,
   }

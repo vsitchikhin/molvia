@@ -89,11 +89,16 @@ export function verdictCardOf(verdict: Verdict): VerdictCard {
  * purchase: a product has one verdict per person, so three purchases of the milk are one
  * question, asked with the place and the day of the latest, the one best remembered. No price,
  * no expense id: the screen has neither, and the two streams stay apart.
+ *
+ * `placeCity` tells «Ереван Сити» of Gyumri from the one of Yerevan, where both wait (MOL-120,
+ * `cityWhereNameRepeats`). Optional, though the server always sends it: an answer of a server
+ * before it, and a card the phone kept from one — the remembered queue, a draft — must still read.
  */
 export const pendingVerdictSchema = z.strictObject({
   itemId: z.uuid(),
   name: itemSchema.shape.name,
   placeName: placeSchema.shape.name,
+  placeCity: placeSchema.shape.city.optional(),
   boughtAt: z.date(),
 })
 export type PendingVerdict = z.infer<typeof pendingVerdictSchema>

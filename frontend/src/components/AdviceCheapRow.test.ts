@@ -62,6 +62,16 @@ describe('AdviceCheapRow', () => {
     expect(plain(render([sas, market], null).get('.second').text())).toBe('Дешевле всего: SAS')
   })
 
+  it('MOL-120: the place named is told from a namesake of another city on the row', () => {
+    const gyumri = { ...place('SAS', 320_000_000_000n), city: 'Гюмри' }
+    const yerevan = { ...place('sas', 335_000_000_000n), city: 'Ереван' }
+
+    expect(plain(render([gyumri, yerevan], null).get('.second').text())).toBe(
+      'Дешевле всего: SAS в Гюмри',
+    )
+    expect(plain(render([gyumri], null).get('.second').text())).toBe('Брали здесь: SAS')
+  })
+
   it('neither a threshold nor a place: the name and the rating, and no empty line', () => {
     const view = render([], null)
 
