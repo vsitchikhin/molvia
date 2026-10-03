@@ -448,10 +448,10 @@ export default defineComponent({
 }
 
 .title {
+  @include display-type;
+
   margin: 0;
-  font-family: var(--font-display);
   font-size: var(--text-title);
-  font-weight: var(--weight-bold);
   line-height: var(--leading-snug);
 }
 

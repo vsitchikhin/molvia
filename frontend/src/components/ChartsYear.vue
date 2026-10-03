@@ -686,7 +686,7 @@ export default defineComponent({
   width: 10px;
   height: 10px;
   margin-left: var(--space-2);
-  border-radius: 2px;
+  border-radius: var(--radius-mark);
 
   &.outline {
     box-shadow: inset 0 0 0 2px var(--text-muted);
@@ -712,11 +712,11 @@ export default defineComponent({
 }
 
 .figure {
+  @include display-type;
+
   display: block;
   margin: 0;
-  font-family: var(--font-display);
   font-size: var(--text-figure);
-  font-weight: 800;
   font-variant-numeric: tabular-nums;
 
   &.small {

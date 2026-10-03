@@ -10,7 +10,7 @@ export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   test: {
     name: 'frontend',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'stylelint/**/*.test.ts'],
     environment: 'happy-dom',
     // The zone CI runs in, on every machine (MOL-82, review Т-1): a day of Yerevan printed in the
     // phone's zone came out right at UTC+4 and a day early in UTC, so the bug was green locally and

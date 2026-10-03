@@ -776,6 +776,8 @@ export default defineComponent({
 }
 
 .entry {
+  @include display-type;
+
   flex: 1;
   width: 0;
   min-width: 0;
@@ -783,19 +785,17 @@ export default defineComponent({
   border: 0;
   background: transparent;
   color: var(--text);
-  font-family: var(--font-display);
   font-size: var(--text-entry);
-  font-weight: 800;
   font-variant-numeric: tabular-nums;
   outline: none;
 }
 
 .sign {
+  @include display-type;
+
   flex: none;
   color: var(--text-muted);
-  font-family: var(--font-display);
   font-size: var(--text-entry-sign);
-  font-weight: 800;
 }
 
 .error {
@@ -856,10 +856,10 @@ export default defineComponent({
 }
 
 .figure {
+  @include display-type;
+
   margin: 0;
-  font-family: var(--font-display);
   font-size: var(--text-figure);
-  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
@@ -894,9 +894,9 @@ export default defineComponent({
 }
 
 .difference-figure {
-  font-family: var(--font-display);
+  @include display-type;
+
   font-size: var(--text-figure);
-  font-weight: 800;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

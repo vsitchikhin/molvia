@@ -350,7 +350,7 @@ export default defineComponent({
 
   &.solid {
     height: 3px;
-    border-radius: 2px;
+    border-radius: var(--radius-mark);
     background: var(--accent);
   }
 
@@ -373,10 +373,10 @@ export default defineComponent({
 }
 
 .figure {
+  @include display-type;
+
   margin: 0;
-  font-family: var(--font-display);
   font-size: var(--text-title);
-  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 

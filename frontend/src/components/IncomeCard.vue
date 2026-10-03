@@ -137,9 +137,9 @@ export default defineComponent({
 }
 
 .amount {
-  font-family: var(--font-display);
+  @include display-type;
+
   font-size: var(--text-card-figure);
-  font-weight: 800;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

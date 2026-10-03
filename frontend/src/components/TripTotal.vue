@@ -349,10 +349,10 @@ export default defineComponent({
 }
 
 .sum {
+  @include display-type;
+
   margin: 0;
-  font-family: var(--font-display);
   font-size: var(--text-figure);
-  font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
   font-variant-numeric: tabular-nums;
 }

@@ -6,5 +6,5 @@
     "jsx": "preserve",
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src/**/*.ts", "src/**/*.vue", "*.config.ts", "env.d.ts"]
+  "include": ["src/**/*.ts", "src/**/*.vue", "stylelint/**/*.ts", "*.config.ts", "env.d.ts"]
 }
