@@ -138,7 +138,7 @@ export function failureReports(environment: FailureEnvironment): FailureReports 
     return sending
   }
 
-  function report(error: unknown, catcher: PhoneCatcher): void {
+  function take(error: unknown, catcher: PhoneCatcher): void {
     if (!phoneDefect(error)) return
     const summary = describePhoneFailure(error, environment.origin)
     const frames = summary.frames ?? []
@@ -164,7 +164,17 @@ export function failureReports(environment: FailureEnvironment): FailureReports 
     void flush()
   }
 
-  return { report, flush }
+  return {
+    // It stands first in a screen's catch: a report that threw would leave the screen loading.
+    report(error, catcher) {
+      try {
+        take(error, catcher)
+      } catch {
+        // Nothing to do: a failure that cannot be described is not worth the screen.
+      }
+    },
+    flush,
+  }
 }
 
 let installed: FailureReports | null = null

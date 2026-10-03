@@ -165,6 +165,21 @@ describe('что уходит и что нет (MOL-144)', () => {
   })
 })
 
+describe('отчёт не ломает catch, в котором стоит', () => {
+  it('сбой самого отчёта — тишина, а не исключение в ветке экрана', () => {
+    const reports = failureReports({
+      ...environment(sending),
+      screen: () => {
+        throw new Error('no router yet')
+      },
+    })
+    expect(() => {
+      reports.report(thrown('x'), 'screen')
+    }).not.toThrow()
+    expect(sending).not.toHaveBeenCalled()
+  })
+})
+
 describe('сбой ли это телефона (Р-4, В-3)', () => {
   it.each([
     ['отказ API своим словом', new ApiError(ERROR.NOT_FOUND), false],
