@@ -1,10 +1,10 @@
 import { existsSync } from 'node:fs'
+import { describeFailure } from '@molvia/model'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { Tokenizer } from '@huggingface/tokenizers'
 import type { InferenceSession, Tensor } from 'onnxruntime-node'
-import { describeFailure } from '@/db/failure'
 import spec from './model.json'
 
 /**

@@ -13,6 +13,7 @@ import {
   VERSION_HEADER,
   errorResponseSchema,
   isWireCode,
+  describeFailure,
 } from '@molvia/model'
 import type { ErrorCode, ErrorResponse } from '@molvia/model'
 import { InvalidBody } from '@/parse'
@@ -140,7 +141,6 @@ import { createSessionRepository } from '@/db/sessions-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
 import { createExportRepository } from '@/db/export-repository'
 import { createReminderRepository } from '@/db/reminders-repository'
-import { describeFailure } from '@/db/failure'
 import { authTransactOn } from '@/db/auth-unit-of-work'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'

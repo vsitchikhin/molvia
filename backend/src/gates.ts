@@ -6,6 +6,7 @@ import {
   LOGIN_SECOND_WAY_PERCENT,
   yerevanDate,
   yerevanMidnight,
+  describeFailure,
 } from '@molvia/model'
 import type {
   GatesReader,
@@ -14,7 +15,6 @@ import type {
   LoginsInWindow,
   RemindersInWindow,
 } from '@/db/gates-reader'
-import { describeFailure } from '@/db/failure'
 
 export const GATES_USAGE =
   'usage: gates --from <when> [--to <when>]   when: a day YYYY-MM-DD in Yerevan (--to takes the day in), or an ISO 8601 moment with an offset'

@@ -1,6 +1,5 @@
-import { telegramUserIdSchema } from '@molvia/model'
+import { telegramUserIdSchema, describeFailure } from '@molvia/model'
 import type { ErasureReport, ErasureRepository } from '@/db/erasure-repository'
-import { describeFailure } from '@/db/failure'
 import { ERASED_TABLES } from '@/db/erasure-repository'
 
 export const FORGET_USAGE = 'usage: forget <telegram-user-id> [--yes]'
