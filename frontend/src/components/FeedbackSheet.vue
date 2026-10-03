@@ -156,6 +156,30 @@ const PLACEHOLDER_KEYS: Record<FeedbackKind | '', string> = {
 }
 
 /**
+ * A reply of `2xx` whose body did not read — cut off on its way, or the shape of a newer server: the
+ * message is written, and is sent as far as the sheet is concerned, as a proposed item is (round 3,
+ * Ф1). Read as a failure, a retry from another screen met `409` and the owner got it twice.
+ */
+function writtenAnyway(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.status !== undefined &&
+    error.status >= 200 &&
+    error.status < 300
+  )
+}
+
+/** A refusal in the API's own body, not its failure: nothing was written. */
+function refusedOutright(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.answered &&
+    error.status === undefined &&
+    error.code !== ERROR.INTERNAL
+  )
+}
+
+/**
  * - `limited` — the day's ten are sent (`429`): held while the sheet is open, since the window is
  *   the server's rolling day and the phone cannot know when it frees; the next opening asks again.
  * - `failed` — no answer, or one that is not a write: the text stays, and «Повторить» sends the same
@@ -373,7 +397,11 @@ export default defineComponent({
       keep()
       phase.value = 'sending'
       try {
-        await api.sendFeedback(message)
+        try {
+          await api.sendFeedback(message)
+        } catch (error) {
+          if (!writtenAnyway(error)) throw error
+        }
         // Sent is sent, whatever became of the sheet meanwhile: the draft goes with it — unless it
         // has changed since, and is another message now.
         dropFeedbackDraft(owner, message.clientKey)
@@ -386,8 +414,8 @@ export default defineComponent({
         // A refusal in the API's own words is a write that did not happen — every write is one
         // transaction — so nothing has left, and what goes with the text is the next opening's again:
         // tomorrow's message from the settings must not carry today's error screen (adversarial Н2).
-        // Only a lost answer or a bare status may hide a message the server holds.
-        if (error instanceof ApiError && error.answered) {
+        // A lost answer, a bare status or the server's own failure may hide a message it holds.
+        if (refusedOutright(error)) {
           frozen.value = null
           keep()
         }

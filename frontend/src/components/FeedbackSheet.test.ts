@@ -3,7 +3,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
-import { ERROR, FEEDBACK_TEXT_MAX } from '@molvia/model'
+import { ERROR, FEEDBACK_TEXT_MAX, ISSUE } from '@molvia/model'
 import type { FeedbackBody, FeedbackSent } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
@@ -504,6 +504,29 @@ describe("a refusal in the API's own words: nothing left (adversarial Н2)", () 
       fromError: false,
       errorCode: null,
     })
+  })
+
+  it('takes a 2xx whose body did not read for sent: the message is written (round 3, Ф1)', async () => {
+    sendFeedback.mockRejectedValueOnce(new ApiError(ISSUE.RESPONSE_INVALID, 'number', true, 201))
+    const { wrapper } = await render('/money')
+    const sheet = await open(wrapper, { from: 'error', code: 'error.internal' })
+    await type(sheet, 'The month did not load')
+
+    await press(sheet)
+
+    expect(sheet.find('.sent').exists()).toBe(true)
+    expect(recallFeedbackDraft(OWNER)).toBeNull()
+  })
+
+  it('must not let go after the server failing in its own words: it may be written', async () => {
+    sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+    const { wrapper } = await render('/money')
+    const sheet = await open(wrapper, { from: 'error', code: 'error.internal' })
+    await type(sheet, 'The month did not load')
+
+    await press(sheet)
+
+    expect(recallFeedbackDraft(OWNER)?.attached).toMatchObject({ route: 'money' })
   })
 
   it("must not let go after an answer that never came: it may be the server's already", async () => {

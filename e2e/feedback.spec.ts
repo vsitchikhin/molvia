@@ -143,6 +143,29 @@ test('a lost answer, opened again: the same message once, not a conflict and a s
   ])
 })
 
+// Written and answered 201, the body cut off on its way: the message is the server's, so the sheet
+// says it is sent — read as a failure, a retry from another screen met 409 and a second one (round 3, Ф1).
+test('a 201 whose body was cut off is sent, once', async ({ page }) => {
+  await signedIn(page, '/settings')
+  await page.getByRole('button', { name: 'Написать разработчику' }).click()
+  const sheet = await opened(page)
+  await sheet.getByText('Идея', { exact: true }).click()
+  await sheet.getByLabel('Сообщение').fill('Список своих магазинов')
+  await page.route(
+    '**/api/feedback',
+    async (route) => {
+      const response = await route.fetch()
+      await route.fulfill({ response, body: '{"numb' })
+    },
+    { times: 1 },
+  )
+
+  await sheet.getByRole('button', { name: 'Отправить' }).click()
+
+  await expect(sheet.getByText('Спасибо, прочитаем', { exact: true })).toBeVisible()
+  expect(await written(page)).toHaveLength(1)
+})
+
 // Opened from a link on the screen rather than from one of its own rows, the sheet still takes one
 // entry of the history: «back» puts it away and leaves the error screen where it was (сверка С-11).
 test('«back» after «Сообщить о проблеме» puts the sheet away, not the screen', async ({ page }) => {
