@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref, shallowRef, watch, type VNodeArrayChildren } from 'vue'
 import IconPlus from '~icons/mdi/plus'
@@ -10,7 +11,16 @@ import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import ScreenState from '@/components/ScreenState.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
+import type * as Api from '@/api'
 import { pwaUpdateKey, type UpdatePhase } from '@/pwaUpdate'
+import { useActorStore } from '@/stores/actor'
+import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
+
+const refusal = vi.hoisted(() => ({ code: null as string | null }))
+vi.mock('@/api', async (actual) => ({
+  ...(await actual<typeof Api>()),
+  lastRefusal: () => refusal.code,
+}))
 
 type Props = Record<string, unknown>
 
@@ -408,6 +418,116 @@ describe('ScreenState', () => {
     it('must not offer it anywhere but an error', () => {
       const { view } = waiting('ready', { kind: 'offline', tone: 'warn' })
       expect(view.find('.action').exists()).toBe(false)
+    })
+  })
+
+  describe('«Сообщить о проблеме» (MOL-147, Р-5)', () => {
+    beforeEach(() => {
+      setActivePinia(createPinia())
+      useActorStore().state = 'ready'
+      refusal.code = null
+    })
+
+    afterEach(() => {
+      setActivePinia(undefined)
+      document.body.innerHTML = ''
+    })
+
+    const report = (view: ReturnType<typeof render>) =>
+      view.findAll('.action button').find((button) => button.text() === en.state.report)
+
+    it('comes last and quietest, under «Повторить»', () => {
+      const buttons = render({ kind: 'error' }).findAll('.action button')
+
+      expect(buttons.map((button) => button.text())).toEqual([en.state.retry, en.state.report])
+      expect(buttons[1]?.classes()).toContain('ghost')
+      expect(buttons[1]?.attributes('aria-haspopup')).toBe('dialog')
+    })
+
+    it("comes after the screen's own action too", () => {
+      const view = render({ kind: 'error' }, { action: () => h('button', 'Recent') })
+
+      expect(view.findAll('.action button').map((button) => button.text())).toEqual([
+        en.state.retry,
+        'Recent',
+        en.state.report,
+      ])
+    })
+
+    it('comes third while a version waits: «Обновить», «Повторить», then the link', () => {
+      const update = { phase: shallowRef('ready'), apply: vi.fn(), serverVersion: vi.fn() }
+      const view = mount(ScreenState, {
+        props: { title: 'Title', kind: 'error' },
+        global: { plugins: [createAppI18n('ru')], provide: { [pwaUpdateKey as symbol]: update } },
+      })
+
+      expect(view.findAll('.action button').map((button) => button.text())).toEqual([
+        'Обновить',
+        'Повторить',
+        ru.state.report,
+      ])
+    })
+
+    it('opens the sheet on «Сломалось» with the code of the last refusal', async () => {
+      refusal.code = 'error.internal'
+      const sheet = useFeedbackSheetStore()
+
+      await report(render({ kind: 'error' }))?.trigger('click')
+
+      expect(sheet.shown).toBe(true)
+      expect(sheet.entry).toEqual({ from: 'error', code: 'error.internal' })
+      expect(render({ kind: 'error' }).emitted('retry')).toBeUndefined()
+    })
+
+    it('opens it without a code when no refusal is fresh', async () => {
+      const sheet = useFeedbackSheetStore()
+
+      await report(render({ kind: 'error' }))?.trigger('click')
+
+      expect(sheet.entry).toEqual({ from: 'error', code: null })
+    })
+
+    it.each([
+      ['offline: the connection broke, not the app', { kind: 'offline', tone: 'warn' }],
+      ['empty', { kind: 'empty', tone: 'accent' }],
+      ['attention', { kind: 'attention' }],
+      [
+        'an inline error: a section failed, the screen works (сверка С-1)',
+        { kind: 'error', inline: true },
+      ],
+    ])('must not be drawn for %s', (_, props) => {
+      expect(report(render(props))).toBeUndefined()
+    })
+
+    it.each(['idle', 'loading', 'offline', 'error', 'signed-out'] as const)(
+      "must not be drawn for nobody known (%s) — the login's own errors among them",
+      (state) => {
+        useActorStore().state = state
+        expect(report(render({ kind: 'error' }))).toBeUndefined()
+      },
+    )
+
+    it('must not be drawn inside a sheet: a sheet over a sheet the history does not hold', async () => {
+      const dialog = document.createElement('dialog')
+      document.body.append(dialog)
+      const view = mount(ScreenState, {
+        props: { title: 'Title', kind: 'error' },
+        attachTo: dialog,
+        global: { plugins: [createAppI18n('en')] },
+      })
+      // Known once it stands in the page, and gone before the frame is painted.
+      await nextTick()
+
+      expect(report(view)).toBeUndefined()
+      expect(view.findAll('.action button').map((button) => button.text())).toEqual([
+        en.state.retry,
+      ])
+      view.unmount()
+    })
+
+    it("must not be drawn without the app's stores: the block on its own", () => {
+      setActivePinia(undefined)
+      expect(report(render({ kind: 'error' }))).toBeUndefined()
     })
   })
 
