@@ -536,6 +536,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
               },
               'receipt read',
             )
+          } else if (event.kind === 'reader_dropped') {
+            // every time: a photo that fells the reader is what this line is there to show
+            instance.log.warn({ reason: event.reason }, 'receipt reader dropped a photo')
           } else if (event.kind === 'strips_failed') {
             instance.log.warn({ reason: event.reason }, 'receipt lines not cut out')
           } else {

@@ -23,8 +23,8 @@ export type ReaderReading = z.infer<typeof readingSchema>
 const stripsSchema = z.object({ strips: z.array(z.base64()) })
 
 /**
- * The reader could not be reached, or failed for a reason of its own (MOL-125): the receipt is not
- * at fault and waits in the queue for it to come back.
+ * The reader could not be reached — refused, not resolved, not there (MOL-125): the receipt is not at
+ * fault and waits in the queue, its attempt uncounted, for the reader to come back.
  */
 export class ReaderUnavailable extends Error {
   constructor(readonly reason: string) {
@@ -40,6 +40,37 @@ export class PhotoUnreadable extends Error {
   constructor(readonly reason: string) {
     super(`receipt photo unreadable: ${reason}`)
   }
+}
+
+/**
+ * The reader was reached and then lost on this photo — the connection dropped with no answer, the
+ * answer cut off, our own time out (review, MOL-125). It may be the reader that fell, or the photo
+ * that felled it, and only a second try tells: the attempt is counted and the receipt goes to the end
+ * of the queue, so a photo that takes the reader down every time neither holds the others nor is read
+ * forever (`RECEIPT_READ_ATTEMPTS`).
+ */
+export class ReaderDropped extends Error {
+  constructor(readonly reason: string) {
+    super(`receipt reader dropped the photo: ${reason}`)
+  }
+}
+
+// What `fetch` says when nothing answered at all: the reader is not there.
+const NEVER_REACHED = new Set([
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+])
+
+function codesOf(error: unknown): string[] {
+  if (typeof error !== 'object' || error === null) return []
+  const cause = 'cause' in error ? error.cause : undefined
+  const own = 'code' in error && typeof error.code === 'string' ? [error.code] : []
+  const inner =
+    'errors' in error && Array.isArray(error.errors) ? error.errors.flatMap(codesOf) : []
+  return [...own, ...inner, ...(cause === undefined ? [] : codesOf(cause))]
 }
 
 export interface ReceiptReader {
@@ -63,22 +94,28 @@ export function receiptReader(url: string): ReceiptReader {
         signal: AbortSignal.timeout(timeoutMs),
       })
     } catch (error) {
-      // our own timeout on a photo the reader is still chewing on is the photo's: the reader
-      // gives up on its own a little before, and says so with a 504
-      if (error instanceof DOMException && error.name === 'TimeoutError') {
-        throw new PhotoUnreadable('timeout')
+      if (codesOf(error).some((code) => NEVER_REACHED.has(code))) {
+        throw new ReaderUnavailable('unreachable')
       }
-      throw new ReaderUnavailable('unreachable')
+      // the reader gives up on Tesseract itself before this and says so with a 504: past our time
+      // it is the reader that hangs, or the photo that hung it
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new ReaderDropped('timeout')
+      }
+      throw new ReaderDropped('dropped')
     }
-    // 422: the photo did not open; 504: Tesseract ran out of its time on it
-    if (answer.status === 422 || answer.status === 504) {
-      throw new PhotoUnreadable(answer.status === 504 ? 'timeout' : 'unreadable')
+    // 422: the photo did not open; 504: Tesseract ran out of its time on it; 500: the reader broke
+    // on it and said so
+    if (answer.status === 422 || answer.status === 504 || answer.status === 500) {
+      throw new PhotoUnreadable(
+        answer.status === 504 ? 'timeout' : answer.status === 500 ? 'failed' : 'unreadable',
+      )
     }
     if (!answer.ok) throw new ReaderUnavailable(`status ${String(answer.status)}`)
     try {
       return await answer.json()
     } catch {
-      throw new ReaderUnavailable('not json')
+      throw new ReaderDropped('cut off')
     }
   }
 

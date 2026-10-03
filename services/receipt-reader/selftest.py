@@ -12,7 +12,6 @@ import json
 import threading
 import urllib.error
 import urllib.request
-from http.server import HTTPServer
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -47,7 +46,7 @@ def post(port, path, body):
 
 
 def main():
-    server = HTTPServer(("127.0.0.1", 0), reader.Handler)
+    server = reader.Server(("127.0.0.1", 0), reader.Handler)
     port = server.server_address[1]
     threading.Thread(target=server.serve_forever, daemon=True).start()
     image = drawn()
@@ -69,6 +68,14 @@ def main():
 
     with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=10) as answer:
         assert json.load(answer)["status"] == "ok"
+
+    # a box of no width, and one off the photo: refused, answered, nothing in the log (review А12)
+    for boxes, code in (("304,0,0,10", 400), ("5000,0,10,10", 422)):
+        try:
+            post(port, f"/strips?boxes={boxes}", image)
+            raise AssertionError(f"strips of {boxes} were cut")
+        except urllib.error.HTTPError as refused:
+            assert refused.code == code, (boxes, refused.code)
 
     try:
         post(port, "/read?langs=hye;rm&psm=4", image)

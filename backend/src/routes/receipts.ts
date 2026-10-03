@@ -60,6 +60,16 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
      */
     scope.put<{ Params: { receiptId: string; part: string } }>(
       '/receipts/:receiptId/parts/:part',
+      {
+        // too large is said by its own code before the body is read (review А7): past the parser's
+        // limit Fastify would answer `issue.body_invalid`, which the phone cannot tell from a bad body
+        onRequest: (request, _reply, done) => {
+          const length = Number(request.headers['content-length'] ?? 0)
+          done(
+            length > RECEIPT_PART_BYTES_MAX ? new DomainError(ERROR.RECEIPT_TOO_LARGE) : undefined,
+          )
+        },
+      },
       async (request, reply) => {
         if (!Buffer.isBuffer(request.body)) throw new DomainError(ERROR.RECEIPT_NOT_PHOTO)
         const receipt = await api.putPart(

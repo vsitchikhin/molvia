@@ -60,10 +60,10 @@ e2e_pwa_port=$(( pwa_port + 1 ))
 # The receipt reader of `make reader` (MOL-125): the API's band, after the fake of Open Food Facts.
 reader_port=$(( api_port + 3 ))
 
-# Все пять портов, которые займёт копия, а не три: против чужого процесса на соседнем
-# порту полоса не помогает, а предупреждение здесь — да.
+# Все шесть портов, которые займёт копия, вместе с читателем чеков: против чужого процесса на
+# соседнем порту полоса не помогает, а предупреждение здесь — да.
 busy=""
-for p in "$api_port" "$pwa_port" "$pg_port" "$e2e_api_port" "$e2e_pwa_port"; do
+for p in "$api_port" "$pwa_port" "$pg_port" "$e2e_api_port" "$e2e_pwa_port" "$reader_port"; do
   if lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then busy="$busy $p"; fi
 done
 

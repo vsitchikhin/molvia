@@ -122,6 +122,9 @@ def strips(image, boxes):
             min(picture.width, left + width + STRIP_MARGIN),
             min(picture.height, top + height + STRIP_MARGIN),
         )
+        # a box off the picture cuts nothing, and Pillow cannot write an empty picture
+        if box[2] <= box[0] or box[3] <= box[1]:
+            raise ValueError("box outside the photo")
         buffer = io.BytesIO()
         picture.crop(box).save(buffer, format="PNG", optimize=True)
         out.append(base64.b64encode(buffer.getvalue()).decode())
@@ -134,7 +137,10 @@ def parse_boxes(raw):
         numbers = part.split(",")
         if len(numbers) != 4 or not all(n.isdigit() for n in numbers):
             return None
-        boxes.append([int(n) for n in numbers])
+        left, top, width, height = (int(n) for n in numbers)
+        if width == 0 or height == 0:
+            return None
+        boxes.append([left, top, width, height])
     return boxes if 0 < len(boxes) <= STRIPS_MAX else None
 
 
@@ -185,6 +191,10 @@ class Handler(BaseHTTPRequestHandler):
         except (subprocess.CalledProcessError, OSError, ValueError, Image.DecompressionBombError):
             # the photo could not be read: never its content, only the kind
             self.answer(422, {"error": "unreadable"})
+        except Exception:
+            # anything else broke on this photo: said, never dropped, and nothing of it logged —
+            # a traceback names the photo's place in memory and, worse, sometimes its text
+            self.answer(500, {"error": "failed"})
 
     def log_message(self, format, *args):
         # the request line names no receipt, but the default log would keep it on stderr forever;
@@ -192,8 +202,15 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+class Server(HTTPServer):
+    def handle_error(self, request, client_address):
+        # a connection that broke under a request — the API gave up, or a read ran out — is not
+        # printed: the reader logs nothing at all
+        pass
+
+
 def main():
-    HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+    Server(("0.0.0.0", PORT), Handler).serve_forever()
 
 
 if __name__ == "__main__":

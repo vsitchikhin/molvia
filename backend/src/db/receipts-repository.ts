@@ -93,11 +93,23 @@ export interface ReceiptRepository {
 
   /** At boot: a reading the last process did not finish is begun again, or fails after its attempts. */
   requeueInterrupted(): Promise<void>
-  /** The oldest receipt waiting for the reader, now `reading`; `null` for an empty queue. */
+  /**
+   * The next receipt for the reader, now `reading`; `null` for an empty queue. People in turn, the one
+   * read least in the last hour first (review А10): fifty receipts of one person do not hold
+   * another's behind them.
+   */
   claimNext(): Promise<ClaimedReceipt | null>
   /** Back to the queue, its attempt not counted: the reader was not there, the receipt not at fault. */
   release(id: string): Promise<void>
-  /** The end of a reading. Nothing happens to a receipt no longer `reading` — removed meanwhile. */
+  /**
+   * The reader dropped this photo: its attempt counted, back to the end of the queue — or failed as
+   * `unreadable` once it has had its attempts (`RECEIPT_READ_ATTEMPTS`).
+   */
+  retry(id: string): Promise<void>
+  /**
+   * The end of a reading. Written into a receipt removed meanwhile too — «Вернуть» brings it back
+   * read; nothing happens to one no longer `reading`, or no longer there after the final purge.
+   */
   finish(id: string, outcome: ReadOutcome): Promise<void>
 }
 
@@ -123,7 +135,8 @@ function toSummary({
   lineCount: lines,
   unsettled: off,
 }: SummaryRow): ReceiptSummary {
-  const read = row.readAt !== null
+  // a head is what a reading found; a receipt failed before any reading has none (review А11)
+  const read = [row.tin, row.printedOn, row.printedTime, row.receiptNo].some((v) => v !== null)
   return {
     id: row.id,
     status: row.status,
@@ -209,11 +222,12 @@ export function createReceiptRepository(db: Db): ReceiptRepository {
           if (inserted) return { receipt: await summaryOf(tx, body.id), created: true }
 
           const [held] = await tx.select().from(receipts).where(eq(receipts.id, body.id)).limit(1)
+          // every field the body names, the country too — there will be more than one (MOL-89)
+          const fields = ['parts', 'country', 'language'] as const
           const same =
             held?.actorId === actorId &&
             held.deletedAt === null &&
-            held.parts === body.parts &&
-            held.language === body.language &&
+            fields.every((field) => held[field] === body[field]) &&
             capturedSame(held.capturedAt, body.capturedAt)
           if (!same) throw new DomainError(ERROR.CONFLICT)
           return { receipt: await summaryOf(tx, body.id), created: false }
@@ -369,13 +383,26 @@ export function createReceiptRepository(db: Db): ReceiptRepository {
 
     async claimNext() {
       return db.transaction(async (tx) => {
-        const [next] = await tx
-          .select({ id: receipts.id })
-          .from(receipts)
-          .where(sql`${receipts.status} = 'queued' and ${receipts.deletedAt} is null`)
-          .orderBy(asc(receipts.queuedAt), asc(receipts.id))
-          .limit(1)
-          .for('update', { skipLocked: true })
+        // each person in turn: the one read least in the last hour first, then the oldest receipt —
+        // a person's next receipt waits behind everyone else's first (review А10)
+        const [next] = await tx.execute<{ id: string }>(sql`
+          select waiting.id from ${receipts} waiting
+          where waiting.status = 'queued' and waiting.deleted_at is null
+          order by (
+            select count(*) from ${receipts} served
+            where served.actor_id = waiting.actor_id
+              and served.reading_at > clock_timestamp() - interval '1 hour'
+          ), waiting.queued_at, waiting.id
+          limit 1`)
+        if (next !== undefined) {
+          // one runner reads, so the row is ours; the lock keeps a second process from it all the same
+          const [locked] = await tx
+            .select({ id: receipts.id })
+            .from(receipts)
+            .where(sql`${receipts.id} = ${next.id} and ${receipts.status} = 'queued'`)
+            .for('update', { skipLocked: true })
+          if (locked === undefined) return null
+        }
         if (next === undefined) return null
         const [claimed] = await tx
           .update(receipts)
@@ -400,6 +427,18 @@ export function createReceiptRepository(db: Db): ReceiptRepository {
       await db
         .update(receipts)
         .set({ status: 'queued', attempts: sql`greatest(${receipts.attempts} - 1, 0)` })
+        .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+    },
+
+    async retry(id) {
+      await db
+        .update(receipts)
+        .set({
+          status: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then 'failed' else 'queued' end`,
+          failure: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then 'unreadable' end`,
+          readAt: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then clock_timestamp() end`,
+          queuedAt: sql`clock_timestamp()`,
+        })
         .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
     },
 

@@ -12,7 +12,7 @@ import am05 from '@molvia/model/testing/receipt-text.am-05.json'
 import type { FastifyInstance } from 'fastify'
 import { createReceiptRepository } from '@/db/receipts-repository'
 import { receiptLineImages, receiptLines, receiptParts, receipts } from '@/db/schema'
-import { PhotoUnreadable, ReaderUnavailable } from '@/receipts/reader'
+import { PhotoUnreadable, ReaderDropped, ReaderUnavailable } from '@/receipts/reader'
 import type { ReaderReading, ReceiptReader } from '@/receipts/reader'
 import { readQueuedReceipts } from '@/usecases/read-receipts'
 import type { ReadReport } from '@/usecases/read-receipts'
@@ -69,7 +69,10 @@ function jpeg(width = 800, height = 2_400, tail = 0): Buffer {
     ...app0,
     ...sof,
     ...Array.from({ length: 9 }, () => 0),
+    // the start of the scan and its data: a head alone is no photo (review А9)
+    ...[0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00],
     tail,
+    0x55,
     0xff,
     0xd9,
   ])
@@ -101,12 +104,15 @@ function get(me: Owner, url: string) {
   return app.inject({ method: 'GET', url, headers: { cookie: me.cookie } })
 }
 
+/** A different photo for every receipt a test sends. */
+let photos = 0
+
 /** The owner's receipt, sent whole: one part, in the queue. */
 async function queued(me: Owner, over: Record<string, unknown> = {}): Promise<string> {
   const receipt = body(over)
   expect((await send(me, receipt)).statusCode).toBe(201)
   for (let part = 1; part <= receipt.parts; part++) {
-    expect((await put(me, receipt.id, part, jpeg(800, 2_400, part))).statusCode).toBe(200)
+    expect((await put(me, receipt.id, part, jpeg(800, 2_400, ++photos % 256))).statusCode).toBe(200)
   }
   return receipt.id
 }
@@ -172,6 +178,14 @@ describe('«Отправить чек»', () => {
     expect((await send(other, receipt)).statusCode).toBe(409)
   })
 
+  it('refuses the same id with any field of the body changed — the country too, once there are two', async () => {
+    const me = await owner()
+    const receipt = body()
+    await send(me, receipt)
+    await db.update(receipts).set({ language: 'en' }).where(eq(receipts.id, receipt.id))
+    expect((await send(me, receipt)).statusCode).toBe(409)
+  })
+
   it('refuses an id in capitals and a country not read yet', async () => {
     const me = await owner()
     expect((await send(me, body({ id: randomUUID().toUpperCase() }))).statusCode).toBe(400)
@@ -209,10 +223,21 @@ describe('a part of the photo', () => {
     expect([text.statusCode, text.json()]).toEqual([415, { code: ERROR.RECEIPT_NOT_PHOTO }])
     const tiny = await put(me, receipt.id, 1, jpeg(120, 2_000))
     expect(tiny.json()).toEqual({ code: ERROR.RECEIPT_NOT_PHOTO })
-    const huge = await put(me, receipt.id, 1, jpeg(800, 4_001))
+    const huge = await put(me, receipt.id, 1, jpeg(800, 6_001))
     expect([huge.statusCode, huge.json()]).toEqual([413, { code: ERROR.RECEIPT_TOO_LARGE }])
+    // a head with no picture after it: the frame is there, the scan is not (review А9)
+    const head = jpeg().subarray(0, 2 + 18 + 19)
+    const empty = await put(me, receipt.id, 1, Buffer.concat([head, Buffer.from([0xff, 0xd9])]))
+    expect(empty.json()).toEqual({ code: ERROR.RECEIPT_NOT_PHOTO })
     // the boundary itself is taken
-    expect((await put(me, receipt.id, 1, jpeg(200, 4_000))).statusCode).toBe(200)
+    expect((await put(me, receipt.id, 1, jpeg(200, 6_000))).statusCode).toBe(200)
+  })
+
+  it('takes a phone’s whole frame — 3 024 × 4 032 of a 12-megapixel camera (review А8)', async () => {
+    const me = await owner()
+    const receipt = body()
+    await send(me, receipt)
+    expect((await put(me, receipt.id, 1, jpeg(3_024, 4_032))).statusCode).toBe(200)
   })
 
   it('takes nothing but JPEG as the body', async () => {
@@ -239,7 +264,9 @@ describe('a part of the photo', () => {
     const receipt = body()
     await send(me, receipt)
     const big = Buffer.concat([jpeg(), Buffer.alloc(8 * 1024 * 1024)])
-    expect((await put(me, receipt.id, 1, big)).statusCode).toBe(413)
+    const answer = await put(me, receipt.id, 1, big)
+    // its own code, said by the length before the body is read (review А7)
+    expect([answer.statusCode, answer.json()]).toEqual([413, { code: ERROR.RECEIPT_TOO_LARGE }])
   })
 })
 
@@ -337,6 +364,60 @@ describe('the queue', () => {
     expect(receiptDetailCodec.parse((await get(me, `/receipts/${id}`)).json()).receipt.status).toBe(
       'parsed',
     )
+  })
+
+  it('sends a photo the reader drops to the end of the queue, and fails it after its attempts', async () => {
+    const me = await owner()
+    const poison = await queued(me)
+    const next = await queued(me)
+    const reader = benchReader()
+    const read = reader.read.bind(reader)
+    const poisonPhoto = (
+      await db.select().from(receiptParts).where(eq(receiptParts.receiptId, poison))
+    )[0]!.photo
+    reader.read = (photo, languages, mode) =>
+      photo.equals(poisonPhoto)
+        ? Promise.reject(new ReaderDropped('dropped'))
+        : read(photo, languages, mode)
+    const first = await readAll(reader)
+    // the neighbour is read in the same round, not held behind the photo that fells the reader
+    expect(first.map((r) => r.kind)).toEqual(['reader_dropped', 'read', 'reader_dropped'])
+    const rows = await db.select().from(receipts)
+    expect(rows.find((r) => r.id === next)?.status).toBe('parsed')
+    expect(rows.find((r) => r.id === poison)).toMatchObject({
+      status: 'failed',
+      failure: 'unreadable',
+      attempts: 2,
+    })
+  })
+
+  it('reads each person’s oldest receipt in turn: fifty of one do not hold another’s (review А10)', async () => {
+    const heavy = await owner()
+    const other = await owner()
+    for (let n = 0; n < 5; n++) await queued(heavy)
+    const theirs = await queued(other)
+    const order: string[] = []
+    let claimed = await repository.claimNext()
+    while (claimed !== null) {
+      order.push(claimed.id)
+      await repository.finish(claimed.id, {
+        kind: 'failed',
+        failure: 'unreadable',
+        readerVersion: null,
+        head: null,
+      })
+      claimed = await repository.claimNext()
+    }
+    expect(order).toHaveLength(6)
+    expect(order.indexOf(theirs)).toBe(1)
+  })
+
+  it('gives a receipt failed before any reading no head at all (review А11)', async () => {
+    const me = await owner()
+    const id = await queued(me)
+    await readAll(benchReader({ read: () => Promise.reject(new PhotoUnreadable('unreadable')) }))
+    const summary = receiptDetailCodec.parse((await get(me, `/receipts/${id}`)).json()).receipt
+    expect([summary.status, summary.header]).toEqual(['failed', null])
   })
 
   it('fails what breaks unexpectedly, and says so to the log', async () => {
