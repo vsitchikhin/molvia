@@ -57,6 +57,8 @@ pg_port=$((  5500 + offset ))
 # занимает именно его и потому уживается с работающим make dev, а не конкурирует с ним.
 e2e_api_port=$(( api_port + 1 ))
 e2e_pwa_port=$(( pwa_port + 1 ))
+# The receipt reader of `make reader` (MOL-125): the API's band, after the fake of Open Food Facts.
+reader_port=$(( api_port + 3 ))
 
 # Все пять портов, которые займёт копия, а не три: против чужого процесса на соседнем
 # порту полоса не помогает, а предупреждение здесь — да.
@@ -102,6 +104,10 @@ BOT_API_SECRET=${kept_bot_secret}
 
 # Открытый API ЦБ Армении, ключа не требует
 CBA_RATES_URL=https://cb.am/latest.json.php
+
+# Читатель чеков (MOL-125), поднимается make reader. Не запущен — чеки ждут в очереди.
+RECEIPT_READER_PORT=${reader_port}
+RECEIPT_READER_URL=http://127.0.0.1:${reader_port}
 ENV
 
 echo ".env создан: CLONE_INDEX=$index, api=$api_port pwa=$pwa_port postgres=$pg_port, база molvia_$index"

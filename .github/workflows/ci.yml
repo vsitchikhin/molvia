@@ -67,6 +67,12 @@ jobs:
       - run: npm run typecheck
       - run: npm run test
 
+      # The receipt reader (MOL-125, В-6): its image built as the release builds it, and one live
+      # read of a receipt the test draws itself — Tesseract and its language files are what no fake
+      # of the API's tests can stand for.
+      - run: docker build -f services/receipt-reader/Dockerfile -t molvia-receipt-reader:ci .
+      - run: docker run --rm molvia-receipt-reader:ci python3 selftest.py
+
   e2e:
     name: end-to-end
     runs-on: ubuntu-latest

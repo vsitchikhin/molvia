@@ -2,9 +2,9 @@
 # so parallel copies never collide: containers, network and volume are all namespaced
 # by COMPOSE_PROJECT, and the volume therefore holds a separate database per copy.
 #
-# Only Postgres lives here for now. The api / pwa / bot services join once the scaffold
-# exists; in development they are meant to run natively anyway — HMR and a debugger
-# attached to a process on the host beat a rebuild inside a container.
+# Postgres by default. The api / pwa / bot run natively — HMR and a debugger attached to a
+# process on the host beat a rebuild inside a container. The receipt reader (MOL-125) is a
+# program, not our code to debug, so it runs here — only when asked: `make reader`.
 #
 # Extensions (pg_trgm, unaccent) are NOT created here: the schema belongs to migrations,
 # and an init script would quietly become a second source of truth.
@@ -35,6 +35,19 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+
+  # Tesseract behind a small HTTP server (MOL-125). Off by default: without it receipts are taken
+  # and wait in the queue, and nothing else needs it. One image for every copy, each its own port.
+  receipt-reader:
+    profiles: [receipts]
+    image: molvia-receipt-reader:dev
+    build:
+      context: .
+      dockerfile: services/receipt-reader/Dockerfile
+    container_name: ${COMPOSE_PROJECT:-molvia_0}-receipt-reader
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${RECEIPT_READER_PORT:-3303}:8080'
 
 volumes:
   pgdata:
