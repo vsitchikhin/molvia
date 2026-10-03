@@ -36,13 +36,15 @@ html:has(dialog:modal) {
 // The keys up under an open sheet (`useKeyboardInset`): Safari draws nothing fixed below the top of
 // the keyboard, and through its glass the page showed between the sheet and the keys. The page is
 // hidden — laid out as it was, so nothing scrolls — and the canvas there is the sheet's colour. The
-// open sheets stay, and so does the live region.
+// open sheets stay, and so does the live region. A sheet mounted in `#app` itself — «Написать
+// разработчику» — is left out in the selector: the rule below did not outweigh this one's id there,
+// and the sheet hid under the keys, its field lost focus, the keys went down (MOL-219).
 html[data-under-keys] {
   body {
     background: var(--surface);
   }
 
-  #app > :not([role='status']) {
+  #app > :not([role='status'], dialog[open]) {
     visibility: hidden;
   }
 
