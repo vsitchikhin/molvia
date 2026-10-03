@@ -96,10 +96,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   in one pass — a `/*` inside a line comment opens nothing (round 2, Б3) — every declaration taken
   whatever its value, a short or upper-case hex expanded — Stylelint asks for the short form and
   `--fix` writes it — and a colour of the lists that is no hex (`oklch()`) fails by name: read by a
-  pattern of six lower-case digits, such a category left the test green (А4, А5). The dot of a
-  category on the chosen chip is under 3:1 on `--accent-tint` for six light categories (А2) — not
-  held: the tint cannot be made lighter without meeting `bad-tint`, and the chip's form is
-  MOL-198's.
+  pattern of six lower-case digits, such a category left the test green (А4, А5). The same one-pass
+  read is in the other readers of the file — `bin/design-md.mjs` and both plugins
+  (`withoutComments`, `roleMixins`). The dot of a category on the chosen chip is under 3:1 on
+  `--accent-tint` for six light categories (А2) — not held: the tint cannot be made lighter without
+  meeting `bad-tint`, and the chip's form is MOL-198's.
 - **Nunito is one weight, 800, one file per subset** (MOL-171): the 400 and 600 files were the same
   variable font copied twice, and the precache fetched each URL. A sentence in a figure's place
   («Рынка нет» on the rate chart) is set in Onest, not Nunito at another weight.
