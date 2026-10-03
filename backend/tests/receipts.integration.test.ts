@@ -333,8 +333,9 @@ describe('the queue', () => {
       .select()
       .from(receiptLineImages)
       .where(eq(receiptLineImages.receiptId, id))
-    // the name and the figures of each of 13 lines, and nothing of the head or the total
-    expect(images).toHaveLength(26)
+    // the figures of each of 13 lines and the names of the 12 between two items — the first's name
+    // has the head above it (review Р19) — and nothing of the head or the total
+    expect(images).toHaveLength(25)
     expect(images.every((image) => image.confirmedAt === null)).toBe(true)
     expect(images.some((image) => /ՀՎՀՀ|Ընդամենը|Ֆիսկալ/.test(image.readText))).toBe(false)
     const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
