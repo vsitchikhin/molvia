@@ -14,6 +14,8 @@ export interface FailureOccurrence {
   readonly route?: string
   readonly frames: readonly string[]
   readonly build: string
+  /** The phone's platform, `ios 18 app` (MOL-144, В-2); none for the API and the bot. */
+  readonly platform?: string
 }
 
 /** Where a fingerprint stands after one more occurrence. */
@@ -32,6 +34,7 @@ export interface FailureRow extends FailureCount {
   readonly route: string | null
   readonly frames: readonly string[]
   readonly build: string
+  readonly platform: string | null
   readonly firstSeenAt: Date
   readonly lastSeenAt: Date
 }
@@ -74,6 +77,7 @@ export function createFailureRepository(db: Conn): FailureRepository {
             route: occurrence.route ?? null,
             frames: [...occurrence.frames],
             build: occurrence.build,
+            platform: occurrence.platform ?? null,
             firstSeenAt: at,
             lastSeenAt: at,
             count: times,
@@ -91,6 +95,7 @@ export function createFailureRepository(db: Conn): FailureRepository {
                 then least(${failures.buildCount}::bigint + excluded.build_count, ${COUNT_CEILING})::integer
                 else excluded.build_count end`,
               build: sql`excluded.build`,
+              platform: sql`excluded.platform`,
             },
           })
           .returning({ count: failures.count, buildCount: failures.buildCount })

@@ -188,6 +188,36 @@ describe('сбой не принадлежит человеку (Р-8 MOL-149)',
       'last_seen_at',
       'count',
       'build_count',
+      // The phone's platform as one line of a short list (MOL-144, В-2): never the User-Agent.
+      'platform',
     ])
+  })
+})
+
+describe('платформа — только у телефона (MOL-144, В-2)', () => {
+  const phone = (platform: string) =>
+    occurrence({
+      source: 'phone',
+      route: 'screen:advice',
+      frames: ['at Xe (/assets/index-BTCsHrpw.js:1:48213)'],
+      build: 'index-BTCsHrpw',
+      platform,
+    })
+
+  it('строка телефона хранит последнюю увиденную платформу', async () => {
+    const failure = phone('ios 18 app')
+    await failureRows.record(failure, 1, AT, none)
+    await failureRows.record({ ...failure, platform: 'ios 26 browser' }, 1, AT, none)
+    const [row] = await failureRows.latest(1)
+    expect(row).toMatchObject({ source: 'phone', platform: 'ios 26 browser', count: 2 })
+  })
+
+  it('у API платформы нет, у телефона она обязательна', async () => {
+    await expect(
+      failureRows.record(occurrence({ platform: 'ios app' }), 1, AT, none),
+    ).rejects.toThrow()
+    await expect(
+      failureRows.record({ ...phone('ios app'), platform: undefined }, 1, AT, none),
+    ).rejects.toThrow()
   })
 })
