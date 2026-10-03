@@ -10,17 +10,17 @@ import {
 import type {
   Currency,
   ReceiptBody,
-  ReceiptDetail,
   ReceiptFailure,
   ReceiptLine,
   ReceiptParsedMatch,
+  ReceiptPlace,
   ReceiptSummary,
   SettingsCity,
 } from '@molvia/model'
 import { translateFailures } from './failure'
-import type { Conn, Db } from './index'
+import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
-import { receiptLineImages, receiptLines, receiptParts, receipts } from './schema'
+import { receiptLineImages, receiptLines, receiptParts, receipts, trips } from './schema'
 
 export interface ReceiptPart {
   readonly photo: Buffer
@@ -82,6 +82,28 @@ export type ReadOutcome =
       readonly head: ReceiptHead | null
     }
 
+/** A line as stored: as read, and what the parse found it to be (MOL-126). */
+export interface StoredReceiptLine extends ReceiptLine {
+  readonly itemId: string | null
+  /** `null` for a line read before MOL-126: nothing was looked for. */
+  readonly match: ReceiptParsedMatch | null
+  readonly translation: string | null
+}
+
+/** A receipt as stored, with what the review is built from beside its summary. */
+export interface StoredReceipt {
+  readonly receipt: ReceiptSummary
+  readonly currency: Currency
+  readonly city: SettingsCity | null
+}
+
+/** The same receipt — tax number and number — recorded before, its purchases not removed (Т-11). */
+export interface RecordedTwin {
+  readonly receiptId: string
+  readonly tripId: string
+  readonly recordedAt: Date
+}
+
 export interface ReceiptRepository {
   /** «Отправить чек»: a new receipt, or the same one sent again; anything else under its id is a 409. */
   create(actorId: string, body: ReceiptBody): Promise<{ receipt: ReceiptSummary; created: boolean }>
@@ -95,8 +117,18 @@ export interface ReceiptRepository {
     position: number,
     part: ReceiptPart,
   ): Promise<{ receipt: ReceiptSummary; queued: boolean }>
-  list(actorId: string): Promise<ReceiptSummary[]>
-  one(actorId: string, id: string): Promise<ReceiptDetail | null>
+  list(actorId: string): Promise<StoredReceipt[]>
+  one(
+    actorId: string,
+    id: string,
+  ): Promise<(StoredReceipt & { readonly lines: StoredReceiptLine[] }) | null>
+  /** The person's receipt of this tax number and number, recorded as purchases still there (Т-11). */
+  recordedTwin(
+    actorId: string,
+    tin: string,
+    receiptNo: string,
+    except: string,
+  ): Promise<RecordedTwin | null>
   remove(actorId: string, id: string): Promise<void>
   /** «Вернуть»: `false` for anything that is not the owner's receipt removed within the window. */
   restore(actorId: string, id: string): Promise<boolean>
@@ -135,13 +167,23 @@ const received = sql<number>`(select count(*)::int from ${receiptParts} where ${
 const lineCount = sql<number>`(select count(*)::int from ${receiptLines} where ${receiptLines.receiptId} = ${receipts.id})`
 const unsettled = sql<number>`(select count(*)::int from ${receiptLines} where ${receiptLines.receiptId} = ${receipts.id} and not ${receiptLines.settled})`
 
-const summaryColumns = { row: receipts, received, lineCount, unsettled }
+// The purchases it was recorded as and their place, while they are there (MOL-126): a trip removed,
+// even within its «Вернуть», is no record of the receipt.
+const recorded = sql<{ tripId: string; place: ReceiptPlace } | null>`(
+  select json_build_object(
+    'tripId', t.id,
+    'place', json_build_object('id', p.id, 'name', p.name, 'city', p.city, 'tin', p.tin))
+  from trips t join places p on p.id = t.place_id
+  where t.id = ${receipts.tripId} and t.deleted_at is null)`
+
+const summaryColumns = { row: receipts, received, lineCount, unsettled, recorded }
 
 interface SummaryRow {
   row: typeof receipts.$inferSelect
   received: number
   lineCount: number
   unsettled: number
+  recorded: { tripId: string; place: ReceiptPlace } | null
 }
 
 function toSummary({
@@ -149,6 +191,7 @@ function toSummary({
   received: held,
   lineCount: lines,
   unsettled: off,
+  recorded: trip,
 }: SummaryRow): ReceiptSummary {
   // a head is what a reading found; a receipt failed before any reading has none (review А11)
   const read = [row.tin, row.printedOn, row.printedTime, row.receiptNo].some((v) => v !== null)
@@ -173,12 +216,21 @@ function toSummary({
     balanced: row.balanced,
     lineCount: lines,
     unsettled: off,
+    place: trip?.place ?? null,
+    tripId: trip?.tripId ?? null,
   }
 }
 
-function toLine(row: typeof receiptLines.$inferSelect, currency: Currency): ReceiptLine {
+function toStored(found: SummaryRow): StoredReceipt {
+  return { receipt: toSummary(found), currency: found.row.currency, city: found.row.city }
+}
+
+function toLine(row: typeof receiptLines.$inferSelect, currency: Currency): StoredReceiptLine {
   const cash = (minor: bigint | null) => (minor === null ? null : { minor, currency })
   return {
+    itemId: row.itemId,
+    match: row.match,
+    translation: row.translation,
     printed: row.printed,
     hs: row.hs,
     sku: row.sku,
@@ -195,7 +247,7 @@ function toLine(row: typeof receiptLines.$inferSelect, currency: Currency): Rece
 
 const capturedSame = (a: Date, b: Date) => a.getTime() === b.getTime()
 
-export function createReceiptRepository(db: Db): ReceiptRepository {
+export function createReceiptRepository(db: Conn): ReceiptRepository {
   async function summaryOf(conn: Conn, id: string): Promise<ReceiptSummary> {
     const [found] = await conn
       .select(summaryColumns)
@@ -302,7 +354,7 @@ export function createReceiptRepository(db: Db): ReceiptRepository {
         .from(receipts)
         .where(and(eq(receipts.actorId, actorId), sql`${receipts.deletedAt} is null`))
         .orderBy(desc(receipts.createdAt), desc(receipts.id))
-      return rows.map(toSummary)
+      return rows.map(toStored)
     },
 
     async one(actorId, id) {
@@ -324,10 +376,30 @@ export function createReceiptRepository(db: Db): ReceiptRepository {
         .from(receiptLines)
         .where(eq(receiptLines.receiptId, own))
         .orderBy(asc(receiptLines.position))
-      return {
-        receipt: toSummary(found),
-        lines: lines.map((line) => toLine(line, found.row.currency)),
-      }
+      return { ...toStored(found), lines: lines.map((line) => toLine(line, found.row.currency)) }
+    },
+
+    async recordedTwin(actorId, tin, receiptNo, except) {
+      const [twin] = await db
+        .select({
+          receiptId: receipts.id,
+          tripId: trips.id,
+          recordedAt: sql<Date>`${receipts.recordedAt}`.mapWith(receipts.recordedAt),
+        })
+        .from(receipts)
+        .innerJoin(trips, and(eq(trips.id, receipts.tripId), sql`${trips.deletedAt} is null`))
+        .where(
+          and(
+            eq(receipts.actorId, actorId),
+            eq(receipts.tin, tin),
+            eq(receipts.receiptNo, receiptNo),
+            sql`${receipts.id} <> ${except}`,
+            eq(receipts.status, 'recorded'),
+          ),
+        )
+        .orderBy(asc(receipts.recordedAt))
+        .limit(1)
+      return twin ?? null
     },
 
     async remove(actorId, id) {

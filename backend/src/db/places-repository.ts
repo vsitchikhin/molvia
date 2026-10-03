@@ -13,6 +13,13 @@ export interface PlaceRepository {
   byIds(ids: readonly string[]): Promise<Place[]>
   /** Places this person has already shopped in, the most recent first. */
   recentFor(actorId: string, limit: number, geography?: SettingsGeography): Promise<Place[]>
+  /**
+   * The places of these sellers' tax numbers in a country (MOL-126), the oldest first: a chain is one
+   * number and a place in each city.
+   */
+  withTins(tins: readonly string[], country: string): Promise<{ place: Place; tin: string }[]>
+  /** The receipt's tax number to the place it was recorded at, unless it has one: never rewritten. */
+  giveTin(placeId: string, tin: string): Promise<void>
 }
 
 type PlaceRow = typeof places.$inferSelect
@@ -121,6 +128,25 @@ export function createPlaceRepository(db: Conn): PlaceRepository {
         .orderBy(desc(max(trips.startedAt)), asc(places.id))
         .limit(rowLimit(limit))
       return rows.map((row) => toPlace(row.place))
+    },
+
+    async withTins(tins, country) {
+      if (tins.length === 0) return []
+      const rows = await db
+        .select()
+        .from(places)
+        .where(and(inArray(places.tin, [...tins]), eq(places.country, country)))
+        .orderBy(asc(places.createdAt), asc(places.id))
+      return rows.flatMap((row) =>
+        row.tin === null ? [] : [{ place: toPlace(row), tin: row.tin }],
+      )
+    },
+
+    async giveTin(placeId, tin) {
+      await db
+        .update(places)
+        .set({ tin })
+        .where(and(eq(places.id, placeId), isNull(places.tin)))
     },
   }
 }

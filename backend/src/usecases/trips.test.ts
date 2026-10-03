@@ -153,6 +153,8 @@ function fakeRepositories(
       byId: unexpected('places.byId'),
       byIds: unexpected('places.byIds'),
       recentFor: unexpected('places.recentFor'),
+      withTins: unexpected('places.withTins'),
+      giveTin: unexpected('places.giveTin'),
       ...overrides.places,
     },
     items: {
@@ -259,6 +261,25 @@ function fakeRepositories(
     budgetPlans: {
       list: unexpected('budgetPlans.list'),
       set: unexpected('budgetPlans.set'),
+    },
+    receipts: {
+      create: unexpected('receipts.create'),
+      putPart: unexpected('receipts.putPart'),
+      list: unexpected('receipts.list'),
+      one: unexpected('receipts.one'),
+      recordedTwin: unexpected('receipts.recordedTwin'),
+      remove: unexpected('receipts.remove'),
+      restore: unexpected('receipts.restore'),
+      purgeStale: unexpected('receipts.purgeStale'),
+      requeueInterrupted: unexpected('receipts.requeueInterrupted'),
+      claimNext: unexpected('receipts.claimNext'),
+      release: unexpected('receipts.release'),
+      retry: unexpected('receipts.retry'),
+      finish: unexpected('receipts.finish'),
+    },
+    storeMemory: {
+      recall: unexpected('storeMemory.recall'),
+      remember: unexpected('storeMemory.remember'),
     },
   }
 }

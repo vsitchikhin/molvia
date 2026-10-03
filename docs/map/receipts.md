@@ -29,7 +29,7 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 
 ## backend · usecases
 
-- `backend/src/usecases/receipts.ts` — Use cases of the owner's side: send, a part checked to be a photo (`error.receipt_not_photo`, `error.receipt_too_large`), list, one, remove, restore.
+- `backend/src/usecases/receipts.ts` — Use cases of the owner's side: send, a part checked to be a photo (`error.receipt_not_photo`, `error.receipt_too_large`), list and one with the place by tax number, one as the review shows it — the memory laid over, the amounts of В-5, a price in doubt, the rate of its day, the receipt recorded before (MOL-126) — remove, restore.
 - `backend/src/usecases/bind-receipt-lines.ts` — `bindReceiptLines`: the lines of a parsed receipt to items, once, in the queue (MOL-126) — the catalogue's names in the till's language with the heading, then the search by the gloss (near found, far «проверьте»), else a new item named by the gloss.
 - `backend/src/usecases/read-receipts.ts` — `readQueuedReceipts`: the queue — every part in both page modes, joined, the reading that adds up kept, «переснимите» by `needsReshoot`, item lines cut out, the city of the address read, the lines bound (MOL-126); a reader away leaves the receipt queued, a photo it cannot read fails.
 
@@ -37,8 +37,11 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 
 - `backend/src/db/receipts-repository.ts` — Repository of receipts: the receipt and its parts named by the phone, the summary and the lines, removal with «Вернуть», the timer's purge (10 minutes, 28 days, a recorded receipt's photo), and the queue — people in turn, claim, release, retry at the end, finish, a reading cut short begun again.
 
+- `backend/src/db/store-memory-repository.ts` — Repository of the shops' shared memory (MOL-126): `recall` — the person's own word, else the item most people said, the later on a tie; `remember` — the person's word on a key, written over their earlier one.
+
 ## backend · tests
 
+- `backend/tests/receipt-review.integration.test.ts` — Integration test of the review (MOL-126): the memory's own word, majority, tie and erased vote; the memory laid over the parse; В-5 and В-1; the place by tax number and city; the receipt recorded before; the rate of the receipt's day.
 - `backend/tests/receipts.integration.test.ts` — Integration test of receipts: sending and parts with their refusals and repeats, the queue on the bench's reading of am-05 with a fake reader, «переснимите», a reader away, removal and the 28 days, the log through the server.
 
 ## services · receipt-reader

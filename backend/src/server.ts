@@ -807,8 +807,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           if (queued) receiptQueue?.nudge()
           return receipt
         },
-        list: (actorId) => receiptsOf(receipts, actorId),
-        one: (actorId, id) => receiptOfOwner(receipts, actorId, id),
+        list: (actor) => receiptsOf(tripData, actor),
+        one: (actor, id) => receiptOfOwner(tripData, actor, id),
         remove: (actorId, id) => removeReceipt(receipts, actorId, id),
         restore: (actorId, id) => restoreReceipt(receipts, actorId, id),
       })

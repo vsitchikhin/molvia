@@ -25,6 +25,10 @@ import type { SpendingCategoryRepository } from './spending-categories-repositor
 import { createSpendingRepository } from './spendings-repository'
 import type { SpendingRepository } from './spendings-repository'
 import type { SearchPickRepository } from './search-picks-repository'
+import { createReceiptRepository } from './receipts-repository'
+import type { ReceiptRepository } from './receipts-repository'
+import { createStoreMemoryRepository } from './store-memory-repository'
+import type { StoreMemoryRepository } from './store-memory-repository'
 import { createTripRepository } from './trips-repository'
 import type { TripRepository } from './trips-repository'
 
@@ -55,6 +59,10 @@ export interface TripRepositories {
   readonly moneyAccounts: MoneyAccountRepository
   /** What the person plans a month at (MOL-117): «Бюджет», counted against the month above. */
   readonly budgetPlans: BudgetPlanRepository
+  /** Receipts read on our server (MOL-125), recorded as a trip in one go (MOL-126). */
+  readonly receipts: ReceiptRepository
+  /** The shops' shared memory «tax number + article → item» (MOL-126). */
+  readonly storeMemory: StoreMemoryRepository
 }
 
 export function tripRepositories(conn: Conn): TripRepositories {
@@ -73,6 +81,8 @@ export function tripRepositories(conn: Conn): TripRepositories {
     money: createMoneyRepository(conn),
     moneyAccounts: createMoneyAccountRepository(conn),
     budgetPlans: createBudgetPlanRepository(conn),
+    receipts: createReceiptRepository(conn),
+    storeMemory: createStoreMemoryRepository(conn),
   }
 }
 

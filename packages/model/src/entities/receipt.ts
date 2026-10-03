@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { EXCHANGE_UNDO_MINUTES } from '#model/entities/exchange'
 import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
 import type { SettingsCity } from '#model/contracts/settings'
+import { toSearchKey } from '#model/support/search-key'
 import { MINOR_EXPONENT } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
 import type { Quantity } from '#model/values/units'
@@ -111,6 +112,33 @@ export type ReceiptParsedMatch = z.infer<typeof receiptParsedMatchSchema>
  */
 export const storeMemoryKindSchema = z.enum(['sku', 'text'])
 export type StoreMemoryKind = z.infer<typeof storeMemoryKindSchema>
+
+/** The longest key the shop's memory keeps, in octets: a line's search key past it is not remembered. */
+export const STORE_MEMORY_KEY_MAX_OCTETS = 600
+
+/** A key of the shop's memory: the till's article, or the line as printed by its search key. */
+export interface StoreMemoryWord {
+  readonly kind: StoreMemoryKind
+  readonly key: string
+}
+
+/**
+ * What the shop's memory knows a line by, the article first (MOL-126): it reads the same every time,
+ * where OCR reads a name differently each time (MOL-114: 4 of 4 against 0 of 43). A line with no
+ * article — Dog City prints none — is known by its text alone.
+ */
+export function storeMemoryWords(line: {
+  readonly printed: string
+  readonly sku: string | null
+}): StoreMemoryWord[] {
+  const words: StoreMemoryWord[] = []
+  if (line.sku !== null && line.sku !== '') words.push({ kind: 'sku', key: line.sku })
+  const text = toSearchKey(line.printed)
+  if (text !== '' && new TextEncoder().encode(text).length <= STORE_MEMORY_KEY_MAX_OCTETS) {
+    words.push({ kind: 'text', key: text })
+  }
+  return words
+}
 
 /**
  * The cities of the settings as a receipt's address prints them, at the start of a row of the head
