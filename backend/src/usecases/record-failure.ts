@@ -147,6 +147,8 @@ export async function recordFailure(
   const claimed = phone && phoneRows !== undefined
   const fresh = !claimed || phoneRows.claim(at, sender)
   let count: FailureCount | null
+  // What of the hour's notices this write took: the budget is spent inside its transaction.
+  let told: readonly OwnerNotice[] = []
   try {
     count = await failures.record(
       occurrence,
@@ -154,14 +156,18 @@ export async function recordFailure(
       at,
       (written) => {
         const notices = noticesFor(occurrence, written, times, owner)
-        return phone && phoneNotices ? phoneNotices.take(notices, at, sender) : notices
+        if (!phone || phoneNotices === undefined) return notices
+        told = phoneNotices.take(notices, at, sender)
+        return told
       },
       { fresh },
     )
   } catch (error) {
     // A write that failed — the database down — wrote no row: its place goes back, or every report
-    // of the outage held one for the hour (review №9).
+    // of the outage held one for the hour (review №9) — and so do the notices it took, if the
+    // transaction failed after the budget gave them (round 5).
     if (claimed && fresh) phoneRows.refund(at, sender)
+    if (told.length > 0) phoneNotices?.refund(told.length, at, sender)
     throw error
   }
   // Not a new row after all — its count is more than what was written now: the place goes back.
@@ -180,6 +186,8 @@ const HOUR_MS = 60 * 60 * 1000
 export interface PhoneNoticeBudget {
   /** What of the phone's notices fits the hour — the sender's and everybody's. */
   take(notices: readonly OwnerNotice[], at: Date, sender?: string): OwnerNotice[]
+  /** Gives back `count` notices taken at `at` by a write that then failed. */
+  refund(count: number, at: Date, sender?: string): void
   /** A new fingerprint of the phone the hour's rows had no room for: not in the table at all. */
   unwritten(): void
   /** How many were held back and how many not written, at most once an hour. */
@@ -231,6 +239,16 @@ export function phoneNoticeBudget(
       }
       if (sender !== undefined) bySender.set(sender, theirs)
       return out
+    },
+    refund(count, at, sender) {
+      const now = at.getTime()
+      for (let index = 0; index < count; index += 1) {
+        const mine = told.lastIndexOf(now)
+        if (mine >= 0) told.splice(mine, 1)
+        const theirs = sender === undefined ? undefined : bySender.get(sender)
+        const position = theirs?.lastIndexOf(now) ?? -1
+        if (position >= 0) theirs?.splice(position, 1)
+      }
     },
     unwritten() {
       lost += 1

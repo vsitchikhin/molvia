@@ -354,6 +354,40 @@ describe('phoneRowBudget — новые строки телефона (ревь�
     expect(rows.claim(new Date(now.getTime() + 60 * 60 * 1000), 'liar')).toBe(true)
   })
 
+  it('транзакция, упавшая после выдачи уведомлений, их возвращает (раунд 5)', async () => {
+    const budget = phoneNoticeBudget(10, 1)
+    const { summary, place, build } = phoneFailure(REPORT)
+    const failsAfter = {
+      record: (
+        _occurrence: unknown,
+        _times: number,
+        _at: Date,
+        notices: (count: { count: number; buildCount: number }) => unknown,
+      ) => {
+        notices({ count: 1, buildCount: 1 })
+        return Promise.reject(new Error('commit failed'))
+      },
+    } as unknown as FailureRepository
+    await expect(
+      recordFailure(
+        { failures: failsAfter, owner: OWNER, phoneNotices: budget },
+        occurrenceOf(summary, place, build),
+        1,
+        now,
+        'one',
+      ),
+    ).rejects.toThrow('commit failed')
+    const notice: OwnerNotice = {
+      kind: 'failure',
+      source: 'phone',
+      errorName: 'TypeError',
+      build,
+      platform: 'ios 18 app',
+      fingerprint: 'abcdef',
+    }
+    expect(budget.take([notice], now, 'one')).toEqual([notice])
+  })
+
   it('запись, которая упала, возвращает своё место (ревью №9)', async () => {
     const rows = phoneRowBudget(10, 1)
     const { summary, place, build } = phoneFailure(REPORT)
