@@ -220,6 +220,8 @@ describe('useItemDetails', () => {
       quantity: parseQuantity('0.35', 'kg'),
       amount: parseMoney('1540', 'AMD'),
       unitPrice: null,
+      printed: null,
+      discount: null,
     }
 
     it('opens with the row as it was written', () => {
@@ -353,6 +355,8 @@ describe('useItemDetails', () => {
         quantity: null,
         amount,
         unitPrice: null,
+        printed: null,
+        discount: null,
       }
       const sheet = details({ expense: row, occupied: [amount] })
       expect(sheet.validate()).toBeNull()

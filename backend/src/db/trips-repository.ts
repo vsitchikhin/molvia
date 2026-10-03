@@ -53,6 +53,14 @@ export type TripToStart = NewTrip & {
   readonly startedOn?: string | null
 }
 
+/** A trip recorded from a receipt (MOL-126): its place, the receipt's day, and its moment if printed. */
+export interface RecordedTrip {
+  readonly id: string
+  readonly placeId: string
+  readonly day: string
+  readonly deviceAt: Date | null
+}
+
 export interface TripRepository {
   /**
    * The currency is a snapshot of the person's setting and the rate a snapshot of the
@@ -79,6 +87,25 @@ export interface TripRepository {
     currency: Currency,
     snapshot: TripSnapshot | null,
   ): Promise<{ trip: Trip; created: boolean }>
+  /**
+   * The owner's lock of trips, to the end of the caller's transaction (MOL-126): «Записать» takes it
+   * before it looks for the same receipt recorded, so two shots of one receipt recorded at once see
+   * each other.
+   */
+  lockOwner(actorId: string): Promise<void>
+  /**
+   * A trip from a receipt (MOL-126): written finished, dated by the receipt's day for «Деньги» and the
+   * accounts alike, at the rate of that day, with the receipt's sum whole (MOL-78). It is never the
+   * open trip, so another one open does not stand in its way. A trip of this id already there is a
+   * 409: a receipt recorded again is answered by the receipt, before this is called.
+   */
+  recordFinished(
+    actorId: string,
+    input: RecordedTrip,
+    currency: Currency,
+    snapshot: TripSnapshot | null,
+    receipt: Money | null,
+  ): Promise<Trip>
   byId(id: string, actorId: string): Promise<Trip | null>
   /**
    * The trip, locked until the caller's transaction ends — `null` for a stranger's or a missing
@@ -308,6 +335,55 @@ export function createTripRepository(db: Conn): TripRepository {
       )
     },
 
+    async lockOwner(actorId) {
+      await ownerLock(db, actorId)
+    },
+
+    async recordFinished(actorId, input, currency, snapshot, receipt) {
+      return translateFailures(async () =>
+        db.transaction(async (tx) => {
+          await ownerLock(tx, actorId)
+          await tx
+            .delete(trips)
+            .where(
+              and(
+                eq(trips.id, input.id),
+                eq(trips.actorId, actorId),
+                lte(trips.deletedAt, undoFrom()),
+              ),
+            )
+          // One moment for the start and the end: the trip is written whole, and «finished after
+          // started» holds by its own row.
+          const [row] = await tx
+            .insert(trips)
+            .values({
+              id: input.id,
+              actorId,
+              placeId: input.placeId,
+              currency,
+              ...rateTo(snapshot?.rate ?? null),
+              rateProvider: snapshot?.provider ?? null,
+              rateJumped: snapshot?.jumped ?? false,
+              ratePreviousScaled: snapshot?.previous?.scaled ?? null,
+              ratePreviousAsOf: snapshot?.previous?.asOf ?? null,
+              startedAt: sql`now()`,
+              finishedAt: sql`now()`,
+              finishedOnDeviceAt: input.deviceAt,
+              startedOn: input.day,
+              finishedOn: input.day,
+              receiptMinor: receipt?.minor ?? null,
+              receiptCurrency: receipt?.currency ?? null,
+              receiptSetAt: receipt === null ? null : sql`now()`,
+              receiptFirstAt: receipt === null ? null : sql`now()`,
+            })
+            .onConflictDoNothing({ target: trips.id })
+            .returning()
+          if (row === undefined) throw new DomainError(ERROR.CONFLICT)
+          return toTrip(row)
+        }),
+      )
+    },
+
     async byId(id, actorId) {
       // A malformed identifier matches nothing, and Postgres would say so with `22P02` — a
       // 500, and a third distinct answer where a stranger's row and a missing row are
@@ -362,6 +438,7 @@ export function createTripRepository(db: Conn): TripRepository {
           startedAt: trips.startedAt,
           finishedAt: trips.finishedAt,
           finishedOnDeviceAt: trips.finishedOnDeviceAt,
+          fromReceipt: sql<boolean>`exists (select 1 from receipts r where r.trip_id = ${trips.id})`,
           cursorAt: sql<string>`to_char(${time} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
         })
         .from(trips)
@@ -382,7 +459,7 @@ export function createTripRepository(db: Conn): TripRepository {
       const last = page.at(-1)
       const sums = await purchasesOf(page.map((row) => row.id))
       return {
-        trips: page.map(({ id, place, startedAt, finishedAt, finishedOnDeviceAt }) => {
+        trips: page.map(({ id, place, startedAt, finishedAt, finishedOnDeviceAt, fromReceipt }) => {
           if (!finishedAt) throw new Error('history contained an unfinished trip')
           const counted = sums.get(id)
           return {
@@ -393,6 +470,7 @@ export function createTripRepository(db: Conn): TripRepository {
             finishedOnDeviceAt,
             itemCount: counted?.itemCount ?? 0,
             total: counted ? counted.total : [],
+            fromReceipt,
           }
         }),
         nextCursor:

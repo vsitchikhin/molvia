@@ -77,9 +77,7 @@ export async function startTrip(
       startedOn !== null && startedOn >= yerevanDate(new Date(now.getTime() - DAY_MS))
         ? startedOn
         : todayOf(actor, now)
-    const snapshot =
-      (await personalRateFor(repositories, actor, context, rateDay)) ??
-      (await officialRateFor(repositories, context, rateDay))
+    const snapshot = await tripRateOn(repositories, actor, context, rateDay)
     const { trip, created } = await repositories.trips.start(
       actor.id,
       { id: body.id, placeId: place.id, startedOn },
@@ -88,6 +86,23 @@ export async function startTrip(
     )
     return { trip: await tripViewFor(repositories, trip), created }
   })
+}
+
+/**
+ * The rate a trip of this pair snapshots on this day: the person's own, else the official one. A trip
+ * started at the shelf takes today's; a receipt recorded later takes its own day's (MOL-126) — the
+ * rule a spending is converted by (MOL-73), never the rate of the day it was typed in.
+ */
+export async function tripRateOn(
+  repositories: Pick<TripRepositories, 'exchanges' | 'incomes' | 'rates'>,
+  actor: Pick<Actor, 'id' | 'incomeCurrency'> & Today,
+  pair: Pick<Actor, 'incomeCurrency' | 'spendCurrency'>,
+  day: string,
+): Promise<TripSnapshot | null> {
+  return (
+    (await personalRateFor(repositories, actor, pair, day)) ??
+    (await officialRateFor(repositories, pair, day))
+  )
 }
 
 /**

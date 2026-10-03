@@ -42,6 +42,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 - `backend/src/embeddings/embedder.ts` — The model of the search by meaning in the API (MOL-105): loaded in the background with onnxruntime's telemetry off, queries ahead of names, a wait of 150 ms, a cache of queries; without it no vector and the letters alone.
 - `backend/src/embeddings/model.json` — The pinned model: EmbeddingGemma-300m q4, its revision and the sha256 of every file — read by the API and by `bin/fetch-model.mjs`.
 - `backend/src/catalogue-seed.ts` — The seed list: some six hundred common names without brands, each with the unit its price is compared by.
+- `backend/src/catalogue-seed-nodes.ts` — The seed's items as a receipt reaches them (MOL-126): their Armenian names and customs headings, one entry per seed line, written by `make seed` to `item_names` and `item_hs`.
 - `backend/src/seed-catalogue-cli.ts` — Entry point of `dist/seed-catalogue.js`: connects to the database and runs the seed command.
 - `backend/src/seed-catalogue.ts` — The seed command behind `make seed`: dry run unless `--yes`, prints what was added, kept and skipped.
 

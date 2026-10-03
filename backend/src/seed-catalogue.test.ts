@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SeedReport, SeedRepository } from '@/db/seed-repository'
 import { CATALOGUE_SEED } from '@/catalogue-seed'
+import { CATALOGUE_SEED_NODES } from '@/catalogue-seed-nodes'
 import { SEED_USAGE, seedCatalogue } from '@/seed-catalogue'
 
 const REPORT: SeedReport = {
@@ -10,6 +11,8 @@ const REPORT: SeedReport = {
     { name: 'хлеб', unit: 'piece', seeded: 'piece' },
   ],
   twins: [{ name: 'Мед', seed: 'Мёд' }],
+  names: 1_500,
+  headings: 800,
 }
 
 function run(argv: string[], report: SeedReport | Error = REPORT) {
@@ -25,14 +28,20 @@ describe('seed-catalogue (MOL-112)', () => {
   it('без --yes только считает: сухой прогон', async () => {
     const { exit, seed, lines } = run([])
     expect(await exit).toBe(0)
-    expect(seed).toHaveBeenCalledWith(expect.any(Array), { dryRun: true })
+    expect(seed).toHaveBeenCalledWith(expect.any(Array), {
+      dryRun: true,
+      nodes: CATALOGUE_SEED_NODES,
+    })
     expect(lines.at(-1)).toMatch(/dry run: nothing changed/)
   })
 
   it('с --yes пишет', async () => {
     const { exit, seed, lines } = run(['--yes'])
     expect(await exit).toBe(0)
-    expect(seed).toHaveBeenCalledWith(expect.any(Array), { dryRun: false })
+    expect(seed).toHaveBeenCalledWith(expect.any(Array), {
+      dryRun: false,
+      nodes: CATALOGUE_SEED_NODES,
+    })
     expect(lines.at(-1)).toBe('written.')
   })
 
@@ -65,6 +74,8 @@ describe('seed-catalogue (MOL-112)', () => {
     expect(lines).toEqual([
       '  added           590',
       '  already there   2',
+      '  armenian names  1500',
+      '  customs codes   800',
       '  another unit    1 (kept as they are)',
       '    Молоко: kg, the seed says l',
       '  same key        1 (the key is taken, not written)',
@@ -74,9 +85,21 @@ describe('seed-catalogue (MOL-112)', () => {
   })
 
   it('без расхождений и двойников строк о них нет', async () => {
-    const { exit, lines } = run(['--yes'], { added: 0, kept: [], twins: [] })
+    const { exit, lines } = run(['--yes'], {
+      added: 0,
+      kept: [],
+      twins: [],
+      names: 0,
+      headings: 0,
+    })
     await exit
-    expect(lines).toEqual(['  added           0', '  already there   0', 'written.'])
+    expect(lines).toEqual([
+      '  added           0',
+      '  already there   0',
+      '  armenian names  0',
+      '  customs codes   0',
+      'written.',
+    ])
   })
 
   it('сбой базы — код 1, код сбоя и ни слова из его сообщения', async () => {

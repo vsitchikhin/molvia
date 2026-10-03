@@ -55,6 +55,8 @@ import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
 import { readQueuedReceipts } from '@/usecases/read-receipts'
+import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
+import { recordReceipt } from '@/usecases/record-receipt'
 import type { ReadReport } from '@/usecases/read-receipts'
 import {
   putReceiptPart,
@@ -203,6 +205,10 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   // A part of a receipt that is not a photo, or one too large (MOL-125): «не принят» on the phone.
   [ERROR.RECEIPT_NOT_PHOTO]: 415,
   [ERROR.RECEIPT_TOO_LARGE]: 413,
+  // «Записать» on a receipt still being read, and one recorded before (MOL-126): well formed, the
+  // state refuses it — the phone shows «уже записан» by the code.
+  [ERROR.RECEIPT_NOT_READY]: 409,
+  [ERROR.RECEIPT_RECORDED_BEFORE]: 409,
 }
 
 // The handler answers with the contract the client parses, so it checks its own reply
@@ -614,6 +620,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
             instance.log.warn({ reason: event.reason }, 'receipt reader dropped a photo')
           } else if (event.kind === 'strips_failed') {
             instance.log.warn({ reason: event.reason }, 'receipt lines not cut out')
+          } else if (event.kind === 'bind_failed') {
+            // read all the same, every line new: a fault of ours, so the owner hears of it
+            failures.report(event.error, job('receipt-binding'), 'receipt lines not bound')
           } else {
             failures.report(event.error, job('receipt-reading'), 'receipt reading failed')
           }
@@ -621,7 +630,19 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         const queue = startItemEmbedding(
           async () => {
             await receipts.requeueInterrupted()
-            await readQueuedReceipts({ receipts, reader, report })
+            await readQueuedReceipts({
+              receipts,
+              reader,
+              report,
+              bind: (claimed, lines) =>
+                bindReceiptLines(
+                  { items: createItemRepository(db), embedder },
+                  claimed.actorId,
+                  claimed.country,
+                  claimed.language,
+                  lines,
+                ),
+            })
           },
           (error) => {
             failures.report(error, job('receipt-queue'), 'receipt queue failed')
@@ -823,10 +844,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           if (queued) receiptQueue?.nudge()
           return receipt
         },
-        list: (actorId) => receiptsOf(receipts, actorId),
-        one: (actorId, id) => receiptOfOwner(receipts, actorId, id),
+        list: (actor) => receiptsOf(tripData, actor),
+        one: (actor, id) => receiptOfOwner(tripData, actor, id),
         remove: (actorId, id) => removeReceipt(receipts, actorId, id),
         restore: (actorId, id) => restoreReceipt(receipts, actorId, id),
+        record: (actor, id, body) => recordReceipt(transact, actor, id, body),
       })
       spendingRoutes(guarded, {
         record: (actor, body) => recordSpending(tripData, actor, body),

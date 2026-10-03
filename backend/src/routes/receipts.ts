@@ -5,20 +5,33 @@ import {
   RECEIPT_PART_BYTES_MAX,
   receiptBodySchema,
   receiptDetailCodec,
+  receiptRecordBodySchema,
+  receiptRecordedCodec,
   receiptSummaryCodec,
   receiptsResponseCodec,
 } from '@molvia/model'
-import type { ReceiptBody, ReceiptDetail, ReceiptSummary } from '@molvia/model'
+import type {
+  Actor,
+  ReceiptBody,
+  ReceiptDetail,
+  ReceiptRecordBody,
+  ReceiptRecorded,
+  ReceiptSummary,
+} from '@molvia/model'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { parseBody } from '@/parse'
+import type { Today } from '@/usecases/today'
 
 export interface ReceiptsApi {
   send(actorId: string, body: ReceiptBody): Promise<{ receipt: ReceiptSummary; created: boolean }>
   putPart(actorId: string, id: string, part: string, photo: Buffer): Promise<ReceiptSummary>
-  list(actorId: string): Promise<ReceiptSummary[]>
-  one(actorId: string, id: string): Promise<ReceiptDetail>
+  list(actor: Actor): Promise<ReceiptSummary[]>
+  /** The review reads the rate of the receipt's day, and «today» is the phone's (MOL-121). */
+  one(actor: Actor & Today, id: string): Promise<ReceiptDetail>
   remove(actorId: string, id: string): Promise<void>
   restore(actorId: string, id: string): Promise<ReceiptSummary>
+  /** «Записать» (MOL-126): the receipt's day and «today» are the phone's (MOL-121). */
+  record(actor: Actor & Today, id: string, body: ReceiptRecordBody): Promise<ReceiptRecorded>
 }
 
 /** A receipt is the person's own: private always, never in a shared cache. */
@@ -27,9 +40,21 @@ function privately(reply: FastifyReply) {
 }
 
 function ownerOf(request: FastifyRequest): string {
+  return actorOf(request).id
+}
+
+function actorOf(request: FastifyRequest): Actor {
   const actor = request.actor
   if (!actor) throw new DomainError(ERROR.NO_ACTOR)
-  return actor.id
+  return actor
+}
+
+function askingOf(request: FastifyRequest): Actor & Today {
+  return {
+    ...actorOf(request),
+    today: request.today,
+    ...(request.zone ? { zone: request.zone } : {}),
+  }
 }
 
 /**
@@ -105,7 +130,7 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
     /** «Покупки»: the person's receipts, the newest first, the removed ones left out. */
     scope.get('/receipts', { exposeHeadRoute: false }, async (request, reply) =>
       privately(reply).send(
-        z.encode(receiptsResponseCodec, { receipts: await api.list(ownerOf(request)) }),
+        z.encode(receiptsResponseCodec, { receipts: await api.list(actorOf(request)) }),
       ),
     )
 
@@ -115,7 +140,7 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
       { exposeHeadRoute: false },
       async (request, reply) =>
         privately(reply).send(
-          z.encode(receiptDetailCodec, await api.one(ownerOf(request), request.params.receiptId)),
+          z.encode(receiptDetailCodec, await api.one(askingOf(request), request.params.receiptId)),
         ),
     )
 
@@ -125,6 +150,19 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
       async (request, reply) => {
         await api.remove(ownerOf(request), request.params.receiptId)
         return privately(reply.code(204)).send()
+      },
+    )
+
+    /**
+     * «Записать» (MOL-126): one write for the whole receipt; the same trip again is the same answer,
+     * another is a 409, and so is the same receipt recorded before.
+     */
+    scope.post<{ Params: { receiptId: string } }>(
+      '/receipts/:receiptId/record',
+      async (request, reply) => {
+        const body = parseBody(receiptRecordBodySchema, request.body)
+        const recorded = await api.record(askingOf(request), request.params.receiptId, body)
+        return privately(reply).send(z.encode(receiptRecordedCodec, recorded))
       },
     )
 
