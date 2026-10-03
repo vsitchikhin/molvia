@@ -175,6 +175,47 @@ export const ru = {
   'owner.failure.build': 'Сборка {build}',
   'owner.failure.buildPrint': 'Сборка {build} · {fingerprint}',
   'owner.failure.more': 'Подробности — make failures',
+  /**
+   * «Написать разработчику» in the bot (MOL-148). The frame is what the person gets around the
+   * owner's reply, in the language of their message (Р-12 of MOL-150); the rest answers a text
+   * written as a reply to the bot, in the writer's language, under their message.
+   */
+  'feedback.frame': 'Ответ на ваше сообщение от {date}:',
+  // The bot knows a frame by this very line (`isReplyFrame`, round 2 Г3): a new wording keeps the old
+  // one in `FRAME_LAST_LINES` (`feedback.ts`), or every frame already sent stops being one and its answers greet.
+  'feedback.howToAnswer': 'Чтобы ответить, ответьте на это сообщение.',
+  'feedback.passed': 'Передали разработчику.',
+  'feedback.delivered': 'Доставлено.',
+  'feedback.deliveredUnmarked':
+    'Доставлено, но сервер не записал, каким сообщением: ответ человека на него не найдёт переписку.',
+  'feedback.blocked': 'Не дошло: человек заблокировал бота.',
+  'feedback.gone': 'Сообщения #fb{thread} больше нет: данные удалены.',
+  'feedback.tooLong': 'Слишком длинно: до {max} знаков. Ничего не отправлено.',
+  'feedback.invisible':
+    'Нечего отправить: в тексте одни невидимые знаки или пустые строки подряд. Ничего не отправлено.',
+  'feedback.limited': 'Сегодня сообщений уже много. Напишите завтра.',
+  'feedback.textOnly': 'Отвечать можно только текстом.',
+  'feedback.failed': 'Не получилось: сервер не ответил. Ответьте ещё раз через минуту.',
+  'feedback.notSent': 'Не отправлено: Telegram не принял сообщение. Ответьте ещё раз.',
+  'feedback.unknown':
+    'Не знаю, дошло ли: связь с Telegram оборвалась. Ответите ещё раз — человек может получить ответ дважды.',
+  /**
+   * A message to the developer, told to the owner (MOL-148, Р-9 of MOL-150). The kind in the sheet's
+   * own words; the tag `#fb{thread}` ends the first line and nothing else may stand after it — the
+   * bot reads it back from there when the owner replies, and a test holds that every kind keeps it.
+   * The screen, the platform and the code are printed as they were sent: the bot repeats no rule of
+   * the app's. The owner's language is not kept, so Russian.
+   */
+  'owner.feedback.bug': '🐞 Сломалось · #fb{thread}',
+  'owner.feedback.idea': '💡 Идея · #fb{thread}',
+  'owner.feedback.other': '💬 Другое · #fb{thread}',
+  'owner.feedback.continued': '↩️ Продолжение · #fb{thread}',
+  'owner.feedback.quote': '> {quote}',
+  'owner.feedback.where': 'Экран {route} · {platform} · {locale}',
+  'owner.feedback.code': 'Код {code}',
+  'owner.feedback.noCode': 'С экрана ошибки, без кода',
+  'owner.feedback.builds': 'Страница {page} · API {api}',
+  'owner.feedback.noBuild': '—',
 } as const
 
 /**

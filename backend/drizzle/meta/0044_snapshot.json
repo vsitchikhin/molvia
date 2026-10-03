@@ -1,6 +1,6 @@
 {
-  "id": "d7a62027-6ca3-4dcc-8ac4-abe1b9f8684a",
-  "prevId": "07c254f8-c190-403f-9814-b472360e9dba",
+  "id": "e4b9b163-0dbf-406d-919b-8f485f42b960",
+  "prevId": "d7a62027-6ca3-4dcc-8ac4-abe1b9f8684a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -931,6 +931,12 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -961,7 +967,7 @@
         },
         "failures_source_known": {
           "name": "failures_source_known",
-          "value": "\"failures\".\"source\" in ('api', 'bot')"
+          "value": "\"failures\".\"source\" in ('api', 'bot', 'phone')"
         },
         "failures_lengths": {
           "name": "failures_lengths",
@@ -974,6 +980,10 @@
         "failures_seen_forward": {
           "name": "failures_seen_forward",
           "value": "\"failures\".\"last_seen_at\" >= \"failures\".\"first_seen_at\""
+        },
+        "failures_platform_phone": {
+          "name": "failures_platform_phone",
+          "value": "(\"failures\".\"platform\" is not null) = (\"failures\".\"source\" = 'phone')\n          and (\"failures\".\"platform\" is null or char_length(\"failures\".\"platform\") <= 32)"
         }
       },
       "isRLSEnabled": false
@@ -2725,7 +2735,7 @@
       "checkConstraints": {
         "owner_notices_kind_known": {
           "name": "owner_notices_kind_known",
-          "value": "\"owner_notices\".\"kind\" in ('failure', 'failure_count', 'feedback', 'feedback_continued')"
+          "value": "\"owner_notices\".\"kind\" in ('failure', 'failure_count', 'failure_muted', 'feedback', 'feedback_continued')"
         },
         "owner_notices_feedback_named": {
           "name": "owner_notices_feedback_named",

@@ -1,5 +1,5 @@
 import { and, inArray, isNull, lt, or, sql } from 'drizzle-orm'
-import { FAILURE_KEEP_DAYS } from '@molvia/model'
+import { FAILURE_KEEP_DAYS, FEEDBACK_NOTICE_KINDS } from '@molvia/model'
 import type { OwnerNotice, OwnerNoticeKind } from '@molvia/model'
 import type { Conn } from './index'
 import { rowLimit } from './rows'
@@ -13,15 +13,41 @@ const FAILURE_NOTICE_KINDS = [
 ] as const satisfies readonly OwnerNoticeKind[]
 const UNHANDED_FAILURE_NOTICE_MS = 24 * 60 * 60 * 1000
 
+/**
+ * How long a notice about a message waits for the bot's word that it went before it is handed the
+ * second time (MOL-148, adversarial В1): a minute's run sends twenty at Telegram's pace in under half
+ * a minute, and a rollout's stop gives up the rest — the next bot takes them ten minutes on. **Each
+ * time after waits twice as long** (round 2, Г2): a hand counts whether the bot tried the notice or
+ * not — a 429 or a stop gives up the rest of a run — so the tries are spread over a day rather than
+ * spent in an hour.
+ */
+export const OWNER_NOTICE_RESEND_MS = 10 * 60 * 1000
+
+/**
+ * How many times a notice about a message is handed at most: with the pause doubling from ten
+ * minutes, the last some 21 hours after the first — a day of Telegram away. Past it, what is left is
+ * a notice Telegram refuses for good, and the bot has reported each refusal as a failure of its own
+ * (`owner:send`), so the owner hears that something did not go. **The named price:** Telegram away for
+ * longer than that, and the message is the table's alone again.
+ */
+export const OWNER_NOTICE_TRIES = 8
+
 export interface OwnerNoticeRepository {
   /**
-   * Hands out the oldest waiting notices and marks them handed in the same statement — at most
-   * once, as the rating reminders are (MOL-101): a second claim at the same moment skips the rows
-   * the first one holds rather than waiting to hand them out again. Their payloads, the API's and the
-   * bot's before the phone's and oldest first within each, as stored: the caller reads them through
-   * `ownerNoticeSchema`.
+   * Hands out the oldest waiting notices and marks them handed in the same statement: a second claim
+   * at the same moment skips the rows the first one holds rather than waiting to hand them out again.
+   * A notice about a failure is handed at most once, as the rating reminders are (MOL-101) — the
+   * table keeps its count. **A notice about a message is handed again** until the bot says it went
+   * (`markSent`), `OWNER_NOTICE_RESEND_MS` after the first time and twice the pause each time after,
+   * at most `OWNER_NOTICE_TRIES` times
+   * (MOL-148, adversarial В1): the table holds nothing else of it. Their payloads, the API's and the
+   * bot's before the phone's (MOL-144) and oldest first within each, as stored: the caller reads them
+   * through `ownerNoticeSchema`.
    */
   claim(limit: number, at: Date): Promise<readonly unknown[]>
+
+  /** The bot sent the notices about these messages: they are not handed again. */
+  markSent(messages: readonly number[], at: Date): Promise<void>
 
   /**
    * Notices handed more than `FAILURE_KEEP_DAYS` ago go, and so do notices about a failure the bot
@@ -45,11 +71,17 @@ export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
     async claim(limit, at) {
       const rows = await db
         .update(ownerNotices)
-        .set({ handedAt: at })
+        .set({ handedAt: at, tries: sql`${ownerNotices.tries} + 1` })
         .where(
           sql`${ownerNotices.id} in (
             select ${ownerNotices.id} from ${ownerNotices}
             where ${ownerNotices.handedAt} is null
+               or (${inArray(ownerNotices.kind, [...FEEDBACK_NOTICE_KINDS])}
+                   and ${ownerNotices.sentAt} is null
+                   and ${ownerNotices.tries} < ${OWNER_NOTICE_TRIES}
+                   and ${ownerNotices.handedAt} < ${at.toISOString()}::timestamptz
+                     - make_interval(secs => ${OWNER_NOTICE_RESEND_MS / 1000}
+                         * power(2, greatest(${ownerNotices.tries}, 1) - 1)))
             order by ${phoneLast}, ${ownerNotices.id}
             limit ${rowLimit(limit)}
             for update skip locked)`,
@@ -66,6 +98,14 @@ export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
 
     async queue(notice, at) {
       await db.insert(ownerNotices).values({ kind: notice.kind, payload: notice, createdAt: at })
+    },
+
+    async markSent(messages, at) {
+      if (messages.length === 0) return
+      await db
+        .update(ownerNotices)
+        .set({ sentAt: at })
+        .where(and(inArray(ownerNotices.feedbackId, [...messages]), isNull(ownerNotices.sentAt)))
     },
 
     async purgeStale(now) {

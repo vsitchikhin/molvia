@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { describeFailure } from '@molvia/model'
 import type { OwnerNotice } from '@molvia/model'
 import type { OwnerNoticeRepository } from '@/db/owner-notices-repository'
 import { claimOwnerNotices } from './owner-notices'
@@ -14,11 +15,7 @@ const NOTICE: OwnerNotice = {
 
 function repository(payloads: unknown[]) {
   const claim = vi.fn<OwnerNoticeRepository['claim']>(() => Promise.resolve(payloads))
-  const notices: OwnerNoticeRepository = {
-    claim,
-    purgeStale: () => Promise.resolve(),
-    queue: () => Promise.resolve(),
-  }
+  const notices: Pick<OwnerNoticeRepository, 'claim'> = { claim }
   return { notices, claim }
 }
 
@@ -43,5 +40,11 @@ describe('claimOwnerNotices (MOL-143)', () => {
     const { notices } = repository([{ kind: 'failure', errorName: 'x' }, NOTICE])
     expect((await claimOwnerNotices(notices, 4242, AT, unreadable)).notices).toEqual([NOTICE])
     expect(unreadable).toHaveBeenCalledTimes(1)
+    const [failure] = unreadable.mock.calls[0] as [unknown]
+    expect(describeFailure(failure)).toMatchObject({
+      errorName: 'OwnerNoticeUnreadable',
+      code: 'OWNER_NOTICE_UNREADABLE',
+    })
+    expect(describeFailure(failure).frames?.length).toBeGreaterThan(0)
   })
 })

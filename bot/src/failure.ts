@@ -23,7 +23,8 @@ const BUTTONS = new Set(['login', 'erase', 'rate', 'remind'])
 /**
  * Where in the bot a failure happened (MOL-143, Р-5): the kind of update and the bot's own name of
  * its button or command — `callback:rate`, `command:delete`, `message`, `my_chat_member` — and never
- * the button's data whole, the text, or who sent it.
+ * the button's data whole, the text, or who sent it. A message answering the bot's own is
+ * `message:reply` (MOL-148): «Написать разработчику» in the bot, apart from the greeting.
  */
 export function handlerOf(ctx: Context): string {
   const data = ctx.callbackQuery?.data
@@ -31,8 +32,12 @@ export function handlerOf(ctx: Context): string {
   const text = ctx.message?.text
   if (text !== undefined) {
     const command = /^\/([A-Za-z_]+)(?:@\w+)?(?:\s|$)/.exec(text)?.[1]
-    return command === undefined ? 'message' : `command:${known(COMMANDS, command.toLowerCase())}`
+    if (command !== undefined) return `command:${known(COMMANDS, command.toLowerCase())}`
   }
+  if (ctx.message !== undefined && ctx.message.reply_to_message?.from?.id === ctx.me.id) {
+    return 'message:reply'
+  }
+  if (text !== undefined) return 'message'
   if (ctx.myChatMember !== undefined) return 'my_chat_member'
   return 'update'
 }

@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { ERROR, ISSUE } from '#model/support/errors'
 import {
+  FEEDBACK_QUOTE_MAX,
   FEEDBACK_TEXT_MAX,
   feedbackAttachedSchema,
   feedbackBodySchema,
   feedbackErrorCodeSchema,
   feedbackPlatformSchema,
+  feedbackQuote,
   feedbackSentCodec,
 } from '#model/contracts/feedback'
+import {
+  FEEDBACK_NOTICE_KINDS,
+  OWNER_NOTICE_KINDS,
+  ownerNoticeSchema,
+} from '#model/contracts/failure'
 
 const body = {
   kind: 'bug',
@@ -138,5 +145,66 @@ describe('what the sheet may attach', () => {
         errorCode: 'error.internal',
       }).success,
     ).toBe(false)
+  })
+})
+
+describe('feedbackQuote — начало ответа в «Продолжении» (MOL-148, Р-10)', () => {
+  it('ровно 200 знаков — целиком, 201 — 200 и многоточие', () => {
+    const exact = 'а'.repeat(FEEDBACK_QUOTE_MAX)
+    expect(feedbackQuote(exact)).toBe(exact)
+    expect(feedbackQuote(`${exact}б`)).toBe(`${exact}…`)
+  })
+
+  it('переносы ответа — пробел: цитата в уведомлении одной строкой', () => {
+    expect(feedbackQuote('Починили.\n\nОбновите  \n приложение.')).toBe(
+      'Починили. Обновите приложение.',
+    )
+  })
+
+  it('режет по знакам, не по половинкам пары', () => {
+    const quote = feedbackQuote('🙂'.repeat(FEEDBACK_QUOTE_MAX + 5))
+    expect(Array.from(quote)).toHaveLength(FEEDBACK_QUOTE_MAX + 1)
+    expect(quote.endsWith('🙂…')).toBe(true)
+  })
+})
+
+describe('уведомления владельцу о сообщении (MOL-148, Р-9 MOL-150)', () => {
+  const notice = {
+    kind: 'feedback',
+    number: 42,
+    thread: 42,
+    feedbackKind: 'idea',
+    text: 'Список своих магазинов',
+    locale: 'ru',
+    pageBuild: null,
+    apiBuild: 'dev',
+    route: 'settings',
+    platform: 'ios 18 app',
+    fromError: false,
+    errorCode: null,
+    at: '2026-10-03T10:07:00.000Z',
+  }
+
+  it('читается каналом владельца', () => {
+    expect(ownerNoticeSchema.parse(notice)).toEqual(notice)
+    expect(
+      ownerNoticeSchema.parse({
+        kind: 'feedback_continued',
+        number: 57,
+        thread: 42,
+        quote: 'Починили',
+        text: 'Спасибо',
+        at: '2026-10-03T11:02:00.000Z',
+      }),
+    ).toMatchObject({ kind: 'feedback_continued' })
+  })
+
+  it('не несёт ничего о человеке: лишнее поле — отказ', () => {
+    expect(ownerNoticeSchema.safeParse({ ...notice, actorId: 'x' }).success).toBe(false)
+    expect(ownerNoticeSchema.safeParse({ ...notice, telegramUserId: 1 }).success).toBe(false)
+  })
+
+  it('виды сообщения — ровно те, что канал держит под feedback_id', () => {
+    expect(FEEDBACK_NOTICE_KINDS.every((kind) => OWNER_NOTICE_KINDS.includes(kind))).toBe(true)
   })
 })

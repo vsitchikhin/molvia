@@ -5,6 +5,7 @@ import type { FeedbackRepository, FeedbackWrite } from '@/db/feedback-repository
 import { sendFeedback } from './send-feedback'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+const OWNER = 700_000_001
 
 const message: FeedbackBody = {
   kind: 'idea',
@@ -36,10 +37,19 @@ describe('sendFeedback', () => {
       ACTOR,
       message,
       'v0.2.0',
+      OWNER,
     )
 
     expect(answer).toEqual({ sent: { number: 42 }, created: true })
-    expect(calls).toEqual([[ACTOR, message, 'v0.2.0', FEEDBACK_DAY_LIMIT]])
+    expect(calls).toEqual([[ACTOR, message, 'v0.2.0', FEEDBACK_DAY_LIMIT, true]])
+  })
+
+  it('queues nothing for the owner where there is none — every copy and end-to-end', async () => {
+    const calls: unknown[][] = []
+
+    await sendFeedback(fake({ kind: 'written', number: 42 }, calls), ACTOR, message, 'dev', null)
+
+    expect(calls).toEqual([[ACTOR, message, 'dev', FEEDBACK_DAY_LIMIT, false]])
   })
 
   it('answers a repeat with the number written before, as not created', async () => {
@@ -48,13 +58,14 @@ describe('sendFeedback', () => {
       ACTOR,
       message,
       'dev',
+      OWNER,
     )
 
     expect(answer).toEqual({ sent: { number: 42 }, created: false })
   })
 
   it('refuses past the day’s limit by its own code', async () => {
-    const sent = sendFeedback(fake({ kind: 'limited' }, []), ACTOR, message, 'dev')
+    const sent = sendFeedback(fake({ kind: 'limited' }, []), ACTOR, message, 'dev', OWNER)
 
     await expect(sent).rejects.toBeInstanceOf(DomainError)
     await expect(sent).rejects.toMatchObject({ code: ERROR.FEEDBACK_RATE_LIMITED })
