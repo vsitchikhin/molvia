@@ -383,6 +383,14 @@ export default defineComponent({
         if (mine !== opening) return
         const code = error instanceof ApiError ? error.code : null
         connected.value = navigator.onLine
+        // A refusal in the API's own words is a write that did not happen — every write is one
+        // transaction — so nothing has left, and what goes with the text is the next opening's again:
+        // tomorrow's message from the settings must not carry today's error screen (adversarial Н2).
+        // Only a lost answer or a bare status may hide a message the server holds.
+        if (error instanceof ApiError && error.answered) {
+          frozen.value = null
+          keep()
+        }
         if (code === ERROR.FEEDBACK_RATE_LIMITED) {
           phase.value = 'limited'
           return

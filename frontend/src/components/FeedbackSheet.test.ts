@@ -481,6 +481,46 @@ describe('a message that may have left already (adversarial В1, В2)', () => {
   })
 })
 
+describe("a refusal in the API's own words: nothing left (adversarial Н2)", () => {
+  it('lets go of what went with it, so the next opening attaches its own', async () => {
+    sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.FEEDBACK_RATE_LIMITED))
+    const { wrapper, router } = await render('/money', 'v0.1.3-20-gd90f9cee')
+    const sheet = await open(wrapper, { from: 'error', code: 'error.internal' })
+    await type(sheet, 'The month did not load')
+    await press(sheet)
+    expect(recallFeedbackDraft(OWNER)?.attached).toBeUndefined()
+    useFeedbackSheetStore().shown = false
+    await flushPromises()
+
+    await router.push('/settings')
+    await open(wrapper)
+
+    expect(sheet.get('h2').text()).toBe(en.feedback.title)
+    expect(attached(sheet)).toContain('screen “Settings”')
+    expect(attached(sheet)).not.toContain('code')
+    await press(sheet)
+    expect(sendFeedback.mock.calls[1]?.[0]).toMatchObject({
+      route: 'settings',
+      fromError: false,
+      errorCode: null,
+    })
+  })
+
+  it("must not let go after an answer that never came: it may be the server's already", async () => {
+    sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'Failed to fetch', false))
+    const { wrapper } = await render('/money')
+    const sheet = await open(wrapper, { from: 'error', code: 'error.internal' })
+    await type(sheet, 'The month did not load')
+
+    await press(sheet)
+
+    expect(recallFeedbackDraft(OWNER)?.attached).toMatchObject({
+      route: 'money',
+      errorCode: 'error.internal',
+    })
+  })
+})
+
 describe('sending', () => {
   it('sends once however often it is pressed, the form held meanwhile', async () => {
     sendFeedback.mockReturnValue(new Promise(() => undefined))
