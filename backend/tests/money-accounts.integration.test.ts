@@ -26,7 +26,7 @@ import type { CachedRate, MoneyAccountsResponse } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createMoneyAccountRepository } from '@/db/money-accounts-repository'
 import { createRateRepository } from '@/db/rates-repository'
-import { actors, expenses, moneyAccounts, moneyMonthRates, spendings } from '@/db/schema'
+import { actors, expenses, moneyAccounts, moneyMonthRates, receipts, spendings } from '@/db/schema'
 import { tripRepositories } from '@/db/unit-of-work'
 import { buildServer } from '@/server'
 import { checkAccount } from '@/usecases/money-accounts'
@@ -1193,6 +1193,31 @@ describe('поход — днём телефона (MOL-121)', () => {
       (await call(me, 'GET', `/money/accounts/${id}/journal`)).json(),
     )
     expect(again.rows.find((row) => row.id === late)?.day).toBe(today)
+  })
+
+  // MOL-126: a trip recorded from a receipt is dated by the receipt's day, checked when it was written
+  it('поход из чека у счёта — день чека, и неделю спустя (MOL-126)', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me, { startOn: daysAgo(10), start: amd('100000') })
+    const trip = await pricedTrip(me, { startedOn: daysAgo(7), finishedOn: daysAgo(7) })
+    await db.insert(receipts).values({
+      id: randomUUID(),
+      actorId: me.id,
+      status: 'recorded',
+      parts: 1,
+      country: 'AM',
+      language: 'ru',
+      currency: 'AMD',
+      capturedAt: new Date(),
+      queuedAt: new Date(),
+      recordedAt: new Date(),
+      tripId: trip,
+    })
+    await call(me, 'PUT', `/trips/${trip}/payment`, { accountId: id })
+    const journal = accountJournalCodec.parse(
+      (await call(me, 'GET', `/money/accounts/${id}/journal`)).json(),
+    )
+    expect(journal.rows.find((row) => row.id === trip)?.day).toBe(daysAgo(7))
   })
 
   // Т-2: west of Yerevan in the last hour of a month the phone's month is still running — its rate

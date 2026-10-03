@@ -143,6 +143,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
       },
       itemsReleased: 1,
       barcodesReleased: 1,
+      memoryReleased: 0,
       counted: true,
     })
     expect(await rowsMentioning(anna)).toEqual([])

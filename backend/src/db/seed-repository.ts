@@ -1,9 +1,9 @@
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { nameIdentity, toSearchKey } from '@molvia/model'
 import type { BaseUnit, NewItem } from '@molvia/model'
 import type { Conn } from './index'
 import { createItemRepository, lockItemKey } from './items-repository'
-import { items } from './schema'
+import { itemHeadings, itemNames, items } from './schema'
 
 /** An item the catalogue already had under a line's name — left exactly as it was. */
 export interface KeptItem {
@@ -31,7 +31,16 @@ export interface SeedReport {
   readonly added: number
   readonly kept: readonly KeptItem[]
   readonly twins: readonly TwinItem[]
+  /** Armenian names written to the seed's items (MOL-126), the ones they had already not counted. */
+  readonly names: number
+  /** Customs headings written to them, likewise. */
+  readonly headings: number
 }
+
+/** What a receipt reaches an item by (MOL-126), keyed by the seed's names: `catalogue-seed-nodes.ts`. */
+export type SeedNodes = Readonly<
+  Record<string, { readonly hy: readonly string[]; readonly hs: readonly string[] } | undefined>
+>
 
 export interface SeedRepository {
   /**
@@ -47,8 +56,15 @@ export interface SeedRepository {
    *
    * A dry run is the real run, rolled back, as erasure's is: its count cannot disagree with
    * what writing does.
+   *
+   * The item a line ends at — added, or there already under its name — gets the line's Armenian
+   * names and customs headings (`nodes`, MOL-126), the ones it lacks; a twin gets none, as it is
+   * someone else's spelling.
    */
-  seed(lines: readonly NewItem[], options: { readonly dryRun: boolean }): Promise<SeedReport>
+  seed(
+    lines: readonly NewItem[],
+    options: { readonly dryRun: boolean; readonly nodes?: SeedNodes },
+  ): Promise<SeedReport>
 }
 
 class DryRun extends Error {
@@ -59,13 +75,15 @@ class DryRun extends Error {
 
 export function createSeedRepository(db: Conn): SeedRepository {
   return {
-    async seed(lines, { dryRun }) {
+    async seed(lines, { dryRun, nodes = {} }) {
       try {
         return await db.transaction(async (tx) => {
           const repository = createItemRepository(tx)
           let added = 0
           const kept: KeptItem[] = []
           const twins: TwinItem[] = []
+          let names = 0
+          let headings = 0
           for (const line of lines) {
             const key = toSearchKey(line.name)
             await lockItemKey(tx, line.kind, key)
@@ -87,9 +105,28 @@ export function createSeedRepository(db: Conn): SeedRepository {
             const { item, created } = proposal
             if (created) added += 1
             else kept.push({ name: item.name, unit: item.defaultUnit, seeded: line.defaultUnit })
+
+            const node = nodes[line.name]
+            if (node === undefined) continue
+            if (node.hy.length > 0) {
+              const written = await tx
+                .insert(itemNames)
+                .values(node.hy.map((name) => ({ itemId: item.id, language: 'hy' as const, name })))
+                .onConflictDoNothing()
+                .returning({ one: sql<number>`1` })
+              names += written.length
+            }
+            if (node.hs.length > 0) {
+              const written = await tx
+                .insert(itemHeadings)
+                .values(node.hs.map((hs) => ({ itemId: item.id, hs })))
+                .onConflictDoNothing()
+                .returning({ one: sql<number>`1` })
+              headings += written.length
+            }
           }
 
-          const report: SeedReport = { added, kept, twins }
+          const report: SeedReport = { added, kept, twins, names, headings }
           if (dryRun) throw new DryRun(report)
           return report
         })

@@ -7,7 +7,8 @@ import { newItemSchema, toSearchKey } from '@molvia/model'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor, insertItem } from './fixtures'
 import { CATALOGUE_SEED } from '@/catalogue-seed'
-import { items } from '@/db/schema'
+import { CATALOGUE_SEED_NODES } from '@/catalogue-seed-nodes'
+import { itemHeadings, itemNames, items } from '@/db/schema'
 import { createSeedRepository } from '@/db/seed-repository'
 
 /**
@@ -45,9 +46,16 @@ describe('SeedRepository.seed', () => {
   it(
     'a dry run counts every line and writes nothing',
     async () => {
-      const report = await seeder.seed(lines, { dryRun: true })
+      const report = await seeder.seed(lines, { dryRun: true, nodes: CATALOGUE_SEED_NODES })
 
-      expect(report).toEqual({ added: lines.length, kept: [], twins: [] })
+      const nodes = Object.values(CATALOGUE_SEED_NODES)
+      expect(report).toEqual({
+        added: lines.length,
+        kept: [],
+        twins: [],
+        names: nodes.reduce((sum, node) => sum + node.hy.length, 0),
+        headings: nodes.reduce((sum, node) => sum + node.hs.length, 0),
+      })
       expect(await itemCount()).toBe(0)
     },
     FULL_RUN_MS,
@@ -91,6 +99,8 @@ describe('SeedRepository.seed', () => {
       added: few.length - 1,
       kept: [{ name: 'МОЛОКО 1,5%', unit: 'l', seeded: 'l' }],
       twins: [],
+      names: 0,
+      headings: 0,
     })
     expect(await itemCount()).toBe(1)
   })
@@ -146,6 +156,8 @@ describe('SeedRepository.seed — the same thing under another spelling', () => 
       added: 0,
       kept: [{ name: 'мёд', unit: 'kg', seeded: 'kg' }],
       twins: [],
+      names: 0,
+      headings: 0,
     })
   })
 
@@ -162,7 +174,42 @@ describe('SeedRepository.seed — the same thing under another spelling', () => 
       { dryRun: true },
     )
 
-    expect(report).toEqual({ added: 1, kept: [], twins: [] })
+    expect(report).toEqual({ added: 1, kept: [], twins: [], names: 0, headings: 0 })
+  })
+
+  // MOL-126: the item a line ends at — added, or there under its name — gets the line's Armenian
+  // names and customs headings; a second run writes none, and a twin gets nothing.
+  it('gives the items their Armenian names and headings once, a twin none', async () => {
+    const actor = await insertActor(db)
+    const theirs = await insertItem(db, {
+      name: 'молоко',
+      searchKey: toSearchKey('молоко'),
+      createdBy: actor,
+    })
+    await insertItem(db, { name: 'Молоко 1.5%', searchKey: toSearchKey('Молоко 1,5%') })
+    const nodes = {
+      Молоко: { hy: ['կաթ', 'կովի կաթ'], hs: ['0401', '0402'] },
+      'Молоко 1,5%': { hy: ['կաթ 1.5%'], hs: ['0401'] },
+      'Молоко 2,5%': { hy: ['կաթ 2.5%'], hs: ['0401'] },
+    }
+    const three = few.slice(0, 3)
+
+    const first = await seeder.seed(three, { dryRun: false, nodes })
+    const again = await seeder.seed(three, { dryRun: false, nodes })
+
+    expect(first).toMatchObject({ names: 3, headings: 3 })
+    expect(again).toMatchObject({ names: 0, headings: 0 })
+    const written = await db
+      .select({ itemId: itemNames.itemId, name: itemNames.name })
+      .from(itemNames)
+      .orderBy(itemNames.name)
+    expect(written.filter((row) => row.itemId === theirs).map((row) => row.name)).toEqual([
+      'կաթ',
+      'կովի կաթ',
+    ])
+    expect(written.map((row) => row.name)).not.toContain('կաթ 1.5%')
+    const [codes] = await db.select({ n: count() }).from(itemHeadings)
+    expect(codes?.n).toBe(3)
   })
 })
 

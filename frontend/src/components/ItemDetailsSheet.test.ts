@@ -472,6 +472,8 @@ describe('ItemDetailsSheet', () => {
       quantity: parseQuantity('0.35', 'kg'),
       amount: parseMoney('1540', 'AMD'),
       unitPrice: null,
+      printed: null,
+      discount: null,
     }
 
     it('opens with the row, and saves only what changed', async () => {
@@ -801,6 +803,8 @@ describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
         quantity: parseQuantity('1', 'l'),
         amount: parseMoney('540', 'AMD'),
         unitPrice: null,
+        printed: null,
+        discount: null,
       }
 
       const { view } = await render({ expense })
