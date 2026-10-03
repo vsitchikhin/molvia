@@ -1,5 +1,5 @@
-import { FEEDBACK_KINDS } from '@molvia/model'
-import type { FeedbackKind } from '@molvia/model'
+import { FEEDBACK_KINDS, feedbackAttachedSchema } from '@molvia/model'
+import type { FeedbackAttached, FeedbackKind } from '@molvia/model'
 import { forget, read, write } from '@/stores/storage'
 
 /**
@@ -16,6 +16,13 @@ export interface FeedbackDraft {
   readonly kind: FeedbackKind | ''
   readonly text: string
   readonly clientKey: string
+  /**
+   * What went with the text the first time it was sent under this key — kept until the content
+   * changes, since the server holds a repeat to all of the message, not to the words alone. Sent
+   * again from another screen, with another code or after a new build, a key that may have reached
+   * the server would meet `409` and a second message (adversarial В1, В2).
+   */
+  readonly attached?: FeedbackAttached
 }
 
 const keyOf = (owner: string): string => `molvia.feedback-draft.${owner}`
@@ -29,9 +36,15 @@ export function recallFeedbackDraft(owner: string | null): FeedbackDraft | null 
   try {
     const value: unknown = JSON.parse(read(keyOf(owner)) ?? 'null')
     if (!value || typeof value !== 'object') return null
-    const { kind, text, clientKey } = value as Record<string, unknown>
+    const { kind, text, clientKey, attached } = value as Record<string, unknown>
     if (typeof text !== 'string' || typeof clientKey !== 'string') return null
-    return { kind: isKind(kind) ? kind : '', text, clientKey }
+    const sent = feedbackAttachedSchema.safeParse(attached)
+    return {
+      kind: isKind(kind) ? kind : '',
+      text,
+      clientKey,
+      ...(sent.success ? { attached: sent.data } : {}),
+    }
   } catch {
     return null
   }

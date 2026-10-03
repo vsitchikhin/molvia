@@ -218,13 +218,13 @@ describe('the focus as it opens', () => {
 })
 
 describe('what goes with the text (MOL-150, Р-7)', () => {
-  it('is shown before sending: the build whole, the screen, the platform in words', async () => {
+  it('is shown before sending: the build whole, the screen, the language, the platform in words', async () => {
     vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(ANDROID)
     const { wrapper } = await render('/settings', 'v0.2.0-4-gab12cd3')
     const sheet = await open(wrapper)
 
     expect(attached(sheet)).toBe(
-      `${en.feedback.attached} version v0.2.0-4-gab12cd3 · screen “Settings” · Android 15, browser`,
+      `${en.feedback.attached} version v0.2.0-4-gab12cd3 · screen “Settings” · English · Android 15, browser`,
     )
   })
 
@@ -233,7 +233,9 @@ describe('what goes with the text (MOL-150, Р-7)', () => {
     const { wrapper } = await render()
     const sheet = await open(wrapper)
 
-    expect(attached(sheet)).toBe(`${en.feedback.attached} screen “Settings” · Android 15, browser`)
+    expect(attached(sheet)).toBe(
+      `${en.feedback.attached} screen “Settings” · English · Android 15, browser`,
+    )
   })
 
   it('names a system it does not know in words, not by its code', async () => {
@@ -300,6 +302,24 @@ describe('«Report a problem» from an error screen', () => {
 })
 
 describe('the draft (MOL-147, Р-2)', () => {
+  it('keeps the kind the person chose when an error screen opens it and nothing is touched (В4)', async () => {
+    const { wrapper } = await render('/money')
+    const sheet = await open(wrapper)
+    await choose(sheet, en.feedback.kinds.idea)
+    await type(sheet, 'A list of my own shops')
+    useFeedbackSheetStore().shown = false
+    await flushPromises()
+
+    await open(wrapper, { from: 'error', code: null })
+    expect(radios(sheet).find((radio) => radio.element.checked)?.element.value).toBe('bug')
+    useFeedbackSheetStore().shown = false
+    await flushPromises()
+
+    expect(recallFeedbackDraft(OWNER)?.kind).toBe('idea')
+    await open(wrapper)
+    expect(radios(sheet).find((radio) => radio.element.checked)?.element.value).toBe('idea')
+  })
+
   it('outlives closing the sheet, and a launch', async () => {
     const { wrapper } = await render()
     const sheet = await open(wrapper)
@@ -363,7 +383,7 @@ describe('the draft (MOL-147, Р-2)', () => {
 
     expect(recallFeedbackDraft(OWNER)).toBeNull()
     expect(sheet.get('.sent').text()).toContain(en.feedback.sent.title)
-    expect(sheet.get('.sent').attributes('role')).toBe('status')
+    expect(sheet.get('.spoken').text()).toBe(`${en.feedback.sent.title}. ${en.feedback.sent.body}`)
     expect(sheet.text()).not.toContain('42')
     expect(sheet.find('textarea').exists()).toBe(false)
     expect(button(sheet).text()).toBe(en.feedback.done)
@@ -396,6 +416,68 @@ describe('the draft (MOL-147, Р-2)', () => {
     await flushPromises()
 
     expect(recallFeedbackDraft(OWNER)?.text).toBe('Second')
+  })
+})
+
+describe('a message that may have left already (adversarial В1, В2)', () => {
+  it('goes again with what went with it, whatever screen or code the sheet is opened with now', async () => {
+    sendFeedback.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const { wrapper, router } = await render('/money')
+    const sheet = await open(wrapper, { from: 'error', code: 'issue.response_invalid' })
+    await type(sheet, 'The list did not load')
+    await press(sheet)
+    useFeedbackSheetStore().shown = false
+    await flushPromises()
+
+    await router.push('/settings')
+    await open(wrapper, { from: 'error', code: 'error.internal' })
+
+    expect(attached(sheet)).toContain('screen “Money”')
+    expect(attached(sheet)).toContain('code issue.response_invalid')
+    await press(sheet)
+    const [first, again] = sendFeedback.mock.calls.map(([body]) => body)
+    expect(again).toEqual(first)
+  })
+
+  it('goes again with the build it left with, after a reload onto another', async () => {
+    sendFeedback.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const before = await render('/settings', 'v0.1.3-20-gd90f9cee')
+    await open(before.wrapper)
+    await choose(before.wrapper, en.feedback.kinds.idea)
+    await type(before.wrapper, 'A list of my own shops')
+    await press(before.wrapper)
+    before.wrapper.unmount()
+    setActivePinia(createPinia())
+    useActorStore().id = OWNER
+
+    const after = await render('/settings', 'v0.1.4-3-gabc12345')
+    await open(after.wrapper)
+    await press(after.wrapper)
+
+    const [first, again] = sendFeedback.mock.calls.map(([body]) => body)
+    expect(again).toEqual(first)
+    expect(again?.pageBuild).toBe('v0.1.3-20-gd90f9cee')
+  })
+
+  it("is this opening's again once its text is changed: a new message with a new key", async () => {
+    sendFeedback.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const { wrapper, router } = await render('/money')
+    const sheet = await open(wrapper, { from: 'error', code: 'error.internal' })
+    await type(sheet, 'The list did not load')
+    await press(sheet)
+    useFeedbackSheetStore().shown = false
+    await flushPromises()
+    await router.push('/settings')
+    await open(wrapper)
+
+    await type(sheet, 'The list did not load, and now the settings')
+
+    expect(attached(sheet)).toContain('screen “Settings”')
+    expect(attached(sheet)).not.toContain('code')
+    await press(sheet)
+    const [first, second] = sendFeedback.mock.calls.map(([body]) => body)
+    expect(second?.clientKey).not.toBe(first?.clientKey)
+    expect(second).toMatchObject({ route: 'settings', fromError: false, errorCode: null })
   })
 })
 
@@ -436,6 +518,23 @@ describe('sending', () => {
     await flushPromises()
     expect(sheet.get('.offline').text()).toBe('')
     expect(button(sheet).text()).toBe(en.feedback.send)
+  })
+
+  it('says the answer through a region there from the opening, not one born with its words (№3)', async () => {
+    sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.FEEDBACK_RATE_LIMITED))
+    const { wrapper } = await render()
+    const sheet = await open(wrapper)
+    const region = sheet.get('.spoken')
+    expect(region.attributes('role')).toBe('status')
+    expect(region.text()).toBe('')
+    await choose(sheet, en.feedback.kinds.idea)
+    await type(sheet, 'The eleventh')
+
+    await press(sheet)
+
+    expect(sheet.get('.spoken').element).toBe(region.element)
+    expect(region.text()).toBe(`${en.feedback.limit.title}. ${en.feedback.limit.body}`)
+    expect(sheet.get('.note').attributes('role')).toBeUndefined()
   })
 
   it("keeps the text past the day's limit, and the next opening asks the server again", async () => {

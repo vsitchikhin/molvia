@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { ISSUE } from '#model/support/errors'
+import { ERROR, ISSUE } from '#model/support/errors'
 import {
   FEEDBACK_TEXT_MAX,
+  feedbackAttachedSchema,
   feedbackBodySchema,
+  feedbackErrorCodeSchema,
   feedbackPlatformSchema,
   feedbackSentCodec,
 } from '#model/contracts/feedback'
@@ -107,5 +109,34 @@ describe('feedbackSentCodec', () => {
     expect(feedbackSentCodec.parse({ number: 42 })).toEqual({ number: 42 })
     expect(feedbackSentCodec.safeParse({ number: 0 }).success).toBe(false)
     expect(feedbackSentCodec.safeParse({ number: 42, actorId: 'x' }).success).toBe(false)
+  })
+})
+
+describe('what the sheet may attach', () => {
+  // A code the body refuses would make the sheet send nothing at all from the very error screen it
+  // is opened on — and blame the person's text (MOL-147, review №5).
+  it("takes every code of the registry, the client's own among them", () => {
+    for (const code of [...Object.values(ERROR), ...Object.values(ISSUE)]) {
+      expect(feedbackErrorCodeSchema.safeParse(code).success, code).toBe(true)
+    }
+  })
+
+  it("keeps what went with a text by the body's own rules, the code's too", () => {
+    const attached = {
+      locale: body.locale,
+      pageBuild: body.pageBuild,
+      route: body.route,
+      platform: body.platform,
+      fromError: body.fromError,
+      errorCode: body.errorCode,
+    }
+    expect(feedbackAttachedSchema.parse(attached)).toEqual(attached)
+    expect(
+      feedbackAttachedSchema.safeParse({
+        ...attached,
+        fromError: false,
+        errorCode: 'error.internal',
+      }).success,
+    ).toBe(false)
   })
 })

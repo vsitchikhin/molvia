@@ -1296,6 +1296,10 @@
     "attached_build": "версия {build}",
     "attached_screen": "экран «{screen}»",
     "attached_code": "код {code}",
+    "languages": {
+      "ru": "русский язык",
+      "en": "английский язык"
+    },
     "platform": {
       "app": "{os}, приложение",
       "browser": "{os}, браузер"

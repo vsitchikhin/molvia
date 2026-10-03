@@ -53,17 +53,40 @@ export const feedbackPlatformSchema = z
 /** A build as `/health` names it — `v0.1.3-20-gd90f9cee` — or a copy's own name. */
 const buildSchema = z.string().regex(/^[0-9A-Za-z._+-]{1,64}$/)
 
-/** The name of the screen the sheet was opened over, without its query or parameters. */
-const routeSchema = z.string().regex(/^[a-z][a-z-]{0,39}$/)
+/**
+ * The name of the screen the sheet was opened over, without its query or parameters. Every route
+ * the app names must fit it — a test of the router holds that — or the sheet could send nothing from
+ * that screen at all (MOL-147, review №5).
+ */
+export const feedbackRouteSchema = z.string().regex(/^[a-z][a-z-]{0,39}$/)
 
-/** What the API last refused with, as the wire names it — `error.internal` (MOL-147, В-1). */
-const errorCodeSchema = z.string().regex(/^(error|issue)\.[a-z_]{1,60}$/)
+/**
+ * What the API last refused with, as the wire names it — `error.internal` (MOL-147, В-1). Every code
+ * of the registry fits it; a test holds that, for the same reason as the routes.
+ */
+export const feedbackErrorCodeSchema = z.string().regex(/^(error|issue)\.[a-z_]{1,60}$/)
+
+/** What goes with the text — everything the sheet shows under it — before the code's rule. */
+const attachedShape = {
+  locale: z.enum(LOCALES),
+  pageBuild: buildSchema.nullable(),
+  route: feedbackRouteSchema,
+  platform: feedbackPlatformSchema,
+  fromError: z.boolean(),
+  errorCode: feedbackErrorCodeSchema.nullable(),
+}
+
+// A code is what an error screen knew; a message from the settings has none to carry.
+function codeFromError({ fromError, errorCode }: { fromError: boolean; errorCode: string | null }) {
+  return fromError || errorCode === null
+}
+const codeRefused = { error: ISSUE.BODY_INVALID, path: ['errorCode'] }
 
 /**
  * The message as the sheet sends it. Everything beside the text is what the sheet shows under it
- * before sending — «Вместе с текстом: версия · экран · платформа» (MOL-150, Р-5, Р-7) — and nothing
- * else: no screen's content, no draft, no queue. The build of the API is not here: the API stamps
- * its own.
+ * before sending — «Вместе с текстом: версия · экран · язык · платформа» (MOL-150, Р-5, Р-7) — and
+ * nothing else: no screen's content, no draft, no queue. The build of the API is not here: the API
+ * stamps its own.
  *
  * `clientKey` is the phone's for this content (Р-2): the same key with the same message is the same
  * message, so a double tap or a lost answer sends the owner nothing twice (MOL-150, Р-4).
@@ -72,19 +95,19 @@ export const feedbackBodySchema = z
   .strictObject({
     kind: feedbackKindSchema,
     text: visibleText(FEEDBACK_TEXT_MAX),
-    locale: z.enum(LOCALES),
-    pageBuild: buildSchema.nullable(),
-    route: routeSchema,
-    platform: feedbackPlatformSchema,
-    fromError: z.boolean(),
-    errorCode: errorCodeSchema.nullable(),
+    ...attachedShape,
     clientKey: deviceIdSchema,
   })
-  // A code is what an error screen knew; a message from the settings has none to carry.
-  .refine(({ fromError, errorCode }) => fromError || errorCode === null, {
-    error: ISSUE.BODY_INVALID,
-    path: ['errorCode'],
-  })
+  .refine(codeFromError, codeRefused)
+
+/**
+ * What went with a text under its key, as the phone keeps it beside the draft until the content
+ * changes (MOL-147, adversarial В1): sent again, the message is the same one to the last field.
+ */
+export const feedbackAttachedSchema = z
+  .strictObject(attachedShape)
+  .refine(codeFromError, codeRefused)
+export type FeedbackAttached = z.infer<typeof feedbackAttachedSchema>
 export type FeedbackBody = z.infer<typeof feedbackBodySchema>
 
 /**

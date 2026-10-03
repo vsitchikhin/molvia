@@ -86,6 +86,46 @@ test('from an error screen: «Сломалось», the screen and the code go w
   ])
 })
 
+// The answer lost on its way back, the sheet closed and opened again from the same error: the
+// message may be the server's already, and it goes again whole — the same key with what went with
+// it — so the repeat is the same number, not a 409 and a second message (adversarial В1).
+test('a lost answer, opened again: the same message once, not a conflict and a second one', async ({
+  page,
+}) => {
+  await page.route('**/api/advice', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '{"nonsense":1}' }),
+  )
+  await signedIn(page, '/')
+  await page.getByRole('button', { name: 'Сообщить о проблеме' }).click()
+  let sheet = await opened(page)
+  await expect(sheet.locator('.attached')).toContainText('код issue.response_invalid')
+  await sheet.getByLabel('Сообщение').fill('Список не загрузился')
+  await page.route(
+    '**/api/feedback',
+    async (route) => {
+      await route.fetch()
+      await route.abort('connectionreset')
+    },
+    { times: 1 },
+  )
+  await sheet.getByRole('button', { name: 'Отправить' }).click()
+  await expect(sheet.getByText('Не получилось отправить', { exact: true })).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  await page.getByRole('button', { name: 'Сообщить о проблеме' }).click()
+  sheet = await opened(page)
+  await expect(sheet.locator('.attached')).toContainText('код issue.response_invalid')
+  const repeat = page.waitForResponse((response) => response.url().endsWith('/api/feedback'))
+  await sheet.getByRole('button', { name: 'Отправить' }).click()
+
+  expect((await repeat).status()).toBe(200)
+  await expect(sheet.getByText('Спасибо, прочитаем', { exact: true })).toBeVisible()
+  expect(await written(page)).toMatchObject([
+    { text: 'Список не загрузился', errorCode: 'issue.response_invalid' },
+  ])
+})
+
 // Opened from a link on the screen rather than from one of its own rows, the sheet still takes one
 // entry of the history: «back» puts it away and leaves the error screen where it was (сверка С-11).
 test('«back» after «Сообщить о проблеме» puts the sheet away, not the screen', async ({ page }) => {

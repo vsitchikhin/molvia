@@ -7,8 +7,12 @@
     <p class="offline" :class="{ shown: offlineWords !== '' }" role="status">
       <IconCloud v-if="offlineWords" aria-hidden="true" />{{ offlineWords }}
     </p>
+    <!-- What the answer was, said: the region is in the sheet from its opening, and only its words
+         come with the answer — «sent» and «the day's limit» born with a role of their own were often
+         not read at all (MOL-19, review №3). A failure is an alert, which is read when inserted. -->
+    <p class="spoken" role="status">{{ spoken }}</p>
 
-    <div v-if="phase === 'sent'" class="sent" role="status">
+    <div v-if="phase === 'sent'" class="sent">
       <span class="circle" aria-hidden="true"><IconCheck /></span>
       <p class="sent-title">{{ t('feedback.sent.title') }}</p>
       <p class="sent-body">{{ t('feedback.sent.body') }}</p>
@@ -45,7 +49,7 @@
     </template>
 
     <template #footer>
-      <div v-if="phase === 'limited'" class="note warn" role="status">
+      <div v-if="phase === 'limited'" class="note warn">
         <IconAlert aria-hidden="true" />
         <div>
           <p class="note-title">{{ t('feedback.limit.title') }}</p>
@@ -85,7 +89,7 @@ import {
   type Component,
 } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import {
   ERROR,
@@ -95,7 +99,13 @@ import {
   pickLocale,
   tidyText,
 } from '@molvia/model'
-import type { FEEDBACK_SYSTEMS, FeedbackBody, FeedbackKind } from '@molvia/model'
+import type {
+  FEEDBACK_SYSTEMS,
+  FeedbackAttached,
+  FeedbackBody,
+  FeedbackKind,
+  AppLocale,
+} from '@molvia/model'
 import IconAlert from '~icons/mdi/alert-outline'
 import IconFailed from '~icons/mdi/alert-circle-outline'
 import IconCheck from '~icons/mdi/check'
@@ -131,6 +141,11 @@ const SYSTEM_KEYS: Record<System, string> = {
   windows: 'feedback.systems.windows',
   linux: 'feedback.systems.linux',
   other: 'feedback.systems.other',
+}
+
+const LANGUAGE_KEYS: Record<AppLocale, string> = {
+  ru: 'feedback.languages.ru',
+  en: 'feedback.languages.en',
 }
 
 const PLACEHOLDER_KEYS: Record<FeedbackKind | '', string> = {
@@ -176,6 +191,7 @@ export default defineComponent({
   setup() {
     const { t, locale } = useI18n()
     const route = useRoute()
+    const router = useRouter()
     const sheet = useFeedbackSheetStore()
     const actor = useActorStore()
     const update = usePwaUpdate()
@@ -189,15 +205,16 @@ export default defineComponent({
     const kinds = ref<{ $el?: HTMLElement } | null>(null)
     const field = ref<{ $el?: HTMLElement } | null>(null)
 
-    /** What the opening attaches: the screen it was opened over, the build, the platform, the code. */
-    const context = ref({
-      route: '',
-      screen: '',
-      pageBuild: null as string | null,
-      platform: '',
-      code: null as string | null,
-    })
-    const fromError = computed(() => sheet.entry.from === 'error')
+    /** What this opening attaches: the screen it was opened over, the build, the platform, the code. */
+    const opened = ref<FeedbackAttached | null>(null)
+    /**
+     * What went with the text the first time it left under the present key — the message, to the
+     * last field, as the server may already hold it (adversarial В1, В2). Let go with the key, when
+     * the kind or the text changes; until then it is what the sheet shows and sends again.
+     */
+    const frozen = ref<FeedbackAttached | null>(null)
+    const attached = computed(() => frozen.value ?? opened.value)
+    const fromError = computed(() => attached.value?.fromError ?? sheet.entry.from === 'error')
 
     // Which opening of the sheet this is: an answer to one closed meanwhile is not this one's.
     let opening = 0
@@ -210,25 +227,28 @@ export default defineComponent({
         opening += 1
         if (!shown) return
         const entry = sheet.entry
-        context.value = {
-          route: typeof route.name === 'string' ? route.name : '',
-          screen: t(route.meta.titleKey),
+        opened.value = {
+          locale: pickLocale(locale.value),
           pageBuild: update.build(),
+          route: typeof route.name === 'string' ? route.name : '',
           platform: platformLine(),
-          code: entry.from === 'error' ? entry.code : null,
+          fromError: entry.from === 'error',
+          errorCode: entry.from === 'error' ? entry.code : null,
         }
         connected.value = navigator.onLine
         phase.value = 'idle'
         unsupported.value = false
         const draft = recallFeedbackDraft(actor.id)
         recalling = true
-        kind.value = entry.from === 'error' ? 'bug' : (draft?.kind ?? '')
+        frozen.value = draft?.attached ?? null
+        // «Сломалось» from an error screen is this opening's, in memory: closed untouched, the draft
+        // keeps the kind the person chose (adversarial В4). A message that may have left already is
+        // the same one, kind and all.
+        kind.value = entry.from === 'error' && frozen.value === null ? 'bug' : (draft?.kind ?? '')
         text.value = draft?.text ?? ''
         clientKey.value = draft?.clientKey ?? newId()
         await nextTick()
         recalling = false
-        // A changed kind — «Сломалось» over a draft of an idea — is new content, with a key of its own.
-        if (draft !== null && kind.value !== draft.kind) changed()
         focusFirst()
       },
     )
@@ -242,13 +262,20 @@ export default defineComponent({
       target?.focus()
     }
 
-    function changed(): void {
-      clientKey.value = newId()
+    function keep(): void {
       keepFeedbackDraft(actor.id, {
         kind: kind.value,
         text: text.value,
         clientKey: clientKey.value,
+        ...(frozen.value === null ? {} : { attached: frozen.value }),
       })
+    }
+
+    /** New content: a key of its own, and what goes with it is this opening's again. */
+    function changed(): void {
+      clientKey.value = newId()
+      frozen.value = null
+      keep()
     }
 
     watch([kind, text], () => {
@@ -277,30 +304,32 @@ export default defineComponent({
         : t('feedback.platform.browser', { os })
     }
 
+    /** The title of a screen by its route's name — the screen the message is about. */
+    function screenOf(name: string): string {
+      const titleKey = router.getRoutes().find((record) => record.name === name)?.meta.titleKey
+      return titleKey === undefined ? name : t(titleKey)
+    }
+
     const attachedWords = computed(() => {
-      const { pageBuild, screen, platform, code } = context.value
+      const sent = attached.value
+      if (sent === null) return ''
       return [
-        pageBuild === null ? null : t('feedback.attached_build', { build: pageBuild }),
-        t('feedback.attached_screen', { screen }),
-        platformWords(platform),
-        code === null ? null : t('feedback.attached_code', { code }),
+        sent.pageBuild === null ? null : t('feedback.attached_build', { build: sent.pageBuild }),
+        t('feedback.attached_screen', { screen: screenOf(sent.route) }),
+        t(LANGUAGE_KEYS[sent.locale]),
+        platformWords(sent.platform),
+        sent.errorCode === null ? null : t('feedback.attached_code', { code: sent.errorCode }),
       ]
         .filter((part) => part !== null && part !== '')
         .join(' · ')
     })
 
     const body = computed(() => {
-      if (kind.value === '') return null
-      const { route: name, pageBuild, platform, code } = context.value
+      if (kind.value === '' || attached.value === null) return null
       const parsed = feedbackBodySchema.safeParse({
         kind: kind.value,
         text: tidyText(text.value),
-        locale: pickLocale(locale.value),
-        pageBuild,
-        route: name,
-        platform,
-        fromError: fromError.value,
-        errorCode: code,
+        ...attached.value,
         clientKey: clientKey.value,
       } satisfies Record<keyof FeedbackBody, unknown>)
       return parsed.success ? parsed.data : null
@@ -339,6 +368,9 @@ export default defineComponent({
       }
       const mine = opening
       const owner = actor.id
+      // From here the server may hold it: what went with it stays with the key (В1).
+      frozen.value = attached.value
+      keep()
       phase.value = 'sending'
       try {
         await api.sendFeedback(message)
@@ -381,6 +413,12 @@ export default defineComponent({
     const offlineWords = computed(() =>
       settled.value && !connected.value && phase.value !== 'sent' ? t('feedback.offline') : '',
     )
+    const spoken = computed(() => {
+      if (phase.value === 'sent') return `${t('feedback.sent.title')}. ${t('feedback.sent.body')}`
+      if (phase.value === 'limited')
+        return `${t('feedback.limit.title')}. ${t('feedback.limit.body')}`
+      return ''
+    })
 
     function sync(): void {
       connected.value = navigator.onLine
@@ -409,6 +447,7 @@ export default defineComponent({
       placeholder,
       attachedWords,
       offlineWords,
+      spoken,
       waiting,
       action,
       press,
@@ -446,6 +485,10 @@ export default defineComponent({
     width: var(--space-6);
     height: var(--space-6);
   }
+}
+
+.spoken {
+  @include visually-hidden;
 }
 
 .text :deep(textarea) {
