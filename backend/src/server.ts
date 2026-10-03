@@ -39,6 +39,7 @@ import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
 import { sessionRoutes } from '@/routes/sessions'
 import { exchangeRoutes } from '@/routes/exchanges'
+import { feedbackRoutes } from '@/routes/feedback'
 import { advice, adviceSearch } from '@/usecases/advice'
 import { ownNever } from '@/usecases/own-never'
 import { ownPrices } from '@/usecases/own-prices'
@@ -46,6 +47,7 @@ import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
 import { exportMine } from '@/usecases/export-mine'
+import { sendFeedback } from '@/usecases/send-feedback'
 import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
@@ -159,6 +161,7 @@ import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
 import { createExportRepository } from '@/db/export-repository'
+import { createFeedbackRepository } from '@/db/feedback-repository'
 import { createReminderRepository } from '@/db/reminders-repository'
 import { authTransactOn } from '@/db/auth-unit-of-work'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
@@ -173,6 +176,7 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.LOGIN_UNAVAILABLE]: 404,
   [ERROR.LOGIN_FORBIDDEN]: 403,
   [ERROR.LOGIN_RATE_LIMITED]: 429,
+  [ERROR.FEEDBACK_RATE_LIMITED]: 429,
   [ERROR.LOGIN_DISABLED]: 503,
   [ERROR.BOT_UNAUTHORIZED]: 401,
   // The request is well formed; another row already holds what it claims — a barcode that
@@ -472,6 +476,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const reader = options.receiptReader ?? null
     let stopReceiptCleanup: (() => Promise<void>) | undefined
     let receiptQueue: ReturnType<typeof startItemEmbedding> | undefined
+    const messages = createFeedbackRepository(db)
     let stopCleanup: (() => Promise<void>) | undefined
     let stopExchangeCleanup: (() => Promise<void>) | undefined
     let stopIncomeCleanup: (() => Promise<void>) | undefined
@@ -479,6 +484,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopTripCleanup: (() => Promise<void>) | undefined
     let stopAccountCleanup: (() => Promise<void>) | undefined
     let stopSessionCleanup: (() => Promise<void>) | undefined
+    let stopFeedbackCleanup: (() => Promise<void>) | undefined
     let stopFailureCleanup: (() => Promise<void>) | undefined
     const embedder = options.embedder?.(instance.log) ?? NO_EMBEDDER
     let itemEmbedding: ReturnType<typeof startItemEmbedding> | undefined
@@ -544,6 +550,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         },
         (error) => {
           failures.report(error, job('failure-cleanup'), 'failure cleanup failed')
+        },
+      )
+      // A message to the developer lives a year from the last word of its thread (MOL-147, В-4 of
+      // MOL-150), whether or not anyone writes again.
+      stopFeedbackCleanup = startLoginCleanup(
+        () => messages.purgeStale(),
+        (error) => {
+          failures.report(error, job('feedback-cleanup'), 'stale feedback cleanup failed')
         },
       )
       // The vectors of the catalogue (MOL-105): a minute timer of their own, nudged after a
@@ -620,6 +634,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopTripCleanup?.()
       await stopAccountCleanup?.()
       await stopSessionCleanup?.()
+      await stopFeedbackCleanup?.()
       await stopFailureCleanup?.()
       await itemEmbedding?.stop()
       await stopReceiptCleanup?.()
@@ -707,6 +722,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       )
       actorEraseRoute(guarded, (telegramUserId) =>
         eraseMe(createErasureRepository(db), telegramUserId),
+      )
+      feedbackRoutes(guarded, (actorId, message) =>
+        sendFeedback(messages, actorId, message, VERSION),
       )
       sessionRoutes(guarded, {
         list: (actorId, currentId) => listSessions(sessions, actorId, currentId),

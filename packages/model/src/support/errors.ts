@@ -93,6 +93,11 @@ export const ERROR = {
   RECEIPT_NOT_PHOTO: 'error.receipt_not_photo',
   /** A part of a receipt whose sides pass `RECEIPT_SIDE_MAX`: the phone sends at most 3 200 px. */
   RECEIPT_TOO_LARGE: 'error.receipt_too_large',
+  /**
+   * A message to the developer past `FEEDBACK_DAY_LIMIT` in a rolling day (MOL-147). The sheet keeps
+   * the text and says to send it tomorrow.
+   */
+  FEEDBACK_RATE_LIMITED: 'error.feedback_rate_limited',
 } as const
 
 export type ErrorCode = (typeof ERROR)[keyof typeof ERROR]

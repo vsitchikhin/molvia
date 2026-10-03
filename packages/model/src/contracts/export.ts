@@ -26,9 +26,10 @@ export const EXPORT_FORMAT = 'molvia-export'
 // the sum typed from the receipt, when it last changed and when it was first typed (MOL-78). 4: an
 // exchange's `channel` (MOL-137). 5: `addedBarcodes`, the codes the person wrote to items of the
 // catalogue (MOL-100). 6: the account's `remindersOff`, whether and why the bot does not remind
-// (MOL-103). 7: `budgetPlans`, what the person plans a month of «Бюджет» at (MOL-117). 8: `receipts`,
+// (MOL-103). 7: `budgetPlans`, what the person plans a month of «Бюджет» at (MOL-117). 8: `feedback`,
+// what the person wrote to the developer and the owner's replies (MOL-147). 9: `receipts`,
 // the receipts photographed and what the reader laid them out into — never the photo (MOL-125).
-export const EXPORT_VERSION = 8
+export const EXPORT_VERSION = 9
 
 const day = z.iso.date()
 
@@ -377,6 +378,34 @@ const addedBarcodeSchema = z.strictObject({
   addedAt: isoDate,
 })
 
+/**
+ * A message to the developer (MOL-147), a thread's continuation too, with the owner's replies to it.
+ * `thread` is the number of the thread's first message, `inReplyTo` the reply a continuation answers.
+ */
+const feedbackSchema = z.strictObject({
+  number: z.int(),
+  kind: z.string(),
+  text: z.string(),
+  locale: z.string(),
+  pageBuild: z.string().nullable(),
+  apiBuild: z.string(),
+  route: z.string().nullable(),
+  platform: z.string().nullable(),
+  errorCode: z.string().nullable(),
+  fromError: z.boolean(),
+  thread: z.int().nullable(),
+  inReplyTo: z.int().nullable(),
+  createdAt: isoDate,
+  replies: z.array(
+    z.strictObject({
+      number: z.int(),
+      text: z.string(),
+      delivered: z.string().nullable(),
+      createdAt: isoDate,
+    }),
+  ),
+})
+
 /** Names for the ids the person's rows point at — shared data, given only so the file reads. */
 const catalogueSchema = z.strictObject({
   items: z.array(z.strictObject({ id: z.uuid(), kind: itemKindSchema, name: z.string() })),
@@ -413,6 +442,7 @@ export const exportContentCodec = z.strictObject({
   accountChecks: z.array(accountCheckSchema),
   proposedItems: z.array(proposedItemSchema),
   addedBarcodes: z.array(addedBarcodeSchema),
+  feedback: z.array(feedbackSchema),
   catalogue: catalogueSchema,
 })
 export type ExportContent = z.output<typeof exportContentCodec>

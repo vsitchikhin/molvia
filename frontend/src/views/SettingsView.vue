@@ -89,6 +89,31 @@
         </li>
       </AppCard>
     </section>
+    <!-- «Написать разработчику» (MOL-147): opens the app's one sheet rather than a screen, as «Выйти»
+         and «Удалить мои данные» do, so there is no chevron. Offline it opens all the same: written
+         now, sent once there is a connection. -->
+    <section class="group">
+      <h2 class="caption">{{ t('settings.group_app') }}</h2>
+      <AppCard as="ul" list>
+        <li>
+          <button
+            class="entry plain"
+            type="button"
+            aria-haspopup="dialog"
+            :aria-describedby="`${id}-feedback`"
+            @click="feedback.open({ from: 'settings' })"
+          >
+            <IconMessage class="entry-icon" aria-hidden="true" />
+            <span class="entry-text">
+              <span class="entry-label">{{ t('settings.feedback.label') }}</span>
+              <span :id="`${id}-feedback`" class="entry-hint">{{
+                t('settings.feedback.hint')
+              }}</span>
+            </span>
+          </button>
+        </li>
+      </AppCard>
+    </section>
     <YourDataGroup />
     <SignOutSheet
       v-model:open="leaveOpen"
@@ -155,6 +180,7 @@ import IconRefresh from '~icons/mdi/refresh'
 import IconChevron from '~icons/mdi/chevron-right'
 import IconDevices from '~icons/mdi/devices'
 import IconLogout from '~icons/mdi/logout'
+import IconMessage from '~icons/mdi/message-text-outline'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -168,6 +194,7 @@ import ScreenState from '@/components/ScreenState.vue'
 import SignOutSheet from '@/components/SignOutSheet.vue'
 import YourDataGroup from '@/components/YourDataGroup.vue'
 import { useSettings } from '@/composables/useSettings'
+import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import { useSignOutStore } from '@/stores/signOut'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
@@ -185,6 +212,7 @@ export default defineComponent({
     IconCloud,
     IconDevices,
     IconLogout,
+    IconMessage,
     IconPencil,
     IconRefresh,
     RemindersGroup,
@@ -248,6 +276,7 @@ export default defineComponent({
       signOut,
       unsent,
       askToLeave,
+      feedback: useFeedbackSheetStore(),
     }
   },
 })
@@ -375,16 +404,31 @@ export default defineComponent({
   flex: 1;
 }
 
-// A button dressed as the link beside it: the same row, the colour of an action that ends
-// something (MOL-57).
-.leave {
+.entry-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) 0;
+}
+
+.entry-hint {
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+}
+
+// A button dressed as the link beside it: the same row.
+.leave,
+.plain {
   width: 100%;
   border: 0;
   background: transparent;
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
 
+// The colour of an action that ends something (MOL-57).
+.leave {
   &,
   .entry-icon {
     color: var(--bad-ink);

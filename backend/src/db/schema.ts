@@ -27,6 +27,9 @@ import {
   BUDGET_PERCENT_MAX,
   DEVICE_NAME_MAX,
   EVENT,
+  FEEDBACK_DELIVERY,
+  FEEDBACK_KINDS,
+  LOCALES,
   LOGIN_CODE_MAX,
   REMINDERS_OFF,
   baseUnitSchema,
@@ -52,7 +55,6 @@ import {
   rateSourceSchema,
   RECEIPT_PARTS_MAX,
   RECEIPT_PART_BYTES_MAX,
-  LOCALES,
   receiptCountrySchema,
   receiptFailureSchema,
   receiptStatusSchema,
@@ -63,6 +65,8 @@ import type {
   BaseUnit,
   Currency,
   EventPayload,
+  FeedbackDelivery,
+  FeedbackKind,
   RemindersOff,
   ExchangeChannel,
   IncomeSource,
@@ -1679,6 +1683,93 @@ export const reminderDays = pgTable(
     check(
       'reminder_days_counts_non_negative',
       sql`least(${table.firstSteps}, ${table.secondSteps}, ${table.thirdSteps}, ${table.items}, ${table.rated}, ${table.offButton}, ${table.offSettings}, ${table.offBlocked}) >= 0`,
+    ),
+  ],
+)
+
+/**
+ * «Написать разработчику» (MOL-147): what a person wrote to the one who builds the app. Not a
+ * review — `verdicts.review` is that — so nothing reads it but the owner. The `id` is the number the
+ * owner sees, `#fb42`, so it is the server's and counts up.
+ *
+ * A thread is its first message and what follows it (MOL-150, В-1): `thread_id` names the first
+ * message on a continuation and is empty on the first, `in_reply_to` the owner's reply a continuation
+ * answers. The continuations come from the bot (MOL-148), and so do the empty `route`, `platform`
+ * and `client_key`: Telegram has no screen and no key to repeat by. A thread lives a year from its
+ * last message (В-4).
+ */
+export const feedback = pgTable(
+  'feedback',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<FeedbackKind>().notNull(),
+    text: text('text').notNull(),
+    locale: text('locale').notNull(),
+    pageBuild: text('page_build'),
+    apiBuild: text('api_build').notNull(),
+    route: text('route'),
+    platform: text('platform'),
+    errorCode: text('error_code'),
+    fromError: boolean('from_error').notNull().default(false),
+    threadId: bigint('thread_id', { mode: 'number' }),
+    inReplyTo: bigint('in_reply_to', { mode: 'number' }).references(
+      (): AnyPgColumn => feedbackReplies.id,
+      { onDelete: 'cascade' },
+    ),
+    clientKey: uuid('client_key'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    // A repeat of the same content is found by its key, within one person (MOL-150, Р-4).
+    unique('feedback_actor_client_key').on(table.actorId, table.clientKey),
+    unique('feedback_id_actor_key').on(table.id, table.actorId),
+    // A continuation belongs to a thread of the same person, and goes with its first message.
+    foreignKey({
+      name: 'feedback_thread_is_owners',
+      columns: [table.threadId, table.actorId],
+      foreignColumns: [table.id, table.actorId],
+    }).onDelete('cascade'),
+    // The day's limit counts one person's messages over a window.
+    index('feedback_actor_created_idx').on(table.actorId, table.createdAt),
+    index('feedback_thread_idx').on(table.threadId),
+    check('feedback_kind_known', oneOf(table.kind, FEEDBACK_KINDS)),
+    check('feedback_locale_known', oneOf(table.locale, LOCALES)),
+    // A code is what an error screen knew; a message from the settings has none.
+    check('feedback_code_from_error', sql`${table.errorCode} is null or ${table.fromError}`),
+    check(
+      'feedback_thread_not_itself',
+      sql`${table.threadId} is null or ${table.threadId} < ${table.id}`,
+    ),
+  ],
+)
+
+/**
+ * The owner's replies (MOL-150, Р-1), written by the bot's half (MOL-148). Kept so the copy is whole
+ * and a continuation shows the owner what is answered; they go with their message.
+ */
+export const feedbackReplies = pgTable(
+  'feedback_replies',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    feedbackId: bigint('feedback_id', { mode: 'number' })
+      .notNull()
+      .references(() => feedback.id, { onDelete: 'cascade' }),
+    text: text('text').notNull(),
+    delivered: text('delivered').$type<FeedbackDelivery>(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    index('feedback_replies_feedback_idx').on(table.feedbackId),
+    check(
+      'feedback_replies_delivered_known',
+      sql`${table.delivered} is null or ${oneOf(table.delivered, FEEDBACK_DELIVERY)}`,
     ),
   ],
 )

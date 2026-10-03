@@ -7,6 +7,8 @@ import {
   itemBarcodes,
   exchanges,
   expenses,
+  feedback,
+  feedbackReplies,
   incomeRevisions,
   incomes,
   moneyAccountChecks,
@@ -250,5 +252,34 @@ export async function aLife(
   await insertSession(db, { actorId })
   await insertLoginRequest(db, { telegramUserId }) // confirmed, not yet collected
   await insertLoginRequest(db, { telegramUserId, consumedAt: new Date() })
+  // What the person wrote to the developer (MOL-147): a message, the owner's reply, and the
+  // person's answer to it — a thread whole.
+  const [message] = await db
+    .insert(feedback)
+    .values({
+      actorId,
+      kind: 'bug',
+      text: 'Не открывается «Деньги»',
+      locale: 'ru',
+      apiBuild: 'dev',
+      route: 'money',
+      platform: 'ios 18 app',
+      clientKey: randomUUID(),
+    })
+    .returning({ id: feedback.id })
+  if (message === undefined) throw new Error('no message')
+  const [reply] = await db
+    .insert(feedbackReplies)
+    .values({ feedbackId: message.id, text: 'Починили', delivered: 'sent' })
+    .returning({ id: feedbackReplies.id })
+  await db.insert(feedback).values({
+    actorId,
+    kind: 'bug',
+    text: 'Спасибо, работает',
+    locale: 'ru',
+    apiBuild: 'dev',
+    threadId: message.id,
+    inReplyTo: reply?.id,
+  })
   return { ownItem, exchangeId, incomeId, spendingId, accountId, receiptId }
 }

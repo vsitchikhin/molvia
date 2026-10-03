@@ -108,8 +108,15 @@ describe('словарь: повторяющиеся тексты', () => {
     // решение, за которое заплачено. Поэтому цена закреплена снимком: новый незаявленный
     // дубль уронит тест, а заявленные видно списком.
     expect(duplicates(RU)).toEqual({
-      // Один глагол у двух шторок: закончить с балансом счёта и с цифрами штрихкода (MOL-98).
-      Готово: ['accounts.done', 'scanner.done'],
+      // Один глагол у трёх шторок: закончить с балансом счёта, с цифрами штрихкода (MOL-98) и с
+      // отправленным сообщением разработчику (MOL-147).
+      Готово: ['accounts.done', 'feedback.done', 'scanner.done'],
+      // Строка входа и заголовок шторки, которую она открывает, — одни слова (MOL-147): человек
+      // видит, что попал туда, куда нажал. И у ссылки экрана ошибки так же.
+      'Написать разработчику': ['feedback.title', 'settings.feedback.label'],
+      'Сообщить о проблеме': ['feedback.title_error', 'state.report'],
+      // Одно состояние отправки у трат и у сообщения разработчику (MOL-147).
+      'Отправляем…': ['feedback.sending', 'spending.pending'],
       // Подпись таба и заголовок экрана — разные роли одного слова, живут отдельно осознанно; у
       // «Покупок» — ещё шеврон записанных покупок и строка приватности о том же (MOL-128).
       Покупки: [
@@ -218,7 +225,10 @@ describe('словарь: повторяющиеся тексты', () => {
     // проверка по обоим.
     expect(duplicates(EN)).toEqual({
       // One verb for two sheets, as in Russian: an account's balance, a barcode's digits (MOL-98).
-      Done: ['accounts.done', 'scanner.done'],
+      Done: ['accounts.done', 'feedback.done', 'scanner.done'],
+      'Write to the developer': ['feedback.title', 'settings.feedback.label'],
+      'Report a problem': ['feedback.title_error', 'state.report'],
+      'Sending…': ['feedback.sending', 'spending.pending'],
       Purchases: [
         'nav.purchases',
         'privacy.stored.purchases.term',
@@ -281,7 +291,7 @@ describe('словарь: повторяющиеся тексты', () => {
       'Save the amendment': ['exchange.sheet.save_amend', 'income.sheet.save_amend'],
       'Now recorded: {details}': ['exchange.sheet.current', 'income.sheet.current'],
       Categories: ['spending.categories.title', 'spending.categories_link'],
-      Other: ['income.source.other', 'spending.category.other'],
+      Other: ['feedback.kinds.other', 'income.source.other', 'spending.category.other'],
       Amount: ['income.sheet.amount', 'spending.sheet.amount', 'trip.receipt.sheet.label'],
       // English has one word where Russian says «было до обмена» and «было до поступления».
       'held before {amount}': ['exchange.sheet.current_held', 'income.sheet.current_held'],
@@ -365,6 +375,7 @@ describe('словарь: плюральные формы', () => {
       'exchange.vs_market.uncounted',
       'exchange.vs_market.count',
       'sign_out.unsent',
+      'field.left',
       'accounts.more',
       'accounts.unassigned',
       'accounts.screen.uncounted',

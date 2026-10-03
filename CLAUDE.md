@@ -367,6 +367,22 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Logs live fourteen days and carry no address and no query**; a failure is logged by its kind
   through `describeFailure`, never by its message.
 
+### Feedback: «Написать разработчику» — `.claude/rules/feedback.md`
+
+- **A message to the developer is never a review** (MOL-141): it feeds nothing, and the word «отзыв»
+  is not used for it; **the kind is the person's**, the schema has no default (MOL-146).
+- **Only what is named goes with the text, and the sheet shows it before sending** (MOL-150, Р-5, Р-7):
+  the page's build, the route's name, the platform as `feedbackPlatformSchema` checks it, the language,
+  an error's code; the API stamps its own build.
+- **A repeat is the same message by `clientKey`, and the phone takes a new key when the content
+  changes** (MOL-147, Р-2): the same key with another content is a `409`; at most ten a rolling day,
+  under the author's lock, `429`.
+- **A thread lives a year from its last message, the owner's reply included** (В-4), and goes with the
+  person.
+- **One sheet, two ways in** (MOL-147): «О приложении» in the settings and «Сообщить о проблеме» drawn
+  by `ScreenState` — only a full-screen error, somebody known, not in a `<dialog>`; the draft is the
+  device's with no queue, and what goes with the text is read from the body it sends.
+
 ### Failures and the owner's channel — `.claude/rules/observability.md`
 
 - **A failure belongs to nobody** (MOL-143): `failures` holds the fingerprint — source, kind, code,

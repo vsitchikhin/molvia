@@ -26,6 +26,8 @@ import {
   exchangeAmendBodySchema,
   exchangeBodySchema,
   exchangesResponseCodec,
+  feedbackBodySchema,
+  feedbackSentCodec,
   incomeAmendBodySchema,
   incomeBodySchema,
   incomesResponseCodec,
@@ -96,6 +98,8 @@ import type {
   CatalogueSearchResponse,
   ExchangeAmendBody,
   ExchangeBody,
+  FeedbackBody,
+  FeedbackSent,
   ExchangesResponse,
   IncomeAmendBody,
   IncomeBody,
@@ -201,6 +205,12 @@ export interface MolviaClient {
   exportMine(options?: {
     readonly signal?: AbortSignal
   }): Promise<{ readonly text: string; readonly exportedAt: Date }>
+  /**
+   * «Написать разработчику» (MOL-147): the message under the phone's key for its content — the same
+   * message again answers with the same number and `created: false`. Past the day's limit it
+   * rejects with `error.feedback_rate_limited`.
+   */
+  sendFeedback(body: FeedbackBody): Promise<{ sent: FeedbackSent; created: boolean }>
   /**
    * Ends one of the owner's sessions. `error.not_found` is the answer for one that is already
    * gone, someone else's and one that never was — a screen reads it as done.
@@ -575,6 +585,13 @@ export function createClient(options: ClientOptions): MolviaClient {
         ...(options.signal === undefined ? {} : { signal: options.signal }),
       })
       return { text: JSON.stringify(file, null, 2), exportedAt: new Date(file.exportedAt) }
+    },
+    sendFeedback: async (body) => {
+      const { status, data } = await exchange('/feedback', feedbackSentCodec, {
+        method: 'POST',
+        body: encode(feedbackBodySchema, body),
+      })
+      return { sent: data, created: status === 201 }
     },
     endSession: async (id) => {
       noContent(await exchange(`/sessions/${segment(id)}`, z.undefined(), { method: 'DELETE' }))

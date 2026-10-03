@@ -13,7 +13,8 @@
   },
   "state": {
     "loading": "Loading…",
-    "retry": "Try again"
+    "retry": "Try again",
+    "report": "Report a problem"
   },
   "trip": {
     "title": "Entry",
@@ -1164,7 +1165,8 @@
     "barcodes_full": "This item already holds twenty codes — no more can be added",
     "barcode_in_store": "This is a shop's own label — such a code is not saved to the catalogue",
     "receipt_not_photo": "This is not a photo of a receipt. Take it again",
-    "receipt_too_large": "The photo is too large. Take the receipt again"
+    "receipt_too_large": "The photo is too large. Take the receipt again",
+    "feedback_rate_limited": "That is a lot of messages for today. Your text is saved — send it tomorrow"
   },
   "settings": {
     "title": "Settings",
@@ -1270,7 +1272,74 @@
     "erase": {
       "label": "Delete my data",
       "hint": "Everything, for good"
+    },
+    "group_app": "About the app",
+    "feedback": {
+      "label": "Write to the developer",
+      "hint": "A bug, an idea or a question. The reply comes in Telegram"
     }
+  },
+  "feedback": {
+    "title": "Write to the developer",
+    "title_error": "Report a problem",
+    "kind_label": "About",
+    "kinds": {
+      "bug": "Broken",
+      "idea": "Idea",
+      "other": "Other"
+    },
+    "text_label": "Message",
+    "placeholder": {
+      "bug": "What you did and what went wrong",
+      "idea": "What's missing",
+      "any": "Write it as it is"
+    },
+    "attached": "Sent along:",
+    "attached_build": "version {build}",
+    "attached_screen": "screen “{screen}”",
+    "attached_code": "code {code}",
+    "languages": {
+      "ru": "Russian",
+      "en": "English"
+    },
+    "platform": {
+      "app": "{os}, app",
+      "browser": "{os}, browser"
+    },
+    "systems": {
+      "ios": "iOS",
+      "ipados": "iPadOS",
+      "android": "Android",
+      "macos": "macOS",
+      "windows": "Windows",
+      "linux": "Linux",
+      "other": "another system"
+    },
+    "send": "Send",
+    "sending": "Sending…",
+    "done": "Done",
+    "need_kind": "Choose what it's about",
+    "need_text": "Write a message",
+    "need_network": "You can send it once online",
+    "need_tomorrow": "You can send it tomorrow",
+    "offline": "No connection. The text is saved — send it once you're back online",
+    "unsupported": "The message has a character that can't be sent",
+    "sent": {
+      "title": "Thanks, we'll read it",
+      "body": "If we reply, it will come in Telegram, from the Molvia bot"
+    },
+    "limit": {
+      "title": "That's a lot of messages for today",
+      "body": "The text is saved — send it tomorrow"
+    },
+    "failed": {
+      "title": "Couldn't send",
+      "body": "The text is still here — try again"
+    }
+  },
+  "field": {
+    "left": "{n} character left | {n} characters left",
+    "full": "That's the limit: {max} characters"
   },
   "privacy": {
     "title": "Data and privacy",
@@ -1321,6 +1390,10 @@
       "reminders": {
         "term": "Rating reminders",
         "text": "When the bot last reminded you to rate your purchases, and which reminder in a row it was — so that it writes less often if you do not answer. And whether the reminders are off — by you, or because you blocked the bot. The message itself carries the item and the shop to Telegram: otherwise the question would not say what it is about."
+      },
+      "feedback": {
+        "term": "Messages to the developer",
+        "text": "What you wrote in «Write to the developer», its kind, and what goes with the text: the app version, the screen, the phone’s system and whether it is the app or a browser, the language, and from an error screen its code. And the developer’s replies. Only the developer reads them. A copy of the message reaches the developer in Telegram without your name or account number, and stays in that chat even after the message is deleted here. Kept for a year from the last message of the conversation."
       },
       "search": {
         "term": "Search picks",

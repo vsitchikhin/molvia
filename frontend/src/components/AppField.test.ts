@@ -1,10 +1,11 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
-import { defineComponent, h, ref } from 'vue'
+import { describe, expect, it, vi } from 'vitest'
+import { defineComponent, h, nextTick, ref } from 'vue'
 import { ERROR } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import AppField from '@/components/AppField.vue'
+import { LINGER_MS } from '@/composables/useAnnouncer'
 
 type Props = InstanceType<typeof AppField>['$props']
 
@@ -179,4 +180,129 @@ it('opens native select, preserves its label and all descriptions, and emits the
   await select.setValue('AMD')
   expect(view.emitted('update:modelValue')).toEqual([['AMD']])
   view.unmount()
+})
+
+describe('the count of what is left (MOL-147)', () => {
+  const counted = (value: string, counterFrom: number | null = 200) =>
+    render({ modelValue: value, kind: 'multiline', counterFrom }, {}, { maxlength: '2000' })
+
+  it('is silent while more than its share is left — 1799 characters say nothing', () => {
+    const view = counted('a'.repeat(1799))
+    expect(view.get('.counter').text()).toBe('')
+    view.unmount()
+  })
+
+  it('counts from exactly its share: 1800 typed, 200 left', () => {
+    const view = counted('a'.repeat(1800))
+    expect(view.get('.counter').text()).toBe('200 characters left')
+    view.unmount()
+  })
+
+  it('counts down as it is typed, in the plural of the language', () => {
+    const view = counted('a'.repeat(1866))
+    expect(view.get('.counter').text()).toBe('134 characters left')
+    view.unmount()
+    const one = counted('a'.repeat(1999))
+    expect(one.get('.counter').text()).toBe('1 character left')
+    one.unmount()
+  })
+
+  it('says the bound once nothing more fits', () => {
+    const view = counted('a'.repeat(2000))
+    expect(view.get('.counter').text()).toBe("That's the limit: 2000 characters")
+    view.unmount()
+  })
+
+  it('is read with the field, not announced at every letter (review №4)', () => {
+    const view = counted('a'.repeat(1866))
+    const counter = view.get('.counter')
+    expect(counter.attributes('aria-live')).toBeUndefined()
+    expect(view.get('textarea').attributes('aria-describedby')).toContain(counter.attributes('id'))
+    view.unmount()
+  })
+
+  it('says what is left as a mark is passed on the way down — the count coming, 100, 20, the end', async () => {
+    const view = counted('')
+    const region = view.get('.counter-spoken')
+    expect(region.attributes('aria-live')).toBe('polite')
+    expect(region.text()).toBe('')
+
+    const said: string[] = []
+    for (const length of [1799, 1800, 1801, 1899, 1900, 1950, 1979, 1980, 1999, 2000]) {
+      await view.setProps({ modelValue: 'a'.repeat(length) })
+      said.push(region.text())
+    }
+
+    expect(said).toEqual([
+      '',
+      '200 characters left',
+      '200 characters left',
+      '200 characters left',
+      '100 characters left',
+      '100 characters left',
+      '100 characters left',
+      '20 characters left',
+      '20 characters left',
+      "That's the limit: 2000 characters",
+    ])
+    view.unmount()
+  })
+
+  it('says what is truly left after a paste past two marks, not the mark (adversarial Н3)', async () => {
+    const view = counted('a'.repeat(1700))
+    await view.setProps({ modelValue: 'a'.repeat(1950) })
+    expect(view.get('.counter-spoken').text()).toBe('50 characters left')
+    view.unmount()
+  })
+
+  it('must not speak when the text gets shorter: erasing is heard by the field itself', async () => {
+    const view = counted('a'.repeat(1979))
+    await view.setProps({ modelValue: 'a'.repeat(1985) })
+    expect(view.get('.counter-spoken').text()).toBe('15 characters left')
+
+    await view.setProps({ modelValue: 'a'.repeat(1979) })
+
+    expect(view.get('.counter-spoken').text()).toBe('15 characters left')
+    expect(view.get('.counter').text()).toBe('21 characters left')
+    view.unmount()
+  })
+
+  it('lets its words go after a while, or browse mode would read them as still true', async () => {
+    vi.useFakeTimers()
+    const view = counted('a'.repeat(1799))
+    await view.setProps({ modelValue: 'a'.repeat(1800) })
+    expect(view.get('.counter-spoken').text()).toBe('200 characters left')
+
+    vi.advanceTimersByTime(LINGER_MS)
+    await nextTick()
+
+    expect(view.get('.counter-spoken').text()).toBe('')
+    view.unmount()
+    vi.useRealTimers()
+  })
+
+  it('takes its marks in order, whatever share is counted', async () => {
+    const view = render(
+      { modelValue: 'a'.repeat(1955), kind: 'multiline', counterFrom: 50 },
+      {},
+      { maxlength: '2000' },
+    )
+    await view.setProps({ modelValue: 'a'.repeat(1960) })
+    expect(view.get('.counter-spoken').text()).toBe('')
+    await view.setProps({ modelValue: 'a'.repeat(1981) })
+    expect(view.get('.counter-spoken').text()).toBe('19 characters left')
+    view.unmount()
+  })
+
+  it('must not tie a silent count to the field', () => {
+    const view = counted('a'.repeat(10))
+    expect(view.get('textarea').attributes('aria-describedby')).toBeUndefined()
+    view.unmount()
+  })
+
+  it('must not be drawn unless asked for: every other field stays as it was', () => {
+    const view = counted('a'.repeat(2000), null)
+    expect(view.find('.counter').exists()).toBe(false)
+    view.unmount()
+  })
 })
