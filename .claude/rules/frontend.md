@@ -38,9 +38,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   sets them only with the text face of its own — a sentence in a figure's place (`&.missing`) is
   `font-family: var(--font)`; `inherit` keeps Nunito (В2); a variant that stays in Nunito keeps its one
   weight (Б1). A mixin that includes the role is the role, learnt from `_mixins.scss` and the file
-  itself through any number of wrappers (В1). Another rule for the same element elsewhere is beyond
-  what a linter can match (Б3), so the role is never put in a placeholder, where `@extend` would carry
-  it into such a rule (В3). **A custom property read where none is declared is refused** by
+  itself through any number of wrappers, comments taken out, names compared as Sass compares them —
+  `display_type` is `display-type` (В1, Г1). Another rule for the same element elsewhere is beyond
+  what a linter can match (Б3), so the role is never put in a placeholder, alone or in a list of
+  selectors, where `@extend` would carry it into such a rule (В3, Г2). **A custom property read where none is declared is refused** by
   our own rule, `molvia/known-custom-property` (`frontend/stylelint/known-properties.mjs`):
   `var(--space-5)` stood on two screens, dropped as invalid, because the spacing list takes any
   `--space-*` by its shape. Known is a declaration made directly in a rule that is exactly `:root`, at the top
