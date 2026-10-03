@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue'
+import { standalone } from '@/platform'
 import { read, write } from '@/stores/storage'
 
 /** Where the setting lives: a tab has its own for this site, an app from the home screen has not. */
@@ -19,13 +20,6 @@ export const PERMISSION_WAIT = 300
 // browser of much of the diaspora — Aloha, DuckDuckGo and the Google app (adversarial А, А′).
 const NOT_SAFARI =
   /CriOS|FxiOS|EdgiOS|OPiOS|OPT\/|YaBrowser|YaApp|AlohaBrowser|DuckDuckGo|Ddg\/|GSA\//
-
-function standalone(): boolean {
-  return (
-    (navigator as Navigator & { standalone?: boolean }).standalone === true ||
-    window.matchMedia('(display-mode: standalone)').matches
-  )
-}
 
 /**
  * Safari on an iPhone or an iPad — in a tab or from the home screen — where the camera is asked

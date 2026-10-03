@@ -10,6 +10,7 @@ const REPORT: ErasureReport = {
     rating_reminders: 1,
     verdicts: 3,
     events: 4,
+    feedback: 2,
     expenses: 5,
     trips: 1,
     exchanges: 2,

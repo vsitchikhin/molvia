@@ -1,6 +1,7 @@
 import { ApiError, createClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { MolviaClient } from '@molvia/client'
+import type { WireCode } from '@molvia/model'
 import { localDay } from '@/days'
 
 // Nothing about identity is passed in, and that is the change MOL-53 made: what proves a
@@ -36,6 +37,38 @@ export function onMissingActor(told: () => void): void {
   missing = told
 }
 
+/**
+ * The last refusals any call met, and when (MOL-147, В-1) — newest last. More than one, since the
+ * question is asked as of a moment past: what an error screen was shown with, after other calls may
+ * have failed meanwhile — a retry, a queue sending, a check of who we are (adversarial Н4).
+ */
+const refusals: { readonly code: WireCode | null; readonly at: number }[] = []
+
+/** How many are kept: far more than fail between an error shown and a tap on its link. */
+const REFUSALS_KEPT = 32
+
+/** How long a refusal stays the reason of an error screen shown after it. */
+export const REFUSAL_FRESH_MS = 60_000
+
+/**
+ * The code of the last refusal, if it came within `REFUSAL_FRESH_MS` before `now` — the moment an
+ * error screen is shown, which keeps it for a message to the developer (MOL-147, В-1). No screen
+ * keeps the code itself: every loader turns a failure into «offline» or «error» before the screen
+ * sees it, so the one seam every call passes through keeps it instead. Another call failing in the
+ * same minute lends its code — the sheet shows it before anything is sent.
+ *
+ * Only what came back from the server has a code: a connection dropped or a reply never waited out
+ * has none of the API's, and the client's `error.internal` for it would send the developer looking
+ * for a failure in a log that has none (adversarial В3а). It is kept all the same, with no code: the
+ * last failure before a screen broke on a dropped connection is that one, and another call's code a
+ * minute older must not stand in for it (round 3, Ф2). Nor is the sheet's own refusal one: «too many
+ * today» is not why a screen broke (В3б).
+ */
+export function lastRefusal(now: number = Date.now()): WireCode | null {
+  const before = refusals.findLast((refusal) => refusal.at <= now)
+  return before !== undefined && now - before.at <= REFUSAL_FRESH_MS ? before.code : null
+}
+
 type Call = (...args: never[]) => Promise<unknown>
 
 /**
@@ -55,17 +88,24 @@ type Call = (...args: never[]) => Promise<unknown>
  * Wrapped by walking the client rather than by listing its methods: a call added later would
  * otherwise lose the seam silently, which is the failure this replaces.
  */
-function watching<T extends Call>(call: T): T {
+function watching<T extends Call>(call: T, remembered: boolean): T {
   return (async (...args: never[]) => {
     try {
       return await call(...args)
     } catch (error) {
-      if (error instanceof ApiError && error.code === ERROR.NO_ACTOR) missing?.()
+      if (error instanceof ApiError) {
+        const replied = error.answered || error.status !== undefined
+        if (remembered) {
+          refusals.push({ code: replied ? error.code : null, at: Date.now() })
+          if (refusals.length > REFUSALS_KEPT) refusals.shift()
+        }
+        if (error.code === ERROR.NO_ACTOR) missing?.()
+      }
       throw error
     }
   }) as T
 }
 
 export const api = Object.fromEntries(
-  Object.entries(client).map(([name, call]) => [name, watching(call)]),
+  Object.entries(client).map(([name, call]) => [name, watching(call, name !== 'sendFeedback')]),
 ) as MolviaClient

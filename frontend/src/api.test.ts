@@ -11,10 +11,11 @@ import type * as Client from '@molvia/client'
  */
 const me = vi.fn<() => Promise<unknown>>()
 const advice = vi.fn<() => Promise<unknown>>()
+const sendFeedback = vi.fn<() => Promise<unknown>>()
 
 vi.mock('@molvia/client', async (original) => {
   const actual = await original<typeof Client>()
-  return { ...actual, createClient: () => ({ me, advice }) }
+  return { ...actual, createClient: () => ({ me, advice, sendFeedback }) }
 })
 
 async function freshApi() {
@@ -25,6 +26,7 @@ async function freshApi() {
 beforeEach(() => {
   me.mockReset()
   advice.mockReset()
+  sendFeedback.mockReset()
 })
 
 describe('когда сервер больше не узнаёт браузер', () => {
@@ -92,5 +94,89 @@ describe('чего шов не принимает за конец сессии',
 
     await expect(api.me()).rejects.toThrow(TypeError)
     expect(told).not.toHaveBeenCalled()
+  })
+})
+
+describe('последний отказ — код экрана ошибки в сообщении разработчику (MOL-147, В-1)', () => {
+  it('помнит код последнего отказа любого вызова, свежий — минуту', async () => {
+    const { api, lastRefusal, REFUSAL_FRESH_MS } = await freshApi()
+    expect(lastRefusal()).toBeNull()
+    advice.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
+    // A 502 of the proxy during a rollout: no body of ours, but a reply — the status says so.
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 502', false, 502))
+
+    await api.advice().catch(() => undefined)
+    await api.me().catch(() => undefined)
+    const at = Date.now()
+
+    expect(lastRefusal(at)).toBe(ERROR.INTERNAL)
+    expect(lastRefusal(at + REFUSAL_FRESH_MS - 1_000)).toBe(ERROR.INTERNAL)
+    expect(lastRefusal(at + REFUSAL_FRESH_MS + 1_000)).toBeNull()
+    // A refusal after the error was shown is not why it was shown (review №1).
+    expect(lastRefusal(at - 5_000)).toBeNull()
+  })
+
+  it('не берёт за отказ то, что не ответ API, и успех кода не стирает', async () => {
+    const { api, lastRefusal } = await freshApi()
+    me.mockRejectedValue(new TypeError('Failed to fetch'))
+    await api.me().catch(() => undefined)
+    expect(lastRefusal()).toBeNull()
+    // Так обрыв и истёкший срок приходят из настоящего клиента: его `error.internal`, а не сервера
+    // (adversarial В3а) — у пятисотки был бы статус.
+    for (const details of ['Load failed', 'aborted']) {
+      me.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, details, false))
+      await api.me().catch(() => undefined)
+    }
+    expect(lastRefusal()).toBeNull()
+
+    advice.mockRejectedValueOnce(new ApiError(ISSUE.BODY_INVALID))
+    await api.advice().catch(() => undefined)
+    me.mockResolvedValue({ id: 'кто-то' })
+    await api.me()
+
+    expect(lastRefusal()).toBe(ISSUE.BODY_INVALID)
+  })
+
+  it('отвечает на момент показа ошибки, даже если после него отказали другие вызовы (adversarial Н4)', async () => {
+    vi.useFakeTimers({ now: 1_000_000, toFake: ['Date'] })
+    const { api, lastRefusal } = await freshApi()
+    advice.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    await api.advice().catch(() => undefined)
+    const shown = Date.now() + 50
+
+    // «Повторить» упал снова, потом соседний вызов — 404.
+    vi.setSystemTime(1_010_000)
+    await api.advice().catch(() => undefined)
+    vi.setSystemTime(1_020_000)
+    me.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
+    await api.me().catch(() => undefined)
+
+    expect(lastRefusal(shown)).toBe(ERROR.INTERNAL)
+    expect(lastRefusal()).toBe(ERROR.NOT_FOUND)
+    vi.useRealTimers()
+  })
+
+  it('экран, упавший на обрыве, не получает чужой код минутной давности (раунд 3, Ф2)', async () => {
+    vi.useFakeTimers({ now: 1_000_000, toFake: ['Date'] })
+    const { api, lastRefusal } = await freshApi()
+    me.mockRejectedValue(new ApiError(ERROR.CONFLICT))
+    await api.me().catch(() => undefined)
+
+    vi.setSystemTime(1_040_000)
+    advice.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Load failed', false))
+    await api.advice().catch(() => undefined)
+
+    expect(lastRefusal(Date.now() + 50)).toBeNull()
+    expect(lastRefusal(1_000_500)).toBe(ERROR.CONFLICT)
+    vi.useRealTimers()
+  })
+
+  it('не одалживает экрану ошибки отказ самой шторки — «много за сегодня» (adversarial В3б)', async () => {
+    const { api, lastRefusal } = await freshApi()
+    sendFeedback.mockRejectedValue(new ApiError(ERROR.FEEDBACK_RATE_LIMITED))
+
+    await api.sendFeedback({} as never).catch(() => undefined)
+
+    expect(lastRefusal()).toBeNull()
   })
 })

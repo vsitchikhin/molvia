@@ -29,6 +29,10 @@
         {{ t('state.retry') }}
       </AppButton>
       <slot name="action" />
+      <AppButton v-if="reportable" variant="ghost" block aria-haspopup="dialog" @click="report">
+        <template #icon><IconReport /></template>
+        {{ t('state.report') }}
+      </AppButton>
     </div>
   </section>
 </template>
@@ -44,14 +48,19 @@ import {
   type Component,
   type PropType,
 } from 'vue'
+import { getActivePinia } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
+import IconReport from '~icons/mdi/message-alert-outline'
 import IconRefresh from '~icons/mdi/refresh'
 import IconUpdate from '~icons/mdi/update'
+import { lastRefusal } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { usePwaUpdate } from '@/pwaUpdate'
+import { useActorStore } from '@/stores/actor'
+import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import { focusScreenTitle } from '@/transitions'
 
 export type StateKind = 'empty' | 'error' | 'offline' | 'attention'
@@ -112,6 +121,12 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  * after the retry where there is one — the search's «Take from recent». While a new version of the
  * app waits, the error offers it first, «Обновить», and the retry second (MOL-132).
  *
+ * Last, quieter than both, «Сообщить о проблеме» (MOL-147, Р-5): the sheet «Написать разработчику»
+ * on «Сломалось», with the code of the API's last refusal before the error was shown (В-1). Only where the screen as a
+ * whole failed — not a section's `inline` error (сверка С-1) — only for somebody known, which
+ * leaves out the login, and never inside a sheet, since a sheet over a sheet the history does not
+ * hold. Drawn here, so no screen has to remember it.
+ *
  * Texts arrive translated, never as a key prefix: a key assembled from a string is invisible
  * to the linter and to vue-tsc alike (MOL-16, О-12).
  *
@@ -121,7 +136,7 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  */
 export default defineComponent({
   name: 'ScreenState',
-  components: { AppButton, IconRefresh, IconUpdate },
+  components: { AppButton, IconRefresh, IconReport, IconUpdate },
   props: {
     kind: { type: String as PropType<StateKind>, required: true, validator: fits },
     tone: { type: String as PropType<StateTone | undefined>, default: undefined },
@@ -187,7 +202,47 @@ export default defineComponent({
     const updating = computed(() => ['ready', 'applying'].includes(update.phase.value))
     const applying = computed(() => update.phase.value === 'applying')
 
-    return { t, root, glyph, toneClass, role, update, updating, applying }
+    // A block drawn outside the app — a component on its own, the kit — has no stores to ask.
+    const pinia = getActivePinia()
+    const actor = pinia ? useActorStore(pinia) : null
+    const feedback = pinia ? useFeedbackSheetStore(pinia) : null
+    const inDialog = ref(false)
+    onMounted(() => {
+      inDialog.value = root.value?.closest('dialog') != null
+    })
+    // The code is the one the error was shown with, not whatever failed by the tap: a person reads
+    // the screen a while before writing, and another call may fail meanwhile (review №1).
+    let shownAt = Date.now()
+    watch(
+      () => props.kind,
+      (kind) => {
+        if (kind === 'error') shownAt = Date.now()
+      },
+    )
+    function report(): void {
+      feedback?.open({ from: 'error', code: lastRefusal(shownAt) })
+    }
+    const reportable = computed(
+      () =>
+        props.kind === 'error' &&
+        !props.inline &&
+        actor?.state === 'ready' &&
+        feedback !== null &&
+        !inDialog.value,
+    )
+
+    return {
+      t,
+      root,
+      glyph,
+      toneClass,
+      role,
+      update,
+      updating,
+      applying,
+      reportable,
+      report,
+    }
   },
 })
 </script>

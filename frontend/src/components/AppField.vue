@@ -63,17 +63,26 @@
     <AppReveal>
       <p v-if="failed" :id="`${id}-error`" class="error">{{ errorText ?? t(error ?? '') }}</p>
     </AppReveal>
+    <!-- Read with the field when it is focused, not at every letter: two hundred announcements over
+         the echo of the typing drown it (MOL-147, review №4). -->
+    <p v-if="counterFrom !== null" :id="`${id}-counter`" class="counter">{{ counter }}</p>
+    <!-- Said only at its marks, through a region there from the start, its words alone changing. -->
+    <p v-if="counterFrom !== null" class="counter-spoken" aria-live="polite">{{ said }}</p>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, useAttrs, useId, useSlots } from 'vue'
+import { computed, defineComponent, onUnmounted, ref, useAttrs, useId, useSlots, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import IconChevronDown from '~icons/mdi/chevron-down'
 import type { ErrorCode } from '@molvia/model'
 import AppReveal from '@/components/AppReveal.vue'
+import { LINGER_MS } from '@/composables/useAnnouncer'
+
+/** How many characters left are said aloud, beside the moment the count comes and the end. */
+const SPOKEN_MARKS = [20, 100]
 
 export type FieldKind = 'text' | 'decimal' | 'digits' | 'multiline' | 'date' | 'select'
 
@@ -127,6 +136,12 @@ export default defineComponent({
      * (MOL-74): the label is still there for a screen reader, only not drawn.
      */
     hideLabel: { type: Boolean, default: false },
+    /**
+     * How many characters left of `maxlength` start to be counted under the field (MOL-147): silent
+     * before, so a long message is not met by a number from its first letter, and not cut short at
+     * the bound in silence either. Counted as the field and the schema count — UTF-16 units.
+     */
+    counterFrom: { type: Number as PropType<number | null>, default: null },
   },
   emits: {
     'update:modelValue': (value: string) => typeof value === 'string',
@@ -151,6 +166,7 @@ export default defineComponent({
         attrs['aria-describedby'],
         slots.suffix ? `${id}-suffix` : undefined,
         failed.value ? `${id}-error` : undefined,
+        counter.value ? `${id}-counter` : undefined,
       ].filter(Boolean)
       return parts.length > 0 ? parts.join(' ') : undefined
     }
@@ -164,7 +180,44 @@ export default defineComponent({
 
     const shows = computed(() => props.kind === 'date' && !!props.display)
 
-    return { t, attrs, id, failed, shows, control, describedBy, update }
+    // `maxlength` is read from `attrs`, which are not reactive: it does not change, the value does.
+    const max = computed(() => Number(attrs.maxlength))
+    /** How many are left while the count shows, `null` while it is silent. */
+    const left = computed(() => {
+      if (props.counterFrom === null || !Number.isInteger(max.value)) return null
+      const rest = Math.max(max.value - props.modelValue.length, 0)
+      return rest > props.counterFrom ? null : rest
+    })
+    const words = (n: number): string =>
+      n === 0 ? t('field.full', { max: max.value }) : t('field.left', { n }, n)
+    const counter = computed(() => (left.value === null ? '' : words(left.value)))
+
+    // Said aloud only as a mark is passed on the way down — the count coming, 100, 20, the end — and
+    // then what is truly left, a paste past two marks included; going up is silent. The words go
+    // after a while, as the app's region lets its own: left there, browse mode reads them as still
+    // true (review №8, adversarial Н3).
+    const marks = computed(() =>
+      [0, ...SPOKEN_MARKS, props.counterFrom ?? 0]
+        .filter((mark) => mark <= (props.counterFrom ?? 0))
+        .sort((a, b) => a - b),
+    )
+    const markOf = (rest: number | null): number =>
+      rest === null ? Infinity : (marks.value.find((mark) => rest <= mark) ?? Infinity)
+    const said = ref('')
+    let lingering: ReturnType<typeof setTimeout> | undefined
+    watch(left, (now, before) => {
+      if (now === null || markOf(now) >= markOf(before)) return
+      said.value = words(now)
+      clearTimeout(lingering)
+      lingering = setTimeout(() => {
+        said.value = ''
+      }, LINGER_MS)
+    })
+    onUnmounted(() => {
+      clearTimeout(lingering)
+    })
+
+    return { t, attrs, id, failed, shows, counter, said, control, describedBy, update }
   },
 })
 </script>
@@ -302,6 +355,22 @@ textarea.control {
 
 .invalid .well {
   border-color: var(--bad);
+}
+
+.counter-spoken {
+  @include visually-hidden;
+}
+
+.counter {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+
+  &:empty {
+    margin: 0;
+  }
 }
 
 .error {

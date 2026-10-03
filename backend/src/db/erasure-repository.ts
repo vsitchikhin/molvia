@@ -14,6 +14,7 @@ export const ACTOR_REFERENCES = [
   'budget_plans.actor_id',
   'events.actor_id',
   'exchanges.actor_id',
+  'feedback.actor_id',
   'incomes.actor_id',
   'item_barcodes.added_by',
   'items.created_by',
@@ -36,6 +37,7 @@ export const ERASED_TABLES = [
   'rating_reminders',
   'verdicts',
   'events',
+  'feedback',
   'expenses',
   'trips',
   'exchanges',
@@ -130,6 +132,7 @@ export function createErasureRepository(db: Db): ErasureRepository {
             rating_reminders: 0,
             verdicts: 0,
             events: 0,
+            feedback: 0,
             expenses: 0,
             trips: 0,
             exchanges: 0,
@@ -174,6 +177,11 @@ export function createErasureRepository(db: Db): ErasureRepository {
             // be erased outweighs a gate, and a lost row there is the lesser harm.
             erased.events = await count(
               sql`delete from events where actor_id = ${actorId} returning 1`,
+            )
+            // What the person wrote to the developer (MOL-147), continuations of a thread too; the
+            // owner's replies go by the cascade from `feedback`, part of the message they answer.
+            erased.feedback = await count(
+              sql`delete from feedback where actor_id = ${actorId} returning 1`,
             )
             // The cascade from `trips` would take these anyway; deleted first so they are counted.
             erased.expenses = await count(sql`
