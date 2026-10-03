@@ -415,7 +415,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   is on `metrics`, a network with no way out, and Grafana calls nobody home. **The dashboard and every
   threshold are JSON in `deploy/grafana`**, baked into its image; a test holds the thresholds and that
   every figure read is written. A restart is a reset of the same container's CPU counter, never
-  `changes()`; the alarms go by their own bot, never the product's.
+  `changes()`; a request whose client left is `aborted`, never lost. **The alarms read a person's
+  requests** — never `unmatched`, `/health`, `/internal/*` — go by their own bot, never the product's,
+  and have a pulse to healthchecks.io, since Grafana is the one that sends.
 
 ### The bot — `.claude/rules/bot.md`
 
@@ -517,9 +519,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   pulse — after a claim, while it hears Telegram, never in its first minute — to healthchecks.io
   and its own Telegram, never our bot; **`/health` is `503` whenever it is not `ok`**, and the bot
   is not in it; a check that never got a ping never alarms, so `BOT_PULSE_URL` is required.
-- **The metrics' services are pulled with a rollout but are not in its check, and a rollback leaves
-  them as they run** (MOL-145), as the receipt reader; the one port they publish is Grafana's, on the
-  loopback.
+- **The metrics never judge a rollout** (MOL-145, adversarial А4): pulled before anything changes,
+  started only once the application is healthy, a failure of theirs a warning; a rollback leaves them as
+  they run. The one port they publish is Grafana's, on the loopback.
 
 ## Tracker and documentation
 

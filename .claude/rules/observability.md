@@ -304,6 +304,17 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   `*`/`unmatched`, one series a class of status — a path carries uuids and, decoded, a person's text,
   and a series for each would be both a leak and a flood. Status is a class, `2xx`…`5xx`; the time is
   a histogram by route alone. Written by hand in Prometheus's text format, no library.
+- **A request whose client left first is counted, as `aborted`** (adversarial А1), with the time it ran
+  until then: Fastify's `onResponse` never comes for a socket the client closed, so the answers nobody
+  waited for — the phone gives up after 15 s, the bot after 5 — were missing from exactly the p95
+  they make. Counted once, by the response's `close` before it finished; not a 5xx — a failure after
+  the client left is in `failures` all the same.
+- **The event loop is measured by a timer of our own, over a sliding minute** (adversarial А2, А2b, А3):
+  a tick every 100 ms writes how late it came, and a render reads the minute behind it, resetting
+  nothing. Node's `monitorEventLoopDelay` was reset by every reader — a scrape VictoriaMetrics gave up
+  on during a long block was still served once the loop freed and took the block with it, as did a
+  `curl` by hand — a block starting right after a reset was never recorded, and an idle loop read its
+  timer's resolution, 20 ms, as delay.
 - **`/metrics` is on a port of its own, never the API's** (В-1): `METRICS_PORT`, 9464 in production,
   unset in a copy and in end-to-end, where nothing listens. Caddy proxies only the API's port, so no
   spelling of a path reaches it — closing `/api/metrics` in the Caddyfile would have rested on Caddy and
@@ -313,11 +324,18 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   the API join it beside their own. cAdvisor reads Docker's socket — root on the machine — and
   postgres_exporter logs in as the database's own user (В-5): neither can send anything anywhere.
   node_exporter is not on the host's network, which would be a port outside, so the machine's network
-  counters are not there. **Grafana alone is in both**, for Telegram, and its one port is on the
-  loopback for the tunnel.
+  counters are not there. **Grafana is in `metrics` and in `alerts` of its own**, for Telegram and the
+  pulse — not in `default` (review №4), beside Caddy, the API, the bot and the receipt reader, which
+  asks nobody who calls — and its one port is on the loopback for the tunnel. cAdvisor has
+  `CAP_SYSLOG` and nothing more (review №1): the OOM-killer is read from the kernel's log, which
+  `kernel.dmesg_restrict=1` of Debian and Ubuntu keeps from anything without it — every OOM counted 0
+  in silence, «Could not configure a source for OOM detection» in its log alone.
 - **Grafana calls nobody home** (Р-6): usage reports, update checks, the news, gravatar, plugin keys
-  and the five plugins it would install at every start are switched off — a test holds each setting.
-  No sign-up, no anonymous view, the admin's password a required line.
+  and the five plugins it would install at every start, snapshots and feedback links are switched off —
+  a test holds each setting. No sign-up, no anonymous view. **The admin's password is
+  `GRAFANA_ADMIN_PASSWORD` at every start** (adversarial А6): Grafana reads it only when it creates its
+  database, so `start.sh` resets it before Grafana runs — a password changed after a leak changed
+  nothing, and the old one kept opening it.
 - **What runs is what the repository says** (В-2, Р-10): the scrape config is baked into
   `molvia-victoria`, the dashboard, the alarms and their contact point into `molvia-grafana`, both built
   by the release with the others; the dashboard is read-only — a panel changed in the interface cannot
@@ -325,7 +343,10 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   parser, and the test holds them at Р-6 of MOL-149. **Every figure the dashboard and the alarms read is
   one the API writes or an exporter's list names** — a name renamed turns a test red, never a panel
   quietly empty — and the API's process figures are read by `job="api"`, since the exporters write the
-  same names.
+  same names. **A rule removed or renamed goes with `deleteRules` of its uid in the same merge**
+  (adversarial А6): provisioning never deletes one by itself, and the old rule would keep alarming from
+  `grafana_data` with nothing in the repository to find it by. A dashboard's file removed takes the
+  dashboard with it (`disableDeletion: false`).
 - **A restart is a reset of the same container's CPU counter** (Р-4): a rollout makes a new container,
   a new series, and starts nothing over. Two measured traps on the way: cAdvisor reads a container's
   start once and never again, so a restart kept its old start time; and VictoriaMetrics' `changes()`
@@ -334,11 +355,23 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
 - **The alarms speak when the figures stop** (Р-5): every rule is Alerting on no data and on an error
   of the query — VictoriaMetrics down — and «Метрики молчат» is any target not answering five minutes.
   The rules that need traffic (5xx, p95, restarts) end in `or on() vector(0)`, so a quiet night is not
-  «no data». **The price, named:** Grafana down is silence — it is the one that sends — and the watch of
-  MOL-142 sees the site, not the metrics.
-- **p95 leaves out the photo of a receipt and needs twenty requests** (Р-3): Fastify's time runs from
-  the headers to the answer, so `PUT /receipts/:receiptId/parts/:part` is the phone's network; one
-  slow request at night would be the p95 of five. The test holds that the route still exists.
+  «no data».
+- **The alarms themselves have a pulse** (adversarial А5): Grafana is the one that sends, and nothing
+  watched it. «Тревоги живы» fires while Grafana counts and VictoriaMetrics answers itself
+  (`min(up{job="victoria"})`, no data and errors are OK — the pulse stopping), and goes to a webhook
+  alone — `ALERTS_PULSE_URL`, the healthchecks.io check `molvia-alerts`, every five minutes, never a
+  resolved message, which would say «alive» the moment it stopped. Its silence is healthchecks.io's own
+  Telegram, as for the machine (MOL-142). The line is required: Grafana refuses a webhook with no URL.
+  **One rule for the owner's id** in the API and in `start.sh`: digits and nothing else
+  (`ownerTelegramIdSchema`) — read by `z.coerce`, `+123` or ` 123` ran the API and stopped Grafana.
+- **The alarms read a person's requests** (adversarial А7, review №5): the share of 5xx, its
+  denominator, p95 and the twenty requests each needs leave out `unmatched`, `/health` and
+  `/internal/*` — a scanner's 404s, the watch, the bot's polls every minute — which diluted a person's
+  500s and slow answers under both thresholds and filled half the twenty by themselves. **The price:** a
+  5xx only the bot meets is not in the share; the failure is in `failures`, and the owner hears of it
+  there. **p95 also leaves out the photo of a receipt** (Р-3): Fastify's time runs from the headers to
+  the answer, so `PUT /receipts/:receiptId/parts/:part` is the phone's network. The test holds every
+  selector and that the route still exists.
 - **The alarms' own bot, never the product's** (В-3): `ALERTS_BOT_TOKEN` lives only in Grafana, a
   container that goes to the internet, and the login's token never does. Whom it writes is
   `OWNER_TELEGRAM_ID`, put into the contact point as text by `deploy/grafana/start.sh` — Grafana 13.0

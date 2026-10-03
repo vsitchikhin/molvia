@@ -422,7 +422,7 @@ VictoriaMetrics keeps thirty days of figures, scraped every fifteen seconds from
 (9464, never through Caddy), node_exporter (the machine), cAdvisor (the containers) and
 postgres_exporter (the database). All four are on a network with no way out. Grafana draws them and
 sends the alarms; it is the only one with a port, on the machine's loopback. Nothing leaves the machine
-but the alarms, through Telegram.
+but the alarms, through Telegram, and the alarms' pulse, to healthchecks.io.
 
 ### Looking
 
@@ -432,10 +432,12 @@ ssh -L 3000:127.0.0.1:3000 molvia     # then http://localhost:3000, admin and GR
 
 Dashboards → Molvia → «Молвия», four rows:
 
-- **API** — requests a minute, the share of 5xx, p50 and p95 (the photo of a receipt left out: its
-  time is the phone's network), how late the event loop ran, the process's memory, and the routes of
-  the last hour by their template — `unmatched` is every request no route answered, a 404, with no
-  path kept;
+- **API** — requests a minute; the share of 5xx and p50/p95 of a person's requests — no scanner's
+  404, no `/health`, no bot's poll, and for p95 no photo of a receipt, whose time is the phone's
+  network; answers by class — `aborted` is a client that left before the answer, the phone after 15 s,
+  the bot after 5; how late the event loop ran over the last minute; the process's memory; and the
+  routes of the last hour by their template — `unmatched` is every request no route answered, a 404,
+  with no path kept;
 - **Машина** — memory, CPU, load, the disk and how many days are left at the pace of the last week;
 - **Контейнеры** — memory against each one's limit, CPU, restarts and OOM over a day;
 - **Postgres** — connections against `max_connections`, the size, the queries running now, the oldest
@@ -451,20 +453,27 @@ product's bot, whose token is the login's and stays out of a container that goes
 Write the alarms' bot `/start` once: a bot cannot write first. Every threshold is in
 `deploy/grafana/provisioning/alerting/rules.json`:
 
-| Alarm                 | When                                                 | What to look at                                                      |
-| --------------------- | ---------------------------------------------------- | -------------------------------------------------------------------- |
-| Память машины         | more than 85 % for 5 minutes                         | «Контейнеры» — who grew; `docker stats --no-stream`                  |
-| Диск машины           | more than 80 %                                       | `df -h /`, `docker system df`, `journalctl --disk-usage`             |
-| Доля 5xx              | more than 5 % of at least 20 answers in 5 minutes    | `make failures` on the machine — what broke has its fingerprint      |
-| Время ответа API      | p95 above 1 s for 15 minutes, at least 20 answers    | the routes' table; the event loop; Postgres — the oldest transaction |
-| Перезапуск контейнера | a container started over by itself — never a rollout | `docker compose … logs --tail 100 <service>`                         |
-| Метрики молчат        | a target did not answer for 5 minutes                | `docker compose … ps` — which of the five is down                    |
+| Alarm                 | When                                                        | What to look at                                                      |
+| --------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------- |
+| Память машины         | more than 85 % for 5 minutes                                | «Контейнеры» — who grew; `docker stats --no-stream`                  |
+| Диск машины           | more than 80 %                                              | `df -h /`, `docker system df`, `journalctl --disk-usage`             |
+| Доля 5xx              | more than 5 % of at least 20 answers to people in 5 minutes | `make failures` on the machine — what broke has its fingerprint      |
+| Время ответа API      | p95 to people above 1 s for 15 minutes, at least 20 answers | the routes' table; the event loop; Postgres — the oldest transaction |
+| Перезапуск контейнера | a container started over by itself — never a rollout        | `docker compose … logs --tail 100 <service>`                         |
+| Метрики молчат        | a target did not answer for 5 minutes                       | `docker compose … ps` — which of the five is down                    |
 
 Every rule also fires when it cannot be counted — VictoriaMetrics down — and says «нет данных».
 `✅ Прошло` comes when it is over. A firing alarm is repeated every six hours.
 
-**What is not watched**: Grafana itself. It is the one that sends, so with it down there is silence;
-the watch of MOL-142 sees the site, not the metrics. Look at the dashboard now and then.
+**The alarms' pulse**: Grafana is the one that sends, so it is watched from outside too. «Тревоги
+живы» fires while Grafana counts its rules and VictoriaMetrics answers, and pings the healthchecks.io
+check `molvia-alerts` every five minutes — never Telegram. Set the check at **period 5 min, grace 10
+min**, with the Telegram integration, as the others of «Signals». Its alarm means Grafana or
+VictoriaMetrics is down — and so is every other alarm: `docker compose … ps grafana victoria`, then their
+`logs --tail 50`.
+
+**Removing an alarm** is `deleteRules` with its uid in the same merge: provisioning never deletes a rule
+by itself, and the old one would keep alarming from Grafana's volume.
 
 ### Trying the alarm
 
@@ -477,11 +486,17 @@ node-exporter`, and `✅ Прошло` follows.
 
 ### Where it is set
 
-- `GRAFANA_ADMIN_PASSWORD`, `ALERTS_BOT_TOKEN` and `OWNER_TELEGRAM_ID` in `~/molvia/.env.prod`; compose
-  refuses to start without any of them, since Grafana would have nobody to write to.
-- The images `molvia-grafana` and `molvia-victoria` are built by the release with the others. A
-  rollout pulls them, but its check of the tag counts only the API, the bot and the PWA, and a
-  rollback leaves the metrics as they run — a tag from before MOL-145 has no image of theirs.
+- `GRAFANA_ADMIN_PASSWORD`, `ALERTS_BOT_TOKEN`, `ALERTS_PULSE_URL` and `OWNER_TELEGRAM_ID` (digits
+  only) in `~/molvia/.env.prod`; compose refuses to start without any of them. **The password is the
+  line's at every start** — change it there and restart Grafana
+  (`docker compose … up -d --force-recreate grafana`); Grafana itself keeps only the first.
+- The images `molvia-grafana` and `molvia-victoria` are built by the release with the others. **The
+  metrics never judge a rollout**: pulled before anything changes, a refusal of the registry a
+  warning; started only once the API answers healthy, a failure of theirs a warning in
+  `~/molvia/deploy.log` — `docker compose … ps` then. A rollback leaves them as they run — a tag from
+  before MOL-145 has no image of theirs.
+- **The first rollout with the metrics recreates Postgres** as well — its networks changed — so the
+  database is away for the seconds the API is.
 - **Grafana 13.0 and the chat id**: `deploy/grafana/start.sh` writes `OWNER_TELEGRAM_ID` into the
   contact point as text before Grafana starts, since Grafana turned it into a number and refused it
   (grafana/alerting #558). A Grafana that takes a numeric chat — after 13.0.2 — no longer needs it.
