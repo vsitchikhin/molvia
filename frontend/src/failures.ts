@@ -1,7 +1,7 @@
 import { ApiError } from '@molvia/client'
 import {
+  ERROR,
   FAILURE_NAME_MAX,
-  ISSUE,
   PHONE_FAILURES_KEPT,
   PHONE_GLOBAL_CATCHERS,
   describePhoneFailure,
@@ -10,6 +10,7 @@ import {
   phoneFailureSchema,
 } from '@molvia/model'
 import type { ClientErrors, PhoneCatcher, PhoneFailure } from '@molvia/model'
+import { exclusively } from '@/stores/queueing'
 import { forget, read, write } from '@/stores/storage'
 
 /** Where the phone keeps its failures until they can be sent (MOL-144, Р-7). Nobody's: no owner. */
@@ -28,20 +29,39 @@ export function pageBuild(url: string, production: boolean): string {
 
 /**
  * Whether a failure is the phone's own (MOL-144, Р-4, owner's В-3). An API's word — a refusal or its
- * 500 — the API has recorded itself; no answer is the connection, the weather at a shelf; a page not
- * of the API's — a portal, a proxy's 502 — is not ours either, a portal's `200` included: only our
- * API names its build. A `2xx` the API sent that the contract could not read is: the phone's code
- * against the server's answer. Everything that is not an answer of the API is the phone's code.
+ * 500 — the API has recorded itself; no answer is the connection, the weather at a shelf, and so is a
+ * body cut off after its headers (adversarial А1); a page not of the API's — a portal, a proxy's
+ * 502 — is not ours either, a portal's `200` included: only our API names its build. The API's `2xx`
+ * that came whole and the contract could not read is (`offContract`): the phone's code against the
+ * server's answer. Everything that is not an answer of the API is the phone's code.
  */
 export function phoneDefect(error: unknown): boolean {
-  if (!(error instanceof ApiError)) return true
+  return !(error instanceof ApiError) || error.offContract
+}
+
+/**
+ * Whether an answer to the sending lets the kept failures go (review №2, №3, adversarial А6): only
+ * our API's — the build named — and not «too many», which says «later», not «never». A proxy's `502`
+ * during a rollout, a portal's page and no answer at all keep them: that rollout is exactly when an
+ * old page meets a new server, and a flood of somebody else's must not cost a real phone its report.
+ */
+function letsGo(error: unknown): boolean {
   return (
-    error.code === ISSUE.RESPONSE_INVALID &&
-    error.fromApi &&
-    error.status !== undefined &&
-    error.status >= 200 &&
-    error.status < 300
+    error instanceof ApiError && error.fromApi && error.code !== ERROR.CLIENT_ERRORS_RATE_LIMITED
   )
+}
+
+/**
+ * Sends of one window after another — within one window by the chain, across windows by the
+ * browser's lock (adversarial А3): two windows that heard `online` read one shared buffer, and each
+ * sent it whole. Inside, the buffer is read afresh, so the second finds it emptied.
+ */
+let turn: Promise<void> = Promise.resolve()
+function oneAtATime(work: () => Promise<void>): Promise<void> {
+  const run = () => exclusively(FAILURES_KEY, work)
+  const mine = turn.then(run, run)
+  turn = mine.catch(() => undefined)
+  return mine
 }
 
 export interface FailureEnvironment {
@@ -100,8 +120,9 @@ function keep(reports: readonly PhoneFailure[]): void {
  * **One failure once a page** (Р-5): a screen that shows its error again on every retry, a loop that
  * throws every frame, send it the first time only — the count is of pages that met it. **Kept until
  * it can be sent** (Р-7): twenty at most, one a failure, on the shared shelf; sent at once, at start
- * and when the connection comes back. **Any answer lets them go** — sent again they would be refused
- * again — and only no answer keeps them. Sending reports nothing about itself (Р-8).
+ * and when the connection comes back, one window at a time. **Our API's answer lets them go** — taken,
+ * or refused for good — but not «too many», and nothing that is not the API's (`letsGo`). Sending
+ * reports nothing about itself (Р-8).
  */
 export function failureReports(environment: FailureEnvironment): FailureReports {
   const seen = new Set<string>()
@@ -114,19 +135,15 @@ export function failureReports(environment: FailureEnvironment): FailureReports 
     try {
       await environment.send({ reports })
     } catch (error) {
-      // No answer: the connection, the weather — kept for the next time.
-      if (error instanceof ApiError && !error.answered && error.status === undefined) return
+      if (!letsGo(error)) return
     }
     const sent = new Set(reports.map(keyOf))
     keep(kept().filter((report) => !sent.has(keyOf(report))))
   }
 
   function flush(): Promise<void> {
-    if (sending !== null) {
-      again = true
-      return sending
-    }
-    sending = sendKept()
+    if (sending !== null) return sending
+    sending = oneAtATime(sendKept)
       .catch(() => undefined)
       .finally(() => {
         sending = null
@@ -158,10 +175,12 @@ export function failureReports(environment: FailureEnvironment): FailureReports 
     if (seen.has(key)) return
     seen.add(key)
     const reports = kept()
-    if (!reports.some((known) => keyOf(known) === key)) {
-      keep([...reports, parsed.data].slice(-PHONE_FAILURES_KEPT))
-    }
-    void flush()
+    if (reports.some((known) => keyOf(known) === key)) return
+    keep([...reports, parsed.data].slice(-PHONE_FAILURES_KEPT))
+    // Caught while a send is out: it goes after it, not with it. Asked again otherwise, a send the
+    // server refused for «too many» would be sent again at once.
+    if (sending === null) void flush()
+    else again = true
   }
 
   return {

@@ -35,19 +35,32 @@ export class ApiError extends Error {
    */
   readonly status: number | undefined
   /**
-   * Whether the reply named the API's build (`VERSION_HEADER`), which only our API does: a `2xx` the
-   * contract could not read is the old code against the new server's answer when it did, and a
-   * portal's page of its own when it did not (MOL-144, Р-4). Told only where that is the question.
+   * Whether the reply named the API's build (`VERSION_HEADER`), which only our API does — on every
+   * reply that came, a refusal included. A proxy's `502` during a rollout and a portal's page do not
+   * (MOL-144, review №3).
    */
   readonly fromApi: boolean
+  /**
+   * The API's `2xx` that came whole and the contract could not read — the old code against the new
+   * server's answer, the phone's own failure (MOL-144, Р-4). Not a body cut off on its way: its
+   * headers named the build too, and Safari's «Load failed» mid-body is the weather (adversarial А1).
+   */
+  readonly offContract: boolean
 
-  constructor(code: WireCode, details?: string, answered = true, status?: number, fromApi = false) {
+  constructor(
+    code: WireCode,
+    details?: string,
+    answered = true,
+    status?: number,
+    reply: { readonly fromApi?: boolean; readonly offContract?: boolean } = {},
+  ) {
     super(details ? `${code}: ${details}` : code)
     this.name = 'ApiError'
     this.code = code
     this.answered = answered
     this.status = status
-    this.fromApi = fromApi
+    this.fromApi = reply.fromApi ?? false
+    this.offContract = reply.offContract ?? false
   }
 }
 
@@ -182,6 +195,8 @@ export function createTransport({
     // at a shelf dropping mid-reply — would otherwise hold the call forever, past both.
     let response: Response
     let body: unknown
+    // Whether the body came and read as JSON: one cut off on its way did not (adversarial А1).
+    let whole = false
     try {
       try {
         response = await fetch(`${baseUrl}${path}`, {
@@ -211,6 +226,7 @@ export function createTransport({
       // to be skipped entirely.
       try {
         body = await response.json()
+        whole = true
       } catch {
         // Cut off by the deadline or by the caller, the reply never came — it is not a reply
         // off the contract.
@@ -228,9 +244,12 @@ export function createTransport({
       if (answer.success) return { status: response.status, data: answer.data }
     }
 
+    const fromApi = response.headers.has(VERSION_HEADER)
     if (!response.ok) {
       const failure = errorResponseSchema.safeParse(body)
-      if (failure.success) throw new ApiError(failure.data.code, failure.data.details)
+      if (failure.success) {
+        throw new ApiError(failure.data.code, failure.data.details, true, undefined, { fromApi })
+      }
       // The body says nothing this project would recognise, so only the status is left —
       // and it is never allowed to mean NO_ACTOR (see CODE_BY_STATUS). A 5xx is the server
       // being down rather than answering off-contract: Caddy's 502 during a deploy is «the
@@ -242,6 +261,7 @@ export function createTransport({
         `HTTP ${String(response.status)}`,
         false,
         response.status,
+        { fromApi },
       )
     }
 
@@ -255,7 +275,7 @@ export function createTransport({
       parsed.error.issues[0]?.path.join('.'),
       true,
       response.status,
-      response.headers.has(VERSION_HEADER),
+      { fromApi, offContract: fromApi && whole },
     )
   }
 

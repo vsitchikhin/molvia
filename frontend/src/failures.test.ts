@@ -101,19 +101,28 @@ describe('что уходит и что нет (MOL-144)', () => {
     expect(sentText()).not.toMatch(/Ширакаци|5000|Cannot price/)
   })
 
-  it('кадр со своим адресом страницы уходит без него, без query и hash', async () => {
+  it('адрес страницы в кадре не уходит: ни путь экрана, ни запрос (адверсариальный А2)', async () => {
+    const trip = '3f2a9c1e-7b4d-4e8a-9c2f-5d6e7f8a9b0c'
     const reports = failureReports(environment(sending))
+    // An inline script — one an extension put into the page — is named by its document.
     reports.report(
-      thrown(
-        'x',
-        'Xe',
-        `TypeError: x\n    at ${ORIGIN}/advice/search?q=%D1%81%D1%8B%D1%80#top:12:3`,
-      ),
+      thrown('x', 'Xe', `TypeError: x\n    at inject (${ORIGIN}/purchases/${trip}:3:15)`),
       'window',
     )
+    reports.report(
+      thrown(
+        'y',
+        'Xe',
+        `TypeError: y\n    at ${ORIGIN}/advice/search?q=%D1%81%D1%8B%D1%80#top:12:3`,
+      ),
+      'screen',
+    )
     await reports.flush()
-    expect(bodies[0]?.reports[0]?.frames).toEqual(['at <anonymous> (/advice/search:12:3)'])
-    expect(sentText()).not.toMatch(/q=|%D1|#top|molvia\.net/)
+    // The window's: no frame of ours, nothing sent. The screen's goes, with its place unknown.
+    expect(bodies.flatMap((body) => body.reports)).toEqual([
+      expect.objectContaining({ catcher: 'screen', frames: ['at <anonymous> (?)'] }),
+    ])
+    expect(sentText()).not.toMatch(new RegExp(`${trip}|purchases|search|q=|%D1|#top|molvia\\.net`))
   })
 
   it('стек Safari без заголовка — с кадрами, без сообщения', async () => {
@@ -186,6 +195,11 @@ describe('сбой ли это телефона (Р-4, В-3)', () => {
     ['500 API своим словом', new ApiError(ERROR.INTERNAL), false],
     ['нет связи', network(), false],
     [
+      'тело API, оборванное после заголовков (адверсариальный А1)',
+      new ApiError(ISSUE.RESPONSE_INVALID, '', true, 200, { fromApi: true }),
+      false,
+    ],
+    [
       'портал или прокси: не 2xx, тело не наше',
       new ApiError(ISSUE.RESPONSE_INVALID, '', false, 502),
       false,
@@ -197,7 +211,10 @@ describe('сбой ли это телефона (Р-4, В-3)', () => {
     ],
     [
       '2xx API, который контракт не прочёл',
-      new ApiError(ISSUE.RESPONSE_INVALID, 'items', true, 200, true),
+      new ApiError(ISSUE.RESPONSE_INVALID, 'items', true, 200, {
+        fromApi: true,
+        offContract: true,
+      }),
       true,
     ],
     ['исключение в коде', new TypeError('x'), true],
@@ -221,13 +238,51 @@ describe('буфер до связи (Р-7)', () => {
     expect(window.localStorage.getItem(FAILURES_KEY)).toBeNull()
   })
 
-  it('любой ответ отпускает буфер — сверх предела тоже', async () => {
-    const refused = vi.fn(() => Promise.reject(new ApiError(ERROR.CLIENT_ERRORS_RATE_LIMITED)))
+  it.each([
+    [
+      'отказ API своим словом — повтор не поможет',
+      new ApiError(ISSUE.BODY_INVALID, '', true, undefined, { fromApi: true }),
+      null,
+    ],
+    [
+      'сверх предела — «позже», а не «никогда» (ревью №2, А6)',
+      new ApiError(ERROR.CLIENT_ERRORS_RATE_LIMITED, '', true, undefined, { fromApi: true }),
+      1,
+    ],
+    [
+      '502 прокси во время выкатки (ревью №3)',
+      new ApiError(ERROR.INTERNAL, 'HTTP 502', false, 502),
+      1,
+    ],
+    ['страница портала с 200 (ревью №3)', new ApiError(ISSUE.RESPONSE_INVALID, '', true, 200), 1],
+  ])('буфер после ответа: %s', async (_name, answer, left) => {
+    const refused = vi.fn(() => Promise.reject(answer))
     const reports = failureReports(environment(refused))
     reports.report(thrown('x'), 'screen')
     await reports.flush()
     expect(refused).toHaveBeenCalledTimes(1)
-    expect(window.localStorage.getItem(FAILURES_KEY)).toBeNull()
+    const kept = window.localStorage.getItem(FAILURES_KEY)
+    expect(kept === null ? null : (JSON.parse(kept) as unknown[]).length).toBe(left)
+  })
+
+  it('два окна на «online» отправляют один буфер один раз (адверсариальный А3)', async () => {
+    failureReports(environment(() => Promise.reject(network()))).report(thrown('x'), 'screen')
+    await nextTick()
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const slow = vi.fn(async (body: ClientErrors) => {
+      bodies.push(body)
+      await gate
+    })
+    const both = Promise.all([
+      failureReports(environment(slow)).flush(),
+      failureReports(environment(slow)).flush(),
+    ])
+    release()
+    await both
+    expect(bodies.flatMap((body) => body.reports)).toHaveLength(1)
   })
 
   it(`не больше ${String(PHONE_FAILURES_KEPT)}: последние, старший уходит`, async () => {

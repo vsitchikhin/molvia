@@ -2004,7 +2004,7 @@ describe('сбои телефона (MOL-144)', () => {
     )
   })
 
-  it('2xx не по контракту: от API — со сборкой в заголовке, от портала — без неё', async () => {
+  it('2xx не по контракту: целый ответ API — offContract, портал — нет', async () => {
     const off = (headers: Record<string, string>) =>
       clientServing(JSON.stringify({ items: 'not a list' }), {
         status: 200,
@@ -2016,8 +2016,40 @@ describe('сбои телефона (MOL-144)', () => {
       code: ISSUE.RESPONSE_INVALID,
       status: 200,
       fromApi: true,
+      offContract: true,
     })
-    expect(await off({})).toMatchObject({ code: ISSUE.RESPONSE_INVALID, fromApi: false })
+    expect(await off({})).toMatchObject({ fromApi: false, offContract: false })
+  })
+
+  it('тело, оборванное после заголовков API, — не offContract: это погода (адверсариальный А1)', async () => {
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: () =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ [VERSION_HEADER]: 'v0.2.0-1-gabc' }),
+          json: () => Promise.reject(new TypeError('Load failed')),
+        } as unknown as Response),
+    })
+    expect(await client.me().catch((error: unknown) => error)).toMatchObject({
+      fromApi: true,
+      offContract: false,
+    })
+  })
+
+  it('отказ: слово API несёт fromApi, 502 прокси — нет (ревью №3)', async () => {
+    const refused = await clientServing(JSON.stringify({ code: ERROR.NOT_FOUND }), {
+      status: 404,
+      headers: { 'content-type': 'application/json', [VERSION_HEADER]: 'v0.2.0-1-gabc' },
+    })
+      .advice()
+      .catch((error: unknown) => error)
+    expect(refused).toMatchObject({ code: ERROR.NOT_FOUND, fromApi: true })
+    const proxy = await clientServing('', { status: 502 })
+      .advice()
+      .catch((error: unknown) => error)
+    expect(proxy).toMatchObject({ status: 502, fromApi: false })
   })
 
   it('портал с 200 вместо 204 — не успех', async () => {
