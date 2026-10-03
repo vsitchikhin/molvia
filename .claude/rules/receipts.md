@@ -169,10 +169,14 @@ teaches nothing. The price kept is the shelf price of a line recorded as read, t
 where a figure reads two ways — «60 60» for «50 50» adds up either way — and it is a hint, never a
 correction (В-1): a price one confused digit off the remembered is `rememberedPrice` on the line, «
 проверьте», and the parse's figures stay as read. Putting the price into the parse is a change of the
-parse, measured on the bench, and is not done here.
+parse, measured on the bench, and is not done here. **The price is someone's figure** (review 5, В6):
+the person's own always; other people's only as their figures are — with access (`shared_until`) and
+from three people (`AGGREGATE_MIN_CONTRIBUTIONS`). The latest price known for the item is taken, a word
+recorded with corrected figures (no price) passed over.
 
 **Nobody's word is shown as someone's**: the answer is an item and, in doubt, a price — never who or
-when. Erasure leaves a word without its author, still counted, as an item outlives its author (MOL-58);
+when. The item itself is shared on one word: «at this seller this article is milk» is the shop's fact
+(owner, 30.09.2026), and `match: memory` says no more than that someone recorded it there. Erasure leaves a word without its author, still counted, as an item outlives its author (MOL-58);
 the copy carries the person's own words.
 
 **There is no path for «a purchase's item changed later» yet** — a purchase's patch is its quantity and
@@ -185,24 +189,36 @@ change of an item, when it comes, writes the person's word as recording does.
 receipt's day — not «today», and never the open trip — at the rate of that day by the trip's own rule
 (`tripRateOn`: the person's own, else the official one of that day, MOL-73's rule); the purchases with
 their own sums; new items through `createUnlessNamed` (MOL-12), one name on two lines one item; the
-person's words to the memory; the receipt's tax number to the place, if it has none — never rewritten;
-the photo deleted; the receipt `recorded`. The server works every figure out itself, the phone's are not
+person's words to the memory; the photo deleted; the receipt `recorded`, pointing at its trip. **The
+owner's lock of trips comes first**, then the receipt's row (review 7, В3): two shots of one receipt
+recorded at once meet there. New items are made before the purchases, in the order of their names'
+keys — each name is locked to the end of the transaction (review 6). The server works every figure out itself, the phone's are not
 trusted: the unit price is the purchase's own, and the lines are every line of the receipt once.
 
-**The trip's money is what was paid** (В-3): the printed total when it was read — the lines left out and
-those OCR lost included — else every line, a line left out at what it would have been recorded at
-(В-5). A purchase keeps what was paid for its line; the line's discount stays on the line and is shown
+**The trip's money is what was paid** (В-3; В-5 of the review, owner, 03.10.2026): the total the phone
+sends — the printed one, or the person's correction of a total OCR misread; without it the printed total
+where it is not below the lines — the lines left out and those OCR lost included, while a lost line only
+ever raises a total, so one below the lines was misread — else every line, a line left out at what it
+would have been recorded at (В-5 of MOL-124). A purchase keeps what was paid for its line; the line's discount stays on the line and is shown
 beside the purchase (Р-9).
 
 **A trip from a receipt is dated by the receipt's day for «Деньги» and the accounts alike**: the rule
-that a `started_on` a day before the server's start is a wrong clock does not hold for a day the server
-checked when it wrote the receipt (`money-accounts-repository`). A receipt of a week ago is a purchase
-of a week ago.
+that a `started_on` a day before the server's start is a wrong clock does not hold for a receipt's day
+(`money-accounts-repository`): it is the day the person confirmed on the review, not a clock's moment —
+the printed one or their correction of it, held only against a day still to come (`latestDay`). A
+receipt of a week ago is a purchase of a week ago.
 
 **The same trip sent again is the same answer, another trip a 409** — the phone names the trip, as every
 write offline (MOL-24). **The same receipt recorded before is refused** (Т-11,
 `error.receipt_recorded_before`): its seller's tax number and number, the person's, while its purchases
 are there — a trip removed lets it be recorded again. A receipt with no number is held by its id alone.
+
+**A recorded receipt is not removed while its trip is there** (review 1, В1, В2): its row dates the trip
+on the accounts, names it «из чека», names its seller's place and guards against a second record —
+removed, the trip moved a week on its account and the same receipt was recorded twice. It goes with
+its trip: once the trip is removed for good (`trip_id` nulled), the receipt is recorded again from its
+lines (В7) — the photo is gone, the lines are not; a trip only marked removed may come back with
+«Вернуть», so until then it is a 409. **One trip is one receipt's** (`receipts_trip_key`).
 
 **What a line is recorded at, before the person corrects it** (MOL-124 В-5, П-2, `receipt-sum.ts`): a
 line that adds up — what was paid; one that does not — the printed sum where the printed total confirms
@@ -210,10 +226,16 @@ it, else quantity × price. Quantity × price is rounded half up to the digits t
 when every amount on it is whole — once: 0,742 kg × 1 290 = 957,18 is 957 on a receipt of whole drams.
 The phone calls these very functions on the review (В-6 of MOL-124).
 
-**The place is found by the seller's tax number in a city** (Р-6): the one its address prints, if it is
-a city of the settings — «ԳՅՈՒՄՐԻ Գորկու 62» at the start of a row of the head, never «ԵՐԵՎԱՆ-ՍԻԹԻ»,
-the chain's name — else the person's own. «Ереван Сити» of Gyumri and of Yerevan are two places of one
-number; two of one name in one city are one place by the rule of `places`.
+**The place is found by the receipts of its seller recorded in a city** (Р-6; review В4): the city its
+address prints, if it is a city of the settings — the row «ԳՅՈՒՄՐԻ …» or «ք. Երևան, …» at the start of a
+row of the head, never the chain's name «ԵՐԵՎԱՆ-ՍԻԹԻ» or «YEREVAN CITY» — else the person's own. Of
+the places this seller's receipts were recorded at there, with the trips still there: the person's own
+last, else the one most people chose, the later on a tie — as the shop's memory is read. **A place
+keeps no tax number**: a column written by the first receipt named a place for everyone, for good, and
+one wrong tap on the sheet sent every receipt of the seller to «SAS». A removed trip takes its word
+with it. «Ереван Сити» of Gyumri and of Yerevan are two places of one number; two of one name in one
+city are one place by the rule of `places`. **A place picked by its id is held to the receipt's
+geography as a new one is** (review 3, В8): the receipt's country and a city of the settings.
 
 ## «Переснимите» (В-4)
 
