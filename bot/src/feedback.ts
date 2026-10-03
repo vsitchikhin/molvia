@@ -154,7 +154,7 @@ export function feedbackComposer({ api }: FeedbackDeps): Composer<Context> {
 /**
  * The owner's reply, sent to the person and its outcome said to the owner (Р-11). The mark goes to
  * the API after the send: a lost mark leaves the reply «unknown», and the person's answer to it
- * cannot find the thread — a named price (Р-4, Р-14).
+ * cannot find the thread — a named price (Р-4, Р-14), said to the owner instead of the 👌.
  */
 async function deliver(
   ctx: Context,
@@ -188,9 +188,15 @@ async function deliver(
     await say('feedback.unknown')
     return
   }
-  await mark(api, ctx, () =>
+  const marked = await mark(api, ctx, () =>
     api.replyDelivered({ reply: answer.reply, outcome: 'sent', messageId }),
   )
+  // Delivered, but the API does not know the message it went as: the person's answer to it cannot
+  // find the thread, and the owner must not wait for one under a 👌 (review №2).
+  if (!marked) {
+    await say('feedback.deliveredUnmarked')
+    return
+  }
   try {
     await ctx.react(DELIVERED_REACTION)
   } catch (error) {
@@ -200,13 +206,19 @@ async function deliver(
 }
 
 /** A word to the API after the send: its failure is the log's, and the owner still hears the outcome. */
-async function mark(api: MolviaBotClient, ctx: Context, call: () => Promise<void>): Promise<void> {
+async function mark(
+  api: MolviaBotClient,
+  ctx: Context,
+  call: () => Promise<void>,
+): Promise<boolean> {
   try {
     await call()
+    return true
   } catch (error) {
     console.error(
       `[molvia] feedback mark: ${error instanceof ApiError ? error.code : 'unexpected failure'}`,
     )
     reportDefect(api, error, handlerOf(ctx))
+    return false
   }
 }

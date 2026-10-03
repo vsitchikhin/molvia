@@ -408,7 +408,8 @@ storage is `feedback.md`.
   to that message, from that account, is the thread's continuation — no number shown to the person,
   and nobody else's chat holds that message. **The named price** (Р-4, Р-14): a mark lost between the
   send and the API leaves that reply «unknown», and an answer to it is refused as nothing of ours —
-  and the owner, who saw 👌, is not told.
+  so the owner gets no 👌 then, but «Доставлено, но… ответ человека на него не найдёт переписку»,
+  and does not wait for an answer that cannot come (review №2).
 - **The same word within a day is the same message** (adversarial В3, round 2 Г1): the same words of
   the same person to the same reply within a rolling 24 hours are a repeat — «ответьте ещё раз» after
   a lost answer writes it once, and so does Telegram handing the update over twice. A day on, the

@@ -82,6 +82,8 @@ export const en: Dictionary = {
   'feedback.howToAnswer': 'To answer, reply to this message.',
   'feedback.passed': 'Passed on to the developer.',
   'feedback.delivered': 'Delivered.',
+  'feedback.deliveredUnmarked':
+    'Delivered, but the server did not record which message it went as: the person’s answer to it will not find the conversation.',
   'feedback.blocked': 'Not delivered: the person blocked the bot.',
   'feedback.gone': 'Message #fb{thread} is gone: the data was erased.',
   'feedback.tooLong': 'Too long: up to {max} characters. Nothing was sent.',

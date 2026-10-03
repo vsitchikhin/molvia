@@ -234,13 +234,15 @@ describe('ответ владельца на уведомление (MOL-148, Р
     expect(replies(calls)).toContain(t('ru', 'feedback.unknown'))
   })
 
-  it('отметка об отправке не дошла до API — владелец всё равно видит 👌', async () => {
+  it('отметка об отправке не дошла до API — вместо 👌 строка: ответ человека не найдёт переписку (ревью №2)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const replyDelivered = vi.fn(() => Promise.reject(new ApiError(ERROR.INTERNAL)))
     const { bot, calls } = harness({ feedbackFromBot: answering(answered), replyDelivered })
 
     await bot.handleUpdate(replyTo({ text: ownerText(NOTICE) }, { text: 'Починили' }))
 
-    expect(sent(calls, 'setMessageReaction')).toHaveLength(1)
+    expect(sent(calls, 'setMessageReaction')).toEqual([])
+    expect(replies(calls).slice(1)).toEqual([t('ru', 'feedback.deliveredUnmarked')])
   })
 
   it.each([
