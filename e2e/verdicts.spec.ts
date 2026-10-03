@@ -18,12 +18,16 @@ interface Person {
  * would have logged in a second, invisible person.
  */
 async function person(page: Page): Promise<Person> {
-  const id = await signedIn(page)
   // The home a newcomer lands on asks for the queue too, and the app remembers its answer. Asked
   // halfway through `bought`, it remembered one purchase of two, and «Оценки» opened on that one —
   // the card on screen is kept when the fresh answer comes, on purpose — so the newest was not
-  // first (MOL-143, CI flake). The purchases start once the home has asked.
-  await page.waitForLoadState('networkidle')
+  // first (MOL-143, CI flake). The purchases start once the home has had its answer: that answer,
+  // not a quiet network, which another request of the home would never let come.
+  const homeAsked = page.waitForResponse(
+    (response) => response.url().includes('/api/verdicts/pending') && response.ok(),
+  )
+  const id = await signedIn(page)
+  await homeAsked
   const headers = await asBrowser(page)
 
   return {

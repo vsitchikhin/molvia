@@ -155,7 +155,8 @@ describe('бот и канал владельцу — /internal (MOL-143)', () =
       payload: report,
     })
     expect(response.statusCode).toBe(204)
-    const [row] = await db.select().from(failures)
+    // Answered at once and written behind the answer: the row is waited for, never raced (№13).
+    const [row] = await recorded()
     expect(row).toMatchObject({ source: 'bot', route: 'callback:rate', errorName: 'GrammyError' })
   })
 
@@ -179,6 +180,7 @@ describe('бот и канал владельцу — /internal (MOL-143)', () =
 
   it('claim отдаёт уведомление владельцу один раз', async () => {
     await app.inject({ method: 'POST', url: '/internal/failures', headers: asBot, payload: report })
+    await recorded()
     const claim = () => app.inject({ method: 'POST', url: '/internal/owner/claim', headers: asBot })
 
     const first = ownerNoticesSchema.parse((await claim()).json())
