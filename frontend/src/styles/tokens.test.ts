@@ -11,11 +11,13 @@ import { describe, expect, it } from 'vitest'
 // A path in a variable: Vite rewrites `new URL('./literal', import.meta.url)` into an asset's address.
 const TOKENS = './_tokens.scss'
 
-// Both kinds of comment out first, a line comment also at the end of a declaration: a value in one is
-// no token, and Sass drops it from what the page draws (as bin/design-md.mjs reads the file).
-const source = readFileSync(new URL(TOKENS, import.meta.url), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .replace(/(^|[\s;{}])\/\/[^\n]*/g, '$1')
+// Both kinds of comment out first, in one pass as Sass reads them: a `/*` inside a line comment opens
+// nothing, and a `//` inside a block comment ends nothing. A value in either is no token, and Sass
+// drops it from what the page draws.
+const source = readFileSync(new URL(TOKENS, import.meta.url), 'utf8').replace(
+  /\/\*[\s\S]*?\*\/|(^|[\s;{}])\/\/[^\n]*/g,
+  (_comment, before?: string) => before ?? '',
+)
 
 // Every declaration, whatever its value: a colour this test cannot read must fail here, not fall out
 // of the lists — Stylelint asks for the short hex (`color-hex-length`), and `--fix` writes it.
@@ -139,8 +141,10 @@ describe.each(['light', 'dark'] as const)('the %s scheme', (scheme) => {
     expect(close).toEqual([])
   })
 
-  // A tint is a fill with no edge — a notice in a sheet, the circle of a state: one the eye cannot
-  // tell from the sheet it lies on is no fill (adversarial А3: the dark bad-tint was 0.038).
+  // A tint is a fill with no edge — a notice in a sheet or a card: one the eye cannot tell from the
+  // sheet it lies on is no fill (adversarial А3: the dark bad-tint was 0.038). On the page ground,
+  // --sunken, the light good, warn and bad tints stand closer — a strip or a state's circle there is
+  // told by its icon and word (review 5, way «а»).
   it(`lays every tint ${String(APART)} apart from --surface`, () => {
     const lost = TINTS.map((tint) => [tint, distance(value(tint), value('surface'))] as const)
       .filter(([, d]) => d < APART)
