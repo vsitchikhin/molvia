@@ -18,7 +18,9 @@ async function refused(code: string, codeFilename = 'Probe.vue'): Promise<string
   })
   return (results[0]?.warnings ?? []).map(
     (warning) =>
-      warning.text.split(/ on an icon| has no| is sized by| is declared| is worn by/)[0] ?? '',
+      warning.text.split(
+        / on an icon| has no| is sized by| is declared| is worn by| is drawn at/,
+      )[0] ?? '',
   )
 }
 
@@ -562,6 +564,86 @@ describe('molvia/icon-size, round 4', () => {
         ),
       ),
     ).toEqual(['<IconY> (line 3)'])
+  })
+})
+
+describe('molvia/icon-size, round 5', () => {
+  it('reads a shorthand key of :class as a class (review 19)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<IconX class="c" :class="{ big }" /><IconX class="d" :class="{ wide, small: x }" />',
+          `.c, .d { ${ICON} }\n.big { width: 2rem; }\n.wide { height: 2rem; }`,
+        ),
+      ),
+    ).toEqual(['width: 2rem', 'height: 2rem'])
+  })
+
+  it('lets a rule that reaches an icon by * through with what sizes nothing (review 20)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<div class="row"><IconX class="c" /></div>',
+          `.c { ${ICON} }\n.row > * { min-width: 0; max-width: 100%; @include appear(0); }`,
+        ),
+      ),
+    ).toEqual([])
+  })
+
+  it('takes a part of an svg for an icon’s only under an icon (review 21)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<svg class="chart"><rect class="bar" /></svg><IconX class="c" />',
+          `.chart rect { height: 2px; }\n.c { ${ICON} }\n.c path { height: 2px; }`,
+        ),
+      ),
+    ).toEqual(['height: 2px'])
+  })
+
+  it('refuses a custom property whose name Sass builds (Д1)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="row"><IconX class="c" /></p>',
+          `$step: --icon;\n.c { ${ICON} }\n.row { #{$step}: 2rem; --#{"ic" + "on"}: 2rem; }`,
+        ),
+      ),
+    ).toEqual(['#{$step}', '--#{"ic" + "on"}'])
+  })
+
+  it('takes nothing outside a <Teleport> for an ancestor of what it holds (Д2)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<div class="page"><Teleport to="body"><p class="toast"><IconCheck /></p></Teleport></div>',
+          `.page svg { ${ICON} }`,
+        ),
+      ),
+    ).toEqual(['<IconCheck> (line 2)'])
+  })
+
+  it('holds the role the import names: the row’s chevron is 20 (Д3)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<button class="row"><IconChevronRight class="chevron" /><IconStar class="star" /></button>',
+          '.chevron { @include icon; font-size: var(--icon-tab); }\n.star { @include icon; font-size: var(--icon-tab); }',
+          "import IconChevronRight from '~icons/mdi/chevron-right'\nimport IconStar from '~icons/mdi/star'",
+        ),
+      ),
+    ).toEqual(['The icon «.chevron» (line 2)'])
+  })
+
+  it('takes the mixin of AppButton for an icon of its slot with a step of its own (Д4)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<AppButton><IconPlus class="plus" /></AppButton>',
+          '.plus { font-size: var(--icon-md); }',
+        ),
+      ),
+    ).toEqual([])
   })
 })
 

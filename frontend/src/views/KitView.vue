@@ -50,42 +50,43 @@
       </div>
     </section>
 
-    <!-- The icon scale (Ф-9, MOL-173): one chevron at every step, for a screen to be checked by. The
+    <!-- The icon scale (Ф-9, MOL-173): one shape at every step, for a screen to be checked by — not the
+         chevron, whose role is 20. The
          step's class is on the wrapper — a class of this page on a child's root would reach
          AppButton's own `.icon` — and written out: a class from `:class` sizes nothing to the linter. -->
     <section class="group">
       <h2 class="caption">{{ t('dev.kit.icons') }}</h2>
       <div class="row">
         <span class="icon-step step-icon-xs">
-          <IconChevronRight class="sample" aria-hidden="true" />
+          <IconShape class="sample" aria-hidden="true" />
           <span class="px">{{ iconPx['icon-xs'] }}</span>
         </span>
         <span class="icon-step step-icon-sm">
-          <IconChevronRight class="sample" aria-hidden="true" />
+          <IconShape class="sample" aria-hidden="true" />
           <span class="px">{{ iconPx['icon-sm'] }}</span>
         </span>
         <span class="icon-step step-icon">
-          <IconChevronRight class="sample" aria-hidden="true" />
+          <IconShape class="sample" aria-hidden="true" />
           <span class="px">{{ iconPx['icon'] }}</span>
         </span>
         <span class="icon-step step-icon-button">
-          <IconChevronRight class="sample" aria-hidden="true" />
+          <IconShape class="sample" aria-hidden="true" />
           <span class="px">{{ iconPx['icon-button'] }}</span>
         </span>
         <span class="icon-step step-state-glyph">
-          <IconChevronRight class="sample" aria-hidden="true" />
+          <IconShape class="sample" aria-hidden="true" />
           <span class="px">{{ iconPx['state-glyph'] }}</span>
         </span>
         <span class="icon-step step-icon-md">
-          <IconChevronRight class="sample" aria-hidden="true" />
+          <IconShape class="sample" aria-hidden="true" />
           <span class="px">{{ iconPx['icon-md'] }}</span>
         </span>
         <span class="icon-step step-icon-back">
-          <IconChevronRight class="sample" aria-hidden="true" />
+          <IconShape class="sample" aria-hidden="true" />
           <span class="px">{{ iconPx['icon-back'] }}</span>
         </span>
         <span class="icon-step step-icon-tab">
-          <IconChevronRight class="sample" aria-hidden="true" />
+          <IconShape class="sample" aria-hidden="true" />
           <span class="px">{{ iconPx['icon-tab'] }}</span>
         </span>
       </div>
@@ -144,10 +145,10 @@ import {
   money,
   SETTINGS_CITIES,
 } from '@molvia/model'
-import IconChevronRight from '~icons/mdi/chevron-right'
 import IconClose from '~icons/mdi/close'
 import IconPlus from '~icons/mdi/plus'
 import IconRefresh from '~icons/mdi/refresh'
+import IconShape from '~icons/mdi/shape-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
@@ -175,10 +176,10 @@ export default defineComponent({
     AppScreen,
     BarcodeScannerSheet,
     BottomSheet,
-    IconChevronRight,
     IconClose,
     IconPlus,
     IconRefresh,
+    IconShape,
     SegmentedControl,
     VerdictBadge,
     VerdictCard,

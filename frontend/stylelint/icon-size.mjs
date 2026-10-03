@@ -60,7 +60,6 @@ const TRANSPARENT = new Set([
   'TransitionGroup',
   'KeepAlive',
   'Suspense',
-  'Teleport',
 ])
   .add('transition')
   .add('transition-group')
@@ -72,7 +71,8 @@ const BORDER = /^border(-(top|right|bottom|left|block|inline)(-(start|end))?)?(-
 const STEP = /^var\(--(icon(-[a-z0-9]+)*|state-glyph)\)$/
 const STEP_NAME = /^--(icon(-[a-z0-9]+)*|state-glyph)$/
 const TURN = new Set(['rotate', 'rotatez', 'translate', 'translatex', 'translatey'])
-const ALLOWED_INCLUDES = new Set(['icon', 'wider-than-phone'])
+// `appear` moves and fades what comes in, and sizes nothing (review 20).
+const ALLOWED_INCLUDES = new Set(['icon', 'wider-than-phone', 'appear'])
 // The parts of an icon's svg: a rule on one is a rule on the icon's glyph (Г2).
 const SVG_PARTS = new Set([
   'path',
@@ -123,6 +123,8 @@ const messages = ruleMessages(ruleName, {
   shared: (name, other, line) =>
     `.${name} is worn by an icon and by <${other}> (line ${line}). An icon's class is its own: a size ` +
     `in a rule of a shared class reaches the icon unchecked (MOL-173).`,
+  role: (size, role, where) =>
+    `${where} is drawn at ${size}; its role takes ${role} — the row's chevron is 20 everywhere (Ф-9).`,
   token: (prop) =>
     `${prop} is declared outside _tokens.scss. A step of the icon scale is the scale's, never set ` +
     `again in a component (MOL-173).`,
@@ -139,30 +141,36 @@ const BOUND_STEP =
   /(?:^|\s)(?::style|v-bind:style|v-bind)=(?:"[^"]*--(?:icon|state-glyph)|'[^']*--(?:icon|state-glyph))/
 const SIZE_ATTRIBUTE = /(?:^|\s)(?::|v-bind:)?(width|height)=/
 const BOUND_STYLE = /(?:^|\s)(?::style|v-bind:style|v-bind)=/
-const IMPORT = /import\s+(\w+)\s+from\s+['"]~icons\/[^'"]+['"]/g
+const IMPORT = /import\s+(\w+)\s+from\s+['"]~icons\/([^'"]+)['"]/g
+// A role the import names: the row's chevron is 20 wherever it stands (Ф-9, Д3).
+const ROLE_STEP = { 'mdi/chevron-right': 'var(--icon)' }
 const COMPONENTS = /components\s*[:=]\s*\{([^}]*)\}/g
 
 const kebab = (name) => name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
 const blank = (text) => text.replace(/[^\n]/g, ' ')
 
+// The icons an SFC imports, by every name the template may use, each with the icon it is.
 function iconNames(sfc) {
-  const names = new Set()
-  for (const [, name] of sfc.matchAll(IMPORT)) names.add(name)
+  const names = new Map()
+  for (const [, name, icon] of sfc.matchAll(IMPORT)) names.set(name, icon)
   for (const [, body] of sfc.matchAll(COMPONENTS)) {
     for (const [, key, value] of body.matchAll(/(\w+)\s*:\s*(\w+)/g))
-      if (names.has(value)) names.add(key)
+      if (names.has(value)) names.set(key, names.get(value))
   }
-  for (const name of [...names]) names.add(kebab(name))
+  for (const [name, icon] of [...names]) names.set(kebab(name), icon)
   return names
 }
 
-// The classes a `:class` names: the keys of an object and the strings in quotes. A class built from a
+// The classes a `:class` names: the keys of an object, shorthand ones too, and the strings in quotes. A class built from a
 // variable or a template string is named nowhere, and no rule reaches it.
 function boundClasses(match) {
   const expression = match?.[1] ?? match?.[2] ?? ''
   const names = new Set()
   for (const [, quoted, key] of expression.matchAll(/'([\w-]+)'|([A-Za-z_][\w-]*)\s*:/g))
     names.add(quoted ?? key)
+  // `{ accent }` — the shorthand the project writes (review 19).
+  for (const [, short] of expression.matchAll(/[{,]\s*([A-Za-z_][\w-]*)\s*(?=[,}])/g))
+    names.add(short)
   return names
 }
 
@@ -205,6 +213,11 @@ export function templateTags(sfc) {
       boundStep: BOUND_STEP.test(attributes),
       parent: stack[stack.length - 1],
       icon,
+      // Imported, the icon it is; else read off the house name, `IconChevronRight` → `mdi/chevron-right`.
+      iconId:
+        icons.get(name) ??
+        (/^Icon[A-Z]/.test(name) ? `mdi/${kebab(name.slice(4))}` : undefined) ??
+        (/^icon-/.test(name) ? `mdi/${name.slice(5)}` : undefined),
       sizeAttribute: icon ? attributes.match(SIZE_ATTRIBUTE)?.[1] : undefined,
       boundStyle: icon && BOUND_STYLE.test(attributes),
     }
@@ -218,11 +231,12 @@ export function templateTags(sfc) {
 const isComponent = (tag) =>
   /[A-Z]/.test(tag.name) || tag.name.includes('-') || tag.name === 'component'
 
-// The element around a tag in the page: the parent, past what renders nothing of its own.
+// The element around a tag in the page: the parent, past what renders nothing of its own. A
+// `<Teleport>` carries what it holds out of the page around it: nothing above it is an ancestor (Д2).
 function up(tag) {
   let parent = tag.parent
   while (parent && TRANSPARENT.has(parent.name)) parent = parent.parent
-  return parent
+  return parent && /^teleport$/i.test(parent.name) ? undefined : parent
 }
 
 // --- selectors ----------------------------------------------------------------------------------
@@ -408,6 +422,9 @@ const fontSize = (node) => node.type === 'decl' && node.prop === 'font-size'
 const isStep = (value) => STEP.test(value.trim())
 
 function resizes(prop, value) {
+  // A minimum of nothing and a maximum of all leave a 1em icon as it is (review 20).
+  if (/^min-/.test(prop) && /^(0|auto)$/.test(value)) return false
+  if (/^max-/.test(prop) && /^(none|100%)$/.test(value)) return false
   if (SIZE.test(prop)) return value !== '1em'
   if (PADDING.test(prop)) return !/^0(\s+0)*$/.test(value)
   if (BORDER.test(prop)) return !/^(0|none|hidden)(\s|$)/.test(value)
@@ -430,7 +447,8 @@ function rule(primary) {
     // The steps are the scale's: declared in _tokens.scss alone (В1).
     if (!root.source?.input.file?.endsWith('/styles/_tokens.scss')) {
       root.walkDecls((decl) => {
-        if (STEP_NAME.test(decl.prop) || /#\{[^}]*(icon|state-glyph)/.test(decl.prop))
+        // A custom property whose name Sass builds may be any step (Д1): none is needed here.
+        if (STEP_NAME.test(decl.prop) || (decl.prop.includes('#{') && /^(--|#\{)/.test(decl.prop)))
           flag(decl, messages.token(decl.prop))
       })
     }
@@ -453,6 +471,16 @@ function rule(primary) {
       return
     }
 
+    // A rule on a part of an svg (`path`) is an icon's when the selector before it reaches an icon of
+    // the template — a chart's own `<svg><rect>` is none (review 21).
+    const partOfIcon = (selector) => {
+      const last = selector.compounds[selector.compounds.length - 1] ?? ''
+      if (!SVG_PARTS.has(last.match(/^[a-z]+/)?.[0] ?? '') || selector.compounds.length < 2)
+        return false
+      const before = parse(selector.compounds.slice(0, -1).join(' '))
+      return icons.some((tag) => reaches(before, tag, true))
+    }
+
     const blocks = root.document
       ? root.document.nodes.filter((node) => node.type === 'root' && !node.source?.inline)
       : [root]
@@ -467,7 +495,7 @@ function rule(primary) {
             (s) =>
               s.svg ||
               s.classes.some((name) => iconClasses.has(name)) ||
-              SVG_PARTS.has(s.compounds[s.compounds.length - 1]?.match(/^[a-z]+/)?.[0] ?? '') ||
+              partOfIcon(s) ||
               icons.some((tag) => reaches(s, tag, true)),
           ),
           svg: selectors.some((s) => s.svg),
@@ -558,12 +586,13 @@ function rule(primary) {
       if (tag.sizeAttribute) flag(root, messages.template(`${tag.sizeAttribute}=`, tag.line))
       if (tag.boundStyle) flag(root, messages.template('A bound style', tag.line))
 
-      // An icon put straight into the slot of a component that sizes it is the component's.
+      // An icon put straight into the slot of a component that sizes it is the component's; a step
+      // of its own there needs no mixin, the component gives it (Д4).
       const parent = up(tag)
       const rules = reaching(tag)
+      const slotted = Boolean(parent && SIZED_SLOTS.has(parent.name))
       if (
-        parent &&
-        SIZED_SLOTS.has(parent.name) &&
+        slotted &&
         !rules.some((entry) => direct(entry.node).some((n) => isMixin(n) || fontSize(n)))
       )
         continue
@@ -575,7 +604,7 @@ function rule(primary) {
         all.find((entry) =>
           entry.selectors.some((s) => s.classes.some((c) => tag.classes.includes(c))),
         )?.node ?? root
-      const mixed = rules.some((entry) => direct(entry.node).some(isMixin))
+      const mixed = slotted || rules.some((entry) => direct(entry.node).some(isMixin))
       let size = ownSize(tag)
       for (
         let above = up(tag);
@@ -585,6 +614,9 @@ function rule(primary) {
         size = ownSize(above)
       }
       const stepped = size !== undefined && isStep(size)
+      const role = ROLE_STEP[tag.iconId]
+      if (stepped && role && size.trim() !== role)
+        flag(anchor, messages.role(size.trim(), role, where))
       if (mixed && stepped) continue
       if (!mixed && !stepped && !rules.some((entry) => direct(entry.node).some(fontSize))) {
         flag(anchor, messages.unsized(where))
