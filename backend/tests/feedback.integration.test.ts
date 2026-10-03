@@ -5,6 +5,7 @@ import {
   ERROR,
   FEEDBACK_BODY_BYTES_MAX,
   FEEDBACK_DAY_LIMIT,
+  FEEDBACK_HEAVY_DAY_LIMIT,
   FEEDBACK_PICTURE_BYTES_MAX,
   ISSUE,
 } from '@molvia/model'
@@ -726,5 +727,26 @@ describe('снимки к сообщению (MOL-167)', () => {
           .values({ feedbackId: id, position: 2, telegramFileId: 'A' }),
       ),
     ).toBe('feedback_picture_files_line')
+  })
+})
+
+describe('тела со снимками считаются до чтения (адверсариальное А3)', () => {
+  it(`${String(FEEDBACK_HEAVY_DAY_LIMIT)} в сутки, дальше — 429 без разбора; лёгкое сообщение и другой человек — как раньше`, async () => {
+    const cookie = await signIn(db, await insertActor(db))
+    // Not a picture: refused at once (415), yet more than a megabyte to read.
+    const heavy = message({ pictures: [Buffer.alloc(800 * 1024).toString('base64')] })
+
+    for (let i = 0; i < FEEDBACK_HEAVY_DAY_LIMIT; i++) {
+      expect((await send(heavy, cookie)).statusCode).toBe(415)
+    }
+    const started = performance.now()
+    const past = await send(heavy, cookie)
+    expect(past.statusCode).toBe(429)
+    expect(past.json()).toEqual({ code: ERROR.FEEDBACK_RATE_LIMITED })
+    expect(performance.now() - started).toBeLessThan(200)
+
+    expect((await send(message(), cookie)).statusCode).toBe(201)
+    const other = await signIn(db, await insertActor(db))
+    expect((await send(heavy, other)).statusCode).toBe(415)
   })
 })

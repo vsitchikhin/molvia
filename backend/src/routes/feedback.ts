@@ -3,6 +3,7 @@ import {
   DomainError,
   ERROR,
   FEEDBACK_BODY_BYTES_MAX,
+  FEEDBACK_HEAVY_BODY_BYTES,
   feedbackBodySchema,
   feedbackSentCodec,
 } from '@molvia/model'
@@ -25,16 +26,28 @@ export type SendFeedback = (
  * limit is this route's alone. Too large by its `Content-Length` is said by its own code before the
  * body is read; one sent in chunks with no length meets the route's limit, a `413` all the same.
  */
-export function feedbackRoutes(app: FastifyInstance, send: SendFeedback): void {
+export function feedbackRoutes(
+  app: FastifyInstance,
+  send: SendFeedback,
+  heavy: (actorId: string) => boolean,
+): void {
   app.post(
     '/feedback',
     {
       bodyLimit: FEEDBACK_BODY_BYTES_MAX,
       onRequest: (request, _reply, done) => {
-        const length = Number(request.headers['content-length'] ?? 0)
+        const named = request.headers['content-length']
+        const length = Number(named ?? 0)
+        if (length > FEEDBACK_BODY_BYTES_MAX) {
+          done(new DomainError(ERROR.FEEDBACK_PICTURE_TOO_LARGE))
+          return
+        }
+        // A body with pictures — or one that names no length — is counted before it is read
+        // (adversarial А3); the session's owner is known by now, from the scope's own hook.
+        const weighty = named === undefined || length > FEEDBACK_HEAVY_BODY_BYTES
         done(
-          length > FEEDBACK_BODY_BYTES_MAX
-            ? new DomainError(ERROR.FEEDBACK_PICTURE_TOO_LARGE)
+          weighty && !heavy(request.actorId)
+            ? new DomainError(ERROR.FEEDBACK_RATE_LIMITED)
             : undefined,
         )
       },

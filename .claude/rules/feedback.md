@@ -113,10 +113,13 @@ a screenshot with it MOL-167 (В-1…В-5, Р-1…Р-13 in `.scratch/tasks/requi
   megabytes of empty segments, or of two-byte markers, held the API's thread for a hundred
   milliseconds a picture. Not one — `error.feedback_picture_invalid`,
   `415`; too heavy — `error.feedback_picture_too_large`, `413`; the text and the other pictures stay on
-  the phone. **The price, named** (А3): a body of eight megabytes is read — JSON, base64 — before
-  anything is counted, some fifty milliseconds of the thread, and a refused one is not counted in the
-  day's limit; a person with a session could send them in a row. Not closed before 0.2: a limit of
-  heavy bodies in memory is the next step if the log ever shows it.
+  the phone. **Bodies with pictures are counted before they are read** (А3):
+  eight megabytes of JSON and base64 cost some fifty milliseconds of the thread before the day's limit
+  can count anything, and a refused body never is counted there. So a body over
+  `FEEDBACK_HEAVY_BODY_BYTES` (a megabyte), or one that names no length, takes a place of
+  `FEEDBACK_HEAVY_DAY_LIMIT` (30 in a rolling day per person — three tries for each of the day's ten)
+  in the route's `onRequest`, the session's owner known by then; past it, `error.feedback_rate_limited`
+  before a byte is read. In the process's memory, as the phone's failures are: a restart forgets it.
 - **One request** (Р-3): the pictures go in base64 in `POST /feedback`, written with the message in one
   transaction, so a repeat compares them too — by `fingerprint`, the sha256 of the bytes kept, which
   outlives them. The body's limit is the route's alone (`FEEDBACK_BODY_BYTES_MAX`), and too large by

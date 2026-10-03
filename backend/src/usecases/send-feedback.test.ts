@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DomainError, ERROR, FEEDBACK_DAY_LIMIT } from '@molvia/model'
 import type { FeedbackBody } from '@molvia/model'
 import type { FeedbackRepository, FeedbackWrite } from '@/db/feedback-repository'
-import { sendFeedback } from './send-feedback'
+import { heavyFeedbackLimit, sendFeedback } from './send-feedback'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const OWNER = 700_000_001
@@ -101,5 +101,25 @@ describe('sendFeedback', () => {
 
     await expect(sent).rejects.toBeInstanceOf(DomainError)
     await expect(sent).rejects.toMatchObject({ code: ERROR.FEEDBACK_RATE_LIMITED })
+  })
+})
+
+describe('heavyFeedbackLimit (адверсариальное А3)', () => {
+  const HOUR = 60 * 60 * 1000
+
+  it('ровно предел за скользящие сутки, у каждого свой; через сутки — снова', () => {
+    const limit = heavyFeedbackLimit(3)
+
+    expect([0, 1, 2, 3].map((i) => limit('anna', i * HOUR))).toEqual([true, true, true, false])
+    expect(limit('boris', 4 * HOUR)).toBe(true)
+    // The first went out of the window a day after it came.
+    expect(limit('anna', 24 * HOUR)).toBe(true)
+    expect(limit('anna', 24 * HOUR + 1)).toBe(false)
+  })
+
+  it('отказанное не считается: память держит не больше предела на человека', () => {
+    const limit = heavyFeedbackLimit(2)
+    for (let i = 0; i < 100; i++) limit('anna', i)
+    expect(limit('anna', 24 * HOUR)).toBe(true)
   })
 })

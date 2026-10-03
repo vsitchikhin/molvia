@@ -1,4 +1,4 @@
-import { DomainError, ERROR, FEEDBACK_DAY_LIMIT } from '@molvia/model'
+import { DomainError, ERROR, FEEDBACK_DAY_LIMIT, FEEDBACK_HEAVY_DAY_LIMIT } from '@molvia/model'
 import type { FeedbackBody, FeedbackSent, TelegramUserId } from '@molvia/model'
 import type { FeedbackRepository } from '@/db/feedback-repository'
 import { pictureOf } from '@/feedback/picture'
@@ -32,4 +32,29 @@ export async function sendFeedback(
   )
   if (write.kind === 'limited') throw new DomainError(ERROR.FEEDBACK_RATE_LIMITED)
   return { sent: { number: write.number }, created: write.kind === 'written' }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Whether one more body with pictures from `actorId` fits the rolling day, and if it does, counted
+ * (adversarial А3). In the process's memory and nowhere else, as the phone's failures are: counted
+ * before the body is read, since reading eight megabytes is the cost — the day's limit of messages
+ * counts only what was written, and a refused body never is. A restart forgets it; a rollout is rare.
+ */
+export type HeavyFeedbackLimit = (actorId: string, now: number) => boolean
+
+export function heavyFeedbackLimit(perDay = FEEDBACK_HEAVY_DAY_LIMIT): HeavyFeedbackLimit {
+  const taken = new Map<string, number[]>()
+  return (actorId, now) => {
+    for (const [who, moments] of taken) {
+      const fresh = moments.filter((at) => now - at < DAY_MS)
+      if (fresh.length === 0) taken.delete(who)
+      else taken.set(who, fresh)
+    }
+    const mine = taken.get(actorId) ?? []
+    if (mine.length >= perDay) return false
+    taken.set(actorId, [...mine, now])
+    return true
+  }
 }

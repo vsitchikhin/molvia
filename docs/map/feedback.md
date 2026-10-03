@@ -13,7 +13,7 @@ Rules: `.claude/rules/feedback.md`. A test beside its source, or mirroring it un
 
 ## backend · usecases
 
-- `backend/src/usecases/send-feedback.ts` — Use case of «Написать разработчику» (MOL-147): the session's owner, the API's own build, the day's limit of the domain; past it `error.feedback_rate_limited`; a new message queued for the owner when there is one (MOL-148); its pictures read and stripped before anything is written (MOL-167).
+- `backend/src/usecases/send-feedback.ts` — Use case of «Написать разработчику» (MOL-147): the session's owner, the API's own build, the day's limit of the domain; past it `error.feedback_rate_limited`; a new message queued for the owner when there is one (MOL-148); its pictures read and stripped before anything is written (MOL-167); `heavyFeedbackLimit`, the bodies with pictures a person may send in a rolling day, counted in memory before they are read.
 - `backend/src/usecases/feedback-from-bot.ts` — Use case of a text written to the bot as a reply (MOL-148): the owner's reply on a tagged notice, else a person's word on a reply they were sent, else `404`; the length by who writes, and the key of a Telegram message.
 
 ## backend · feedback

@@ -54,6 +54,18 @@ export const FEEDBACK_BODY_BYTES_MAX =
   Math.ceil((FEEDBACK_PICTURES_MAX * FEEDBACK_PICTURE_BYTES_MAX) / 3) * 4 + 64 * 1024
 
 /**
+ * A body heavier than this carries pictures (MOL-167): every other message is a few kilobytes.
+ */
+export const FEEDBACK_HEAVY_BODY_BYTES = 1024 * 1024
+
+/**
+ * How many bodies with pictures a person may send in a rolling day, written or refused (MOL-167,
+ * adversarial А3): three tries for each of the day's messages. Eight megabytes are read — JSON,
+ * base64 — before the day's limit can count anything, so these are counted before they are read.
+ */
+export const FEEDBACK_HEAVY_DAY_LIMIT = 3 * FEEDBACK_DAY_LIMIT
+
+/**
  * How long a picture's bytes are kept when the owner's bot never took them (MOL-167, В-1): they are
  * kept only until they reach the owner's Telegram, and a week is the bot away for a week, or a copy
  * with no owner at all. What is left of a picture after is a line — its number, size and when it went.

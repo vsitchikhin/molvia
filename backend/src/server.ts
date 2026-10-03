@@ -48,7 +48,7 @@ import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
 import { exportMine } from '@/usecases/export-mine'
-import { sendFeedback } from '@/usecases/send-feedback'
+import { heavyFeedbackLimit, sendFeedback } from '@/usecases/send-feedback'
 import { feedbackFromBot } from '@/usecases/feedback-from-bot'
 import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
@@ -783,8 +783,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       actorEraseRoute(guarded, (telegramUserId) =>
         eraseMe(createErasureRepository(db), telegramUserId),
       )
-      feedbackRoutes(guarded, (actorId, message) =>
-        sendFeedback(messages, actorId, message, VERSION, owner),
+      const heavyFeedback = heavyFeedbackLimit()
+      feedbackRoutes(
+        guarded,
+        (actorId, message) => sendFeedback(messages, actorId, message, VERSION, owner),
+        (actorId) => heavyFeedback(actorId, Date.now()),
       )
       sessionRoutes(guarded, {
         list: (actorId, currentId) => listSessions(sessions, actorId, currentId),
