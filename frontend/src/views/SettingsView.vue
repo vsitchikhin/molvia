@@ -97,7 +97,7 @@
       <AppCard as="ul" list>
         <li>
           <button
-            class="entry plain"
+            class="entry opener"
             type="button"
             aria-haspopup="dialog"
             :aria-describedby="`${id}-feedback`"
@@ -416,9 +416,10 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
-// A button dressed as the link beside it: the same row.
+// A button dressed as the link beside it: the same row. Never `.plain`: that is AppCard's tone on
+// its root, which carries this screen's scope as well, and the rule took the card's surface.
 .leave,
-.plain {
+.opener {
   width: 100%;
   border: 0;
   background: transparent;
