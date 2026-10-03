@@ -523,8 +523,10 @@ describe('PurchasesView (MOL-128)', () => {
     })
 
     it('одно имя в одном городе — одно место, без города (MOL-120)', async () => {
+      // one moment for both: two calls of `yesterday()` a millisecond apart made «sas» the latest
+      const at = yesterday()
       pendingVerdicts.mockResolvedValue({
-        items: [card(1, 'SAS', yesterday(), 'Ереван'), card(2, 'sas', yesterday(), 'ереван')],
+        items: [card(1, 'SAS', at, 'Ереван'), card(2, 'sas', at, 'ереван')],
         total: 2,
       })
       const { view } = await render()
