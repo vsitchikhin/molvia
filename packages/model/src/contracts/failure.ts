@@ -17,8 +17,8 @@ export const FAILURE_ROUTE_MAX = 200
 export const FAILURE_FRAME_MAX = 300
 
 /**
- * How many times a known failure has to happen in one build for the owner to hear of it again
- * (MOL-143, В-5): the first time says «it happened», these say «it keeps happening». At most three
+ * The counts in one build a known failure has to cross for the owner to hear of it again (MOL-143,
+ * В-5): the first time says «it happened», these say «it keeps happening» — at most three more
  * messages a fingerprint a build, and silence while it does not grow.
  */
 export const FAILURE_COUNT_NOTICES = [10, 100, 1000] as const

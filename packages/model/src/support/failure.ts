@@ -53,10 +53,17 @@ export function describeFailure(error: unknown): FailureSummary {
   const code = raw !== undefined && /^[\dA-Z_]{1,64}$/.test(raw) ? raw : undefined
   let frames: string[] | undefined
   if (error instanceof Error && typeof error.stack === 'string') {
-    // With no message V8 writes the name alone, and some runners still add `: ` after it.
-    const headers = error.message
-      ? [`${error.name}: ${error.message}`]
-      : [`${error.name}: `, error.name]
+    // With no message V8 writes the name alone, and some runners still add `: ` after it. Node's
+    // own errors put their code into the head — `RangeError [ERR_OUT_OF_RANGE]: …` — and without
+    // that form the commonest mistake in Node lost every frame (adversarial А5): bare `node` writes
+    // it so, while vitest's own `prepareStackTrace` does not, so the tests never saw it.
+    const names =
+      'code' in error && typeof error.code === 'string'
+        ? [error.name, `${error.name} [${error.code}]`]
+        : [error.name]
+    const headers = names.flatMap((name) =>
+      error.message ? [`${name}: ${error.message}`] : [`${name}: `, name],
+    )
     const header = headers.find((candidate) => error.stack?.startsWith(`${candidate}\n`))
     if (header !== undefined) {
       frames = error.stack

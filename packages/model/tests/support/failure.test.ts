@@ -59,6 +59,25 @@ describe('describeFailure — вид сбоя без слова из его со
     expect(describeFailure(error)).not.toHaveProperty('code')
   })
 
+  it('ошибка Node с кодом в шапке — `Name [CODE]: …` — кадры не теряет (адверсариальный А5)', () => {
+    const error = Object.assign(new RangeError('The value of "size" is out of range'), {
+      code: 'ERR_OUT_OF_RANGE',
+    })
+    // As bare `node` writes it; vitest's own `prepareStackTrace` leaves the code out.
+    error.stack = `RangeError [ERR_OUT_OF_RANGE]: ${error.message}\n    at sizeOfPhoto (photo.ts:3:9)`
+    expect(describeFailure(error)).toEqual({
+      errorName: 'RangeError',
+      code: 'ERR_OUT_OF_RANGE',
+      frames: ['at sizeOfPhoto (photo.ts:3:9)'],
+    })
+  })
+
+  it('и шапка с кодом всё так же срезается целиком: строка отзыва в сообщении — не кадр', () => {
+    const error = Object.assign(new TypeError(`bad\n${FORGED}`), { code: 'ERR_INVALID_ARG_TYPE' })
+    error.stack = `TypeError [ERR_INVALID_ARG_TYPE]: ${error.message}\n    at real (a.ts:1:1)`
+    expect(describeFailure(error).frames).toEqual(['at real (a.ts:1:1)'])
+  })
+
   it('кадров не больше восьми', () => {
     const error = new Error('deep')
     error.stack = [
