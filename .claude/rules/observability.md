@@ -228,7 +228,8 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   timer at most once an hour, past the cap** (`failure_muted`, «🔕 Скрыто уведомлений о сбоях
   телефона: M», review №7, round 3 В2) — not with the next failure, which may never come, and not when
   the cap has room, which seven networks keeping it full never leave; it also says how many new
-  fingerprints the hour's rows had no room for. **The price, named:** seven networks — seven IPv4
+  fingerprints the hour's rows had no room for, and sends to `make failures` only for the held ones —
+  the unwritten are in no table (review №10). **The price, named:** seven networks — seven IPv4
   addresses, seven `/48` — silence the names of the phone's new failures for an hour; the table keeps
   them and the owner hears «скрыто M» every hour. Never silenced would take another bot: the phone's
   failures one message a minute, with no cap. A restart starts the hour over and forgets what was
@@ -238,15 +239,20 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   slow filled the queue, and the API's own was the log's alone. **The price, named:** past four in
   flight and fifty waiting, a burst of different new failures of phones is dropped with a warning —
   a real burst that wide is the app broken everywhere, and the first fifty say it.
-- **The phone adds at most ten new rows an hour from one sender and a thousand from everybody**
+- **The phone adds at most sixty new rows an hour from one sender and a thousand from everybody**
   (`phoneRowBudget`, review №6, №8): a fingerprint is all the phone's words, so every invented report
   could be a new row — two hundred a minute, kept thirty days and copied every night, a disk's worth.
   Past the budget a known fingerprint still counts and a new one is not written, with a warning, and
   the hour's summary says how many. A hundred shared by everybody alone was spent by two addresses in
   two minutes, and every real new failure after a rollout was written nowhere for the hour
-  (adversarial В1). A place is taken before the write and given back if the row was there: four
-  writes run at once. **The price, named:** a hundred networks fill the hour; some 720 000 rows in
-  thirty days at most. The nightly copy keeps the table: what is in it is bounded.
+  (adversarial В1); ten a sender were too few for a mobile operator's address, which thousands of
+  phones share — one failure of a rollout is a dozen fingerprints, its screens times its systems
+  (Г1). A place is taken before the write and given back if the row was there or the write failed
+  (review №9): four writes run at once, and an outage of the database held a place a report. **The
+  prices, named:** seventeen networks fill the hour, some 720 000 rows in thirty days at most; and the
+  sender is an address, so one subscriber of an operator sending sixty invented reports an hour takes
+  the new rows of every phone behind the same address — telling phones apart would need a mark of the
+  device, which is tracking. The nightly copy keeps the table: what is in it is bounded.
 - **The scanner's worker carries no model** (`barcodes.md`), so its failure travels to the page as
   the error's name, message and stack and is described there by the one rule (Р-11) — the message
   never leaves the phone; a throw it did not catch is `WorkerError` at its file, line and column.
