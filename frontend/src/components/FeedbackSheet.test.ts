@@ -481,6 +481,60 @@ describe('a message that may have left already (adversarial В1, В2)', () => {
   })
 })
 
+describe('another window of the app with the same draft (round 5, Т1)', () => {
+  const theirs = {
+    locale: 'en',
+    pageBuild: null,
+    route: 'advice',
+    platform: 'android browser',
+    fromError: true,
+    errorCode: 'error.internal',
+  } as const
+
+  async function drafted() {
+    const { wrapper } = await render('/settings')
+    const sheet = await open(wrapper)
+    await choose(sheet, en.feedback.kinds.bug)
+    await type(sheet, 'The list did not load')
+    const draft = recallFeedbackDraft(OWNER)
+    if (draft === null) throw new Error('no draft')
+    return { sheet, draft }
+  }
+
+  it('sends what the other window sent under the key, not its own opening', async () => {
+    const { sheet, draft } = await drafted()
+    // The other window sent it from an error screen, and the answer was lost.
+    localStorage.setItem(
+      `molvia.feedback-draft.${OWNER}`,
+      JSON.stringify({ ...draft, attached: theirs }),
+    )
+
+    await press(sheet)
+
+    expect(sendFeedback.mock.calls[0]?.[0]).toMatchObject({ ...theirs, clientKey: draft.clientKey })
+  })
+
+  it('must not take what was sent under another key: that is another message', async () => {
+    const { sheet, draft } = await drafted()
+    localStorage.setItem(
+      `molvia.feedback-draft.${OWNER}`,
+      JSON.stringify({
+        ...draft,
+        clientKey: '7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f',
+        attached: theirs,
+      }),
+    )
+
+    await press(sheet)
+
+    expect(sendFeedback.mock.calls[0]?.[0]).toMatchObject({
+      route: 'settings',
+      fromError: false,
+      clientKey: draft.clientKey,
+    })
+  })
+})
+
 describe("a refusal in the API's own words: nothing left (adversarial Н2)", () => {
   it('lets go of what went with it, so the next opening attaches its own', async () => {
     sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.FEEDBACK_RATE_LIMITED))

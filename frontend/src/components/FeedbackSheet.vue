@@ -371,6 +371,13 @@ export default defineComponent({
         return
       }
       if (waiting.value !== null || phase.value === 'sending') return
+      // Another window of the app may have sent this very draft since the sheet opened, its answer
+      // lost: the key on the device is the same, and what went with it is there — sent with ours, it
+      // would meet `409` and a second message (round 5, Т1).
+      const stored = recallFeedbackDraft(actor.id)
+      if (stored?.clientKey === clientKey.value && stored.attached !== undefined) {
+        frozen.value = stored.attached
+      }
       const message = body.value
       if (message === null) {
         // A kind and a text that draws something are there, and still the schema refuses: a
