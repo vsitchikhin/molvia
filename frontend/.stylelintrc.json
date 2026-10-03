@@ -1,9 +1,14 @@
 {
   "extends": ["stylelint-config-standard-scss", "stylelint-config-recommended-vue/scss"],
-  "plugins": ["./stylelint/known-properties.mjs", "./stylelint/display-type.mjs"],
+  "plugins": [
+    "./stylelint/known-properties.mjs",
+    "./stylelint/display-type.mjs",
+    "./stylelint/icon-size.mjs"
+  ],
   "rules": {
     "molvia/known-custom-property": true,
     "molvia/display-type-whole": true,
+    "molvia/icon-size": true,
     "color-no-hex": [
       true,
       {
