@@ -6,6 +6,7 @@ import { useActorStore } from '@/stores/actor'
 import { isRecord } from '@/stores/queueing'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { useReceiptQueueStore } from '@/stores/receiptQueue'
 import { read, write } from '@/stores/storage'
 import { reportFailure } from '@/failures'
 
@@ -65,6 +66,7 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
   const actor = useActorStore()
   const spendings = useSpendingQueueStore()
   const trips = useTripQueueStore()
+  const receipts = useReceiptQueueStore()
 
   function recallAll(owner: string): Record<string, unknown> {
     const raw = read(`${key}.${owner}`)
@@ -190,8 +192,9 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
     adopt()
     void load()
   })
+  // A receipt recorded is a finished trip too (MOL-127): «Деньги» and the charts move with it.
   watch(
-    () => [spendings.landed, trips.landed],
+    () => [spendings.landed, trips.landed, receipts.landed],
     () => void load(),
   )
   onMounted(() => void load())

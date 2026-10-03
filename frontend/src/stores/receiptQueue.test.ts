@@ -1,0 +1,341 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { ApiError } from '@molvia/client'
+import { ERROR, ISSUE, parseMoney, parseQuantity } from '@molvia/model'
+import type { ReceiptBody, ReceiptRecordBody } from '@molvia/model'
+import type { PhotoShelf } from '@/receipts/photoShelf'
+import { useActorStore } from '@/stores/actor'
+import { useReceiptQueueStore } from '@/stores/receiptQueue'
+
+const sendReceipt = vi.fn<(body: ReceiptBody) => Promise<unknown>>()
+const putReceiptPart = vi.fn<(id: string, part: number, photo: Blob) => Promise<unknown>>()
+const removeReceipt = vi.fn<(id: string) => Promise<void>>()
+const restoreReceipt = vi.fn<(id: string) => Promise<unknown>>()
+const recordReceipt = vi.fn<(id: string, body: ReceiptRecordBody) => Promise<{ tripId: string }>>()
+const calls: string[] = []
+vi.mock('@/api', () => ({
+  api: {
+    sendReceipt: (body: ReceiptBody) => (calls.push(`create ${body.id}`), sendReceipt(body)),
+    putReceiptPart: (id: string, part: number, photo: Blob) => (
+      calls.push(`part ${id} ${String(part)}`),
+      putReceiptPart(id, part, photo)
+    ),
+    removeReceipt: (id: string) => (calls.push(`remove ${id}`), removeReceipt(id)),
+    restoreReceipt: (id: string) => (calls.push(`restore ${id}`), restoreReceipt(id)),
+    recordReceipt: (id: string, body: ReceiptRecordBody) => (
+      calls.push(`record ${id}`),
+      recordReceipt(id, body)
+    ),
+  },
+}))
+
+// The shelf is IndexedDB, which happy-dom has not got: the queue is held against one in memory,
+// and the shelf itself is end-to-end's, in a real browser.
+const photos = new Map<string, Blob>()
+let refusePut = false
+vi.mock('@/receipts/photoShelf', () => ({
+  photoShelf: (owner: string): PhotoShelf => ({
+    put: (id, part, photo) => {
+      if (refusePut) return Promise.resolve(false)
+      photos.set(`${owner}/${id}/${String(part)}`, photo)
+      return Promise.resolve(true)
+    },
+    get: (id, part) => Promise.resolve(photos.get(`${owner}/${id}/${String(part)}`) ?? null),
+    parts: (id) =>
+      Promise.resolve(
+        [...photos.entries()]
+          .filter(([key]) => key.startsWith(`${owner}/${id}/`))
+          .map(([, p]) => p),
+      ),
+    drop: (id) => {
+      for (const key of [...photos.keys()])
+        if (key.startsWith(`${owner}/${id}/`)) photos.delete(key)
+      return Promise.resolve()
+    },
+    keepOnly: () => Promise.resolve(),
+  }),
+}))
+
+const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+const RECEIPT = 'cccccccc-0000-4000-8000-000000000001'
+const SECOND = 'cccccccc-0000-4000-8000-000000000002'
+const TRIP = 'dddddddd-0000-4000-8000-000000000001'
+const MILK = 'aaaaaaaa-0000-4000-8000-000000000001'
+
+function body(id = RECEIPT, parts = 2): ReceiptBody {
+  return { id, parts, country: 'AM', language: 'ru', capturedAt: new Date('2026-10-03T15:00:00Z') }
+}
+
+function shots(n: number): Blob[] {
+  return Array.from({ length: n }, (_, index) => new Blob([`photo ${String(index + 1)}`]))
+}
+
+function recordBody(tripId = TRIP): ReceiptRecordBody {
+  return {
+    tripId,
+    place: { name: 'Ереван Сити', city: 'Гюмри' },
+    purchasedOn: '2026-10-03',
+    lines: [
+      {
+        position: 0,
+        skip: false,
+        item: { id: MILK },
+        quantity: parseQuantity('1', 'piece'),
+        amount: parseMoney('590', 'AMD'),
+      },
+      { position: 1, skip: true },
+    ],
+  }
+}
+
+function fresh(state: 'ready' | 'idle' = 'ready') {
+  localStorage.setItem('molvia.actor', ME)
+  setActivePinia(createPinia())
+  useActorStore().state = state
+  return useReceiptQueueStore()
+}
+
+const settled = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+describe('receipt queue', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+    calls.length = 0
+    photos.clear()
+    refusePut = false
+    for (const mock of [sendReceipt, putReceiptPart, removeReceipt, restoreReceipt])
+      mock.mockReset().mockResolvedValue(undefined)
+    recordReceipt.mockReset().mockResolvedValue({ tripId: TRIP })
+    vi.restoreAllMocks()
+  })
+
+  it('sends the receipt, then its parts in order, each with the photo from the shelf', async () => {
+    const queue = fresh()
+    expect(await queue.capture(body(), shots(2))).toBe(true)
+    await queue.flush()
+    expect(calls).toEqual([`create ${RECEIPT}`, `part ${RECEIPT} 1`, `part ${RECEIPT} 2`])
+    expect(await putReceiptPart.mock.calls[1]?.[2].text()).toBe('photo 2')
+    expect(queue.pending).toEqual([])
+    // The photos stay: «не разобран» shows them from this phone (Т-4).
+    expect(photos.size).toBe(2)
+  })
+
+  it('queues nothing for a receipt whose photos are not the parts it announces', async () => {
+    const queue = fresh()
+    expect(await queue.capture(body(RECEIPT, 2), shots(1))).toBe(false)
+    expect(queue.pending).toEqual([])
+  })
+
+  it('queues nothing when the phone had nowhere to keep a photo', async () => {
+    refusePut = true
+    const queue = fresh()
+    expect(await queue.capture(body(), shots(2))).toBe(false)
+    expect(queue.pending).toEqual([])
+    expect(calls).toEqual([])
+  })
+
+  it('a receipt taken with no signal waits on the shelf and goes once the connection is back', async () => {
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    const queue = fresh()
+    expect(await queue.capture(body(RECEIPT, 1), shots(1))).toBe(true)
+    await queue.flush()
+    expect(calls).toEqual([])
+    expect(queue.pending).toHaveLength(2)
+
+    online.mockReturnValue(true)
+    // The app opened again later: the queue is storage, not memory.
+    const again = fresh()
+    expect(again.pending).toHaveLength(2)
+    await again.flush()
+    expect(calls).toEqual([`create ${RECEIPT}`, `part ${RECEIPT} 1`])
+  })
+
+  it.each([
+    ['a connection that dropped', new ApiError(ERROR.INTERNAL, 'x', false)],
+    ['a portal page', new ApiError(ISSUE.RESPONSE_INVALID, 'x', false)],
+    ['a code the API did not say itself', new ApiError(ERROR.NOT_FOUND, 'x', false)],
+    ['an identity the server forgot', new ApiError(ERROR.NO_ACTOR, 'x')],
+    ['a server that broke', new ApiError(ERROR.INTERNAL, 'x')],
+  ])('%s holds the queue rather than dropping the receipt', async (_, error) => {
+    putReceiptPart.mockRejectedValueOnce(error)
+    const queue = fresh()
+    await queue.capture(body(), shots(2))
+    await queue.capture(body(SECOND, 1), shots(1))
+    await settled()
+    expect(calls).toEqual([`create ${RECEIPT}`, `part ${RECEIPT} 1`])
+    expect(queue.pending).toHaveLength(4)
+    expect(queue.rejected).toEqual([])
+  })
+
+  it.each([
+    ['not a photo', ERROR.RECEIPT_NOT_PHOTO],
+    ['too large', ERROR.RECEIPT_TOO_LARGE],
+  ])(
+    'a part refused as %s is «не принят»: never sent again, its later parts go with it',
+    async (_, code) => {
+      putReceiptPart.mockRejectedValueOnce(new ApiError(code, 'x'))
+      const queue = fresh()
+      await queue.capture(body(RECEIPT, 3), shots(3))
+      await queue.capture(body(SECOND, 1), shots(1))
+      await queue.flush()
+      expect(calls).toEqual([
+        `create ${RECEIPT}`,
+        `part ${RECEIPT} 1`,
+        `create ${SECOND}`,
+        `part ${SECOND} 1`,
+      ])
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toMatchObject([
+        { code, write: { kind: 'part', id: RECEIPT, part: 1 } },
+      ])
+    },
+  )
+
+  it('a part whose photo the shelf lost is «не принят», not a request without a body', async () => {
+    const queue = fresh('idle')
+    await queue.capture(body(RECEIPT, 1), shots(1))
+    photos.clear()
+    useActorStore().state = 'ready'
+    await queue.flush()
+    expect(calls).toEqual([`create ${RECEIPT}`])
+    expect(queue.rejected).toMatchObject([{ code: ERROR.NOT_FOUND, write: { kind: 'part' } }])
+  })
+
+  it('a part of a receipt removed on another phone is done, and so are the rest', async () => {
+    putReceiptPart.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'x'))
+    const queue = fresh()
+    await queue.capture(body(), shots(2))
+    await queue.flush()
+    expect(queue.pending).toEqual([])
+    expect(queue.rejected).toEqual([])
+  })
+
+  it('«Убрать» on a refused receipt removes it from the server and its photos from the phone', async () => {
+    putReceiptPart.mockRejectedValueOnce(new ApiError(ERROR.RECEIPT_NOT_PHOTO, 'x'))
+    const queue = fresh()
+    await queue.capture(body(RECEIPT, 1), shots(1))
+    await queue.flush()
+    const [refused] = queue.rejected
+    if (!refused) throw new Error('no refusal')
+    queue.dismiss(refused)
+    await queue.flush()
+    await settled()
+    expect(calls.at(-1)).toBe(`remove ${RECEIPT}`)
+    expect(queue.rejected).toEqual([])
+    expect(photos.size).toBe(0)
+  })
+
+  describe('«Удалить чек» and «Вернуть»', () => {
+    it('a receipt nobody began to send is taken out of the queue, and put back whole', async () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const queue = fresh()
+      await queue.capture(body(), shots(2))
+      const undo = queue.remove(RECEIPT)
+      expect(queue.pending).toEqual([])
+      expect(queue.lastRemoved?.undo.id).toBe(RECEIPT)
+      queue.restore(undo)
+      expect(queue.pending.map((write) => write.kind)).toEqual(['create', 'part', 'part'])
+      expect(queue.lastRemoved).toBeNull()
+    })
+
+    it('its photos go only when the strip goes', async () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const queue = fresh()
+      await queue.capture(body(), shots(2))
+      queue.remove(RECEIPT)
+      expect(photos.size).toBe(2)
+      queue.forgetRemoved()
+      await settled()
+      expect(photos.size).toBe(0)
+    })
+
+    it('one the server may have goes to it as a removal, and «Вернуть» as a restore', async () => {
+      const queue = fresh()
+      await queue.capture(body(RECEIPT, 1), shots(1))
+      await queue.flush()
+      const undo = queue.remove(RECEIPT)
+      await queue.flush()
+      queue.restore(undo)
+      await queue.flush()
+      expect(calls.slice(-2)).toEqual([`remove ${RECEIPT}`, `restore ${RECEIPT}`])
+    })
+
+    it('«Вернуть» before the removal left takes the removal back — nothing is sent', async () => {
+      const queue = fresh()
+      await queue.capture(body(RECEIPT, 1), shots(1))
+      await queue.flush()
+      calls.length = 0
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const undo = queue.remove(RECEIPT)
+      queue.restore(undo)
+      expect(queue.pending).toEqual([])
+      expect(calls).toEqual([])
+    })
+
+    it('a removal of a receipt the server does not have is done', async () => {
+      removeReceipt.mockRejectedValueOnce(new ApiError(ERROR.NOT_FOUND, 'x'))
+      const queue = fresh()
+      await queue.capture(body(RECEIPT, 1), shots(1))
+      await queue.flush()
+      queue.remove(RECEIPT)
+      await queue.flush()
+      expect(queue.rejected).toEqual([])
+    })
+  })
+
+  describe('«Записать»', () => {
+    it('records under the trip the phone named, and lets the photos go', async () => {
+      const queue = fresh()
+      await queue.capture(body(RECEIPT, 1), shots(1))
+      await queue.flush()
+      queue.record(RECEIPT, recordBody())
+      await queue.flush()
+      expect(recordReceipt.mock.calls[0]?.[1].tripId).toBe(TRIP)
+      expect(queue.recorded).toEqual([{ receiptId: RECEIPT, tripId: TRIP, count: 1 }])
+      expect(photos.size).toBe(0)
+    })
+
+    it('a second tap while the first waits is one record', () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const queue = fresh()
+      queue.record(RECEIPT, recordBody())
+      queue.record(RECEIPT, recordBody('dddddddd-0000-4000-8000-000000000002'))
+      expect(queue.pending).toHaveLength(1)
+    })
+
+    it('a refusal is set aside, and the next «Записать» takes its place', async () => {
+      recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.RECEIPT_RECORDED_BEFORE, 'x'))
+      const queue = fresh()
+      queue.record(RECEIPT, recordBody())
+      await queue.flush()
+      expect(queue.rejected).toMatchObject([
+        { code: ERROR.RECEIPT_RECORDED_BEFORE, write: { kind: 'record', id: RECEIPT } },
+      ])
+      queue.record(RECEIPT, recordBody('dddddddd-0000-4000-8000-000000000002'))
+      expect(queue.rejected).toEqual([])
+    })
+
+    it('a lost answer holds it, and the repeat goes under the same trip', async () => {
+      recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'x', false))
+      const queue = fresh()
+      queue.record(RECEIPT, recordBody())
+      await settled()
+      expect(queue.pending).toHaveLength(1)
+      const again = fresh()
+      await again.flush()
+      expect(recordReceipt.mock.calls.map((call) => call[1].tripId)).toEqual([TRIP, TRIP])
+    })
+  })
+
+  it('a broken entry is dropped alone', () => {
+    localStorage.setItem(
+      `molvia.receipt-queue.${ME}`,
+      JSON.stringify([
+        { key: 'a', write: { kind: 'part', id: RECEIPT, part: 9 } },
+        { key: 'b', write: { kind: 'remove', id: RECEIPT } },
+      ]),
+    )
+    expect(fresh('idle').pending).toEqual([{ kind: 'remove', id: RECEIPT }])
+  })
+})

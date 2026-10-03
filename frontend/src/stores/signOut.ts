@@ -17,6 +17,8 @@ import {
 import type { ErasureNote } from '@/stores/identity'
 import { whileQueueIsStill } from '@/stores/tripQueue'
 import { whileSpendingsAreStill } from '@/stores/spendingQueue'
+import { whileReceiptsAreStill } from '@/stores/receiptQueue'
+import { forgetPhotos } from '@/receipts/photoShelf'
 import { reportFailure } from '@/failures'
 
 /** Read afresh each time: the connection read before an `await` says nothing about after it. */
@@ -34,15 +36,19 @@ function notReached(error: unknown): boolean {
 }
 
 /**
- * The drawer goes while no window sends either queue of this owner — the trip's, then the
- * spendings' (MOL-82), always in that order, so two windows never wait on each other.
+ * The drawer goes while no window sends any queue of this owner — the trip's, the spendings'
+ * (MOL-82), then the receipts' (MOL-127), always in that order, so two windows never wait on each
+ * other. The photos of receipts are waited for inside: the reload after «Выйти» must not cut their
+ * deletion short.
  */
 function whileQueuesAreStill(owner: string, work: () => void): Promise<void> {
   return whileQueueIsStill(owner, () =>
-    whileSpendingsAreStill(owner, () => {
-      work()
-      return Promise.resolve()
-    }),
+    whileSpendingsAreStill(owner, () =>
+      whileReceiptsAreStill(owner, async () => {
+        work()
+        await forgetPhotos(owner)
+      }),
+    ),
   )
 }
 

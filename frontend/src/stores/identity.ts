@@ -18,6 +18,7 @@
  * the session itself survives, because a cookie the server set is not what ITP caps.
  */
 import { forget, forgetWhere, read, reshape, sharedHolds, write, writeOwn } from '@/stores/storage'
+import { forgetPhotos } from '@/receipts/photoShelf'
 
 const KEY = 'molvia.actor'
 
@@ -147,6 +148,9 @@ export function forgetOwner(owner: string): void {
   reshape(LEAVING_KEY, (value) => (value === owner ? null : value))
   reshape(ERASING_KEY, (value) => (value === owner ? null : value))
   reshape(LOGIN_KEY, (value) => withoutClaimOf(owner, value))
+  // The photos of receipts are not on a shelf the sweep reaches: their database goes by its name
+  // (MOL-127). «Выйти» waits for it before the reload; every other way here lets it run.
+  void forgetPhotos(owner)
 }
 
 function withoutClaimOf(owner: string, value: string): string | null {
