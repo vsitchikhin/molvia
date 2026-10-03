@@ -19,12 +19,14 @@
 //   - on a rule that styles an icon — one whose last compound is `svg`, an icon's class, or that
 //     reaches an icon by any other means (`.row > *`, Г2), and one on a part of it (`path`, `*`,
 //     `:is(path, g)`) under a selector that reaches the icon or, past a descendant combinator, an
-//     element around it (`.row path`, И1) —
+//     element around it (`.row path`, И1), unless it names a part the template writes in a chart's
+//     own svg (`.card rect`, 27) —
 //     `font-size` only `var(--icon*)` or `var(--state-glyph)`; width, height, their logical and
 //     min-/max- forms only 1em (a minimum of 0 or auto, a maximum of none pass); no padding or border
-//     width (the old pencil was a box of 32 with a glyph of 16, А4, Б4), no scale, zoom, translate in
-//     depth, or transform but a turn or a shift, no contour of its own (`d`, И1); no flex share but
-//     none (Е4: a shrinking icon is 16);
+//     width, on any side (the old pencil was a box of 32 with a glyph of 16, А4, Б4, 28), no scale,
+//     zoom, translate in depth, or transform but a turn or a shift, no contour of its own (`d`, И1);
+//     no `overflow: visible`, clip or mask — a stroke painted past the box, a glyph cut in it (К1);
+//     no flex share but none (Е4: a shrinking icon is 16);
 //     no `@include` but `icon`, `wider-than-phone` and `appear`, whose bodies are read like the rule's
 //     (А6) — down a nested `@media` too (А2);
 //   - in the template: an icon's class is its own, worn by nothing else (В2); no `style` with a size,
@@ -50,7 +52,9 @@
 // itself — `AppButton`, the one in `SIZED_SLOTS`; a step inherited through a component, which may set
 // a font-size of its own; specificity, which the order of the file stands in for; a `<component :is>`
 // named neither icon nor glyph; a `:style` or `v-bind` with an object from the script, which the rule
-// cannot read; an SFC with no `<style>` block, which gives the rule no root. A `<Teleport>` carries
+// cannot read; an SFC with no `<style>` block, which gives the rule no root; a rule on a part named
+// through a wrapper that holds both an icon and a chart's own svg with that part — `.card path` beside
+// a chart's `<path>` is the chart's, and the icon's glyph is styled through its class (27). A `<Teleport>` carries
 // its content out of the page around it, unless a static `disabled` keeps it in place — a bound one may
 // be false (Д2, Е5, Ж4).
 
@@ -479,7 +483,16 @@ function resizes(prop, value) {
   if (/^flex(-shrink|-grow|-basis)?$/.test(prop)) return !/^(none|0|auto|0 0 auto)$/.test(value)
   if (SIZE.test(prop)) return value !== '1em'
   if (PADDING.test(prop)) return !/^0(\s+0)*$/.test(value)
-  if (BORDER.test(prop)) return !/^(0|none|hidden)(\s|$)/.test(value)
+  // `border-width` is one value a side: `0 0 1px` widens the bottom (28); a shorthand starts with
+  // its width or its style.
+  if (BORDER.test(prop))
+    return /-width$/.test(prop) ? !/^0(\s+0)*$/.test(value) : !/^(0|none|hidden)(\s|$)/.test(value)
+  // The box holds the glyph: let out, a stroke paints past it; clipped or masked, less of it is
+  // painted (К1).
+  if (/^overflow(-x|-y|-block|-inline)?$/.test(prop)) return /\bvisible\b/.test(value)
+  if (prop === 'overflow-clip-margin') return !/^0(px)?$/.test(value)
+  if (/^(clip-path|clip|(-webkit-)?mask(-image|-box-image)?)$/.test(prop))
+    return !/^(none|auto)$/.test(value)
   if (prop === 'scale') return !/^(none|1)$/.test(value)
   if (prop === 'zoom') return !/^(1|normal|reset)$/.test(value)
   if (prop === 'translate') return !/^(none|\S+(\s+\S+)?(\s+0)?)$/.test(value)
@@ -530,6 +543,12 @@ function rule(primary) {
       return
     }
 
+    // The parts the template writes inside an svg of its own, a chart's — no icon's.
+    const charted = tags.filter((tag) => {
+      for (let around = tag.parent; around; around = around.parent)
+        if (around.name === 'svg') return true
+      return false
+    })
     // A rule on a part of an svg (`path`, `*`, `:is(path, g)`) is an icon's when the selector before
     // it reaches an icon of the template, or, past a descendant combinator, an element around one:
     // `.row path` is the glyph of the row's icon (И1) — a chart's own `<svg><rect>` is none (review 21).
@@ -542,9 +561,13 @@ function rule(primary) {
           .map((c, i) => (i ? `${combinators[i - 1]} ${c}` : c))
           .join(' '),
       )
-      const child = combinators[combinators.length - 1] === '>'
+      if (icons.some((tag) => reaches(before, tag, true))) return true
+      // Through an element around an icon, a part the template writes in a chart's own svg is what
+      // the rule names: `.card rect` beside a chart is the chart's (27, review 21).
+      if (combinators[combinators.length - 1] === '>') return false
+      if (charted.some((tag) => reaches(selector, tag, true))) return false
       return icons.some((tag) => {
-        for (let around = tag; around; around = child ? undefined : up(around))
+        for (let around = up(tag); around; around = up(around))
           if (reaches(before, around, true)) return true
         return false
       })

@@ -813,7 +813,7 @@ describe('molvia/icon-size, round 8', () => {
 
 describe('molvia/icon-size, round 9', () => {
   const strip = '<p class="row"><IconInfo /></p>'
-  const sized = '.row svg { @include icon; overflow: visible; font-size: var(--icon-sm); }\n'
+  const sized = '.row svg { @include icon; font-size: var(--icon-sm); }\n'
 
   it("reads a rule on a part of the glyph named through its wrapper as the icon's (И1)", async () => {
     expect(
@@ -838,7 +838,7 @@ describe('molvia/icon-size, round 9', () => {
       await refused(
         sfc(
           '<AppButton class="go"><IconPlus /></AppButton>',
-          '.go :deep(svg) { overflow: visible; }\n.go :deep(path) { transform: scale(1.6); }',
+          '.go :deep(path) { transform: scale(1.6); }',
         ),
       ),
     ).toEqual(['transform: scale(1.6)'])
@@ -854,6 +854,47 @@ describe('molvia/icon-size, round 9', () => {
         ),
       ),
     ).toEqual([])
+  })
+})
+
+describe('molvia/icon-size, round 10', () => {
+  it("reads a part the template writes in a chart's own svg as the chart's, beside an icon (27)", async () => {
+    expect(
+      await refused(
+        sfc(
+          '<div class="card"><IconX class="c" /><svg class="chart"><rect class="bar" /></svg></div>',
+          `.c { ${ICON} }\n.card rect { height: 2px; }\n.c path { transform: scale(2); }`,
+        ),
+      ),
+    ).toEqual(['transform: scale(2)'])
+  })
+
+  it('reads every side of border-width (28)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<IconX class="c" />',
+          `.c { ${ICON} border-width: 0 0 1px; border-block-width: 0 0; border: 0 solid; }`,
+        ),
+      ),
+    ).toEqual(['border-width: 0 0 1px'])
+  })
+
+  it('refuses what paints the glyph past its box or cuts it: overflow, a clip, a mask (К1)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="row"><IconInfo /></p>\n<IconX class="c" />',
+          '.row svg { @include icon; overflow: visible; font-size: var(--icon-sm); }\n' +
+            `.c { ${ICON} clip-path: inset(25%); mask-image: none; overflow: hidden; }\n` +
+            '.row path { -webkit-mask: linear-gradient(#000, transparent); }',
+        ),
+      ),
+    ).toEqual([
+      'overflow: visible',
+      'clip-path: inset(25%)',
+      '-webkit-mask: linear-gradient(#000, transparent)',
+    ])
   })
 })
 
