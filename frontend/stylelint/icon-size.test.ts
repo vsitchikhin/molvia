@@ -811,6 +811,52 @@ describe('molvia/icon-size, round 8', () => {
   })
 })
 
+describe('molvia/icon-size, round 9', () => {
+  const strip = '<p class="row"><IconInfo /></p>'
+  const sized = '.row svg { @include icon; overflow: visible; font-size: var(--icon-sm); }\n'
+
+  it("reads a rule on a part of the glyph named through its wrapper as the icon's (И1)", async () => {
+    expect(
+      await refused(
+        sfc(
+          strip,
+          sized +
+            '.row path { transform: scale(1.6); }\n.row :is(path, g) { scale: 1.6; }\n' +
+            '.row * * { transform: scale(1.6); }\n.row path { d: path("M-6 -6h36v36H-6z"); }',
+        ),
+      ),
+    ).toEqual([
+      'transform: scale(1.6)',
+      'scale: 1.6',
+      'transform: scale(1.6)',
+      'd: path("M-6 -6h36v36H-6z")',
+    ])
+  })
+
+  it("reads :deep(path) under an AppButton as its icon's (И1)", async () => {
+    expect(
+      await refused(
+        sfc(
+          '<AppButton class="go"><IconPlus /></AppButton>',
+          '.go :deep(svg) { overflow: visible; }\n.go :deep(path) { transform: scale(1.6); }',
+        ),
+      ),
+    ).toEqual(['transform: scale(1.6)'])
+  })
+
+  it("lets a colour of the glyph, a chart's own svg and a path no icon holds through (И1)", async () => {
+    expect(
+      await refused(
+        sfc(
+          `${strip}\n<div class="card"><IconX class="c" /><svg class="plot"><path d="M0 0" /></svg></div>`,
+          `${sized}.row path { fill: var(--accent); }\n.c { ${ICON} }\n` +
+            '.plot path { transform: scale(2); }\n.card > path { transform: scale(2); }',
+        ),
+      ),
+    ).toEqual([])
+  })
+})
+
 describe('templateTags', () => {
   it('takes the tags of the template: icons, their static classes, lines and parents', () => {
     const tags = templateTags(

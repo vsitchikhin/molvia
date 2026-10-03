@@ -17,11 +17,14 @@
 //   - a rule on `svg` has both lines or neither; with the mixin, the nearest font-size around it is a
 //     step — the last rule of the file for the same element (Б2, В5);
 //   - on a rule that styles an icon — one whose last compound is `svg`, an icon's class, or that
-//     reaches an icon by any other means (`.row > *`, Г2), and one on a part of it (`path`) —
+//     reaches an icon by any other means (`.row > *`, Г2), and one on a part of it (`path`, `*`,
+//     `:is(path, g)`) under a selector that reaches the icon or, past a descendant combinator, an
+//     element around it (`.row path`, И1) —
 //     `font-size` only `var(--icon*)` or `var(--state-glyph)`; width, height, their logical and
 //     min-/max- forms only 1em (a minimum of 0 or auto, a maximum of none pass); no padding or border
 //     width (the old pencil was a box of 32 with a glyph of 16, А4, Б4), no scale, zoom, translate in
-//     depth, or transform but a turn or a shift; no flex share but none (Е4: a shrinking icon is 16);
+//     depth, or transform but a turn or a shift, no contour of its own (`d`, И1); no flex share but
+//     none (Е4: a shrinking icon is 16);
 //     no `@include` but `icon`, `wider-than-phone` and `appear`, whose bodies are read like the rule's
 //     (А6) — down a nested `@media` too (А2);
 //   - in the template: an icon's class is its own, worn by nothing else (В2); no `style` with a size,
@@ -457,7 +460,18 @@ function maybeStep(name) {
   )
 }
 
+// Whether a compound names a part of an svg: its tag, `*`, or one of `:is()`/`:where()` (И1).
+function isPart(compound) {
+  const alternatives = compound.match(/:(is|where)\(([^()]*)\)/)
+  if (alternatives)
+    return isPart(compound.replace(alternatives[0], '')) || split(alternatives[2], /,/).some(isPart)
+  const type = compound.replace(/:[\w-]+(\([^()]*\))?/g, '').match(/^[a-z]+|^\*/)?.[0] ?? ''
+  return type === '*' || SVG_PARTS.has(type)
+}
+
 function resizes(prop, value) {
+  // A contour of its own redraws the glyph at any size (И1).
+  if (prop === 'd') return value !== 'none'
   // A minimum of nothing and a maximum of all leave a 1em icon as it is (review 20).
   if (/^min-/.test(prop) && /^(0|auto)$/.test(value)) return false
   if (/^max-/.test(prop) && value === 'none') return false
@@ -516,14 +530,24 @@ function rule(primary) {
       return
     }
 
-    // A rule on a part of an svg (`path`) is an icon's when the selector before it reaches an icon of
-    // the template — a chart's own `<svg><rect>` is none (review 21).
+    // A rule on a part of an svg (`path`, `*`, `:is(path, g)`) is an icon's when the selector before
+    // it reaches an icon of the template, or, past a descendant combinator, an element around one:
+    // `.row path` is the glyph of the row's icon (И1) — a chart's own `<svg><rect>` is none (review 21).
     const partOfIcon = (selector) => {
-      const last = selector.compounds[selector.compounds.length - 1] ?? ''
-      if (!SVG_PARTS.has(last.match(/^[a-z]+/)?.[0] ?? '') || selector.compounds.length < 2)
+      const { compounds, combinators } = selector
+      if (compounds.length < 2 || !isPart(compounds[compounds.length - 1])) return false
+      const before = parse(
+        compounds
+          .slice(0, -1)
+          .map((c, i) => (i ? `${combinators[i - 1]} ${c}` : c))
+          .join(' '),
+      )
+      const child = combinators[combinators.length - 1] === '>'
+      return icons.some((tag) => {
+        for (let around = tag; around; around = child ? undefined : up(around))
+          if (reaches(before, around, true)) return true
         return false
-      const before = parse(selector.compounds.slice(0, -1).join(' '))
-      return icons.some((tag) => reaches(before, tag, true))
+      })
     }
 
     const blocks = root.document
