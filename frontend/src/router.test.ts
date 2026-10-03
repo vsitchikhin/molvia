@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { START_LOCATION, createMemoryHistory, createRouter } from 'vue-router'
+import { feedbackRouteSchema } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { routes, scrollBehavior } from '@/router'
@@ -253,5 +254,17 @@ describe('scrollBehavior', () => {
       { to: '/', from: '/', answer: { top: 0 } },
       { to: '/', from: '/', answer: false },
     ])
+  })
+})
+
+describe('the name of every screen', () => {
+  // It goes with a message to the developer (MOL-147): a name the body refuses would leave the
+  // sheet unable to send anything from that screen, and blame the person's text (review №5).
+  it('is one a message to the developer can carry', () => {
+    const names = routes.flatMap((route) => ('name' in route ? [route.name] : []))
+    expect(names.length).toBeGreaterThan(10)
+    for (const name of names) {
+      expect(feedbackRouteSchema.safeParse(name).success, name).toBe(true)
+    }
   })
 })
