@@ -219,6 +219,29 @@ describe('the city of the address (MOL-126, Р-6)', () => {
     expect(receiptCityOf(rows('ԳՅՈՒՄՐԻ Շիրազի 57', '| |208) ԵՐԵՎԱՆ ԿՈՆՅԱԿ'))).toBe('Гюмри')
   })
 
+  // round 6, Р6-В1: the stray letter forgiven before a city is forgiven before an item's heading too
+  it('ends the head at an item row behind a stray letter at the paper’s edge', () => {
+    expect(
+      receiptCityOf(rows('ՀՀ, ք. Երևան, Շիրազի 57', 'Բաժին 1', 'Ն (2203) ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ')),
+    ).toBe('Ереван')
+    expect(receiptCityOf(rows('ԳՅՈՒՄՐԻ Շիրազի 57', 'Ն (2208) ԵՐԵՎԱՆ ԿՈՆՅԱԿ'))).toBe('Гюмри')
+  })
+
+  // round 6, Р6-В2: the head is the rows above the first item, however many — «Ереван Сити» runs to 17
+  it('reads the address past the fifteenth row when the items begin below it', () => {
+    const banner = Array.from({ length: 16 }, () => 'ՏՆՏԵՍԱԿԱՆ ԱՊՐԱՆՔՆԵՐ')
+    expect(
+      receiptCityOf(
+        rows(
+          ...banner,
+          'ԳՅՈՒՄՐԻ Գորկու 62 2.',
+          '1.Պոլիէթիլենային տոպրակ',
+          '3923/1122223 1Հտ 50 50',
+        ),
+      ),
+    ).toBe('Гюмри')
+  })
+
   // round 5, Р5-В2, review 16: must not fire — a phone's area code and a house number are the head
   it('does not end the head at a phone’s area code or a house number', () => {
     expect(receiptCityOf(rows('DOG CITY', 'Հեռ. (0312) 5-55-55', 'ԳՅՈՒՄՐԻ Շիրազի 57'))).toBe(
@@ -250,7 +273,7 @@ describe('the city of the address (MOL-126, Р-6)', () => {
   })
 
   it('looks in the head of the first part only', () => {
-    const late = [...rows(...Array.from({ length: 15 }, () => 'ՏՆՏԵՍԱԿԱՆ')), ...rows('ԳՅՈՒՄՐԻ')]
+    const late = [...rows(...Array.from({ length: 40 }, () => 'ՏՆՏԵՍԱԿԱՆ')), ...rows('ԳՅՈՒՄՐԻ')]
     expect(receiptCityOf(late)).toBeNull()
     expect(receiptCityOf([{ text: 'ԳՅՈՒՄՐԻ Գորկու 62', part: 1, line: 0 }])).toBeNull()
   })

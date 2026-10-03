@@ -174,8 +174,12 @@ const CITY_ANYWHERE: Readonly<Record<SettingsCity, RegExp>> = {
   Ереван: new RegExp(`(?<!\\p{L})${CITY_WORDS.Ереван}`, 'iu'),
 }
 
-/** Rows of the head a city is looked for in: the address stands above the first item line. */
-const HEAD_ROWS = 15
+/**
+ * The head is the rows above the first item (round 6, Р6-В2): a fixed window of fifteen left the address
+ * of «Ереван Сити» past it on six readings of the bench — its head runs to the 17th row. Where no item
+ * row is read at all, this many rows stand for the head.
+ */
+const HEAD_ROWS = 40
 
 /**
  * A row of an item, where the head ends (round 4, Р4-В1): a table's customs heading opening the row,
@@ -185,7 +189,8 @@ const HEAD_ROWS = 15
  * a city is a line, not the address. Not a phone's area code «Հեռ. (0312) 5-55-55», which neither opens
  * the row nor has a name after it, nor a house number «62, Գորկու …» (round 5, Р5-В2, review 16).
  */
-const ITEM_ROW = /^[^\p{L}\d]*\(?\d{2,4}\)\s*\p{L}|\d{4}\s*\/\s*\d{5,}|^\s*\d{1,3}\.\s*\p{L}/u
+const ITEM_ROW =
+  /^[^\p{L}\d]*(?:\p{L}[^\p{L}\s]*\s+[^\p{L}\d]*)?\(?\d{2,4}\)\s*\p{L}|\d{4}\s*\/\s*\d{5,}|^\s*\d{1,3}\.\s*\p{L}/u
 
 /**
  * The city a receipt's address prints, if it is one of the settings'; read in the first part only. A
@@ -196,9 +201,9 @@ const ITEM_ROW = /^[^\p{L}\d]*\(?\d{2,4}\)\s*\p{L}|\d{4}\s*\/\s*\d{5,}|^\s*\d{1,
  * Two cities are no answer — the place is then looked for in the person's own city.
  */
 export function receiptCityOf(rows: readonly TextRow[]): SettingsCity | null {
-  const first = rows.filter((row) => row.part === 0).slice(0, HEAD_ROWS)
+  const first = rows.filter((row) => row.part === 0)
   const items = first.findIndex((row) => ITEM_ROW.test(row.text))
-  const head = items < 0 ? first : first.slice(0, items)
+  const head = items < 0 ? first.slice(0, HEAD_ROWS) : first.slice(0, items)
   const cities = Object.keys(RECEIPT_CITIES) as SettingsCity[]
   const opening = cities.filter((city) => head.some((row) => RECEIPT_CITIES[city].test(row.text)))
   if (opening.length === 1) return opening[0] ?? null
