@@ -49,6 +49,11 @@ const previewPort = String(Number(pwaPort) + 1)
 // real base nothing, and the hint is on — a contact set — only here and in production.
 const offPort = String(Number(apiPort) + 1)
 
+// The receipt reader is a fake too (MOL-127, Р-7), two ports further: the next one is the copy's own
+// Tesseract (`make reader`). It answers every photo with the bench's reading of am-05, so a receipt
+// taken in the browser is read, reviewed and recorded with no Tesseract on the machine.
+const readerPort = String(Number(apiPort) + 3)
+
 // The scanner's camera is a file (MOL-98): Chromium films the barcode `globalSetup` draws, and a
 // spec that wants the camera grants it — without the grant Chromium refuses, which is the case of
 // «no permission». The full Chromium, not the headless shell every other spec runs in: the shell
@@ -126,6 +131,13 @@ export default defineConfig({
       stdout: 'pipe',
     },
     {
+      command: 'node bin/fake-receipt-reader.mjs',
+      url: `http://127.0.0.1:${readerPort}/health`,
+      env: { READER_PORT: readerPort },
+      reuseExistingServer: false,
+      stdout: 'pipe',
+    },
+    {
       // The database is recreated first, in the command of the server that needs it rather
       // than in an npm script: `npx playwright test` is what gets typed while debugging a
       // spec, and it would walk past a preparation step of its own.
@@ -145,9 +157,9 @@ export default defineConfig({
         OPEN_FOOD_FACTS_CONTACT: 'e2e@molvia.test',
         // The fake has no limit, and every spec of a missed code asks it once (adversarial Е).
         OPEN_FOOD_FACTS_PER_MINUTE: '600',
-        // No receipt reader (MOL-125, review А14): the copy's `.env` names its own, and a run must not
-        // read with a Tesseract the copy happens to run. Empty is unset — receipts wait in the queue.
-        RECEIPT_READER_URL: '',
+        // The fake reader (MOL-127), never the copy's own Tesseract (MOL-125, review А14): a run must
+        // not read with whatever the copy happens to run, and its answer must be the same every time.
+        RECEIPT_READER_URL: `http://127.0.0.1:${readerPort}`,
       },
       // Never reuse: on these ports there is nothing of ours to reuse, and a server left by
       // a crashed run must fail loudly instead of quietly answering with old code.

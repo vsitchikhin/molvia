@@ -44,7 +44,7 @@ async function read(page: Page, id: string): Promise<WireTrip> {
   return (await response.json()) as WireTrip
 }
 async function startInUi(page: Page, name: string): Promise<void> {
-  await page.getByRole('button', { name: 'Record purchases' }).click()
+  await page.getByRole('button', { name: 'Add by hand' }).click()
   await page.waitForTimeout(400)
   await sheet(page).getByLabel('Another place').fill(name)
   await sheet(page).getByRole('button', { name: 'Start the entry' }).click()
@@ -233,7 +233,7 @@ test('a finished record deleted from its own screen leaves «Записаны»,
     )
     .toBe(404)
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Record purchases' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add by hand' })).toBeVisible()
   await expect(recent).toHaveCount(0)
 })
 
@@ -250,10 +250,10 @@ test('a trip deleted with no connection is gone at once, and the removal goes wi
     window.dispatchEvent(new Event('offline'))
   })
   await page.getByRole('button', { name: 'Delete the entry' }).click()
-  await expect(page.getByRole('button', { name: 'Record purchases' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add by hand' })).toBeVisible()
   // Kept on the phone across a reload, and the trip does not come back from memory.
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Record purchases' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add by hand' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Delete the entry' })).toHaveCount(0)
 
   await page.unroute('**/api/**')

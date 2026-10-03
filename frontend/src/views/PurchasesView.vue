@@ -152,7 +152,7 @@
           <ReceiptUndoStrip class="undo" />
           <ReceiptSentLine class="undo" />
           <CaptureButton :country="country" />
-          <ManualEntryButton by-hand class="by-hand" />
+          <div class="by-hand"><ManualEntryButton by-hand /></div>
         </template>
         <ManualEntryButton v-else />
       </div>
