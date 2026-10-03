@@ -23,6 +23,7 @@ import {
   places,
   ratingReminders,
   receiptLines,
+  storeMemory,
   receipts,
   searchPicks,
   sessions,
@@ -76,6 +77,7 @@ export const EXPORT_COLUMNS: Readonly<
     | 'owner_notices'
     | 'items'
     | 'item_barcodes'
+    | 'store_memory'
     | 'receipt_lines'
     | 'receipt_parts'
     | 'receipt_line_images',
@@ -298,7 +300,9 @@ export const EXPORT_COLUMNS: Readonly<
       'receipt_no',
       'total_minor',
       'balanced',
+      'city',
       'recorded_at',
+      'trip_id',
       'deleted_at',
     ],
     omitted: { actor_id: OWNER },
@@ -316,6 +320,10 @@ export const EXPORT_COLUMNS: Readonly<
       'sum_minor',
       'discount_minor',
       'settled',
+      'item_id',
+      'match',
+      'translation',
+      'expense_id',
     ],
     omitted: { receipt_id: 'the receipt it is nested in' },
   },
@@ -468,6 +476,10 @@ export const EXPORT_COLUMNS: Readonly<
   // Read twice: the codes of the items the person added, whoever wrote them, and every code the
   // person wrote, to whichever item (MOL-100) — the second is theirs, as an item's author is.
   item_barcodes: { exported: ['code', 'item_id', 'added_at'], omitted: { added_by: OWNER } },
+  store_memory: {
+    exported: ['tin', 'kind', 'key', 'item_id', 'price_minor', 'price_currency', 'written_at'],
+    omitted: { id: 'a key of the row, of no meaning to the person', actor_id: OWNER },
+  },
 }
 
 export interface ExportRepository {
@@ -655,6 +667,19 @@ export function createExportRepository(db: Db): ExportRepository {
             .from(itemBarcodes)
             .where(eq(itemBarcodes.addedBy, actorId))
             .orderBy(asc(itemBarcodes.addedAt), asc(itemBarcodes.code))
+          const memoryRows = await tx
+            .select({
+              tin: storeMemory.tin,
+              kind: storeMemory.kind,
+              key: storeMemory.key,
+              itemId: storeMemory.itemId,
+              priceMinor: storeMemory.priceMinor,
+              priceCurrency: storeMemory.priceCurrency,
+              writtenAt: storeMemory.writtenAt,
+            })
+            .from(storeMemory)
+            .where(eq(storeMemory.actorId, actorId))
+            .orderBy(asc(storeMemory.writtenAt), asc(storeMemory.id))
           const namedItems = await tx
             .select({ id: items.id, kind: items.kind, name: items.name })
             .from(items)
@@ -687,6 +712,21 @@ export function createExportRepository(db: Db): ExportRepository {
                     .select({ id: itemBarcodes.itemId })
                     .from(itemBarcodes)
                     .where(eq(itemBarcodes.addedBy, actorId)),
+                ),
+                inArray(
+                  items.id,
+                  tx
+                    .select({ id: storeMemory.itemId })
+                    .from(storeMemory)
+                    .where(eq(storeMemory.actorId, actorId)),
+                ),
+                inArray(
+                  items.id,
+                  tx
+                    .select({ id: receiptLines.itemId })
+                    .from(receiptLines)
+                    .innerJoin(receipts, eq(receipts.id, receiptLines.receiptId))
+                    .where(eq(receipts.actorId, actorId)),
                 ),
               ),
             )
@@ -948,7 +988,9 @@ export function createExportRepository(db: Db): ExportRepository {
               receiptNo: row.receiptNo,
               total: cash(row.totalMinor, row.currency),
               balanced: row.balanced,
+              city: row.city,
               recordedAt: row.recordedAt,
+              tripId: row.tripId,
               removedAt: row.deletedAt,
               lines: (linesOf.get(row.id) ?? []).map((line) => ({
                 position: line.position,
@@ -963,6 +1005,10 @@ export function createExportRepository(db: Db): ExportRepository {
                 sum: cash(line.sumMinor, row.currency),
                 discount: cash(line.discountMinor, row.currency),
                 settled: line.settled,
+                itemId: line.itemId,
+                match: line.match,
+                translation: line.translation,
+                expenseId: line.expenseId,
               })),
             })),
             spendingCategories: categoryRows.map((row) => ({
@@ -1031,6 +1077,14 @@ export function createExportRepository(db: Db): ExportRepository {
               createdAt: row.createdAt,
             })),
             addedBarcodes: addedCodeRows,
+            storeMemory: memoryRows.map((row) => ({
+              tin: row.tin,
+              kind: row.kind,
+              key: row.key,
+              itemId: row.itemId,
+              price: cash(row.priceMinor, row.priceCurrency),
+              writtenAt: row.writtenAt,
+            })),
             feedback: feedbackRows.map((row) => ({
               number: row.id,
               kind: row.kind,

@@ -424,8 +424,11 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
                  -- Unless it is more than a day before the server's start: an evening offline is
                  -- hours, and a clock days behind is a wrong clock, not a shelf (Ж1).
                  -- The phone's day of «Начать» where it named one (MOL-121) — held by the same
-                 -- measure: a day more than one before the server's is a wrong clock.
+                 -- measure: a day more than one before the server's is a wrong clock. A trip
+                 -- recorded from a receipt (MOL-126) is dated by the receipt's day, the one the
+                 -- person confirmed rather than a clock's: a week-old receipt is a week-old purchase.
                  to_char(case when t.started_on >= (t.started_at at time zone 'Asia/Yerevan')::date - 1
+                                or exists (select 1 from receipts r where r.trip_id = t.id)
                               then t.started_on
                               else (case when t.finished_on_device_at >= t.started_at - interval '1 day'
                                          then least(t.started_at, t.finished_on_device_at)

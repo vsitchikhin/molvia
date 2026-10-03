@@ -1,6 +1,6 @@
 {
-  "id": "bec2c69d-dbf0-472a-9d33-20c794d2622e",
-  "prevId": "e4b9b163-0dbf-406d-919b-8f485f42b960",
+  "id": "7105fabd-5f6b-4f8d-9ca6-adc9212f1eb7",
+  "prevId": "bec2c69d-dbf0-472a-9d33-20c794d2622e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1118,6 +1118,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "pictures": {
+          "name": "pictures",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1232,6 +1239,198 @@
         "feedback_continuation_answers": {
           "name": "feedback_continuation_answers",
           "value": "(\"feedback\".\"thread_id\" is null) = (\"feedback\".\"in_reply_to\" is null)"
+        },
+        "feedback_says_something": {
+          "name": "feedback_says_something",
+          "value": "\"feedback\".\"text\" <> '' or \"feedback\".\"pictures\" > 0"
+        },
+        "feedback_pictures_range": {
+          "name": "feedback_pictures_range",
+          "value": "\"feedback\".\"pictures\" between 0 and 3"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.feedback_picture_files": {
+      "name": "feedback_picture_files",
+      "schema": "",
+      "columns": {
+        "feedback_id": {
+          "name": "feedback_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "image": {
+          "name": "image",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "telegram_file_id": {
+          "name": "telegram_file_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        }
+      },
+      "indexes": {
+        "feedback_picture_files_created_idx": {
+          "name": "feedback_picture_files_created_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "feedback_picture_files_line": {
+          "name": "feedback_picture_files_line",
+          "tableFrom": "feedback_picture_files",
+          "tableTo": "feedback_pictures",
+          "columnsFrom": ["feedback_id", "position"],
+          "columnsTo": ["feedback_id", "position"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "feedback_picture_files_feedback_id_position_pk": {
+          "name": "feedback_picture_files_feedback_id_position_pk",
+          "columns": ["feedback_id", "position"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "feedback_picture_files_one_source": {
+          "name": "feedback_picture_files_one_source",
+          "value": "(\"feedback_picture_files\".\"image\" is null) <> (\"feedback_picture_files\".\"telegram_file_id\" is null)"
+        },
+        "feedback_picture_files_image_size": {
+          "name": "feedback_picture_files_image_size",
+          "value": "\"feedback_picture_files\".\"image\" is null\n          or octet_length(\"feedback_picture_files\".\"image\") between 1 and 2097152"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.feedback_pictures": {
+      "name": "feedback_pictures",
+      "schema": "",
+      "columns": {
+        "feedback_id": {
+          "name": "feedback_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bytes": {
+          "name": "bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "feedback_pictures_feedback_id_feedback_id_fk": {
+          "name": "feedback_pictures_feedback_id_feedback_id_fk",
+          "tableFrom": "feedback_pictures",
+          "tableTo": "feedback",
+          "columnsFrom": ["feedback_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "feedback_pictures_feedback_id_position_pk": {
+          "name": "feedback_pictures_feedback_id_position_pk",
+          "columns": ["feedback_id", "position"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "feedback_pictures_position_range": {
+          "name": "feedback_pictures_position_range",
+          "value": "\"feedback_pictures\".\"position\" between 1 and 3"
+        },
+        "feedback_pictures_source_known": {
+          "name": "feedback_pictures_source_known",
+          "value": "\"feedback_pictures\".\"source\" in ('phone', 'telegram')"
+        },
+        "feedback_pictures_bytes_size": {
+          "name": "feedback_pictures_bytes_size",
+          "value": "\"feedback_pictures\".\"bytes\" is null or \"feedback_pictures\".\"bytes\" > 0"
+        },
+        "feedback_pictures_sides_positive": {
+          "name": "feedback_pictures_sides_positive",
+          "value": "\"feedback_pictures\".\"width\" > 0 and \"feedback_pictures\".\"height\" > 0"
         }
       },
       "isRLSEnabled": false

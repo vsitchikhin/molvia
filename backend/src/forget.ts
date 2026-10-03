@@ -47,6 +47,7 @@ export async function forget(
   for (const table of ERASED_TABLES) write(`  ${table.padEnd(20)}${String(report.erased[table])}`)
   write(`  ${'items kept'.padEnd(20)}${String(report.itemsReleased)} (author removed)`)
   write(`  ${'codes kept'.padEnd(20)}${String(report.barcodesReleased)} (author removed)`)
+  write(`  ${'shop memory kept'.padEnd(20)}${String(report.memoryReleased)} (author removed)`)
   if (report.counted)
     write(`  ${'erasures'.padEnd(20)}+1 (a count by week of arrival, no id — the gates read it)`)
   write(dryRun ? 'dry run: nothing changed. Run again with --yes to erase.' : 'erased.')

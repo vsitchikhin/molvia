@@ -3,7 +3,7 @@ import { tripViewCodec, tripViewOf } from '@molvia/model'
 import type { Trip, TripView } from '@molvia/model'
 import type { TripRepositories } from '@/db/unit-of-work'
 
-export type TripViewDeps = Pick<TripRepositories, 'places' | 'expenses' | 'items'>
+export type TripViewDeps = Pick<TripRepositories, 'places' | 'expenses' | 'items' | 'receipts'>
 
 /**
  * The trip as the screen shows it, and the one way every trip route builds its answer (MOL-21,
@@ -14,7 +14,7 @@ export type TripViewDeps = Pick<TripRepositories, 'places' | 'expenses' | 'items
  * a plain Error — a 500 with a log line — rather than a DomainError the client would read as 404.
  */
 export async function tripViewFor(
-  { places, expenses, items }: TripViewDeps,
+  { places, expenses, items, receipts }: TripViewDeps,
   trip: Trip,
 ): Promise<TripView> {
   const place = await places.byId(trip.placeId)
@@ -22,7 +22,7 @@ export async function tripViewFor(
 
   const rows = await expenses.forTrip(trip.id, trip.actorId)
   const catalogue = await items.byIds([...new Set(rows.map((row) => row.itemId))])
-  const view = tripViewOf(trip, place, rows, catalogue)
+  const view = tripViewOf(trip, place, rows, catalogue, await receipts.sourceOf(trip.id))
 
   // Encoded here as well as in the route, because here is still inside the writer's
   // transaction: an answer the wire cannot carry must undo the write it describes, not follow it

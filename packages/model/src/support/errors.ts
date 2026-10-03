@@ -93,6 +93,15 @@ export const ERROR = {
   RECEIPT_NOT_PHOTO: 'error.receipt_not_photo',
   /** A part of a receipt whose sides pass `RECEIPT_SIDE_MAX`: the phone sends at most 3 200 px. */
   RECEIPT_TOO_LARGE: 'error.receipt_too_large',
+  /** «Записать» on a receipt not laid out into lines: still being read, or failed (MOL-126). */
+  RECEIPT_NOT_READY: 'error.receipt_not_ready',
+  /** The same receipt — its seller's tax number and its number — recorded before, its purchases there (Т-11). */
+  RECEIPT_RECORDED_BEFORE: 'error.receipt_recorded_before',
+  /**
+   * A receipt dated after the latest day anywhere on Earth (`latestDay`, MOL-121 — the phone's today
+   * may be a day ahead of Yerevan's) — a day still to come (MOL-126).
+   */
+  RECEIPT_IN_FUTURE: 'error.receipt_in_future',
   /**
    * A message to the developer past `FEEDBACK_DAY_LIMIT` in a rolling day (MOL-147). The sheet keeps
    * the text and says to send it tomorrow.

@@ -289,6 +289,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
           finishedOnDeviceAt: trip.finishedOnDeviceAt ?? null,
           itemCount: trip.expenses.length,
           total: [...trip.total],
+          fromReceipt: trip.receiptId !== null,
         }
       : null
   }

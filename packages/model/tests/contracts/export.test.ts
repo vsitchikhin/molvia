@@ -189,7 +189,9 @@ const file: ExportFile = {
       receiptNo: '21410811',
       total: money(74_000n, 'AMD'),
       balanced: true,
-      recordedAt: null,
+      city: 'Гюмри',
+      recordedAt: at,
+      tripId: id(4),
       removedAt: null,
       lines: [
         {
@@ -202,6 +204,10 @@ const file: ExportFile = {
           sum: money(74_000n, 'AMD'),
           discount: money(0n, 'AMD'),
           settled: true,
+          itemId: id(8),
+          match: 'search',
+          translation: 'молоко',
+          expenseId: id(9),
         },
       ],
     },
@@ -257,6 +263,16 @@ const file: ExportFile = {
     },
   ],
   addedBarcodes: [{ barcode: '4850001234567', itemId: id(8), addedAt: at }],
+  storeMemory: [
+    {
+      tin: '01282006',
+      kind: 'sku',
+      key: '1163909',
+      itemId: id(8),
+      price: money(37_000n, 'AMD'),
+      writtenAt: at,
+    },
+  ],
   feedback: [
     {
       number: 41,
@@ -328,7 +344,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(10)
+    expect(wire.version).toBe(11)
     expect(wire.receipts[0]?.lines[0]?.quantity).toEqual({ value: '2.000', unit: 'piece' })
     expect(wire.feedback[1]).toMatchObject({ thread: 41, inReplyTo: 7, replies: [] })
     expect(wire.budgetPlans[0]?.plan).toEqual({

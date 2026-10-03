@@ -6,22 +6,32 @@ import {
   mergeParts,
   moneyOfHundredths,
   needsReshoot,
+  receiptCityOf,
   receiptDateOf,
   receiptTimeOf,
   receiptLineOf,
   receiptLineCodec,
 } from '@molvia/model'
-import type { Currency, ReceiptText, TextRow } from '@molvia/model'
+import type { Currency, ReceiptLine, ReceiptText, TextRow } from '@molvia/model'
 import { z } from 'zod'
 import type {
   ClaimedReceipt,
+  LineBinding,
   LineImage,
   ReadOutcome,
   ReceiptHead,
   ReceiptRepository,
 } from '@/db/receipts-repository'
 import { PhotoUnreadable, ReaderDropped, ReaderUnavailable } from '@/receipts/reader'
+import { TILL_KINDS_LATIN } from '@/receipts/till-kinds-latin'
+import { TILL_WORDS_RU } from '@/receipts/till-words-ru'
 import type { Box, ReceiptReader } from '@/receipts/reader'
+
+// The kinds of goods a till names: an item named after a city names its kind beside it (MOL-126).
+const TILL_WORDS: ReadonlySet<string> = new Set([
+  ...Object.keys(TILL_WORDS_RU),
+  ...TILL_KINDS_LATIN,
+])
 
 // The latest day a receipt may print: the server's tomorrow, so no zone's today is refused.
 const latestPrinted = (): string =>
@@ -33,6 +43,11 @@ const STRIPS_PER_REQUEST = 32
 export interface ReadReceiptsDeps {
   readonly receipts: ReceiptRepository
   readonly reader: ReceiptReader
+  /** The lines to items (MOL-126): `bindReceiptLines`, one binding for each line in order. */
+  readonly bind: (
+    claimed: ClaimedReceipt,
+    lines: readonly ReceiptLine[],
+  ) => Promise<readonly LineBinding[]>
   /** What happened, for the log: never the receipt's text, its tax number or its photo (MOL-58). */
   readonly report: (event: ReadReport) => void
 }
@@ -49,9 +64,14 @@ export type ReadReport =
   | { readonly kind: 'reader_unavailable'; readonly reason: string }
   | { readonly kind: 'reader_dropped'; readonly reason: string }
   | { readonly kind: 'strips_failed'; readonly reason: string }
+  | { readonly kind: 'bind_failed'; readonly error: unknown }
   | { readonly kind: 'error'; readonly error: unknown }
 
-function headOf(text: ReceiptText, currency: Currency): ReceiptHead {
+function headOf(
+  text: ReceiptText,
+  currency: Currency,
+  readings: readonly (readonly TextRow[])[],
+): ReceiptHead {
   return {
     tin: text.tin,
     printedOn: receiptDateOf(text, latestPrinted()),
@@ -60,6 +80,8 @@ function headOf(text: ReceiptText, currency: Currency): ReceiptHead {
     totalMinor: moneyOfHundredths(text.totalHundredths, currency)?.minor ?? null,
     balanced: text.balanced,
     layout: text.layout,
+    city:
+      readings.map((rows) => receiptCityOf(rows, TILL_WORDS)).find((city) => city !== null) ?? null,
   }
 }
 
@@ -69,7 +91,7 @@ function headOf(text: ReceiptText, currency: Currency): ReceiptHead {
  * `reshoot` (В-4); one laid out has its item lines cut out for the reader's training (MOL-169).
  */
 async function readOne(
-  { reader, report }: ReadReceiptsDeps,
+  { reader, report, bind }: ReadReceiptsDeps,
   claimed: ClaimedReceipt,
 ): Promise<ReadOutcome> {
   if (claimed.parts.length === 0) {
@@ -96,7 +118,7 @@ async function readOne(
     readings.push(mergeParts(parts))
   }
   const text = bestReading(readings)
-  const head = headOf(text, currency)
+  const head = headOf(text, currency, readings)
   if (needsReshoot(text))
     return { kind: 'failed', failure: 'reshoot', readerVersion: version, head }
 
@@ -119,7 +141,17 @@ async function readOne(
   if (!z.array(receiptLineCodec).safeEncode(lines).success) {
     return { kind: 'failed', failure: 'unreadable', readerVersion: version, head }
   }
-  return { kind: 'parsed', readerVersion: version ?? '', head, lines, images }
+  let bindings: readonly LineBinding[] = []
+  try {
+    bindings = await bind(claimed, lines)
+  } catch (error) {
+    // what the lines are is the review's help, not the receipt: it is read without it, every line new
+    report({ kind: 'bind_failed', error })
+  }
+  if (bindings.length !== lines.length) {
+    bindings = lines.map(() => ({ itemId: null, match: 'new', translation: null }))
+  }
+  return { kind: 'parsed', readerVersion: version ?? '', head, lines, bindings, images }
 }
 
 /** The item lines, row by row — never the head with the customer's name, never the total. */

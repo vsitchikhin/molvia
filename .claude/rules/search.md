@@ -444,6 +444,11 @@ shows what it moves.
 
 ## How the catalogue grows
 
+- **The seed carries the items' Armenian names and customs headings too** (MOL-126,
+  `catalogue-seed-nodes.ts`): what a receipt line is matched by, written to `item_names` and `item_hs`
+  for the item a seed line ends at, a twin given none. **They are not the person's search**, which
+  reads `items.name` alone: a receipt's line is matched by `createLineMatcher` (`.claude/rules/receipts.md`).
+
 - **The catalogue grows two ways: «Предложить товар» and the seed (MOL-112).** MOL-12 decided «no
   seed» and the owner reversed it on 26.09.2026: with an empty catalogue every trip began by
   typing the shelf in — 3–4 new words a trip in the owner's own log, 5–8 at the level of a brand
