@@ -422,7 +422,22 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   `router.replace` gives way to the purchases, and «Записали N покупок» comes in the history's state —
   said once, never on a reload.
 - **«Итог чека» is a button** (Р-8): OCR misses the total on half the receipts, and the trip's money is
-  the receipt's total (MOL-78); the person's total goes as `total`.
+  the receipt's total (MOL-78); the person's total goes as `total`. **It turns В-5 again**: with the
+  person's total the amounts of the lines not edited are `recordedSums` over their figures and that
+  total, so a printed sum the total confirms is what is recorded (review 4).
+- **An edit of a line is the person's figure**: «≠» of the reading goes with it, «проверьте» only
+  once the item is chosen (`confirmed`), and «Сохранить» with nothing changed writes no draft — the
+  line goes on following the server and the shop's memory (review 16). «Не записывать» and «Вернуть в
+  запись» are written at once, with no figure checked (review 17).
+- **While «Записать» waits the receipt is what was sent** (review 5, adversarial А1): no line, place,
+  total or removal opens; the answer moves only the review that asked, never a screen the person went
+  to meanwhile (А5). A removal of a recorded receipt (409) is done, never «не принят».
+- **«Не принят» is a photo's word**: only a refused announcement or part makes that row, dated by the
+  moment of the refusal; a tap opens the sheet with the reason and «Убрать», never removes by itself.
+  **A receipt the server holds with parts missing and this phone none of them** is «не все части
+  дошли», with «Удалить», and asked about by nobody: the list is asked again only while one is read
+  (adversarial А2). A removal takes the parts still waiting out of the queue, and «Вернуть» puts them
+  back (А3).
 - **The line's sheet is its own** (`ReceiptLineSheet`), with the box of «За единицу» and «Тут дешевле»
   of the purchase's sheet — the same keys and `useCheaperHint`: a line writes into a draft, the
   purchase's sheet into the trip's queue, and one component for both would carry both. Its currency is
