@@ -61,9 +61,17 @@ export type BotFailure = z.infer<typeof botFailureSchema>
 /**
  * Where on the phone a failure was caught (MOL-144, Р-3): Vue's handler, the window's `error` and
  * `unhandledrejection`, an error a screen showed, the barcode reader's worker, the service worker's
- * registration.
+ * registration, and a step of the start that threw before the app was mounted (adversarial А4).
  */
-export const PHONE_CATCHERS = ['vue', 'window', 'rejection', 'screen', 'scanner', 'sw'] as const
+export const PHONE_CATCHERS = [
+  'vue',
+  'window',
+  'rejection',
+  'screen',
+  'scanner',
+  'sw',
+  'start',
+] as const
 export type PhoneCatcher = (typeof PHONE_CATCHERS)[number]
 
 /**

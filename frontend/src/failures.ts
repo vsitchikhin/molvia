@@ -126,6 +126,9 @@ function keep(reports: readonly PhoneFailure[]): void {
  */
 export function failureReports(environment: FailureEnvironment): FailureReports {
   const seen = new Set<string>()
+  // One error once, whoever caught it: the start reports its own throw and throws it on, and the
+  // window hears it again.
+  const heard = new WeakSet<object>()
   let sending: Promise<void> | null = null
   let again = false
 
@@ -156,6 +159,10 @@ export function failureReports(environment: FailureEnvironment): FailureReports 
   }
 
   function take(error: unknown, catcher: PhoneCatcher): void {
+    if (typeof error === 'object' && error !== null) {
+      if (heard.has(error)) return
+      heard.add(error)
+    }
     if (!phoneDefect(error)) return
     const summary = describePhoneFailure(error, environment.origin)
     const frames = summary.frames ?? []

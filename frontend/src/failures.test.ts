@@ -174,6 +174,19 @@ describe('что уходит и что нет (MOL-144)', () => {
   })
 })
 
+describe('одна ошибка — один отчёт, кто бы её ни поймал (А4)', () => {
+  it('старт сообщил и бросил дальше, окно услышало её же — уходит один раз', async () => {
+    const reports = failureReports(environment(sending))
+    const error = thrown('start')
+    reports.report(error, 'start')
+    reports.report(error, 'window')
+    await reports.flush()
+    expect(bodies.flatMap((body) => body.reports.map((report) => report.catcher))).toEqual([
+      'start',
+    ])
+  })
+})
+
 describe('отчёт не ломает catch, в котором стоит', () => {
   it('сбой самого отчёта — тишина, а не исключение в ветке экрана', () => {
     const reports = failureReports({
