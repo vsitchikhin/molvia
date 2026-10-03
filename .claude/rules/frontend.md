@@ -149,15 +149,31 @@ The detail behind the frontend lines of `CLAUDE.md`.
   23 places. **An icon is `@include icon` (1em both ways, `flex: none`) with its step written
   beside it as `font-size`** — never an argument of the mixin: `font-size: $size` in `_mixins.scss`
   is checked by nothing, while the line in the component goes through the allowed-list, which takes
-  `var(--icon*)` and `--state-glyph`. **On an icon a width or a height is refused but 1em**
-  (`molvia/icon-size`, `frontend/stylelint/icon-size.mjs`, owner's В-1 «а»): an icon is a selector
-  ending in `svg` (`:deep` opened) or holding a class the SFC's own template puts on an `<Icon…>` or
-  a self-closing `<component :is>`, or `&` under such a rule. Width and height are no allowed-list's,
-  since a dot, a circle and a chart are sized there too; the rule reads the template instead, and
-  on master before it found all 142 literals. It cannot see a class bound by `:class` or an icon
-  styled from another file — a parent's scoped `svg {}` covers the second. A circle around an icon
-  is sized as a shape; the glyph in it is the icon (the pencil of «Настройки» was a 32 svg with
-  padding, now 18 in a 32 circle).
+  `var(--icon*)` and `--state-glyph`. **The scale is held by `molvia/icon-size`**
+  (`frontend/stylelint/icon-size.mjs`, owner's В-1 «а»), on master before it found all 142
+  literals. On an icon: **both lines are there** — an icon with a class has `@include icon` and a
+  step in the rules of its classes (they may be split, `.entry-icon, .entry-chevron { @include icon }`
+  beside `.entry-icon { font-size: … }`), a rule on `svg` has the pair or neither, and then only
+  colours an icon another rule sizes, its step allowed in a rule around it (`AppButton`'s
+  `.glyph`). Adversarial А1: a step alone is drawn at the 1.2em unplugin-icons writes — 24 for a
+  chevron of 20, the next step up, which looks meant — and the mixin alone at the text it stands in.
+  **`font-size` is a step of the icon scale**, never `--text-*`, `1em` or `inherit` — the
+  allowed-list takes those for text. **Width and height are 1em, and there is no padding, scale or
+  scaling transform, nor an `@include` but `icon`** (А4: the old pencil was a 32 box with a 16
+  glyph; А6: a mixin of its own carried a width past the rule) — down a nested `@media`, `@supports`
+  or `@include … { }` too (А2, `wider-than-phone` is how a wider icon would be written). **Nor in
+  the template**: `style`, `:style` or a `width=`/`height=` on an icon is refused (А5). An icon is a
+  tag imported from `~icons/` under any name, or written `Icon…`/`icon-…`, or a `<component :is>`
+  that holds nothing; the template is read with its attributes' quotes, so `v-if="n > 0"` ends no
+  tag (А3). A rule styles one when, the nesting resolved — `&` replaced, `&-chevron` glued to its
+  parent (А7) — the last compound of a selector is the tag `svg` (`:deep` opened, `:is()` and
+  `:where()` read inside, `:not()` left out; a class named `svg` is no tag) or holds a class the
+  icon wears. Width and height are no allowed-list's, since a dot, a circle and a chart are sized
+  there too; the rule reads the template instead. It cannot see a class bound by `:class` or an
+  icon styled from another file — a parent's scoped `svg {}` covers the second; so the kit's scale
+  sets its step on the wrapper, `.step-icon-sm .sample`, which also keeps a class of the page off
+  `AppButton`'s own `.icon`. A circle around an icon is sized as a shape; the glyph in it is the icon
+  (the pencil of «Настройки» was a 32 svg with padding, now 18 in a 32 circle).
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
   `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a
