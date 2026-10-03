@@ -606,6 +606,24 @@ test.describe('the sheet', () => {
     // Opened with no keyboard, the share is of the whole screen.
     expect(whole).toBeCloseTo(page.viewportSize()!.height * 0.82, 0)
   })
+
+  // The page is hidden under the keys, the sheet of a screen is not, and its field keeps the focus
+  // (hotfix-bottom-menu, MOL-219). The keys themselves never come up in a test browser: the mark
+  // `useKeyboardInset` sets for them is set by hand.
+  test('stays, its field focused, while the keys are up and the page is hidden', async ({
+    page,
+  }) => {
+    await openSheet(page)
+    const field = sheet(page).getByLabel('How much')
+    await expect(field).toBeFocused()
+    await page.evaluate(() => {
+      document.documentElement.dataset.underKeys = ''
+    })
+    await settled(page)
+    await expect(page.locator('h1')).toBeHidden()
+    await expect(sheet(page)).toBeVisible()
+    await expect(field).toBeFocused()
+  })
 })
 
 // The segment looks as in the handoff and still answers a thumb over the whole 44px (review Р-3).
