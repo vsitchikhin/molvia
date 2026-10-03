@@ -17,6 +17,7 @@ import type {
   ReceiptPlace,
   ReceiptSummary,
   SettingsCity,
+  TripReceiptSource,
 } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -155,6 +156,8 @@ export interface ReceiptRepository {
    * rows cut out of the lines recorded as read confirmed with the text read, every other row deleted.
    */
   markRecorded(id: string, recorded: RecordedReceipt): Promise<void>
+  /** The receipt a trip was recorded from, with each purchase's line as printed (MOL-126). */
+  sourceOf(tripId: string): Promise<TripReceiptSource | null>
   /** The person's receipt of this tax number and number, recorded as purchases still there (Т-11). */
   recordedTwin(
     actorId: string,
@@ -474,6 +477,47 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           confirmedAt: sql`clock_timestamp()`,
         })
         .where(eq(receiptLineImages.receiptId, id))
+    },
+
+    async sourceOf(tripId) {
+      const [receipt] = await db
+        .select({ id: receipts.id, currency: receipts.currency })
+        .from(receipts)
+        .where(eq(receipts.tripId, tripId))
+        .limit(1)
+      if (receipt === undefined) return null
+      const lines = await db
+        .select({
+          expenseId: receiptLines.expenseId,
+          printed: receiptLines.printed,
+          discountMinor: receiptLines.discountMinor,
+        })
+        .from(receiptLines)
+        .where(
+          and(eq(receiptLines.receiptId, receipt.id), sql`${receiptLines.expenseId} is not null`),
+        )
+      return {
+        receiptId: receipt.id,
+        lines: new Map(
+          lines.flatMap((line) =>
+            line.expenseId === null
+              ? []
+              : [
+                  [
+                    line.expenseId,
+                    {
+                      printed: line.printed,
+                      // a discount of nothing is no discount
+                      discount:
+                        line.discountMinor === null || line.discountMinor === 0n
+                          ? null
+                          : { minor: line.discountMinor, currency: receipt.currency },
+                    },
+                  ] as const,
+                ],
+          ),
+        ),
+      }
     },
 
     async recordedTwin(actorId, tin, receiptNo, except) {

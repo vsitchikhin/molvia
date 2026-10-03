@@ -271,6 +271,7 @@ function fakeRepositories(
       recordedTwin: unexpected('receipts.recordedTwin'),
       lockForRecord: unexpected('receipts.lockForRecord'),
       markRecorded: unexpected('receipts.markRecorded'),
+      sourceOf: () => Promise.resolve(null),
       remove: unexpected('receipts.remove'),
       restore: unexpected('receipts.restore'),
       purgeStale: unexpected('receipts.purgeStale'),

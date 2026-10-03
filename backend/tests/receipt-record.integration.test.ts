@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { ERROR, receiptRecordedCodec } from '@molvia/model'
+import { ERROR, receiptRecordedCodec, tripHistoryCodec, tripViewCodec } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createExpenseRepository } from '@/db/expenses-repository'
 import { createMoneyRepository } from '@/db/money-repository'
@@ -356,6 +356,50 @@ describe('«Записать»', () => {
     expect(response.statusCode).toBe(200)
     const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
     expect(trip?.receiptMinor).toBe(215_000n)
+  })
+
+  it('shows the trip as recorded from the receipt: each purchase with its line and discount', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    const id = await parsedReceipt(me, LINES.slice(0, 2))
+    await db
+      .update(receiptLines)
+      .set({ discountMinor: 740n })
+      .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 0)))
+    const tripId = randomUUID()
+    expect(
+      (
+        await record(me, id, {
+          tripId,
+          place: { id: place },
+          purchasedOn: '2026-09-26',
+          lines: [
+            {
+              position: 0,
+              skip: false,
+              item: { id: milk },
+              quantity: pieces(2),
+              amount: amount(740),
+            },
+            { position: 1, skip: true },
+          ],
+        })
+      ).statusCode,
+    ).toBe(200)
+
+    const cookie = await signIn(db, me)
+    const trip = tripViewCodec.parse(
+      (await app.inject({ method: 'GET', url: `/trips/${tripId}`, headers: { cookie } })).json(),
+    )
+    expect(trip.receiptId).toBe(id)
+    expect(trip.expenses.map((row) => [row.printed, row.discount?.minor ?? null])).toEqual([
+      ['Կաթ «Իգիթ» 3.2% 1լ', 740n],
+    ])
+    const history = tripHistoryCodec.parse(
+      (await app.inject({ method: 'GET', url: '/trips/history', headers: { cookie } })).json(),
+    )
+    expect(history.trips.map((row) => [row.id, row.fromReceipt])).toEqual([[tripId, true]])
   })
 
   it('is the owner’s alone, and keeps the tax number a place already has', async () => {
