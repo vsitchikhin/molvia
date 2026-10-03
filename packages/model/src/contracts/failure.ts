@@ -1,12 +1,13 @@
 import { z } from 'zod'
+import { feedbackPlatformSchema, feedbackRouteSchema } from './feedback'
 import { telegramUserIdSchema } from '#model/entities/actor'
 import { FAILURE_FRAMES } from '#model/support/failure'
 
 /**
- * Where a failure came from (MOL-143). `phone` joins with MOL-144; the bot has no build of its own
- * and is rolled out from the same commit as the API, so its failures carry the API's.
+ * Where a failure came from (MOL-143). The bot has no build of its own and is rolled out from the
+ * same commit as the API, so its failures carry the API's; the phone names its own (MOL-144).
  */
-export const FAILURE_SOURCES = ['api', 'bot'] as const
+export const FAILURE_SOURCES = ['api', 'bot', 'phone'] as const
 export type FailureSource = (typeof FAILURE_SOURCES)[number]
 
 /** The longest kind and driver code a failure keeps: a class name and a SQLSTATE fit with room. */
@@ -57,6 +58,62 @@ export const botFailureSchema = z.strictObject({
 })
 export type BotFailure = z.infer<typeof botFailureSchema>
 
+/**
+ * Where on the phone a failure was caught (MOL-144, Р-3): Vue's handler, the window's `error` and
+ * `unhandledrejection`, an error a screen showed, the barcode reader's worker, the service worker's
+ * registration.
+ */
+export const PHONE_CATCHERS = ['vue', 'window', 'rejection', 'screen', 'scanner', 'sw'] as const
+export type PhoneCatcher = (typeof PHONE_CATCHERS)[number]
+
+/**
+ * The screen a phone's failure happened on: a route's name (`feedbackRouteSchema`, which a test of
+ * the router holds every name to), `login` behind the door of the login, `start` before the first
+ * route is settled.
+ */
+export const phoneScreenSchema = feedbackRouteSchema
+
+/**
+ * The page's build (MOL-144, В-1): the name of its own script, `index-BTCsHrpw` — a hash of its
+ * content, which changes exactly when the phone's code does — or `dev` on the development server.
+ */
+export const phoneBuildSchema = z.string().regex(/^(?:dev|index-[\w-]{4,24})$/)
+
+/**
+ * A frame as the phone sends it, one shape for every engine (`phoneFrame`, Р-1): an identifier or
+ * `?`, and a path of the app's own origin with its line and column, or `?`. Nothing else passes — no
+ * address of the page, no query, no word of text.
+ */
+export const phoneFrameSchema = z
+  .string()
+  .max(FAILURE_WIRE_FRAME_MAX)
+  .regex(/^at [\w$.<>[\]/?]{1,100} \((?:\?|\/[\w./@~+-]{0,400}:\d{1,9}:\d{1,9})\)$/)
+
+/**
+ * What the phone says about a failure of its own (MOL-144): its kind and frames, where it was
+ * caught, on which screen, in which build and on what platform — never the message, a field, a
+ * draft, the queue, storage or an answer of the API (the requirements, «не прикладывать»).
+ */
+export const phoneFailureSchema = z.strictObject({
+  errorName: failureNameSchema,
+  code: failureCodeSchema.optional(),
+  frames: z.array(phoneFrameSchema).min(1).max(FAILURE_FRAMES),
+  catcher: z.enum(PHONE_CATCHERS),
+  screen: phoneScreenSchema,
+  build: phoneBuildSchema,
+  platform: feedbackPlatformSchema,
+})
+export type PhoneFailure = z.infer<typeof phoneFailureSchema>
+
+/** How many failures the phone keeps until it can send them, and sends at once (MOL-144, Р-7). */
+export const PHONE_FAILURES_KEPT = 20
+
+/** The body of `POST /client-errors`: what the phone has kept, all of it at once. */
+export const clientErrorsSchema = z.strictObject({
+  reports: z.array(phoneFailureSchema).min(1).max(PHONE_FAILURES_KEPT),
+})
+export type ClientErrors = z.infer<typeof clientErrorsSchema>
+
 /** What every notice about a failure names: where, what, and in which build. */
 const failureFacts = {
   source: z.enum(FAILURE_SOURCES),
@@ -67,6 +124,8 @@ const failureFacts = {
     .string()
     .min(1)
     .max(FAILURE_NAME_MAX * 2),
+  /** The phone's platform, `ios 18 app` (MOL-144, В-2); none for the API and the bot. */
+  platform: feedbackPlatformSchema.optional(),
 }
 
 /** A fingerprint seen for the first time in this build (MOL-143, В-2): the frame it was thrown at. */
