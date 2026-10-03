@@ -1063,31 +1063,88 @@ describe('a screenshot with the message (MOL-167)', () => {
     expect(recallFeedbackDraft(OWNER)).toMatchObject({ pictures: 1 })
   })
 
-  it('takes a new key after a reload when the message had begun to leave with pictures (Б3)', async () => {
+  describe('a draft that began to leave with pictures this page lost (adversarial Б3, В2)', () => {
     const key = '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d'
-    keepFeedbackDraft(OWNER, {
-      kind: 'bug',
-      text: 'Look',
-      clientKey: key,
-      pictures: 1,
-      attached: {
-        locale: 'en',
-        pageBuild: null,
-        route: 'settings',
-        platform: 'ios 18 app',
-        fromError: false,
-        errorCode: null,
-      },
+    const leaving = () => {
+      keepFeedbackDraft(OWNER, {
+        kind: 'bug',
+        text: 'Look',
+        clientKey: key,
+        pictures: 1,
+        attached: {
+          locale: 'en',
+          pageBuild: null,
+          route: 'settings',
+          platform: 'ios 18 app',
+          fromError: false,
+          errorCode: null,
+        },
+      })
+    }
+
+    it('keeps its key at the opening: the window sending it drops the draft (В2)', async () => {
+      leaving()
+      const { wrapper } = await render()
+      const sheet = await open(wrapper)
+
+      expect(note(sheet).text()).toBe(en.feedback.picture.lost)
+      expect(recallFeedbackDraft(OWNER)?.clientKey).toBe(key)
+      dropFeedbackDraft(OWNER, key)
+      expect(recallFeedbackDraft(OWNER)).toBeNull()
     })
+
+    it('takes a 409 under that key for sent: the server holds it, pictures and all (Б3)', async () => {
+      leaving()
+      sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT))
+      const { wrapper } = await render()
+      const sheet = await open(wrapper)
+
+      await press(sheet)
+
+      expect(sendFeedback.mock.calls[0]?.[0].clientKey).toBe(key)
+      expect(sheet.find('.sent').exists()).toBe(true)
+      expect(sheet.find('.note.bad').exists()).toBe(false)
+      expect(recallFeedbackDraft(OWNER)).toBeNull()
+      expect(sendFeedback).toHaveBeenCalledOnce()
+    })
+
+    it("control: changed since, a 409 is the phone's own defect again — a new key and «Try again»", async () => {
+      leaving()
+      sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT))
+      const { wrapper } = await render()
+      const sheet = await open(wrapper)
+      await type(sheet, 'Look again')
+      const typed = recallFeedbackDraft(OWNER)?.clientKey
+
+      await press(sheet)
+
+      expect(sheet.find('.note.bad').exists()).toBe(true)
+      expect(recallFeedbackDraft(OWNER)?.clientKey).not.toBe(typed)
+    })
+  })
+
+  it('says sent in the opening it came to, the sheet closed and opened untouched (adversarial В1)', async () => {
+    let answer: (value: { sent: FeedbackSent; created: boolean }) => void = () => undefined
+    sendFeedback.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
     const { wrapper } = await render()
     const sheet = await open(wrapper)
+    await choose(sheet, en.feedback.kinds.bug)
+    await type(sheet, 'Broken')
+    await attachFiles(sheet, screenshot('shown'))
+    await button(sheet).trigger('click')
+    useFeedbackSheetStore().shown = false
+    await flushPromises()
+    await open(sheet)
 
-    expect(note(sheet).text()).toBe(en.feedback.picture.lost)
-    const renewed = recallFeedbackDraft(OWNER)?.clientKey
-    expect(renewed).not.toBe(key)
-    await press(sheet)
-    expect(sendFeedback.mock.calls[0]?.[0].clientKey).toBe(renewed)
-    expect(sheet.find('.note.bad').exists()).toBe(false)
+    answer({ sent: { number: 42 }, created: true })
+    await flushPromises()
+
+    expect(sheet.find('.sent').exists()).toBe(true)
+    expect(button(sheet).text()).toBe(en.feedback.done)
   })
 
   it('tries every file chosen: one the browser cannot open does not keep the next (adversarial А6)', async () => {

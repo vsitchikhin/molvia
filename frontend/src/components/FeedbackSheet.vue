@@ -255,6 +255,12 @@ export default defineComponent({
      */
     const pictures = ref<HeldPicture[]>([])
     const drawing = ref(false)
+    /**
+     * The draft had begun to leave, under its key, with pictures this page no longer holds — a reload,
+     * or another window sending it right now. Until the content changes, a `409` under that key says
+     * the server holds that very message, pictures and all (adversarial В2, Б3).
+     */
+    const leftWithPictures = ref(false)
     const pictureNote = ref<string | null>(null)
     const kinds = ref<{ $el?: HTMLElement } | null>(null)
     const field = ref<{ $el?: HTMLElement } | null>(null)
@@ -304,14 +310,12 @@ export default defineComponent({
         clientKey.value = draft?.clientKey ?? newId()
         await nextTick()
         recalling = false
-        // A reload left the pictures behind — or another window holds them. A draft that never left
-        // keeps its key: a new one here would keep it from going when that window sends it (review 7).
-        // One that has begun to leave may be the server's already with its pictures, and the same key
-        // without them is a sure `409` and «Не получилось» (adversarial Б3): it is another message now.
-        if ((draft?.pictures ?? 0) > pictures.value.length) {
-          pictureNote.value = t('feedback.picture.lost')
-          if (draft?.attached !== undefined) changed()
-        }
+        // A reload left the pictures behind — or another window holds them, and may be sending them
+        // now. Said, and the key kept: the opening decides nothing for another window (review 7,
+        // adversarial В2). What a `409` then means is decided by the answer, in `press`.
+        const lost = (draft?.pictures ?? 0) > pictures.value.length
+        if (lost) pictureNote.value = t('feedback.picture.lost')
+        leftWithPictures.value = lost && draft?.attached !== undefined
         focusFirst()
       },
     )
@@ -339,6 +343,7 @@ export default defineComponent({
     function changed(): void {
       clientKey.value = newId()
       frozen.value = null
+      leftWithPictures.value = false
       keep()
     }
 
@@ -528,8 +533,10 @@ export default defineComponent({
         // meanwhile makes another message, and its pictures are that message's — never taken from
         // under the finger.
         dropFeedbackDraft(owner, message.clientKey)
-        if (clientKey.value === message.clientKey) letPicturesGo()
-        if (mine !== opening) return
+        if (clientKey.value !== message.clientKey) return
+        // The same message, whichever opening it is in now: closed and opened again untouched, the
+        // sheet says it went rather than let its pictures go from under the finger (adversarial В1).
+        letPicturesGo()
         phase.value = 'sent'
       } catch (error) {
         if (mine !== opening) return
@@ -544,6 +551,14 @@ export default defineComponent({
           frozen.value = null
           keep()
           phase.value = 'limited'
+          return
+        }
+        // The same key, the same words, and the pictures it began to leave with lost on this page: the
+        // server holds that very message, pictures and all — sent, not a second one (В2, Б3).
+        if (code === ERROR.CONFLICT && leftWithPictures.value) {
+          dropFeedbackDraft(owner, message.clientKey)
+          letPicturesGo()
+          phase.value = 'sent'
           return
         }
         // The same key with another content — a defect of the phone, never the person's (Р-2): a
