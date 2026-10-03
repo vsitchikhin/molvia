@@ -1,10 +1,10 @@
-import type { ReaderReply, ReaderRequest } from './protocol'
+import type { ReaderFailure, ReaderReply, ReaderRequest } from './protocol'
 
 /** The part of a worker the reader uses — so a test can hand it a fake. */
 export interface ReaderWorker {
   postMessage(request: ReaderRequest, transfer: Transferable[]): void
   addEventListener(type: 'message', listener: (event: MessageEvent<ReaderReply>) => void): void
-  addEventListener(type: 'error', listener: () => void): void
+  addEventListener(type: 'error', listener: (event: ErrorEvent) => void): void
   terminate(): void
 }
 
@@ -16,11 +16,32 @@ export interface BarcodeReader {
   dispose: () => void
 }
 
+/** The reader failed; `cause` is what failed in the worker, when it said (MOL-144, Р-11). */
 export class ReaderFailed extends Error {
-  constructor() {
-    super('barcode reader failed')
+  constructor(cause?: Error) {
+    super('barcode reader failed', cause === undefined ? undefined : { cause })
     this.name = 'ReaderFailed'
   }
+}
+
+/** The worker's failure brought back as an error of the page, to be described like any other. */
+function failureOf({ name, message, stack }: ReaderFailure): Error {
+  const error = new Error(message)
+  error.name = name
+  error.stack = stack
+  return error
+}
+
+/**
+ * A throw the worker did not catch: the browser names the file, the line and the column, and the
+ * message, which is left out — one frame at the place, `WorkerError` for its kind.
+ */
+function uncaughtOf(event: ErrorEvent | undefined): Error | undefined {
+  if (event?.filename === undefined || event.filename === '') return undefined
+  const error = new Error()
+  error.name = 'WorkerError'
+  error.stack = `${event.filename}:${String(event.lineno)}:${String(event.colno)}`
+  return error
 }
 
 function spawn(): ReaderWorker {
@@ -34,34 +55,41 @@ function spawn(): ReaderWorker {
  * request still waiting and every one after it — the sheet shows its error state.
  */
 export function createBarcodeReader(worker: ReaderWorker = spawn()): BarcodeReader {
-  const waiting = new Map<number, { resolve: (code: string | null) => void; reject: () => void }>()
+  const waiting = new Map<
+    number,
+    { resolve: (code: string | null) => void; reject: (cause?: Error) => void }
+  >()
   let next = 0
   let failed = false
+  let failure: Error | undefined
 
-  const fail = () => {
+  const fail = (cause?: Error) => {
     failed = true
-    for (const request of waiting.values()) request.reject()
+    failure ??= cause
+    for (const request of waiting.values()) request.reject(cause)
     waiting.clear()
   }
-  worker.addEventListener('error', fail)
+  worker.addEventListener('error', (event) => {
+    fail(uncaughtOf(event))
+  })
   worker.addEventListener('message', ({ data: reply }) => {
     const request = waiting.get(reply.id)
     if (!request) return
     waiting.delete(reply.id)
     if (reply.ok) request.resolve(reply.code)
-    else request.reject()
+    else request.reject(reply.failure === undefined ? undefined : failureOf(reply.failure))
   })
 
   const ask = (request: ReaderRequest, transfer: Transferable[]) =>
     new Promise<string | null>((resolve, reject) => {
       if (failed) {
-        reject(new ReaderFailed())
+        reject(new ReaderFailed(failure))
         return
       }
       waiting.set(request.id, {
         resolve,
-        reject: () => {
-          reject(new ReaderFailed())
+        reject: (cause) => {
+          reject(new ReaderFailed(cause))
         },
       })
       worker.postMessage(request, transfer)

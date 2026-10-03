@@ -9,6 +9,7 @@ import { recallJournal, rememberJournal, useAccountsStore } from '@/stores/accou
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { reportFailure } from '@/failures'
 
 /** `missing` — another's, deleted or never there: one 404 for all three (MOL-115, п. 1). */
 export type JournalPhase = 'idle' | 'loading' | 'ready' | 'missing' | 'error' | 'offline'
@@ -73,6 +74,7 @@ export function useAccountJournal(accountId: Ref<string>): AccountJournal {
       confirmed.value = true
       more.value = 'idle'
     } catch (caught) {
+      reportFailure(caught, 'screen')
       if (actor.id !== owner || accountId.value !== id || mine !== latest) return
       if (caught instanceof ApiError && caught.code === ERROR.NOT_FOUND && caught.answered) {
         shown.value = null

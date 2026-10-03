@@ -393,15 +393,23 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A failure belongs to nobody** (MOL-143): `failures` holds the fingerprint — source, kind, code,
   top frame without its position, the route's template — and nothing of a person, so no key to
   `actors`, no erasure, no copy; a new column is a decision about privacy.
-- **A failure is an answer of 500 or more, a job of the API's timers, a defect of the bot, or an owner's
-  notice the contract no longer reads** (MOL-148, placed as the claim's route); one path writes the log
-  and the table (`failureReporter`), and the answer never waits for the table.
+- **A failure is an answer of 500 or more, a job of the API's timers, a defect of the bot, the phone's
+  own (MOL-144), or an owner's notice the contract no longer reads** (MOL-148, placed as the claim's
+  route); one path writes the log and the table (`failureReporter`), and the answer never waits for
+  the table.
 - **The owner hears of a fingerprint the first time in a build and at 10, 100, 1000 there** —
   no daily summary; through `owner_notices`, claimed by the bot every minute, at most once, written
   to `OWNER_TELEGRAM_ID` of the API's environment — empty in every copy. MOL-148 joins as a kind,
   **handed again until the bot says it went**: a message's notice is all there is of it.
 - **The API runs without `--enable-source-maps`** (В-6, +70…80 MB measured): `make failures` reads
   the API's frames back through the image's map.
+- **The phone's own failures come by `POST /client-errors`** (MOL-144): no session, the kind and
+  frames in one shape for every engine and never the message (`describePhoneFailure`); a screen's
+  «error» calls `reportFailure`, which sends only the phone's defects — never an API's word or the
+  weather; once a page, kept on the device until the API answers; the build is the name of the page's
+  script, and in the fingerprint. The owner hears of the phone three times an hour a sender and twenty
+  in all, after the API's, the rest told as a count once an hour; at most sixty new rows of it an hour
+  a sender and a thousand in all.
 
 ### The bot — `.claude/rules/bot.md`
 

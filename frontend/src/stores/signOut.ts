@@ -17,6 +17,7 @@ import {
 import type { ErasureNote } from '@/stores/identity'
 import { whileQueueIsStill } from '@/stores/tripQueue'
 import { whileSpendingsAreStill } from '@/stores/spendingQueue'
+import { reportFailure } from '@/failures'
 
 /** Read afresh each time: the connection read before an `await` says nothing about after it. */
 function connected(): boolean {
@@ -167,6 +168,7 @@ export const useSignOutStore = defineStore('signOut', () => {
     try {
       await (way === 'erase' ? api.eraseMe() : api.logout())
     } catch (error) {
+      reportFailure(error, 'screen')
       leaving.value = false
       if (way === 'erase' && error instanceof ApiError && error.code === ERROR.NO_ACTOR) {
         if (!unsettled) {

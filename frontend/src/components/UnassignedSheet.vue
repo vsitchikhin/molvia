@@ -80,6 +80,7 @@ import { useReconnect } from '@/composables/useReconnect'
 import { useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { reportFailure } from '@/failures'
 
 /**
  * «Не попали в остатки» (MOL-123, handoff 01): the operations with no account that could still
@@ -124,7 +125,8 @@ export default defineComponent({
         if (mine !== latest) return
         rows.value = answer.rows
         state.value = 'ready'
-      } catch {
+      } catch (error) {
+        reportFailure(error, 'screen')
         if (mine !== latest) return
         if (state.value !== 'ready') state.value = navigator.onLine ? 'error' : 'offline'
       }

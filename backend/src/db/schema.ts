@@ -1819,14 +1819,14 @@ export const feedbackReplies = pgTable(
 )
 
 /**
- * Failures of the API and the bot, one row a fingerprint (MOL-143): the kind, the driver's code, the
- * top frame without its position and the place — a route's template, a handler of the bot, a job —
- * hashed together, so a failure that happens a thousand times is one row with a count.
+ * Failures of the API, the bot and the phone, one row a fingerprint (MOL-143, MOL-144): the kind,
+ * the driver's code, the top frame without its position and the place — a route's template, a
+ * handler of the bot, a job, a phone's catcher and screen — hashed together, so a failure that happens a thousand times is one row with a count.
  *
  * **A failure belongs to nobody** (Р-8 of MOL-149): no actor, no Telegram id, no address, no
  * session, no query, no body and no message — what `describeFailure` lets through and nothing
- * else. So there is no key to `actors`, erasure and the copy have nothing here to reach, and the
- * privacy page has nothing to say. Kept 30 days after the last time it happened.
+ * else. So there is no key to `actors`, and erasure and the copy have nothing here to reach; the
+ * privacy page says only what a phone sends (MOL-144). Kept 30 days after the last time it happened.
  *
  * `build` is the last build it happened in, and `build_count` how many times there: the owner hears
  * of a fingerprint the first time in a build and at 10, 100 and 1000 (В-2, В-5).
@@ -1845,6 +1845,11 @@ export const failures = pgTable(
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull(),
     count: integer('count').notNull(),
     buildCount: integer('build_count').notNull(),
+    /**
+     * The phone's platform the last time it happened, `ios 18 app` (MOL-144, В-2): the one line
+     * `platformLine` makes of the User-Agent, never the User-Agent. The API and the bot have none.
+     */
+    platform: text('platform'),
   },
   (table) => [
     check('failures_fingerprint_hex', sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
@@ -1861,6 +1866,11 @@ export const failures = pgTable(
       sql`${table.count} >= ${table.buildCount} and ${table.buildCount} >= 1`,
     ),
     check('failures_seen_forward', sql`${table.lastSeenAt} >= ${table.firstSeenAt}`),
+    check(
+      'failures_platform_phone',
+      sql`(${table.platform} is not null) = (${table.source} = 'phone')
+          and (${table.platform} is null or char_length(${table.platform}) <= 32)`,
+    ),
     index('failures_last_seen_at').on(table.lastSeenAt),
   ],
 )

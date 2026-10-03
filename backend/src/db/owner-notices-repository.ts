@@ -1,6 +1,6 @@
 import { and, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { FAILURE_KEEP_DAYS, FEEDBACK_NOTICE_KINDS } from '@molvia/model'
-import type { OwnerNoticeKind } from '@molvia/model'
+import type { OwnerNotice, OwnerNoticeKind } from '@molvia/model'
 import type { Conn } from './index'
 import { rowLimit } from './rows'
 import { ownerNotices } from './schema'
@@ -9,6 +9,7 @@ import { ownerNotices } from './schema'
 const FAILURE_NOTICE_KINDS = [
   'failure',
   'failure_count',
+  'failure_muted',
 ] as const satisfies readonly OwnerNoticeKind[]
 const UNHANDED_FAILURE_NOTICE_MS = 24 * 60 * 60 * 1000
 
@@ -39,8 +40,9 @@ export interface OwnerNoticeRepository {
    * table keeps its count. **A notice about a message is handed again** until the bot says it went
    * (`markSent`), `OWNER_NOTICE_RESEND_MS` after the first time and twice the pause each time after,
    * at most `OWNER_NOTICE_TRIES` times
-   * (MOL-148, adversarial В1): the table holds nothing else of it. Their payloads, oldest first, as
-   * stored: the caller reads them through `ownerNoticeSchema`.
+   * (MOL-148, adversarial В1): the table holds nothing else of it. Their payloads, the API's and the
+   * bot's before the phone's (MOL-144) and oldest first within each, as stored: the caller reads them
+   * through `ownerNoticeSchema`.
    */
   claim(limit: number, at: Date): Promise<readonly unknown[]>
 
@@ -52,7 +54,17 @@ export interface OwnerNoticeRepository {
    * did not take within a day: after a day without the bot the owner would get them in a heap.
    */
   purgeStale(now: Date): Promise<void>
+
+  /** One notice queued by itself, not with a failure: the phone's held back, told (MOL-144). */
+  queue(notice: OwnerNotice, at: Date): Promise<void>
 }
+
+/**
+ * The phone's notices after the API's and the bot's (MOL-144, adversarial А5): its endpoint is open,
+ * and a stream of invented failures queued ahead of the API's own put that one a day back in a queue
+ * of twenty a minute — and the day's purge took it unheard.
+ */
+const phoneLast = sql`coalesce(${ownerNotices.payload} ->> 'source' = 'phone', false)`
 
 export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
   return {
@@ -70,12 +82,22 @@ export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
                    and ${ownerNotices.handedAt} < ${at.toISOString()}::timestamptz
                      - make_interval(secs => ${OWNER_NOTICE_RESEND_MS / 1000}
                          * power(2, greatest(${ownerNotices.tries}, 1) - 1)))
-            order by ${ownerNotices.id}
+            order by ${phoneLast}, ${ownerNotices.id}
             limit ${rowLimit(limit)}
             for update skip locked)`,
         )
-        .returning({ id: ownerNotices.id, payload: ownerNotices.payload })
-      return rows.sort((a, b) => a.id - b.id).map((row) => row.payload)
+        .returning({
+          id: ownerNotices.id,
+          payload: ownerNotices.payload,
+          phone: sql<boolean>`${phoneLast}`,
+        })
+      return rows
+        .sort((a, b) => Number(a.phone) - Number(b.phone) || a.id - b.id)
+        .map((row) => row.payload)
+    },
+
+    async queue(notice, at) {
+      await db.insert(ownerNotices).values({ kind: notice.kind, payload: notice, createdAt: at })
     },
 
     async markSent(messages, at) {

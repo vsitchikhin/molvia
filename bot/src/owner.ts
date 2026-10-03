@@ -16,15 +16,34 @@ import { reportDefect } from './failure'
 export function ownerText(notice: OwnerNotice): string {
   if (notice.kind === 'feedback') return feedbackText(notice)
   if (notice.kind === 'feedback_continued') return continuedText(notice)
+  if (notice.kind === 'failure_muted') {
+    // Said only what is so (review №10, adversarial Г2): no «скрыто: 0», and `make failures` only for
+    // the held ones — the unwritten are in no table.
+    const held = notice.count > 0
+    return [
+      ...(held ? [t(undefined, 'owner.failure.muted', { count: notice.count })] : []),
+      ...(notice.unwritten === undefined
+        ? []
+        : [t(undefined, 'owner.failure.unwritten', { unwritten: notice.unwritten })]),
+      ...(held ? [t(undefined, 'owner.failure.more')] : []),
+    ].join('\n')
+  }
   const kind = notice.code === undefined ? notice.errorName : `${notice.errorName} ${notice.code}`
   const what = t(undefined, 'owner.failure.what', {
     kind,
     place: notice.route ?? t(undefined, 'owner.failure.nowhere'),
   })
+  // The phone's (MOL-144): which system it broke on is the first thing to know of a phone's failure.
+  const platform = [
+    ...(notice.platform === undefined
+      ? []
+      : [t(undefined, 'owner.failure.platform', { platform: notice.platform })]),
+  ]
   if (notice.kind === 'failure_count') {
     return [
       t(undefined, 'owner.failure.again', { count: notice.count, source: notice.source }),
       what,
+      ...platform,
       t(undefined, 'owner.failure.build', { build: notice.build }),
     ].join('\n')
   }
@@ -32,6 +51,7 @@ export function ownerText(notice: OwnerNotice): string {
     t(undefined, 'owner.failure.new', { source: notice.source }),
     what,
     ...(notice.frame === undefined ? [] : [notice.frame]),
+    ...platform,
     t(undefined, 'owner.failure.buildPrint', {
       build: notice.build,
       fingerprint: notice.fingerprint,

@@ -8,6 +8,7 @@ import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { read, write } from '@/stores/storage'
 import { forgetOwnPrices } from '@/stores/ownPrices'
+import { reportFailure } from '@/failures'
 
 /** `idle` — no identity, so there is nobody to advise. */
 export type AdvicePhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'offline'
@@ -211,7 +212,8 @@ export function useAdvice(): Advice {
       confirmed.value = true
       remember()
       forgetOwnNever(id, fresh)
-    } catch {
+    } catch (error) {
+      reportFailure(error, 'screen')
       if (owner.value !== id || mine !== latest || location.value !== where) return
       // Decided after the failure, never narrowed from a check before the request: a
       // connection lost while the answer was on its way is the commonest break at a shelf,

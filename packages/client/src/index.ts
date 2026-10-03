@@ -27,6 +27,7 @@ import {
   exchangeBodySchema,
   exchangesResponseCodec,
   feedbackBodySchema,
+  clientErrorsSchema,
   feedbackSentCodec,
   incomeAmendBodySchema,
   incomeBodySchema,
@@ -100,6 +101,7 @@ import type {
   ExchangeBody,
   FeedbackBody,
   FeedbackSent,
+  ClientErrors,
   ExchangesResponse,
   IncomeAmendBody,
   IncomeBody,
@@ -211,6 +213,12 @@ export interface MolviaClient {
    * rejects with `error.feedback_rate_limited`.
    */
   sendFeedback(body: FeedbackBody): Promise<{ sent: FeedbackSent; created: boolean }>
+  /**
+   * The phone's own failures (MOL-144): what it has kept, all at once, with no session needed. `204`
+   * whether they were written or not; past the limit it rejects with
+   * `error.client_errors_rate_limited`.
+   */
+  reportClientErrors(body: ClientErrors): Promise<void>
   /**
    * Ends one of the owner's sessions. `error.not_found` is the answer for one that is already
    * gone, someone else's and one that never was — a screen reads it as done.
@@ -592,6 +600,14 @@ export function createClient(options: ClientOptions): MolviaClient {
         body: encode(feedbackBodySchema, body),
       })
       return { sent: data, created: status === 201 }
+    },
+    reportClientErrors: async (body) => {
+      noContent(
+        await exchange('/client-errors', z.undefined(), {
+          method: 'POST',
+          body: encode(clientErrorsSchema, body),
+        }),
+      )
     },
     endSession: async (id) => {
       noContent(await exchange(`/sessions/${segment(id)}`, z.undefined(), { method: 'DELETE' }))

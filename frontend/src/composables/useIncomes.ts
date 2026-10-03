@@ -14,6 +14,7 @@ import { api } from '@/api'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
+import { reportFailure } from '@/failures'
 
 /** `idle` — no identity yet, so there is nobody whose incomes to ask for. */
 export type IncomesPhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'offline'
@@ -98,7 +99,8 @@ export function useIncomes(): Incomes {
       if (mine !== latest) return
       overview.value = answer
       failure.value = null
-    } catch {
+    } catch (error) {
+      reportFailure(error, 'screen')
       if (mine !== latest) return
       // Decided after the failure, never before the request (MOL-19, A1).
       failure.value = navigator.onLine ? 'error' : 'offline'

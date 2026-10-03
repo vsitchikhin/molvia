@@ -2,6 +2,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
+import { reportFailure } from '@/failures'
 
 export interface TapSettingState<T> {
   /** The server's answer; undefined while it is not known yet. */
@@ -43,7 +44,8 @@ export function useTapSetting<T>(
       if (mine !== latest) return
       value.value = answer
       failure.value = null
-    } catch {
+    } catch (error) {
+      reportFailure(error, 'screen')
       if (mine !== latest) return
       failure.value = navigator.onLine ? 'error' : 'offline'
     }

@@ -4,6 +4,7 @@ import { inStoreBarcode } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
+import { reportFailure } from '@/failures'
 
 // Asked afresh each time, as the search asks it: the answer before the request says nothing about
 // the connection by the time the request has failed.
@@ -111,7 +112,8 @@ export function useBarcodeLookup(options: BarcodeLookupOptions): BarcodeLookup {
       if (mine !== latest) return
       if (entry) hand(entry, read, quiet)
       else phase.value = 'missing'
-    } catch {
+    } catch (error) {
+      reportFailure(error, 'screen')
       if (mine !== latest) return
       if (!fromDevice(read, quiet)) phase.value = connected() ? 'error' : 'offline'
     } finally {

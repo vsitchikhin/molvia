@@ -78,6 +78,10 @@ export default defineConfig(({ mode }) => {
         },
       }),
     ],
+    // The maps lie beside the build, for `make failures` to read a phone's frames (MOL-144, Р-7 of
+    // MOL-149): the repository is public, so they disclose nothing. Not precached — `globPatterns`
+    // has no `map` — and a browser fetches one only with its tools open.
+    build: { sourcemap: true },
     resolve: { alias: { '@': src } },
     css: {
       preprocessorOptions: {

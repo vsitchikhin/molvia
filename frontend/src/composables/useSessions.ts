@@ -6,6 +6,7 @@ import type { SessionView, SessionsResponse } from '@molvia/model'
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
+import { reportFailure } from '@/failures'
 
 /**
  * `idle` — no identity yet. There is no `empty`: a live session is always in its own list, and
@@ -49,7 +50,8 @@ export function useSessions(): Sessions {
       if (mine !== latest) return
       list.value = answer
       failure.value = null
-    } catch {
+    } catch (error) {
+      reportFailure(error, 'screen')
       if (mine !== latest) return
       // A list that could not be read again is not shown as if it had been (round 2, Д4): it is
       // the copy this composable refuses to keep, only in memory instead of on the disk.

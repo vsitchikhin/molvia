@@ -1,8 +1,11 @@
 import { effectScope, nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { useBarcodeScan } from '@/composables/useBarcodeScan'
+import { reportFailure } from '@/failures'
 import { ReaderFailed, type BarcodeReader } from '@/scanner/barcodeReader'
 import type { FrameSource } from '@/scanner/capture'
+
+vi.mock('@/failures', () => ({ reportFailure: vi.fn() }))
 
 const image = (): ImageData => ({
   data: new Uint8ClampedArray(4),
@@ -198,5 +201,32 @@ describe('useBarcodeScan', () => {
     scan.warm()
     scope.stop()
     expect(dispose).toHaveBeenCalledOnce()
+  })
+})
+
+describe("the reader's failure is reported (MOL-144, Р-11)", () => {
+  it("as the scanner's, by what failed in the worker", async () => {
+    const cause = new Error('unreachable')
+    cause.name = 'RuntimeError'
+    const { reader } = fakeReader([new ReaderFailed(cause)])
+    const { live } = scanWith(reader)
+    live.value = true
+    await settle()
+    expect(reportFailure).toHaveBeenLastCalledWith(cause, 'scanner')
+  })
+
+  it("and a throw of the page's own step as it was thrown", async () => {
+    vi.mocked(reportFailure).mockClear()
+    const broken = new TypeError('no crop')
+    const { reader } = fakeReader(['4850000000007'])
+    const { live } = scanWith(
+      reader,
+      frames(() => {
+        throw broken
+      }),
+    )
+    live.value = true
+    await settle()
+    expect(reportFailure).toHaveBeenCalledExactlyOnceWith(broken, 'scanner')
   })
 })

@@ -4,6 +4,7 @@ import { drawsNothing, toSearchKey } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
+import { reportFailure } from '@/failures'
 
 /**
  * `idle` — nothing typed, the screen shows the recent items and nothing is asked. `loading` —
@@ -110,7 +111,8 @@ export function useCatalogueSearch(query: Ref<string>): CatalogueSearch {
       }
       // Still dimmed while a newer search waits for its pause.
       stale.value = pending !== undefined
-    } catch {
+    } catch (error) {
+      reportFailure(error, 'screen')
       // A failure of a search a newer one is waiting to replace says nothing about that one: the
       // screen keeps what it shows until the newer answers (Р-17).
       if (mine !== latest || pending !== undefined) return
