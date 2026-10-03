@@ -7,6 +7,8 @@ paths:
   - 'backend/src/usecases/{record-failure,owner-notices}*.ts'
   - 'backend/src/db/{failures,owner-notices}-repository.ts'
   - 'backend/src/login-cleanup.ts'
+  - 'backend/src/server.ts'
+  - 'bot/src/assemble.ts'
   - 'backend/tests/failures*.ts'
   - 'bot/src/{failure,owner}*.ts'
   - 'bin/failures.sh'
@@ -31,10 +33,15 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   phone describe a failure the same way: the name, the driver's code, up to eight frames cut below
   the stack's header. It moved to `packages/model` because the bot cannot import the API;
   `describeMigrationFailure` stays in the API, since it reads drizzle's wrapper.
+  **The head is `name: message`, or `name [code]: message`** — Node's own errors put their code
+  there (`RangeError [ERR_OUT_OF_RANGE]`), and without that form they lost every frame (adversarial
+  А5). Only bare `node` writes it so: vitest's own `prepareStackTrace` does not, so the test writes
+  the stack by hand. Whatever the form, the head is cut whole, never judged by its shape.
 - **A row is a fingerprint** (Р-2): sha256 of the source, the kind, the code, the top frame
   **without its line and column**, and the place. The API ships as one bundled file, so a frame's
   position moves with every build; kept, every rollout would have made every failure new. The frames
-  themselves are kept whole, for the owner to read. **The named price** (adversarial review 5): the
+  themselves are kept whole, for the owner to read, cut to 300 — the fingerprint is taken from the
+  frame before the cut (adversarial А6). **The named price** (adversarial review 5): the
   file is always `dist/index.js`, so the top frame is the function's name and nothing more — two
   different throws in two anonymous callbacks of one route are one fingerprint, the second silent
   until the count crosses a threshold, its frames written over the first's. Accepted: a fingerprint
@@ -42,15 +49,21 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
 - **A failure is an answer of 500 or more** (Р-3). A `DomainError`, a body or a path refused — the
   caller's — is not, and is logged as before. **The place is the method and the route's template,
   never the address**: a path carries uuids and, decoded, a person's text; with no route matched
-  there is no place at all.
+  there is no place at all. `HEAD`, which Fastify answers for every `GET` itself, is placed as the
+  `GET` (adversarial А7): one defect, one place.
 - **One path writes the log and the table** (`failureReporter`): every failure the log hears of is
   in the table, by the same summary. **The answer does not wait for the table** (Р-4): a recording
   that fails — the database down, which may be the very failure — is one more line of the log,
-  `failure not recorded`, never a second failure and never a retry. **At most four recordings wait
-  at once** (`RECORDINGS_AT_ONCE`, adversarial review 4): a failure that is the database itself —
-  slow, out of connections — would otherwise queue one per request on the pool of the live ones;
-  past four, the failure is the log's alone, and a burst may count short. The tests wait on
-  `failureRecorded`, never on a timer.
+  `failure not recorded`, never a second failure and never a retry. **A burst is gathered, never
+  dropped** (adversarial А1–А3): occurrences of one fingerprint wait in memory and go as one write
+  of their count, a fingerprint has one write in flight at most and all of them together four
+  (`RECORDINGS_AT_ONCE`) — so a failure that is the database itself never queues a write a request
+  on the pool the live ones need, three hundred in a minute are counted three hundred, and a new
+  failure in the middle of a burst takes the next free turn. A cap of four that dropped the rest
+  counted 100 at once as 4 and lost a new fingerprint behind them. **The bot's reports go through
+  the same gate** and are answered at once; past it they had taken the whole pool. Past 200
+  fingerprints waiting a failure is the log's alone; what waits when the process stops is lost. The
+  tests wait on `failureRecorded`, never on a timer.
 - **The jobs of the API's timers are failures too** (В-1): the seven cleanups, the vectors of the
   catalogue, the rating reminders and the rates' refresh, as `job:<name>`. The cleanups' runner hands
   the error on — before, they logged «cleanup failed» without it. **A source of rates that does not
@@ -68,16 +81,18 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   the owner's message, a new fingerprint a word (adversarial review 2). **A handler that catches its
   own error reports it too** — the API's answer the contract does not read, from a press of the
   scale, a login, an erasure, the switch, either claim (`remind:claim`, `owner:claim`); before the
-  review only `bot.catch` and `remind:send` did, and the third class of defects was nowhere. `bot.catch` logs by kind too: it printed the message before. The
-  bot has no build of its own and is rolled out from the API's commit, so the API stamps its build.
+  review only `bot.catch` and `remind:send` did. The bot has no build of its own and is rolled out
+  from the API's commit, so the API stamps its build.
 - **The owner hears of a fingerprint the first time in a build** (В-2) — after a rollout a failure
   still alive says so once more, which is «the fix did not help» — **and when it reaches 10, 100 and
-  1000 there** (В-5): «it happened» and then «it keeps happening», at most four messages a
-  fingerprint a build, and silence while nothing new happens and nothing grows. **There is no daily
+  1000 there** (В-5): «it happened» and then «it keeps happening» — the first and at most three
+  more a fingerprint a build, and silence while nothing new happens and nothing grows. A threshold
+  is **crossed**, not equalled: a burst written as one count of 147 takes 3 to 150 past both 10 and
+  100, and the owner hears the larger. **There is no daily
   summary** (the owner, В-4/В-5): it said «was there anything», which the first message already
   says, and «how much» is wanted when it grows, not at a fixed hour. The count in a build is a
   column that starts over when the build changes, moved by the same upsert that takes the row's
-  lock, so the 1st, 10th, 100th and 1000th are each seen by exactly one occurrence.
+  lock, so each threshold is crossed by exactly one write.
 - **The owner's channel is one** (Р-9 of MOL-149): `owner_notices`, a kind and its fields as
   `ownerNoticeSchema` reads them — a union by `kind` the feedback of MOL-148 joins as a branch. The
   bot claims them every minute (`POST /internal/owner/claim`), the API marks them handed in the same
@@ -91,7 +106,9 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   the owner would get a heap, and `make failures` has the count. A handed notice is kept 30 days,
   and so is a failure after it last happened — both by the minute runner of the cleanups.
 - **The messages are Russian, keys of the bot's dictionary** (`owner.failure.*`), plain text: a
-  frame or a route is shown as it is, and no markup can break on it. A 429 ends the minute's run.
+  frame or a route is shown as it is, and no markup can break on it. A 429 ends the minute's run
+  and says how many went with it; **a stop sends the rest without the pauses** (adversarial А4) —
+  they are marked handed, and a rollout, every stop, is when there is a batch.
 - **`make failures`** (`dist/failures.js` in the API's image, as `gates`): the latest fingerprints,
   read only, the first six characters of each beside it — the message names a fingerprint by them.
 - **The API runs without `--enable-source-maps`** (В-6, measured): Node parses the whole map of

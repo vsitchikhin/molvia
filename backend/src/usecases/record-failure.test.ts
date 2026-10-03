@@ -72,6 +72,14 @@ describe('occurrenceOf — отпечаток', () => {
     expect(long.route).toHaveLength(200)
   })
 
+  it('отпечаток — от кадра до обрезки: срез на «:строка:» не оставляет позицию (А6)', () => {
+    const at = (line: number) =>
+      `at handler (/app/${'p'.repeat(270)}/dist/index.js:${String(line)}:7)`
+    expect(
+      occurrenceOf({ errorName: 'TypeError', frames: [at(48213)] }, place, 'b1').fingerprint,
+    ).toBe(occurrenceOf({ errorName: 'TypeError', frames: [at(48250)] }, place, 'b2').fingerprint)
+  })
+
   it('без маршрута — без маршрута, а не пустая строка', () => {
     expect(occurrenceOf({ errorName: 'Error' }, { source: 'api' }, BUILD)).not.toHaveProperty(
       'route',
@@ -90,7 +98,7 @@ describe('noticesFor — что услышит владелец (В-2, В-5)', (
   }
 
   it('первый раз в сборке — сообщение с кадром и началом отпечатка', () => {
-    expect(noticesFor(occurrence, { count: 7, buildCount: 1 }, OWNER)).toEqual([
+    expect(noticesFor(occurrence, { count: 7, buildCount: 1 }, 1, OWNER)).toEqual([
       {
         kind: 'failure',
         source: 'api',
@@ -104,17 +112,34 @@ describe('noticesFor — что услышит владелец (В-2, В-5)', (
   })
 
   it.each([10, 100, 1000] as const)('ровно %i в сборке — сообщение о счёте', (buildCount) => {
-    expect(noticesFor(occurrence, { count: buildCount + 5, buildCount }, OWNER)).toEqual([
+    expect(noticesFor(occurrence, { count: buildCount + 5, buildCount }, 1, OWNER)).toEqual([
       expect.objectContaining({ kind: 'failure_count', count: buildCount }),
     ])
   })
 
   it.each([2, 9, 11, 99, 101, 999, 1001, 10_000])('%i в сборке — тишина', (buildCount) => {
-    expect(noticesFor(occurrence, { count: buildCount, buildCount }, OWNER)).toEqual([])
+    expect(noticesFor(occurrence, { count: buildCount, buildCount }, 1, OWNER)).toEqual([])
+  })
+
+  it('всплеск одной записью: 3 → 150 перешёл и 10, и 100 — владелец слышит большее (А1)', () => {
+    expect(noticesFor(occurrence, { count: 150, buildCount: 150 }, 147, OWNER)).toEqual([
+      expect.objectContaining({ kind: 'failure_count', count: 100 }),
+    ])
+  })
+
+  it('первая же запись — пачка из 12: «новый сбой» и «уже 10»', () => {
+    expect(
+      noticesFor(occurrence, { count: 12, buildCount: 12 }, 12, OWNER).map((notice) => notice.kind),
+    ).toEqual(['failure', 'failure_count'])
+  })
+
+  it('порог ровно на краю пачки считается, сразу за ним — нет', () => {
+    expect(noticesFor(occurrence, { count: 10, buildCount: 10 }, 4, OWNER)).toHaveLength(1)
+    expect(noticesFor(occurrence, { count: 14, buildCount: 14 }, 4, OWNER)).toEqual([])
   })
 
   it('без владельца — ничего, даже впервые', () => {
-    expect(noticesFor(occurrence, { count: 1, buildCount: 1 }, null)).toEqual([])
-    expect(noticesFor(occurrence, { count: 10, buildCount: 10 }, null)).toEqual([])
+    expect(noticesFor(occurrence, { count: 1, buildCount: 1 }, 1, null)).toEqual([])
+    expect(noticesFor(occurrence, { count: 10, buildCount: 10 }, 1, null)).toEqual([])
   })
 })

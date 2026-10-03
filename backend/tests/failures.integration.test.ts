@@ -51,22 +51,30 @@ const none = (): readonly OwnerNotice[] => []
 describe('failures — строка на отпечаток', () => {
   it('повтор того же отпечатка копит счёт, а не строки', async () => {
     const failure = occurrence()
-    expect(await failureRows.record(failure, AT, none)).toEqual({ count: 1, buildCount: 1 })
-    expect(await failureRows.record(failure, AT, none)).toEqual({ count: 2, buildCount: 2 })
+    expect(await failureRows.record(failure, 1, AT, none)).toEqual({ count: 1, buildCount: 1 })
+    expect(await failureRows.record(failure, 1, AT, none)).toEqual({ count: 2, buildCount: 2 })
 
     const [row] = await failureRows.latest(10)
     expect(row).toMatchObject({ count: 2, buildCount: 2, firstSeenAt: AT, lastSeenAt: AT })
     expect(await failureRows.latest(10)).toHaveLength(1)
   })
 
+  it('пачка пишется одной записью со своим счётом и в сборке', async () => {
+    const failure = occurrence()
+    expect(await failureRows.record(failure, 37, AT, none)).toEqual({ count: 37, buildCount: 37 })
+    expect(await failureRows.record(failure, 5, AT, none)).toEqual({ count: 42, buildCount: 42 })
+    const moved = { ...failure, build: 'v0.2.0-4-gbbbbbbb' }
+    expect(await failureRows.record(moved, 3, AT, none)).toEqual({ count: 45, buildCount: 3 })
+  })
+
   it('другая сборка: счёт в сборке с единицы, общий растёт, кадры — последние', async () => {
     const failure = occurrence()
-    await failureRows.record(failure, AT, none)
-    await failureRows.record(failure, AT, none)
+    await failureRows.record(failure, 1, AT, none)
+    await failureRows.record(failure, 1, AT, none)
     const later = new Date(AT.getTime() + 60_000)
     const moved = { ...failure, build: 'v0.2.0-4-gbbbbbbb', frames: ['at rateItem (x.ts:50:1)'] }
 
-    expect(await failureRows.record(moved, later, none)).toEqual({ count: 3, buildCount: 1 })
+    expect(await failureRows.record(moved, 1, later, none)).toEqual({ count: 3, buildCount: 1 })
     const [row] = await failureRows.latest(1)
     expect(row).toMatchObject({ build: moved.build, frames: moved.frames, lastSeenAt: later })
   })
@@ -74,7 +82,7 @@ describe('failures — строка на отпечаток', () => {
   it('десять разом: каждое число в сборке видит ровно одна запись', async () => {
     const failure = occurrence()
     const seen = await Promise.all(
-      Array.from({ length: 10 }, () => failureRows.record(failure, AT, none)),
+      Array.from({ length: 10 }, () => failureRows.record(failure, 1, AT, none)),
     )
     expect(seen.map((count) => count.buildCount).sort((a, b) => a - b)).toEqual([
       1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
@@ -83,23 +91,23 @@ describe('failures — строка на отпечаток', () => {
 
   it('уведомление ложится в той же транзакции, что и счёт', async () => {
     const failure = occurrence()
-    await failureRows.record(failure, AT, (count) => (count.buildCount === 1 ? [notice()] : []))
-    await failureRows.record(failure, AT, (count) => (count.buildCount === 1 ? [notice()] : []))
+    await failureRows.record(failure, 1, AT, (count) => (count.buildCount === 1 ? [notice()] : []))
+    await failureRows.record(failure, 1, AT, (count) => (count.buildCount === 1 ? [notice()] : []))
     expect(await notices.claim(20, AT)).toEqual([notice()])
   })
 
   it('уведомление, которое не легло, откатывает и счёт', async () => {
     const failure = occurrence()
     const broken = { ...notice(), kind: 'feedback' } as unknown as OwnerNotice
-    await expect(failureRows.record(failure, AT, () => [broken])).rejects.toThrow()
+    await expect(failureRows.record(failure, 1, AT, () => [broken])).rejects.toThrow()
     expect(await failureRows.latest(10)).toEqual([])
   })
 
   it('отпечаток, не случавшийся 30 дней, уходит; 30 дней без минуты — остаётся', async () => {
     const old = occurrence()
     const fresh = occurrence()
-    await failureRows.record(old, new Date(AT.getTime() - 30 * DAY - 60_000), none)
-    await failureRows.record(fresh, new Date(AT.getTime() - 30 * DAY + 60_000), none)
+    await failureRows.record(old, 1, new Date(AT.getTime() - 30 * DAY - 60_000), none)
+    await failureRows.record(fresh, 1, new Date(AT.getTime() - 30 * DAY + 60_000), none)
 
     await failureRows.purgeStale(AT)
     expect((await failureRows.latest(10)).map((row) => row.fingerprint)).toEqual([
@@ -109,10 +117,10 @@ describe('failures — строка на отпечаток', () => {
 
   it('база не пускает чужой источник и девятый кадр', async () => {
     await expect(
-      failureRows.record(occurrence({ source: 'phone' as 'api' }), AT, none),
+      failureRows.record(occurrence({ source: 'phone' as 'api' }), 1, AT, none),
     ).rejects.toThrow()
     const nine = Array.from({ length: 9 }, (_, index) => `at f${String(index)} (a.ts)`)
-    await expect(failureRows.record(occurrence({ frames: nine }), AT, none)).rejects.toThrow()
+    await expect(failureRows.record(occurrence({ frames: nine }), 1, AT, none)).rejects.toThrow()
   })
 })
 

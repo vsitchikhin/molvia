@@ -19,7 +19,7 @@ export interface FailureOccurrence {
 /** Where a fingerprint stands after one more occurrence. */
 export interface FailureCount {
   readonly count: number
-  /** How many times in `build` — 1 means it is the first time there. */
+  /** How many times in `build`: equal to the times just written means they are the first there. */
   readonly buildCount: number
 }
 
@@ -41,13 +41,14 @@ const COUNT_CEILING = 2 ** 31 - 1
 
 export interface FailureRepository {
   /**
-   * Adds one occurrence to its fingerprint and queues what the owner should hear of it, in one
-   * transaction. The row is written by one `insert … on conflict do update`, which takes the row's
-   * lock: two occurrences at once are counted one after the other, so the 1st, 10th, 100th and
-   * 1000th in a build are each seen by exactly one of them and none twice (Р-8).
+   * Adds `times` occurrences to their fingerprint — a burst the reporter gathered is one write — and
+   * queues what the owner should hear of them, in one transaction. The row is written by one
+   * `insert … on conflict do update`, which takes the row's lock: two writes at once are counted one
+   * after the other, so each threshold in a build is crossed by exactly one of them (Р-8).
    */
   record(
     occurrence: FailureOccurrence,
+    times: number,
     at: Date,
     notices: (count: FailureCount) => readonly OwnerNotice[],
   ): Promise<FailureCount>
@@ -61,7 +62,7 @@ export interface FailureRepository {
 
 export function createFailureRepository(db: Conn): FailureRepository {
   return {
-    async record(occurrence, at, notices) {
+    async record(occurrence, times, at, notices) {
       return db.transaction(async (tx) => {
         const [row] = await tx
           .insert(failures)
@@ -75,8 +76,8 @@ export function createFailureRepository(db: Conn): FailureRepository {
             build: occurrence.build,
             firstSeenAt: at,
             lastSeenAt: at,
-            count: 1,
-            buildCount: 1,
+            count: times,
+            buildCount: times,
           })
           .onConflictDoUpdate({
             target: failures.fingerprint,
@@ -84,9 +85,10 @@ export function createFailureRepository(db: Conn): FailureRepository {
               // The latest frames and build: the line numbers are the ones of the build it is in now.
               frames: sql`excluded.frames`,
               lastSeenAt: sql`greatest(${failures.lastSeenAt}, excluded.last_seen_at)`,
-              count: sql`least(${failures.count} + 1, ${COUNT_CEILING})`,
+              count: sql`least(${failures.count} + excluded.count, ${COUNT_CEILING})`,
               buildCount: sql`case when ${failures.build} = excluded.build
-                then least(${failures.buildCount} + 1, ${COUNT_CEILING}) else 1 end`,
+                then least(${failures.buildCount} + excluded.build_count, ${COUNT_CEILING})
+                else excluded.build_count end`,
               build: sql`excluded.build`,
             },
           })

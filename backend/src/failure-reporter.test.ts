@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { FastifyBaseLogger } from 'fastify'
+import type { FailureOccurrence } from '@/db/failures-repository'
 import { RECORDINGS_AT_ONCE, failureReporter } from './failure-reporter'
 
 function fakeLog() {
@@ -7,35 +8,46 @@ function fakeLog() {
   return { log: { error } as unknown as FastifyBaseLogger, error }
 }
 
+/** A write held until released, so what waits behind it can be seen. */
+function heldWrites() {
+  const writes: { occurrence: FailureOccurrence; times: number; release: () => void }[] = []
+  const write = vi.fn(
+    (occurrence: FailureOccurrence, times: number) =>
+      new Promise<void>((resolve) => {
+        writes.push({ occurrence, times, release: resolve })
+      }),
+  )
+  return { write, writes }
+}
+
+const at = (route: string) => ({ source: 'api', route }) as const
+
 describe('failureReporter — лог и таблица одним путём (MOL-143)', () => {
   it('пишет в лог по виду и записывает то же самое', async () => {
     const { log, error } = fakeLog()
-    const record = vi.fn(() => Promise.resolve())
+    const write = vi.fn(() => Promise.resolve())
     const recordings: Promise<void>[] = []
-    const reporter = failureReporter(record, log, (recording) => recordings.push(recording))
+    const reporter = failureReporter('b1', write, log, (recording) => recordings.push(recording))
 
-    reporter.report(
-      new TypeError('отзыв: «сыр так себе»'),
-      { source: 'api', route: 'GET /x' },
-      'request failed',
-    )
+    reporter.report(new TypeError('отзыв: «сыр так себе»'), at('GET /x'), 'request failed')
     await Promise.all(recordings)
 
     expect(error).toHaveBeenCalledWith(
       expect.objectContaining({ errorName: 'TypeError' }),
       'request failed',
     )
-    expect(record).toHaveBeenCalledWith(expect.objectContaining({ errorName: 'TypeError' }), {
-      source: 'api',
-      route: 'GET /x',
-    })
-    expect(JSON.stringify([error.mock.calls, record.mock.calls])).not.toContain('сыр')
+    expect(write).toHaveBeenCalledWith(
+      expect.objectContaining({ errorName: 'TypeError', route: 'GET /x', build: 'b1' }),
+      1,
+    )
+    expect(JSON.stringify([error.mock.calls, write.mock.calls])).not.toContain('сыр')
   })
 
   it('запись, которая упала, — строка в логе, а не второй сбой и не исключение', async () => {
     const { log, error } = fakeLog()
     const recordings: Promise<void>[] = []
     const reporter = failureReporter(
+      'b1',
       () =>
         Promise.reject(Object.assign(new Error('connection ended'), { code: 'CONNECTION_ENDED' })),
       log,
@@ -54,25 +66,55 @@ describe('failureReporter — лог и таблица одним путём (MO
     expect(error).toHaveBeenCalledTimes(2)
   })
 
-  it('не больше четырёх записей разом: лишний сбой — строка в логе, а не очередь к базе', async () => {
-    const { log, error } = fakeLog()
-    let release: () => void = () => undefined
-    const held = new Promise<void>((resolve) => {
-      release = resolve
-    })
-    const record = vi.fn(() => held)
+  it('всплеск одного отпечатка — одна запись в полёте, остальное одной записью со счётом (А1, А3)', async () => {
+    const { log } = fakeLog()
+    const { write, writes } = heldWrites()
     const recordings: Promise<void>[] = []
-    const reporter = failureReporter(record, log, (recording) => recordings.push(recording))
+    const reporter = failureReporter('b1', write, log, (recording) => recordings.push(recording))
+    const boom = new TypeError('x')
+
+    for (let index = 0; index < 100; index += 1)
+      reporter.report(boom, at('GET /x'), 'request failed')
+    expect(writes.map((one) => one.times)).toEqual([1])
+
+    writes[0]?.release()
+    await vi.waitFor(() => {
+      expect(writes.map((one) => one.times)).toEqual([1, 99])
+    })
+    writes[1]?.release()
+    await Promise.all(recordings)
+  })
+
+  it('новый сбой посреди всплеска берёт свободный ход, а не отказ (А2)', () => {
+    const { log, error } = fakeLog()
+    const { write, writes } = heldWrites()
+    const reporter = failureReporter('b1', write, log)
+
+    for (let index = 0; index < 30; index += 1) {
+      reporter.report(new TypeError('x'), at('GET /known'), 'request failed')
+    }
+    reporter.report(new RangeError('y'), at('GET /new'), 'request failed')
+
+    expect(writes.map((one) => one.occurrence.route)).toEqual(['GET /known', 'GET /new'])
+    expect(error).not.toHaveBeenCalledWith({ reason: 'busy' }, 'failure not recorded')
+  })
+
+  it(`не больше ${String(RECORDINGS_AT_ONCE)} записей разом: пятый отпечаток ждёт хода, а не теряется`, async () => {
+    const { log } = fakeLog()
+    const { write, writes } = heldWrites()
+    const recordings: Promise<void>[] = []
+    const reporter = failureReporter('b1', write, log, (recording) => recordings.push(recording))
 
     for (let index = 0; index <= RECORDINGS_AT_ONCE; index += 1) {
-      reporter.report(new Error('x'), { source: 'api' }, 'request failed')
+      reporter.report(new Error('x'), at(`GET /r${String(index)}`), 'request failed')
     }
-    expect(record).toHaveBeenCalledTimes(RECORDINGS_AT_ONCE)
-    expect(error).toHaveBeenLastCalledWith({ reason: 'busy' }, 'failure not recorded')
+    expect(writes).toHaveLength(RECORDINGS_AT_ONCE)
 
-    release()
+    writes[0]?.release()
+    await vi.waitFor(() => {
+      expect(writes).toHaveLength(RECORDINGS_AT_ONCE + 1)
+    })
+    for (const one of writes) one.release()
     await Promise.all(recordings)
-    reporter.report(new Error('x'), { source: 'api' }, 'request failed')
-    expect(record).toHaveBeenCalledTimes(RECORDINGS_AT_ONCE + 1)
   })
 })

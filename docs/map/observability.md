@@ -10,10 +10,10 @@ Rules: `.claude/rules/observability.md`. A test beside its source, or mirroring 
 
 ## backend
 
-- `backend/src/failure-reporter.ts` — One path for a failure of the API (MOL-143): logged by its kind and recorded beside it without being waited for; a recording that fails is one more line of the log; `apiFailureReporter` is the API's, queued for the owner.
+- `backend/src/failure-reporter.ts` — One path for a failure of the API and the bot's reports (MOL-143): logged by its kind and gathered in memory by fingerprint, one write in flight a fingerprint and four at once, a burst written as one count; a recording that fails is one more line of the log; `apiFailureReporter` is the API's, queued for the owner.
 - `backend/src/failures.ts` — The command behind `make failures` and `dist/failures.js`: the latest fingerprints — when, the first six of the fingerprint, source, kind, place, counts in all and in the last build, frames — the API's of the running build read back to the source through the image's map (`bundleDecoder`, В-6); usage and a failure by kind.
 - `backend/src/failures-cli.ts` — Entry point of `dist/failures.js`: connects to the database and runs the failures command.
-- `backend/src/usecases/record-failure.ts` — Use case «Сбой»: the fingerprint — source, kind, code, top frame without its position, place — the fields cut to the table's limits, and what the owner hears: the first time in a build, then 10, 100, 1000 (В-2, В-5); the bot's report is one more place.
+- `backend/src/usecases/record-failure.ts` — Use case «Сбой»: the fingerprint — source, kind, code, top frame without its position, place — the fields cut to the table's limits, and what the owner hears: the first time in a build, then 10, 100, 1000 crossed (В-2, В-5); the bot's report as a summary and its handler.
 - `backend/src/db/failures-repository.ts` — Repository of `failures`: one occurrence added to its fingerprint by a single upsert that counts in the build, the owner's notices queued in the same transaction, the 30 days kept, the latest for `make failures`.
 - `backend/src/db/owner-notices-repository.ts` — Repository of `owner_notices`: the claim that hands out and marks in one statement, skipping rows another claim holds; a notice about a failure unhanded for a day goes, a handed one after 30 days.
 - `backend/src/usecases/owner-notices.ts` — Use case «Что сказать владельцу»: the notices waiting, handed to the bot with whom to write; nothing without an owner; a stored notice the contract no longer reads is said once and dropped.

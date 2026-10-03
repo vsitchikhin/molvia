@@ -21,14 +21,6 @@ export interface FailurePlace {
   readonly route?: string
 }
 
-export interface FailureRecording {
-  readonly failures: FailureRepository
-  /** The owner's Telegram id — `null` in every copy and in end-to-end, where nothing is queued. */
-  readonly owner: TelegramUserId | null
-  /** The API's build: the bot is rolled out from the same commit and has none of its own. */
-  readonly build: string
-}
-
 /**
  * A frame without its position (MOL-143, Р-2): `at rateItem (src/x.ts:42:7)` is `at rateItem
  * (src/x.ts)`. The API ships as one bundled file, so the line of a frame moves with every build —
@@ -59,12 +51,11 @@ export function occurrenceOf(
     .slice(0, FAILURE_FRAMES)
     .map((frame) => frame.slice(0, FAILURE_FRAME_MAX))
   const route = place.route?.slice(0, FAILURE_ROUTE_MAX)
+  // The top frame as it came, before the cut: cut at 300 first, a frame could lose half its
+  // `:line:column` and keep the rest, and every rollout would make its failure new (adversarial А6).
+  const top = framePlace(summary.frames?.[0] ?? '')
   const fingerprint = createHash('sha256')
-    .update(
-      [place.source, errorName, summary.code ?? '', framePlace(frames[0] ?? ''), route ?? ''].join(
-        '\u0000',
-      ),
-    )
+    .update([place.source, errorName, summary.code ?? '', top, route ?? ''].join('\u0000'))
     .digest('hex')
   return {
     fingerprint,
@@ -78,13 +69,15 @@ export function occurrenceOf(
 }
 
 /**
- * What the owner hears of one more occurrence (MOL-143): the first time in a build, with the frame
- * it was thrown at (В-2), and again when it reaches 10, 100 and 1000 there (В-5) — at most four
- * messages a fingerprint a build, and none where no owner is set.
+ * What the owner hears of `times` more occurrences written at once (MOL-143): the first time in a
+ * build, with the frame it was thrown at (В-2), and when the count there crosses 10, 100 or 1000
+ * (В-5) — crosses, not equals: a burst is written as one row of `times`, and 3 → 150 has passed both
+ * 10 and 100, of which the owner hears the larger. None where no owner is set.
  */
 export function noticesFor(
   occurrence: FailureOccurrence,
   count: FailureCount,
+  times: number,
   owner: TelegramUserId | null,
 ): OwnerNotice[] {
   if (owner === null) return []
@@ -95,42 +88,53 @@ export function noticesFor(
     ...(occurrence.route === undefined ? {} : { route: occurrence.route }),
     build: occurrence.build,
   }
-  if (count.buildCount === 1) {
+  const notices: OwnerNotice[] = []
+  const before = count.buildCount - times
+  if (before <= 0) {
     const [frame] = occurrence.frames
-    return [
-      {
-        kind: 'failure',
-        ...facts,
-        ...(frame === undefined ? {} : { frame }),
-        fingerprint: occurrence.fingerprint.slice(0, 6),
-      },
-    ]
+    notices.push({
+      kind: 'failure',
+      ...facts,
+      ...(frame === undefined ? {} : { frame }),
+      fingerprint: occurrence.fingerprint.slice(0, 6),
+    })
   }
-  const reached = FAILURE_COUNT_NOTICES.find((threshold) => threshold === count.buildCount)
-  return reached === undefined ? [] : [{ kind: 'failure_count', ...facts, count: reached }]
+  const crossed = FAILURE_COUNT_NOTICES.filter(
+    (threshold) => before < threshold && threshold <= count.buildCount,
+  ).at(-1)
+  if (crossed !== undefined) notices.push({ kind: 'failure_count', ...facts, count: crossed })
+  return notices
 }
 
-/** «Сбой» — one occurrence into the table, and what the owner should hear of it, at once. */
+export interface FailureRecording {
+  readonly failures: FailureRepository
+  /** The owner's Telegram id — `null` in every copy and in end-to-end, where nothing is queued. */
+  readonly owner: TelegramUserId | null
+}
+
+/** «Сбой» — `times` occurrences of one fingerprint into the table, and what the owner should hear. */
 export async function recordFailure(
-  { failures, owner, build }: FailureRecording,
-  summary: FailureSummary,
-  place: FailurePlace,
+  { failures, owner }: FailureRecording,
+  occurrence: FailureOccurrence,
+  times: number,
   at: Date,
 ): Promise<void> {
-  const occurrence = occurrenceOf(summary, place, build)
-  await failures.record(occurrence, at, (count) => noticesFor(occurrence, count, owner))
+  await failures.record(occurrence, times, at, (count) =>
+    noticesFor(occurrence, count, times, owner),
+  )
 }
 
-/** A failure the bot reports of its own (Р-5): its handler is its place. */
-export async function recordBotFailure(
-  recording: FailureRecording,
-  { handler, errorName, code, frames }: BotFailure,
-  at: Date,
-): Promise<void> {
-  const summary: FailureSummary = {
-    errorName,
-    ...(code === undefined ? {} : { code }),
-    ...(frames === undefined ? {} : { frames }),
+/** A failure the bot reports of its own (Р-5): its summary, and its handler as its place. */
+export function botFailure({ handler, errorName, code, frames }: BotFailure): {
+  readonly summary: FailureSummary
+  readonly place: FailurePlace
+} {
+  return {
+    summary: {
+      errorName,
+      ...(code === undefined ? {} : { code }),
+      ...(frames === undefined ? {} : { frames }),
+    },
+    place: { source: 'bot', route: handler },
   }
-  await recordFailure(recording, summary, { source: 'bot', route: handler }, at)
 }

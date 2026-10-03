@@ -21,7 +21,7 @@ import { VERSION, env, loginConfig } from '@/env'
 import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
 import { apiFailureReporter } from '@/failure-reporter'
-import { recordBotFailure } from '@/usecases/record-failure'
+import { botFailure } from '@/usecases/record-failure'
 import { claimOwnerNotices } from '@/usecases/owner-notices'
 import type { FailurePlace } from '@/usecases/record-failure'
 import { createFailureRepository } from '@/db/failures-repository'
@@ -236,7 +236,9 @@ function routePath(request: FastifyRequest): string {
  */
 function requestPlace(request: FastifyRequest): FailurePlace {
   const route = request.routeOptions.url
-  return { source: 'api', ...(route === undefined ? {} : { route: `${request.method} ${route}` }) }
+  // Fastify answers `HEAD` of every `GET` itself: one defect, one place (adversarial А7).
+  const method = request.method === 'HEAD' ? 'GET' : request.method
+  return { source: 'api', ...(route === undefined ? {} : { route: `${method} ${route}` }) }
 }
 
 /** A job of the API's own timers, by its name (В-1). */
@@ -585,12 +587,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       rateFromBot: (itemId, body) =>
         rateFromBot({ actors, items, verdicts, reminders }, itemId, body),
       switchReminders: (body) => switchRemindersFromBot(reminders, body, new Date()),
-      reportFailure: (body) =>
-        recordBotFailure(
-          { failures: createFailureRepository(db), owner, build: VERSION },
-          body,
-          new Date(),
-        ),
+      // Through the same gate as the API's own (adversarial А3): answered at once, never waited on.
+      reportFailure: (body) => {
+        const { summary, place } = botFailure(body)
+        failures.take(summary, place)
+        return Promise.resolve()
+      },
       claimOwnerNotices: () =>
         claimOwnerNotices(createOwnerNoticeRepository(db), owner, new Date(), (issue) => {
           instance.log.error(describeFailure(issue), 'owner notice unreadable')
