@@ -627,3 +627,74 @@ describe('rows of a thousand letters after the articles (review Р22)', () => {
     expect(performance.now() - started).toBeLessThan(1_000)
   })
 })
+
+// Review round 5 of MOL-125.
+describe('a line of a till with no shelf price whose figures OCR glued long (review 10)', () => {
+  it('is laid out with its neighbours, ninety thousand readings of it and no throw', () => {
+    const glued = `${'3568'.repeat(5)},38/${'3568'.repeat(5)},85`
+    const text = [
+      ...Array.from(
+        { length: 5 },
+        (_, i) => `${String(i + 1)}.Հաց\n1905/116300${String(i)} 1Հտ 300,00/0`,
+      ),
+      `6.x\n1905/1163009 1Հտ ${glued}`,
+    ].join('\n')
+    const got = parse(text)
+    expect(got.lines).toHaveLength(6)
+    expect(got.lines.slice(0, 5).map((line) => line.sumHundredths)).toEqual(
+      Array.from({ length: 5 }, () => 30_000),
+    )
+  })
+})
+
+describe('two flavours of one yoghurt, numbered in a row (review Р23)', () => {
+  const rows = (am05 as Fixture).readings[0]!.split('\n')
+  const at = (start: string) => rows.findIndex((row) => row.startsWith(start))
+  const twoParts = (firstEndsAt: string, secondStartsAt: string, edit = (r: string[]) => r) =>
+    parseReceiptText(
+      mergeParts([
+        rowsOf(rows.slice(0, at(firstEndsAt) + 1).join('\n'), 0),
+        rowsOf(edit(rows.slice(at(secondStartsAt))).join('\n'), 1),
+      ]),
+    )
+  const whole = parse((am05 as Fixture).readings[0]!).lines.map((line) => line.sku)
+
+  it('are two items when the parts are cut between them with no overlap', () => {
+    expect(twoParts('0403/1160033', '9.Յոգուրտ').lines.map((l) => l.sku)).toEqual(whole)
+  })
+
+  it('are two items when the overlap ends in the first and the second part lost it at its edge', () => {
+    const got = twoParts('0403/1160033', '7.Պոլիէթիլենային', (r) =>
+      r
+        .filter((row) => !row.startsWith('8.Յոգուրտ'))
+        .map((row) => (row.startsWith('0403/1160033') ? '0403/11' : row)),
+    )
+    expect(got.lines.map((l) => l.sku)).toEqual(whole)
+  })
+})
+
+describe('a tie of a till with no discount (review Р24)', () => {
+  it('highlights the line OCR misread as well as the line the total changed', () => {
+    const figures = [
+      '2197,44',
+      '1430,72',
+      '1146,56',
+      '316,32',
+      '344,00',
+      '248,00',
+      '1517,76',
+      '1186,88',
+      '1856,96',
+      '1359,68',
+    ]
+    const got = parse(
+      [
+        ...figures.map((f, i) => `${String(i + 1)}. item\n0401/116300${String(i)} 1Հտ ${f}/0,00`),
+        'Ընդամենը 12104.32',
+      ].join('\n'),
+    )
+    expect(got.balanced).toBe(true)
+    const doubtful = got.lines.flatMap((line, i) => (line.settled ? [] : [i]))
+    expect(doubtful).toEqual(expect.arrayContaining([3, 9]))
+  })
+})

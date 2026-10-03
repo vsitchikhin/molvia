@@ -227,7 +227,8 @@ function asReadRate(all: readonly Candidate[][]): number | null {
   return mode(
     all
       .flatMap((list) => {
-        const fewest = Math.min(...list.map((x) => x.swaps))
+        // a loop, not `Math.min(...)`: a list of ninety thousand readings is past the stack (review 10)
+        const fewest = list.reduce((least, x) => Math.min(least, x.swaps), Infinity)
         return list.filter((x) => x.swaps === fewest).slice(0, 1)
       })
       .map((x) => Math.round(x.rate * 1000) / 1000),
@@ -602,6 +603,26 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
     balanced && total !== null && picks.filter((x) => x === null).length === 1
       ? total - picks.reduce((a, x) => a + (x?.paid ?? 0), 0)
       : null
+  // In a tie the total could have made its change in another line just as well: every line that
+  // changed, and every line with a reading of its own that differs by the same amount, is in doubt
+  // (review Р20, Р24) — the line OCR misread among them, not only the one the total picked.
+  const doubt = new Set<number>()
+  if (tied) {
+    const moves = picks.flatMap((pick, i) => {
+      const first = lists[i]?.[0]
+      return pick !== null && first !== undefined && pick !== first
+        ? [[i, pick.paid - first.paid]]
+        : []
+    })
+    for (const [i] of moves) doubt.add(i ?? -1)
+    lists.forEach((list, j) => {
+      const first = list[0]
+      if (first === undefined || doubt.has(j)) return
+      if (moves.some(([, move]) => list.some((x) => x !== first && x.paid - first.paid === move))) {
+        doubt.add(j)
+      }
+    })
+  }
   const lines = found.map((f, i): ReceiptTextLine => {
     const pick = picks[i] ?? null
     return {
@@ -613,9 +634,8 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
       priceHundredths: finite(pick?.price ?? (f.priceS === null ? null : hundredthsOf(f.priceS))),
       sumHundredths: finite(pick?.paid ?? blankSum ?? hundredthsOf(f.paidS)),
       discountHundredths: finite(pick?.disc ?? hundredthsOf(f.discS)),
-      // when the total could not tell two fixes apart, a line it changed from its reading is not
-      // vouched for: highlighted for the person to check (review Р20)
-      settled: pick !== null && !(tied && pick !== lists[i]?.[0]),
+      // what the total could not tell apart is not vouched for: highlighted for the person to check
+      settled: pick !== null && !doubt.has(i),
       rows: f.rows,
     }
   })
@@ -823,8 +843,14 @@ export function rowsOf(text: string, part: number): TextRow[] {
 // next part after it too. Another item's near article, or the first of two bags, makes no such seam.
 // No seam — an overlap of a name row only — joins the parts, dropping the rows both of them hold.
 const ARTICLE = /\d{4}\s*\/\s*(\d{5,})/
-const near = (a: string, b: string): boolean =>
-  a.length === b.length && Array.from(a).filter((c, i) => c !== b.charAt(i)).length <= 1
+// One digit off the way OCR misreads this font (5 for 6, 1 for 4, 3 for 8, 0 for 9) — not any
+// digit: a till numbers one maker's line in a row, and 1160033 and 1160036 are two flavours of one
+// yoghurt, not one article read twice (review Р23).
+const near = (a: string, b: string): boolean => {
+  if (a.length !== b.length) return false
+  const off = Array.from(a).flatMap((c, i) => (c === b.charAt(i) ? [] : [[c, b.charAt(i)]]))
+  return off.length === 0 || (off.length === 1 && CONFUSED[off[0]?.[0] ?? ''] === off[0]?.[1])
+}
 const articleOf = (row: TextRow): string => ARTICLE.exec(row.text)?.[1] ?? ''
 
 interface Article {
@@ -837,13 +863,6 @@ function articlesOf(rows: readonly TextRow[]): Article[] {
     const article = articleOf(row)
     return article === '' ? [] : [{ article, at }]
   })
-}
-
-interface Seam {
-  readonly mine: number
-  readonly theirs: number
-  /** Found by the rows after it rather than by every article after it: an overlap read worse. */
-  readonly loose: boolean
 }
 
 // How alike two rows read: 1 for the same text, 0 for nothing in common (Levenshtein over the longer).
@@ -873,27 +892,44 @@ function likeness(a: string, b: string): number {
 // The rows of an overlap read twice look alike even where OCR read one of them worse.
 const ALIKE = 0.7
 
-/**
- * How far either part's rows after a seam are looked through for one read alike in the other: the
- * first part's next two, the next part's next three — the overlap repeats them, one perhaps lost or
- * split in two at the next part's top edge (review Р21).
- */
-const SEAM_ROWS_MINE = 2
-const SEAM_ROWS_THEIRS = 3
-
-/** The last articles of the text so far a loose seam is looked for at: the overlap is at its end. */
-const LOOSE_SEAM_TRIES = 8
-
-// The non-empty rows after `at`, by their place.
-function rowsAfter(rows: readonly TextRow[], at: number, count: number): number[] {
-  const found: number[] = []
-  for (let k = at + 1; k < rows.length && found.length < count; k++) {
-    if ((rows[k]?.text.trim() ?? '') !== '') found.push(k)
-  }
-  return found
+// Two articles one could be the other misread: two digits off at most — but one digit off by a swap
+// OCR does not make is the next article of the list, as one maker numbers the flavours of a yoghurt
+// in a row: 1160033 and 1160036 (review Р23).
+function misread(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  const off = Array.from(a).flatMap((c, i) => (c === b.charAt(i) ? [] : [[c, b.charAt(i)]]))
+  if (off.length > 2) return false
+  const [only] = off
+  return !(off.length === 1 && only !== undefined && CONFUSED[only[0] ?? ''] !== only[1])
 }
 
-function seamOf(
+const NUMBER = /^\s*(\d{1,2})(?!\d)\s*[.,]?\s*\p{L}/u
+
+/**
+ * Two rows the overlap could hold twice: read alike, and not two items — not two numbers of the list,
+ * not two articles that differ but by OCR's swaps (review Р23). Two flavours of one yoghurt read
+ * alike letter for letter, «8.Յոգուրտ … դեղձ» and «9.Յոգուրտ … ելակ».
+ */
+function sameRow(a: string, b: string): boolean {
+  const [na, nb] = [NUMBER.exec(a)?.[1], NUMBER.exec(b)?.[1]]
+  if (na !== undefined && nb !== undefined && na !== nb) return false
+  const [aa, ab] = [ARTICLE.exec(a)?.[1], ARTICLE.exec(b)?.[1]]
+  if (aa !== undefined && ab !== undefined && !misread(aa, ab)) return false
+  return likeness(a, b) >= ALIKE
+}
+
+/** How many rows of either part an overlap is looked for in: an overlap is a few items, not a page. */
+const OVERLAP_ROWS = 16
+/** Rows at the next part's top edge that may precede the overlap: a cut row, a blank, a smudge. */
+const OVERLAP_LEAD = 3
+
+interface Seam {
+  readonly mine: number
+  readonly theirs: number
+}
+
+/** The strict seam: by the till's articles, as above. */
+function articleSeam(
   rows: readonly TextRow[],
   next: readonly TextRow[],
   same: (a: string, b: string) => boolean,
@@ -908,56 +944,74 @@ function seamOf(
     if (b === undefined || j > i) continue
     const later = theirs.slice(j + 1)
     const kept = mine.slice(i + 1).every((m) => later.some((t) => near(m.article, t.article)))
-    if (kept) return { mine: a.at, theirs: b.at, loose: false }
-    // rows of the overlap read worse in the next part — an article two digits off, figures cut at its
-    // top edge, a name lost or split (review Р17, Р21): rows right after the seam still read alike in
-    // both parts, while two bags of one article have different items after them
-    if (i < mine.length - LOOSE_SEAM_TRIES) continue
-    const ours = rowsAfter(rows, a.at, SEAM_ROWS_MINE)
-    const theirsAfter = rowsAfter(next, b.at, SEAM_ROWS_THEIRS)
-    const alike = ours.some((k) =>
-      theirsAfter.some((q) => likeness(rows[k]?.text ?? '', next[q]?.text ?? '') >= ALIKE),
-    )
-    if (alike) return { mine: a.at, theirs: b.at, loose: true }
+    if (kept) return { mine: a.at, theirs: b.at }
   }
   return null
 }
 
 /**
- * Where the next part goes on after a loose seam: past the rows of the overlap the text so far keeps
- * — each found read alike a little ahead in the next part. A row of the first part found nowhere is
- * its bottom edge cut through, or a row the next part lost, and moves nothing (review 9).
+ * The overlap where an article does not show it — read worse in the next part: an article two digits
+ * off, figures cut at its top edge, a name lost or split, a row cut through at the first part's foot
+ * (review Р17, Р21, 9, Р23). The first part's last rows and the next part's first are aligned, row for
+ * row in order (`sameRow`), the longest alignment that starts near the next part's top: the next part
+ * goes on after the last row aligned, and the first part keeps its own reading of the overlap.
  */
-function pastOverlap(rows: readonly TextRow[], seam: Seam, next: readonly TextRow[]): number {
-  let from = seam.theirs + 1
-  for (const k of rowsAfter(rows, seam.mine, rows.length)) {
-    const ahead = rowsAfter(next, from - 1, SEAM_ROWS_THEIRS)
-    const q = ahead.find((at) => likeness(rows[k]?.text ?? '', next[at]?.text ?? '') >= ALIKE)
-    if (q !== undefined) from = q + 1
+function alignedSeam(rows: readonly TextRow[], next: readonly TextRow[]): number | null {
+  const tail = rows.flatMap((row, at) => (row.text.trim() === '' ? [] : [at])).slice(-OVERLAP_ROWS)
+  const head = next
+    .flatMap((row, at) => (row.text.trim() === '' ? [] : [at]))
+    .slice(0, OVERLAP_ROWS)
+  const mineText = (i: number) => rows[tail[i] ?? 0]?.text ?? ''
+  const theirText = (j: number) => next[head[j] ?? 0]?.text ?? ''
+  // rows read alike; and the figures right below an item's name read alike in both are that item's,
+  // whatever article OCR made of them there
+  const alike = tail.map((_, i) =>
+    head.map((_, j) => {
+      if (sameRow(mineText(i), theirText(j))) return true
+      const named =
+        i > 0 && j > 0 && NUMBER.test(mineText(i - 1)) && sameRow(mineText(i - 1), theirText(j - 1))
+      return named && ARTICLE.test(mineText(i)) && ARTICLE.test(theirText(j))
+    }),
+  )
+  const isAlike = (i: number, j: number) => alike[i]?.[j] === true
+  // the longest common run, in order, by rows read alike
+  const best = Array.from({ length: tail.length + 1 }, () =>
+    Array.from({ length: head.length + 1 }, () => 0),
+  )
+  for (let i = tail.length - 1; i >= 0; i--) {
+    const row = best[i] ?? []
+    for (let j = head.length - 1; j >= 0; j--) {
+      row[j] = isAlike(i, j)
+        ? 1 + (best[i + 1]?.[j + 1] ?? 0)
+        : Math.max(best[i + 1]?.[j] ?? 0, row[j + 1] ?? 0)
+    }
   }
-  return from
+  // walk it, and keep where the next part's rows were last aligned
+  let [i, j, first, last] = [0, 0, -1, -1]
+  while (i < tail.length && j < head.length) {
+    if (isAlike(i, j)) {
+      if (first < 0) first = j
+      last = j
+      i++
+      j++
+    } else if ((best[i + 1]?.[j] ?? 0) >= (best[i]?.[j + 1] ?? 0)) i++
+    else j++
+  }
+  // the overlap starts at the next part's top, or it is no overlap but two items alike
+  if (last < 0 || first > OVERLAP_LEAD) return null
+  return head[last] ?? null
 }
 
 export function mergeParts(parts: readonly (readonly TextRow[])[]): TextRow[] {
   let rows = [...(parts[0] ?? [])]
   for (const next of parts.slice(1)) {
-    const seam = seamOf(rows, next, (a, b) => a === b) ?? seamOf(rows, next, near)
-    if (seam?.loose === true) {
-      // the text so far keeps its own reading of the overlap, read better
-      rows = [...rows, ...next.slice(pastOverlap(rows, seam, next))]
-      continue
-    }
+    const seam = articleSeam(rows, next, (a, b) => a === b) ?? articleSeam(rows, next, near)
     if (seam !== null) {
       rows = [...rows.slice(0, seam.mine + 1), ...next.slice(seam.theirs + 1)]
       continue
     }
-    const text = (row: TextRow | undefined) => row?.text.trim() ?? ''
-    let shared = 0
-    for (let n = Math.min(rows.length, next.length); n >= 1 && shared === 0; n--) {
-      const tail = rows.slice(-n)
-      if (tail.every((row, i) => text(row) !== '' && text(row) === text(next[i]))) shared = n
-    }
-    rows = [...rows, ...next.slice(shared)]
+    const aligned = alignedSeam(rows, next)
+    rows = [...rows, ...next.slice(aligned === null ? 0 : aligned + 1)]
   }
   return rows
 }
