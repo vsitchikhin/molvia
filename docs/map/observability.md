@@ -21,6 +21,9 @@ Rules: `.claude/rules/observability.md`. A test beside its source, or mirroring 
 - `backend/tests/failures-api.integration.test.ts` — Integration test of failures through a real server: a 500 by its route's template and never the address, a person's text in the driver's message nowhere, a refusal not a failure, one notice a build, none without an owner; the bot's report and the owner's claim through `/internal`.
 - `backend/tests/client-errors.integration.test.ts` — Integration test of `POST /client-errors` (MOL-144): taken with no session and with a stranger's cookie, a row of `phone` with the page's build and platform, the owner's notice naming them; a message, a frame with the page's address or an origin, a User-Agent, an empty or too large batch refused; twenty a minute from an address, a forged header from outside not believed, the address in neither the log nor the table.
 - `backend/tests/failures.integration.test.ts` — Integration test of the two tables: the count by fingerprint and by build, ten at once, a notice in the same transaction, the 30 days, the queue handed out once, no key to `actors`.
+- `backend/src/metrics.ts` — The API's metrics (MOL-145) in Prometheus's text format, with no library: answers counted by method, route template and class of status, their time in a histogram by route — a request no route answered is `*`/`unmatched`, never its path — and the process's event loop delay, heap and resident memory.
+- `backend/src/metrics-server.ts` — `GET /metrics` on a port of its own (MOL-145, В-1), never the API's: what the network of the metrics scrapes and Caddy cannot reach.
+- `backend/tests/metrics.integration.test.ts` — Integration test of the metrics through a real server: a uuid and a query never in a label, a hundred unknown paths one series, `HEAD` as `GET`, a failure as 5xx; `/metrics` no address of the API in any spelling, and answered on its own server.
 
 ## frontend
 

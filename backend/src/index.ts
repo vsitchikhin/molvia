@@ -16,12 +16,18 @@ import { apiFailureReporter } from '@/failure-reporter'
 import { marketRatesRefresh } from '@/usecases/refresh-market-rates'
 import { officialRatesRefresh } from '@/usecases/refresh-official-rates'
 import { receiptReader } from '@/receipts/reader'
+import { httpMetrics, processMetrics } from '@/metrics'
+import { buildMetricsServer } from '@/metrics-server'
 import { buildServer } from './server'
+
+// Every answer is counted only where somebody scrapes the count (MOL-145): production names the port.
+const http = env.METRICS_PORT === undefined ? undefined : httpMetrics()
 
 // The model of the search by meaning loads in the background (MOL-105): the API answers by the
 // letters until it is ready, and without its files, for good. The receipt reader is asked only
 // where it is named (MOL-125).
 const app = buildServer({
+  ...(http === undefined ? {} : { metrics: http }),
   ...(env.EMBEDDINGS === 'on'
     ? {
         embedder: (log: Parameters<typeof startEmbedder>[1]) =>
@@ -91,3 +97,17 @@ app.listen({ port: env.API_PORT, host }).catch((error: unknown) => {
   app.log.error(error)
   process.exit(1)
 })
+
+// `/metrics` on its own port (MOL-145, В-1): the network of the metrics scrapes it, Caddy never sees it.
+if (http !== undefined && env.METRICS_PORT !== undefined) {
+  const running = processMetrics()
+  const metrics = buildMetricsServer([http, running])
+  app.addHook('onClose', async () => {
+    running.stop()
+    await metrics.close()
+  })
+  metrics.listen({ port: env.METRICS_PORT, host }).catch((error: unknown) => {
+    app.log.error(error)
+    process.exit(1)
+  })
+}

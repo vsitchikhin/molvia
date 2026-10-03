@@ -16,6 +16,15 @@ try {
 
 const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3300),
+  /**
+   * The port `/metrics` answers on (MOL-145, В-1): its own, inside the compose network, never the
+   * API's — Caddy proxies only that. Unset in a copy and in end-to-end: nobody scrapes them, and no
+   * port is opened. Empty is unset, as compose passes a variable it was not given.
+   */
+  METRICS_PORT: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.coerce.number().int().positive().optional(),
+  ),
   DATABASE_URL: z.string().min(1),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   /**
