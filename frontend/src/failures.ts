@@ -81,11 +81,24 @@ export interface FailureReports {
   flush(): Promise<void>
 }
 
-/** The same failure on the phone — what the API fingerprints, as the phone can tell it. */
+/**
+ * The same failure on the phone — what the API fingerprints, as the phone can tell it: the build
+ * included (adversarial Д1 of round 5). Without it a report with no frame — a registration's
+ * `DOMException` — kept from an old build stood for the same failure of the new one, and the new
+ * build's never went.
+ */
 function keyOf(report: PhoneFailure): string {
   const top = (report.frames?.[0] ?? '').replace(/:\d+:\d+\)$/, ')')
   const system = report.platform.split(' ')[0] ?? ''
-  return [report.catcher, report.screen, report.errorName, report.code ?? '', top, system].join('|')
+  return [
+    report.catcher,
+    report.screen,
+    report.errorName,
+    report.code ?? '',
+    top,
+    system,
+    report.build,
+  ].join('|')
 }
 
 function kept(): PhoneFailure[] {

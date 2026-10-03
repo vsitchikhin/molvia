@@ -187,6 +187,30 @@ describe('одна ошибка — один отчёт, кто бы её ни �
   })
 })
 
+describe('ключ телефона — как отпечаток API, со сборкой (адверсариальный Д1)', () => {
+  it('сбой без кадров, ждущий со старой сборки, не глушит тот же сбой новой', async () => {
+    const frameless = () => {
+      const error = new Error('')
+      error.name = 'SecurityError'
+      error.stack = ''
+      return error
+    }
+    const offline = failureReports({
+      ...environment(() => Promise.reject(network())),
+      build: 'index-OldBuild1',
+    })
+    offline.report(frameless(), 'sw')
+    await offline.flush()
+    const fresh = failureReports({ ...environment(sending), build: 'index-NewBuild2' })
+    fresh.report(frameless(), 'sw')
+    await fresh.flush()
+    expect(bodies.flatMap((body) => body.reports.map((report) => report.build)).sort()).toEqual([
+      'index-NewBuild2',
+      'index-OldBuild1',
+    ])
+  })
+})
+
 describe('отчёт не ломает catch, в котором стоит', () => {
   it('сбой самого отчёта — тишина, а не исключение в ветке экрана', () => {
     const reports = failureReports({
