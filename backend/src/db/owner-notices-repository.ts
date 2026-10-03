@@ -79,31 +79,34 @@ const phoneLast = sql`coalesce(${ownerNotices.payload} ->> 'source' = 'phone', f
 export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
   return {
     async claim(limit, at) {
-      const rows = await db
-        .update(ownerNotices)
-        .set({ handedAt: at, tries: sql`${ownerNotices.tries} + 1` })
-        .where(
-          sql`${ownerNotices.id} in (
-            select ${ownerNotices.id} from ${ownerNotices}
-            where ${ownerNotices.handedAt} is null
-               or (${inArray(ownerNotices.kind, [...FEEDBACK_NOTICE_KINDS])}
-                   and ${ownerNotices.sentAt} is null
-                   and ${ownerNotices.tries} < ${OWNER_NOTICE_TRIES}
-                   and ${ownerNotices.handedAt} < ${at.toISOString()}::timestamptz
-                     - make_interval(secs => ${OWNER_NOTICE_RESEND_MS / 1000}
-                         * power(2, greatest(${ownerNotices.tries}, 1) - 1)))
-            order by ${phoneLast}, ${ownerNotices.id}
-            limit ${rowLimit(limit)}
-            for update skip locked)`,
-        )
-        .returning({
-          id: ownerNotices.id,
-          payload: ownerNotices.payload,
-          phone: sql<boolean>`${phoneLast}`,
-        })
-      return rows
-        .sort((a, b) => Number(a.phone) - Number(b.phone) || a.id - b.id)
-        .map((row) => row.payload)
+      // The rows are picked once, in a materialized CTE, and the update joins them (MOL-145, CI): as
+      // `where id in (select … limit n for update skip locked)` Postgres may run the subquery more
+      // than once, each time skipping what the last one locked, and hand out more than `limit` — a
+      // claim of two gave three.
+      const rows = await db.execute<{ id: string; payload: unknown; phone: boolean }>(sql`
+        with picked as materialized (
+          select ${ownerNotices.id} as id from ${ownerNotices}
+          where ${ownerNotices.handedAt} is null
+             or (${inArray(ownerNotices.kind, [...FEEDBACK_NOTICE_KINDS])}
+                 and ${ownerNotices.sentAt} is null
+                 and ${ownerNotices.tries} < ${OWNER_NOTICE_TRIES}
+                 and ${ownerNotices.handedAt} < ${at.toISOString()}::timestamptz
+                   - make_interval(secs => ${OWNER_NOTICE_RESEND_MS / 1000}
+                       * power(2, greatest(${ownerNotices.tries}, 1) - 1)))
+          order by ${phoneLast}, ${ownerNotices.id}
+          limit ${rowLimit(limit)}
+          for update skip locked)
+        update ${ownerNotices}
+        set handed_at = ${at.toISOString()}::timestamptz, tries = ${ownerNotices.tries} + 1
+        from picked
+        where ${ownerNotices.id} = picked.id
+        returning ${ownerNotices.id} as id, ${ownerNotices.payload} as payload, ${phoneLast} as phone`)
+      return (
+        [...rows]
+          // `bigint` comes back as text from a statement drizzle does not map.
+          .sort((a, b) => Number(a.phone) - Number(b.phone) || Number(a.id) - Number(b.id))
+          .map((row) => row.payload)
+      )
     },
 
     async queue(notice, at) {
