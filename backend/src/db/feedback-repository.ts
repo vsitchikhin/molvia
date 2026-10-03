@@ -20,7 +20,14 @@ import type { PictureIn } from '@/feedback/picture'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { theRow } from './rows'
-import { actors, feedback, feedbackPictures, feedbackReplies, ownerNotices } from './schema'
+import {
+  actors,
+  feedback,
+  feedbackPictureFiles,
+  feedbackPictures,
+  feedbackReplies,
+  ownerNotices,
+} from './schema'
 
 /** What a write came to: a message, the same message again, or the day's limit reached. */
 export type FeedbackWrite =
@@ -195,11 +202,17 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
                 feedbackId: row.id,
                 position: index + 1,
                 source: 'phone' as const,
-                image: picture.image,
                 fingerprint: picture.fingerprint,
                 bytes: picture.bytes,
                 width: picture.width,
                 height: picture.height,
+              })),
+            )
+            await tx.insert(feedbackPictureFiles).values(
+              pictures.map((picture, index) => ({
+                feedbackId: row.id,
+                position: index + 1,
+                image: picture.image,
               })),
             )
           }
@@ -357,12 +370,14 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
               feedbackId: row.id,
               position: 1,
               source: 'telegram',
-              telegramFileId: picture.fileId,
               fingerprint: picture.fileUniqueId,
               bytes: picture.bytes,
               width: picture.width,
               height: picture.height,
             })
+            await tx
+              .insert(feedbackPictureFiles)
+              .values({ feedbackId: row.id, position: 1, telegramFileId: picture.fileId })
           }
           if (notify) {
             const notice: FeedbackContinuedNotice = {
@@ -401,37 +416,26 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
     async picture(number, position) {
       const [row] = await db
         .select({
-          source: feedbackPictures.source,
-          image: feedbackPictures.image,
-          telegramFileId: feedbackPictures.telegramFileId,
+          image: feedbackPictureFiles.image,
+          telegramFileId: feedbackPictureFiles.telegramFileId,
         })
-        .from(feedbackPictures)
+        .from(feedbackPictureFiles)
         .where(
-          and(eq(feedbackPictures.feedbackId, number), eq(feedbackPictures.position, position)),
+          and(
+            eq(feedbackPictureFiles.feedbackId, number),
+            eq(feedbackPictureFiles.position, position),
+          ),
         )
-      if (row?.source === 'phone' && row.image !== null) {
-        return { source: 'phone', jpeg: row.image.toString('base64') }
-      }
-      if (row?.source === 'telegram' && row.telegramFileId !== null) {
-        return { source: 'telegram', fileId: row.telegramFileId }
-      }
+      if (row?.image != null) return { source: 'phone', jpeg: row.image.toString('base64') }
+      if (row?.telegramFileId != null) return { source: 'telegram', fileId: row.telegramFileId }
       return null
     },
 
     async forgetPictures() {
-      await db
-        .update(feedbackPictures)
-        .set({ image: null, telegramFileId: null })
-        .where(
-          and(
-            or(
-              sql`${feedbackPictures.image} is not null`,
-              sql`${feedbackPictures.telegramFileId} is not null`,
-            ),
-            sql`${feedbackPictures.createdAt}
-              < clock_timestamp() - make_interval(days => ${FEEDBACK_PICTURE_KEPT_DAYS})`,
-          ),
-        )
+      await db.delete(feedbackPictureFiles).where(
+        sql`${feedbackPictureFiles.createdAt}
+            < clock_timestamp() - make_interval(days => ${FEEDBACK_PICTURE_KEPT_DAYS})`,
+      )
     },
 
     async purgeStale() {

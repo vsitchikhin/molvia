@@ -72,6 +72,7 @@ export const EXPORT_COLUMNS: Readonly<
     | 'income_revisions'
     | 'feedback_replies'
     | 'feedback_pictures'
+    | 'feedback_picture_files'
     | 'owner_notices'
     | 'items'
     | 'item_barcodes'
@@ -392,12 +393,21 @@ export const EXPORT_COLUMNS: Readonly<
     exported: ['position', 'source', 'width', 'height', 'bytes', 'created_at', 'sent_at'],
     omitted: {
       feedback_id: 'said by where the picture sits: under the message it went with',
+      fingerprint:
+        'a checksum of the picture, so one sent twice is written once; it shows nothing of the picture',
+    },
+  },
+  // The picture itself, while it waits for the owner's bot (MOL-167, В-1): never in the copy.
+  feedback_picture_files: {
+    exported: [],
+    omitted: {
+      feedback_id: 'said by the line of the picture in `pictures`',
+      position: 'said by the line of the picture in `pictures`',
       image:
         'the picture is kept only until it reaches the developer’s Telegram, then erased; your own file is in your gallery',
       telegram_file_id:
         'Telegram’s name for the photo you sent the bot, kept until the developer has it; the photo is in your chat',
-      fingerprint:
-        'a checksum of the picture, so one sent twice is written once; it shows nothing of the picture',
+      created_at: 'when the picture came: said by its line in `pictures`',
     },
   },
   // The owner's notice of a message (MOL-148) goes with the message, so it is the person's too — and

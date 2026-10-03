@@ -12,7 +12,13 @@ import type { FastifyInstance } from 'fastify'
 import { VERSION } from '@/env'
 import { createFeedbackRepository } from '@/db/feedback-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
-import { actors, feedback, feedbackPictures, feedbackReplies } from '@/db/schema'
+import {
+  actors,
+  feedback,
+  feedbackPictureFiles,
+  feedbackPictures,
+  feedbackReplies,
+} from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aScreenshot, clearAll, insertActor, signIn } from './fixtures'
@@ -514,6 +520,12 @@ describe('снимки к сообщению (MOL-167)', () => {
       .from(feedbackPictures)
       .where(eq(feedbackPictures.feedbackId, number))
       .orderBy(feedbackPictures.position)
+  const filesOf = (number: number) =>
+    db
+      .select()
+      .from(feedbackPictureFiles)
+      .where(eq(feedbackPictureFiles.feedbackId, number))
+      .orderBy(feedbackPictureFiles.position)
 
   it('три снимка — одна запись: по порядку, со сторонами, без места съёмки', async () => {
     const cookie = await signIn(db, await insertActor(db))
@@ -537,7 +549,9 @@ describe('снимки к сообщению (MOL-167)', () => {
       [2, 'phone', 1080, 2400],
       [3, 'phone', 2400, 1080],
     ])
-    const first = kept[0]?.image ?? Buffer.alloc(0)
+    const files = await filesOf(number)
+    expect(files).toHaveLength(3)
+    const first = files[0]?.image ?? Buffer.alloc(0)
     expect(first.includes(Buffer.from('GPS'))).toBe(false)
     expect(first.includes(Buffer.from('Exif'))).toBe(false)
     expect(kept[0]?.bytes).toBe(first.length)
@@ -663,17 +677,17 @@ describe('снимки к сообщению (MOL-167)', () => {
       number: number
     }>()
     await db
-      .update(feedbackPictures)
+      .update(feedbackPictureFiles)
       .set({ createdAt: new Date(Date.now() - 7 * 24 * 3_600_000 - 60_000) })
-      .where(eq(feedbackPictures.feedbackId, old.number))
+      .where(eq(feedbackPictureFiles.feedbackId, old.number))
 
     await createFeedbackRepository(db).forgetPictures()
 
-    const [gone] = await picturesOf(old.number)
-    const [kept] = await picturesOf(fresh.number)
-    expect(gone?.image).toBeNull()
-    expect(gone?.fingerprint).toEqual(expect.any(String))
-    expect(kept?.image).not.toBeNull()
+    expect(await filesOf(old.number)).toHaveLength(0)
+    expect(await filesOf(fresh.number)).toHaveLength(1)
+    // The line stays, never said to have gone (adversarial А4).
+    const [line] = await picturesOf(old.number)
+    expect(line).toMatchObject({ fingerprint: expect.any(String) as unknown, sentAt: null })
   })
 
   it('база держит «слова или снимок» и место снимка сама', async () => {
@@ -698,8 +712,19 @@ describe('снимки к сообщению (MOL-167)', () => {
         ...extra,
       })
     expect(await refusedBy(picture(4))).toBe('feedback_pictures_position_range')
-    expect(await refusedBy(picture(1, { telegramFileId: 'Ag' }))).toBe(
-      'feedback_pictures_kept_by_source',
+    await picture(1)
+    const file = (values: Record<string, unknown>) =>
+      db.insert(feedbackPictureFiles).values({ feedbackId: id, position: 1, ...values })
+    expect(await refusedBy(file({ image: Buffer.from([1]), telegramFileId: 'Ag' }))).toBe(
+      'feedback_picture_files_one_source',
     )
+    expect(await refusedBy(file({}))).toBe('feedback_picture_files_one_source')
+    expect(
+      await refusedBy(
+        db
+          .insert(feedbackPictureFiles)
+          .values({ feedbackId: id, position: 2, telegramFileId: 'A' }),
+      ),
+    ).toBe('feedback_picture_files_line')
   })
 })

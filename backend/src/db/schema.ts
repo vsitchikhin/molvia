@@ -1931,16 +1931,15 @@ export const ownerNotices = pgTable(
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' })
 
 /**
- * The pictures of a message to the developer (MOL-167), by their position. **The bytes live only
- * until they reach the owner's Telegram** (В-1): the bot's word that the notice went empties `image`
- * and `telegram_file_id`, and the minute timer empties what the bot never took within
- * `FEEDBACK_PICTURE_KEPT_DAYS`. What is left is the line the copy shows. Never in the nightly copy, as
- * a receipt's photo (`backup.sh`).
+ * The pictures of a message to the developer (MOL-167), by their position: the line of each that
+ * stays with the message — where it came from, its sides and size, and when it reached the owner's
+ * Telegram (`sent_at`, empty for one that never did). The picture itself is `feedback_picture_files`,
+ * kept only until then (В-1).
  *
  * A picture comes from the phone — a JPEG the API stripped of its metadata (Р-2) — or from Telegram,
- * a photo a person sent the bot, kept by Telegram's id only (Р-8). `fingerprint` tells the same picture
- * sent again from another — the sha256 of the bytes, or Telegram's `file_unique_id` — and outlives the
- * bytes, since a repeat is looked for after they went.
+ * a photo a person sent the bot (Р-8). `fingerprint` tells the same picture sent again from another —
+ * the sha256 of the bytes kept, or Telegram's `file_unique_id` — and outlives the picture, since a
+ * repeat is looked for after it went.
  */
 export const feedbackPictures = pgTable(
   'feedback_pictures',
@@ -1950,8 +1949,6 @@ export const feedbackPictures = pgTable(
       .references(() => feedback.id, { onDelete: 'cascade' }),
     position: smallint('position').notNull(),
     source: text('source').$type<'phone' | 'telegram'>().notNull(),
-    image: bytea('image'),
-    telegramFileId: text('telegram_file_id'),
     fingerprint: text('fingerprint').notNull(),
     bytes: integer('bytes'),
     width: integer('width').notNull(),
@@ -1968,23 +1965,48 @@ export const feedbackPictures = pgTable(
       sql`${table.position} between 1 and ${sql.raw(String(FEEDBACK_PICTURES_MAX))}`,
     ),
     check('feedback_pictures_source_known', sql`${table.source} in ('phone', 'telegram')`),
-    // Each source keeps its own: the phone's bytes, Telegram's id — and neither once delivered.
+    check('feedback_pictures_bytes_size', sql`${table.bytes} is null or ${table.bytes} > 0`),
+    check('feedback_pictures_sides_positive', sql`${table.width} > 0 and ${table.height} > 0`),
+  ],
+)
+
+/**
+ * A picture of a message while it waits for the owner's bot (MOL-167, В-1): the phone's JPEG, or the
+ * id Telegram keeps a person's photo by. The row goes when the bot says the notice went, or after
+ * `FEEDBACK_PICTURE_KEPT_DAYS` the bot never took it — the bot away, or a copy with no owner. **Never
+ * in the nightly copy** (`backup.sh`), as a receipt's photo: a table of its own, so the line of a
+ * picture in `feedback_pictures` comes back from a restore while the picture does not (adversarial А5).
+ */
+export const feedbackPictureFiles = pgTable(
+  'feedback_picture_files',
+  {
+    feedbackId: bigint('feedback_id', { mode: 'number' }).notNull(),
+    position: smallint('position').notNull(),
+    image: bytea('image'),
+    telegramFileId: text('telegram_file_id'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.feedbackId, table.position] }),
+    foreignKey({
+      name: 'feedback_picture_files_line',
+      columns: [table.feedbackId, table.position],
+      foreignColumns: [feedbackPictures.feedbackId, feedbackPictures.position],
+    }).onDelete('cascade'),
+    // One or the other: the phone's bytes, or Telegram's id.
     check(
-      'feedback_pictures_kept_by_source',
-      sql`(${table.source} = 'phone' or ${table.image} is null)
-          and (${table.source} = 'telegram' or ${table.telegramFileId} is null)`,
+      'feedback_picture_files_one_source',
+      sql`(${table.image} is null) <> (${table.telegramFileId} is null)`,
     ),
     check(
-      'feedback_pictures_image_size',
+      'feedback_picture_files_image_size',
       sql`${table.image} is null
           or octet_length(${table.image}) between 1 and ${sql.raw(String(FEEDBACK_PICTURE_BYTES_MAX))}`,
     ),
-    check('feedback_pictures_bytes_size', sql`${table.bytes} is null or ${table.bytes} > 0`),
-    check('feedback_pictures_sides_positive', sql`${table.width} > 0 and ${table.height} > 0`),
-    // The timer looks for bytes still held past their week.
-    index('feedback_pictures_held_idx')
-      .on(table.createdAt)
-      .where(sql`${table.image} is not null or ${table.telegramFileId} is not null`),
+    // The timer looks for pictures held past their week.
+    index('feedback_picture_files_created_idx').on(table.createdAt),
   ],
 )
 

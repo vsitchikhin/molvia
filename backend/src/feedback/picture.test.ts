@@ -123,3 +123,127 @@ describe('pictureOf — снимок, каким он хранится', () => {
     )
   })
 })
+
+describe('метаданные в любом месте файла (ревью 1, адверсариальное А2)', () => {
+  const sof2 = (width: number, height: number) =>
+    segment(0xc2, [0x08, height >> 8, height & 0xff, width >> 8, width & 0xff, 0x01])
+  const sos = segment(0xda, [0x01, 0x01, 0x00, 0x00, 0x3f, 0x00])
+  // Entropy-coded data with a stuffed 0xFF and a restart marker in it: neither is a segment.
+  const scan = [0x55, 0xff, 0x00, 0x55, 0xff, 0xd0, 0x55]
+
+  it('между сканами прогрессивного JPEG — вырезаются, сканы целы', () => {
+    const progressive = Buffer.from([
+      0xff,
+      0xd8,
+      ...JFIF,
+      ...sof2(1179, 2556),
+      ...sos,
+      ...scan,
+      ...EXIF,
+      ...COMMENT,
+      ...sos,
+      ...scan,
+      0xff,
+      0xd9,
+    ])
+
+    const clean = withoutMetadata(progressive) ?? Buffer.alloc(0)
+
+    expect(contains(clean, 'GPS')).toBe(false)
+    expect(contains(clean, 'Gyumri')).toBe(false)
+    expect(clean).toEqual(
+      Buffer.from([
+        0xff,
+        0xd8,
+        ...JFIF,
+        ...sof2(1179, 2556),
+        ...sos,
+        ...scan,
+        ...sos,
+        ...scan,
+        0xff,
+        0xd9,
+      ]),
+    )
+    expect(jpegSize(clean)).toEqual({ width: 1179, height: 2556 })
+  })
+
+  it('после конца картинки — ничего: ни второго JPEG со своим EXIF (MPF, Ultra HDR), ни хвоста', () => {
+    const primary = jpeg(1179, 2556)
+    const secondary = jpeg(295, 639, [EXIF])
+    const tail = Buffer.from('+374 99 123456', 'latin1')
+
+    expect(withoutMetadata(Buffer.concat([primary, secondary]))?.equals(primary)).toBe(true)
+    expect(withoutMetadata(Buffer.concat([primary, tail]))?.equals(primary)).toBe(true)
+  })
+
+  it('APP0 — только JFIF и без миниатюры; JFXX — вон', () => {
+    const thumbnail = segment(0xe0, [
+      ...ascii('JFIF\0'),
+      1,
+      1,
+      0,
+      0,
+      1,
+      0,
+      1,
+      2,
+      1,
+      9,
+      9,
+      9,
+      9,
+      9,
+      9,
+    ])
+    const jfxx = segment(0xe0, [...ascii('JFXX\0'), 0x10, ...ascii('a thumbnail of the photo')])
+    const sof = segment(0xc0, [0x08, 0x01, 0x00, 0x01, 0x00, 0x01])
+    const body = [...sof, ...sos, 0x55, 0xff, 0xd9]
+
+    const withThumbnail = withoutMetadata(Buffer.from([0xff, 0xd8, ...thumbnail, ...body]))
+    expect(withThumbnail).toEqual(Buffer.from([0xff, 0xd8, ...JFIF, ...body]))
+    const withJfxx = withoutMetadata(Buffer.from([0xff, 0xd8, ...JFIF, ...jfxx, ...body]))
+    expect(withJfxx).toEqual(Buffer.from([0xff, 0xd8, ...JFIF, ...body]))
+  })
+
+  it('без конца картинки или со вторым началом внутри — не JPEG', () => {
+    const open = jpeg(100, 100).subarray(0, -2)
+    expect(withoutMetadata(Buffer.concat([open, Buffer.from([0x55, 0x55])]))).toBeNull()
+    const nested = Buffer.from([0xff, 0xd8, 0xff, 0xd8, ...jpeg(100, 100).subarray(2)])
+    expect(withoutMetadata(nested)).toBeNull()
+  })
+})
+
+describe('потолок разбора (адверсариальное А3)', () => {
+  /** Two megabytes of empty four-byte segments before the frame. */
+  function crowded(): Buffer {
+    const head = [0xff, 0xd8]
+    const tail = [
+      ...segment(0xc0, [0x08, 0x03, 0xe8, 0x03, 0xe8, 0x01]),
+      ...segment(0xda, [0x01, 0x01, 0, 0, 0x3f, 0]),
+      0x55,
+      0xff,
+      0xd9,
+    ]
+    const count = Math.floor((FEEDBACK_PICTURE_BYTES_MAX - head.length - tail.length) / 4)
+    const bytes = Buffer.alloc(head.length + count * 4 + tail.length)
+    bytes.set(head, 0)
+    for (let at = 0; at < count; at++) bytes.set([0xff, 0xdb, 0x00, 0x02], 2 + at * 4)
+    bytes.set(tail, 2 + count * 4)
+    return bytes
+  }
+
+  it('больше 256 сегментов — «не подошёл», не пройдя файл до конца', () => {
+    const encoded = crowded().toString('base64')
+    const timed = () => {
+      const started = performance.now()
+      expect(() => pictureOf(encoded)).toThrow(
+        expect.objectContaining({ code: ERROR.FEEDBACK_PICTURE_INVALID }),
+      )
+      return performance.now() - started
+    }
+    // The fastest of five: other copies' load on this machine only ever adds time. The base64 of two
+    // megabytes is most of what is left.
+    expect(Math.min(...Array.from({ length: 5 }, timed))).toBeLessThan(15)
+  })
+})

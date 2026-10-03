@@ -711,7 +711,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           )
         }),
       ownerNoticesSent: (body) =>
-        createOwnerNoticeRepository(db).markSent(body.messages, new Date()),
+        createOwnerNoticeRepository(db).markSent(body.messages, new Date(), body.missed),
       feedbackFromBot: (body) => feedbackFromBot(messages, owner, body, VERSION),
       replyDelivered: (body) => messages.markDelivered(body),
       feedbackPicture: (number, position) => messages.picture(number, position),

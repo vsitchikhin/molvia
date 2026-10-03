@@ -42,7 +42,7 @@ partial="$RCLONE_REMOTE/partial/$name"
 docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres \
   sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom \
     --exclude-table-data=receipt_parts --exclude-table-data=receipt_line_images \
-    --exclude-table-data=feedback_pictures' \
+    --exclude-table-data=feedback_picture_files' \
   | age --encrypt --recipient "$AGE_RECIPIENT" \
   | rclone rcat --streaming-upload-cutoff 1G "$partial"
 

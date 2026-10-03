@@ -3,7 +3,7 @@ import { FAILURE_KEEP_DAYS, FEEDBACK_NOTICE_KINDS } from '@molvia/model'
 import type { OwnerNotice, OwnerNoticeKind } from '@molvia/model'
 import type { Conn } from './index'
 import { rowLimit } from './rows'
-import { feedbackPictures, ownerNotices } from './schema'
+import { feedbackPictureFiles, feedbackPictures, ownerNotices } from './schema'
 
 /** A notice about a failure not handed within a day goes: `make failures` still has its count (Р-7). */
 const FAILURE_NOTICE_KINDS = [
@@ -47,11 +47,16 @@ export interface OwnerNoticeRepository {
   claim(limit: number, at: Date): Promise<readonly unknown[]>
 
   /**
-   * The bot sent the notices about these messages: they are not handed again, and their pictures'
-   * bytes and Telegram ids go in the same transaction — the owner's Telegram has them now (MOL-167,
-   * В-1). What is left of each picture is its line.
+   * The bot sent the notices about these messages: they are not handed again, and their pictures go
+   * in the same transaction — the owner's Telegram has them now (MOL-167, В-1). What is left of each
+   * is its line, `sent_at` set only for a picture that was there to send and not among `missed`
+   * (adversarial А4): one the timer let go, or Telegram refused, never reached the owner.
    */
-  markSent(messages: readonly number[], at: Date): Promise<void>
+  markSent(
+    messages: readonly number[],
+    at: Date,
+    missed?: readonly { readonly message: number; readonly position: number }[],
+  ): Promise<void>
 
   /**
    * Notices handed more than `FAILURE_KEEP_DAYS` ago go, and so do notices about a failure the bot
@@ -104,8 +109,12 @@ export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
       await db.insert(ownerNotices).values({ kind: notice.kind, payload: notice, createdAt: at })
     },
 
-    async markSent(messages, at) {
+    async markSent(messages, at, missed = []) {
       if (messages.length === 0) return
+      const notMissed = missed.map(
+        ({ message, position }) =>
+          sql`not (${feedbackPictures.feedbackId} = ${message} and ${feedbackPictures.position} = ${position})`,
+      )
       await db.transaction(async (tx) => {
         await tx
           .update(ownerNotices)
@@ -113,13 +122,20 @@ export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
           .where(and(inArray(ownerNotices.feedbackId, [...messages]), isNull(ownerNotices.sentAt)))
         await tx
           .update(feedbackPictures)
-          .set({ image: null, telegramFileId: null, sentAt: at })
+          .set({ sentAt: at })
           .where(
             and(
               inArray(feedbackPictures.feedbackId, [...messages]),
               isNull(feedbackPictures.sentAt),
+              sql`exists (select 1 from ${feedbackPictureFiles}
+                where ${feedbackPictureFiles.feedbackId} = ${feedbackPictures.feedbackId}
+                  and ${feedbackPictureFiles.position} = ${feedbackPictures.position})`,
+              ...notMissed,
             ),
           )
+        await tx
+          .delete(feedbackPictureFiles)
+          .where(inArray(feedbackPictureFiles.feedbackId, [...messages]))
       })
     },
 

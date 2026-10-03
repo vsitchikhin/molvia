@@ -8,6 +8,7 @@ import {
   exchanges,
   expenses,
   feedback,
+  feedbackPictureFiles,
   feedbackPictures,
   feedbackReplies,
   incomeRevisions,
@@ -275,11 +276,15 @@ export async function aLife(
     feedbackId: message.id,
     position: 1,
     source: 'phone',
-    image: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
     fingerprint: 'life',
     bytes: 4,
     width: 1179,
     height: 2556,
+  })
+  await db.insert(feedbackPictureFiles).values({
+    feedbackId: message.id,
+    position: 1,
+    image: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
   })
   const [reply] = await db
     .insert(feedbackReplies)

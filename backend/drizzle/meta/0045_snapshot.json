@@ -1,5 +1,5 @@
 {
-  "id": "acf011f9-eca4-4808-bccf-372590a68c2d",
+  "id": "b35f8125-7caa-40c6-bba7-307c067d155c",
   "prevId": "e4b9b163-0dbf-406d-919b-8f485f42b960",
   "version": "7",
   "dialect": "postgresql",
@@ -1251,6 +1251,90 @@
       },
       "isRLSEnabled": false
     },
+    "public.feedback_picture_files": {
+      "name": "feedback_picture_files",
+      "schema": "",
+      "columns": {
+        "feedback_id": {
+          "name": "feedback_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "image": {
+          "name": "image",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "telegram_file_id": {
+          "name": "telegram_file_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        }
+      },
+      "indexes": {
+        "feedback_picture_files_created_idx": {
+          "name": "feedback_picture_files_created_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "feedback_picture_files_line": {
+          "name": "feedback_picture_files_line",
+          "tableFrom": "feedback_picture_files",
+          "tableTo": "feedback_pictures",
+          "columnsFrom": ["feedback_id", "position"],
+          "columnsTo": ["feedback_id", "position"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "feedback_picture_files_feedback_id_position_pk": {
+          "name": "feedback_picture_files_feedback_id_position_pk",
+          "columns": ["feedback_id", "position"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "feedback_picture_files_one_source": {
+          "name": "feedback_picture_files_one_source",
+          "value": "(\"feedback_picture_files\".\"image\" is null) <> (\"feedback_picture_files\".\"telegram_file_id\" is null)"
+        },
+        "feedback_picture_files_image_size": {
+          "name": "feedback_picture_files_image_size",
+          "value": "\"feedback_picture_files\".\"image\" is null\n          or octet_length(\"feedback_picture_files\".\"image\") between 1 and 2097152"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.feedback_pictures": {
       "name": "feedback_pictures",
       "schema": "",
@@ -1272,18 +1356,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "image": {
-          "name": "image",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "telegram_file_id": {
-          "name": "telegram_file_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "fingerprint": {
           "name": "fingerprint",
@@ -1323,24 +1395,7 @@
           "notNull": false
         }
       },
-      "indexes": {
-        "feedback_pictures_held_idx": {
-          "name": "feedback_pictures_held_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"feedback_pictures\".\"image\" is not null or \"feedback_pictures\".\"telegram_file_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "feedback_pictures_feedback_id_feedback_id_fk": {
           "name": "feedback_pictures_feedback_id_feedback_id_fk",
@@ -1368,14 +1423,6 @@
         "feedback_pictures_source_known": {
           "name": "feedback_pictures_source_known",
           "value": "\"feedback_pictures\".\"source\" in ('phone', 'telegram')"
-        },
-        "feedback_pictures_kept_by_source": {
-          "name": "feedback_pictures_kept_by_source",
-          "value": "(\"feedback_pictures\".\"source\" = 'phone' or \"feedback_pictures\".\"image\" is null)\n          and (\"feedback_pictures\".\"source\" = 'telegram' or \"feedback_pictures\".\"telegram_file_id\" is null)"
-        },
-        "feedback_pictures_image_size": {
-          "name": "feedback_pictures_image_size",
-          "value": "\"feedback_pictures\".\"image\" is null\n          or octet_length(\"feedback_pictures\".\"image\") between 1 and 2097152"
         },
         "feedback_pictures_bytes_size": {
           "name": "feedback_pictures_bytes_size",
