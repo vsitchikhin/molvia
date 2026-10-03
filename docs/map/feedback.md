@@ -35,3 +35,7 @@ Rules: `.claude/rules/feedback.md`. A test beside its source, or mirroring it un
 ## frontend · other
 
 - `frontend/src/platform.ts` — The platform a message to the developer carries (MOL-147): `platformLine` — the system, the major version the browser still tells, app or browser — and `standalone()`, opened from the home screen, shared with the camera hint.
+
+## e2e
+
+- `e2e/feedback.spec.ts` — End-to-end: «Написать разработчику» from the settings with no kind chosen, from an error screen with «Сломалось», the screen and the code, «back» puts the sheet away, offline the button waits and the draft stays; each row read back through the copy.
