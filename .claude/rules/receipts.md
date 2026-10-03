@@ -239,14 +239,14 @@ and the shape of an «address row», and each form OCR made moved them again; th
 beside its shop's — and the place is looked for in the person's own city: an address read in any form
 names its city, so no item can name another one beside it. **And the city must stand in an address row**:
 a house after its first word («Գորկու 62», glued «Գորկուծ22», «62գ» a building), four digits at most — five
-and more are a tax number — or the street and the house on the next row («ք. Գյումրի,» / «Գորկու 62»); and
+and more are a tax number — or, with «ք.» before the city — a mark no item's name has — the house anywhere on the row («62, Գորկու փ., ք. Գյումրի») or the street and the house on the next («ք. Գյումրի,» / «Գորկու 62»); a shop named after a city over a street without one is no address (round 12); and
 none of an item's marks — a kind of the till's dictionary beside the city (`TILL_WORDS_RU` and the Latin
 `TILL_KINDS_LATIN`, «LAGER», passed in; one letter off from seven letters), the city in quotes, a table's
 heading, an article, a unit right after its number «0.5լ», «5տ», a gram from a hundred «500գ», a sum's
 hundredths, a price and a sum at the row's end. A word cut with a dot decides nothing — «Գոր.», «Վարդ.»
 are streets as often as kinds. A house «62 տ.», a postal code, a day on the row, a flat «162/105», any mark
 OCR put at the edge are an address's. **The chain's site** — «www.yerevan-city.am», «Ww Yerevan: СПу. ат» —
-names no city (round 11). The end of the head stays a bound only: above a table's first heading, two rows
+names no city (round 11) — a row with no digit: an address with its country's code «…, AM» is still one (round 12). The end of the head stays a bound only: above a table's first heading, two rows
 above a card's first article, twenty rows where none is read. **The one form left** is undecidable from
 the text: the address not read at all, and in the head an item named after a city with no kind beside it
 — a bare brand, a kind OCR cut mid-word — and a number. It names the item's city; the person sees the

@@ -156,6 +156,12 @@ const CITY_ANYWHERE: Readonly<Record<SettingsCity, RegExp>> = {
   Ереван: new RegExp(`(?<!\\p{L})${CITY_WORDS.Ереван}`, 'iu'),
 }
 
+/** The city after «ք.», քաղաք — a mark an address has and an item's name never does. */
+const CITY_MARKED: Readonly<Record<SettingsCity, RegExp>> = {
+  Гюмри: new RegExp(`(?<!\\p{L})ք\\.\\s*${CITY_WORDS.Гюмри}`, 'iu'),
+  Ереван: new RegExp(`(?<!\\p{L})ք\\.\\s*${CITY_WORDS.Ереван}`, 'iu'),
+}
+
 /**
  * The head is the rows above the first item (round 6, Р6-В2): a fixed window of fifteen left the address
  * of «Ереван Сити» past it on six readings of the bench — its head runs to the 17th row. Where no item
@@ -213,7 +219,7 @@ export function receiptCityOf(
   const first = rows.filter((row) => row.part === 0)
   const head = first.slice(0, headEnd(first))
   // the chain's site, «www.yerevan-city.am», however OCR read it — «Ww Yerevan: СПу. ат» — names no city
-  const lines = head.filter((row) => !SITE_ROW.test(row.text))
+  const lines = head.filter((row) => !isSiteRow(row.text))
   const cities = Object.keys(CITY_ANYWHERE) as SettingsCity[]
   // the city an address names — the one city named in the head at all: an item named after another
   // city, or a chain's legal address beside its shop's, is two cities and no answer (rounds 3–10)
@@ -221,20 +227,30 @@ export function receiptCityOf(
   if (named.length !== 1) return null
   const [city] = named
   if (city === undefined) return null
-  return lines.some(
-    (row, i) =>
-      CITY_ANYWHERE[city].test(row.text) &&
-      (isAddressRow(row.text, productWords) ||
-        // the city on its row, the street and the house on the next: «ք. Գյումրի,» / «Գորկու 62»
-        (!itemShaped(row.text, productWords) &&
-          isAddressRow(lines[i + 1]?.text ?? '', productWords))),
-  )
+  return lines.some((row, i) => {
+    if (!CITY_ANYWHERE[city].test(row.text)) return false
+    // «ք.», a city's own mark, never stands in an item's name: after it the house may come first,
+    // «62, Գորկու փ., ք. Գյումրի», or on the next row, «ք. Գյումրի,» / «Գորկու 62» — a shop named after a
+    // city, «ԵՐԵՎԱՆ ՄԹԵՐՔ» over «Գորկու 62», has no mark and is no address (round 12, Р12-В1)
+    const marked = CITY_MARKED[city].test(row.text)
+    return (
+      isAddressRow(row.text, productWords, marked) ||
+      (marked &&
+        !itemShaped(row.text, productWords) &&
+        isAddressRow(lines[i + 1]?.text ?? '', productWords, false))
+    )
+  })
     ? city
     : null
 }
 
-/** A site's row: «www.…», «….am», and how OCR reads them, «Ww …», «… ат» (round 11, Р11-В1). */
-const SITE_ROW = /(?<!\p{L})w{2,}(?!\p{L})|(?:\.|\s)(?:am|ат)\s*$|https?:/iu
+/**
+ * A site's row: «www.…», «….am», and how OCR reads them, «Ww …», «… ат» (round 11, Р11-В1) — with no
+ * digit, since an address has its house: «ԳՅՈՒՄՐԻ Գորկու 62, AM» is the country's code (round 12, Р12-В2).
+ */
+function isSiteRow(text: string): boolean {
+  return !/\d/u.test(text) && /(?<!\p{L})w{2,}(?!\p{L})|(?:\.|\s)(?:am|ат)\s*$|https?:/iu.test(text)
+}
 
 const NO_WORDS: ReadonlySet<string> = new Set()
 
@@ -264,12 +280,13 @@ const ITEM_SHAPED = [
  * beside it, «ԳՅՈՒՄՐԻ Գորկու 62». What OCR adds at the paper's edge — «9.», «2..1», «= 4 -» — stands
  * before an address as before an item and decides nothing.
  */
-function isAddressRow(text: string, productWords: ReadonlySet<string>): boolean {
+function isAddressRow(text: string, productWords: ReadonlySet<string>, marked: boolean): boolean {
   if (itemShaped(text, productWords)) return false
   // an address names its house after its first word: «Գորկու 62», «Գորկուծ22» as OCR glued it; a row
-  // with no number there — «1.ԳՅՈՒՄՐԻ ԳԱ ուր.», a name OCR cut — is no address (round 10, Р10-В1)
+  // with no number there — «1.ԳՅՈՒՄՐԻ ԳԱ ուր.», a name OCR cut — is no address (round 10, Р10-В1),
+  // unless «ք.» names the city: «62, Գորկու փ., ք. Գյումրի» (round 12)
   const letter = text.search(/\p{L}/u)
-  if (letter < 0 || !/\d/u.test(text.slice(letter))) return false
+  if (letter < 0 || !/\d/u.test(marked ? text : text.slice(letter))) return false
   // a house is four digits at most; five and more are a tax number, a till's, a receipt's (round 11)
   if (/\d{5,}/u.test(text)) return false
   // a price and a sum stand at the row's end, in the hundreds; a postal code and a house are not there

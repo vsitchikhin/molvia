@@ -275,6 +275,10 @@ describe('the city of the address (MOL-126, Р-6)', () => {
     expect(
       receiptCityOf(rows('DOG CITY', '62, Գորկու փ.', 'ք. Գյումրի, Գորկու 62', 'ՀՎՀՀ 02615412')),
     ).toBe('Гюмри')
+    // the house first on the city's own row, «ք.» naming the city (round 12, №19)
+    expect(receiptCityOf(rows('DOG CITY', '62, Գորկու փ., ք. Գյումրի', 'ՀՎՀՀ 02615412'))).toBe(
+      'Гюмри',
+    )
   })
 
   // round 3, Р3-В2: a chain's legal address beside its shop's — two cities are no answer
@@ -471,6 +475,18 @@ describe('an item named after a city never names the receipt’s city (MOL-126)'
   // round 11: the city and the street on two rows; the chain's site however OCR read it
   it('reads a city whose street stands on the next row, and no city off the chain’s site', () => {
     expect(receiptCityOf(rows('ք. Գյումրի,', 'Գորկու 62', 'ՀՎՀՀ:01282006'), words)).toBe('Гюмри')
+    // a shop named after a city over a street without one is no address (round 12, Р12-В1)
+    expect(receiptCityOf(rows('ԵՐԵՎԱՆ ՄԹԵՐՔ', 'Գորկու 62', 'ԳՀ:31025350'), words)).toBeNull()
+    expect(receiptCityOf(rows('ԳՅՈՒՄՐԻ ՄԱՐԿԵՏ', 'Կոմիտասի 35', 'ԳՀ:31025350'), words)).toBeNull()
+    // a country's code and OCR's noise on an address are not a site (round 12, Р12-В2)
+    for (const address of [
+      'ԳՅՈՒՄՐԻ Գորկու 62, AM',
+      'Gyumri, Gorki 62, AM',
+      'ԳՅՈՒՄՐԻ Գորկու 62 ат',
+      'Ww ԳՅՈՒՄՐԻ Գորկու 62',
+    ]) {
+      expect(receiptCityOf(rows('DOG CITY', address, 'ԳՀ:31025350'), words)).toBe('Гюмри')
+    }
     for (const site of ['Ww Yerevan: СПу. ат', 'www.yerevan.city.am', 'www yerevan—city am']) {
       expect(receiptCityOf(rows('ԵՐԵՎԱՆ-ՍԻԹԻ', site, 'ԳՅՈՒՄՐԻ Գորկու 62 2.'), words)).toBe('Гюмри')
     }
