@@ -388,7 +388,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 ### Frontend — `.claude/rules/frontend.md`
 
-- **Two self-hosted faces, Nunito and Onest; the dram sign from a face of its own.**
+- **Two self-hosted faces, Nunito and Onest; the dram sign from a face of its own.** Nunito is one
+  weight, 800, set only through `@include display-type` (MOL-171, Ф-7).
+- **`frontend/DESIGN.md` is the style, and the linter holds it** (MOL-171): a weight, a size, a
+  radius, a colour function or a custom property no file defines fails Stylelint; the token block
+  of DESIGN.md is `make format`'s to write and `make lint`'s to check.
 - **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
   `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the
   failure; polite states speak through the one live region in `App.vue`.
@@ -681,8 +685,10 @@ database access. In a product about data integrity, two write paths will silentl
 - **The target device is a phone in one hand, at the shelf, in bad light.**
   Everything is designed from there; desktop is derived.
 - **Tokens live in one file** (`styles/_tokens.scss`). Components use variables only:
-  not a single hardcoded hex, not a single magic spacing off the scale. Stylelint enforces
-  both — a literal colour or an off-scale padding fails `make lint`.
+  not a single hardcoded hex, not a single magic spacing off the scale, weight, size or radius.
+  Stylelint enforces all of it, and a custom property defined nowhere (MOL-171) — a literal fails
+  `make lint`. **The style is described in `frontend/DESIGN.md`**, what Claude Design draws from;
+  its token block is generated from `_tokens.scss` (`bin/design-md.mjs`) and never typed.
 - **Everything is SCSS.** There is no plain CSS in the project.
 - Touch target >= 44px. The primary action is reachable with a thumb.
 - **Every SFC is one file in one fixed order:** `<template>`, then `<script lang="ts">`

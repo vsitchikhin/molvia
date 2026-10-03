@@ -12,6 +12,30 @@ The detail behind the frontend lines of `CLAUDE.md`.
   single Cyrillic glyph, so its Russian mockups were rendered by a system fallback the
   whole time. Fonts live in the repository and are precached — the app is opened where the
   connection drops, and a request to someone else's CDN is one more thing that can hang.
+- **`frontend/DESIGN.md` is the style, and the linter holds it** (MOL-171). DESIGN.md (with
+  `PRODUCT.md` beside it) is what Claude Design draws from and what a screen is checked against; its
+  token block is the file's front matter, generated from `_tokens.scss` by `bin/design-md.mjs` and
+  passed through Prettier — `make format` rewrites quotes otherwise, and the check would fail on its
+  own output. `npm run format` writes it, `npm run lint` refuses one out of date: a block typed by
+  hand drifts at the first edit of a token, and the next design is drawn in old colours. Stylelint
+  allows, outside `_tokens.scss`, `_mixins.scss` and `_fonts.scss`: a weight only `var(--weight-*)`, a
+  size only `var(--text-*)`, `var(--icon*)`, `inherit` or `1em`, a radius only `var(--radius*)`, `0`,
+  `50%` or a `calc()` of them, no colour function (`rgb()`, `oklch()`…), and `font-family` only
+  `var(--font)` — **Nunito comes only with `@include display-type`**, its face and its one weight
+  together (Ф-7, owner's В-3): a weight rule alone let Nunito be set at 600 beside it, and
+  `--weight-display` on Onest asks for an 800 Onest has not got. **A custom property read where none
+  is declared is refused** by our own rule, `molvia/known-custom-property`
+  (`frontend/stylelint/known-properties.mjs`): `var(--space-5)` stood on two screens, dropped as
+  invalid, because the spacing list takes any `--space-*` by its shape. Known is a declaration in the
+  tokens (either scheme), `main.scss`, the mixins, the file itself — or the one list of properties a
+  script sets (`SET_BY_SCRIPT`, today `--sheet-drag`), where a false alarm is fixed, never by a
+  disable comment in the component. A fallback does not make a name known. The one disable comment
+  is `AppButton`'s icon size, until the icon scale (MOL-173). **A branch red after master took this:**
+  Nunito is `@include display-type` in place of the `font-family`/`font-weight` pair, a literal is a
+  token, and `npm run lint:style -w @molvia/frontend` names every place.
+- **Nunito is one weight, 800, one file per subset** (MOL-171): the 400 and 600 files were the same
+  variable font copied twice, and the precache fetched each URL. A sentence in a figure's place
+  («Рынка нет» on the rate chart) is set in Onest, not Nunito at another weight.
 - **The dram sign `֏` comes from a face of its own,** scoped to `unicode-range: U+058F`.
   Of the 321 Google fonts covering Cyrillic, four also cover Armenian and none is usable
   here. Without this the glyph falls back to a system font and shifts the baseline in the

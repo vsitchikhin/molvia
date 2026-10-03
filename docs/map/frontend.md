@@ -44,7 +44,11 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 
 ## frontend · other
 
-- `frontend/.stylelintrc.json` — Stylelint config: no literal colours, spacing only from the token scale, safe areas only through tokens.
+- `frontend/.stylelintrc.json` — Stylelint config: no literal colours, colour functions or safe areas; spacing, weight, size and radius only from tokens; Nunito only through `display-type`; the unknown-property plugin.
+- `frontend/DESIGN.md` — The style for Claude Design and for us: the token block generated from `_tokens.scss` by `bin/design-md.mjs`, then the named rules of colour, type, layout, shape and the kit.
+- `frontend/PRODUCT.md` — The product in one page for Claude Design: what it answers, who, where, tone, trust, anti-references.
+- `frontend/stylelint/known-properties.mjs` — Stylelint rule `molvia/known-custom-property`: a `var(--x)` must be declared in the tokens, `main.scss`, the mixins, its own file, or the list of properties set by script.
+- `frontend/stylelint/known-properties.test.ts` — Test: the rule takes tokens of either scheme, globals, a file's own property and one set by script; refuses an unknown name with or without a fallback, in a mixin's arguments and inside `calc`.
 - `frontend/env.d.ts` — Ambient type references for Vite and the PWA plugin's client.
 - `frontend/index.html` — The PWA's HTML shell: viewport with keyboard resizing, per-scheme theme colours, the device's scheme set before the first paint, icons, the app mount.
 - `frontend/public/` — Static assets served as is: `favicon.svg` (the icon source), the rasterised app icons and the self-hosted font files.
@@ -60,8 +64,8 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/navigation.ts` — Navigation rules: how a tab tap is written into history (home — «Что брать»), where the back chevron leads, up to the parent, cold-start parent laying, guarded step back and `afterStep`.
 - `frontend/src/pwaUpdate.ts` — Service-worker registration and update: quietly while hidden with no sheet, or by «Обновить»; looks every 15 min and on a new server build; `phase` for the app.
 - `frontend/src/router.ts` — The router: every route with its title key, tab and parent, redirects of old addresses (`/trip*`, `/advice`), the dev-only kit route, and the scroll behaviour.
-- `frontend/src/styles/_fonts.scss` — Font faces: self-hosted Nunito and Onest subsets, and the dram sign's own face.
-- `frontend/src/styles/_mixins.scss` — SCSS mixins injected into every component: touch target, wider-than-phone, pinned bar, visually hidden, focus ring, appear (a fade-in with a short rise on insertion).
+- `frontend/src/styles/_fonts.scss` — Font faces: self-hosted Nunito (800 only) and Onest subsets, and the dram sign's own face.
+- `frontend/src/styles/_mixins.scss` — SCSS mixins injected into every component: display type (Nunito at its one weight), touch target, wider-than-phone, pinned bar, visually hidden, focus ring, appear (a fade-in with a short rise on insertion).
 - `frontend/src/styles/_tokens.scss` — Design tokens: every colour, size, radius and duration as custom properties, light and dark schemes.
 - `frontend/src/styles/main.scss` — Global styles entry: fonts and tokens, body, a page held still under a modal, view-transition animations between screens, the `appear` keyframes of the motion grammar.
 - `frontend/src/styles/theme-color.test.ts` — Test: the status-bar and manifest colours in `index.html` and `vite.config.ts` match the tokens of each scheme.
