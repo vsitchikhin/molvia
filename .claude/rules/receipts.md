@@ -31,18 +31,44 @@ made the names up (MOL-114). What reads is a chain of cheap parts:
 | Figures       | the till's layout, the line's arithmetic, the receipt's discount rate, the printed total | `receipt-text.ts`         |
 | «Переснимите» | too little read to be worth correcting                                                   | `needsReshoot`            |
 
-**The parse is a port, held line for line.** `receipt-text.ts` is MOL-114's `hybrid.mjs` in
-TypeScript, and on the bench's readings it gives what the prototype gave — the fixtures
-`receipt-text.am-*.json` and `.scratch/tasks/status/MOL-125/parity.mjs` hold it. A change of a rule is
-measured on the bench before and after, never fitted to one receipt: the rules were picked looking at
-the first four receipts, and the honest figure is the one on receipts the rules never saw.
+**The parse is a port, measured on the bench.** `receipt-text.ts` began as MOL-114's `hybrid.mjs` in
+TypeScript, line for line on the bench's readings (`.scratch/tasks/status/MOL-125/parity.mjs`); the
+review of MOL-125 then fixed what the prototype got wrong, and each fix was run on the bench's truth
+before and after (`score.mjs`: lines whose quantity and sum are right). A change of a rule is measured
+so, never fitted to one receipt: the rules were picked looking at the first four receipts, and the
+honest figure is the one on receipts the rules never saw.
+
+| Fix                                                                             | Bench, right of 162                                                                        |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| before the review                                                               | 65                                                                                         |
+| the total's rest goes to a blank line only when the lines met the total (Р6)    | 66 — am-08 lost a negative sum                                                             |
+| a line read untouched before the receipt's rate (Р5); the seam of parts (Р7–Р9) | 66, the same                                                                               |
+| **refused:** a discount without decimals taking no shelf price (Р4)             | 63 — OCR splits «86,9» into «86 9» (am-02), and the greedy group of the prototype reads it |
 
 **The search for a line's figures has a ceiling** (review, MOL-125): it grows as a power of the digits
 OCR can confuse in every field, and it runs in the API's process — twelve glued twelve-digit lines
 held every request for half a minute. A line past `LINE_COMBINATIONS_MAX` (200 000), or past what is
 left of `READING_COMBINATIONS_MAX` (500 000 a reading), is taken as read, unsettled. The bench's worst
 line tries 55 176 and its busiest reading 122 161 (am-03); the worst case now costs about half a
-second.
+second. **Every line may try `LINE_COMBINATIONS_FLOOR` (10 000) whatever the reading spent** (Р15):
+rows of an item's shape above the list — a stamp, a smudge — would otherwise drain the budget, and every
+real line would keep its confusions.
+
+**The search against the total is bounded too** (Р14): a till that prints no shelf price lets every
+swap of a line fit the line, and the readings multiply by dozens a line — fifteen ordinary lines held
+the API for 52 s. The search carries the cheapest `RECONCILE_STATES_MAX` (2 000) readings from line to
+line and stops past `RECONCILE_STEPS_MAX` steps, the lines then keeping their first reading as when no
+total was read; thirty such lines balance in under a second, and the bench reads the same.
+
+**A long receipt's seam must be one an overlap can make** (Р7–Р9): the last article of the text so far
+that the next part has (exactly, else one digit off), where the next part holds no more articles before
+it than the text so far does, and everything after it in the text so far is in the next part too.
+Another item's near article, or the first of two bags, makes no seam; an overlap of a name row only
+joins the parts without the rows both hold.
+
+**What is printed at the head is checked as a calendar and a clock** (Р10, Р12, Р13): a date of
+the calendar from 2000 to the server's tomorrow, a time `HH:MM` — OCR makes up «01.01.0000», which
+Postgres refuses, «2099» and «99:99».
 
 **Amounts are counted in hundredths, not in minor units.** A till prints hundredths whatever the
 currency; `moneyOfHundredths` turns them into the currency's minor units by its exponent. Quantities
@@ -111,9 +137,10 @@ write sent again, another photo in its place a 409; the last part puts the recei
 **A part is a raw JPEG**, the API's one body that is not JSON, taken in the receipts' scope only — every
 other route keeps a megabyte. **What is not a photo is refused at once** — not a JPEG by its frame
 header, no scan with data after it (a head alone, review А9), a side under 200 px
-(`error.receipt_not_photo`, 415); a side over 6 000 px, or a `Content-Length` over 8 MB said before the
-body is read (`error.receipt_too_large`, 413, review А7): «не принят» on the phone, set aside by its
-queue, never retried. **The ceiling of a side lets a phone's whole frame through** — 4 032 px of a
+(`error.receipt_not_photo`, 415); a side over 6 000 px, or a body over 8 MB — by its
+`Content-Length` before it is read, and counted by the scope's own parser when it comes in chunks
+with no length (`error.receipt_too_large`, 413, review А7, А16): «не принят» on the phone, set aside
+by its queue, never retried. **The ceiling of a side lets a phone's whole frame through** — 4 032 px of a
 12-megapixel camera, 5 712 of a 24-megapixel one (review А8): the phone crops to 3 200, and one that did
 not would otherwise be refused for good. Whether the data decodes is the reader's to find out.
 
@@ -127,7 +154,8 @@ not would otherwise be refused for good. Whether the data decodes is the reader'
 | An item line cut out   | 28 days after the receipt is recorded (owner, 02.10.2026)                                      |
 
 **Cut-out lines are item rows only** — a line's figures, and its name row only when the item's number
-was read on it; a table's heading row only. Never the head where a customer's name is printed, never
+was read on it — one or two digits and then a letter, never a date or a phone (Р16); a table's heading
+row only. Never the head where a customer's name is printed, never
 the total (review А5, А6): above the first item whose name OCR lost stands the head — the VAT, a
 buyer — and a table's last row runs on into a total whose word OCR misread. They are cut when the
 receipt is read, since the boxes are the reading's; recording writes the text a person confirmed

@@ -422,13 +422,13 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 - **No model reads a receipt** (MOL-114): Tesseract in `services/receipt-reader`, a container with no
   database and no disk; the API holds the queue, the photos and the parse, one receipt at a time.
-- **The parse is MOL-114's prototype, held line for line** (`receipt-text.ts`, its fixtures): a rule
-  changed is measured on the bench before and after; amounts in hundredths, never floats.
+- **The parse is MOL-114's prototype, measured on the bench** (`receipt-text.ts`, `score.mjs`): a rule
+  changed is run on the bench's truth before and after; amounts in hundredths, never floats.
 - **«Переснимите» is «too little read»** (`needsReshoot`, В-4) — never «the total did not match» alone.
 - **The reader away leaves a receipt queued; a photo it drops goes to the end with its attempt
   counted; a photo it cannot read fails** — never lost, never read forever; people read in turn.
-- **The search for a line's figures has a ceiling** (`LINE_COMBINATIONS_MAX`, a budget a reading):
-  it runs in the API's process.
+- **Every search of the parse has a ceiling** — a line's, a reading's, the total's
+  (`*_COMBINATIONS_*`, `RECONCILE_*`): it runs in the API's process.
 - **A photo lives until the receipt is recorded, a receipt not recorded 28 days, a cut-out item line
   28 days after recording** (В-3); **photos never enter the nightly copy** (В-2), never the log.
 
