@@ -166,6 +166,46 @@ const file: ExportFile = {
       removedAt: null,
     },
   ],
+  receipts: [
+    {
+      id: id(30),
+      status: 'parsed',
+      failure: null,
+      parts: 2,
+      country: 'AM',
+      language: 'ru',
+      currency: 'AMD',
+      capturedAt: at,
+      createdAt: at,
+      queuedAt: at,
+      readingAt: at,
+      readAt: at,
+      attempts: 1,
+      readerVersion: 'tesseract 5.5.0 · dc2c9f36ac9d',
+      layout: 'card',
+      tin: '01282006',
+      printedOn: '2026-09-30',
+      printedTime: '15:03',
+      receiptNo: '21410811',
+      total: money(74_000n, 'AMD'),
+      balanced: true,
+      recordedAt: null,
+      removedAt: null,
+      lines: [
+        {
+          position: 0,
+          printed: 'Կաթ «Իգիթ» 3.2% 1լ',
+          hs: '0401',
+          sku: '1163909',
+          quantity: { milli: 2_000n, unit: 'piece' },
+          price: money(37_000n, 'AMD'),
+          sum: money(74_000n, 'AMD'),
+          discount: money(0n, 'AMD'),
+          settled: true,
+        },
+      ],
+    },
+  ],
   spendingCategories: [
     { id: id(14), preset: null, name: 'Такси', colour: 0, archivedAt: null, createdAt: at },
   ],
@@ -242,7 +282,8 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(7)
+    expect(wire.version).toBe(8)
+    expect(wire.receipts[0]?.lines[0]?.quantity).toEqual({ value: '2.000', unit: 'piece' })
     expect(wire.budgetPlans[0]?.plan).toEqual({
       kind: 'amount',
       amount: { amount: '250000.00', currency: 'AMD' },
@@ -255,6 +296,10 @@ describe('exportFileCodec', () => {
 
   it('names no secret: no token, no hash, no login code anywhere in the file', () => {
     expect(keysOf(wire).filter((key) => /token|hash|secret|^code$/i.test(key))).toEqual([])
+  })
+
+  it('carries a receipt’s lines, never the bytes of its photo or of its cut-out lines (MOL-125)', () => {
+    expect(keysOf(wire).filter((key) => /photo|image/i.test(key))).toEqual([])
   })
 
   it('names the person once, in the account — no row repeats whose it is', () => {

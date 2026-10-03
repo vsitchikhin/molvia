@@ -104,7 +104,12 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
     const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
-    const { exchangeId, incomeId, spendingId, accountId } = await aLife(db, anna, tg, shared)
+    const { exchangeId, incomeId, spendingId, accountId, receiptId } = await aLife(
+      db,
+      anna,
+      tg,
+      shared,
+    )
 
     const report = await erasure.erase(tg, { dryRun: false })
 
@@ -121,6 +126,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
         exchanges: 2,
         incomes: 2,
         spendings: 2,
+        receipts: 2,
         budget_plans: 1,
         spending_categories: 1,
         money_month_rates: 1,
@@ -136,6 +142,8 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     expect(await rowsMentioning(anna)).toEqual([])
     expect(await rowsMentioning(accountId)).toEqual([])
     expect(await rowsMentioning(spendingId)).toEqual([])
+    // the photo, the lines read and the lines cut out go with the receipt (MOL-125)
+    expect(await rowsMentioning(receiptId)).toEqual([])
     expect(await rowsMentioning(String(tg), true)).toEqual([])
     expect(await rowsMentioning(exchangeId)).toEqual([])
     expect(await rowsMentioning(incomeId)).toEqual([])

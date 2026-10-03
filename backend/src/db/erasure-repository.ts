@@ -21,6 +21,7 @@ export const ACTOR_REFERENCES = [
   'money_accounts.actor_id',
   'money_month_rates.actor_id',
   'rating_reminders.actor_id',
+  'receipts.actor_id',
   'search_picks.actor_id',
   'sessions.actor_id',
   'spending_categories.actor_id',
@@ -41,6 +42,7 @@ export const ERASED_TABLES = [
   'exchanges',
   'incomes',
   'spendings',
+  'receipts',
   'budget_plans',
   'spending_categories',
   'money_month_rates',
@@ -135,6 +137,7 @@ export function createErasureRepository(db: Db): ErasureRepository {
             exchanges: 0,
             incomes: 0,
             spendings: 0,
+            receipts: 0,
             budget_plans: 0,
             spending_categories: 0,
             money_month_rates: 0,
@@ -198,6 +201,11 @@ export function createErasureRepository(db: Db): ErasureRepository {
             // pointed at, and the rates the person's closed months were frozen at.
             erased.spendings = await count(
               sql`delete from spendings where actor_id = ${actorId} returning 1`,
+            )
+            // Receipts photographed (MOL-125), removed ones too: the photo, the lines read and the
+            // lines cut out for the reader's training go by the cascade — part of a receipt.
+            erased.receipts = await count(
+              sql`delete from receipts where actor_id = ${actorId} returning 1`,
             )
             // The plans of «Бюджет» (MOL-117) point at the categories, so they go before them.
             erased.budget_plans = await count(

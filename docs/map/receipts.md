@@ -15,3 +15,9 @@ Rules: `.claude/rules/receipts.md`. A test beside its source, or mirroring it un
 - `services/receipt-reader/reader.py` — The receipt reader (MOL-125): Tesseract behind Python's own HTTP server — `POST /read` a part's text, row by row with each row's box; `POST /strips` item lines cut out as PNG; `GET /health` with the version of Tesseract and its language files. Stateless, no database, nothing of a receipt logged.
 - `services/receipt-reader/selftest.py` — The reader's live test (В-6), run inside the image by CI: a receipt drawn on the spot, read in both page modes through the server's HTTP, a line cut out, the refusals.
 - `services/receipt-reader/Dockerfile` — The reader's image: Debian trixie, Tesseract and the languages MOL-114 measured (`hye kat srp srp_latn rus eng`), Python and Pillow from apt, run as nobody.
+
+## backend · db
+
+The tables are in the skeleton's schema: `receipts`, `receipt_parts`, `receipt_lines`,
+`receipt_line_images`, migration `0040_receipts`. Erasure takes them through `receipts`; the copy
+carries receipts and their lines, never a photo.
