@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { feedbackPlatformSchema, feedbackRouteSchema } from './feedback'
 import { telegramUserIdSchema } from '#model/entities/actor'
-import { FAILURE_FRAMES } from '#model/support/failure'
+import { FAILURE_FRAMES, PHONE_SCRIPT_PATH } from '#model/support/failure'
 
 /**
  * Where a failure came from (MOL-143). The bot has no build of its own and is rolled out from the
@@ -94,7 +94,9 @@ export const phoneBuildSchema = z.string().regex(/^(?:dev|index-[\w-]{4,24})$/)
 export const phoneFrameSchema = z
   .string()
   .max(FAILURE_WIRE_FRAME_MAX)
-  .regex(/^at [\w$.<>[\]/?]{1,100} \((?:\?|\/[\w./@~+-]{0,400}:\d{1,9}:\d{1,9})\)$/)
+  .regex(
+    new RegExp(`^at [\\w$.<>[\\]/?]{1,100} \\((?:\\?|${PHONE_SCRIPT_PATH}:\\d{1,9}:\\d{1,9})\\)$`),
+  )
 
 /**
  * What the phone says about a failure of its own (MOL-144): its kind and frames, where it was

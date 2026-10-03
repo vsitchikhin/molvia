@@ -82,14 +82,21 @@ export function describeFailure(error: unknown): FailureSummary {
 
 /** A frame's function as the phone sends it: an identifier and nothing a sentence could be. */
 const FRAME_FUNCTION = /^[\w$.<>[\]/]{1,100}$/
-/** A path of the app's own origin, as a script's file can be named — never a query or a hash. */
-const OWN_PATH = /^\/[\w./@~+-]{0,400}$/
+/**
+ * A script of the app's own origin, as a frame may name it (MOL-144, adversarial А2): a file of the
+ * build or of the development server — `/assets/index-BTCsHrpw.js`, `/sw.js`, `/src/views/X.vue`,
+ * `/@fs/…/transport.ts` — never a screen's address. An inline `<script>`, one an extension put into
+ * the page included, is named by its document: `/purchases/<trip>` is a person's trip, and it is no
+ * code of ours either. The API's schema takes the same shape.
+ */
+export const PHONE_SCRIPT_PATH =
+  '\\/(?:(?:assets|src|@fs|@vite|node_modules)\\/[\\w./@~+-]{1,400}|[\\w.-]{1,100})\\.(?:js|mjs|ts|vue)'
+const OWN_PATH = new RegExp(`^${PHONE_SCRIPT_PATH}$`)
 
 /**
- * Where a frame's code is, as the phone sends it (MOL-144, Р-1): a path of the app's own origin with
- * its line and column, or `?` for anything else — another origin, an extension, `eval`, native code.
- * The query and the hash are cut: a page's own address can stand in a frame, and its query is what a
- * person searched for.
+ * Where a frame's code is, as the phone sends it (MOL-144, Р-1): a script of the app's own origin
+ * with its line and column, or `?` for anything else — another origin, an extension, `eval`, native
+ * code, a page's own address. The query and the hash are cut before the path is judged.
  */
 function framePlaceOf(location: string, origin: string): string {
   const position = /^(.*):(\d{1,9}):(\d{1,9})$/.exec(location)

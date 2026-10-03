@@ -36,6 +36,8 @@ describe('phoneFailureSchema — что телефон говорит о сбо�
     'at Купить сыр (/a.js:1:2)',
     'Xe@/assets/index.js:1:2',
     'at Xe (/assets/index.js)',
+    'at inject (/purchases/3f2a9c1e-7b4d-4e8a-9c2f-5d6e7f8a9b0c:3:15)',
+    'at f (/:1:2)',
   ])('кадр не того вида — %s — отказ', (frame) => {
     expect(phoneFrameSchema.safeParse(frame).success).toBe(false)
   })

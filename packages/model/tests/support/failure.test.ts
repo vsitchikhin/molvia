@@ -150,13 +150,21 @@ describe('phoneFrame — кадр одного вида для всех движ
     expect(phoneFrame(line, ORIGIN)).toBe(frame)
   })
 
-  it('адрес страницы с запросом — путь без query и hash', () => {
-    expect(
-      phoneFrame('at https://molvia.net/advice/search?q=%D1%81%D1%8B%D1%80#top:12:3', ORIGIN),
-    ).toBe('at <anonymous> (/advice/search:12:3)')
+  it('файл скрипта — путь без query и hash', () => {
     expect(
       phoneFrame('at x (http://127.0.0.1:5300/src/main.ts?t=1696:4:5)', 'http://127.0.0.1:5300'),
     ).toBe('at x (/src/main.ts:4:5)')
+    expect(phoneFrame(`at x (${ORIGIN}/sw.js:1:2)`, ORIGIN)).toBe('at x (/sw.js:1:2)')
+  })
+
+  it('адрес страницы — не свой код и не уходит: id поездки, запрос (адверсариальный А2)', () => {
+    const trip = '3f2a9c1e-7b4d-4e8a-9c2f-5d6e7f8a9b0c'
+    expect(phoneFrame(`at inject (${ORIGIN}/purchases/${trip}:3:15)`, ORIGIN)).toBe('at inject (?)')
+    expect(phoneFrame(`inject@${ORIGIN}/money/accounts/${trip}:3:15`, ORIGIN)).toBe('at inject (?)')
+    expect(phoneFrame(`at ${ORIGIN}/advice/search?q=%D1%81%D1%8B%D1%80#top:12:3`, ORIGIN)).toBe(
+      'at <anonymous> (?)',
+    )
+    expect(phoneFrame(`at f (${ORIGIN}/:1:2)`, ORIGIN)).toBe('at f (?)')
   })
 
   it('чужой origin, расширение, native и eval — «?»', () => {
