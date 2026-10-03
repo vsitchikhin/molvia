@@ -435,9 +435,24 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   // could not decode is answered before any hook and is not counted.
   const metrics = options.metrics
   if (metrics !== undefined) {
+    // Each request once: by its answer, or as `aborted` when the client left first (adversarial А1)
+    // — a closed socket never gives `onResponse`, and the answer nobody waited for is the slow one.
+    const counted = new WeakSet<FastifyRequest>()
+    app.addHook('onRequest', (request, reply, next) => {
+      reply.raw.once('close', () => {
+        if (reply.raw.writableFinished || counted.has(request)) return
+        counted.add(request)
+        const { method, route } = routeOf(request)
+        metrics.observe(method, route, 'aborted', reply.elapsedTime / 1000)
+      })
+      next()
+    })
     app.addHook('onResponse', (request, reply, next) => {
-      const { method, route } = routeOf(request)
-      metrics.observe(method, route, reply.statusCode, reply.elapsedTime / 1000)
+      if (!counted.has(request)) {
+        counted.add(request)
+        const { method, route } = routeOf(request)
+        metrics.observe(method, route, reply.statusCode, reply.elapsedTime / 1000)
+      }
       next()
     })
   }

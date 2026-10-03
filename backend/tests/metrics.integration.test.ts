@@ -3,6 +3,9 @@
  * request named, and `/metrics` answers only on its own port.
  */
 import { randomUUID } from 'node:crypto'
+import http from 'node:http'
+import type { AddressInfo } from 'node:net'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { httpMetrics } from '@/metrics'
@@ -31,6 +34,12 @@ beforeEach(async () => {
   // A route that fails as a defect does, for the class of 5xx.
   app.get('/probe/:id', () => {
     throw new Error('boom')
+  })
+  // A route stuck as a lock or the wallet's chain once held one, answering after its client gave up.
+  app.get('/probe-slow/:outcome', async (request) => {
+    await sleep(300)
+    if ((request.params as { outcome: string }).outcome === 'fail') throw new Error('late boom')
+    return { ok: true }
   })
   await app.ready()
 })
@@ -104,6 +113,46 @@ describe('the labels of an answer', () => {
     expect(metrics.render()).toMatch(
       /^molvia_http_request_duration_seconds_count\{method="GET",route="\/health"\} 1$/m,
     )
+  })
+})
+
+describe('a request its client left before the answer (adversarial А1)', () => {
+  /** A GET over a real socket, given up after `ms`, as the phone gives up after 15 s. */
+  async function abandon(path: string, ms: number): Promise<void> {
+    await app.listen({ port: 0, host: '127.0.0.1' })
+    const { port } = app.server.address() as AddressInfo
+    await new Promise<void>((resolve) => {
+      const request = http.get({ host: '127.0.0.1', port, path })
+      request.on('error', () => {
+        resolve()
+      })
+      setTimeout(() => {
+        request.destroy()
+      }, ms)
+    })
+    // The handler runs on into the closed socket.
+    await sleep(400)
+  }
+
+  it('is counted once, as aborted, with the time it ran until the client left', async () => {
+    await abandon('/probe-slow/ok', 100)
+
+    expect(requestSeries()).toEqual([
+      '{method="GET",route="/probe-slow/:outcome",status="aborted"} 1',
+    ])
+    expect(metrics.render()).toMatch(
+      /^molvia_http_request_duration_seconds_count\{method="GET",route="\/probe-slow\/:outcome"\} 1$/m,
+    )
+  })
+
+  it('a failure after the client left is aborted in the metrics and recorded as a failure', async () => {
+    await abandon('/probe-slow/fail', 100)
+    await Promise.allSettled(recordings)
+
+    expect(requestSeries()).toEqual([
+      '{method="GET",route="/probe-slow/:outcome",status="aborted"} 1',
+    ])
+    expect(recordings.length).toBeGreaterThan(0)
   })
 })
 

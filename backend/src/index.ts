@@ -93,12 +93,8 @@ if (env.RATES_REFRESH === 'on') {
 // business being on the LAN — the Vite proxy reaches it over the loopback either way.
 const host = env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1'
 
-app.listen({ port: env.API_PORT, host }).catch((error: unknown) => {
-  app.log.error(error)
-  process.exit(1)
-})
-
 // `/metrics` on its own port (MOL-145, В-1): the network of the metrics scrapes it, Caddy never sees it.
+// Before the API's `listen` (review №6): a hook added once it listens is refused.
 if (http !== undefined && env.METRICS_PORT !== undefined) {
   const running = processMetrics()
   const metrics = buildMetricsServer([http, running])
@@ -111,3 +107,8 @@ if (http !== undefined && env.METRICS_PORT !== undefined) {
     process.exit(1)
   })
 }
+
+app.listen({ port: env.API_PORT, host }).catch((error: unknown) => {
+  app.log.error(error)
+  process.exit(1)
+})

@@ -14,6 +14,17 @@ try {
   // no .env in this environment — fall through to process.env
 }
 
+/**
+ * The owner's Telegram id as `.env.prod` writes it: digits and nothing else. One rule with Grafana's
+ * `deploy/grafana/start.sh` (MOL-145, adversarial А5): read by `z.coerce`, `+123`, ` 123` and `1.23e8`
+ * ran the API while the same line stopped Grafana, and every alarm with it.
+ */
+export const ownerTelegramIdSchema = z
+  .string()
+  .regex(/^\d+$/)
+  .transform(Number)
+  .pipe(telegramUserIdSchema)
+
 const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3300),
   /**
@@ -80,7 +91,7 @@ const envSchema = z.object({
    */
   OWNER_TELEGRAM_ID: z.preprocess(
     (value) => (value === '' ? undefined : value),
-    z.coerce.number().pipe(telegramUserIdSchema).optional(),
+    ownerTelegramIdSchema.optional(),
   ),
   /**
    * Where the PWA is served — production's site — for `make failures` to read the phone's frames
