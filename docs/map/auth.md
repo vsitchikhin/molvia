@@ -45,7 +45,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 
 - `backend/src/cookie.ts` — The only module that reads or sets a cookie: the session, login and dev-account cookies, each set together with `no-store`; putting the session out takes back a term set earlier in the same answer (MOL-94).
 - `backend/src/device-name.ts` — Derives an «iPhone · Safari»-style device name from a `User-Agent` for session and login rows.
-- `backend/src/login-cleanup.ts` — The minute timer every expired-row cleanup hangs on — login requests, sessions and the undo windows.
+- `backend/src/login-cleanup.ts` — The minute timer every expired-row cleanup hangs on — login requests, sessions, the undo windows and the failures (MOL-143); a failure is handed on to be recorded.
 - `backend/src/login-config.ts` — Reads the login's environment — bot username and `BOT_API_SECRET`; neither means no real door, production requires both.
 - `backend/src/secret.ts` — `secretOrNull`: the one rule for what a session token or a login secret may look like, RFC 6265's cookie-octet.
 

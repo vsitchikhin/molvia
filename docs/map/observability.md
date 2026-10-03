@@ -10,6 +10,9 @@ Rules: `.claude/rules/observability.md`. A test beside its source, or mirroring 
 
 ## backend
 
+- `backend/src/failure-reporter.ts` — One path for a failure of the API (MOL-143): logged by its kind and recorded beside it without being waited for; a recording that fails is one more line of the log; `apiFailureReporter` is the API's, queued for the owner.
+- `backend/src/usecases/record-failure.ts` — Use case «Сбой»: the fingerprint — source, kind, code, top frame without its position, place — the fields cut to the table's limits, and what the owner hears: the first time in a build, then 10, 100, 1000 (В-2, В-5); the bot's report is one more place.
 - `backend/src/db/failures-repository.ts` — Repository of `failures`: one occurrence added to its fingerprint by a single upsert that counts in the build, the owner's notices queued in the same transaction, the 30 days kept, the latest for `make failures`.
 - `backend/src/db/owner-notices-repository.ts` — Repository of `owner_notices`: the claim that hands out and marks in one statement, skipping rows another claim holds; a notice about a failure unhanded for a day goes, a handed one after 30 days.
+- `backend/tests/failures-api.integration.test.ts` — Integration test of failures through a real server: a 500 by its route's template and never the address, a person's text in the driver's message nowhere, a refusal not a failure, one notice a build, none without an owner.
 - `backend/tests/failures.integration.test.ts` — Integration test of the two tables: the count by fingerprint and by build, ten at once, a notice in the same transaction, the 30 days, the queue handed out once, no key to `actors`.
