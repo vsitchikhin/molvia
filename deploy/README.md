@@ -385,8 +385,11 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod exec backend node
 ```
 
 In a working copy the same thing is `make failures [LIMIT=20]`. Find the message's fingerprint by
-its first six characters; the frames are the bundle's, and the function's name in them is the
-source's.
+its first six characters. The frames are the bundle's — the function's name in them is the source's
+— and under each frame of the API of the running build stands its line in the source, read through
+the map in the image (`→ src/usecases/rate-item.ts:27:1`). The API runs without
+`--enable-source-maps` on purpose: the map costs it some 75 MB of memory for good (MOL-143, В-6).
+The bot's frames and another build's are left as they are.
 
 ## Backups (MOL-70)
 

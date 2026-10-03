@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { FailureRow } from '@/db/failures-repository'
-import { FAILURES_USAGE, failures, formatFailures } from './failures'
+import { FAILURES_USAGE, bundleDecoder, failures, formatFailures } from './failures'
 
 const ROW: FailureRow = {
   fingerprint: '3f9a1c'.padEnd(64, '0'),
@@ -71,5 +71,42 @@ describe('make failures (MOL-143)', () => {
     )
     expect(exit).toBe(1)
     expect(lines).toEqual(['reading the failures failed: 28P01'])
+  })
+})
+
+describe('кадры бандла по карте образа (В-6)', () => {
+  // Line 1 of the bundle is line 1 of `rate-item.ts`, line 2 — line 5 of `server.ts`; line 3 has none.
+  const decode = bundleDecoder({
+    version: 3,
+    sources: ['../src/usecases/rate-item.ts', '../src/server.ts'],
+    names: [],
+    mappings: 'AAAA;ACIA',
+  })
+  const frame = (line: number) => `at rateItem (file:///app/dist/index.js:${String(line)}:1)`
+  const api = { ...ROW, frames: [frame(1), frame(2), frame(3), 'at async Promise.all (index 0)'] }
+
+  it('кадр бандла — строка исходника под ним; без записи в карте и не кадр бандла — как есть', () => {
+    expect(decode(frame(1))).toBe('src/usecases/rate-item.ts:1:1')
+    expect(decode(frame(2))).toBe('src/server.ts:5:1')
+    expect(decode('at file:///app/dist/index.js:2:1')).toBe('src/server.ts:5:1')
+    expect(decode(frame(3))).toBeUndefined()
+    expect(decode('at async Promise.all (index 0)')).toBeUndefined()
+  })
+
+  it('make failures подписывает кадры API своей сборки', () => {
+    expect(formatFailures([api], { build: ROW.build, decode }).slice(2, 7)).toEqual([
+      `    ${frame(1)}`,
+      '      → src/usecases/rate-item.ts:1:1',
+      `    ${frame(2)}`,
+      '      → src/server.ts:5:1',
+      `    ${frame(3)}`,
+    ])
+  })
+
+  it('чужая сборка и бот — без расшифровки: их строки читались бы не по той карте', () => {
+    const plain = formatFailures([api])
+    expect(formatFailures([api], { build: 'v0.2.0-9-gfffffff', decode })).toEqual(plain)
+    const bot = { ...api, source: 'bot' }
+    expect(formatFailures([bot], { build: ROW.build, decode })).toEqual(formatFailures([bot]))
   })
 })
