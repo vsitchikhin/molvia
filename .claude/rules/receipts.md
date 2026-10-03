@@ -76,17 +76,23 @@ every wrong line is highlighted in each.
 that the next part has (exactly, else one digit off by a swap OCR makes — 5↔6, 1↔4, 3↔8, 0↔9), where the
 next part holds no more articles before it than the text so far does, and everything after it in the
 text so far is in the next part too. **One digit off by any other digit is the next article of the
-list**: a maker numbers its flavours in a row, 1160033 and 1160036 are two yoghurts (Р23).
+list**: a maker numbers its flavours in a row, 1160033 and 1160036 are two yoghurts (Р23). **And one
+swap of OCR off is the same article only under the same name** (Р25): one pair of neighbours in ten,
+1160035 and 1160036, differs by a swap OCR makes, and only «8.Յոգուրտ … դեղձ» against «9.Յոգուրտ … ելակ»
+tells them. A name OCR lost leaves the digits to decide; a name split in two rows is read whole.
 
 **Where the articles do not show the overlap** — rows of it read worse in the next part: an article two
 digits off, figures cut at its top edge, a name lost or split, a row cut through at the first part's
 foot (Р17, Р21, 9, Р23) — the first part's last sixteen rows and the next part's first sixteen are
 aligned in order, the longest run of rows the overlap could hold twice (`sameRow`: read alike, not two
-numbers of the list, not two articles that differ but by OCR's swaps; and the figures right below a name
-aligned are that item's, whatever article OCR made there). The run must start within the next part's
-first three rows, or it is two items alike rather than an overlap; the next part goes on after the last
-row aligned, and the first part keeps its own reading of the overlap. No run — the parts are joined.
-Likeness reads a row's first 80 letters (Р22).
+numbers of the list, not two articles; an article misread by OCR's swaps only under one name; and the
+figures right below a name aligned are that item's, whatever article OCR made there). The run must be
+the first part's foot and the next part's top — end within the last three rows of the one, start within
+the first three of the other — or it is rows alike in the middle, a rule under the head and a rule above
+the total (review 11), or two items alike; the next part goes on after the last row aligned, and the
+first part keeps its own reading of the overlap. No run — the parts are joined. Likeness reads a row's
+first 80 letters (Р22), and the strict seam compares digits by a loop: two hundred articles cost it
+seventy milliseconds, not two seconds of CI.
 
 **What is printed at the head is checked as a calendar and a clock** (Р10, Р12, Р13): a date of
 the calendar from 2000 to the server's tomorrow, a time `HH:MM` — OCR makes up «01.01.0000», which
