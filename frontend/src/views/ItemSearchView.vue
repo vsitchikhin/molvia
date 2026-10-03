@@ -1088,7 +1088,8 @@ export default defineComponent({
 }
 
 .code-hint-source {
-  color: var(--text-muted);
+  /* Ink, not muted: muted text is under 4.5:1 on a tint (MOL-172). */
+  color: var(--text);
   font-size: var(--text-footnote);
 }
 

@@ -209,7 +209,7 @@ export default defineComponent({
   gap: var(--space-2);
   min-height: var(--touch-target);
   padding: 0 var(--space-4);
-  border: var(--hairline) solid var(--border);
+  border: var(--hairline) solid var(--border-strong);
   border-radius: var(--radius-pill);
   background: var(--surface-2);
   transition:
@@ -316,6 +316,11 @@ export default defineComponent({
 
     .name {
       font-weight: var(--weight-bold);
+    }
+
+    /* Muted text is under 4.5:1 on a tint (MOL-172). */
+    .meta {
+      color: var(--text);
     }
   }
 }

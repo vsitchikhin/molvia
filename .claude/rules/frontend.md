@@ -65,6 +65,42 @@ The detail behind the frontend lines of `CLAUDE.md`.
   master took this:**
   Nunito is `@include display-type` in place of the `font-family`/`font-weight` pair, a literal is a
   token, and `npm run lint:style -w @molvia/frontend` names every place.
+- **Colours that can meet on a screen are held apart by a test, not by eye** (MOL-172,
+  `frontend/src/styles/tokens.test.ts`): in both schemes any two steps of different roles — accent
+  with `accent-solid`, good, warn, bad, `graphic` — and every category against every step of a role
+  stand 0.08 apart in OKLab; `accent`, `good`, `warn`, `bad`, `graphic` and every category are 3:1
+  on `--surface`; `text`, `text-muted` and the inks 4.5:1 on `surface`, `sunken`, `surface-2`, an
+  ink on its own tint, `on-accent` on `accent-solid`; and the dark mixin declares every one of them
+  — a name it left out draws the light value on a dark ground. **No list of exceptions** (owner's
+  В-13, MOL-118): the handoff checked chosen pairs and missed more than it named, among them the
+  light `graphic` 0.071 from `good` and the dark tints of accent and warn 0.030; a value that fails
+  is changed. «Any two steps of different roles» is one rule rather than a list of pairs, since a
+  tint against another role's mark passes by lightness alone. Categories among themselves are not
+  held (owner's В-1): 36 light and 62 dark pairs stand closer, and a name beside the dot tells them
+  apart until MOL-218 measures which meet in one donut. `--graphic` is the colour of data without
+  one of its own; `--border-strong` is decoration and the edge of a field (Ф-3: `--border` there was
+  1.29:1 on the well). The math — WCAG luminance and Ottosson's OKLab — is the test's own thirty
+  lines, no dependency. **A tint stands 0.08 from `--surface`** (adversarial А3): a fill with no
+  edge — a notice in a sheet — that the eye cannot tell from the sheet is no fill; the dark
+  `bad-tint` of 157 v2 was 0.038. **Not from `--sunken`** (review 5, way «а»): on the page ground
+  the light good, warn and bad tints stand 0.071, 0.070 and 0.040 — a strip under the month's
+  switcher, a state's circle — held by icon and word; to hold them too the light `bad-tint` turns
+  pink (`#fec5c7`, hue 28° → 16°), and that was not bought. **Nor from `--surface-2`** (round 3,
+  В1), by the same price: on a well the light `warn-tint` and `bad-tint` stand 0.071 and 0.055, the
+  dark ones 0.058 and 0.079 — the mark «ждёт отправки» on a queued row of «Покупки» (`TripRow`) is
+  told by its word. **`--text-muted` is for the three grounds, never a tint** (А1): under 4.5:1
+  there in both schemes, and the tints cannot be lifted for it — in the dark they would have to sink
+  to OKLab L 0.32 and part by saturation alone, the accent's turning brick; on a tint a secondary
+  line is `--text` (the chosen account, the active catalogue row, the hint of Open Food Facts, the
+  account's row under the pointer). **The file is read as Sass reads it**: both kinds of comment out
+  in one pass — a `/*` inside a line comment opens nothing (round 2, Б3) — every declaration taken
+  whatever its value, a short or upper-case hex expanded — Stylelint asks for the short form and
+  `--fix` writes it — and a colour of the lists that is no hex (`oklch()`) fails by name: read by a
+  pattern of six lower-case digits, such a category left the test green (А4, А5). The same one-pass
+  read is in the other readers of the file — `bin/design-md.mjs` and both plugins
+  (`withoutComments`, `roleMixins`). The dot of a category on the chosen chip is under 3:1 on
+  `--accent-tint` for six light categories (А2) — not held: the tint cannot be made lighter without
+  meeting `bad-tint`, and the chip's form is MOL-198's.
 - **Nunito is one weight, 800, one file per subset** (MOL-171): the 400 and 600 files were the same
   variable font copied twice, and the precache fetched each URL. A sentence in a figure's place
   («Рынка нет» on the rate chart) is set in Onest, not Nunito at another weight.
