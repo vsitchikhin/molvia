@@ -287,7 +287,7 @@ export async function remindDue(
 }
 
 /** Waits `ms`, or less if `signal` aborts first: `true` for the whole wait, `false` for a cut. */
-async function sleep(ms: number, signal?: AbortSignal): Promise<boolean> {
+export async function sleep(ms: number, signal?: AbortSignal): Promise<boolean> {
   if (signal?.aborted) return false
   return new Promise((resolve) => {
     const timer = setTimeout(() => {

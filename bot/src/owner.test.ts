@@ -139,6 +139,30 @@ describe('tellOwner — забрать и отправить', () => {
 })
 
 describe('startOwnerNotices — таймер раз в минуту', () => {
+  it('остановка посреди пачки досылает остаток без пауз — они уже выданы (А4)', async () => {
+    const { api, sent } = telegram()
+    const claim = vi.fn(() =>
+      Promise.resolve<OwnerNotices>({ to: OWNER, notices: [NEW, AGAIN, NEW, AGAIN, NEW] }),
+    )
+    const stop = startOwnerNotices(
+      { claimOwnerNotices: claim } as unknown as MolviaBotClient,
+      api,
+      60_000,
+    )
+    await vi.waitFor(() => {
+      expect(sent).toHaveLength(1)
+    })
+    await stop()
+    expect(sent).toHaveLength(5)
+  })
+
+  it('429 кончает прогон и говорит, сколько ушло с ним', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api } = telegram(429)
+    await tellOwner(claiming({ to: OWNER, notices: [NEW, AGAIN, NEW] }), api, noWait)
+    expect(log).toHaveBeenCalledWith('[molvia] owner: 429 flood, 2 notices given up')
+  })
+
   it('спрашивает при старте и каждую минуту, остановка ждёт хвост', async () => {
     vi.useFakeTimers()
     const { api } = telegram()

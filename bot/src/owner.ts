@@ -5,6 +5,7 @@ import type { MolviaBotClient } from '@molvia/client'
 import type { OwnerNotice } from '@molvia/model'
 import { t } from './i18n'
 import { telegramFailure } from './assemble'
+import { sleep } from './remind'
 import { reportDefect } from './failure'
 
 /**
@@ -46,7 +47,7 @@ type Wait = (ms: number) => Promise<boolean>
  * One minute's notices (MOL-143): claimed from the API, which has already marked them handed, and
  * sent one by one. At most once, as the reminders are: a notice whose message failed is the log's,
  * by its kind, and `make failures` still has the count. A 429 ends the run — the rest would be
- * refused the same way, and they are gone too: a heap of old notices is worth less than none.
+ * refused the same way — and the log says how many went with it.
  */
 export async function tellOwner(
   api: MolviaBotClient,
@@ -64,30 +65,20 @@ export async function tellOwner(
   const { to, notices } = claimed
   if (to === null) return
   for (const [index, notice] of notices.entries()) {
-    if (index > 0 && !(await wait(OWNER_PAUSE_MS))) return
+    // A stop cuts the pause short and the rest goes without it: they are marked handed already,
+    // and a rollout — every stop — is when there is a batch (adversarial А4).
+    if (index > 0) await wait(OWNER_PAUSE_MS)
     try {
       await telegram.sendMessage(to, ownerText(notice))
     } catch (error) {
       console.error(`[molvia] owner notice: ${telegramFailure(error)}`)
-      if (error instanceof GrammyError && error.error_code === 429) return
+      if (error instanceof GrammyError && error.error_code === 429) {
+        const left = notices.length - index - 1
+        if (left > 0) console.error(`[molvia] owner: 429 flood, ${String(left)} notices given up`)
+        return
+      }
     }
   }
-}
-
-/** Waits `ms`, or less if `signal` aborts first: `true` for the whole wait, `false` for a cut. */
-async function sleep(ms: number, signal?: AbortSignal): Promise<boolean> {
-  if (signal?.aborted) return false
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      signal?.removeEventListener('abort', cut)
-      resolve(true)
-    }, ms)
-    const cut = (): void => {
-      clearTimeout(timer)
-      resolve(false)
-    }
-    signal?.addEventListener('abort', cut, { once: true })
-  })
 }
 
 /** How often the bot asks: a new failure reaches the owner within a minute. */
