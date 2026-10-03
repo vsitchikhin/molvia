@@ -7,29 +7,30 @@ colors:
   surface-2: '#f7efe1'
   border: '#e0d3bd'
   border-strong: '#cbbb9f'
+  graphic: '#746258'
   text: '#1f1c19'
   text-muted: '#6c6152'
   on-accent: '#fffaf2'
   accent: '#b2622d'
   accent-solid: '#8c491a'
   accent-ink: '#8c491a'
-  accent-tint: '#ffe1d0'
+  accent-tint: '#ffce8c'
   good: '#5d7239'
   good-ink: '#3f4f24'
-  good-tint: '#e5efd2'
-  warn: '#a2761c'
-  warn-ink: '#6d4d0a'
-  warn-tint: '#f9ecc9'
-  bad: '#a5352a'
+  good-tint: '#cae5b7'
+  warn: '#9d7d13'
+  warn-ink: '#533302'
+  warn-tint: '#fef4ad'
+  bad: '#ab2b2a'
   bad-ink: '#742018'
-  bad-tint: '#f8ddd6'
+  bad-tint: '#f9d8d3'
   cat-groceries: '#2e7d73'
   cat-cafe: '#8e4f93'
-  cat-rent: '#7b5534'
+  cat-rent: '#524569'
   cat-home: '#3d6d99'
   cat-beauty: '#c4587f'
   cat-transport: '#5a5ea6'
-  cat-telecom: '#b86f26'
+  cat-telecom: '#00566d'
   cat-health: '#3f8f84'
   cat-clothes: '#9a76c0'
   cat-pets: '#2c8197'
@@ -38,12 +39,12 @@ colors:
   cat-other: '#8e8171'
   cat-own-0: '#1f7a8c'
   cat-own-1: '#9b4f6e'
-  cat-own-2: '#3f7d56'
+  cat-own-2: '#5480c7'
   cat-own-3: '#6a5aa8'
   cat-own-4: '#3f5f99'
   cat-own-5: '#946b8f'
   cat-own-6: '#2f8a74'
-  cat-own-7: '#6b6b6b'
+  cat-own-7: '#49555c'
   chrome: 'rgb(255 250 242 / 88%)'
   scrim: 'rgb(38 27 16 / 40%)'
   viewfinder-ground: '#14110f'
@@ -54,41 +55,42 @@ colors:
   surface-2-dark: '#2a2521'
   border-dark: '#3b342c'
   border-strong-dark: '#524940'
+  graphic-dark: '#857a6c'
   text-dark: '#f5ece0'
   text-muted-dark: '#a99a87'
   on-accent-dark: '#1a120c'
   accent-dark: '#e8925a'
   accent-solid-dark: '#e8925a'
   accent-ink-dark: '#f2ad7e'
-  accent-tint-dark: '#3a2417'
+  accent-tint-dark: '#4f3b2e'
   good-dark: '#a6c077'
   good-ink-dark: '#bdd493'
-  good-tint-dark: '#2a3320'
-  warn-dark: '#dfae4f'
-  warn-ink-dark: '#edc673'
-  warn-tint-dark: '#372b13'
-  bad-dark: '#e8836f'
-  bad-ink-dark: '#f2a494'
-  bad-tint-dark: '#3b201b'
+  good-tint-dark: '#24431a'
+  warn-dark: '#daac35'
+  warn-ink-dark: '#f7ca6a'
+  warn-tint-dark: '#3c2900'
+  bad-dark: '#e47696'
+  bad-ink-dark: '#f4a3b7'
+  bad-tint-dark: '#400d25'
   cat-groceries-dark: '#5fb8aa'
   cat-cafe-dark: '#d09bd6'
-  cat-rent-dark: '#cfa47a'
+  cat-rent-dark: '#a486d7'
   cat-home-dark: '#93b8de'
-  cat-beauty-dark: '#ee98b6'
+  cat-beauty-dark: '#b47696'
   cat-transport-dark: '#a7aae6'
-  cat-telecom-dark: '#f2b57a'
-  cat-health-dark: '#9ad8cc'
+  cat-telecom-dark: '#24a7cf'
+  cat-health-dark: '#95d9d0'
   cat-clothes-dark: '#c9b2ea'
   cat-pets-dark: '#7cc6d8'
   cat-leisure-dark: '#a9c1c9'
   cat-documents-dark: '#bfb0d6'
   cat-other-dark: '#b3a593'
   cat-own-0-dark: '#72c1d1'
-  cat-own-1-dark: '#dc9ab5'
-  cat-own-2-dark: '#8fcaa1'
+  cat-own-1-dark: '#c796b2'
+  cat-own-2-dark: '#729fe9'
   cat-own-3-dark: '#b4a8e6'
   cat-own-4-dark: '#9bb2e3'
-  cat-own-5-dark: '#d1aecd'
+  cat-own-5-dark: '#bfa5c5'
   cat-own-6-dark: '#7fcfb9'
   cat-own-7-dark: '#b5b5b5'
   chrome-dark: 'rgb(32 28 25 / 88%)'
@@ -284,15 +286,16 @@ A warm, low-chroma ground with four semantic roles — accent, good, warn, bad �
 
 - **Olive** (`good`, `good-ink`, `good-tint`): the "Брать" verdict, a reconciliation that came out even, a plus against the market.
 - **Ochre** (`warn`, `warn-ink`, `warn-tint`): "Только если дёшево", stale data, attention.
-- **Brick** (`bad`, `bad-ink`, `bad-tint`): "Не брать", errors, a minus against the market, destructive words.
+- **Brick** (`bad`, `bad-ink`, `bad-tint`; dark — crimson, held off the terracotta): "Не брать", errors, a minus against the market, destructive words.
 
 ### Neutral
 
 - **Warm Paper** (`sunken` #f3e8d6 / dark #14110f): the page ground.
 - **Cream Card** (`surface` #fffaf2 / dark #201c19): cards, sheets, the bars.
 - **Well** (`surface-2`): inputs, segmented tracks, inert pills, empty-state circles.
-- **Seam** (`border`, `border-strong`): card edges and the secondary button's outline — decoration only.
-- **Ink** (`text` #1f1c19) and **Faded Ink** (`text-muted` #6c6152): text; muted still clears 4.5:1 on every ground.
+- **Seam** (`border`, `border-strong`): card edges, the secondary button's outline, the edge of a field — decoration only.
+- **Graphic** (`graphic` #746258 / dark #857a6c): data that carries meaning without a colour of its own — 3:1 on `surface`.
+- **Ink** (`text` #1f1c19) and **Faded Ink** (`text-muted` #6c6152): text; muted clears 4.5:1 on `surface`, `sunken` and `surface-2` — not on a tint, where a secondary line is `text`.
 
 ### Categories of spending
 
@@ -305,14 +308,21 @@ and always stands beside its name.
 never data, never status, never decoration. A chart series is `text` or `graphic`, not accent
 **(target)**. A note or hint sits on `surface-2`, not on `accent-tint` **(target)**.
 
-**The Neighbouring Roles Rule (target).** Any two roles that can meet on a screen — accent, bad, warn,
-good, their tints and inks, and every category — stand at least 0.08 apart in OKLab, in both schemes.
-Today the dark `accent` and `bad` (0.050) and the tints `accent-tint`/`bad-tint` (0.016–0.018) break
-it, as do `cat-telecom`, `cat-rent` and `cat-own-2`: propose new values (FIXES Ф-1, Ф-2).
+**The Neighbouring Roles Rule.** Any two steps of different roles — accent (with `accent-solid`),
+good, warn, bad, `graphic` — and every category against every step of a role stand at least 0.08
+apart in OKLab, in both schemes; a mark and a category are 3:1 on `surface`, text 4.5:1 on its
+ground, and a tint, a fill with no edge, stands 0.08 from `surface` — a notice in a sheet or a card.
+On the page ground (`sunken`) the light good, warn and bad tints stand closer (0.071, 0.070, 0.040):
+a strip or a state's circle there is told by its icon and word, not by the edge of its fill. So is a
+mark on a well (`surface-2`: light warn and bad 0.071 and 0.055, dark 0.058 and 0.079) — «ждёт
+отправки» by its word. `frontend/src/styles/tokens.test.ts` holds every pair, with no list of
+exceptions: a value that fails is changed, never excused (MOL-172). Categories among themselves are
+not held yet (MOL-218): today a name beside the colour tells two close ones apart.
 
-**The Graphic Is Data Rule (target).** Anything that carries meaning — an unselected bar, the
-"Остальные" sector, the "no data" dash, the off track of a switch — is at least 3:1 on `surface`, by a
-`graphic` token. `border-strong` (1.8:1) is decoration only.
+**The Graphic Is Data Rule.** Anything that carries meaning — an unselected bar, the "Остальные"
+sector, the "no data" dash, the off track of a switch — is drawn in `graphic`, at least 3:1 on
+`surface`. `border-strong` (1.8:1) is decoration only. The charts, the countdown of "Вернуть" and
+the switch still draw `border-strong` until their own tasks **(target)**.
 
 **The Colour Never Alone Rule.** Beside every colour stands a word, a form or a figure: a verdict has
 its icon and word, a category its name, a plus or minus its sign and "лучше / хуже рынка".
@@ -426,7 +436,7 @@ its weight does not change on selection, so the row never reflows under the thum
 
 ### Inputs / Fields
 
-- **Field:** a 44 well on `surface-2`, radius 14, hairline `border` (to be strengthened — target); label above in 13/600 `text-muted`; focus turns the edge `accent` with a 2 px `accent-tint` halo; the error is a word from the registry under the field. Never `type="number"`.
+- **Field:** a 44 well on `surface-2`, radius 14, hairline `border-strong`; label above in 13/600 `text-muted`; focus turns the edge `accent` with a 2 px `accent-tint` halo; the error is a word from the registry under the field. Never `type="number"`.
 - **SearchField (target, one):** a pill well on `surface-2`, a magnifier left, "Очистить" or the scanner right. One look for every search in the app.
 - **Segmented control:** a `surface-2` track, segments 38 that answer the thumb over the full 44.
 

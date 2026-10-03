@@ -2,7 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import stylelint from 'stylelint'
 import { describe, expect, it } from 'vitest'
-import { rootNames } from './known-properties.mjs'
+import { rootNames, withoutComments } from './known-properties.mjs'
 
 const config = {
   plugins: [fileURLToPath(new URL('./known-properties.mjs', import.meta.url))],
@@ -67,6 +67,12 @@ describe('molvia/known-custom-property', () => {
   it('does not take a name from a comment at the end of a declaration', async () => {
     expect(await unknown('.a { --own: 1px; // --later: not yet\n  width: var(--later); }')).toEqual(
       ['--later'],
+    )
+  })
+
+  it('hides nothing behind a `/*` inside a line comment, read as Sass reads it', () => {
+    expect(withoutComments('--a: 1; // notes/*.md\n--b: 2;\n/* end */\n--c: 3;')).toBe(
+      '--a: 1; \n--b: 2;\n\n--c: 3;',
     )
   })
 

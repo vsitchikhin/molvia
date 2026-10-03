@@ -73,6 +73,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/styles/_mixins.scss` — SCSS mixins injected into every component: display type (Nunito at its one weight), touch target, wider-than-phone, pinned bar, visually hidden, focus ring, appear (a fade-in with a short rise on insertion).
 - `frontend/src/styles/_tokens.scss` — Design tokens: every colour, size, radius and duration as custom properties, light and dark schemes.
 - `frontend/src/styles/main.scss` — Global styles entry: fonts and tokens, body, a page held still under a modal, view-transition animations between screens, the `appear` keyframes of the motion grammar.
+- `frontend/src/styles/tokens.test.ts` — Test: in both schemes any two steps of different colour roles and every category against a role stand 0.08 apart in OKLab, marks and categories reach 3:1 on the surface, text 4.5:1 on its grounds, and every such colour is declared in the dark scheme.
 - `frontend/src/styles/theme-color.test.ts` — Test: the status-bar and manifest colours in `index.html` and `vite.config.ts` match the tokens of each scheme.
 - `frontend/src/transitions.ts` — Screen moves: push, pop or tab direction for view transitions, focus moved to the new screen's heading, and the page held as tall as the window while only the query changes.
 - `frontend/vite.config.ts` — Vite config: Vue, MDI icons, PWA manifest and precache, mixins injected into SCSS, the copy's ports and the `/api` proxy.

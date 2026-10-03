@@ -3,5 +3,6 @@ import type { Plugin } from 'stylelint'
 
 export declare const SET_BY_SCRIPT: Record<string, string>
 export declare function rootNames(code: string): string[]
+export declare function withoutComments(source: string): string
 declare const plugin: Plugin
 export default plugin
