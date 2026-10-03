@@ -24,6 +24,8 @@ Rules: `.claude/rules/observability.md`. A test beside its source, or mirroring 
 
 ## frontend
 
+- `frontend/src/catchers.ts` — The phone's catchers, imported by the first line of `main.ts` (MOL-144): the app's reports and the window's `error`, `unhandledrejection` and `online` stand before any other module of the app is evaluated; the screen is `start` until `main.ts` places it.
+- `frontend/src/main-first-route.test.ts` — Test of the start whose first route did not settle (MOL-144, adversarial Б2): its throw is reported as the start's, and the app is mounted all the same.
 - `frontend/src/failures.ts` — The phone's own failures (MOL-144): whether a failure is the phone's (`phoneDefect` — not an API's word, not the weather), the kind and frames in one shape with no message, the screen, the page's build by its script's name (`pageBuild`) and the platform; one a failure a page, kept on the device up to twenty until there is an answer, sent at once, at start and on `online`; `reportFailure` is the call every catch makes.
 
 ## bin

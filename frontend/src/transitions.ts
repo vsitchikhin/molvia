@@ -198,7 +198,12 @@ export function focusScreenTitle(): void {
  * to the heading, the second tap on «‹» went into the title (MOL-136, adversarial Ф).
  */
 export function installArrival(router: Router, t: (key: string) => string): void {
-  const name = (to: RouteLocationNormalized): string => `${t(to.meta.titleKey)} · ${t('app.name')}`
+  // The first route that never settled is the router's start, with no meta at all: the app's name
+  // alone, or the throw would stop the start before the app is mounted (adversarial Б2 of MOL-144).
+  const name = (to: RouteLocationNormalized): string => {
+    const key = to.meta.titleKey as string | undefined
+    return key === undefined ? t('app.name') : `${t(key)} · ${t('app.name')}`
+  }
 
   document.title = name(router.currentRoute.value)
   router.afterEach(async (to, from, failure) => {

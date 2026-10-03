@@ -1,3 +1,5 @@
+// First, before any other module of the app is evaluated: the phone's catchers (MOL-144, Б3).
+import { failures, placeFailures } from '@/catchers'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from '@/App.vue'
@@ -9,43 +11,11 @@ import { installSheetEntryGuard } from '@/composables/useSheetHistory'
 import { installColorScheme } from '@/composables/useColorScheme'
 import { sessionEnded, useActorStore } from '@/stores/actor'
 import { forgetTheInviteDoor } from '@/stores/identity'
-import { api, onMissingActor, onServerVersion } from '@/api'
-import { installFailureReports, pageBuild } from '@/failures'
-import { platformLine } from '@/platform'
+import { onMissingActor, onServerVersion } from '@/api'
 import { useLoginStore } from '@/stores/login'
 import { forget, read, writeOwn } from '@/stores/storage'
 import { NO_UPDATE, holdsTyping, installPwaUpdate, pwaUpdateKey } from '@/pwaUpdate'
 import '@/styles/main.scss'
-
-// The phone's own failures go to the API's table (MOL-144), and the catchers stand first, before any
-// step of the start (adversarial А4): a white screen at the first launch is the class MOL-79 was. The
-// login screen breaks before there is a session. The screen is a route's name — `login` behind the
-// door, `start` until the app is mounted, since the door's store must not be raised by a failure.
-// **The price, named:** what throws while the bundle's modules are evaluated, before this line runs,
-// reaches nobody — no code of ours runs yet, and a listener in `index.html` would have no way to
-// send it but a second copy of these rules.
-let mounted = false
-const failures = installFailureReports({
-  origin: window.location.origin,
-  build: pageBuild(import.meta.url, import.meta.env.PROD),
-  platform: () => platformLine(),
-  screen: () => {
-    if (!mounted) return 'start'
-    const route = router.currentRoute.value
-    if (useLoginStore().closed && route.meta.public !== true) return 'login'
-    return typeof route.name === 'string' ? route.name : 'start'
-  },
-  send: (body) => api.reportClientErrors(body),
-})
-window.addEventListener('error', (event) => {
-  failures.report(event.error, 'window')
-})
-window.addEventListener('unhandledrejection', (event) => {
-  failures.report(event.reason, 'rejection')
-})
-window.addEventListener('online', () => {
-  void failures.flush()
-})
 
 /**
  * Everything the start does after the catchers stand. A step that throws is reported as the start's
@@ -121,6 +91,9 @@ function start(): void {
     // leaving a blank screen at the shelf.
     .catch((error: unknown) => {
       console.error('[molvia]', 'first route', error)
+      // A guard, a route's meta, a screen that cannot load: the start's, and the owner's to hear
+      // (adversarial Б2).
+      failures.report(error, 'start')
     })
     .finally(() => {
       installViewTransitions(router)
@@ -128,7 +101,13 @@ function start(): void {
       installHeightHold(router)
       installSheetEntryGuard(router)
       app.mount('#app')
-      mounted = true
+      // The screen is a route's name — `login` behind the door — from now on: before, the door's
+      // store must not be raised by a failure.
+      placeFailures(() => {
+        const route = router.currentRoute.value
+        if (useLoginStore().closed && route.meta.public !== true) return 'login'
+        return typeof route.name === 'string' ? route.name : 'start'
+      })
       // What an earlier launch caught with no connection goes now.
       void failures.flush()
 
