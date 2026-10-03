@@ -600,7 +600,9 @@ export default defineComponent({
         recordAfterPlace.value = false
         if (recordOnClose) {
           recordOnClose = false
-          void record()
+          // Told from inside the pop of the sheet's step: «Записать» offline goes up at once, and a
+          // move made before the step lands is dropped as a second tap (review 34, as `retaken`).
+          afterStep(() => void record())
         }
       },
       saveTotal: (total: Money | null) => {

@@ -10,6 +10,8 @@ import type { ReceiptDetail, ReceiptRecordBody, ReceiptReviewLine } from '@molvi
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import CaptureSheet from '@/components/CaptureSheet.vue'
+import ReceiptPlaceSheet from '@/components/ReceiptPlaceSheet.vue'
+import { stepBack } from '@/navigation'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 
@@ -166,6 +168,28 @@ describe('ReceiptView (MOL-127)', () => {
     clock += 1000
     expect(sheet()?.textContent).toContain(ru.receipt.place.title)
     expect(recordReceipt).not.toHaveBeenCalled()
+  })
+
+  it('no place read and no connection: the place, then «Записать» goes up to «Покупки» (review 34)', async () => {
+    receipt.mockResolvedValue(detail({ place: false }))
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    const { view, router } = await render()
+    await button(view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    clock += 1000
+    const place = view.findComponent(ReceiptPlaceSheet)
+    place.vm.$emit('chosen', { name: 'Ереван Сити', city: 'Гюмри' }, '2026-10-01')
+    // A browser tells the sheet it is closed from inside the pop of its step, before that step has
+    // landed; happy-dom lands it first. So the order is laid by hand: the step in flight, the sheet
+    // closed, then the pop.
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => undefined)
+    stepBack(router)
+    place.props('onClosed')?.()
+    await flushPromises()
+    go.mockRestore()
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('purchases')
   })
 
   it('a late answer moves nobody who already left the review (adversarial А5)', async () => {
