@@ -31,14 +31,18 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `--weight-display` on Onest asks for an 800 Onest has not got. The mixin's two lines are the place
   the allowed-list is disabled for it, line by line — the mixins are checked like any file, since a
   literal there reaches every component that includes it (А4). **A role is whole**
-  (`molvia/display-type-whole`, `frontend/stylelint/display-type.mjs`): beside the include no `font`,
-  `font-family`, `font-weight` or `font-variation-settings` — a weight after it left the figures at
-  800 and drew the dram sign at 400, Dram having three weights (А3); a nested variant (a sentence in a
-  figure's place) sets its own face. **A custom property read where none is declared is refused** by
+  (`molvia/display-type-whole`, `frontend/stylelint/display-type.mjs`): in the rule with the include,
+  down its `@media` and `@include wider-than-phone` (the same element on a wider screen, adversarial
+  Б2), no `all`, `font`, `font-family`, `font-weight` or `font-variation-settings` — a weight after it
+  left the figures at 800 and drew the dram sign at 400, Dram having three weights (А3). A nested rule
+  sets them only with a face of its own — a sentence in a figure's place (`&.missing`) is Onest; a
+  variant that stays in Nunito keeps its one weight (Б1). Another rule for the same element elsewhere
+  is beyond what a linter can match (Б3). **A custom property read where none is declared is refused** by
   our own rule, `molvia/known-custom-property` (`frontend/stylelint/known-properties.mjs`):
   `var(--space-5)` stood on two screens, dropped as invalid, because the spacing list takes any
-  `--space-*` by its shape. Known is a declaration in `:root` of the tokens, `main.scss`, the mixins,
-  the file itself — or the one list of properties a script sets (`SET_BY_SCRIPT`, today
+  `--space-*` by its shape. Known is a declaration in a top-level `:root` of the tokens or `main.scss`
+  (one only a media query declares is undefined in the light scheme, Б5), in a mixin's body (known
+  everywhere, set where the mixin is included), the file itself — or the one list of properties a script sets (`SET_BY_SCRIPT`, today
   `--sheet-drag`), where a false alarm is fixed, never by a disable comment in the component. A name
   the dark scheme alone declares is undefined in the light one and is refused in `_tokens.scss` (А5);
   a name in a comment is no declaration (А9); a fallback does not make a name known; a name Sass builds
