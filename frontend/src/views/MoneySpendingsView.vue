@@ -169,10 +169,12 @@
     </FloatingDock>
 
     <template v-if="canWrite && phase !== 'idle'" #docked>
-      <AppButton ref="addButton" size="large" block @click="add">
-        <template #icon><IconPlus /></template>
-        {{ t('spending.summary.add') }}
-      </AppButton>
+      <div class="add">
+        <AppButton ref="addButton" size="large" block @click="add">
+          <template #icon><IconPlus /></template>
+          {{ t('spending.summary.add') }}
+        </AppButton>
+      </div>
     </template>
 
     <SpendingSheet
@@ -390,6 +392,11 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The dock keeps no padding of its own above or below: the screen's row does (as «Покупки»). */
+.add {
+  padding: var(--space-3) 0;
+}
+
 .content {
   display: flex;
   flex-direction: column;
