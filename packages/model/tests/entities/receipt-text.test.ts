@@ -120,13 +120,59 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
     expect(got.lines.reduce((sum, l) => sum + (l.sumHundredths ?? 0), 0)).toBe(got.totalHundredths)
   })
 
-  it('remembers the rows a line was read from, for cutting it out', () => {
-    const got = read(am03 as Fixture)
-    const milk = got.lines[2]!
-    expect(milk.rows.map((r) => r.text)).toEqual([
-      'Յ Կաթ «Рае» 3.2% 11',
-      '0401/1163909 1Հտ 366,3/3,7 370',
+  it('cuts a line out by its name and figures when the number of the item was read', () => {
+    const coke = read(am03 as Fixture).lines[1]!
+    expect(coke.rows.map((r) => r.text)).toEqual([
+      '2.Գազավորված ըմպելիք «Կոկա Կոլա» 1.6լ',
+      '2202/096796 14տ 702,9/7,1 710',
     ])
+  })
+
+  it('cuts only the figures when the number was not read — «Յ» for «3»', () => {
+    const milk = read(am03 as Fixture).lines[2]!
+    expect(milk.rows.map((r) => r.text)).toEqual(['0401/1163909 1Հտ 366,3/3,7 370'])
+  })
+
+  it('cuts only the heading row of a table', () => {
+    const got = read(am04 as Fixture)
+    expect(
+      got.lines.every((line) => line.rows.length === 1 && /\(\d{4}\)/.test(line.rows[0]!.text)),
+    ).toBe(true)
+  })
+})
+
+describe('what is never cut out (review, MOL-125)', () => {
+  it('a row of the head above the first item whose name OCR lost: a buyer, the VAT', () => {
+    const text = [
+      'Որից ԱԱՀ = 1 446,36',
+      'Գնորդ՝ Իվան Պետրով, հեռ. 091 123456',
+      '3923/1122223 1Հտ 60 60',
+      '2.Կաթ «Իգիթ» 3.2% 1լ',
+      '0401/1163909 2Հտ 740 370',
+    ].join('\n')
+    const lines = parseReceiptText(rowsOf(text, 0)).lines
+    expect(lines.map((l) => l.rows.map((r) => r.text))).toEqual([
+      ['3923/1122223 1Հտ 60 60'],
+      ['2.Կաթ «Իգիթ» 3.2% 1լ', '0401/1163909 2Հտ 740 370'],
+    ])
+  })
+})
+
+describe('a reading OCR glued into long figures', () => {
+  // twelve lines whose every field is long digits OCR confuses: the search grows as a power of them
+  const glued = (digits: number, count = 12) =>
+    Array.from({ length: count }, (_, i) =>
+      [
+        `${String(i + 1)}.Կաթ`,
+        `0401/1163909 1Հտ ${'5'.repeat(digits)},56/${'6'.repeat(digits)},65 ${'8'.repeat(digits)}`,
+      ].join('\n'),
+    ).join('\n')
+
+  it.each([6, 9, 12, 20])('is laid out in under two seconds with %i-digit figures', (digits) => {
+    const started = performance.now()
+    const got = parseReceiptText(rowsOf(glued(digits), 0))
+    expect(got.lines).toHaveLength(12)
+    expect(performance.now() - started).toBeLessThan(2_000)
   })
 })
 

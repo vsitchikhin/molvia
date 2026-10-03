@@ -30,7 +30,13 @@ export interface ReceiptTextLine {
   readonly discountHundredths: number | null
   /** The line's own arithmetic holds for the figures given. */
   readonly settled: boolean
-  /** The rows the line was read from — its name and its figures — for cutting it out. */
+  /**
+   * The rows the line may be cut out from for the reader's training (MOL-169): its figures, and its
+   * name only when the item's number was read on it. A name row is the first row above the figures,
+   * and above the first item that is the head — the VAT, a buyer's name — when OCR lost the name: the
+   * number is what says it is an item. A table gives its heading row only: its last row runs on into
+   * the total when OCR misreads the total's word.
+   */
   readonly rows: readonly TextRow[]
 }
 
@@ -112,22 +118,56 @@ interface Candidate {
 // The till rounds to a few luma: 609,97 paid for 610.
 const TOLERANCE_HUNDREDTHS = 3
 
+/**
+ * Past this many combinations a line's figures are taken as read, with no reading tried: the
+ * search grows as a power of the digits OCR can confuse in every field, and it runs in the API's
+ * process — twelve glued twelve-digit figures held it for half a minute (review, MOL-125). The
+ * bench's worst line has 55 176 (am-03), a quarter of it.
+ */
+export const LINE_COMBINATIONS_MAX = 200_000
+
+/**
+ * And past this many over one reading the lines left are taken as read: a line under the ceiling
+ * still costs a tenth of a second, and twelve of them stalled every request of the API for one. The
+ * bench's busiest reading tries 122 161 (am-03).
+ */
+export const READING_COMBINATIONS_MAX = 500_000
+
+/** What a reading may still try. */
+interface Budget {
+  left: number
+}
+
+// Takes `combinations` from the budget, or says the line is to be taken as read.
+function afford(budget: Budget, combinations: number): boolean {
+  if (combinations > LINE_COMBINATIONS_MAX || combinations > budget.left) return false
+  budget.left -= combinations
+  return true
+}
+
 // One pass over the figures of a line: every combination that satisfies paid + discount =
 // quantity × price is a candidate; the receipt's own discount rate then picks among them (a card
 // discount is one percentage), and after it the fewest swaps.
 function candidates(
+  budget: Budget,
   qtyS: string,
   paidS: string,
   discS: string,
   priceS: string | null,
 ): Candidate[] {
   const out: Candidate[] = []
-  const paids = [paidS, ...dropGroup(paidS)]
-  for (const q of variants(qtyS)) {
-    for (const p0 of paids) {
-      for (const p of variants(p0)) {
-        for (const d of variants(discS)) {
-          for (const pr of priceS === null ? [null] : variants(priceS)) {
+  const qtys = variants(qtyS)
+  const paids = [paidS, ...dropGroup(paidS)].map((p0) => ({ p0, all: variants(p0) }))
+  const discs = variants(discS)
+  const prices = priceS === null ? [null] : variants(priceS)
+  const combinations =
+    qtys.length * paids.reduce((n, p) => n + p.all.length, 0) * discs.length * prices.length
+  if (!afford(budget, combinations)) return out
+  for (const q of qtys) {
+    for (const { p0, all } of paids) {
+      for (const p of all) {
+        for (const d of discs) {
+          for (const pr of prices) {
             const qty = milliOf(q)
             const paid = hundredthsOf(p)
             const disc = hundredthsOf(d)
@@ -300,10 +340,13 @@ interface Found {
 
 // «0,694q» for 0,89 kg: when no reading of the weight fits, the weight is paid ÷ price, if that
 // comes out in whole grams — at a cost of two swaps, so a readable weight always wins.
-function byWeight(paidS: string, priceS: string): Candidate[] {
+function byWeight(budget: Budget, paidS: string, priceS: string): Candidate[] {
   const out: Candidate[] = []
-  for (const p of variants(paidS)) {
-    for (const pr of variants(priceS)) {
+  const paids = variants(paidS)
+  const prices = variants(priceS)
+  if (!afford(budget, paids.length * prices.length)) return out
+  for (const p of paids) {
+    for (const pr of prices) {
       const paid = hundredthsOf(p)
       const price = hundredthsOf(pr)
       const qty = Math.round((paid * 1000) / price)
@@ -324,7 +367,7 @@ function byWeight(paidS: string, priceS: string): Candidate[] {
 
 // Every way to cut the numbers into «paid» and «price»: «1 260 630» is 1 260 and 630, or 1 and
 // 260 630; a count of pieces is what paid ÷ price makes whole.
-function plainCandidates(found: Found): Candidate[] {
+function plainCandidates(budget: Budget, found: Found): Candidate[] {
   const tokens = found.plain ?? []
   const group = (g: readonly string[]): boolean =>
     g.length === 1 ||
@@ -337,8 +380,12 @@ function plainCandidates(found: Found): Candidate[] {
     const paidS = a.join(' ')
     const priceS = b.join('')
     if (found.weighed)
-      out.push(...candidates(found.qtyS, paidS, '0', priceS), ...byWeight(paidS, priceS))
-    else for (let q = 1; q <= 20; q++) out.push(...candidates(String(q), paidS, '0', priceS))
+      out.push(
+        ...candidates(budget, found.qtyS, paidS, '0', priceS),
+        ...byWeight(budget, paidS, priceS),
+      )
+    else
+      for (let q = 1; q <= 20; q++) out.push(...candidates(budget, String(q), paidS, '0', priceS))
   }
   // with no discount the paid sum is qty × price to the luma, not «about» it
   return out.filter((x) => Math.round((x.qty * x.price) / 1000) === x.paid)
@@ -374,8 +421,9 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
     let j = i - 1
     while (j > 0 && (mapped[j] ?? '').trim() === '') j-- // OCR leaves blank lines between the halves
     const headRow = mapped[j] ?? ''
-    const head = ITEM.exec(headRow)?.[2] ?? headRow
-    const source = rows.filter((_, k) => k === j || k === i)
+    const numbered = ITEM.exec(headRow)
+    const head = numbered?.[2] ?? headRow
+    const source = rows.filter((_, k) => (k === j && numbered !== null) || k === i)
     if (figures !== null) {
       const mid = figures[3] ?? ''
       const weight = WEIGHT.exec(mid)
@@ -413,9 +461,12 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
 
   const printedTotal = TOTAL.exec(text)
   const total = printedTotal?.[1] === undefined ? null : hundredthsOf(printedTotal[1])
+  const budget: Budget = { left: READING_COMBINATIONS_MAX }
   const lists = settle(
     found.map((f) =>
-      f.plain !== null ? plainCandidates(f) : candidates(f.qtyS, f.paidS, f.discS, f.priceS),
+      f.plain !== null
+        ? plainCandidates(budget, f)
+        : candidates(budget, f.qtyS, f.paidS, f.discS, f.priceS),
     ),
   )
   const { picks, balanced } = reconcile(
@@ -599,7 +650,7 @@ function tableLines(rows: readonly TextRow[]): { lines: ReceiptTextLine[]; total
       sumHundredths: finite(sum),
       discountHundredths: null,
       settled: c.settled,
-      rows: o.item.rows,
+      rows: o.item.rows.slice(0, 1),
     }
   })
   return { lines, total }

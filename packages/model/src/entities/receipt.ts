@@ -14,17 +14,19 @@ export const RECEIPT_PARTS_MAX = 4
 
 /**
  * A part as the phone sends it: a JPEG of the receipt cropped to its edges at full resolution —
- * up to 3 200 px on the long side (MOL-114). The ceilings leave room above that, and refuse what is
- * not a photo of a receipt.
+ * up to 3 200 px on the long side (MOL-114). The ceilings leave room above that and refuse what is
+ * not a photo of a receipt; a phone's whole frame passes too — 4 032 px of a 12-megapixel camera,
+ * 5 712 of a 24-megapixel one (review А8) — since a part refused is never retried.
  */
 export const RECEIPT_PART_BYTES_MAX = 8 * 1024 * 1024
-export const RECEIPT_SIDE_MAX = 4_000
+export const RECEIPT_SIDE_MAX = 6_000
 export const RECEIPT_SIDE_MIN = 200
 
 /**
  * How long anything of a receipt stays (В-3, MOL-125; owner, 02.10.2026): a receipt not recorded is
- * removed whole this many days after it was shot, and the cut-out item lines kept for retraining the
- * reader (MOL-169) leave this many days after the receipt was recorded.
+ * removed whole this many days after it reached the server — by its clock, not the phone's — and
+ * the cut-out item lines kept for retraining the reader (MOL-169) leave this many days after the
+ * receipt was recorded.
  */
 export const RECEIPT_KEEP_DAYS = 28
 
