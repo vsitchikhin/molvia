@@ -11,22 +11,34 @@ import { describe, expect, it } from 'vitest'
 // A path in a variable: Vite rewrites `new URL('./literal', import.meta.url)` into an asset's address.
 const TOKENS = './_tokens.scss'
 
-// Comments out first: a hex in one is no token, and Sass drops it from what the page draws.
-const source = readFileSync(new URL(TOKENS, import.meta.url), 'utf8').replace(
-  /\/\*[\s\S]*?\*\//g,
-  '',
-)
+// Both kinds of comment out first, a line comment also at the end of a declaration: a value in one is
+// no token, and Sass drops it from what the page draws (as bin/design-md.mjs reads the file).
+const source = readFileSync(new URL(TOKENS, import.meta.url), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/(^|[\s;{}])\/\/[^\n]*/g, '$1')
 
-function colours(block: string): Map<string, string> {
+// Every declaration, whatever its value: a colour this test cannot read must fail here, not fall out
+// of the lists — Stylelint asks for the short hex (`color-hex-length`), and `--fix` writes it.
+function declarations(block: string): Map<string, string> {
   return new Map(
-    [...block.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-f]{6});/g)].map((m) => [m[1] ?? '', m[2] ?? '']),
+    [...block.matchAll(/--([a-z0-9-]+)\s*:\s*([^;]+);/g)].map((m) => [
+      m[1] ?? '',
+      (m[2] ?? '').trim(),
+    ]),
   )
+}
+
+/** The value as `#rrggbb` in lower case, or undefined for anything that is not a hex colour. */
+function hex(value: string | undefined): string | undefined {
+  const digits = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value ?? '')?.[1]?.toLowerCase()
+  if (!digits) return undefined
+  return '#' + (digits.length === 3 ? digits.replace(/./g, '$&$&') : digits)
 }
 
 const darkAt = source.indexOf('@mixin dark-scheme')
 const declared = {
-  light: colours(source.slice(source.indexOf(':root {'), darkAt)),
-  dark: colours(source.slice(darkAt)),
+  light: declarations(source.slice(source.indexOf(':root {'), darkAt)),
+  dark: declarations(source.slice(darkAt)),
 }
 
 // A role is a meaning; its steps are a mark, the same at text size, a fill — and the accent's solid.
@@ -41,7 +53,11 @@ const STEPS = Object.values(ROLES).flat()
 const MARKS = ['accent', 'good', 'warn', 'bad', 'graphic']
 const TEXT = ['text', 'text-muted', 'accent-ink', 'good-ink', 'warn-ink', 'bad-ink']
 const GROUNDS = ['surface', 'sunken', 'surface-2']
-const CATEGORIES = [...declared.light.keys()].filter((name) => name.startsWith('cat-'))
+// A category is every `--cat-*` but the share of its colour under an icon, which is a percentage.
+const CATEGORIES = [...declared.light]
+  .filter(([name, value]) => name.startsWith('cat-') && !value.endsWith('%'))
+  .map(([name]) => name)
+const TINTS = ['accent-tint', 'good-tint', 'warn-tint', 'bad-tint']
 
 const APART = 0.08
 const MARK_CONTRAST = 3
@@ -87,17 +103,17 @@ describe.each(['light', 'dark'] as const)('the %s scheme', (scheme) => {
   // The dark block repeats every colour: a name it left out would draw the light value on a dark
   // ground, and the pairs below would be checked against a colour nobody sees.
   const value = (name: string): string => {
-    const hex = declared[scheme].get(name)
-    if (!hex) throw new Error(`--${name} is not declared in the ${scheme} scheme`)
-    return hex
+    const colour = hex(declared[scheme].get(name))
+    if (!colour) throw new Error(`--${name} is no hex colour in the ${scheme} scheme`)
+    return colour
   }
 
-  it('declares every colour the pairs are made of', () => {
+  it('declares every colour the pairs are made of, as a hex', () => {
     expect(CATEGORIES.length).toBeGreaterThan(0)
-    const missing = [...STEPS, ...TEXT, ...GROUNDS, 'on-accent', ...CATEGORIES].filter(
-      (name) => !declared[scheme].has(name),
-    )
-    expect(missing).toEqual([])
+    const unread = [...STEPS, ...TEXT, ...GROUNDS, 'on-accent', ...CATEGORIES]
+      .filter((name) => !hex(declared[scheme].get(name)))
+      .map((name) => `--${name}: ${declared[scheme].get(name) ?? 'not declared'}`)
+    expect(unread).toEqual([])
   })
 
   it(`holds any two steps of different roles ${String(APART)} apart`, () => {
@@ -121,6 +137,15 @@ describe.each(['light', 'dark'] as const)('the %s scheme', (scheme) => {
         if (d < APART) close.push(`--${category} / --${step} ${d.toFixed(3)}`)
       }
     expect(close).toEqual([])
+  })
+
+  // A tint is a fill with no edge — a notice in a sheet, the circle of a state: one the eye cannot
+  // tell from the sheet it lies on is no fill (adversarial А3: the dark bad-tint was 0.038).
+  it(`lays every tint ${String(APART)} apart from --surface`, () => {
+    const lost = TINTS.map((tint) => [tint, distance(value(tint), value('surface'))] as const)
+      .filter(([, d]) => d < APART)
+      .map(([tint, d]) => `--${tint} / --surface ${d.toFixed(3)}`)
+    expect(lost).toEqual([])
   })
 
   it(`draws every mark and category at ${String(MARK_CONTRAST)}:1 on --surface`, () => {

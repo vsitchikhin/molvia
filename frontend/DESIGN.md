@@ -14,16 +14,16 @@ colors:
   accent: '#b2622d'
   accent-solid: '#8c491a'
   accent-ink: '#8c491a'
-  accent-tint: '#ffce91'
+  accent-tint: '#ffce8c'
   good: '#5d7239'
   good-ink: '#3f4f24'
   good-tint: '#cae5b7'
   warn: '#9d7d13'
   warn-ink: '#533302'
-  warn-tint: '#fff4b9'
+  warn-tint: '#fef4ad'
   bad: '#ab2b2a'
   bad-ink: '#742018'
-  bad-tint: '#f8ddd6'
+  bad-tint: '#f9d8d3'
   cat-groceries: '#2e7d73'
   cat-cafe: '#8e4f93'
   cat-rent: '#524569'
@@ -68,10 +68,10 @@ colors:
   good-tint-dark: '#24431a'
   warn-dark: '#daac35'
   warn-ink-dark: '#f7ca6a'
-  warn-tint-dark: '#392905'
+  warn-tint-dark: '#3c2900'
   bad-dark: '#e47696'
   bad-ink-dark: '#f4a3b7'
-  bad-tint-dark: '#2f171e'
+  bad-tint-dark: '#400d25'
   cat-groceries-dark: '#5fb8aa'
   cat-cafe-dark: '#d09bd6'
   cat-rent-dark: '#a486d7'
@@ -295,7 +295,7 @@ A warm, low-chroma ground with four semantic roles — accent, good, warn, bad �
 - **Well** (`surface-2`): inputs, segmented tracks, inert pills, empty-state circles.
 - **Seam** (`border`, `border-strong`): card edges, the secondary button's outline, the edge of a field — decoration only.
 - **Graphic** (`graphic` #746258 / dark #857a6c): data that carries meaning without a colour of its own — 3:1 on `surface`.
-- **Ink** (`text` #1f1c19) and **Faded Ink** (`text-muted` #6c6152): text; muted still clears 4.5:1 on every ground.
+- **Ink** (`text` #1f1c19) and **Faded Ink** (`text-muted` #6c6152): text; muted clears 4.5:1 on `surface`, `sunken` and `surface-2` — not on a tint, where a secondary line is `text`.
 
 ### Categories of spending
 
@@ -310,7 +310,8 @@ never data, never status, never decoration. A chart series is `text` or `graphic
 
 **The Neighbouring Roles Rule.** Any two steps of different roles — accent (with `accent-solid`),
 good, warn, bad, `graphic` — and every category against every step of a role stand at least 0.08
-apart in OKLab, in both schemes; a mark and a category are 3:1 on `surface`, text 4.5:1 on its ground.
+apart in OKLab, in both schemes; a mark and a category are 3:1 on `surface`, text 4.5:1 on its ground,
+and a tint, a fill with no edge, stands 0.08 from the `surface` it lies on.
 `frontend/src/styles/tokens.test.ts` holds every pair, with no list of exceptions: a value that fails
 is changed, never excused (MOL-172). Categories among themselves are not held yet (MOL-218): today a
 name beside the colour tells two close ones apart.
