@@ -1,6 +1,8 @@
 {
   "extends": ["stylelint-config-standard-scss", "stylelint-config-recommended-vue/scss"],
+  "plugins": ["./stylelint/known-properties.mjs"],
   "rules": {
+    "molvia/known-custom-property": true,
     "color-no-hex": [
       true,
       {
