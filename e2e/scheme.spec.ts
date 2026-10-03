@@ -175,8 +175,9 @@ test('a segment scrolled under the pinned header stays under it, and the header 
   await page.setViewportSize({ width: 320, height: 568 })
   await page.emulateMedia({ colorScheme: 'light' })
   await signedIn(page, '/settings')
-  // The groups over «Тема» load by requests of their own and grow when they answer: measured before
-  // that, the word slid from under the header and the point missed it — now and then, on CI (MOL-171).
+  // The groups over «Тема» load by requests of their own, and their answers redraw them (the switches
+  // come enabled, their descriptions change). Measured before that, the point once missed the header
+  // on CI (MOL-171) — the exact move was not caught; measured after, nothing over the word is pending.
   await expect(page.getByRole('switch', { name: 'Зарплата — в следующий месяц' })).toBeEnabled()
   await expect(page.getByRole('switch', { name: 'Напоминать об оценке в Telegram' })).toBeEnabled()
   const bar = await page.locator('header.bar').boundingBox()

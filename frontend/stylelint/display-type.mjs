@@ -138,7 +138,7 @@ function rule(primary) {
     }
 
     root.walkAtRules('forward', (forward) => {
-      if (/\sas\s/.test(` ${forward.params} `)) {
+      if (/(^|[\s'"])as\s/.test(forward.params)) {
         report({ ruleName, result, node: forward, message: messages.forward() })
       }
     })

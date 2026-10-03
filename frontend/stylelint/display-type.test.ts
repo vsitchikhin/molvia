@@ -174,8 +174,10 @@ describe('molvia/display-type-whole', () => {
 
   it('refuses a @forward that renames by a prefix, and takes one that does not', async () => {
     expect(
-      await refused("@forward 'mixins' as type-*;\n@forward 'mixins' show display-type;"),
-    ).toEqual(['@forward'])
+      await refused(
+        "@forward 'mixins' as type-*;\n@forward 'mixins'as tone-*;\n@forward 'mixins' show display-type;",
+      ),
+    ).toEqual(['@forward', '@forward'])
   })
 
   it('tells _mixins.scss by its whole path: another styles/_mixins.scss is not it', async () => {
