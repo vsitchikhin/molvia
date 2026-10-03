@@ -87,8 +87,12 @@ function openTrip(bought = 0): TripViewModel {
   })
 }
 
+// One moment for the whole file: two cards «bought yesterday» are bought at the same instant —
+// read anew, the second was now and then a millisecond newer, and the order of places turned (CI).
+const NOW = new Date()
+
 function yesterday(): Date {
-  const at = new Date()
+  const at = new Date(NOW)
   at.setDate(at.getDate() - 1)
   return at
 }
