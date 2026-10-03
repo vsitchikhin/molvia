@@ -226,10 +226,10 @@ export default defineComponent({
 }
 
 .name {
+  @include display-type;
+
   margin: var(--space-2) 0 0;
-  font-family: var(--font-display);
   font-size: var(--text-title);
-  font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
 }
 </style>

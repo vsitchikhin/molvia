@@ -33,6 +33,7 @@ const STORED = [
   'exchanges',
   'incomes',
   'spendings',
+  'receipts',
   'accounts',
   'places',
   'barcodes',
@@ -74,8 +75,9 @@ export default defineComponent({
 }
 
 h2 {
+  @include display-type;
+
   margin: var(--space-6) 0 var(--space-3);
-  font-family: var(--font-display);
   font-size: var(--text-headline);
 }
 

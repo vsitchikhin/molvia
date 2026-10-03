@@ -137,10 +137,10 @@ export default defineComponent({
 }
 
 .intro-title {
+  @include display-type;
+
   margin: 0 0 var(--space-2);
-  font-family: var(--font-display);
   font-size: var(--text-title);
-  font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
   text-wrap: balance;
 }

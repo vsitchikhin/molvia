@@ -53,6 +53,19 @@ import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
+import { readQueuedReceipts } from '@/usecases/read-receipts'
+import type { ReadReport } from '@/usecases/read-receipts'
+import {
+  putReceiptPart,
+  receiptOfOwner,
+  receiptsOf,
+  removeReceipt,
+  restoreReceipt,
+  sendReceipt,
+} from '@/usecases/receipts'
+import { receiptRoutes } from '@/routes/receipts'
+import { createReceiptRepository } from '@/db/receipts-repository'
+import type { ReceiptReader } from '@/receipts/reader'
 import { recentPlaces } from '@/usecases/recent-places'
 import { rateFromBot } from '@/usecases/rate-from-bot'
 import { rateItem } from '@/usecases/rate-item'
@@ -185,6 +198,9 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   // Not 400: the request is well formed, it simply names no subject the server can find.
   // The PWA reads exactly this to decide that its stored identity is gone (MOL-8, Р-4).
   [ERROR.NO_ACTOR]: 401,
+  // A part of a receipt that is not a photo, or one too large (MOL-125): «не принят» on the phone.
+  [ERROR.RECEIPT_NOT_PHOTO]: 415,
+  [ERROR.RECEIPT_TOO_LARGE]: 413,
 }
 
 // The handler answers with the contract the client parses, so it checks its own reply
@@ -283,6 +299,12 @@ export interface ServerOptions {
    * and a test that needs it hands it in — every other test would load 200 MB for nothing.
    */
   readonly embedder?: (log: EmbeddingLog) => Embedder
+  /**
+   * The receipt reader (MOL-125). Absent or `null`, receipts are taken and wait in the queue: the
+   * API's entry builds the real one from `RECEIPT_READER_URL`, and a test hands in a fake — no test
+   * reads with a Tesseract a copy happens to run.
+   */
+  readonly receiptReader?: ReceiptReader | null
   /**
    * The owner's Telegram id the failures are queued for (MOL-143). Absent, it is the environment's
    * — set in production only; a test names one, or `null` for none.
@@ -451,6 +473,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const removedSpendings = createSpendingRepository(db)
     const removedTrips = createTripRepository(db)
     const removedAccounts = createMoneyAccountRepository(db)
+    const receipts = createReceiptRepository(db)
+    const reader = options.receiptReader ?? null
+    let stopReceiptCleanup: (() => Promise<void>) | undefined
+    let receiptQueue: ReturnType<typeof startItemEmbedding> | undefined
     const messages = createFeedbackRepository(db)
     let stopCleanup: (() => Promise<void>) | undefined
     let stopExchangeCleanup: (() => Promise<void>) | undefined
@@ -547,6 +573,58 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       void embedder.loaded.then(() => {
         writer.nudge()
       })
+      // Receipts (MOL-125): a removal final after its ten minutes, a receipt not recorded after its
+      // 28 days, a line cut out for training 28 days after it was confirmed.
+      stopReceiptCleanup = startLoginCleanup(
+        () => receipts.purgeStale(),
+        (error) => {
+          failures.report(error, job('receipt-cleanup'), 'receipt cleanup failed')
+        },
+      )
+      if (reader !== null) {
+        // The queue of receipts: the embeddings' runner, reused — a minute timer and a nudge when a
+        // receipt's last part arrives. Before each round a reading left unfinished — by the last
+        // process, or by a round that failed half-way — is begun again; no round runs beside it.
+        let readerDown = false
+        const report = (event: ReadReport): void => {
+          if (event.kind === 'reader_unavailable') {
+            // once per fall, not once a minute while it lies
+            if (!readerDown)
+              instance.log.warn({ reason: event.reason }, 'receipt reader unavailable')
+            readerDown = true
+          } else if (event.kind === 'read') {
+            if (readerDown) instance.log.info('receipt reader back')
+            readerDown = false
+            instance.log.info(
+              {
+                status: event.status,
+                failure: event.failure,
+                parts: event.parts,
+                lines: event.lines,
+                ms: event.ms,
+              },
+              'receipt read',
+            )
+          } else if (event.kind === 'reader_dropped') {
+            // every time: a photo that fells the reader is what this line is there to show
+            instance.log.warn({ reason: event.reason }, 'receipt reader dropped a photo')
+          } else if (event.kind === 'strips_failed') {
+            instance.log.warn({ reason: event.reason }, 'receipt lines not cut out')
+          } else {
+            failures.report(event.error, job('receipt-reading'), 'receipt reading failed')
+          }
+        }
+        const queue = startItemEmbedding(
+          async () => {
+            await receipts.requeueInterrupted()
+            await readQueuedReceipts({ receipts, reader, report })
+          },
+          (error) => {
+            failures.report(error, job('receipt-queue'), 'receipt queue failed')
+          },
+        )
+        receiptQueue = queue
+      }
       ready()
     })
     instance.addHook('onClose', async () => {
@@ -560,6 +638,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopFeedbackCleanup?.()
       await stopFailureCleanup?.()
       await itemEmbedding?.stop()
+      await stopReceiptCleanup?.()
+      await receiptQueue?.stop()
     })
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
@@ -708,6 +788,18 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         amend: (actor, id, body) => amendIncome(tripData, actor, id, body),
         remove: (actor, id) => removeIncome(tripData, actor, id),
         restore: (actor, id) => restoreIncome(tripData, actor, id),
+      })
+      receiptRoutes(guarded, {
+        send: (actorId, body) => sendReceipt(receipts, actorId, body),
+        putPart: async (actorId, id, part, photo) => {
+          const { receipt, queued } = await putReceiptPart(receipts, actorId, id, part, photo)
+          if (queued) receiptQueue?.nudge()
+          return receipt
+        },
+        list: (actorId) => receiptsOf(receipts, actorId),
+        one: (actorId, id) => receiptOfOwner(receipts, actorId, id),
+        remove: (actorId, id) => removeReceipt(receipts, actorId, id),
+        restore: (actorId, id) => restoreReceipt(receipts, actorId, id),
       })
       spendingRoutes(guarded, {
         record: (actor, body) => recordSpending(tripData, actor, body),

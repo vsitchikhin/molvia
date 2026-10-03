@@ -133,10 +133,10 @@ export default defineComponent({
 }
 
 .name {
+  @include display-type;
+
   display: block;
-  font-family: var(--font-display);
   font-size: var(--text-title);
-  font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
 }
 

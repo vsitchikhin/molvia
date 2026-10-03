@@ -132,6 +132,7 @@ export default defineComponent({
   flex: none;
 
   /* 22 — the handoff's icon inside a button */
+  /* stylelint-disable-next-line declaration-property-value-allowed-list -- its token comes with the icon scale, MOL-173 */
   font-size: 1.375rem;
 
   :deep(svg) {

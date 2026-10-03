@@ -60,6 +60,8 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       # Optional: empty leaves the Open Food Facts hint off (MOL-162).
       OPEN_FOOD_FACTS_CONTACT: ${OPEN_FOOD_FACTS_CONTACT:-}
+      # The receipt reader below (MOL-125); while it is down, receipts wait in the queue.
+      RECEIPT_READER_URL: http://receipt-reader:8080
       # Whom the bot tells of a new failure (MOL-143): the owner's Telegram id. Required as a line,
       # as BOT_PULSE_URL is: a forgotten one would leave every failure silent and nobody would know.
       # Empty, on purpose, keeps the failures in their table and tells nobody.
@@ -67,6 +69,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  receipt-reader:
+    logging: *logging
+    # Tesseract and the language files MOL-114 measured, behind a small HTTP server: a photo in, its
+    # text out. No database, no disk but /tmp, no port outside the compose network (MOL-125, В-1).
+    image: ghcr.io/vsitchikhin/molvia-receipt-reader:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: services/receipt-reader/Dockerfile
+    restart: unless-stopped
+    # Three of the four cores and a gigabyte: a receipt takes them for half a minute, and the API,
+    # the bot and Postgres keep the fourth (MOL-113, «Ресурсы сервера»).
+    cpus: 3
+    mem_limit: 1g
+    read_only: true
+    tmpfs:
+      - /tmp
 
   bot:
     logging: *logging

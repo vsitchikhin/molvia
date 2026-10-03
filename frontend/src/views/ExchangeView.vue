@@ -484,8 +484,9 @@ export default defineComponent({
 }
 
 .figure {
+  @include display-type;
+
   margin: 0;
-  font-family: var(--font-display);
   font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
 }
@@ -518,8 +519,8 @@ export default defineComponent({
 
   svg {
     flex: none;
-    width: var(--space-5);
-    height: var(--space-5);
+    width: var(--space-4);
+    height: var(--space-4);
   }
 }
 

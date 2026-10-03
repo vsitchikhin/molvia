@@ -23,6 +23,7 @@ entry; a data file (`sql`, `json`, fonts, icons) by an entry for a directory abo
 | `advice.md`          | «Что брать», verdicts and «Оценки», the event log, the gates                   |
 | `trips.md`           | «Покупки», the record typed by hand, the queue on the device, places, settings |
 | `barcodes.md`        | the barcode scanner, a code typed by hand, the item by its code (MOL-99)       |
+| `receipts.md`        | the receipt photo, its reader, the queue that reads it, the lines it gives     |
 | `money-rates.md`     | official rates and their feeds, exchanges, incomes, the wallet                 |
 | `money-spendings.md` | spendings, categories, the month, the «Деньги» screen and its queue            |
 | `money-accounts.md`  | accounts, balances, «Списано со счёта», the check                              |

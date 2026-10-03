@@ -34,6 +34,12 @@ The shape worth knowing here:
   from a constructor called `AbortSignal`, and the bot's first use of the global one had esbuild
   rename abort-controller's class — every call to Telegram failed in production, every unbundled
   test passed. `bot/src/bundle.test.ts` builds the bot and checks the name.
+- **The receipt reader is the one service not built from our TypeScript** (MOL-125):
+  `services/receipt-reader`, Debian trixie with Tesseract and Python from apt, an image of its own in
+  the release beside the three, three cores and a gigabyte, read-only but `/tmp`. `deploy.sh` pulls it
+  with the others; **a rollback starts `backend bot frontend` only** — a tag from before MOL-125 has no
+  reader image, and `up -d` of everything would stop on the missing pull with the API left broken. The
+  reader holds nothing and answers any API alike, so whatever runs of it stays.
 - **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
   exists only for trying the stack on a laptop, where Docker Desktop has no journald.
 - **The database is copied every night, encrypted, off the machine** (MOL-70): `pg_dump` inside the
@@ -43,7 +49,9 @@ The shape worth knowing here:
   written on the privacy page: an erased person lives in the copies exactly that long, so the term is
   a promise, not a setting. A restore brings back whoever was erased after the copy — a window of
   at most a day, accepted for 0.1 and named on the page (owner's decision, 26.09.2026); a record of
-  erasures that outlives the database is 0.2's, with the lawyer. A missing copy is an alarm
+  erasures that outlives the database is 0.2's, with the lawyer. **Receipt photos and the item lines
+  cut out of them stay out of the copy** (`--exclude-table-data`, MOL-125 В-2): their tables come back
+  empty, and a receipt queued without its photo fails as `unreadable`. A missing copy is an alarm
   (healthchecks.io), not a log line. `deploy/README.md`, «Backups».
 - **Migrations run when the API starts.** There is one instance, and a schema that lags
   the code deployed against it is the worse of the two failures. `make migrate`, the test

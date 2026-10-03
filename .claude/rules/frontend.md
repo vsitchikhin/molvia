@@ -12,6 +12,62 @@ The detail behind the frontend lines of `CLAUDE.md`.
   single Cyrillic glyph, so its Russian mockups were rendered by a system fallback the
   whole time. Fonts live in the repository and are precached — the app is opened where the
   connection drops, and a request to someone else's CDN is one more thing that can hang.
+- **`frontend/DESIGN.md` is the style, and the linter holds it** (MOL-171). DESIGN.md (with
+  `PRODUCT.md` beside it) is what Claude Design draws from and what a screen is checked against; its
+  token block is the file's front matter, generated from `_tokens.scss` by `bin/design-md.mjs` and
+  passed through Prettier — `make format` rewrites quotes otherwise, and the check would fail on its
+  own output. `npm run format` writes it, `npm run lint` refuses one out of date: a block typed by
+  hand drifts at the first edit of a token, and the next design is drawn in old colours; a line comment
+  in `_tokens.scss` is no token for it either (adversarial А8). Stylelint allows, outside
+  `_tokens.scss` and `_fonts.scss` (its `@font-face` descriptors): a weight only `var(--weight-*)`; a
+  size only a step of the type scale named one by one, `var(--icon*)`, `inherit` or `1em` — `--text`
+  and `--text-muted` are colours, and as a size the browser drops them (А2); a radius only
+  `var(--radius*)`, `0`, `50%` or a sum or difference of tokens in `calc()` — a number beside a token
+  is a radius off the scale (А6); no colour function (`rgb()`, `oklch()`…); `font-family` only
+  `var(--font)`; the `font` shorthand only `inherit` — it carried a face, a weight and a size past all
+  three longhand rules (А1); `font-variation-settings` only `normal` — the Nunito file is variable, and
+  its axis drew it at 400 (А7). **Nunito comes only with `@include display-type`**, its face and its
+  one weight together (Ф-7, owner's В-3): a weight rule alone let Nunito be set at 600 beside it, and
+  `--weight-display` on Onest asks for an 800 Onest has not got. The mixin's two lines are the place
+  the allowed-list is disabled for it, line by line — the mixins are checked like any file, since a
+  literal there reaches every component that includes it (А4). **A role is whole**
+  (`molvia/display-type-whole`, `frontend/stylelint/display-type.mjs`): in the rule with the include,
+  down its `@media` and `@include wider-than-phone` (the same element on a wider screen, adversarial
+  Б2) — a role set inside one of them is checked from the rule up, so a sibling block cannot undo it
+  (Ж1) — no `all`, `font`, `font-family`, `font-weight` or `font-variation-settings` — a weight after it
+  left the figures at 800 and drew the dram sign at 400, Dram having three weights (А3). A nested rule
+  sets them only with the text face of its own — a sentence in a figure's place (`&.missing`) is
+  `font-family: var(--font)`; `inherit` keeps Nunito (В2); a variant that stays in Nunito keeps its one
+  weight (Б1). A mixin that includes the role is the role, through any number of wrappers, and it
+  is written in `_mixins.scss` alone — the one place the plugin reads at load — and refused where it is
+  defined anywhere else, so the place a wrapper may live and the place it is looked for are one (Ж2,
+  З1) — that file told by its whole path, not by a `styles/_mixins.scss` ending another one (И2), and
+  `@forward … as prefix-*` refused, since it renames the role with no `@mixin` to catch (И1). It is read with comments taken out, names compared as Sass compares them —
+  `display_type` is `display-type` (В1, Г1), whether included by name, through a namespace
+  (`m.display-type`) or `sass:meta` (Д1, Д2). Another rule for the same element elsewhere is beyond
+  what a linter can match (Б3), so the role is never put in a placeholder, anywhere in a selector,
+  where `@extend` would carry it into such a rule (В3, Г2, Д3). **`@extend` and `@use 'sass:meta'`
+  are refused outright** (adversarial round 6): neither is used, and between them they carried every
+  remaining way past the check — a rule the role was extended into, a mixin applied under no name
+  (Е2, Е3). The check reads the source, not the compiled CSS: each round of review found a narrower way
+  past it, and the last ones were deliberate. **A custom property read where none is declared is refused** by
+  our own rule, `molvia/known-custom-property` (`frontend/stylelint/known-properties.mjs`):
+  `var(--space-5)` stood on two screens, dropped as invalid, because the spacing list takes any
+  `--space-*` by its shape. Known is a declaration made directly in a rule that is exactly `:root`, at the top
+  level of the tokens or `main.scss` (one only a media query or `[…]:root` declares is undefined in the
+  light scheme, Б5, В4), in a mixin's body (known
+  everywhere, set where the mixin is included), the file itself — or the one list of properties a script sets (`SET_BY_SCRIPT`, today
+  `--sheet-drag`), where a false alarm is fixed, never by a disable comment in the component. A name
+  the dark scheme alone declares is undefined in the light one and is refused in `_tokens.scss` (А5);
+  a name in a comment is no declaration (А9); a fallback does not make a name known; a name Sass builds
+  by interpolation (`var(--space-#{$n})`) is not checked. Besides the mixin's two lines, the one
+  disable comment is `AppButton`'s icon size, until the icon scale (MOL-173). **A branch red after
+  master took this:**
+  Nunito is `@include display-type` in place of the `font-family`/`font-weight` pair, a literal is a
+  token, and `npm run lint:style -w @molvia/frontend` names every place.
+- **Nunito is one weight, 800, one file per subset** (MOL-171): the 400 and 600 files were the same
+  variable font copied twice, and the precache fetched each URL. A sentence in a figure's place
+  («Рынка нет» on the rate chart) is set in Onest, not Nunito at another weight.
 - **The dram sign `֏` comes from a face of its own,** scoped to `unicode-range: U+058F`.
   Of the 321 Google fonts covering Cyrillic, four also cover Armenian and none is usable
   here. Without this the glyph falls back to a system font and shifts the baseline in the

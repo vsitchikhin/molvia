@@ -87,12 +87,13 @@ function openTrip(bought = 0): TripViewModel {
   })
 }
 
-/**
- * A day ago, from now. Two cards meant to be bought at the same moment take one call: two calls a
- * millisecond apart make the second the newer, and the order of a line flipped on CI (MOL-143).
- */
+// One moment for the whole file: two cards «bought yesterday» are bought at the same instant —
+// read anew, the second was now and then a millisecond newer, and the order of places turned on CI
+// (MOL-143 gave most tests one call; the one MOL-120 test it missed failed on MOL-171's CI).
+const NOW = new Date()
+
 function yesterday(): Date {
-  const at = new Date()
+  const at = new Date(NOW)
   at.setDate(at.getDate() - 1)
   return at
 }

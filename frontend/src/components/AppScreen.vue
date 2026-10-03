@@ -366,10 +366,10 @@ export default defineComponent({
 }
 
 .title {
+  @include display-type;
+
   margin: 0;
-  font-family: var(--font-display);
   font-size: var(--text-display);
-  font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
   letter-spacing: -0.01em;
 

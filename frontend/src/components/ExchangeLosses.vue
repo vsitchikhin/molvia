@@ -97,10 +97,10 @@ export default defineComponent({
 }
 
 .total {
+  @include display-type;
+
   margin: 0;
-  font-family: var(--font-display);
   font-size: var(--text-figure);
-  font-weight: 800;
   font-variant-numeric: tabular-nums;
 
   &.negative {
@@ -181,7 +181,7 @@ export default defineComponent({
 
 .fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--radius-mark);
 
   &.bad {
     background: var(--bad);

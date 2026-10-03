@@ -1,6 +1,6 @@
 {
-  "id": "a5be76c2-9b3e-4eec-8abe-00e422e6e81f",
-  "prevId": "3699188b-d751-4bdc-b6cb-4f4cc5c547ab",
+  "id": "d7a62027-6ca3-4dcc-8ac4-abe1b9f8684a",
+  "prevId": "07c254f8-c190-403f-9814-b472360e9dba",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1092,6 +1092,16 @@
             "type": "stored"
           }
         },
+        "thread_key": {
+          "name": "thread_key",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "generated": {
+            "as": "coalesce(thread_id, id)",
+            "type": "stored"
+          }
+        },
         "client_key": {
           "name": "client_key",
           "type": "uuid",
@@ -1167,8 +1177,8 @@
           "name": "feedback_answers_own_reply",
           "tableFrom": "feedback",
           "tableTo": "feedback_replies",
-          "columnsFrom": ["in_reply_to", "actor_id"],
-          "columnsTo": ["id", "actor_id"],
+          "columnsFrom": ["in_reply_to", "actor_id", "thread_key"],
+          "columnsTo": ["id", "actor_id", "thread_id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1180,15 +1190,15 @@
           "nullsNotDistinct": false,
           "columns": ["actor_id", "client_key"]
         },
-        "feedback_id_actor_key": {
-          "name": "feedback_id_actor_key",
-          "nullsNotDistinct": false,
-          "columns": ["id", "actor_id"]
-        },
         "feedback_id_actor_head_key": {
           "name": "feedback_id_actor_head_key",
           "nullsNotDistinct": false,
           "columns": ["id", "actor_id", "head"]
+        },
+        "feedback_id_actor_thread_key": {
+          "name": "feedback_id_actor_thread_key",
+          "nullsNotDistinct": false,
+          "columns": ["id", "actor_id", "thread_key"]
         }
       },
       "policies": {},
@@ -1249,6 +1259,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "thread_id": {
+          "name": "thread_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
         "text": {
           "name": "text",
           "type": "text",
@@ -1297,18 +1313,18 @@
           "name": "feedback_replies_message_is_owners",
           "tableFrom": "feedback_replies",
           "tableTo": "feedback",
-          "columnsFrom": ["feedback_id", "actor_id"],
-          "columnsTo": ["id", "actor_id"],
+          "columnsFrom": ["feedback_id", "actor_id", "thread_id"],
+          "columnsTo": ["id", "actor_id", "thread_key"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "feedback_replies_id_actor_key": {
-          "name": "feedback_replies_id_actor_key",
+        "feedback_replies_id_actor_thread_key": {
+          "name": "feedback_replies_id_actor_thread_key",
           "nullsNotDistinct": false,
-          "columns": ["id", "actor_id"]
+          "columns": ["id", "actor_id", "thread_id"]
         },
         "feedback_replies_telegram_message_key": {
           "name": "feedback_replies_telegram_message_key",
@@ -1320,7 +1336,7 @@
       "checkConstraints": {
         "feedback_replies_delivered_known": {
           "name": "feedback_replies_delivered_known",
-          "value": "\"feedback_replies\".\"delivered\" is null or \"feedback_replies\".\"delivered\" in ('sent', 'blocked')"
+          "value": "\"feedback_replies\".\"delivered\" is null or \"feedback_replies\".\"delivered\" in ('sent', 'blocked', 'failed')"
         }
       },
       "isRLSEnabled": false
@@ -2644,6 +2660,19 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tries": {
+          "name": "tries",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         }
       },
       "indexes": {
@@ -2864,6 +2893,554 @@
         "rating_reminders_window_before": {
           "name": "rating_reminders_window_before",
           "value": "\"rating_reminders\".\"window_from\" < \"rating_reminders\".\"reminded_on\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.receipt_line_images": {
+      "name": "receipt_line_images",
+      "schema": "",
+      "columns": {
+        "receipt_id": {
+          "name": "receipt_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "piece": {
+          "name": "piece",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "image": {
+          "name": "image",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "read_text": {
+          "name": "read_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confirmed_text": {
+          "name": "confirmed_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        }
+      },
+      "indexes": {
+        "receipt_line_images_confirmed_idx": {
+          "name": "receipt_line_images_confirmed_idx",
+          "columns": [
+            {
+              "expression": "confirmed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "receipt_line_images_receipt_id_receipts_id_fk": {
+          "name": "receipt_line_images_receipt_id_receipts_id_fk",
+          "tableFrom": "receipt_line_images",
+          "tableTo": "receipts",
+          "columnsFrom": ["receipt_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "receipt_line_images_receipt_id_position_piece_pk": {
+          "name": "receipt_line_images_receipt_id_position_piece_pk",
+          "columns": ["receipt_id", "position", "piece"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "receipt_line_images_piece_range": {
+          "name": "receipt_line_images_piece_range",
+          "value": "\"receipt_line_images\".\"piece\" between 0 and 3"
+        },
+        "receipt_line_images_confirmed_whole": {
+          "name": "receipt_line_images_confirmed_whole",
+          "value": "(\"receipt_line_images\".\"confirmed_text\" is null) = (\"receipt_line_images\".\"confirmed_at\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.receipt_lines": {
+      "name": "receipt_lines",
+      "schema": "",
+      "columns": {
+        "receipt_id": {
+          "name": "receipt_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "printed": {
+          "name": "printed",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hs": {
+          "name": "hs",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sku": {
+          "name": "sku",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "qty_milli": {
+          "name": "qty_milli",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "qty_unit": {
+          "name": "qty_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "price_minor": {
+          "name": "price_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sum_minor": {
+          "name": "sum_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "discount_minor": {
+          "name": "discount_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "settled": {
+          "name": "settled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "receipt_lines_receipt_id_receipts_id_fk": {
+          "name": "receipt_lines_receipt_id_receipts_id_fk",
+          "tableFrom": "receipt_lines",
+          "tableTo": "receipts",
+          "columnsFrom": ["receipt_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "receipt_lines_receipt_id_position_pk": {
+          "name": "receipt_lines_receipt_id_position_pk",
+          "columns": ["receipt_id", "position"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "receipt_lines_position_non_negative": {
+          "name": "receipt_lines_position_non_negative",
+          "value": "\"receipt_lines\".\"position\" >= 0"
+        },
+        "receipt_lines_quantity_whole": {
+          "name": "receipt_lines_quantity_whole",
+          "value": "(\"receipt_lines\".\"qty_milli\" is null) = (\"receipt_lines\".\"qty_unit\" is null)"
+        },
+        "receipt_lines_quantity_positive": {
+          "name": "receipt_lines_quantity_positive",
+          "value": "\"receipt_lines\".\"qty_milli\" is null or \"receipt_lines\".\"qty_milli\" > 0"
+        },
+        "receipt_lines_unit_known": {
+          "name": "receipt_lines_unit_known",
+          "value": "\"receipt_lines\".\"qty_unit\" is null or \"receipt_lines\".\"qty_unit\" in ('kg', 'l', 'piece')"
+        },
+        "receipt_lines_amounts_non_negative": {
+          "name": "receipt_lines_amounts_non_negative",
+          "value": "coalesce(\"receipt_lines\".\"price_minor\", 0) >= 0 and coalesce(\"receipt_lines\".\"sum_minor\", 0) >= 0 and coalesce(\"receipt_lines\".\"discount_minor\", 0) >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.receipt_parts": {
+      "name": "receipt_parts",
+      "schema": "",
+      "columns": {
+        "receipt_id": {
+          "name": "receipt_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "photo": {
+          "name": "photo",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "width": {
+          "name": "width",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "height": {
+          "name": "height",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "receipt_parts_receipt_id_receipts_id_fk": {
+          "name": "receipt_parts_receipt_id_receipts_id_fk",
+          "tableFrom": "receipt_parts",
+          "tableTo": "receipts",
+          "columnsFrom": ["receipt_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "receipt_parts_receipt_id_position_pk": {
+          "name": "receipt_parts_receipt_id_position_pk",
+          "columns": ["receipt_id", "position"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "receipt_parts_position_range": {
+          "name": "receipt_parts_position_range",
+          "value": "\"receipt_parts\".\"position\" between 1 and 4"
+        },
+        "receipt_parts_photo_size": {
+          "name": "receipt_parts_photo_size",
+          "value": "octet_length(\"receipt_parts\".\"photo\") between 1 and 8388608"
+        },
+        "receipt_parts_sides_positive": {
+          "name": "receipt_parts_sides_positive",
+          "value": "\"receipt_parts\".\"width\" > 0 and \"receipt_parts\".\"height\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.receipts": {
+      "name": "receipts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "failure": {
+          "name": "failure",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parts": {
+          "name": "parts",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "country": {
+          "name": "country",
+          "type": "char(2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "char(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "captured_at": {
+          "name": "captured_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        },
+        "queued_at": {
+          "name": "queued_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reading_at": {
+          "name": "reading_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "reader_version": {
+          "name": "reader_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "layout": {
+          "name": "layout",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tin": {
+          "name": "tin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "printed_on": {
+          "name": "printed_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "printed_time": {
+          "name": "printed_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "receipt_no": {
+          "name": "receipt_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_minor": {
+          "name": "total_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "balanced": {
+          "name": "balanced",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "receipts_actor_created_idx": {
+          "name": "receipts_actor_created_idx",
+          "columns": [
+            {
+              "expression": "actor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "receipts_queue_idx": {
+          "name": "receipts_queue_idx",
+          "columns": [
+            {
+              "expression": "queued_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"receipts\".\"status\" = 'queued' and \"receipts\".\"deleted_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "receipts_actor_id_actors_id_fk": {
+          "name": "receipts_actor_id_actors_id_fk",
+          "tableFrom": "receipts",
+          "tableTo": "actors",
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "receipts_status_known": {
+          "name": "receipts_status_known",
+          "value": "\"receipts\".\"status\" in ('uploading', 'queued', 'reading', 'parsed', 'failed', 'recorded')"
+        },
+        "receipts_failure_known": {
+          "name": "receipts_failure_known",
+          "value": "\"receipts\".\"failure\" is null or \"receipts\".\"failure\" in ('reshoot', 'unreadable')"
+        },
+        "receipts_failure_of_failed": {
+          "name": "receipts_failure_of_failed",
+          "value": "(\"receipts\".\"status\" = 'failed') = (\"receipts\".\"failure\" is not null)"
+        },
+        "receipts_parts_range": {
+          "name": "receipts_parts_range",
+          "value": "\"receipts\".\"parts\" between 1 and 4"
+        },
+        "receipts_country_known": {
+          "name": "receipts_country_known",
+          "value": "\"receipts\".\"country\" in ('AM')"
+        },
+        "receipts_language_known": {
+          "name": "receipts_language_known",
+          "value": "\"receipts\".\"language\" in ('ru', 'en')"
+        },
+        "receipts_currency_known": {
+          "name": "receipts_currency_known",
+          "value": "\"receipts\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+        },
+        "receipts_whole_when_queued": {
+          "name": "receipts_whole_when_queued",
+          "value": "\"receipts\".\"status\" = 'uploading' or \"receipts\".\"queued_at\" is not null"
+        },
+        "receipts_attempts_non_negative": {
+          "name": "receipts_attempts_non_negative",
+          "value": "\"receipts\".\"attempts\" >= 0"
+        },
+        "receipts_layout_known": {
+          "name": "receipts_layout_known",
+          "value": "\"receipts\".\"layout\" is null or \"receipts\".\"layout\" in ('card', 'table')"
+        },
+        "receipts_total_non_negative": {
+          "name": "receipts_total_non_negative",
+          "value": "\"receipts\".\"total_minor\" is null or \"receipts\".\"total_minor\" >= 0"
         }
       },
       "isRLSEnabled": false

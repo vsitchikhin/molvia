@@ -32,8 +32,8 @@ under `packages/model/tests/`, is covered by the source's entry.
 
 - `frontend/eslint.config.js` — PWA lint config: Vue and TypeScript type-aware, SFC block order, no bare strings in templates, the import boundaries.
 - `frontend/package.json` — PWA package: Vue, Pinia, vue-router, vue-i18n, Reka UI, Vite with the PWA and icons plugins; dev, build, lint and style lint.
-- `frontend/tsconfig.json` — PWA TypeScript config: DOM, Vite, PWA and icon types, `@/` to `src`, `.vue` files included.
-- `frontend/vitest.config.ts` — PWA component Vitest project: Vue and icons plugins, happy-dom, the time zone pinned to UTC.
+- `frontend/tsconfig.json` — PWA TypeScript config: DOM, Vite, PWA and icon types, `@/` to `src`, `.vue` files and the Stylelint plugin's test included.
+- `frontend/vitest.config.ts` — PWA component Vitest project: Vue and icons plugins, happy-dom, the time zone pinned to UTC; also runs the Stylelint plugin's test.
 
 ## bot
 
@@ -49,23 +49,23 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `.githooks/commit-msg` — Git hook: refuses a subject that is not a Conventional Commit with the Jira key as scope.
 - `.githooks/pre-commit` — Git hook: refuses a commit whose files are not formatted by Prettier; every other check is CI's.
 - `.github/dependabot.yml` — Dependabot: weekly grouped npm updates and monthly GitHub Actions updates.
-- `.github/workflows/ci.yml` — CI on push and pull request: format check, lint, types and tests against Postgres, and end-to-end in a phone browser — the only place any check runs unasked; both jobs gate a merge.
+- `.github/workflows/ci.yml` — CI on push and pull request: format check, lint, types and tests against Postgres, the receipt reader's image and its live test, and end-to-end in a phone browser — the only place any check runs unasked; both jobs gate a merge.
 - `.gitignore` — Ignored files: env files, the `.scratch` and `.lavish` links, dependencies, builds, certificates, Playwright output.
 - `.nvmrc` — The Node major version, 22.
 - `.prettierignore` — What Prettier leaves alone: builds, the lockfile, the shared links, hooks, recorded rate-provider responses.
 - `.prettierrc.json` — Prettier settings: no semicolons, single quotes, width 100, trailing commas.
-- `Makefile` — The canonical entry point: setup, stack, database, migrate, forget, seed, gates, dev, format, lint, typecheck, test, check, certs, icons.
+- `Makefile` — The canonical entry point: setup, stack, the receipt reader, database, migrate, forget, seed, gates, dev, format, lint, typecheck, test, check, certs, icons.
 - `bin/check-code-map.mjs` — Refuses a code map that lies: a file it does not cover, a path that does not exist, a file with two homes; run by `npm run lint`.
-- `bin/init-env.sh` — Generates this copy's `.env` from its index: ports, databases, compose project; keeps bot settings across `--force`.
+- `bin/design-md.mjs` — The token block of `frontend/DESIGN.md` from `_tokens.scss`, through Prettier: `--write` in `npm run format`, `--check` in `npm run lint`.
+- `bin/init-env.sh` — Generates this copy's `.env` from its index: ports — the receipt reader's too — databases, compose project; keeps bot settings across `--force`.
 - `bin/fetch-model.mjs` — Fetches the pinned embedding model (MOL-105) into `.models/` or a given directory, file by file against its sha256, with the notice of its terms; `make model`, CI and the API's image.
 - `bin/link-shared.sh` — Points `.scratch`, `.lavish` and `.models` at the directory shared by all working copies; idempotent.
 - `bin/one-at-a-time.sh` — Runs a command under the one lock all copies share, so the heavy checks of several copies take turns; gives the command no terminal so vitest does not watch by default, refuses a vitest told to watch and Playwright's UI and debugger, names the waited copy by its root.
-- `docker-compose.yml` — Development stack: this copy's Postgres only, on the loopback, named by the copy's index.
+- `docker-compose.yml` — Development stack: this copy's Postgres on the loopback, named by the copy's index; the receipt reader only under the `receipts` profile (`make reader`).
 - `eslint.config.base.js` — Shared lint preset every module opts into: type-aware rules, the alias-or-sibling import shape, the `deny` helper.
 - `eslint.config.js` — Root lint config: only `e2e/` and the repository's own config files; each module lints itself.
 - `package.json` — Root workspace: the module list and the repository-wide dev, lint, format, typecheck, test and e2e scripts, shared dev tools.
-- `services/README.md` — What `services/` is: non-TypeScript services, outside the workspaces and clients of the API.
-- `services/receipt-ocr/README.md` — Receipt OCR, a Python service for 1.0, not started: why Python, why not earlier, why photo and OCR.
+- `services/README.md` — What `services/` is: non-TypeScript services, outside the workspaces and never reaching the database — the receipt reader the API calls.
 - `tsconfig.base.json` — Shared strict TypeScript options every module extends.
 - `tsconfig.json` — Root TypeScript config: type-checks `e2e/` and the root config files.
 - `vitest.config.ts` — Root Vitest run: gathers the modules' projects, coverage with a threshold on the domain only.

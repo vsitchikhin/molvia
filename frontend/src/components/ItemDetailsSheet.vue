@@ -693,9 +693,9 @@ export default defineComponent({
 }
 
 .per-unit-value {
-  font-family: var(--font-display);
+  @include display-type;
+
   font-size: var(--text-title);
-  font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

@@ -179,8 +179,9 @@ export default defineComponent({
 }
 
 .question {
+  @include display-type;
+
   margin: var(--space-2) 0 var(--space-6);
-  font-family: var(--font-display);
   font-size: var(--text-title);
   line-height: var(--leading-snug);
   overflow-wrap: anywhere;
