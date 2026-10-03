@@ -41,12 +41,19 @@ export interface RejectedReceiptWrite {
    * be sent without it, and the person is told the same way: «не принят».
    */
   readonly code: WireCode
+  /** When it was refused: the row of «не принят» is dated by it, never by the moment it is drawn. */
+  readonly at: number
 }
 
-/** What «Вернуть» needs: the receipt, and the writes taken out with one nobody had begun to send. */
+/**
+ * What «Вернуть» needs: the receipt, and the writes taken out of the queue with it — the whole receipt
+ * when nobody had begun to send it (`local`), or its parts still waiting once the announcement left.
+ */
 export interface ReceiptUndo {
   readonly id: string
   readonly writes?: readonly ReceiptWrite[]
+  /** The server never heard of it: its photos go off the phone with the strip. */
+  readonly local?: true
 }
 
 /** The receipt whose purchases were just written, and where they are. */
@@ -73,7 +80,9 @@ const REJECTED_KEY = 'molvia.receipt-rejected'
  */
 const DONE_ENOUGH: Partial<Record<ReceiptWrite['kind'], readonly WireCode[]>> = {
   part: [ERROR.NOT_FOUND],
-  remove: [ERROR.NOT_FOUND],
+  // A recorded receipt is not removed (409 of MOL-126): its purchases are in «Записаны», and a refusal
+  // drawn as «не принят» would speak of a photo about a receipt that is there (adversarial А1).
+  remove: [ERROR.NOT_FOUND, ERROR.CONFLICT],
   restore: [ERROR.NOT_FOUND],
 }
 
@@ -167,7 +176,8 @@ function recallRejected(key: string): RejectedReceiptWrite[] {
   return parsedList(key).flatMap((item: unknown) => {
     if (!isRecord(item) || typeof item.key !== 'string' || !isWireCode(item.code)) return []
     const write = decode(item.write)
-    return write ? [{ key: item.key, write, code: item.code }] : []
+    const at = typeof item.at === 'number' ? item.at : 0
+    return write ? [{ key: item.key, write, code: item.code, at }] : []
   })
 }
 
@@ -252,6 +262,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
           key: item.key,
           write: encode(item.write),
           code: item.code,
+          at: item.at,
         })),
       ),
       (past) => past,
@@ -394,7 +405,10 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
           const id = receiptOf(write)
           kept = kept.filter((item) => !(item.write.kind === 'part' && item.write.id === id))
         }
-        rejected.value = [...rejected.value, { key: newKey(), write, code: refusal }]
+        rejected.value = [
+          ...rejected.value,
+          { key: newKey(), write, code: refusal, at: Date.now() },
+        ]
       }
       persist(owner)
       landed.value++
@@ -465,9 +479,14 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
       )
       if (own.some((item) => item.write.kind === 'create') && own.every(waiting)) {
         kept = kept.filter((item) => !own.includes(item))
-        undo = { id, writes: own.map((item) => item.write) }
+        undo = { id, writes: own.map((item) => item.write), local: true }
         return
       }
+      // The announcement left: the parts still waiting go out of the queue with the removal, and
+      // «Вернуть» puts them back — a photo the person removed is not uploaded meanwhile (А3).
+      const parts = own.filter(waiting)
+      kept = kept.filter((item) => !parts.includes(item))
+      if (parts.length > 0) undo = { id, writes: parts.map((item) => item.write) }
       if (
         kept.some((item) => waiting(item) && item.write.kind === 'remove' && item.write.id === id)
       )
@@ -477,14 +496,14 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     // «Переснять» removes the receipt it replaces with no strip: the person asked for a new one.
     const owner = actor.id
     if (!quiet) lastRemoved.value = { undo, stamp: Date.now(), left: 0, at: Date.now() }
-    else if (owner && undo.writes) void photoShelf(owner).drop(id)
+    else if (owner && undo.local) void photoShelf(owner).drop(id)
     return undo
   }
 
-  /** «Вернуть»: what was taken out put back; else the waiting removal taken back, or a restore sent. */
+  /** «Вернуть»: what was taken out put back; the waiting removal taken back, or a restore sent. */
   function restore(undo: ReceiptUndo): void {
     change(() => {
-      if (undo.writes) {
+      if (undo.local && undo.writes) {
         kept = [...kept, ...undo.writes.map((write) => ({ key: newKey(), write }))]
         return
       }
@@ -495,6 +514,8 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
         at === -1
           ? [...kept, { key: newKey(), write: { kind: 'restore', id: undo.id } }]
           : kept.filter((_, index) => index !== at)
+      // The parts taken out with the removal go after whatever brings the receipt back.
+      if (undo.writes) kept = [...kept, ...undo.writes.map((write) => ({ key: newKey(), write }))]
     })
     if (lastRemoved.value?.undo.id === undo.id) lastRemoved.value = null
   }
@@ -509,7 +530,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     }
     lastRemoved.value = null
     const owner = actor.id
-    if (owner && last.undo.writes) void photoShelf(owner).drop(last.undo.id)
+    if (owner && last.undo.local) void photoShelf(owner).drop(last.undo.id)
   }
 
   /**

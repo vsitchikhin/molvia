@@ -273,6 +273,39 @@ describe('receipt queue', () => {
       expect(calls).toEqual([])
     })
 
+    it('parts still waiting once the announcement left go out with the removal, and come back with «Вернуть» (А3)', async () => {
+      putReceiptPart.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'x', false))
+      const queue = fresh()
+      await queue.capture(body(RECEIPT, 2), shots(2))
+      await settled()
+      // The announcement landed; part 1 was tried, its answer lost.
+      calls.length = 0
+      const undo = queue.remove(RECEIPT)
+      expect(queue.pending.map((write) => write.kind)).toEqual(['part', 'remove'])
+      expect(undo.writes?.map((write) => write.kind)).toEqual(['part'])
+      queue.restore(undo)
+      // The removal still waiting is taken back, and the part put back after the one that was tried.
+      expect(queue.pending.map((write) => write.kind)).toEqual(['part', 'part'])
+    })
+
+    it('a removal of a recorded receipt (409) is done: no «не принят» for a receipt in «Записаны» (А1)', async () => {
+      removeReceipt.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'x'))
+      const queue = fresh()
+      queue.remove(RECEIPT)
+      await queue.flush()
+      expect(queue.rejected).toEqual([])
+    })
+
+    it('a refusal keeps the moment it came: the row is not dated by when it is drawn', async () => {
+      putReceiptPart.mockRejectedValueOnce(new ApiError(ERROR.RECEIPT_NOT_PHOTO, 'x'))
+      const queue = fresh()
+      await queue.capture(body(RECEIPT, 1), shots(1))
+      await queue.flush()
+      const at = queue.rejected[0]?.at ?? 0
+      expect(at).toBeGreaterThan(0)
+      expect(fresh().rejected[0]?.at).toBe(at)
+    })
+
     it('a removal of a receipt the server does not have is done', async () => {
       removeReceipt.mockRejectedValueOnce(new ApiError(ERROR.NOT_FOUND, 'x'))
       const queue = fresh()
