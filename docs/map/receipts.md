@@ -9,6 +9,7 @@ Rules: `.claude/rules/receipts.md`. A test beside its source, or mirroring it un
 - `packages/model/tests/entities/` — Fixtures `receipt-text.am-*.json`: four of the owner's receipts as read, the item rows and the total only under a made-up header, with what the prototype gave (В-7).
 - `packages/model/src/entities/receipt.ts` — A receipt's statuses and why one failed, its limits (four parts, the size of a part, 28 days), the countries read and their alphabets, `needsReshoot` (В-4) and the lines in the domain's money and quantities.
 - `packages/model/src/entities/receipt-sum.ts` — The arithmetic of a receipt under review, one on the phone and the server (MOL-124 В-6): a line adds up with its product rounded to the receipt's digits (П-2), what a line is recorded at (В-5), «Строки», the difference with the total and its suspect line, a price one confused digit off the memory's (В-1).
+- `packages/model/src/entities/receipt-match.ts` — `createLineMatcher`: a receipt line to a catalogue item by the item's names in the till's language, the customs heading ruling out what cannot be, a variety by the fat printed, the heading alone as a far match; the gloss by the dictionary of till words — the port of MOL-114's `dict-match.mjs` (MOL-126).
 - `packages/model/src/contracts/receipt.ts` — «Отправить чек» and a receipt on the wire: the body named by the phone, the summary in «Покупки», the lines as read.
 
 ## packages/client
@@ -23,6 +24,7 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 ## backend · receipts
 
 - `backend/src/receipts/jpeg.ts` — `jpegSize`: the sides of a JPEG from its frame header, and a scan with data after it, without decoding — what is not a photo is refused before it is kept.
+- `backend/src/receipts/till-words-ru.ts` — The dictionary of Armenian till words in Russian (MOL-114's `words-hy-ru.json`): a line's gloss, a new item's proposed name, the query of the search when the names find nothing.
 - `backend/src/receipts/reader.ts` — The client of the receipt reader: a part read in a page mode, item lines cut out; `ReaderUnavailable` (nothing answered: the receipt waits), `ReaderDropped` (lost on the photo: counted, to the end), `PhotoUnreadable` (it fails).
 
 ## backend · usecases
