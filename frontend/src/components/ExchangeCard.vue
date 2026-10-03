@@ -234,8 +234,9 @@ export default defineComponent({
   color: var(--accent-ink);
 
   svg {
-    width: var(--space-4);
-    height: var(--space-4);
+    @include icon;
+
+    font-size: var(--icon-sm);
   }
 }
 
@@ -306,9 +307,9 @@ export default defineComponent({
 }
 
 .note-icon {
-  flex: none;
-  width: var(--space-4);
-  height: var(--space-4);
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 
 .note-text {

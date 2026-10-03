@@ -160,8 +160,9 @@ export default defineComponent({
   background: var(--text);
 
   svg {
-    width: var(--space-4);
-    height: var(--space-4);
+    @include icon;
+
+    font-size: var(--icon-sm);
   }
 }
 
@@ -192,8 +193,9 @@ export default defineComponent({
 }
 
 .picture-add-icon {
-  width: var(--space-6);
-  height: var(--space-6);
+  @include icon;
+
+  font-size: var(--icon-md);
 }
 
 .picture-file {

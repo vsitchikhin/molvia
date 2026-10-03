@@ -1,9 +1,14 @@
 {
   "extends": ["stylelint-config-standard-scss", "stylelint-config-recommended-vue/scss"],
-  "plugins": ["./stylelint/known-properties.mjs", "./stylelint/display-type.mjs"],
+  "plugins": [
+    "./stylelint/known-properties.mjs",
+    "./stylelint/display-type.mjs",
+    "./stylelint/icon-size.mjs"
+  ],
   "rules": {
     "molvia/known-custom-property": true,
     "molvia/display-type-whole": true,
+    "molvia/icon-size": true,
     "color-no-hex": [
       true,
       {
@@ -25,7 +30,7 @@
         "font-family": ["/^(var\\(--font\\)|inherit)$/"],
         "font-weight": ["/^(var\\(--weight-(regular|medium|bold)\\)|inherit)$/"],
         "font-size": [
-          "/^(var\\(--(text-(display|title|figure|headline|body|callout|footnote|caption|entry|entry-sign|card-figure)|icon(-[a-z0-9]+)*)\\)|inherit|1em)$/"
+          "/^(var\\(--(text-(display|title|figure|headline|body|callout|footnote|caption|entry|entry-sign|card-figure)|icon(-[a-z0-9]+)*|state-glyph)\\)|inherit|1em)$/"
         ],
         "font-variation-settings": ["normal"],
         "/^border(-(top|bottom)-(left|right)|-(start|end)-(start|end))?-radius$/": [

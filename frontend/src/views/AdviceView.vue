@@ -317,8 +317,9 @@ export default defineComponent({
 .city-reloading,
 .stale-text {
   svg {
-    width: var(--space-4);
-    height: var(--space-4);
+    @include icon;
+
+    font-size: var(--icon-sm);
     vertical-align: middle;
     margin-right: var(--space-2);
   }

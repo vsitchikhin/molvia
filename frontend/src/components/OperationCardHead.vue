@@ -89,8 +89,9 @@ export default defineComponent({
   }
 
   svg {
-    width: var(--space-6);
-    height: var(--space-6);
+    @include icon;
+
+    font-size: var(--icon-md);
   }
 }
 </style>

@@ -632,6 +632,9 @@ export default defineComponent({
 }
 
 .currency-caret {
+  @include icon;
+
+  font-size: var(--icon);
   position: absolute;
   right: 0;
   pointer-events: none;
@@ -667,7 +670,9 @@ export default defineComponent({
 }
 
 .hint-icon {
-  flex-shrink: 0;
+  @include icon;
+
+  font-size: var(--icon-sm);
   margin-top: var(--space-1);
 }
 

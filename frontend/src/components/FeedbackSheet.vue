@@ -669,9 +669,9 @@ export default defineComponent({
   }
 
   svg {
-    flex: none;
-    width: var(--space-6);
-    height: var(--space-6);
+    @include icon;
+
+    font-size: var(--icon-sm);
   }
 }
 
@@ -705,9 +705,9 @@ export default defineComponent({
 }
 
 .clip {
-  flex: none;
-  width: var(--space-4);
-  height: var(--space-4);
+  @include icon;
+
+  font-size: var(--icon-sm);
   margin-top: var(--space-1);
 }
 
@@ -731,8 +731,9 @@ export default defineComponent({
   color: var(--good-ink);
 
   svg {
-    width: var(--space-6);
-    height: var(--space-6);
+    @include icon;
+
+    font-size: var(--icon-md);
   }
 }
 
@@ -757,9 +758,9 @@ export default defineComponent({
   border-radius: var(--radius);
 
   svg {
-    flex: none;
-    width: var(--space-6);
-    height: var(--space-6);
+    @include icon;
+
+    font-size: var(--icon-sm);
   }
 }
 

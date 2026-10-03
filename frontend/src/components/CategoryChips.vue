@@ -149,8 +149,9 @@ export default defineComponent({
 }
 
 .plus {
-  width: 1.125rem;
-  height: 1.125rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 
 .error {
@@ -164,9 +165,9 @@ export default defineComponent({
 }
 
 .alert {
-  flex: none;
-  width: 1.125rem;
-  height: 1.125rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 
 @media (prefers-reduced-motion: reduce) {

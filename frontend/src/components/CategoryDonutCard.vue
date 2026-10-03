@@ -184,8 +184,9 @@ export default defineComponent({
 }
 
 .chevron {
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon);
 }
 
 .figure {

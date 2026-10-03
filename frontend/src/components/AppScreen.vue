@@ -320,10 +320,9 @@ export default defineComponent({
 }
 
 .chevron {
-  /* 26 — the handoff's chevron */
-  flex: none;
-  width: 1.625rem;
-  height: 1.625rem;
+  @include icon;
+
+  font-size: var(--icon-back);
 }
 
 /* The ladder keeps a label from being cut; this keeps one inside its column where nothing

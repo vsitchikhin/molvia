@@ -85,9 +85,9 @@ export default defineComponent({
 }
 
 .icon {
-  /* 14 — the handoff's icon inside a badge */
-  width: 0.875rem;
-  height: 0.875rem;
+  @include icon;
+
+  font-size: var(--icon-xs);
 }
 
 .filled {

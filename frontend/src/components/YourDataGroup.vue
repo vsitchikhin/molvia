@@ -175,10 +175,17 @@ export default defineComponent({
 
 .entry-icon,
 .entry-chevron {
-  flex: none;
-  width: var(--space-6);
-  height: var(--space-6);
+  @include icon;
+
   color: var(--text-muted);
+}
+
+.entry-icon {
+  font-size: var(--icon-md);
+}
+
+.entry-chevron {
+  font-size: var(--icon);
 }
 
 .entry-text {
@@ -218,9 +225,9 @@ export default defineComponent({
   font-size: var(--text-footnote);
 
   svg {
-    flex: none;
-    width: var(--space-6);
-    height: var(--space-6);
+    @include icon;
+
+    font-size: var(--icon-sm);
   }
 }
 

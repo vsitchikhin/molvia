@@ -129,9 +129,9 @@ export default defineComponent({
   font-size: var(--text-footnote);
 
   svg {
-    flex: none;
-    width: var(--space-4);
-    height: var(--space-4);
+    @include icon;
+
+    font-size: var(--icon-sm);
   }
 }
 </style>

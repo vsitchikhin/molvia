@@ -294,10 +294,11 @@ export default defineComponent({
 }
 
 .chevron {
+  @include icon;
+
+  font-size: var(--icon);
   position: absolute;
   right: var(--space-3);
-  width: var(--space-6);
-  height: var(--space-6);
   color: var(--text-muted);
   pointer-events: none;
 }
@@ -321,9 +322,9 @@ textarea.control {
 }
 
 .shown-icon {
-  flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon);
   color: var(--text-muted);
 }
 

@@ -408,6 +408,15 @@ disappears in bad light. Circles are a form (`50%`), not a size.
 Native HTML first, then Reka UI; never a styled kit. Icons are MDI. Every touch target is at least
 44; the sheet's main action is 52.
 
+### Icons
+
+One step per role, never a literal (Ф-9): `icon-xs` 14 inside a pill of 13 (the verdict, «Отправляем…»);
+`icon-sm` 18 in a strip, a note, a field's error; `icon` 20 — a row's chevron, always, the magnifier, a
+select's arrow; `icon-button` 22 before the word in a button; `icon-md` 24 — a row's own icon and the glyph
+of a button that is only an icon; `icon-back` 26; `icon-tab` 27. A glyph in a state's circle is
+`state-glyph` 22. An icon is drawn at its font-size (`@include icon`), and the linter refuses a width or a
+height on it.
+
 ### Buttons
 
 - **Shape:** pill, 44 high (52 as the main action of a sheet), 16 side padding, a 22 icon before the word.
@@ -415,7 +424,7 @@ Native HTML first, then Reka UI; never a styled kit. Icons are MDI. Every touch 
 - **Secondary:** `surface` with a `border-strong` hairline, `text` 600.
 - **Tinted (target, new):** `accent-tint` fill, `accent-ink` text — "Вернуть", "Записать разницу", "Добавить счёт". The old handoffs called this "secondary"; it is a variant of its own.
 - **Ghost / Danger ghost:** no fill, `accent-ink` / `bad-ink` text. "Убрать" a category is ghost, not danger: it erases nothing **(target)**.
-- **Icon:** a 44 circle on `surface-2`.
+- **Icon:** a 44 circle on `surface-2`, its glyph 24.
 - **Inactive (target):** one look everywhere — solid `surface-2`, `text-muted`, still focusable (`aria-disabled`), and the words say why ("Выберите оценку"). No opacity.
 - **Focus:** a 2 px `accent` ring, 2 px out.
 
