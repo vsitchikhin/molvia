@@ -441,7 +441,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `font-size`; the row's chevron is 20 everywhere. `molvia/icon-size` holds that every icon is on the
   scale — sized by the pair from a rule that reaches it in the template without a condition, its
   class its own, `--icon*` declared in `_tokens.scss` alone, no width, padding, border or scale on it,
-  in the template too; which step is the role's is DESIGN.md's and review's, but for the chevron.
+  in the template too; which step is the role's is DESIGN.md's and review's — the role is the place's.
 - **Colours that can meet are held apart by `tokens.test.ts`** (MOL-172): two steps of different roles
   and a category against a role 0.08 OKLab apart, marks 3:1, text 4.5:1, both schemes; a value that
   fails is changed, never excused. Data without a colour of its own is `--graphic`. **Any two
