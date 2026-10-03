@@ -691,7 +691,7 @@ describe('molvia/icon-size, round 6', () => {
           '.row { font-size: var(--icon-sm); }\n.row svg { @include icon; }',
         ),
       ),
-    ).toEqual(['font-size: var(--text-display)', 'A bound font-size'])
+    ).toEqual(['font-size: var(--text-display)', '<IconX> (line 2)', 'A bound font-size'])
   })
 
   it('refuses a flex share and a maximum of the box on an icon (Е4)', async () => {
@@ -714,6 +714,59 @@ describe('molvia/icon-size, round 6', () => {
         ),
       ),
     ).toEqual([])
+  })
+})
+
+describe('molvia/icon-size, round 7', () => {
+  it('takes a step in the style of the wrapper for the step, and refuses one of text there (review 25)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<span style="font-size: var(--icon)"><IconX class="c" /></span>\n<span style="font-size: 2rem"><IconY class="d" /></span>',
+          '.c, .d { @include icon; }',
+        ),
+      ),
+    ).toEqual(['font-size: 2rem', 'The icon «.d» (line 3)'])
+  })
+
+  it('refuses any @property outside the tokens, a built name and capitals too (Ж2, Ж1)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<IconX class="c" />',
+          `$n: icon;\n@property --#{$n} { syntax: "<length>"; inherits: false; initial-value: 32px; }\n` +
+            `@PROPERTY --other { syntax: "<length>"; inherits: false; initial-value: 1px; }\n.c { ${ICON} }`,
+        ),
+      ),
+    ).toEqual(['@property --#{$n}', '@property --other'])
+  })
+
+  it('takes font in a bound style of the wrapper for a font-size (Ж3)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="row" :style="{ font: big }"><IconX /></p>',
+          '.row { font-size: var(--icon-sm); }\n.row svg { @include icon; }',
+        ),
+      ),
+    ).toEqual(['A bound font-size'])
+  })
+
+  it('takes a bound :disabled of a <Teleport> for a move (Ж4)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<div class="page"><Teleport to="body" :disabled="inline"><IconCheck /></Teleport></div>',
+          `.page svg { ${ICON} }`,
+        ),
+      ),
+    ).toEqual(['<IconCheck> (line 2)'])
+  })
+
+  it('reads a property name in capitals as the browser does (Ж1)', async () => {
+    expect(await refused(sfc('<IconX class="c" />', `.c { ${ICON} WIDTH: 2rem; }`))).toEqual([
+      'WIDTH: 2rem',
+    ])
   })
 })
 
