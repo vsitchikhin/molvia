@@ -32,8 +32,8 @@ under `packages/model/tests/`, is covered by the source's entry.
 
 - `frontend/eslint.config.js` — PWA lint config: Vue and TypeScript type-aware, SFC block order, no bare strings in templates, the import boundaries.
 - `frontend/package.json` — PWA package: Vue, Pinia, vue-router, vue-i18n, Reka UI, Vite with the PWA and icons plugins; dev, build, lint and style lint.
-- `frontend/tsconfig.json` — PWA TypeScript config: DOM, Vite, PWA and icon types, `@/` to `src`, `.vue` files included.
-- `frontend/vitest.config.ts` — PWA component Vitest project: Vue and icons plugins, happy-dom, the time zone pinned to UTC.
+- `frontend/tsconfig.json` — PWA TypeScript config: DOM, Vite, PWA and icon types, `@/` to `src`, `.vue` files and the Stylelint plugin's test included.
+- `frontend/vitest.config.ts` — PWA component Vitest project: Vue and icons plugins, happy-dom, the time zone pinned to UTC; also runs the Stylelint plugin's test.
 
 ## bot
 
@@ -56,6 +56,7 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `.prettierrc.json` — Prettier settings: no semicolons, single quotes, width 100, trailing commas.
 - `Makefile` — The canonical entry point: setup, stack, database, migrate, forget, seed, gates, dev, format, lint, typecheck, test, check, certs, icons.
 - `bin/check-code-map.mjs` — Refuses a code map that lies: a file it does not cover, a path that does not exist, a file with two homes; run by `npm run lint`.
+- `bin/design-md.mjs` — The token block of `frontend/DESIGN.md` from `_tokens.scss`, through Prettier: `--write` in `npm run format`, `--check` in `npm run lint`.
 - `bin/init-env.sh` — Generates this copy's `.env` from its index: ports, databases, compose project; keeps bot settings across `--force`.
 - `bin/fetch-model.mjs` — Fetches the pinned embedding model (MOL-105) into `.models/` or a given directory, file by file against its sha256, with the notice of its terms; `make model`, CI and the API's image.
 - `bin/link-shared.sh` — Points `.scratch`, `.lavish` and `.models` at the directory shared by all working copies; idempotent.
