@@ -150,24 +150,6 @@ const CITY_WORDS: Readonly<Record<SettingsCity, string>> = {
   Ереван: '(?:երևան|երե[վւ]ան|yerevan)(?![\\p{L}-])(?!\\s*[-–]?\\s*(?:սիթի|city|сити))',
 }
 
-/**
- * The start of a row before its city: marks and digits, one stray letter OCR reads at the paper's edge
- * («է ԳՅՈՒՄՐԻ Գորկու 62»), and «ք.».
- */
-const OPENING = '^[^\\p{L}]*(?:\\p{L}[^\\p{L}\\s]*\\s+[^\\p{L}]*)??(?:ք\\.?\\s*)?'
-
-/** A city opening a row of the head — the shop's address («ԳՅՈՒՄՐԻ Գորկու 62», «ք. Երևան, …»). */
-export const RECEIPT_CITIES: Readonly<Record<SettingsCity, RegExp>> = {
-  Гюмри: new RegExp(`${OPENING}${CITY_WORDS.Гюмри}`, 'iu'),
-  Ереван: new RegExp(`${OPENING}${CITY_WORDS.Ереван}`, 'iu'),
-}
-
-/** A city after «ք.» — «город» — anywhere in a row of the head («ՀՀ, ք. Երևան, …»). */
-const CITY_AFTER_MARK: Readonly<Record<SettingsCity, RegExp>> = {
-  Гюмри: new RegExp(`(?<!\\p{L})ք\\.\\s*${CITY_WORDS.Гюмри}`, 'iu'),
-  Ереван: new RegExp(`(?<!\\p{L})ք\\.\\s*${CITY_WORDS.Ереван}`, 'iu'),
-}
-
 /** A city named anywhere in a row of the head, a word of its own: an address, or an item's name. */
 const CITY_ANYWHERE: Readonly<Record<SettingsCity, RegExp>> = {
   Гюмри: new RegExp(`(?<!\\p{L})${CITY_WORDS.Гюмри}`, 'iu'),
@@ -230,20 +212,18 @@ export function receiptCityOf(
 ): SettingsCity | null {
   const first = rows.filter((row) => row.part === 0)
   const head = first.slice(0, headEnd(first))
-  // the city is read off an address only — never off an item's row, wherever the head's end fell
-  // (round 9, Р9-В1): the boundary is a guess OCR moves, what stands beside the city is the row's own
-  const addresses = head.filter((row) => isAddressRow(row.text, productWords))
-  const cities = Object.keys(RECEIPT_CITIES) as SettingsCity[]
-  const opening = cities.filter((city) =>
-    addresses.some((row) => RECEIPT_CITIES[city].test(row.text)),
-  )
-  if (opening.length === 1) return opening[0] ?? null
-  if (opening.length > 1) return null
-  const marked = cities.filter((city) =>
-    addresses.some((row) => CITY_AFTER_MARK[city].test(row.text)),
-  )
+  const cities = Object.keys(CITY_ANYWHERE) as SettingsCity[]
+  // the city an address names — the one city named in the head at all: an item named after another
+  // city, or a chain's legal address beside its shop's, is two cities and no answer (rounds 3–10)
   const named = cities.filter((city) => head.some((row) => CITY_ANYWHERE[city].test(row.text)))
-  return marked.length === 1 && named.length === 1 ? (marked[0] ?? null) : null
+  if (named.length !== 1) return null
+  const [city] = named
+  if (city === undefined) return null
+  return head.some(
+    (row) => CITY_ANYWHERE[city].test(row.text) && isAddressRow(row.text, productWords),
+  )
+    ? city
+    : null
 }
 
 const NO_WORDS: ReadonlySet<string> = new Set()
@@ -259,9 +239,11 @@ const CITY_WORD = /^(?:գյումրի|gyumri|երևան|երե[վւ]ան|yerevan
 const ITEM_SHAPED = [
   TABLE_ITEM_ROW,
   CARD_ARTICLE_ROW,
-  // a unit ends its word: «500գ», never «1 ԳՅՈՒՄՐԻ», whose first letter is a gram's
-  /\d\s*(?:%|(?:լ|մլ|կգ|գր?|հտ|հատ|տ|l|ml|kg|g|pcs)(?![\p{L}\d]))/iu,
-  /\d[.,]\d{2}(?!\d)/u,
+  // a unit ends its word: «500գ», never «1 ԳՅՈՒՄՐԻ», whose first letter is a gram's; a one-letter unit
+  // stands right after its number, «5տ», «500գ» — «Գորկու 62 տ.» is a house, տուն (round 10, Р10-В2)
+  /\d\s*(?:%|(?:մլ|կգ|գր|հտ|հատ|ml|kg|pcs)(?![\p{L}\d]))|\d(?:լ|գ|տ|l|g)(?![\p{L}\d])/iu,
+  // a sum's hundredths «450.00», never a day «02.10.2026»
+  /\d[.,]\d{2}(?![\d.,])/u,
 ]
 
 /**
@@ -274,29 +256,44 @@ const ITEM_SHAPED = [
 function isAddressRow(text: string, productWords: ReadonlySet<string>): boolean {
   if (ITEM_SHAPED.some((shape) => shape.test(text))) return false
   if (/[«“"„']\s*(?:գյումրի|gyumri|երևան|երե[վւ]ան|yerevan)/iu.test(text)) return false
-  const prices = (text.match(/(?<![\p{L}\d])\d+(?![\p{L}\d])/gu) ?? []).filter(
+  // an address names its house after its first word: «Գորկու 62», «Գորկուծ22» as OCR glued it; a row
+  // with no number there — «1.ԳՅՈՒՄՐԻ ԳԱ ուր.», a name OCR cut — is no address (round 10, Р10-В1)
+  const letter = text.search(/\p{L}/u)
+  if (letter < 0 || !/\d/u.test(text.slice(letter))) return false
+  // a price and a sum stand at the row's end, in the hundreds; a postal code and a house are not there
+  // both, «Գյումրի 3101, Ռիժկովի 104», nor is a house and its flat «162/105» (round 10, Р10-В2)
+  const tail = /(?:\s+\d+)+\s*$/u.exec(text.replace(/[^\p{L}\d\s/]+$/u, ''))?.[0] ?? ''
+  const prices = (tail.match(/(?<![\d/])\d+(?![\d/])/gu) ?? []).filter(
     (number) => Number(number) >= 100,
   )
   if (prices.length >= 2) return false
-  const words = text
-    .toLowerCase()
-    .split(/[^\p{L}]+/u)
-    .filter((word) => Array.from(word).length >= 2)
+  // the words with what follows each, so an abbreviation keeps its dot: «ԳԱՐ.» is «գարեջուր» cut by the till
+  const words = [...text.toLowerCase().matchAll(/(\p{L}{2,})(\.?)/gu)].map(
+    ([, word = '', dot]) => ({
+      word,
+      cut: dot === '.',
+    }),
+  )
   return !words.some(
-    (word, i) =>
+    ({ word }, i) =>
       CITY_WORD.test(word) &&
       [words[i - 1], words[i + 1]].some(
-        (beside) => beside !== undefined && isProductWord(beside, productWords),
+        (beside) => beside !== undefined && isProductWord(beside.word, beside.cut, productWords),
       ),
   )
 }
 
 /**
- * A word of the till's dictionary, or a long one OCR read a letter off («ԳԱՐԵՋՈԻՐ»). A short word must be
- * the word itself: the street «Շիրազի» is a letter off «շիրակի», «ширакский» of the dictionary.
+ * A word of the till's dictionary; a long one OCR read a letter off («ԳԱՐԵՋՈԻՐ»); or the start of one the
+ * till cut with a dot («ԳԱՐ.»). A short word must be the word itself: the street «Շիրազի» is a letter off
+ * «շիրակի», «ширакский» of the dictionary.
  */
-function isProductWord(word: string, productWords: ReadonlySet<string>): boolean {
+function isProductWord(word: string, cut: boolean, productWords: ReadonlySet<string>): boolean {
   if (productWords.has(word)) return true
+  // a till's abbreviation, three letters and more and a dot: the start of a kind, «ԳԱՐ.», «ԿՈՆ.»
+  if (cut && Array.from(word).length >= 3) {
+    for (const known of productWords) if (known.startsWith(word)) return true
+  }
   if (Array.from(word).length < FUZZY_LETTERS) return false
   for (const known of productWords) {
     if (Math.abs(known.length - word.length) <= 1 && withinOneEdit(known, word)) return true

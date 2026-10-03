@@ -281,8 +281,9 @@ describe('the city of the address (MOL-126, Р-6)', () => {
   it('takes no city after «ք.» when another one is named in the head', () => {
     const chain = rows('"ԵՐԵՎԱՆ ՍԻԹԻ" ՍՊԸ', 'ՀՀ, ք. Երևան, Արշակունյաց 34', 'Գորկու 62, Գյումրի')
     expect(receiptCityOf(chain)).toBeNull()
-    // the shop's address opening a row decides over the legal one
-    expect(receiptCityOf(rows('ՀՀ, ք. Երևան, Արշակունյաց 34', 'Գյումրի, Գորկու 62'))).toBe('Гюмри')
+    // the legal address of one city beside a shop's of another: two cities, no answer (round 10) —
+    // the place is looked for in the person's own city, never in a city the head may have misnamed
+    expect(receiptCityOf(rows('ՀՀ, ք. Երևան, Արշակունյաց 34', 'Գյումրի, Գորկու 62'))).toBeNull()
     // two shops' addresses opening rows — no answer
     expect(receiptCityOf(rows('Գյումրի, Գորկու 62', 'Երևան, Կոմիտասի 5'))).toBeNull()
   })
@@ -342,7 +343,7 @@ describe('the moment a receipt prints', () => {
 // round 9 and before: the city is read off an address, never off an item named after a city — the
 // shapes OCR made of either on the bench, crossed every way, and no head may name the item's city
 describe('an item named after a city never names the receipt’s city (MOL-126)', () => {
-  const words = new Set(['գարեջուր', 'կոնյակ', 'սպիտակ', 'հնգամյա'])
+  const words = new Set(['գարեջուր', 'կոնյակ', 'սպիտակ', 'հնգամյա', 'lager', 'brandy'])
   const rows = (...texts: string[]) => texts.map((text, line) => ({ text, part: 0, line }))
   const marks = [
     '',
@@ -371,6 +372,8 @@ describe('an item named after a city never names the receipt’s city (MOL-126)'
       'Գյումրի գարեջուր',
       'ԳԱՐԵՋՈՒՐ ԳՅՈՒՄՐԻ ՍՊԻՏԱԿ',
       'ԳՅՈՒՄՐԻ ԳԱՐԵՋՈԻՐ',
+      'ԳՅՈՒՄՐԻ ԳԱՐ.',
+      'GYUMRI LAGER',
       'Գարեջուր "Գյումրի"',
     ],
     Ереван: [
@@ -381,6 +384,8 @@ describe('an item named after a city never names the receipt’s city (MOL-126)'
       'YEREVAN կոնյակ',
       'Կոնյակ «Երեւան» 5տ',
       'ԵՐԵՎԱՆ ԿՈՆՅԱԿ ՀՆԳԱՄՅԱ',
+      'ԵՐԵՎԱՆ ԿՈՆ.',
+      'YEREVAN BRANDY',
     ],
   }
   const tails = [
@@ -433,11 +438,48 @@ describe('an item named after a city never names the receipt’s city (MOL-126)'
                 wrong.push(`«${item}» ${String(address)}`)
             }
           }
-    expect(wrong.slice(0, 10)).toEqual([])
+    expect(wrong).toEqual([])
+  })
+
+  // the strong half: an address read in any form names its city, and any other city named in the head is
+  // no answer — so even a bare brand, a kind OCR cut mid-word, never names another city beside it
+  it.each([
+    ['Ереван', 'Гюмри'],
+    ['Гюмри', 'Ереван'],
+  ] as const)('with the address of %s read, nothing names %s', (home, other) => {
+    const bare = {
+      Гюмри: ['Գյումրի', 'ԳՅՈՒՄՐԻ ԳԱ ուր.', 'GYUMRI', 'Գյումրի 62 2.'],
+      Ереван: ['Երևան', 'ԵՐԵՎԱՆ ԿՈ ակ.', 'YEREVAN', 'Երևան 34'],
+    }
+    const wrong: string[] = []
+    for (const address of addresses[home])
+      if (address !== null)
+        for (const mark of marks)
+          for (const name of [...items[other], ...bare[other]])
+            for (const tail of tails) {
+              const item = `${mark}${name}${tail}`
+              for (const head of [
+                ['ЧЕК', address, 'ՀՎՀՀ:01282006', item, '2203/1100001 1Հտ 450 450'],
+                [item, address],
+                [address, item],
+              ]) {
+                if (receiptCityOf(rows(...head), words) === other)
+                  wrong.push(`«${item}» ${address}`)
+              }
+            }
+    expect(wrong).toEqual([])
   })
 
   it('still reads the address beside a street, whatever OCR put at its edge', () => {
     for (const address of [
+      'ыы ԳՅՈՒՄՐԻ Գորկու 62 2 --',
+      'Se .»ԳՅՈՒՄՐԻ Գորկու 62 2.',
+      '«ՀԱՎԵՏ ԳՅՈՒՄՐԻ Գորկու 62 2 .-',
+      'ԳՅՈՒՄՐԻ Գորկու 62 տ.',
+      'ք. Գյումրի, Գորկու 62 տ. 3',
+      'Գյումրի 3101, Ռիժկովի 104',
+      'ԳՅՈՒՄՐԻ Գորկու 62 02.10.2026',
+      'ԳՅՈՒՄՐԻ Գորկու 162/105',
       'ԳՅՈՒՄՐԻ Գորկու 62 2.',
       '9. ԳՅՈՒՄՐԻ Գորկու 62 2.',
       '2..1 ԳՅՈՒՄՐԻ Գորկու 62 2,',

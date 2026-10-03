@@ -232,21 +232,25 @@ it, else quantity × price. Quantity × price is rounded half up to the digits t
 when every amount on it is whole — once: 0,742 kg × 1 290 = 957,18 is 957 on a receipt of whole drams.
 The phone calls these very functions on the review (В-6 of MOL-124).
 
-**The place is found by the receipts of its seller recorded in a city** (Р-6; review В4). **The city is
-read off an address, never off an item's row** (rounds 4–9): nine rounds of review moved the end of the
-head — where items begin — and each OCR shape moved it again; the end stays a bound (above a table's first
-heading, two rows above a card's first article, twenty rows where none is read), and what decides is the
-row itself. An item named after a city names its kind beside it — «ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ», «Կոնյակ Երևան»,
-a word of the till's dictionary (`TILL_WORDS_RU`, passed in; one letter off counts from seven letters,
-since the street «Շիրազի» is a letter off «շիրակի») — or puts the city in quotes as a brand, or carries a
-table's heading, an article, a unit «0.5լ», a sum with hundredths, two prices; an address puts a street
-beside the city. What OCR adds at the paper's edge — «9.», «2..1», «= 4 -» — stands before both and decides
-nothing. Of the addresses: a city opening the row decides; else a city after «ք.» decides only when no other
-city is named in the head (a chain's legal address beside its shop's); two cities are no answer, and the
-place is then looked for in the person's own city. The chain's name «ԵՐԵՎԱՆ-ՍԻԹԻ», «YEREVAN CITY» is no city.
-**A test crosses every shape the bench showed** — marks, item names of both cities, tails, addresses or
-none — and no head may name an item's city; on all 260 readings of the bench the city is found where the
-address was read (129), and nowhere another. Of
+**The place is found by the receipts of its seller recorded in a city** (Р-6; review В4). **The city is the
+one city the head names, read off an address** (rounds 3–10). Ten rounds of review moved the end of the head
+and the shape of an «address row», and each form OCR made moved them again; the rule is now two halves.
+**Any second city named in the head is no answer** — an item named after a city, a chain's legal address
+beside its shop's — and the place is looked for in the person's own city: an address read in any form
+names its city, so no item can name another one beside it. **And the city must stand in an address row**:
+a number after its first word (a house, «Գորկու 62», glued «Գորկուծ22»), and none of an item's marks — a
+kind of the till's dictionary beside the city (`TILL_WORDS_RU`, passed in; Latin kinds «LAGER» too; one
+letter off from seven letters; a till's abbreviation with a dot «ԳԱՐ.»), the city in quotes, a table's
+heading, an article, a unit right after its number «0.5լ», «5տ», a sum's hundredths, a price and a sum at
+the row's end. A house «62 տ.», a postal code, a day on the row, a flat «162/105», any mark OCR put at the
+edge are an address's. The end of the head stays a bound only: above a table's first heading, two rows
+above a card's first article, twenty rows where none is read. **The one form left** is undecidable from
+the text: the address not read at all, and in the head an item named after a city with no kind beside it
+— a bare brand, a kind OCR cut mid-word — and a number. It names the item's city; the person sees the
+place on the review. **Two tests cross every shape** the rounds found — marks, names, tails, addresses —
+both ways: with the address read nothing names another city, bare brands included; without it, no item
+with its kind does. On all 260 readings of the bench the city is found in 132, and never another.
+Of
 the places this seller's receipts were recorded at there, with the trips still there: the person's own
 last, else the one most people chose, the later on a tie — as the shop's memory is read. **A place
 keeps no tax number**: a column written by the first receipt named a place for everyone, for good, and
