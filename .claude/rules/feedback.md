@@ -4,6 +4,8 @@ paths:
   - 'packages/model/tests/contracts/feedback.test.ts'
   - 'backend/src/routes/feedback.ts'
   - 'backend/src/usecases/send-feedback*.ts'
+  - 'backend/src/usecases/feedback-from-bot*.ts'
+  - 'backend/tests/feedback-bot.integration.test.ts'
   - 'backend/src/db/feedback-repository.ts'
   - 'backend/tests/feedback.integration.test.ts'
   - 'frontend/src/components/FeedbackSheet.vue'
@@ -97,10 +99,22 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
   section with the replies nested, `client_key` left out as the phone's key against a repeat.
 - **What `/privacy` says** — «Сообщения разработчику»: what is kept and attached, that only the owner
   reads, that a copy of the notice stays in the owner's Telegram without a name or an id even after
-  erasure (В-3), and the year. A change here is a change there.
-- **The owner's notice is not in MOL-147** (Р-7): when it was planned there was no channel to the
-  owner. MOL-143 has built it since — `owner_notices`, claimed by the bot (`observability.md`) — and
-  MOL-148 joins it as a kind of its own, with the reply. Until then a message waits in the table.
+  erasure (В-3), the year, and since MOL-148 a word written in reply in the bot and the number of the
+  Telegram message each reply went out as. A change here is a change there.
+- **The owner hears of every new message** (MOL-148, Р-6): a notice of kind `feedback` in the owner's
+  channel (`owner_notices`, `observability.md`), queued in the transaction of the write, only where
+  `OWNER_TELEGRAM_ID` is set, and never for a repeat. **It names its message by `feedback_id`** and
+  goes with it — erased with the person, purged with the thread's year (Р-5); unclaimed, it is not
+  dropped after a day as a failure's is. A message written before MOL-148 has none (Р-13).
+- **The owner's reply and the person's answer to it are the bot's** (`bot.md`), and the API decides
+  which a text is (`feedbackFromBot`). **The reply lies under the person's latest word in the thread**
+  — that is what the owner answers — and «от 3 октября» is that word's day in the person's country's
+  zone (Р-3). **A continuation is a message of its thread**: the thread's kind and language, no screen,
+  platform or page build, the form's day limit, and a key made of the chat and the Telegram message,
+  so an update Telegram hands over twice is written once (Р-7). It is found by the message the reply
+  went out as — `feedback_replies.telegram_message_id`, looked for only beside the person (В-2).
+- **A reply's outcome is the bot's word after the send** (Р-4): `sent` with that message, or
+  `blocked`; empty is «unknown». `gone` is not a value: a message gone has no reply to mark.
 
 ## The sheet and its two ways in
 

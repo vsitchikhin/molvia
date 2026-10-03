@@ -378,7 +378,12 @@ that are easiest to break; the file holds every rule of the area and the reason 
   changes** (MOL-147, Р-2): the same key with another content is a `409`; at most ten a rolling day,
   under the author's lock, `429`.
 - **A thread lives a year from its last message, the owner's reply included** (В-4), and goes with the
-  person.
+  person. **The database holds the thread** (MOL-148): a continuation names its first message, of the
+  same person, and answers a reply to that person — never another's.
+- **The bot passes, the API decides** (MOL-148): a text written as a reply to the bot goes with
+  `ctx.from.id`, the message answered and the tag `#fb42` of its first line — the only place the tag
+  is read; only `OWNER_TELEGRAM_ID` makes it a reply, and a person's word finds its thread by the
+  message the reply went out as. Delivered is 👌 — ✅ is not a reaction Telegram takes.
 - **One sheet, two ways in** (MOL-147): «О приложении» in the settings and «Сообщить о проблеме» drawn
   by `ScreenState` — only a full-screen error, somebody known, not in a `<dialog>`; the draft is the
   device's with no queue, and what goes with the text is read from the body it sends.
