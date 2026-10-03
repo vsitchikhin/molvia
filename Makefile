@@ -95,6 +95,10 @@ gates: ## Read gates 0.2 and 0.3: make gates FROM=<day|moment> [TO=<day|moment>]
 	$(NEED_SCAFFOLD)
 	$(if $(filter command line,$(origin FROM)),,unset FROM;) $(if $(filter command line,$(origin TO)),,unset TO;) ./bin/gates.sh "$${FROM:-}" "$${TO:-}"
 
+failures: ## The latest failures of the API and the bot: make failures [LIMIT=20] (MOL-143)
+	$(NEED_SCAFFOLD)
+	$(if $(filter command line,$(origin LIMIT)),,unset LIMIT;) ./bin/failures.sh "$${LIMIT:-}"
+
 model: ## Fetch the embedding model of catalogue search into .models, checked by sha256 (MOL-105)
 	node bin/fetch-model.mjs
 

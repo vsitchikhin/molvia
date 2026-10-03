@@ -7,9 +7,10 @@
 //   node bin/bundle.mjs backend
 //   node bin/bundle.mjs bot
 //
-// The API ships three more files beside its server: `dist/forget.js`, the owner's fallback for
+// The API ships four more files beside its server: `dist/forget.js`, the owner's fallback for
 // erasing a person by hand (MOL-58), `dist/seed-catalogue.js`, which puts the common names into
-// the catalogue (MOL-112), and `dist/gates.js`, which reads gates 0.2 and 0.3 (MOL-91). The
+// the catalogue (MOL-112), `dist/gates.js`, which reads gates 0.2 and 0.3 (MOL-91), and
+// `dist/failures.js`, which reads the table of failures (MOL-143). The
 // production machine has neither the source nor a published database port, so the image it
 // already runs is the only place such a tool can live.
 
@@ -31,6 +32,7 @@ const entries = {
     forget: 'src/forget-cli.ts',
     'seed-catalogue': 'src/seed-catalogue-cli.ts',
     gates: 'src/gates-cli.ts',
+    failures: 'src/failures-cli.ts',
   },
   bot: { index: 'src/index.ts' },
 }
