@@ -8,6 +8,7 @@ import {
   exchanges,
   expenses,
   feedback,
+  feedbackPictures,
   feedbackReplies,
   incomeRevisions,
   incomes,
@@ -265,9 +266,21 @@ export async function aLife(
       route: 'money',
       platform: 'ios 18 app',
       clientKey: randomUUID(),
+      pictures: 1,
     })
     .returning({ id: feedback.id })
   if (message === undefined) throw new Error('no message')
+  // Its screenshot, still waiting for the owner's bot (MOL-167).
+  await db.insert(feedbackPictures).values({
+    feedbackId: message.id,
+    position: 1,
+    source: 'phone',
+    image: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+    fingerprint: 'life',
+    bytes: 4,
+    width: 1179,
+    height: 2556,
+  })
   const [reply] = await db
     .insert(feedbackReplies)
     .values({

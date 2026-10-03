@@ -1,15 +1,21 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
-import { ERROR, FEEDBACK_DAY_LIMIT, ISSUE } from '@molvia/model'
+import {
+  ERROR,
+  FEEDBACK_BODY_BYTES_MAX,
+  FEEDBACK_DAY_LIMIT,
+  FEEDBACK_PICTURE_BYTES_MAX,
+  ISSUE,
+} from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { VERSION } from '@/env'
 import { createFeedbackRepository } from '@/db/feedback-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
-import { actors, feedback, feedbackReplies } from '@/db/schema'
+import { actors, feedback, feedbackPictures, feedbackReplies } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, signIn } from './fixtures'
+import { aScreenshot, clearAll, insertActor, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 
@@ -498,5 +504,202 @@ describe('схема нитей держит первое сообщение и 
         }),
       ),
     ).toBe('feedback_replies_delivered_known')
+  })
+})
+
+describe('снимки к сообщению (MOL-167)', () => {
+  const picturesOf = (number: number) =>
+    db
+      .select()
+      .from(feedbackPictures)
+      .where(eq(feedbackPictures.feedbackId, number))
+      .orderBy(feedbackPictures.position)
+
+  it('три снимка — одна запись: по порядку, со сторонами, без места съёмки', async () => {
+    const cookie = await signIn(db, await insertActor(db))
+    const pictures = [
+      aScreenshot(1179, 2556, { gps: true }),
+      aScreenshot(1080, 2400, { seed: 1 }),
+      aScreenshot(2400, 1080, { seed: 2 }),
+    ]
+
+    const reply = await send(message({ pictures }), cookie)
+
+    expect(reply.statusCode).toBe(201)
+    const { number } = reply.json<{ number: number }>()
+    const [row] = await db.select().from(feedback).where(eq(feedback.id, number))
+    expect(row?.pictures).toBe(3)
+    const kept = await picturesOf(number)
+    expect(
+      kept.map(({ position, source, width, height }) => [position, source, width, height]),
+    ).toEqual([
+      [1, 'phone', 1179, 2556],
+      [2, 'phone', 1080, 2400],
+      [3, 'phone', 2400, 1080],
+    ])
+    const first = kept[0]?.image ?? Buffer.alloc(0)
+    expect(first.includes(Buffer.from('GPS'))).toBe(false)
+    expect(first.includes(Buffer.from('Exif'))).toBe(false)
+    expect(kept[0]?.bytes).toBe(first.length)
+    expect(kept.every((picture) => picture.sentAt === null)).toBe(true)
+  })
+
+  it('четвёртый снимок — 400, ничего не записано', async () => {
+    const cookie = await signIn(db, await insertActor(db))
+    const four = [0, 1, 2, 3].map((seed) => aScreenshot(1179, 2556, { seed }))
+
+    const reply = await send(message({ pictures: four }), cookie)
+
+    expect(reply.statusCode).toBe(400)
+    expect(reply.json()).toMatchObject({ details: 'pictures' })
+    expect(await db.select().from(feedback)).toHaveLength(0)
+  })
+
+  it('снимок без текста — сообщение; ни текста, ни снимка — 400', async () => {
+    const cookie = await signIn(db, await insertActor(db))
+    const silent: Record<string, unknown> = { ...message() }
+    delete silent.text
+
+    const alone = await send({ ...silent, pictures: [aScreenshot()] }, cookie)
+    expect(alone.statusCode).toBe(201)
+    const [row] = await db.select().from(feedback)
+    expect(row).toMatchObject({ text: '', pictures: 1 })
+
+    const nothing = await send({ ...message(), text: undefined }, cookie)
+    expect(nothing.statusCode).toBe(400)
+    expect(nothing.json()).toEqual({ code: ISSUE.TEXT_NOT_VISIBLE, details: 'text' })
+  })
+
+  it('не JPEG и стороны вне пределов — 415, текст и другие снимки не записаны', async () => {
+    const cookie = await signIn(db, await insertActor(db))
+    const png = Buffer.from('\x89PNG\r\n\x1a\n0000', 'latin1').toString('base64')
+
+    for (const odd of [png, aScreenshot(99, 500), aScreenshot(149, 3000)]) {
+      const reply = await send(message({ pictures: [aScreenshot(), odd] }), cookie)
+      expect(reply.statusCode).toBe(415)
+      expect(reply.json()).toEqual({ code: ERROR.FEEDBACK_PICTURE_INVALID })
+    }
+    expect(await db.select().from(feedback)).toHaveLength(0)
+  })
+
+  it('снимок больше двух мегабайт — 413 своим кодом', async () => {
+    const cookie = await signIn(db, await insertActor(db))
+    const heavy = Buffer.concat([
+      Buffer.from(aScreenshot(), 'base64'),
+      Buffer.alloc(FEEDBACK_PICTURE_BYTES_MAX),
+    ]).toString('base64')
+
+    const reply = await send(message({ pictures: [heavy] }), cookie)
+
+    expect(reply.statusCode).toBe(413)
+    expect(reply.json()).toEqual({ code: ERROR.FEEDBACK_PICTURE_TOO_LARGE })
+  })
+
+  it('тело больше предела — 413 по длине, не читая; другие маршруты держат мегабайт', async () => {
+    const cookie = await signIn(db, await insertActor(db))
+    const payload = JSON.stringify(message({ text: 'а'.repeat(FEEDBACK_BODY_BYTES_MAX) }))
+
+    const reply = await app.inject({
+      method: 'POST',
+      url: '/feedback',
+      payload,
+      headers: { cookie, 'content-type': 'application/json' },
+    })
+
+    expect(reply.statusCode).toBe(413)
+    expect(reply.json()).toEqual({ code: ERROR.FEEDBACK_PICTURE_TOO_LARGE })
+    // Three pictures at their limit fit; the rest of the API keeps Fastify's megabyte.
+    const settings = await app.inject({
+      method: 'PUT',
+      url: '/actors/me/settings',
+      payload: JSON.stringify({ note: 'а'.repeat(2 * 1024 * 1024) }),
+      headers: { cookie, 'content-type': 'application/json' },
+    })
+    expect(settings.statusCode).toBe(413)
+  })
+
+  it('повтор с теми же снимками — та же запись; другой снимок или без него под тем же ключом — 409', async () => {
+    const cookie = await signIn(db, await insertActor(db))
+    const body = message({ pictures: [aScreenshot(1179, 2556, { gps: true })] })
+
+    const first = await send(body, cookie)
+    // The same picture with its metadata stripped again is the same picture.
+    const again = await send(body, cookie)
+    expect(again.statusCode).toBe(200)
+    expect(again.json()).toEqual(first.json())
+
+    const other = await send({ ...body, pictures: [aScreenshot(1179, 2556, { seed: 5 })] }, cookie)
+    expect(other.statusCode).toBe(409)
+    const without = await send({ ...body, pictures: undefined }, cookie)
+    expect(without.statusCode).toBe(409)
+    expect(await db.select().from(feedbackPictures)).toHaveLength(1)
+  })
+
+  it('стирание человека уносит снимки', async () => {
+    const anna = await insertActor(db)
+    const boris = await insertActor(db)
+    await send(message({ pictures: [aScreenshot()] }), await signIn(db, anna))
+    await send(message({ pictures: [aScreenshot()] }), await signIn(db, boris))
+    const [annas] = await db
+      .select({ telegram: actors.telegramUserId })
+      .from(actors)
+      .where(eq(actors.id, anna))
+
+    await createErasureRepository(db).erase(annas?.telegram ?? 0, { dryRun: false })
+
+    const left = await db
+      .select()
+      .from(feedbackPictures)
+      .innerJoin(feedback, eq(feedback.id, feedbackPictures.feedbackId))
+    expect(left.map((row) => row.feedback.actorId)).toEqual([boris])
+  })
+
+  it('байты, не забранные ботом за неделю, стираются; строка снимка остаётся', async () => {
+    const cookie = await signIn(db, await insertActor(db))
+    const old = (await send(message({ pictures: [aScreenshot()] }), cookie)).json<{
+      number: number
+    }>()
+    const fresh = (await send(message({ pictures: [aScreenshot()] }), cookie)).json<{
+      number: number
+    }>()
+    await db
+      .update(feedbackPictures)
+      .set({ createdAt: new Date(Date.now() - 7 * 24 * 3_600_000 - 60_000) })
+      .where(eq(feedbackPictures.feedbackId, old.number))
+
+    await createFeedbackRepository(db).forgetPictures()
+
+    const [gone] = await picturesOf(old.number)
+    const [kept] = await picturesOf(fresh.number)
+    expect(gone?.image).toBeNull()
+    expect(gone?.fingerprint).toEqual(expect.any(String))
+    expect(kept?.image).not.toBeNull()
+  })
+
+  it('база держит «слова или снимок» и место снимка сама', async () => {
+    const anna = await insertActor(db)
+    const silent = db.insert(feedback).values({
+      actorId: anna,
+      kind: 'bug',
+      text: '',
+      locale: 'ru',
+      apiBuild: 'dev',
+    })
+    expect(await refusedBy(silent)).toBe('feedback_says_something')
+    const id = await aMessage(anna, new Date())
+    const picture = (position: number, extra: Record<string, unknown> = {}) =>
+      db.insert(feedbackPictures).values({
+        feedbackId: id,
+        position,
+        source: 'phone',
+        fingerprint: 'x',
+        width: 10,
+        height: 10,
+        ...extra,
+      })
+    expect(await refusedBy(picture(4))).toBe('feedback_pictures_position_range')
+    expect(await refusedBy(picture(1, { telegramFileId: 'Ag' }))).toBe(
+      'feedback_pictures_kept_by_source',
+    )
   })
 })

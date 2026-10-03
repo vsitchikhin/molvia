@@ -3,7 +3,7 @@ import { FAILURE_KEEP_DAYS, FEEDBACK_NOTICE_KINDS } from '@molvia/model'
 import type { OwnerNotice, OwnerNoticeKind } from '@molvia/model'
 import type { Conn } from './index'
 import { rowLimit } from './rows'
-import { ownerNotices } from './schema'
+import { feedbackPictures, ownerNotices } from './schema'
 
 /** A notice about a failure not handed within a day goes: `make failures` still has its count (Р-7). */
 const FAILURE_NOTICE_KINDS = [
@@ -46,7 +46,11 @@ export interface OwnerNoticeRepository {
    */
   claim(limit: number, at: Date): Promise<readonly unknown[]>
 
-  /** The bot sent the notices about these messages: they are not handed again. */
+  /**
+   * The bot sent the notices about these messages: they are not handed again, and their pictures'
+   * bytes and Telegram ids go in the same transaction — the owner's Telegram has them now (MOL-167,
+   * В-1). What is left of each picture is its line.
+   */
   markSent(messages: readonly number[], at: Date): Promise<void>
 
   /**
@@ -102,10 +106,21 @@ export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
 
     async markSent(messages, at) {
       if (messages.length === 0) return
-      await db
-        .update(ownerNotices)
-        .set({ sentAt: at })
-        .where(and(inArray(ownerNotices.feedbackId, [...messages]), isNull(ownerNotices.sentAt)))
+      await db.transaction(async (tx) => {
+        await tx
+          .update(ownerNotices)
+          .set({ sentAt: at })
+          .where(and(inArray(ownerNotices.feedbackId, [...messages]), isNull(ownerNotices.sentAt)))
+        await tx
+          .update(feedbackPictures)
+          .set({ image: null, telegramFileId: null, sentAt: at })
+          .where(
+            and(
+              inArray(feedbackPictures.feedbackId, [...messages]),
+              isNull(feedbackPictures.sentAt),
+            ),
+          )
+      })
     },
 
     async purgeStale(now) {

@@ -348,6 +348,7 @@ export default defineComponent({
         text: tidyText(text.value),
         ...attached.value,
         clientKey: clientKey.value,
+        pictures: undefined,
       } satisfies Record<keyof FeedbackBody, unknown>)
       return parsed.success ? parsed.data : null
     })

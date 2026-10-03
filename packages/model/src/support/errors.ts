@@ -99,6 +99,15 @@ export const ERROR = {
    */
   FEEDBACK_RATE_LIMITED: 'error.feedback_rate_limited',
   /**
+   * A picture of a message to the developer that is not one the owner can be sent (MOL-167, Р-2): not
+   * a JPEG, or sides outside `FEEDBACK_PICTURE_SIDE_MIN`…`FEEDBACK_PICTURE_SIDE_MAX` or past
+   * `FEEDBACK_PICTURE_RATIO_MAX`. The phone draws every picture to fit, so this is another picture to
+   * choose — the text and the other pictures stay.
+   */
+  FEEDBACK_PICTURE_INVALID: 'error.feedback_picture_invalid',
+  /** A picture past `FEEDBACK_PICTURE_BYTES_MAX`, or a message's body past `FEEDBACK_BODY_BYTES_MAX`. */
+  FEEDBACK_PICTURE_TOO_LARGE: 'error.feedback_picture_too_large',
+  /**
    * Failures of the phone past the limit of an address or of everybody's minute (MOL-144, Р-6). The
    * phone shows nothing: it forgets what it kept, since sending it again would change nothing.
    */

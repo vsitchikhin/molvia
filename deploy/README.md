@@ -421,6 +421,10 @@ key never comes to this machine — a compromised server cannot read old copies.
   dumped without their data. A photo carries a customer's name and lives until its receipt is
   recorded; a copy would keep it fourteen days. After a restore those tables are empty — a receipt
   still queued fails as unreadable, one read keeps its lines.
+- **No picture of a message to the developer is in a copy** (MOL-167, В-1): `feedback_pictures` is
+  dumped without its data. Its bytes live only until the owner's Telegram has them, a week at most.
+  After a restore a message still says how many pictures it had, and a notice still waiting goes
+  without them — the bot finds none to fetch.
 - **A missing copy is an alarm.** Each run pings healthchecks.io with its exit code; no ping for 25
   hours, or a failed one, reaches the owner in Telegram. The service sees when the server pinged and
   from where — no data.

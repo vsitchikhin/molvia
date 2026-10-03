@@ -10,6 +10,7 @@ import {
   exchanges,
   expenses,
   feedback,
+  feedbackPictures,
   feedbackReplies,
   incomeRevisions,
   incomes,
@@ -70,6 +71,7 @@ export const EXPORT_COLUMNS: Readonly<
     | 'exchange_revisions'
     | 'income_revisions'
     | 'feedback_replies'
+    | 'feedback_pictures'
     | 'owner_notices'
     | 'items'
     | 'item_barcodes'
@@ -372,6 +374,7 @@ export const EXPORT_COLUMNS: Readonly<
       thread_head: 'said by `thread`: the key that holds a continuation to its first message',
       thread_key:
         'said by `thread`: the key that holds a continuation to a reply of its own thread',
+      pictures: 'said by `pictures`: one line for each',
     },
   },
   feedback_replies: {
@@ -382,6 +385,19 @@ export const EXPORT_COLUMNS: Readonly<
       thread_id: 'said by where the reply sits: under a message of that thread',
       telegram_message_id:
         'which message the reply went out as in your chat, so your answer to it finds its thread; it means nothing outside that chat',
+    },
+  },
+  // What is left of a picture once it reached the owner (MOL-167, В-1): never the picture itself.
+  feedback_pictures: {
+    exported: ['position', 'source', 'width', 'height', 'bytes', 'created_at', 'sent_at'],
+    omitted: {
+      feedback_id: 'said by where the picture sits: under the message it went with',
+      image:
+        'the picture is kept only until it reaches the developer’s Telegram, then erased; your own file is in your gallery',
+      telegram_file_id:
+        'Telegram’s name for the photo you sent the bot, kept until the developer has it; the photo is in your chat',
+      fingerprint:
+        'a checksum of the picture, so one sent twice is written once; it shows nothing of the picture',
     },
   },
   // The owner's notice of a message (MOL-148) goes with the message, so it is the person's too — and
@@ -516,6 +532,21 @@ export function createExportRepository(db: Db): ExportRepository {
             .innerJoin(feedback, eq(feedback.id, feedbackReplies.feedbackId))
             .where(eq(feedback.actorId, actorId))
             .orderBy(asc(feedbackReplies.id))
+          const pictureRows = await tx
+            .select({
+              feedbackId: feedbackPictures.feedbackId,
+              position: feedbackPictures.position,
+              source: feedbackPictures.source,
+              width: feedbackPictures.width,
+              height: feedbackPictures.height,
+              bytes: feedbackPictures.bytes,
+              createdAt: feedbackPictures.createdAt,
+              sentAt: feedbackPictures.sentAt,
+            })
+            .from(feedbackPictures)
+            .innerJoin(feedback, eq(feedback.id, feedbackPictures.feedbackId))
+            .where(eq(feedback.actorId, actorId))
+            .orderBy(asc(feedbackPictures.feedbackId), asc(feedbackPictures.position))
           const exchangeRows = await tx
             .select()
             .from(exchanges)
@@ -691,6 +722,7 @@ export function createExportRepository(db: Db): ExportRepository {
             replyRows.map((row) => row.reply),
             (reply) => reply.feedbackId,
           )
+          const picturesOf = grouped(pictureRows, (picture) => picture.feedbackId)
 
           return {
             account: {
@@ -1008,6 +1040,15 @@ export function createExportRepository(db: Db): ExportRepository {
                 text: reply.text,
                 delivered: reply.delivered,
                 createdAt: reply.createdAt,
+              })),
+              pictures: (picturesOf.get(row.id) ?? []).map((picture) => ({
+                position: picture.position,
+                source: picture.source,
+                width: picture.width,
+                height: picture.height,
+                bytes: picture.bytes,
+                createdAt: picture.createdAt,
+                sentAt: picture.sentAt,
               })),
             })),
             catalogue: { items: namedItems, places: namedPlaces },

@@ -1,17 +1,26 @@
-import { and, desc, eq, isNull, or, sql } from 'drizzle-orm'
-import { DomainError, ERROR, FEEDBACK_KEPT_YEARS, feedbackQuote } from '@molvia/model'
+import { and, asc, desc, eq, isNull, or, sql } from 'drizzle-orm'
+import {
+  DomainError,
+  ERROR,
+  FEEDBACK_KEPT_YEARS,
+  FEEDBACK_PICTURE_KEPT_DAYS,
+  feedbackQuote,
+} from '@molvia/model'
 import type {
   AppLocale,
   FeedbackBody,
   FeedbackContinuedNotice,
   FeedbackNotice,
+  FeedbackPicture,
   ReplyDelivered,
+  TelegramPicture,
   TelegramUserId,
 } from '@molvia/model'
+import type { PictureIn } from '@/feedback/picture'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { theRow } from './rows'
-import { actors, feedback, feedbackReplies, ownerNotices } from './schema'
+import { actors, feedback, feedbackPictures, feedbackReplies, ownerNotices } from './schema'
 
 /** What a write came to: a message, the same message again, or the day's limit reached. */
 export type FeedbackWrite =
@@ -41,7 +50,9 @@ export type ContinueWrite = 'written' | 'repeated' | 'limited' | 'gone'
 
 export interface ContinueThread {
   readonly reply: AnsweredReply
+  /** `''` when the word is a photo alone (MOL-167, В-3). */
   readonly text: string
+  readonly picture?: TelegramPicture
   readonly apiBuild: string
   readonly limit: number
   readonly notify: boolean
@@ -58,6 +69,7 @@ export interface FeedbackRepository {
   record(
     actorId: string,
     message: FeedbackBody,
+    pictures: readonly PictureIn[],
     apiBuild: string,
     limit: number,
     notify: boolean,
@@ -95,6 +107,18 @@ export interface FeedbackRepository {
 
   /** What became of a reply once the bot tried (Р-4); a reply already marked keeps its mark. */
   markDelivered(delivery: ReplyDelivered): Promise<void>
+
+  /**
+   * A picture of message `number` as the bot sends it to the owner (MOL-167, Р-5): the phone's JPEG
+   * or Telegram's id. `null` once delivered or past its week — or never there.
+   */
+  picture(number: number, position: number): Promise<FeedbackPicture | null>
+
+  /**
+   * The bytes and the Telegram ids the owner's bot never took within `FEEDBACK_PICTURE_KEPT_DAYS`
+   * (MOL-167, В-1): emptied, the line of each picture left.
+   */
+  forgetPictures(): Promise<void>
 }
 
 type Row = typeof feedback.$inferSelect
@@ -107,7 +131,7 @@ function lockAuthor(actorId: string) {
 function saysTheSame(row: Row, message: FeedbackBody): boolean {
   return (
     row.kind === message.kind &&
-    row.text === message.text &&
+    row.text === (message.text ?? '') &&
     row.locale === message.locale &&
     row.pageBuild === message.pageBuild &&
     row.route === message.route &&
@@ -119,7 +143,7 @@ function saysTheSame(row: Row, message: FeedbackBody): boolean {
 
 export function createFeedbackRepository(db: Conn): FeedbackRepository {
   return {
-    record(actorId, message, apiBuild, limit, notify) {
+    record(actorId, message, pictures, apiBuild, limit, notify) {
       return translateFailures(() =>
         db.transaction(async (tx): Promise<FeedbackWrite> => {
           await tx.execute(lockAuthor(actorId))
@@ -128,9 +152,19 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
             .from(feedback)
             .where(and(eq(feedback.actorId, actorId), eq(feedback.clientKey, message.clientKey)))
           if (same !== undefined) {
-            // The phone takes a new key when the content changes (Р-2): another content under the
-            // same key is a defect of the caller, never a message to lose silently.
-            if (!saysTheSame(same, message)) throw new DomainError(ERROR.CONFLICT)
+            // The phone takes a new key when the content changes (Р-2) — a picture added or taken
+            // away too (MOL-167, Р-6): another content under the same key is a defect of the
+            // caller, never a message to lose silently. A picture is compared by its fingerprint,
+            // which outlives its bytes.
+            const kept = await tx
+              .select({ fingerprint: feedbackPictures.fingerprint })
+              .from(feedbackPictures)
+              .where(eq(feedbackPictures.feedbackId, same.id))
+              .orderBy(asc(feedbackPictures.position))
+            const samePictures =
+              kept.map((picture) => picture.fingerprint).join() ===
+              pictures.map((picture) => picture.fingerprint).join()
+            if (!saysTheSame(same, message) || !samePictures) throw new DomainError(ERROR.CONFLICT)
             return { kind: 'repeated', number: same.id }
           }
           const [today] = await tx.execute<{ n: number }>(sql`
@@ -142,7 +176,7 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
             .values({
               actorId,
               kind: message.kind,
-              text: message.text,
+              text: message.text ?? '',
               locale: message.locale,
               pageBuild: message.pageBuild,
               apiBuild,
@@ -151,16 +185,31 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
               errorCode: message.errorCode,
               fromError: message.fromError,
               clientKey: message.clientKey,
+              pictures: pictures.length,
             })
             .returning({ id: feedback.id, createdAt: feedback.createdAt })
           const row = theRow(written, 'feedback')
+          if (pictures.length > 0) {
+            await tx.insert(feedbackPictures).values(
+              pictures.map((picture, index) => ({
+                feedbackId: row.id,
+                position: index + 1,
+                source: 'phone' as const,
+                image: picture.image,
+                fingerprint: picture.fingerprint,
+                bytes: picture.bytes,
+                width: picture.width,
+                height: picture.height,
+              })),
+            )
+          }
           if (notify) {
             const notice: FeedbackNotice = {
               kind: 'feedback',
               number: row.id,
               thread: row.id,
               feedbackKind: message.kind,
-              text: message.text,
+              text: message.text ?? '',
               locale: message.locale,
               pageBuild: message.pageBuild,
               apiBuild,
@@ -169,6 +218,7 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
               fromError: message.fromError,
               errorCode: message.errorCode,
               at: row.createdAt.toISOString(),
+              ...(pictures.length > 0 ? { pictures: pictures.length } : {}),
             }
             await tx.insert(ownerNotices).values({
               kind: notice.kind,
@@ -241,7 +291,7 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
       return row ?? null
     },
 
-    continueThread({ reply, text, apiBuild, limit, notify }) {
+    continueThread({ reply, text, picture, apiBuild, limit, notify }) {
       return translateFailures(() =>
         db.transaction(async (tx): Promise<ContinueWrite> => {
           await tx.execute(lockAuthor(reply.actorId))
@@ -256,14 +306,23 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
               and(eq(feedbackReplies.id, reply.reply), eq(feedbackReplies.actorId, reply.actorId)),
             )
           if (answered === undefined) return 'gone'
+          // The same photo is the same file in Telegram's eyes (MOL-167, Р-8): a word with another
+          // photo, or with one where there was none, is another word.
           const [same] = await tx
             .select({ id: feedback.id })
             .from(feedback)
+            .leftJoin(
+              feedbackPictures,
+              and(eq(feedbackPictures.feedbackId, feedback.id), eq(feedbackPictures.position, 1)),
+            )
             .where(
               and(
                 eq(feedback.actorId, reply.actorId),
                 eq(feedback.inReplyTo, reply.reply),
                 eq(feedback.text, text),
+                picture === undefined
+                  ? isNull(feedbackPictures.fingerprint)
+                  : eq(feedbackPictures.fingerprint, picture.fileUniqueId),
                 sql`${feedback.createdAt} > clock_timestamp() - interval '24 hours'`,
               ),
             )
@@ -289,9 +348,22 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
               apiBuild,
               threadId: answered.thread,
               inReplyTo: reply.reply,
+              pictures: picture === undefined ? 0 : 1,
             })
             .returning({ id: feedback.id, createdAt: feedback.createdAt })
           const row = theRow(written, 'feedback')
+          if (picture !== undefined) {
+            await tx.insert(feedbackPictures).values({
+              feedbackId: row.id,
+              position: 1,
+              source: 'telegram',
+              telegramFileId: picture.fileId,
+              fingerprint: picture.fileUniqueId,
+              bytes: picture.bytes,
+              width: picture.width,
+              height: picture.height,
+            })
+          }
           if (notify) {
             const notice: FeedbackContinuedNotice = {
               kind: 'feedback_continued',
@@ -300,6 +372,7 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
               quote: feedbackQuote(answered.text),
               text,
               at: row.createdAt.toISOString(),
+              ...(picture === undefined ? {} : { pictures: 1 }),
             }
             await tx.insert(ownerNotices).values({
               kind: notice.kind,
@@ -323,6 +396,42 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
           })
           .where(and(eq(feedbackReplies.id, delivery.reply), isNull(feedbackReplies.delivered))),
       )
+    },
+
+    async picture(number, position) {
+      const [row] = await db
+        .select({
+          source: feedbackPictures.source,
+          image: feedbackPictures.image,
+          telegramFileId: feedbackPictures.telegramFileId,
+        })
+        .from(feedbackPictures)
+        .where(
+          and(eq(feedbackPictures.feedbackId, number), eq(feedbackPictures.position, position)),
+        )
+      if (row?.source === 'phone' && row.image !== null) {
+        return { source: 'phone', jpeg: row.image.toString('base64') }
+      }
+      if (row?.source === 'telegram' && row.telegramFileId !== null) {
+        return { source: 'telegram', fileId: row.telegramFileId }
+      }
+      return null
+    },
+
+    async forgetPictures() {
+      await db
+        .update(feedbackPictures)
+        .set({ image: null, telegramFileId: null })
+        .where(
+          and(
+            or(
+              sql`${feedbackPictures.image} is not null`,
+              sql`${feedbackPictures.telegramFileId} is not null`,
+            ),
+            sql`${feedbackPictures.createdAt}
+              < clock_timestamp() - make_interval(days => ${FEEDBACK_PICTURE_KEPT_DAYS})`,
+          ),
+        )
     },
 
     async purgeStale() {
