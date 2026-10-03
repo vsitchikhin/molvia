@@ -111,6 +111,13 @@ describe('ownerText — что прочитает владелец (MOL-143)', (
     expect(ownerText({ kind: 'failure_muted', source: 'phone', count: 37 })).toBe(
       ['🔕 Скрыто уведомлений о сбоях телефона: 37', 'Подробности — make failures'].join('\n'),
     )
+    expect(ownerText({ kind: 'failure_muted', source: 'phone', count: 0, unwritten: 5 })).toBe(
+      [
+        '🔕 Скрыто уведомлений о сбоях телефона: 0',
+        'Не записано новых сбоев телефона: 5 — предел строк часа',
+        'Подробности — make failures',
+      ].join('\n'),
+    )
   })
 
   it('без маршрута и без кадра — так и сказано, пустых строк нет', () => {

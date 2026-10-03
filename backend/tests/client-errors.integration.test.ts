@@ -20,7 +20,7 @@ import {
   PHONE_NOTICES_PER_HOUR,
   PHONE_NOTICES_PER_SENDER,
   PHONE_REPORTS_PER_ADDRESS,
-  PHONE_ROWS_PER_HOUR,
+  PHONE_ROWS_PER_SENDER,
   occurrenceOf,
   recordFailure,
 } from '@/usecases/record-failure'
@@ -190,7 +190,7 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
     expect((await send({ reports: [REPORT] }, '100.64.12.34')).statusCode).toBe(204)
   })
 
-  it('IPv6 считается по /56: сети одного роутера делят минуту (ревью №2, Б4)', async () => {
+  it('IPv6 считается по /48: сети одной /48 делят минуту (ревью №2, Б4, В2)', async () => {
     for (let host = 1; host <= PHONE_REPORTS_PER_ADDRESS / PHONE_FAILURES_KEPT; host += 1) {
       expect(
         (await send(buffer(`H${String(host)}_`), `2001:db8:1:2${String(host).padStart(2, '0')}::1`))
@@ -198,7 +198,8 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
       ).toBe(204)
     }
     expect((await send({ reports: [REPORT] }, '2001:db8:1:2ff::9')).statusCode).toBe(429)
-    expect((await send({ reports: [REPORT] }, '2001:db8:1:300::1')).statusCode).toBe(204)
+    expect((await send({ reports: [REPORT] }, '2001:db8:1:300::1')).statusCode).toBe(429)
+    expect((await send({ reports: [REPORT] }, '2001:db8:2:100::1')).statusCode).toBe(204)
   })
 
   it('X-Forwarded-For не от внутренней сети не верится: счёт идёт по пиру', async () => {
@@ -235,8 +236,8 @@ describe('поток выдуманных сбоев не топит канал 
     await recorded()
     const payloads = (await db.select().from(ownerNotices)).map((notice) => notice.payload)
     expect(payloads).toContainEqual(expect.objectContaining({ errorName: 'RealDefect' }))
-    // The table counts every one of them.
-    expect(await recorded()).toHaveLength(PHONE_FAILURES_KEPT + 1)
+    // The table: the sender's new rows of the hour, and the real one.
+    expect(await recorded()).toHaveLength(PHONE_ROWS_PER_SENDER + 1)
   })
 
   it(`всем вместе — ${String(PHONE_NOTICES_PER_HOUR)} уведомлений в час`, async () => {
@@ -260,21 +261,20 @@ describe('поток выдуманных сбоев не топит канал 
     expect(await failureNotices()).toHaveLength(PHONE_NOTICES_PER_SENDER)
   })
 
-  it(`новых строк телефона — не больше ${String(PHONE_ROWS_PER_HOUR)} в час, известный отпечаток считается дальше (ревью №6)`, async () => {
-    const hosts = Math.ceil((PHONE_ROWS_PER_HOUR + 10) / PHONE_FAILURES_KEPT)
-    for (let host = 1; host <= hosts; host += 1) {
-      expect(
-        (await send(buffer(`Row${String(host)}_`), `192.0.2.${String(host)}`)).statusCode,
-      ).toBe(204)
-      await recorded()
-    }
-    expect(await recorded()).toHaveLength(PHONE_ROWS_PER_HOUR)
+  it(`новых строк с одного адреса — ${String(PHONE_ROWS_PER_SENDER)} в час, чужой настоящий сбой записан (ревью №8, В1)`, async () => {
+    expect((await send(buffer('Liar'), '203.0.113.9')).statusCode).toBe(204)
+    await recorded()
+    expect(await recorded()).toHaveLength(PHONE_ROWS_PER_SENDER)
     expect(lines.join('\n')).toContain('phone rows')
-    // The first one is known: it still counts past the hour's new rows.
-    const again = { reports: [{ ...REPORT, errorName: 'Row1_0' }] }
-    expect((await send(again, '192.0.2.200')).statusCode).toBe(204)
+
+    const real = { reports: [{ ...REPORT, errorName: 'RealDefect' }] }
+    expect((await send(real, '198.51.100.7')).statusCode).toBe(204)
+    // A fingerprint already there still counts, past the sender's new rows.
+    const again = { reports: [{ ...REPORT, errorName: 'Liar0' }] }
+    expect((await send(again, '203.0.113.9')).statusCode).toBe(204)
     const rows = await recorded()
-    expect(rows.find((row) => row.errorName === 'Row1_0')?.count).toBe(2)
+    expect(rows.map((row) => row.errorName)).toContain('RealDefect')
+    expect(rows.find((row) => row.errorName === 'Liar0')?.count).toBe(2)
   })
 
   it('скрытое сказано таймером одним уведомлением, когда в часе есть место (ревью №7)', async () => {

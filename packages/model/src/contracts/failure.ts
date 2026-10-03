@@ -166,13 +166,17 @@ export const failureCountNoticeSchema = z.strictObject({
 })
 
 /**
- * The phone's notices held back past the hour's budget, told once the hour has room (MOL-144, review
- * №1, №7): how many, and that `make failures` has them. The table counts every one.
+ * The phone's notices held back past the hour's budget and the new fingerprints not written, told by
+ * the minute timer at most once an hour (MOL-144, review №1, №7, round 3): how many, and that
+ * `make failures` has the held ones.
  */
 export const failureMutedNoticeSchema = z.strictObject({
   kind: z.literal('failure_muted'),
   source: z.literal('phone'),
-  count: z.int().positive(),
+  /** Notices held back. */
+  count: z.int().nonnegative(),
+  /** New fingerprints the hour's rows had no room for: not in the table at all (round 3, В1). */
+  unwritten: z.int().positive().optional(),
 })
 
 /**

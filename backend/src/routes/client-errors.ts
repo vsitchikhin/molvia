@@ -27,9 +27,11 @@ function addressOf(request: FastifyRequest): string {
 }
 
 /**
- * An IPv6 address counts by its `/56` (review №2, adversarial Б4): one home connection has 2^64
- * addresses in its `/64`, and the router of one flat is usually given a `/56` — 256 of them. An IPv4
- * address, or anything else, counts as it is.
+ * An IPv6 address counts by its `/48` (review №2, adversarial Б4, В2): one home connection has 2^64
+ * addresses in its `/64`, a flat's router is usually given a `/56`, and a free tunnel hands out a whole
+ * `/48` — 256 networks `/56`, each its own minute and its own hour of notices otherwise. The price: a
+ * provider that gives its customers `/56` out of one `/48` puts them in one minute, as an operator's
+ * CGNAT does with IPv4. An IPv4 address, or anything else, counts as it is.
  */
 export function networkOf(address: string): string {
   if (!isIPv6(address) || /^::ffff:[\d.]+$/i.test(address)) return address
@@ -39,8 +41,10 @@ export function networkOf(address: string): string {
   const groups = address.includes('::')
     ? [...left, ...Array<string>(8 - left.length - right.length).fill('0'), ...right]
     : left
-  const [a = 0, b = 0, c = 0, d = 0] = groups.slice(0, 4).map((group) => Number.parseInt(group, 16))
-  return `${[a, b, c, d & 0xff00].map((group) => group.toString(16)).join(':')}::/56`
+  return `${groups
+    .slice(0, 3)
+    .map((group) => Number.parseInt(group, 16).toString(16))
+    .join(':')}::/48`
 }
 
 /**

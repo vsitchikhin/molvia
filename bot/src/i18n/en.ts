@@ -77,6 +77,8 @@ export const en: Dictionary = {
   'owner.failure.nowhere': 'no route',
   'owner.failure.platform': 'Platform {platform}',
   'owner.failure.muted': '🔕 Notices about the phone held back: {count}',
+  'owner.failure.unwritten':
+    'New phone failures not written: {unwritten} — the hour’s rows were full',
   'owner.failure.build': 'Build {build}',
   'owner.failure.buildPrint': 'Build {build} · {fingerprint}',
   'owner.failure.more': 'Details — make failures',

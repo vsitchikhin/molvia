@@ -17,6 +17,9 @@ export function ownerText(notice: OwnerNotice): string {
   if (notice.kind === 'failure_muted') {
     return [
       t(undefined, 'owner.failure.muted', { count: notice.count }),
+      ...(notice.unwritten === undefined
+        ? []
+        : [t(undefined, 'owner.failure.unwritten', { unwritten: notice.unwritten })]),
       t(undefined, 'owner.failure.more'),
     ].join('\n')
   }

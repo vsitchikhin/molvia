@@ -142,7 +142,9 @@ export async function recordFailure(
   sender?: string,
 ): Promise<boolean> {
   const phone = occurrence.source === 'phone'
-  const fresh = !phone || phoneRows === undefined || phoneRows.room(at)
+  // Taken before the write, given back if the row was there: four writes run at once, and each
+  // asking first and taking after let the hour's rows run past by three.
+  const fresh = !phone || phoneRows === undefined || phoneRows.claim(at, sender)
   const count = await failures.record(
     occurrence,
     times,
@@ -153,8 +155,10 @@ export async function recordFailure(
     },
     { fresh },
   )
-  // A new row: its count is exactly what was written now.
-  if (phone && count?.count === times) phoneRows?.take(at)
+  // Not a new row after all — its count is more than what was written now: the place goes back.
+  if (phone && fresh && count !== null && count.count !== times) phoneRows?.refund(at, sender)
+  // A new fingerprint past the hour's rows: not in the table, so the summary says so (round 3, В1).
+  if (count === null) phoneNotices?.unwritten()
   return count !== null
 }
 
@@ -167,7 +171,9 @@ const HOUR_MS = 60 * 60 * 1000
 export interface PhoneNoticeBudget {
   /** What of the phone's notices fits the hour — the sender's and everybody's. */
   take(notices: readonly OwnerNotice[], at: Date, sender?: string): OwnerNotice[]
-  /** How many were held back, once the hour has room to say so, and only once. */
+  /** A new fingerprint of the phone the hour's rows had no room for: not in the table at all. */
+  unwritten(): void
+  /** How many were held back and how many not written, at most once an hour. */
   held(at: Date): OwnerNotice | null
 }
 
@@ -178,10 +184,14 @@ export interface PhoneNoticeBudget {
  * messages a minute in the owner's chat, the API's own drowned behind them. A cap shared by everybody
  * alone was spent by ten invented reports at the start of an hour, and a real failure after the
  * rollout was told to nobody; a sender's own three leave the rest to the others. **What is held back
- * is counted, never queued, and told once the hour has room** (`held`, review №7): «скрыто M — make
- * failures» comes by the minute timer, not with the next failure, which may never come. The table
- * counts all of them. In the process's memory: a restart starts the hour over and forgets what was
- * held — a rollout is a restart, the price named.
+ * is counted, never queued, and told by the minute timer** (`held`, review №7): «скрыто M — make
+ * failures», not with the next failure, which may never come — **at most once an hour and past the
+ * hour's twenty** (adversarial В2 of round 3): a cap kept full by seven networks would otherwise never
+ * have room for it. It says, too, how many new fingerprints the hour's rows had no room for. **The
+ * price, named:** seven networks — seven IPv4 addresses, seven `/48` — silence the names of the
+ * phone's new failures for an hour; the table keeps them and the owner hears «скрыто M» every hour.
+ * In the process's memory: a restart starts the hour over and forgets what was held — a rollout is a
+ * restart.
  */
 export function phoneNoticeBudget(
   perHour = PHONE_NOTICES_PER_HOUR,
@@ -190,6 +200,8 @@ export function phoneNoticeBudget(
   let told: number[] = []
   const bySender = new Map<string, number[]>()
   let muted = 0
+  let lost = 0
+  let lastHeld: number | undefined
   const recent = (moments: readonly number[], now: number) =>
     moments.filter((moment) => now - moment < HOUR_MS)
 
@@ -211,44 +223,82 @@ export function phoneNoticeBudget(
       if (sender !== undefined) bySender.set(sender, theirs)
       return out
     },
+    unwritten() {
+      lost += 1
+    },
     held(at) {
       const now = at.getTime()
       told = recent(told, now)
       for (const [sender, moments] of bySender) {
         if (recent(moments, now).length === 0) bySender.delete(sender)
       }
-      if (muted === 0 || told.length >= perHour) return null
-      told.push(now)
-      const notice: OwnerNotice = { kind: 'failure_muted', source: 'phone', count: muted }
+      if (muted === 0 && lost === 0) return null
+      if (lastHeld !== undefined && now - lastHeld < HOUR_MS) return null
+      lastHeld = now
+      const notice: OwnerNotice = {
+        kind: 'failure_muted',
+        source: 'phone',
+        count: muted,
+        ...(lost > 0 ? { unwritten: lost } : {}),
+      }
       muted = 0
+      lost = 0
       return notice
     },
   }
 }
 
-/** How many new rows the phone's reports may add to the table in an hour (review №6). */
-export const PHONE_ROWS_PER_HOUR = 100
+/** How many new rows the phone's reports may add to the table in an hour (review №6, №8). */
+export const PHONE_ROWS_PER_HOUR = 1000
+/** And how many of them one sender may add (review №8, adversarial В1 of round 3). */
+export const PHONE_ROWS_PER_SENDER = 10
 
 export interface PhoneRowBudget {
-  room(at: Date): boolean
-  take(at: Date): void
+  /** Takes a place for a new row, if the hour has one for the sender and for everybody. */
+  claim(at: Date, sender?: string): boolean
+  /** Gives back a place taken at `at` for a row that was there already. */
+  refund(at: Date, sender?: string): void
 }
 
 /**
- * The phone's new fingerprints, at most `PHONE_ROWS_PER_HOUR` an hour (review №6): a fingerprint is
- * all the phone's words — the kind, the frames, the build — so every invented report could be a new
- * row, two hundred a minute kept thirty days and copied every night. Past the hour a known
- * fingerprint still counts, and a new one is not written: some 72 000 rows in thirty days at most.
+ * The phone's new fingerprints (review №6, №8): at most `PHONE_ROWS_PER_SENDER` an hour from one
+ * sender and `PHONE_ROWS_PER_HOUR` from everybody. A fingerprint is all the phone's words — the kind,
+ * the frames, the build — so every invented report could be a new row, two hundred a minute kept
+ * thirty days and copied every night. Past the budget a known fingerprint still counts and a new one
+ * is not written, and the hour's summary says how many. A cap shared by everybody alone was spent by
+ * two addresses in two minutes, and every real new failure after a rollout was written nowhere for the
+ * hour (adversarial В1); a sender's ten leave the rest to the others. **The price, named:** a hundred
+ * networks fill the hour; some 720 000 rows in thirty days at most.
  */
-export function phoneRowBudget(perHour = PHONE_ROWS_PER_HOUR): PhoneRowBudget {
+export function phoneRowBudget(
+  perHour = PHONE_ROWS_PER_HOUR,
+  perSender = PHONE_ROWS_PER_SENDER,
+): PhoneRowBudget {
   let added: number[] = []
+  const bySender = new Map<string, number[]>()
+  const recent = (moments: readonly number[], now: number) =>
+    moments.filter((moment) => now - moment < HOUR_MS)
+  const without = (moments: readonly number[], moment: number) => {
+    const index = moments.lastIndexOf(moment)
+    return index < 0 ? [...moments] : [...moments.slice(0, index), ...moments.slice(index + 1)]
+  }
   return {
-    room(at) {
-      added = added.filter((moment) => at.getTime() - moment < HOUR_MS)
-      return added.length < perHour
+    claim(at, sender) {
+      const now = at.getTime()
+      added = recent(added, now)
+      const theirs = sender === undefined ? [] : recent(bySender.get(sender) ?? [], now)
+      if (added.length >= perHour || theirs.length >= perSender) {
+        if (sender !== undefined) bySender.set(sender, theirs)
+        return false
+      }
+      added.push(now)
+      if (sender !== undefined) bySender.set(sender, [...theirs, now])
+      return true
     },
-    take(at) {
-      added.push(at.getTime())
+    refund(at, sender) {
+      const now = at.getTime()
+      added = without(added, now)
+      if (sender !== undefined) bySender.set(sender, without(bySender.get(sender) ?? [], now))
     },
   }
 }

@@ -9,6 +9,7 @@ import {
   PHONE_NOTICES_PER_SENDER,
   PHONE_REPORTS_PER_MINUTE,
   PHONE_ROWS_PER_HOUR,
+  PHONE_ROWS_PER_SENDER,
   framePlace,
   noticesFor,
   occurrenceOf,
@@ -299,7 +300,29 @@ describe('phoneNoticeBudget — уведомления о телефоне (ре
       budget.take([notice(index)], at(1), `sender${String(index)}`),
     ).flat()
     expect(told).toHaveLength(PHONE_NOTICES_PER_HOUR)
-    expect(budget.held(at(2))).toBeNull()
+  })
+
+  it('сводка — поверх потолка и раз в час: семь сетей, держащие потолок, её не глушат (раунд 3, В2)', () => {
+    const budget = phoneNoticeBudget()
+    for (let index = 0; index < PHONE_NOTICES_PER_HOUR + 3; index += 1) {
+      budget.take([notice(index)], at(1), `sender${String(index)}`)
+    }
+    expect(budget.held(at(2))).toEqual({ kind: 'failure_muted', source: 'phone', count: 3 })
+    budget.take([notice(99)], at(3), 'late')
+    expect(budget.held(at(4))).toBeNull()
+    expect(budget.held(at(62))).toEqual({ kind: 'failure_muted', source: 'phone', count: 1 })
+  })
+
+  it('незаписанные новые сбои названы той же сводкой (раунд 3, В1)', () => {
+    const budget = phoneNoticeBudget()
+    budget.unwritten()
+    budget.unwritten()
+    expect(budget.held(at(0))).toEqual({
+      kind: 'failure_muted',
+      source: 'phone',
+      count: 0,
+      unwritten: 2,
+    })
   })
 
   it('скрытое названо таймером, как только в часе есть место, — один раз (ревью №7, Б1б)', () => {
@@ -309,23 +332,37 @@ describe('phoneNoticeBudget — уведомления о телефоне (ре
     expect(budget.held(at(2))).toBeNull()
   })
 
-  it('волна сверх часа и тишина: скрытые сказаны, когда час освободился, без нового сбоя', () => {
+  it('волна сверх часа и тишина: скрытые сказаны таймером, без нового сбоя', () => {
     const budget = phoneNoticeBudget(10, 10)
     for (let index = 0; index <= 10; index += 1) budget.take([notice(index)], at(index), 'same')
-    expect(budget.held(at(30))).toBeNull()
-    expect(budget.held(at(125))).toEqual({ kind: 'failure_muted', source: 'phone', count: 1 })
+    expect(budget.held(at(30))).toEqual({ kind: 'failure_muted', source: 'phone', count: 1 })
+    expect(budget.held(at(125))).toBeNull()
   })
 })
 
-describe('phoneRowBudget — новые строки телефона, не больше ста в час (ревью №6)', () => {
-  it(`${String(PHONE_ROWS_PER_HOUR)} в час, дальше места нет, через час — снова есть`, () => {
+describe('phoneRowBudget — новые строки телефона (ревью №6, №8, раунд 3, В1)', () => {
+  const now = new Date(Date.UTC(2026, 9, 3, 12, 0))
+
+  it(`одному отправителю — ${String(PHONE_ROWS_PER_SENDER)} в час: два адреса не стирают чужой сбой`, () => {
     const rows = phoneRowBudget()
-    const now = new Date(Date.UTC(2026, 9, 3, 12, 0))
-    for (let index = 0; index < PHONE_ROWS_PER_HOUR; index += 1) {
-      expect(rows.room(now)).toBe(true)
-      rows.take(now)
+    for (let index = 0; index < PHONE_ROWS_PER_SENDER; index += 1) {
+      expect(rows.claim(now, 'liar')).toBe(true)
     }
-    expect(rows.room(now)).toBe(false)
-    expect(rows.room(new Date(now.getTime() + 60 * 60 * 1000))).toBe(true)
+    expect(rows.claim(now, 'liar')).toBe(false)
+    expect(rows.claim(now, 'phone')).toBe(true)
+    expect(rows.claim(new Date(now.getTime() + 60 * 60 * 1000), 'liar')).toBe(true)
+  })
+
+  it('место, взятое под строку, которая уже была, возвращается', () => {
+    const rows = phoneRowBudget(10, 1)
+    expect(rows.claim(now, 'one')).toBe(true)
+    rows.refund(now, 'one')
+    expect(rows.claim(now, 'one')).toBe(true)
+  })
+
+  it(`всем вместе — ${String(PHONE_ROWS_PER_HOUR)} в час`, () => {
+    const rows = phoneRowBudget(30, 10)
+    for (let index = 0; index < 30; index += 1) rows.claim(now, `sender${String(index % 3)}`)
+    expect(rows.claim(now, 'fresh')).toBe(false)
   })
 })
