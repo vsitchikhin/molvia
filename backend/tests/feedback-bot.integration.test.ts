@@ -836,7 +836,7 @@ describe('то же слово на тот же ответ позже суток
 })
 
 describe('уведомление о сообщении, которое контракт не читает, — сбой API (раунд 3, Д1)', () => {
-  it('прежняя форма payload: claim его не отдаёт, но в failures — job:owner-notice', async () => {
+  it('прежняя форма payload: claim его не отдаёт, но в failures — сбой под маршрутом claim', async () => {
     const app = await serverFor(OWNER)
     const { thread } = await aThread(app)
     // The payload as an earlier build wrote it — before `number` was there.
@@ -853,7 +853,7 @@ describe('уведомление о сообщении, которое конт�
     expect(claim.json()).toEqual({ to: OWNER, notices: [] })
     await Promise.all(recordings)
     const recorded = await db.select({ route: failures.route }).from(failures)
-    expect(recorded).toEqual([{ route: 'job:owner-notice' }])
+    expect(recorded).toEqual([{ route: 'POST /internal/owner/claim' }])
     expect(await db.select().from(feedback).where(eq(feedback.id, thread))).toHaveLength(1)
   })
 })
