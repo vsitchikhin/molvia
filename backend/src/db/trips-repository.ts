@@ -88,17 +88,17 @@ export interface TripRepository {
     snapshot: TripSnapshot | null,
   ): Promise<{ trip: Trip; created: boolean }>
   /**
-   * A trip from a receipt (MOL-126): written finished, dated by the receipt's day for «Деньги» and the
-   * accounts alike, at the rate of that day, with the receipt's sum whole (MOL-78). It is never the
-   * open trip, so another one open does not stand in its way. A trip of this id already there is a
-   * 409: a receipt recorded again is answered by the receipt, before this is called.
-   */
-  /**
    * The owner's lock of trips, to the end of the caller's transaction (MOL-126): «Записать» takes it
    * before it looks for the same receipt recorded, so two shots of one receipt recorded at once see
    * each other.
    */
   lockOwner(actorId: string): Promise<void>
+  /**
+   * A trip from a receipt (MOL-126): written finished, dated by the receipt's day for «Деньги» and the
+   * accounts alike, at the rate of that day, with the receipt's sum whole (MOL-78). It is never the
+   * open trip, so another one open does not stand in its way. A trip of this id already there is a
+   * 409: a receipt recorded again is answered by the receipt, before this is called.
+   */
   recordFinished(
     actorId: string,
     input: RecordedTrip,

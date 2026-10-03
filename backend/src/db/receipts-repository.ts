@@ -621,21 +621,27 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     async remove(actorId, id) {
       const own = idOrNull(id)
       if (own === null) return
-      const [held] = await db
-        .select({ tripId: receipts.tripId })
-        .from(receipts)
-        .where(and(eq(receipts.id, own), eq(receipts.actorId, actorId)))
-      if (held?.tripId != null) throw new DomainError(ERROR.CONFLICT)
-      await db
-        .update(receipts)
-        .set({ deletedAt: sql`clock_timestamp()` })
-        .where(
-          and(
-            eq(receipts.id, own),
-            eq(receipts.actorId, actorId),
-            sql`${receipts.deletedAt} is null`,
-          ),
-        )
+      await db.transaction(async (tx) => {
+        // under the row's lock, as «Записать» takes it: a record committed while this waited is seen
+        // (round 2, Р2-В1), and a receipt just recorded is not marked away from under its trip
+        const [held] = await tx
+          .select({ tripId: receipts.tripId })
+          .from(receipts)
+          .where(
+            and(
+              eq(receipts.id, own),
+              eq(receipts.actorId, actorId),
+              sql`${receipts.deletedAt} is null`,
+            ),
+          )
+          .for('update')
+        if (held === undefined) return
+        if (held.tripId !== null) throw new DomainError(ERROR.CONFLICT)
+        await tx
+          .update(receipts)
+          .set({ deletedAt: sql`clock_timestamp()` })
+          .where(eq(receipts.id, own))
+      })
     },
 
     async restore(actorId, id) {

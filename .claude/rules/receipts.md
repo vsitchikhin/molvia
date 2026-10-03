@@ -169,10 +169,11 @@ teaches nothing. The price kept is the shelf price of a line recorded as read, t
 where a figure reads two ways — «60 60» for «50 50» adds up either way — and it is a hint, never a
 correction (В-1): a price one confused digit off the remembered is `rememberedPrice` on the line, «
 проверьте», and the parse's figures stay as read. Putting the price into the parse is a change of the
-parse, measured on the bench, and is not done here. **The price is someone's figure** (review 5, В6):
-the person's own always; other people's only as their figures are — with access (`shared_until`) and
-from three people (`AGGREGATE_MIN_CONTRIBUTIONS`). The latest price known for the item is taken, a word
-recorded with corrected figures (no price) passed over.
+parse, measured on the bench, and is not done here. **The price is someone's figure** (review 5, В6; round 2, Р2-В3): the
+person's own always; other people's only as their figures are — with access (`shared_until`) and from
+three prices (`AGGREGATE_MIN_CONTRIBUTIONS`), their lower median, as the prices of places open
+(MOL-166). Three people for an item are not three prices: a word recorded with corrected figures
+carries none.
 
 **Nobody's word is shown as someone's**: the answer is an item and, in doubt, a price — never who or
 when. The item itself is shared on one word: «at this seller this article is milk» is the shop's fact
@@ -196,7 +197,8 @@ keys — each name is locked to the end of the transaction (review 6). The serve
 trusted: the unit price is the purchase's own, and the lines are every line of the receipt once.
 
 **The trip's money is what was paid** (В-3; В-5 of the review, owner, 03.10.2026): the total the phone
-sends — the printed one, or the person's correction of a total OCR misread; without it the printed total
+sends — the printed one, or the person's correction of a total OCR misread, in the receipt's currency
+(another is `error.currency_mismatch`, round 2, Р2-В2); without it the printed total
 where it is not below the lines — the lines left out and those OCR lost included, while a lost line only
 ever raises a total, so one below the lines was misread — else every line, a line left out at what it
 would have been recorded at (В-5 of MOL-124). A purchase keeps what was paid for its line; the line's discount stays on the line and is shown
@@ -218,7 +220,10 @@ on the accounts, names it «из чека», names its seller's place and guards
 removed, the trip moved a week on its account and the same receipt was recorded twice. It goes with
 its trip: once the trip is removed for good (`trip_id` nulled), the receipt is recorded again from its
 lines (В7) — the photo is gone, the lines are not; a trip only marked removed may come back with
-«Вернуть», so until then it is a 409. **One trip is one receipt's** (`receipts_trip_key`).
+«Вернуть», so until then it is a 409. «Удалить чек» reads the receipt under the row's lock «Записать»
+holds (round 2, Р2-В1): a record committed while it waited is seen. **One trip is one receipt's**
+(`receipts_trip_key`), and the recorded receipts are indexed by their seller (`receipts_recorded_tin_idx`):
+every look at a receipt reads its seller's place off them.
 
 **What a line is recorded at, before the person corrects it** (MOL-124 В-5, П-2, `receipt-sum.ts`): a
 line that adds up — what was paid; one that does not — the printed sum where the printed total confirms
@@ -227,8 +232,8 @@ when every amount on it is whole — once: 0,742 kg × 1 290 = 957,18 is 957 on 
 The phone calls these very functions on the review (В-6 of MOL-124).
 
 **The place is found by the receipts of its seller recorded in a city** (Р-6; review В4): the city its
-address prints, if it is a city of the settings — the row «ԳՅՈՒՄՐԻ …» or «ք. Երևան, …» at the start of a
-row of the head, never the chain's name «ԵՐԵՎԱՆ-ՍԻԹԻ» or «YEREVAN CITY» — else the person's own. Of
+address prints, if it is a city of the settings — the row «ԳՅՈՒՄՐԻ …» at the start of a row of the head,
+or after «ք.» anywhere in it («ՀՀ, ք. Երևան, …», round 2, Р2-В4), never the chain's name «ԵՐԵՎԱՆ-ՍԻԹԻ» or «YEREVAN CITY» — else the person's own. Of
 the places this seller's receipts were recorded at there, with the trips still there: the person's own
 last, else the one most people chose, the later on a tie — as the shop's memory is read. **A place
 keeps no tax number**: a column written by the first receipt named a place for everyone, for good, and

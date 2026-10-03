@@ -474,7 +474,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   on every reading. The matcher is MOL-114's `dict-match.mjs`, held to the bench.
 - **The shops' memory is shared** (owner, 30.09.2026): the person's own word first, else the item most
   people said, the later on a tie; the erased still count; nobody's word is shown as someone's, and
-  another person's shelf price only with access and from three people.
+  another person's shelf price only with access and from three prices, their lower median.
 - **A place keeps no tax number**: the place of a seller is where its receipts were recorded, read as
   the memory is; a recorded receipt is not removed while its trip is there — its row dates the trip.
 - **«Записать» is the whole receipt in one transaction** (`recordReceipt`): a trip finished on the

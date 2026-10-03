@@ -172,6 +172,11 @@ describe('the city of the address (MOL-126, Р-6)', () => {
   it('reads the city after «ք.», the word for «город»', () => {
     expect(receiptCityOf(rows('ք. Երևան, Արշակունյաց 34'))).toBe('Ереван')
     expect(receiptCityOf(rows('Ք.ԳՅՈՒՄՐԻ ԳՈՐԿՈՒ 62'))).toBe('Гюмри')
+    // after the country or the province (round 2, Р2-В4)
+    expect(receiptCityOf(rows('ՀՀ, ք. Երևան, Արշակունյաց 34'))).toBe('Ереван')
+    expect(receiptCityOf(rows('Շիրակի մարզ, ք. Գյումրի, Գորկու 62'))).toBe('Гюмри')
+    // a word ending in «ք» is no «ք.» before a city
+    expect(receiptCityOf(rows('Սուրճ ք.Երևանյան'))).toBeNull()
   })
 
   it('does not take the chain in Latin or Cyrillic letters for the city either', () => {

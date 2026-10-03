@@ -1,7 +1,7 @@
 -- What a receipt line is and where it goes (MOL-126): the catalogue's names in the tills' languages and
 -- the customs headings an item is sold under (written by the seed), a receipt to the one trip it was
--- recorded as, the shop's shared memory «tax number + article → item», and a receipt's lines bound to items and
--- recorded as purchases. The memory outlives its author: erasure leaves a word without one.
+-- recorded as, the shop's shared memory «tax number + article → item», and a receipt's lines bound to
+-- items and recorded as purchases. The memory outlives its author: erasure leaves a word without one.
 CREATE TABLE "item_hs" (
 	"item_id" uuid NOT NULL,
 	"hs" char(4) NOT NULL,
@@ -51,5 +51,6 @@ ALTER TABLE "receipt_lines" ADD CONSTRAINT "receipt_lines_expense_id_expenses_id
 ALTER TABLE "receipts" ADD CONSTRAINT "receipts_trip_id_trips_id_fk" FOREIGN KEY ("trip_id") REFERENCES "public"."trips"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "receipt_lines_expense_key" ON "receipt_lines" USING btree ("expense_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "receipts_trip_key" ON "receipts" USING btree ("trip_id") WHERE "receipts"."trip_id" is not null;--> statement-breakpoint
+CREATE INDEX "receipts_recorded_tin_idx" ON "receipts" USING btree ("tin") WHERE "receipts"."status" = 'recorded';--> statement-breakpoint
 ALTER TABLE "receipt_lines" ADD CONSTRAINT "receipt_lines_match_known" CHECK ("receipt_lines"."match" is null or "receipt_lines"."match" in ('search', 'weak', 'new'));--> statement-breakpoint
 ALTER TABLE "receipts" ADD CONSTRAINT "receipts_city_known" CHECK ("receipts"."city" is null or "receipts"."city" in ('Гюмри', 'Ереван'));

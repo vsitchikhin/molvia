@@ -1958,6 +1958,10 @@ export const receipts = pgTable(
     uniqueIndex('receipts_trip_key')
       .on(table.tripId)
       .where(sql`${table.tripId} is not null`),
+    // A seller's place is read off its recorded receipts on every look at a receipt (MOL-126).
+    index('receipts_recorded_tin_idx')
+      .on(table.tin)
+      .where(sql`${table.status} = 'recorded'`),
     // The queue: the oldest receipt waiting for the reader is one index step.
     index('receipts_queue_idx')
       .on(table.queuedAt)

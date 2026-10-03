@@ -143,14 +143,15 @@ export function storeMemoryWords(line: {
 
 /**
  * The cities of the settings as a receipt's address prints them, at the start of a row of the head
- * («ԳՅՈՒՄՐԻ Գորկու 62», «ք. Երևան, …» — «ք.» is «город»): a place is the shop in its city (Р-6).
+ * («ԳՅՈՒՄՐԻ Գորկու 62»), or after «ք.» — «город» — anywhere in a row of the head («ՀՀ, ք. Երևան, …»,
+ * «Շիրակի մարզ, ք. Գյումրի, …»): a place is the shop in its city (Р-6).
  * «ԵՐԵՎԱՆ-ՍԻԹԻ», «YEREVAN CITY» is the chain's name, not the city, and an item named after the capital
  * is a line, not the head.
  */
 export const RECEIPT_CITIES: Readonly<Record<SettingsCity, RegExp>> = {
-  Гюмри: /^[^\p{L}]*(?:ք\.?\s*)?(?:գյումրի|gyumri)(?![\p{L}-])/iu,
+  Гюмри: /(?:^[^\p{L}]*(?:ք\.?\s*)?|(?<!\p{L})ք\.\s*)(?:գյումրի|gyumri)(?![\p{L}-])/iu,
   Ереван:
-    /^[^\p{L}]*(?:ք\.?\s*)?(?:երևան|երե[վւ]ան|yerevan)(?![\p{L}-])(?!\s*[-–]?\s*(?:սիթի|city|сити))/iu,
+    /(?:^[^\p{L}]*(?:ք\.?\s*)?|(?<!\p{L})ք\.\s*)(?:երևան|երե[վւ]ան|yerevan)(?![\p{L}-])(?!\s*[-–]?\s*(?:սիթի|city|сити))/iu,
 }
 
 /** Rows of the head a city is looked for in: the address stands above the first item line. */

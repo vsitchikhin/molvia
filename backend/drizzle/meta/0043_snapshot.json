@@ -1,5 +1,5 @@
 {
-  "id": "632202d9-946b-4578-81d2-9eabc7e84f9b",
+  "id": "032bc6b0-f918-40f7-aae5-f90c4aaad582",
   "prevId": "07c254f8-c190-403f-9814-b472360e9dba",
   "version": "7",
   "dialect": "postgresql",
@@ -3448,6 +3448,22 @@
           ],
           "isUnique": true,
           "where": "\"receipts\".\"trip_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "receipts_recorded_tin_idx": {
+          "name": "receipts_recorded_tin_idx",
+          "columns": [
+            {
+              "expression": "tin",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"receipts\".\"status\" = 'recorded'",
           "concurrently": false,
           "method": "btree",
           "with": {}

@@ -464,6 +464,10 @@ describe('«Записать»', () => {
       receiptNo: '3',
     })
     expect(await moneyOf(fixed, body({ total: amount(2_190) }))).toBe(219_000n)
+    // a total in another currency than the receipt's is the phone's mistake (round 2, Р2-В2)
+    const other = await parsedReceipt(me, LINES.slice(0, 2), { receiptNo: '4' })
+    const refused = await record(me, other, body({ total: { amount: '10', currency: 'USD' } }))
+    expect([refused.statusCode, codeOf(refused)]).toEqual([400, ERROR.CURRENCY_MISMATCH])
   })
 
   // review 1, В1, В2, В7: the receipt row holds the trip's date on the accounts, «из чека» and the

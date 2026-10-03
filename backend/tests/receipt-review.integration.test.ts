@@ -132,9 +132,10 @@ describe('the shops’ memory (Р-2)', () => {
 
     await memory.remember(third, TIN, [{ ...milkWord, itemId: full, price: amd(380) }])
     expect(await recall(newcomer)).toBe(full)
+    // the lower median of the winning item's prices: 370 and 380
     expect(
-      (await memory.recall(newcomer, TIN, [milkWord])).get(memoryKey(milkWord))?.price,
-    ).toEqual(amd(380))
+      (await memory.recall(newcomer, TIN, [milkWord])).get(memoryKey(milkWord))?.sharedPrice,
+    ).toEqual(amd(370))
 
     // erased, the word stays without its author and still counts
     await db.delete(actors).where(eq(actors.id, me))
@@ -151,8 +152,9 @@ describe('the shops’ memory (Р-2)', () => {
     expect((await memory.recall(me, TIN, [milkWord])).get(memoryKey(milkWord))).toEqual({
       itemId: light,
       own: true,
-      voters: 1,
-      price: amd(390),
+      ownPrice: amd(390),
+      priced: 1,
+      sharedPrice: amd(390),
     })
     expect((await memory.recall(me, '57424557', [milkWord])).size).toBe(0)
     expect(await memory.recall(me, TIN, [])).toEqual(new Map())
@@ -226,7 +228,7 @@ describe('the review of a receipt', () => {
 
   // В6 of the adversarial review: a shelf price is someone's figure — the person's own always, other
   // people's only with access and from three people
-  it('names another person’s remembered price only with access and from three people', async () => {
+  it('names another person’s remembered price only with access and from three prices, their lower median', async () => {
     const me = await insertActor(db)
     const bag = await insertItem(db, { name: 'Пакет-майка', searchKey: 'paket-maika' })
     const others = [await insertActor(db), await insertActor(db), await insertActor(db)]
@@ -244,15 +246,21 @@ describe('the review of a receipt', () => {
     expect((await doubted())?.rememberedPrice).toBeNull()
     expect((await doubted())?.match).toBe('memory')
 
+    // three people for the item, two prices: closed even with access (round 2, Р2-В3)
     await memory.remember(others[1] ?? me, TIN, [word])
     await memory.remember(others[2] ?? me, TIN, [{ ...word, price: null }])
-    expect((await doubted())?.rememberedPrice).toBeNull()
     await db
       .update(actors)
       .set({ sharedUntil: new Date(Date.now() + 86_400_000) })
       .where(eq(actors.id, me))
-    // three people, and the latest known price — a word with none passed over (review 10)
+    expect((await doubted())?.rememberedPrice).toBeNull()
+
+    // three prices — 50, 50, 70: their lower median
+    await memory.remember(others[2] ?? me, TIN, [{ ...word, price: amd(70) }])
     expect((await doubted())?.rememberedPrice).toEqual(amd(50))
+    // without access, closed again
+    await db.update(actors).set({ sharedUntil: null }).where(eq(actors.id, me))
+    expect((await doubted())?.rememberedPrice).toBeNull()
   })
 
   it('names the place by the receipts of its seller recorded in the city its address prints, else the person’s', async () => {

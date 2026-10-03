@@ -13,7 +13,14 @@ import {
   recordedSums,
   storeMemoryWords,
 } from '@molvia/model'
-import type { Actor, ReceiptBody, ReceiptDetail, ReceiptPlace, ReceiptSummary } from '@molvia/model'
+import type {
+  Actor,
+  Money,
+  ReceiptBody,
+  ReceiptDetail,
+  ReceiptPlace,
+  ReceiptSummary,
+} from '@molvia/model'
 import type { ReceiptRepository, StoredReceipt } from '@/db/receipts-repository'
 import { memoryKey } from '@/db/store-memory-repository'
 import type { Recalled } from '@/db/store-memory-repository'
@@ -152,10 +159,15 @@ export async function receiptOfOwner(
   const amounts = recordedSums(lines, receipt.total, digits)
 
   // a price the memory holds is someone's shelf price: one's own always; other people's only as
-  // their figures are — with access, and from three people (`AGGREGATE_MIN_CONTRIBUTIONS`)
+  // their figures are — with access, and from three prices, their lower median (round 2, Р2-В3)
   const now = new Date()
-  const othersPricesOpen = (recalled: Recalled) =>
-    hasSharedAccess(actor, now) && recalled.voters >= AGGREGATE_MIN_CONTRIBUTIONS
+  const rememberedOf = (recalled: Recalled | null): Money | null => {
+    if (recalled === null) return null
+    if (recalled.ownPrice !== null) return recalled.ownPrice
+    return hasSharedAccess(actor, now) && recalled.priced >= AGGREGATE_MIN_CONTRIBUTIONS
+      ? recalled.sharedPrice
+      : null
+  }
 
   const day = receipt.header?.date ?? todayOf(actor, now)
   const snapshot = await tripRateOn(
@@ -195,12 +207,9 @@ export async function receiptOfOwner(
               : (line.match ?? 'new'),
         translation: line.translation,
         amount: amounts[i] ?? null,
-        rememberedPrice:
-          remembered !== null &&
-          (remembered.own || othersPricesOpen(remembered)) &&
-          priceInDoubt(line.price, remembered.price)
-            ? remembered.price
-            : null,
+        rememberedPrice: priceInDoubt(line.price, rememberedOf(remembered))
+          ? rememberedOf(remembered)
+          : null,
       }
     }),
     rate: snapshot?.rate ?? null,

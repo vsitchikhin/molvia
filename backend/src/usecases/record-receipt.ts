@@ -52,7 +52,11 @@ function receiptMoney(
   body: ReceiptRecordBody,
   currency: Money['currency'],
 ): Money | null {
-  if (body.total !== undefined) return body.total
+  if (body.total !== undefined) {
+    // the receipt's currency is printed on it: a total in another is the phone's mistake (Р2-В2)
+    if (body.total.currency !== currency) throw new DomainError(ERROR.CURRENCY_MISMATCH)
+    return body.total
+  }
   const digits = receiptDigits(currency, [
     printed,
     ...stored.flatMap((line) => [line.price, line.sum, line.discount]),

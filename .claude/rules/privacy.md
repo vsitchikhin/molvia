@@ -32,7 +32,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   person added stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
   nulled (MOL-100), the words they gave the shops' memory stay with `actor_id` nulled and still count
   (MOL-126: a fact about the shop, never shown as anyone's; a shelf price in it reaches another person
-  only with access and from three people), and **every place stays** (owner's decision 24.09.2026). People erase
+  only with access and from three prices, their lower median), and **every place stays** (owner's decision 24.09.2026). People erase
   themselves through **two doors and one function**: `/delete` in the bot, and since MOL-94
   «Удалить мои данные» in the settings' group «Ваши данные», under «Скачать мои данные» (owner's
   decision В-2: the copy is one row above it). The second is `DELETE /actors/me` in the guarded

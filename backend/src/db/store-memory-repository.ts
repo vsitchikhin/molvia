@@ -5,15 +5,17 @@ import type { Conn } from './index'
 import { storeMemory } from './schema'
 
 /**
- * What the memory says a key is: the item; whether it is the person's own word; how many people said
- * that item; and the shelf price it had — the person's own when the word is theirs, else the latest
- * one known for that item, a word with no price passed over.
+ * What the memory says a key is: the item, and whether it is the person's own word; the shelf price of
+ * their own word; and of everyone's words for that item, how many carry a price and the lower median of
+ * those prices — other people's figures open from three of them, as the prices of places do (MOL-166).
  */
 export interface Recalled {
   readonly itemId: string
   readonly own: boolean
-  readonly voters: number
-  readonly price: Money | null
+  readonly ownPrice: Money | null
+  /** Words for the item that carry a price, the person's own included. */
+  readonly priced: number
+  readonly sharedPrice: Money | null
 }
 
 /** A word to remember: this key at this seller is this item, at this shelf price. */
@@ -25,8 +27,8 @@ export interface MemoryWord extends StoreMemoryWord {
 export interface StoreMemoryRepository {
   /**
    * What the shop's memory says each key is, for this person (MOL-126, Р-2): their own word first;
-   * else the item most people said — the erased count — and on a tie the one said last, with the price
-   * of the latest word for it. Keyed `kind:key`.
+   * else the item most people said — the erased count — and on a tie the one said last; with the
+   * person's own price and everyone's priced words for that item. Keyed `kind:key`.
    */
   recall(
     actorId: string,
@@ -48,42 +50,56 @@ export function createStoreMemoryRepository(db: Conn): StoreMemoryRepository {
         key: string
         item_id: string
         own: boolean
-        voters: number
-        price_minor: string | null
-        price_currency: Currency | null
+        own_minor: string | null
+        own_currency: Currency | null
+        priced: number
+        median_minor: string | null
+        median_currency: Currency | null
       }>(sql`
-        select distinct on (kind, key) kind, key, item_id, own, voters,
-          case when own then price_minor else known_minor end::text as price_minor,
-          case when own then price_currency else known_currency end as price_currency
-        from (
-          select m.*,
-            coalesce(m.actor_id = ${actorId}, false) as own,
-            count(*) over item::int as voters,
-            max(m.written_at) over item as latest,
-            first_value(m.price_minor) over (item order by m.price_minor is null, m.written_at desc
-              rows between unbounded preceding and unbounded following) as known_minor,
-            first_value(m.price_currency) over (item order by m.price_minor is null, m.written_at desc
-              rows between unbounded preceding and unbounded following) as known_currency
+        with words as (
+          select m.*, coalesce(m.actor_id = ${actorId}, false) as own
           from ${storeMemory} m
           where m.tin = ${tin}
             and (m.kind, m.key) in (${sql.join(
               words.map((word) => sql`(${word.kind}, ${word.key})`),
               sql`, `,
             )})
-          window item as (partition by m.kind, m.key, m.item_id)
-        ) words
-        order by kind, key, own desc, voters desc, latest desc, written_at desc, id`)
+        ), winners as (
+          select distinct on (kind, key) kind, key, item_id, own,
+            price_minor as own_minor, price_currency as own_currency
+          from (
+            select w.*,
+              count(*) over item as voters,
+              max(w.written_at) over item as latest
+            from words w
+            window item as (partition by w.kind, w.key, w.item_id)
+          ) ranked
+          order by kind, key, own desc, voters desc, latest desc, written_at desc, id
+        )
+        select v.kind, v.key, v.item_id, v.own,
+          case when v.own then v.own_minor end::text as own_minor,
+          case when v.own then v.own_currency end as own_currency,
+          p.priced, p.median_minor::text as median_minor, p.median_currency
+        from winners v
+        cross join lateral (
+          select count(*)::int as priced,
+            percentile_disc(0.5) within group (order by w.price_minor) as median_minor,
+            min(w.price_currency) as median_currency
+          from words w
+          where w.kind = v.kind and w.key = v.key and w.item_id = v.item_id
+            and w.price_minor is not null
+        ) p`)
+      const money = (minor: string | null, currency: Currency | null): Money | null =>
+        minor === null || currency === null ? null : { minor: BigInt(minor), currency }
       return new Map(
         rows.map((row) => [
           memoryKey(row),
           {
             itemId: row.item_id,
             own: row.own,
-            voters: row.voters,
-            price:
-              row.price_minor === null || row.price_currency === null
-                ? null
-                : { minor: BigInt(row.price_minor), currency: row.price_currency },
+            ownPrice: money(row.own_minor, row.own_currency),
+            priced: row.priced,
+            sharedPrice: money(row.median_minor, row.median_currency),
           },
         ]),
       )
