@@ -3,8 +3,9 @@ import am01 from './receipt-text.am-01.json'
 import am03 from './receipt-text.am-03.json'
 import am04 from './receipt-text.am-04.json'
 import am05 from './receipt-text.am-05.json'
+import { needsReshoot } from '#model/entities/receipt'
 import { bestReading, mergeParts, parseReceiptText, rowsOf } from '#model/entities/receipt-text'
-import type { ReceiptText } from '#model/entities/receipt-text'
+import type { ReceiptText, TextRow } from '#model/entities/receipt-text'
 
 /**
  * The fixtures are the owner's receipts as Tesseract read them on the server (MOL-114) — the item
@@ -262,5 +263,162 @@ describe('parts of a long receipt', () => {
   it('puts parts with no common article one after another', () => {
     const merged = mergeParts([part(0, 'a'), part(1, 'b'), part(2, 'c')])
     expect(merged.map((r) => r.text)).toEqual(['a', 'b', 'c'])
+  })
+})
+
+// Review rounds 1–2 of MOL-125: what the adversarial review proved, held here so it stays fixed.
+const parse = (text: string): ReceiptText => parseReceiptText(rowsOf(text, 0))
+const money = (h: number) => `${String(Math.floor(h / 100))},${String(h % 100).padStart(2, '0')}`
+const totalRow = (h: number) =>
+  `Ընդամենը ${String(Math.floor(h / 100))}.${String(h % 100).padStart(2, '0')}`
+
+describe('a till that prints no shelf price, settled against its total (review Р14)', () => {
+  // am-01's till: «paid/discount», a tenth off every line — every swap of a line «fits» the line
+  const receipt = (count: number) => {
+    let seed = 7
+    const rnd = (n: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed % n
+    }
+    let total = 0
+    const body = Array.from({ length: count }, (_, i) => {
+      const paid = 20_000 + rnd(200_000)
+      total += paid
+      return `${String(i + 1)}. item\n0401/1163${String(100 + i)} 1Հտ ${money(paid)}/${money(Math.round(paid * 0.105))}`
+    })
+    return [...body, totalRow(total)].join('\n')
+  }
+
+  it.each([12, 18, 30])('balances %i lines in under two seconds', (count) => {
+    const started = performance.now()
+    const got = parse(receipt(count))
+    expect([got.lines.length, got.balanced]).toEqual([count, true])
+    expect(performance.now() - started).toBeLessThan(2_000)
+  })
+})
+
+describe('rows of an item’s shape above the list (review Р15)', () => {
+  // a stamp or a smudge read as items: each under a line's ceiling, together over the reading's
+  const junk = (ones: number, k: number) =>
+    `${String(k)}. x\n0401/1163${String(k)}0 1 ${'1'.repeat(ones)},11/${'1'.repeat(ones)}`
+
+  it('leave every real line its search: am-05’s yoghurt still reads 290,00, settled', () => {
+    const text = (am05 as Fixture).readings[0]!.replace(
+      'Որից ԱԱՀ = 1 446,36',
+      ['Որից ԱԱՀ = 1 446,36', junk(23, 7), junk(23, 8), junk(19, 9)].join('\n'),
+    )
+    const yoghurt = parse(text).lines.find((line) => line.sku === '1160033')!
+    expect([yoghurt.sumHundredths, yoghurt.settled]).toEqual([29_000, true])
+  })
+})
+
+describe('a line printed with no discount among discounted ones (review Р5)', () => {
+  it('keeps the zero it printed rather than the receipt’s rate', () => {
+    const got = parse(
+      [
+        '1. Կաթ',
+        '0401/1163909 1Հտ 99,1/0,9 100',
+        '2. Հաց',
+        '1905/1078044 1Հտ 99,1/0,9 100',
+        '3. Գինի',
+        '2204/1234567 1Հտ 1000,00/0,0 1000',
+        totalRow(119_820),
+      ].join('\n'),
+    )
+    const wine = got.lines[2]!
+    expect([wine.sumHundredths, wine.discountHundredths, wine.priceHundredths]).toEqual([
+      100_000, 0, 100_000,
+    ])
+  })
+})
+
+describe('a receipt barely read (review Р6)', () => {
+  const crumpled = [
+    '1. Կաթ',
+    '0401/1163909 1Հտ 99,1/0,9 100',
+    '2. Ինչ-որ բան',
+    '0402/1163901 1Հտ 13,13/13,13 2',
+    totalRow(1_000_000),
+  ].join('\n')
+
+  it('gives a line with no reading nothing of the total when the lines do not meet it', () => {
+    const got = parse(crumpled)
+    expect(got.balanced).toBe(false)
+    expect(got.lines[1]!.sumHundredths).not.toBe(990_090)
+  })
+
+  it('is «переснимите»', () => {
+    expect(needsReshoot(parse(crumpled))).toBe(true)
+  })
+})
+
+describe('the head is never a name row to cut, though it starts with digits (review Р16)', () => {
+  it.each(['01.10.2026 12:00 Գանձապահ՝ Աննա Սարգսյան', '091 123456 Իվան Պետրով'])('%s', (head) => {
+    const lines = parse([head, '3923/1122223 1Հտ 60 60'].join('\n')).lines
+    expect(lines[0]!.rows.map((r) => r.text)).toEqual(['3923/1122223 1Հտ 60 60'])
+  })
+})
+
+describe('the seam of two parts (review Р7–Р9)', () => {
+  const part = (index: number, ...rows: string[]): TextRow[] => rowsOf(rows.join('\n'), index)
+  const articles = (rows: readonly TextRow[]) =>
+    rows.flatMap((r) => /\d{4}\s*\/\s*(\d{5,})/.exec(r.text)?.[1] ?? [])
+
+  it('is no other item’s near article: an overlap of a name row only joins the parts', () => {
+    const merged = mergeParts([
+      part(0, '1. Կեֆիր', '0401/1163909 1Հտ 366,3/3,7 370', '2. Հաց'),
+      part(
+        1,
+        '2. Հաց',
+        '1905/1078044 1Հտ 247,5/2,5 250',
+        '3. Պանիր',
+        '0406/1163903 1Հտ 1 980,0/20 2000',
+      ),
+    ])
+    expect(articles(merged)).toEqual(['1163909', '1078044', '1163903'])
+    expect(merged.filter((r) => r.text === '2. Հաց')).toHaveLength(1)
+  })
+
+  it('is not the first of two bags', () => {
+    const merged = mergeParts([
+      part(
+        0,
+        '1. Տոպրակ',
+        '3923/1122223 1Հտ 49,6/0,4 50',
+        '2. Կեֆիր',
+        '0401/1163909 1Հտ 366,3/3,7 370',
+        '3. Տոպրակ',
+      ),
+      part(
+        1,
+        '3. Տոպրակ',
+        '3923/1122223 1Հտ 49,6/0,4 50',
+        '4. Կարագ',
+        '0405/1234567 1Հտ 891,0/9 900',
+      ),
+    ])
+    expect(articles(merged)).toEqual(['1122223', '1163909', '1122223', '1234567'])
+  })
+
+  it('keeps every line of an overlap of two items with near articles once', () => {
+    const merged = mergeParts([
+      part(
+        0,
+        '1. Կաթ',
+        '0401/1163903 1Հտ 366,3/3,7 370',
+        '2. Կեֆիր',
+        '0401/1163909 1Հտ 445,5/4,5 450',
+      ),
+      part(
+        1,
+        '1. Կաթ',
+        '0401/1163903 1Հտ 366,3/3,7 370',
+        '2. Կեֆիր',
+        '0401/1163909 1Հտ 445,5/4,5 450',
+        '3. Կարագ',
+        '0405/1234567 1Հտ 891,0/9 900',
+      ),
+    ])
+    expect(articles(merged)).toEqual(['1163903', '1163909', '1234567'])
   })
 })

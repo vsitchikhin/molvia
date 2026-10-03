@@ -98,9 +98,15 @@ export const RESHOOT_TOTAL_SHARE = 0.7
  */
 export function needsReshoot(text: ReceiptText): boolean {
   if (text.lines.length === 0) return true
-  if (text.totalHundredths !== null && text.totalHundredths > 0) {
-    const read = text.lines.reduce((sum, line) => sum + (line.sumHundredths ?? 0), 0)
-    return read < RESHOOT_TOTAL_SHARE * text.totalHundredths
+  const total = text.totalHundredths
+  if (total !== null && total > 0) {
+    // a sum the domain throws away — past a safe integer, or past the total itself — covers nothing
+    // (review Р11): junk OCR would otherwise vouch for a receipt barely read
+    const read = text.lines.reduce((sum, line) => {
+      const own = line.sumHundredths
+      return sum + (own !== null && Number.isSafeInteger(own) && own <= total ? own : 0)
+    }, 0)
+    return read < RESHOOT_TOTAL_SHARE * total
   }
   const settled = text.lines.filter((line) => line.settled).length
   return settled * 2 < text.lines.length
@@ -154,11 +160,20 @@ export function receiptLineOf(line: ReceiptTextLine, currency: Currency): Receip
   }
 }
 
-/** The date a receipt prints, if it is a real one: `YYYY-MM-DD`. */
-export function receiptDateOf(text: ReceiptText): string | null {
+/**
+ * The date a receipt prints, if it is one a receipt can have: `YYYY-MM-DD`, a day of the calendar,
+ * not before 2000 and not after `latest` — the server's today and a day for the zones (review Р10,
+ * Р13). OCR makes up «01.01.0000», which Postgres refuses, and «2099».
+ */
+export function receiptDateOf(text: ReceiptText, latest: string): string | null {
   if (text.date === null) return null
   const day = new Date(`${text.date}T00:00:00Z`)
-  return Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== text.date
-    ? null
-    : text.date
+  if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== text.date) return null
+  return text.date >= '2000-01-01' && text.date <= latest ? text.date : null
+}
+
+/** The time a receipt prints, if it is one a clock shows: `HH:MM` (review Р12). */
+export function receiptTimeOf(text: ReceiptText): string | null {
+  const time = /^([01]\d|2[0-3]):[0-5]\d$/.exec(text.time ?? '')
+  return time === null ? null : time[0]
 }

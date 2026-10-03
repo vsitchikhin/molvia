@@ -133,6 +133,13 @@ export const LINE_COMBINATIONS_MAX = 200_000
  */
 export const READING_COMBINATIONS_MAX = 500_000
 
+/**
+ * What every line may try whatever the reading has spent (review Р15): rows of an item's shape above
+ * the list — a stamp, a code, a smudge — would otherwise drain the budget before the first item, and
+ * every real line would keep its confusions. A real line tries a few thousand (am-05: 1 694 at most).
+ */
+export const LINE_COMBINATIONS_FLOOR = 10_000
+
 /** What a reading may still try. */
 interface Budget {
   left: number
@@ -140,7 +147,8 @@ interface Budget {
 
 // Takes `combinations` from the budget, or says the line is to be taken as read.
 function afford(budget: Budget, combinations: number): boolean {
-  if (combinations > LINE_COMBINATIONS_MAX || combinations > budget.left) return false
+  if (combinations > LINE_COMBINATIONS_MAX) return false
+  if (combinations > LINE_COMBINATIONS_FLOOR && combinations > budget.left) return false
   budget.left -= combinations
   return true
 }
@@ -205,7 +213,10 @@ function settle(all: Candidate[][]): Candidate[][] {
   const rate = mode(clean)
   return all.map((list) =>
     list.sort(
-      (a, b) => (rate === null ? 0 : off(a.rate, rate) - off(b.rate, rate)) || a.swaps - b.swaps,
+      (a, b) =>
+        Number(a.swaps > 0) - Number(b.swaps > 0) ||
+        (rate === null ? 0 : off(a.rate, rate) - off(b.rate, rate)) ||
+        a.swaps - b.swaps,
     ),
   )
 }
@@ -228,10 +239,37 @@ function looksLike(rest: number, printed: string): boolean {
 }
 
 interface State {
-  readonly sum?: number
+  readonly sum: number
   readonly cost: number
-  readonly picks: readonly (Candidate | null)[]
+  // the line's pick and the state it was made from: a chain, not a copied list — the copy made the
+  // search quadratic in the lines and a receipt of fifteen of them held the API for a minute
+  readonly pick: Candidate | null
+  readonly prev: State | null
   readonly blank: number
+}
+
+/**
+ * Past this many steps the total no longer chooses among the readings (review Р14, MOL-125): the
+ * lines keep their first reading, as when no total was read. The search against the total grows with
+ * every line whose figures read several ways, in the API's process; the bench's longest takes
+ * 94 445 (am-03).
+ */
+export const RECONCILE_STEPS_MAX = 2_000_000
+
+/**
+ * The readings the search carries from one line to the next: the cheapest — fewest swaps — when there
+ * are more (review Р14). A till that prints no shelf price lets every swap of a line «fit» the line,
+ * and the readings multiply by dozens a line; the cheapest are the ones the total would choose among.
+ * The bench carries up to 9 732 (am-03) and reads the same with two thousand: thirty such lines are
+ * settled against their total in under a second.
+ */
+export const RECONCILE_STATES_MAX = 2_000
+
+function picksOf(state: State): (Candidate | null)[] {
+  const picks: (Candidate | null)[] = []
+  // every state but the start made a pick: the start is the one with nothing before it
+  for (let at = state; at.prev !== null; at = at.prev) picks.push(at.pick)
+  return picks.reverse()
 }
 
 // The printed total is the last judge. OCR can misread both columns alike — «60 60» for «50 50» —
@@ -246,19 +284,22 @@ function reconcile(
   const first = lists.map((list) => list[0] ?? null)
   if (total === null || !Number.isFinite(total)) return { picks: first, balanced: false }
 
-  let states = new Map<string, State>([['0|false', { cost: 0, picks: [], blank: -1 }]])
-  lists.forEach((list, i) => {
+  const start: State = { sum: 0, cost: 0, pick: null, prev: null, blank: -1 }
+  let states = new Map<string, State>([['0|false', start]])
+  let steps = 0
+  for (const [i, list] of lists.entries()) {
     const next = new Map<string, State>()
-    const put = (sum: number, state: State): void => {
-      const key = `${String(sum)}|${String(state.blank >= 0)}`
+    const put = (state: State): void => {
+      steps += 1
+      const key = `${String(state.sum)}|${String(state.blank >= 0)}`
       const was = next.get(key)
       if (was === undefined || state.cost < was.cost) next.set(key, state)
     }
     for (const state of states.values()) {
-      const base = state.sum ?? 0
+      if (steps > RECONCILE_STEPS_MAX) break
       if (list.length === 0) {
         if (state.blank < 0) {
-          put(base, { sum: base, cost: state.cost + 4, picks: [...state.picks, null], blank: i })
+          put({ sum: state.sum, cost: state.cost + 4, pick: null, prev: state, blank: i })
         }
         continue
       }
@@ -266,22 +307,27 @@ function reconcile(
       for (const [k, x] of list.entries()) {
         if (seen.has(x.paid)) continue
         seen.add(x.paid)
-        const sum = base + x.paid
+        const sum = state.sum + x.paid
         if (sum > total) continue
-        put(sum, {
+        put({
           sum,
           cost: state.cost + x.swaps + (k > 0 ? 0.5 : 0),
-          picks: [...state.picks, x],
+          pick: x,
+          prev: state,
           blank: state.blank,
         })
       }
     }
-    states = next
-  })
+    if (steps > RECONCILE_STEPS_MAX) return { picks: first, balanced: false }
+    states =
+      next.size > RECONCILE_STATES_MAX
+        ? new Map([...next].sort((a, b) => a[1].cost - b[1].cost).slice(0, RECONCILE_STATES_MAX))
+        : next
+  }
 
   let best: State | null = null
   for (const state of states.values()) {
-    const rest = total - (state.sum ?? 0)
+    const rest = total - state.sum
     const ok =
       state.blank < 0
         ? rest === 0 || Math.abs(rest) <= 1
@@ -290,10 +336,13 @@ function reconcile(
   }
   return best === null
     ? { picks: first, balanced: false }
-    : { picks: [...best.picks], balanced: true }
+    : { picks: picksOf(best), balanced: true }
 }
 
 const ITEM = /^\s*(\d{1,2})\s*[.,]?\s*(\S.*)$/
+// An item's number for cutting a name row out (review Р16): one or two digits and then a letter — a
+// date «01.10.2026 …» or a phone «091 123456 …» above the list is not an item, and its row is the head.
+const NUMBERED = /^\s*\d{1,2}(?!\d)\s*[.,]?\s*\p{L}/u
 // «8506/119112 1Հտ 760,75/89,25 850» — code, quantity, paid/discount, shelf price (old/new).
 const FIGURES =
   /^\s*(\d{1,4})\s*\/\s*([\d.]{5,})\s+(.*?)\s*(\d[\d ]*[.,]\d{1,2})\s*\/\s*(\d[\d ]*(?:[.,]\d{1,2})?)(?:\s+(?:\d[\d ]*\/\s*)?(\d[\d ]*\d|\d))?\s*$/
@@ -421,9 +470,9 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
     let j = i - 1
     while (j > 0 && (mapped[j] ?? '').trim() === '') j-- // OCR leaves blank lines between the halves
     const headRow = mapped[j] ?? ''
-    const numbered = ITEM.exec(headRow)
-    const head = numbered?.[2] ?? headRow
-    const source = rows.filter((_, k) => (k === j && numbered !== null) || k === i)
+    const head = ITEM.exec(headRow)?.[2] ?? headRow
+    const numbered = NUMBERED.test(headRow)
+    const source = rows.filter((_, k) => (k === j && numbered) || k === i)
     if (figures !== null) {
       const mid = figures[3] ?? ''
       const weight = WEIGHT.exec(mid)
@@ -474,8 +523,11 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
     total,
     found.map((f) => (f.plain !== null ? f.plain.join('') : f.paidS).replace(/\D/g, '')),
   )
+  // what the total leaves goes to the one line with no reading only when the lines met the total —
+  // otherwise «the rest» is a guess, and a line that took it would cover a receipt barely read
+  // (review Р6)
   const blankSum =
-    total !== null && picks.filter((x) => x === null).length === 1
+    balanced && total !== null && picks.filter((x) => x === null).length === 1
       ? total - picks.reduce((a, x) => a + (x?.paid ?? 0), 0)
       : null
   const lines = found.map((f, i): ReceiptTextLine => {
@@ -690,28 +742,64 @@ export function rowsOf(text: string, part: number): TextRow[] {
 }
 
 // A long receipt comes in parts shot with an overlap (MOL-124 В-1). The seam is found by the till's
-// article numbers: the last article of the text so far that the next part also has (one digit may
-// differ — OCR) — the next part is taken from the row after it. No common article — parts are joined.
+// articles: the last article of the text so far that the next part also has (exactly, else with one
+// digit off — OCR), and the next part is taken from the row after it. A seam must be one an overlap
+// can make (review Р7–Р9): the next part starts inside the text so far, so it holds no more articles
+// before the seam than the text so far does; and what the text so far holds after the seam is in the
+// next part after it too. Another item's near article, or the first of two bags, makes no such seam.
+// No seam — an overlap of a name row only — joins the parts, dropping the rows both of them hold.
 const ARTICLE = /\d{4}\s*\/\s*(\d{5,})/
 const near = (a: string, b: string): boolean =>
   a.length === b.length && Array.from(a).filter((c, i) => c !== b.charAt(i)).length <= 1
 const articleOf = (row: TextRow): string => ARTICLE.exec(row.text)?.[1] ?? ''
 
+interface Article {
+  readonly article: string
+  readonly at: number
+}
+
+function articlesOf(rows: readonly TextRow[]): Article[] {
+  return rows.flatMap((row, at) => {
+    const article = articleOf(row)
+    return article === '' ? [] : [{ article, at }]
+  })
+}
+
+function seamOf(
+  mine: readonly Article[],
+  theirs: readonly Article[],
+  same: (a: string, b: string) => boolean,
+): { mine: number; theirs: number } | null {
+  for (let i = mine.length - 1; i >= 0; i--) {
+    const a = mine[i]
+    if (a === undefined) continue
+    const j = theirs.findIndex((b) => same(a.article, b.article))
+    const b = theirs[j]
+    if (b === undefined || j > i) continue
+    const later = theirs.slice(j + 1)
+    const kept = mine.slice(i + 1).every((m) => later.some((t) => near(m.article, t.article)))
+    if (kept) return { mine: a.at, theirs: b.at }
+  }
+  return null
+}
+
 export function mergeParts(parts: readonly (readonly TextRow[])[]): TextRow[] {
   let rows = [...(parts[0] ?? [])]
   for (const next of parts.slice(1)) {
-    const mine = rows.map(articleOf).filter((a) => a !== '')
-    let cut = -1
-    for (let k = mine.length - 1; k >= 0 && cut < 0; k--) {
-      const article = mine[k] ?? ''
-      cut = next.findIndex((r) => near(articleOf(r), article))
+    const mine = articlesOf(rows)
+    const theirs = articlesOf(next)
+    const seam = seamOf(mine, theirs, (a, b) => a === b) ?? seamOf(mine, theirs, near)
+    if (seam !== null) {
+      rows = [...rows.slice(0, seam.mine + 1), ...next.slice(seam.theirs + 1)]
+      continue
     }
-    const seamRow = next[cut]
-    if (seamRow !== undefined) {
-      const seam = articleOf(seamRow)
-      const at = rows.findLastIndex((r) => near(articleOf(r), seam))
-      rows = [...rows.slice(0, at + 1), ...next.slice(cut + 1)]
-    } else rows = [...rows, ...next]
+    const text = (row: TextRow | undefined) => row?.text.trim() ?? ''
+    let shared = 0
+    for (let n = Math.min(rows.length, next.length); n >= 1 && shared === 0; n--) {
+      const tail = rows.slice(-n)
+      if (tail.every((row, i) => text(row) !== '' && text(row) === text(next[i]))) shared = n
+    }
+    rows = [...rows, ...next.slice(shared)]
   }
   return rows
 }

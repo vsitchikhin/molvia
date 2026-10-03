@@ -5,6 +5,7 @@ import {
   needsReshoot,
   receiptDateOf,
   receiptLineOf,
+  receiptTimeOf,
 } from '#model/entities/receipt'
 import type { ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
 
@@ -67,6 +68,12 @@ describe('«разгладьте и переснимите» (В-4)', () => {
     expect(needsReshoot(receipt([line(), line(), line()]))).toBe(false)
   })
 
+  it('counts no sum the domain throws away: past a safe integer, past the total (review Р11)', () => {
+    const junk = line({ sumHundredths: Number.MAX_SAFE_INTEGER + 2 })
+    expect(needsReshoot(receipt([junk], 1_000_000))).toBe(true)
+    expect(needsReshoot(receipt([line({ sumHundredths: 2_000_000 })], 1_000_000))).toBe(true)
+  })
+
   it('takes a total of zero for no total', () => {
     expect(needsReshoot(receipt([line()], 0))).toBe(false)
   })
@@ -113,16 +120,38 @@ describe('the figures as the domain’s values', () => {
 })
 
 describe('the date a receipt prints', () => {
-  it('takes a real day', () => {
-    expect(receiptDateOf({ ...receipt([]), date: '2026-09-30' })).toBe('2026-09-30')
+  const latest = '2026-10-04'
+  it('takes a real day, up to the latest one', () => {
+    expect(receiptDateOf({ ...receipt([]), date: '2026-09-30' }, latest)).toBe('2026-09-30')
+    expect(receiptDateOf({ ...receipt([]), date: latest }, latest)).toBe(latest)
   })
 
   it('drops a day OCR made up: 30 February, month 13', () => {
-    expect(receiptDateOf({ ...receipt([]), date: '2026-02-30' })).toBeNull()
-    expect(receiptDateOf({ ...receipt([]), date: '2026-13-01' })).toBeNull()
+    expect(receiptDateOf({ ...receipt([]), date: '2026-02-30' }, latest)).toBeNull()
+    expect(receiptDateOf({ ...receipt([]), date: '2026-13-01' }, latest)).toBeNull()
+  })
+
+  it('drops a year no receipt has: 0000, which Postgres refuses, 1999, and the future (review Р10, Р13)', () => {
+    expect(receiptDateOf({ ...receipt([]), date: '0000-01-01' }, latest)).toBeNull()
+    expect(receiptDateOf({ ...receipt([]), date: '1999-12-31' }, latest)).toBeNull()
+    expect(receiptDateOf({ ...receipt([]), date: '2026-10-05' }, latest)).toBeNull()
+    expect(receiptDateOf({ ...receipt([]), date: '2099-10-01' }, latest)).toBeNull()
   })
 
   it('has none when none was read', () => {
-    expect(receiptDateOf(receipt([]))).toBeNull()
+    expect(receiptDateOf(receipt([]), latest)).toBeNull()
+  })
+})
+
+describe('the time a receipt prints (review Р12)', () => {
+  it('takes a time a clock shows, the day’s edges included', () => {
+    expect(receiptTimeOf({ ...receipt([]), time: '00:00' })).toBe('00:00')
+    expect(receiptTimeOf({ ...receipt([]), time: '23:59' })).toBe('23:59')
+  })
+
+  it('drops one it does not', () => {
+    expect(receiptTimeOf({ ...receipt([]), time: '99:99' })).toBeNull()
+    expect(receiptTimeOf({ ...receipt([]), time: '24:00' })).toBeNull()
+    expect(receiptTimeOf(receipt([]))).toBeNull()
   })
 })
