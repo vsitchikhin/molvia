@@ -7,17 +7,25 @@ import {
   confirmLoginSchema,
   dueRemindersSchema,
   eraseMeSchema,
+  feedbackFromBotAnswerSchema,
+  feedbackFromBotSchema,
   loginPreviewCodec,
   ownerNoticesSchema,
+  ownerNoticesSentSchema,
   rateFromBotSchema,
+  replyDeliveredSchema,
   switchRemindersFromBotSchema,
 } from '@molvia/model'
 import type {
   BotFailure,
   DueReminders,
+  FeedbackFromBot,
+  FeedbackFromBotAnswer,
   LoginPreview,
   OwnerNotices,
+  OwnerNoticesSent,
   RateFromBot,
+  ReplyDelivered,
   SwitchRemindersFromBot,
   TelegramUserId,
 } from '@molvia/model'
@@ -38,6 +46,9 @@ export function internalAuthRoutes(
     switchReminders(body: SwitchRemindersFromBot): Promise<void>
     reportFailure(body: BotFailure): Promise<void>
     claimOwnerNotices(): Promise<OwnerNotices>
+    ownerNoticesSent(body: OwnerNoticesSent): Promise<void>
+    feedbackFromBot(body: FeedbackFromBot): Promise<FeedbackFromBotAnswer>
+    replyDelivered(body: ReplyDelivered): Promise<void>
   },
 ): void {
   const digest = (value: string): Buffer => createHash('sha256').update(value).digest()
@@ -116,6 +127,25 @@ export function internalAuthRoutes(
     scope.post('/internal/owner/claim', { onRequest: refuseAnyBody }, async (request) => {
       parseQuery(z.strictObject({}), request.query)
       return ownerNoticesSchema.parse(await api.claimOwnerNotices())
+    })
+    // The notices about messages the bot sent (MOL-148): those are not handed again.
+    scope.post('/internal/owner/sent', async (request, reply) => {
+      parseQuery(z.strictObject({}), request.query)
+      await api.ownerNoticesSent(parseBody(ownerNoticesSentSchema, request.body))
+      return reply.code(204).send()
+    })
+    // «Написать разработчику» in the bot (MOL-148): a text written as a reply to the bot — the
+    // owner's reply or a person's word — and what became of a reply sent. Who is the owner, and
+    // whose thread it is, is decided here; the bot passes `ctx.from.id` and the message.
+    scope.post('/internal/feedback/reply', async (request) => {
+      parseQuery(z.strictObject({}), request.query)
+      const body = parseBody(feedbackFromBotSchema, request.body)
+      return feedbackFromBotAnswerSchema.parse(await api.feedbackFromBot(body))
+    })
+    scope.post('/internal/feedback/delivered', async (request, reply) => {
+      parseQuery(z.strictObject({}), request.query)
+      await api.replyDelivered(parseBody(replyDeliveredSchema, request.body))
+      return reply.code(204).send()
     })
     done()
   })

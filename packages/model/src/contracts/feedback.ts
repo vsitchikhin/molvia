@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { deviceIdSchema } from './trip'
+import { telegramUserIdSchema } from '#model/entities/actor'
 import { ISSUE } from '#model/support/errors'
 import { LOCALES } from '#model/support/locale'
 import { visibleText } from '#model/support/text'
@@ -24,10 +25,12 @@ export const FEEDBACK_DAY_LIMIT = 10
 export const FEEDBACK_KEPT_YEARS = 1
 
 /**
- * What became of the owner's reply (MOL-150, Р-11): reached the person, the bot was blocked, or the
- * message was gone by then. Written by the bot's half (MOL-148).
+ * What became of the owner's reply (MOL-150, Р-11): reached the person, the bot was blocked, or
+ * Telegram refused it otherwise and the owner was told to send it again (MOL-148, adversarial В4).
+ * Empty is «unknown» — the bot stopped between the send and the mark. A message gone has no reply to
+ * mark: the bot is told so before anything is written (Р-4).
  */
-export const FEEDBACK_DELIVERY = ['sent', 'blocked', 'gone'] as const
+export const FEEDBACK_DELIVERY = ['sent', 'blocked', 'failed'] as const
 export type FeedbackDelivery = (typeof FEEDBACK_DELIVERY)[number]
 
 export const FEEDBACK_SYSTEMS = [
@@ -116,3 +119,132 @@ export type FeedbackBody = z.infer<typeof feedbackBodySchema>
  */
 export const feedbackSentCodec = z.strictObject({ number: z.int().positive() })
 export type FeedbackSent = z.infer<typeof feedbackSentCodec>
+
+/**
+ * The owner's reply, as long as it may be (MOL-150, Р-2): it goes to the person inside a frame, and
+ * the whole must fit one Telegram message of 4096.
+ */
+export const FEEDBACK_REPLY_MAX = 3500
+
+/**
+ * How much of the owner's reply a «Продолжение #fb42» quotes (MOL-148, Р-10): a reply of 3500 and a
+ * continuation of 2000 do not fit one Telegram message together.
+ */
+export const FEEDBACK_QUOTE_MAX = 200
+
+/**
+ * The start of the owner's reply a continuation quotes, on one line — a second line of the reply read
+ * as the person's own words under it — cut by characters, never a pair in half.
+ */
+export function feedbackQuote(reply: string): string {
+  const characters = Array.from(reply.replace(/\s*\n\s*/g, ' '))
+  return characters.length <= FEEDBACK_QUOTE_MAX
+    ? characters.join('')
+    : `${characters.slice(0, FEEDBACK_QUOTE_MAX).join('')}…`
+}
+
+/** The number of a thread — its first message's — as the owner's notices tag it: `#fb42`. */
+const threadNumberSchema = z.int().positive()
+
+/**
+ * A message from the app, told to the owner (MOL-148, Р-9 of MOL-150): the kind, the text, everything
+ * that went with it, when, and the thread's tag. Nothing of the person — no Telegram id, no name, no
+ * `actor_id`: the copy stays in the owner's chat for good (В-3).
+ */
+export const feedbackNoticeSchema = z.strictObject({
+  kind: z.literal('feedback'),
+  /** The message's own number — the bot says by it that the notice went (adversarial В1). */
+  number: threadNumberSchema,
+  thread: threadNumberSchema,
+  feedbackKind: feedbackKindSchema,
+  text: z.string().min(1).max(FEEDBACK_TEXT_MAX),
+  locale: z.enum(LOCALES),
+  pageBuild: buildSchema.nullable(),
+  apiBuild: buildSchema,
+  route: feedbackRouteSchema.nullable(),
+  platform: feedbackPlatformSchema.nullable(),
+  fromError: z.boolean(),
+  errorCode: feedbackErrorCodeSchema.nullable(),
+  at: z.iso.datetime(),
+})
+export type FeedbackNotice = z.infer<typeof feedbackNoticeSchema>
+
+/**
+ * A person's answer to the owner's reply, told to the owner (MOL-148, В-1 of MOL-150): the same tag,
+ * so the hashtag shows the whole thread, and the start of the reply it answers.
+ */
+export const feedbackContinuedNoticeSchema = z.strictObject({
+  kind: z.literal('feedback_continued'),
+  number: threadNumberSchema,
+  thread: threadNumberSchema,
+  quote: z
+    .string()
+    .min(1)
+    .max(FEEDBACK_QUOTE_MAX + 1),
+  text: z.string().min(1).max(FEEDBACK_TEXT_MAX),
+  at: z.iso.datetime(),
+})
+export type FeedbackContinuedNotice = z.infer<typeof feedbackContinuedNoticeSchema>
+
+/** Telegram's own bound on a message's text: what the bot can be handed at all. */
+export const TELEGRAM_TEXT_MAX = 4096
+
+/** A message's id in one Telegram chat — counted per chat, so never an identity alone. */
+export const telegramMessageIdSchema = z.int().positive().max(Number.MAX_SAFE_INTEGER)
+
+/**
+ * A text written to the bot as a reply to one of its own messages (MOL-148, Р-2): who wrote it —
+ * `ctx.from.id`, never anything in the text — the bot's message it answers, the tag that message's
+ * first line carries, if any, and the text as typed. Not the message's own id: a word is the same
+ * word sent again by its content (adversarial В3). **What it is, the API
+ * decides**: the owner's reply on a notice, a person's word on a reply they got, or nothing of ours.
+ * How long it may be depends on which, so the bound here is only Telegram's.
+ */
+export const feedbackFromBotSchema = z.strictObject({
+  telegramUserId: telegramUserIdSchema,
+  repliedMessageId: telegramMessageIdSchema,
+  thread: threadNumberSchema.nullable(),
+  text: z.string().min(1).max(TELEGRAM_TEXT_MAX),
+})
+export type FeedbackFromBot = z.infer<typeof feedbackFromBotSchema>
+
+/**
+ * What a text written to the bot came to (MOL-148, Р-2, Р-11). `answered` — the owner's reply is
+ * written, and the bot sends it to `to` in the person's `locale`, saying the `day` of the message it
+ * answers in their zone; `continued` — a person's word joined their thread; `gone` — the owner's tag
+ * names a thread no longer there; `too_long` and `invisible` — nothing written, the text is the
+ * writer's to fix; `limited` — the person's day of messages is spent, the form's limit and this one
+ * being one. A text that is nothing of ours is a `404`, and the bot lets it on to the greeting.
+ */
+export const feedbackFromBotAnswerSchema = z.discriminatedUnion('outcome', [
+  z.strictObject({
+    outcome: z.literal('answered'),
+    reply: z.int().positive(),
+    to: telegramUserIdSchema,
+    locale: z.enum(LOCALES),
+    day: z.iso.date(),
+  }),
+  z.strictObject({ outcome: z.literal('continued') }),
+  z.strictObject({ outcome: z.literal('gone'), thread: threadNumberSchema }),
+  z.strictObject({ outcome: z.literal('too_long'), max: z.int().positive() }),
+  z.strictObject({ outcome: z.literal('invisible') }),
+  z.strictObject({ outcome: z.literal('limited') }),
+])
+export type FeedbackFromBotAnswer = z.infer<typeof feedbackFromBotAnswerSchema>
+
+/**
+ * What became of the owner's reply once the bot tried to send it (MOL-148, Р-4): `sent` with the
+ * message it went out as in the person's chat — their answer to it finds the thread by that (В-2) —
+ * `blocked`, or `failed` when Telegram refused it otherwise. The bot's word, after the send; a mark
+ * lost leaves the reply «unknown».
+ */
+export const replyDeliveredSchema = z.discriminatedUnion('outcome', [
+  z.strictObject({
+    reply: z.int().positive(),
+    outcome: z.literal('sent'),
+    messageId: telegramMessageIdSchema,
+  }),
+  z.strictObject({ reply: z.int().positive(), outcome: z.literal('blocked') }),
+  z.strictObject({ reply: z.int().positive(), outcome: z.literal('failed') }),
+])
+export type ReplyDelivered = z.infer<typeof replyDeliveredSchema>

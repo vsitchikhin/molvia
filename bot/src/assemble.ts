@@ -8,6 +8,7 @@ import { loginComposer } from './login'
 import type { LoginDeps } from './login'
 import { heardFrom, muteComposer } from './mute'
 import { rateComposer } from './rate'
+import { feedbackComposer } from './feedback'
 import { handlerOf, reportFailure } from './failure'
 
 /**
@@ -53,6 +54,9 @@ export function assembleBot(
   bot.use(rateComposer(deps))
   // «Не напоминать» under it, and Telegram's word that the bot was blocked (MOL-103).
   bot.use(muteComposer(deps))
+  // A text written as a reply to the bot — the owner's reply, a person's word (MOL-148). Before the
+  // login's catch-all, which greets every text; what is not ours goes on to it.
+  bot.use(feedbackComposer(deps))
   bot.use(loginComposer(deps))
 
   // The last resort: a handler that throws must not take the process with it. The update itself

@@ -31,6 +31,21 @@ function message(text: string): Omit<Update, 'update_id'> {
   return { message: { message_id: 1, date: 0, chat: CHAT, from: FROM, text } }
 }
 
+/** A message written as a reply to one from `author` — the bot's, or the person's own (MOL-148). */
+function answering(author: number, text: string | undefined): Omit<Update, 'update_id'> {
+  const replied = { message_id: 2, date: 0, chat: CHAT, from: { ...FROM, id: author }, text: 'x' }
+  return {
+    message: {
+      message_id: 3,
+      date: 0,
+      chat: CHAT,
+      from: FROM,
+      ...(text === undefined ? {} : { text }),
+      reply_to_message: replied,
+    } as never,
+  }
+}
+
 function press(data: string): Omit<Update, 'update_id'> {
   return { callback_query: { id: 'cb', from: FROM, chat_instance: 'ci', data } }
 }
@@ -55,6 +70,9 @@ describe('handlerOf — где случилось, без того, кто и ч
     [message('/ivan_petrov'), 'command:other'],
     [press('anya:1'), 'callback:other'],
     [message('мой адрес: ул. Ширакаци 12'), 'message'],
+    [answering(BOT_INFO.id, 'Обновил, работает'), 'message:reply'],
+    [answering(FROM.id, 'ответ на своё'), 'message'],
+    [answering(BOT_INFO.id, undefined), 'message:reply'],
   ])('%#', (update, handler) => {
     expect(handlerOf(context(update))).toBe(handler)
   })
