@@ -124,3 +124,13 @@ export const ownerNoticesSchema = z.strictObject({
   notices: z.array(ownerNoticeSchema).max(OWNER_NOTICES_PER_CLAIM),
 })
 export type OwnerNotices = z.infer<typeof ownerNoticesSchema>
+
+/**
+ * The messages to the developer whose notices the bot sent (MOL-148, adversarial В1), by their own
+ * numbers: a notice about a message is handed again until it is said to have gone. A failure's needs
+ * no word — the table keeps its count.
+ */
+export const ownerNoticesSentSchema = z.strictObject({
+  messages: z.array(z.int().positive()).min(1).max(OWNER_NOTICES_PER_CLAIM),
+})
+export type OwnerNoticesSent = z.infer<typeof ownerNoticesSentSchema>

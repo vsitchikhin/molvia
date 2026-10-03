@@ -39,14 +39,12 @@ function fake(
 
 const fromOwner: FeedbackFromBot = {
   telegramUserId: OWNER,
-  messageId: 500,
   repliedMessageId: 499,
   thread: 42,
   text: 'Починили, обновите приложение',
 }
 const fromAnna: FeedbackFromBot = {
   telegramUserId: ANNA,
-  messageId: 9032,
   repliedMessageId: 9031,
   thread: null,
   text: 'Обновил, работает',
@@ -135,7 +133,7 @@ describe('feedbackFromBot — продолжение нити (MOL-148, В-2)', 
       {
         reply: answered,
         text: 'Обновил, работает',
-        key: telegramKey(ANNA, 9032),
+        key: telegramKey(ANNA, 9031, 'Обновил, работает'),
         apiBuild: 'v0.2.0',
         limit: FEEDBACK_DAY_LIMIT,
         notify: true,
@@ -188,12 +186,12 @@ describe('feedbackFromBot — продолжение нити (MOL-148, В-2)', 
 })
 
 describe('telegramKey', () => {
-  it('uuid по форме; один чат и сообщение — один ключ, другое — другой', () => {
-    expect(telegramKey(ANNA, 9032)).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-    )
-    expect(telegramKey(ANNA, 9032)).toBe(telegramKey(ANNA, 9032))
-    expect(telegramKey(ANNA, 9033)).not.toBe(telegramKey(ANNA, 9032))
-    expect(telegramKey(ANNA + 1, 9032)).not.toBe(telegramKey(ANNA, 9032))
+  it('uuid по форме; один чат, ответ и текст — один ключ; другое в любом из трёх — другой', () => {
+    const key = telegramKey(ANNA, 9031, 'Спасибо')
+    expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+    expect(telegramKey(ANNA, 9031, 'Спасибо')).toBe(key)
+    expect(telegramKey(ANNA, 9031, 'Спасибо!')).not.toBe(key)
+    expect(telegramKey(ANNA, 9040, 'Спасибо')).not.toBe(key)
+    expect(telegramKey(ANNA + 1, 9031, 'Спасибо')).not.toBe(key)
   })
 })

@@ -239,6 +239,16 @@ describe('POST /feedback (MOL-147)', () => {
   })
 })
 
+/** The thread a message is of — the first message's number — as a reply to it carries it. */
+async function threadOf(feedbackId: number): Promise<number> {
+  const [row] = await db
+    .select({ thread: feedback.threadKey })
+    .from(feedback)
+    .where(eq(feedback.id, feedbackId))
+  if (row === undefined) throw new Error('no message')
+  return row.thread
+}
+
 const monthsAgo = (months: number) => new Date(Date.now() - months * 30.5 * 86_400_000)
 
 async function aMessage(actorId: string, at: Date, thread?: { id: number; reply?: number }) {
@@ -262,7 +272,14 @@ async function aMessage(actorId: string, at: Date, thread?: { id: number; reply?
 async function aReply(actorId: string, feedbackId: number, at: Date) {
   const [row] = await db
     .insert(feedbackReplies)
-    .values({ feedbackId, actorId, text: 'ответ', delivered: 'sent', createdAt: at })
+    .values({
+      feedbackId,
+      actorId,
+      threadId: await threadOf(feedbackId),
+      text: 'ответ',
+      delivered: 'sent',
+      createdAt: at,
+    })
     .returning({ id: feedbackReplies.id })
   if (row === undefined) throw new Error('no reply')
   return row.id
@@ -374,6 +391,37 @@ describe('схема нитей держит первое сообщение и 
     expect(await db.select().from(feedback)).toHaveLength(3)
   })
 
+  it('продолжение свежей нити не отвечает на ответ старой нити того же человека (В5 MOL-148)', async () => {
+    const anna = await insertActor(db)
+    const old = await aMessage(anna, monthsAgo(14))
+    const oldReply = await aReply(anna, old, monthsAgo(14))
+    const fresh = await aMessage(anna, now)
+    const freshReply = await aReply(anna, fresh, now)
+
+    expect(await refusedBy(aMessage(anna, now, { id: fresh, reply: oldReply }))).toBe(
+      'feedback_answers_own_reply',
+    )
+    // The same word answering its own thread's reply outlives the old thread's purge.
+    const word = await aMessage(anna, now, { id: fresh, reply: freshReply })
+    await createFeedbackRepository(db).purgeStale()
+    const left = await db.select({ id: feedback.id }).from(feedback)
+    expect(left.map((row) => row.id).sort((a, b) => a - b)).toEqual([fresh, word])
+  })
+
+  it('ответ не встаёт под сообщение с чужой нитью в своей колонке', async () => {
+    const anna = await insertActor(db)
+    const first = await aMessage(anna, now)
+    const second = await aMessage(anna, now)
+
+    expect(
+      await refusedBy(
+        db
+          .insert(feedbackReplies)
+          .values({ feedbackId: first, actorId: anna, threadId: second, text: 'ответ' }),
+      ),
+    ).toBe('feedback_replies_message_is_owners')
+  })
+
   it('продолжение не встаёт в нить другого человека', async () => {
     const anna = await insertActor(db)
     const boris = await insertActor(db)
@@ -421,9 +469,14 @@ describe('схема нитей держит первое сообщение и 
     const annas = await aMessage(anna, now)
     const borises = await aMessage(boris, now)
     const sent = (actorId: string, feedbackId: number) =>
-      db
-        .insert(feedbackReplies)
-        .values({ feedbackId, actorId, text: 'ответ', delivered: 'sent', telegramMessageId: 9031 })
+      db.insert(feedbackReplies).values({
+        feedbackId,
+        actorId,
+        threadId: feedbackId,
+        text: 'ответ',
+        delivered: 'sent',
+        telegramMessageId: 9031,
+      })
 
     await sent(anna, annas)
     await sent(boris, borises)
@@ -436,9 +489,13 @@ describe('схема нитей держит первое сообщение и 
 
     expect(
       await refusedBy(
-        db
-          .insert(feedbackReplies)
-          .values({ feedbackId: annas, actorId: anna, text: 'ответ', delivered: 'gone' as never }),
+        db.insert(feedbackReplies).values({
+          feedbackId: annas,
+          actorId: anna,
+          threadId: annas,
+          text: 'ответ',
+          delivered: 'gone' as never,
+        }),
       ),
     ).toBe('feedback_replies_delivered_known')
   })

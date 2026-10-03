@@ -67,7 +67,8 @@ export interface FeedbackRepository {
 
   /**
    * Threads whose last message — the person's or the owner's reply — is older than they are kept
-   * (MOL-150, В-4): removed whole, the first message taking its continuations and replies along.
+   * (MOL-150, В-4): removed whole, the first message taking its continuations and replies along. A
+   * reply Telegram refused never reached anyone and keeps no thread alive (adversarial В4).
    */
   purgeStale(): Promise<void>
 
@@ -155,6 +156,7 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
           if (notify) {
             const notice: FeedbackNotice = {
               kind: 'feedback',
+              number: row.id,
               thread: row.id,
               feedbackKind: message.kind,
               text: message.text,
@@ -207,7 +209,7 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
           if (last === undefined || author === undefined) return null
           const [written] = await tx
             .insert(feedbackReplies)
-            .values({ feedbackId: last.id, actorId: head.actorId, text })
+            .values({ feedbackId: last.id, actorId: head.actorId, threadId: thread, text })
             .returning({ id: feedbackReplies.id })
           return {
             reply: theRow(written, 'feedback_replies').id,
@@ -286,6 +288,7 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
           if (notify) {
             const notice: FeedbackContinuedNotice = {
               kind: 'feedback_continued',
+              number: row.id,
               thread: answered.thread,
               quote: feedbackQuote(answered.text),
               text,
@@ -322,7 +325,7 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
           and id in (
             select coalesce(f.thread_id, f.id)
             from feedback f
-            left join feedback_replies r on r.feedback_id = f.id
+            left join feedback_replies r on r.feedback_id = f.id and r.delivered is distinct from 'failed'
             group by coalesce(f.thread_id, f.id)
             having greatest(max(f.created_at), max(r.created_at))
               < clock_timestamp() - make_interval(years => ${FEEDBACK_KEPT_YEARS})

@@ -295,6 +295,8 @@ export const EXPORT_COLUMNS: Readonly<
       client_key: 'the phone’s key against sending one message twice, not what was said',
       head: 'said by `thread`: a first message has none',
       thread_head: 'said by `thread`: the key that holds a continuation to its first message',
+      thread_key:
+        'said by `thread`: the key that holds a continuation to a reply of its own thread',
     },
   },
   feedback_replies: {
@@ -302,6 +304,7 @@ export const EXPORT_COLUMNS: Readonly<
     omitted: {
       feedback_id: 'said by where the reply sits: under the message it answers',
       actor_id: OWNER,
+      thread_id: 'said by where the reply sits: under a message of that thread',
       telegram_message_id:
         'which message the reply went out as in your chat, so your answer to it finds its thread; it means nothing outside that chat',
     },
@@ -317,6 +320,8 @@ export const EXPORT_COLUMNS: Readonly<
       feedback_id: 'said by the message it is about',
       created_at: 'when the message was written: in `feedback`',
       handed_at: 'when the owner’s bot took the notice — about the owner’s channel, not you',
+      sent_at: 'when the owner’s bot said it went — about the owner’s channel, not you',
+      tries: 'how many times the owner’s bot took it — about the owner’s channel, not you',
     },
   },
   budget_plans: {

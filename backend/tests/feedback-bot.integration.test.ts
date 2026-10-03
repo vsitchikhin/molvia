@@ -83,6 +83,7 @@ describe('сообщение из приложения — уведомлени�
     expect(queued[0]?.feedbackId).toBe(number)
     expect(queued[0]?.payload).toEqual({
       kind: 'feedback',
+      number,
       thread: number,
       feedbackKind: 'bug',
       text: body.text,
@@ -232,7 +233,6 @@ async function aThread(app: FastifyInstance, text = 'Не грузится «Ч�
 async function answer(app: FastifyInstance, thread: number, messageId: number, text = 'Починили') {
   const reply = await fromBot(app, {
     telegramUserId: OWNER,
-    messageId: 1000 + messageId,
     repliedMessageId: 900,
     thread,
     text,
@@ -255,7 +255,6 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
 
     const reply = await fromBot(app, {
       telegramUserId: OWNER,
-      messageId: 501,
       repliedMessageId: 500,
       thread: number,
       text: '  Починили, обновите  ',
@@ -281,7 +280,6 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
 
     const reply = await fromBot(app, {
       telegramUserId: stranger,
-      messageId: 1,
       repliedMessageId: 2,
       thread,
       text: 'Подделка',
@@ -297,7 +295,6 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
 
     const reply = await fromBot(app, {
       telegramUserId: OWNER,
-      messageId: 1,
       repliedMessageId: 2,
       thread,
       text: 'Ответ',
@@ -313,7 +310,6 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
 
     const reply = await fromBot(app, {
       telegramUserId: OWNER,
-      messageId: 1,
       repliedMessageId: 2,
       thread,
       text: 'Ответ',
@@ -334,7 +330,6 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
 
     const reply = await fromBot(app, {
       telegramUserId: OWNER,
-      messageId: 1,
       repliedMessageId: 2,
       thread,
       text: 'Ответ',
@@ -349,7 +344,6 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
     await answer(app, thread, 9031)
     await fromBot(app, {
       telegramUserId: telegram,
-      messageId: 9032,
       repliedMessageId: 9031,
       thread: null,
       text: 'Спасибо',
@@ -361,7 +355,6 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
 
     const reply = await fromBot(app, {
       telegramUserId: OWNER,
-      messageId: 1,
       repliedMessageId: 2,
       thread: continued?.id,
       text: 'Ответ',
@@ -376,7 +369,6 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
 
     const reply = await fromBot(app, {
       telegramUserId: OWNER,
-      messageId: 1,
       repliedMessageId: 2,
       thread,
       text: 'а'.repeat(3501),
@@ -393,7 +385,6 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
     const sentReply = await answer(app, first.thread, 9031)
     const blocked = await fromBot(app, {
       telegramUserId: OWNER,
-      messageId: 2,
       repliedMessageId: 1,
       thread: second.thread,
       text: 'Ответ',
@@ -426,7 +417,6 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
 
     const word = await fromBot(app, {
       telegramUserId: telegram,
-      messageId: 9032,
       repliedMessageId: 9031,
       thread: null,
       text: 'Обновил, работает',
@@ -454,6 +444,7 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
     expect(ownerNoticesSchema.parse(claim.json()).notices).toEqual([
       {
         kind: 'feedback_continued',
+        number: continued?.id,
         thread,
         quote: 'Починили, обновите приложение',
         text: 'Обновил, работает',
@@ -468,7 +459,6 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
     await answer(app, thread, 9031)
     await fromBot(app, {
       telegramUserId: telegram,
-      messageId: 9032,
       repliedMessageId: 9031,
       thread: null,
       text: 'Всё равно не грузится',
@@ -493,7 +483,6 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
     await answer(app, thread, 9031)
     const word = {
       telegramUserId: telegram,
-      messageId: 9032,
       repliedMessageId: 9031,
       thread: null,
       text: 'Спасибо',
@@ -518,7 +507,6 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
 
     const word = await fromBot(app, {
       telegramUserId: boris,
-      messageId: 9032,
       repliedMessageId: 9031,
       thread: null,
       text: 'Чужое',
@@ -534,7 +522,6 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
 
     const word = await fromBot(app, {
       telegramUserId: telegram,
-      messageId: 77,
       repliedMessageId: 76,
       thread: null,
       text: 'Привет',
@@ -553,13 +540,12 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
       )
     }
     await answer(app, thread, 9031)
-    const word = (messageId: number) =>
+    const word = (count: number) =>
       fromBot(app, {
         telegramUserId: telegram,
-        messageId,
         repliedMessageId: 9031,
         thread: null,
-        text: `слово ${String(messageId)}`,
+        text: `слово ${String(count)}`,
       })
 
     expect((await word(9032)).json()).toEqual({ outcome: 'continued' })
@@ -574,7 +560,6 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
     const word = (text: string) =>
       fromBot(app, {
         telegramUserId: telegram,
-        messageId: 9032,
         repliedMessageId: 9031,
         thread: null,
         text,
@@ -590,7 +575,6 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
     const { telegram, thread } = await aThread(app)
     await fromBot(app, {
       telegramUserId: OWNER,
-      messageId: 1,
       repliedMessageId: 2,
       thread,
       text: 'Ответ',
@@ -598,7 +582,6 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
 
     const word = await fromBot(app, {
       telegramUserId: telegram,
-      messageId: 9032,
       repliedMessageId: 9031,
       thread: null,
       text: 'Спасибо',
@@ -613,7 +596,6 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
     await answer(app, thread, 9031)
     await fromBot(app, {
       telegramUserId: telegram,
-      messageId: 9032,
       repliedMessageId: 9031,
       thread: null,
       text: 'Ещё',
@@ -633,10 +615,161 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
     const reply = await app.inject({
       method: 'POST',
       url: '/internal/feedback/reply',
-      payload: { telegramUserId: OWNER, messageId: 1, repliedMessageId: 2, thread, text: 'Ответ' },
+      payload: { telegramUserId: OWNER, repliedMessageId: 2, thread, text: 'Ответ' },
     })
 
     expect(reply.statusCode).toBe(401)
     expect(await db.select().from(feedbackReplies)).toHaveLength(0)
+  })
+})
+
+describe('уведомление о сообщении выдаётся, пока бот не скажет, что оно ушло (MOL-148, адверсариальное В1)', () => {
+  const MINUTE = 60_000
+
+  it('не отправленное — снова через десять минут; отправленное — больше нет', async () => {
+    const app = await serverFor(OWNER)
+    const { thread } = await aThread(app)
+    const notices = createOwnerNoticeRepository(db)
+    const now = Date.now()
+
+    expect(await notices.claim(20, new Date(now))).toMatchObject([{ number: thread }])
+    expect(await notices.claim(20, new Date(now + 9 * MINUTE))).toEqual([])
+    expect(await notices.claim(20, new Date(now + 11 * MINUTE))).toMatchObject([{ number: thread }])
+
+    const sent = await app.inject({
+      method: 'POST',
+      url: '/internal/owner/sent',
+      payload: { messages: [thread] },
+      headers: asBot,
+    })
+    expect(sent.statusCode).toBe(204)
+    expect(await notices.claim(20, new Date(now + 60 * MINUTE))).toEqual([])
+  })
+
+  it('не больше шести раз: дальше его не принимает сам Telegram, и об этом говорит отчёт бота', async () => {
+    const app = await serverFor(OWNER)
+    await aThread(app)
+    const notices = createOwnerNoticeRepository(db)
+    const now = Date.now()
+
+    const handed = []
+    for (let step = 0; step < 10; step += 1) {
+      handed.push((await notices.claim(20, new Date(now + step * 11 * MINUTE))).length)
+    }
+
+    expect(handed).toEqual([1, 1, 1, 1, 1, 1, 0, 0, 0, 0])
+  })
+
+  it('уведомление о сбое по-прежнему выдаётся один раз', async () => {
+    await serverFor(OWNER)
+    const notices = createOwnerNoticeRepository(db)
+    const now = Date.now()
+    await db.insert(ownerNotices).values({
+      kind: 'failure',
+      payload: {
+        kind: 'failure',
+        source: 'api',
+        errorName: 'TypeError',
+        build: 'dev',
+        fingerprint: 'abcdef',
+      },
+      createdAt: new Date(now),
+    })
+
+    expect(await notices.claim(20, new Date(now))).toHaveLength(1)
+    expect(await notices.claim(20, new Date(now + 60 * MINUTE))).toEqual([])
+  })
+
+  it('продолжение тоже: его номер — его собственный, не нити', async () => {
+    const app = await serverFor(OWNER)
+    const { telegram, thread } = await aThread(app)
+    await answer(app, thread, 9031)
+    const notices = createOwnerNoticeRepository(db)
+    await notices.claim(20, new Date())
+    await notices.markSent([thread], new Date())
+    await fromBot(app, {
+      telegramUserId: telegram,
+      repliedMessageId: 9031,
+      thread: null,
+      text: 'Спасибо',
+    })
+    const [continued] = await db
+      .select({ id: feedback.id })
+      .from(feedback)
+      .where(eq(feedback.threadId, thread))
+    const now = Date.now()
+
+    expect(await notices.claim(20, new Date(now))).toMatchObject([
+      { kind: 'feedback_continued', number: continued?.id, thread },
+    ])
+    await notices.markSent([continued?.id ?? 0], new Date(now))
+    expect(await notices.claim(20, new Date(now + 60 * MINUTE))).toEqual([])
+  })
+})
+
+describe('то же слово после «ответьте ещё раз» — та же запись (адверсариальное В3)', () => {
+  it('два сообщения Telegram с одним текстом на один ответ — одна строка и одно уведомление', async () => {
+    const app = await serverFor(OWNER)
+    const { telegram, thread } = await aThread(app)
+    await answer(app, thread, 9031)
+    const word = (text: string) =>
+      fromBot(app, { telegramUserId: telegram, repliedMessageId: 9031, thread: null, text })
+
+    expect((await word('Всё ещё не грузится')).json()).toEqual({ outcome: 'continued' })
+    expect((await word('  Всё ещё не грузится ')).json()).toEqual({ outcome: 'continued' })
+    expect((await word('А теперь грузится')).json()).toEqual({ outcome: 'continued' })
+
+    const words = await db
+      .select({ text: feedback.text })
+      .from(feedback)
+      .where(eq(feedback.threadId, thread))
+    expect(words.map((row) => row.text)).toEqual(['Всё ещё не грузится', 'А теперь грузится'])
+    expect(
+      await db.select().from(ownerNotices).where(eq(ownerNotices.kind, 'feedback_continued')),
+    ).toHaveLength(2)
+  })
+})
+
+describe('Telegram не принял ответ — failed (адверсариальное В4)', () => {
+  it('исход failed записан, id сообщения нет; ответ, который никуда не ушёл, не продлевает нить', async () => {
+    const app = await serverFor(OWNER)
+    const { actorId, thread } = await aThread(app)
+    const reply = await fromBot(app, {
+      telegramUserId: OWNER,
+      repliedMessageId: 2,
+      thread,
+      text: 'Ответ',
+    })
+    const { reply: replyId } = reply.json<{ reply: number }>()
+
+    expect((await delivered(app, { reply: replyId, outcome: 'failed' })).statusCode).toBe(204)
+    const [row] = await db.select().from(feedbackReplies)
+    expect(row).toMatchObject({ delivered: 'failed', telegramMessageId: null })
+
+    await db
+      .update(feedback)
+      .set({ createdAt: new Date(Date.now() - 400 * 86_400_000) })
+      .where(eq(feedback.actorId, actorId))
+    await createFeedbackRepository(db).purgeStale()
+    expect(await db.select().from(feedback)).toHaveLength(0)
+  })
+})
+
+describe('ответ знает свою нить (адверсариальное В5)', () => {
+  it('ответ на продолжение записан с нитью первого сообщения', async () => {
+    const app = await serverFor(OWNER)
+    const { telegram, thread } = await aThread(app)
+    await answer(app, thread, 9031)
+    await fromBot(app, {
+      telegramUserId: telegram,
+      repliedMessageId: 9031,
+      thread: null,
+      text: 'Ещё',
+    })
+
+    await answer(app, thread, 9040, 'Второй ответ')
+
+    const rows = await db.select({ thread: feedbackReplies.threadId }).from(feedbackReplies)
+    expect(rows.map((row) => row.thread)).toEqual([thread, thread])
   })
 })

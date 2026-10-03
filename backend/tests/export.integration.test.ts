@@ -344,6 +344,7 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     .values({
       feedbackId: message.id,
       actorId,
+      threadId: message.id,
       text: 'Починили',
       delivered: 'sent',
       createdAt: at(26),

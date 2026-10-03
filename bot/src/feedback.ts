@@ -2,7 +2,7 @@ import { Composer, GrammyError } from 'grammy'
 import type { Context } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
-import { ERROR } from '@molvia/model'
+import { ERROR, LOCALES } from '@molvia/model'
 import type { AppLocale, FeedbackFromBotAnswer } from '@molvia/model'
 import { telegramFailure } from './assemble'
 import { t } from './i18n'
@@ -39,8 +39,19 @@ export function replyFrame(text: string, day: string, locale: AppLocale): string
 }
 
 /**
+ * Whether a message of the bot's is the frame of a reply (MOL-148): its last line is the frame's own,
+ * in any language the bot speaks. The bot reads its message back, as it reads a notice's tag.
+ */
+export function isReplyFrame(text: string): boolean {
+  const last = text.slice(text.lastIndexOf('\n') + 1)
+  return LOCALES.some((locale) => last === t(locale, 'feedback.howToAnswer'))
+}
+
+/**
  * «Написать разработчику» in the bot (MOL-148): a text written **as a reply to one of the bot's own
- * messages**, in a private chat, is handed to the API with who wrote it (`ctx.from.id`), the message
+ * messages** — a notice tagged `#fb42` or the frame of a reply, and no other (adversarial В2: a
+ * reply to the greeting must not wait on the API, and get «сервер не ответил» for an answer) —
+ * in a private chat, is handed to the API with who wrote it (`ctx.from.id`), the message
  * answered and the tag `#fb42` that message's first line carries. **The API says what it was** — the
  * owner's reply on a notice, a person's word on a reply they got, or nothing of ours — and the bot
  * only acts on the answer: nothing of ours goes on to the greeting, as before.
@@ -61,6 +72,14 @@ export function feedbackComposer({ api }: FeedbackDeps): Composer<Context> {
       return
     }
     const thread = threadTagOf(replied.text ?? '')
+    const command = ctx.message.entities?.some(
+      (entity) => entity.type === 'bot_command' && entity.offset === 0,
+    )
+    // A command is the bot's to answer, never a word to the developer (adversarial В6).
+    if ((thread === null && !isReplyFrame(replied.text ?? '')) || command === true) {
+      await next()
+      return
+    }
     const language = ctx.from.language_code
     const say = async (key: MessageKey, params?: Record<string, string | number>) => {
       await ctx.reply(t(language, key, params), {
@@ -69,7 +88,7 @@ export function feedbackComposer({ api }: FeedbackDeps): Composer<Context> {
     }
     const text = ctx.message.text
     if (text === undefined) {
-      // A photo on a tagged notice must not look sent; anywhere else the bot stays quiet, as before.
+      // A photo on a tagged notice must not look sent; on a frame the bot stays quiet, as before.
       if (thread === null) await next()
       else await say('feedback.textOnly')
       return
@@ -79,7 +98,6 @@ export function feedbackComposer({ api }: FeedbackDeps): Composer<Context> {
     try {
       answer = await api.feedbackFromBot({
         telegramUserId: ctx.from.id,
-        messageId: ctx.message.message_id,
         repliedMessageId: replied.message_id,
         thread,
         text,
@@ -125,7 +143,7 @@ export function feedbackComposer({ api }: FeedbackDeps): Composer<Context> {
 /**
  * The owner's reply, sent to the person and its outcome said to the owner (Р-11). The mark goes to
  * the API after the send: a lost mark leaves the reply «unknown», and the person's answer to it
- * cannot find the thread — a named price (Р-14).
+ * cannot find the thread — a named price (Р-4, Р-14).
  */
 async function deliver(
   ctx: Context,
@@ -147,6 +165,9 @@ async function deliver(
     }
     console.error(`[molvia] feedback reply: ${telegramFailure(error)}`)
     reportDefect(api, error, handlerOf(ctx))
+    // The reply is written and never reached the person: the copy says so, and «ответьте ещё раз»
+    // writes another (adversarial В4).
+    await mark(api, ctx, () => api.replyDelivered({ reply: answer.reply, outcome: 'failed' }))
     await say('feedback.notSent')
     return
   }

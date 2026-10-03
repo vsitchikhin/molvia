@@ -25,11 +25,12 @@ export const FEEDBACK_DAY_LIMIT = 10
 export const FEEDBACK_KEPT_YEARS = 1
 
 /**
- * What became of the owner's reply (MOL-150, Р-11): reached the person, or the bot was blocked.
+ * What became of the owner's reply (MOL-150, Р-11): reached the person, the bot was blocked, or
+ * Telegram refused it otherwise and the owner was told to send it again (MOL-148, adversarial В4).
  * Empty is «unknown» — the bot stopped between the send and the mark. A message gone has no reply to
- * mark: the bot is told so before anything is written (MOL-148, Р-4).
+ * mark: the bot is told so before anything is written (Р-4).
  */
-export const FEEDBACK_DELIVERY = ['sent', 'blocked'] as const
+export const FEEDBACK_DELIVERY = ['sent', 'blocked', 'failed'] as const
 export type FeedbackDelivery = (typeof FEEDBACK_DELIVERY)[number]
 
 export const FEEDBACK_SYSTEMS = [
@@ -131,11 +132,14 @@ export const FEEDBACK_REPLY_MAX = 3500
  */
 export const FEEDBACK_QUOTE_MAX = 200
 
-/** The start of the owner's reply a continuation quotes, cut by characters, never a pair in half. */
+/**
+ * The start of the owner's reply a continuation quotes, on one line — a second line of the reply read
+ * as the person's own words under it — cut by characters, never a pair in half.
+ */
 export function feedbackQuote(reply: string): string {
-  const characters = Array.from(reply)
+  const characters = Array.from(reply.replace(/\s*\n\s*/g, ' '))
   return characters.length <= FEEDBACK_QUOTE_MAX
-    ? reply
+    ? characters.join('')
     : `${characters.slice(0, FEEDBACK_QUOTE_MAX).join('')}…`
 }
 
@@ -149,6 +153,8 @@ const threadNumberSchema = z.int().positive()
  */
 export const feedbackNoticeSchema = z.strictObject({
   kind: z.literal('feedback'),
+  /** The message's own number — the bot says by it that the notice went (adversarial В1). */
+  number: threadNumberSchema,
   thread: threadNumberSchema,
   feedbackKind: feedbackKindSchema,
   text: z.string().min(1).max(FEEDBACK_TEXT_MAX),
@@ -169,6 +175,7 @@ export type FeedbackNotice = z.infer<typeof feedbackNoticeSchema>
  */
 export const feedbackContinuedNoticeSchema = z.strictObject({
   kind: z.literal('feedback_continued'),
+  number: threadNumberSchema,
   thread: threadNumberSchema,
   quote: z
     .string()
@@ -187,14 +194,14 @@ export const telegramMessageIdSchema = z.int().positive().max(Number.MAX_SAFE_IN
 
 /**
  * A text written to the bot as a reply to one of its own messages (MOL-148, Р-2): who wrote it —
- * `ctx.from.id`, never anything in the text — the message's id, the bot's message it answers, the
- * tag that message's first line carries, if any, and the text as typed. **What it is, the API
+ * `ctx.from.id`, never anything in the text — the bot's message it answers, the tag that message's
+ * first line carries, if any, and the text as typed. Not the message's own id: a word is the same
+ * word sent again by its content (adversarial В3). **What it is, the API
  * decides**: the owner's reply on a notice, a person's word on a reply they got, or nothing of ours.
  * How long it may be depends on which, so the bound here is only Telegram's.
  */
 export const feedbackFromBotSchema = z.strictObject({
   telegramUserId: telegramUserIdSchema,
-  messageId: telegramMessageIdSchema,
   repliedMessageId: telegramMessageIdSchema,
   thread: threadNumberSchema.nullable(),
   text: z.string().min(1).max(TELEGRAM_TEXT_MAX),
@@ -228,7 +235,8 @@ export type FeedbackFromBotAnswer = z.infer<typeof feedbackFromBotAnswerSchema>
 /**
  * What became of the owner's reply once the bot tried to send it (MOL-148, Р-4): `sent` with the
  * message it went out as in the person's chat — their answer to it finds the thread by that (В-2) —
- * or `blocked`. The bot's word, after the send; a mark lost leaves the reply «unknown».
+ * `blocked`, or `failed` when Telegram refused it otherwise. The bot's word, after the send; a mark
+ * lost leaves the reply «unknown».
  */
 export const replyDeliveredSchema = z.discriminatedUnion('outcome', [
   z.strictObject({
@@ -237,5 +245,6 @@ export const replyDeliveredSchema = z.discriminatedUnion('outcome', [
     messageId: telegramMessageIdSchema,
   }),
   z.strictObject({ reply: z.int().positive(), outcome: z.literal('blocked') }),
+  z.strictObject({ reply: z.int().positive(), outcome: z.literal('failed') }),
 ])
 export type ReplyDelivered = z.infer<typeof replyDeliveredSchema>

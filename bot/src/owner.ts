@@ -157,6 +157,8 @@ export async function tellOwner(
         deadline,
       )
     } catch (error) {
+      // A notice about a message is handed again until it is said to have gone (MOL-148, adversarial
+      // В1); one about a failure goes with the failure's count still in the table.
       // A send cut by the end of the stop's time: it and the rest are given up, and said so — a
       // hung socket held the stop past compose's thirty seconds, and the kill said nothing
       // (adversarial В1).
@@ -171,7 +173,31 @@ export async function tellOwner(
         if (left > 0) console.error(`[molvia] owner: 429 flood, ${String(left)} notices given up`)
         return
       }
+      continue
     }
+    if (notice.kind === 'feedback' || notice.kind === 'feedback_continued') {
+      await saySent(api, notice.number, deadline)
+    }
+  }
+}
+
+/**
+ * The bot's word that a notice about a message went (MOL-148, adversarial В1). Lost, the API hands
+ * the notice again ten minutes on and the owner reads it twice — a named price, the other way being a
+ * message nobody reads.
+ */
+async function saySent(
+  api: MolviaBotClient,
+  message: number,
+  deadline?: AbortSignal,
+): Promise<void> {
+  try {
+    await api.ownerNoticesSent([message], deadline)
+  } catch (error) {
+    console.error(
+      `[molvia] owner notice sent: ${error instanceof ApiError ? error.code : 'unexpected'}`,
+    )
+    reportDefect(api, error, 'owner:sent')
   }
 }
 

@@ -12,6 +12,7 @@ import {
   loginCodeSchema,
   loginPreviewCodec,
   ownerNoticesSchema,
+  ownerNoticesSentSchema,
   rateFromBotSchema,
   replyDeliveredSchema,
   switchRemindersFromBotSchema,
@@ -56,6 +57,11 @@ export interface MolviaBotClient {
    * wait short — the bot's stop has a deadline of its own.
    */
   claimOwnerNotices(signal?: AbortSignal): Promise<OwnerNotices>
+  /**
+   * The notices about these messages went to the owner (MOL-148): they are not handed again. Until
+   * this is said, the API hands them again ten minutes on.
+   */
+  ownerNoticesSent(messages: readonly number[], signal?: AbortSignal): Promise<void>
   /**
    * A text written to the bot as a reply to one of its messages (MOL-148): the API says what it was
    * — the owner's reply, a person's word in a thread — or `404`, nothing of ours.
@@ -127,6 +133,15 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
       await request('/internal/feedback/delivered', z.undefined(), {
         method: 'POST',
         body: body.data,
+      })
+    },
+    ownerNoticesSent: async (messages, signal) => {
+      const body = ownerNoticesSentSchema.safeParse({ messages })
+      if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'messages')
+      await request('/internal/owner/sent', z.undefined(), {
+        method: 'POST',
+        body: body.data,
+        ...(signal === undefined ? {} : { signal }),
       })
     },
     claimOwnerNotices: async (signal) =>

@@ -155,6 +155,12 @@ describe('feedbackQuote — начало ответа в «Продолжени�
     expect(feedbackQuote(`${exact}б`)).toBe(`${exact}…`)
   })
 
+  it('переносы ответа — пробел: цитата в уведомлении одной строкой', () => {
+    expect(feedbackQuote('Починили.\n\nОбновите  \n приложение.')).toBe(
+      'Починили. Обновите приложение.',
+    )
+  })
+
   it('режет по знакам, не по половинкам пары', () => {
     const quote = feedbackQuote('🙂'.repeat(FEEDBACK_QUOTE_MAX + 5))
     expect(Array.from(quote)).toHaveLength(FEEDBACK_QUOTE_MAX + 1)
@@ -165,6 +171,7 @@ describe('feedbackQuote — начало ответа в «Продолжени�
 describe('уведомления владельцу о сообщении (MOL-148, Р-9 MOL-150)', () => {
   const notice = {
     kind: 'feedback',
+    number: 42,
     thread: 42,
     feedbackKind: 'idea',
     text: 'Список своих магазинов',
@@ -183,6 +190,7 @@ describe('уведомления владельцу о сообщении (MOL-1
     expect(
       ownerNoticeSchema.parse({
         kind: 'feedback_continued',
+        number: 57,
         thread: 42,
         quote: 'Починили',
         text: 'Спасибо',

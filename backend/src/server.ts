@@ -613,6 +613,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         claimOwnerNotices(createOwnerNoticeRepository(db), owner, new Date(), (issue) => {
           instance.log.error(describeFailure(issue), 'owner notice unreadable')
         }),
+      ownerNoticesSent: (body) =>
+        createOwnerNoticeRepository(db).markSent(body.messages, new Date()),
       feedbackFromBot: (body) => feedbackFromBot(messages, owner, body, VERSION),
       replyDelivered: (body) => messages.markDelivered(body),
     })

@@ -61,6 +61,7 @@ const noWait = () => Promise.resolve(true)
 
 const MESSAGE: OwnerNotice = {
   kind: 'feedback',
+  number: 42,
   thread: 42,
   feedbackKind: 'bug',
   text: 'Список «Что брать» не грузится, белый экран',
@@ -75,6 +76,7 @@ const MESSAGE: OwnerNotice = {
 }
 const CONTINUED: OwnerNotice = {
   kind: 'feedback_continued',
+  number: 57,
   thread: 42,
   quote: 'Починили, обновите приложение',
   text: 'Обновил, всё работает',
@@ -177,6 +179,51 @@ describe('ownerText — что прочитает владелец (MOL-143)', (
         'Подробности — make failures',
       ].join('\n'),
     )
+  })
+})
+
+describe('tellOwner — уведомление о сообщении ушло, и API это знает (MOL-148, адверсариальное В1)', () => {
+  function client(notices: OwnerNotice[]) {
+    const ownerNoticesSent = vi.fn<MolviaBotClient['ownerNoticesSent']>(() => Promise.resolve())
+    const api = {
+      claimOwnerNotices: vi.fn(() => Promise.resolve({ to: OWNER, notices })),
+      ownerNoticesSent,
+      reportFailure: vi.fn(() => Promise.resolve()),
+    } as unknown as MolviaBotClient
+    return { api, ownerNoticesSent }
+  }
+
+  it('отправленные сообщения называются API по номерам, сбой — нет', async () => {
+    const { api: telegramApi } = telegram()
+    const { api, ownerNoticesSent } = client([NEW, MESSAGE, CONTINUED])
+
+    await tellOwner(api, telegramApi, noWait)
+
+    expect(ownerNoticesSent.mock.calls.map((call) => call[0] as unknown)).toEqual([[42], [57]])
+  })
+
+  it('Telegram не принял (502, 429) — не названо: API выдаст его снова', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    for (const code of [502, 429]) {
+      const { api: telegramApi } = telegram(code)
+      const { api, ownerNoticesSent } = client([MESSAGE, CONTINUED])
+
+      await tellOwner(api, telegramApi, noWait)
+
+      expect(ownerNoticesSent).not.toHaveBeenCalled()
+    }
+  })
+
+  it('слово «ушло» не дошло до API — строка в логе, остальные отправляются', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api: telegramApi, sent } = telegram()
+    const { api, ownerNoticesSent } = client([MESSAGE, CONTINUED])
+    ownerNoticesSent.mockImplementationOnce(() => Promise.reject(new ApiError(ERROR.INTERNAL)))
+
+    await tellOwner(api, telegramApi, noWait)
+
+    expect(sent).toHaveLength(2)
+    expect(errors).toHaveBeenCalledWith('[molvia] owner notice sent: error.internal')
   })
 })
 

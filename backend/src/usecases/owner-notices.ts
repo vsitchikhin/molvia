@@ -11,7 +11,7 @@ import type { OwnerNoticeRepository } from '@/db/owner-notices-repository'
  * marked with the rest, so it is said once through `unreadable` and never handed out again.
  */
 export async function claimOwnerNotices(
-  notices: OwnerNoticeRepository,
+  notices: Pick<OwnerNoticeRepository, 'claim'>,
   owner: TelegramUserId | null,
   at: Date,
   unreadable: (issue: unknown) => void,

@@ -1719,6 +1719,10 @@ export const feedback = pgTable(
     threadHead: boolean('thread_head').generatedAlwaysAs(
       (): SQL => sql`case when thread_id is not null then true end`,
     ),
+    // The thread a row is of — its first message's id — for the key a continuation answers by.
+    threadKey: bigint('thread_key', { mode: 'number' })
+      .notNull()
+      .generatedAlwaysAs((): SQL => sql`coalesce(thread_id, id)`),
     clientKey: uuid('client_key'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -1730,17 +1734,20 @@ export const feedback = pgTable(
     unique('feedback_actor_client_key').on(table.actorId, table.clientKey),
     unique('feedback_id_actor_key').on(table.id, table.actorId),
     unique('feedback_id_actor_head_key').on(table.id, table.actorId, table.head),
+    unique('feedback_id_actor_thread_key').on(table.id, table.actorId, table.threadKey),
     // A continuation names a first message of the same person, and goes with it.
     foreignKey({
       name: 'feedback_thread_is_owners',
       columns: [table.threadId, table.actorId, table.threadHead],
       foreignColumns: [table.id, table.actorId, table.head],
     }).onDelete('cascade'),
-    // A continuation answers the owner's reply to the same person, never another's.
+    // A continuation answers the owner's reply in its own thread, never another's — not even another
+    // thread of the same person, or `purgeStale` took the fresh word with the old thread (MOL-148,
+    // adversarial В5).
     foreignKey({
       name: 'feedback_answers_own_reply',
-      columns: [table.inReplyTo, table.actorId],
-      foreignColumns: [feedbackReplies.id, feedbackReplies.actorId],
+      columns: [table.inReplyTo, table.actorId, table.threadKey],
+      foreignColumns: [feedbackReplies.id, feedbackReplies.actorId, feedbackReplies.threadId],
     }).onDelete('cascade'),
     // The day's limit counts one person's messages over a window.
     index('feedback_actor_created_idx').on(table.actorId, table.createdAt),
@@ -1763,8 +1770,9 @@ export const feedback = pgTable(
 
 /**
  * The owner's replies (MOL-150, Р-1), written by the bot's half (MOL-148). Kept so the copy is whole
- * and a continuation shows the owner what is answered; they go with their message. `actor_id` is the
- * message's author, there for the key a continuation answers by (adversarial В5).
+ * and a continuation shows the owner what is answered; they go with their message. `actor_id` and
+ * `thread_id` are the message's author and thread, there for the key a continuation answers by
+ * (adversarial В5 of MOL-147 and of MOL-148).
  *
  * `telegram_message_id` is the message the reply went out as in the person's chat (MOL-148, В-2): a
  * person answering it in Telegram is how their word finds its thread, with no number shown to them.
@@ -1776,6 +1784,7 @@ export const feedbackReplies = pgTable(
     id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
     feedbackId: bigint('feedback_id', { mode: 'number' }).notNull(),
     actorId: uuid('actor_id').notNull(),
+    threadId: bigint('thread_id', { mode: 'number' }).notNull(),
     text: text('text').notNull(),
     delivered: text('delivered').$type<FeedbackDelivery>(),
     telegramMessageId: bigint('telegram_message_id', { mode: 'number' }),
@@ -1786,10 +1795,10 @@ export const feedbackReplies = pgTable(
   (table) => [
     foreignKey({
       name: 'feedback_replies_message_is_owners',
-      columns: [table.feedbackId, table.actorId],
-      foreignColumns: [feedback.id, feedback.actorId],
+      columns: [table.feedbackId, table.actorId, table.threadId],
+      foreignColumns: [feedback.id, feedback.actorId, feedback.threadKey],
     }).onDelete('cascade'),
-    unique('feedback_replies_id_actor_key').on(table.id, table.actorId),
+    unique('feedback_replies_id_actor_thread_key').on(table.id, table.actorId, table.threadId),
     unique('feedback_replies_telegram_message_key').on(table.actorId, table.telegramMessageId),
     index('feedback_replies_feedback_idx').on(table.feedbackId),
     check(
@@ -1867,6 +1876,10 @@ export const ownerNotices = pgTable(
     }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
     handedAt: timestamp('handed_at', { withTimezone: true }),
+    // A notice about a message is handed until the bot says it went (MOL-148, adversarial В1): the
+    // table holds nothing else of it, so a send that failed must not lose it.
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    tries: smallint('tries').notNull().default(0),
   },
   (table) => [
     check('owner_notices_kind_known', oneOf(table.kind, OWNER_NOTICE_KINDS)),

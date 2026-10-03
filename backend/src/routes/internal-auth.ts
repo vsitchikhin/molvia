@@ -11,6 +11,7 @@ import {
   feedbackFromBotSchema,
   loginPreviewCodec,
   ownerNoticesSchema,
+  ownerNoticesSentSchema,
   rateFromBotSchema,
   replyDeliveredSchema,
   switchRemindersFromBotSchema,
@@ -22,6 +23,7 @@ import type {
   FeedbackFromBotAnswer,
   LoginPreview,
   OwnerNotices,
+  OwnerNoticesSent,
   RateFromBot,
   ReplyDelivered,
   SwitchRemindersFromBot,
@@ -44,6 +46,7 @@ export function internalAuthRoutes(
     switchReminders(body: SwitchRemindersFromBot): Promise<void>
     reportFailure(body: BotFailure): Promise<void>
     claimOwnerNotices(): Promise<OwnerNotices>
+    ownerNoticesSent(body: OwnerNoticesSent): Promise<void>
     feedbackFromBot(body: FeedbackFromBot): Promise<FeedbackFromBotAnswer>
     replyDelivered(body: ReplyDelivered): Promise<void>
   },
@@ -124,6 +127,12 @@ export function internalAuthRoutes(
     scope.post('/internal/owner/claim', { onRequest: refuseAnyBody }, async (request) => {
       parseQuery(z.strictObject({}), request.query)
       return ownerNoticesSchema.parse(await api.claimOwnerNotices())
+    })
+    // The notices about messages the bot sent (MOL-148): those are not handed again.
+    scope.post('/internal/owner/sent', async (request, reply) => {
+      parseQuery(z.strictObject({}), request.query)
+      await api.ownerNoticesSent(parseBody(ownerNoticesSentSchema, request.body))
+      return reply.code(204).send()
     })
     // «Написать разработчику» in the bot (MOL-148): a text written as a reply to the bot — the
     // owner's reply or a person's word — and what became of a reply sent. Who is the owner, and

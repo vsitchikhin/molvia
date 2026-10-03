@@ -19,6 +19,7 @@ const ANNA_TELEGRAM = 777
 
 const NOTICE: OwnerNotice = {
   kind: 'feedback',
+  number: 42,
   thread: 42,
   feedbackKind: 'bug',
   text: 'Список «Что брать» не грузится',
@@ -131,7 +132,6 @@ describe('ответ владельца на уведомление (MOL-148, Р
     expect(seen).toEqual([
       {
         telegramUserId: OWNER.id,
-        messageId: 501,
         repliedMessageId: 500,
         thread: 42,
         text: 'Fixed, please update',
@@ -199,6 +199,21 @@ describe('ответ владельца на уведомление (MOL-148, Р
     expect(switchReminders).not.toHaveBeenCalledWith(ANNA_TELEGRAM, 'unblocked')
     expect(sent(calls, 'setMessageReaction')).toEqual([])
     expect(replies(calls)).toContain(t('ru', 'feedback.blocked'))
+  })
+
+  it('Telegram не принял ответ (400) — исход failed, владельцу «Не отправлено» (В4)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const replyDelivered = vi.fn(() => Promise.resolve())
+    const { bot, calls } = harness(
+      { feedbackFromBot: answering(answered), replyDelivered },
+      (method, chat) => (method === 'sendMessage' && chat === ANNA_TELEGRAM ? 400 : undefined),
+    )
+
+    await bot.handleUpdate(replyTo({ text: ownerText(NOTICE) }, { text: 'Починили' }))
+
+    expect(replyDelivered).toHaveBeenCalledWith({ reply: 17, outcome: 'failed' })
+    expect(sent(calls, 'setMessageReaction')).toEqual([])
+    expect(replies(calls)).toContain(t('ru', 'feedback.notSent'))
   })
 
   it('отметка об отправке не дошла до API — владелец всё равно видит 👌', async () => {
@@ -282,15 +297,51 @@ describe('продолжение нити и чужое (MOL-148, В-1 MOL-150, 
     expect(seen[0]?.thread).toBeNull()
   })
 
-  it('не наше (404) — апдейт идёт дальше, к приветствию, как раньше', async () => {
-    const { bot, calls } = harness({
-      feedbackFromBot: answering(new ApiError(ERROR.NOT_FOUND)),
-    })
+  it('ответ на приветствие или напоминание в API не идёт: приветствие, даже когда API лежит (В2)', async () => {
+    const feedbackFromBot = answering(new ApiError(ERROR.INTERNAL))
+    const { bot, calls } = harness({ feedbackFromBot })
 
     await bot.handleUpdate(
-      replyTo({ text: 'Вчера · Ереван Сити — Молоко' }, { from: ANNA, text: 'Привет' }),
+      replyTo({ text: 'Вчера · Ереван Сити — Молоко' }, { from: ANNA, text: 'А как войти?' }),
+    )
+    await bot.handleUpdate(
+      replyTo(
+        { text: t(undefined, 'start.greeting', { url: 'https://molvia.test' }) },
+        { from: ANNA, text: 'Привет' },
+      ),
     )
 
+    expect(feedbackFromBot).not.toHaveBeenCalled()
+    expect(replies(calls)).toEqual([
+      t(undefined, 'start.greeting', { url: 'https://molvia.test' }),
+      t(undefined, 'start.greeting', { url: 'https://molvia.test' }),
+    ])
+  })
+
+  it('рамка узнаётся на любом языке бота', async () => {
+    const seen: FeedbackFromBot[] = []
+    const { bot } = harness({ feedbackFromBot: answering({ outcome: 'continued' }, seen) })
+
+    for (const locale of ['ru', 'en'] as const) {
+      await bot.handleUpdate(
+        replyTo({ text: replyFrame('Ответ', '2026-10-03', locale) }, { from: ANNA, text: locale }),
+      )
+    }
+
+    expect(seen.map((message) => message.text)).toEqual(['ru', 'en'])
+  })
+
+  it('команда ответом на рамку — боту, не разработчику (В6)', async () => {
+    const feedbackFromBot = answering({ outcome: 'continued' })
+    const { bot, calls } = harness({ feedbackFromBot })
+    const update = replyTo({ text: frame }, { from: ANNA, text: '/start' })
+    ;(update.message as { entities?: unknown }).entities = [
+      { type: 'bot_command', offset: 0, length: 6 },
+    ]
+
+    await bot.handleUpdate(update)
+
+    expect(feedbackFromBot).not.toHaveBeenCalled()
     expect(replies(calls)).toEqual([t(undefined, 'start.greeting', { url: 'https://molvia.test' })])
   })
 
