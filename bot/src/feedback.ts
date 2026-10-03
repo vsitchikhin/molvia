@@ -3,7 +3,7 @@ import type { Context } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
 import { ERROR, LOCALES } from '@molvia/model'
-import type { AppLocale, FeedbackFromBotAnswer } from '@molvia/model'
+import type { AppLocale, FeedbackFromBot, FeedbackFromBotAnswer } from '@molvia/model'
 import { telegramFailure } from './assemble'
 import { t } from './i18n'
 import type { MessageKey } from './i18n'
@@ -82,7 +82,7 @@ export function feedbackComposer({ api }: FeedbackDeps): Composer<Context> {
       await next()
       return
     }
-    const thread = threadTagOf(replied.text ?? '')
+    const thread = threadTagOf(replied.text ?? replied.caption ?? '')
     const command = ctx.message.entities?.some(
       (entity) => entity.type === 'bot_command' && entity.offset === 0,
     )
@@ -97,11 +97,18 @@ export function feedbackComposer({ api }: FeedbackDeps): Composer<Context> {
         reply_parameters: { message_id: ctx.message.message_id },
       })
     }
-    const text = ctx.message.text
-    if (text === undefined) {
-      // A photo on a tagged notice must not look sent; on a frame the bot stays quiet, as before.
-      if (thread === null) await next()
-      else await say('feedback.textOnly')
+    const word = wordOf(ctx.message)
+    // The owner's reply is words only (MOL-167, Р-9): a picture, a sticker or a file on a tagged
+    // notice must not look sent — nor a photo's caption go without its photo.
+    if (thread !== null && (typeof word === 'string' || word.picture !== undefined)) {
+      await say('feedback.textOnly')
+      return
+    }
+    if (typeof word === 'string') {
+      // A picture sent as a file keeps its EXIF — where and when it was taken (MOL-167, Р-8); on a
+      // frame anything else that is not a word stays quiet, as before.
+      if (word === 'a file' && isPhotoFile(ctx.message)) await say('feedback.photoOnly')
+      else await next()
       return
     }
 
@@ -111,7 +118,7 @@ export function feedbackComposer({ api }: FeedbackDeps): Composer<Context> {
         telegramUserId: ctx.from.id,
         repliedMessageId: replied.message_id,
         thread,
-        text,
+        ...word,
       })
     } catch (error) {
       if (error instanceof ApiError && error.code === ERROR.NOT_FOUND) {
@@ -128,7 +135,7 @@ export function feedbackComposer({ api }: FeedbackDeps): Composer<Context> {
 
     switch (answer.outcome) {
       case 'answered':
-        await deliver(ctx, api, answer, text, say)
+        await deliver(ctx, api, answer, word.text ?? '', say)
         return
       case 'continued':
         await say('feedback.passed')
@@ -149,6 +156,49 @@ export function feedbackComposer({ api }: FeedbackDeps): Composer<Context> {
   })
 
   return composer
+}
+
+type Word = Pick<FeedbackFromBot, 'text' | 'picture'>
+
+interface Incoming {
+  readonly text?: string
+  readonly caption?: string
+  readonly photo?: readonly {
+    file_id: string
+    file_unique_id: string
+    width: number
+    height: number
+    file_size?: number
+  }[]
+  readonly document?: { readonly mime_type?: string }
+}
+
+/**
+ * What a reply to the bot says (MOL-167): its text; a photo, its caption with it if there is one —
+ * the largest size Telegram keeps, by its id, the bytes left in Telegram; `a file` for a document,
+ * which keeps its EXIF; `not ours` for anything else, a sticker or a voice, on to the greeting.
+ */
+function wordOf(message: Incoming): Word | 'a file' | 'not ours' {
+  if (message.text !== undefined) return { text: message.text }
+  const largest = message.photo?.at(-1)
+  if (largest !== undefined) {
+    return {
+      ...(message.caption === undefined ? {} : { text: message.caption }),
+      picture: {
+        fileId: largest.file_id,
+        fileUniqueId: largest.file_unique_id,
+        width: largest.width,
+        height: largest.height,
+        bytes: largest.file_size ?? null,
+      },
+    }
+  }
+  return message.document === undefined ? 'not ours' : 'a file'
+}
+
+/** A file that is a picture: the person meant to send a screenshot, and is told how. */
+function isPhotoFile(message: Incoming): boolean {
+  return message.document?.mime_type?.startsWith('image/') === true
 }
 
 /**

@@ -30,6 +30,8 @@ import {
   FEEDBACK_DELIVERY,
   FEEDBACK_NOTICE_KINDS,
   FEEDBACK_KINDS,
+  FEEDBACK_PICTURES_MAX,
+  FEEDBACK_PICTURE_BYTES_MAX,
   LOCALES,
   LOGIN_CODE_MAX,
   REMINDERS_OFF,
@@ -1784,6 +1786,9 @@ export const feedback = pgTable(
       .notNull()
       .generatedAlwaysAs((): SQL => sql`coalesce(thread_id, id)`),
     clientKey: uuid('client_key'),
+    // How many pictures went with it (MOL-167): `feedback_pictures` holds them, this only the count,
+    // so the rule «words or a picture» is the table's own.
+    pictures: smallint('pictures').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .default(sql`clock_timestamp()`),
@@ -1823,6 +1828,12 @@ export const feedback = pgTable(
     check(
       'feedback_continuation_answers',
       sql`(${table.threadId} is null) = (${table.inReplyTo} is null)`,
+    ),
+    // Words, a picture, or both (MOL-167, В-3).
+    check('feedback_says_something', sql`${table.text} <> '' or ${table.pictures} > 0`),
+    check(
+      'feedback_pictures_range',
+      sql`${table.pictures} between 0 and ${sql.raw(String(FEEDBACK_PICTURES_MAX))}`,
     ),
   ],
 )
@@ -1967,6 +1978,86 @@ export const ownerNotices = pgTable(
 
 /** Bytes as Postgres keeps them: a receipt's photo and its cut-out lines (MOL-125). */
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' })
+
+/**
+ * The pictures of a message to the developer (MOL-167), by their position: the line of each that
+ * stays with the message — where it came from, its sides and size, and when it reached the owner's
+ * Telegram (`sent_at`, empty for one that never did). The picture itself is `feedback_picture_files`,
+ * kept only until then (В-1).
+ *
+ * A picture comes from the phone — a JPEG the API stripped of its metadata (Р-2) — or from Telegram,
+ * a photo a person sent the bot (Р-8). `fingerprint` tells the same picture sent again from another —
+ * the sha256 of the bytes kept, or Telegram's `file_unique_id` — and outlives the picture, since a
+ * repeat is looked for after it went.
+ */
+export const feedbackPictures = pgTable(
+  'feedback_pictures',
+  {
+    feedbackId: bigint('feedback_id', { mode: 'number' })
+      .notNull()
+      .references(() => feedback.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    source: text('source').$type<'phone' | 'telegram'>().notNull(),
+    fingerprint: text('fingerprint').notNull(),
+    bytes: integer('bytes'),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.feedbackId, table.position] }),
+    check(
+      'feedback_pictures_position_range',
+      sql`${table.position} between 1 and ${sql.raw(String(FEEDBACK_PICTURES_MAX))}`,
+    ),
+    check('feedback_pictures_source_known', sql`${table.source} in ('phone', 'telegram')`),
+    check('feedback_pictures_bytes_size', sql`${table.bytes} is null or ${table.bytes} > 0`),
+    check('feedback_pictures_sides_positive', sql`${table.width} > 0 and ${table.height} > 0`),
+  ],
+)
+
+/**
+ * A picture of a message while it waits for the owner's bot (MOL-167, В-1): the phone's JPEG, or the
+ * id Telegram keeps a person's photo by. The row goes when the bot says the notice went, or after
+ * `FEEDBACK_PICTURE_KEPT_DAYS` the bot never took it — the bot away, or a copy with no owner. **Never
+ * in the nightly copy** (`backup.sh`), as a receipt's photo: a table of its own, so the line of a
+ * picture in `feedback_pictures` comes back from a restore while the picture does not (adversarial А5).
+ */
+export const feedbackPictureFiles = pgTable(
+  'feedback_picture_files',
+  {
+    feedbackId: bigint('feedback_id', { mode: 'number' }).notNull(),
+    position: smallint('position').notNull(),
+    image: bytea('image'),
+    telegramFileId: text('telegram_file_id'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.feedbackId, table.position] }),
+    foreignKey({
+      name: 'feedback_picture_files_line',
+      columns: [table.feedbackId, table.position],
+      foreignColumns: [feedbackPictures.feedbackId, feedbackPictures.position],
+    }).onDelete('cascade'),
+    // One or the other: the phone's bytes, or Telegram's id.
+    check(
+      'feedback_picture_files_one_source',
+      sql`(${table.image} is null) <> (${table.telegramFileId} is null)`,
+    ),
+    check(
+      'feedback_picture_files_image_size',
+      sql`${table.image} is null
+          or octet_length(${table.image}) between 1 and ${sql.raw(String(FEEDBACK_PICTURE_BYTES_MAX))}`,
+    ),
+    // The timer looks for pictures held past their week.
+    index('feedback_picture_files_created_idx').on(table.createdAt),
+  ],
+)
 
 /**
  * A receipt photographed on the phone and read on our server (MOL-125). Named by the device, as

@@ -289,6 +289,17 @@ const file: ExportFile = {
       inReplyTo: null,
       createdAt: at,
       replies: [{ number: 7, text: 'Починили', delivered: 'sent', createdAt: at }],
+      pictures: [
+        {
+          position: 1,
+          source: 'phone',
+          width: 1179,
+          height: 2556,
+          bytes: 412_000,
+          createdAt: at,
+          sentAt: at,
+        },
+      ],
     },
     {
       number: 42,
@@ -305,6 +316,7 @@ const file: ExportFile = {
       inReplyTo: 7,
       createdAt: at,
       replies: [],
+      pictures: [],
     },
   ],
   catalogue: {
@@ -332,7 +344,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(10)
+    expect(wire.version).toBe(11)
     expect(wire.receipts[0]?.lines[0]?.quantity).toEqual({ value: '2.000', unit: 'piece' })
     expect(wire.feedback[1]).toMatchObject({ thread: 41, inReplyTo: 7, replies: [] })
     expect(wire.budgetPlans[0]?.plan).toEqual({

@@ -11,6 +11,9 @@ paths:
   - 'frontend/src/components/FeedbackSheet.vue'
   - 'frontend/src/stores/feedback*.ts'
   - 'frontend/src/platform.ts'
+  - 'frontend/src/feedbackPicture*.ts'
+  - 'backend/src/feedback/**'
+  - 'bot/src/owner.ts'
   - 'e2e/feedback.spec.ts'
 ---
 
@@ -18,7 +21,8 @@ paths:
 
 The detail behind the feedback lines of `CLAUDE.md`. The epic is MOL-141, its decisions MOL-150
 (В-1…В-6, Р-1…Р-17 in `.scratch/tasks/requirements/MOL-150.md`); the message, its sheet and its two
-ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread continued — MOL-148.
+ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread continued — MOL-148,
+a screenshot with it MOL-167 (В-1…В-5, Р-1…Р-13 in `.scratch/tasks/requirements/MOL-167.md`).
 
 ## What a message is
 
@@ -29,6 +33,10 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
   (MOL-146): the schema has no default. Only the error screen opens the sheet on «Сломалось»,
   because there the person said so by tapping «Сообщить о проблеме».
 - **The text is `visibleText(2000)`** — the one rule of the domain for what draws, as a review's is.
+- **Words, a picture, or both** (MOL-167, В-3): «Сломалось» with a screenshot, its screen and its code
+  often says it all, and «пришлите скрин» in the bot is answered by a photo with no caption. A text
+  sent must still have something visible; a message with neither is refused — `text` absent from the
+  body, `''` in the row, and `feedback_says_something` holds it in the base.
 
 ## What goes with the text
 
@@ -76,6 +84,82 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
   `error.feedback_rate_limited`, `429`; the sheet keeps the text.
 - **The number is the server's**, an identity counting up — the `#fb42` the owner sees. The screen
   does not show it (Р-13).
+
+## A screenshot (MOL-167)
+
+- **Only what the person attaches, and only from the gallery** (MOL-150, В-6): a screen shows other
+  people's prices and one's own spendings — exactly what the epic forbade to attach in silence — so a
+  picture goes only by the person's own act, and they see it before sending. No snapshot of the page is
+  taken programmatically: a library and an inexact picture. At most `FEEDBACK_PICTURES_MAX` (3, В-2).
+- **The phone draws every picture anew** (`pictureFromFile`, Р-1): the orientation applied while
+  decoding, the longest side to `FEEDBACK_PICTURE_SIDE`, a JPEG at 0.85, then 0.7, then smaller, until it
+  fits `FEEDBACK_PICTURE_BYTES_MAX`. **A canvas writes only its own** (review 3): WebKit an EXIF of
+  the colour space and the sides and an APP13, Chromium an ICC profile — nothing of the file chosen,
+  never where it was taken; the API cuts those too. What the sheet shows is the drawing, never the
+  file chosen. The drawing's path — the orientation, the canvas, the JPEG — is held on WebKit too, by a
+  probe in `sheet.spec.ts`: WebKit keeps no session on the test's loopback, so the sheet itself is held
+  on Chromium only (review 2).
+- **The API does not take the phone's word** (`pictureOf`, Р-2): a JPEG by its frame, sides
+  100…4 000 and no more than twenty times as long as wide (Telegram's limit for a photo), and **nothing
+  but the picture** (`withoutMetadata`, review 1, adversarial А2): every segment is walked — between
+  the scans of a progressive JPEG too, the entropy-coded data skipped by its stuffed bytes and restarts —
+  every APP segment but a plain JFIF without its thumbnail and Adobe's twelve bytes of colour transform
+  (review 9: cut, a JPEG saved as RGB or CMYK comes out in the wrong colours), and every comment, is cut
+  wherever it stands,
+  and whatever follows the end of the picture is cut — a second JPEG of MPF or Ultra HDR with its own
+  EXIF, any tail. A client changed by hand must not carry where a photo was taken. **More than 256
+  markers outside the scans is no picture** (А3, Б1), one with no length counted as one with — and a
+  restart or a TEM before the first scan is none at all: a real picture has a few dozen, and two
+  megabytes of empty segments, or of two-byte markers, held the API's thread for a hundred
+  milliseconds a picture. Not one — `error.feedback_picture_invalid`,
+  `415`; too heavy — `error.feedback_picture_too_large`, `413`; the text and the other pictures stay on
+  the phone. **The price, named** (А3): a body of eight megabytes is read — JSON, base64 — before
+  anything is counted, some fifty milliseconds of the thread, and a refused one is not counted in the
+  day's limit; a person with a session could send them in a row. Not closed before 0.2: a limit of
+  heavy bodies in memory is the next step if the log ever shows it.
+- **One request** (Р-3): the pictures go in base64 in `POST /feedback`, written with the message in one
+  transaction, so a repeat compares them too — by `fingerprint`, the sha256 of the bytes kept, which
+  outlives them. The body's limit is the route's alone (`FEEDBACK_BODY_BYTES_MAX`), and too large by
+  its `Content-Length` says its own code before the body is read; every other route keeps a megabyte.
+  A separate upload would have needed a table of pictures waiting for their message.
+- **The picture lives only until the owner's Telegram has it** (В-1): it waits in a table of its own,
+  `feedback_picture_files` — the phone's bytes or Telegram's id — and its row goes with the bot's word
+  that the notice went, in that transaction, or after `FEEDBACK_PICTURE_KEPT_DAYS` (7) the bot never
+  took it — the bot away, or a copy with no owner. What stays is the line in `feedback_pictures`:
+  place, source, sides, size, and `sent_at` **for every picture the bot did not name as missed**
+  (adversarial А4, Б4) — one the timer let go before the bot came, or Telegram refused, never reached
+  the owner, and the bot, which found it gone or saw the refusal, is what knows it; a file the timer
+  let go while its picture was on its way still went. The copy shows the line and never a picture. **The
+  nightly copy leaves out the files, not the lines** (`backup.sh`, А5): a restored message still says
+  what it had, and its repeat is still the same message. The copy in the owner's chat stays, as the
+  text's does (В-3 of MOL-150), and `/privacy` says Telegram sees it.
+- **A photo from the bot is kept by Telegram's id** (Р-8): `source = telegram`, `fingerprint` its
+  `file_unique_id` — the same photo sent twice to the same reply within a day is one word. **A caption
+  that draws nothing is no words** (`drawsNothing`, review 5): the photo goes alone, as В-3 allows.
+- **The day's limit is the message's** (Р-10): pictures do not count apart.
+- **In the sheet** (В-4 «б»: no handoff drew it — the brief of MOL-147 left it out — so it is built
+  from the sheet's own kit and tokens): a row under the field, each picture shown whole (`contain`,
+  never cropped — the person checks what goes) with «Убрать» on a thumb-sized corner, and «Приложить
+  снимок» as a label over a native file input — the gallery's own picker, by tap, keyboard and screen
+  reader alike — while there is room; before any, a line says a screenshot is made with the phone's
+  buttons. The pictures are the content: one added or taken away takes a new key (Р-6), and the line
+  of what goes with the text starts with «2 снимка». The button waits for words or a picture, and
+  while a picture is drawn; **words are what draws something**, by the domain's `drawsNothing` — a
+  word joiner beside a picture is no words, and the picture goes alone (review 5). Each file chosen is
+  tried on its own, and the first refusal said (adversarial А6). **The pictures live in the page's
+  memory**, the draft keeps their number: megabytes on the shelf would push out the queue of purchases
+  kept there. Where the draft has more than the page holds — a reload, or another window that holds
+  them — the sheet says «Снимки не сохранились». **A draft that never left keeps its key**: a new key at
+  the opening kept the other window's draft from going when that window sent it (review 7); the next
+  change takes a key, as any does. **One that has begun to leave takes a new key at once** (Б3): the
+  server may hold it with its pictures, and the same key without them was a sure `409` and «Не
+  получилось». **The price**: a message whose answer was lost with its pictures, sent again without
+  them, is a second message. A picture the API refused is
+  said under the pictures, never as a failure of the message. **The pictures go with the message
+  sent, the sheet open or not** (adversarial А1): kept, the next message opened with a screenshot
+  already sent, one kind away from sending it again. **«Another message» is the key's**, for the draft
+  and the pictures alike (Б2): a word or a picture changed while it was on its way makes another
+  message, and its pictures stay — never taken from under the finger. The body is read at the press, never with every letter (review 6).
 
 ## Threads, replies, the term
 

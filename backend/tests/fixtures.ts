@@ -231,3 +231,35 @@ export async function tripContext(db: Db, owner: string): Promise<ActorSettings>
     },
   )
 }
+
+const jpegSegment = (marker: number, body: readonly number[]) => [
+  0xff,
+  marker,
+  (body.length + 2) >> 8,
+  (body.length + 2) & 0xff,
+  ...body,
+]
+
+/**
+ * A screenshot as a phone's gallery hands it over, in base64 (MOL-167): a JPEG of these sides, and
+ * with `gps` an EXIF block naming where it was taken — what the API must strip. `seed` makes the
+ * picture another one at the same size.
+ */
+export function aScreenshot(width = 1179, height = 2556, { gps = false, seed = 0 } = {}): string {
+  const exif = gps
+    ? jpegSegment(0xe1, [...Buffer.from('Exif\0\0GPS 40.7942N 43.8453E', 'latin1')])
+    : []
+  return Buffer.from([
+    0xff,
+    0xd8,
+    ...jpegSegment(0xe0, [...Buffer.from('JFIF\0', 'latin1'), 1, 1, 0, 0, 1, 0, 1, 0, 0]),
+    ...exif,
+    ...jpegSegment(0xc0, [0x08, height >> 8, height & 0xff, width >> 8, width & 0xff, 0x01]),
+    ...jpegSegment(0xda, [0x01, 0x01, 0x00, 0x00, 0x3f, 0x00]),
+    0x55,
+    seed & 0x7f,
+    0x55,
+    0xff,
+    0xd9,
+  ]).toString('base64')
+}

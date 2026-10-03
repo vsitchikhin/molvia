@@ -41,7 +41,7 @@ describe('sendFeedback', () => {
     )
 
     expect(answer).toEqual({ sent: { number: 42 }, created: true })
-    expect(calls).toEqual([[ACTOR, message, 'v0.2.0', FEEDBACK_DAY_LIMIT, true]])
+    expect(calls).toEqual([[ACTOR, message, [], 'v0.2.0', FEEDBACK_DAY_LIMIT, true]])
   })
 
   it('queues nothing for the owner where there is none — every copy and end-to-end', async () => {
@@ -49,7 +49,7 @@ describe('sendFeedback', () => {
 
     await sendFeedback(fake({ kind: 'written', number: 42 }, calls), ACTOR, message, 'dev', null)
 
-    expect(calls).toEqual([[ACTOR, message, 'dev', FEEDBACK_DAY_LIMIT, false]])
+    expect(calls).toEqual([[ACTOR, message, [], 'dev', FEEDBACK_DAY_LIMIT, false]])
   })
 
   it('answers a repeat with the number written before, as not created', async () => {
@@ -62,6 +62,38 @@ describe('sendFeedback', () => {
     )
 
     expect(answer).toEqual({ sent: { number: 42 }, created: false })
+  })
+
+  it('hands the repository the pictures stripped, and writes nothing for a picture refused', async () => {
+    const calls: unknown[][] = []
+    const screenshot = (width: number) =>
+      Buffer.from([
+        ...[0xff, 0xd8],
+        ...[0xff, 0xe1, 0x00, 0x08, ...Buffer.from('GPS:1', 'latin1'), 0x00],
+        ...[0xff, 0xc0, 0x00, 0x08, 0x08, 0x09, 0xfc, width >> 8, width & 0xff, 0x01],
+        ...[0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x55, 0xff, 0xd9],
+      ]).toString('base64')
+
+    await sendFeedback(
+      fake({ kind: 'written', number: 42 }, calls),
+      ACTOR,
+      { ...message, pictures: [screenshot(1179)] },
+      'dev',
+      OWNER,
+    )
+    const [handed] = calls[0]?.[2] as { image: Buffer; width: number; height: number }[]
+    expect(handed).toMatchObject({ width: 1179, height: 2556 })
+    expect(handed?.image.includes(Buffer.from('GPS'))).toBe(false)
+
+    const refused = sendFeedback(
+      fake({ kind: 'written', number: 43 }, calls),
+      ACTOR,
+      { ...message, pictures: [screenshot(1179), screenshot(50)] },
+      'dev',
+      OWNER,
+    )
+    await expect(refused).rejects.toMatchObject({ code: ERROR.FEEDBACK_PICTURE_INVALID })
+    expect(calls).toHaveLength(1)
   })
 
   it('refuses past the day’s limit by its own code', async () => {

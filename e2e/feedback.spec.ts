@@ -231,3 +231,79 @@ test('the keys up: the sheet stays and its field keeps the focus', async ({ page
   await field.pressSequentially('Клавиатура держится')
   await expect(field).toHaveValue('Клавиатура держится')
 })
+
+/** A screenshot as a phone's gallery would hand it over: a PNG the browser itself draws. */
+async function aScreenshot(page: Page, width = 390, height = 844): Promise<Buffer> {
+  const url = await page.evaluate(
+    ([w, h]) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const context = canvas.getContext('2d')
+      if (context) {
+        context.fillStyle = '#f3e8d6'
+        context.fillRect(0, 0, w, h)
+        context.fillStyle = '#8a4a1c'
+        context.fillRect(20, 60, w - 40, 80)
+      }
+      return canvas.toDataURL('image/png')
+    },
+    [width, height] as const,
+  )
+  return Buffer.from(url.slice(url.indexOf(',') + 1), 'base64')
+}
+
+// MOL-167: the person attaches a screenshot from the gallery and sees it before it goes; the server
+// keeps it until the owner's bot has it — none in e2e — and the copy shows its line, never the picture.
+test('a screenshot attached: shown before sending, and its line in the copy', async ({ page }) => {
+  await signedIn(page, '/settings')
+  await page.getByRole('button', { name: 'Написать разработчику' }).click()
+  const sheet = await opened(page)
+  await sheet.getByText('Сломалось', { exact: true }).click()
+  await expect(
+    sheet.getByRole('button', { name: 'Напишите сообщение или приложите снимок' }),
+  ).toBeVisible()
+
+  await sheet
+    .locator('input[type="file"]')
+    .setInputFiles({ name: 'screen.png', mimeType: 'image/png', buffer: await aScreenshot(page) })
+
+  await expect(sheet.getByRole('img', { name: 'Снимок 1' })).toBeVisible()
+  await expect(sheet.locator('.attached')).toContainText('1 снимок')
+  // A picture alone says enough: no words asked for (В-3).
+  await sheet.getByRole('button', { name: 'Отправить' }).click()
+  await expect(sheet.getByText('Спасибо, прочитаем', { exact: true })).toBeVisible()
+
+  const [message] = await written(page)
+  expect(message).toMatchObject({ kind: 'bug', text: '', route: 'settings' })
+  expect(message?.pictures).toEqual([
+    {
+      position: 1,
+      source: 'phone',
+      width: 390,
+      height: 844,
+      bytes: expect.any(Number) as unknown,
+      createdAt: expect.any(Date) as unknown,
+      sentAt: null,
+    },
+  ])
+})
+
+test('a screenshot taken away before sending does not go', async ({ page }) => {
+  await signedIn(page, '/settings')
+  await page.getByRole('button', { name: 'Написать разработчику' }).click()
+  const sheet = await opened(page)
+  await sheet.getByText('Идея', { exact: true }).click()
+  await sheet.getByLabel('Сообщение').fill('Цены в рублях')
+  await sheet
+    .locator('input[type="file"]')
+    .setInputFiles({ name: 'screen.png', mimeType: 'image/png', buffer: await aScreenshot(page) })
+  await expect(sheet.getByRole('img', { name: 'Снимок 1' })).toBeVisible()
+
+  await sheet.getByRole('button', { name: 'Убрать снимок 1' }).click()
+  await expect(sheet.getByRole('img', { name: 'Снимок 1' })).toHaveCount(0)
+  await sheet.getByRole('button', { name: 'Отправить' }).click()
+  await expect(sheet.getByText('Спасибо, прочитаем', { exact: true })).toBeVisible()
+
+  expect(await written(page)).toMatchObject([{ text: 'Цены в рублях', pictures: [] }])
+})

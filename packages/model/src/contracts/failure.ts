@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  FEEDBACK_PICTURES_MAX,
   feedbackContinuedNoticeSchema,
   feedbackNoticeSchema,
   feedbackPlatformSchema,
@@ -232,5 +233,19 @@ export type OwnerNotices = z.infer<typeof ownerNoticesSchema>
  */
 export const ownerNoticesSentSchema = z.strictObject({
   messages: z.array(z.int().positive()).min(1).max(OWNER_NOTICES_PER_CLAIM),
+  /**
+   * The pictures of those messages that did not reach the owner (MOL-167, adversarial А4): Telegram
+   * refused them, or they were no longer there to take. They go as the others do, but are not «sent» —
+   * the person's copy says what the owner had.
+   */
+  missed: z
+    .array(
+      z.strictObject({
+        message: z.int().positive(),
+        position: z.int().min(1).max(FEEDBACK_PICTURES_MAX),
+      }),
+    )
+    .max(OWNER_NOTICES_PER_CLAIM * FEEDBACK_PICTURES_MAX)
+    .optional(),
 })
 export type OwnerNoticesSent = z.infer<typeof ownerNoticesSentSchema>
