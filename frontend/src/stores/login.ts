@@ -7,6 +7,7 @@ import { api } from '@/api'
 import { forget, read, write } from '@/stores/storage'
 import { LOGIN_KEY } from '@/stores/identity'
 import { useActorStore } from '@/stores/actor'
+import { reportFailure } from '@/failures'
 
 /**
  * The login as the device remembers it — and the device remembers exactly three things.
@@ -298,6 +299,7 @@ export const useLoginStore = defineStore('login', () => {
   }
 
   function refused(error: unknown): LoginFailure {
+    reportFailure(error, 'screen')
     if (error instanceof ApiError) {
       if (error.code === ERROR.LOGIN_RATE_LIMITED) return 'rate_limited'
       if (error.code === ERROR.LOGIN_DISABLED) return 'disabled'
@@ -356,6 +358,7 @@ export const useLoginStore = defineStore('login', () => {
     failure.value = null
     const view = await actor.signIn()
     if (!view) {
+      // failure reported where it failed: none — the seam of development, no build carries it (MOL-144).
       failure.value = navigator.onLine ? 'error' : 'offline'
       return
     }

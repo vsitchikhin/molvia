@@ -114,6 +114,7 @@ import { categoriesWith, categoryColour } from '@/components/spending'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
+import { reportFailure } from '@/failures'
 
 /**
  * «Деньги → Категории» (MOL-82, В-1): the person's own list. «Убрать» takes a category out of the
@@ -151,7 +152,8 @@ export default defineComponent({
         if (mine !== latest) return
         server.value = answer.categories
         failure.value = null
-      } catch {
+      } catch (error) {
+        reportFailure(error, 'screen')
         if (mine !== latest) return
         failure.value = navigator.onLine ? 'error' : 'offline'
       }

@@ -17,6 +17,7 @@ import { forgetOwnPrices } from '@/stores/ownPrices'
 import { HOLDS, isRecord } from '@/stores/queueing'
 import type { Loose } from '@/stores/queueing'
 import { read, write } from '@/stores/storage'
+import { reportFailure } from '@/failures'
 
 /**
  * Re-exported rather than declared again: the scale of MOL-32 owns it (`components/rating.ts`),
@@ -244,6 +245,7 @@ export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
       try {
         await api.rateItem(draft.card.itemId, ratingOf({ ...draft, score: draft.score }))
       } catch (error) {
+        reportFailure(error, 'screen')
         const code = error instanceof ApiError ? error.code : ERROR.INTERNAL
         // A code the API did not say itself — a proxy's 404 page read as `not_found` — is no
         // refusal: taken for one, it confirmed and dropped a saved rating (adversarial H1).

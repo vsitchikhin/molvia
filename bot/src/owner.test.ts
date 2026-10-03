@@ -164,6 +164,49 @@ describe('ownerText — что прочитает владелец (MOL-143)', (
     )
   })
 
+  it('сбой телефона называет платформу (MOL-144)', () => {
+    const phone: OwnerNotice = {
+      kind: 'failure',
+      source: 'phone',
+      errorName: 'TypeError',
+      route: 'screen:advice',
+      build: 'index-BTCsHrpw',
+      platform: 'ios 18 app',
+      frame: 'at Xe (/assets/index-BTCsHrpw.js:1:48213)',
+      fingerprint: '7c21e0',
+    }
+    expect(ownerText(phone)).toBe(
+      [
+        '🔴 Новый сбой · phone',
+        'TypeError · screen:advice',
+        'at Xe (/assets/index-BTCsHrpw.js:1:48213)',
+        'Платформа ios 18 app',
+        'Сборка index-BTCsHrpw · 7c21e0',
+        'Подробности — make failures',
+      ].join('\n'),
+    )
+    expect(ownerText({ ...phone, kind: 'failure_count', count: 10 })).toContain(
+      'Платформа ios 18 app\nСборка index-BTCsHrpw',
+    )
+  })
+
+  it('скрытые уведомления о телефоне — сколько и где смотреть (MOL-144, ревью №7)', () => {
+    expect(ownerText({ kind: 'failure_muted', source: 'phone', count: 37 })).toBe(
+      ['🔕 Скрыто уведомлений о сбоях телефона: 37', 'Подробности — make failures'].join('\n'),
+    )
+    expect(ownerText({ kind: 'failure_muted', source: 'phone', count: 2, unwritten: 5 })).toBe(
+      [
+        '🔕 Скрыто уведомлений о сбоях телефона: 2',
+        '🔕 Не записано новых сбоев телефона: 5 — предел строк часа',
+        'Подробности — make failures',
+      ].join('\n'),
+    )
+    // Only the unwritten: no «скрыто: 0», and nothing to look for in `make failures` (review №10).
+    expect(ownerText({ kind: 'failure_muted', source: 'phone', count: 0, unwritten: 3 })).toBe(
+      '🔕 Не записано новых сбоев телефона: 3 — предел строк часа',
+    )
+  })
+
   it('без маршрута и без кадра — так и сказано, пустых строк нет', () => {
     const bare: OwnerNotice = {
       kind: 'failure',

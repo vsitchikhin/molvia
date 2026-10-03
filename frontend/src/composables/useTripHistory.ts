@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { useActorStore } from '@/stores/actor'
+import { reportFailure } from '@/failures'
 import { useReconnect } from './useReconnect'
 
 /** A row of «Записаны» on «Покупки» (MOL-128; the history and the home screen, MOL-77). */
@@ -111,7 +112,8 @@ export function useTripHistory(): TripHistoryScreen {
         if (token === run) taken = await history.load(more)
       }
       if (token === run) trouble.value = taken ? null : 'error'
-    } catch {
+    } catch (error) {
+      reportFailure(error, 'screen')
       if (token === run) trouble.value = navigator.onLine ? 'error' : 'offline'
     } finally {
       if (token === run) busy.value = false

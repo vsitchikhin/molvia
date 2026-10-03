@@ -12,6 +12,7 @@ import type {
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
+import { reportFailure } from '@/failures'
 
 /** How an amendment ended: written, made over a version that moved on, or the exchange is gone. */
 export type AmendOutcome = 'saved' | 'conflict' | 'gone'
@@ -113,7 +114,8 @@ export function useExchanges(): Exchanges {
       if (mine !== latest) return
       overview.value = answer
       failure.value = null
-    } catch {
+    } catch (error) {
+      reportFailure(error, 'screen')
       if (mine !== latest) return
       // Decided after the failure, never before the request: a connection that drops while the
       // answer is on its way is the commonest break of all (MOL-19, A1).

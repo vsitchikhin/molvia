@@ -17,16 +17,67 @@ const BUNDLE_FRAME = /(?:\(|\s)\S*\/dist\/index\.js:(\d+):(\d+)\)?$/
  * rather than given the nearest one before it.
  */
 export function bundleDecoder(payload: object): FrameDecoder {
-  const map = new SourceMap(payload as ConstructorParameters<typeof SourceMap>[0])
+  const map = sourceMapOf(payload)
   return (frame) => {
     const position = BUNDLE_FRAME.exec(frame)
-    if (position === null) return undefined
-    const line = Number(position[1]) - 1
-    const column = Number(position[2]) - 1
-    const entry = map.findEntry(line, column)
-    if (!('originalSource' in entry) || entry.generatedLine !== line) return undefined
-    const source = entry.originalSource.replace(/^(?:\.\.\/)+/, '')
-    return `${source}:${String(entry.originalLine + 1)}:${String(entry.originalColumn + 1)}`
+    return position === null ? undefined : sourceAt(map, position[1], position[2])
+  }
+}
+
+function sourceMapOf(payload: object): SourceMap {
+  return new SourceMap(payload as ConstructorParameters<typeof SourceMap>[0])
+}
+
+/** The source's line under a line and a column of the bundle, both counted from one. */
+function sourceAt(map: SourceMap, line = '', column = ''): string | undefined {
+  const generated = Number(line) - 1
+  const entry = map.findEntry(generated, Number(column) - 1)
+  if (!('originalSource' in entry) || entry.generatedLine !== generated) return undefined
+  const source = entry.originalSource.replace(/^(?:\.\.\/)+/, '')
+  return `${source}:${String(entry.originalLine + 1)}:${String(entry.originalColumn + 1)}`
+}
+
+/**
+ * How long a map is waited for (review №4): the rows are read by then, and a site that does not
+ * answer must not hold `make failures` — its frames are printed as they are.
+ */
+const MAP_TIMEOUT_MS = 10_000
+
+/** A phone's frame of a script of the site: `at Xe (/assets/index-BTCsHrpw.js:1:48213)` (MOL-144). */
+const PHONE_FRAME = /\((\/assets\/[\w.-]+\.js):(\d+):(\d+)\)$/
+
+/**
+ * The phone's frames read back through the maps published beside the build (MOL-144, Р-7 of MOL-149,
+ * Р-9): each file's map from the site by the file's name, `<site>/assets/index-BTCsHrpw.js.map`. The
+ * name is a hash of the file's content, so a map found is that file's own — whatever build the row
+ * names. A map the site no longer has — the build was replaced — leaves its frames as they are; so
+ * does a site that does not answer. Fetched once a file for one run.
+ */
+export async function phoneDecoder(
+  rows: readonly FailureRow[],
+  site: string,
+  fetchMap: (url: URL) => Promise<Response> = (url) =>
+    fetch(url, { signal: AbortSignal.timeout(MAP_TIMEOUT_MS) }),
+): Promise<FrameDecoder> {
+  const files = new Set(
+    rows
+      .filter((row) => row.source === 'phone')
+      .flatMap((row) => row.frames.map((frame) => PHONE_FRAME.exec(frame)?.[1]))
+      .filter((file) => file !== undefined),
+  )
+  const maps = new Map<string, SourceMap>()
+  for (const file of files) {
+    try {
+      const response = await fetchMap(new URL(`${file}.map`, site))
+      if (response.ok) maps.set(file, sourceMapOf((await response.json()) as object))
+    } catch {
+      // No map, no line of the source: the frame is printed as it is.
+    }
+  }
+  return (frame) => {
+    const position = PHONE_FRAME.exec(frame)
+    const map = position?.[1] === undefined ? undefined : maps.get(position[1])
+    return map === undefined ? undefined : sourceAt(map, position?.[2], position?.[3])
   }
 }
 
@@ -49,6 +100,7 @@ export async function failures(
   read: (limit: number) => Promise<readonly FailureRow[]>,
   write: (line: string) => void,
   decoding?: { readonly build: string; readonly decode: FrameDecoder },
+  phone?: (rows: readonly FailureRow[]) => Promise<FrameDecoder>,
 ): Promise<FailuresExit> {
   const limit = limitOf(argv)
   if (limit === null) {
@@ -64,7 +116,7 @@ export async function failures(
     write(`reading the failures failed: ${failure.code ?? failure.errorName}`)
     return 1
   }
-  for (const line of formatFailures(rows, decoding)) write(line)
+  for (const line of formatFailures(rows, decoding, await phone?.(rows))) write(line)
   return 0
 }
 
@@ -85,11 +137,13 @@ function moment(at: Date): string {
 /**
  * A fingerprint a block. Frames are read back through the map only for the API's failures of the
  * build this image is — another build's lines would be read through the wrong map — and the bot's
- * map is in the bot's image, so its frames stay the bundle's.
+ * map is in the bot's image, so its frames stay the bundle's. The phone's are read through the map
+ * of their own file, from the site (MOL-144).
  */
 export function formatFailures(
   rows: readonly FailureRow[],
   decoding?: { readonly build: string; readonly decode: FrameDecoder },
+  phone?: FrameDecoder,
 ): string[] {
   if (rows.length === 0) return ['no failures in the last 30 days']
   const lines: string[] = []
@@ -97,12 +151,14 @@ export function formatFailures(
     const kind = row.code === null ? row.errorName : `${row.errorName} ${row.code}`
     lines.push(
       `${moment(row.lastSeenAt)}  ${row.fingerprint.slice(0, 6)}  ${row.source}  ${kind}  ${row.route ?? '(no route)'}`,
-      `  ${String(row.count)} in all since ${moment(row.firstSeenAt)}, ${String(row.buildCount)} in ${row.build}`,
+      `  ${String(row.count)} in all since ${moment(row.firstSeenAt)}, ${String(row.buildCount)} in ${row.build}${row.platform === null ? '' : ` · ${row.platform}`}`,
       ...row.frames.flatMap((frame) => {
         const source =
-          decoding !== undefined && row.source === 'api' && row.build === decoding.build
-            ? decoding.decode(frame)
-            : undefined
+          row.source === 'phone'
+            ? phone?.(frame)
+            : decoding !== undefined && row.source === 'api' && row.build === decoding.build
+              ? decoding.decode(frame)
+              : undefined
         return source === undefined ? [`    ${frame}`] : [`    ${frame}`, `      → ${source}`]
       }),
       '',

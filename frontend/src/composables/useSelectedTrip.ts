@@ -7,6 +7,7 @@ import type { LocalFinishedTrip } from '@/stores/tripHistory'
 import { useActorStore } from '@/stores/actor'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { reportFailure } from '@/failures'
 import { useReconnect } from './useReconnect'
 
 export interface SelectedTrip {
@@ -75,6 +76,7 @@ export function useSelectedTrip(target: MaybeRefOrGetter<string | null>): Select
       trouble.value = null
       stale.value = false
     } catch (error) {
+      reportFailure(error, 'screen')
       if (token !== request) return
       const localStart = queue.pending.some((w) => w.kind === 'start' && w.tripId === selected)
       const absent = error instanceof ApiError && error.answered && error.code === ERROR.NOT_FOUND

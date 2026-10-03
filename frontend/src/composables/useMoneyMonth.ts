@@ -11,6 +11,7 @@ import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { read, write } from '@/stores/storage'
+import { reportFailure } from '@/failures'
 
 /** `idle` — no identity, so there is no month to read. */
 export type MoneyPhase = 'idle' | 'loading' | 'ready' | 'error' | 'offline'
@@ -185,7 +186,8 @@ export function useMoneyMonth(selected: Ref<string>): MoneyMonth {
         moreAfterRead = false
         void loadMore()
       }
-    } catch {
+    } catch (error) {
+      reportFailure(error, 'screen')
       if (actor.id !== id || selected.value !== month || mine !== latest) return
       // Decided after the failure, never before the request (MOL-19, A1).
       failure.value = navigator.onLine ? 'error' : 'offline'
