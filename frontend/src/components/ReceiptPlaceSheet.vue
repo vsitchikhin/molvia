@@ -61,7 +61,7 @@ import { computed, defineComponent, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCheck from '~icons/mdi/check'
-import { drawsNothing, isRateDay, newPlaceSchema, pastedLine } from '@molvia/model'
+import { drawsNothing, isRateDay, latestDay, newPlaceSchema, pastedLine } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -106,7 +106,16 @@ export default defineComponent({
     const chosen = ref<string | null>(null)
     const name = ref('')
     const when = ref(props.day)
-    const latest = computed(() => localDay())
+    /**
+     * The latest day the sheet lets through: the phone's today, or the day it opened with when that
+     * is later and the server takes it (`latestDay`) — a receipt printed after Yerevan's midnight on
+     * a phone west of it is dated by a day this phone has not reached (adversarial В1, as the
+     * spending's sheet, adversarial Л). A day misread far ahead is still refused (review 18).
+     */
+    const latest = computed(() => {
+      const today = localDay()
+      return props.day > today && props.day <= latestDay(new Date()) ? props.day : today
+    })
 
     const city = computed(() => actor.settings?.city ?? '')
     const choices = computed(() => {
