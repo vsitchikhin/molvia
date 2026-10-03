@@ -216,8 +216,7 @@ describe('платформа — только у телефона (MOL-144, В-2
     await expect(
       failureRows.record(occurrence({ platform: 'ios app' }), 1, AT, none),
     ).rejects.toThrow()
-    await expect(
-      failureRows.record({ ...phone('ios app'), platform: undefined }, 1, AT, none),
-    ).rejects.toThrow()
+    const { platform: _platform, ...bare } = phone('ios app')
+    await expect(failureRows.record(bare, 1, AT, none)).rejects.toThrow()
   })
 })

@@ -10,6 +10,7 @@ const ROW: FailureRow = {
   route: 'PUT /verdicts/:itemId',
   frames: ['at rateItem (src/usecases/rate-item.ts:42:7)', 'at async next (src/server.ts:1:1)'],
   build: 'v0.2.0-4-gabc1234',
+  platform: null,
   firstSeenAt: new Date('2026-10-13T08:00:00.000Z'),
   lastSeenAt: new Date('2026-10-14T10:07:31.512Z'),
   count: 37,
