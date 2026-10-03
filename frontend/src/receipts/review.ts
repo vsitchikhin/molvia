@@ -31,6 +31,8 @@ export interface ReviewLine {
   readonly amount: Money | null
   readonly skip: boolean
   readonly edited: boolean
+  /** The quantity and the sum are the person's, not the reading's (review 28). */
+  readonly ownFigures: boolean
 }
 
 /** The name a new item is written under: the person's, else the gloss, else the line as printed. */
@@ -64,8 +66,10 @@ export function reviewLines(detail: ReceiptDetail, draft: ReceiptDraft | null): 
   const amounts = amountsOf(detail, draft)
   return detail.lines.map((line, position) => {
     const edit = draft?.lines[position]
+    const amount = amounts[position] ?? line.amount
     if (edit) {
       const itemId = 'id' in edit.item ? edit.item.id : null
+      const figures = edit.figures
       return {
         position,
         line,
@@ -74,13 +78,14 @@ export function reviewLines(detail: ReceiptDetail, draft: ReceiptDraft | null): 
         isNew: itemId === null,
         // «проверьте» goes only once the person chose the item, not with any edit (review 16).
         check: line.match === 'weak' && edit.confirmed !== true && itemId === line.itemId,
-        // The figures are the person's now: what they typed is what was paid, and «≠» of the
-        // reading no longer describes the line (receipts.md, «On the phone»).
-        mismatch: false,
-        quantity: edit.quantity,
-        amount: edit.amount,
+        // Figures typed are what was paid, and «≠» of the reading no longer describes the line; an
+        // item chosen alone leaves the figures, and the sum, to the reading (review 28).
+        mismatch: figures ? false : !line.settled && line.sum !== null,
+        quantity: figures ? figures.quantity : line.quantity,
+        amount: figures ? figures.amount : amount,
         skip: edit.skip,
         edited: true,
+        ownFigures: figures !== undefined,
       }
     }
     const isNew = line.itemId === null
@@ -93,9 +98,10 @@ export function reviewLines(detail: ReceiptDetail, draft: ReceiptDraft | null): 
       check: line.match === 'weak',
       mismatch: !line.settled && line.sum !== null,
       quantity: line.quantity,
-      amount: amounts[position] ?? line.amount,
+      amount,
       skip: false,
       edited: false,
+      ownFigures: false,
     }
   })
 }

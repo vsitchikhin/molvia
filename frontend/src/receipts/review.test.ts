@@ -97,8 +97,7 @@ describe('the lines of the review', () => {
       lines: {
         3: {
           item: { id: MILK, name: 'Шоколад «Гранд»' },
-          quantity: parseQuantity('1', 'piece'),
-          amount: amd('980'),
+          figures: { quantity: parseQuantity('1', 'piece'), amount: amd('980') },
           skip: false,
           confirmed: true,
         },
@@ -124,7 +123,7 @@ describe('the balance — the model’s, not a sum of the phone’s', () => {
     const detail = receiptA()
     const draft: ReceiptDraft = {
       lines: {
-        0: { item: { id: MILK, name: 'Молоко' }, quantity: null, amount: amd('531'), skip: true },
+        0: { item: { id: MILK, name: 'Молоко' }, skip: true },
       },
     }
     const balance = reviewBalance(detail, reviewLines(detail, draft), draft)
@@ -166,11 +165,27 @@ describe('a total the person typed (Р-8, review 4)', () => {
     const detail = receiptA(null)
     const draft: ReceiptDraft = {
       lines: {
-        3: { item: { id: MILK, name: 'Шоколад' }, quantity: null, amount: amd('900'), skip: false },
+        3: {
+          item: { id: MILK, name: 'Шоколад' },
+          figures: { quantity: null, amount: amd('900') },
+          skip: false,
+        },
       },
       total: amd('3663'),
     }
     expect(reviewLines(detail, draft)[3]?.amount).toEqual(amd('900'))
+  })
+
+  it('an item chosen alone leaves the sum to the total, in either order of the edits (review 28)', () => {
+    const detail = receiptA(null)
+    const chosen = { item: { id: MILK, name: 'Шоколад' }, skip: false, confirmed: true as const }
+    // The item first, then the total — and the total first, then the item: one draft either way,
+    // since the sheet writes no figure the person did not change.
+    const draft: ReceiptDraft = { lines: { 3: chosen }, total: amd('3663') }
+    const [, , , chocolate] = reviewLines(detail, draft)
+    expect(chocolate?.amount).toEqual(amd('980'))
+    expect(chocolate).toMatchObject({ check: false, mismatch: true, ownFigures: false })
+    expect(reviewLines(detail, { lines: { 3: chosen } })[3]?.amount).toEqual(amd('890'))
   })
 })
 
@@ -181,8 +196,7 @@ describe('«проверьте» on a line edited (review 16)', () => {
       lines: {
         3: {
           item: { id: MILK, name: 'Шоколад «Гранд»' },
-          quantity: parseQuantity('1', 'piece'),
-          amount: amd('980'),
+          figures: { quantity: parseQuantity('1', 'piece'), amount: amd('980') },
           skip: false,
           ...(confirmed ? { confirmed: true as const } : {}),
         },
@@ -210,7 +224,7 @@ describe('what «Записать» sends', () => {
   it('a line left out goes as «не записываем»', () => {
     const detail = receiptA()
     const draft: ReceiptDraft = {
-      lines: { 1: { item: { name: 'Помидоры' }, quantity: null, amount: null, skip: true } },
+      lines: { 1: { item: { name: 'Помидоры' }, skip: true } },
     }
     const body = recordBody(detail, draft, reviewLines(detail, draft), TRIP, '2026-09-27')
     expect(body?.lines[1]).toEqual({ position: 1, skip: true })

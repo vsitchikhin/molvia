@@ -7,14 +7,21 @@ import { useActorStore } from '@/stores/actor'
 import { isRecord } from '@/stores/queueing'
 import { read, write } from '@/stores/storage'
 
+/** How much and what the line cost, as the person typed them. */
+export interface LineFigures {
+  readonly quantity: Quantity | null
+  readonly amount: Money | null
+}
+
 /**
  * A line as the person left it on the review (MOL-127, Т-9): the item — one of the catalogue, or a
- * new one by its name — the quantity, what the line cost, and whether it is recorded at all.
+ * new one by its name — and whether it is recorded at all. `figures` only once the person changed
+ * them: until then the line is recorded at what the server or the person's total works out, whatever
+ * else was edited (review 28).
  */
 export interface LineDraft {
   readonly item: { readonly id: string; readonly name: string } | { readonly name: string }
-  readonly quantity: Quantity | null
-  readonly amount: Money | null
+  readonly figures?: LineFigures
   readonly skip: boolean
   /** The person chose the item — «проверьте» is answered (review 16). */
   readonly confirmed?: true
@@ -47,8 +54,9 @@ const lineCodec = z.strictObject({
     z.strictObject({ id: z.uuid(), name: z.string() }),
     z.strictObject({ name: z.string() }),
   ]),
-  quantity: quantityCodec.nullable(),
-  amount: moneyCodec.nullable(),
+  figures: z
+    .strictObject({ quantity: quantityCodec.nullable(), amount: moneyCodec.nullable() })
+    .optional(),
   skip: z.boolean(),
   confirmed: z.literal(true).optional(),
 })
@@ -87,8 +95,13 @@ function recall(owner: string | null): Record<string, ReceiptDraft> {
       const draft: ReceiptDraft = {
         lines: Object.fromEntries(
           Object.entries(parsed.data.lines).map(([position, line]) => {
-            const { confirmed, ...rest } = line
-            const kept: LineDraft = confirmed ? { ...rest, confirmed } : rest
+            const { confirmed, figures, item, skip } = line
+            const kept: LineDraft = {
+              item,
+              skip,
+              ...(figures ? { figures } : {}),
+              ...(confirmed ? { confirmed } : {}),
+            }
             return [Number(position), kept]
           }),
         ),

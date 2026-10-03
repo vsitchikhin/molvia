@@ -154,7 +154,7 @@ import { useCheaperHint } from '@/composables/useCheaperHint'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay } from '@/days'
 import type { ReviewLine } from '@/receipts/review'
-import type { LineDraft } from '@/stores/receiptDrafts'
+import type { LineDraft, LineFigures } from '@/stores/receiptDrafts'
 
 const UNITS: readonly BaseUnit[] = ['kg', 'l', 'piece']
 const INVISIBLE_CHARACTERS = new RegExp(`[${INVISIBLE}]`, 'gu')
@@ -381,15 +381,28 @@ export default defineComponent({
         amountBad.value = money === 'bad'
         if (many === 'bad' || money === 'bad' || chosen === null) return null
       }
+      // «Не записывать» and «Вернуть» need no figures checked: what cannot be read stays as read.
+      const figures: LineFigures = {
+        quantity: many === 'bad' ? start.quantity : many,
+        amount: money === 'bad' ? start.amount : money,
+      }
       return {
         item:
           chosen ?? (start.itemId ? { id: start.itemId, name: start.name } : { name: start.name }),
-        // «Не записывать» and «Вернуть» need no figures checked: what cannot be read stays as read.
-        quantity: many === 'bad' ? start.quantity : many,
-        amount: money === 'bad' ? start.amount : money,
+        // The figures go into the draft only once they are the person's: a sum prefilled and left
+        // alone follows the reading and the total, in whatever order the edits came (review 28).
+        ...(start.ownFigures || !sameFigures(figures) ? { figures } : {}),
         skip: skipped,
         ...(settled.value || (start.edited && !start.check) ? { confirmed: true as const } : {}),
       }
+    }
+
+    function sameFigures(figures: LineFigures): boolean {
+      return (
+        figures.quantity?.milli === start.quantity?.milli &&
+        figures.quantity?.unit === start.quantity?.unit &&
+        figures.amount?.minor === start.amount?.minor
+      )
     }
 
     function same(next: LineDraft): boolean {
@@ -398,9 +411,7 @@ export default defineComponent({
       return (
         before === after &&
         next.item.name === start.name &&
-        next.quantity?.milli === start.quantity?.milli &&
-        next.quantity?.unit === start.quantity?.unit &&
-        next.amount?.minor === start.amount?.minor &&
+        (next.figures === undefined || sameFigures(next.figures)) &&
         next.skip === start.skip &&
         !settled.value
       )

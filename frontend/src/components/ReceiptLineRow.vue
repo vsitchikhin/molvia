@@ -56,13 +56,13 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const figures = computed(() => {
       const { quantity } = props.line
-      const price = props.line.edited ? null : props.line.line.price
+      const price = props.line.ownFigures ? null : props.line.line.price
       if (!quantity) return null
       const qty = `${formatQuantity(quantity, locale.value)} ${t(`item.unit_${quantity.unit}`)}`
       if (!price) return qty
       const discount = props.line.line.discount
       // A discount of nothing is printed by the till as «0,00»: no «− 0» after the price.
-      return discount && discount.minor > 0n && !props.line.edited
+      return discount && discount.minor > 0n && !props.line.ownFigures
         ? t('receipt.review.qty_price_discount', {
             qty,
             price: formatMoney(price, locale.value),

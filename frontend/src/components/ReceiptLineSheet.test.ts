@@ -8,6 +8,7 @@ import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from '@/router'
+import ItemPickSheet from '@/components/ItemPickSheet.vue'
 import ReceiptLineSheet from '@/components/ReceiptLineSheet.vue'
 import type { ReviewLine } from '@/receipts/review'
 import type { LineDraft } from '@/stores/receiptDrafts'
@@ -49,6 +50,7 @@ function chocolate(): ReviewLine {
     amount: amd('980'),
     skip: false,
     edited: false,
+    ownFigures: false,
   }
 }
 
@@ -123,9 +125,7 @@ describe('ReceiptLineSheet (MOL-127)', () => {
   it('«Не записывать» is written at once, whatever the figures (review 17)', async () => {
     const { saved } = await render()
     await flushPromises()
-    const quantity = sheet()?.querySelector<HTMLInputElement>(
-      '[data-field="quantity"] input, input[data-field="quantity"]',
-    )
+    const quantity = sheet()?.querySelector<HTMLInputElement>('[data-field="quantity"]')
     if (quantity) {
       quantity.value = 'не число'
       quantity.dispatchEvent(new Event('input'))
@@ -135,7 +135,33 @@ describe('ReceiptLineSheet (MOL-127)', () => {
     await flushPromises()
     expect(saved).toHaveLength(1)
     expect(saved[0]?.skip).toBe(true)
-    expect(saved[0]?.quantity).toEqual(parseQuantity('1', 'piece'))
+    // What could not be read stays as read: no figure of the person's goes into the draft.
+    expect(saved[0]?.figures).toBeUndefined()
+  })
+
+  it('an item chosen alone writes no figures: the sum follows the reading and the total (review 28)', async () => {
+    const { view, saved } = await render()
+    await flushPromises()
+    view.findComponent(ItemPickSheet).vm.$emit('picked', { id: MILK, name: 'Шоколад «Гранд»' })
+    await flushPromises()
+    press(ru.receipt.line.save)
+    await flushPromises()
+    expect(saved).toHaveLength(1)
+    expect(saved[0]).toMatchObject({ item: { id: MILK }, confirmed: true })
+    expect(saved[0]?.figures).toBeUndefined()
+  })
+
+  it('a sum typed is the person’s figure', async () => {
+    const { saved } = await render()
+    await flushPromises()
+    const amount = sheet()?.querySelector<HTMLInputElement>('[data-field="amount"]')
+    if (!amount) throw new Error('нет поля суммы')
+    amount.value = '975'
+    amount.dispatchEvent(new Event('input'))
+    await flushPromises()
+    press(ru.receipt.line.save)
+    await flushPromises()
+    expect(saved[0]?.figures).toEqual({ quantity: parseQuantity('1', 'piece'), amount: amd('975') })
   })
 
   it('«Вернуть в запись» brings a line left out back at once (review 17)', async () => {
