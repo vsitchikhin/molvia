@@ -16,6 +16,8 @@ export interface LineDraft {
   readonly quantity: Quantity | null
   readonly amount: Money | null
   readonly skip: boolean
+  /** The person chose the item — «проверьте» is answered (review 16). */
+  readonly confirmed?: true
 }
 
 /** A place as the review holds it: one of the catalogue, or a new shop by its name and city. */
@@ -48,6 +50,7 @@ const lineCodec = z.strictObject({
   quantity: quantityCodec.nullable(),
   amount: moneyCodec.nullable(),
   skip: z.boolean(),
+  confirmed: z.literal(true).optional(),
 })
 
 const draftCodec = z.strictObject({
@@ -83,7 +86,11 @@ function recall(owner: string | null): Record<string, ReceiptDraft> {
       const { place, purchasedOn, total } = parsed.data
       const draft: ReceiptDraft = {
         lines: Object.fromEntries(
-          Object.entries(parsed.data.lines).map(([position, line]) => [Number(position), line]),
+          Object.entries(parsed.data.lines).map(([position, line]) => {
+            const { confirmed, ...rest } = line
+            const kept: LineDraft = confirmed ? { ...rest, confirmed } : rest
+            return [Number(position), kept]
+          }),
         ),
         ...(place ? { place } : {}),
         ...(purchasedOn ? { purchasedOn } : {}),

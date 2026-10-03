@@ -92,7 +92,7 @@ describe('the lines of the review', () => {
     expect(lines[3]?.amount).toEqual(amd('890'))
   })
 
-  it('an edit stands over the reading, and settles the item and the sum', () => {
+  it('an edit stands over the reading: its sum, and «≠» gone with the figures the person typed', () => {
     const draft: ReceiptDraft = {
       lines: {
         3: {
@@ -100,6 +100,7 @@ describe('the lines of the review', () => {
           quantity: parseQuantity('1', 'piece'),
           amount: amd('980'),
           skip: false,
+          confirmed: true,
         },
       },
     }
@@ -143,6 +144,52 @@ describe('the balance — the model’s, not a sum of the phone’s', () => {
     const balance = reviewBalance(detail, reviewLines(detail, null), null)
     expect(balance.difference).toBeNull()
     expect(balance.suspect).toBeNull()
+  })
+})
+
+describe('a total the person typed (Р-8, review 4)', () => {
+  it('turns В-5 for the lines not edited: the printed sum the total confirms is recorded', () => {
+    // The total was not read: the server recorded the chocolate at 1 × 890.
+    const detail = receiptA(null)
+    expect(reviewLines(detail, null)[3]?.amount).toEqual(amd('890'))
+    // The person types the receipt's total; the printed sums add up to it, so 980 stands.
+    const draft: ReceiptDraft = { lines: {}, total: amd('3663') }
+    const lines = reviewLines(detail, draft)
+    expect(lines[3]?.amount).toEqual(amd('980'))
+    expect(reviewBalance(detail, lines, draft).difference).toEqual(amd('0'))
+    const body = recordBody(detail, draft, lines, TRIP, '2026-09-27')
+    expect(body?.lines[3]).toMatchObject({ amount: amd('980') })
+    expect(body?.total).toEqual(amd('3663'))
+  })
+
+  it('a line the person edited keeps their figure', () => {
+    const detail = receiptA(null)
+    const draft: ReceiptDraft = {
+      lines: {
+        3: { item: { id: MILK, name: 'Шоколад' }, quantity: null, amount: amd('900'), skip: false },
+      },
+      total: amd('3663'),
+    }
+    expect(reviewLines(detail, draft)[3]?.amount).toEqual(amd('900'))
+  })
+})
+
+describe('«проверьте» on a line edited (review 16)', () => {
+  it('stays until the person chose the item, whatever else was changed', () => {
+    const detail = receiptA()
+    const edited = (confirmed: boolean): ReceiptDraft => ({
+      lines: {
+        3: {
+          item: { id: MILK, name: 'Шоколад «Гранд»' },
+          quantity: parseQuantity('1', 'piece'),
+          amount: amd('980'),
+          skip: false,
+          ...(confirmed ? { confirmed: true as const } : {}),
+        },
+      },
+    })
+    expect(reviewLines(detail, edited(false))[3]?.check).toBe(true)
+    expect(reviewLines(detail, edited(true))[3]?.check).toBe(false)
   })
 })
 

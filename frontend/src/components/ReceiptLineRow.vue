@@ -61,7 +61,8 @@ export default defineComponent({
       const qty = `${formatQuantity(quantity, locale.value)} ${t(`item.unit_${quantity.unit}`)}`
       if (!price) return qty
       const discount = props.line.line.discount
-      return discount && !props.line.edited
+      // A discount of nothing is printed by the till as «0,00»: no «− 0» after the price.
+      return discount && discount.minor > 0n && !props.line.edited
         ? t('receipt.review.qty_price_discount', {
             qty,
             price: formatMoney(price, locale.value),

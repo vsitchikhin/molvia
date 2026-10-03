@@ -1,4 +1,4 @@
-import { RECEIPT_CURRENCY, receiptBalance } from '@molvia/model'
+import { RECEIPT_CURRENCY, receiptBalance, receiptDigits, recordedSums } from '@molvia/model'
 import type {
   Money,
   Quantity,
@@ -38,7 +38,30 @@ function newName(line: ReceiptReviewLine): string {
   return (line.itemName ?? line.translation ?? line.printed).trim()
 }
 
+/**
+ * What each line is recorded at when the person corrected the total (Р-8, review 4): the server
+ * worked the amounts out by the total OCR read, and В-5 turns on the total — the printed sum of a
+ * line that does not add up stands when the total confirms it. So the very `recordedSums` of the
+ * model is run again over the lines' figures and the person's total; without one, the server's.
+ */
+function amountsOf(detail: ReceiptDetail, draft: ReceiptDraft | null) {
+  const total = draft?.total
+  if (!total) return detail.lines.map((line) => line.amount)
+  const figures = detail.lines.map(({ quantity, price, sum, discount }) => ({
+    quantity,
+    price,
+    sum,
+    discount,
+  }))
+  const digits = receiptDigits(total.currency, [
+    total,
+    ...detail.lines.flatMap((line) => [line.price, line.sum, line.discount]),
+  ])
+  return recordedSums(figures, total, digits)
+}
+
 export function reviewLines(detail: ReceiptDetail, draft: ReceiptDraft | null): ReviewLine[] {
+  const amounts = amountsOf(detail, draft)
   return detail.lines.map((line, position) => {
     const edit = draft?.lines[position]
     if (edit) {
@@ -49,7 +72,10 @@ export function reviewLines(detail: ReceiptDetail, draft: ReceiptDraft | null): 
         itemId,
         name: edit.item.name,
         isNew: itemId === null,
-        check: false,
+        // «проверьте» goes only once the person chose the item, not with any edit (review 16).
+        check: line.match === 'weak' && edit.confirmed !== true && itemId === line.itemId,
+        // The figures are the person's now: what they typed is what was paid, and «≠» of the
+        // reading no longer describes the line (receipts.md, «On the phone»).
         mismatch: false,
         quantity: edit.quantity,
         amount: edit.amount,
@@ -67,7 +93,7 @@ export function reviewLines(detail: ReceiptDetail, draft: ReceiptDraft | null): 
       check: line.match === 'weak',
       mismatch: !line.settled && line.sum !== null,
       quantity: line.quantity,
-      amount: line.amount,
+      amount: amounts[position] ?? line.amount,
       skip: false,
       edited: false,
     }

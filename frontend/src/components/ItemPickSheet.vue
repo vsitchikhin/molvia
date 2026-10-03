@@ -30,12 +30,14 @@
     </AppCard>
 
     <!-- The line's own name stays possible: a new item is made by «Записать» itself (Р-1 of MOL-113). -->
-    <AppCard v-if="newName" class="keep" list>
+    <AppCard v-if="newName && nameFits" class="keep" list>
       <button class="result keep-new" type="button" @click="$emit('picked', { name: newName })">
         <span class="result-name">{{ t('receipt.pick.keep_new', { text: newName }) }}</span>
         <span class="result-note">{{ t('receipt.pick.keep_new_note') }}</span>
       </button>
     </AppCard>
+    <!-- A name the catalogue would refuse is said here, not by the receipt refused from the queue. -->
+    <p v-else-if="newName" class="note">{{ t('receipt.pick.bad_name') }}</p>
     <p class="note">{{ t('receipt.pick.note') }}</p>
   </BottomSheet>
 </template>
@@ -44,7 +46,7 @@
 import { computed, defineComponent, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { drawsNothing, pastedLine } from '@molvia/model'
+import { drawsNothing, newItemSchema, pastedLine } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -91,6 +93,9 @@ export default defineComponent({
       results,
       stale,
       newName,
+      nameFits: computed(
+        () => newName.value !== null && newItemSchema.shape.name.safeParse(newName.value).success,
+      ),
       meta: computed(() =>
         props.translation
           ? t('receipt.pick.meta_translation', { printed: props.printed, text: props.translation })

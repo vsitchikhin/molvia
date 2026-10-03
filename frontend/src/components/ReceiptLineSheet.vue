@@ -30,7 +30,12 @@
         </p>
       </div>
       <div v-else class="field">
-        <AppField v-model="name" :label="t('receipt.line.name')" :maxlength="NAME_MAX">
+        <AppField
+          v-model="name"
+          :label="t('receipt.line.name')"
+          :maxlength="NAME_MAX"
+          :error-text="nameBad ? t('receipt.pick.bad_name') : null"
+        >
           <template #label-extra
             ><span class="tag">{{ t('receipt.review.tag_new') }}</span></template
           >
@@ -108,19 +113,21 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconChevronRight from '~icons/mdi/chevron-right'
 import IconMagnify from '~icons/mdi/magnify'
 import {
   ERROR,
+  INVISIBLE,
   currencySign,
   decimalFromMilli,
   drawsNothing,
   formatMoney,
   formatQuantity,
   formatUnitPrice,
+  lineProduct,
   newItemSchema,
   parseMoney,
   parseQuantity,
@@ -150,6 +157,7 @@ import type { ReviewLine } from '@/receipts/review'
 import type { LineDraft } from '@/stores/receiptDrafts'
 
 const UNITS: readonly BaseUnit[] = ['kg', 'l', 'piece']
+const INVISIBLE_CHARACTERS = new RegExp(`[${INVISIBLE}]`, 'gu')
 /** As an item's own schema bounds its name. */
 const NAME_MAX = 200
 
@@ -183,6 +191,8 @@ export default defineComponent({
       default: null,
     },
     country: { type: String as PropType<ReceiptCountry>, required: true },
+    /** The digits the receipt prints its sums to (`receiptDigits`, П-2). */
+    digits: { type: Number, required: true },
     onClosed: { type: Function as PropType<() => void>, default: undefined },
   },
   emits: {
@@ -202,27 +212,42 @@ export default defineComponent({
     const picking = ref(false)
     const quantityBad = ref(false)
     const amountBad = ref(false)
+    const nameBad = ref(false)
     /** «проверьте» holds until the person settles the item one way or another. */
     const settled = ref(false)
 
     const units = computed(() => UNITS.map((value) => ({ value, label: t(`item.unit_${value}`) })))
 
+    // As the purchase's sheet reads a field (`useItemDetails`): what draws nothing is not input, and
+    // a space stays the domain's group separator (review 22).
+    const visible = (text: string) => text.replace(INVISIBLE_CHARACTERS, '').trim()
     function typedQuantity(): Quantity | null | 'bad' {
-      if (!quantity.value.trim()) return null
+      const text = visible(quantity.value)
+      if (!text) return null
       try {
-        return parseQuantity(quantity.value.trim(), unit.value)
+        return parseQuantity(text, unit.value)
       } catch {
         return 'bad'
       }
     }
     function typedAmount(): Money | null | 'bad' {
-      if (!amount.value.trim()) return null
+      const text = visible(amount.value)
+      if (!text) return null
       try {
-        return parseMoney(amount.value.replace(/\s/gu, ''), props.currency)
+        return parseMoney(text, props.currency)
       } catch {
         return 'bad'
       }
     }
+    watch(quantity, () => {
+      quantityBad.value = false
+    })
+    watch(amount, () => {
+      amountBad.value = false
+    })
+    watch(name, () => {
+      nameBad.value = false
+    })
     const parsedQuantity = computed(() => {
       const value = typedQuantity()
       return value === 'bad' ? null : value
@@ -294,7 +319,7 @@ export default defineComponent({
 
     const figures = start.line
     const discountHint = computed(() =>
-      figures.discount && figures.price
+      figures.discount && figures.discount.minor > 0n && figures.price
         ? t('receipt.line.discount_hint', {
             price: formatMoney(figures.price, locale.value),
             discount: formatMoney(figures.discount, locale.value),
@@ -322,30 +347,71 @@ export default defineComponent({
         printed: formatMoney(figures.sum, locale.value),
         qty: `${formatQuantity(figures.quantity, locale.value)} ${t(`item.unit_${figures.quantity.unit}`)}`,
         price: formatMoney(figures.price, locale.value),
-        sum: start.amount ? formatMoney(start.amount, locale.value) : '—',
+        // Quantity × price as the receipt rounds it, less the line's discount — never the sum it is
+        // recorded at, which may be the printed one itself (review 10).
+        sum: formatMoney(
+          {
+            minor:
+              lineProduct(figures.quantity, figures.price, props.digits).minor -
+              (figures.discount?.minor ?? 0n),
+            currency: figures.price.currency,
+          },
+          locale.value,
+        ),
       })
     })
 
-    function draft(skipped: boolean): LineDraft | null {
-      const many = typedQuantity()
-      const money = typedAmount()
-      quantityBad.value = many === 'bad'
-      amountBad.value = money === 'bad'
-      if (many === 'bad' || money === 'bad') return null
-      let chosen: LineDraft['item']
-      if (item.value.id) chosen = { id: item.value.id, name: item.value.name }
-      else {
-        const typed = pastedLine(name.value)
-        const valid = !drawsNothing(typed) && newItemSchema.shape.name.safeParse(typed).success
-        chosen = { name: valid ? typed : item.value.name }
-      }
-      return { item: chosen, quantity: many, amount: money, skip: skipped }
+    function chosenItem(): LineDraft['item'] | null {
+      if (item.value.id) return { id: item.value.id, name: item.value.name }
+      const typed = pastedLine(name.value)
+      if (drawsNothing(typed)) return { name: item.value.name }
+      // A name the catalogue would refuse is said here, not by the whole receipt refused from the
+      // queue (review 26).
+      if (!newItemSchema.shape.name.safeParse(typed).success) return null
+      return { name: typed }
     }
 
-    function finish(skipped: boolean): void {
-      const line = draft(skipped)
-      if (!line) return
-      emit('saved', line)
+    function line(skipped: boolean, figuresToo: boolean): LineDraft | null {
+      const chosen = chosenItem()
+      nameBad.value = chosen === null
+      const many = typedQuantity()
+      const money = typedAmount()
+      if (figuresToo) {
+        quantityBad.value = many === 'bad'
+        amountBad.value = money === 'bad'
+        if (many === 'bad' || money === 'bad' || chosen === null) return null
+      }
+      return {
+        item:
+          chosen ?? (start.itemId ? { id: start.itemId, name: start.name } : { name: start.name }),
+        // «Не записывать» and «Вернуть» need no figures checked: what cannot be read stays as read.
+        quantity: many === 'bad' ? start.quantity : many,
+        amount: money === 'bad' ? start.amount : money,
+        skip: skipped,
+        ...(settled.value || (start.edited && !start.check) ? { confirmed: true as const } : {}),
+      }
+    }
+
+    function same(next: LineDraft): boolean {
+      const before = start.itemId ?? null
+      const after = 'id' in next.item ? next.item.id : null
+      return (
+        before === after &&
+        next.item.name === start.name &&
+        next.quantity?.milli === start.quantity?.milli &&
+        next.quantity?.unit === start.quantity?.unit &&
+        next.amount?.minor === start.amount?.minor &&
+        next.skip === start.skip &&
+        !settled.value
+      )
+    }
+
+    function finish(skipped: boolean, figuresToo: boolean): void {
+      const next = line(skipped, figuresToo)
+      if (!next) return
+      // Nothing changed: no draft — the line goes on following the server and the shop's memory,
+      // and «≠» and «проверьте» stay (review 16).
+      if (!same(next)) emit('saved', next)
       emit('update:open', false)
     }
 
@@ -362,6 +428,7 @@ export default defineComponent({
       picking,
       quantityBad,
       amountBad,
+      nameBad,
       units,
       perUnit,
       itemHint,
@@ -391,13 +458,14 @@ export default defineComponent({
         picking.value = false
       },
       save: () => {
-        finish(false)
+        finish(false, true)
       },
+      // Both are the person's whole answer, written at once (review 17).
       leaveOut: () => {
-        finish(true)
+        finish(true, false)
       },
       unskip: () => {
-        skip.value = false
+        finish(false, false)
       },
     }
   },
@@ -529,6 +597,16 @@ export default defineComponent({
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
   gap: var(--space-3);
   align-items: start;
+}
+
+// The field's grid sizes its column by the input's own width, and the field ran under the units
+// beside it: its one column is the share the row gives it.
+.row > * {
+  min-width: 0;
+}
+
+.quantity {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .sign {

@@ -44,6 +44,7 @@
         min="2000-01-02"
         :max="latest"
         :display="dayShown"
+        :error-text="dayBad ? t('spending.sheet.bad_day') : null"
       />
     </div>
 
@@ -139,7 +140,14 @@ export default defineComponent({
         ? newPlaceSchema.shape.name.safeParse(typedName.value).success
         : false,
     )
-    const ready = computed(() => (chosen.value !== null || fresh.value) && when.value !== '')
+    // `max` of the field does not stop a day typed, and the day may come misread off the receipt:
+    // a day still to come is refused here, not from the queue (review 18).
+    const dayBad = computed(
+      () => when.value !== '' && (when.value > latest.value || when.value < '2000-01-01'),
+    )
+    const ready = computed(
+      () => (chosen.value !== null || fresh.value) && when.value !== '' && !dayBad.value,
+    )
 
     return {
       t,
@@ -149,6 +157,7 @@ export default defineComponent({
       name,
       when,
       latest,
+      dayBad,
       ready,
       meta: computed(() =>
         props.read && props.current
@@ -170,7 +179,7 @@ export default defineComponent({
         const place: PlaceDraft | null =
           picked ??
           (fresh.value && typedName.value ? { name: typedName.value, city: city.value } : null)
-        if (!place || !when.value) return
+        if (!place || !when.value || dayBad.value) return
         emit('chosen', place, when.value)
         emit('update:open', false)
       },
