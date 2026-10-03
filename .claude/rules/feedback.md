@@ -42,7 +42,9 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
   as of the moment `ScreenState` drew the error, not of the tap — a person reads a while before
   writing. **The seam keeps the last refusals, not one** (adversarial Н1, Н4): asked as of a moment
   past, one slot answered nothing once anything failed after it — «Повторить» failing again, a queue
-  sending — and the screen's own code was lost. **Only what came back from the server is a refusal** (adversarial В3): a dropped
+  sending — and the screen's own code was lost. **A dropped connection is kept too, with no code**
+  (round 3, Ф2): a screen that broke on one has no code of its own, and another call's refusal a
+  minute older must not stand in for it. **Only what came back from the server is a refusal** (adversarial В3): a dropped
   connection or a request never answered has no code of the API's — the client's `error.internal`
   for it would send the developer to a log with nothing in it, so a reply is told by its status — and
   the sheet's own refusals are not remembered, or «too many today» would become a screen's reason.
@@ -132,7 +134,10 @@ against the code in `.scratch/tasks/status/MOL-118/v2-feedback.md` (С-1…С-12
   answer would otherwise meet `409` and leave the owner two messages. Before the first send, and
   after any edit, they are the opening's (Р-6). **A refusal in the API's own words lets them go**
   (adversarial Н2): every write is one transaction, so nothing has left, and tomorrow's message from
-  the settings must not carry today's error screen; only a lost answer or a bare status keeps them.
+  the settings must not carry today's error screen; a lost answer, a bare status and the server's own
+  `error.internal` keep them. **A `2xx` whose body did not read is sent** (round 3, Ф1): cut off on its
+  way or shaped by a newer server, the message is written — read as a failure, a retry from another
+  screen met `409` and the owner got it twice.
   **An error screen chooses «Сломалось» for its opening only** (В4): closed untouched, the draft
   keeps the kind the person chose.
 - **The button says why it waits**, inactive and focusable, in the order a person can put it right:
