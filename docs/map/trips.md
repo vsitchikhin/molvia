@@ -104,4 +104,4 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `e2e/item-details.spec.ts` — End-to-end: a purchase typed in the sheet becomes one priced row on the server, with a double tap and with no connection.
 - `e2e/settings.spec.ts` — End-to-end: the settings draft survives tabs and offline, conflicts show, and an offline or old-app trip keeps its context.
 - `e2e/trip-history.spec.ts` — End-to-end: «Записаны» paging, editing an old record, offline finishes kept across reload, removal from a finished record.
-- `e2e/trip.spec.ts` — End-to-end: a record started from «Записать покупки», filled, corrected, finished, removed and brought back, offline too; the newcomer's «Что брать».
+- `e2e/trip.spec.ts` — End-to-end: a record started from «Записать вручную», filled, corrected, finished, removed and brought back, offline too; the newcomer's «Что брать».

@@ -11,6 +11,9 @@
  * `sessionStorage` is the second shelf rather than a fallback of last resort: it survives a
  * reload in the same tab, which is the difference between one identity per launch and one
  * per session on a device that cannot write to disk at all.
+ *
+ * Web Storage only. The photos of receipts are megabytes no shelf holds, and live in IndexedDB
+ * behind `receipts/photoShelf.ts` — the one other store of the app (MOL-127).
  */
 
 function shelves(): Storage[] {

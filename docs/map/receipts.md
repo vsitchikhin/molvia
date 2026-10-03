@@ -85,3 +85,4 @@ memory: erasure leaves its words without an author, the copy carries the person'
 - `frontend/src/components/ReceiptPlaceSheet.vue` — «Где купили?»: the place read, the shops of this phone or a new one, and the day; «Записать» with no place opens it.
 - `frontend/src/components/ReceiptTotalSheet.vue` — «Итог чека» put right, in the receipt's currency, into the draft.
 - `frontend/src/views/ReceiptView.vue` — `/purchases/receipts/:id`: the review, «не разобран» with its photos, «уже записан», gone; «Записать N» through the queue, then `router.replace` to the purchases.
+- `e2e/receipts.spec.ts` — Spec against the fake reader: a receipt from the gallery to the purchases under a place named, «back» to «Покупки»; taken with no connection and kept across a reload; not a photo; four parts and no fifth; «Удалить чек» and «Вернуть».
