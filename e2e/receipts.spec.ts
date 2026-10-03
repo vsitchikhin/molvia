@@ -62,12 +62,18 @@ async function capture(page: Page, parts = 1): Promise<void> {
 /**
  * «Save 13 purchases», naming the place when the review asks for it. The place is found by the tax
  * number once any receipt of that seller was recorded — by another spec on the same database too —
- * so the sheet comes or does not, and neither is the point of a spec.
+ * so the sheet comes or does not, and neither is the point of a spec: the spec takes whichever came.
  */
 async function saveAll(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Save 13 purchases' }).click()
-  await page.waitForTimeout(500)
-  if (await sheet(page).isVisible()) {
+  // One of two outcomes, waited for and never timed (review 30): the sheet asks, or the review
+  // gave way.
+  const asked = async () => {
+    if (await sheet(page).isVisible()) return 'asked'
+    return new URL(page.url()).pathname.includes('/purchases/receipts/') ? null : 'left'
+  }
+  await expect.poll(asked, READ).not.toBeNull()
+  if ((await asked()) === 'asked') {
     await expect(sheet(page)).toContainText('Where was it?')
     await sheet(page).getByLabel('Another place').fill('Ереван Сити')
     await sheet(page).getByRole('button', { name: 'Save 13 purchases' }).click()

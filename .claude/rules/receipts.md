@@ -425,18 +425,30 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   the receipt's total (MOL-78); the person's total goes as `total`. **It turns В-5 again**: with the
   person's total the amounts of the lines not edited are `recordedSums` over their figures and that
   total, so a printed sum the total confirms is what is recorded (review 4).
-- **An edit of a line is the person's figure**: «≠» of the reading goes with it, «проверьте» only
+- **A figure edited is the person's figure**: «≠» of the reading goes with it, «проверьте» only
   once the item is chosen (`confirmed`), and «Сохранить» with nothing changed writes no draft — the
-  line goes on following the server and the shop's memory (review 16). «Не записывать» and «Вернуть в
-  запись» are written at once, with no figure checked (review 17).
+  line goes on following the server and the shop's memory (review 16). **The draft holds the figures
+  only once they changed** (`figures`, review 28): the sum in the field is prefilled, and written with
+  an item chosen it froze the line — the item and then the total recorded 890, the total and then the
+  item 980, for the same taps. Left alone, the line's sum is the server's or the person's total's,
+  whatever was edited around it. «Не записывать» and «Вернуть в запись» are written at once, with no
+  figure checked (review 17).
 - **While «Записать» waits the receipt is what was sent** (review 5, adversarial А1): no line, place,
   total or removal opens; the answer moves only the review that asked, never a screen the person went
-  to meanwhile (А5). A removal of a recorded receipt (409) is done, never «не принят».
+  to meanwhile (А5). A removal of a recorded receipt (409) is done, never «не принят». **The price,
+  named** (adversarial round 2): a record the server answers 5xx again and again is held by MOL-24's
+  rule for good, the receipt locked and the receipts behind it waiting — as a trip's write holds its
+  queue. There is no «cancel the record»: the handoff has none, and a 5xx on one receipt is a defect
+  the owner hears of (MOL-143).
 - **«Не принят» is a photo's word**: only a refused announcement or part makes that row, dated by the
   moment of the refusal; a tap opens the sheet with the reason and «Убрать», never removes by itself.
   **A receipt the server holds with parts missing and this phone none of them** is «не все части
   дошли», with «Удалить», and asked about by nobody: the list is asked again only while one is read
-  (adversarial А2). A removal takes the parts still waiting out of the queue, and «Вернуть» puts them
+  (adversarial А2). **Not one this phone delivered whole** (`delivered`, review 29, adversarial Б1):
+  the last part leaves the queue as it lands, and the list read before still says `uploading` — for a
+  moment always, for good when the next read fails at the till; the server never goes back to
+  `uploading` after the last part, so such a receipt is being read until the list says where it is.
+  Kept on the phone, for the read may be a restart away. A removal takes the parts still waiting out of the queue, and «Вернуть» puts them
   back (А3).
 - **The line's sheet is its own** (`ReceiptLineSheet`), with the box of «За единицу» and «Тут дешевле»
   of the purchase's sheet — the same keys and `useCheaperHint`: a line writes into a draft, the
