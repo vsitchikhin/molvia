@@ -238,15 +238,15 @@ shop's address and decides; else a city after «ք.» anywhere in a row («ՀՀ,
 Р2-В4) decides only when no other city is named in the head at all — a chain prints its legal address
 beside its shop's («ՀՀ, ք. Երևան» on a Gyumri receipt whose shop is «Գորկու 62, Գյումրի», round 3,
 Р3-В2), and two cities are no answer; never the chain's name «ԵՐԵՎԱՆ-ՍԻԹԻ» or «YEREVAN CITY». **The head
-ends at the first item row** (round 4, Р4-В1): a table's heading opening the row with the name after it
-— «(2203) ԳՅՈՒՄՐԻ …», or «| |824) …» as OCR reads it with the bracket and a digit lost (round 5, Р5-В1)
-— a card's article «0401/…», or its item number with a dot «3.…». Dog City's items begin at its ninth
-row, and an item named after a city, the beer «Գյումրի», is a line, not the address. A phone's area code
-«Հեռ. (0312) …» and a house number «62, Գորկու …» are the head and end nothing (Р5-В2, review 16). The
-head is every row above the first item — not a window of fifteen, which left «Ереван Сити»'s address past
-it on six readings of the bench (round 6, Р6-В2) — and forty rows where no item is read at all; the stray
-letter at the edge is forgiven before an item's heading as before a city (Р6-В1). On the bench both page
-modes now find the address of every receipt whose address they read, and no other city. One stray letter OCR reads at the paper's edge may stand before
+ends at the first item** (rounds 4–7): a table's heading opening the row with the name after it —
+«(2203) ԳՅՈՒՄՐԻ …», «| |824) …» as OCR reads it with the bracket lost, a stray letter at the edge
+before it forgiven; a card's item number with a dot «3.…»; and two rows above a card's first article
+«0401/…» — whole or cut by OCR, «1906/9000» — since the item's name stands above it, its number read
+without a dot as often as with one (round 7, Р7-В1). An item named after a city, the beer «Գյումրի», is
+a line, not the address. A phone's area code «Հեռ. (0312) …» and a house number «62, Գորկու …» are
+the head and end nothing (round 5, review 16). Where no item is read at all, twenty rows stand for the
+head — the address of «Ереван Сити» runs to the 17th. On the bench both page modes find the address of
+every receipt whose address they read, and no other city. One stray letter OCR reads at the paper's edge may stand before
 the city («է ԳՅՈՒՄՐԻ Գորկու 62», am-08); on every reading of the bench the city is found exactly where
 the address stands in the head, and nowhere else — else the person's own. Of
 the places this seller's receipts were recorded at there, with the trips still there: the person's own

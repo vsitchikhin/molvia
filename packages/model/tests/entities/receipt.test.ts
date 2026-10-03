@@ -242,6 +242,16 @@ describe('the city of the address (MOL-126, Р-6)', () => {
     ).toBe('Гюмри')
   })
 
+  // round 7, Р7-В1: a card's first item's name stands above its article, its number often without a
+  // dot — the head ends above the name; an article cut by OCR still ends it
+  it('ends a card’s head above its first item’s name, its article whole or cut', () => {
+    const banner = Array.from({ length: 6 }, () => 'ՏՆՏԵՍԱԿԱՆ ԱՊՐԱՆՔՆԵՐ')
+    const card = (article: string) =>
+      rows(...banner, 'ԵՐԵՎԱՆ Արշակունյաց 34', 'ՀՎՀՀ:01282006', '1 ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ 0.5լ', article)
+    expect(receiptCityOf(card('2203/1100001 1Հտ 450 450'))).toBe('Ереван')
+    expect(receiptCityOf(card('2203/1100 1Հտ 450 450'))).toBe('Ереван')
+  })
+
   // round 5, Р5-В2, review 16: must not fire — a phone's area code and a house number are the head
   it('does not end the head at a phone’s area code or a house number', () => {
     expect(receiptCityOf(rows('DOG CITY', 'Հեռ. (0312) 5-55-55', 'ԳՅՈՒՄՐԻ Շիրազի 57'))).toBe(

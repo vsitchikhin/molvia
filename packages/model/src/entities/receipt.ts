@@ -177,20 +177,45 @@ const CITY_ANYWHERE: Readonly<Record<SettingsCity, RegExp>> = {
 /**
  * The head is the rows above the first item (round 6, Р6-В2): a fixed window of fifteen left the address
  * of «Ереван Сити» past it on six readings of the bench — its head runs to the 17th row. Where no item
- * row is read at all, this many rows stand for the head.
+ * row is read at all, this many rows stand for the head: past them the items begin (round 7, Р7-В1).
  */
-const HEAD_ROWS = 40
+const HEAD_ROWS = 20
 
 /**
- * A row of an item, where the head ends (round 4, Р4-В1): a table's customs heading opening the row,
- * then the name — «(2203) ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ», or «| |824) ՏՈՏՈՒՀՈՂ» as OCR reads it with the bracket
- * and a digit lost (round 5, Р5-В1); a card's article «0401/1163909»; a card's item number with its
- * dot before the name, «3.Գյումրի …». Dog City's items begin at its ninth row, and an item named after
- * a city is a line, not the address. Not a phone's area code «Հեռ. (0312) 5-55-55», which neither opens
- * the row nor has a name after it, nor a house number «62, Գորկու …» (round 5, Р5-В2, review 16).
+ * A table's item row, where the head ends (round 4, Р4-В1): its customs heading opening the row, then the
+ * name — «(2203) ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ», or «| |824) ՏՈՏՈՒՀՈՂ» as OCR reads it with the bracket and a digit
+ * lost (round 5, Р5-В1), a stray letter at the edge before it forgiven (round 6, Р6-В1). Dog City's items
+ * begin at its ninth row, and an item named after a city is a line, not the address. Not a phone's area
+ * code «Հեռ. (0312) 5-55-55», which neither opens the row nor has a name after it (round 5, Р5-В2).
  */
-const ITEM_ROW =
-  /^[^\p{L}\d]*(?:\p{L}[^\p{L}\s]*\s+[^\p{L}\d]*)?\(?\d{2,4}\)\s*\p{L}|\d{4}\s*\/\s*\d{5,}|^\s*\d{1,3}\.\s*\p{L}/u
+const TABLE_ITEM_ROW = /^[^\p{L}\d]*(?:\p{L}[^\p{L}\s]*\s+[^\p{L}\d]*)?\(?\d{2,4}\)\s*\p{L}/u
+
+/**
+ * A card's article row, «0401/1163909», or cut by OCR, «1906/9000» (round 7, Р7-В1): the item's name stands
+ * above it — one row, or two when it is split — and its number «1 …», «1…» is read without a dot as often
+ * as with one. So the head of a card ends two rows above its first article. A card's item number with its
+ * dot, «3.Գյումրի …», ends it where it stands; a house number «62, Գորկու …» does not (review 16).
+ */
+const CARD_ARTICLE_ROW = /\d{4}\s*\/\s*\d{3,}/u
+const CARD_NUMBER_ROW = /^\s*\d{1,3}\.\s*\p{L}/u
+const CARD_NAME_ROWS = 2
+
+/** Where a receipt's head ends: before its first item, or `HEAD_ROWS` where no item is read. */
+function headEnd(rows: readonly TextRow[]): number {
+  const ends: number[] = []
+  const table = rows.findIndex((row) => TABLE_ITEM_ROW.test(row.text))
+  if (table >= 0) ends.push(table)
+  const article = rows.findIndex((row) => CARD_ARTICLE_ROW.test(row.text))
+  if (article >= 0) {
+    // the name above the article: its number with a dot marks where it begins, else two rows up
+    const above = Math.max(0, article - CARD_NAME_ROWS)
+    const numbered = rows.slice(above, article).findIndex((row) => CARD_NUMBER_ROW.test(row.text))
+    ends.push(numbered < 0 ? above : above + numbered)
+  }
+  const number = rows.findIndex((row) => CARD_NUMBER_ROW.test(row.text))
+  if (number >= 0) ends.push(number)
+  return ends.length === 0 ? Math.min(rows.length, HEAD_ROWS) : Math.min(...ends)
+}
 
 /**
  * The city a receipt's address prints, if it is one of the settings'; read in the first part only. A
@@ -202,8 +227,7 @@ const ITEM_ROW =
  */
 export function receiptCityOf(rows: readonly TextRow[]): SettingsCity | null {
   const first = rows.filter((row) => row.part === 0)
-  const items = first.findIndex((row) => ITEM_ROW.test(row.text))
-  const head = items < 0 ? first.slice(0, HEAD_ROWS) : first.slice(0, items)
+  const head = first.slice(0, headEnd(first))
   const cities = Object.keys(RECEIPT_CITIES) as SettingsCity[]
   const opening = cities.filter((city) => head.some((row) => RECEIPT_CITIES[city].test(row.text)))
   if (opening.length === 1) return opening[0] ?? null
