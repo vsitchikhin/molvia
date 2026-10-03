@@ -358,6 +358,39 @@ ps bot` — is it running, how often did it restart — and `logs --tail 50 bot`
 - `[molvia] remind claim: <code>` — the API refuses the claim;
 - `[molvia] pulse: <kind>` — the ping did not go out: `network`, `timeout` or healthchecks.io's status.
 
+### Failures of the API and the bot (MOL-143)
+
+The checks above say that something is **down**. A failure says that something **broke** while the
+rest is up: an answer of 500, a job of the API's timers, a handler of the bot. Each goes to the
+table `failures` in the API's database by its fingerprint — the kind, the code, the top frame and
+the route's template, never anything of a person — and the owner hears of it through **our** bot,
+since the machine is up when a failure happens:
+
+- `🔴 Новый сбой` — a fingerprint the first time in this build: its kind, place, top frame, build
+  and the first six characters of the fingerprint;
+- `🟠 Уже 10 / 100 / 1000 раз в этой сборке` — a known one that keeps happening. Nothing in between,
+  and nothing once a day: silence means nothing new and nothing growing.
+
+Whom the bot writes is `OWNER_TELEGRAM_ID` in `~/molvia/.env.prod`, handed to the API by
+`docker-compose.prod.yml`. **The line is required**, as `BOT_PULSE_URL` is; empty, on purpose, keeps
+the failures in their table and tells nobody — every working copy and end-to-end. A notice the bot
+did not take within a day is dropped; the count stays in the table. Failures are kept 30 days after
+they last happened.
+
+**What broke** — the table, newest first:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod exec backend node dist/failures.js
+docker compose -f docker-compose.prod.yml --env-file .env.prod exec backend node dist/failures.js --limit 50
+```
+
+In a working copy the same thing is `make failures [LIMIT=20]`. Find the message's fingerprint by
+its first six characters. The frames are the bundle's — the function's name in them is the source's
+— and under each frame of the API of the running build stands its line in the source, read through
+the map in the image (`→ src/usecases/rate-item.ts:27:1`). The API runs without
+`--enable-source-maps` on purpose: the map costs it some 75 MB of memory for good (MOL-143, В-6).
+The bot's frames and another build's are left as they are.
+
 ## Backups (MOL-70)
 
 Every night at 04:00 in Yerevan `molvia-backup.timer` runs `backup/backup.sh`: `pg_dump` inside the

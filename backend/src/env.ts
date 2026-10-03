@@ -1,7 +1,7 @@
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
-import { UNNAMED_BUILD } from '@molvia/model'
+import { UNNAMED_BUILD, telegramUserIdSchema } from '@molvia/model'
 import model from '@/embeddings/model.json'
 import { loginConfiguration } from './login-config'
 
@@ -56,6 +56,15 @@ const envSchema = z.object({
     .string()
     .min(1)
     .default(fileURLToPath(new URL(`../../.models/${model.name}`, import.meta.url))),
+  /**
+   * Whom the bot writes about failures (MOL-143, Р-9 of MOL-149): the owner's Telegram id. Set in
+   * production only — without it nothing is queued for anyone, so a copy's failures go to its table
+   * and stay there. Empty is unset, as compose passes a variable it was not given.
+   */
+  OWNER_TELEGRAM_ID: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.coerce.number().pipe(telegramUserIdSchema).optional(),
+  ),
   /** Where the base is asked; end-to-end points it at a fake of its own. */
   OPEN_FOOD_FACTS_URL: z.url({ protocol: /^https?$/ }).optional(),
   /**

@@ -29,6 +29,7 @@ entry; a data file (`sql`, `json`, fonts, icons) by an entry for a directory abo
 | `auth.md`            | sessions, the login request, the cookie, the login screen, «Выйти», devices    |
 | `privacy.md`         | erasure, the privacy page, logs                                                |
 | `bot.md`             | the bot: its half of the login, `/delete`                                      |
+| `observability.md`   | failures of the API and the bot, the owner's channel in Telegram (MOL-143)     |
 | `frontend.md`        | the app shell and kit: `App.vue`, the screen frame, the sheet, states, styles  |
 | `e2e.md`             | end-to-end infrastructure; each spec lives in its area's map                   |
 | `deploy.md`          | images, the production stack, backups, the release workflow                    |

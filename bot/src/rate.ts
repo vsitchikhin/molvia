@@ -6,6 +6,7 @@ import { ERROR, ISSUE } from '@molvia/model'
 import { dropKeyboard, refuse, settleKeeping, stopSpinner } from './answer'
 import { t } from './i18n'
 import { SCALE_DATA, keyboardOf, readText, scale, shownText, writeText } from './remind'
+import { handlerOf, reportDefect } from './failure'
 
 export interface RateDeps {
   readonly api: MolviaBotClient
@@ -46,6 +47,7 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
       console.error(
         `[molvia] rate: ${error instanceof ApiError ? error.code : 'unexpected failure'}`,
       )
+      reportDefect(api, error, handlerOf(ctx))
       // The scale stays: a repeat is harmless, and «press again» must leave something to press.
       await refuse(ctx, 'rate.failed')
       return

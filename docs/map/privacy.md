@@ -16,7 +16,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 
 - `backend/src/db/erasure-repository.ts` — Repository of erasure: everything about one Telegram id in one transaction, a dry run rolled back; `ACTOR_REFERENCES` names every key to `actors`. Tests: `backend/tests/erasure.integration.test.ts`.
 - `backend/src/db/export-repository.ts` — Repository of «Скачать мои данные» (MOL-93): everything of one owner as one read-only snapshot; `EXPORT_SECTION_OF` ties each erased table to its section, `EXPORT_COLUMNS` names every column as exported or left out and why. Tests: `backend/tests/export.integration.test.ts`.
-- `backend/src/db/failure.ts` — Postgres failures: foreign-key and unique violations turned into domain errors, and `describeFailure`, a failure logged by its kind without its message; `describeMigrationFailure` adds the statement that failed, DDL from our files, or the migrator's own words about a file of ours (MOL-153). Tests: `backend/tests/migration-log.integration.test.ts`.
+- `backend/src/db/failure.ts` — Postgres failures: foreign-key and unique violations turned into domain errors; `describeMigrationFailure`, a failed migration by its kind (`describeFailure` of the model, MOL-143) adds the statement that failed, DDL from our files, or the migrator's own words about a file of ours (MOL-153). Tests: `backend/tests/migration-log.integration.test.ts`.
 
 ## backend · other
 

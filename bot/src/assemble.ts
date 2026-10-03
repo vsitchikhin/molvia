@@ -8,6 +8,7 @@ import { loginComposer } from './login'
 import type { LoginDeps } from './login'
 import { heardFrom, muteComposer } from './mute'
 import { rateComposer } from './rate'
+import { handlerOf, reportFailure } from './failure'
 
 /**
  * The bot, wired in the one order that matters.
@@ -55,9 +56,10 @@ export function assembleBot(
   bot.use(loginComposer(deps))
 
   // The last resort: a handler that throws must not take the process with it. The update itself
-  // is deliberately not logged — it carries the person's name, username and language.
-  bot.catch(({ error }) => {
-    console.error(`[molvia] update failed: ${error instanceof Error ? error.message : 'unknown'}`)
+  // is deliberately not logged — it carries the person's name, username and language — and nor is
+  // the error's message: it is logged by its kind and reported to the API by its handler (MOL-143).
+  bot.catch(({ error, ctx }) => {
+    reportFailure(deps.api, error, handlerOf(ctx))
   })
 
   return bot

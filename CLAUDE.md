@@ -367,6 +367,19 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Logs live fourteen days and carry no address and no query**; a failure is logged by its kind
   through `describeFailure`, never by its message.
 
+### Failures and the owner's channel — `.claude/rules/observability.md`
+
+- **A failure belongs to nobody** (MOL-143): `failures` holds the fingerprint — source, kind, code,
+  top frame without its position, the route's template — and nothing of a person, so no key to
+  `actors`, no erasure, no copy; a new column is a decision about privacy.
+- **A failure is an answer of 500 or more, a job of the API's timers, or a defect of the bot**; one
+  path writes the log and the table (`failureReporter`), and the answer never waits for the table.
+- **The owner hears of a fingerprint the first time in a build and at 10, 100, 1000 there** —
+  no daily summary; through `owner_notices`, claimed by the bot every minute, at most once, written
+  to `OWNER_TELEGRAM_ID` of the API's environment — empty in every copy. MOL-148 joins as a kind.
+- **The API runs without `--enable-source-maps`** (В-6, +70…80 MB measured): `make failures` reads
+  the API's frames back through the image's map.
+
 ### The bot — `.claude/rules/bot.md`
 
 - **Whose data goes is `ctx.from.id`, never anything in the button.**
