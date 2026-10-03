@@ -1,0 +1,12 @@
+# The dashboard of `deploy/grafana/dashboards`, read-only (MOL-145, Р-10): a panel changed in the
+# interface is not saved — change the JSON and merge.
+apiVersion: 1
+providers:
+  - name: molvia
+    folder: Molvia
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 0
+    options:
+      path: /etc/grafana/dashboards

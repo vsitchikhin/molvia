@@ -19,6 +19,7 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 
 ## backend · tests
 
+- `backend/tests/compose.ts` — Test helper: `docker-compose.prod.yml` as text and each service's block of lines, for the tests that hold its shape.
 - `backend/src/db/journal.test.ts` — Unit test: the journal of migrations is numbered in order and every stamp is later than the one before it.
 - `backend/tests/migration-stamps.integration.test.ts` — Integration test: a migration drizzle skipped because its stamp is older than one applied is named, and stops the chain.
 
@@ -36,7 +37,7 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 
 ## repository
 
-- `.env.prod.example` — Template of the server's `.env.prod`: domain, Postgres credentials, the production bot's token and username, the bot–API secret, the bot's pulse URL.
+- `.env.prod.example` — Template of the server's `.env.prod`: domain, Postgres credentials, the production bot's token and username, the bot–API secret, the bot's pulse URL, Grafana's password and the alarms' bot (MOL-145).
 - `.github/workflows/release.yml` — Release workflow: after green CI on master builds the four images — the receipt reader's too — and rolls them out over ssh; a version tag names built images.
 - `.github/workflows/watch.yml` — The outside watch (MOL-142): every five minutes `/api/health` and the page to the healthchecks.io check «molvia-up» — a `/fail` when three of four tries half a minute apart fail — and the certificate's term to «molvia-cert»; red only when it could not report.
 - `bin/bundle.mjs` — esbuild bundler for the API and bot images; the API also gets its forget, seed-catalogue, gates and failures tools.
@@ -50,4 +51,4 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 - `deploy/deploy.sh` — The deploy key's forced command: rolls out one published image tag, checks health, rolls back on failure — without the receipt reader, which a tag before it lacks; honours `deploy.hold`.
 - `deploy/reindex-text.sql` — Rebuilds every index whose key is text or an expression by the rules of the libc the database now runs under — the block of `0038` for a move a migration cannot make (MOL-105).
 - `deploy/window-duplicates.sql` — After a rolled-back deploy (MOL-105): what the old API wrote twice into indexes of another libc — search picks merged, a login code dropped, every other pair of a unique text key named; index scans off.
-- `docker-compose.prod.yml` — Production stack: Postgres, API, bot, the receipt reader (three cores, a gigabyte) and Caddy-served PWA on one network, logging to journald.
+- `docker-compose.prod.yml` — Production stack: Postgres, API, bot, the receipt reader (three cores, a gigabyte) and Caddy-served PWA, logging to journald; and the metrics (MOL-145) — VictoriaMetrics, node_exporter, cAdvisor, postgres_exporter on a network with no way out, Grafana on the loopback.
