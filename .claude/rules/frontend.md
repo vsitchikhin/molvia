@@ -65,6 +65,21 @@ The detail behind the frontend lines of `CLAUDE.md`.
   master took this:**
   Nunito is `@include display-type` in place of the `font-family`/`font-weight` pair, a literal is a
   token, and `npm run lint:style -w @molvia/frontend` names every place.
+- **Colours that can meet on a screen are held apart by a test, not by eye** (MOL-172,
+  `frontend/src/styles/tokens.test.ts`): in both schemes any two steps of different roles — accent
+  with `accent-solid`, good, warn, bad, `graphic` — and every category against every step of a role
+  stand 0.08 apart in OKLab; `accent`, `good`, `warn`, `bad`, `graphic` and every category are 3:1 on
+  `--surface`; `text`, `text-muted` and the inks 4.5:1 on `surface`, `sunken`, `surface-2`, an ink on
+  its own tint, `on-accent` on `accent-solid`; and the dark mixin declares every one of them — a name it
+  left out draws the light value on a dark ground. **No list of exceptions** (owner's В-13, MOL-118):
+  the handoff checked chosen pairs and missed more than it named, among them the light `graphic` 0.071 from `good`
+  and the dark tints of accent and warn 0.030; a value that fails is changed. «Any two steps of
+  different roles» is one rule rather than a list of pairs, since a tint against another role's mark
+  passes by lightness alone. Categories among themselves are not held (owner's В-1): 36 light and 62
+  dark pairs stand closer, and a name beside the dot tells them apart until MOL-218 measures which
+  meet in one donut. `--graphic` is the colour of data without one of its own; `--border-strong` is
+  decoration and the edge of a field (Ф-3: `--border` there was 1.29:1 on the well). The math —
+  WCAG luminance and Ottosson's OKLab — is the test's own thirty lines, no dependency.
 - **Nunito is one weight, 800, one file per subset** (MOL-171): the 400 and 600 files were the same
   variable font copied twice, and the precache fetched each URL. A sentence in a figure's place
   («Рынка нет» on the rate chart) is set in Onest, not Nunito at another weight.

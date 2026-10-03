@@ -286,14 +286,15 @@ A warm, low-chroma ground with four semantic roles — accent, good, warn, bad �
 
 - **Olive** (`good`, `good-ink`, `good-tint`): the "Брать" verdict, a reconciliation that came out even, a plus against the market.
 - **Ochre** (`warn`, `warn-ink`, `warn-tint`): "Только если дёшево", stale data, attention.
-- **Brick** (`bad`, `bad-ink`, `bad-tint`): "Не брать", errors, a minus against the market, destructive words.
+- **Brick** (`bad`, `bad-ink`, `bad-tint`; dark — crimson, held off the terracotta): "Не брать", errors, a minus against the market, destructive words.
 
 ### Neutral
 
 - **Warm Paper** (`sunken` #f3e8d6 / dark #14110f): the page ground.
 - **Cream Card** (`surface` #fffaf2 / dark #201c19): cards, sheets, the bars.
 - **Well** (`surface-2`): inputs, segmented tracks, inert pills, empty-state circles.
-- **Seam** (`border`, `border-strong`): card edges and the secondary button's outline — decoration only.
+- **Seam** (`border`, `border-strong`): card edges, the secondary button's outline, the edge of a field — decoration only.
+- **Graphic** (`graphic` #746258 / dark #857a6c): data that carries meaning without a colour of its own — 3:1 on `surface`.
 - **Ink** (`text` #1f1c19) and **Faded Ink** (`text-muted` #6c6152): text; muted still clears 4.5:1 on every ground.
 
 ### Categories of spending
@@ -307,14 +308,17 @@ and always stands beside its name.
 never data, never status, never decoration. A chart series is `text` or `graphic`, not accent
 **(target)**. A note or hint sits on `surface-2`, not on `accent-tint` **(target)**.
 
-**The Neighbouring Roles Rule (target).** Any two roles that can meet on a screen — accent, bad, warn,
-good, their tints and inks, and every category — stand at least 0.08 apart in OKLab, in both schemes.
-Today the dark `accent` and `bad` (0.050) and the tints `accent-tint`/`bad-tint` (0.016–0.018) break
-it, as do `cat-telecom`, `cat-rent` and `cat-own-2`: propose new values (FIXES Ф-1, Ф-2).
+**The Neighbouring Roles Rule.** Any two steps of different roles — accent (with `accent-solid`),
+good, warn, bad, `graphic` — and every category against every step of a role stand at least 0.08
+apart in OKLab, in both schemes; a mark and a category are 3:1 on `surface`, text 4.5:1 on its ground.
+`frontend/src/styles/tokens.test.ts` holds every pair, with no list of exceptions: a value that fails
+is changed, never excused (MOL-172). Categories among themselves are not held yet (MOL-218): today a
+name beside the colour tells two close ones apart.
 
-**The Graphic Is Data Rule (target).** Anything that carries meaning — an unselected bar, the
-"Остальные" sector, the "no data" dash, the off track of a switch — is at least 3:1 on `surface`, by a
-`graphic` token. `border-strong` (1.8:1) is decoration only.
+**The Graphic Is Data Rule.** Anything that carries meaning — an unselected bar, the "Остальные"
+sector, the "no data" dash, the off track of a switch — is drawn in `graphic`, at least 3:1 on
+`surface`. `border-strong` (1.8:1) is decoration only. The charts, the countdown of "Вернуть" and the
+switch still draw `border-strong` until their own tasks **(target)**.
 
 **The Colour Never Alone Rule.** Beside every colour stands a word, a form or a figure: a verdict has
 its icon and word, a category its name, a plus or minus its sign and "лучше / хуже рынка".
@@ -428,7 +432,7 @@ its weight does not change on selection, so the row never reflows under the thum
 
 ### Inputs / Fields
 
-- **Field:** a 44 well on `surface-2`, radius 14, hairline `border` (to be strengthened — target); label above in 13/600 `text-muted`; focus turns the edge `accent` with a 2 px `accent-tint` halo; the error is a word from the registry under the field. Never `type="number"`.
+- **Field:** a 44 well on `surface-2`, radius 14, hairline `border-strong`; label above in 13/600 `text-muted`; focus turns the edge `accent` with a 2 px `accent-tint` halo; the error is a word from the registry under the field. Never `type="number"`.
 - **SearchField (target, one):** a pill well on `surface-2`, a magnifier left, "Очистить" or the scanner right. One look for every search in the app.
 - **Segmented control:** a `surface-2` track, segments 38 that answer the thumb over the full 44.
 
