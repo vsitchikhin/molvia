@@ -179,42 +179,48 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
       )
     },
 
-    reply(thread, text) {
-      return db.transaction(async (tx): Promise<ReplyWritten | null> => {
-        const [head] = await tx
-          .select({ actorId: feedback.actorId, locale: feedback.locale })
-          .from(feedback)
-          .where(and(eq(feedback.id, thread), isNull(feedback.threadId)))
-        if (head === undefined) return null
-        await tx.execute(lockAuthor(head.actorId))
-        const [last] = await tx
-          .select({ id: feedback.id, createdAt: feedback.createdAt })
-          .from(feedback)
-          .where(
-            and(
-              eq(feedback.actorId, head.actorId),
-              or(eq(feedback.id, thread), eq(feedback.threadId, thread)),
-            ),
-          )
-          .orderBy(desc(feedback.id))
-          .limit(1)
-        const [author] = await tx
-          .select({ telegram: actors.telegramUserId, country: actors.country })
-          .from(actors)
-          .where(eq(actors.id, head.actorId))
-        // Erased between the two reads: the cascade took the thread, and there is nobody to answer.
-        if (last === undefined || author === undefined) return null
-        const [written] = await tx
-          .insert(feedbackReplies)
-          .values({ feedbackId: last.id, actorId: head.actorId, text })
-          .returning({ id: feedbackReplies.id })
-        return {
-          reply: theRow(written, 'feedback_replies').id,
-          to: author.telegram,
-          locale: head.locale as AppLocale,
-          answeredAt: last.createdAt,
-          country: author.country,
-        }
+    async reply(thread, text) {
+      const write = async () =>
+        db.transaction(async (tx): Promise<ReplyWritten | null> => {
+          const [head] = await tx
+            .select({ actorId: feedback.actorId, locale: feedback.locale })
+            .from(feedback)
+            .where(and(eq(feedback.id, thread), isNull(feedback.threadId)))
+          if (head === undefined) return null
+          await tx.execute(lockAuthor(head.actorId))
+          const [last] = await tx
+            .select({ id: feedback.id, createdAt: feedback.createdAt })
+            .from(feedback)
+            .where(
+              and(
+                eq(feedback.actorId, head.actorId),
+                or(eq(feedback.id, thread), eq(feedback.threadId, thread)),
+              ),
+            )
+            .orderBy(desc(feedback.id))
+            .limit(1)
+          const [author] = await tx
+            .select({ telegram: actors.telegramUserId, country: actors.country })
+            .from(actors)
+            .where(eq(actors.id, head.actorId))
+          // Erased between the two reads: the cascade took the thread, and there is nobody to answer.
+          if (last === undefined || author === undefined) return null
+          const [written] = await tx
+            .insert(feedbackReplies)
+            .values({ feedbackId: last.id, actorId: head.actorId, text })
+            .returning({ id: feedbackReplies.id })
+          return {
+            reply: theRow(written, 'feedback_replies').id,
+            to: author.telegram,
+            locale: head.locale as AppLocale,
+            answeredAt: last.createdAt,
+            country: author.country,
+          }
+        })
+      // Erased between the reads and the write: the key finds no message, and the thread is gone.
+      return translateFailures(write).catch((error: unknown) => {
+        if (error instanceof DomainError && error.code === ERROR.NOT_FOUND) return null
+        throw error
       })
     },
 
