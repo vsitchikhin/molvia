@@ -169,6 +169,23 @@ export const ru = {
   'owner.failure.build': 'Сборка {build}',
   'owner.failure.buildPrint': 'Сборка {build} · {fingerprint}',
   'owner.failure.more': 'Подробности — make failures',
+  /**
+   * A message to the developer, told to the owner (MOL-148, Р-9 of MOL-150). The kind in the sheet's
+   * own words; the tag `#fb{thread}` ends the first line and nothing else may stand after it — the
+   * bot reads it back from there when the owner replies, and a test holds that every kind keeps it.
+   * The screen, the platform and the code are printed as they were sent: the bot repeats no rule of
+   * the app's. The owner's language is not kept, so Russian.
+   */
+  'owner.feedback.bug': '🐞 Сломалось · #fb{thread}',
+  'owner.feedback.idea': '💡 Идея · #fb{thread}',
+  'owner.feedback.other': '💬 Другое · #fb{thread}',
+  'owner.feedback.continued': '↩️ Продолжение · #fb{thread}',
+  'owner.feedback.quote': '> {quote}',
+  'owner.feedback.where': 'Экран {route} · {platform} · {locale}',
+  'owner.feedback.code': 'Код {code}',
+  'owner.feedback.noCode': 'С экрана ошибки, без кода',
+  'owner.feedback.builds': 'Страница {page} · API {api}',
+  'owner.feedback.noBuild': '—',
 } as const
 
 /**

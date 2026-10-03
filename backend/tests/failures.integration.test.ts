@@ -166,10 +166,13 @@ describe('owner_notices — выдаётся один раз', () => {
 
 describe('сбой не принадлежит человеку (Р-8 MOL-149)', () => {
   it('ни одна колонка новых таблиц не ссылается на actors', async () => {
-    const references = await db.execute<{ table: string }>(sql`
-      select conrelid::regclass::text as table from pg_constraint
+    const references = await db.execute<{ table: string; target: string }>(sql`
+      select conrelid::regclass::text as table, confrelid::regclass::text as target
+      from pg_constraint
       where contype = 'f' and conrelid in ('failures'::regclass, 'owner_notices'::regclass)`)
-    expect([...references]).toEqual([])
+    // The one key is a message's to the developer (MOL-148): its notice goes with it, and a
+    // notice about a failure cannot carry it (`owner_notices_feedback_named`).
+    expect([...references]).toEqual([{ table: 'owner_notices', target: 'feedback' }])
   })
 
   it('в таблице нет колонки, куда мог бы лечь человек', async () => {

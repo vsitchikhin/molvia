@@ -644,7 +644,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         eraseMe(createErasureRepository(db), telegramUserId),
       )
       feedbackRoutes(guarded, (actorId, message) =>
-        sendFeedback(messages, actorId, message, VERSION),
+        sendFeedback(messages, actorId, message, VERSION, owner),
       )
       sessionRoutes(guarded, {
         list: (actorId, currentId) => listSessions(sessions, actorId, currentId),

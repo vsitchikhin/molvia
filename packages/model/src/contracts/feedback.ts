@@ -117,3 +117,63 @@ export type FeedbackBody = z.infer<typeof feedbackBodySchema>
  */
 export const feedbackSentCodec = z.strictObject({ number: z.int().positive() })
 export type FeedbackSent = z.infer<typeof feedbackSentCodec>
+
+/**
+ * The owner's reply, as long as it may be (MOL-150, Р-2): it goes to the person inside a frame, and
+ * the whole must fit one Telegram message of 4096.
+ */
+export const FEEDBACK_REPLY_MAX = 3500
+
+/**
+ * How much of the owner's reply a «Продолжение #fb42» quotes (MOL-148, Р-10): a reply of 3500 and a
+ * continuation of 2000 do not fit one Telegram message together.
+ */
+export const FEEDBACK_QUOTE_MAX = 200
+
+/** The start of the owner's reply a continuation quotes, cut by characters, never a pair in half. */
+export function feedbackQuote(reply: string): string {
+  const characters = Array.from(reply)
+  return characters.length <= FEEDBACK_QUOTE_MAX
+    ? reply
+    : `${characters.slice(0, FEEDBACK_QUOTE_MAX).join('')}…`
+}
+
+/** The number of a thread — its first message's — as the owner's notices tag it: `#fb42`. */
+const threadNumberSchema = z.int().positive()
+
+/**
+ * A message from the app, told to the owner (MOL-148, Р-9 of MOL-150): the kind, the text, everything
+ * that went with it, when, and the thread's tag. Nothing of the person — no Telegram id, no name, no
+ * `actor_id`: the copy stays in the owner's chat for good (В-3).
+ */
+export const feedbackNoticeSchema = z.strictObject({
+  kind: z.literal('feedback'),
+  thread: threadNumberSchema,
+  feedbackKind: feedbackKindSchema,
+  text: z.string().min(1).max(FEEDBACK_TEXT_MAX),
+  locale: z.enum(LOCALES),
+  pageBuild: buildSchema.nullable(),
+  apiBuild: buildSchema,
+  route: feedbackRouteSchema.nullable(),
+  platform: feedbackPlatformSchema.nullable(),
+  fromError: z.boolean(),
+  errorCode: feedbackErrorCodeSchema.nullable(),
+  at: z.iso.datetime(),
+})
+export type FeedbackNotice = z.infer<typeof feedbackNoticeSchema>
+
+/**
+ * A person's answer to the owner's reply, told to the owner (MOL-148, В-1 of MOL-150): the same tag,
+ * so the hashtag shows the whole thread, and the start of the reply it answers.
+ */
+export const feedbackContinuedNoticeSchema = z.strictObject({
+  kind: z.literal('feedback_continued'),
+  thread: threadNumberSchema,
+  quote: z
+    .string()
+    .min(1)
+    .max(FEEDBACK_QUOTE_MAX + 1),
+  text: z.string().min(1).max(FEEDBACK_TEXT_MAX),
+  at: z.iso.datetime(),
+})
+export type FeedbackContinuedNotice = z.infer<typeof feedbackContinuedNoticeSchema>

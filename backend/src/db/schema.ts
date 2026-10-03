@@ -27,6 +27,7 @@ import {
   DEVICE_NAME_MAX,
   EVENT,
   FEEDBACK_DELIVERY,
+  FEEDBACK_NOTICE_KINDS,
   FEEDBACK_KINDS,
   LOCALES,
   LOGIN_CODE_MAX,
@@ -1851,8 +1852,9 @@ export const failures = pgTable(
  * minute and the claim marks them handed in its own transaction — at most once, as the rating
  * reminders are. Who the owner is lives in the API's environment, never here.
  *
- * Nothing in a notice about a failure belongs to a person, so there is no key to `actors`; the
- * feedback of MOL-148 joins as one more kind and decides for itself what of its own is erased.
+ * Nothing in a notice about a failure belongs to a person, so there is no key to `actors`. A notice
+ * about a message to the developer (MOL-148) carries its text, so it names the message by
+ * `feedback_id` and goes with it — the person erased, or the thread a year old (Р-8 of MOL-150).
  */
 export const ownerNotices = pgTable(
   'owner_notices',
@@ -1860,11 +1862,19 @@ export const ownerNotices = pgTable(
     id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
     kind: text('kind').notNull(),
     payload: jsonb('payload').notNull(),
+    feedbackId: bigint('feedback_id', { mode: 'number' }).references(() => feedback.id, {
+      onDelete: 'cascade',
+    }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
     handedAt: timestamp('handed_at', { withTimezone: true }),
   },
   (table) => [
     check('owner_notices_kind_known', oneOf(table.kind, OWNER_NOTICE_KINDS)),
+    check(
+      'owner_notices_feedback_named',
+      sql`(${oneOf(table.kind, FEEDBACK_NOTICE_KINDS)}) = (${table.feedbackId} is not null)`,
+    ),
+    index('owner_notices_feedback_idx').on(table.feedbackId),
     check('owner_notices_payload_object', sql`jsonb_typeof(${table.payload}) = 'object'`),
     check('owner_notices_payload_kind', sql`${table.payload} ->> 'kind' = ${table.kind}`),
     index('owner_notices_waiting')

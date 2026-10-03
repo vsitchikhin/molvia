@@ -1,10 +1,10 @@
 import { and, eq, sql } from 'drizzle-orm'
 import { DomainError, ERROR, FEEDBACK_KEPT_YEARS } from '@molvia/model'
-import type { FeedbackBody } from '@molvia/model'
+import type { FeedbackBody, FeedbackNotice } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { theRow } from './rows'
-import { feedback } from './schema'
+import { feedback, ownerNotices } from './schema'
 
 /** What a write came to: a message, the same message again, or the day's limit reached. */
 export type FeedbackWrite =
@@ -17,13 +17,15 @@ export interface FeedbackRepository {
    * A message from the sheet (MOL-147), under a lock of its author: the same key with the same
    * content is the message written before, the same key with another content a conflict, and past
    * `limit` messages in a rolling day nothing is written. A repeat is not counted against the limit
-   * — it writes nothing. `apiBuild` is this server's, never the phone's word.
+   * — it writes nothing. `apiBuild` is this server's, never the phone's word. With `notify`, a new
+   * message is queued for the owner in the same transaction (MOL-148, Р-6); a repeat queues nothing.
    */
   record(
     actorId: string,
     message: FeedbackBody,
     apiBuild: string,
     limit: number,
+    notify: boolean,
   ): Promise<FeedbackWrite>
 
   /**
@@ -55,7 +57,7 @@ function saysTheSame(row: Row, message: FeedbackBody): boolean {
 
 export function createFeedbackRepository(db: Conn): FeedbackRepository {
   return {
-    record(actorId, message, apiBuild, limit) {
+    record(actorId, message, apiBuild, limit, notify) {
       return translateFailures(() =>
         db.transaction(async (tx): Promise<FeedbackWrite> => {
           await tx.execute(lockAuthor(actorId))
@@ -88,8 +90,31 @@ export function createFeedbackRepository(db: Conn): FeedbackRepository {
               fromError: message.fromError,
               clientKey: message.clientKey,
             })
-            .returning({ id: feedback.id })
-          return { kind: 'written', number: theRow(written, 'feedback').id }
+            .returning({ id: feedback.id, createdAt: feedback.createdAt })
+          const row = theRow(written, 'feedback')
+          if (notify) {
+            const notice: FeedbackNotice = {
+              kind: 'feedback',
+              thread: row.id,
+              feedbackKind: message.kind,
+              text: message.text,
+              locale: message.locale,
+              pageBuild: message.pageBuild,
+              apiBuild,
+              route: message.route,
+              platform: message.platform,
+              fromError: message.fromError,
+              errorCode: message.errorCode,
+              at: row.createdAt.toISOString(),
+            }
+            await tx.insert(ownerNotices).values({
+              kind: notice.kind,
+              payload: notice,
+              feedbackId: row.id,
+              createdAt: row.createdAt,
+            })
+          }
+          return { kind: 'written', number: row.id }
         }),
       )
     },

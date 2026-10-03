@@ -23,6 +23,8 @@ Rules: `.claude/rules/feedback.md`. A test beside its source, or mirroring it un
 
 - `backend/tests/feedback.integration.test.ts` — Integration test: `POST /feedback` writes the session's owner with the API's build; no session, an author named, an empty or invisible text, a code without an error screen are refused; a repeat is the same number, another content under the key a 409; the tenth of a rolling day is taken, the eleventh a 429, a burst stops at the limit; a thread goes whole a year past its last message, the person's or the owner's.
 
+- `backend/tests/feedback-bot.integration.test.ts` — Integration test of the bot's half (MOL-148): a new message queues one notice for the owner with nothing of the person, a repeat and a copy without an owner none, the bot's claim reads it; erasure and a thread's year take the notice along, a day unclaimed does not.
+
 ## frontend · components
 
 - `frontend/src/components/FeedbackSheet.vue` — The sheet «Написать разработчику» (MOL-147), one for the app in `App.vue`: the kind, the text, what goes with it shown before sending, the button that says what it waits for, sent, the day's limit, a failure.

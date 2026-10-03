@@ -2,7 +2,7 @@ import { GrammyError } from 'grammy'
 import type { Api } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
-import type { OwnerNotice } from '@molvia/model'
+import type { FeedbackContinuedNotice, FeedbackNotice, OwnerNotice } from '@molvia/model'
 import { t } from './i18n'
 import { telegramFailure } from './assemble'
 import { sleep } from './remind'
@@ -11,9 +11,11 @@ import { reportDefect } from './failure'
 /**
  * The words of one notice to the owner (MOL-143). Always Russian: the owner's language is not
  * something we keep, and the message goes without an update to read one from. Plain text, no
- * markup — a frame or a route is shown as it is, and nothing in it can break a parse.
+ * markup — a frame, a route or a person's text is shown as it is, and nothing in it can break a parse.
  */
 export function ownerText(notice: OwnerNotice): string {
+  if (notice.kind === 'feedback') return feedbackText(notice)
+  if (notice.kind === 'feedback_continued') return continuedText(notice)
   const kind = notice.code === undefined ? notice.errorName : `${notice.errorName} ${notice.code}`
   const what = t(undefined, 'owner.failure.what', {
     kind,
@@ -35,6 +37,67 @@ export function ownerText(notice: OwnerNotice): string {
       fingerprint: notice.fingerprint,
     }),
     t(undefined, 'owner.failure.more'),
+  ].join('\n')
+}
+
+/**
+ * The thread a notice is about, read back from the end of its first line — `#fb42` (MOL-148, Р-3).
+ * Only there: the frame of a reply quotes the owner's text, which may carry a tag of its own, and the
+ * first line of every notice is the bot's alone. `null` where there is none.
+ */
+export function threadTagOf(text: string): number | null {
+  const first = text.split('\n', 1)[0] ?? ''
+  const tag = /#fb([1-9]\d{0,15})$/.exec(first)
+  if (!tag?.[1]) return null
+  const thread = Number(tag[1])
+  return Number.isSafeInteger(thread) ? thread : null
+}
+
+/** When, as the owner reads it: Yerevan's day and minute — the owner lives there (MOL-148). */
+const OWNER_MOMENT = new Intl.DateTimeFormat('ru', {
+  timeZone: 'Asia/Yerevan',
+  day: 'numeric',
+  month: 'long',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
+/**
+ * A message from the app (MOL-148, Р-9 of MOL-150): the kind and the tag first — the tag ends the
+ * first line, where the bot reads it back from the owner's reply — then the text, and what went with
+ * it as it was sent. Nothing of the person: the notice has nothing of them to print.
+ */
+function feedbackText(notice: FeedbackNotice): string {
+  const page = notice.pageBuild ?? t(undefined, 'owner.feedback.noBuild')
+  const code =
+    notice.errorCode !== null
+      ? [t(undefined, 'owner.feedback.code', { code: notice.errorCode })]
+      : notice.fromError
+        ? [t(undefined, 'owner.feedback.noCode')]
+        : []
+  return [
+    t(undefined, `owner.feedback.${notice.feedbackKind}`, { thread: notice.thread }),
+    notice.text,
+    '',
+    t(undefined, 'owner.feedback.where', {
+      route: notice.route ?? t(undefined, 'owner.feedback.noBuild'),
+      platform: notice.platform ?? t(undefined, 'owner.feedback.noBuild'),
+      locale: notice.locale,
+    }),
+    ...code,
+    t(undefined, 'owner.feedback.builds', { page, api: notice.apiBuild }),
+    OWNER_MOMENT.format(new Date(notice.at)),
+  ].join('\n')
+}
+
+/** A person's answer to the owner's reply (MOL-148, В-1 of MOL-150): the tag, the reply quoted. */
+function continuedText(notice: FeedbackContinuedNotice): string {
+  return [
+    t(undefined, 'owner.feedback.continued', { thread: notice.thread }),
+    t(undefined, 'owner.feedback.quote', { quote: notice.quote }),
+    notice.text,
+    '',
+    OWNER_MOMENT.format(new Date(notice.at)),
   ].join('\n')
 }
 

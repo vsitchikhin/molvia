@@ -6,7 +6,8 @@ import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { OwnerNotice, OwnerNotices } from '@molvia/model'
-import { OWNER_STOP_BUDGET_MS, ownerText, startOwnerNotices, tellOwner } from './owner'
+import { FEEDBACK_KINDS } from '@molvia/model'
+import { OWNER_STOP_BUDGET_MS, ownerText, startOwnerNotices, tellOwner, threadTagOf } from './owner'
 
 const OWNER = 4242
 const NEW: OwnerNotice = {
@@ -57,6 +58,85 @@ function claiming(answer: OwnerNotices | Error): MolviaBotClient {
 }
 
 const noWait = () => Promise.resolve(true)
+
+const MESSAGE: OwnerNotice = {
+  kind: 'feedback',
+  thread: 42,
+  feedbackKind: 'bug',
+  text: 'Список «Что брать» не грузится, белый экран',
+  locale: 'ru',
+  pageBuild: 'v0.1.3-29-g873189fd',
+  apiBuild: 'v0.1.3-30-gabc12345',
+  route: 'advice',
+  platform: 'ios 18 app',
+  fromError: true,
+  errorCode: 'issue.response_invalid',
+  at: '2026-10-03T10:07:00.000Z',
+}
+const CONTINUED: OwnerNotice = {
+  kind: 'feedback_continued',
+  thread: 42,
+  quote: 'Починили, обновите приложение',
+  text: 'Обновил, всё работает',
+  at: '2026-10-03T11:02:00.000Z',
+}
+
+describe('ownerText — сообщение разработчику (MOL-148)', () => {
+  it('вид и метка первой строкой, текст, что ушло с ним, время по Еревану', () => {
+    const lines = ownerText(MESSAGE).split('\n')
+    expect(lines.slice(0, 6)).toEqual([
+      '🐞 Сломалось · #fb42',
+      'Список «Что брать» не грузится, белый экран',
+      '',
+      'Экран advice · ios 18 app · ru',
+      'Код issue.response_invalid',
+      'Страница v0.1.3-29-g873189fd · API v0.1.3-30-gabc12345',
+    ])
+    expect(lines[6]).toMatch(/^3 октября.*14:07$/)
+    expect(lines).toHaveLength(7)
+  })
+
+  it('с экрана ошибки без кода — так и сказано; из настроек — ни строки о коде', () => {
+    const noCode = ownerText({ ...MESSAGE, errorCode: null })
+    expect(noCode).toContain('С экрана ошибки, без кода')
+    const settings = ownerText({
+      ...MESSAGE,
+      feedbackKind: 'idea',
+      fromError: false,
+      errorCode: null,
+      pageBuild: null,
+    })
+    expect(settings).not.toMatch(/Код|ошибки/)
+    expect(settings).toContain('Страница — · API')
+    expect(settings.split('\n')[0]).toBe('💡 Идея · #fb42')
+  })
+
+  it('продолжение: та же метка, цитата ответа, слово человека', () => {
+    const lines = ownerText(CONTINUED).split('\n')
+    expect(lines.slice(0, 4)).toEqual([
+      '↩️ Продолжение · #fb42',
+      '> Починили, обновите приложение',
+      'Обновил, всё работает',
+      '',
+    ])
+    expect(lines[4]).toMatch(/^3 октября.*15:02$/)
+  })
+
+  it('метка не теряется из ключа: каждый вид и продолжение читаются обратно в номер нити', () => {
+    for (const feedbackKind of FEEDBACK_KINDS) {
+      expect(threadTagOf(ownerText({ ...MESSAGE, feedbackKind }))).toBe(42)
+    }
+    expect(threadTagOf(ownerText(CONTINUED))).toBe(42)
+  })
+
+  it('метка читается только с конца первой строки', () => {
+    expect(threadTagOf('Ответ на ваше сообщение от 3 октября:\n\nСм. #fb7')).toBeNull()
+    expect(threadTagOf('🐞 Сломалось · #fb42 и ещё')).toBeNull()
+    expect(threadTagOf('🐞 Сломалось · #fb042')).toBeNull()
+    expect(threadTagOf('🐞 Сломалось · #fb99999999999999999')).toBeNull()
+    expect(threadTagOf('')).toBeNull()
+  })
+})
 
 describe('ownerText — что прочитает владелец (MOL-143)', () => {
   it('новый сбой: откуда, вид и место, кадр, сборка с отпечатком, где подробности', () => {
