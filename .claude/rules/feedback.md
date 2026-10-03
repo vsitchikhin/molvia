@@ -105,7 +105,9 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
   channel (`owner_notices`, `observability.md`), queued in the transaction of the write, only where
   `OWNER_TELEGRAM_ID` is set, and never for a repeat. **It names its message by `feedback_id`** and
   goes with it — erased with the person, purged with the thread's year (Р-5); unclaimed, it is not
-  dropped after a day as a failure's is. A message written before MOL-148 has none (Р-13).
+  dropped after a day as a failure's is. Going with the person, it is theirs to the copy too: every
+  column of `owner_notices` is left out there with its reason — what it holds of them is the message,
+  in `feedback` word for word. A message written before MOL-148 has none (Р-13).
 - **The owner's reply and the person's answer to it are the bot's** (`bot.md`), and the API decides
   which a text is (`feedbackFromBot`). **The reply lies under the person's latest word in the thread**
   — that is what the owner answers — and «от 3 октября» is that word's day in the person's country's

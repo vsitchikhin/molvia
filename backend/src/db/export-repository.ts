@@ -67,6 +67,7 @@ export const EXPORT_COLUMNS: Readonly<
     | 'exchange_revisions'
     | 'income_revisions'
     | 'feedback_replies'
+    | 'owner_notices'
     | 'items'
     | 'item_barcodes',
     { readonly exported: readonly string[]; readonly omitted?: Readonly<Record<string, string>> }
@@ -303,6 +304,19 @@ export const EXPORT_COLUMNS: Readonly<
       actor_id: OWNER,
       telegram_message_id:
         'which message the reply went out as in your chat, so your answer to it finds its thread; it means nothing outside that chat',
+    },
+  },
+  // The owner's notice of a message (MOL-148) goes with the message, so it is the person's too — and
+  // all it holds of them is the message itself, in `feedback` word for word.
+  owner_notices: {
+    exported: [],
+    omitted: {
+      id: 'the owner’s channel’s own number, not yours',
+      kind: 'a message or its continuation: said by the message in `feedback`',
+      payload: 'the message itself, already in `feedback` word for word',
+      feedback_id: 'said by the message it is about',
+      created_at: 'when the message was written: in `feedback`',
+      handed_at: 'when the owner’s bot took the notice — about the owner’s channel, not you',
     },
   },
   budget_plans: {
