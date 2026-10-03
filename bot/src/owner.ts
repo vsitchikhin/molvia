@@ -1,4 +1,4 @@
-import { GrammyError } from 'grammy'
+import { GrammyError, InputFile } from 'grammy'
 import type { Api } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
@@ -66,6 +66,7 @@ export function ownerText(notice: OwnerNotice): string {
  * first line of every notice is the bot's alone. `null` where there is none.
  */
 export function threadTagOf(text: string): number | null {
+  // A picture's caption carries the tag as a notice does (MOL-167): `text ?? caption` is the caller's.
   const first = text.split('\n', 1)[0] ?? ''
   const tag = /#fb([1-9]\d{0,15})$/.exec(first)
   if (!tag?.[1]) return null
@@ -97,7 +98,7 @@ function feedbackText(notice: FeedbackNotice): string {
         : []
   return [
     t(undefined, `owner.feedback.${notice.feedbackKind}`, { thread: notice.thread }),
-    notice.text,
+    notice.text === '' ? t(undefined, 'owner.feedback.noText') : notice.text,
     '',
     t(undefined, 'owner.feedback.where', {
       route: notice.route ?? t(undefined, 'owner.feedback.noBuild'),
@@ -105,9 +106,17 @@ function feedbackText(notice: FeedbackNotice): string {
       locale: notice.locale,
     }),
     ...code,
+    ...picturesLine(notice.pictures),
     t(undefined, 'owner.feedback.builds', { page, api: notice.apiBuild }),
     OWNER_MOMENT.format(new Date(notice.at)),
   ].join('\n')
+}
+
+/** «Снимков: 2» — the pictures that follow as replies to the notice (MOL-167, Р-5). */
+function picturesLine(pictures: number | undefined): string[] {
+  return pictures === undefined
+    ? []
+    : [t(undefined, 'owner.feedback.pictures', { count: pictures })]
 }
 
 /** A person's answer to the owner's reply (MOL-148, В-1 of MOL-150): the tag, the reply quoted. */
@@ -115,7 +124,8 @@ function continuedText(notice: FeedbackContinuedNotice): string {
   return [
     t(undefined, 'owner.feedback.continued', { thread: notice.thread }),
     t(undefined, 'owner.feedback.quote', { quote: notice.quote }),
-    notice.text,
+    notice.text === '' ? t(undefined, 'owner.feedback.noText') : notice.text,
+    ...picturesLine(notice.pictures),
     '',
     OWNER_MOMENT.format(new Date(notice.at)),
   ].join('\n')
@@ -163,11 +173,12 @@ export async function tellOwner(
       console.error(`[molvia] owner: stopping, ${String(left)} notices given up`)
       return
     }
+    let sent: { message_id: number }
     try {
       // grammY types its signal by the `abort-controller` package; the platform's is the same thing.
       // Raced against the end of the stop's time as well: a transport that does not hear its
       // signal must not hold the stop either (adversarial В1).
-      await cutAt(
+      sent = await cutAt(
         telegram.sendMessage(
           to,
           ownerText(notice),
@@ -199,9 +210,96 @@ export async function tellOwner(
       continue
     }
     if (notice.kind === 'feedback' || notice.kind === 'feedback_continued') {
+      const pictures = notice.pictures ?? 0
+      if (pictures > 0) {
+        const went = await sendPictures(api, telegram, to, notice, sent.message_id, {
+          wait,
+          pauseMs,
+          deadline,
+        })
+        // Cut off: the notice goes again whole — the text twice, the price of a lost mark (Р-5).
+        if (went === 'cut') {
+          if (deadline?.aborted) {
+            console.error(
+              `[molvia] owner: stopping, ${String(notices.length - index)} notices given up`,
+            )
+            return
+          }
+          continue
+        }
+      }
       await saySent(api, notice.number, deadline)
     }
   }
+}
+
+/** Telegram's own word for a caption: the tag ends its first line, as a notice's does. */
+function pictureCaption(position: number, count: number, thread: number): string {
+  return t(undefined, 'owner.feedback.pictureCaption', { position, count, thread })
+}
+
+/**
+ * The pictures of a message, each a photo replying to its notice, captioned with the thread's tag —
+ * so the owner's reply to a picture finds the thread as a reply to the notice does (MOL-167, Р-5).
+ * The phone's JPEG goes as a file, a person's Telegram photo by its id: not forwarded, no sender
+ * shown. A picture Telegram refuses, or one no longer there, is the log's and the rest go on: a
+ * notice that could never go whole would be handed for good. `cut` — the connection broke or the stop
+ * ran out of time, and nothing is said to have gone.
+ */
+async function sendPictures(
+  api: MolviaBotClient,
+  telegram: Api,
+  to: number,
+  notice: FeedbackNotice | FeedbackContinuedNotice,
+  replyTo: number,
+  { wait, pauseMs, deadline }: { wait: Wait; pauseMs: number; deadline?: AbortSignal | undefined },
+): Promise<'sent' | 'cut'> {
+  const count = notice.pictures ?? 0
+  for (let position = 1; position <= count; position++) {
+    if (!(await wait(pauseMs))) return 'cut'
+    let picture
+    try {
+      picture = await api.feedbackPicture(notice.number, position, deadline)
+    } catch (error) {
+      console.error(
+        `[molvia] owner picture: ${error instanceof ApiError ? error.code : 'unexpected'}`,
+      )
+      reportDefect(api, error, 'owner:picture')
+      return 'cut'
+    }
+    if (picture === null) {
+      console.error('[molvia] owner picture: gone before it was sent')
+      continue
+    }
+    const photo =
+      picture.source === 'phone'
+        ? new InputFile(
+            Buffer.from(picture.jpeg, 'base64'),
+            `fb${String(notice.number)}-${String(position)}.jpg`,
+          )
+        : picture.fileId
+    try {
+      await cutAt(
+        telegram.sendPhoto(
+          to,
+          photo,
+          {
+            caption: pictureCaption(position, count, notice.thread),
+            reply_parameters: { message_id: replyTo, allow_sending_without_reply: true },
+          },
+          deadline as Parameters<Api['sendPhoto']>[3],
+        ),
+        deadline,
+      )
+    } catch (error) {
+      console.error(`[molvia] owner picture: ${telegramFailure(error)}`)
+      reportDefect(api, error, 'owner:picture')
+      if (deadline?.aborted) return 'cut'
+      if (error instanceof GrammyError && error.error_code !== 429) continue
+      return 'cut'
+    }
+  }
+  return 'sent'
 }
 
 /**

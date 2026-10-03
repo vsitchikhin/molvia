@@ -9,6 +9,7 @@ import {
   eraseMeSchema,
   feedbackFromBotAnswerSchema,
   feedbackFromBotSchema,
+  feedbackPictureSchema,
   loginCodeSchema,
   loginPreviewCodec,
   ownerNoticesSchema,
@@ -23,6 +24,7 @@ import type {
   DueReminders,
   FeedbackFromBot,
   FeedbackFromBotAnswer,
+  FeedbackPicture,
   LoginPreview,
   OwnerNotices,
   ReminderSwitch,
@@ -69,6 +71,15 @@ export interface MolviaBotClient {
   feedbackFromBot(message: FeedbackFromBot): Promise<FeedbackFromBotAnswer>
   /** What became of the owner's reply once sent: the message it went out as, or blocked. */
   replyDelivered(delivery: ReplyDelivered): Promise<void>
+  /**
+   * A picture of message `number`, to send the owner after its notice (MOL-167): the phone's JPEG or
+   * Telegram's id of a photo. `null` where there is none any more — delivered, or past its week.
+   */
+  feedbackPicture(
+    number: number,
+    position: number,
+    signal?: AbortSignal,
+  ): Promise<FeedbackPicture | null>
 }
 
 /** An internal client has no session and cannot attach its secret to an arbitrary API path. */
@@ -143,6 +154,23 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
         body: body.data,
         ...(signal === undefined ? {} : { signal }),
       })
+    },
+    feedbackPicture: async (number, position, signal) => {
+      if (!Number.isSafeInteger(number) || number < 1)
+        throw new ApiError(ISSUE.PATH_INVALID, 'number')
+      if (!Number.isSafeInteger(position) || position < 1) {
+        throw new ApiError(ISSUE.PATH_INVALID, 'position')
+      }
+      try {
+        return await request(
+          `/internal/feedback/${String(number)}/pictures/${String(position)}`,
+          feedbackPictureSchema,
+          signal === undefined ? {} : { signal },
+        )
+      } catch (error) {
+        if (error instanceof ApiError && error.code === ERROR.NOT_FOUND) return null
+        throw error
+      }
     },
     claimOwnerNotices: async (signal) =>
       request('/internal/owner/claim', ownerNoticesSchema, {

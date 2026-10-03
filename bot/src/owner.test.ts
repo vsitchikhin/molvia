@@ -453,3 +453,113 @@ describe('startOwnerNotices — таймер раз в минуту', () => {
     expect(log).toHaveBeenCalledWith('[molvia] owner: stopping, the claim under way given up')
   })
 })
+
+describe('tellOwner — снимки после уведомления (MOL-167, Р-5)', () => {
+  const WITH_PICTURES: OwnerNotice = { ...MESSAGE, pictures: 2 }
+  const PHOTO_WORD: OwnerNotice = { ...CONTINUED, text: '', pictures: 1 }
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xd9]).toString('base64')
+
+  function calls(refuse: (method: string) => number | 'network' | undefined = () => undefined) {
+    const made: { method: string; payload: Record<string, unknown> }[] = []
+    const bot = new Bot('42:TEST', { botInfo: { id: 42 } as UserFromGetMe })
+    const transformer: Transformer = (_prev, method, payload) => {
+      made.push({ method, payload: payload })
+      const code = refuse(method)
+      if (code === 'network') return Promise.reject(new Error('reset'))
+      if (code !== undefined) {
+        return Promise.resolve({ ok: false, error_code: code, description: 'no' }) as never
+      }
+      return Promise.resolve({ ok: true, result: { message_id: 700 + made.length } }) as never
+    }
+    bot.api.config.use(transformer)
+    return { telegramApi: bot.api, made }
+  }
+
+  function client(notices: OwnerNotice[], pictures: MolviaBotClient['feedbackPicture']) {
+    const ownerNoticesSent = vi.fn<MolviaBotClient['ownerNoticesSent']>(() => Promise.resolve())
+    const feedbackPicture = vi.fn(pictures)
+    const api = {
+      claimOwnerNotices: vi.fn(() => Promise.resolve({ to: OWNER, notices })),
+      ownerNoticesSent,
+      feedbackPicture,
+      reportFailure: vi.fn(() => Promise.resolve()),
+    } as unknown as MolviaBotClient
+    return { api, ownerNoticesSent, feedbackPicture }
+  }
+
+  const phone: MolviaBotClient['feedbackPicture'] = () =>
+    Promise.resolve({ source: 'phone', jpeg: JPEG })
+
+  it('текст, затем каждый снимок ответом на него с меткой в подписи; «ушло» — после всех', async () => {
+    const { telegramApi, made } = calls()
+    const { api, ownerNoticesSent, feedbackPicture } = client([WITH_PICTURES], phone)
+
+    await tellOwner(api, telegramApi, noWait)
+
+    expect(made.map((call) => call.method)).toEqual(['sendMessage', 'sendPhoto', 'sendPhoto'])
+    expect(made[0]?.payload.text).toContain('Снимков: 2')
+    expect(
+      made.slice(1).map((call) => [call.payload.caption, call.payload.reply_parameters]),
+    ).toEqual([
+      ['Снимок 1 из 2 · #fb42', { message_id: 701, allow_sending_without_reply: true }],
+      ['Снимок 2 из 2 · #fb42', { message_id: 701, allow_sending_without_reply: true }],
+    ])
+    expect(threadTagOf(String(made[1]?.payload.caption))).toBe(42)
+    expect(feedbackPicture.mock.calls.map((call) => [call[0], call[1]])).toEqual([
+      [42, 1],
+      [42, 2],
+    ])
+    expect(ownerNoticesSent.mock.calls.map((call) => call[0] as unknown)).toEqual([[42]])
+  })
+
+  it('фото из бота — по id Telegram, не пересылкой; без текста — пометка', async () => {
+    const { telegramApi, made } = calls()
+    const { api } = client([PHOTO_WORD], () =>
+      Promise.resolve({ source: 'telegram', fileId: 'AgAC-large' }),
+    )
+
+    await tellOwner(api, telegramApi, noWait)
+
+    expect(made[0]?.payload.text).toContain('(без текста, только снимок)')
+    expect(made[1]).toMatchObject({
+      method: 'sendPhoto',
+      payload: { photo: 'AgAC-large', caption: 'Снимок 1 из 1 · #fb42' },
+    })
+  })
+
+  it('снимок Telegram отверг (400) или его уже нет — остальное идёт, сообщение «ушло»', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    let photos = 0
+    const { telegramApi, made } = calls((method) =>
+      method === 'sendPhoto' && ++photos === 1 ? 400 : undefined,
+    )
+    const { api, ownerNoticesSent } = client(
+      [WITH_PICTURES, { ...WITH_PICTURES, number: 43, thread: 43 }],
+      (number) => (number === 43 ? Promise.resolve(null) : phone(number, 1)),
+    )
+
+    await tellOwner(api, telegramApi, noWait)
+
+    expect(made.filter((call) => call.method === 'sendPhoto')).toHaveLength(2)
+    expect(ownerNoticesSent.mock.calls.map((call) => call[0] as unknown)).toEqual([[42], [43]])
+    expect((api.reportFailure as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toMatchObject({
+      handler: 'owner:picture',
+    })
+  })
+
+  it('связь оборвалась на снимке или API не отдал его — «ушло» не сказано: уведомление придёт снова', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    for (const [refuse, pictures] of [
+      [(method: string) => (method === 'sendPhoto' ? ('network' as const) : undefined), phone],
+      [() => undefined, () => Promise.reject(new ApiError(ERROR.INTERNAL))],
+      [(method: string) => (method === 'sendPhoto' ? 429 : undefined), phone],
+    ] as const) {
+      const { telegramApi } = calls(refuse)
+      const { api, ownerNoticesSent } = client([WITH_PICTURES], pictures)
+
+      await tellOwner(api, telegramApi, noWait)
+
+      expect(ownerNoticesSent).not.toHaveBeenCalled()
+    }
+  })
+})

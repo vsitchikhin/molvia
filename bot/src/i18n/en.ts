@@ -95,6 +95,8 @@ export const en: Dictionary = {
     'Nothing to send: the text is only invisible characters or blank lines in a row. Nothing was sent.',
   'feedback.limited': 'That is a lot of messages for today. Write again tomorrow.',
   'feedback.textOnly': 'Only text can be sent as an answer.',
+  'feedback.photoOnly':
+    'Send the picture as a photo, not as a file: a file keeps where and when it was taken.',
   'feedback.failed': 'That did not work: the server did not answer. Reply again in a minute.',
   'feedback.notSent': 'Not sent: Telegram refused the message. Reply again.',
   'feedback.unknown':
@@ -109,4 +111,7 @@ export const en: Dictionary = {
   'owner.feedback.noCode': 'From an error screen, no code',
   'owner.feedback.builds': 'Page {page} · API {api}',
   'owner.feedback.noBuild': '—',
+  'owner.feedback.pictures': 'Pictures: {count}',
+  'owner.feedback.pictureCaption': 'Picture {position} of {count} · #fb{thread}',
+  'owner.feedback.noText': '(no text, a picture only)',
 }
