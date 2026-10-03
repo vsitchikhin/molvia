@@ -1,6 +1,7 @@
 import { newItemSchema, describeFailure } from '@molvia/model'
 import type { SeedReport, SeedRepository } from '@/db/seed-repository'
 import { CATALOGUE_SEED } from '@/catalogue-seed'
+import { CATALOGUE_SEED_NODES } from '@/catalogue-seed-nodes'
 
 export const SEED_USAGE = 'usage: seed-catalogue [--yes]'
 
@@ -30,7 +31,7 @@ export async function seedCatalogue(
   )
   let report: SeedReport
   try {
-    report = await seeder.seed(lines, { dryRun })
+    report = await seeder.seed(lines, { dryRun, nodes: CATALOGUE_SEED_NODES })
   } catch (error) {
     // The kind of failure and never its message: a driver's message is the query with its
     // parameters, as `forget` says of its own.
@@ -42,6 +43,8 @@ export async function seedCatalogue(
   const otherUnit = report.kept.filter((item) => item.unit !== item.seeded)
   write(`  ${'added'.padEnd(16)}${String(report.added)}`)
   write(`  ${'already there'.padEnd(16)}${String(report.kept.length)}`)
+  write(`  ${'armenian names'.padEnd(16)}${String(report.names)}`)
+  write(`  ${'customs codes'.padEnd(16)}${String(report.headings)}`)
   if (otherUnit.length > 0) {
     write(`  ${'another unit'.padEnd(16)}${String(otherUnit.length)} (kept as they are)`)
     for (const item of otherUnit)
