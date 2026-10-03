@@ -251,7 +251,9 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   phones share — one failure of a rollout is a dozen fingerprints, its screens times its systems
   (Г1). A place is taken before the write and given back if the row was there or the write failed
   (review №9): four writes run at once, and an outage of the database held a place a report. So
-  are the notices a failed transaction took: the budget is spent inside it. **The
+  are the notices a failed transaction took: the budget is spent inside it. **The held ones are
+  counted after the commit** (adversarial Е1, Ж1): counted inside, the minute timer told «скрыто» of a
+  write still in flight that then failed, and taking it back off later ate another's. **The
   prices, named:** seventeen networks fill the hour, some 720 000 rows in thirty days at most; and the
   sender is an address, so one subscriber of an operator sending sixty invented reports an hour takes
   the new rows of every phone behind the same address — telling phones apart would need a mark of the
