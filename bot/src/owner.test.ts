@@ -81,6 +81,32 @@ describe('ownerText — что прочитает владелец (MOL-143)', (
     )
   })
 
+  it('сбой телефона называет платформу (MOL-144)', () => {
+    const phone: OwnerNotice = {
+      kind: 'failure',
+      source: 'phone',
+      errorName: 'TypeError',
+      route: 'screen:advice',
+      build: 'index-BTCsHrpw',
+      platform: 'ios 18 app',
+      frame: 'at Xe (/assets/index-BTCsHrpw.js:1:48213)',
+      fingerprint: '7c21e0',
+    }
+    expect(ownerText(phone)).toBe(
+      [
+        '🔴 Новый сбой · phone',
+        'TypeError · screen:advice',
+        'at Xe (/assets/index-BTCsHrpw.js:1:48213)',
+        'Платформа ios 18 app',
+        'Сборка index-BTCsHrpw · 7c21e0',
+        'Подробности — make failures',
+      ].join('\n'),
+    )
+    expect(ownerText({ ...phone, kind: 'failure_count', count: 10 })).toContain(
+      'Платформа ios 18 app\nСборка index-BTCsHrpw',
+    )
+  })
+
   it('без маршрута и без кадра — так и сказано, пустых строк нет', () => {
     const bare: OwnerNotice = {
       kind: 'failure',

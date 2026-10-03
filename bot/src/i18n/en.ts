@@ -75,6 +75,7 @@ export const en: Dictionary = {
   'owner.failure.again': '🟠 {count} times in this build already · {source}',
   'owner.failure.what': '{kind} · {place}',
   'owner.failure.nowhere': 'no route',
+  'owner.failure.platform': 'Platform {platform}',
   'owner.failure.build': 'Build {build}',
   'owner.failure.buildPrint': 'Build {build} · {fingerprint}',
   'owner.failure.more': 'Details — make failures',

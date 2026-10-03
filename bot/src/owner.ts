@@ -19,10 +19,16 @@ export function ownerText(notice: OwnerNotice): string {
     kind,
     place: notice.route ?? t(undefined, 'owner.failure.nowhere'),
   })
+  // The phone's (MOL-144): which system it broke on is the first thing to know of a phone's failure.
+  const platform =
+    notice.platform === undefined
+      ? []
+      : [t(undefined, 'owner.failure.platform', { platform: notice.platform })]
   if (notice.kind === 'failure_count') {
     return [
       t(undefined, 'owner.failure.again', { count: notice.count, source: notice.source }),
       what,
+      ...platform,
       t(undefined, 'owner.failure.build', { build: notice.build }),
     ].join('\n')
   }
@@ -30,6 +36,7 @@ export function ownerText(notice: OwnerNotice): string {
     t(undefined, 'owner.failure.new', { source: notice.source }),
     what,
     ...(notice.frame === undefined ? [] : [notice.frame]),
+    ...platform,
     t(undefined, 'owner.failure.buildPrint', {
       build: notice.build,
       fingerprint: notice.fingerprint,
