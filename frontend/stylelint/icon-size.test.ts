@@ -17,7 +17,8 @@ async function refused(code: string, codeFilename = 'Probe.vue'): Promise<string
     },
   })
   return (results[0]?.warnings ?? []).map(
-    (warning) => warning.text.split(/ on an icon| has no| is sized by/)[0] ?? '',
+    (warning) =>
+      warning.text.split(/ on an icon| has no| is sized by| is declared| is worn by/)[0] ?? '',
   )
 }
 
@@ -45,7 +46,7 @@ describe('molvia/icon-size', () => {
     expect(
       await refused(
         sfc(
-          '<IconChevron class="chevron" />\n<IconInfo class="entry entry-icon" />',
+          '<IconChevron class="chevron" />\n<a class="leave"><IconInfo class="entry entry-icon" /></a>',
           `.chevron { ${ICON} width: 1em; height: 1em; color: var(--text-muted); }\n` +
             '.entry, .other { @include icon; }\n.leave .entry-icon { font-size: var(--icon-md); }',
         ),
@@ -188,18 +189,22 @@ describe('molvia/icon-size', () => {
     })
   })
 
-  describe('a class an icon shares with something else names no icon (замечание 11)', () => {
-    it('a modifier on text or a dot is theirs; with a class of the icon alone it is the icon’s', async () => {
-      expect(
-        await refused(
-          sfc(
-            `<IconX class="lead muted accent" /><p class="muted" /><span class="dot accent" />`,
-            `.lead { ${ICON} }\n.muted { font-size: var(--text-footnote); }\n` +
-              '.dot.accent { width: var(--space-2); }\n.lead.accent { width: 2rem; }',
-          ),
+  it('refuses a class an icon shares with text or a dot, and checks its rules as an icon’s (замечание 11, В2)', async () => {
+    expect(
+      await refused(
+        sfc(
+          `<IconX class="lead muted accent" /><p class="muted" /><span class="dot accent" />`,
+          `.lead { ${ICON} }\n.muted { font-size: var(--text-footnote); }\n` +
+            '.dot.accent { width: var(--space-2); }',
         ),
-      ).toEqual(['width: 2rem'])
-    })
+      ),
+    ).toEqual([
+      'font-size: var(--text-footnote)',
+      'width: var(--space-2)',
+      '.muted',
+      '.accent',
+      'The icon «.lead.muted.accent» (line 2)',
+    ])
   })
 
   it('reads svg as an icon wherever it ends a selector, :deep opened', async () => {
@@ -356,7 +361,7 @@ describe('molvia/icon-size', () => {
     ).toEqual(['width: 1rem'])
   })
 
-  it('does not see a class bound by :class — a named limit', async () => {
+  it('does not see a class bound by :class — a named limit: the width passes, the icon is unsized', async () => {
     expect(
       await refused(
         sfc(
@@ -364,7 +369,112 @@ describe('molvia/icon-size', () => {
           '.chevron { width: 1.25rem; }',
         ),
       ),
+    ).toEqual(['<IconChevron> (line 2)'])
+  })
+})
+
+describe('molvia/icon-size, round 3', () => {
+  it('refuses a step of the scale declared again in a component (В1)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="row"><IconChevron class="chevron" /></p>',
+          `.chevron { ${ICON} --icon: 2rem; }\n.row { --icon-md: 2rem; --state-glyph: 1px; --bar-colour: red; }`,
+        ),
+      ),
+    ).toEqual(['--icon', '--icon-md', '--state-glyph'])
+  })
+
+  it('refuses a class an icon shares with anything else (В2)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="strip big">text <IconCloud class="big" /></p>',
+          '.strip svg { @include icon; font-size: var(--icon-sm); }\n.strip .big { width: 2rem; }',
+        ),
+      ),
+    ).toEqual(['width: 2rem', '.big'])
+  })
+
+  it('takes the pair only from a rule that reaches the icon in the template (В3)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="row"><IconChevron class="chevron" /></p>\n<p class="hint"><IconInfo /></p>\n' +
+            '<p class="note"><span><IconCloud /></span></p>',
+          `.card .chevron { ${ICON} }\nbutton svg { ${ICON} }\n.note > svg { ${ICON} }`,
+        ),
+      ),
+    ).toEqual(['The icon «.chevron» (line 2)', '<IconInfo> (line 3)', '<IconCloud> (line 4)'])
+  })
+
+  it('takes a pair under an attribute, a state class of no element or a structural pseudo-class for none (В3)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<button class="row"><IconChevron class="a" /></button>\n<button class="row"><IconChevron class="b" /></button>\n' +
+            '<p><IconChevron class="c" /></p>',
+          `.row[aria-expanded='true'] .a { ${ICON} }\n.row.is-open .b { ${ICON} }\n.c:first-child { ${ICON} }`,
+        ),
+      ),
+    ).toEqual(['The icon «.a» (line 2)', 'The icon «.b» (line 3)', 'The icon «.c» (line 4)'])
+  })
+
+  it('reaches through tags and the child combinator, and a class bound by :class may be worn', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="note"><IconCloud /></p>\n<div :class="tone"><IconInfo /></div>\n<button><IconCheck /></button>',
+          `.note > svg { ${ICON} }\n.warn svg { ${ICON} }\nbutton svg { ${ICON} }`,
+        ),
+      ),
     ).toEqual([])
+  })
+
+  it('leaves to the component only the slot of one that sizes it; Transition renders nothing (В4, замечание 15)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<RouterLink to="/"><IconX /></RouterLink>\n<AppCard><IconY /></AppCard>\n' +
+            '<p class="hint"><Transition><IconCheck v-if="ok" /></Transition></p>\n' +
+            '<AppButton><template #icon><IconPlus /></template></AppButton>',
+          '.x { color: red; }',
+        ),
+      ),
+    ).toEqual(['<IconX> (line 2)', '<IconY> (line 3)', '<IconCheck> (line 4)'])
+  })
+
+  it('checks every icon on a line, not the first alone (замечание 16)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="strip"><IconX />x</p><p class="note"><IconY />y</p>',
+          '.strip svg { @include icon; font-size: var(--icon-sm); }',
+        ),
+      ),
+    ).toEqual(['<IconY> (line 2)'])
+  })
+
+  it('takes the last font-size of the file for the element around, as the cascade does (В5)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="note"><IconInfo /></p>',
+          '.note { font-size: var(--icon-sm); svg { @include icon; } }\n.note { font-size: var(--text-display); }',
+        ),
+      ),
+    ).toEqual(['«svg»', '<IconInfo> (line 2)'])
+  })
+
+  it('refuses a translate in depth, lets a flat one through (В5)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<IconChevron class="chevron" />',
+          `.chevron { ${ICON} translate: 0 0 3.75rem; }\n.chevron.flat { translate: 1px 2px; }`,
+        ),
+      ),
+    ).toEqual(['translate: 0 0 3.75rem'])
   })
 })
 
