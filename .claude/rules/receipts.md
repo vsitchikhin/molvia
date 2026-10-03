@@ -418,7 +418,11 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   line left alone follows the server, which may still learn it from the memory; they work with no
   connection, and the receipt itself is kept for the review offline (`useReceipt`). **«Записать» sends
   the whole receipt under a trip the phone names**, through the queue: a double tap and a repeat are one
-  record, and with no connection the screen goes back to «Покупки» (Р-5). After the answer
+  record, and with no connection the screen goes back to «Покупки» (Р-5) — from the place's sheet too,
+  once its step has landed (`afterStep`, review 34: a move made from its `onClosed` was dropped as a
+  second tap, and the person stayed on a locked review). **The day of the purchases is the server's
+  rule** (`isRateDay`, not after the phone's today — or the day the sheet opened with, while the server
+  takes it: a receipt printed after Yerevan's midnight on a phone west of it, adversarial В1). After the answer
   `router.replace` gives way to the purchases, and «Записали N покупок» comes in the history's state —
   said once, never on a reload.
 - **«Итог чека» is a button** (Р-8): OCR misses the total on half the receipts, and the trip's money is
