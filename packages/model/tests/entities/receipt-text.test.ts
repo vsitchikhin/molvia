@@ -698,3 +698,57 @@ describe('a tie of a till with no discount (review Р24)', () => {
     expect(doubtful).toEqual(expect.arrayContaining([3, 9]))
   })
 })
+
+// Review round 6 of MOL-125.
+describe('neighbours of one line numbered …5 and …6, one swap of OCR apart (review Р25)', () => {
+  const rows = (am05 as Fixture).readings[0]!.replace('0403/1160033', '0403/1160035').split('\n')
+  const at = (start: string) => rows.findIndex((row) => row.startsWith(start))
+  const twoParts = (secondStartsAt: string, edit = (r: string[]) => r) =>
+    parseReceiptText(
+      mergeParts([
+        rowsOf(rows.slice(0, at('0403/1160035') + 1).join('\n'), 0),
+        rowsOf(edit(rows.slice(at(secondStartsAt))).join('\n'), 1),
+      ]),
+    )
+  const whole = parse(rows.join('\n')).lines.map((line) => line.sku)
+
+  it('are two items when the parts are cut between them with no overlap', () => {
+    expect(twoParts('9.Յոգուրտ').lines.map((l) => l.sku)).toEqual(whole)
+  })
+
+  it('are two items when the second part lost the first of them at its edge', () => {
+    const got = twoParts('7.Պոլիէթիլենային', (r) =>
+      r
+        .filter((row) => !row.startsWith('8.Յոգուրտ'))
+        .map((row) => (row.startsWith('0403/1160035') ? '0403/11' : row)),
+    )
+    expect(got.lines.map((l) => l.sku)).toEqual(whole)
+  })
+})
+
+describe('a rule under the head and a rule above the total, with no overlap between the parts (review 11)', () => {
+  it('joins the parts and loses no item', () => {
+    const rule = '------------------------------'
+    const got = parseReceiptText(
+      mergeParts([
+        rowsOf(
+          [
+            'ՎԱՃԱՌՔ',
+            rule,
+            '1.Կաթ',
+            '0401/1163909 2Հտ 740 370',
+            '2.Հաց',
+            '1905/1234567 1Հտ 300 300',
+          ].join('\n'),
+          0,
+        ),
+        rowsOf(
+          ['3.Պանիր Լոռի', '0406/1122334 1Հտ 2100 2100', rule, 'Ընդամենը 3140.00'].join('\n'),
+          1,
+        ),
+      ]),
+    )
+    expect(got.lines.map((line) => line.printed)).toEqual(['Կաթ', 'Հաց', 'Պանիր Լոռի'])
+    expect(got.balanced).toBe(true)
+  })
+})
