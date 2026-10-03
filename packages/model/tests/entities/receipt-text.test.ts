@@ -45,6 +45,10 @@ interface Fixture {
 const hundredths = (x: number | null) => (x === null ? null : Math.round(x * 100))
 const thousandths = (x: number | null) => (x === null ? null : Math.round(x * 1000))
 
+// Where the port departs from the prototype on purpose: a line the total changed from its reading is
+// highlighted (review Р27) — am-05's peaches, 342,66 read and 342,65 by the total, right but not as read.
+const CHANGED_BY_TOTAL: Readonly<Record<string, readonly string[]>> = { 'am-05': ['016189'] }
+
 function read(fixture: Fixture): ReceiptText {
   return bestReading(fixture.readings.map((text) => rowsOf(text, 0)))
 }
@@ -55,7 +59,7 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
     ['am-03', am03],
     ['am-04', am04],
     ['am-05', am05],
-  ] as [string, Fixture][])('%s', (_, fixture) => {
+  ] as [string, Fixture][])('%s', (name, fixture) => {
     const got = read(fixture)
     const want = fixture.expected
     expect({
@@ -95,7 +99,7 @@ describe('a receipt read by Tesseract, as the prototype read it', () => {
         hundredths(l.unit_price),
         hundredths(l.sum),
         hundredths(l.discount),
-        l.settled,
+        l.settled && !(CHANGED_BY_TOTAL[name] ?? []).includes(l.sku ?? ''),
       ]),
     )
   })
@@ -788,5 +792,32 @@ describe('a part that starts at an item’s figures, its name left in the part b
     expect(join(rows.slice(0, name), rows.slice(figures)).lines.map((l) => l.sku)).toEqual(
       expect.arrayContaining(['1160035', '1160036']),
     )
+  })
+})
+
+// Review round 8 of MOL-125.
+describe('an item read twice at a seam, its article one swap of OCR off (review Р27)', () => {
+  it('is not balanced away silently: the line the total changed to make up for it is highlighted', () => {
+    const rows = (am05 as Fixture).readings[1]!.split('\n')
+    const figures = rows.findIndex((row) => row.startsWith('0403/1160036'))
+    const got = parseReceiptText(
+      mergeParts([
+        rowsOf(rows.slice(0, figures + 1).join('\n'), 0),
+        rowsOf(
+          [
+            (rows[figures] ?? '').replace('0403/1160036', '0403/1160086'),
+            ...rows.slice(figures + 1),
+          ].join('\n'),
+          1,
+        ),
+      ]),
+    )
+    const whole = parseReceiptText(rowsOf(rows.join('\n'), 0))
+    const wrong = got.lines.filter((line) => {
+      const same = whole.lines.find((w) => w.sku === line.sku)
+      return same?.sumHundredths !== line.sumHundredths
+    })
+    expect(wrong.length).toBeGreaterThan(0)
+    expect(!got.balanced || wrong.every((line) => !line.settled)).toBe(true)
   })
 })

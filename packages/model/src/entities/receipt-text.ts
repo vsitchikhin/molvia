@@ -603,18 +603,19 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
     balanced && total !== null && picks.filter((x) => x === null).length === 1
       ? total - picks.reduce((a, x) => a + (x?.paid ?? 0), 0)
       : null
-  // In a tie the total could have made its change in another line just as well: every line that
-  // changed, and every line with a reading of its own that differs by the same amount, is in doubt
-  // (review Р20, Р24) — the line OCR misread among them, not only the one the total picked.
-  const doubt = new Set<number>()
+  // A line the total changed from its reading is not vouched for (review Р27): the total sets any
+  // difference right by one swap in some line whose own arithmetic holds — a line read twice or lost
+  // at a seam included — so «balanced» is «balanced as read», and a change by the total is one look of
+  // the person's. In a tie the total could have made its change in another line just as well: every
+  // line with a reading of its own that differs by the same amount is in doubt too (review Р20, Р24).
+  const moves = picks.flatMap((pick, i) => {
+    const first = lists[i]?.[0]
+    return pick !== null && first !== undefined && pick !== first
+      ? [[i, pick.paid - first.paid]]
+      : []
+  })
+  const doubt = new Set<number>(moves.map(([i]) => i ?? -1))
   if (tied) {
-    const moves = picks.flatMap((pick, i) => {
-      const first = lists[i]?.[0]
-      return pick !== null && first !== undefined && pick !== first
-        ? [[i, pick.paid - first.paid]]
-        : []
-    })
-    for (const [i] of moves) doubt.add(i ?? -1)
     lists.forEach((list, j) => {
       const first = list[0]
       if (first === undefined || doubt.has(j)) return
@@ -634,7 +635,7 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
       priceHundredths: finite(pick?.price ?? (f.priceS === null ? null : hundredthsOf(f.priceS))),
       sumHundredths: finite(pick?.paid ?? blankSum ?? hundredthsOf(f.paidS)),
       discountHundredths: finite(pick?.disc ?? hundredthsOf(f.discS)),
-      // what the total could not tell apart is not vouched for: highlighted for the person to check
+      // what the total changed or could not tell apart: highlighted for the person to check
       settled: pick !== null && !doubt.has(i),
       rows: f.rows,
     }
@@ -821,6 +822,35 @@ function tableReceipt(rows: readonly TextRow[], table: ReturnType<typeof tableLi
 
 /** One reading of a receipt — the rows of its parts, joined — into lines with figures. */
 export function parseReceiptText(rows: readonly TextRow[]): ReceiptText {
+  return withTwins(readingOf(rows))
+}
+
+/**
+ * An item read twice at a seam, its article one swap of OCR off, is a line of its own the total cannot
+ * see (review Р27): two lines of one sum whose articles are so close are both a look away. Marked after
+ * the reading is chosen, never in the choice: it says nothing of how well a reading read (am-13 on the
+ * bench lost four right lines to a reading chosen so).
+ */
+function withTwins(read: ReceiptText): ReceiptText {
+  const twin = (line: ReceiptTextLine) =>
+    read.lines.some(
+      (other) =>
+        other !== line &&
+        line.sku !== null &&
+        other.sku !== null &&
+        line.sku !== other.sku &&
+        near(line.sku, other.sku) &&
+        line.sumHundredths !== null &&
+        other.sumHundredths === line.sumHundredths,
+    )
+  if (!read.lines.some(twin)) return read
+  return {
+    ...read,
+    lines: read.lines.map((line) => (twin(line) ? { ...line, settled: false } : line)),
+  }
+}
+
+function readingOf(rows: readonly TextRow[]): ReceiptText {
   const card = cardReceipt(rows)
   const text = rows.map((r) => r.text).join('\n')
   if (/\(\d{4}\)/.test(text)) {
@@ -1079,12 +1109,12 @@ export function mergeParts(parts: readonly (readonly TextRow[])[]): TextRow[] {
  * the judge; no truth is needed.
  */
 export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptText {
-  const parsed = readings.map(parseReceiptText)
+  const parsed = readings.map(readingOf)
   const settledCount = (r: ReceiptText): number => r.lines.filter((l) => l.settled).length
   const sorted = [...parsed].sort(
     (a, b) => Number(b.balanced) - Number(a.balanced) || settledCount(b) - settledCount(a),
   )
   const best = sorted[0]
   if (best === undefined) throw new RangeError('a receipt needs at least one reading')
-  return best
+  return withTwins(best)
 }
