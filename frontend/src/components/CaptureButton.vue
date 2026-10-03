@@ -25,7 +25,7 @@ import type { ReceiptCountry } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import CaptureSheet from '@/components/CaptureSheet.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
-import { useNavigation } from '@/navigation'
+import { afterStep, useNavigation } from '@/navigation'
 
 /**
  * «Сфотографировать чек» (MOL-127, handoff 01–03): the main action of the strip on «Что брать» and
@@ -56,7 +56,9 @@ export default defineComponent({
 
     function sent(offline: boolean): void {
       announce?.(t(offline ? 'receipt.capture.sent_offline' : 'receipt.capture.sent'))
-      if (route.name !== 'purchases') void goTab('purchases')
+      // Told from the sheet's `onClosed`, inside the step back that closed it: a move made there is
+      // dropped, so it waits for the step to land (review 3).
+      if (route.name !== 'purchases') afterStep(() => void goTab('purchases'))
     }
 
     return {

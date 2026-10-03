@@ -52,6 +52,15 @@ function canvasOf(size: Size): HTMLCanvasElement {
   return canvas
 }
 
+/**
+ * A canvas let go of at once: Safari frees a canvas's memory lazily and refuses a new one past its
+ * limit, and a receipt of four parts taken again is six to eight large canvases (review 14).
+ */
+function release(canvas: HTMLCanvasElement): void {
+  canvas.width = 0
+  canvas.height = 0
+}
+
 function jpegOf(canvas: HTMLCanvasElement): Promise<Blob | null> {
   return new Promise((resolve) => {
     canvas.toBlob(resolve, 'image/jpeg', RECEIPT_PHOTO_QUALITY)
@@ -95,6 +104,7 @@ export async function encodePhoto(source: HTMLCanvasElement): Promise<PreparedPh
     context.drawImage(source, 0, 0, size.width, size.height)
   }
   const photo = await jpegOf(canvas)
+  if (canvas !== source) release(canvas)
   if (!photo || !sendable(size, photo.size)) return { ok: false }
   return { ok: true, photo, size }
 }
@@ -102,5 +112,10 @@ export async function encodePhoto(source: HTMLCanvasElement): Promise<PreparedPh
 /** A file made ready as a part, whole frame. */
 export async function preparePhoto(file: Blob): Promise<PreparedPhoto> {
   const canvas = await decodePhoto(file)
-  return canvas ? encodePhoto(canvas) : { ok: false }
+  if (!canvas) return { ok: false }
+  try {
+    return await encodePhoto(canvas)
+  } finally {
+    release(canvas)
+  }
 }

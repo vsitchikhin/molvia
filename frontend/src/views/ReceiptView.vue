@@ -5,6 +5,7 @@
         class="place-line"
         :class="{ missing: !place }"
         type="button"
+        :disabled="locked"
         @click="askPlace(false)"
       >
         <span>{{ placeLine }}</span>
@@ -125,7 +126,7 @@
             :key="one.position"
             :line="one"
             :lang="lang"
-            @open="openLine(one.position)"
+            @open="!locked && openLine(one.position)"
           />
         </AppCard>
         <ReceiptTotal
@@ -133,15 +134,17 @@
           :balance="balance"
           :total="shownTotal"
           :rate="detail.rate"
-          :day="day"
+          :day="rateDay"
           :suspect="suspect"
-          @total="totalOpen = true"
+          @total="!locked && (totalOpen = true)"
         />
         <p class="note">
           <IconImageOff class="note-icon" aria-hidden="true" />
           {{ t('receipt.review.photo_note') }}
         </p>
-        <AppButton variant="danger-ghost" block class="delete" @click="remove">
+        <!-- Not while «Записать» waits: the purchases are on their way, and a removal behind them
+             would meet a recorded receipt (adversarial А1). -->
+        <AppButton v-if="!locked" variant="danger-ghost" block class="delete" @click="remove">
           <template #icon><IconDelete /></template>
           {{ t('purchases.delete') }}
         </AppButton>
@@ -152,14 +155,21 @@
       <div class="dock">
         <template v-if="docked === 'record'">
           <p v-if="recording" class="under">{{ t('receipt.review.recording') }}</p>
-          <AppButton v-else size="large" block :busy="sending" @click="record">
+          <AppButton
+            v-else
+            size="large"
+            block
+            :busy="sending"
+            :inactive="balance.recorded === 0"
+            @click="record"
+          >
             {{ t('receipt.review.record', { n: balance.recorded }, balance.recorded) }}
           </AppButton>
           <p v-if="!online && !recording" class="under">{{ t('receipt.review.record_offline') }}</p>
         </template>
         <template v-else-if="docked === 'failed' && country">
           <ManualEntryButton />
-          <AppButton variant="ghost" block @click="retaking = true">
+          <AppButton variant="ghost" block @click="retake">
             <template #icon><IconCamera /></template>
             {{ t('receipt.capture.retake') }}
           </AppButton>
@@ -187,6 +197,7 @@
       :lang="lang"
       :place="linePlace"
       :country="detail.receipt.country"
+      :digits="digits"
       :on-closed="lineClosed"
       @update:open="lineOpen = $event"
       @saved="saveLine"
@@ -213,14 +224,15 @@
       :corrected="!!draft?.total"
       @saved="saveTotal"
     />
+    <!-- Mounted until it is put away, as from the strip: the sheet tells «sent» from its `onClosed`,
+         and unmounted on `update:open` it told nobody (review 2). -->
     <CaptureSheet
-      v-if="country && detail && retaking"
-      :open="retaking"
+      v-if="country && detail && retakeMounted"
+      v-model:open="retaking"
       :country="country"
       :replacing="detail.receipt.id"
-      :on-closed="() => (retaking = false)"
-      @update:open="(open) => !open && (retaking = false)"
-      @sent="goUp"
+      :on-closed="() => (retakeMounted = false)"
+      @sent="retaken"
     />
   </AppScreen>
 </template>
@@ -235,7 +247,7 @@ import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconImageOff from '~icons/mdi/image-off-outline'
 import IconReceiptCheck from '~icons/mdi/receipt-text-check-outline'
-import { RECEIPT_CURRENCY } from '@molvia/model'
+import { RECEIPT_CURRENCY, receiptDigits } from '@molvia/model'
 import type { Money } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -255,7 +267,7 @@ import { useReceipt } from '@/composables/useReceipt'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { calendarDay, dayOfAnyYear, localDay } from '@/days'
 import { newId } from '@/ids'
-import { useNavigation } from '@/navigation'
+import { afterStep, useNavigation } from '@/navigation'
 import { photoShelf } from '@/receipts/photoShelf'
 import { recordBody, reviewBalance, reviewDay, reviewLines, reviewPlace } from '@/receipts/review'
 import { useActorStore } from '@/stores/actor'
@@ -340,6 +352,20 @@ export default defineComponent({
       return at === null ? null : (lines.value[at]?.name ?? null)
     })
     const checks = computed(() => lines.value.filter((one) => one.check && !one.skip).length)
+    /** The digits the receipt prints its sums to (П-2): the line's «кол-во × цена» is rounded so. */
+    const digits = computed(() => {
+      const one = detail.value
+      if (!one) return 0
+      return receiptDigits(currency.value, [
+        one.receipt.total,
+        ...one.lines.flatMap((line) => [line.price, line.sum, line.discount]),
+      ])
+    })
+    /** «≈ … по курсу» names the day of the rate the server sent, never the day chosen (review 19). */
+    const rateDay = computed(() => {
+      const asOf = detail.value?.rate?.asOf
+      return asOf ? localDay(asOf) : day.value
+    })
 
     const dayOf = (at: Date | string) =>
       typeof at === 'string'
@@ -379,6 +405,11 @@ export default defineComponent({
       )
       return refusal ? t('receipt.review.refused', { reason: t(refusal.code) }) : null
     })
+    /**
+     * While «Записать» waits in the queue — or is being sent — the receipt is what was sent: an edit
+     * made now would not reach the server (review 5), nor would a removal (adversarial А1).
+     */
+    const locked = computed(() => recording.value || sending.value)
     const docked = computed(() => {
       if (!detail.value) return null
       if (status.value === 'failed') return 'failed'
@@ -438,6 +469,7 @@ export default defineComponent({
     const recordAfterPlace = ref(false)
     const totalOpen = ref(false)
     const retaking = ref(false)
+    const retakeMounted = ref(false)
     const sending = ref(false)
     let recordOnClose = false
 
@@ -462,6 +494,9 @@ export default defineComponent({
           return
         }
         await queue.flush()
+        // The answer may come after the person left: only this very review gives way to the
+        // purchases, never a screen they moved to meanwhile (adversarial А5).
+        if (route.name !== 'purchase-receipt' || id.value !== one.receipt.id) return
         const note = queue.recorded.find((done) => done.receiptId === one.receipt.id)
         if (note) {
           drafts.forget(one.receipt.id)
@@ -534,6 +569,18 @@ export default defineComponent({
       record,
       remove,
       goUp: () => void goUp(),
+      locked,
+      digits,
+      rateDay,
+      retakeMounted,
+      retake: () => {
+        retakeMounted.value = true
+        retaking.value = true
+      },
+      // The receipt this one replaced is gone: so is its screen, once the sheet's step has landed.
+      retaken: () => {
+        afterStep(() => void goUp())
+      },
       openTrip: (tripId: string) => void router.push({ name: 'purchase', params: { tripId } }),
       lineClosed: () => {
         opened.value = null

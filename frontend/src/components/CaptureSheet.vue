@@ -98,7 +98,8 @@
         </AppButton>
       </div>
       <template v-else>
-        <AppButton size="large" block :busy="sending" :disabled="preparing" @click="send">
+        <!-- Busy, not disabled, while a photo is made ready: the button says it is working. -->
+        <AppButton size="large" block :busy="sending || preparing" @click="send">
           {{ t('receipt.capture.send') }}
         </AppButton>
         <p v-if="!online" class="under">{{ t('receipt.capture.send_offline') }}</p>
@@ -111,7 +112,7 @@
     <template #title>{{
       t('receipt.capture.part_of', { n: (chosen ?? 0) + 1, total: parts.length })
     }}</template>
-    <img v-if="chosenPart" :src="chosenPart.url" alt="" class="large" />
+    <img v-if="chosenPart" :src="chosenPart.url" alt="" class="part-photo" />
     <template #footer>
       <div class="pair">
         <AppButton variant="danger-ghost" size="large" @click="removePart">
@@ -254,7 +255,7 @@ export default defineComponent({
     }
 
     async function send(): Promise<void> {
-      if (sending.value || parts.value.length === 0) return
+      if (sending.value || preparing.value || parts.value.length === 0) return
       sending.value = true
       try {
         const language = LOCALES.find((one) => one === locale.value) ?? 'ru'
@@ -486,7 +487,7 @@ export default defineComponent({
   gap: var(--space-2);
 }
 
-.large {
+.part-photo {
   display: block;
   width: 100%;
   max-height: 18.75rem;

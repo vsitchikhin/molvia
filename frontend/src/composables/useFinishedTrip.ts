@@ -123,6 +123,10 @@ export function useFinishedTrip(): FinishedTrip {
       ? state.recorded
       : null,
   )
+  // Taken off the entry once read: the browser keeps an entry's state across a reload and a step
+  // back and forth, and the words came back each time (review 9, adversarial А6).
+  if (recorded.value !== null && typeof state === 'object' && state !== null)
+    window.history.replaceState({ ...state, recorded: null }, '')
   const opened = ref<OpenedPurchase | null>(null)
   let opening = 0
   function amend(row: TripRowView): void {
