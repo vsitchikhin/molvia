@@ -10,12 +10,16 @@
   <template v-else>
     <RouterView />
     <TabBar v-if="route.meta.tab" />
+    <!-- «Написать разработчику» — one sheet for the app, opened from the settings and from any error
+         screen (MOL-147); only where somebody is known to write it. -->
+    <FeedbackSheet v-if="!closed" />
   </template>
 </template>
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import FeedbackSheet from '@/components/FeedbackSheet.vue'
 import TabBar from '@/components/TabBar.vue'
 import { releaseHeightHold } from '@/transitions'
 import LoginView from '@/views/LoginView.vue'
@@ -32,7 +36,7 @@ import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 // and the frame around each screen is AppScreen's.
 export default defineComponent({
   name: 'AppRoot',
-  components: { LoginView, TabBar },
+  components: { FeedbackSheet, LoginView, TabBar },
   setup() {
     const actor = useActorStore()
     const login = useLoginStore()

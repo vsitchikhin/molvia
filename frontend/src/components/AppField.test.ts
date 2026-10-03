@@ -180,3 +180,47 @@ it('opens native select, preserves its label and all descriptions, and emits the
   expect(view.emitted('update:modelValue')).toEqual([['AMD']])
   view.unmount()
 })
+
+describe('the count of what is left (MOL-147)', () => {
+  const counted = (value: string, counterFrom: number | null = 200) =>
+    render({ modelValue: value, kind: 'multiline', counterFrom }, {}, { maxlength: '2000' })
+
+  it('is silent while more than its share is left — 1799 characters say nothing', () => {
+    const view = counted('a'.repeat(1799))
+    expect(view.get('.counter').text()).toBe('')
+    view.unmount()
+  })
+
+  it('counts from exactly its share: 1800 typed, 200 left', () => {
+    const view = counted('a'.repeat(1800))
+    expect(view.get('.counter').text()).toBe('200 characters left')
+    view.unmount()
+  })
+
+  it('counts down as it is typed, in the plural of the language', () => {
+    const view = counted('a'.repeat(1866))
+    expect(view.get('.counter').text()).toBe('134 characters left')
+    view.unmount()
+    const one = counted('a'.repeat(1999))
+    expect(one.get('.counter').text()).toBe('1 character left')
+    one.unmount()
+  })
+
+  it('says the bound once nothing more fits', () => {
+    const view = counted('a'.repeat(2000))
+    expect(view.get('.counter').text()).toBe("That's the limit: 2000 characters")
+    view.unmount()
+  })
+
+  it('is a polite region there from the start, so its first words are read', () => {
+    const view = counted('')
+    expect(view.get('.counter').attributes('aria-live')).toBe('polite')
+    view.unmount()
+  })
+
+  it('must not be drawn unless asked for: every other field stays as it was', () => {
+    const view = counted('a'.repeat(2000), null)
+    expect(view.find('.counter').exists()).toBe(false)
+    view.unmount()
+  })
+})

@@ -63,6 +63,9 @@
     <AppReveal>
       <p v-if="failed" :id="`${id}-error`" class="error">{{ errorText ?? t(error ?? '') }}</p>
     </AppReveal>
+    <!-- Polite and there from the start, only its words changing: a region born with its words is
+         often not read (MOL-19). -->
+    <p v-if="counterFrom !== null" class="counter" aria-live="polite">{{ counter }}</p>
   </div>
 </template>
 
@@ -127,6 +130,12 @@ export default defineComponent({
      * (MOL-74): the label is still there for a screen reader, only not drawn.
      */
     hideLabel: { type: Boolean, default: false },
+    /**
+     * How many characters left of `maxlength` start to be counted under the field (MOL-147): silent
+     * before, so a long message is not met by a number from its first letter, and not cut short at
+     * the bound in silence either. Counted as the field and the schema count — UTF-16 units.
+     */
+    counterFrom: { type: Number as PropType<number | null>, default: null },
   },
   emits: {
     'update:modelValue': (value: string) => typeof value === 'string',
@@ -164,7 +173,16 @@ export default defineComponent({
 
     const shows = computed(() => props.kind === 'date' && !!props.display)
 
-    return { t, attrs, id, failed, shows, control, describedBy, update }
+    // `maxlength` is read from `attrs`, which are not reactive: it does not change, the value does.
+    const counter = computed(() => {
+      const max = Number(attrs.maxlength)
+      if (props.counterFrom === null || !Number.isInteger(max)) return ''
+      const left = Math.max(max - props.modelValue.length, 0)
+      if (left > props.counterFrom) return ''
+      return left === 0 ? t('field.full', { max }) : t('field.left', { n: left }, left)
+    })
+
+    return { t, attrs, id, failed, shows, counter, control, describedBy, update }
   },
 })
 </script>
@@ -302,6 +320,18 @@ textarea.control {
 
 .invalid .well {
   border-color: var(--bad);
+}
+
+.counter {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+
+  &:empty {
+    margin: 0;
+  }
 }
 
 .error {

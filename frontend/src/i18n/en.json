@@ -13,7 +13,8 @@
   },
   "state": {
     "loading": "Loading…",
-    "retry": "Try again"
+    "retry": "Try again",
+    "report": "Report a problem"
   },
   "trip": {
     "title": "Entry",
@@ -1269,7 +1270,70 @@
     "erase": {
       "label": "Delete my data",
       "hint": "Everything, for good"
+    },
+    "group_app": "About the app",
+    "feedback": {
+      "label": "Write to the developer",
+      "hint": "A bug, an idea or a question. The reply comes in Telegram"
     }
+  },
+  "feedback": {
+    "title": "Write to the developer",
+    "title_error": "Report a problem",
+    "kind_label": "About",
+    "kinds": {
+      "bug": "Broken",
+      "idea": "Idea",
+      "other": "Other"
+    },
+    "text_label": "Message",
+    "placeholder": {
+      "bug": "What you did and what went wrong",
+      "idea": "What's missing",
+      "any": "Write it as it is"
+    },
+    "attached": "Sent along:",
+    "attached_build": "version {build}",
+    "attached_screen": "screen “{screen}”",
+    "attached_code": "code {code}",
+    "platform": {
+      "app": "{os}, app",
+      "browser": "{os}, browser"
+    },
+    "systems": {
+      "ios": "iOS",
+      "ipados": "iPadOS",
+      "android": "Android",
+      "macos": "macOS",
+      "windows": "Windows",
+      "linux": "Linux",
+      "other": "another system"
+    },
+    "send": "Send",
+    "sending": "Sending…",
+    "done": "Done",
+    "need_kind": "Choose what it's about",
+    "need_text": "Write a message",
+    "need_network": "You can send it once online",
+    "need_tomorrow": "You can send it tomorrow",
+    "offline": "No connection. The text is saved — send it once you're back online",
+    "unsupported": "The message has a character that can't be sent",
+    "sent": {
+      "title": "Thanks, we'll read it",
+      "body": "If we reply, it will come in Telegram, from the Molvia bot"
+    },
+    "limit": {
+      "title": "That's a lot of messages for today",
+      "body": "The text is saved — send it tomorrow"
+    },
+    "failed": {
+      "title": "Couldn't send",
+      "body": "The text is still here — try again"
+    }
+  },
+  "field": {
+    "left": "{n} character left | {n} characters left",
+    "full": "That's the limit: {max} characters"
   },
   "privacy": {
     "title": "Data and privacy",
