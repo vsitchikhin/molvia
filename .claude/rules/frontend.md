@@ -79,7 +79,19 @@ The detail behind the frontend lines of `CLAUDE.md`.
   dark pairs stand closer, and a name beside the dot tells them apart until MOL-218 measures which
   meet in one donut. `--graphic` is the colour of data without one of its own; `--border-strong` is
   decoration and the edge of a field (Ф-3: `--border` there was 1.29:1 on the well). The math —
-  WCAG luminance and Ottosson's OKLab — is the test's own thirty lines, no dependency.
+  WCAG luminance and Ottosson's OKLab — is the test's own thirty lines, no dependency. **A tint stands
+  0.08 from `--surface`** (adversarial А3): a fill with no edge — a notice in a sheet — that the eye
+  cannot tell from the sheet is no fill; the dark `bad-tint` of 157 v2 was 0.038. **`--text-muted` is
+  for the three grounds, never a tint** (А1): under 4.5:1 there in both schemes, and the tints cannot
+  be lifted for it — in the dark they would have to sink to OKLab L 0.32 and part by saturation alone,
+  the accent's turning brick; on a tint a secondary line is `--text` (the chosen account, the active
+  catalogue row, the hint of Open Food Facts). **The file is read as Sass reads it**: both kinds of
+  comment out, every declaration taken whatever its value, a short or upper-case hex expanded —
+  Stylelint asks for the short form and `--fix` writes it — and a colour of the lists that is no hex
+  (`oklch()`) fails by name: read by a pattern of six lower-case digits, such a category left the test
+  green (А4, А5). The dot of a category on the chosen chip is under 3:1 on `--accent-tint` for six
+  light categories (А2) — not held: the tint cannot be made lighter without meeting `bad-tint`, and the
+  chip's form is MOL-198's.
 - **Nunito is one weight, 800, one file per subset** (MOL-171): the 400 and 600 files were the same
   variable font copied twice, and the precache fetched each URL. A sentence in a figure's place
   («Рынка нет» on the rate chart) is set in Onest, not Nunito at another weight.
