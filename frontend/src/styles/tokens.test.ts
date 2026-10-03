@@ -204,7 +204,8 @@ it(`keeps every category within ${String(SAME_HUE)}° of its hue in both schemes
     return [Math.hypot(a, b), (Math.atan2(b, a) * 180) / Math.PI]
   }
   const drifted = CATEGORIES.flatMap((name) => {
-    const [light, dark] = [declared.light.get(name), declared.dark.get(name)]
+    // Read as the pairs read it; a colour that is no hex fails there, by name.
+    const [light, dark] = [hex(declared.light.get(name)), hex(declared.dark.get(name))]
     if (!light || !dark) return []
     const [[lightChroma, lightHue], [darkChroma, darkHue]] = [hue(light), hue(dark)]
     if (Math.min(lightChroma, darkChroma) < ACHROMATIC) return []
