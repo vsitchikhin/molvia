@@ -108,9 +108,13 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   (MOL-101) — a bot that dies between the claim and the message loses it, and the count stays in
   the table. **A message's until the bot says it went** (MOL-148, adversarial В1): the table holds
   nothing else of it, so the bot names the messages it sent (`POST /internal/owner/sent`), and one
-  not named is handed again `OWNER_NOTICE_RESEND_MS` (ten minutes) after the last time, at most
-  `OWNER_NOTICE_TRIES` (six) times — a send Telegram refused, a 429 that gave up the run, a rollout's
-  stop. **The named price:** the word lost after a send that went, the owner reads it twice.
+  not named is handed again `OWNER_NOTICE_RESEND_MS` (ten minutes) after the first time, **each pause
+  twice the one before**, at most `OWNER_NOTICE_TRIES` (eight) times — some 21 hours (round 2, Г2): a
+  hand counts whether the bot tried the notice or not, a 429 or a stop giving up the rest of a run,
+  so the tries are spread over a day rather than spent in an hour. **A notice Telegram refuses for
+  what it is** (a 400) is the bot's failure, `owner:send` — the owner hears that something did not go.
+  **The named prices:** the word lost after a send that went, the owner reads it twice; Telegram away
+  longer than a day, the message is the table's alone again.
   Whom to write is `OWNER_TELEGRAM_ID` in the API's environment, never in the bot and never in a
   row. Without it nothing is queued at all: every working copy and end-to-end keep their failures in
   their table. In production the line is required, as `BOT_PULSE_URL` is: a forgotten one would

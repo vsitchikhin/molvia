@@ -89,7 +89,7 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
   a key cannot compare with a constant; `in_reply_to` names a reply to the same person — else erasing
   one person cascaded into another's row — by `(in_reply_to, actor_id)`, so a reply carries its
   message's `actor_id`; and a continuation, and only a continuation, answers a reply. The migration
-  came with the writer, `0042`, before the first row of either.
+  came with the writer, `0043`, before the first row of either.
 - **The owner's replies are kept** (`feedback_replies`, Р-1) so the copy is whole and a continuation
   shows the owner what is answered; they go with their message by the cascade.
 - **A thread lives a year from its last message, the person's or the owner's** (В-4): `purgeStale`
@@ -113,9 +113,10 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
   which a text is (`feedbackFromBot`). **The reply lies under the person's latest word in the thread**
   — that is what the owner answers — and «от 3 октября» is that word's day in the person's country's
   zone (Р-3). **A continuation is a message of its thread**: the thread's kind and language, no screen,
-  platform or page build, the form's day limit, and a key made of the chat, the reply answered and
-  the words — so an update Telegram hands over twice, or the same word sent again after the bot said
-  «ответьте ещё раз», is written once (Р-7, adversarial В3). It is found by the message the reply
+  platform or page build, the form's day limit, and no key: **the same words of the same person to
+  the same reply within a rolling day are a repeat**, looked for before the count — an update Telegram
+  hands over twice, or the word sent again after «ответьте ещё раз», is written once, and the same word
+  a day on is a new one (Р-7, adversarial В3, round 2 Г1). It is found by the message the reply
   went out as — `feedback_replies.telegram_message_id`, looked for only beside the person (В-2).
 - **A reply's outcome is the bot's word after the send** (Р-4): `sent` with that message, `blocked`,
   or `failed` — Telegram refused it otherwise, and it never reached the person nor keeps the thread

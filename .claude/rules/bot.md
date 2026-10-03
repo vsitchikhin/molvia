@@ -398,7 +398,9 @@ storage is `feedback.md`.
   the reply is marked `blocked`, their reminders go off by the path of MOL-103, and the owner reads
   «Не дошло: человек заблокировал бота». **Any other refusal of Telegram is marked `failed`**
   (adversarial В4) — the copy says the reply never reached the person, and it keeps no thread alive
-  — and the owner reads «Не отправлено… Ответьте ещё раз». Every other outcome — a thread gone, too long, nothing
+  — and the owner reads «Не отправлено… Ответьте ещё раз». **A broken connection marks nothing**
+  (review №8): Telegram may have taken the message before it broke, so the reply stays «unknown» and
+  the owner reads «Не знаю, дошло ли… человек может получить ответ дважды». Every other outcome — a thread gone, too long, nothing
   visible, the person's day spent, the server silent — is one line under the message it answers; no
   error is shown, and there are no buttons to keep.
 - **The person's answer finds its thread by the message it answers** (В-2): after the send the bot
@@ -407,9 +409,14 @@ storage is `feedback.md`.
   and nobody else's chat holds that message. **The named price** (Р-4, Р-14): a mark lost between the
   send and the API leaves that reply «unknown», and an answer to it is refused as nothing of ours —
   and the owner, who saw 👌, is not told.
-- **The same word is the same message** (adversarial В3): a continuation is keyed by the chat, the
-  reply it answers and its words, so «ответьте ещё раз» after a lost answer writes it once — and so
-  does Telegram handing the update over twice. Two different words to one reply are two messages.
+- **The same word within a day is the same message** (adversarial В3, round 2 Г1): the same words of
+  the same person to the same reply within a rolling 24 hours are a repeat — «ответьте ещё раз» after
+  a lost answer writes it once, and so does Telegram handing the update over twice. A day on, the
+  same «Не работает» is a new word: taken for a repeat for good, it was «передали» and nothing.
+- **The frame is known by its last line, so that line is frozen like a tag** (round 2, Г3): a frame
+  stays in a person's chat for good. A new wording of `feedback.howToAnswer` moves the old one, in
+  every language, to `FRAME_LAST_LINES`, or every frame already sent stops being one and its answers
+  greet.
 - **A failure in the composer is `message:reply`** (`handlerOf`): apart from the greeting's `message`.
 - **Only text** (Р-9): a photo or a voice on a tagged notice says «Отвечать можно только текстом» —
   the owner must not think it went; a person's photo is met with silence, as any photo was.
