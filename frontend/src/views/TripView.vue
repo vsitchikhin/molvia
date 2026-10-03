@@ -214,6 +214,7 @@ import { useItemEntryStore } from '@/stores/itemEntry'
 import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { reportFailure } from '@/failures'
 
 /** What the sheet is open on: a row being amended. */
 interface Opened {
@@ -297,7 +298,8 @@ export default defineComponent({
       try {
         await trips.load()
         trouble.value = null
-      } catch {
+      } catch (error) {
+        reportFailure(error, 'screen')
         // Which of the two it was is decided after the failure, never narrowed from a check made
         // before the request: a connection that drops mid-answer is the commonest break (MOL-19).
         trouble.value = navigator.onLine ? 'error' : 'offline'

@@ -8,6 +8,7 @@ import { useActorStore } from '@/stores/actor'
 import { spendingOf, useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { read, write } from '@/stores/storage'
+import { reportFailure } from '@/failures'
 
 /**
  * The accounts as this phone last heard them, per owner (MOL-123, Р-1): the page whole — its
@@ -120,7 +121,8 @@ export const useAccountsStore = defineStore('accounts', () => {
       const answer = await api.moneyAccounts()
       if (actor.id !== owner || mine !== latest) return
       accept(answer)
-    } catch {
+    } catch (error) {
+      reportFailure(error, 'screen')
       if (actor.id !== owner || mine !== latest) return
       // Decided after the failure, never before the request (MOL-19, A1).
       failure.value = navigator.onLine ? 'error' : 'offline'

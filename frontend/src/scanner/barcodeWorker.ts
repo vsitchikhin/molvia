@@ -20,8 +20,15 @@ scope.onmessage = ({ data: request }) => {
     (code) => {
       scope.postMessage({ id: request.id, ok: true, code })
     },
-    () => {
-      scope.postMessage({ id: request.id, ok: false })
+    (error: unknown) => {
+      // The worker carries no model: the page describes the failure (MOL-144, Р-11).
+      scope.postMessage({
+        id: request.id,
+        ok: false,
+        ...(error instanceof Error
+          ? { failure: { name: error.name, message: error.message, stack: error.stack ?? '' } }
+          : {}),
+      })
     },
   )
 }

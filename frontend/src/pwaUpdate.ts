@@ -1,5 +1,6 @@
 import { inject, readonly, shallowRef, type InjectionKey, type Ref } from 'vue'
 import { UNNAMED_BUILD } from '@molvia/model'
+import { reportFailure } from '@/failures'
 
 /**
  * What a new version of the app waits for, and what the page needs to be told about the world.
@@ -309,6 +310,7 @@ export function installPwaUpdate(environment: PwaEnvironment): PwaUpdate {
     })
     .catch((error: unknown) => {
       console.error('[molvia]', 'service worker', error)
+      reportFailure(error, 'sw')
     })
 
   document.addEventListener('visibilitychange', () => {

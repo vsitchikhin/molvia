@@ -1975,3 +1975,87 @@ describe('«Написать разработчику» (MOL-147)', () => {
     expect(calls).toHaveLength(0)
   })
 })
+
+describe('сбои телефона (MOL-144)', () => {
+  const report = {
+    errorName: 'TypeError',
+    frames: ['at Xe (/assets/index-BTCsHrpw.js:1:48213)'],
+    catcher: 'screen' as const,
+    screen: 'advice',
+    build: 'index-BTCsHrpw',
+    platform: 'ios 18 app',
+  }
+
+  it('шлёт сохранённое одним телом и ждёт 204', async () => {
+    const { client, calls } = clientRecording()
+    await client.reportClientErrors({ reports: [report] }).catch(() => undefined)
+    expect(calls.map((call) => [call.url, call.method])).toEqual([
+      ['http://api/client-errors', 'POST'],
+    ])
+    await expect(
+      clientServing(null, { status: 204 }).reportClientErrors({ reports: [report] }),
+    ).resolves.toBeUndefined()
+  })
+
+  it('сверх предела — свой код', async () => {
+    const client = clientAnswering(429, { code: ERROR.CLIENT_ERRORS_RATE_LIMITED })
+    expect(await codeOf(client.reportClientErrors({ reports: [report] }))).toBe(
+      ERROR.CLIENT_ERRORS_RATE_LIMITED,
+    )
+  })
+
+  it('2xx не по контракту: целый ответ API — offContract, портал — нет', async () => {
+    const off = (headers: Record<string, string>) =>
+      clientServing(JSON.stringify({ items: 'not a list' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json', ...headers },
+      })
+        .advice()
+        .catch((error: unknown) => error)
+    expect(await off({ [VERSION_HEADER]: 'v0.2.0-1-gabc' })).toMatchObject({
+      code: ISSUE.RESPONSE_INVALID,
+      status: 200,
+      fromApi: true,
+      offContract: true,
+    })
+    expect(await off({})).toMatchObject({ fromApi: false, offContract: false })
+  })
+
+  it('тело, оборванное после заголовков API, — не offContract: это погода (адверсариальный А1)', async () => {
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: () =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ [VERSION_HEADER]: 'v0.2.0-1-gabc' }),
+          json: () => Promise.reject(new TypeError('Load failed')),
+        } as unknown as Response),
+    })
+    expect(await client.me().catch((error: unknown) => error)).toMatchObject({
+      fromApi: true,
+      offContract: false,
+    })
+  })
+
+  it('отказ: слово API несёт fromApi, 502 прокси — нет (ревью №3)', async () => {
+    const refused = await clientServing(JSON.stringify({ code: ERROR.NOT_FOUND }), {
+      status: 404,
+      headers: { 'content-type': 'application/json', [VERSION_HEADER]: 'v0.2.0-1-gabc' },
+    })
+      .advice()
+      .catch((error: unknown) => error)
+    expect(refused).toMatchObject({ code: ERROR.NOT_FOUND, fromApi: true })
+    const proxy = await clientServing('', { status: 502 })
+      .advice()
+      .catch((error: unknown) => error)
+    expect(proxy).toMatchObject({ status: 502, fromApi: false })
+  })
+
+  it('портал с 200 вместо 204 — не успех', async () => {
+    const client = clientAnswering(200, { welcome: 'wifi' })
+    expect(await codeOf(client.reportClientErrors({ reports: [report] }))).toBe(
+      ISSUE.RESPONSE_INVALID,
+    )
+  })
+})

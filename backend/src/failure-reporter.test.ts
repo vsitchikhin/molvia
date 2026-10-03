@@ -1,11 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { FastifyBaseLogger } from 'fastify'
 import type { FailureOccurrence } from '@/db/failures-repository'
-import { RECORDINGS_AT_ONCE, failureReporter } from './failure-reporter'
+import {
+  FINGERPRINTS_WAITING,
+  PHONE_FINGERPRINTS_WAITING,
+  RECORDINGS_AT_ONCE,
+  failureReporter,
+} from './failure-reporter'
 
 function fakeLog() {
   const error = vi.fn()
-  return { log: { error } as unknown as FastifyBaseLogger, error }
+  const warn = vi.fn()
+  return { log: { error, warn } as unknown as FastifyBaseLogger, error, warn }
 }
 
 /** A write held until released, so what waits behind it can be seen. */
@@ -39,6 +45,7 @@ describe('failureReporter — лог и таблица одним путём (MO
     expect(write).toHaveBeenCalledWith(
       expect.objectContaining({ errorName: 'TypeError', route: 'GET /x', build: 'b1' }),
       1,
+      undefined,
     )
     expect(JSON.stringify([error.mock.calls, write.mock.calls])).not.toContain('сыр')
   })
@@ -116,5 +123,68 @@ describe('failureReporter — лог и таблица одним путём (MO
     })
     for (const one of writes) one.release()
     await Promise.all(recordings)
+  })
+})
+
+describe('сбои телефона не вытесняют сбои API (MOL-144, адверсариальный А5)', () => {
+  const phone = (index: number) =>
+    [
+      { errorName: `E${String(index)}`, frames: ['at Xe (/assets/index-BTCsHrpw.js:1:1)'] },
+      { source: 'phone', route: 'screen:advice', platform: 'ios 18 app' },
+      'index-BTCsHrpw',
+    ] as const
+
+  it('поток выдуманных сбоев при медленной базе: сбой API всё равно встаёт в очередь', () => {
+    const { log, error, warn } = fakeLog()
+    const { write } = heldWrites()
+    const reporter = failureReporter('b1', write, log)
+    for (let index = 0; index < FINGERPRINTS_WAITING * 2; index += 1) {
+      reporter.take(...phone(index))
+    }
+    expect(warn).toHaveBeenCalledWith({ reason: 'phone busy' }, 'phone failure not recorded')
+
+    reporter.report(new Error('connection timeout'), at('GET /advice'), 'request failed')
+    expect(error).not.toHaveBeenCalledWith({ reason: 'busy' }, 'failure not recorded')
+  })
+
+  it(`телефону — не больше ${String(PHONE_FINGERPRINTS_WAITING)} в очереди, его отказ — предупреждение, не сбой`, () => {
+    const { log, error, warn } = fakeLog()
+    const { write, writes } = heldWrites()
+    const reporter = failureReporter('b1', write, log)
+    for (let index = 0; index < RECORDINGS_AT_ONCE + PHONE_FINGERPRINTS_WAITING + 1; index += 1) {
+      reporter.take(...phone(index))
+    }
+    expect(writes).toHaveLength(RECORDINGS_AT_ONCE)
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(error).not.toHaveBeenCalled()
+  })
+
+  it('свободный ход — сначала сбою API, потом телефону', async () => {
+    const { log } = fakeLog()
+    const { write, writes } = heldWrites()
+    const reporter = failureReporter('b1', write, log)
+    for (let index = 0; index < RECORDINGS_AT_ONCE + 3; index += 1) reporter.take(...phone(index))
+    reporter.report(new Error('timeout'), at('GET /advice'), 'request failed')
+    writes[0]?.release()
+    await vi.waitFor(() => {
+      expect(writes).toHaveLength(RECORDINGS_AT_ONCE + 1)
+    })
+    expect(writes.at(-1)?.occurrence.source).toBe('api')
+  })
+})
+
+describe('чей отчёт — идёт с записью, но не в неё (MOL-144, адверсариальный Б1)', () => {
+  it('сеть отправителя доходит до записи рядом с отпечатком, в самом отпечатке её нет', () => {
+    const { log } = fakeLog()
+    const { write } = heldWrites()
+    const reporter = failureReporter('b1', write, log)
+    reporter.take(
+      { errorName: 'TypeError', frames: ['at Xe (/assets/index-BTCsHrpw.js:1:1)'] },
+      { source: 'phone', route: 'screen:advice', platform: 'ios 18 app' },
+      'index-BTCsHrpw',
+      '198.51.100.7',
+    )
+    expect(write).toHaveBeenCalledWith(expect.anything(), 1, '198.51.100.7')
+    expect(JSON.stringify(write.mock.calls[0]?.[0])).not.toContain('198.51.100.7')
   })
 })

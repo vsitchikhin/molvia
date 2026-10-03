@@ -57,6 +57,7 @@ import RatingScale from '@/components/RatingScale.vue'
 import type { Score } from '@/components/rating'
 import { currentIdentity } from '@/stores/identity'
 import { forgetOwnPrices } from '@/stores/ownPrices'
+import { reportFailure } from '@/failures'
 
 /** The review's own bound (`newVerdictSchema`), kept by the field so it cannot be passed. */
 const REVIEW_MAX = 500
@@ -169,6 +170,7 @@ export default defineComponent({
         emit('saved')
         open.value = false
       } catch (error) {
+        reportFailure(error, 'screen')
         const code = error instanceof ApiError ? error.code : null
         // Decided after the failure: a connection that went while the answer was on its way is
         // not the server breaking. A code the domain has words for keeps its own.

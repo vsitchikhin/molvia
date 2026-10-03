@@ -166,6 +166,12 @@ export const ru = {
   'owner.failure.again': '🟠 Уже {count} раз в этой сборке · {source}',
   'owner.failure.what': '{kind} · {place}',
   'owner.failure.nowhere': 'без маршрута',
+  /** The phone's platform, `ios 18 app`, as `platformLine` writes it (MOL-144). */
+  'owner.failure.platform': 'Платформа {platform}',
+  /** The phone's notices held back past the hour's budget, told once it has room (MOL-144). */
+  'owner.failure.muted': '🔕 Скрыто уведомлений о сбоях телефона: {count}',
+  /** New fingerprints of the phone the hour's rows had no room for (MOL-144, round 3, В1). */
+  'owner.failure.unwritten': '🔕 Не записано новых сбоев телефона: {unwritten} — предел строк часа',
   'owner.failure.build': 'Сборка {build}',
   'owner.failure.buildPrint': 'Сборка {build} · {fingerprint}',
   'owner.failure.more': 'Подробности — make failures',

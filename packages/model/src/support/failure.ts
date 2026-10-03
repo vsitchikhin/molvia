@@ -79,3 +79,88 @@ export function describeFailure(error: unknown): FailureSummary {
     ...(frames?.length ? { frames } : {}),
   }
 }
+
+/** A frame's function as the phone sends it: an identifier and nothing a sentence could be. */
+const FRAME_FUNCTION = /^[\w$.<>[\]/]{1,100}$/
+/**
+ * A script of the app's own origin, as a frame may name it (MOL-144, adversarial А2): a file of the
+ * build or of the development server — `/assets/index-BTCsHrpw.js`, `/sw.js`, `/src/views/X.vue`,
+ * `/@fs/…/transport.ts` — never a screen's address. An inline `<script>`, one an extension put into
+ * the page included, is named by its document: `/purchases/<trip>` is a person's trip, and it is no
+ * code of ours either. The API's schema takes the same shape.
+ */
+export const PHONE_SCRIPT_PATH =
+  '\\/(?:(?:assets|src|@fs|@vite|node_modules)\\/[\\w./@~+-]{1,400}|[\\w.-]{1,100})\\.(?:js|mjs|ts|vue)'
+const OWN_PATH = new RegExp(`^${PHONE_SCRIPT_PATH}$`)
+
+/**
+ * Where a frame's code is, as the phone sends it (MOL-144, Р-1): a script of the app's own origin
+ * with its line and column, or `?` for anything else — another origin, an extension, `eval`, native
+ * code, a page's own address. The query and the hash are cut before the path is judged.
+ */
+function framePlaceOf(location: string, origin: string): string {
+  const position = /^(.*):(\d{1,9}):(\d{1,9})$/.exec(location)
+  if (position === null) return '?'
+  const [, address = '', line = '', column = ''] = position
+  if (!address.startsWith(`${origin}/`)) return '?'
+  const path = address.slice(origin.length).replace(/[?#].*$/, '')
+  return OWN_PATH.test(path) ? `${path}:${line}:${column}` : '?'
+}
+
+/**
+ * One line of a browser's stack brought to one shape for every engine (MOL-144, Р-1) —
+ * `at <function> (<path>:<line>:<column>)` — or nothing, for a line that is not a frame. V8 writes
+ * `at fn (url:1:2)`, WebKit and Gecko `fn@url:1:2`; the function is kept only while it is an
+ * identifier, `?` otherwise, so a line of text never passes for one.
+ */
+export function phoneFrame(line: string, origin: string): string | undefined {
+  let name: string
+  let location: string
+  if (line.startsWith('at ')) {
+    const called = /^at (.+?) \((.*)\)$/.exec(line)
+    name = called?.[1] ?? ''
+    location = called?.[2] ?? line.slice(3)
+  } else {
+    const at = line.indexOf('@')
+    name = at < 0 ? '' : line.slice(0, at)
+    location = at < 0 ? line : line.slice(at + 1)
+    if (!/:\d{1,9}:\d{1,9}$/.test(location)) return undefined
+  }
+  const bare = name.replace(/^(?:async\*|async |new )/, '')
+  const fn = bare === '' ? '<anonymous>' : FRAME_FUNCTION.test(bare) ? bare : '?'
+  return `at ${fn} (${framePlaceOf(location, origin)})`
+}
+
+/** Whether a frame the phone sends is in the app's own code, not another origin's or native. */
+export function ownFrame(frame: string): boolean {
+  return !frame.endsWith('(?)')
+}
+
+/**
+ * A failure on the phone, described as `describeFailure` describes one and its frames brought to
+ * one shape (MOL-144, Р-1). **WebKit and Gecko write the stack without a header** — frames alone,
+ * `fn@url:1:2` — so the rule that cuts V8's header gave an iPhone no frames at all. Their stack never
+ * holds the message, so it is read line by line — **only while the message is nowhere in it**: a
+ * stack that holds it is not one of theirs, and gives no frames, as before.
+ */
+export function describePhoneFailure(error: unknown, origin: string): FailureSummary {
+  const summary = describeFailure(error)
+  let lines = summary.frames
+  if (
+    lines === undefined &&
+    error instanceof Error &&
+    typeof error.stack === 'string' &&
+    (error.message === '' || !error.stack.includes(error.message))
+  ) {
+    lines = error.stack.split('\n').map((line) => line.trim())
+  }
+  const frames = (lines ?? [])
+    .map((line) => phoneFrame(line, origin))
+    .filter((frame) => frame !== undefined)
+    .slice(0, FAILURE_FRAMES)
+  return {
+    errorName: summary.errorName,
+    ...(summary.code === undefined ? {} : { code: summary.code }),
+    ...(frames.length > 0 ? { frames } : {}),
+  }
+}

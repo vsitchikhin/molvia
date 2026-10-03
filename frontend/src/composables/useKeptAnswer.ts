@@ -7,6 +7,7 @@ import { isRecord } from '@/stores/queueing'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { read, write } from '@/stores/storage'
+import { reportFailure } from '@/failures'
 
 /** `idle` — no identity, so there is nothing to read. */
 export type KeptPhase = 'idle' | 'loading' | 'ready' | 'error' | 'offline'
@@ -156,7 +157,8 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
       if (mine < (failed.get(asked) ?? 0)) return
       failure.value = null
       confirmed.value = true
-    } catch {
+    } catch (error) {
+      reportFailure(error, 'screen')
       failed.set(asked, Math.max(mine, failed.get(asked) ?? 0))
       if (actor.id !== id || subject.value !== asked || mine !== latest) return
       failure.value = navigator.onLine ? 'error' : 'offline'

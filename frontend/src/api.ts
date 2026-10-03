@@ -106,6 +106,12 @@ function watching<T extends Call>(call: T, remembered: boolean): T {
   }) as T
 }
 
+/**
+ * Calls whose refusal is never why a screen broke: the sheet's own «too many today» (В3б), and the
+ * phone's failures sent in the background (MOL-144, Р-8).
+ */
+const NOT_A_REASON = new Set(['sendFeedback', 'reportClientErrors'])
+
 export const api = Object.fromEntries(
-  Object.entries(client).map(([name, call]) => [name, watching(call, name !== 'sendFeedback')]),
+  Object.entries(client).map(([name, call]) => [name, watching(call, !NOT_A_REASON.has(name))]),
 ) as MolviaClient

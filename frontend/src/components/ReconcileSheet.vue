@@ -216,6 +216,7 @@ import { useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import type { QueuedWrite } from '@/stores/tripQueue'
+import { reportFailure } from '@/failures'
 
 type Reason = AccountCheckResponse['reasons'][number]
 /** A check as this sheet sends it: the day is the request's (MOL-121). */
@@ -344,7 +345,8 @@ export default defineComponent({
         // The account's «сверено» and, when it came out even, its window moved.
         void store.refresh()
         return true
-      } catch {
+      } catch (error) {
+        reportFailure(error, 'screen')
         if (mine === asking) failure.value = navigator.onLine ? 'error' : 'offline'
         return false
       }
@@ -641,7 +643,8 @@ export default defineComponent({
       if (known) return known
       try {
         return (await api.spendingCategories()).categories.find(isOther) ?? null
-      } catch {
+      } catch (error) {
+        reportFailure(error, 'screen')
         return null
       }
     }
@@ -656,6 +659,7 @@ export default defineComponent({
     }
     function incomeUnavailable(): void {
       incomeOpen.value = false
+      // failure reported where it failed: the income sheet's own load (MOL-144).
       failure.value = navigator.onLine ? 'error' : 'offline'
     }
 

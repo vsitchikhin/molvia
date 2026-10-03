@@ -12,6 +12,11 @@ paths:
   - 'backend/tests/failures*.ts'
   - 'bot/src/{failure,owner}*.ts'
   - 'bin/failures.sh'
+  - 'backend/src/routes/client-errors.ts'
+  - 'backend/tests/client-errors*.ts'
+  - 'frontend/src/failures*.ts'
+  - 'frontend/src/scanner/{barcodeReader,barcodeWorker,protocol}.ts'
+  - 'e2e/client-errors*.ts'
 ---
 
 # Failures of the API and the bot, and the owner's channel (MOL-143)
@@ -25,8 +30,8 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
 
 - **A failure belongs to nobody** (Р-8 of MOL-149). `failures` has no actor, no Telegram id, no
   address, no session, no query, no body and no message — `describeFailure` and the place, nothing
-  else — so there is no key to `actors`, erasure and the copy have nothing to reach, and the privacy
-  page has nothing to say. A test holds every column of the table by name and the absence of any
+  else — so there is no key to `actors`, and erasure and the copy have nothing to reach; the privacy
+  page says only what a phone sends (MOL-144), and `platform` was that decision. A test holds every column of the table by name and the absence of any
   foreign key, and another puts a person's review into a driver's message and finds it nowhere.
   **A new column is a decision about privacy, not a field.**
 - **`describeFailure` is one rule, in the domain** (Р-1): the API, the bot and — with MOL-144 — the
@@ -148,3 +153,135 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   (`bundleDecoder`); a line the map has no entry for is left as it is, never given the nearest one.
   Another build's frames would be read through the wrong map, and the bot's map is in the bot's
   image: both are printed as they are.
+
+## The phone's failures (MOL-144)
+
+What breaks on a phone is what neither end-to-end nor development shows — the first day of 0.1
+(MOL-79), the sheet on iOS (MOL-80), the keyboard (MOL-135) — and before this task it left a line in
+that phone's own console and nothing else. MOL-149 decided the shape (В-2: our own `POST
+/client-errors` into the same table, nothing of a third party in the PWA; Р-7: the maps beside the
+build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/requirements/MOL-144.md`.
+
+- **Taken with no session, and a cookie that came is never read** (Р-8 of MOL-149): the login screen
+  breaks before there is one, and a failure belongs to nobody. The source is `phone`; the place is
+  `<catcher>:<screen>` — Vue's handler, the window's `error` and `unhandledrejection`, a screen's own
+  catch, the scanner, the worker's registration, a step of the start, times a route's name (`login`
+  behind the door, `start` before the app is mounted, since the door's store must not be raised by a
+  failure). **The catchers stand before any module of the app is evaluated** (adversarial А4, Б3):
+  `catchers.ts` is the first import of `main.ts`, and modules are evaluated in the order they are
+  imported, so a module of the app that throws as it loads is heard. A step of the start that throws
+  is reported as `start` and thrown on — the first route that did not settle too (Б2), and the app is
+  mounted all the same — and one error object is one report whoever hears it. **The price, named:**
+  what throws before `catchers.ts` runs — the bundle failing to parse, the few modules it imports
+  (the client, the model, storage) — reaches nobody.
+- **What leaves is the kind and the frames, never the message** (`describePhoneFailure`), nor a
+  field, a draft, the queue, storage or an answer of the API: the screen, the build and the platform
+  are the app's own words. **WebKit and Gecko write the stack without a header** — frames alone,
+  `fn@url:1:2` — and the rule that cuts V8's header gave an iPhone no frame at all; their stack never
+  holds the message, so it is read line by line, **only while the message is nowhere in it**.
+  **Every engine's frame is brought to one shape on the phone** (`phoneFrame`, Р-1):
+  `at <function> (<path>:<line>:<column>)`, the function kept only while it is an identifier, the
+  path only of **a script of the app's own origin** (`PHONE_SCRIPT_PATH`: the build's `/assets/`,
+  a file at the root, the development server's `/src/`, `/@fs/`, `/node_modules/`) with its query
+  and hash cut, anything else `?`. **A page's own address is not a script** (adversarial А2): an
+  inline `<script>` — one an extension put into the page included — is named by its document, and
+  `/purchases/<trip>` is a person's trip and no code of ours. The API's schema takes the same shape
+  and nothing else, so no word of text and no address passes.
+- **Whether it is the phone's own is one rule** (`phoneDefect`, Р-4, owner's В-3): an API's word —
+  a refusal or its 500 — the API recorded itself; no answer is the weather; a page not of the API's —
+  a portal, a proxy's 502 — is not ours. **A `2xx` the contract could not read is**, but only the
+  API's, and only whole (`ApiError.offContract`): the reply named the API's build (`fromApi`,
+  `X-Molvia-Version`) — the transport marks a portal's `200` page and the API's unreadable answer
+  alike, as answered, and the first rule, found by end-to-end, let not one such failure through —
+  and its body read as JSON: one cut off after its headers, Safari's «Load failed» of an app put away
+  mid-answer, is the weather (adversarial А1). **Every catch
+  where a screen chooses «error»** calls `reportFailure` first — twenty-nine of them, and a test of
+  the sources holds every branch to it (review №5) — a branch whose failure was reported elsewhere,
+  a child's load or a catch up the chain, says so in a comment the test counts: the error stops in
+  those catches and never reached Vue's handler, so a throw inside a screen's load was the one class
+  nobody could see. **A report never throws** — it stands first in those catches.
+- **What the window hears goes only with a frame of the app's own code** (Р-2): an extension, a
+  script of Telegram's browser, `Script error.` of another origin. What the app's own catchers hear
+  is the app's wherever it was thrown, and goes with no frame too — a registration's `DOMException`
+  has none.
+- **One failure once a page** (Р-5): a retry that shows the same error, a loop that throws every
+  frame, send it the first time only, so the count is of pages that met it. **A failure is the same
+  on the phone as in the API's fingerprint**, its build included (adversarial Д1): a report with no
+  frame kept from an old build no longer stands for the new build's. **Kept until our API has
+  answered** (Р-7): `molvia.failures` on the shared shelf, twenty at most, one a failure; sent at once,
+  at start and on `online`, **one window at a time** (`navigator.locks`, adversarial А3: two windows
+  hearing `online` each sent the shared buffer whole). **The API's answer lets them go** — taken, or
+  refused for good — **but not «too many»**, which says «later» (review №2: a stream of somebody
+  else's cost a real phone its report), and **nothing that is not the API's**: a proxy's `502` during a
+  rollout, the very window an old page meets a new server in, and a portal's page keep them (review
+  №3). Nobody's, so «Выйти» leaves it. Sending reports nothing about itself and is no reason a screen
+  broke (`lastRefusal`, Р-8).
+- **The page's build is the name of its own script** (В-1): `index-BTCsHrpw`, a hash of its content,
+  which changes exactly when the phone's code does. The page has no other version; the first one the
+  API named (`pwaUpdate.build()`) is the new build for the old code from the cache after a rollout —
+  the very window a failure of the old code matters in — and a git version built in would make every
+  merge a new app on every phone. **So a phone's fingerprint lives within a build** (Р-10), and the
+  build is in it (review №1): the code is minified and the top frame's file is the build's anyway, and
+  a failure with no frame of the build — a registration's, the scanner worker's file whose hash does
+  not move with `index` — shared one row between an old page and a new one during a rollout and was
+  «new in this build» at every turn. The owner hears of it once a build as of any other, and only the
+  count across builds is lost.
+- **The platform is a column and its system is in the fingerprint** (В-2): `platformLine`'s one line,
+  never the User-Agent, the last one seen; «only on iOS» is seen at once, and the API's and the bot's
+  fingerprints did not move — the system is added only where there is one.
+- **The limit is the process's** (Р-6): sixty reports a minute from an address — three buffers: one
+  was too few for a mobile operator's address, which thousands of phones share (adversarial А6) — and
+  two hundred from everybody, the whole body refused past it with `429`, which the phone keeps its
+  buffer through. The address is the one Caddy names last in `X-Forwarded-For`, believed only from
+  inside, **an IPv6 one by its `/48`** (review №2, adversarial Б4, В2: one home connection has 2^64 in
+  its `/64`, a flat's router is given a `/56`, and a free tunnel a whole `/48`), the limit's key and
+  nothing else — in no log, in no table. **The channel can be silenced, not flooded** — the price,
+  named: someone sending from many addresses takes the minute's two hundred, and the real phones'
+  reports wait for the next start or `online`.
+- **The owner hears of the phone three times an hour from one sender and twenty from everybody**
+  (`phoneNoticeBudget`, review №1, adversarial Б1): the endpoint is open and a build is the phone's
+  word, so a report with a new build each time was «new in this build» each time — twenty messages a
+  minute; and a cap shared by everybody alone was spent by ten invented reports at the start of an
+  hour, and the real failure after a rollout was told to nobody. The sender is the limit's key, the
+  network, in memory alone. **What is held back is counted, never queued, and told by the minute
+  timer at most once an hour, past the cap** (`failure_muted`, «🔕 Скрыто уведомлений о сбоях
+  телефона: M», review №7, round 3 В2) — not with the next failure, which may never come, and not when
+  the cap has room, which seven networks keeping it full never leave; it also says how many new
+  fingerprints the hour's rows had no room for, and sends to `make failures` only for the held ones —
+  the unwritten are in no table (review №10). **The price, named:** seven networks — seven IPv4
+  addresses, seven `/48` — silence the names of the phone's new failures for an hour; the table keeps
+  them and the owner hears «скрыто M» every hour. Never silenced would take another bot: the phone's
+  failures one message a minute, with no cap. A restart starts the hour over and forgets what was
+  held — and a rollout is a restart. **The API's and the bot's go first** (adversarial А5): the
+  claim hands them out before the phone's, and the reporter writes them first and keeps fifty of its
+  two hundred places at most for the phone's — a stream of invented failures while the database was
+  slow filled the queue, and the API's own was the log's alone. **The price, named:** past four in
+  flight and fifty waiting, a burst of different new failures of phones is dropped with a warning —
+  a real burst that wide is the app broken everywhere, and the first fifty say it.
+- **The phone adds at most sixty new rows an hour from one sender and a thousand from everybody**
+  (`phoneRowBudget`, review №6, №8): a fingerprint is all the phone's words, so every invented report
+  could be a new row — two hundred a minute, kept thirty days and copied every night, a disk's worth.
+  Past the budget a known fingerprint still counts and a new one is not written, with a warning, and
+  the hour's summary says how many. A hundred shared by everybody alone was spent by two addresses in
+  two minutes, and every real new failure after a rollout was written nowhere for the hour
+  (adversarial В1); ten a sender were too few for a mobile operator's address, which thousands of
+  phones share — one failure of a rollout is a dozen fingerprints, its screens times its systems
+  (Г1). A place is taken before the write and given back if the row was there or the write failed
+  (review №9): four writes run at once, and an outage of the database held a place a report. So
+  are the notices a failed transaction took: the budget is spent inside it. **The held ones are
+  counted after the commit** (adversarial Е1, Ж1): counted inside, the minute timer told «скрыто» of a
+  write still in flight that then failed, and taking it back off later ate another's. **The
+  prices, named:** seventeen networks fill the hour, some 720 000 rows in thirty days at most; and the
+  sender is an address, so one subscriber of an operator sending sixty invented reports an hour takes
+  the new rows of every phone behind the same address — telling phones apart would need a mark of the
+  device, which is tracking. The nightly copy keeps the table: what is in it is bounded.
+- **The scanner's worker carries no model** (`barcodes.md`), so its failure travels to the page as
+  the error's name, message and stack and is described there by the one rule (Р-11) — the message
+  never leaves the phone; a throw it did not catch is `WorkerError` at its file, line and column.
+- **The maps lie beside the build** (`build.sourcemap`, not precached, fetched by a browser only with
+  its tools open) — the repository is public. `make failures` reads a phone's frame through the map
+  of its own file from the site (`phoneDecoder`, `APP_BASE_URL` of the API's environment): the name
+  is a hash of the content, so a map found is that file's own; a build the site no longer serves is
+  printed as it is, and so is one a site does not answer for within ten seconds (review №4).
+- **Not here:** failures inside the service worker itself — it has nobody to send them; a message to
+  the developer carrying a failure's fingerprint (MOL-147 sends the API's last code instead).

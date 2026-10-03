@@ -21,7 +21,7 @@ import { VERSION, env, loginConfig } from '@/env'
 import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
 import { apiFailureReporter } from '@/failure-reporter'
-import { botFailure } from '@/usecases/record-failure'
+import { botFailure, phoneReportLimit, takePhoneFailures } from '@/usecases/record-failure'
 import { claimOwnerNotices } from '@/usecases/owner-notices'
 import type { FailurePlace } from '@/usecases/record-failure'
 import { createFailureRepository } from '@/db/failures-repository'
@@ -39,6 +39,7 @@ import { tripRoutes } from '@/routes/trips'
 import { verdictRoutes } from '@/routes/verdicts'
 import { sessionRoutes } from '@/routes/sessions'
 import { exchangeRoutes } from '@/routes/exchanges'
+import { clientErrorsRoute } from '@/routes/client-errors'
 import { feedbackRoutes } from '@/routes/feedback'
 import { advice, adviceSearch } from '@/usecases/advice'
 import { ownNever } from '@/usecases/own-never'
@@ -180,6 +181,7 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.LOGIN_FORBIDDEN]: 403,
   [ERROR.LOGIN_RATE_LIMITED]: 429,
   [ERROR.FEEDBACK_RATE_LIMITED]: 429,
+  [ERROR.CLIENT_ERRORS_RATE_LIMITED]: 429,
   [ERROR.LOGIN_DISABLED]: 503,
   [ERROR.BOT_UNAUTHORIZED]: 401,
   // The request is well formed; another row already holds what it claims — a barcode that
@@ -554,6 +556,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           const now = new Date()
           await createFailureRepository(db).purgeStale(now)
           await createOwnerNoticeRepository(db).purgeStale(now)
+          // The phone's notices held back, told once the hour has room (MOL-144, review №7).
+          await failures.tellHeld(now)
         },
         (error) => {
           failures.report(error, job('failure-cleanup'), 'failure cleanup failed')
@@ -725,6 +729,22 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         createOwnerNoticeRepository(db).markSent(body.messages, new Date()),
       feedbackFromBot: (body) => feedbackFromBot(messages, owner, body, VERSION),
       replyDelivered: (body) => messages.markDelivered(body),
+    })
+
+    // The phone's failures (MOL-144): no session, a limit in memory, the page's own build.
+    const phoneLimit = phoneReportLimit()
+    clientErrorsRoute(instance, (body, address) => {
+      takePhoneFailures(
+        {
+          limit: phoneLimit,
+          take: (summary, place, build, sender) => {
+            failures.take(summary, place, build, sender)
+          },
+        },
+        body,
+        address,
+        Date.now(),
+      )
     })
 
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).
