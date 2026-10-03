@@ -10,6 +10,8 @@ paths:
   - 'backend/src/routes/health.ts'
   - 'bot/src/pulse.ts'
   - '.env.prod.example'
+  - 'deploy/grafana/**'
+  - 'deploy/victoria/**'
 ---
 
 # Deployment
@@ -40,6 +42,22 @@ The shape worth knowing here:
   with the others; **a rollback starts `backend bot frontend` only** — a tag from before MOL-125 has no
   reader image, and `up -d` of everything would stop on the missing pull with the API left broken. The
   reader holds nothing and answers any API alike, so whatever runs of it stays.
+- **The metrics are five more services and two more images** (MOL-145): VictoriaMetrics,
+  node_exporter, cAdvisor and postgres_exporter on `metrics`, an `internal` network with no way out,
+  Grafana in `metrics` and in `alerts`, a network of its own with a way out, its one port on
+  `127.0.0.1:3000` for an SSH tunnel. `molvia-grafana` and `molvia-victoria` carry what they read baked
+  in and are built by the release beside the four; the exporters are upstream images of exact tags.
+  **They never judge a rollout** (adversarial А4): their images are pulled before anything changes, the
+  upstream ones too, but a registry's refusal is a warning; the rollout's success is
+  `up -d postgres backend bot frontend receipt-reader` and the health that follows, and only then are
+  the metrics started, a failure of theirs — Grafana's port held, a device missing — said and the
+  rollout standing. `up -d` of everything judged them, and a metrics container that could not start
+  rolled a healthy API back. A rollback leaves them as they run — a tag from before MOL-145 has none of
+  their images. Each has a limit of memory, together under a gigabyte (Р-9), measured once production
+  ran them. `GRAFANA_ADMIN_PASSWORD`, `ALERTS_BOT_TOKEN`, `ALERTS_PULSE_URL` and `OWNER_TELEGRAM_ID` are
+  required and filled — empty is no longer a way to tell nobody of the failures (review №3). **The
+  first rollout recreates Postgres** too: its networks changed. The rules of what they measure are
+  `observability.md`; `deploy/README.md`, «Metrics».
 - **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
   exists only for trying the stack on a laptop, where Docker Desktop has no journald.
 - **The database is copied every night, encrypted, off the machine** (MOL-70): `pg_dump` inside the
@@ -136,7 +154,8 @@ The shape worth knowing here:
   - **A `/fail` is three failures in four tries half a minute apart**: it raises the alarm with no
     grace, and every merge leaves the API silent for seconds — a rollout fails one or two. All four
     had to fail at first, and a site failing three requests in four passed as well (adversarial
-    Б1). Failing every second request still passes: the share of 5xx is MOL-145's, a named price.
+    Б1). Failing every second request still passes: the share of 5xx is MOL-145's alarm, not the
+    watch's.
   - **One check, one state that can last.** healthchecks.io speaks only when a check flips, and a
     certificate «expiring in 13 days» is down for days: on `molvia-up` it kept a fall of the API
     silent the whole time (Б2). An unreadable certificate is the site's matter and pings nothing.

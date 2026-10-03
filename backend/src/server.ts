@@ -21,6 +21,7 @@ import { VERSION, env, loginConfig } from '@/env'
 import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
 import { apiFailureReporter } from '@/failure-reporter'
+import type { HttpMetrics } from '@/metrics'
 import { botFailure, phoneReportLimit, takePhoneFailures } from '@/usecases/record-failure'
 import { claimOwnerNotices } from '@/usecases/owner-notices'
 import type { FailurePlace } from '@/usecases/record-failure'
@@ -258,10 +259,20 @@ function routePath(request: FastifyRequest): string {
  * route there is no place at all.
  */
 function requestPlace(request: FastifyRequest): FailurePlace {
-  const route = request.routeOptions.url
-  // Fastify answers `HEAD` of every `GET` itself: one defect, one place (adversarial А7).
-  const method = request.method === 'HEAD' ? 'GET' : request.method
+  const { method, route } = routeOf(request)
   return { source: 'api', ...(route === undefined ? {} : { route: `${method} ${route}` }) }
+}
+
+/**
+ * The method and the route's template a request reached — the failure's place and the metrics'
+ * labels alike (MOL-145, Р-1), so the two never name one request differently. Fastify answers `HEAD`
+ * of every `GET` itself: one defect, one place (adversarial А7), and one series.
+ */
+function routeOf(request: FastifyRequest): { method: string; route: string | undefined } {
+  return {
+    method: request.method === 'HEAD' ? 'GET' : request.method,
+    route: request.routeOptions.url,
+  }
 }
 
 /** A job of the API's own timers, by its name (В-1). */
@@ -314,6 +325,11 @@ export interface ServerOptions {
   readonly owner?: TelegramUserId | null
   /** Every recording of a failure, for a test to wait on before it reads the table. */
   readonly failureRecorded?: (recording: Promise<void>) => void
+  /**
+   * Where every answer is counted (MOL-145). Absent, nothing is: the API's entry hands in the one its
+   * metrics port serves, and a test the one it reads.
+   */
+  readonly metrics?: HttpMetrics
 }
 
 /**
@@ -414,6 +430,32 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     void reply.header(VERSION_HEADER, NAMED_BUILD)
     next(null, payload)
   })
+
+  // Every answer by its route's template, a 404 and an error included (MOL-145). A path Fastify
+  // could not decode is answered before any hook and is not counted.
+  const metrics = options.metrics
+  if (metrics !== undefined) {
+    // Each request once: by its answer, or as `aborted` when the client left first (adversarial А1)
+    // — a closed socket never gives `onResponse`, and the answer nobody waited for is the slow one.
+    const counted = new WeakSet<FastifyRequest>()
+    app.addHook('onRequest', (request, reply, next) => {
+      reply.raw.once('close', () => {
+        if (reply.raw.writableFinished || counted.has(request)) return
+        counted.add(request)
+        const { method, route } = routeOf(request)
+        metrics.observe(method, route, 'aborted', reply.elapsedTime / 1000)
+      })
+      next()
+    })
+    app.addHook('onResponse', (request, reply, next) => {
+      if (!counted.has(request)) {
+        counted.add(request)
+        const { method, route } = routeOf(request)
+        metrics.observe(method, route, reply.statusCode, reply.elapsedTime / 1000)
+      }
+      next()
+    })
+  }
 
   // Fastify's own 404 writes `Route GET:/path?q=… not found` into the log and into the body,
   // past the request serializer: an old client or a mistyped path would log the query the

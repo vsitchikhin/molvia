@@ -1,0 +1,365 @@
+{
+  "apiVersion": 1,
+  "groups": [
+    {
+      "orgId": 1,
+      "name": "molvia",
+      "folder": "Molvia",
+      "interval": "1m",
+      "rules": [
+        {
+          "uid": "molvia-memory",
+          "title": "Память машины",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "victoria",
+              "model": {
+                "refId": "A",
+                "expr": "1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes",
+                "instant": true,
+                "range": false
+              }
+            },
+            {
+              "refId": "C",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [0.85]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "Alerting",
+          "execErrState": "Alerting",
+          "for": "5m",
+          "annotations": {
+            "summary": "Занято {{ with $values.A }}{{ humanizePercentage .Value }}{{ else }}— нет данных{{ end }} памяти дольше 5 минут. Свопа нет: дальше OOM-killer по API или Postgres."
+          },
+          "labels": {},
+          "isPaused": false
+        },
+        {
+          "uid": "molvia-disk",
+          "title": "Диск машины",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "victoria",
+              "model": {
+                "refId": "A",
+                "expr": "max(1 - node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})",
+                "instant": true,
+                "range": false
+              }
+            },
+            {
+              "refId": "C",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [0.8]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "Alerting",
+          "execErrState": "Alerting",
+          "for": "0s",
+          "annotations": {
+            "summary": "Диск / занят на {{ with $values.A }}{{ humanizePercentage .Value }}{{ else }}— нет данных{{ end }}."
+          },
+          "labels": {},
+          "isPaused": false
+        },
+        {
+          "uid": "molvia-5xx",
+          "title": "Доля 5xx",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "victoria",
+              "model": {
+                "refId": "A",
+                "expr": "((sum(increase(molvia_http_requests_total{route!~\"unmatched|/health|/internal/.*\",status=\"5xx\"}[5m])) / sum(increase(molvia_http_requests_total{route!~\"unmatched|/health|/internal/.*\"}[5m]))) and on() (sum(increase(molvia_http_requests_total{route!~\"unmatched|/health|/internal/.*\"}[5m])) >= 20)) or on() vector(0)",
+                "instant": true,
+                "range": false
+              }
+            },
+            {
+              "refId": "C",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [0.05]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "Alerting",
+          "execErrState": "Alerting",
+          "for": "0s",
+          "annotations": {
+            "summary": "{{ with $values.A }}{{ humanizePercentage .Value }}{{ else }}— нет данных{{ end }} ответов людям за 5 минут — 5xx. Что именно — make failures."
+          },
+          "labels": {},
+          "isPaused": false
+        },
+        {
+          "uid": "molvia-p95",
+          "title": "Время ответа API",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "victoria",
+              "model": {
+                "refId": "A",
+                "expr": "(histogram_quantile(0.95, sum by (le) (rate(molvia_http_request_duration_seconds_bucket{route!~\"unmatched|/health|/internal/.*|/receipts/:receiptId/parts/:part\"}[5m]))) and on() (sum(increase(molvia_http_requests_total{route!~\"unmatched|/health|/internal/.*|/receipts/:receiptId/parts/:part\"}[5m])) >= 20)) or on() vector(0)",
+                "instant": true,
+                "range": false
+              }
+            },
+            {
+              "refId": "C",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [1]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "Alerting",
+          "execErrState": "Alerting",
+          "for": "15m",
+          "annotations": {
+            "summary": "p95 ответа людям {{ with $values.A }}{{ humanizeDuration .Value }}{{ else }}— нет данных{{ end }} дольше 15 минут (без загрузки фото чека, служебных запросов и 404)."
+          },
+          "labels": {},
+          "isPaused": false
+        },
+        {
+          "uid": "molvia-restart",
+          "title": "Перезапуск контейнера",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "victoria",
+              "model": {
+                "refId": "A",
+                "expr": "max by (container_label_com_docker_compose_service) (resets(container_cpu_usage_seconds_total{container_label_com_docker_compose_service!=\"\"}[10m])) or on() vector(0)",
+                "instant": true,
+                "range": false
+              }
+            },
+            {
+              "refId": "C",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [0]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "Alerting",
+          "execErrState": "Alerting",
+          "for": "0s",
+          "annotations": {
+            "summary": "Контейнер {{ $labels.container_label_com_docker_compose_service }} перезапустился сам — не выкаткой."
+          },
+          "labels": {},
+          "isPaused": false
+        },
+        {
+          "uid": "molvia-targets",
+          "title": "Метрики молчат",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "victoria",
+              "model": {
+                "refId": "A",
+                "expr": "min by (job) (up)",
+                "instant": true,
+                "range": false
+              }
+            },
+            {
+              "refId": "C",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "lt",
+                      "params": [1]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "Alerting",
+          "execErrState": "Alerting",
+          "for": "5m",
+          "annotations": {
+            "summary": "{{ $labels.job }} не отвечает VictoriaMetrics 5 минут: его панели и тревоги слепы."
+          },
+          "labels": {},
+          "isPaused": false
+        },
+        {
+          "uid": "molvia-pulse",
+          "title": "Тревоги живы",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "victoria",
+              "model": {
+                "refId": "A",
+                "expr": "min(up{job=\"victoria\"})",
+                "instant": true,
+                "range": false
+              }
+            },
+            {
+              "refId": "C",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [0]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "OK",
+          "for": "0s",
+          "annotations": {
+            "summary": "Пульс тревог: Grafana считает правила, VictoriaMetrics отвечает. Идёт на healthchecks.io, не в Telegram."
+          },
+          "labels": {
+            "pulse": "true"
+          },
+          "isPaused": false
+        }
+      ]
+    }
+  ]
+}

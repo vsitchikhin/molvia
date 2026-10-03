@@ -21,6 +21,10 @@ Rules: `.claude/rules/observability.md`. A test beside its source, or mirroring 
 - `backend/tests/failures-api.integration.test.ts` — Integration test of failures through a real server: a 500 by its route's template and never the address, a person's text in the driver's message nowhere, a refusal not a failure, one notice a build, none without an owner; the bot's report and the owner's claim through `/internal`.
 - `backend/tests/client-errors.integration.test.ts` — Integration test of `POST /client-errors` (MOL-144): taken with no session and with a stranger's cookie, a row of `phone` with the page's build and platform, the owner's notice naming them; a message, a frame with the page's address or an origin, a User-Agent, an empty or too large batch refused; twenty a minute from an address, a forged header from outside not believed, the address in neither the log nor the table.
 - `backend/tests/failures.integration.test.ts` — Integration test of the two tables: the count by fingerprint and by build, ten at once, a notice in the same transaction, the 30 days, the queue handed out once, no key to `actors`.
+- `backend/src/metrics.ts` — The API's metrics (MOL-145) in Prometheus's text format, with no library: answers counted by method, route template and class of status — `aborted` when the client left first — their time in a histogram by route, a request no route answered `*`/`unmatched`, never its path; the process's event loop — how late a tick of its own came, over a sliding minute no reader resets — heap and resident memory.
+- `backend/src/metrics-server.ts` — `GET /metrics` on a port of its own (MOL-145, В-1), never the API's: what the network of the metrics scrapes and Caddy cannot reach.
+- `backend/tests/metrics.integration.test.ts` — Integration test of the metrics through a real server: a uuid and a query never in a label, a hundred unknown paths one series, `HEAD` as `GET`, a failure as 5xx; `/metrics` no address of the API in any spelling, and answered on its own server.
+- `backend/tests/metrics-stack.integration.test.ts` — Test of the metrics' stack as written (MOL-145): no port but Caddy's and Grafana's on the loopback, the exporters on a network with no way out, Caddy proxying only the API's port, Grafana calling nobody home, the alarms at the thresholds of Р-6 of MOL-149, and every figure the dashboard and the alarms read written by the API or an exporter.
 
 ## frontend
 
@@ -36,3 +40,14 @@ Rules: `.claude/rules/observability.md`. A test beside its source, or mirroring 
 
 - `bot/src/failure.ts` — The bot's failures (MOL-143): `handlerOf` — the kind of update and the prefix of its button or command, never its data or sender — what is a defect and what is the weather (network, Telegram, the API's own answers), the report by kind to the API, its own failure one line of the log.
 - `bot/src/owner.ts` — The owner's notices: claimed from the API every minute as the reminders are, sent one by one in Russian, a 429 ending the run, a message's notice said to have gone (MOL-148); `ownerText` writes a new failure, a count reached, and a message to the developer or its continuation with the thread's tag ending the first line (MOL-148), which `threadTagOf` reads back.
+
+## deploy · metrics
+
+- `deploy/victoria/Dockerfile` — Image `molvia-victoria` (MOL-145, В-2): VictoriaMetrics of an exact tag with its scrape config baked in.
+- `deploy/victoria/scrape.yml` — What VictoriaMetrics scrapes every fifteen seconds: the API's own metrics port, node_exporter, cAdvisor, postgres_exporter and itself.
+- `deploy/grafana/Dockerfile` — Image `molvia-grafana` (MOL-145, В-2): Grafana of an exact tag with the dashboard, the alarms and their contact point baked in, started through `start.sh`.
+- `deploy/grafana/start.sh` — Grafana's entry: writes `OWNER_TELEGRAM_ID` into the contact point as text, refusing anything but digits, the API's rule — Grafana 13.0 makes a number of what it reads from the environment — and sets the admin's password from `GRAFANA_ADMIN_PASSWORD` at every start.
+- `deploy/grafana/provisioning/datasources/victoria.yaml` — The one source of the dashboard and the alarms: VictoriaMetrics, read as Prometheus, not editable.
+- `deploy/grafana/provisioning/dashboards/molvia.yaml` — The provider of the dashboard: read-only, a change in the interface is not kept (Р-10), and a file removed takes its dashboard with it.
+- `deploy/grafana/provisioning/alerting/` — The alarms (`rules.json`: every threshold in one file — memory, disk, 5xx and p95 of a person's requests, a restart, figures gone silent, and the pulse) and where they go (`notify.json`: the Telegram contact point of the alarms' own bot, the message in Russian, the pulse's webhook to healthchecks.io, the policy).
+- `deploy/grafana/dashboards/` — The dashboard «Молвия»: the API, the machine, the containers, Postgres.
