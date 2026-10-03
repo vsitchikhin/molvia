@@ -5,21 +5,22 @@
 // while `font-variation-settings` moves Nunito's own axis, the file being a variable font.
 //
 // The whole rule is read, down its nested at-rules: an `@media` or `@include wider-than-phone`
-// inside it is the same element on a wider screen (adversarial Б2). A nested rule is another element
+// inside it is the same element on a wider screen (adversarial Б2) — and a role set inside one of
+// them is checked from the rule up, so a sibling block cannot set the weight again (Ж1). A nested rule is another element
 // or a variant, and may set these only together with a face of its own — a sentence in a figure's
 // place (`&.missing`) is Onest — `font-family: var(--font)`, never `inherit`, which keeps Nunito (В2);
 // a variant that stays in Nunito keeps its one weight (Б1). Another rule for the same element
 // elsewhere in the file is beyond what a linter can match (Б3), and so the role is never put in a
 // placeholder, where `@extend` would carry it into such a rule (В3).
 //
-// A mixin that includes the role is the role (В1): its name is learnt from styles/_mixins.scss when
-// the plugin loads, and from the file being linted, through any number of wrappers. Names are
+// A mixin that includes the role is the role (В1): its name is learnt from every partial of styles/
+// when the plugin loads (Ж2), and from the file being linted, through any number of wrappers. Names are
 // compared as Sass compares them — a hyphen and an underscore are one character (Г1) — and found
 // however the include names them: through a namespace (`m.display-type`, Д1) or `sass:meta`
 // (`meta.apply(meta.get-mixin('display-type'))`, Д2). `sass:meta` itself is refused — a mixin kept in
 // a variable carries the role under no name at all (Е2) — and so is `@extend`, by the config (Е3).
 
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import stylelint from 'stylelint'
 
 const {
@@ -81,8 +82,13 @@ export function roleMixins(source, known = new Set(['display-type'])) {
   return roles
 }
 
+const STYLES = new URL('../src/styles/', import.meta.url)
+
 const SHARED = roleMixins(
-  readFileSync(new URL('../src/styles/_mixins.scss', import.meta.url), 'utf8'),
+  readdirSync(STYLES)
+    .filter((file) => /^_.+\.scss$/.test(file))
+    .map((file) => readFileSync(new URL(file, STYLES), 'utf8'))
+    .join('\n'),
 )
 
 const messages = ruleMessages(ruleName, {
@@ -126,7 +132,16 @@ function rule(primary) {
     root.walkAtRules('include', (include) => {
       const name = includedName(include.params)
       if (!name || !roles.has(sassName(name)) || !include.parent) return
-      const parent = include.parent
+      // Up through the media queries to the rule they belong to; a mixin's body is its own place.
+      let parent = include.parent
+      while (
+        parent.type === 'atrule' &&
+        parent.name !== 'mixin' &&
+        parent.parent &&
+        parent.parent.type !== 'root'
+      ) {
+        parent = parent.parent
+      }
       if (parent.type === 'rule' && PLACEHOLDER.test(parent.selector.trim())) {
         report({ ruleName, result, node: include, message: messages.placeholder() })
         return

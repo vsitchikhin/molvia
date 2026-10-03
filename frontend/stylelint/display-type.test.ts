@@ -147,4 +147,21 @@ describe('molvia/display-type-whole', () => {
       ),
     ).toEqual(['sass:meta', 'font-weight'])
   })
+
+  it('checks a role set inside a media query from its rule: a sibling block is the same element', async () => {
+    expect(
+      await refused(
+        '.a { @include wider-than-phone { @include display-type; } ' +
+          '@include wider-than-phone { font-weight: var(--weight-regular); } }',
+      ),
+    ).toEqual(['font-weight'])
+  })
+
+  it('keeps a wrapper in a mixin its own place: the body of the mixin, not the file', async () => {
+    expect(
+      await refused(
+        '@mixin figure-type { @include display-type; }\n.b { font-weight: var(--weight-bold); }',
+      ),
+    ).toEqual([])
+  })
 })
