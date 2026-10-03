@@ -175,7 +175,16 @@ describe('сбой ли это телефона (Р-4, В-3)', () => {
       new ApiError(ISSUE.RESPONSE_INVALID, '', false, 502),
       false,
     ],
-    ['2xx, который контракт не прочёл', new ApiError(ISSUE.RESPONSE_INVALID, '', false, 200), true],
+    [
+      'портал с 200 и своей страницей: сборки API не назвал',
+      new ApiError(ISSUE.RESPONSE_INVALID, '', true, 200),
+      false,
+    ],
+    [
+      '2xx API, который контракт не прочёл',
+      new ApiError(ISSUE.RESPONSE_INVALID, 'items', true, 200, true),
+      true,
+    ],
     ['исключение в коде', new TypeError('x'), true],
   ])('%s', (_name, error, defect) => {
     expect(phoneDefect(error)).toBe(defect)

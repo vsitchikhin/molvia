@@ -2004,6 +2004,22 @@ describe('сбои телефона (MOL-144)', () => {
     )
   })
 
+  it('2xx не по контракту: от API — со сборкой в заголовке, от портала — без неё', async () => {
+    const off = (headers: Record<string, string>) =>
+      clientServing(JSON.stringify({ items: 'not a list' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json', ...headers },
+      })
+        .advice()
+        .catch((error: unknown) => error)
+    expect(await off({ [VERSION_HEADER]: 'v0.2.0-1-gabc' })).toMatchObject({
+      code: ISSUE.RESPONSE_INVALID,
+      status: 200,
+      fromApi: true,
+    })
+    expect(await off({})).toMatchObject({ code: ISSUE.RESPONSE_INVALID, fromApi: false })
+  })
+
   it('портал с 200 вместо 204 — не успех', async () => {
     const client = clientAnswering(200, { welcome: 'wifi' })
     expect(await codeOf(client.reportClientErrors({ reports: [report] }))).toBe(

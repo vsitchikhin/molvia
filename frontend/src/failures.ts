@@ -1,6 +1,7 @@
 import { ApiError } from '@molvia/client'
 import {
   FAILURE_NAME_MAX,
+  ISSUE,
   PHONE_FAILURES_KEPT,
   PHONE_GLOBAL_CATCHERS,
   describePhoneFailure,
@@ -28,13 +29,19 @@ export function pageBuild(url: string, production: boolean): string {
 /**
  * Whether a failure is the phone's own (MOL-144, Р-4, owner's В-3). An API's word — a refusal or its
  * 500 — the API has recorded itself; no answer is the connection, the weather at a shelf; a page not
- * of the API's answering with something else — a portal, a proxy's 502 — is not ours either. A `2xx`
- * the contract could not read is: the phone's code against the server's answer. Everything that is
- * not an answer of the API is the phone's code.
+ * of the API's — a portal, a proxy's 502 — is not ours either, a portal's `200` included: only our
+ * API names its build. A `2xx` the API sent that the contract could not read is: the phone's code
+ * against the server's answer. Everything that is not an answer of the API is the phone's code.
  */
 export function phoneDefect(error: unknown): boolean {
   if (!(error instanceof ApiError)) return true
-  return !error.answered && error.status !== undefined && error.status >= 200 && error.status < 300
+  return (
+    error.code === ISSUE.RESPONSE_INVALID &&
+    error.fromApi &&
+    error.status !== undefined &&
+    error.status >= 200 &&
+    error.status < 300
+  )
 }
 
 export interface FailureEnvironment {

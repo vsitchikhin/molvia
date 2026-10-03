@@ -34,13 +34,20 @@ export class ApiError extends Error {
    * whose answer was lost on the way back by exactly this (MOL-68, review Т1).
    */
   readonly status: number | undefined
+  /**
+   * Whether the reply named the API's build (`VERSION_HEADER`), which only our API does: a `2xx` the
+   * contract could not read is the old code against the new server's answer when it did, and a
+   * portal's page of its own when it did not (MOL-144, Р-4). Told only where that is the question.
+   */
+  readonly fromApi: boolean
 
-  constructor(code: WireCode, details?: string, answered = true, status?: number) {
+  constructor(code: WireCode, details?: string, answered = true, status?: number, fromApi = false) {
     super(details ? `${code}: ${details}` : code)
     this.name = 'ApiError'
     this.code = code
     this.answered = answered
     this.status = status
+    this.fromApi = fromApi
   }
 }
 
@@ -248,6 +255,7 @@ export function createTransport({
       parsed.error.issues[0]?.path.join('.'),
       true,
       response.status,
+      response.headers.has(VERSION_HEADER),
     )
   }
 
