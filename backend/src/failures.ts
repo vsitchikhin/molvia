@@ -37,6 +37,12 @@ function sourceAt(map: SourceMap, line = '', column = ''): string | undefined {
   return `${source}:${String(entry.originalLine + 1)}:${String(entry.originalColumn + 1)}`
 }
 
+/**
+ * How long a map is waited for (review №4): the rows are read by then, and a site that does not
+ * answer must not hold `make failures` — its frames are printed as they are.
+ */
+const MAP_TIMEOUT_MS = 10_000
+
 /** A phone's frame of a script of the site: `at Xe (/assets/index-BTCsHrpw.js:1:48213)` (MOL-144). */
 const PHONE_FRAME = /\((\/assets\/[\w.-]+\.js):(\d+):(\d+)\)$/
 
@@ -50,7 +56,8 @@ const PHONE_FRAME = /\((\/assets\/[\w.-]+\.js):(\d+):(\d+)\)$/
 export async function phoneDecoder(
   rows: readonly FailureRow[],
   site: string,
-  fetchMap: (url: URL) => Promise<Response> = (url) => fetch(url),
+  fetchMap: (url: URL) => Promise<Response> = (url) =>
+    fetch(url, { signal: AbortSignal.timeout(MAP_TIMEOUT_MS) }),
 ): Promise<FrameDecoder> {
   const files = new Set(
     rows
