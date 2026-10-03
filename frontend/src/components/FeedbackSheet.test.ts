@@ -518,6 +518,40 @@ describe("a refusal in the API's own words: nothing left (adversarial Н2)", () 
     expect(recallFeedbackDraft(OWNER)).toBeNull()
   })
 
+  it("must not take a portal's 200 page for sent: the draft stays, and the retry is the same message (round 4, П1)", async () => {
+    sendFeedback.mockRejectedValueOnce(new ApiError(ISSUE.RESPONSE_INVALID, undefined, true, 200))
+    const { wrapper } = await render()
+    const sheet = await open(wrapper)
+    await choose(sheet, en.feedback.kinds.idea)
+    await type(sheet, 'Typed for ten minutes')
+
+    await press(sheet)
+
+    expect(sheet.find('.sent').exists()).toBe(false)
+    expect(sheet.get('.note').text()).toContain(en.feedback.failed.title)
+    expect(recallFeedbackDraft(OWNER)?.text).toBe('Typed for ten minutes')
+    await press(sheet)
+    const [first, again] = sendFeedback.mock.calls.map(([body]) => body)
+    expect(again).toEqual(first)
+  })
+
+  it('must not let go after a 401 that follows a lost answer: the row may be there (round 4, П3)', async () => {
+    sendFeedback
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockRejectedValueOnce(new ApiError(ERROR.NO_ACTOR))
+    const { wrapper } = await render('/money')
+    const sheet = await open(wrapper, { from: 'error', code: 'error.internal' })
+    await type(sheet, 'The month did not load')
+
+    await press(sheet)
+    await press(sheet)
+
+    expect(recallFeedbackDraft(OWNER)?.attached).toMatchObject({
+      route: 'money',
+      errorCode: 'error.internal',
+    })
+  })
+
   it('must not let go after the server failing in its own words: it may be written', async () => {
     sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
     const { wrapper } = await render('/money')

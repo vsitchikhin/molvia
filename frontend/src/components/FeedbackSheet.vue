@@ -93,6 +93,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import {
   ERROR,
+  ISSUE,
   FEEDBACK_TEXT_MAX,
   feedbackBodySchema,
   feedbackPlatformSchema,
@@ -156,27 +157,14 @@ const PLACEHOLDER_KEYS: Record<FeedbackKind | '', string> = {
 }
 
 /**
- * A reply of `2xx` whose body did not read — cut off on its way, or the shape of a newer server: the
- * message is written, and is sent as far as the sheet is concerned, as a proposed item is (round 3,
- * Ф1). Read as a failure, a retry from another screen met `409` and the owner got it twice.
+ * A `201` whose body did not read — cut off on its way, or the shape of a newer server: the API wrote
+ * the message, and it is sent as far as the sheet is concerned (round 3, Ф1). Only `201`, as the
+ * login trusts it (`mayHaveStarted`, MOL-68): no portal says it, and a portal's own `200` page taken
+ * for «sent» erased a message that never left (round 4, П1, П2; review №9). A `200` is a repeat, and
+ * a repeat is safe to send again.
  */
 function writtenAnyway(error: unknown): boolean {
-  return (
-    error instanceof ApiError &&
-    error.status !== undefined &&
-    error.status >= 200 &&
-    error.status < 300
-  )
-}
-
-/** A refusal in the API's own body, not its failure: nothing was written. */
-function refusedOutright(error: unknown): boolean {
-  return (
-    error instanceof ApiError &&
-    error.answered &&
-    error.status === undefined &&
-    error.code !== ERROR.INTERNAL
-  )
+  return error instanceof ApiError && error.code === ISSUE.RESPONSE_INVALID && error.status === 201
 }
 
 /**
@@ -411,15 +399,14 @@ export default defineComponent({
         if (mine !== opening) return
         const code = error instanceof ApiError ? error.code : null
         connected.value = navigator.onLine
-        // A refusal in the API's own words is a write that did not happen — every write is one
-        // transaction — so nothing has left, and what goes with the text is the next opening's again:
-        // tomorrow's message from the settings must not carry today's error screen (adversarial Н2).
-        // A lost answer, a bare status or the server's own failure may hide a message it holds.
-        if (refusedOutright(error)) {
+        // The day's limit is counted after a repeat is looked for, so a `429` says no message is
+        // held under this key: what goes with the text is the next opening's again, and tomorrow's
+        // message from the settings does not carry today's error screen (adversarial Н2). Nothing
+        // else says it — a `401` or a `400` is refused before the write and knows nothing of an
+        // earlier send whose answer was lost (round 4, П3); a `409` takes a new key below.
+        if (code === ERROR.FEEDBACK_RATE_LIMITED) {
           frozen.value = null
           keep()
-        }
-        if (code === ERROR.FEEDBACK_RATE_LIMITED) {
           phase.value = 'limited'
           return
         }
