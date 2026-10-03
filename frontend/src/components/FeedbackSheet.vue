@@ -304,11 +304,13 @@ export default defineComponent({
         clientKey.value = draft?.clientKey ?? newId()
         await nextTick()
         recalling = false
-        // A reload left the pictures behind — or another window holds them. Said, and nothing more:
-        // a new key here would keep the draft from going when that window sends it (review 7). The
-        // next change of the content takes a new key, as any does.
+        // A reload left the pictures behind — or another window holds them. A draft that never left
+        // keeps its key: a new one here would keep it from going when that window sends it (review 7).
+        // One that has begun to leave may be the server's already with its pictures, and the same key
+        // without them is a sure `409` and «Не получилось» (adversarial Б3): it is another message now.
         if ((draft?.pictures ?? 0) > pictures.value.length) {
           pictureNote.value = t('feedback.picture.lost')
+          if (draft?.attached !== undefined) changed()
         }
         focusFirst()
       },
@@ -513,7 +515,6 @@ export default defineComponent({
       frozen.value = attached.value
       keep()
       phase.value = 'sending'
-      const sentPictures = pictures.value
       try {
         try {
           await api.sendFeedback(message)
@@ -523,9 +524,11 @@ export default defineComponent({
         // Sent is sent, whatever became of the sheet meanwhile: the draft goes with it — unless it
         // has changed since, and is another message now. So do the pictures it went with, closed or
         // not (adversarial А1): kept, the next message opened with a screenshot already sent, one
-        // kind away from sending it again. Pictures changed meanwhile are another message's.
+        // kind away from sending it again. «Changed since» is the key's, for both (Б2): a word added
+        // meanwhile makes another message, and its pictures are that message's — never taken from
+        // under the finger.
         dropFeedbackDraft(owner, message.clientKey)
-        if (pictures.value === sentPictures) letPicturesGo()
+        if (clientKey.value === message.clientKey) letPicturesGo()
         if (mine !== opening) return
         phase.value = 'sent'
       } catch (error) {

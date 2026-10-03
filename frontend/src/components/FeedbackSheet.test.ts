@@ -1036,6 +1036,60 @@ describe('a screenshot with the message (MOL-167)', () => {
     expect(tiles(sheet)).toHaveLength(2)
   })
 
+  it('keeps the pictures of a message whose words changed while it was on its way (adversarial Б2)', async () => {
+    let answer: (value: { sent: FeedbackSent; created: boolean }) => void = () => undefined
+    sendFeedback.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    const { wrapper } = await render()
+    const sheet = await open(wrapper)
+    await choose(sheet, en.feedback.kinds.bug)
+    await type(sheet, 'Broken')
+    await attachFiles(sheet, screenshot('kept'))
+    await button(sheet).trigger('click')
+    useFeedbackSheetStore().shown = false
+    await flushPromises()
+    await open(sheet)
+    await type(sheet, 'Broken, and one more thing')
+
+    answer({ sent: { number: 42 }, created: true })
+    await flushPromises()
+
+    // Another message now, by its key: its pictures stay where the finger left them, nothing said.
+    expect(tiles(sheet)).toHaveLength(1)
+    expect(note(sheet).exists()).toBe(false)
+    expect(recallFeedbackDraft(OWNER)).toMatchObject({ pictures: 1 })
+  })
+
+  it('takes a new key after a reload when the message had begun to leave with pictures (Б3)', async () => {
+    const key = '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d'
+    keepFeedbackDraft(OWNER, {
+      kind: 'bug',
+      text: 'Look',
+      clientKey: key,
+      pictures: 1,
+      attached: {
+        locale: 'en',
+        pageBuild: null,
+        route: 'settings',
+        platform: 'ios 18 app',
+        fromError: false,
+        errorCode: null,
+      },
+    })
+    const { wrapper } = await render()
+    const sheet = await open(wrapper)
+
+    expect(note(sheet).text()).toBe(en.feedback.picture.lost)
+    const renewed = recallFeedbackDraft(OWNER)?.clientKey
+    expect(renewed).not.toBe(key)
+    await press(sheet)
+    expect(sendFeedback.mock.calls[0]?.[0].clientKey).toBe(renewed)
+    expect(sheet.find('.note.bad').exists()).toBe(false)
+  })
+
   it('tries every file chosen: one the browser cannot open does not keep the next (adversarial А6)', async () => {
     const { PictureRefused } = await import('@/feedbackPicture')
     drawPicture
