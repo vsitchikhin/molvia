@@ -161,6 +161,13 @@ press — the only channel people are given, because there Telegram already says
   «expired, spent, declined and unknown are one answer» belong to MOL-54 and are read off its
   refusals. The bot adds exactly two things: the account, which only Telegram can vouch for,
   and the person's explicit consent.
+- **A handler's failure is logged by its kind and reported to the API by its handler** (MOL-143,
+  `failure.ts`): `bot.catch` printed the error's message before. Only a defect is reported — never
+  the network, Telegram's 403, 429 or 5xx, or the API's own answers — and the handler is the kind of
+  update and the prefix of its button or command, never the button's data, the text or `ctx.from`.
+  **The owner's notices** are the bot's second timer, the twin of the reminders'
+  (`POST /internal/owner/claim`, `owner.ts`): claimed, already marked, sent one by one in Russian.
+  The rules are in `observability.md`.
 - **Telegram updates are never logged whole** (the privacy page, п. 4.3): an update carries a
   name, a username and a language we deliberately do not store. What goes to the log is the code
   of the error and the operation that failed. How a press is answered — `settle`, `refuse`, the

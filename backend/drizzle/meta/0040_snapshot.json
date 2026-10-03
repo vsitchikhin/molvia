@@ -1,5 +1,5 @@
 {
-  "id": "2c9c9652-2461-4a89-9cf7-83ca57388647",
+  "id": "460ec6b5-5f8f-43ff-a55d-35ed2714292f",
   "prevId": "b7ccee6d-9be9-411a-bb42-1c05055d12f1",
   "version": "7",
   "dialect": "postgresql",
@@ -862,62 +862,33 @@
       },
       "isRLSEnabled": false
     },
-    "public.feedback": {
-      "name": "feedback",
+    "public.failures": {
+      "name": "failures",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
-          "type": "bigint",
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "char(64)",
           "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "always",
-            "name": "feedback_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "9223372036854775807",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "actor_id": {
-          "name": "actor_id",
-          "type": "uuid",
-          "primaryKey": false,
           "notNull": true
         },
-        "kind": {
-          "name": "kind",
+        "source": {
+          "name": "source",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "text": {
-          "name": "text",
+        "error_name": {
+          "name": "error_name",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "locale": {
-          "name": "locale",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "page_build": {
-          "name": "page_build",
+        "code": {
+          "name": "code",
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "api_build": {
-          "name": "api_build",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
         },
         "route": {
           "name": "route",
@@ -925,205 +896,49 @@
           "primaryKey": false,
           "notNull": false
         },
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "error_code": {
-          "name": "error_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "from_error": {
-          "name": "from_error",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "thread_id": {
-          "name": "thread_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "in_reply_to": {
-          "name": "in_reply_to",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "client_key": {
-          "name": "client_key",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "clock_timestamp()"
-        }
-      },
-      "indexes": {
-        "feedback_actor_created_idx": {
-          "name": "feedback_actor_created_idx",
-          "columns": [
-            {
-              "expression": "actor_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "feedback_thread_idx": {
-          "name": "feedback_thread_idx",
-          "columns": [
-            {
-              "expression": "thread_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "feedback_actor_id_actors_id_fk": {
-          "name": "feedback_actor_id_actors_id_fk",
-          "tableFrom": "feedback",
-          "tableTo": "actors",
-          "columnsFrom": ["actor_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "feedback_in_reply_to_feedback_replies_id_fk": {
-          "name": "feedback_in_reply_to_feedback_replies_id_fk",
-          "tableFrom": "feedback",
-          "tableTo": "feedback_replies",
-          "columnsFrom": ["in_reply_to"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "feedback_thread_is_owners": {
-          "name": "feedback_thread_is_owners",
-          "tableFrom": "feedback",
-          "tableTo": "feedback",
-          "columnsFrom": ["thread_id", "actor_id"],
-          "columnsTo": ["id", "actor_id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "feedback_actor_client_key": {
-          "name": "feedback_actor_client_key",
-          "nullsNotDistinct": false,
-          "columns": ["actor_id", "client_key"]
-        },
-        "feedback_id_actor_key": {
-          "name": "feedback_id_actor_key",
-          "nullsNotDistinct": false,
-          "columns": ["id", "actor_id"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "feedback_kind_known": {
-          "name": "feedback_kind_known",
-          "value": "\"feedback\".\"kind\" in ('bug', 'idea', 'other')"
-        },
-        "feedback_locale_known": {
-          "name": "feedback_locale_known",
-          "value": "\"feedback\".\"locale\" in ('ru', 'en')"
-        },
-        "feedback_code_from_error": {
-          "name": "feedback_code_from_error",
-          "value": "\"feedback\".\"error_code\" is null or \"feedback\".\"from_error\""
-        },
-        "feedback_thread_not_itself": {
-          "name": "feedback_thread_not_itself",
-          "value": "\"feedback\".\"thread_id\" is null or \"feedback\".\"thread_id\" < \"feedback\".\"id\""
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.feedback_replies": {
-      "name": "feedback_replies",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "bigint",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "always",
-            "name": "feedback_replies_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "9223372036854775807",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "feedback_id": {
-          "name": "feedback_id",
-          "type": "bigint",
+        "frames": {
+          "name": "frames",
+          "type": "text[]",
           "primaryKey": false,
           "notNull": true
         },
-        "text": {
-          "name": "text",
+        "build": {
+          "name": "build",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "delivered": {
-          "name": "delivered",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
+        "first_seen_at": {
+          "name": "first_seen_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
-          "default": "clock_timestamp()"
+          "notNull": true
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "build_count": {
+          "name": "build_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {
-        "feedback_replies_feedback_idx": {
-          "name": "feedback_replies_feedback_idx",
+        "failures_last_seen_at": {
+          "name": "failures_last_seen_at",
           "columns": [
             {
-              "expression": "feedback_id",
+              "expression": "last_seen_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1135,24 +950,30 @@
           "with": {}
         }
       },
-      "foreignKeys": {
-        "feedback_replies_feedback_id_feedback_id_fk": {
-          "name": "feedback_replies_feedback_id_feedback_id_fk",
-          "tableFrom": "feedback_replies",
-          "tableTo": "feedback",
-          "columnsFrom": ["feedback_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "feedback_replies_delivered_known": {
-          "name": "feedback_replies_delivered_known",
-          "value": "\"feedback_replies\".\"delivered\" is null or \"feedback_replies\".\"delivered\" in ('sent', 'blocked', 'gone')"
+        "failures_fingerprint_hex": {
+          "name": "failures_fingerprint_hex",
+          "value": "\"failures\".\"fingerprint\" ~ '^[0-9a-f]{64}$'"
+        },
+        "failures_source_known": {
+          "name": "failures_source_known",
+          "value": "\"failures\".\"source\" in ('api', 'bot')"
+        },
+        "failures_lengths": {
+          "name": "failures_lengths",
+          "value": "char_length(\"failures\".\"error_name\") between 1 and 64\n          and (\"failures\".\"code\" is null or char_length(\"failures\".\"code\") <= 64)\n          and (\"failures\".\"route\" is null or char_length(\"failures\".\"route\") <= 200)\n          and cardinality(\"failures\".\"frames\") <= 8"
+        },
+        "failures_counts": {
+          "name": "failures_counts",
+          "value": "\"failures\".\"count\" >= \"failures\".\"build_count\" and \"failures\".\"build_count\" >= 1"
+        },
+        "failures_seen_forward": {
+          "name": "failures_seen_forward",
+          "value": "\"failures\".\"last_seen_at\" >= \"failures\".\"first_seen_at\""
         }
       },
       "isRLSEnabled": false
@@ -2422,6 +2243,90 @@
         "open_food_facts_quantity_unit": {
           "name": "open_food_facts_quantity_unit",
           "value": "\"open_food_facts\".\"quantity_unit\" is null or \"open_food_facts\".\"quantity_unit\" in ('kg', 'l')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.owner_notices": {
+      "name": "owner_notices",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "owner_notices_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "handed_at": {
+          "name": "handed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "owner_notices_waiting": {
+          "name": "owner_notices_waiting",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"owner_notices\".\"handed_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "owner_notices_kind_known": {
+          "name": "owner_notices_kind_known",
+          "value": "\"owner_notices\".\"kind\" in ('failure', 'failure_count')"
+        },
+        "owner_notices_payload_object": {
+          "name": "owner_notices_payload_object",
+          "value": "jsonb_typeof(\"owner_notices\".\"payload\") = 'object'"
+        },
+        "owner_notices_payload_kind": {
+          "name": "owner_notices_payload_kind",
+          "value": "\"owner_notices\".\"payload\" ->> 'kind' = \"owner_notices\".\"kind\""
         }
       },
       "isRLSEnabled": false

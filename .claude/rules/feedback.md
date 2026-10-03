@@ -95,8 +95,9 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
 - **What `/privacy` says** — «Сообщения разработчику»: what is kept and attached, that only the owner
   reads, that a copy of the notice stays in the owner's Telegram without a name or an id even after
   erasure (В-3), and the year. A change here is a change there.
-- **The owner's notice is not in MOL-147** (Р-7): there is no channel to the owner yet (MOL-143), and
-  MOL-148 builds it if it comes first. Until then a message waits in the table.
+- **The owner's notice is not in MOL-147** (Р-7): when it was planned there was no channel to the
+  owner. MOL-143 has built it since — `owner_notices`, claimed by the bot (`observability.md`) — and
+  MOL-148 joins it as a kind of its own, with the reply. Until then a message waits in the table.
 
 ## The sheet and its two ways in
 

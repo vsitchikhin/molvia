@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { LOGIN_HEADER, ERROR, ISSUE } from '@molvia/model'
-import { createClient, createBotClient } from './index'
+import { ApiError, createClient, createBotClient } from './index'
 
 const id = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const expiresAt = '2026-09-22T12:00:00Z'
@@ -120,6 +120,65 @@ describe('login clients', () => {
     for (const [, options] of fetch.mock.calls) {
       expect(new Headers(options?.headers).get('authorization')).toBe(`Bearer ${secret}`)
     }
+  })
+
+  it("the owner's channel: a failure reported by kind, the notices claimed (MOL-143)", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            to: 4242,
+            notices: [
+              {
+                kind: 'failure_count',
+                source: 'bot',
+                errorName: 'GrammyError',
+                route: 'callback:rate',
+                build: 'v0.2.0',
+                count: 10,
+              },
+            ],
+          }),
+        ),
+      )
+    const bot = createBotClient({ baseUrl: 'http://backend', fetch, secret })
+    await bot.reportFailure({ errorName: 'TypeError', handler: 'callback:rate' })
+    expect((await bot.claimOwnerNotices()).notices[0]).toMatchObject({ count: 10 })
+    expect(fetch.mock.calls.map(([url, options]) => [url, options?.method])).toEqual([
+      ['http://backend/internal/failures', 'POST'],
+      ['http://backend/internal/owner/claim', 'POST'],
+    ])
+    expect(fetch.mock.calls[0]?.[1]?.body).toBe(
+      JSON.stringify({ errorName: 'TypeError', handler: 'callback:rate' }),
+    )
+  })
+
+  it("the owner's claim hears the caller's signal: the bot's stop has a deadline (MOL-143)", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(
+      async (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('aborted', 'AbortError'))
+          })
+        }),
+    )
+    const bot = createBotClient({ baseUrl: 'http://backend', fetch, secret })
+    const deadline = new AbortController()
+    const claim = bot.claimOwnerNotices(deadline.signal)
+    deadline.abort()
+    await expect(claim).rejects.toBeInstanceOf(ApiError)
+  })
+
+  it('a report that carries more than a kind is refused before it is sent (MOL-143)', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>()
+    const bot = createBotClient({ baseUrl: 'http://backend', fetch, secret })
+    const withText = { errorName: 'TypeError', handler: 'message', text: 'привет' }
+    await expect(bot.reportFailure(withText)).rejects.toMatchObject({ code: ISSUE.BODY_INVALID })
+    const sentence = { errorName: 'Не вышло: сыр', handler: 'message' }
+    await expect(bot.reportFailure(sentence)).rejects.toMatchObject({ code: ISSUE.BODY_INVALID })
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('a claim that grew a field about the person is refused (MOL-101)', async () => {

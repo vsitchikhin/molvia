@@ -17,7 +17,7 @@ NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json i
 # The heavy checks of every copy on this machine take turns, the push's among them (MOL-139).
 ONE_AT_A_TIME = ./bin/one-at-a-time.sh "make $@"
 
-.PHONY: help setup hooks up down reup ps logs psql migrate forget seed gates db-reset dev format lint typecheck test e2e check prod-build certs icons ports
+.PHONY: help setup hooks up down reup ps logs psql migrate forget seed gates failures db-reset dev format lint typecheck test e2e check prod-build certs icons ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -94,6 +94,10 @@ seed: ## Put the common names into the catalogue: make seed [YES=1] (dry run wit
 gates: ## Read gates 0.2 and 0.3: make gates FROM=<day|moment> [TO=<day|moment>]
 	$(NEED_SCAFFOLD)
 	$(if $(filter command line,$(origin FROM)),,unset FROM;) $(if $(filter command line,$(origin TO)),,unset TO;) ./bin/gates.sh "$${FROM:-}" "$${TO:-}"
+
+failures: ## The latest failures of the API and the bot: make failures [LIMIT=20] (MOL-143)
+	$(NEED_SCAFFOLD)
+	$(if $(filter command line,$(origin LIMIT)),,unset LIMIT;) ./bin/failures.sh "$${LIMIT:-}"
 
 model: ## Fetch the embedding model of catalogue search into .models, checked by sha256 (MOL-105)
 	node bin/fetch-model.mjs

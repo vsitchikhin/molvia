@@ -157,6 +157,18 @@ export const ru = {
   'remind.resumed': '🔔 Напоминания снова включены.',
   'remind.gone': 'Включать нечего: аккаунта в Molvia больше нет.',
   'remind.switchFailed': 'Не дождался ответа. Нажмите ещё раз через минуту.',
+  /**
+   * A failure, told to the owner (MOL-143): the first time in a build, then at 10, 100 and 1000
+   * there. Russian always — the owner's language is not kept. The kind and the place are the
+   * table's own words, a class name and a route's template, and are printed as they are.
+   */
+  'owner.failure.new': '🔴 Новый сбой · {source}',
+  'owner.failure.again': '🟠 Уже {count} раз в этой сборке · {source}',
+  'owner.failure.what': '{kind} · {place}',
+  'owner.failure.nowhere': 'без маршрута',
+  'owner.failure.build': 'Сборка {build}',
+  'owner.failure.buildPrint': 'Сборка {build} · {fingerprint}',
+  'owner.failure.more': 'Подробности — make failures',
 } as const
 
 /**

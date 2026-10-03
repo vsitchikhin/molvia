@@ -13,12 +13,19 @@ import {
   VERSION_HEADER,
   errorResponseSchema,
   isWireCode,
+  describeFailure,
 } from '@molvia/model'
-import type { ErrorCode, ErrorResponse } from '@molvia/model'
+import type { ErrorCode, ErrorResponse, TelegramUserId } from '@molvia/model'
 import { InvalidBody } from '@/parse'
 import { VERSION, env, loginConfig } from '@/env'
 import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
+import { apiFailureReporter } from '@/failure-reporter'
+import { botFailure } from '@/usecases/record-failure'
+import { claimOwnerNotices } from '@/usecases/owner-notices'
+import type { FailurePlace } from '@/usecases/record-failure'
+import { createFailureRepository } from '@/db/failures-repository'
+import { createOwnerNoticeRepository } from '@/db/owner-notices-repository'
 import { healthRoutes } from '@/routes/health'
 import { internalAuthRoutes } from '@/routes/internal-auth'
 import { withActor } from '@/routes/actor'
@@ -143,7 +150,6 @@ import { createErasureRepository } from '@/db/erasure-repository'
 import { createExportRepository } from '@/db/export-repository'
 import { createFeedbackRepository } from '@/db/feedback-repository'
 import { createReminderRepository } from '@/db/reminders-repository'
-import { describeFailure } from '@/db/failure'
 import { authTransactOn } from '@/db/auth-unit-of-work'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
@@ -227,6 +233,23 @@ function routePath(request: FastifyRequest): string {
   return request.routeOptions.url ?? decodedPath(request.url)
 }
 
+/**
+ * Where a failed request is kept in the table of failures (MOL-143, Р-3): the method and the
+ * route's template, never the address — a path carries uuids and, decoded, a person's text. With no
+ * route there is no place at all.
+ */
+function requestPlace(request: FastifyRequest): FailurePlace {
+  const route = request.routeOptions.url
+  // Fastify answers `HEAD` of every `GET` itself: one defect, one place (adversarial А7).
+  const method = request.method === 'HEAD' ? 'GET' : request.method
+  return { source: 'api', ...(route === undefined ? {} : { route: `${method} ${route}` }) }
+}
+
+/** A job of the API's own timers, by its name (В-1). */
+function job(name: string): FailurePlace {
+  return { source: 'api', route: `job:${name}` }
+}
+
 function decodedPath(url: string): string {
   const path = url.split('?', 1)[0] ?? ''
   try {
@@ -259,6 +282,13 @@ export interface ServerOptions {
    * and a test that needs it hands it in — every other test would load 200 MB for nothing.
    */
   readonly embedder?: (log: EmbeddingLog) => Embedder
+  /**
+   * The owner's Telegram id the failures are queued for (MOL-143). Absent, it is the environment's
+   * — set in production only; a test names one, or `null` for none.
+   */
+  readonly owner?: TelegramUserId | null
+  /** Every recording of a failure, for a test to wait on before it reads the table. */
+  readonly failureRecorded?: (recording: Promise<void>) => void
 }
 
 /**
@@ -328,10 +358,19 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           .send({ code: ISSUE.PATH_INVALID })
         return
       }
-      app.log.error(describeFailure(error), 'request refused by the framework')
+      failures.report(error, { source: 'api' }, 'request refused by the framework')
       void reply.status(500).send({ code: ERROR.INTERNAL })
     },
   })
+
+  // Every failure of the API, logged by its kind and recorded beside it (MOL-143).
+  const owner = options.owner === undefined ? (env.OWNER_TELEGRAM_ID ?? null) : options.owner
+  const failures = apiFailureReporter(
+    () => options.db ?? getDb(),
+    owner,
+    app.log,
+    options.failureRecorded,
+  )
 
   // The auth scopes set `no-store` on what their routes answer, but a path no route matches
   // and a URL Fastify cannot decode are answered before any scope is entered (adversarial А4).
@@ -393,8 +432,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     // the query with its parameters, so a failed search wrote what was searched for and who
     // asked, and a dropped connection wrote the hash of every session token in flight — into a
     // log the privacy page promises holds neither.
-    app.log.error(describeFailure(error), failureMessage(request))
-    return reply.status(error.statusCode ?? 500).send({ code: ERROR.INTERNAL })
+    // A failure is an answer of 500 or more (Р-3); anything below is the caller's, logged as before.
+    const status = error.statusCode ?? 500
+    if (status >= 500) failures.report(error, requestPlace(request), failureMessage(request))
+    else app.log.error(describeFailure(error), failureMessage(request))
+    return reply.status(status).send({ code: ERROR.INTERNAL })
   })
 
   // The composition point: routes are handed what they need instead of importing it. Binding
@@ -417,13 +459,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopAccountCleanup: (() => Promise<void>) | undefined
     let stopSessionCleanup: (() => Promise<void>) | undefined
     let stopFeedbackCleanup: (() => Promise<void>) | undefined
+    let stopFailureCleanup: (() => Promise<void>) | undefined
     const embedder = options.embedder?.(instance.log) ?? NO_EMBEDDER
     let itemEmbedding: ReturnType<typeof startItemEmbedding> | undefined
     instance.addHook('onReady', (ready) => {
       stopCleanup = startLoginCleanup(
         () => loginRequests.removeExpired(),
-        () => {
-          instance.log.error('login request cleanup failed')
+        (error) => {
+          failures.report(error, job('login-cleanup'), 'login request cleanup failed')
         },
       )
       // The login timer's runner, reused — it owns only a minute timer and knows nothing of
@@ -431,53 +474,64 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       // screen again (MOL-40, В-7).
       stopExchangeCleanup = startLoginCleanup(
         () => removedExchanges.purgeStale(),
-        () => {
-          instance.log.error('removed exchange cleanup failed')
+        (error) => {
+          failures.report(error, job('exchange-cleanup'), 'removed exchange cleanup failed')
         },
       )
       // The same for incomes (MOL-66): one rule for removing one's own money.
       stopIncomeCleanup = startLoginCleanup(
         () => removedIncomes.purgeStale(),
-        () => {
-          instance.log.error('removed income cleanup failed')
+        (error) => {
+          failures.report(error, job('income-cleanup'), 'removed income cleanup failed')
         },
       )
       // And for spendings (MOL-73, В-4): the ten minutes are the server's, whatever the strip says.
       stopSpendingCleanup = startLoginCleanup(
         () => removedSpendings.purgeStale(),
-        () => {
-          instance.log.error('removed spending cleanup failed')
+        (error) => {
+          failures.report(error, job('spending-cleanup'), 'removed spending cleanup failed')
         },
       )
       // And for trips (MOL-76, Р-1): a trip is money too, and its purchases go with it.
       stopTripCleanup = startLoginCleanup(
         () => removedTrips.purgeStale(),
-        () => {
-          instance.log.error('removed trip cleanup failed')
+        (error) => {
+          failures.report(error, job('trip-cleanup'), 'removed trip cleanup failed')
         },
       )
       // And for accounts without operations (MOL-115): deleted ten minutes on, whatever named one
       // meanwhile left without an account rather than lost (Р-17).
       stopAccountCleanup = startLoginCleanup(
         () => removedAccounts.purgeStale(),
-        () => {
-          instance.log.error('removed account cleanup failed')
+        (error) => {
+          failures.report(error, job('account-cleanup'), 'removed account cleanup failed')
         },
       )
       // An expired session has no reader, and it kept a device name for good while the privacy
       // page promises 180 days from the last use (MOL-57, owner's decision Q4).
       stopSessionCleanup = startLoginCleanup(
         () => sessions.removeExpired(),
-        () => {
-          instance.log.error('expired session cleanup failed')
+        (error) => {
+          failures.report(error, job('session-cleanup'), 'expired session cleanup failed')
+        },
+      )
+      // The failures' own 30 days, and the owner's notices nobody took (MOL-143, Р-7, Р-9).
+      stopFailureCleanup = startLoginCleanup(
+        async () => {
+          const now = new Date()
+          await createFailureRepository(db).purgeStale(now)
+          await createOwnerNoticeRepository(db).purgeStale(now)
+        },
+        (error) => {
+          failures.report(error, job('failure-cleanup'), 'failure cleanup failed')
         },
       )
       // A message to the developer lives a year from the last word of its thread (MOL-147, В-4 of
       // MOL-150), whether or not anyone writes again.
       stopFeedbackCleanup = startLoginCleanup(
         () => messages.purgeStale(),
-        () => {
-          instance.log.error('stale feedback cleanup failed')
+        (error) => {
+          failures.report(error, job('feedback-cleanup'), 'stale feedback cleanup failed')
         },
       )
       // The vectors of the catalogue (MOL-105): a minute timer of their own, nudged after a
@@ -485,7 +539,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       const writer = startItemEmbedding(
         () => embedMissing({ embeddings: createItemEmbeddingRepository(db), embedder }),
         (error) => {
-          instance.log.error(describeFailure(error), 'item embedding failed')
+          failures.report(error, job('item-embedding'), 'item embedding failed')
         },
       )
       itemEmbedding = writer
@@ -503,6 +557,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopAccountCleanup?.()
       await stopSessionCleanup?.()
       await stopFeedbackCleanup?.()
+      await stopFailureCleanup?.()
       await itemEmbedding?.stop()
     })
     const actors = createActorRepository(db)
@@ -540,13 +595,23 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           reminders,
           new Date(),
           (error) => {
-            instance.log.error(describeFailure(error), 'rating reminder failed')
+            failures.report(error, job('rating-reminder'), 'rating reminder failed')
           },
           quietToday,
         ),
       rateFromBot: (itemId, body) =>
         rateFromBot({ actors, items, verdicts, reminders }, itemId, body),
       switchReminders: (body) => switchRemindersFromBot(reminders, body, new Date()),
+      // Through the same gate as the API's own (adversarial А3): answered at once, never waited on.
+      reportFailure: (body) => {
+        const { summary, place } = botFailure(body)
+        failures.take(summary, place)
+        return Promise.resolve()
+      },
+      claimOwnerNotices: () =>
+        claimOwnerNotices(createOwnerNoticeRepository(db), owner, new Date(), (issue) => {
+          instance.log.error(describeFailure(issue), 'owner notice unreadable')
+        }),
     })
 
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).

@@ -3,9 +3,9 @@ import {
   isMarketPlausible,
   isRateFresh,
   yerevanDate,
+  describeFailure,
 } from '@molvia/model'
 import type { CachedRate, MarketRate } from '@molvia/model'
-import { describeFailure } from '@/db/failure'
 import type { MarketRateRepository } from '@/db/market-rates-repository'
 import type { RateRepository } from '@/db/rates-repository'
 import type { MarketFile } from '@/rates/cba-market'

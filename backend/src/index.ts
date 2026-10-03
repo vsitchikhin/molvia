@@ -12,6 +12,7 @@ import { marketFiles } from '@/rates/cba-market'
 import { cbrFeed } from '@/rates/cbr'
 import { erapiFeed } from '@/rates/erapi'
 import { refreshAtBoot, startSchedule } from '@/rates/schedule'
+import { apiFailureReporter } from '@/failure-reporter'
 import { marketRatesRefresh } from '@/usecases/refresh-market-rates'
 import { officialRatesRefresh } from '@/usecases/refresh-official-rates'
 import { buildServer } from './server'
@@ -37,6 +38,7 @@ try {
 // official one (MOL-137).
 if (env.RATES_REFRESH === 'on') {
   const rates = createRateRepository(getDb())
+  const rateFailures = apiFailureReporter(getDb, env.OWNER_TELEGRAM_ID ?? null, app.log)
   const official = officialRatesRefresh({
     primary: cbaFeed(),
     fallbacks: [cbrFeed(), erapiFeed()],
@@ -52,8 +54,13 @@ if (env.RATES_REFRESH === 'on') {
   })
   const stop = startSchedule(
     async () => {
-      await official()
-      await market()
+      try {
+        await official()
+        await market()
+      } catch (error) {
+        // A source that does not answer is logged inside and is not a failure; what escapes is ours.
+        rateFailures.report(error, { source: 'api', route: 'job:rates' }, 'rates refresh failed')
+      }
     },
     {
       immediately: refreshAtBoot(await rates.lastFetchedAt().catch(() => null), new Date(), {

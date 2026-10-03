@@ -1,6 +1,5 @@
-import { newItemSchema } from '@molvia/model'
+import { newItemSchema, describeFailure } from '@molvia/model'
 import type { SeedReport, SeedRepository } from '@/db/seed-repository'
-import { describeFailure } from '@/db/failure'
 import { CATALOGUE_SEED } from '@/catalogue-seed'
 
 export const SEED_USAGE = 'usage: seed-catalogue [--yes]'

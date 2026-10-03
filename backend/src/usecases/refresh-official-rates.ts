@@ -4,10 +4,10 @@ import {
   isRateFresh,
   isRateJump,
   yerevanDate,
+  describeFailure,
 } from '@molvia/model'
 import type { AmdRate, CachedRate } from '@molvia/model'
 import type { PastRate, RateRepository } from '@/db/rates-repository'
-import { describeFailure } from '@/db/failure'
 import { FOREIGN, FeedError } from '@/rates/feed'
 import type { Published, RateFeed } from '@/rates/feed'
 
