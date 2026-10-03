@@ -1,0 +1,13 @@
+# The one source of the dashboard and the alarms (MOL-145): VictoriaMetrics on the `metrics` network,
+# read as Prometheus. Not editable in the interface — the repository is what runs (Р-10).
+apiVersion: 1
+datasources:
+  - name: VictoriaMetrics
+    uid: victoria
+    type: prometheus
+    access: proxy
+    url: http://victoria:8428
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
