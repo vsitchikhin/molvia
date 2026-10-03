@@ -209,3 +209,25 @@ test('offline the button waits and the text stays; back online it goes', async (
   await expect(sheet.getByText('Спасибо, прочитаем', { exact: true })).toBeVisible()
   expect(await written(page)).toMatchObject([{ kind: 'other', text: 'Написано у полки' }])
 })
+
+// Mounted in `#app` itself, not in a screen: the page hidden under the keys took the sheet with it,
+// its field lost the focus and the keys went down at once (MOL-219). The keys never come up in a
+// test browser: the mark `useKeyboardInset` sets for them is set by hand.
+test('the keys up: the sheet stays and its field keeps the focus', async ({ page }) => {
+  await signedIn(page, '/settings')
+  await page.getByRole('button', { name: 'Написать разработчику' }).click()
+  const sheet = await opened(page)
+  await sheet.getByText('Идея', { exact: true }).click()
+  const field = sheet.getByLabel('Сообщение')
+  await field.click()
+  await expect(field).toBeFocused()
+
+  await page.evaluate(() => {
+    document.documentElement.dataset.underKeys = ''
+  })
+  await expect(page.locator('h1')).toBeHidden()
+  await expect(sheet).toBeVisible()
+  await expect(field).toBeFocused()
+  await field.pressSequentially('Клавиатура держится')
+  await expect(field).toHaveValue('Клавиатура держится')
+})
