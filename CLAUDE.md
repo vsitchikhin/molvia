@@ -400,8 +400,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   frames in one shape for every engine and never the message (`describePhoneFailure`); a screen's
   «error» calls `reportFailure`, which sends only the phone's defects — never an API's word or the
   weather; once a page, kept on the device until the API answers; the build is the name of the page's
-  script, and in the fingerprint. The owner hears of the phone at most ten times an hour, after the
-  API's.
+  script, and in the fingerprint. The owner hears of the phone three times an hour a sender and twenty
+  in all, after the API's, the rest told as a count; at most a hundred new rows of it an hour.
 
 ### The bot — `.claude/rules/bot.md`
 

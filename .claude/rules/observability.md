@@ -150,11 +150,13 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   `<catcher>:<screen>` — Vue's handler, the window's `error` and `unhandledrejection`, a screen's own
   catch, the scanner, the worker's registration, a step of the start, times a route's name (`login`
   behind the door, `start` before the app is mounted, since the door's store must not be raised by a
-  failure). **The catchers stand before any step of the start** (adversarial А4): a step that throws
-  is reported as `start` and thrown on, and one error object is one report whoever hears it. **The
-  price, named:** what throws while the bundle's modules are evaluated, before `main.ts` runs, reaches
-  nobody — no code of ours runs yet, and a listener in `index.html` could send it only by a second
-  copy of these rules.
+  failure). **The catchers stand before any module of the app is evaluated** (adversarial А4, Б3):
+  `catchers.ts` is the first import of `main.ts`, and modules are evaluated in the order they are
+  imported, so a module of the app that throws as it loads is heard. A step of the start that throws
+  is reported as `start` and thrown on — the first route that did not settle too (Б2), and the app is
+  mounted all the same — and one error object is one report whoever hears it. **The price, named:**
+  what throws before `catchers.ts` runs — the bundle failing to parse, the few modules it imports
+  (the client, the model, storage) — reaches nobody.
 - **What leaves is the kind and the frames, never the message** (`describePhoneFailure`), nor a
   field, a draft, the queue, storage or an answer of the API: the screen, the build and the platform
   are the app's own words. **WebKit and Gecko write the stack without a header** — frames alone,
@@ -212,20 +214,31 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   was too few for a mobile operator's address, which thousands of phones share (adversarial А6) — and
   two hundred from everybody, the whole body refused past it with `429`, which the phone keeps its
   buffer through. The address is the one Caddy names last in `X-Forwarded-For`, believed only from
-  inside, **an IPv6 one by its `/64`** (review №2: one home connection has 2^64), the limit's key and
+  inside, **an IPv6 one by its `/56`** (review №2, adversarial Б4: one home connection has 2^64 in
+  its `/64`, and a flat's router is given a `/56`), the limit's key and
   nothing else — in no log, in no table. **The channel can be silenced, not flooded** — the price,
   named: someone sending from many addresses takes the minute's two hundred, and the real phones'
   reports wait for the next start or `online`.
-- **The owner hears of the phone at most ten times an hour** (`phoneNoticeBudget`, review №1): the
-  endpoint is open and a build is the phone's word, so a report with a new build each time was «new
-  in this build» each time — twenty messages a minute. Past ten an hour a notice is held back and
-  counted, never queued, and the next one let through says «и ещё M» (`muted`); the table counts all
-  of them; a restart starts the hour over. **The API's and the bot's go first** (adversarial А5): the
+- **The owner hears of the phone three times an hour from one sender and twenty from everybody**
+  (`phoneNoticeBudget`, review №1, adversarial Б1): the endpoint is open and a build is the phone's
+  word, so a report with a new build each time was «new in this build» each time — twenty messages a
+  minute; and a cap shared by everybody alone was spent by ten invented reports at the start of an
+  hour, and the real failure after a rollout was told to nobody. The sender is the limit's key, the
+  network, in memory alone. **What is held back is counted, never queued, and told by the minute
+  timer once the hour has room** (`failure_muted`, «🔕 Скрыто уведомлений о сбоях телефона: M»,
+  review №7) — not with the next failure, which may never come. The table counts all of them. **The
+  price, named:** a restart starts the hour over and forgets what was held — and a rollout is a
+  restart. **The API's and the bot's go first** (adversarial А5): the
   claim hands them out before the phone's, and the reporter writes them first and keeps fifty of its
   two hundred places at most for the phone's — a stream of invented failures while the database was
   slow filled the queue, and the API's own was the log's alone. **The price, named:** past four in
   flight and fifty waiting, a burst of different new failures of phones is dropped with a warning —
   a real burst that wide is the app broken everywhere, and the first fifty say it.
+- **The phone adds at most a hundred new rows an hour** (`phoneRowBudget`, review №6): a fingerprint
+  is all the phone's words, so every invented report could be a new row — two hundred a minute, kept
+  thirty days and copied every night, a disk's worth. Past the hour a known fingerprint still counts
+  and a new one is not written, with a warning: some 72 000 rows in thirty days at most. The nightly
+  copy keeps the table: what is in it is bounded now.
 - **The scanner's worker carries no model** (`barcodes.md`), so its failure travels to the page as
   the error's name, message and stack and is described there by the one rule (Р-11) — the message
   never leaves the phone; a throw it did not catch is `WorkerError` at its file, line and column.
