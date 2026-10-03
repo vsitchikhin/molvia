@@ -47,4 +47,25 @@ describe('molvia/display-type-whole', () => {
   it('does not touch a rule without the include', async () => {
     expect(await refused('.a { @include appear; font-weight: var(--weight-bold); }')).toEqual([])
   })
+
+  it('refuses a nested variant that changes the weight and stays in Nunito', async () => {
+    expect(
+      await refused(
+        '.a { @include display-type; &.small { font-weight: var(--weight-regular); } }',
+      ),
+    ).toEqual(['font-weight'])
+  })
+
+  it('reads the media queries of the role: the same element on a wider screen', async () => {
+    expect(
+      await refused(
+        '.a { @include display-type; @include wider-than-phone { font-weight: var(--weight-regular); } ' +
+          '@media (width >= 40rem) { font-variation-settings: normal; } }',
+      ),
+    ).toEqual(['font-weight', 'font-variation-settings'])
+  })
+
+  it('refuses all: unset beside the include', async () => {
+    expect(await refused('.a { @include display-type; all: unset; }')).toEqual(['all'])
+  })
 })

@@ -3,9 +3,11 @@
 // time, and nothing said so — the allowed-list of spacing takes any `--space-*` by its shape.
 //
 // A name is known when it is declared
-//   - in styles/_tokens.scss, in `:root` — a name the dark scheme alone declares is undefined in the
-//     light one, and is refused in _tokens.scss itself;
-//   - in styles/main.scss or styles/_mixins.scss, which every component gets;
+//   - in a top-level `:root` of styles/_tokens.scss or styles/main.scss — a name only the dark scheme
+//     or a media query declares is undefined in the light one (adversarial А5, Б5), and the dark
+//     scheme's is refused in _tokens.scss itself;
+//   - in the body of a mixin of styles/_mixins.scss, which every component gets — known everywhere,
+//     though it is set only where the mixin is included (`--appear-rise`, read with a fallback);
 //   - in the file being linted — a component's own property, set beside where it is read;
 //   - or by a script, and then it is named below with the file that sets it.
 // A fallback does not make a name known: `var(--space-5, 1rem)` is the same typo. A name built by
@@ -43,27 +45,38 @@ function declaredIn(code) {
   return [...code.matchAll(DECLARATION)].map((m) => m[1])
 }
 
-// The body of the first block that opens after `opener`, braces counted.
-function blockOf(code, opener) {
-  const at = code.indexOf(opener)
-  if (at < 0) throw new Error(`no ${opener} in _tokens.scss`)
-  const start = code.indexOf('{', at)
+// The names declared in the `:root { … }` blocks at the top level of a stylesheet — not in one
+// nested in a media query, not in `:root:not(…)` or under another selector.
+export function rootNames(code) {
+  const names = []
   let depth = 0
-  for (let i = start; i < code.length; i++) {
+  for (let i = 0; i < code.length; i++) {
     if (code[i] === '{') depth++
-    if (code[i] === '}' && --depth === 0) return code.slice(start + 1, i)
+    else if (code[i] === '}') depth--
+    else if (depth === 0 && /^:root\s*\{/.test(code.slice(i, i + 64))) {
+      const start = code.indexOf('{', i)
+      let inner = 0
+      let end = start
+      for (; end < code.length; end++) {
+        if (code[end] === '{') inner++
+        if (code[end] === '}' && --inner === 0) break
+      }
+      names.push(...declaredIn(code.slice(start + 1, end)))
+      i = end
+    }
   }
-  throw new Error(`unclosed ${opener} in _tokens.scss`)
+  return names
 }
 
 const styles = (file) =>
   withoutComments(readFileSync(new URL(`../src/styles/${file}`, import.meta.url), 'utf8'))
 
-const ROOT = new Set(declaredIn(blockOf(styles('_tokens.scss'), ':root')))
+const ROOT = new Set(rootNames(styles('_tokens.scss')))
+if (ROOT.size === 0) throw new Error('no :root in _tokens.scss')
 
 const GLOBAL = new Set([
   ...ROOT,
-  ...declaredIn(styles('main.scss')),
+  ...rootNames(styles('main.scss')),
   ...declaredIn(styles('_mixins.scss')),
   ...Object.keys(SET_BY_SCRIPT),
 ])

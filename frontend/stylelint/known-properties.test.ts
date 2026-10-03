@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import stylelint from 'stylelint'
 import { describe, expect, it } from 'vitest'
+import { rootNames } from './known-properties.mjs'
 
 const config = {
   plugins: [fileURLToPath(new URL('./known-properties.mjs', import.meta.url))],
@@ -77,5 +78,14 @@ describe('molvia/known-custom-property', () => {
 
   it('does not take a name the dark scheme alone declares as a token elsewhere', async () => {
     expect(await unknown('.a { color: var(--probe-ink); }')).toEqual(['--probe-ink'])
+  })
+
+  it('takes globals from a top-level :root only, not from a media query or another selector', () => {
+    expect(
+      rootNames(
+        ':root {\n  --a: 1;\n}\n\n@media (prefers-color-scheme: dark) {\n  :root {\n    --b: 2;\n  }\n}\n\n' +
+          'html[data-nav] {\n  --c: 0s;\n}\n\n:root:not([data-scheme]) {\n  --d: 3;\n}\n',
+      ),
+    ).toEqual(['--a'])
   })
 })
