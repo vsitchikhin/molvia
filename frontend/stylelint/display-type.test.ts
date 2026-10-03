@@ -125,6 +125,14 @@ describe('molvia/display-type-whole', () => {
     ]).toEqual(['display-type'])
   })
 
+  it('hides no mixin behind a `/*` inside a line comment', () => {
+    expect([
+      ...roleMixins(
+        '@mixin row {\n  // see notes/*.md\n}\n@mixin figure { @include display-type; }\n/* end */',
+      ),
+    ]).toEqual(['display-type', 'figure'])
+  })
+
   it('finds the role through a namespace and through sass:meta', async () => {
     expect(
       await refused(

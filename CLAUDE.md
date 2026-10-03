@@ -429,6 +429,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **`frontend/DESIGN.md` is the style, and the linter holds it** (MOL-171): a weight, a size, a
   radius, a colour function or a custom property no file defines fails Stylelint; the token block
   of DESIGN.md is `make format`'s to write and `make lint`'s to check.
+- **Colours that can meet are held apart by `tokens.test.ts`** (MOL-172): two steps of different roles
+  and a category against a role 0.08 OKLab apart, marks 3:1, text 4.5:1, both schemes; a value that
+  fails is changed, never excused. Data without a colour of its own is `--graphic`. **Any two
+  categories 0.07 apart, one hue in both schemes** (MOL-218): a ring puts any two side by side.
 - **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
   `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the
   failure; polite states speak through the one live region in `App.vue`.

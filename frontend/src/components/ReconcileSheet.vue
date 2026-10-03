@@ -764,7 +764,7 @@ export default defineComponent({
   padding: 0 var(--space-4);
   border-radius: var(--radius-lg);
   background: var(--surface-2);
-  box-shadow: inset 0 0 0 var(--hairline) var(--border);
+  box-shadow: inset 0 0 0 var(--hairline) var(--border-strong);
 
   &:focus-within {
     box-shadow: inset 0 0 0 2px var(--accent);

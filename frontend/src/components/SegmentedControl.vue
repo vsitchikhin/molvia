@@ -119,7 +119,7 @@ export default defineComponent({
   background: var(--surface-2);
 
   /* The edge is drawn inside rather than taking room: every pixel of the 44 goes to the thumb. */
-  box-shadow: inset 0 0 0 var(--hairline) var(--border);
+  box-shadow: inset 0 0 0 var(--hairline) var(--border-strong);
 }
 
 .segment {

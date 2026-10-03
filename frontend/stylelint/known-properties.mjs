@@ -36,9 +36,13 @@ const DECLARATION = /(--[\w-]+)\s*:/g
 const REFERENCE = /var\(\s*(--[\w-]+)(#\{)?/g
 
 // A line comment starts where `//` follows the start of a line, a space or the end of a rule — never
-// inside `url(https://…)`; it may close a line that declares something.
-function withoutComments(source) {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[\s;{}])\/\/[^\n]*/g, '$1')
+// inside `url(https://…)`; it may close a line that declares something. One pass, as Sass reads them:
+// a `/*` inside a line comment opens nothing (MOL-172, adversarial Б3).
+export function withoutComments(source) {
+  return source.replace(
+    /\/\*[\s\S]*?\*\/|(^|[\s;{}])\/\/[^\n]*/g,
+    (_comment, before) => before ?? '',
+  )
 }
 
 function declaredIn(code) {
