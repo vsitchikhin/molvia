@@ -212,19 +212,29 @@ export function receiptCityOf(
 ): SettingsCity | null {
   const first = rows.filter((row) => row.part === 0)
   const head = first.slice(0, headEnd(first))
+  // the chain's site, «www.yerevan-city.am», however OCR read it — «Ww Yerevan: СПу. ат» — names no city
+  const lines = head.filter((row) => !SITE_ROW.test(row.text))
   const cities = Object.keys(CITY_ANYWHERE) as SettingsCity[]
   // the city an address names — the one city named in the head at all: an item named after another
   // city, or a chain's legal address beside its shop's, is two cities and no answer (rounds 3–10)
-  const named = cities.filter((city) => head.some((row) => CITY_ANYWHERE[city].test(row.text)))
+  const named = cities.filter((city) => lines.some((row) => CITY_ANYWHERE[city].test(row.text)))
   if (named.length !== 1) return null
   const [city] = named
   if (city === undefined) return null
-  return head.some(
-    (row) => CITY_ANYWHERE[city].test(row.text) && isAddressRow(row.text, productWords),
+  return lines.some(
+    (row, i) =>
+      CITY_ANYWHERE[city].test(row.text) &&
+      (isAddressRow(row.text, productWords) ||
+        // the city on its row, the street and the house on the next: «ք. Գյումրի,» / «Գորկու 62»
+        (!itemShaped(row.text, productWords) &&
+          isAddressRow(lines[i + 1]?.text ?? '', productWords))),
   )
     ? city
     : null
 }
+
+/** A site's row: «www.…», «….am», and how OCR reads them, «Ww …», «… ат» (round 11, Р11-В1). */
+const SITE_ROW = /(?<!\p{L})w{2,}(?!\p{L})|(?:\.|\s)(?:am|ат)\s*$|https?:/iu
 
 const NO_WORDS: ReadonlySet<string> = new Set()
 
@@ -240,8 +250,9 @@ const ITEM_SHAPED = [
   TABLE_ITEM_ROW,
   CARD_ARTICLE_ROW,
   // a unit ends its word: «500գ», never «1 ԳՅՈՒՄՐԻ», whose first letter is a gram's; a one-letter unit
-  // stands right after its number, «5տ», «500գ» — «Գորկու 62 տ.» is a house, տուն (round 10, Р10-В2)
-  /\d\s*(?:%|(?:մլ|կգ|գր|հտ|հատ|ml|kg|pcs)(?![\p{L}\d]))|\d(?:լ|գ|տ|l|g)(?![\p{L}\d])/iu,
+  // stands right after its number, «5տ», «0.5լ» — «Գորկու 62 տ.» is a house, տուն (round 10, Р10-В2) —
+  // and a gram is a hundred and more, or a fraction: «62գ» is a house's third building (round 11, Р11-В2)
+  /\d\s*(?:%|(?:մլ|կգ|գր|հտ|հատ|ml|kg|pcs)(?![\p{L}\d]))|\d(?:լ|տ|l)(?![\p{L}\d])|(?:\d{3,}|\d[.,]\d+)(?:գ|g)(?![\p{L}\d])/iu,
   // a sum's hundredths «450.00», never a day «02.10.2026»
   /\d[.,]\d{2}(?![\d.,])/u,
 ]
@@ -254,12 +265,13 @@ const ITEM_SHAPED = [
  * before an address as before an item and decides nothing.
  */
 function isAddressRow(text: string, productWords: ReadonlySet<string>): boolean {
-  if (ITEM_SHAPED.some((shape) => shape.test(text))) return false
-  if (/[«“"„']\s*(?:գյումրի|gyumri|երևան|երե[վւ]ան|yerevan)/iu.test(text)) return false
+  if (itemShaped(text, productWords)) return false
   // an address names its house after its first word: «Գորկու 62», «Գորկուծ22» as OCR glued it; a row
   // with no number there — «1.ԳՅՈՒՄՐԻ ԳԱ ուր.», a name OCR cut — is no address (round 10, Р10-В1)
   const letter = text.search(/\p{L}/u)
   if (letter < 0 || !/\d/u.test(text.slice(letter))) return false
+  // a house is four digits at most; five and more are a tax number, a till's, a receipt's (round 11)
+  if (/\d{5,}/u.test(text)) return false
   // a price and a sum stand at the row's end, in the hundreds; a postal code and a house are not there
   // both, «Գյումրի 3101, Ռիժկովի 104», nor is a house and its flat «162/105» (round 10, Р10-В2)
   const tail = /(?:\s+\d+)+\s*$/u.exec(text.replace(/[^\p{L}\d\s/]+$/u, ''))?.[0] ?? ''
@@ -267,33 +279,37 @@ function isAddressRow(text: string, productWords: ReadonlySet<string>): boolean 
     (number) => Number(number) >= 100,
   )
   if (prices.length >= 2) return false
-  // the words with what follows each, so an abbreviation keeps its dot: «ԳԱՐ.» is «գարեջուր» cut by the till
+  return true
+}
+
+/** The marks of an item's row (rounds 9–11): its shapes, the city in quotes, a kind beside the city. */
+function itemShaped(text: string, productWords: ReadonlySet<string>): boolean {
+  if (ITEM_SHAPED.some((shape) => shape.test(text))) return true
+  if (/[«“"„']\s*(?:գյումրի|gyumri|երևան|երե[վւ]ան|yerevan)/iu.test(text)) return true
+  // a word cut with a dot is an abbreviation, a street's as often as a kind's — «Վարդ.» is Վարդանանց, not
+  // «վարդ», a rose — and decides nothing (round 11, Р11-В2)
   const words = [...text.toLowerCase().matchAll(/(\p{L}{2,})(\.?)/gu)].map(
     ([, word = '', dot]) => ({
       word,
       cut: dot === '.',
     }),
   )
-  return !words.some(
+  return words.some(
     ({ word }, i) =>
       CITY_WORD.test(word) &&
       [words[i - 1], words[i + 1]].some(
-        (beside) => beside !== undefined && isProductWord(beside.word, beside.cut, productWords),
+        (beside) => beside !== undefined && !beside.cut && isProductWord(beside.word, productWords),
       ),
   )
 }
 
 /**
- * A word of the till's dictionary; a long one OCR read a letter off («ԳԱՐԵՋՈԻՐ»); or the start of one the
- * till cut with a dot («ԳԱՐ.»). A short word must be the word itself: the street «Շիրազի» is a letter off
- * «շիրակի», «ширакский» of the dictionary.
+ * A word of the till's dictionary, or a long one OCR read a letter off («ԳԱՐԵՋՈԻՐ»). A short word must be
+ * the word itself: the street «Շիրազի» is a letter off «շիրակի», «ширакский» of the dictionary. A word
+ * cut with a dot is not a kind's start: «Գոր.», «Շիր.» are streets as often (round 11, Р11-В2).
  */
-function isProductWord(word: string, cut: boolean, productWords: ReadonlySet<string>): boolean {
+function isProductWord(word: string, productWords: ReadonlySet<string>): boolean {
   if (productWords.has(word)) return true
-  // a till's abbreviation, three letters and more and a dot: the start of a kind, «ԳԱՐ.», «ԿՈՆ.»
-  if (cut && Array.from(word).length >= 3) {
-    for (const known of productWords) if (known.startsWith(word)) return true
-  }
   if (Array.from(word).length < FUZZY_LETTERS) return false
   for (const known of productWords) {
     if (Math.abs(known.length - word.length) <= 1 && withinOneEdit(known, word)) return true

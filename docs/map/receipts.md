@@ -24,6 +24,7 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 ## backend · receipts
 
 - `backend/src/receipts/jpeg.ts` — `jpegSize`: the sides of a JPEG from its frame header, and a scan with data after it, without decoding — what is not a photo is refused before it is kept.
+- `backend/src/receipts/till-kinds-latin.ts` — The kinds a till prints in Latin letters (MOL-126): beside a city they make a receipt's row an item's, not its address; not the gloss's.
 - `backend/src/receipts/till-words-ru.ts` — The dictionary of Armenian till words in Russian (MOL-114's `words-hy-ru.json`): a line's gloss, a new item's proposed name, the query of the search when the names find nothing.
 - `backend/src/receipts/reader.ts` — The client of the receipt reader: a part read in a page mode, item lines cut out; `ReaderUnavailable` (nothing answered: the receipt waits), `ReaderDropped` (lost on the photo: counted, to the end), `PhotoUnreadable` (it fails).
 

@@ -238,18 +238,21 @@ and the shape of an «address row», and each form OCR made moved them again; th
 **Any second city named in the head is no answer** — an item named after a city, a chain's legal address
 beside its shop's — and the place is looked for in the person's own city: an address read in any form
 names its city, so no item can name another one beside it. **And the city must stand in an address row**:
-a number after its first word (a house, «Գորկու 62», glued «Գորկուծ22»), and none of an item's marks — a
-kind of the till's dictionary beside the city (`TILL_WORDS_RU`, passed in; Latin kinds «LAGER» too; one
-letter off from seven letters; a till's abbreviation with a dot «ԳԱՐ.»), the city in quotes, a table's
-heading, an article, a unit right after its number «0.5լ», «5տ», a sum's hundredths, a price and a sum at
-the row's end. A house «62 տ.», a postal code, a day on the row, a flat «162/105», any mark OCR put at the
-edge are an address's. The end of the head stays a bound only: above a table's first heading, two rows
+a house after its first word («Գորկու 62», glued «Գորկուծ22», «62գ» a building), four digits at most — five
+and more are a tax number — or the street and the house on the next row («ք. Գյումրի,» / «Գորկու 62»); and
+none of an item's marks — a kind of the till's dictionary beside the city (`TILL_WORDS_RU` and the Latin
+`TILL_KINDS_LATIN`, «LAGER», passed in; one letter off from seven letters), the city in quotes, a table's
+heading, an article, a unit right after its number «0.5լ», «5տ», a gram from a hundred «500գ», a sum's
+hundredths, a price and a sum at the row's end. A word cut with a dot decides nothing — «Գոր.», «Վարդ.»
+are streets as often as kinds. A house «62 տ.», a postal code, a day on the row, a flat «162/105», any mark
+OCR put at the edge are an address's. **The chain's site** — «www.yerevan-city.am», «Ww Yerevan: СПу. ат» —
+names no city (round 11). The end of the head stays a bound only: above a table's first heading, two rows
 above a card's first article, twenty rows where none is read. **The one form left** is undecidable from
 the text: the address not read at all, and in the head an item named after a city with no kind beside it
 — a bare brand, a kind OCR cut mid-word — and a number. It names the item's city; the person sees the
 place on the review. **Two tests cross every shape** the rounds found — marks, names, tails, addresses —
 both ways: with the address read nothing names another city, bare brands included; without it, no item
-with its kind does. On all 260 readings of the bench the city is found in 132, and never another.
+with its kind does. On all 260 readings of the bench the city is found in 133, and never another.
 Of
 the places this seller's receipts were recorded at there, with the trips still there: the person's own
 last, else the one most people chose, the later on a tie — as the shop's memory is read. **A place

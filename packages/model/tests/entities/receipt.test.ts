@@ -372,7 +372,6 @@ describe('an item named after a city never names the receipt’s city (MOL-126)'
       'Գյումրի գարեջուր',
       'ԳԱՐԵՋՈՒՐ ԳՅՈՒՄՐԻ ՍՊԻՏԱԿ',
       'ԳՅՈՒՄՐԻ ԳԱՐԵՋՈԻՐ',
-      'ԳՅՈՒՄՐԻ ԳԱՐ.',
       'GYUMRI LAGER',
       'Գարեջուր "Գյումրի"',
     ],
@@ -384,7 +383,6 @@ describe('an item named after a city never names the receipt’s city (MOL-126)'
       'YEREVAN կոնյակ',
       'Կոնյակ «Երեւան» 5տ',
       'ԵՐԵՎԱՆ ԿՈՆՅԱԿ ՀՆԳԱՄՅԱ',
-      'ԵՐԵՎԱՆ ԿՈՆ.',
       'YEREVAN BRANDY',
     ],
   }
@@ -448,8 +446,8 @@ describe('an item named after a city never names the receipt’s city (MOL-126)'
     ['Гюмри', 'Ереван'],
   ] as const)('with the address of %s read, nothing names %s', (home, other) => {
     const bare = {
-      Гюмри: ['Գյումրի', 'ԳՅՈՒՄՐԻ ԳԱ ուր.', 'GYUMRI', 'Գյումրի 62 2.'],
-      Ереван: ['Երևան', 'ԵՐԵՎԱՆ ԿՈ ակ.', 'YEREVAN', 'Երևան 34'],
+      Гюмри: ['Գյումրի', 'ԳՅՈՒՄՐԻ ԳԱ ուր.', 'GYUMRI', 'Գյումրի 62 2.', 'ԳՅՈՒՄՐԻ ԳԱՐ.'],
+      Ереван: ['Երևան', 'ԵՐԵՎԱՆ ԿՈ ակ.', 'YEREVAN', 'Երևան 34', 'ԵՐԵՎԱՆ ԿՈՆ.'],
     }
     const wrong: string[] = []
     for (const address of addresses[home])
@@ -470,6 +468,16 @@ describe('an item named after a city never names the receipt’s city (MOL-126)'
     expect(wrong).toEqual([])
   })
 
+  // round 11: the city and the street on two rows; the chain's site however OCR read it
+  it('reads a city whose street stands on the next row, and no city off the chain’s site', () => {
+    expect(receiptCityOf(rows('ք. Գյումրի,', 'Գորկու 62', 'ՀՎՀՀ:01282006'), words)).toBe('Гюмри')
+    for (const site of ['Ww Yerevan: СПу. ат', 'www.yerevan.city.am', 'www yerevan—city am']) {
+      expect(receiptCityOf(rows('ԵՐԵՎԱՆ-ՍԻԹԻ', site, 'ԳՅՈՒՄՐԻ Գորկու 62 2.'), words)).toBe('Гюмри')
+    }
+    // a tax number under a city is no street
+    expect(receiptCityOf(rows('Գյումրի', 'ՀՎՀՀ:01282006'), words)).toBeNull()
+  })
+
   it('still reads the address beside a street, whatever OCR put at its edge', () => {
     for (const address of [
       'ыы ԳՅՈՒՄՐԻ Գորկու 62 2 --',
@@ -480,6 +488,10 @@ describe('an item named after a city never names the receipt’s city (MOL-126)'
       'Գյումրի 3101, Ռիժկովի 104',
       'ԳՅՈՒՄՐԻ Գորկու 62 02.10.2026',
       'ԳՅՈՒՄՐԻ Գորկու 162/105',
+      'ԳՅՈՒՄՐԻ Գորկու 62գ',
+      'ԳՅՈՒՄՐԻ Շիր. 57',
+      'ԳՅՈՒՄՐԻ Գոր. 62',
+      'ԳՅՈՒՄՐԻ Վարդ. 12',
       'ԳՅՈՒՄՐԻ Գորկու 62 2.',
       '9. ԳՅՈՒՄՐԻ Գորկու 62 2.',
       '2..1 ԳՅՈՒՄՐԻ Գորկու 62 2,',
