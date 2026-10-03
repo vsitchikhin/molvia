@@ -61,22 +61,25 @@ A till that prints no shelf price lets every swap of a line fit the line, so onl
 fifteen ordinary lines held the API for 52 s before the beam (Р14), ninety now balance in a third of a
 second. A line past its ceiling is taken as read, unsettled.
 
-**Where only the total judges, the rate the lines share helps it** (review Р20): such a till has no line
-read with no swap, so the receipt's discount rate is taken from the lines as read, and a reading off it
-costs the total a quarter of a swap more — 816,32 read as 316,32 is put right rather than another line
-«fixed» to make up the difference. Only there: as an order of a line's readings the same rate «fixed»
-am-01's right sum to fit, 66 → 65 on the bench. **«Сошлось» is «сошлось as read»** (review Р27): a line the total changed from its reading is
-unsettled — highlighted for the person to check, even where the change is right (am-05's peaches,
-342,66 read and 342,65 by the total). The total sets any difference right by one swap in some line whose
-own arithmetic holds, a line read twice or lost at a seam included, and vouched for, that line hid the
-error: an extra yoghurt at a seam was «balanced» by a pastry of 460 read as 160. **In a tie** every line
-with a reading of its own that differs by the same amount is in doubt too (Р20, Р24) — the line OCR
-misread among them. On a generator of such receipts 1–3 in 15 «balance» wrong, and every wrong line is
+**Where only the total judges, the rate the lines share helps it** (review Р20): such a till has no
+line read with no swap, so the receipt's discount rate is taken from the lines as read, and a
+reading off it costs the total a quarter of a swap more — 816,32 read as 316,32 is put right rather
+than another line «fixed» to make up the difference. Only there: as an order of a line's readings
+the same rate «fixed» am-01's right sum to fit, 66 → 65 on the bench. **«Сошлось» is «сошлось as
+read»** (review Р27): a line the total changed from its reading is unsettled — highlighted for the
+person to check, even where the change is right (am-05's peaches, 342,66 read and 342,65 by the
+total). The total sets any difference right by one swap in some line whose own arithmetic holds, a
+line read twice or lost at a seam included, and vouched for, that line hid the error: an extra
+yoghurt at a seam was «balanced» by a pastry of 460 read as 160. **In a tie** every line with a
+reading of its own that differs by the same amount is in doubt too (Р20, Р24) — the line OCR misread
+among them. On a generator of such receipts 1–3 in 15 «balance» wrong, and every wrong line is
 highlighted in each. **Two lines of one sum whose articles are one swap of OCR apart are both
-highlighted** — an item read twice at a seam is a line the total cannot see; two neighbours of one line
-at one price (am-13's beers, 008765 and 008766) cost one look. Marked after the reading is chosen, never
-in the choice: it says nothing of how well a reading read, and am-13 lost four right lines to a reading
-chosen so. The bench is unchanged; the port departs from the prototype in these marks only.
+highlighted** — an item read twice at a seam is a line the total cannot see. **Only across a seam**
+(Р28): one line from one part and one from another; in one photo an item has nowhere to be read twice,
+and two neighbours of one line at one price — am-13's beers, 008765 and 008766 — are two items read
+right. Marked after the reading is chosen, never in the choice: it says nothing of how well a reading
+read, and am-13 lost four right lines to a reading chosen so. The bench is unchanged; the port departs
+from the prototype in these marks only.
 
 **A long receipt's seam must be one an overlap can make** (Р7–Р9): the last article of the text so far
 that the next part has (exactly, else one digit off by a swap OCR makes — 5↔6, 1↔4, 3↔8, 0↔9), where the
@@ -194,12 +197,12 @@ not would otherwise be refused for good. Whether the data decodes is the reader'
 
 **Cut-out lines are item rows only** — a line's figures, and its name row only between two items:
 right below the figures of the one before, and with the item's number read on it — one or two digits
-and then a letter, never a date or a phone (Р16, Р19). The first item's name row is never cut: the head
-is above it, and OCR reads a stray digit at the edge. A table gives its heading row only. Never the head where a customer's name is printed, never
-the total (review А5, А6): above the first item whose name OCR lost stands the head — the VAT, a
-buyer — and a table's last row runs on into a total whose word OCR misread. They are cut when the
-receipt is read, since the boxes are the reading's; recording writes the text a person confirmed
-(MOL-126).
+and then a letter, never a date or a phone (Р16, Р19). The first item's name row is never cut: the
+head is above it, and OCR reads a stray digit at the edge. A table gives its heading row only. Never
+the head where a customer's name is printed, never the total (review А5, А6): above the first item
+whose name OCR lost stands the head — the VAT, a buyer — and a table's last row runs on into a total
+whose word OCR misread. They are cut when the receipt is read, since the boxes are the reading's;
+recording writes the text a person confirmed (MOL-126).
 
 ## Privacy
 
