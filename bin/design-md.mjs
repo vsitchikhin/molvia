@@ -16,7 +16,11 @@ import prettier from 'prettier'
 
 const TOKENS = new URL('../frontend/src/styles/_tokens.scss', import.meta.url)
 
-const scss = readFileSync(TOKENS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+// Both kinds of comment out, a line comment also at the end of a declaration: a value in one is not a
+// token, and Sass drops it from the CSS the page draws with.
+const scss = readFileSync(TOKENS, 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/(^|[\s;{}])\/\/[^\n]*/g, '$1')
 
 function block(source, opener) {
   const at = source.indexOf(opener)

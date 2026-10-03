@@ -1,8 +1,9 @@
 {
   "extends": ["stylelint-config-standard-scss", "stylelint-config-recommended-vue/scss"],
-  "plugins": ["./stylelint/known-properties.mjs"],
+  "plugins": ["./stylelint/known-properties.mjs", "./stylelint/display-type.mjs"],
   "rules": {
     "molvia/known-custom-property": true,
+    "molvia/display-type-whole": true,
     "color-no-hex": [
       true,
       {
@@ -20,11 +21,15 @@
         "/^(margin|padding|gap|inset|top|right|bottom|left|scroll-margin|scroll-padding)/": [
           "/^(0|auto|inherit|initial|unset|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\))*( \\* -1)?\\))(\\s+(0|auto|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\))*( \\* -1)?\\))){0,3}$/"
         ],
+        "font": ["/^inherit$/"],
         "font-family": ["/^(var\\(--font\\)|inherit)$/"],
         "font-weight": ["/^(var\\(--weight-(regular|medium|bold)\\)|inherit)$/"],
-        "font-size": ["/^(var\\(--(text|icon)(-[a-z0-9]+)*\\)|inherit|1em)$/"],
+        "font-size": [
+          "/^(var\\(--(text-(display|title|figure|headline|body|callout|footnote|caption|entry|entry-sign|card-figure)|icon(-[a-z0-9]+)*)\\)|inherit|1em)$/"
+        ],
+        "font-variation-settings": ["normal"],
         "/^border(-(top|bottom)-(left|right)|-(start|end)-(start|end))?-radius$/": [
-          "/^(0|50%|inherit|var\\(--radius(-[a-z]+)?\\)|calc\\((var\\(--(radius(-[a-z]+)?|segment-inset)\\)|[0-9.]+|[ ()*/+-])+\\))(\\s+(0|50%|inherit|var\\(--radius(-[a-z]+)?\\)|calc\\((var\\(--(radius(-[a-z]+)?|segment-inset)\\)|[0-9.]+|[ ()*/+-])+\\))){0,3}$/"
+          "/^(0|50%|inherit|var\\(--radius(-[a-z]+)?\\)|calc\\(var\\(--(radius(-[a-z]+)?|segment-inset)\\)( [+-] var\\(--(radius(-[a-z]+)?|segment-inset)\\))+\\))(\\s+(0|50%|inherit|var\\(--radius(-[a-z]+)?\\)|calc\\(var\\(--(radius(-[a-z]+)?|segment-inset)\\)( [+-] var\\(--(radius(-[a-z]+)?|segment-inset)\\))+\\))){0,3}$/"
         ]
       },
       {
@@ -57,7 +62,7 @@
       }
     },
     {
-      "files": ["**/styles/_mixins.scss", "**/styles/_fonts.scss"],
+      "files": ["**/styles/_fonts.scss"],
       "rules": {
         "declaration-property-value-allowed-list": null
       }

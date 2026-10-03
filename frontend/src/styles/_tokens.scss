@@ -86,7 +86,8 @@
   --radius-pill: 999px;
 
   /* The rounding of a mark of data — a bar's foot, a legend key, a tick — only enough to take the
-     corner's edge off; anything larger reads as a pill on a mark a few pixels thick. */
+     corner's edge off. On a tick three pixels wide it rounds the ends whole, as handoff 157 v2 draws
+     the usual month's mark. */
   --radius-mark: 0.125rem; /* 2 */
   --hairline: 1px;
 

@@ -9,8 +9,14 @@ const config = {
   rules: { 'molvia/known-custom-property': true },
 }
 
-async function unknown(code: string): Promise<string[]> {
-  const { results } = await stylelint.lint({ code, config })
+const TOKENS = fileURLToPath(new URL('../src/styles/_tokens.scss', import.meta.url))
+
+async function unknown(code: string, codeFilename?: string): Promise<string[]> {
+  const { results } = await stylelint.lint({
+    code,
+    config,
+    ...(codeFilename ? { codeFilename } : {}),
+  })
   return (results[0]?.warnings ?? []).map((warning) => warning.text.split(' ')[0] ?? '')
 }
 
@@ -51,5 +57,25 @@ describe('molvia/known-custom-property', () => {
     expect(await unknown('.a { top: calc(var(--bar-height) + var( --dock-hight)); }')).toEqual([
       '--dock-hight',
     ])
+  })
+
+  it('does not check a name Sass builds by interpolation', async () => {
+    expect(await unknown('.a { gap: var(--space-#{$step}); }')).toEqual([])
+  })
+
+  it('does not take a name from a comment at the end of a declaration', async () => {
+    expect(await unknown('.a { --own: 1px; // --later: not yet\n  width: var(--later); }')).toEqual(
+      ['--later'],
+    )
+  })
+
+  it('refuses, in _tokens.scss, a name the dark scheme alone declares', async () => {
+    expect(
+      await unknown('@mixin dark-scheme {\n  --text: #fff;\n  --probe-ink: #fff;\n}', TOKENS),
+    ).toEqual(['--probe-ink'])
+  })
+
+  it('does not take a name the dark scheme alone declares as a token elsewhere', async () => {
+    expect(await unknown('.a { color: var(--probe-ink); }')).toEqual(['--probe-ink'])
   })
 })
