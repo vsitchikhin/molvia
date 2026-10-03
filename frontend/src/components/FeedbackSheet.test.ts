@@ -13,7 +13,12 @@ import { routes } from '@/router'
 import FeedbackSheet from '@/components/FeedbackSheet.vue'
 import type * as FeedbackPictureExports from '@/feedbackPicture'
 import { useActorStore } from '@/stores/actor'
-import { feedbackSent, keepFeedbackDraft, recallFeedbackDraft } from '@/stores/feedbackDraft'
+import {
+  dropFeedbackDraft,
+  feedbackSent,
+  keepFeedbackDraft,
+  recallFeedbackDraft,
+} from '@/stores/feedbackDraft'
 import { useFeedbackSheetStore, type FeedbackEntry } from '@/stores/feedbackSheet'
 
 const sendFeedback =
@@ -967,20 +972,100 @@ describe('a screenshot with the message (MOL-167)', () => {
     expect(note(sheet).text()).toBe(en.error.feedback_picture_too_large)
   })
 
-  it('says the pictures were not kept after a reload, and takes a new key', async () => {
-    keepFeedbackDraft(OWNER, {
-      kind: 'bug',
-      text: 'Look',
-      clientKey: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d',
-      pictures: 2,
-    })
+  it('says the pictures were not kept after a reload, and leaves the key alone (review 7)', async () => {
+    const key = '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d'
+    keepFeedbackDraft(OWNER, { kind: 'bug', text: 'Look', clientKey: key, pictures: 2 })
     const { wrapper } = await render()
     const sheet = await open(wrapper)
 
     expect(note(sheet).text()).toBe(en.feedback.picture.lost)
     expect(textarea(sheet).element.value).toBe('Look')
-    expect(recallFeedbackDraft(OWNER)?.clientKey).not.toBe('0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d')
-    expect(recallFeedbackDraft(OWNER)?.pictures).toBeUndefined()
+    expect(recallFeedbackDraft(OWNER)?.clientKey).toBe(key)
+    // The window that holds them sends under that key, and the draft goes with it.
+    dropFeedbackDraft(OWNER, key)
+    expect(recallFeedbackDraft(OWNER)).toBeNull()
+    // Anything done here is another content, under a key of its own.
+    await type(sheet, 'Look again')
+    expect(recallFeedbackDraft(OWNER)?.clientKey).not.toBe(key)
+  })
+
+  it('lets the pictures go once sent, the sheet closed meanwhile (adversarial А1)', async () => {
+    let answer: (value: { sent: FeedbackSent; created: boolean }) => void = () => undefined
+    sendFeedback.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    const { wrapper } = await render()
+    const sheet = await open(wrapper)
+    await choose(sheet, en.feedback.kinds.bug)
+    await attachFiles(sheet, screenshot('with my balance on it'))
+    await button(sheet).trigger('click')
+    useFeedbackSheetStore().shown = false
+    await flushPromises()
+
+    answer({ sent: { number: 42 }, created: true })
+    await flushPromises()
+    await open(sheet)
+
+    expect(tiles(sheet)).toHaveLength(0)
+    await choose(sheet, en.feedback.kinds.idea)
+    expect(button(sheet).text()).toBe(en.feedback.need_text)
+  })
+
+  it('keeps pictures changed while the first message was on its way: they are another message', async () => {
+    let answer: (value: { sent: FeedbackSent; created: boolean }) => void = () => undefined
+    sendFeedback.mockReturnValueOnce(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    const { wrapper } = await render()
+    const sheet = await open(wrapper)
+    await choose(sheet, en.feedback.kinds.bug)
+    await attachFiles(sheet, screenshot('first'))
+    await button(sheet).trigger('click')
+    useFeedbackSheetStore().shown = false
+    await flushPromises()
+    await open(sheet)
+    await attachFiles(sheet, screenshot('second'))
+
+    answer({ sent: { number: 42 }, created: true })
+    await flushPromises()
+
+    expect(tiles(sheet)).toHaveLength(2)
+  })
+
+  it('tries every file chosen: one the browser cannot open does not keep the next (adversarial А6)', async () => {
+    const { PictureRefused } = await import('@/feedbackPicture')
+    drawPicture
+      .mockImplementationOnce((file) =>
+        Promise.resolve({ jpeg: new Blob([file]), width: 1179, height: 2556 }),
+      )
+      .mockRejectedValueOnce(new PictureRefused('unreadable'))
+    const { wrapper } = await render()
+    const sheet = await open(wrapper)
+
+    await attachFiles(sheet, screenshot('one'), screenshot('heic'), screenshot('three'))
+
+    expect(drawPicture).toHaveBeenCalledTimes(3)
+    expect(tiles(sheet)).toHaveLength(2)
+    expect(note(sheet).text()).toBe(en.feedback.picture.unreadable)
+  })
+
+  it('takes a text that draws nothing beside a picture for no text: the picture goes (review 5)', async () => {
+    const { wrapper } = await render()
+    const sheet = await open(wrapper)
+    await choose(sheet, en.feedback.kinds.bug)
+    await attachFiles(sheet, screenshot('alone'))
+
+    await type(sheet, '\u2060 \u200b')
+    expect(button(sheet).text()).toBe(en.feedback.send)
+    await press(sheet)
+
+    expect(sendFeedback).toHaveBeenCalledOnce()
+    expect(sendFeedback.mock.calls[0]?.[0].text).toBeUndefined()
+    expect(sheet.text()).not.toContain(en.feedback.unsupported)
   })
 
   it('lets the pictures go once sent', async () => {

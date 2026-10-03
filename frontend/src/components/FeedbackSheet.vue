@@ -106,6 +106,7 @@ import {
   ISSUE,
   FEEDBACK_PICTURES_MAX,
   FEEDBACK_TEXT_MAX,
+  drawsNothing,
   feedbackBodySchema,
   feedbackPlatformSchema,
   pickLocale,
@@ -303,10 +304,11 @@ export default defineComponent({
         clientKey.value = draft?.clientKey ?? newId()
         await nextTick()
         recalling = false
-        // A reload left the pictures behind: what is held now is another message, under a new key.
+        // A reload left the pictures behind — or another window holds them. Said, and nothing more:
+        // a new key here would keep the draft from going when that window sends it (review 7). The
+        // next change of the content takes a new key, as any does.
         if ((draft?.pictures ?? 0) > pictures.value.length) {
           pictureNote.value = t('feedback.picture.lost')
-          changed()
         }
         focusFirst()
       },
@@ -356,22 +358,26 @@ export default defineComponent({
       pictureNote.value = null
       drawing.value = true
       try {
+        // Each file on its own: one the browser cannot open does not keep the next from being tried
+        // (adversarial А6), and the first refusal is what is said.
         for (const file of files.slice(0, FEEDBACK_PICTURES_MAX - pictures.value.length)) {
-          const drawn = await pictureFromFile(file)
-          pictures.value = [
-            ...pictures.value,
-            {
-              url: URL.createObjectURL(drawn.jpeg),
-              base64: await base64Of(drawn.jpeg),
-              width: drawn.width,
-              height: drawn.height,
-            },
-          ]
-          picturesChanged()
+          try {
+            const drawn = await pictureFromFile(file)
+            pictures.value = [
+              ...pictures.value,
+              {
+                url: URL.createObjectURL(drawn.jpeg),
+                base64: await base64Of(drawn.jpeg),
+                width: drawn.width,
+                height: drawn.height,
+              },
+            ]
+            picturesChanged()
+          } catch (error) {
+            const reason = error instanceof PictureRefused ? error.reason : 'unreadable'
+            pictureNote.value ??= t(PICTURE_NOTES[reason])
+          }
         }
-      } catch (error) {
-        const reason = error instanceof PictureRefused ? error.reason : 'unreadable'
-        pictureNote.value = t(PICTURE_NOTES[reason])
       } finally {
         drawing.value = false
       }
@@ -436,9 +442,15 @@ export default defineComponent({
 
     /** The text as it goes, or nothing: a picture may go alone (MOL-167, В-3). */
     const words = computed(() => tidyText(text.value))
-    const saysWords = computed(() => words.value.trim() !== '')
+    // What draws nothing is no words, by the domain's own rule (review 5): a word joiner pasted beside
+    // a screenshot must not keep the screenshot from going.
+    const saysWords = computed(() => !drawsNothing(words.value))
 
-    const body = computed(() => {
+    /**
+     * The message as it goes, read at the press and not before (review 6): the pictures' base64 is
+     * megabytes, and a body read again with every letter typed checked them every time.
+     */
+    function bodyNow() {
       if (kind.value === '' || attached.value === null) return null
       const parsed = feedbackBodySchema.safeParse({
         kind: kind.value,
@@ -449,7 +461,7 @@ export default defineComponent({
           pictures.value.length === 0 ? undefined : pictures.value.map((picture) => picture.base64),
       } satisfies Record<keyof FeedbackBody, unknown>)
       return parsed.success ? parsed.data : null
-    })
+    }
 
     /** Why the button does not send, if it does not — `null` when it does. */
     const waiting = computed<string | null>(() => {
@@ -488,7 +500,7 @@ export default defineComponent({
         phase.value = 'sent'
         return
       }
-      const message = body.value
+      const message = bodyNow()
       if (message === null) {
         // A kind and a text that draws something are there, and still the schema refuses: a
         // character that cannot be sent — said under the field rather than left to a grey button.
@@ -501,6 +513,7 @@ export default defineComponent({
       frozen.value = attached.value
       keep()
       phase.value = 'sending'
+      const sentPictures = pictures.value
       try {
         try {
           await api.sendFeedback(message)
@@ -508,10 +521,12 @@ export default defineComponent({
           if (!writtenAnyway(error)) throw error
         }
         // Sent is sent, whatever became of the sheet meanwhile: the draft goes with it — unless it
-        // has changed since, and is another message now.
+        // has changed since, and is another message now. So do the pictures it went with, closed or
+        // not (adversarial А1): kept, the next message opened with a screenshot already sent, one
+        // kind away from sending it again. Pictures changed meanwhile are another message's.
         dropFeedbackDraft(owner, message.clientKey)
+        if (pictures.value === sentPictures) letPicturesGo()
         if (mine !== opening) return
-        letPicturesGo()
         phase.value = 'sent'
       } catch (error) {
         if (mine !== opening) return

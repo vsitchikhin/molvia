@@ -5,6 +5,7 @@ import {
   FEEDBACK_REPLY_MAX,
   FEEDBACK_TEXT_MAX,
   dayIn,
+  drawsNothing,
   timeZoneOf,
   visibleText,
 } from '@molvia/model'
@@ -64,7 +65,11 @@ export async function feedbackFromBot(
 
   const answered = await repository.answeredBy(message.telegramUserId, message.repliedMessageId)
   if (answered === null) throw new DomainError(ERROR.NOT_FOUND)
-  const text = message.text === undefined ? '' : readText(message.text, FEEDBACK_TEXT_MAX)
+  // A caption that draws nothing under a photo is no words: the photo alone is enough (В-3, review 5).
+  const text =
+    message.text === undefined || (message.picture !== undefined && drawsNothing(message.text))
+      ? ''
+      : readText(message.text, FEEDBACK_TEXT_MAX)
   if (typeof text !== 'string') return text
   const write = await repository.continueThread({
     reply: answered,
