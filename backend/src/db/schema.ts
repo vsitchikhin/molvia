@@ -1695,8 +1695,9 @@ export const reminderDays = pgTable(
  *
  * A thread is its first message and what follows it (MOL-150, В-1): `thread_id` names the first
  * message on a continuation and is empty on the first, `in_reply_to` the owner's reply a continuation
- * answers. The continuations come from the bot (MOL-148), and so do the empty `route`, `platform`
- * and `page_build`: Telegram has no screen. A thread lives a year from its last message (В-4).
+ * answers. The continuations come from the bot (MOL-148), and so do the empty `route`, `platform`,
+ * `page_build` and `client_key`: Telegram has no screen, and a repeat there is the same words to the
+ * same reply within a day (review №9, round 2 Г1). A thread lives a year from its last message (В-4).
  *
  * **The database holds the thread, not the writer** (MOL-148, adversarial В5 of MOL-147): a
  * continuation names only a first message, and only its own person's — `head` and `thread_head` are

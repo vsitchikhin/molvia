@@ -8,7 +8,10 @@ import type { OwnerNoticeRepository } from '@/db/owner-notices-repository'
  * owner. Without an owner nothing is queued, and nothing is claimed either.
  *
  * A stored notice the contract no longer reads is a defect of ours, not the owner's to see: it was
- * marked with the rest, so it is said once through `unreadable` and never handed out again.
+ * marked with the rest and goes through `unreadable` — a failure of the API's, so the owner hears of
+ * it. A failure's is never handed out again; a message's is handed again as an unsent one is, and
+ * said each time (MOL-148, round 3 Д1, Д2). So a notice's payload changes only so the stored ones
+ * still read: a field added is optional, a bound only widens.
  */
 export async function claimOwnerNotices(
   notices: Pick<OwnerNoticeRepository, 'claim'>,

@@ -691,7 +691,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       },
       claimOwnerNotices: () =>
         claimOwnerNotices(createOwnerNoticeRepository(db), owner, new Date(), (issue) => {
-          instance.log.error(describeFailure(issue), 'owner notice unreadable')
+          // A failure of ours, recorded as one (MOL-148, round 3 Д1): a message's notice the contract
+          // no longer reads is the message lost, and the owner hears of the failure at least.
+          failures.report(issue, job('owner-notice'), 'owner notice unreadable')
         }),
       ownerNoticesSent: (body) =>
         createOwnerNoticeRepository(db).markSent(body.messages, new Date()),

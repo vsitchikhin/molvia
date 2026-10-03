@@ -1,12 +1,12 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { ownerNoticesSchema } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createErasureRepository } from '@/db/erasure-repository'
 import { createFeedbackRepository } from '@/db/feedback-repository'
 import { createOwnerNoticeRepository } from '@/db/owner-notices-repository'
-import { actors, feedback, feedbackReplies, ownerNotices } from '@/db/schema'
+import { actors, failures, feedback, feedbackReplies, ownerNotices } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
@@ -22,8 +22,16 @@ const asBot = { authorization: `Bearer ${botSecret}` }
 
 const servers: FastifyInstance[] = []
 
+let recordings: Promise<void>[] = []
+
 async function serverFor(owner: number | null): Promise<FastifyInstance> {
-  const app = buildServer({ db, owner, login: { username: 'molvia_bot', botSecret } })
+  const app = buildServer({
+    db,
+    owner,
+    login: { username: 'molvia_bot', botSecret },
+    failureRecorded: (recording) => recordings.push(recording),
+    logStream: { write: () => undefined },
+  })
   await app.ready()
   servers.push(app)
   return app
@@ -31,6 +39,7 @@ async function serverFor(owner: number | null): Promise<FastifyInstance> {
 
 beforeEach(async () => {
   await clearAll(db)
+  recordings = []
 })
 
 afterAll(async () => {
@@ -823,5 +832,28 @@ describe('то же слово на тот же ответ позже суток
     }
 
     expect(await db.select().from(feedback).where(eq(feedback.threadId, thread))).toHaveLength(2)
+  })
+})
+
+describe('уведомление о сообщении, которое контракт не читает, — сбой API (раунд 3, Д1)', () => {
+  it('прежняя форма payload: claim его не отдаёт, но в failures — job:owner-notice', async () => {
+    const app = await serverFor(OWNER)
+    const { thread } = await aThread(app)
+    // The payload as an earlier build wrote it — before `number` was there.
+    await db.update(ownerNotices).set({
+      payload: sql`${ownerNotices.payload} - 'number'`,
+    })
+
+    const claim = await app.inject({
+      method: 'POST',
+      url: '/internal/owner/claim',
+      headers: asBot,
+    })
+
+    expect(claim.json()).toEqual({ to: OWNER, notices: [] })
+    await Promise.all(recordings)
+    const recorded = await db.select({ route: failures.route }).from(failures)
+    expect(recorded).toEqual([{ route: 'job:owner-notice' }])
+    expect(await db.select().from(feedback).where(eq(feedback.id, thread))).toHaveLength(1)
   })
 })
