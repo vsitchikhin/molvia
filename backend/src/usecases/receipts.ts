@@ -141,7 +141,7 @@ export async function receiptOfOwner(
   const recalled =
     tin === null
       ? new Map<string, Recalled>()
-      : await repositories.storeMemory.recall(actor.id, tin, words.flat())
+      : await repositories.storeMemory.recall(actor.id, tin, words.flat(), currency)
   const memory = words.map(
     (own) =>
       own.map((word) => recalled.get(memoryKey(word))).find((hit) => hit !== undefined) ?? null,

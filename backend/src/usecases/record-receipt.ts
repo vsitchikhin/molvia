@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import {
   DomainError,
   ERROR,
+  addMoney,
   geographyAllowed,
   latestDay,
   nameIdentity,
@@ -62,13 +63,14 @@ function receiptMoney(
     ...stored.flatMap((line) => [line.price, line.sum, line.discount]),
   ])
   const left = recordedSums(stored, printed, digits)
-  let minor: bigint | null = 0n
+  let sum: Money | null = { minor: 0n, currency }
   for (const line of body.lines) {
     const amount = line.skip ? (left[line.position] ?? null) : line.amount
-    if (minor === null || amount?.currency !== currency) minor = null
-    else minor += amount.minor
+    // `addMoney` holds the column's bound: lines each within it may add up past it (round 3, Р3-В1),
+    // which is `error.invalid_amount`, not a 500 from the table
+    sum = sum === null || amount?.currency !== currency ? null : addMoney(sum, amount)
   }
-  const lines = minor !== null && minor > 0n ? { minor, currency } : null
+  const lines = sum !== null && sum.minor > 0n ? sum : null
   if (printed !== null && printed.minor > 0n && (lines === null || printed.minor >= lines.minor)) {
     return printed
   }

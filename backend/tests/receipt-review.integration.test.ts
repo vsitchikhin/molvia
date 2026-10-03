@@ -118,7 +118,7 @@ describe('the shops’ memory (Р-2)', () => {
     const full = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
     const light = await insertItem(db, { name: 'Молоко 2,5%', searchKey: 'moloko 2,5%' })
     const recall = async (actorId: string) =>
-      (await memory.recall(actorId, TIN, [milkWord])).get(memoryKey(milkWord))?.itemId
+      (await memory.recall(actorId, TIN, [milkWord], 'AMD')).get(memoryKey(milkWord))?.itemId
 
     await memory.remember(me, TIN, [{ ...milkWord, itemId: full, price: amd(370) }])
     expect(await recall(newcomer)).toBe(full)
@@ -134,7 +134,7 @@ describe('the shops’ memory (Р-2)', () => {
     expect(await recall(newcomer)).toBe(full)
     // the lower median of the winning item's prices: 370 and 380
     expect(
-      (await memory.recall(newcomer, TIN, [milkWord])).get(memoryKey(milkWord))?.sharedPrice,
+      (await memory.recall(newcomer, TIN, [milkWord], 'AMD')).get(memoryKey(milkWord))?.sharedPrice,
     ).toEqual(amd(370))
 
     // erased, the word stays without its author and still counts
@@ -149,15 +149,19 @@ describe('the shops’ memory (Р-2)', () => {
     const light = await insertItem(db, { name: 'Молоко 2,5%', searchKey: 'moloko 2,5%' })
     await memory.remember(me, TIN, [{ ...milkWord, itemId: full, price: null }])
     await memory.remember(me, TIN, [{ ...milkWord, itemId: light, price: amd(390) }])
-    expect((await memory.recall(me, TIN, [milkWord])).get(memoryKey(milkWord))).toEqual({
+    expect((await memory.recall(me, TIN, [milkWord], 'AMD')).get(memoryKey(milkWord))).toEqual({
       itemId: light,
       own: true,
       ownPrice: amd(390),
       priced: 1,
       sharedPrice: amd(390),
     })
-    expect((await memory.recall(me, '57424557', [milkWord])).size).toBe(0)
-    expect(await memory.recall(me, TIN, [])).toEqual(new Map())
+    expect((await memory.recall(me, '57424557', [milkWord], 'AMD')).size).toBe(0)
+    expect(await memory.recall(me, TIN, [], 'AMD')).toEqual(new Map())
+    // a price of another currency is never in one median with the receipt's (review 15)
+    expect(
+      (await memory.recall(me, TIN, [milkWord], 'RUB')).get(memoryKey(milkWord))?.sharedPrice,
+    ).toBeNull()
   })
 })
 

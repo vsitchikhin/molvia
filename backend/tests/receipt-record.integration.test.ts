@@ -468,6 +468,20 @@ describe('«Записать»', () => {
     const other = await parsedReceipt(me, LINES.slice(0, 2), { receiptNo: '4' })
     const refused = await record(me, other, body({ total: { amount: '10', currency: 'USD' } }))
     expect([refused.statusCode, codeOf(refused)]).toEqual([400, ERROR.CURRENCY_MISMATCH])
+    // lines each within the column's bound, past it together: refused, not a 500 (round 3, Р3-В1)
+    const huge = await parsedReceipt(me, LINES.slice(0, 2), { receiptNo: '5' })
+    const vast = { amount: '50000000000000000', currency: 'AMD' }
+    const overflow = await record(
+      me,
+      huge,
+      body({
+        lines: [
+          { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: vast },
+          { position: 1, skip: false, item: { id: milk }, quantity: pieces(1), amount: vast },
+        ],
+      }),
+    )
+    expect([overflow.statusCode, codeOf(overflow)]).toEqual([400, ERROR.INVALID_AMOUNT])
   })
 
   // review 1, В1, В2, В7: the receipt row holds the trip's date on the accounts, «из чека» and the

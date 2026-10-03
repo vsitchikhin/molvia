@@ -172,7 +172,7 @@ correction (В-1): a price one confused digit off the remembered is `rememberedP
 parse, measured on the bench, and is not done here. **The price is someone's figure** (review 5, В6; round 2, Р2-В3): the
 person's own always; other people's only as their figures are — with access (`shared_until`) and from
 three prices (`AGGREGATE_MIN_CONTRIBUTIONS`), their lower median, as the prices of places open
-(MOL-166). Three people for an item are not three prices: a word recorded with corrected figures
+(MOL-166) — in the receipt's currency only: prices of two currencies are never one median (review 15). Three people for an item are not three prices: a word recorded with corrected figures
 carries none.
 
 **Nobody's word is shown as someone's**: the answer is an item and, in doubt, a price — never who or
@@ -201,7 +201,8 @@ sends — the printed one, or the person's correction of a total OCR misread, in
 (another is `error.currency_mismatch`, round 2, Р2-В2); without it the printed total
 where it is not below the lines — the lines left out and those OCR lost included, while a lost line only
 ever raises a total, so one below the lines was misread — else every line, a line left out at what it
-would have been recorded at (В-5 of MOL-124). A purchase keeps what was paid for its line; the line's discount stays on the line and is shown
+would have been recorded at (В-5 of MOL-124). The sum is held to the column's bound by `addMoney`: lines
+each within it may add up past it, which is `error.invalid_amount`, not a 500 (round 3, Р3-В1). A purchase keeps what was paid for its line; the line's discount stays on the line and is shown
 beside the purchase (Р-9).
 
 **A trip from a receipt is dated by the receipt's day for «Деньги» and the accounts alike**: the rule
@@ -232,8 +233,11 @@ when every amount on it is whole — once: 0,742 kg × 1 290 = 957,18 is 957 on 
 The phone calls these very functions on the review (В-6 of MOL-124).
 
 **The place is found by the receipts of its seller recorded in a city** (Р-6; review В4): the city its
-address prints, if it is a city of the settings — the row «ԳՅՈՒՄՐԻ …» at the start of a row of the head,
-or after «ք.» anywhere in it («ՀՀ, ք. Երևան, …», round 2, Р2-В4), never the chain's name «ԵՐԵՎԱՆ-ՍԻԹԻ» or «YEREVAN CITY» — else the person's own. Of
+address prints, if it is a city of the settings — a city opening a row of the head («ԳՅՈՒՄՐԻ …») is the
+shop's address and decides; else a city after «ք.» anywhere in a row («ՀՀ, ք. Երևան, …», round 2,
+Р2-В4) decides only when no other city is named in the head at all — a chain prints its legal address
+beside its shop's («ՀՀ, ք. Երևան» on a Gyumri receipt whose shop is «Գորկու 62, Գյումրի», round 3,
+Р3-В2), and two cities are no answer; never the chain's name «ԵՐԵՎԱՆ-ՍԻԹԻ» or «YEREVAN CITY» — else the person's own. Of
 the places this seller's receipts were recorded at there, with the trips still there: the person's own
 last, else the one most people chose, the later on a tie — as the shop's memory is read. **A place
 keeps no tax number**: a column written by the first receipt named a place for everyone, for good, and

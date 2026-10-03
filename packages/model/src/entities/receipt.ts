@@ -142,28 +142,52 @@ export function storeMemoryWords(line: {
 }
 
 /**
- * The cities of the settings as a receipt's address prints them, at the start of a row of the head
- * («ԳՅՈՒՄՐԻ Գորկու 62»), or after «ք.» — «город» — anywhere in a row of the head («ՀՀ, ք. Երևան, …»,
- * «Շիրակի մարզ, ք. Գյումրի, …»): a place is the shop in its city (Р-6).
- * «ԵՐԵՎԱՆ-ՍԻԹԻ», «YEREVAN CITY» is the chain's name, not the city, and an item named after the capital
- * is a line, not the head.
+ * The cities of the settings as a receipt prints them, as a word (Р-6): a place is the shop in its city.
+ * «ԵՐԵՎԱՆ-ՍԻԹԻ», «YEREVAN CITY» is the chain's name, not the city.
  */
+const CITY_WORDS: Readonly<Record<SettingsCity, string>> = {
+  Гюмри: '(?:գյումրի|gyumri)(?![\\p{L}-])',
+  Ереван: '(?:երևան|երե[վւ]ան|yerevan)(?![\\p{L}-])(?!\\s*[-–]?\\s*(?:սիթի|city|сити))',
+}
+
+/** A city opening a row of the head — the shop's address («ԳՅՈՒՄՐԻ Գորկու 62», «ք. Երևան, …»). */
 export const RECEIPT_CITIES: Readonly<Record<SettingsCity, RegExp>> = {
-  Гюмри: /(?:^[^\p{L}]*(?:ք\.?\s*)?|(?<!\p{L})ք\.\s*)(?:գյումրի|gyumri)(?![\p{L}-])/iu,
-  Ереван:
-    /(?:^[^\p{L}]*(?:ք\.?\s*)?|(?<!\p{L})ք\.\s*)(?:երևան|երե[վւ]ան|yerevan)(?![\p{L}-])(?!\s*[-–]?\s*(?:սիթի|city|сити))/iu,
+  Гюмри: new RegExp(`^[^\\p{L}]*(?:ք\\.?\\s*)?${CITY_WORDS.Гюмри}`, 'iu'),
+  Ереван: new RegExp(`^[^\\p{L}]*(?:ք\\.?\\s*)?${CITY_WORDS.Ереван}`, 'iu'),
+}
+
+/** A city after «ք.» — «город» — anywhere in a row of the head («ՀՀ, ք. Երևան, …»). */
+const CITY_AFTER_MARK: Readonly<Record<SettingsCity, RegExp>> = {
+  Гюмри: new RegExp(`(?<!\\p{L})ք\\.\\s*${CITY_WORDS.Гюмри}`, 'iu'),
+  Ереван: new RegExp(`(?<!\\p{L})ք\\.\\s*${CITY_WORDS.Ереван}`, 'iu'),
+}
+
+/** A city named anywhere in a row of the head, a word of its own: an address, or an item's name. */
+const CITY_ANYWHERE: Readonly<Record<SettingsCity, RegExp>> = {
+  Гюмри: new RegExp(`(?<!\\p{L})${CITY_WORDS.Гюмри}`, 'iu'),
+  Ереван: new RegExp(`(?<!\\p{L})${CITY_WORDS.Ереван}`, 'iu'),
 }
 
 /** Rows of the head a city is looked for in: the address stands above the first item line. */
 const HEAD_ROWS = 15
 
-/** The city a receipt's address prints, if it is one of the settings'; read in the first part only. */
+/**
+ * The city a receipt's address prints, if it is one of the settings'; read in the first part only. A
+ * city opening a row is the shop's address and decides. Else a city after «ք.» anywhere in a row —
+ * «ՀՀ, ք. Երևան, …», «Շիրակի մարզ, ք. Գյումրի, …» (round 2, Р2-В4) — decides only when no other city
+ * is named in the head at all: a chain prints its own legal address beside the shop's, «ՀՀ, ք.
+ * Երևան» on a receipt of its Gyumri shop whose address is «Գորկու 62, Գյումրի» (round 3, Р3-В2).
+ * Two cities are no answer — the place is then looked for in the person's own city.
+ */
 export function receiptCityOf(rows: readonly TextRow[]): SettingsCity | null {
   const head = rows.filter((row) => row.part === 0).slice(0, HEAD_ROWS)
-  for (const [city, pattern] of Object.entries(RECEIPT_CITIES) as [SettingsCity, RegExp][]) {
-    if (head.some((row) => pattern.test(row.text))) return city
-  }
-  return null
+  const cities = Object.keys(RECEIPT_CITIES) as SettingsCity[]
+  const opening = cities.filter((city) => head.some((row) => RECEIPT_CITIES[city].test(row.text)))
+  if (opening.length === 1) return opening[0] ?? null
+  if (opening.length > 1) return null
+  const marked = cities.filter((city) => head.some((row) => CITY_AFTER_MARK[city].test(row.text)))
+  const named = cities.filter((city) => head.some((row) => CITY_ANYWHERE[city].test(row.text)))
+  return marked.length === 1 && named.length === 1 ? (marked[0] ?? null) : null
 }
 
 /** Tesseract's page modes the reading is tried in; the one whose lines add up is kept. */

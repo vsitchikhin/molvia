@@ -28,12 +28,14 @@ export interface StoreMemoryRepository {
   /**
    * What the shop's memory says each key is, for this person (MOL-126, Р-2): their own word first;
    * else the item most people said — the erased count — and on a tie the one said last; with the
-   * person's own price and everyone's priced words for that item. Keyed `kind:key`.
+   * person's own price and everyone's priced words for that item in `currency` — the receipt's: prices
+   * of two currencies are never one median (MOL-166). Keyed `kind:key`.
    */
   recall(
     actorId: string,
     tin: string,
     words: readonly StoreMemoryWord[],
+    currency: Currency,
   ): Promise<Map<string, Recalled>>
   /** The person's word on each key, written over their earlier one: a receipt recorded, a line corrected. */
   remember(actorId: string, tin: string, words: readonly MemoryWord[]): Promise<void>
@@ -43,7 +45,7 @@ export const memoryKey = (word: StoreMemoryWord): string => `${word.kind}:${word
 
 export function createStoreMemoryRepository(db: Conn): StoreMemoryRepository {
   return {
-    async recall(actorId, tin, words) {
+    async recall(actorId, tin, words, currency) {
       if (words.length === 0) return new Map()
       const rows = await db.execute<{
         kind: StoreMemoryKind
@@ -84,10 +86,10 @@ export function createStoreMemoryRepository(db: Conn): StoreMemoryRepository {
         cross join lateral (
           select count(*)::int as priced,
             percentile_disc(0.5) within group (order by w.price_minor) as median_minor,
-            min(w.price_currency) as median_currency
+            ${currency}::text as median_currency
           from words w
           where w.kind = v.kind and w.key = v.key and w.item_id = v.item_id
-            and w.price_minor is not null
+            and w.price_minor is not null and w.price_currency = ${currency}
         ) p`)
       const money = (minor: string | null, currency: Currency | null): Money | null =>
         minor === null || currency === null ? null : { minor: BigInt(minor), currency }

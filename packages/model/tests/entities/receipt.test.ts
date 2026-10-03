@@ -179,6 +179,16 @@ describe('the city of the address (MOL-126, Р-6)', () => {
     expect(receiptCityOf(rows('Սուրճ ք.Երևանյան'))).toBeNull()
   })
 
+  // round 3, Р3-В2: a chain's legal address beside its shop's — two cities are no answer
+  it('takes no city after «ք.» when another one is named in the head', () => {
+    const chain = rows('"ԵՐԵՎԱՆ ՍԻԹԻ" ՍՊԸ', 'ՀՀ, ք. Երևան, Արշակունյաց 34', 'Գորկու 62, Գյումրի')
+    expect(receiptCityOf(chain)).toBeNull()
+    // the shop's address opening a row decides over the legal one
+    expect(receiptCityOf(rows('ՀՀ, ք. Երևան, Արշակունյաց 34', 'Գյումրի, Գորկու 62'))).toBe('Гюмри')
+    // two shops' addresses opening rows — no answer
+    expect(receiptCityOf(rows('Գյումրի, Գորկու 62', 'Երևան, Կոմիտասի 5'))).toBeNull()
+  })
+
   it('does not take the chain in Latin or Cyrillic letters for the city either', () => {
     expect(receiptCityOf(rows('YEREVAN CITY', 'Yerevan-City'))).toBeNull()
     expect(receiptCityOf(rows('Ереван Сити'))).toBeNull()
