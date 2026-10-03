@@ -356,7 +356,13 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   a new series, and starts nothing over. Two measured traps on the way: cAdvisor reads a container's
   start once and never again, so a restart kept its old start time; and VictoriaMetrics' `changes()`
   counts a series' first sample, so «the start changed» was every container of every rollout.
-  `resets()` was seen to catch the one container killed, and only it.
+  `resets()` was seen to catch the one container killed, and only it. **On the server cAdvisor needs
+  containerd's socket** (production, 04.10.2026): Docker 29 keeps its containers in containerd, and
+  without `/run/containerd/containerd.sock` the docker factory failed to register — the machine alone,
+  no container, so Grafana killed by the OOM-killer on the first login raised nothing. Docker Desktop
+  showed every container, which is why the self-test passed. **«Контейнеры не видны»** says so when it
+  happens again: `absent()` of the API's CPU series five minutes. **Grafana has 768 MB**: 384 was the
+  guess, and opening the interface of Grafana 13 took it past.
 - **The alarms speak when the figures stop** (Р-5): every rule is Alerting on no data and on an error
   of the query — VictoriaMetrics down — and «Метрики молчат» is any target not answering five minutes.
   The rules that need traffic (5xx, p95, restarts) end in `or on() vector(0)`, so a quiet night is not

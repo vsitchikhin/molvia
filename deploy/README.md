@@ -453,14 +453,15 @@ product's bot, whose token is the login's and stays out of a container that goes
 Write the alarms' bot `/start` once: a bot cannot write first. Every threshold is in
 `deploy/grafana/provisioning/alerting/rules.json`:
 
-| Alarm                 | When                                                        | What to look at                                                      |
-| --------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------- |
-| Память машины         | more than 85 % for 5 minutes                                | «Контейнеры» — who grew; `docker stats --no-stream`                  |
-| Диск машины           | more than 80 %                                              | `df -h /`, `docker system df`, `journalctl --disk-usage`             |
-| Доля 5xx              | more than 5 % of at least 20 answers to people in 5 minutes | `make failures` on the machine — what broke has its fingerprint      |
-| Время ответа API      | p95 to people above 1 s for 15 minutes, at least 20 answers | the routes' table; the event loop; Postgres — the oldest transaction |
-| Перезапуск контейнера | a container started over by itself — never a rollout        | `docker compose … logs --tail 100 <service>`                         |
-| Метрики молчат        | a target did not answer for 5 minutes                       | `docker compose … ps` — which of the five is down                    |
+| Alarm                 | When                                                        | What to look at                                                             |
+| --------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Память машины         | more than 85 % for 5 minutes                                | «Контейнеры» — who grew; `docker stats --no-stream`                         |
+| Диск машины           | more than 80 %                                              | `df -h /`, `docker system df`, `journalctl --disk-usage`                    |
+| Доля 5xx              | more than 5 % of at least 20 answers to people in 5 minutes | `make failures` on the machine — what broke has its fingerprint             |
+| Время ответа API      | p95 to people above 1 s for 15 minutes, at least 20 answers | the routes' table; the event loop; Postgres — the oldest transaction        |
+| Перезапуск контейнера | a container started over by itself — never a rollout        | `docker compose … logs --tail 100 <service>`                                |
+| Контейнеры не видны   | cAdvisor shows no container of the API for 5 minutes        | `docker compose … logs cadvisor \| grep factory` — its socket to containerd |
+| Метрики молчат        | a target did not answer for 5 minutes                       | `docker compose … ps` — which of the five is down                           |
 
 Every rule also fires when it cannot be counted — VictoriaMetrics down — and says «нет данных».
 `✅ Прошло` comes when it is over. A firing alarm is repeated every six hours.

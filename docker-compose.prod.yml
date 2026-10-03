@@ -219,6 +219,10 @@ services:
     volumes:
       - /:/rootfs:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Docker 29 keeps its containers in containerd, and cAdvisor's docker factory reads them through
+      # this socket: without it the factory failed to register, and on the server cAdvisor saw the
+      # machine alone — no container, no restart, no OOM — while Docker Desktop showed them all.
+      - /run/containerd/containerd.sock:/run/containerd/containerd.sock:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
@@ -278,7 +282,9 @@ services:
       # A rule that fires while Grafana counts and VictoriaMetrics answers pings the healthchecks.io
       # check «molvia-alerts» every five minutes; its silence is healthchecks.io's own Telegram.
       ALERTS_PULSE_URL: ${ALERTS_PULSE_URL:?set ALERTS_PULSE_URL — the alarms would be watched by nobody}
-    mem_limit: 384m
+    # 384 MB was the guess before production; opening the interface took Grafana 13 past it and the
+    # OOM-killer took Grafana — and the alarms with it — on the first login (04.10.2026).
+    mem_limit: 768m
     ports:
       # The one port of the metrics, on the machine's loopback only: `ssh -L 3000:127.0.0.1:3000`.
       - '127.0.0.1:${GRAFANA_PORT:-3000}:3000'
