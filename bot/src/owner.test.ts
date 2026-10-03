@@ -148,12 +148,50 @@ describe('startOwnerNotices — таймер раз в минуту', () => {
       { claimOwnerNotices: claim } as unknown as MolviaBotClient,
       api,
       60_000,
+      50,
     )
     await vi.waitFor(() => {
       expect(sent).toHaveLength(1)
     })
+    const stopped = performance.now()
     await stop()
     expect(sent).toHaveLength(5)
+    // Four pauses of 50 ms after the stop: the pace held — without it they went in a few ms (Б3).
+    expect(performance.now() - stopped).toBeGreaterThanOrEqual(180)
+  })
+
+  it('отправка, повисшая к концу времени остановки, обрывается, и остаток назван (В1)', async () => {
+    vi.useFakeTimers()
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    let calls = 0
+    const bot = new Bot('42:TEST', { botInfo: { id: 42 } as UserFromGetMe })
+    // The first message goes; the second hangs, as a stuck socket does, until its signal fires.
+    const transformer: Transformer = (_prev, _method, _payload, signal) => {
+      calls += 1
+      if (calls === 1) return Promise.resolve({ ok: true, result: { message_id: 1 } }) as never
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => {
+          reject(new Error('aborted'))
+        })
+      }) as never
+    }
+    bot.api.config.use(transformer)
+    const claim = vi.fn(() =>
+      Promise.resolve<OwnerNotices>({ to: OWNER, notices: [NEW, AGAIN, NEW, AGAIN] }),
+    )
+    const stop = startOwnerNotices(
+      { claimOwnerNotices: claim } as unknown as MolviaBotClient,
+      bot.api,
+      60_000,
+      50,
+    )
+    await vi.advanceTimersByTimeAsync(60)
+    expect(calls).toBe(2)
+
+    const stopped = stop()
+    await vi.advanceTimersByTimeAsync(OWNER_STOP_BUDGET_MS)
+    await stopped
+    expect(log).toHaveBeenCalledWith('[molvia] owner: stopping, 3 notices given up')
   })
 
   it('429 кончает прогон и говорит, сколько ушло с ним', async () => {

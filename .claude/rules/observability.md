@@ -114,7 +114,9 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   they are marked handed, and a rollout, every stop, is when there is a batch — while
   `OWNER_STOP_BUDGET_MS` (20 s of the bot's 30 of `stop_grace_period`) lasts, then gives up the rest
   and says how many. Without the pauses nineteen messages went in a hundred milliseconds into one
-  chat, where Telegram allows about one a second.
+  chat, where Telegram allows about one a second. **A send hung when that time runs out is cut** (adversarial В1):
+  every send carries the stop's deadline as its signal and is raced against it, since a socket that
+  never answers held the stop past compose's thirty seconds and the kill said nothing.
 - **`make failures`** (`dist/failures.js` in the API's image, as `gates`): the latest fingerprints,
   read only, the first six characters of each beside it — the message names a fingerprint by them.
 - **The API runs without `--enable-source-maps`** (В-6, measured): Node parses the whole map of

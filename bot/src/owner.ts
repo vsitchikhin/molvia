@@ -54,6 +54,7 @@ export async function tellOwner(
   telegram: Api,
   wait: Wait = async (ms) => sleep(ms),
   pauseMs = OWNER_PAUSE_MS,
+  deadline?: AbortSignal,
 ): Promise<void> {
   let claimed
   try {
@@ -74,8 +75,27 @@ export async function tellOwner(
       return
     }
     try {
-      await telegram.sendMessage(to, ownerText(notice))
+      // grammY types its signal by the `abort-controller` package; the platform's is the same thing.
+      // Raced against the end of the stop's time as well: a transport that does not hear its
+      // signal must not hold the stop either (adversarial В1).
+      await cutAt(
+        telegram.sendMessage(
+          to,
+          ownerText(notice),
+          undefined,
+          deadline as Parameters<Api['sendMessage']>[3],
+        ),
+        deadline,
+      )
     } catch (error) {
+      // A send cut by the end of the stop's time: it and the rest are given up, and said so — a
+      // hung socket held the stop past compose's thirty seconds, and the kill said nothing
+      // (adversarial В1).
+      if (deadline?.aborted) {
+        const left = notices.length - index
+        console.error(`[molvia] owner: stopping, ${String(left)} notices given up`)
+        return
+      }
       console.error(`[molvia] owner notice: ${telegramFailure(error)}`)
       if (error instanceof GrammyError && error.error_code === 429) {
         const left = notices.length - index - 1
@@ -84,6 +104,28 @@ export async function tellOwner(
       }
     }
   }
+}
+
+/**
+ * `work`, or a refusal when `signal` fires first. The listener goes with the race: one left on the
+ * signal after its send went through would reject later, when the stop's time ran out, with nobody
+ * to hear it.
+ */
+async function cutAt<T>(work: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (signal === undefined) return work
+  return new Promise<T>((resolve, reject) => {
+    const cut = (): void => {
+      reject(new Error('the stop ran out of time'))
+    }
+    if (signal.aborted) {
+      cut()
+      return
+    }
+    signal.addEventListener('abort', cut, { once: true })
+    work.then(resolve, reject).finally(() => {
+      signal.removeEventListener('abort', cut)
+    })
+  })
 }
 
 /** How often the bot asks: a new failure reaches the owner within a minute. */
@@ -99,7 +141,8 @@ export const OWNER_STOP_BUDGET_MS = 20_000
 /**
  * The owner's timer, the twin of the reminders' (MOL-101): every minute the API is asked, a run
  * still going is not doubled, the timer keeps no process alive, and a stop waits for the rest —
- * sent at the same pace while `OWNER_STOP_BUDGET_MS` lasts, then given up and said so.
+ * sent at the same pace while `OWNER_STOP_BUDGET_MS` lasts, then given up and said so; a send hung
+ * when the time runs out is cut, so the stop ends inside compose's grace period.
  */
 export function startOwnerNotices(
   api: MolviaBotClient,
@@ -110,6 +153,8 @@ export function startOwnerNotices(
   let running: Promise<void> | undefined
   const stopping = new AbortController()
   let stoppedAt: number | undefined
+  // Fires when the stop's time is out: a send under way is cut, not only the next pause.
+  const deadline = new AbortController()
   const wait: Wait = async (ms) => {
     if (stoppedAt === undefined && (await sleep(ms, stopping.signal))) return true
     // The stop came during the pause, or before it: the time left decides.
@@ -120,7 +165,7 @@ export function startOwnerNotices(
   }
   const tick = (): void => {
     if (running) return
-    running = tellOwner(api, telegram, wait, pauseMs).finally(() => {
+    running = tellOwner(api, telegram, wait, pauseMs, deadline.signal).finally(() => {
       running = undefined
     })
   }
@@ -131,6 +176,10 @@ export function startOwnerNotices(
     clearInterval(timer)
     stoppedAt = performance.now()
     stopping.abort()
+    const out = setTimeout(() => {
+      deadline.abort()
+    }, OWNER_STOP_BUDGET_MS)
     await running
+    clearTimeout(out)
   }
 }
