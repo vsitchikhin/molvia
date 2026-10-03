@@ -50,6 +50,48 @@
       </div>
     </section>
 
+    <!-- The icon scale (Ф-9, MOL-173): one shape at every step, for a screen to be checked by — not a
+         chevron, which reads as a row's. The step's class is on the wrapper — a class of this page on
+         a child's root would reach AppButton's own `.icon` — and written out: a class from `:class`
+         sizes nothing to the linter. -->
+    <section class="group">
+      <h2 class="caption">{{ t('dev.kit.icons') }}</h2>
+      <div class="row">
+        <span class="icon-step step-icon-xs">
+          <IconShape class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['icon-xs'] }}</span>
+        </span>
+        <span class="icon-step step-icon-sm">
+          <IconShape class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['icon-sm'] }}</span>
+        </span>
+        <span class="icon-step step-icon">
+          <IconShape class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['icon'] }}</span>
+        </span>
+        <span class="icon-step step-icon-button">
+          <IconShape class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['icon-button'] }}</span>
+        </span>
+        <span class="icon-step step-state-glyph">
+          <IconShape class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['state-glyph'] }}</span>
+        </span>
+        <span class="icon-step step-icon-md">
+          <IconShape class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['icon-md'] }}</span>
+        </span>
+        <span class="icon-step step-icon-back">
+          <IconShape class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['icon-back'] }}</span>
+        </span>
+        <span class="icon-step step-icon-tab">
+          <IconShape class="sample" aria-hidden="true" />
+          <span class="px">{{ iconPx['icon-tab'] }}</span>
+        </span>
+      </div>
+    </section>
+
     <section class="group">
       <h2 class="caption">{{ t('dev.kit.cards') }}</h2>
       <AppCard as="ul" list>
@@ -106,6 +148,7 @@ import {
 import IconClose from '~icons/mdi/close'
 import IconPlus from '~icons/mdi/plus'
 import IconRefresh from '~icons/mdi/refresh'
+import IconShape from '~icons/mdi/shape-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
@@ -136,6 +179,7 @@ export default defineComponent({
     IconClose,
     IconPlus,
     IconRefresh,
+    IconShape,
     SegmentedControl,
     VerdictBadge,
     VerdictCard,
@@ -151,6 +195,16 @@ export default defineComponent({
       t,
       ERROR,
       levels: Object.values(VERDICT_LEVEL),
+      iconPx: {
+        'icon-xs': 14,
+        'icon-sm': 18,
+        icon: 20,
+        'icon-button': 22,
+        'state-glyph': 22,
+        'icon-md': 24,
+        'icon-back': 26,
+        'icon-tab': 27,
+      },
       units,
       // The handoff's real receipt, through the formatters: the sign belongs to the currency.
       figures: { price: formatMoney(money(57000n, 'AMD')) },
@@ -218,6 +272,55 @@ export default defineComponent({
 .figure {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.icon-step {
+  display: inline-grid;
+  justify-items: center;
+  gap: var(--space-1);
+  min-width: var(--touch-target);
+}
+
+.sample {
+  @include icon;
+}
+
+.step-icon-xs .sample {
+  font-size: var(--icon-xs);
+}
+
+.step-icon-sm .sample {
+  font-size: var(--icon-sm);
+}
+
+.step-icon .sample {
+  font-size: var(--icon);
+}
+
+.step-icon-button .sample {
+  font-size: var(--icon-button);
+}
+
+.step-state-glyph .sample {
+  font-size: var(--state-glyph);
+}
+
+.step-icon-md .sample {
+  font-size: var(--icon-md);
+}
+
+.step-icon-back .sample {
+  font-size: var(--icon-back);
+}
+
+.step-icon-tab .sample {
+  font-size: var(--icon-tab);
+}
+
+.px {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
 }
 
 .scanned {

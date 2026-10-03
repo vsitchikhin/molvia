@@ -243,9 +243,9 @@ export default defineComponent({
 }
 
 .icon {
-  flex: none;
-  width: 1.5rem;
-  height: 1.5rem;
+  @include icon;
+
+  font-size: var(--icon-md);
   color: var(--text-muted);
 }
 
@@ -271,9 +271,9 @@ export default defineComponent({
 }
 
 .chevron {
-  flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon);
   color: var(--text-muted);
 }
 

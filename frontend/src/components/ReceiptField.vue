@@ -103,6 +103,9 @@ export default defineComponent({
 }
 
 .currency-caret {
+  @include icon;
+
+  font-size: var(--icon);
   position: absolute;
   right: 0;
   pointer-events: none;

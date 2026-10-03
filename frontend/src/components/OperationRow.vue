@@ -249,8 +249,9 @@ export default defineComponent({
 }
 
 .glyph {
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon);
 }
 
 .text {
@@ -301,9 +302,9 @@ export default defineComponent({
 }
 
 .chevron {
-  flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon);
   color: var(--text-muted);
 }
 </style>

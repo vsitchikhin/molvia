@@ -100,6 +100,16 @@
   --touch-target-lg: 3.25rem; /* 52 — the sheet's main action, the most frequent tap in the product */
   --rating-key: 3.5rem; /* 56 — a key of the 1–5 scale, the one action of «Оценки» */
 
+  /* Icons (Ф-9, MOL-173): one step per role. An icon takes its step as font-size and is 1em
+     itself (@include icon), so the rule that checks a size checks the icon too. */
+  --icon-xs: 0.875rem; /* 14 — inside a pill of 13: the verdict, «Отправляем…» */
+  --icon-sm: 1.125rem; /* 18 — a strip, a note, a field's error */
+  --icon: 1.25rem; /* 20 — a row's chevron, the magnifier, a select's arrow */
+  --icon-button: 1.375rem; /* 22 — before the word in a button */
+  --icon-md: 1.5rem; /* 24 — a row's own icon; a button that is only an icon */
+  --icon-back: 1.625rem; /* 26 — «back» in the top row */
+  --icon-tab: 1.6875rem; /* 27 — the tab bar */
+
   /* The verdict badge: a pill with its word, or a circle with the icon alone — 22 in a row, 24
      beside a group's title. The gap between icon and word is the handoff's 5. */
   --badge-height: 1.75rem; /* 28 */

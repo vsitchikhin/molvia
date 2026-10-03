@@ -228,10 +228,9 @@ export default defineComponent({
 }
 
 .glyph {
-  /* 20 — the handoff's magnifier and row chevron */
-  flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon);
   color: var(--text-muted);
 }
 

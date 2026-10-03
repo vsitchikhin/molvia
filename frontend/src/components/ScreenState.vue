@@ -270,8 +270,9 @@ export default defineComponent({
 }
 
 .glyph {
-  width: var(--state-glyph);
-  height: var(--state-glyph);
+  @include icon;
+
+  font-size: var(--state-glyph);
 }
 
 .accent .circle {

@@ -272,9 +272,9 @@ export default defineComponent({
 }
 
 .magnify {
-  flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon);
   color: var(--text-muted);
 }
 
@@ -309,8 +309,9 @@ export default defineComponent({
   cursor: pointer;
 
   svg {
-    width: 1.25rem;
-    height: 1.25rem;
+    @include icon;
+
+    font-size: var(--icon);
   }
 
   &:focus-visible {
