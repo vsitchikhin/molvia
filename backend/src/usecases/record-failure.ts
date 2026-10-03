@@ -147,8 +147,8 @@ export async function recordFailure(
   const claimed = phone && phoneRows !== undefined
   const fresh = !claimed || phoneRows.claim(at, sender)
   let count: FailureCount | null
-  // What of the hour's notices this write took, and how many it held back: the budget is spent
-  // inside its transaction.
+  // What of the hour's notices this write took, and how many it held back: the budget is asked
+  // inside its transaction, and the held ones are counted only once it has committed.
   let told = 0
   let held = 0
   try {
@@ -159,22 +159,25 @@ export async function recordFailure(
       (written) => {
         const notices = noticesFor(occurrence, written, times, owner)
         if (!phone || phoneNotices === undefined) return notices
-        const taken = phoneNotices.take(notices, at, sender)
-        told = taken.length
-        held = notices.length - taken.length
-        return taken
+        const asked = phoneNotices.ask(notices, at, sender)
+        told = asked.told.length
+        held = asked.held
+        return asked.told
       },
       { fresh },
     )
   } catch (error) {
     // A write that failed — the database down — wrote no row: its place goes back, or every report
     // of the outage held one for the hour (review №9) — and so do the notices it took, if the
-    // transaction failed after the budget gave them (round 5), and the ones it held back are not
-    // «скрыто» of a failure that is in no table (adversarial Е1 of round 6).
+    // transaction failed after the budget gave them (round 5). The ones it held back were never
+    // counted: «скрыто» is of failures in the table (adversarial Е1 of round 6, Ж1 of round 7).
     if (claimed && fresh) phoneRows.refund(at, sender)
-    if (told + held > 0) phoneNotices?.refund(told, held, at, sender)
+    if (told > 0) phoneNotices?.refund(told, at, sender)
     throw error
   }
+  // Held back, and written: now it is «скрыто». Counted after the commit, so the minute timer
+  // never tells of a write still in flight that then fails (adversarial Ж1).
+  if (held > 0) phoneNotices?.hold(held)
   // Not a new row after all — its count is more than what was written now: the place goes back.
   if (phone && fresh && count !== null && count.count !== times) phoneRows?.refund(at, sender)
   // A new fingerprint past the hour's rows: not in the table, so the summary says so (round 3, В1).
@@ -189,13 +192,21 @@ export const PHONE_NOTICES_PER_SENDER = 3
 const HOUR_MS = 60 * 60 * 1000
 
 export interface PhoneNoticeBudget {
-  /** What of the phone's notices fits the hour — the sender's and everybody's. */
-  take(notices: readonly OwnerNotice[], at: Date, sender?: string): OwnerNotice[]
   /**
-   * A write that then failed: gives back the `told` notices it took at `at`, and takes the `held`
-   * ones it held back off the count of the held.
+   * What of the phone's notices fits the hour — the sender's and everybody's — and how many did not:
+   * those are not counted yet (`hold`).
    */
-  refund(told: number, held: number, at: Date, sender?: string): void
+  ask(
+    notices: readonly OwnerNotice[],
+    at: Date,
+    sender?: string,
+  ): { readonly told: OwnerNotice[]; readonly held: number }
+  /** Counts `count` notices held back of a failure written: «скрыто». */
+  hold(count: number): void
+  /** `ask` and `hold` at once, for a failure already in the table. */
+  take(notices: readonly OwnerNotice[], at: Date, sender?: string): OwnerNotice[]
+  /** A write that then failed: gives back the `told` notices it took at `at`. */
+  refund(told: number, at: Date, sender?: string): void
   /** A new fingerprint of the phone the hour's rows had no room for: not in the table at all. */
   unwritten(): void
   /** How many were held back and how many not written, at most once an hour. */
@@ -231,14 +242,15 @@ export function phoneNoticeBudget(
     moments.filter((moment) => now - moment < HOUR_MS)
 
   return {
-    take(notices, at, sender) {
+    ask(notices, at, sender) {
       const now = at.getTime()
       told = recent(told, now)
       const theirs = sender === undefined ? [] : recent(bySender.get(sender) ?? [], now)
       const out: OwnerNotice[] = []
+      let kept = 0
       for (const notice of notices) {
         if (told.length >= perHour || theirs.length >= perSender) {
-          muted += 1
+          kept += 1
           continue
         }
         told.push(now)
@@ -246,10 +258,17 @@ export function phoneNoticeBudget(
         out.push(notice)
       }
       if (sender !== undefined) bySender.set(sender, theirs)
-      return out
+      return { told: out, held: kept }
     },
-    refund(given, kept, at, sender) {
-      muted = Math.max(0, muted - kept)
+    hold(count) {
+      muted += count
+    },
+    take(notices, at, sender) {
+      const asked = this.ask(notices, at, sender)
+      this.hold(asked.held)
+      return asked.told
+    },
+    refund(given, at, sender) {
       const now = at.getTime()
       for (let index = 0; index < given; index += 1) {
         const mine = told.lastIndexOf(now)

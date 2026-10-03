@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import type { FailureOccurrence, FailureRepository } from '@/db/failures-repository'
+import type { FailureCount, FailureOccurrence, FailureRepository } from '@/db/failures-repository'
 import { ERROR } from '@molvia/model'
 import type { OwnerNotice, PhoneFailure } from '@molvia/model'
 import {
@@ -412,6 +412,62 @@ describe('phoneRowBudget — новые строки телефона (ревь�
       ),
     ).rejects.toThrow('could not insert the notice')
     expect(budget.held(now)).toBeNull()
+  })
+
+  it('сводка не называет запись в полёте, а упавшая не съедает чужое «скрыто» (адверсариальный Ж1)', async () => {
+    const budget = phoneNoticeBudget(10, 0)
+    const { summary, place, build } = phoneFailure(REPORT)
+    let fail: () => void = () => undefined
+    const failed = new Promise<void>((resolve) => {
+      fail = resolve
+    })
+    const slow = {
+      record: async (
+        _occurrence: unknown,
+        _times: number,
+        _at: Date,
+        notices: (count: FailureCount) => unknown,
+      ) => {
+        notices({ count: 1, buildCount: 1 })
+        await failed
+        throw new Error('could not insert the notice')
+      },
+    } as unknown as FailureRepository
+    const writing = {
+      record: (
+        _occurrence: unknown,
+        _times: number,
+        _at: Date,
+        notices: (count: FailureCount) => unknown,
+      ) => {
+        notices({ count: 1, buildCount: 1 })
+        return Promise.resolve({ count: 1, buildCount: 1 })
+      },
+    } as unknown as FailureRepository
+    const a = recordFailure(
+      { failures: slow, owner: OWNER, phoneNotices: budget },
+      occurrenceOf(summary, place, build),
+      1,
+      now,
+      'one',
+    )
+    // A is still in flight: the minute timer tells nothing of it.
+    expect(budget.held(new Date(now.getTime() + 60_000))).toBeNull()
+    await recordFailure(
+      { failures: writing, owner: OWNER, phoneNotices: budget },
+      occurrenceOf({ ...summary, errorName: 'B' }, place, build),
+      1,
+      now,
+      'one',
+    )
+    fail()
+    await expect(a).rejects.toThrow('could not insert the notice')
+    // B was held back and written: it is the one told.
+    expect(budget.held(new Date(now.getTime() + 2 * 60_000))).toEqual({
+      kind: 'failure_muted',
+      source: 'phone',
+      count: 1,
+    })
   })
 
   it('запись, которая упала, возвращает своё место (ревью №9)', async () => {
