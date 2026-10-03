@@ -43,6 +43,7 @@ jobs:
           - { name: backend, dockerfile: backend/Dockerfile }
           - { name: bot, dockerfile: bot/Dockerfile }
           - { name: frontend, dockerfile: frontend/Dockerfile }
+          - { name: receipt-reader, dockerfile: services/receipt-reader/Dockerfile }
 
     steps:
       - uses: actions/checkout@v7
@@ -92,7 +93,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: ${{ matrix.name == 'backend' && format('APP_VERSION={0}', steps.commit.outputs.version) || '' }}
-          # A cache per image: shared, the three overwrote each other's layers.
+          # A cache per image: shared, the images overwrote each other's layers.
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
@@ -114,7 +115,7 @@ jobs:
       # A tag names the build production runs (owner's decision В-4), so it waits until
       # production's /health names its commit — up to twenty minutes, CI, build and rollout of a
       # fresh merge. A rollout that failed, was held or stood aside never gets there, and the tag
-      # is refused rather than put on a build nobody ran. Names are put on all three images or on
+      # is refused rather than put on a build nobody ran. Names are put on all the images or on
       # none.
       - env:
           OWNER: ${{ github.repository_owner }}
@@ -132,13 +133,13 @@ jobs:
             echo "::error::production runs ${version:-nothing}, not $short — a tag names the build that runs: set it on that commit, or re-run this job once $short rolls out"
             exit 1
           fi
-          for name in backend bot frontend; do
+          for name in backend bot frontend receipt-reader; do
             if ! docker buildx imagetools inspect "ghcr.io/$OWNER/molvia-$name:sha-$short" >/dev/null; then
               echo "::error::ghcr.io/$OWNER/molvia-$name:sha-$short is missing although production runs $short"
               exit 1
             fi
           done
-          for name in backend bot frontend; do
+          for name in backend bot frontend receipt-reader; do
             image="ghcr.io/$OWNER/molvia-$name"
             docker buildx imagetools create --tag "$image:$GITHUB_REF_NAME" "$image:sha-$short"
           done

@@ -37,17 +37,17 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 ## repository
 
 - `.env.prod.example` — Template of the server's `.env.prod`: domain, Postgres credentials, the production bot's token and username, the bot–API secret, the bot's pulse URL.
-- `.github/workflows/release.yml` — Release workflow: after green CI on master builds the three images and rolls them out over ssh; a version tag names built images.
+- `.github/workflows/release.yml` — Release workflow: after green CI on master builds the four images — the receipt reader's too — and rolls them out over ssh; a version tag names built images.
 - `.github/workflows/watch.yml` — The outside watch (MOL-142): every five minutes `/api/health` and the page to the healthchecks.io check «molvia-up» — a `/fail` when three of four tries half a minute apart fail — and the certificate's term to «molvia-cert»; red only when it could not report.
 - `bin/bundle.mjs` — esbuild bundler for the API and bot images; the API also gets its forget, seed-catalogue, gates and failures tools.
 - `deploy/Caddyfile` — Caddy config: TLS for the domain, `/api` stripped and proxied to the API, internal routes closed, SPA fallback, headers, no access log.
 - `deploy/README.md` — Operations guide: new machine, deploys and the deploy key, login setup, local prod stack, erasure, seeding, gates, signals, backups and restore, the Postgres image and its move off alpine.
 - `deploy/backup/backup.env.example` — Template of the server's `backup.env`: age recipient, R2 remote, healthchecks.io URL, retention days.
-- `deploy/backup/backup.sh` — Nightly backup: `pg_dump` in the container, encrypted to the owner's age key, streamed to R2, pinged to healthchecks.io.
+- `deploy/backup/backup.sh` — Nightly backup: `pg_dump` in the container without the data of receipt photos and cut-out lines (MOL-125), encrypted to the owner's age key, streamed to R2, pinged to healthchecks.io.
 - `deploy/backup/molvia-backup.service` — systemd unit running the nightly backup script as the deploy user.
 - `deploy/backup/molvia-backup.timer` — systemd timer: the backup at 04:00 Yerevan time, catching up a night the machine was off.
 - `deploy/backup/restore.sh` — Restore from the owner's machine: list copies, drill into a throwaway Postgres, or replace production under a deploy hold.
-- `deploy/deploy.sh` — The deploy key's forced command: rolls out one published image tag, checks health, rolls back on failure; honours `deploy.hold`.
+- `deploy/deploy.sh` — The deploy key's forced command: rolls out one published image tag, checks health, rolls back on failure — without the receipt reader, which a tag before it lacks; honours `deploy.hold`.
 - `deploy/reindex-text.sql` — Rebuilds every index whose key is text or an expression by the rules of the libc the database now runs under — the block of `0038` for a move a migration cannot make (MOL-105).
 - `deploy/window-duplicates.sql` — After a rolled-back deploy (MOL-105): what the old API wrote twice into indexes of another libc — search picks merged, a login code dropped, every other pair of a unique text key named; index scans off.
-- `docker-compose.prod.yml` — Production stack: Postgres, API, bot and Caddy-served PWA on one network, logging to journald.
+- `docker-compose.prod.yml` — Production stack: Postgres, API, bot, the receipt reader (three cores, a gigabyte) and Caddy-served PWA on one network, logging to journald.

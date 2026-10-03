@@ -160,6 +160,14 @@ The detail behind the privacy lines of `CLAUDE.md`.
   the catalogue's licence mark — the base is ODbL, what is derived from it is offered on request — and
   the copy leaves it out with that reason. No photo of the base is ever fetched: a picture from its CDN
   would hand the phone to a third party. `/privacy` says all of it under «Незнакомый штрихкод».
+- **A receipt is read on our own server, and its photo lives days** (MOL-125, the owner's decisions of
+  27.09 and 02.10.2026): Tesseract in `services/receipt-reader`, a container with no database, no
+  disk and no log, asked over the compose network only — no third party sees a receipt. The photo
+  carries a customer's name and goes once the receipt is recorded, a receipt not recorded goes whole
+  after 28 days, an item line cut out for retraining the reader goes 28 days after recording, and
+  none of them ever enters the nightly copy (`pg_dump --exclude-table-data`, В-2) — a copy lives
+  fourteen days, longer than the promise. The copy of one's data carries receipts and their lines,
+  never a photo. `/privacy` says all of it under «Чеки». `.claude/rules/receipts.md`.
 - **Logs live fourteen days and carry no address and no query** (MOL-58). The API logs a request
   as its method and path — the query of `/catalogue/search` is what a person looked for; Caddy
   keeps no access log; Postgres logs its errors `terse`, without the row values of `DETAIL`;

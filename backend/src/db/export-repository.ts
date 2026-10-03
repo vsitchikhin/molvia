@@ -21,6 +21,8 @@ import {
   moneyMonthRates,
   places,
   ratingReminders,
+  receiptLines,
+  receipts,
   searchPicks,
   sessions,
   spendingCategories,
@@ -45,6 +47,7 @@ export const EXPORT_SECTION_OF: Readonly<Record<ErasedTable, keyof ExportContent
   exchanges: 'exchanges',
   incomes: 'incomes',
   spendings: 'spendings',
+  receipts: 'receipts',
   spending_categories: 'spendingCategories',
   budget_plans: 'budgetPlans',
   money_month_rates: 'monthRates',
@@ -68,7 +71,10 @@ export const EXPORT_COLUMNS: Readonly<
     | 'income_revisions'
     | 'feedback_replies'
     | 'items'
-    | 'item_barcodes',
+    | 'item_barcodes'
+    | 'receipt_lines'
+    | 'receipt_parts'
+    | 'receipt_line_images',
     { readonly exported: readonly string[]; readonly omitted?: Readonly<Record<string, string>> }
   >
 > = {
@@ -265,6 +271,75 @@ export const EXPORT_COLUMNS: Readonly<
     ],
     omitted: { actor_id: OWNER },
   },
+  receipts: {
+    exported: [
+      'id',
+      'status',
+      'failure',
+      'parts',
+      'country',
+      'language',
+      'currency',
+      'captured_at',
+      'created_at',
+      'queued_at',
+      'reading_at',
+      'read_at',
+      'attempts',
+      'reader_version',
+      'layout',
+      'tin',
+      'printed_on',
+      'printed_time',
+      'receipt_no',
+      'total_minor',
+      'balanced',
+      'recorded_at',
+      'deleted_at',
+    ],
+    omitted: { actor_id: OWNER },
+  },
+  // Read with their receipt, as an exchange's earlier versions are.
+  receipt_lines: {
+    exported: [
+      'position',
+      'printed',
+      'hs',
+      'sku',
+      'qty_milli',
+      'qty_unit',
+      'price_minor',
+      'sum_minor',
+      'discount_minor',
+      'settled',
+    ],
+    omitted: { receipt_id: 'the receipt it is nested in' },
+  },
+  // Taken by erasure with their receipt; never in the file — bytes of a picture, kept days (В-3).
+  receipt_parts: {
+    exported: [],
+    omitted: {
+      receipt_id: 'the receipt it is a part of',
+      position: 'a part of a photo that is not in the file',
+      photo: 'the photo itself: deleted once the receipt is recorded, never copied out',
+      width: 'a measure of the photo that is not in the file',
+      height: 'a measure of the photo that is not in the file',
+      created_at: 'when a photo that is not in the file arrived',
+    },
+  },
+  receipt_line_images: {
+    exported: [],
+    omitted: {
+      receipt_id: 'the receipt it was cut from',
+      position: 'the line it was cut from, which is in the file',
+      piece: 'a row of a picture that is not in the file',
+      image: 'a line cut out of the photo for the reader’s training (MOL-169), kept 28 days',
+      read_text: 'the reader’s text of that row, which the line in the file already says',
+      confirmed_text: 'the line as recorded, which the purchases already say',
+      confirmed_at: 'when the receipt was recorded, which the receipt in the file says',
+      created_at: 'when the row was cut, which the receipt’s reading says',
+    },
+  },
   spending_categories: {
     exported: ['id', 'preset', 'name', 'colour', 'archived_at', 'created_at'],
     omitted: { actor_id: OWNER },
@@ -442,6 +517,21 @@ export function createExportRepository(db: Db): ExportRepository {
             .from(spendings)
             .where(eq(spendings.actorId, actorId))
             .orderBy(asc(spendings.spentOn), asc(spendings.createdAt), asc(spendings.id))
+          const receiptRows = await tx
+            .select()
+            .from(receipts)
+            .where(eq(receipts.actorId, actorId))
+            .orderBy(asc(receipts.createdAt), asc(receipts.id))
+          const receiptLineRows = await tx
+            .select({ line: receiptLines })
+            .from(receiptLines)
+            .innerJoin(receipts, eq(receipts.id, receiptLines.receiptId))
+            .where(eq(receipts.actorId, actorId))
+            .orderBy(asc(receiptLines.position))
+          const linesOf = grouped(
+            receiptLineRows.map((row) => row.line),
+            (line) => line.receiptId,
+          )
           const categoryRows = await tx
             .select()
             .from(spendingCategories)
@@ -767,6 +857,45 @@ export function createExportRepository(db: Db): ExportRepository {
               createdAt: row.createdAt,
               amendedAt: row.amendedAt,
               removedAt: row.deletedAt,
+            })),
+            receipts: receiptRows.map((row) => ({
+              id: row.id,
+              status: row.status,
+              failure: row.failure,
+              parts: row.parts,
+              country: row.country,
+              language: row.language,
+              currency: row.currency,
+              capturedAt: row.capturedAt,
+              createdAt: row.createdAt,
+              queuedAt: row.queuedAt,
+              readingAt: row.readingAt,
+              readAt: row.readAt,
+              attempts: row.attempts,
+              readerVersion: row.readerVersion,
+              layout: row.layout,
+              tin: row.tin,
+              printedOn: row.printedOn,
+              printedTime: row.printedTime,
+              receiptNo: row.receiptNo,
+              total: cash(row.totalMinor, row.currency),
+              balanced: row.balanced,
+              recordedAt: row.recordedAt,
+              removedAt: row.deletedAt,
+              lines: (linesOf.get(row.id) ?? []).map((line) => ({
+                position: line.position,
+                printed: line.printed,
+                hs: line.hs,
+                sku: line.sku,
+                quantity:
+                  line.qtyMilli === null || line.qtyUnit === null
+                    ? null
+                    : { milli: line.qtyMilli, unit: line.qtyUnit },
+                price: cash(line.priceMinor, row.currency),
+                sum: cash(line.sumMinor, row.currency),
+                discount: cash(line.discountMinor, row.currency),
+                settled: line.settled,
+              })),
             })),
             spendingCategories: categoryRows.map((row) => ({
               id: row.id,

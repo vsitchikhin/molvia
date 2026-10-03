@@ -45,7 +45,12 @@ up: ## Start Postgres and apply migrations
 	 else echo "Postgres is up on port $(POSTGRES_PORT); no scaffold yet, skipping migrations"; fi
 
 down: ## Stop the stack, keeping the data
-	docker compose down
+	docker compose --profile receipts down
+
+reader: ## Start the receipt reader (Tesseract) for this copy
+	$(REQUIRE_ENV)
+	docker compose --profile receipts up -d --build receipt-reader
+	@echo "receipt reader: http://127.0.0.1:$(RECEIPT_READER_PORT)/health"
 
 reup: down up ## Restart the stack
 
@@ -158,7 +163,7 @@ icons: ## Regenerate the app icons from the mark in favicon.svg
 
 ports: ## Show this copy's index and ports
 	$(REQUIRE_ENV)
-	@echo "copy $(CLONE_INDEX): api $(API_PORT) · pwa $(PWA_PORT) · postgres $(POSTGRES_PORT) · db $(POSTGRES_DB)"
+	@echo "copy $(CLONE_INDEX): api $(API_PORT) · pwa $(PWA_PORT) · postgres $(POSTGRES_PORT) · db $(POSTGRES_DB) · reader $(RECEIPT_READER_PORT)"
 	@# The e2e database is named by E2E_DATABASE_URL, so it is read from there rather than
 	@# assembled here: a second place that decides the name is a second place to drift.
 	@if [ -n "$(E2E_API_PORT)" ]; then \
