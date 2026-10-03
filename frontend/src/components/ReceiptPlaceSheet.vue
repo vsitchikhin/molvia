@@ -61,7 +61,7 @@ import { computed, defineComponent, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCheck from '~icons/mdi/check'
-import { drawsNothing, newPlaceSchema, pastedLine } from '@molvia/model'
+import { drawsNothing, isRateDay, newPlaceSchema, pastedLine } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -141,9 +141,10 @@ export default defineComponent({
         : false,
     )
     // `max` of the field does not stop a day typed, and the day may come misread off the receipt:
-    // a day still to come is refused here, not from the queue (review 18).
+    // a day still to come is refused here, not from the queue (review 18) — by the server's own
+    // rule, as the spending's sheet does (review 33).
     const dayBad = computed(
-      () => when.value !== '' && (when.value > latest.value || when.value < '2000-01-01'),
+      () => when.value !== '' && !(isRateDay(when.value) && when.value <= latest.value),
     )
     const ready = computed(
       () => (chosen.value !== null || fresh.value) && when.value !== '' && !dayBad.value,

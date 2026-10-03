@@ -9,6 +9,7 @@ import { ERROR, parseMoney, parseQuantity } from '@molvia/model'
 import type { ReceiptDetail, ReceiptRecordBody, ReceiptReviewLine } from '@molvia/model'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
+import CaptureSheet from '@/components/CaptureSheet.vue'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 
@@ -200,6 +201,46 @@ describe('ReceiptView (MOL-127)', () => {
     await view.get('.receipt-line').trigger('click')
     await flushPromises()
     expect(sheet()).toBeNull()
+  })
+
+  it('«Переснять»: the sheet replaces this receipt, and «sent» takes the screen up (review 2, 31)', async () => {
+    receipt.mockResolvedValue(detail({ status: 'failed' }))
+    const { view, router } = await render()
+    await button(view, ru.receipt.capture.retake).trigger('click')
+    await flushPromises()
+    const capture = view.findComponent(CaptureSheet)
+    expect(capture.props('replacing')).toBe(ID)
+    // «sent» comes from the sheet's own `onClosed`, before it lets the screen unmount it (happy-dom
+    // closes a dialog at once, so the close itself is end-to-end's).
+    capture.vm.$emit('sent', false)
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('purchases')
+  })
+
+  it('no answer and nothing kept: an error is red with «Повторить», offline is not (MOL-19)', async () => {
+    receipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 500'))
+    const failed = await render()
+    expect(failed.view.text()).toContain(ru.receipt.review.error.title)
+    expect(failed.view.text()).toContain(ru.receipt.review.error.body)
+    expect(failed.view.find('.state.bad').exists()).toBe(true)
+    while (mounted.length) mounted.pop()?.unmount()
+
+    localStorage.clear()
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    receipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Load failed', false))
+    const { view } = await render()
+    expect(view.text()).toContain(ru.receipt.review.offline)
+    expect(view.find('.state.bad').exists()).toBe(false)
+  })
+
+  it('offline, the receipt read before is reviewed from the phone under the strip (MOL-19)', async () => {
+    await render()
+    while (mounted.length) mounted.pop()?.unmount()
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    receipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Load failed', false))
+    const { view } = await render()
+    expect(view.find('.strip').text()).toContain(ru.receipt.review.offline)
+    expect(view.findAll('.receipt-line')).toHaveLength(2)
   })
 
   it('a receipt the server has no more is said so, with the way back (handoff question 5)', async () => {

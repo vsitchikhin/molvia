@@ -247,7 +247,7 @@ import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconImageOff from '~icons/mdi/image-off-outline'
 import IconReceiptCheck from '~icons/mdi/receipt-text-check-outline'
-import { RECEIPT_CURRENCY, receiptDigits } from '@molvia/model'
+import { RECEIPT_CURRENCY, receiptDigits, yerevanDate } from '@molvia/model'
 import type { Money } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -361,10 +361,14 @@ export default defineComponent({
         ...one.lines.flatMap((line) => [line.price, line.sum, line.discount]),
       ])
     })
-    /** «≈ … по курсу» names the day of the rate the server sent, never the day chosen (review 19). */
+    /**
+     * «≈ … по курсу» names the day of the rate the server sent, never the day chosen (review 19) —
+     * in the rate's own zone, as every rate is printed: `asOf` is Yerevan's midnight, the evening
+     * before in UTC, and a phone west of it would say the day before (review 32).
+     */
     const rateDay = computed(() => {
       const asOf = detail.value?.rate?.asOf
-      return asOf ? localDay(asOf) : day.value
+      return asOf ? yerevanDate(asOf) : day.value
     })
 
     const dayOf = (at: Date | string) =>
