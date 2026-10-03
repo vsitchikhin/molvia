@@ -25,6 +25,9 @@ interface FinishedTrip extends Omit<SelectedTrip, 'load'> {
   t: ReturnType<typeof useI18n>['t']
   name: ComputedRef<string>
   meta: ComputedRef<string>
+  /** The purchases just written from a receipt, said once on arrival (MOL-127, 5o). */
+  recorded: Ref<number | null>
+  toVerdicts: () => void
   rows: ComputedRef<TripRowView[]>
   waiting: ComputedRef<number>
   /** «Сумма по чеку» of this record (MOL-78). */
@@ -59,7 +62,7 @@ export function useFinishedTrip(): FinishedTrip {
   const router = useRouter()
   const { t, locale } = useI18n()
   const queue = useTripQueueStore()
-  const { goBack, goUp } = useNavigation()
+  const { goBack, goTab, goUp } = useNavigation()
   /**
    * To «Покупки», where the refusals stand and the list is: up, when it is this screen's parent —
    * a push laid a second «Покупки» over the first and «back» met it again (review Р-17); opened
@@ -94,15 +97,31 @@ export function useFinishedTrip(): FinishedTrip {
       selected.trip.value?.finishedOnDeviceAt ??
       selected.trip.value?.finishedAt,
   )
-  const meta = computed(() =>
-    finished.value
+  const meta = computed(() => {
+    const line = finished.value
       ? t('trip.history.finished_at', {
           when: new Intl.DateTimeFormat(locale.value, {
             dateStyle: 'medium',
             timeStyle: 'short',
           }).format(finished.value),
         })
-      : t('trip.history.unfinished'),
+      : t('trip.history.unfinished')
+    // Recorded from a receipt (MOL-126): said beside the day, as «Записаны» says it (MOL-127).
+    return selected.trip.value?.receiptId ? `${line} · ${t('receipt.recorded.from_receipt')}` : line
+  })
+  /**
+   * «Записали N покупок» (handoff 05, 5o): the review hands the count over in the history's state
+   * as it gives way to this screen (`router.replace`), so it is said once, on arrival, and a reload
+   * or a «back» to here later says nothing.
+   */
+  const state: unknown = window.history.state
+  const recorded = ref<number | null>(
+    typeof state === 'object' &&
+      state !== null &&
+      'recorded' in state &&
+      typeof state.recorded === 'number'
+      ? state.recorded
+      : null,
   )
   const opened = ref<OpenedPurchase | null>(null)
   let opening = 0
@@ -170,6 +189,8 @@ export function useFinishedTrip(): FinishedTrip {
     t,
     name,
     meta,
+    recorded,
+    toVerdicts: () => void goTab('verdicts'),
     rows,
     waiting,
     receiptOpen,

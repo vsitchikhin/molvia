@@ -12,6 +12,8 @@
         <span v-if="row.mark" class="mark">{{ t(`trip.queued.${row.mark}`) }}</span>
       </span>
       <span v-if="quantity" class="quantity">{{ quantity }}</span>
+      <!-- A purchase from a receipt: the line as the till printed it, grey under it (MOL-127, 5o). -->
+      <span v-if="row.expense?.printed" class="printed">{{ row.expense.printed }}</span>
     </span>
 
     <span class="price">
@@ -155,6 +157,17 @@ button.row {
 .per-unit {
   color: var(--text-muted);
   font-size: var(--text-footnote);
+}
+
+.printed {
+  display: block;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-printed);
+  font-size: var(--text-footnote);
+  line-height: var(--leading-body);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .price {
