@@ -38,7 +38,10 @@ export interface PwaUpdate {
   /**
    * The build this page runs as: the first the API named to it — the page has no version of its
    * own. Null before the first answer, and on a copy that was not built by the release. What a
-   * message to the developer says the page was (MOL-147).
+   * message to the developer says the page was (MOL-147). **The price, named** (review №2): a page
+   * brought up from the cache after a rollout meets the new API first, so it names the API's build,
+   * not the code it runs — the very case of an old page failing on a new answer. Only a version
+   * built into the page would say it truly, and that is a change of the release, not of this task.
    */
   build(): string | null
 }

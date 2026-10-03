@@ -32,12 +32,25 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
 
 - **Only what is named, and the person sees it before sending** (MOL-150, Р-5, Р-7): the build of
   the page (the first `X-Molvia-Version` the page met, `pwaUpdate`), the screen as a route's name
-  without its query or parameters, the platform, the app's language, and from an error screen the
+  without its query or parameters, the app's language, the platform, and from an error screen the
   code. Never the content of a screen, a draft, the queue or the User-Agent. The build of the API is
-  stamped by the API at the write — never the phone's word for it.
+  stamped by the API at the write — never the phone's word for it. **The price of «the first build
+  met»** (review №2): a page brought up from the cache after a rollout meets the new API first and
+  names its build, not the old code it runs. A version built into the page would close it — a change
+  of the release, proposed apart.
+- **The code is the last refusal of the API before the error was shown** (В-1 «а», review №1): taken
+  as of the moment `ScreenState` drew the error, not of the tap — a person reads a while before
+  writing. **Only what came back from the server is a refusal** (adversarial В3): a dropped
+  connection or a request never answered has no code of the API's — the client's `error.internal`
+  for it would send the developer to a log with nothing in it, so a reply is told by its status — and
+  the sheet's own refusals are not remembered, or «too many today» would become a screen's reason.
 - **The platform is a line the domain can check**, `feedbackPlatformSchema`: a system from a short
   list, its major version when the platform shows one, `app` or `browser` — `ios 18 app`. Any other
   shape is refused, so the phone cannot attach more than the sheet says it does (MOL-147, Р-4).
+  **A version frozen is left out rather than sent wrong**: since iOS 26 an iPhone says `OS 18_6`
+  whatever it runs, so without Safari's `Version/` an `OS` of 18 and later goes with no number
+  (adversarial В6). Every route's name and every code of the registry fit the body's rules, and
+  tests hold both: one that did not would leave the sheet unable to send from that very screen.
 - **The language goes in the body** (Р-8): the API knows no app language otherwise, and the owner's
   reply and its frame in the bot are written in it (MOL-148, the bot keeps no language, MOL-101 Р-7).
 
@@ -63,7 +76,11 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
 - **A thread is its first message and what follows** (В-1): `thread_id` is empty on the first and
   names it on a continuation, of the same person — a composite key holds that — and `in_reply_to`
   names the owner's reply a continuation answers. Continuations and replies are written by the bot's
-  half (MOL-148); a continuation from Telegram has no screen, platform or key.
+  half (MOL-148); a continuation from Telegram has no screen, platform or key. **Two things the schema
+  does not hold yet, and MOL-148 must, with its writer** (adversarial В5): that `thread_id` names a
+  first message and never a continuation — else `purgeStale` groups a fresh word under the wrong
+  head and takes the thread with it — and that `in_reply_to` is a reply in the same person's thread —
+  else erasing one person cascades into another's row. No row of either exists before MOL-148.
 - **The owner's replies are kept** (`feedback_replies`, Р-1) so the copy is whole and a continuation
   shows the owner what is answered; they go with their message by the cascade.
 - **A thread lives a year from its last message, the person's or the owner's** (В-4): `purgeStale`
@@ -106,14 +123,26 @@ against the code in `.scratch/tasks/status/MOL-118/v2-feedback.md` (С-1…С-12
   must lose nothing. **Its key is the content's** (Р-2): a new `clientKey` with every change of the
   kind or the text, kept beside them, so a retry after a lost answer — a reload too — is the same
   message. A draft is forgotten only if it is still the one that was sent.
+- **Once it has left, what went with it stays with the key** (adversarial В1, В2): the server holds a
+  repeat to the whole message, so the draft keeps the screen, the code, the build, the language and
+  the platform the first send carried, and the sheet shows and sends them again until the kind or
+  the text changes — reopened from another screen, after another refusal or a new build, a lost
+  answer would otherwise meet `409` and leave the owner two messages. Before the first send, and
+  after any edit, they are the opening's (Р-6). **An error screen chooses «Сломалось» for its opening
+  only** (В4): closed untouched, the draft keeps the kind the person chose.
 - **The button says why it waits**, inactive and focusable, in the order a person can put it right:
   the kind, the text, the day's limit, the connection; then «Отправить», «Отправляем…» (pressed once
   however often), «Повторить» after a failure, «Готово» once sent. **The limit lives while the sheet
   is open**: the server's day is rolling and the phone cannot know when it frees, so the next opening
   asks again (С-8). **A `409` takes a new key before «Повторить»** (С-9): the same key would meet it
   for ever, and it is a defect of the phone, never the person's.
-- **Sent is a block inside the sheet** with `role="status"` — the app's live region is outside the
-  modal dialog (С-10); no number (Р-13). Closing it puts the focus back on the way in.
+- **The answer is said inside the sheet** — the app's live region is outside the modal dialog
+  (С-10) — **through a region there from the opening** (review №3): «sent» and «the day's limit»
+  drawn with a role of their own were often not read at all; a failure is an alert, read when
+  inserted. No number (Р-13). Closing it puts the focus back on the way in.
+- **The count of what is left is read with the field, and said only at its marks** (review №4): the
+  coming of the count, 100, 20 and the end — two hundred announcements over the echo of the typing
+  drown it.
 - **Kept for the kit, not copied here** (С-2): the pinned footer, a filled segment, an inactive
   button without transparency and `StatusStrip` are the kit's tasks (MOL-170); the offline strip is a
   line of the sheet in the meantime. The header is not pinned and the field has one height (С-3,
