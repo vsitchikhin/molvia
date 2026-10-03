@@ -44,6 +44,16 @@ const GROUNDS = ['surface', 'sunken', 'surface-2']
 const CATEGORIES = [...declared.light.keys()].filter((name) => name.startsWith('cat-'))
 
 const APART = 0.08
+/**
+ * Two categories stand side by side wherever a month puts them — the ring goes from the largest sum
+ * down, and every account has all thirteen presets — so every pair is held (MOL-218, owner's В-1).
+ * Lower than between roles (owner's В-2): with seven colours kept and the dark scheme the same hue
+ * as the light, 0.074 is as far as twenty-one go; a name always stands beside a category's colour.
+ */
+const CATEGORY_APART = 0.07
+// A category is one colour in both schemes, lifted for the dark ground; a grey has no hue to keep.
+const SAME_HUE = 10
+const ACHROMATIC = 0.04
 const MARK_CONTRAST = 3
 const TEXT_CONTRAST = 4.5
 
@@ -65,20 +75,21 @@ function contrast(a: string, b: string): number {
   return (light + 0.05) / (dark + 0.05)
 }
 
-// Euclidean distance in OKLab (Björn Ottosson's matrices): the distance the eye reads, so one number
-// means the same for two pale tints and two saturated marks.
+// OKLab (Björn Ottosson's matrices): the space the eye reads, so one number means the same for two
+// pale tints and two saturated marks.
+function oklab(hex: string): [number, number, number] {
+  const [r, g, bl] = linear(hex)
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * bl)
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * bl)
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * bl)
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ]
+}
+
 function distance(a: string, b: string): number {
-  const oklab = (hex: string) => {
-    const [r, g, bl] = linear(hex)
-    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * bl)
-    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * bl)
-    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * bl)
-    return [
-      0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
-      1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
-      0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
-    ]
-  }
   const [x, y] = [oklab(a), oklab(b)]
   return Math.hypot(...x.map((v, i) => v - (y[i] ?? 0)))
 }
@@ -123,6 +134,16 @@ describe.each(['light', 'dark'] as const)('the %s scheme', (scheme) => {
     expect(close).toEqual([])
   })
 
+  it(`holds any two categories ${String(CATEGORY_APART)} apart`, () => {
+    const close: string[] = []
+    for (const [i, a] of CATEGORIES.entries())
+      for (const b of CATEGORIES.slice(i + 1)) {
+        const d = distance(value(a), value(b))
+        if (d < CATEGORY_APART) close.push(`--${a} / --${b} ${d.toFixed(3)}`)
+      }
+    expect(close).toEqual([])
+  })
+
   it(`draws every mark and category at ${String(MARK_CONTRAST)}:1 on --surface`, () => {
     const faint = [...MARKS, ...CATEGORIES]
       .map((name) => [name, contrast(value(name), value('surface'))] as const)
@@ -146,4 +167,20 @@ describe.each(['light', 'dark'] as const)('the %s scheme', (scheme) => {
       .map(([text, ground, ratio]) => `--${text} on --${ground} ${ratio.toFixed(2)}:1`)
     expect(faint).toEqual([])
   })
+})
+
+it(`keeps every category within ${String(SAME_HUE)}° of its hue in both schemes`, () => {
+  const hue = (hex: string): [number, number] => {
+    const [, a, b] = oklab(hex)
+    return [Math.hypot(a, b), (Math.atan2(b, a) * 180) / Math.PI]
+  }
+  const drifted = CATEGORIES.flatMap((name) => {
+    const [light, dark] = [declared.light.get(name), declared.dark.get(name)]
+    if (!light || !dark) return []
+    const [[lightChroma, lightHue], [darkChroma, darkHue]] = [hue(light), hue(dark)]
+    if (Math.min(lightChroma, darkChroma) < ACHROMATIC) return []
+    const apart = Math.abs(((lightHue - darkHue + 540) % 360) - 180)
+    return apart > SAME_HUE ? [`--${name} ${apart.toFixed(1)}°`] : []
+  })
+  expect(drifted).toEqual([])
 })

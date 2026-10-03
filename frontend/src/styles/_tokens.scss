@@ -209,28 +209,30 @@
   /* A colour never works alone — a name stands beside it — and none is red, olive, ochre or
      terracotta: those say «плохо», «хорошо», «внимание» and «здесь можно нажать». Every one is at
      least 3:1 on --surface, for an icon and a bar; none is used for text. The thirteen presets are
-     keyed as the model keys them; one's own categories take the palette by turn (`colour` 0–7). */
+     keyed as the model keys them; one's own categories take the palette by turn (`colour` 0–7).
+     Any two can meet in one ring, so any two stand 0.07 apart, and a category keeps its hue in
+     both schemes (MOL-218, `tokens.test.ts`). */
   --cat-groceries: #2e7d73;
   --cat-cafe: #8e4f93;
   --cat-rent: #524569;
   --cat-home: #3d6d99;
   --cat-beauty: #c4587f;
-  --cat-transport: #5a5ea6;
+  --cat-transport: #474b9b;
   --cat-telecom: #00566d;
-  --cat-health: #3f8f84;
-  --cat-clothes: #9a76c0;
-  --cat-pets: #2c8197;
-  --cat-leisure: #627d86;
-  --cat-documents: #7d6b94;
+  --cat-health: #64978f;
+  --cat-clothes: #a466b2;
+  --cat-pets: #1b99d1;
+  --cat-leisure: #667c8e;
+  --cat-documents: #a783af;
   --cat-other: #8e8171;
-  --cat-own-0: #1f7a8c;
-  --cat-own-1: #9b4f6e;
-  --cat-own-2: #5480c7;
-  --cat-own-3: #6a5aa8;
-  --cat-own-4: #3f5f99;
-  --cat-own-5: #946b8f;
-  --cat-own-6: #2f8a74;
-  --cat-own-7: #49555c;
+  --cat-own-0: #018ea2;
+  --cat-own-1: #675886;
+  --cat-own-2: #5d6dc1;
+  --cat-own-3: #867ed1;
+  --cat-own-4: #1e3d6b;
+  --cat-own-5: #532268;
+  --cat-own-6: #069875;
+  --cat-own-7: #034445;
 
   /* How much of the category's colour the circle under its icon carries. */
   --cat-tint-share: 15%;
@@ -283,23 +285,23 @@
   --cat-cafe: #d09bd6;
   --cat-rent: #a486d7;
   --cat-home: #93b8de;
-  --cat-beauty: #b47696;
-  --cat-transport: #a7aae6;
+  --cat-beauty: #b47592;
+  --cat-transport: #767dd2;
   --cat-telecom: #24a7cf;
-  --cat-health: #95d9d0;
-  --cat-clothes: #c9b2ea;
-  --cat-pets: #7cc6d8;
-  --cat-leisure: #a9c1c9;
-  --cat-documents: #bfb0d6;
+  --cat-health: #8de1d4;
+  --cat-clothes: #edabfc;
+  --cat-pets: #8ad4fe;
+  --cat-leisure: #bec3c7;
+  --cat-documents: #e3c5eb;
   --cat-other: #b3a593;
-  --cat-own-0: #72c1d1;
-  --cat-own-1: #c796b2;
-  --cat-own-2: #729fe9;
-  --cat-own-3: #b4a8e6;
-  --cat-own-4: #9bb2e3;
-  --cat-own-5: #bfa5c5;
-  --cat-own-6: #7fcfb9;
-  --cat-own-7: #b5b5b5;
+  --cat-own-0: #40c8df;
+  --cat-own-1: #a69cbe;
+  --cat-own-2: #8fa2f7;
+  --cat-own-3: #bbb5ff;
+  --cat-own-4: #7890b5;
+  --cat-own-5: #9e6bb6;
+  --cat-own-6: #60d3ae;
+  --cat-own-7: #4b9898;
   --cat-tint-share: 22%;
 
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
