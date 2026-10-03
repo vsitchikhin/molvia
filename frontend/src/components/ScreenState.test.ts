@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref, shallowRef, watch, type VNodeArrayChildren } from 'vue'
@@ -433,7 +433,7 @@ describe('ScreenState', () => {
       document.body.innerHTML = ''
     })
 
-    const report = (view: ReturnType<typeof render>) =>
+    const report = (view: VueWrapper) =>
       view.findAll('.action button').find((button) => button.text() === en.state.report)
 
     it('comes last and quietest, under «Повторить»', () => {

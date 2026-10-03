@@ -111,7 +111,7 @@ describe('«Write to the developer» from the settings', () => {
   })
 
   it('gives the reasons in the order a person can put them right: kind, text, day, connection', async () => {
-    sendFeedback.mockRejectedValue(new ApiError(ERROR.FEEDBACK_RATE_LIMITED, 429))
+    sendFeedback.mockRejectedValue(new ApiError(ERROR.FEEDBACK_RATE_LIMITED))
     const { wrapper } = await render()
     const sheet = await open(wrapper)
 
@@ -439,7 +439,7 @@ describe('sending', () => {
   })
 
   it("keeps the text past the day's limit, and the next opening asks the server again", async () => {
-    sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.FEEDBACK_RATE_LIMITED, 429))
+    sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.FEEDBACK_RATE_LIMITED))
     const { wrapper } = await render()
     const sheet = await open(wrapper)
     await choose(sheet, en.feedback.kinds.idea)
@@ -462,7 +462,7 @@ describe('sending', () => {
   })
 
   it('says a failure out loud, keeps the text, and retries the same message', async () => {
-    sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 500))
+    sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
     const { wrapper } = await render()
     const sheet = await open(wrapper)
     await choose(sheet, en.feedback.kinds.bug)
@@ -482,7 +482,7 @@ describe('sending', () => {
   })
 
   it('takes the failure back once the text is changed', async () => {
-    sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 500))
+    sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
     const { wrapper } = await render()
     const sheet = await open(wrapper)
     await choose(sheet, en.feedback.kinds.bug)
@@ -496,7 +496,7 @@ describe('sending', () => {
   })
 
   it('takes a new key after a 409, so «Try again» cannot meet it for ever (сверка С-9)', async () => {
-    sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 409))
+    sendFeedback.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT))
     const { wrapper } = await render()
     const sheet = await open(wrapper)
     await choose(sheet, en.feedback.kinds.bug)
