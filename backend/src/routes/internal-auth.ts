@@ -3,12 +3,14 @@ import { z } from 'zod'
 import {
   DomainError,
   ERROR,
+  FEEDBACK_PICTURES_MAX,
   botFailureSchema,
   confirmLoginSchema,
   dueRemindersSchema,
   eraseMeSchema,
   feedbackFromBotAnswerSchema,
   feedbackFromBotSchema,
+  feedbackPictureSchema,
   loginPreviewCodec,
   ownerNoticesSchema,
   ownerNoticesSentSchema,
@@ -21,6 +23,7 @@ import type {
   DueReminders,
   FeedbackFromBot,
   FeedbackFromBotAnswer,
+  FeedbackPicture,
   LoginPreview,
   OwnerNotices,
   OwnerNoticesSent,
@@ -32,6 +35,12 @@ import type {
 import type { FastifyInstance } from 'fastify'
 import { parseBody, parseQuery, resourceId } from '@/parse'
 import { refuseAnyBody } from './empty-body'
+
+/** A message's number and a picture's place in it, as the path spells them. */
+const pictureAddress = z.strictObject({
+  number: z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  position: z.coerce.number().int().min(1).max(FEEDBACK_PICTURES_MAX),
+})
 
 export function internalAuthRoutes(
   app: FastifyInstance,
@@ -49,6 +58,7 @@ export function internalAuthRoutes(
     ownerNoticesSent(body: OwnerNoticesSent): Promise<void>
     feedbackFromBot(body: FeedbackFromBot): Promise<FeedbackFromBotAnswer>
     replyDelivered(body: ReplyDelivered): Promise<void>
+    feedbackPicture(number: number, position: number): Promise<FeedbackPicture | null>
   },
 ): void {
   const digest = (value: string): Buffer => createHash('sha256').update(value).digest()
@@ -147,6 +157,21 @@ export function internalAuthRoutes(
       await api.replyDelivered(parseBody(replyDeliveredSchema, request.body))
       return reply.code(204).send()
     })
+    // A picture of a message, fetched by the bot to send the owner after the notice (MOL-167, Р-5):
+    // the phone's JPEG or Telegram's id; `404` once delivered, past its week, or never there.
+    scope.get<{ Params: { number: string; position: string } }>(
+      '/internal/feedback/:number/pictures/:position',
+      { onRequest: refuseAnyBody, exposeHeadRoute: false },
+      async (request) => {
+        parseQuery(z.strictObject({}), request.query)
+        // A malformed address is a missing one, as every address of the API (MOL-25, Р-3).
+        const address = pictureAddress.safeParse(request.params)
+        if (!address.success) throw new DomainError(ERROR.NOT_FOUND)
+        const picture = await api.feedbackPicture(address.data.number, address.data.position)
+        if (picture === null) throw new DomainError(ERROR.NOT_FOUND)
+        return feedbackPictureSchema.parse(picture)
+      },
+    )
     done()
   })
 }

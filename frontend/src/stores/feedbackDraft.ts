@@ -23,6 +23,12 @@ export interface FeedbackDraft {
    * the server would meet `409` and a second message (adversarial В1, В2).
    */
   readonly attached?: FeedbackAttached
+  /**
+   * How many pictures went with the draft (MOL-167, Р-6). The pictures themselves live in the page's
+   * memory — megabytes on this shelf would push out the queue of purchases kept on it — so after a
+   * reload the sheet can only say they were not kept.
+   */
+  readonly pictures?: number
 }
 
 const keyOf = (owner: string): string => `molvia.feedback-draft.${owner}`
@@ -57,7 +63,7 @@ function store(owner: string, draft: FeedbackDraft | null, sent: readonly string
 
 export function recallFeedbackDraft(owner: string | null): FeedbackDraft | null {
   if (owner === null) return null
-  const { kind, text, clientKey, attached } = stored(owner)
+  const { kind, text, clientKey, attached, pictures } = stored(owner)
   if (typeof text !== 'string' || typeof clientKey !== 'string') return null
   const sent = feedbackAttachedSchema.safeParse(attached)
   return {
@@ -65,13 +71,15 @@ export function recallFeedbackDraft(owner: string | null): FeedbackDraft | null 
     text,
     clientKey,
     ...(sent.success ? { attached: sent.data } : {}),
+    ...(typeof pictures === 'number' && pictures > 0 ? { pictures } : {}),
   }
 }
 
-/** A draft with neither a kind nor a text is no draft: it is forgotten rather than kept empty. */
+/** A draft with no kind, no text and no picture is no draft: it is forgotten rather than kept empty. */
 export function keepFeedbackDraft(owner: string | null, draft: FeedbackDraft): void {
   if (owner === null) return
-  store(owner, draft.kind === '' && draft.text === '' ? null : draft, sentOf(stored(owner)))
+  const empty = draft.kind === '' && draft.text === '' && (draft.pictures ?? 0) === 0
+  store(owner, empty ? null : draft, sentOf(stored(owner)))
 }
 
 /**
