@@ -146,8 +146,13 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
 - **Taken with no session, and a cookie that came is never read** (Р-8 of MOL-149): the login screen
   breaks before there is one, and a failure belongs to nobody. The source is `phone`; the place is
   `<catcher>:<screen>` — Vue's handler, the window's `error` and `unhandledrejection`, a screen's own
-  catch, the scanner, the worker's registration, times a route's name (`login` behind the door,
-  `start` before the app is mounted, since the door's store must not be raised by a failure).
+  catch, the scanner, the worker's registration, a step of the start, times a route's name (`login`
+  behind the door, `start` before the app is mounted, since the door's store must not be raised by a
+  failure). **The catchers stand before any step of the start** (adversarial А4): a step that throws
+  is reported as `start` and thrown on, and one error object is one report whoever hears it. **The
+  price, named:** what throws while the bundle's modules are evaluated, before `main.ts` runs, reaches
+  nobody — no code of ours runs yet, and a listener in `index.html` could send it only by a second
+  copy of these rules.
 - **What leaves is the kind and the frames, never the message** (`describePhoneFailure`), nor a
   field, a draft, the queue, storage or an answer of the API: the screen, the build and the platform
   are the app's own words. **WebKit and Gecko write the stack without a header** — frames alone,
@@ -155,43 +160,70 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   holds the message, so it is read line by line, **only while the message is nowhere in it**.
   **Every engine's frame is brought to one shape on the phone** (`phoneFrame`, Р-1):
   `at <function> (<path>:<line>:<column>)`, the function kept only while it is an identifier, the
-  path only of the app's own origin with its query and hash cut — a page's own address stands in a
-  frame of an inline script, and its query is what a person searched for — anything else `?`. The
-  API's schema takes that shape and nothing else, so no word of text and no address passes.
+  path only of **a script of the app's own origin** (`PHONE_SCRIPT_PATH`: the build's `/assets/`,
+  a file at the root, the development server's `/src/`, `/@fs/`, `/node_modules/`) with its query
+  and hash cut, anything else `?`. **A page's own address is not a script** (adversarial А2): an
+  inline `<script>` — one an extension put into the page included — is named by its document, and
+  `/purchases/<trip>` is a person's trip and no code of ours. The API's schema takes the same shape
+  and nothing else, so no word of text and no address passes.
 - **Whether it is the phone's own is one rule** (`phoneDefect`, Р-4, owner's В-3): an API's word —
   a refusal or its 500 — the API recorded itself; no answer is the weather; a page not of the API's —
-  a portal, a proxy's 502 — is not ours. **A `2xx` the contract could not read is**, but only when
-  the reply named the API's build (`ApiError.fromApi`, `X-Molvia-Version`): the transport marks a
-  portal's `200` page and the API's unreadable answer alike, as answered, and only our API names its
-  build — found by end-to-end, where the first rule let not one such failure through. **Every catch
+  a portal, a proxy's 502 — is not ours. **A `2xx` the contract could not read is**, but only the
+  API's, and only whole (`ApiError.offContract`): the reply named the API's build (`fromApi`,
+  `X-Molvia-Version`) — the transport marks a portal's `200` page and the API's unreadable answer
+  alike, as answered, and the first rule, found by end-to-end, let not one such failure through —
+  and its body read as JSON: one cut off after its headers, Safari's «Load failed» of an app put away
+  mid-answer, is the weather (adversarial А1). **Every catch
   where a screen chooses «error»** calls `reportFailure` first — twenty-nine of them, and a test of
-  the sources holds a new one to it: the error stops in those catches and never reached Vue's
-  handler, so a throw inside a screen's load was the one class nobody could see.
+  the sources holds every branch to it (review №5) — a branch whose failure was reported elsewhere,
+  a child's load or a catch up the chain, says so in a comment the test counts: the error stops in
+  those catches and never reached Vue's handler, so a throw inside a screen's load was the one class
+  nobody could see. **A report never throws** — it stands first in those catches.
 - **What the window hears goes only with a frame of the app's own code** (Р-2): an extension, a
   script of Telegram's browser, `Script error.` of another origin. What the app's own catchers hear
   is the app's wherever it was thrown, and goes with no frame too — a registration's `DOMException`
   has none.
 - **One failure once a page** (Р-5): a retry that shows the same error, a loop that throws every
-  frame, send it the first time only, so the count is of pages that met it. **Kept until there is an
-  answer** (Р-7): `molvia.failures` on the shared shelf, twenty at most, one a failure; sent at once,
-  at start and on `online`; **any answer lets them go** — refused, they would be refused again — and
-  only no answer keeps them. Nobody's, so «Выйти» leaves it. Sending reports nothing about itself and
-  is no reason a screen broke (`lastRefusal`, Р-8).
+  frame, send it the first time only, so the count is of pages that met it. **Kept until our API has
+  answered** (Р-7): `molvia.failures` on the shared shelf, twenty at most, one a failure; sent at once,
+  at start and on `online`, **one window at a time** (`navigator.locks`, adversarial А3: two windows
+  hearing `online` each sent the shared buffer whole). **The API's answer lets them go** — taken, or
+  refused for good — **but not «too many»**, which says «later» (review №2: a stream of somebody
+  else's cost a real phone its report), and **nothing that is not the API's**: a proxy's `502` during a
+  rollout, the very window an old page meets a new server in, and a portal's page keep them (review
+  №3). Nobody's, so «Выйти» leaves it. Sending reports nothing about itself and is no reason a screen
+  broke (`lastRefusal`, Р-8).
 - **The page's build is the name of its own script** (В-1): `index-BTCsHrpw`, a hash of its content,
   which changes exactly when the phone's code does. The page has no other version; the first one the
   API named (`pwaUpdate.build()`) is the new build for the old code from the cache after a rollout —
   the very window a failure of the old code matters in — and a git version built in would make every
-  merge a new app on every phone. **So a phone's fingerprint lives within a build** (Р-10): the code
-  is minified and the top frame's file is the build's; the owner hears of it once a build as of any
-  other, and only the count across builds is lost.
+  merge a new app on every phone. **So a phone's fingerprint lives within a build** (Р-10), and the
+  build is in it (review №1): the code is minified and the top frame's file is the build's anyway, and
+  a failure with no frame of the build — a registration's, the scanner worker's file whose hash does
+  not move with `index` — shared one row between an old page and a new one during a rollout and was
+  «new in this build» at every turn. The owner hears of it once a build as of any other, and only the
+  count across builds is lost.
 - **The platform is a column and its system is in the fingerprint** (В-2): `platformLine`'s one line,
   never the User-Agent, the last one seen; «only on iOS» is seen at once, and the API's and the bot's
   fingerprints did not move — the system is added only where there is one.
-- **The limit is the process's** (Р-6): twenty reports a minute from an address — a whole buffer —
-  and two hundred from everybody, the whole body refused past it with `429`. The address is the one
-  Caddy names last in `X-Forwarded-For`, believed only from inside, the limit's key and nothing else
-  — in no log, in no table. **The price, named:** someone sending from many addresses meets only the
-  two hundred, and a new fingerprint a minute in the owner's chat is the most it can make.
+- **The limit is the process's** (Р-6): sixty reports a minute from an address — three buffers: one
+  was too few for a mobile operator's address, which thousands of phones share (adversarial А6) — and
+  two hundred from everybody, the whole body refused past it with `429`, which the phone keeps its
+  buffer through. The address is the one Caddy names last in `X-Forwarded-For`, believed only from
+  inside, **an IPv6 one by its `/64`** (review №2: one home connection has 2^64), the limit's key and
+  nothing else — in no log, in no table. **The channel can be silenced, not flooded** — the price,
+  named: someone sending from many addresses takes the minute's two hundred, and the real phones'
+  reports wait for the next start or `online`.
+- **The owner hears of the phone at most ten times an hour** (`phoneNoticeBudget`, review №1): the
+  endpoint is open and a build is the phone's word, so a report with a new build each time was «new
+  in this build» each time — twenty messages a minute. Past ten an hour a notice is held back and
+  counted, never queued, and the next one let through says «и ещё M» (`muted`); the table counts all
+  of them; a restart starts the hour over. **The API's and the bot's go first** (adversarial А5): the
+  claim hands them out before the phone's, and the reporter writes them first and keeps fifty of its
+  two hundred places at most for the phone's — a stream of invented failures while the database was
+  slow filled the queue, and the API's own was the log's alone. **The price, named:** past four in
+  flight and fifty waiting, a burst of different new failures of phones is dropped with a warning —
+  a real burst that wide is the app broken everywhere, and the first fifty say it.
 - **The scanner's worker carries no model** (`barcodes.md`), so its failure travels to the page as
   the error's name, message and stack and is described there by the one rule (Р-11) — the message
   never leaves the phone; a throw it did not catch is `WorkerError` at its file, line and column.
@@ -199,6 +231,6 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   its tools open) — the repository is public. `make failures` reads a phone's frame through the map
   of its own file from the site (`phoneDecoder`, `APP_BASE_URL` of the API's environment): the name
   is a hash of the content, so a map found is that file's own; a build the site no longer serves is
-  printed as it is.
+  printed as it is, and so is one a site does not answer for within ten seconds (review №4).
 - **Not here:** failures inside the service worker itself — it has nobody to send them; a message to
   the developer carrying a failure's fingerprint (MOL-147 sends the API's last code instead).

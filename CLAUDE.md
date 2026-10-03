@@ -399,7 +399,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The phone's own failures come by `POST /client-errors`** (MOL-144): no session, the kind and
   frames in one shape for every engine and never the message (`describePhoneFailure`); a screen's
   «error» calls `reportFailure`, which sends only the phone's defects — never an API's word or the
-  weather; once a page, kept on the device until an answer; the build is the name of the page's script.
+  weather; once a page, kept on the device until the API answers; the build is the name of the page's
+  script, and in the fingerprint. The owner hears of the phone at most ten times an hour, after the
+  API's.
 
 ### The bot — `.claude/rules/bot.md`
 
