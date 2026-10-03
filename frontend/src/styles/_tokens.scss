@@ -172,8 +172,9 @@
 
   /* Every pair that can meet is held by tokens.test.ts, in both schemes (MOL-172): two steps of
      different roles and a category against a role at least 0.08 apart in OKLab, a mark 3:1 and text
-     4.5:1 on its ground, a tint 0.08 from --surface (not --sunken). A value that fails there is changed, never
-     excused. --text-muted is for the three grounds, never a tint (under 4.5:1 there). */
+     4.5:1 on its ground, a tint 0.08 from --surface (not from --sunken or --surface-2, where a
+     word tells it). A value that fails there is changed, never excused. --text-muted is for the
+     three grounds, never a tint (under 4.5:1 there). */
   --sunken: #f3e8d6; /* the page ground; cards sit on it */
   --surface: #fffaf2;
   --surface-2: #f7efe1; /* input wells, sunken rows inside a card */
@@ -181,7 +182,8 @@
   --border-strong: #cbbb9f; /* decoration, and the edge of a field — never data */
 
   /* What carries meaning without a colour of its own: an unselected bar, «Остальные», the dash of
-     «no data», the off track of a switch — 3:1 on --surface, where --border-strong is 1.8:1 (Ф-3). */
+     «no data», the off track of a switch — 3:1 on --surface, where --border-strong is 1.8:1
+     (Ф-3). */
   --graphic: #746258;
 
   --text: #1f1c19;

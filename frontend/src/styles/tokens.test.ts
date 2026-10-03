@@ -8,19 +8,20 @@ import { describe, expect, it } from 'vitest'
  * value that fails is changed in `_tokens.scss` (owner's В-13, MOL-118).
  */
 
-// A path in a variable: Vite rewrites `new URL('./literal', import.meta.url)` into an asset's address.
+// A path in a variable: Vite rewrites `new URL('./literal', import.meta.url)` into an asset's
+// address.
 const TOKENS = './_tokens.scss'
 
-// Both kinds of comment out first, in one pass as Sass reads them: a `/*` inside a line comment opens
-// nothing, and a `//` inside a block comment ends nothing. A value in either is no token, and Sass
-// drops it from what the page draws.
+// Both kinds of comment out first, in one pass as Sass reads them: a `/*` inside a line comment
+// opens nothing, and a `//` inside a block comment ends nothing. A value in either is no token, and
+// Sass drops it from what the page draws.
 const source = readFileSync(new URL(TOKENS, import.meta.url), 'utf8').replace(
   /\/\*[\s\S]*?\*\/|(^|[\s;{}])\/\/[^\n]*/g,
   (_comment, before?: string) => before ?? '',
 )
 
-// Every declaration, whatever its value: a colour this test cannot read must fail here, not fall out
-// of the lists — Stylelint asks for the short hex (`color-hex-length`), and `--fix` writes it.
+// Every declaration, whatever its value: a colour this test cannot read must fail here, not fall
+// out of the lists — Stylelint asks for the short hex (`color-hex-length`), and `--fix` writes it.
 function declarations(block: string): Map<string, string> {
   return new Map(
     [...block.matchAll(/--([a-z0-9-]+)\s*:\s*([^;]+);/g)].map((m) => [
@@ -43,7 +44,8 @@ const declared = {
   dark: declarations(source.slice(darkAt)),
 }
 
-// A role is a meaning; its steps are a mark, the same at text size, a fill — and the accent's solid.
+// A role is a meaning; its steps are a mark, the same at text size, a fill — and the accent's
+// solid.
 const ROLES: Record<string, readonly string[]> = {
   accent: ['accent', 'accent-solid', 'accent-ink', 'accent-tint'],
   good: ['good', 'good-ink', 'good-tint'],
@@ -83,8 +85,8 @@ function contrast(a: string, b: string): number {
   return (light + 0.05) / (dark + 0.05)
 }
 
-// Euclidean distance in OKLab (Björn Ottosson's matrices): the distance the eye reads, so one number
-// means the same for two pale tints and two saturated marks.
+// Euclidean distance in OKLab (Björn Ottosson's matrices): the distance the eye reads, so one
+// number means the same for two pale tints and two saturated marks.
 function distance(a: string, b: string): number {
   const oklab = (hex: string) => {
     const [r, g, bl] = linear(hex)
@@ -143,8 +145,9 @@ describe.each(['light', 'dark'] as const)('the %s scheme', (scheme) => {
 
   // A tint is a fill with no edge — a notice in a sheet or a card: one the eye cannot tell from the
   // sheet it lies on is no fill (adversarial А3: the dark bad-tint was 0.038). On the page ground,
-  // --sunken, the light good, warn and bad tints stand closer — a strip or a state's circle there is
-  // told by its icon and word (review 5, way «а»).
+  // --sunken, the light good, warn and bad tints stand closer — a strip or a state's circle there
+  // is told by its icon and word (review 5, way «а»); so is a mark on a well, --surface-2 (round 3,
+  // В1).
   it(`lays every tint ${String(APART)} apart from --surface`, () => {
     const lost = TINTS.map((tint) => [tint, distance(value(tint), value('surface'))] as const)
       .filter(([, d]) => d < APART)
