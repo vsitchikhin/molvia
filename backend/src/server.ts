@@ -53,6 +53,7 @@ import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
 import { readQueuedReceipts } from '@/usecases/read-receipts'
+import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
 import type { ReadReport } from '@/usecases/read-receipts'
 import {
   putReceiptPart,
@@ -609,6 +610,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
             instance.log.warn({ reason: event.reason }, 'receipt reader dropped a photo')
           } else if (event.kind === 'strips_failed') {
             instance.log.warn({ reason: event.reason }, 'receipt lines not cut out')
+          } else if (event.kind === 'bind_failed') {
+            // read all the same, every line new: a fault of ours, so the owner hears of it
+            failures.report(event.error, job('receipt-binding'), 'receipt lines not bound')
           } else {
             failures.report(event.error, job('receipt-reading'), 'receipt reading failed')
           }
@@ -616,7 +620,19 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         const queue = startItemEmbedding(
           async () => {
             await receipts.requeueInterrupted()
-            await readQueuedReceipts({ receipts, reader, report })
+            await readQueuedReceipts({
+              receipts,
+              reader,
+              report,
+              bind: (claimed, lines) =>
+                bindReceiptLines(
+                  { items: createItemRepository(db), embedder },
+                  claimed.actorId,
+                  claimed.country,
+                  claimed.language,
+                  lines,
+                ),
+            })
           },
           (error) => {
             failures.report(error, job('receipt-queue'), 'receipt queue failed')

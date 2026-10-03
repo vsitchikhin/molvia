@@ -162,6 +162,7 @@ function fakeRepositories(
       createUnlessNamed: unexpected('items.createUnlessNamed'),
       search: unexpected('items.search'),
       byBarcode: unexpected('items.byBarcode'),
+      nodes: unexpected('items.nodes'),
       attachBarcode: unexpected('items.attachBarcode'),
       detachBarcode: unexpected('items.detachBarcode'),
       ...overrides.items,

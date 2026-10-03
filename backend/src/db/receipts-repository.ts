@@ -13,7 +13,9 @@ import type {
   ReceiptDetail,
   ReceiptFailure,
   ReceiptLine,
+  ReceiptParsedMatch,
   ReceiptSummary,
+  SettingsCity,
 } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn, Db } from './index'
@@ -29,7 +31,9 @@ export interface ReceiptPart {
 /** A receipt taken from the queue to be read: where it was bought and its photo, part by part. */
 export interface ClaimedReceipt {
   readonly id: string
+  readonly actorId: string
   readonly country: ReceiptSummary['country']
+  readonly language: ReceiptSummary['language']
   readonly parts: readonly { readonly position: number; readonly photo: Buffer }[]
 }
 
@@ -42,6 +46,15 @@ export interface ReceiptHead {
   readonly totalMinor: bigint | null
   readonly balanced: boolean
   readonly layout: 'card' | 'table'
+  /** The city of the settings its address prints (MOL-126, Р-6). */
+  readonly city: SettingsCity | null
+}
+
+/** What the parse found a line to be (MOL-126): an item and how, and the line word by word. */
+export interface LineBinding {
+  readonly itemId: string | null
+  readonly match: ReceiptParsedMatch
+  readonly translation: string | null
 }
 
 export interface LineImage {
@@ -58,6 +71,8 @@ export type ReadOutcome =
       readonly readerVersion: string
       readonly head: ReceiptHead
       readonly lines: readonly ReceiptLine[]
+      /** One for each line, in their order. */
+      readonly bindings: readonly LineBinding[]
       readonly images: readonly LineImage[]
     }
   | {
@@ -412,14 +427,19 @@ export function createReceiptRepository(db: Db): ReceiptRepository {
             attempts: sql`${receipts.attempts} + 1`,
           })
           .where(eq(receipts.id, next.id))
-          .returning({ id: receipts.id, country: receipts.country })
+          .returning({
+            id: receipts.id,
+            actorId: receipts.actorId,
+            country: receipts.country,
+            language: receipts.language,
+          })
         const parts = await tx
           .select({ position: receiptParts.position, photo: receiptParts.photo })
           .from(receiptParts)
           .where(eq(receiptParts.receiptId, next.id))
           .orderBy(asc(receiptParts.position))
         const row = theRow(claimed, 'receipts')
-        return { id: row.id, country: row.country, parts }
+        return { ...row, parts }
       })
     },
 
@@ -459,6 +479,7 @@ export function createReceiptRepository(db: Db): ReceiptRepository {
             receiptNo: head?.receiptNo ?? null,
             totalMinor: head?.totalMinor ?? null,
             balanced: head?.balanced ?? false,
+            city: head?.city ?? null,
           })
           .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
           .returning({ id: receipts.id })
@@ -481,6 +502,9 @@ export function createReceiptRepository(db: Db): ReceiptRepository {
               sumMinor: line.sum?.minor ?? null,
               discountMinor: line.discount?.minor ?? null,
               settled: line.settled,
+              itemId: outcome.bindings[position]?.itemId ?? null,
+              match: outcome.bindings[position]?.match ?? null,
+              translation: outcome.bindings[position]?.translation ?? null,
             })),
           )
         }

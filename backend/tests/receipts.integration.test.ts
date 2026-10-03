@@ -11,15 +11,25 @@ import {
 } from '@molvia/model'
 import am05 from '@molvia/model/testing/receipt-text.am-05.json'
 import type { FastifyInstance } from 'fastify'
+import { createItemRepository } from '@/db/items-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
-import { receiptLineImages, receiptLines, receiptParts, receipts } from '@/db/schema'
+import { NO_EMBEDDER } from '@/embeddings/embedder'
+import {
+  itemHeadings,
+  itemNames,
+  receiptLineImages,
+  receiptLines,
+  receiptParts,
+  receipts,
+} from '@/db/schema'
 import { PhotoUnreadable, ReaderDropped, ReaderUnavailable } from '@/receipts/reader'
 import type { ReaderReading, ReceiptReader } from '@/receipts/reader'
+import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
 import { readQueuedReceipts } from '@/usecases/read-receipts'
 import type { ReadReport } from '@/usecases/read-receipts'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, signIn } from './fixtures'
+import { clearAll, insertActor, insertItem, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const repository = createReceiptRepository(db)
@@ -148,7 +158,19 @@ function benchReader(over: Partial<ReceiptReader> = {}): ReceiptReader & { asked
 
 async function readAll(reader: ReceiptReader): Promise<ReadReport[]> {
   const reports: ReadReport[] = []
-  await readQueuedReceipts({ receipts: repository, reader, report: (event) => reports.push(event) })
+  await readQueuedReceipts({
+    receipts: repository,
+    reader,
+    report: (event) => reports.push(event),
+    bind: (claimed, lines) =>
+      bindReceiptLines(
+        { items: createItemRepository(db), embedder: NO_EMBEDDER },
+        claimed.actorId,
+        claimed.country,
+        claimed.language,
+        lines,
+      ),
+  })
   return reports
 }
 
@@ -344,6 +366,33 @@ describe('the queue', () => {
       1,
       'card',
     ])
+  })
+
+  // MOL-126: what the lines are is found once, in the queue — by the catalogue's Armenian names and
+  // the heading, then by the search with the gloss; a line nobody knows is a new item named by it
+  it('binds the lines to items while reading', async () => {
+    const me = await owner()
+    const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+    const plain = await insertItem(db, { name: 'Молоко', searchKey: 'moloko' })
+    await db.insert(itemNames).values([
+      { itemId: milk, language: 'hy', name: 'կաթ 3.2%' },
+      { itemId: plain, language: 'hy', name: 'կաթ' },
+    ])
+    await db.insert(itemHeadings).values([
+      { itemId: milk, hs: '0401' },
+      { itemId: plain, hs: '0401' },
+    ])
+    const id = await queued(me)
+    await readAll(benchReader())
+
+    const lines = await db
+      .select()
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+      .orderBy(receiptLines.position)
+    expect(lines[2]).toMatchObject({ itemId: milk, match: 'search', translation: 'молоко' })
+    expect(lines.filter((line) => line.match === 'new').length).toBeGreaterThan(0)
+    expect(lines.every((line) => line.match !== null)).toBe(true)
   })
 
   it('asks for a new shot when nothing worth checking was read (В-4)', async () => {
