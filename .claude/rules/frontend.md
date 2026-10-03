@@ -190,34 +190,37 @@ The detail behind the frontend lines of `CLAUDE.md`.
   component makes every line above right and the icon 32 — nor set by a `:style` of any tag; and
   no custom property may have a name Sass builds where it could be a step — `--#{…}`,
   `--icon-#{…}`, `--state-#{…}`, a whole `#{$step}`; `--cat-#{$c}` cannot and passes (Г1, Д1,
-  review 23); nor is any `@property` registered outside the tokens — its name may be built, and
-  its initial value would size every icon of the app (Е1, Ж2). Property names are matched whatever
-  their case, as the browser matches them (Ж1). **Nor in the template**: a size or a font-size off
-  the scale in `style`, any `:style` or `v-bind="…"`, a `width=`/`height=` (А5, Б3); on the way
-  from an icon to the element it takes its step from, no `font-size` in a `style` but a step and
-  none bound, the `font` shorthand included (Е2, Ж3: the style of a wrapper wins over its rule —
-  and so a step there is the step, review 25). An icon is a tag imported from `~icons/` under any
-  name or registered under another in `components` (Б5), or written `Icon…`/`icon-…`, or a
-  `<component :is>` of an `icon` or a `glyph` that holds nothing — the name of its expression
-  tells it from a card's `<component :is="as" />` (Б6), so one named otherwise (`row.symbol`) is
-  no icon to the rule. The template is read with its attributes' quotes, so `v-if="n > 0"` ends no
-  tag (А3); `<Transition>` and the like render nothing of their own, so an icon in one stands in
-  its parent (В4), and so does `<slot>` (review 18); a `<Teleport>` carries its content out of the
-  page around it, so nothing above it is an ancestor (Д2), unless a static `disabled` keeps it in
-  place — a bound `:disabled` may be false (Е5, Ж4). The nesting is resolved first — `&` replaced,
-  `&-chevron` glued to its parent (А7); `svg` is the tag, a class named `svg` none. Width and
-  height are no allowed-list's, since a dot, a circle and a chart are sized there too; the rule
-  reads the template instead. **Out of its sight, by design:** a class from `:class` — the keys,
-  shorthand ones too (`{ accent }`, review 19), and quoted strings of its expression are read,
-  checked as the element's and never counted for a size; one from a variable is named nowhere; an
-  icon styled from another file, or put straight into the slot of a component that sizes its slot
-  itself — `AppButton`, the one in `SIZED_SLOTS`, which gives the mixin, so a step of the icon's
-  own there is enough (Д4), where a new component with an icon slot goes with its own `:deep(svg)`
-  (review 15: `RouterLink` or `AppCard` size nothing); a step inherited through a component, which
-  may set a font-size of its own; specificity; a `:style` or `v-bind` with an object from the
-  script, which the rule cannot read; an SFC with no `<style>` block, which gives the rule no root
-  to run on. A circle around an icon is sized as a shape; the glyph in it is the icon (the pencil
-  of «Настройки» was a 32 svg with padding, now 18 in a 32 circle).
+  review 23); nor may `@property` register a step outside the tokens — by its name or one Sass
+  builds that could be a step — since its initial value would size every icon of the app (Е1, Ж2);
+  any other property is no business of the scale and passes (review 26). Property names are
+  matched whatever their case, as the browser matches them (Ж1). **Nor in the template**: a size
+  or a font-size off the scale in `style`, any `:style` or `v-bind="…"`, a `width=`/`height=` (А5,
+  Б3); on the way from an icon to the element it takes its step from, no `font-size` in a `style`
+  but a step and none bound, the `font` shorthand included (Е2, Ж3: the style of a wrapper wins
+  over its rule — and so a step there is the step, review 25, for a rule on `svg` too; its rules
+  are read all the same, since one with `!important` or under `@media` may still give it text, З1,
+  З2). An icon is a tag imported from `~icons/` under any name or registered under another in
+  `components` (Б5), or written `Icon…`/`icon-…`, or a `<component :is>` of an `icon` or a `glyph`
+  that holds nothing — the name of its expression tells it from a card's `<component :is="as" />`
+  (Б6), so one named otherwise (`row.symbol`) is no icon to the rule. The template is read with
+  its attributes' quotes, so `v-if="n > 0"` ends no tag (А3); `<Transition>` and the like render
+  nothing of their own, so an icon in one stands in its parent (В4), and so does `<slot>` (review
+  18); a `<Teleport>` carries its content out of the page around it, so nothing above it is an
+  ancestor (Д2), unless a static `disabled` keeps it in place — a bound `:disabled` may be false
+  (Е5, Ж4). The nesting is resolved first — `&` replaced, `&-chevron` glued to its parent (А7);
+  `svg` is the tag, a class named `svg` none. Width and height are no allowed-list's, since a dot,
+  a circle and a chart are sized there too; the rule reads the template instead. **Out of its
+  sight, by design:** a class from `:class` — the keys, shorthand ones too (`{ accent }`, review
+  19), and quoted strings of its expression are read, checked as the element's and never counted
+  for a size; one from a variable is named nowhere; an icon styled from another file, or put
+  straight into the slot of a component that sizes its slot itself — `AppButton`, the one in
+  `SIZED_SLOTS`, which gives the mixin, so a step of the icon's own there is enough (Д4), where a
+  new component with an icon slot goes with its own `:deep(svg)` (review 15: `RouterLink` or
+  `AppCard` size nothing); a step inherited through a component, which may set a font-size of its
+  own; specificity; a `:style` or `v-bind` with an object from the script, which the rule cannot
+  read; an SFC with no `<style>` block, which gives the rule no root to run on. A circle around an
+  icon is sized as a shape; the glyph in it is the icon (the pencil of «Настройки» was a 32 svg
+  with padding, now 18 in a 32 circle).
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
   `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a
