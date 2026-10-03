@@ -385,6 +385,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `ctx.from.id`, the message answered and the tag `#fb42` of its first line — the only place the tag
   is read; only `OWNER_TELEGRAM_ID` makes it a reply, and a person's word finds its thread by the
   message the reply went out as. Delivered is 👌 — ✅ is not a reaction Telegram takes.
+- **A screenshot only by the person's own act, from the gallery, seen before sending** (MOL-167): the
+  phone draws it anew and the API keeps nothing but the picture whatever the phone did — every segment
+  walked, metadata cut wherever it stands, nothing after the end; the picture lives only until the
+  owner's Telegram has it, a week at most, never in the nightly copy or the person's copy — its line
+  stays, «sent» only if it reached the owner. Words, a picture, or both.
 - **One sheet, two ways in** (MOL-147): «О приложении» in the settings and «Сообщить о проблеме» drawn
   by `ScreenState` — only a full-screen error, somebody known, not in a `<dialog>`; the draft is the
   device's with no queue, and what goes with the text is read from the body it sends.
@@ -411,6 +416,14 @@ that are easiest to break; the file holds every rule of the area and the reason 
   script, and in the fingerprint. The owner hears of the phone three times an hour a sender and twenty
   in all, after the API's, the rest told as a count once an hour; at most sixty new rows of it an hour
   a sender and a thousand in all.
+- **The metrics' labels are a route's template, never a path** (MOL-145): `/metrics` on its own port
+  (`METRICS_PORT`), never the API's, which is all Caddy reaches; what sees the machine or the database
+  is on `metrics`, a network with no way out, and Grafana calls nobody home. **The dashboard and every
+  threshold are JSON in `deploy/grafana`**, baked into its image; a test holds the thresholds and that
+  every figure read is written. A restart is a reset of the same container's CPU counter, never
+  `changes()`; a request whose client left is `aborted`, never lost. **The alarms read a person's
+  requests** — never `unmatched`, `/health`, `/internal/*` — go by their own bot, never the product's,
+  and have a pulse to healthchecks.io, since Grafana is the one that sends.
 
 ### The bot — `.claude/rules/bot.md`
 
@@ -533,6 +546,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   pulse — after a claim, while it hears Telegram, never in its first minute — to healthchecks.io
   and its own Telegram, never our bot; **`/health` is `503` whenever it is not `ok`**, and the bot
   is not in it; a check that never got a ping never alarms, so `BOT_PULSE_URL` is required.
+- **The metrics never judge a rollout** (MOL-145, adversarial А4): pulled before anything changes,
+  started only once the application is healthy, a failure of theirs a warning; a rollback leaves them as
+  they run. The one port they publish is Grafana's, on the loopback.
 
 ## Tracker and documentation
 

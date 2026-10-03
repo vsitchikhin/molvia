@@ -5,6 +5,7 @@ import {
   FEEDBACK_REPLY_MAX,
   FEEDBACK_TEXT_MAX,
   dayIn,
+  drawsNothing,
   timeZoneOf,
   visibleText,
 } from '@molvia/model'
@@ -36,6 +37,10 @@ function readText(text: string, max: number): string | Refused {
  *   up to `FEEDBACK_TEXT_MAX` as the form's, under the form's day limit;
  * - else nothing of ours — `404`, and the bot lets it on to the greeting. A tag in a stranger's reply
  *   is that too: only the owner's account makes it a reply.
+ *
+ * A person's word may be a photo, with a caption or without (MOL-167, Р-8, В-3); the owner's reply is
+ * words only (Р-9) — the bot says so to the owner before asking, so a reply here has a text, and a
+ * photo beside it is none of the reply's.
  */
 export async function feedbackFromBot(
   repository: Pick<FeedbackRepository, 'reply' | 'answeredBy' | 'continueThread'>,
@@ -44,6 +49,7 @@ export async function feedbackFromBot(
   apiBuild: string,
 ): Promise<FeedbackFromBotAnswer> {
   if (owner !== null && message.telegramUserId === owner && message.thread !== null) {
+    if (message.text === undefined) return { outcome: 'invisible' }
     const text = readText(message.text, FEEDBACK_REPLY_MAX)
     if (typeof text !== 'string') return text
     const written = await repository.reply(message.thread, text)
@@ -59,11 +65,16 @@ export async function feedbackFromBot(
 
   const answered = await repository.answeredBy(message.telegramUserId, message.repliedMessageId)
   if (answered === null) throw new DomainError(ERROR.NOT_FOUND)
-  const text = readText(message.text, FEEDBACK_TEXT_MAX)
+  // A caption that draws nothing under a photo is no words: the photo alone is enough (В-3, review 5).
+  const text =
+    message.text === undefined || (message.picture !== undefined && drawsNothing(message.text))
+      ? ''
+      : readText(message.text, FEEDBACK_TEXT_MAX)
   if (typeof text !== 'string') return text
   const write = await repository.continueThread({
     reply: answered,
     text,
+    ...(message.picture === undefined ? {} : { picture: message.picture }),
     apiBuild,
     limit: FEEDBACK_DAY_LIMIT,
     notify: owner !== null,

@@ -2,7 +2,7 @@
 // DOM for the code inside page.evaluate, which runs in the browser.
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { open } from './session'
+import { open, signedIn } from './session'
 
 /**
  * The sheet in a real browser and a real history — what the component tests cannot show: that
@@ -742,4 +742,76 @@ test('× closes the sheet of a screen that writes its false late', async ({ page
   await page.waitForTimeout(1000)
   await expect(sheet(page)).toBeHidden()
   expect(await historyLength(page)).toBe(length)
+})
+
+// MOL-167 (review 2): the owner's phone is an iPhone, and what Safari does its own way is exactly this
+// — a file input inside an open `<dialog>`, `createImageBitmap` of the file and `toBlob` of the canvas.
+test.describe('a screenshot in «Написать разработчику»', () => {
+  test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
+
+  test('is drawn anew, shown before sending and sent', async ({ page, browserName }) => {
+    test.skip(
+      browserName === 'webkit',
+      'WebKit keeps no Secure cookie on http://127.0.0.1: no screen behind the login',
+    )
+    await signedIn(page, '/settings')
+    await page.getByRole('button', { name: 'Написать разработчику' }).click()
+    const feedback = page.getByRole('dialog')
+    await expect(feedback).toBeVisible()
+    await page.waitForTimeout(400)
+    await feedback.getByText('Сломалось', { exact: true }).click()
+    const png = await page.evaluate(() => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 390
+      canvas.height = 844
+      const context = canvas.getContext('2d')
+      if (context) {
+        context.fillStyle = '#3b7a57'
+        context.fillRect(0, 0, 390, 844)
+      }
+      return canvas.toDataURL('image/png')
+    })
+
+    await feedback.locator('input[type="file"]').setInputFiles({
+      name: 'screen.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(png.slice(png.indexOf(',') + 1), 'base64'),
+    })
+
+    await expect(feedback.getByRole('img', { name: 'Снимок 1' })).toBeVisible()
+    await expect(feedback.locator('.attached')).toContainText('1 снимок')
+    await feedback.getByRole('button', { name: 'Отправить' }).click()
+    await expect(feedback.getByText('Спасибо, прочитаем', { exact: true })).toBeVisible()
+  })
+})
+
+// What the sheet cannot be signed in for on WebKit, the platform is asked directly (review 2): the very
+// calls `pictureFromFile` makes — the orientation applied while decoding, a canvas, a JPEG — on a page
+// open to anybody.
+test('a picture is drawn anew as a JPEG the way the sheet draws it', async ({ page }) => {
+  await page.goto('/privacy')
+  const drawn = await page.evaluate(async () => {
+    const source = document.createElement('canvas')
+    source.width = 390
+    source.height = 844
+    source.getContext('2d')?.fillRect(0, 0, 390, 844)
+    const png = await new Promise<Blob | null>((done) => {
+      source.toBlob(done, 'image/png')
+    })
+    if (png === null) return null
+    const picture = await createImageBitmap(png, { imageOrientation: 'from-image' })
+    const canvas = document.createElement('canvas')
+    canvas.width = picture.width
+    canvas.height = picture.height
+    canvas.getContext('2d')?.drawImage(picture, 0, 0)
+    picture.close()
+    const jpeg = await new Promise<Blob | null>((done) => {
+      canvas.toBlob(done, 'image/jpeg', 0.85)
+    })
+    if (jpeg === null) return null
+    const head = new Uint8Array(await jpeg.slice(0, 2).arrayBuffer())
+    return { type: jpeg.type, width: canvas.width, height: canvas.height, head: [...head] }
+  })
+
+  expect(drawn).toEqual({ type: 'image/jpeg', width: 390, height: 844, head: [0xff, 0xd8] })
 })

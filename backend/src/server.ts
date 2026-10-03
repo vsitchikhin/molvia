@@ -21,6 +21,7 @@ import { VERSION, env, loginConfig } from '@/env'
 import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
 import { apiFailureReporter } from '@/failure-reporter'
+import type { HttpMetrics } from '@/metrics'
 import { botFailure, phoneReportLimit, takePhoneFailures } from '@/usecases/record-failure'
 import { claimOwnerNotices } from '@/usecases/owner-notices'
 import type { FailurePlace } from '@/usecases/record-failure'
@@ -48,7 +49,7 @@ import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
 import { exportMine } from '@/usecases/export-mine'
-import { sendFeedback } from '@/usecases/send-feedback'
+import { heavyFeedbackLimit, sendFeedback } from '@/usecases/send-feedback'
 import { feedbackFromBot } from '@/usecases/feedback-from-bot'
 import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
@@ -181,6 +182,8 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.LOGIN_FORBIDDEN]: 403,
   [ERROR.LOGIN_RATE_LIMITED]: 429,
   [ERROR.FEEDBACK_RATE_LIMITED]: 429,
+  [ERROR.FEEDBACK_PICTURE_INVALID]: 415,
+  [ERROR.FEEDBACK_PICTURE_TOO_LARGE]: 413,
   [ERROR.CLIENT_ERRORS_RATE_LIMITED]: 429,
   [ERROR.LOGIN_DISABLED]: 503,
   [ERROR.BOT_UNAUTHORIZED]: 401,
@@ -264,10 +267,20 @@ function routePath(request: FastifyRequest): string {
  * route there is no place at all.
  */
 function requestPlace(request: FastifyRequest): FailurePlace {
-  const route = request.routeOptions.url
-  // Fastify answers `HEAD` of every `GET` itself: one defect, one place (adversarial А7).
-  const method = request.method === 'HEAD' ? 'GET' : request.method
+  const { method, route } = routeOf(request)
   return { source: 'api', ...(route === undefined ? {} : { route: `${method} ${route}` }) }
+}
+
+/**
+ * The method and the route's template a request reached — the failure's place and the metrics'
+ * labels alike (MOL-145, Р-1), so the two never name one request differently. Fastify answers `HEAD`
+ * of every `GET` itself: one defect, one place (adversarial А7), and one series.
+ */
+function routeOf(request: FastifyRequest): { method: string; route: string | undefined } {
+  return {
+    method: request.method === 'HEAD' ? 'GET' : request.method,
+    route: request.routeOptions.url,
+  }
 }
 
 /** A job of the API's own timers, by its name (В-1). */
@@ -320,6 +333,11 @@ export interface ServerOptions {
   readonly owner?: TelegramUserId | null
   /** Every recording of a failure, for a test to wait on before it reads the table. */
   readonly failureRecorded?: (recording: Promise<void>) => void
+  /**
+   * Where every answer is counted (MOL-145). Absent, nothing is: the API's entry hands in the one its
+   * metrics port serves, and a test the one it reads.
+   */
+  readonly metrics?: HttpMetrics
 }
 
 /**
@@ -420,6 +438,32 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     void reply.header(VERSION_HEADER, NAMED_BUILD)
     next(null, payload)
   })
+
+  // Every answer by its route's template, a 404 and an error included (MOL-145). A path Fastify
+  // could not decode is answered before any hook and is not counted.
+  const metrics = options.metrics
+  if (metrics !== undefined) {
+    // Each request once: by its answer, or as `aborted` when the client left first (adversarial А1)
+    // — a closed socket never gives `onResponse`, and the answer nobody waited for is the slow one.
+    const counted = new WeakSet<FastifyRequest>()
+    app.addHook('onRequest', (request, reply, next) => {
+      reply.raw.once('close', () => {
+        if (reply.raw.writableFinished || counted.has(request)) return
+        counted.add(request)
+        const { method, route } = routeOf(request)
+        metrics.observe(method, route, 'aborted', reply.elapsedTime / 1000)
+      })
+      next()
+    })
+    app.addHook('onResponse', (request, reply, next) => {
+      if (!counted.has(request)) {
+        counted.add(request)
+        const { method, route } = routeOf(request)
+        metrics.observe(method, route, reply.statusCode, reply.elapsedTime / 1000)
+      }
+      next()
+    })
+  }
 
   // Fastify's own 404 writes `Route GET:/path?q=… not found` into the log and into the body,
   // past the request serializer: an old client or a mistyped path would log the query the
@@ -565,8 +609,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       )
       // A message to the developer lives a year from the last word of its thread (MOL-147, В-4 of
       // MOL-150), whether or not anyone writes again.
+      // A picture's bytes live until the owner's bot took them, a week at most (MOL-167, В-1).
       stopFeedbackCleanup = startLoginCleanup(
-        () => messages.purgeStale(),
+        async () => {
+          await messages.purgeStale()
+          await messages.forgetPictures()
+        },
         (error) => {
           failures.report(error, job('feedback-cleanup'), 'stale feedback cleanup failed')
         },
@@ -726,9 +774,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           )
         }),
       ownerNoticesSent: (body) =>
-        createOwnerNoticeRepository(db).markSent(body.messages, new Date()),
+        createOwnerNoticeRepository(db).markSent(body.messages, new Date(), body.missed),
       feedbackFromBot: (body) => feedbackFromBot(messages, owner, body, VERSION),
       replyDelivered: (body) => messages.markDelivered(body),
+      feedbackPicture: (number, position) => messages.picture(number, position),
     })
 
     // The phone's failures (MOL-144): no session, a limit in memory, the page's own build.
@@ -776,8 +825,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       actorEraseRoute(guarded, (telegramUserId) =>
         eraseMe(createErasureRepository(db), telegramUserId),
       )
-      feedbackRoutes(guarded, (actorId, message) =>
-        sendFeedback(messages, actorId, message, VERSION, owner),
+      const heavyFeedback = heavyFeedbackLimit()
+      feedbackRoutes(
+        guarded,
+        (actorId, message) => sendFeedback(messages, actorId, message, VERSION, owner),
+        (actorId) => heavyFeedback(actorId, Date.now()),
       )
       sessionRoutes(guarded, {
         list: (actorId, currentId) => listSessions(sessions, actorId, currentId),

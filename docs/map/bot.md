@@ -20,7 +20,7 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 
 ## packages/client
 
-- `packages/client/src/bot.ts` — The bot's API client: preview, confirm and decline a login, erase a person, claim the rating reminders due, rate by a press (MOL-101) and switch them (MOL-103), report a failure of its own and claim the owner's notices (MOL-143), hand over a text written as a reply, say what became of a reply sent and which notices went (MOL-148), over the internal channel with the bot secret. Tests: `packages/client/src/auth.test.ts`.
+- `packages/client/src/bot.ts` — The bot's API client: preview, confirm and decline a login, erase a person, claim the rating reminders due, rate by a press (MOL-101) and switch them (MOL-103), report a failure of its own and claim the owner's notices (MOL-143), hand over a text written as a reply, say what became of a reply sent and which notices went (MOL-148), fetch a message's picture for the owner (MOL-167), over the internal channel with the bot secret. Tests: `packages/client/src/auth.test.ts`.
 
 ## bot
 
@@ -28,7 +28,7 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 - `bot/src/assemble.ts` — Wires the bot: per-chat `sequentialize`, the erase, rate, switch and feedback composers before the login's, a handler's failure by kind to the log and the API (MOL-143), and the concurrent runner with the updates it handles named, a `getUpdates` retried at a pause growing linearly, its own log off and a failure logged by kind (`telegramFailure`); `introduce` asks `getMe` before it, retried the same way.
 - `bot/src/bundle.test.ts` — Test of the bot as it ships (MOL-142): builds the bundle and checks that a class esbuild renamed keeps its name — node-fetch under grammY takes a signal only from a constructor called `AbortSignal`.
 - `bot/src/env.ts` — The bot's environment: the Telegram token read alone, `BOT_API_SECRET`, the API and app addresses, the pulse URL; a refusal names variables, never values.
-- `bot/src/feedback.ts` — «Написать разработчику» in the bot (MOL-148): a text written as a reply to a tagged notice or to the frame of a reply goes to the API with the tag of that message's first line, a command and any other reply on to the greeting; the owner's reply sent to the person in the frame of their language, then 👌 or «Доставлено», «не дошло» on a block; a person's word passed on; what is not ours goes on to the greeting.
+- `bot/src/feedback.ts` — «Написать разработчику» in the bot (MOL-148): a text written as a reply to a tagged notice or to the frame of a reply goes to the API with the tag of that message's first line, a command and any other reply on to the greeting; the owner's reply sent to the person in the frame of their language, then 👌 or «Доставлено», «не дошло» on a block; a person's word passed on; a photo on a frame is a word by Telegram's id and its caption, a picture sent as a file is asked again as a photo, the owner's reply words only (MOL-167); what is not ours goes on to the greeting.
 - `bot/src/erase.ts` — `/delete`: one question naming what goes and what stays, «Удалить навсегда» valid for ten minutes, erasing whoever pressed.
 - `bot/src/i18n.ts` — `t()`: a bot message by key in the sender's language through `pickLocale`, with `{name}` substitution.
 - `bot/src/i18n/en.ts` — The bot's English dictionary, mirroring the Russian one key for key.

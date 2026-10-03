@@ -1,15 +1,23 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { ownerNoticesSchema } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createErasureRepository } from '@/db/erasure-repository'
 import { createFeedbackRepository } from '@/db/feedback-repository'
 import { createOwnerNoticeRepository } from '@/db/owner-notices-repository'
-import { actors, failures, feedback, feedbackReplies, ownerNotices } from '@/db/schema'
+import {
+  actors,
+  failures,
+  feedback,
+  feedbackPictureFiles,
+  feedbackPictures,
+  feedbackReplies,
+  ownerNotices,
+} from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, signIn } from './fixtures'
+import { aScreenshot, clearAll, insertActor, signIn } from './fixtures'
 
 // MOL-148: the bot's half of «Написать разработчику» — the owner's notice, the reply, a thread
 // continued — through a real server and a real Postgres.
@@ -863,5 +871,341 @@ describe('уведомление о сообщении, которое конт�
       },
     ])
     expect(await db.select().from(feedback).where(eq(feedback.id, thread))).toHaveLength(1)
+  })
+})
+
+describe('снимки — владельцу после уведомления (MOL-167, Р-5, Р-8)', () => {
+  const photo = {
+    fileId: 'AgACAgIAAxkBAAIBZ2b',
+    fileUniqueId: 'AQADxL0xG-kK',
+    width: 1280,
+    height: 2772,
+    bytes: 180_211,
+  }
+
+  async function picture(app: FastifyInstance, number: number, position: number, bot = asBot) {
+    return app.inject({
+      method: 'GET',
+      url: `/internal/feedback/${String(number)}/pictures/${String(position)}`,
+      headers: bot,
+    })
+  }
+
+  async function sentBy(app: FastifyInstance, messages: number[]) {
+    return app.inject({
+      method: 'POST',
+      url: '/internal/owner/sent',
+      payload: { messages },
+      headers: asBot,
+    })
+  }
+
+  it('уведомление называет, сколько снимков; бот берёт каждый по месту, без места съёмки', async () => {
+    const app = await serverFor(OWNER)
+    const cookie = await signIn(db, await insertActor(db))
+    const sent = await send(
+      app,
+      cookie,
+      message({ pictures: [aScreenshot(1179, 2556, { gps: true }), aScreenshot(1080, 2400)] }),
+    )
+    const { number } = sent.json<{ number: number }>()
+
+    const claim = await app.inject({ method: 'POST', url: '/internal/owner/claim', headers: asBot })
+    expect(ownerNoticesSchema.parse(claim.json()).notices[0]).toMatchObject({ pictures: 2 })
+
+    const first = await picture(app, number, 1)
+    expect(first.statusCode).toBe(200)
+    expect(first.headers['cache-control']).toBe('no-store')
+    const body = first.json<{ source: string; jpeg: string }>()
+    expect(body.source).toBe('phone')
+    const bytes = Buffer.from(body.jpeg, 'base64')
+    expect(bytes.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]))
+    expect(bytes.includes(Buffer.from('GPS'))).toBe(false)
+    expect((await picture(app, number, 2)).statusCode).toBe(200)
+    expect((await picture(app, number, 3)).statusCode).toBe(404)
+    expect((await picture(app, number, 4)).statusCode).toBe(404)
+  })
+
+  it('без секрета бота снимка не дают', async () => {
+    const app = await serverFor(OWNER)
+    const cookie = await signIn(db, await insertActor(db))
+    const { number } = (await send(app, cookie, message({ pictures: [aScreenshot()] }))).json<{
+      number: number
+    }>()
+
+    expect((await picture(app, number, 1, { authorization: 'Bearer nope' })).statusCode).toBe(401)
+  })
+
+  it('«ушло» стирает байты в той же записи; строка снимка с моментом остаётся', async () => {
+    const app = await serverFor(OWNER)
+    const cookie = await signIn(db, await insertActor(db))
+    const { number } = (await send(app, cookie, message({ pictures: [aScreenshot()] }))).json<{
+      number: number
+    }>()
+    const other = (await send(app, cookie, message({ pictures: [aScreenshot()] }))).json<{
+      number: number
+    }>()
+
+    expect((await sentBy(app, [number])).statusCode).toBe(204)
+
+    expect((await picture(app, number, 1)).statusCode).toBe(404)
+    const [gone] = await db
+      .select()
+      .from(feedbackPictures)
+      .where(eq(feedbackPictures.feedbackId, number))
+    expect(gone?.sentAt).toBeInstanceOf(Date)
+    const files = await db
+      .select()
+      .from(feedbackPictureFiles)
+      .where(eq(feedbackPictureFiles.feedbackId, number))
+    expect(files).toHaveLength(0)
+    expect((await picture(app, other.number, 1)).statusCode).toBe(200)
+  })
+
+  it('без текста — уведомление с пустым текстом и снимком; контракт его читает', async () => {
+    const app = await serverFor(OWNER)
+    const silent: Record<string, unknown> = { ...message() }
+    delete silent.text
+    await send(app, await signIn(db, await insertActor(db)), {
+      ...silent,
+      pictures: [aScreenshot()],
+    })
+
+    const claim = await app.inject({ method: 'POST', url: '/internal/owner/claim', headers: asBot })
+
+    expect(ownerNoticesSchema.parse(claim.json()).notices[0]).toMatchObject({
+      text: '',
+      pictures: 1,
+    })
+  })
+
+  it('фото человека на ответ — продолжение со снимком из Telegram, байтов у нас нет', async () => {
+    const app = await serverFor(OWNER)
+    const { telegram, thread } = await aThread(app)
+    await answer(app, thread, 9031, 'Пришлите экран счёта')
+    await app.inject({ method: 'POST', url: '/internal/owner/claim', headers: asBot })
+
+    const word = await fromBot(app, {
+      telegramUserId: telegram,
+      repliedMessageId: 9031,
+      thread: null,
+      picture: photo,
+    })
+
+    expect(word.json()).toEqual({ outcome: 'continued' })
+    const [continued] = await db.select().from(feedback).where(eq(feedback.threadId, thread))
+    expect(continued).toMatchObject({ text: '', pictures: 1 })
+    const [kept] = await db
+      .select()
+      .from(feedbackPictures)
+      .where(eq(feedbackPictures.feedbackId, continued?.id ?? 0))
+    const [file] = await db
+      .select()
+      .from(feedbackPictureFiles)
+      .where(eq(feedbackPictureFiles.feedbackId, continued?.id ?? 0))
+    expect(file).toMatchObject({ image: null, telegramFileId: photo.fileId })
+    expect(kept).toMatchObject({
+      source: 'telegram',
+      fingerprint: photo.fileUniqueId,
+      width: 1280,
+      height: 2772,
+      bytes: 180_211,
+    })
+    const claim = await app.inject({ method: 'POST', url: '/internal/owner/claim', headers: asBot })
+    expect(ownerNoticesSchema.parse(claim.json()).notices).toEqual([
+      {
+        kind: 'feedback_continued',
+        number: continued?.id,
+        thread,
+        quote: 'Пришлите экран счёта',
+        text: '',
+        at: expect.any(String) as string,
+        pictures: 1,
+      },
+    ])
+    expect((await picture(app, continued?.id ?? 0, 1)).json()).toEqual({
+      source: 'telegram',
+      fileId: photo.fileId,
+    })
+    await sentBy(app, [continued?.id ?? 0])
+    expect((await picture(app, continued?.id ?? 0, 1)).statusCode).toBe(404)
+  })
+
+  it('то же фото дважды — одно слово; другое фото или то же с подписью — новое', async () => {
+    const app = await serverFor(OWNER)
+    const { telegram, thread } = await aThread(app)
+    await answer(app, thread, 9031)
+    const word = (extra: Record<string, unknown>) =>
+      fromBot(app, { telegramUserId: telegram, repliedMessageId: 9031, thread: null, ...extra })
+
+    await word({ picture: photo })
+    await word({ picture: photo })
+    await word({ picture: { ...photo, fileId: 'AgAC-other', fileUniqueId: 'AQAD-other' } })
+    await word({ text: 'Вот', picture: photo })
+    await word({ text: 'Вот' })
+
+    const words = await db.select().from(feedback).where(eq(feedback.threadId, thread))
+    expect(words.map((row) => [row.text, row.pictures])).toEqual([
+      ['', 1],
+      ['', 1],
+      ['Вот', 1],
+      ['Вот', 0],
+    ])
+  })
+
+  it('ответ владельца — только словами: фото без подписи на уведомление — ничего не записано', async () => {
+    const app = await serverFor(OWNER)
+    const { thread } = await aThread(app)
+
+    const reply = await fromBot(app, {
+      telegramUserId: OWNER,
+      repliedMessageId: 900,
+      thread,
+      picture: photo,
+    })
+
+    expect(reply.json()).toEqual({ outcome: 'invisible' })
+    expect(await db.select().from(feedbackReplies)).toHaveLength(0)
+  })
+})
+
+describe('ревью и адверсариальное MOL-167', () => {
+  const pictureOf = (app: FastifyInstance, number: number, position = 1) =>
+    app.inject({
+      method: 'GET',
+      url: `/internal/feedback/${String(number)}/pictures/${String(position)}`,
+      headers: asBot,
+    })
+  const sentBy = (app: FastifyInstance, body: Record<string, unknown>) =>
+    app.inject({ method: 'POST', url: '/internal/owner/sent', payload: body, headers: asBot })
+  const linesOf = (number: number) =>
+    db
+      .select()
+      .from(feedbackPictures)
+      .where(eq(feedbackPictures.feedbackId, number))
+      .orderBy(feedbackPictures.position)
+
+  it('EXIF между сканами прогрессивного JPEG до базы и до бота не доходит (А2)', async () => {
+    const app = await serverFor(OWNER)
+    const segment = (marker: number, body: readonly number[]) => [
+      0xff,
+      marker,
+      (body.length + 2) >> 8,
+      (body.length + 2) & 0xff,
+      ...body,
+    ]
+    const sos = segment(0xda, [0x01, 0x01, 0x00, 0x00, 0x3f, 0x00])
+    const gps = segment(0xe1, [...Buffer.from('Exif\0\0GPS 40.7942N 43.8453E', 'latin1')])
+    const progressive = Buffer.from([
+      0xff,
+      0xd8,
+      ...segment(0xc2, [0x08, 0x09, 0xfc, 0x04, 0x9b, 0x01]),
+      ...sos,
+      0x55,
+      ...gps,
+      ...sos,
+      0x55,
+      0xff,
+      0xd9,
+      ...Buffer.from('tail: +374 99 123456', 'latin1'),
+    ]).toString('base64')
+    const cookie = await signIn(db, await insertActor(db))
+
+    const sent = await send(app, cookie, message({ pictures: [progressive] }))
+
+    expect(sent.statusCode).toBe(201)
+    const { number } = sent.json<{ number: number }>()
+    const handed = Buffer.from(
+      (await pictureOf(app, number)).json<{ jpeg: string }>().jpeg,
+      'base64',
+    )
+    expect(handed.includes(Buffer.from('GPS'))).toBe(false)
+    expect(handed.includes(Buffer.from('+374'))).toBe(false)
+  })
+
+  it('«ушло» не ставится снимку, которого не было или который Telegram отверг (А4)', async () => {
+    const app = await serverFor(OWNER)
+    const cookie = await signIn(db, await insertActor(db))
+    const { number } = (
+      await send(
+        app,
+        cookie,
+        message({
+          pictures: [
+            aScreenshot(),
+            aScreenshot(1080, 2400, { seed: 1 }),
+            aScreenshot(1080, 2400, { seed: 2 }),
+          ],
+        }),
+      )
+    ).json<{ number: number }>()
+    // The third was taken by the week's timer before the bot came back.
+    await db
+      .delete(feedbackPictureFiles)
+      .where(and(eq(feedbackPictureFiles.feedbackId, number), eq(feedbackPictureFiles.position, 3)))
+
+    // The second Telegram refused; the third the bot found gone (a 404) — both named by the bot.
+    expect((await pictureOf(app, number, 3)).statusCode).toBe(404)
+    const said = await sentBy(app, {
+      messages: [number],
+      missed: [
+        { message: number, position: 2 },
+        { message: number, position: 3 },
+      ],
+    })
+
+    expect(said.statusCode).toBe(204)
+    expect((await linesOf(number)).map((line) => line.sentAt !== null)).toEqual([
+      true,
+      false,
+      false,
+    ])
+    expect(await db.select().from(feedbackPictureFiles)).toHaveLength(0)
+  })
+
+  it('после восстановления без файлов строки снимков целы, повтор — то же сообщение (А5)', async () => {
+    const app = await serverFor(OWNER)
+    const cookie = await signIn(db, await insertActor(db))
+    const body: Record<string, unknown> = { ...message(), pictures: [aScreenshot()] }
+    delete body.text
+    const first = await send(app, cookie, body)
+    const { number } = first.json<{ number: number }>()
+
+    // What `pg_dump --exclude-table-data=feedback_picture_files` brings back: the files, empty.
+    await db.delete(feedbackPictureFiles)
+
+    expect(await linesOf(number)).toHaveLength(1)
+    const copy = await app.inject({ method: 'GET', url: '/actors/me/export', headers: { cookie } })
+    const [written] = copy.json<{ feedback: { pictures: unknown[] }[] }>().feedback
+    expect(written?.pictures).toHaveLength(1)
+    const again = await send(app, cookie, body)
+    expect(again.statusCode).toBe(200)
+    expect(again.json()).toEqual(first.json())
+  })
+})
+
+describe('раунд 2 MOL-167', () => {
+  it('снимок, который бот взял и отправил, «дошёл», даже если таймер отпустил файл до слова бота (Б4)', async () => {
+    const app = await serverFor(OWNER)
+    const cookie = await signIn(db, await insertActor(db))
+    const { number } = (await send(app, cookie, message({ pictures: [aScreenshot()] }))).json<{
+      number: number
+    }>()
+    // The bot took it; meanwhile the week's timer let the file go.
+    await db.delete(feedbackPictureFiles)
+
+    const said = await app.inject({
+      method: 'POST',
+      url: '/internal/owner/sent',
+      payload: { messages: [number] },
+      headers: asBot,
+    })
+
+    expect(said.statusCode).toBe(204)
+    const [line] = await db
+      .select()
+      .from(feedbackPictures)
+      .where(eq(feedbackPictures.feedbackId, number))
+    expect(line?.sentAt).toBeInstanceOf(Date)
   })
 })
