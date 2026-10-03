@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { ERROR, ISSUE } from '#model/support/errors'
 import {
+  FEEDBACK_BODY_BYTES_MAX,
+  FEEDBACK_PICTURES_MAX,
+  FEEDBACK_PICTURE_BYTES_MAX,
   FEEDBACK_QUOTE_MAX,
   FEEDBACK_TEXT_MAX,
   feedbackAttachedSchema,
   feedbackBodySchema,
   feedbackErrorCodeSchema,
+  feedbackFromBotSchema,
+  feedbackPictureSchema,
   feedbackPlatformSchema,
   feedbackQuote,
   feedbackSentCodec,
@@ -206,5 +211,92 @@ describe('уведомления владельцу о сообщении (MOL-1
 
   it('виды сообщения — ровно те, что канал держит под feedback_id', () => {
     expect(FEEDBACK_NOTICE_KINDS.every((kind) => OWNER_NOTICE_KINDS.includes(kind))).toBe(true)
+  })
+})
+
+describe('снимки к сообщению (MOL-167)', () => {
+  const jpeg = '/9j/4AAQSkZJRgABAQ=='
+  const photo = {
+    fileId: 'AgACAgIAAxkBAAIB',
+    fileUniqueId: 'AQADxL0xG',
+    width: 1179,
+    height: 2556,
+    bytes: 412_000,
+  }
+
+  it('до трёх снимков, четвёртый — отказ; без снимков — как раньше', () => {
+    const three = Array.from({ length: FEEDBACK_PICTURES_MAX }, () => jpeg)
+    expect(feedbackBodySchema.parse({ ...body, pictures: three }).pictures).toHaveLength(3)
+    expect(issueOf({ ...body, pictures: [...three, jpeg] })?.path).toEqual(['pictures'])
+    expect(feedbackBodySchema.parse(body).pictures).toBeUndefined()
+  })
+
+  it('снимок — base64, иное — отказ', () => {
+    expect(issueOf({ ...body, pictures: ['не картинка'] })?.path).toEqual(['pictures', 0])
+  })
+
+  it('текст или снимок, хотя бы одно (В-3)', () => {
+    const silent: Record<string, unknown> = { ...body }
+    delete silent.text
+    expect(feedbackBodySchema.parse({ ...silent, pictures: [jpeg] }).text).toBeUndefined()
+    expect(issueOf(silent)).toMatchObject({ path: ['text'], message: ISSUE.TEXT_NOT_VISIBLE })
+    expect(issueOf({ ...silent, pictures: [] })?.path).toEqual(['text'])
+    // Набранный текст по-прежнему должен быть виден, и со снимком тоже.
+    expect(issueOf({ ...body, text: '   ', pictures: [jpeg] })?.message).toBe(
+      ISSUE.TEXT_NOT_VISIBLE,
+    )
+  })
+
+  it('тело вмещает три снимка на пределе в base64', () => {
+    const encoded = Math.ceil(FEEDBACK_PICTURE_BYTES_MAX / 3) * 4
+    expect(FEEDBACK_BODY_BYTES_MAX).toBeGreaterThan(FEEDBACK_PICTURES_MAX * encoded)
+  })
+
+  it('уведомление со снимками и без текста читается; прежнее, без поля, — тоже', () => {
+    const notice = {
+      kind: 'feedback',
+      number: 42,
+      thread: 42,
+      feedbackKind: 'bug',
+      text: '',
+      locale: 'ru',
+      pageBuild: null,
+      apiBuild: 'dev',
+      route: 'trip',
+      platform: 'ios 18 app',
+      fromError: false,
+      errorCode: null,
+      at: '2026-10-03T10:07:00.000Z',
+      pictures: 2,
+    }
+    expect(ownerNoticeSchema.parse(notice)).toEqual(notice)
+    const before: Record<string, unknown> = { ...notice }
+    delete before.pictures
+    expect(ownerNoticeSchema.parse({ ...before, text: 'Было' })).toMatchObject({ text: 'Было' })
+    expect(ownerNoticeSchema.safeParse({ ...notice, pictures: 4 }).success).toBe(false)
+    expect(ownerNoticeSchema.safeParse({ ...notice, pictures: 0 }).success).toBe(false)
+  })
+
+  it('фото в боте — слово и без подписи; без подписи и без фото — отказ', () => {
+    const word = { telegramUserId: 7, repliedMessageId: 3, thread: null }
+    expect(feedbackFromBotSchema.parse({ ...word, picture: photo }).text).toBeUndefined()
+    expect(feedbackFromBotSchema.parse({ ...word, text: 'Вот', picture: photo })).toMatchObject({
+      text: 'Вот',
+    })
+    expect(feedbackFromBotSchema.safeParse(word).error?.issues[0]?.path).toEqual(['text'])
+    expect(feedbackFromBotSchema.safeParse({ ...word, text: '' }).success).toBe(false)
+  })
+
+  it('снимок для бота — байты телефона или id Telegram, не оба', () => {
+    expect(feedbackPictureSchema.parse({ source: 'phone', jpeg })).toEqual({
+      source: 'phone',
+      jpeg,
+    })
+    expect(feedbackPictureSchema.parse({ source: 'telegram', fileId: photo.fileId })).toMatchObject(
+      { source: 'telegram' },
+    )
+    expect(
+      feedbackPictureSchema.safeParse({ source: 'phone', jpeg, fileId: photo.fileId }).success,
+    ).toBe(false)
   })
 })

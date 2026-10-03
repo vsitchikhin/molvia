@@ -25,6 +25,54 @@ export const FEEDBACK_DAY_LIMIT = 10
 export const FEEDBACK_KEPT_YEARS = 1
 
 /**
+ * Pictures a message may carry (MOL-167, В-2): a «before» and an «after», and one to spare. The
+ * person attaches each one, from the gallery, and sees it before sending (MOL-150, В-6).
+ */
+export const FEEDBACK_PICTURES_MAX = 3
+
+/**
+ * The longest side the phone draws a picture to before it goes (MOL-167, Р-1): Telegram shrinks a
+ * photo anyway, and a screenshot of a phone fits whole.
+ */
+export const FEEDBACK_PICTURE_SIDE = 2560
+
+/**
+ * What the API takes of one picture (MOL-167, Р-2): a JPEG of at most two megabytes — the phone's
+ * drawing of a screenshot weighs a fraction of it — with sides from 100 to 4 000 px, and no more than
+ * twenty times as long as it is wide: Telegram refuses a photo past that.
+ */
+export const FEEDBACK_PICTURE_BYTES_MAX = 2 * 1024 * 1024
+export const FEEDBACK_PICTURE_SIDE_MIN = 100
+export const FEEDBACK_PICTURE_SIDE_MAX = 4000
+export const FEEDBACK_PICTURE_RATIO_MAX = 20
+
+/**
+ * The most a message's body may weigh (MOL-167, Р-3): every picture at its limit in base64, and room
+ * for the rest. Only `POST /feedback` takes this much; every other route keeps a megabyte.
+ */
+export const FEEDBACK_BODY_BYTES_MAX =
+  Math.ceil((FEEDBACK_PICTURES_MAX * FEEDBACK_PICTURE_BYTES_MAX) / 3) * 4 + 64 * 1024
+
+/**
+ * A body heavier than this carries pictures (MOL-167): every other message is a few kilobytes.
+ */
+export const FEEDBACK_HEAVY_BODY_BYTES = 1024 * 1024
+
+/**
+ * How many bodies with pictures a person may send in a rolling day, written or refused (MOL-167,
+ * adversarial А3): three tries for each of the day's messages. Eight megabytes are read — JSON,
+ * base64 — before the day's limit can count anything, so these are counted before they are read.
+ */
+export const FEEDBACK_HEAVY_DAY_LIMIT = 3 * FEEDBACK_DAY_LIMIT
+
+/**
+ * How long a picture's bytes are kept when the owner's bot never took them (MOL-167, В-1): they are
+ * kept only until they reach the owner's Telegram, and a week is the bot away for a week, or a copy
+ * with no owner at all. What is left of a picture after is a line — its number, size and when it went.
+ */
+export const FEEDBACK_PICTURE_KEPT_DAYS = 7
+
+/**
  * What became of the owner's reply (MOL-150, Р-11): reached the person, the bot was blocked, or
  * Telegram refused it otherwise and the owner was told to send it again (MOL-148, adversarial В4).
  * Empty is «unknown» — the bot stopped between the send and the mark. A message gone has no reply to
@@ -86,6 +134,18 @@ function codeFromError({ fromError, errorCode }: { fromError: boolean; errorCode
 const codeRefused = { error: ISSUE.BODY_INVALID, path: ['errorCode'] }
 
 /**
+ * A message says something: words, a picture, or both (MOL-167, В-3) — «Сломалось» with a screenshot,
+ * the screen and the code often says it all. A text sent must still have something visible in it.
+ */
+function saysSomething(message: {
+  text?: string | undefined
+  pictures?: readonly unknown[] | undefined
+}) {
+  const { text, pictures } = message
+  return text !== undefined || (pictures?.length ?? 0) > 0
+}
+
+/**
  * The message as the sheet sends it. Everything beside the text is what the sheet shows under it
  * before sending — «Вместе с текстом: версия · экран · язык · платформа» (MOL-150, Р-5, Р-7) — and
  * nothing else: no screen's content, no draft, no queue. The build of the API is not here: the API
@@ -97,11 +157,14 @@ const codeRefused = { error: ISSUE.BODY_INVALID, path: ['errorCode'] }
 export const feedbackBodySchema = z
   .strictObject({
     kind: feedbackKindSchema,
-    text: visibleText(FEEDBACK_TEXT_MAX),
+    /** Absent when the message is a picture alone (MOL-167, В-3). */
+    text: visibleText(FEEDBACK_TEXT_MAX).optional(),
     ...attachedShape,
     clientKey: deviceIdSchema,
+    pictures: z.array(z.base64()).max(FEEDBACK_PICTURES_MAX).optional(),
   })
   .refine(codeFromError, codeRefused)
+  .refine(saysSomething, { error: ISSUE.TEXT_NOT_VISIBLE, path: ['text'] })
 
 /**
  * What went with a text under its key, as the phone keeps it beside the draft until the content
@@ -146,6 +209,9 @@ export function feedbackQuote(reply: string): string {
 /** The number of a thread — its first message's — as the owner's notices tag it: `#fb42`. */
 const threadNumberSchema = z.int().positive()
 
+/** How many pictures a notice is followed by. */
+const picturesSchema = z.int().min(1).max(FEEDBACK_PICTURES_MAX)
+
 /**
  * A message from the app, told to the owner (MOL-148, Р-9 of MOL-150): the kind, the text, everything
  * that went with it, when, and the thread's tag. Nothing of the person — no Telegram id, no name, no
@@ -157,7 +223,8 @@ export const feedbackNoticeSchema = z.strictObject({
   number: threadNumberSchema,
   thread: threadNumberSchema,
   feedbackKind: feedbackKindSchema,
-  text: z.string().min(1).max(FEEDBACK_TEXT_MAX),
+  /** Empty when the message is a picture alone (MOL-167, В-3). */
+  text: z.string().max(FEEDBACK_TEXT_MAX),
   locale: z.enum(LOCALES),
   pageBuild: buildSchema.nullable(),
   apiBuild: buildSchema,
@@ -166,6 +233,11 @@ export const feedbackNoticeSchema = z.strictObject({
   fromError: z.boolean(),
   errorCode: feedbackErrorCodeSchema.nullable(),
   at: z.iso.datetime(),
+  /**
+   * How many pictures go after the text (MOL-167, Р-5), each fetched by its position. Absent where
+   * there are none — a notice queued before MOL-167 still reads.
+   */
+  pictures: picturesSchema.optional(),
 })
 export type FeedbackNotice = z.infer<typeof feedbackNoticeSchema>
 
@@ -181,8 +253,11 @@ export const feedbackContinuedNoticeSchema = z.strictObject({
     .string()
     .min(1)
     .max(FEEDBACK_QUOTE_MAX + 1),
-  text: z.string().min(1).max(FEEDBACK_TEXT_MAX),
+  /** Empty when the word is a photo alone (MOL-167, В-3). */
+  text: z.string().max(FEEDBACK_TEXT_MAX),
   at: z.iso.datetime(),
+  /** The photo sent with the word (MOL-167, Р-8); absent where there was none. */
+  pictures: picturesSchema.optional(),
 })
 export type FeedbackContinuedNotice = z.infer<typeof feedbackContinuedNoticeSchema>
 
@@ -193,6 +268,30 @@ export const TELEGRAM_TEXT_MAX = 4096
 export const telegramMessageIdSchema = z.int().positive().max(Number.MAX_SAFE_INTEGER)
 
 /**
+ * A photo a person sent the bot (MOL-167, Р-8): Telegram's own id of its largest size, which the bot
+ * sends the owner again by, and the id Telegram gives the same file in every chat — what tells a photo
+ * sent twice from another. The bytes stay in Telegram: a photo sent as one is stripped of its EXIF there.
+ */
+export const telegramPictureSchema = z.strictObject({
+  fileId: z.string().min(1).max(256),
+  fileUniqueId: z.string().min(1).max(64),
+  width: z.int().positive(),
+  height: z.int().positive(),
+  bytes: z.int().positive().nullable(),
+})
+export type TelegramPicture = z.infer<typeof telegramPictureSchema>
+
+/**
+ * A picture of a message as the bot fetches it to send the owner (MOL-167, Р-5): the JPEG the phone
+ * sent, already stripped, or a photo Telegram holds, by its id.
+ */
+export const feedbackPictureSchema = z.discriminatedUnion('source', [
+  z.strictObject({ source: z.literal('phone'), jpeg: z.base64() }),
+  z.strictObject({ source: z.literal('telegram'), fileId: z.string().min(1).max(256) }),
+])
+export type FeedbackPicture = z.infer<typeof feedbackPictureSchema>
+
+/**
  * A text written to the bot as a reply to one of its own messages (MOL-148, Р-2): who wrote it —
  * `ctx.from.id`, never anything in the text — the bot's message it answers, the tag that message's
  * first line carries, if any, and the text as typed. Not the message's own id: a word is the same
@@ -200,12 +299,19 @@ export const telegramMessageIdSchema = z.int().positive().max(Number.MAX_SAFE_IN
  * decides**: the owner's reply on a notice, a person's word on a reply they got, or nothing of ours.
  * How long it may be depends on which, so the bound here is only Telegram's.
  */
-export const feedbackFromBotSchema = z.strictObject({
-  telegramUserId: telegramUserIdSchema,
-  repliedMessageId: telegramMessageIdSchema,
-  thread: threadNumberSchema.nullable(),
-  text: z.string().min(1).max(TELEGRAM_TEXT_MAX),
-})
+export const feedbackFromBotSchema = z
+  .strictObject({
+    telegramUserId: telegramUserIdSchema,
+    repliedMessageId: telegramMessageIdSchema,
+    thread: threadNumberSchema.nullable(),
+    /** The text, or a photo's caption — absent when a photo came without one (MOL-167, В-3). */
+    text: z.string().min(1).max(TELEGRAM_TEXT_MAX).optional(),
+    picture: telegramPictureSchema.optional(),
+  })
+  .refine((body) => body.text !== undefined || body.picture !== undefined, {
+    error: ISSUE.TEXT_NOT_VISIBLE,
+    path: ['text'],
+  })
 export type FeedbackFromBot = z.infer<typeof feedbackFromBotSchema>
 
 /**

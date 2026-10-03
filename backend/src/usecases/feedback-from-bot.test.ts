@@ -183,3 +183,40 @@ describe('feedbackFromBot — продолжение нити (MOL-148, В-2)', 
     })
   })
 })
+
+describe('feedbackFromBot — фото человека (MOL-167, Р-8, В-3)', () => {
+  const answered = { reply: 17, actorId: ANNAS_ID }
+  const picture = {
+    fileId: 'AgAC-large',
+    fileUniqueId: 'AQAD-u',
+    width: 1280,
+    height: 2772,
+    bytes: null,
+  }
+
+  it('фото без подписи и с подписью из одних невидимых знаков — слово без текста (ревью 5)', async () => {
+    for (const text of [undefined, '⁠', '​ ​']) {
+      const calls = { replies: [], continued: [] as ContinueThread[] }
+      const word: FeedbackFromBot = {
+        ...fromAnna,
+        picture,
+        ...(text === undefined ? { text: undefined } : { text }),
+      }
+
+      const answer = await feedbackFromBot(fake({ answered }, calls), OWNER, word, 'dev')
+
+      expect(answer).toEqual({ outcome: 'continued' })
+      expect(calls.continued[0]).toMatchObject({ text: '', picture })
+    }
+  })
+
+  it('невидимый текст без фото — по-прежнему «нечего отправить»', async () => {
+    const answer = await feedbackFromBot(
+      fake({ answered }),
+      OWNER,
+      { ...fromAnna, text: '​' },
+      'dev',
+    )
+    expect(answer).toEqual({ outcome: 'invisible' })
+  })
+})

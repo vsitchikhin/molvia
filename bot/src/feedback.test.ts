@@ -78,8 +78,14 @@ function harness(api: Partial<MolviaBotClient>, refuse: Refuse = {}): { bot: Bot
 
 /** A message `from` writes in their chat, as a reply to the bot's message `replied`. */
 function replyTo(
-  replied: { text?: string; fromBot?: boolean; messageId?: number },
-  { from = OWNER, text, photo = false }: { from?: object; text?: string; photo?: boolean } = {},
+  replied: { text?: string; caption?: string; fromBot?: boolean; messageId?: number },
+  {
+    from = OWNER,
+    text,
+    photo = false,
+    caption,
+    document,
+  }: { from?: object; text?: string; photo?: boolean; caption?: string; document?: string } = {},
 ): Update {
   const chat = { id: (from as { id: number }).id, type: 'private', first_name: 'x' }
   return {
@@ -89,7 +95,24 @@ function replyTo(
       date: 0,
       chat: chat as never,
       from: from as never,
-      ...(photo ? { photo: [{ file_id: 'p', file_unique_id: 'p', width: 1, height: 1 }] } : {}),
+      ...(photo
+        ? {
+            photo: [
+              { file_id: 'small', file_unique_id: 'small-u', width: 90, height: 195 },
+              {
+                file_id: 'large',
+                file_unique_id: 'large-u',
+                width: 1280,
+                height: 2772,
+                file_size: 180_211,
+              },
+            ],
+          }
+        : {}),
+      ...(caption === undefined ? {} : { caption }),
+      ...(document === undefined
+        ? {}
+        : { document: { file_id: 'd', file_unique_id: 'd-u', mime_type: document } }),
       ...(text === undefined ? {} : { text }),
       reply_to_message: {
         message_id: replied.messageId ?? 500,
@@ -97,6 +120,7 @@ function replyTo(
         chat: chat as never,
         from: (replied.fromBot === false ? ANNA : BOT_INFO) as never,
         ...(replied.text === undefined ? {} : { text: replied.text }),
+        ...(replied.caption === undefined ? {} : { caption: replied.caption }),
       } as never,
     },
   }
@@ -396,13 +420,77 @@ describe('продолжение нити и чужое (MOL-148, В-1 MOL-150, 
     expect(replies(calls)).toHaveLength(2)
   })
 
-  it('фото человека в ответ на рамку — бот молчит, как раньше на любое фото', async () => {
-    const feedbackFromBot = answering({ outcome: 'continued' })
-    const { bot, calls } = harness({ feedbackFromBot })
+  it('фото человека в ответ на рамку — продолжение: самый большой размер по id, без подписи — без текста (MOL-167)', async () => {
+    const seen: FeedbackFromBot[] = []
+    const { bot, calls } = harness({ feedbackFromBot: answering({ outcome: 'continued' }, seen) })
 
     await bot.handleUpdate(replyTo({ text: frame }, { from: ANNA, photo: true }))
 
+    expect(seen).toEqual([
+      {
+        telegramUserId: ANNA_TELEGRAM,
+        repliedMessageId: 500,
+        thread: null,
+        picture: {
+          fileId: 'large',
+          fileUniqueId: 'large-u',
+          width: 1280,
+          height: 2772,
+          bytes: 180_211,
+        },
+      },
+    ])
+    expect(replies(calls)).toEqual([t(undefined, 'feedback.passed')])
+  })
+
+  it('подпись к фото — текст слова', async () => {
+    const seen: FeedbackFromBot[] = []
+    const { bot } = harness({ feedbackFromBot: answering({ outcome: 'continued' }, seen) })
+
+    await bot.handleUpdate(replyTo({ text: frame }, { from: ANNA, photo: true, caption: 'Вот' }))
+
+    expect(seen[0]).toMatchObject({ text: 'Вот', picture: { fileId: 'large' } })
+  })
+
+  it('картинка файлом — «пришлите как фото»: в файле место съёмки; другой файл — молчание', async () => {
+    const feedbackFromBot = answering({ outcome: 'continued' })
+    const { bot, calls } = harness({ feedbackFromBot })
+
+    await bot.handleUpdate(replyTo({ text: frame }, { from: ANNA, document: 'image/jpeg' }))
+    await bot.handleUpdate(replyTo({ text: frame }, { from: ANNA, document: 'application/pdf' }))
+
     expect(feedbackFromBot).not.toHaveBeenCalled()
-    expect(replies(calls)).toEqual([])
+    expect(replies(calls)).toEqual([t(undefined, 'feedback.photoOnly')])
+  })
+})
+
+describe('снимки у владельца (MOL-167, Р-5, Р-9)', () => {
+  const answered: FeedbackFromBotAnswer = {
+    outcome: 'answered',
+    reply: 7,
+    to: ANNA_TELEGRAM,
+    locale: 'ru',
+    day: '2026-10-03',
+  }
+
+  it('reply владельца на снимок находит нить по метке в подписи', async () => {
+    const seen: FeedbackFromBot[] = []
+    const { bot } = harness({ feedbackFromBot: answering(answered, seen) })
+
+    await bot.handleUpdate(replyTo({ caption: 'Снимок 2 из 2 · #fb42' }, { text: 'Вижу, чиню' }))
+
+    expect(seen).toMatchObject([{ telegramUserId: OWNER.id, thread: 42, text: 'Вижу, чиню' }])
+  })
+
+  it('фото владельца с подписью на уведомление — «только текстом»: подпись без фото не уходит', async () => {
+    const feedbackFromBot = answering(answered)
+    const { bot, calls } = harness({ feedbackFromBot })
+
+    await bot.handleUpdate(
+      replyTo({ text: ownerText(NOTICE) }, { photo: true, caption: 'Смотрите' }),
+    )
+
+    expect(feedbackFromBot).not.toHaveBeenCalled()
+    expect(replies(calls)).toEqual([t('ru', 'feedback.textOnly')])
   })
 })

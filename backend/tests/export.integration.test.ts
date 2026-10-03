@@ -14,6 +14,7 @@ import {
   exchanges,
   expenses,
   feedback,
+  feedbackPictures,
   feedbackReplies,
   incomeRevisions,
   incomes,
@@ -335,10 +336,23 @@ async function aFullLife(actorId: string, telegramUserId: number) {
       errorCode: 'error.internal',
       fromError: true,
       clientKey: randomUUID(),
+      pictures: 1,
       createdAt: at(25),
     })
     .returning({ id: feedback.id })
   if (message === undefined) throw new Error('no message')
+  // Its screenshot, delivered to the owner: the bytes are gone, the line stays (MOL-167, В-1).
+  await db.insert(feedbackPictures).values({
+    feedbackId: message.id,
+    position: 1,
+    source: 'phone',
+    fingerprint: 'full-life',
+    bytes: 412_000,
+    width: 1179,
+    height: 2556,
+    createdAt: at(25),
+    sentAt: at(26),
+  })
   const [reply] = await db
     .insert(feedbackReplies)
     .values({
@@ -486,6 +500,7 @@ describe('состав экспорта — один источник правд
     expect(content.exchanges.flatMap((exchange) => exchange.earlierVersions)).toHaveLength(1)
     expect(content.incomes.flatMap((income) => income.earlierVersions)).toHaveLength(1)
     expect(content.feedback.flatMap((message) => message.replies)).toHaveLength(1)
+    expect(content.feedback.flatMap((message) => message.pictures)).toHaveLength(1)
   })
 })
 
