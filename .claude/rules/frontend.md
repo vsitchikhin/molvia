@@ -42,8 +42,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `display_type` is `display-type` (В1, Г1), whether included by name, through a namespace
   (`m.display-type`) or `sass:meta` (Д1, Д2). Another rule for the same element elsewhere is beyond
   what a linter can match (Б3), so the role is never put in a placeholder, anywhere in a selector,
-  where `@extend` would carry it into such a rule (В3, Г2, Д3). The check reads the source, not the
-  compiled CSS: each round of review found a narrower way past it, and the last ones were deliberate. **A custom property read where none is declared is refused** by
+  where `@extend` would carry it into such a rule (В3, Г2, Д3). **`@extend` and `@use 'sass:meta'`
+  are refused outright** (adversarial round 6): neither is used, and between them they carried every
+  remaining way past the check — a rule the role was extended into, a mixin applied under no name
+  (Е2, Е3). The check reads the source, not the compiled CSS: each round of review found a narrower way
+  past it, and the last ones were deliberate. **A custom property read where none is declared is refused** by
   our own rule, `molvia/known-custom-property` (`frontend/stylelint/known-properties.mjs`):
   `var(--space-5)` stood on two screens, dropped as invalid, because the spacing list takes any
   `--space-*` by its shape. Known is a declaration made directly in a rule that is exactly `:root`, at the top
