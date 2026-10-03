@@ -5,6 +5,7 @@ import { defineComponent, h } from 'vue'
 import { RouterView, createRouter, createWebHistory } from 'vue-router'
 import { ERROR, currentTripResponseSchema, parseMoney, tripViewCodec } from '@molvia/model'
 import type {
+  ReceiptsResponse,
   AdviceResponse,
   PendingVerdicts,
   TripHistory,
@@ -24,6 +25,7 @@ const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
 const currentTrip = vi.fn<() => Promise<TripViewModel | null>>()
 const advice = vi.fn<() => Promise<AdviceResponse>>()
 const addExpense = vi.fn<() => Promise<unknown>>()
+const receipts = vi.fn<() => Promise<ReceiptsResponse>>()
 vi.mock('@/api', () => ({
   api: {
     advice: () => advice(),
@@ -35,7 +37,7 @@ vi.mock('@/api', () => ({
     finishTrip: () => new Promise(() => undefined),
     removeTrip: () => new Promise(() => undefined),
     addExpense: () => addExpense(),
-    receipts: () => Promise.resolve({ receipts: [] }),
+    receipts: () => receipts(),
   },
 }))
 
@@ -128,11 +130,12 @@ const App = defineComponent(() => () => h(RouterView))
 async function render({
   before,
   path = '/purchases',
-}: { before?: () => void; path?: string } = {}) {
+  country = 'AM',
+}: { before?: () => void; path?: string; country?: string } = {}) {
   localStorage.setItem('molvia.actor', ME)
   localStorage.setItem(
     `molvia.settings.${ME}`,
-    JSON.stringify({ country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+    JSON.stringify({ country, city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
   )
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -208,6 +211,8 @@ describe('PurchasesView (MOL-128)', () => {
     currentTrip.mockResolvedValue(null)
     addExpense.mockReset()
     addExpense.mockReturnValue(new Promise(() => undefined))
+    receipts.mockReset()
+    receipts.mockResolvedValue({ receipts: [] })
     advice.mockReset()
     advice.mockResolvedValue({
       geography: { country: 'AM', city: 'Гюмри' },
@@ -224,6 +229,65 @@ describe('PurchasesView (MOL-128)', () => {
     while (mounted.length) mounted.pop()?.unmount()
     vi.restoreAllMocks()
     document.body.innerHTML = ''
+  })
+
+  describe('без чека (Д-3, ревью 12)', () => {
+    it('человек не из страны чеков — одна кнопка «Записать покупки», камеры и чеков нет', async () => {
+      const { view } = await render({ country: 'GE' })
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).not.toContain(ru.purchases.capture)
+      expect(receipts).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('чеки (MOL-127)', () => {
+    it('пока список чеков не ответил, «пусто» не говорится (ревью 7)', async () => {
+      receipts.mockReturnValue(new Promise(() => undefined))
+      const { view } = await render()
+      expect(view.text()).not.toContain(ru.purchases.empty.title)
+      expect(view.find('.skeleton').exists()).toBe(true)
+    })
+
+    it('список чеков упал — «пусто» нет, есть тихая строка о чеках (ревью 7)', async () => {
+      receipts.mockRejectedValue(new Error('HTTP 500'))
+      const { view } = await render()
+      expect(view.text()).not.toContain(ru.purchases.empty.title)
+      expect(view.text()).toContain(ru.purchases.receipts_error)
+    })
+
+    it('тап по «не принят» открывает шторку и ничего не удаляет (ревью 8)', async () => {
+      const { view } = await render({
+        before: () => {
+          localStorage.setItem(
+            `molvia.receipt-rejected.${ME}`,
+            JSON.stringify([
+              {
+                key: 'k1',
+                code: 'error.receipt_not_photo',
+                at: Date.now(),
+                write: {
+                  kind: 'create',
+                  body: {
+                    id: 'cccccccc-0000-4000-8000-000000000001',
+                    parts: 1,
+                    country: 'AM',
+                    language: 'ru',
+                    capturedAt: new Date().toISOString(),
+                  },
+                },
+              },
+            ]),
+          )
+        },
+      })
+      const row = view.findAll('.purchase-row').find((one) => one.text().includes('Не принят'))
+      expect(row).toBeDefined()
+      await row?.trigger('click')
+      await flushPromises()
+      expect(openSheet()?.textContent).toContain(ru.purchases.remove)
+      // Still there until «Убрать» in the sheet.
+      expect(localStorage.getItem(`molvia.receipt-rejected.${ME}`)).toContain('k1')
+    })
   })
 
   describe('пусто — только когда это известно (MOL-77)', () => {

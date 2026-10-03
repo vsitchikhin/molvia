@@ -137,13 +137,21 @@ export function useTripHistory(): TripHistoryScreen {
   useReconnect(() => {
     if (!loading.value) void load()
   })
-  // A receipt recorded is a finished record the server made (MOL-127): «Записаны» is read again.
+  // A receipt recorded is a finished record the server made (MOL-127): «Записаны» is read again —
+  // after a load already on its way, which may have set out before the record landed (review 15).
+  let again = false
   watch(
     () => receipts.recorded.length,
     () => {
-      if (!loading.value) void load()
+      if (loading.value) again = true
+      else void load()
     },
   )
+  watch(loading, (now) => {
+    if (now || !again) return
+    again = false
+    void load()
+  })
   // A screen taken away ends its asking: a retry asleep in its pause would otherwise wake and go
   // for the history again with nobody to show it to (round 3, И1).
   onScopeDispose(() => {

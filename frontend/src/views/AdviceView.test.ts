@@ -94,11 +94,11 @@ const broke = () => new ApiError(ERROR.INTERNAL, 'HTTP 502')
 
 const mounted: VueWrapper[] = []
 
-async function render({ identity = true } = {}) {
+async function render({ identity = true, country = 'AM' } = {}) {
   localStorage.setItem('molvia.actor', ME)
   localStorage.setItem(
     `molvia.settings.${ME}`,
-    JSON.stringify({ country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+    JSON.stringify({ country, city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
   )
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -115,6 +115,23 @@ async function render({ identity = true } = {}) {
 }
 
 describe('AdviceView', () => {
+  // A country the server reads no receipt of (Р-1): the version «без чека» of MOL-128 (Д-3).
+  describe('without receipts (Д-3, review 12)', () => {
+    it('a person with ratings has no strip; a newcomer records purchases from it', async () => {
+      const georgia = { geography: { country: 'GE', city: 'Гюмри' } }
+      advice.mockResolvedValue(answer([milk], georgia))
+      const rated = await render({ country: 'GE' })
+      expect(rated.view.find('.dock').exists()).toBe(false)
+      expect(rated.view.text()).not.toContain(en.purchases.capture)
+
+      advice.mockResolvedValue(answer([], georgia))
+      const newcomer = await render({ country: 'GE' })
+      expect(newcomer.view.text()).toContain(en.advice.home.new.title)
+      expect(newcomer.view.get('.dock').text()).toContain(en.purchases.manual)
+      expect(newcomer.view.text()).not.toContain(en.purchases.capture)
+    })
+  })
+
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()

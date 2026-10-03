@@ -4,7 +4,8 @@ import { ERROR, receiptsResponseCodec } from '@molvia/model'
 import type { Money, ReceiptSummary, WireCode } from '@molvia/model'
 import { api } from '@/api'
 import { useKeptAnswer } from '@/composables/useKeptAnswer'
-import type { KeptPhase } from '@/composables/useKeptAnswer'
+import { useOnline } from '@/composables/useOnline'
+import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { photoShelf } from '@/receipts/photoShelf'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
@@ -15,11 +16,13 @@ import type { RejectedReceiptWrite } from '@/stores/receiptQueue'
 export const RECEIPT_POLL_MS = 5000
 
 /**
- * Where a receipt is, as «Покупки» say it (handoff 03): two of the states are the phone's queue —
- * waiting for a connection, refused — the rest are the server's.
+ * Where a receipt is, as «Покупки» say it (handoff 03): the queue of this phone says three of them —
+ * waiting for a connection, sending, not accepted — the server the rest. `stuck` — the server holds a
+ * receipt with parts missing and this phone has none of them to send: another phone's, or one whose
+ * queue «Выйти» took (adversarial А2).
  */
 export type ReceiptRowState =
-  'waiting' | 'sending' | 'rejected' | 'parsing' | 'parsed' | 'recording' | 'failed'
+  'waiting' | 'sending' | 'stuck' | 'rejected' | 'parsing' | 'parsed' | 'recording' | 'failed'
 
 export interface ReceiptRow {
   readonly id: string
@@ -30,6 +33,8 @@ export interface ReceiptRow {
   readonly summary: ReceiptSummary | null
   /** «Не принят»: the refusal «Убрать» takes away. */
   readonly rejected: RejectedReceiptWrite | null
+  /** «Записать» was refused: the review says why, the row says to open it (review 20). */
+  readonly recordRefused: boolean
 }
 
 /** Why a receipt was not accepted, in the words of «Не принят: …». */
@@ -41,11 +46,23 @@ export function rejectedReason(code: WireCode): 'not_photo' | 'too_large' | 'los
 }
 
 /** The rows a working section shows (`Разбираем`), and the ones to look at (`Посмотреть и записать`). */
-export const WORKING: readonly ReceiptRowState[] = ['waiting', 'sending', 'rejected', 'parsing']
+export const WORKING: readonly ReceiptRowState[] = [
+  'waiting',
+  'sending',
+  'stuck',
+  'rejected',
+  'parsing',
+]
+
+/** Being sent or read — what the newcomer's (б) speaks of; a refused or stuck receipt is not (А4). */
+export const UNDER_WAY: readonly ReceiptRowState[] = ['waiting', 'sending', 'parsing']
 
 export interface ReceiptsScreen {
   readonly rows: ComputedRef<ReceiptRow[]>
-  readonly phase: ComputedRef<KeptPhase>
+  /** The server has answered, and there is no receipt to show — «пусто» may be said (MOL-77). */
+  readonly knownEmpty: ComputedRef<boolean>
+  /** Why the list on screen is not this visit's, or why there is none (MOL-19). */
+  readonly trouble: ComputedRef<'error' | 'offline' | null>
   readonly retry: () => Promise<void>
   readonly total: (row: ReceiptRow) => Money | null
   readonly online: Ref<boolean>
@@ -57,22 +74,30 @@ export interface ReceiptsScreen {
  * «запишем, когда появится связь» — then the server's. A recorded receipt is a row of «Записаны»
  * and not here; one being removed is nowhere.
  *
- * **Asked again every few seconds while something is being read** (Р-4) and the screen is in view:
- * there is no push. The answer is kept on the phone, so offline the list stands as last read.
- * Every list read lets the photo shelf and the drafts go of receipts nothing names any more (Т-4).
+ * **Asked only of a person who takes receipts** (Р-1): for anyone else the answer is an empty list
+ * with no request. **Asked again every few seconds only while one is being read** (Р-4, adversarial
+ * А2) and the screen is in view: there is no push, and nothing else moves by itself. The answer is
+ * kept on the phone, so offline the list stands as last read. Every list read lets the photo shelf
+ * and the drafts go of receipts nothing names any more (Т-4).
  */
 export function useReceipts(): ReceiptsScreen {
   const actor = useActorStore()
   const queue = useReceiptQueueStore()
   const drafts = useReceiptDraftsStore()
-  const online = ref(navigator.onLine)
+  const online = useOnline()
+  const { country } = useReceiptCapture()
 
   const kept = useKeptAnswer({
     key: 'molvia.receipts',
     subject: ref('all'),
-    ask: () => api.receipts(),
+    ask: () => (country.value ? api.receipts() : Promise.resolve({ receipts: [] })),
     codec: receiptsResponseCodec,
     kept: 1,
+  })
+
+  // The settings come after the first paint: a country known only then is asked about then.
+  watch(country, (now, before) => {
+    if (now && !before) void kept.retry()
   })
 
   const rows = computed<ReceiptRow[]>(() => {
@@ -81,21 +106,27 @@ export function useReceipts(): ReceiptsScreen {
     )
     const lastRemoved = queue.lastRemoved?.undo.id
     if (lastRemoved) removing.add(lastRemoved)
+    // Only a photo the server refused is «не принят»: a refused removal or «Вернуть» is no photo.
     const rejectedOf = new Map(
       queue.rejected
-        .filter((item) => item.write.kind !== 'record')
+        .filter((item) => item.write.kind === 'create' || item.write.kind === 'part')
         .map((item) => [receiptOf(item.write), item]),
+    )
+    const refusedRecords = new Set(
+      queue.rejected.flatMap((item) => (item.write.kind === 'record' ? [item.write.id] : [])),
     )
     const recording = new Set(
       queue.pending.filter((write) => write.kind === 'record').map((write) => write.id),
     )
     const uploading = new Map(
       queue.pending.flatMap((write) =>
-        write.kind === 'create' ? [[write.body.id, write.body]] : [],
+        write.kind === 'create' ? [[write.body.id, write.body] as const] : [],
       ),
     )
-    const partsWaiting = new Set(
-      queue.pending.filter((write) => write.kind === 'part').map((write) => write.id),
+    const sendingHere = new Set(
+      queue.pending.flatMap((write) =>
+        write.kind === 'part' || write.kind === 'create' ? [receiptOf(write)] : [],
+      ),
     )
     const result = new Map<string, ReceiptRow>()
 
@@ -104,8 +135,8 @@ export function useReceipts(): ReceiptsScreen {
       const rejected = rejectedOf.get(summary.id) ?? null
       let state: ReceiptRowState
       if (rejected) state = 'rejected'
-      else if (summary.status === 'uploading' || partsWaiting.has(summary.id))
-        state = online.value ? 'sending' : 'waiting'
+      else if (sendingHere.has(summary.id)) state = online.value ? 'sending' : 'waiting'
+      else if (summary.status === 'uploading') state = 'stuck'
       else if (summary.status === 'parsed')
         state = recording.has(summary.id) ? 'recording' : 'parsed'
       else if (summary.status === 'failed') state = 'failed'
@@ -117,6 +148,7 @@ export function useReceipts(): ReceiptsScreen {
         parts: summary.parts,
         summary,
         rejected,
+        recordRefused: refusedRecords.has(summary.id),
       })
     }
     // What the server does not know yet, or did not take: the phone's own word.
@@ -129,6 +161,7 @@ export function useReceipts(): ReceiptsScreen {
         parts: body.parts,
         summary: null,
         rejected: null,
+        recordRefused: false,
       })
     }
     for (const [id, rejected] of rejectedOf) {
@@ -137,10 +170,11 @@ export function useReceipts(): ReceiptsScreen {
       result.set(id, {
         id,
         state: 'rejected',
-        capturedAt: write.kind === 'create' ? write.body.capturedAt : new Date(),
+        capturedAt: write.kind === 'create' ? write.body.capturedAt : new Date(rejected.at),
         parts: write.kind === 'create' ? write.body.parts : 1,
         summary: null,
         rejected,
+        recordRefused: false,
       })
     }
     return [...result.values()].sort(
@@ -154,7 +188,7 @@ export function useReceipts(): ReceiptsScreen {
     () => kept.answer.value,
     (answer) => {
       const owner = actor.id
-      if (!answer || !owner) return
+      if (!answer || !owner || !country.value) return
       const named = new Set([
         ...answer.receipts.filter((one) => one.status !== 'recorded').map((one) => one.id),
         ...queue.pending.map(receiptOf),
@@ -168,26 +202,26 @@ export function useReceipts(): ReceiptsScreen {
   )
 
   let timer: ReturnType<typeof setInterval> | undefined
-  const listen = () => {
-    online.value = navigator.onLine
-  }
   onMounted(() => {
-    window.addEventListener('online', listen)
-    window.addEventListener('offline', listen)
     timer = setInterval(() => {
-      const reading = rows.value.some((row) => row.state === 'parsing' || row.state === 'sending')
+      const reading = rows.value.some((row) => row.state === 'parsing')
       if (reading && online.value && document.visibilityState === 'visible') void kept.retry()
     }, RECEIPT_POLL_MS)
   })
   onUnmounted(() => {
     clearInterval(timer)
-    window.removeEventListener('online', listen)
-    window.removeEventListener('offline', listen)
   })
 
   return {
     rows,
-    phase: kept.phase,
+    knownEmpty: computed(() => kept.answer.value !== null && rows.value.length === 0),
+    trouble: computed(() => {
+      if (!country.value) return null
+      const stale = kept.stale.value
+      if (stale === 'error' || stale === 'offline') return stale
+      const phase = kept.phase.value
+      return phase === 'error' || phase === 'offline' ? phase : null
+    }),
     retry: kept.retry,
     total: (row) => row.summary?.total ?? null,
     online,

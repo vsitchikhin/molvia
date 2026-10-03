@@ -225,7 +225,10 @@
     "recorded_receipt": "{count} · {day} · from a receipt",
     "queued": {
       "waiting": "The photos are on your phone. We’ll send them once you are online — nothing to do.",
-      "parsing": "Reading is under way — you can close the app. The ready receipt goes to “Check and save”."
+      "parsing": "Reading is under way — you can close the app. The ready receipt goes to “Check and save”.",
+      "sending": "The photos are going to the server. If you close the app, sending goes on the next time you open it.",
+      "stuck": "The server got only some parts of this receipt, and this phone has none of them. Delete the receipt and take it again.",
+      "rejected": "The server didn’t take this receipt: {reason}. Remove it and take it again."
     },
     "delete": "Delete receipt",
     "delete_note": "The photo goes with it",
@@ -233,7 +236,11 @@
     "empty_capture": {
       "body": "Photograph a receipt — we read the lines, you check them and save with one button. No receipt — “Add by hand”."
     },
-    "error_capture": "You can still photograph a receipt or add by hand"
+    "error_capture": "You can still photograph a receipt or add by hand",
+    "stuck_meta": "{parts} · not all parts arrived",
+    "record_refused": "not saved — open it and fix it",
+    "receipts_error": "Receipts didn’t load — we’ll show them once the server answers",
+    "receipts_offline": "Offline · receipts from this phone"
   },
   "item": {
     "search_title": "What did you pick up?",
@@ -1910,7 +1917,8 @@
       "meta_translation": "For the line “{printed}” · translation “{text}”",
       "keep_new": "Keep as a new item “{text}”",
       "keep_new_note": "Saving adds it to the catalogue",
-      "note": "Items come from the catalogue only: the same Save button adds a new one"
+      "note": "Items come from the catalogue only: the same Save button adds a new one",
+      "bad_name": "This name won’t do — make it shorter"
     },
     "place": {
       "title": "Where was it?",

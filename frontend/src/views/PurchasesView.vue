@@ -41,10 +41,9 @@
             :key="row.id"
             :icon="iconOf(row)"
             :class="{ breathing: row.state === 'parsing' && receipts.online.value }"
-            :warn="row.state === 'rejected'"
+            :warn="row.state === 'rejected' || row.state === 'stuck'"
             :title="receiptTitle(row)"
             :meta="receiptMeta(row)"
-            :tag="row.state === 'rejected' ? t('purchases.remove') : null"
             @open="openReceipt(row)"
           />
         </AppReveal>
@@ -109,6 +108,16 @@
       :body="t('trip.history.offline_body')"
     />
     <p v-if="history.stale && rows.length > 0" class="memory">{{ t('trip.history.cached') }}</p>
+    <!-- The receipts' own trouble, quietly: the screen's red block is the history's (review 7). -->
+    <p v-if="country && receipts.trouble.value" class="memory">
+      {{
+        t(
+          receipts.trouble.value === 'offline'
+            ? 'purchases.receipts_offline'
+            : 'purchases.receipts_error',
+        )
+      }}
+    </p>
 
     <template v-if="rows.length > 0">
       <p class="caption">{{ t('purchases.group_recorded') }}</p>
@@ -195,10 +204,9 @@ import { useTripHistory } from '@/composables/useTripHistory'
 import type { HistoryRow } from '@/composables/useTripHistory'
 import { useTripRows } from '@/composables/useTripRows'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
-import { dayOfAnyYear, purchaseDay, timeOfDay } from '@/days'
+import { calendarDay, dayOfAnyYear, purchaseDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
-import { useReceiptQueueStore } from '@/stores/receiptQueue'
 import { useTripStore } from '@/stores/trip'
 
 /**
@@ -257,17 +265,31 @@ export default defineComponent({
     // Receipts (MOL-127): the version «с чеком» for a person whose country the server reads (Р-1).
     const { country } = useReceiptCapture()
     const receipts = useReceipts()
-    const receiptQueue = useReceiptQueueStore()
     const receiptRows = computed(() => (country.value ? receipts.rows.value : []))
     const working = computed(() => receiptRows.value.filter((row) => WORKING.includes(row.state)))
     const review = computed(() => receiptRows.value.filter((row) => !WORKING.includes(row.state)))
-    const workRow = ref<ReceiptRow | null>(null)
+    // The sheet follows the live row: a receipt read while it is up says so (review 21).
+    const workId = ref<string | null>(null)
+    const workKept = ref<ReceiptRow | null>(null)
+    const workRow = computed(
+      () => receiptRows.value.find((row) => row.id === workId.value) ?? workKept.value,
+    )
     const workingOpen = ref(false)
 
+    /**
+     * «Пусто» only for what is known to be empty (MOL-77): the history answered empty, and — for a
+     * person who takes receipts — the list of receipts too (review 7): a receipt taken on another phone
+     * is a purchase on its way.
+     */
     const shown = computed<'list' | 'loading' | 'empty'>(() => {
       if (rows.value.length > 0 || receiptRows.value.length > 0 || trouble.value !== null)
         return 'list'
-      if (history.answeredEmpty) return open.value || pending.value > 0 ? 'list' : 'empty'
+      const receiptsKnown = !country.value || receipts.knownEmpty.value
+      if (history.answeredEmpty) {
+        if (open.value || pending.value > 0) return 'list'
+        if (receiptsKnown) return 'empty'
+        return receipts.trouble.value ? 'list' : 'loading'
+      }
       return loading.value ? 'loading' : 'list'
     })
 
@@ -275,10 +297,11 @@ export default defineComponent({
       day: purchaseDay(at, locale.value),
       time: timeOfDay(at, locale.value),
     })
+    // A printed day is a calendar day, never a moment (review 23).
     const readDay = (row: ReceiptRow): string => {
       const printed = row.summary?.header?.date
       return printed
-        ? dayOfAnyYear(new Date(`${printed}T12:00:00Z`), locale.value)
+        ? calendarDay(printed, locale.value, { day: 'numeric', month: 'short' })
         : when(row.capturedAt).day
     }
     function receiptTitle(row: ReceiptRow): string {
@@ -296,6 +319,8 @@ export default defineComponent({
           return t('purchases.waiting', { parts })
         case 'sending':
           return t('purchases.sending', { parts })
+        case 'stuck':
+          return t('purchases.stuck_meta', { parts })
         case 'rejected':
           return t('purchases.rejected_meta', {
             reason: t(
@@ -317,6 +342,7 @@ export default defineComponent({
       }
     }
     function receiptNote(row: ReceiptRow): string | null {
+      if (row.recordRefused && row.state === 'parsed') return t('purchases.record_refused')
       const unsettled = row.summary?.unsettled ?? 0
       return row.state === 'parsed' && unsettled > 0
         ? t('purchases.issues_mismatch', { n: unsettled }, unsettled)
@@ -326,6 +352,7 @@ export default defineComponent({
       switch (row.state) {
         case 'waiting':
         case 'sending':
+        case 'stuck':
           return IconCloudUpload
         case 'parsing':
           return IconSync
@@ -337,12 +364,10 @@ export default defineComponent({
       }
     }
     function openReceipt(row: ReceiptRow): void {
-      if (row.state === 'rejected') {
-        if (row.rejected) receiptQueue.dismiss(row.rejected)
-        return
-      }
+      // «Не принят» and every receipt in work open their sheet: a tap removes nothing (review 8).
       if (WORKING.includes(row.state)) {
-        workRow.value = row
+        workId.value = row.id
+        workKept.value = row
         workingOpen.value = true
         return
       }

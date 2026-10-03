@@ -70,7 +70,12 @@
       <!-- The most important empty state of the product, and only for a list known to be empty —
            answered now or remembered (MOL-128, handoff `02`): no answer and no memory is offline
            or a failure above, never a newcomer (MOL-56, MOL-77). -->
-      <AdviceHomeNew v-else-if="phase === 'empty'" />
+      <!-- Kept while its «Записать вручную» has a sheet up: an answer with rows arriving under «Где
+           вы?» would take the sheet with it (review Р-15 of MOL-128, review 6 of MOL-127). -->
+      <AdviceHomeNew
+        v-else-if="phase === 'empty' || (country && entering)"
+        @busy="entering = $event"
+      />
 
       <template v-else-if="!searching">
         <AdviceGroup v-if="groups.take.length > 0" level="take">

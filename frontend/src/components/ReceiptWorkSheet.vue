@@ -3,9 +3,7 @@
     <template #title>{{ title }}</template>
     <template v-if="meta" #meta>{{ meta }}</template>
 
-    <p class="body">
-      {{ t(row?.state === 'parsing' ? 'purchases.queued.parsing' : 'purchases.queued.waiting') }}
-    </p>
+    <p class="body">{{ body }}</p>
     <ul v-if="photos.length > 0" class="photos" :aria-label="t('receipt.sheet.photos')">
       <li v-for="(url, index) in photos" :key="url">
         <img :src="url" :alt="t('receipt.capture.part', { n: index + 1 })" class="photo" />
@@ -13,7 +11,19 @@
     </ul>
 
     <template #footer>
-      <AppButton variant="secondary" size="large" block @click="remove">
+      <!-- «Не принят»: nothing to bring back — the receipt never got there whole (review 8: a tap on
+           the row opens this, it never removes by itself). -->
+      <AppButton
+        v-if="row?.state === 'rejected'"
+        variant="secondary"
+        size="large"
+        block
+        @click="dismiss"
+      >
+        <template #icon><IconDelete /></template>
+        {{ t('purchases.remove') }}
+      </AppButton>
+      <AppButton v-else variant="secondary" size="large" block @click="remove">
         <template #icon><IconDelete /></template>
         {{ t('purchases.delete') }}
       </AppButton>
@@ -23,12 +33,13 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, defineComponent, onBeforeUnmount, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconDelete from '~icons/mdi/delete-outline'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import { rejectedReason } from '@/composables/useReceipts'
 import type { ReceiptRow } from '@/composables/useReceipts'
 import { photoShelf } from '@/receipts/photoShelf'
 import { useActorStore } from '@/stores/actor'
@@ -37,7 +48,8 @@ import { useReceiptQueueStore } from '@/stores/receiptQueue'
 /**
  * The sheet of a receipt still in work (handoff 03, 3f — `ReceiptSheet` there; that name is the
  * receipt's sum of MOL-78 here, Р-10): where it is, the parts as this phone took them, and «Удалить
- * чек» — with «Вернуть» on «Покупки» for ten seconds (П-8).
+ * чек» — with «Вернуть» on «Покупки» for ten seconds (П-8); «Убрать» for one not accepted. The row is
+ * the live one: a receipt read while the sheet is up says so.
  */
 export default defineComponent({
   name: 'ReceiptWorkSheet',
@@ -75,11 +87,36 @@ export default defineComponent({
     )
     onBeforeUnmount(letGo)
 
+    const body = computed(() => {
+      const row = props.row
+      switch (row?.state) {
+        case 'sending':
+          return t('purchases.queued.sending')
+        case 'stuck':
+          return t('purchases.queued.stuck')
+        case 'rejected':
+          return t('purchases.queued.rejected', {
+            reason: t(
+              `purchases.reasons.${rejectedReason(row.rejected?.code ?? 'error.internal')}`,
+            ),
+          })
+        case 'waiting':
+          return t('purchases.queued.waiting')
+        default:
+          return t('purchases.queued.parsing')
+      }
+    })
+
     return {
       t,
       photos,
+      body,
       remove: () => {
         if (props.row) queue.remove(props.row.id)
+        emit('update:open', false)
+      },
+      dismiss: () => {
+        if (props.row?.rejected) queue.dismiss(props.row.rejected)
         emit('update:open', false)
       },
     }

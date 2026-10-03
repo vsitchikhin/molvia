@@ -13,9 +13,9 @@
     <AppReveal>
       <AppCard v-if="variant === 'parsing' && reading" class="pending" list>
         <PurchaseRow
-          :icon="IconSync"
+          :icon="underWay?.state === 'parsing' ? IconSync : IconCloudUpload"
           :title="t('purchases.group_working')"
-          :meta="t('purchases.parsing_unknown')"
+          :meta="underWayMeta"
           @open="goTab('purchases')"
         />
       </AppCard>
@@ -82,7 +82,7 @@
     <!-- With receipts the strip holds the camera, and the record typed by hand is a row of its own
          under the cycle (2a): at the market, or with the receipt lost. -->
     <div v-if="country" class="by-hand">
-      <ManualEntryButton by-hand />
+      <ManualEntryButton by-hand @busy="$emit('busy', $event)" />
       <p class="by-hand-note">{{ t('advice.home.manual_body') }}</p>
     </div>
 
@@ -98,6 +98,7 @@ import IconChevronRight from '~icons/mdi/chevron-right'
 import IconLightbulb from '~icons/mdi/lightbulb-on-outline'
 import IconStar from '~icons/mdi/star-outline'
 import IconSync from '~icons/mdi/sync'
+import IconCloudUpload from '~icons/mdi/cloud-upload-outline'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
@@ -105,7 +106,7 @@ import PurchaseRow from '@/components/PurchaseRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import { usePendingFrom } from '@/composables/usePendingFrom'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
-import { WORKING, useReceipts } from '@/composables/useReceipts'
+import { UNDER_WAY, useReceipts } from '@/composables/useReceipts'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
 import { useNavigation } from '@/navigation'
 
@@ -134,6 +135,10 @@ export default defineComponent({
     PurchaseRow,
     ScreenSkeleton,
   },
+  emits: {
+    /** «Записать вручную» has a sheet up: the screen keeps this mounted meanwhile (review 6, Р-15). */
+    busy: (up: boolean) => typeof up === 'boolean',
+  },
   setup() {
     const { t } = useI18n()
     const { goTab } = useNavigation()
@@ -141,10 +146,21 @@ export default defineComponent({
     const pending = computed(() => queue.count.value)
     const { country } = useReceiptCapture()
     const receipts = useReceipts()
-    const reading = computed(
-      () =>
-        country.value !== null && receipts.rows.value.some((row) => WORKING.includes(row.state)),
+    // Only a receipt being sent or read: a refused or stuck one is not «разбираем» (А4, review 11).
+    const underWay = computed(() =>
+      country.value === null
+        ? null
+        : (receipts.rows.value.find((row) => UNDER_WAY.includes(row.state)) ?? null),
     )
+    const reading = computed(() => underWay.value !== null)
+    const underWayMeta = computed(() => {
+      const row = underWay.value
+      if (!row) return null
+      const parts = t('receipt.capture.parts', { n: row.parts }, row.parts)
+      if (row.state === 'waiting') return t('purchases.waiting', { parts })
+      if (row.state === 'sending') return t('purchases.sending', { parts })
+      return t('purchases.parsing_unknown')
+    })
     const INTRO = computed(() => ({
       pending: { title: 'advice.home.pending.title', body: 'advice.home.pending.body' },
       parsing: { title: 'advice.home.parsing.title', body: 'advice.home.parsing.body' },
@@ -156,6 +172,9 @@ export default defineComponent({
       t,
       IconStar,
       IconSync,
+      IconCloudUpload,
+      underWay,
+      underWayMeta,
       pending,
       country,
       reading,
