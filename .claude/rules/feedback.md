@@ -40,7 +40,9 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
   of the release, proposed apart.
 - **The code is the last refusal of the API before the error was shown** (В-1 «а», review №1): taken
   as of the moment `ScreenState` drew the error, not of the tap — a person reads a while before
-  writing. **Only what came back from the server is a refusal** (adversarial В3): a dropped
+  writing. **The seam keeps the last refusals, not one** (adversarial Н1, Н4): asked as of a moment
+  past, one slot answered nothing once anything failed after it — «Повторить» failing again, a queue
+  sending — and the screen's own code was lost. **Only what came back from the server is a refusal** (adversarial В3): a dropped
   connection or a request never answered has no code of the API's — the client's `error.internal`
   for it would send the developer to a log with nothing in it, so a reply is told by its status — and
   the sheet's own refusals are not remembered, or «too many today» would become a screen's reason.
@@ -128,8 +130,11 @@ against the code in `.scratch/tasks/status/MOL-118/v2-feedback.md` (С-1…С-12
   the platform the first send carried, and the sheet shows and sends them again until the kind or
   the text changes — reopened from another screen, after another refusal or a new build, a lost
   answer would otherwise meet `409` and leave the owner two messages. Before the first send, and
-  after any edit, they are the opening's (Р-6). **An error screen chooses «Сломалось» for its opening
-  only** (В4): closed untouched, the draft keeps the kind the person chose.
+  after any edit, they are the opening's (Р-6). **A refusal in the API's own words lets them go**
+  (adversarial Н2): every write is one transaction, so nothing has left, and tomorrow's message from
+  the settings must not carry today's error screen; only a lost answer or a bare status keeps them.
+  **An error screen chooses «Сломалось» for its opening only** (В4): closed untouched, the draft
+  keeps the kind the person chose.
 - **The button says why it waits**, inactive and focusable, in the order a person can put it right:
   the kind, the text, the day's limit, the connection; then «Отправить», «Отправляем…» (pressed once
   however often), «Повторить» after a failure, «Готово» once sent. **The limit lives while the sheet
@@ -142,7 +147,9 @@ against the code in `.scratch/tasks/status/MOL-118/v2-feedback.md` (С-1…С-12
   inserted. No number (Р-13). Closing it puts the focus back on the way in.
 - **The count of what is left is read with the field, and said only at its marks** (review №4): the
   coming of the count, 100, 20 and the end — two hundred announcements over the echo of the typing
-  drown it.
+  drown it. **What is said is what is truly left**, as a mark is passed on the way down — a paste past
+  two marks says «50», not «100» — going up is silent, and the words go after the app region's time
+  (review №8, adversarial Н3).
 - **Kept for the kit, not copied here** (С-2): the pinned footer, a filled segment, an inactive
   button without transparency and `StatusStrip` are the kit's tasks (MOL-170); the offline strip is a
   line of the sheet in the meantime. The header is not pinned and the field has one height (С-3,
