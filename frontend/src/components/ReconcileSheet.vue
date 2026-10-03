@@ -659,6 +659,7 @@ export default defineComponent({
     }
     function incomeUnavailable(): void {
       incomeOpen.value = false
+      // failure reported where it failed: the income sheet's own load (MOL-144).
       failure.value = navigator.onLine ? 'error' : 'offline'
     }
 

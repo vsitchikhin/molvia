@@ -342,17 +342,26 @@ describe('pageBuild — сборка страницы по имени её фа�
 describe('ошибка, которую показал экран, уходит (В-3)', () => {
   // Every screen decides «error» or «offline» in its own catch, and the error stops there: it never
   // reaches Vue's handler. A screen added later that forgets the call is the failure this replaces.
-  it('каждый файл, где экран выбирает «ошибку», зовёт reportFailure', () => {
+  it('каждая ветка, где экран выбирает «ошибку», отчитывается — или сказано где (ревью №5)', () => {
     const sources = import.meta.glob(['/src/**/*.{ts,vue}', '!/src/**/*.test.ts'], {
       query: '?raw',
       import: 'default',
       eager: true,
     })
-    const choosing = /\? '(?:error|failed|categories)' : 'offline'|\? 'offline' : 'error'/
+    const choosing = /\? '(?:error|failed|categories)' : 'offline'|\? 'offline' : 'error'/g
+    // A branch whose failure was reported elsewhere — a child's load, a catch up the chain — says so.
+    const counted = (text: string, pattern: RegExp) => [...text.matchAll(pattern)].length
     const silent = Object.entries(sources)
-      .filter(([, text]) => choosing.test(text) && !text.includes('reportFailure('))
-      .map(([path]) => path)
+      .map(([path, text]) => ({
+        path,
+        branches: counted(text, choosing),
+        reports:
+          counted(text, /reportFailure\(/g) +
+          counted(text, /\/\/ failure reported where it failed:/g),
+      }))
+      .filter(({ branches, reports }) => branches > reports)
     expect(silent).toEqual([])
-    expect(Object.values(sources).filter((text) => choosing.test(text)).length).toBeGreaterThan(20)
+    const all = Object.values(sources).reduce((sum, text) => sum + counted(text, choosing), 0)
+    expect(all).toBeGreaterThan(25)
   })
 })

@@ -358,6 +358,7 @@ export const useLoginStore = defineStore('login', () => {
     failure.value = null
     const view = await actor.signIn()
     if (!view) {
+      // failure reported where it failed: none — the seam of development, no build carries it (MOL-144).
       failure.value = navigator.onLine ? 'error' : 'offline'
       return
     }
