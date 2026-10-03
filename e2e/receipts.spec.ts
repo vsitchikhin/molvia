@@ -74,6 +74,12 @@ async function saveAll(page: Page): Promise<void> {
   }
   await expect.poll(asked, READ).not.toBeNull()
   if ((await asked()) === 'asked') {
+    // Seen at once, it is still rising, and until it has risen it takes no tap at all (MOL-69): its
+    // rise, then the double-tap floor — as `erase.spec.ts` waits.
+    await sheet(page).evaluate((dialog) =>
+      Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished)),
+    )
+    await page.waitForTimeout(350)
     await expect(sheet(page)).toContainText('Where was it?')
     await sheet(page).getByLabel('Another place').fill('Ереван Сити')
     await sheet(page).getByRole('button', { name: 'Save 13 purchases' }).click()
