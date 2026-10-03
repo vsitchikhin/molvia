@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { Readable } from 'node:stream'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
@@ -257,6 +258,34 @@ describe('a part of the photo', () => {
     expect((await put(me, receipt.id, 'x', jpeg())).statusCode).toBe(404)
     expect((await put(other, receipt.id, 1, jpeg())).statusCode).toBe(404)
     expect((await put(me, 'not-a-uuid', 1, jpeg())).statusCode).toBe(404)
+  })
+
+  it('refuses a part over the size sent in chunks with no length, by its own code (review А16)', async () => {
+    const me = await owner()
+    const receipt = body()
+    await send(me, receipt)
+    const big = Buffer.concat([jpeg(), Buffer.alloc(9 * 1024 * 1024)])
+    const answer = await app.inject({
+      method: 'PUT',
+      url: `/receipts/${receipt.id}/parts/1`,
+      headers: { cookie: me.cookie, 'content-type': 'image/jpeg' },
+      payload: Readable.from([big.subarray(0, 4 * 1024 * 1024), big.subarray(4 * 1024 * 1024)]),
+    })
+    expect([answer.statusCode, answer.json()]).toEqual([413, { code: ERROR.RECEIPT_TOO_LARGE }])
+  })
+
+  it('takes a part of exactly the size a part may have', async () => {
+    const me = await owner()
+    const receipt = body()
+    await send(me, receipt)
+    const exact = jpeg()
+    const photo = Buffer.concat([
+      exact.subarray(0, exact.length - 2),
+      Buffer.alloc(8 * 1024 * 1024 - exact.length, 0x11),
+      exact.subarray(-2),
+    ])
+    expect(photo.length).toBe(8 * 1024 * 1024)
+    expect((await put(me, receipt.id, 1, photo)).statusCode).toBe(200)
   })
 
   it('refuses a part over the size a part may have before reading it whole', async () => {

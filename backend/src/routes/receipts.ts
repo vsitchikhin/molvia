@@ -39,13 +39,33 @@ function ownerOf(request: FastifyRequest): string {
  */
 export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
   void app.register((scope, _options, done) => {
-    scope.addContentTypeParser(
-      'image/jpeg',
-      { parseAs: 'buffer', bodyLimit: RECEIPT_PART_BYTES_MAX },
-      (_request, body, parsed) => {
-        parsed(null, body)
-      },
-    )
+    // Counted here rather than by Fastify's `bodyLimit` (review А16): a body sent in chunks names no
+    // length, and past Fastify's limit the answer would be `issue.body_invalid`, which the phone cannot
+    // tell from a malformed body. Past ours it is `error.receipt_too_large`, however it was sent.
+    scope.addContentTypeParser('image/jpeg', (_request, payload, parsed) => {
+      const chunks: Buffer[] = []
+      let size = 0
+      let over = false
+      payload.on('data', (chunk: Buffer) => {
+        if (over) return
+        size += chunk.length
+        if (size > RECEIPT_PART_BYTES_MAX) {
+          over = true
+          chunks.length = 0
+          parsed(new DomainError(ERROR.RECEIPT_TOO_LARGE), undefined)
+          return
+        }
+        chunks.push(chunk)
+      })
+      payload.on('end', () => {
+        if (!over) parsed(null, Buffer.concat(chunks))
+      })
+      payload.on('error', (error: Error) => {
+        if (over) return
+        over = true
+        parsed(error, undefined)
+      })
+    })
 
     /** 201 for a new receipt, 200 for the same one again — the queue sending twice. */
     scope.post('/receipts', async (request, reply) => {

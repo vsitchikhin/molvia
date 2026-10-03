@@ -7,6 +7,7 @@ import {
   moneyOfHundredths,
   needsReshoot,
   receiptDateOf,
+  receiptTimeOf,
   receiptLineOf,
   receiptLineCodec,
 } from '@molvia/model'
@@ -21,6 +22,10 @@ import type {
 } from '@/db/receipts-repository'
 import { PhotoUnreadable, ReaderDropped, ReaderUnavailable } from '@/receipts/reader'
 import type { Box, ReceiptReader } from '@/receipts/reader'
+
+// The latest day a receipt may print: the server's tomorrow, so no zone's today is refused.
+const latestPrinted = (): string =>
+  new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
 /** Rows cut out per request: the reader takes 64; a long receipt's lines go in several. */
 const STRIPS_PER_REQUEST = 32
@@ -49,8 +54,8 @@ export type ReadReport =
 function headOf(text: ReceiptText, currency: Currency): ReceiptHead {
   return {
     tin: text.tin,
-    printedOn: receiptDateOf(text),
-    printedTime: text.time,
+    printedOn: receiptDateOf(text, latestPrinted()),
+    printedTime: receiptTimeOf(text),
     receiptNo: text.receiptNo,
     totalMinor: moneyOfHundredths(text.totalHundredths, currency)?.minor ?? null,
     balanced: text.balanced,
