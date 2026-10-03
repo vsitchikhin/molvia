@@ -224,16 +224,106 @@ function headEnd(rows: readonly TextRow[]): number {
  * Երևան» on a receipt of its Gyumri shop whose address is «Գորկու 62, Գյումրի» (round 3, Р3-В2).
  * Two cities are no answer — the place is then looked for in the person's own city.
  */
-export function receiptCityOf(rows: readonly TextRow[]): SettingsCity | null {
+export function receiptCityOf(
+  rows: readonly TextRow[],
+  productWords: ReadonlySet<string> = NO_WORDS,
+): SettingsCity | null {
   const first = rows.filter((row) => row.part === 0)
   const head = first.slice(0, headEnd(first))
+  // the city is read off an address only — never off an item's row, wherever the head's end fell
+  // (round 9, Р9-В1): the boundary is a guess OCR moves, what stands beside the city is the row's own
+  const addresses = head.filter((row) => isAddressRow(row.text, productWords))
   const cities = Object.keys(RECEIPT_CITIES) as SettingsCity[]
-  const opening = cities.filter((city) => head.some((row) => RECEIPT_CITIES[city].test(row.text)))
+  const opening = cities.filter((city) =>
+    addresses.some((row) => RECEIPT_CITIES[city].test(row.text)),
+  )
   if (opening.length === 1) return opening[0] ?? null
   if (opening.length > 1) return null
-  const marked = cities.filter((city) => head.some((row) => CITY_AFTER_MARK[city].test(row.text)))
+  const marked = cities.filter((city) =>
+    addresses.some((row) => CITY_AFTER_MARK[city].test(row.text)),
+  )
   const named = cities.filter((city) => head.some((row) => CITY_ANYWHERE[city].test(row.text)))
   return marked.length === 1 && named.length === 1 ? (marked[0] ?? null) : null
+}
+
+const NO_WORDS: ReadonlySet<string> = new Set()
+
+/** The cities as a word of a row, lower case: what an address or an item's name says beside it. */
+const CITY_WORD = /^(?:գյումրի|gyumri|երևան|երե[վւ]ան|yerevan)$/u
+
+/**
+ * What an item's row has and an address never does (round 9, Р9-В1): a table's customs heading opening
+ * it; a card's article; an amount with its unit — a volume, a weight, a count, a fat — «0.5լ», «500գ»,
+ * «5տ», «3.2%»; a sum with its hundredths «450.00»; a price and a sum, two numbers in the hundreds.
+ */
+const ITEM_SHAPED = [
+  TABLE_ITEM_ROW,
+  CARD_ARTICLE_ROW,
+  // a unit ends its word: «500գ», never «1 ԳՅՈՒՄՐԻ», whose first letter is a gram's
+  /\d\s*(?:%|(?:լ|մլ|կգ|գր?|հտ|հատ|տ|l|ml|kg|g|pcs)(?![\p{L}\d]))/iu,
+  /\d[.,]\d{2}(?!\d)/u,
+]
+
+/**
+ * A row an address may be read off. An item named after a city — the beer «Գյումրի», the cognac
+ * «Երևան» — names its kind beside the city, «ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ», «Կոնյակ Երևան», a word of the till's
+ * dictionary, or puts the city in quotes as a brand, «Գարեջուր «Գյումրի»»; an address puts a street
+ * beside it, «ԳՅՈՒՄՐԻ Գորկու 62». What OCR adds at the paper's edge — «9.», «2..1», «= 4 -» — stands
+ * before an address as before an item and decides nothing.
+ */
+function isAddressRow(text: string, productWords: ReadonlySet<string>): boolean {
+  if (ITEM_SHAPED.some((shape) => shape.test(text))) return false
+  if (/[«“"„']\s*(?:գյումրի|gyumri|երևան|երե[վւ]ան|yerevan)/iu.test(text)) return false
+  const prices = (text.match(/(?<![\p{L}\d])\d+(?![\p{L}\d])/gu) ?? []).filter(
+    (number) => Number(number) >= 100,
+  )
+  if (prices.length >= 2) return false
+  const words = text
+    .toLowerCase()
+    .split(/[^\p{L}]+/u)
+    .filter((word) => Array.from(word).length >= 2)
+  return !words.some(
+    (word, i) =>
+      CITY_WORD.test(word) &&
+      [words[i - 1], words[i + 1]].some(
+        (beside) => beside !== undefined && isProductWord(beside, productWords),
+      ),
+  )
+}
+
+/**
+ * A word of the till's dictionary, or a long one OCR read a letter off («ԳԱՐԵՋՈԻՐ»). A short word must be
+ * the word itself: the street «Շիրազի» is a letter off «շիրակի», «ширакский» of the dictionary.
+ */
+function isProductWord(word: string, productWords: ReadonlySet<string>): boolean {
+  if (productWords.has(word)) return true
+  if (Array.from(word).length < FUZZY_LETTERS) return false
+  for (const known of productWords) {
+    if (Math.abs(known.length - word.length) <= 1 && withinOneEdit(known, word)) return true
+  }
+  return false
+}
+
+/** From this many letters a word one letter off the dictionary's is still the dictionary's. */
+const FUZZY_LETTERS = 7
+
+function withinOneEdit(a: string, b: string): boolean {
+  if (a === b) return true
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a]
+  let i = 0
+  let j = 0
+  let edits = 0
+  while (i < short.length && j < long.length) {
+    if (short[i] === long[j]) {
+      i++
+      j++
+      continue
+    }
+    if (++edits > 1) return false
+    if (short.length === long.length) i++
+    j++
+  }
+  return edits + (long.length - j) + (short.length - i) <= 1
 }
 
 /** Tesseract's page modes the reading is tried in; the one whose lines add up is kept. */

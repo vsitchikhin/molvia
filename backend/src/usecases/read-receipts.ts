@@ -23,7 +23,11 @@ import type {
   ReceiptRepository,
 } from '@/db/receipts-repository'
 import { PhotoUnreadable, ReaderDropped, ReaderUnavailable } from '@/receipts/reader'
+import { TILL_WORDS_RU } from '@/receipts/till-words-ru'
 import type { Box, ReceiptReader } from '@/receipts/reader'
+
+// The kinds of goods a till names: an item named after a city names its kind beside it (MOL-126).
+const TILL_WORDS: ReadonlySet<string> = new Set(Object.keys(TILL_WORDS_RU))
 
 // The latest day a receipt may print: the server's tomorrow, so no zone's today is refused.
 const latestPrinted = (): string =>
@@ -72,7 +76,8 @@ function headOf(
     totalMinor: moneyOfHundredths(text.totalHundredths, currency)?.minor ?? null,
     balanced: text.balanced,
     layout: text.layout,
-    city: readings.map(receiptCityOf).find((city) => city !== null) ?? null,
+    city:
+      readings.map((rows) => receiptCityOf(rows, TILL_WORDS)).find((city) => city !== null) ?? null,
   }
 }
 

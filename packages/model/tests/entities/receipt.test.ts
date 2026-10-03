@@ -272,9 +272,9 @@ describe('the city of the address (MOL-126, Р-6)', () => {
     expect(receiptCityOf(rows('DOG CITY', 'Հեռ. (0312) 5-55-55', 'ԳՅՈՒՄՐԻ Շիրազի 57'))).toBe(
       'Гюмри',
     )
-    expect(receiptCityOf(rows('DOG CITY', '62, Գորկու փ., ք. Գյումրի', 'ՀՎՀՀ 02615412'))).toBe(
-      'Гюмри',
-    )
+    expect(
+      receiptCityOf(rows('DOG CITY', '62, Գորկու փ.', 'ք. Գյումրի, Գորկու 62', 'ՀՎՀՀ 02615412')),
+    ).toBe('Гюмри')
   })
 
   // round 3, Р3-В2: a chain's legal address beside its shop's — two cities are no answer
@@ -336,5 +336,117 @@ describe('the moment a receipt prints', () => {
   it('is none without a time a clock shows', () => {
     expect(receiptMomentOf('2026-09-26', null, 'AM')).toBeNull()
     expect(receiptMomentOf('2026-09-26', '25:00', 'AM')).toBeNull()
+  })
+})
+
+// round 9 and before: the city is read off an address, never off an item named after a city — the
+// shapes OCR made of either on the bench, crossed every way, and no head may name the item's city
+describe('an item named after a city never names the receipt’s city (MOL-126)', () => {
+  const words = new Set(['գարեջուր', 'կոնյակ', 'սպիտակ', 'հնգամյա'])
+  const rows = (...texts: string[]) => texts.map((text, line) => ({ text, part: 0, line }))
+  const marks = [
+    '',
+    '1.',
+    '1. ',
+    '1 ',
+    '1',
+    '10,',
+    '10, ',
+    '| |203) ',
+    '(2203) ',
+    'Ն (2203) ',
+    '| | ',
+    '= ',
+    'Ն ',
+    '2 1.',
+    '= 4 - ',
+    '9. ',
+    '2..1 ',
+  ]
+  const items = {
+    Гюмри: [
+      'ԳՅՈՒՄՐԻ ԳԱՐԵՋՈՒՐ',
+      'Գարեջուր «Գյումրի»',
+      'Գարեջուր Գյումրի',
+      'Գյումրի գարեջուր',
+      'ԳԱՐԵՋՈՒՐ ԳՅՈՒՄՐԻ ՍՊԻՏԱԿ',
+      'ԳՅՈՒՄՐԻ ԳԱՐԵՋՈԻՐ',
+      'Գարեջուր "Գյումրի"',
+    ],
+    Ереван: [
+      'ԵՐԵՎԱՆ ԿՈՆՅԱԿ',
+      'Կոնյակ «Երևան»',
+      'Կոնյակ Երևան',
+      'Երեւան կոնյակ',
+      'YEREVAN կոնյակ',
+      'Կոնյակ «Երեւան» 5տ',
+      'ԵՐԵՎԱՆ ԿՈՆՅԱԿ ՀՆԳԱՄՅԱ',
+    ],
+  }
+  const tails = [
+    '',
+    ' 0.5լ',
+    ' 500գ',
+    ' 1 450 450',
+    ' 2 450 900',
+    ' 5տ. 0.5լ',
+    ' 3.2%',
+    ' 1Հտ 450 450',
+    ' 0,5',
+    ' 1 450',
+    ' 1 50 50',
+    ' 1 120',
+    ' 450',
+    ' 12',
+    ' 62 2.',
+  ]
+  const addresses = {
+    Гюмри: ['ԳՅՈՒՄՐԻ Գորկու 62 2.', 'ՀՀ, ք. Գյումրի, Գորկու 62', null],
+    Ереван: ['ԵՐԵՎԱՆ Արշակունյաց 34', 'ՀՀ, ք. Երևան, Արշակունյաց 34', null],
+  } as const
+
+  it.each([
+    ['Ереван', 'Гюмри'],
+    ['Гюмри', 'Ереван'],
+  ] as const)('on a receipt of %s, never %s', (home, other) => {
+    const wrong: string[] = []
+    for (const address of addresses[home])
+      for (const mark of marks)
+        for (const name of items[other])
+          for (const tail of tails) {
+            const item = `${mark}${name}${tail}`
+            const shop = address === null ? [] : [address]
+            for (const head of [
+              [
+                'ЧЕК',
+                ...shop,
+                'ՀՎՀՀ:01282006',
+                '/ԱԱՀ-ով հարկվող/',
+                item,
+                '2203/1100001 1Հտ 450 450',
+              ],
+              ['DOG CITY', ...shop, 'Թան:', item, '(3824) ՏՈՏՈՒՀՈՂ'],
+              [item, ...shop, 'ՀՎՀՀ:01282006'],
+              [...shop, item],
+            ]) {
+              if (receiptCityOf(rows(...head), words) === other)
+                wrong.push(`«${item}» ${String(address)}`)
+            }
+          }
+    expect(wrong.slice(0, 10)).toEqual([])
+  })
+
+  it('still reads the address beside a street, whatever OCR put at its edge', () => {
+    for (const address of [
+      'ԳՅՈՒՄՐԻ Գորկու 62 2.',
+      '9. ԳՅՈՒՄՐԻ Գորկու 62 2.',
+      '2..1 ԳՅՈՒՄՐԻ Գորկու 62 2,',
+      '= 4 - ԳՅՈՒՄՐԻ Գորկու 62 2.',
+      'ԳՅՈՒՄՐԻ Գորկուծ22. _',
+      'ԳՅՈՒՄՐԻ Գորկու 62.2',
+      'ԳՅՈՒՄՐԻ Շիրազի 57',
+    ]) {
+      expect(receiptCityOf(rows('ԵՐԵՎԱՆ-ՍԻԹԻ', address, 'ՀՎՀՀ:01282006'), words)).toBe('Гюмри')
+    }
   })
 })
