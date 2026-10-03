@@ -508,8 +508,9 @@ export default defineComponent({
 }
 
 .other-chevron {
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon);
 }
 
 .tag {

@@ -201,9 +201,9 @@ export default defineComponent({
 }
 
 .chevron {
-  flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon);
   margin-top: var(--space-1);
   color: var(--text-muted);
 }

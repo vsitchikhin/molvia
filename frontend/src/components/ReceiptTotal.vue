@@ -146,9 +146,9 @@ export default defineComponent({
 }
 
 .chevron {
-  flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon);
   color: var(--text-muted);
 }
 
@@ -180,8 +180,8 @@ export default defineComponent({
 }
 
 .difference-icon {
-  flex: none;
-  width: 1.125rem;
-  height: 1.125rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 </style>

@@ -59,9 +59,9 @@ export default defineComponent({
 }
 
 .icon {
-  flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
   color: var(--good-ink);
 }
 </style>

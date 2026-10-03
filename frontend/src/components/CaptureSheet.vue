@@ -352,9 +352,9 @@ export default defineComponent({
 }
 
 .notice-icon {
-  flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
+  @include icon;
+
+  font-size: var(--icon-sm);
 }
 
 .hints {
@@ -383,8 +383,9 @@ export default defineComponent({
   background: var(--surface-2);
 
   svg {
-    width: var(--state-glyph);
-    height: var(--state-glyph);
+    @include icon;
+
+    font-size: var(--state-glyph);
   }
 }
 
@@ -461,8 +462,9 @@ export default defineComponent({
 }
 
 .more-icon {
-  width: 1.625rem;
-  height: 1.625rem;
+  @include icon;
+
+  font-size: var(--icon-md);
 }
 
 .caption {
