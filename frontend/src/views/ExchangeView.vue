@@ -519,8 +519,8 @@ export default defineComponent({
 
   svg {
     flex: none;
-    width: var(--space-5);
-    height: var(--space-5);
+    width: var(--space-4);
+    height: var(--space-4);
   }
 }
 

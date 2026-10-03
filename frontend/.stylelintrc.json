@@ -13,11 +13,22 @@
         "message": "Colours live in styles/_tokens.scss. Use var(--\u2026)."
       }
     ],
-    "declaration-property-value-allowed-list": {
-      "/^(margin|padding|gap|inset|top|right|bottom|left|scroll-margin|scroll-padding)/": [
-        "/^(0|auto|inherit|initial|unset|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\))*( \\* -1)?\\))(\\s+(0|auto|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\))*( \\* -1)?\\))){0,3}$/"
-      ]
-    },
+    "declaration-property-value-allowed-list": [
+      {
+        "/^(margin|padding|gap|inset|top|right|bottom|left|scroll-margin|scroll-padding)/": [
+          "/^(0|auto|inherit|initial|unset|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\))*( \\* -1)?\\))(\\s+(0|auto|var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)|calc\\(var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\)( [+-] var\\(--(space-[a-z0-9]+|safe-(top|bottom|left|right)|bar-height|tabbar-height|keyboard-inset|dock-height|segment-inset|badge-gap)\\))*( \\* -1)?\\))){0,3}$/"
+        ],
+        "font-family": ["/^(var\\(--font\\)|inherit)$/"],
+        "font-weight": ["/^(var\\(--weight-(regular|medium|bold)\\)|inherit)$/"],
+        "font-size": ["/^(var\\(--(text|icon)(-[a-z0-9]+)*\\)|inherit|1em)$/"],
+        "/^border(-(top|bottom)-(left|right)|-(start|end)-(start|end))?-radius$/": [
+          "/^(0|50%|inherit|var\\(--radius(-[a-z]+)?\\)|calc\\((var\\(--(radius(-[a-z]+)?|segment-inset)\\)|[0-9.]+|[ ()*/+-])+\\))(\\s+(0|50%|inherit|var\\(--radius(-[a-z]+)?\\)|calc\\((var\\(--(radius(-[a-z]+)?|segment-inset)\\)|[0-9.]+|[ ()*/+-])+\\))){0,3}$/"
+        ]
+      },
+      {
+        "message": "%s: \"%s\" is not allowed here. Spacing, weights, sizes and radii are tokens of styles/_tokens.scss (DESIGN.md); Nunito and its weight come only with @include display-type."
+      }
+    ],
     "declaration-property-value-disallowed-list": [
       { "scroll-behavior": ["smooth"] },
       {
@@ -25,9 +36,9 @@
       }
     ],
     "function-disallowed-list": [
-      ["env"],
+      ["env", "rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch", "color"],
       {
-        "message": "Safe areas live in styles/_tokens.scss. Use var(--safe-\u2026)."
+        "message": "Colours and safe areas live in styles/_tokens.scss. Use var(--\u2026)."
       }
     ],
     "no-descending-specificity": null,
@@ -41,6 +52,12 @@
         "color-named": null,
         "declaration-property-value-allowed-list": null,
         "function-disallowed-list": null
+      }
+    },
+    {
+      "files": ["**/styles/_mixins.scss", "**/styles/_fonts.scss"],
+      "rules": {
+        "declaration-property-value-allowed-list": null
       }
     }
   ],

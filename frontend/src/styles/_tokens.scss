@@ -84,6 +84,10 @@
   --radius-lg: 1.25rem;
   --radius-sheet: 1.5rem;
   --radius-pill: 999px;
+
+  /* The rounding of a mark of data — a bar's foot, a legend key, a tick — only enough to take the
+     corner's edge off; anything larger reads as a pill on a mark a few pixels thick. */
+  --radius-mark: 0.125rem; /* 2 */
   --hairline: 1px;
 
   --touch-target: 2.75rem; /* 44px — the smallest thing a thumb hits reliably */

@@ -181,7 +181,7 @@ export default defineComponent({
 
 .fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--radius-mark);
 
   &.bad {
     background: var(--bad);

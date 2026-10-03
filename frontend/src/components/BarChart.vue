@@ -214,7 +214,7 @@ export default defineComponent({
   width: 100%;
   max-width: 2.25rem;
   min-height: 2px;
-  border-radius: 8px 8px 3px 3px;
+  border-radius: var(--radius-sm) var(--radius-sm) var(--radius-mark) var(--radius-mark);
   background: var(--border-strong);
 
   /* A new answer — another period, another category — grows the bars where they stand (MOL-151):
@@ -247,7 +247,8 @@ export default defineComponent({
 
 .paired .fill {
   max-width: 1.25rem;
-  border-radius: 6px 6px 2px 2px;
+  border-radius: calc(var(--radius-sm) - var(--radius-mark))
+    calc(var(--radius-sm) - var(--radius-mark)) var(--radius-mark) var(--radius-mark);
 }
 
 .outline {

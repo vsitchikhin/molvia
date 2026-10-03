@@ -350,7 +350,7 @@ export default defineComponent({
 
   &.solid {
     height: 3px;
-    border-radius: 2px;
+    border-radius: var(--radius-mark);
     background: var(--accent);
   }
 
