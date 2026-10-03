@@ -27,4 +27,4 @@ Rules: `.claude/rules/observability.md`. A test beside its source, or mirroring 
 ## bot
 
 - `bot/src/failure.ts` — The bot's failures (MOL-143): `handlerOf` — the kind of update and the prefix of its button or command, never its data or sender — what is a defect and what is the weather (network, Telegram, the API's own answers), the report by kind to the API, its own failure one line of the log.
-- `bot/src/owner.ts` — The owner's notices: claimed from the API every minute as the reminders are, sent one by one in Russian, a 429 ending the run; `ownerText` writes a new failure and a count reached.
+- `bot/src/owner.ts` — The owner's notices: claimed from the API every minute as the reminders are, sent one by one in Russian, a 429 ending the run; `ownerText` writes a new failure, a count reached, and a message to the developer or its continuation with the thread's tag ending the first line (MOL-148), which `threadTagOf` reads back.

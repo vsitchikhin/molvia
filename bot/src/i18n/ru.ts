@@ -170,6 +170,24 @@ export const ru = {
   'owner.failure.buildPrint': 'Сборка {build} · {fingerprint}',
   'owner.failure.more': 'Подробности — make failures',
   /**
+   * «Написать разработчику» in the bot (MOL-148). The frame is what the person gets around the
+   * owner's reply, in the language of their message (Р-12 of MOL-150); the rest answers a text
+   * written as a reply to the bot, in the writer's language, under their message.
+   */
+  'feedback.frame': 'Ответ на ваше сообщение от {date}:',
+  'feedback.howToAnswer': 'Чтобы ответить, ответьте на это сообщение.',
+  'feedback.passed': 'Передали разработчику.',
+  'feedback.delivered': 'Доставлено.',
+  'feedback.blocked': 'Не дошло: человек заблокировал бота.',
+  'feedback.gone': 'Сообщения #fb{thread} больше нет: данные удалены.',
+  'feedback.tooLong': 'Слишком длинно: до {max} знаков. Ничего не отправлено.',
+  'feedback.invisible':
+    'Нечего отправить: в тексте одни невидимые знаки или пустые строки подряд. Ничего не отправлено.',
+  'feedback.limited': 'Сегодня сообщений уже много. Напишите завтра.',
+  'feedback.textOnly': 'Отвечать можно только текстом.',
+  'feedback.failed': 'Не получилось: сервер не ответил. Ответьте ещё раз через минуту.',
+  'feedback.notSent': 'Не отправлено: Telegram не принял сообщение. Ответьте ещё раз.',
+  /**
    * A message to the developer, told to the owner (MOL-148, Р-9 of MOL-150). The kind in the sheet's
    * own words; the tag `#fb{thread}` ends the first line and nothing else may stand after it — the
    * bot reads it back from there when the owner replies, and a test holds that every kind keeps it.
