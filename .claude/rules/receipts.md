@@ -1,6 +1,6 @@
 ---
 paths:
-  - 'packages/model/src/entities/{receipt,receipt-text}.ts'
+  - 'packages/model/src/entities/{receipt,receipt-text,receipt-sum,receipt-match}.ts'
   - 'packages/model/src/contracts/receipt.ts'
   - 'packages/model/tests/entities/receipt*'
   - 'packages/model/tests/contracts/receipt.test.ts'

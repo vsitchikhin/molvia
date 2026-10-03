@@ -884,6 +884,11 @@ const ARTICLE = /\d{4}\s*\/\s*(\d{5,})/
 // One digit off the way OCR misreads this font (5 for 6, 1 for 4, 3 for 8, 0 for 9) — not any
 // digit: a till numbers one maker's line in a row, and 1160033 and 1160036 are two flavours of one
 // yoghurt, not one article read twice (review Р23).
+/** Two figures one digit OCR confuses apart (5↔6, 1↔4, 3↔8, 0↔9) — not the same figure. */
+export function ocrSwapApart(a: string, b: string): boolean {
+  return a !== b && near(a, b)
+}
+
 function near(a: string, b: string): boolean {
   if (a.length !== b.length) return false
   let off = -1
