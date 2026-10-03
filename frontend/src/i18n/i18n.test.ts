@@ -375,6 +375,7 @@ describe('словарь: плюральные формы', () => {
       'exchange.vs_market.uncounted',
       'exchange.vs_market.count',
       'sign_out.unsent',
+      'feedback.attached_pictures',
       'field.left',
       'accounts.more',
       'accounts.unassigned',

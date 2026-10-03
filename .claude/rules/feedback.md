@@ -113,6 +113,18 @@ a screenshot with it MOL-167 (В-1…В-5, Р-1…Р-13 in `.scratch/tasks/requi
 - **A photo from the bot is kept by Telegram's id** (Р-8): `source = telegram`, `fingerprint` its
   `file_unique_id` — the same photo sent twice to the same reply within a day is one word.
 - **The day's limit is the message's** (Р-10): pictures do not count apart.
+- **In the sheet** (В-4 «б»: no handoff drew it — the brief of MOL-147 left it out — so it is built
+  from the sheet's own kit and tokens): a row under the field, each picture shown whole (`contain`,
+  never cropped — the person checks what goes) with «Убрать» on a thumb-sized corner, and «Приложить
+  снимок» as a label over a native file input — the gallery's own picker, by tap, keyboard and screen
+  reader alike — while there is room; before any, a line says a screenshot is made with the phone's
+  buttons. The pictures are the content: one added or taken away takes a new key (Р-6), and the line
+  of what goes with the text starts with «2 снимка». The button waits for words or a picture, and
+  while a picture is drawn. **The pictures live in the page's memory**, the draft keeps their number:
+  megabytes on the shelf would push out the queue of purchases kept there. After a reload the sheet
+  says «Снимки не сохранились» and takes a new key — **the price**: a message whose answer was lost
+  with its pictures, sent again without them, is a second message. A picture the API refused is said
+  under the pictures, never as a failure of the message; the drawings go once it is sent.
 
 ## Threads, replies, the term
 

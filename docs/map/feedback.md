@@ -32,11 +32,12 @@ Rules: `.claude/rules/feedback.md`. A test beside its source, or mirroring it un
 
 ## frontend · components
 
-- `frontend/src/components/FeedbackSheet.vue` — The sheet «Написать разработчику» (MOL-147), one for the app in `App.vue`: the kind, the text, what goes with it shown before sending, the button that says what it waits for, sent, the day's limit, a failure.
+- `frontend/src/components/FeedbackPictures.vue` — The row of a message's pictures (MOL-167): each the drawing that goes, shown whole, with «Убрать»; «Приложить снимок» over the gallery's own picker while there is room; how a screenshot is made, or why a picture did not go in.
+- `frontend/src/components/FeedbackSheet.vue` — The sheet «Написать разработчику» (MOL-147), one for the app in `App.vue`: the kind, the text, up to three pictures held in the page's memory and sent with the text or alone (MOL-167), what goes with it shown before sending, the button that says what it waits for, sent, the day's limit, a failure, a picture the API refused said under the pictures.
 
 ## frontend · stores
 
-- `frontend/src/stores/feedbackDraft.ts` — The draft of a message to the developer on the device (MOL-147): the kind, the text and the key of its content, under the person.
+- `frontend/src/stores/feedbackDraft.ts` — The draft of a message to the developer on the device (MOL-147): the kind, the text and the key of its content, under the person; how many pictures went with it, never the pictures (MOL-167).
 - `frontend/src/stores/feedbackSheet.ts` — Opens the one sheet «Написать разработчику» and keeps where from — the settings, or an error screen with the code of the last refusal.
 
 ## frontend · other
@@ -47,4 +48,4 @@ Rules: `.claude/rules/feedback.md`. A test beside its source, or mirroring it un
 
 ## e2e
 
-- `e2e/feedback.spec.ts` — End-to-end: «Написать разработчику» from the settings with no kind chosen, from an error screen with «Сломалось», the screen and the code, «back» puts the sheet away, offline the button waits and the draft stays; each row read back through the copy.
+- `e2e/feedback.spec.ts` — End-to-end: «Написать разработчику» from the settings with no kind chosen, from an error screen with «Сломалось», the screen and the code, «back» puts the sheet away, offline the button waits and the draft stays; each row read back through the copy; a screenshot attached — seen before sending, alone with no words, its line in the copy — and one taken away before sending (MOL-167).

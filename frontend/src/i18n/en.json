@@ -1301,6 +1301,18 @@
     "attached_build": "version {build}",
     "attached_screen": "screen “{screen}”",
     "attached_code": "code {code}",
+    "attached_pictures": "{n} picture | {n} pictures",
+    "picture": {
+      "list": "Pictures with the message",
+      "alt": "Picture {n}",
+      "remove": "Remove picture {n}",
+      "add": "Attach a picture",
+      "adding": "Preparing the picture…",
+      "hint": "Take a screenshot with the phone’s buttons and attach it from the gallery. Only what you attach is sent.",
+      "unreadable": "The picture could not be opened — choose another one",
+      "shape": "The picture is too narrow or too long — choose another one",
+      "lost": "The pictures were not kept — attach them again"
+    },
     "languages": {
       "ru": "Russian",
       "en": "English"
@@ -1322,7 +1334,7 @@
     "sending": "Sending…",
     "done": "Done",
     "need_kind": "Choose what it's about",
-    "need_text": "Write a message",
+    "need_text": "Write a message or attach a picture",
     "need_network": "You can send it once online",
     "need_tomorrow": "You can send it tomorrow",
     "offline": "No connection. The text is saved — send it once you're back online",

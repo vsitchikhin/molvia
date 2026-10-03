@@ -37,6 +37,16 @@
         :readonly="phase === 'sending'"
         :error-text="unsupported ? t('feedback.unsupported') : null"
       />
+      <!-- Only what the person attaches, seen before it goes (MOL-167, MOL-150 В-6). -->
+      <FeedbackPictures
+        :pictures="pictures"
+        :max="picturesMax"
+        :drawing="drawing"
+        :disabled="phase === 'sending'"
+        :note="pictureNote"
+        @add="attach"
+        @remove="detach"
+      />
       <!-- What goes with the text, always and before sending (MOL-150, Р-7): read from the body
            itself, so it cannot say one thing and send another. -->
       <p class="attached">
@@ -94,6 +104,7 @@ import { ApiError } from '@molvia/client'
 import {
   ERROR,
   ISSUE,
+  FEEDBACK_PICTURES_MAX,
   FEEDBACK_TEXT_MAX,
   feedbackBodySchema,
   feedbackPlatformSchema,
@@ -118,6 +129,9 @@ import { api } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import FeedbackPictures from '@/components/FeedbackPictures.vue'
+import { PictureRefused, base64Of, pictureFromFile } from '@/feedbackPicture'
+import type { PictureRefusal } from '@/feedbackPicture'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { newId } from '@/ids'
 import { platformLine } from '@/platform'
@@ -180,6 +194,20 @@ function writtenAnyway(error: unknown): boolean {
  */
 type Phase = 'idle' | 'sending' | 'sent' | 'limited' | 'failed'
 
+/** A picture held for the message: the drawing shown, and what the body carries. */
+interface HeldPicture {
+  readonly url: string
+  readonly base64: string
+  readonly width: number
+  readonly height: number
+}
+
+/** Why the phone could not take a picture, by the words the row says it with. */
+const PICTURE_NOTES: Record<PictureRefusal, string> = {
+  unreadable: 'feedback.picture.unreadable',
+  shape: 'feedback.picture.shape',
+}
+
 /**
  * «Написать разработчику» (MOL-147) — the one sheet of the app, opened from the settings or from an
  * error screen («Сообщить о проблеме»), mounted once in `App.vue` and opened through its store.
@@ -198,6 +226,7 @@ export default defineComponent({
     AppButton,
     AppField,
     BottomSheet,
+    FeedbackPictures,
     IconAlert,
     IconCheck,
     IconCloud,
@@ -219,6 +248,13 @@ export default defineComponent({
     const phase = ref<Phase>('idle')
     const unsupported = ref(false)
     const connected = ref(navigator.onLine)
+    /**
+     * The pictures, in the page's memory only (MOL-167, Р-6): the draft on the shelf keeps their
+     * number, and after a reload the sheet says they were not kept.
+     */
+    const pictures = ref<HeldPicture[]>([])
+    const drawing = ref(false)
+    const pictureNote = ref<string | null>(null)
     const kinds = ref<{ $el?: HTMLElement } | null>(null)
     const field = ref<{ $el?: HTMLElement } | null>(null)
 
@@ -255,6 +291,7 @@ export default defineComponent({
         connected.value = navigator.onLine
         phase.value = 'idle'
         unsupported.value = false
+        pictureNote.value = null
         const draft = recallFeedbackDraft(actor.id)
         recalling = true
         frozen.value = draft?.attached ?? null
@@ -266,6 +303,11 @@ export default defineComponent({
         clientKey.value = draft?.clientKey ?? newId()
         await nextTick()
         recalling = false
+        // A reload left the pictures behind: what is held now is another message, under a new key.
+        if ((draft?.pictures ?? 0) > pictures.value.length) {
+          pictureNote.value = t('feedback.picture.lost')
+          changed()
+        }
         focusFirst()
       },
     )
@@ -285,6 +327,7 @@ export default defineComponent({
         text: text.value,
         clientKey: clientKey.value,
         ...(frozen.value === null ? {} : { attached: frozen.value }),
+        ...(pictures.value.length === 0 ? {} : { pictures: pictures.value.length }),
       })
     }
 
@@ -302,6 +345,54 @@ export default defineComponent({
       // An edit is the answer to «не получилось»; the day's limit it does not lift.
       if (phase.value === 'failed') phase.value = 'idle'
     })
+
+    /** A picture added or taken away is another content: a key of its own, as an edit is (Р-6). */
+    function picturesChanged(): void {
+      changed()
+      if (phase.value === 'failed') phase.value = 'idle'
+    }
+
+    async function attach(files: File[]): Promise<void> {
+      pictureNote.value = null
+      drawing.value = true
+      try {
+        for (const file of files.slice(0, FEEDBACK_PICTURES_MAX - pictures.value.length)) {
+          const drawn = await pictureFromFile(file)
+          pictures.value = [
+            ...pictures.value,
+            {
+              url: URL.createObjectURL(drawn.jpeg),
+              base64: await base64Of(drawn.jpeg),
+              width: drawn.width,
+              height: drawn.height,
+            },
+          ]
+          picturesChanged()
+        }
+      } catch (error) {
+        const reason = error instanceof PictureRefused ? error.reason : 'unreadable'
+        pictureNote.value = t(PICTURE_NOTES[reason])
+      } finally {
+        drawing.value = false
+      }
+    }
+
+    function detach(index: number): void {
+      const gone = pictures.value[index]
+      if (gone === undefined) return
+      URL.revokeObjectURL(gone.url)
+      pictures.value = pictures.value.filter((_, at) => at !== index)
+      pictureNote.value = null
+      picturesChanged()
+    }
+
+    function letPicturesGo(): void {
+      for (const picture of pictures.value) URL.revokeObjectURL(picture.url)
+      pictures.value = []
+    }
+
+    // Another person on this device: what was held for the last one is not theirs.
+    watch(() => actor.id, letPicturesGo)
 
     const kindOptions = computed(() => [
       { value: 'bug', label: t('feedback.kinds.bug') },
@@ -330,7 +421,9 @@ export default defineComponent({
     const attachedWords = computed(() => {
       const sent = attached.value
       if (sent === null) return ''
+      const count = pictures.value.length
       return [
+        count === 0 ? null : t('feedback.attached_pictures', { n: count }, count),
         sent.pageBuild === null ? null : t('feedback.attached_build', { build: sent.pageBuild }),
         t('feedback.attached_screen', { screen: screenOf(sent.route) }),
         t(LANGUAGE_KEYS[sent.locale]),
@@ -341,14 +434,19 @@ export default defineComponent({
         .join(' · ')
     })
 
+    /** The text as it goes, or nothing: a picture may go alone (MOL-167, В-3). */
+    const words = computed(() => tidyText(text.value))
+    const saysWords = computed(() => words.value.trim() !== '')
+
     const body = computed(() => {
       if (kind.value === '' || attached.value === null) return null
       const parsed = feedbackBodySchema.safeParse({
         kind: kind.value,
-        text: tidyText(text.value),
+        text: saysWords.value || pictures.value.length === 0 ? words.value : undefined,
         ...attached.value,
         clientKey: clientKey.value,
-        pictures: undefined,
+        pictures:
+          pictures.value.length === 0 ? undefined : pictures.value.map((picture) => picture.base64),
       } satisfies Record<keyof FeedbackBody, unknown>)
       return parsed.success ? parsed.data : null
     })
@@ -357,7 +455,8 @@ export default defineComponent({
     const waiting = computed<string | null>(() => {
       if (phase.value === 'sent' || phase.value === 'sending') return null
       if (kind.value === '') return t('feedback.need_kind')
-      if (tidyText(text.value).trim() === '') return t('feedback.need_text')
+      if (drawing.value) return t('feedback.picture.adding')
+      if (!saysWords.value && pictures.value.length === 0) return t('feedback.need_text')
       if (phase.value === 'limited') return t('feedback.need_tomorrow')
       if (!connected.value) return t('feedback.need_network')
       return null
@@ -412,6 +511,7 @@ export default defineComponent({
         // has changed since, and is another message now.
         dropFeedbackDraft(owner, message.clientKey)
         if (mine !== opening) return
+        letPicturesGo()
         phase.value = 'sent'
       } catch (error) {
         if (mine !== opening) return
@@ -431,6 +531,14 @@ export default defineComponent({
         // The same key with another content — a defect of the phone, never the person's (Р-2): a
         // new key, or «Повторить» would meet the same refusal for ever (сверка С-9).
         if (code === ERROR.CONFLICT) changed()
+        // A picture the API would not take: refused before anything is written, said under the
+        // pictures, and the next one chosen is another message (MOL-167, Р-2). The phone always names
+        // the body's length, so a body too large is the route's own code too.
+        if (code === ERROR.FEEDBACK_PICTURE_INVALID || code === ERROR.FEEDBACK_PICTURE_TOO_LARGE) {
+          pictureNote.value = t(code)
+          phase.value = 'idle'
+          return
+        }
         phase.value = 'failed'
       }
     }
@@ -493,6 +601,12 @@ export default defineComponent({
       action,
       press,
       textMax: FEEDBACK_TEXT_MAX,
+      pictures,
+      picturesMax: FEEDBACK_PICTURES_MAX,
+      drawing,
+      pictureNote,
+      attach,
+      detach,
       COUNTER_FROM,
     }
   },
