@@ -122,7 +122,7 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  * app waits, the error offers it first, «Обновить», and the retry second (MOL-132).
  *
  * Last, quieter than both, «Сообщить о проблеме» (MOL-147, Р-5): the sheet «Написать разработчику»
- * on «Сломалось», with the code of the last refusal of the API (В-1). Only where the screen as a
+ * on «Сломалось», with the code of the API's last refusal before the error was shown (В-1). Only where the screen as a
  * whole failed — not a section's `inline` error (сверка С-1) — only for somebody known, which
  * leaves out the login, and never inside a sheet, since a sheet over a sheet the history does not
  * hold. Drawn here, so no screen has to remember it.
@@ -210,8 +210,17 @@ export default defineComponent({
     onMounted(() => {
       inDialog.value = root.value?.closest('dialog') != null
     })
+    // The code is the one the error was shown with, not whatever failed by the tap: a person reads
+    // the screen a while before writing, and another call may fail meanwhile (review №1).
+    let shownAt = Date.now()
+    watch(
+      () => props.kind,
+      (kind) => {
+        if (kind === 'error') shownAt = Date.now()
+      },
+    )
     function report(): void {
-      feedback?.open({ from: 'error', code: lastRefusal() })
+      feedback?.open({ from: 'error', code: lastRefusal(shownAt) })
     }
     const reportable = computed(
       () =>

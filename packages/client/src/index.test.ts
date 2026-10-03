@@ -166,6 +166,22 @@ describe('everything the client throws is an ApiError', () => {
     expect(await codeOf(client.me())).toBe(ERROR.INTERNAL)
   })
 
+  it('and tells a reply with no body of ours from no reply at all, by its status (MOL-147)', async () => {
+    // Both are `error.internal`; only the first is the server's word on why the screen broke.
+    const reply = await clientServing('<html>502 Bad Gateway</html>', { status: 502 })
+      .health()
+      .catch((error: unknown) => error)
+    const dropped = await createClient({
+      baseUrl: 'http://api',
+      fetch: () => Promise.reject(new TypeError('Failed to fetch')),
+    })
+      .me()
+      .catch((error: unknown) => error)
+
+    expect(reply).toMatchObject({ code: ERROR.INTERNAL, answered: false, status: 502 })
+    expect(dropped).toMatchObject({ code: ERROR.INTERNAL, answered: false, status: undefined })
+  })
+
   it('and telling «not found» apart from the rest without reading a message', async () => {
     const client = clientServing('<html>nginx</html>', { status: 404 })
     expect(await codeOf(client.me())).toBe(ERROR.NOT_FOUND)

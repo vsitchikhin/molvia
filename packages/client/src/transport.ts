@@ -27,7 +27,8 @@ export class ApiError extends Error {
    */
   readonly answered: boolean
   /**
-   * The status of a reply whose body did not match the contract, when there was one. A portal
+   * The status of a reply whose body did not match the contract, when there was one — a bare status
+   * too, so a code inferred from a reply is told from one made up for no reply at all (MOL-147). A portal
    * answers a redirected request with `200` and a page of its own, and a reply of ours cut off on
    * its body arrives with our own status — the login tells a start that never reached us from one
    * whose answer was lost on the way back by exactly this (MOL-68, review Т1).
@@ -233,6 +234,7 @@ export function createTransport({
         CODE_BY_STATUS[response.status] ?? fallback,
         `HTTP ${String(response.status)}`,
         false,
+        response.status,
       )
     }
 

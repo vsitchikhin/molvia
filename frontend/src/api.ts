@@ -44,14 +44,20 @@ let refused: { readonly code: WireCode; readonly at: number } | undefined
 export const REFUSAL_FRESH_MS = 60_000
 
 /**
- * The code of the last refusal, if it came within `REFUSAL_FRESH_MS` before `now` — what an error
- * screen says it failed with in a message to the developer (MOL-147, В-1). No screen keeps the code
- * itself: every loader turns a failure into «offline» or «error» before the screen sees it, so the
- * one seam every call passes through keeps it instead. Another call failing in the same minute
- * lends its code — the sheet shows it before anything is sent.
+ * The code of the last refusal, if it came within `REFUSAL_FRESH_MS` before `now` — the moment an
+ * error screen is shown, which keeps it for a message to the developer (MOL-147, В-1). No screen
+ * keeps the code itself: every loader turns a failure into «offline» or «error» before the screen
+ * sees it, so the one seam every call passes through keeps it instead. Another call failing in the
+ * same minute lends its code — the sheet shows it before anything is sent.
+ *
+ * Only what came back from the server is a refusal: a connection dropped or a reply never waited
+ * out has no code of the API's, and the client's `error.internal` for it would send the developer
+ * looking for a failure in a log that has none (adversarial В3а). Nor is the sheet's own refusal
+ * one: «too many today» is not why a screen broke (В3б).
  */
 export function lastRefusal(now: number = Date.now()): WireCode | null {
-  return refused !== undefined && now - refused.at <= REFUSAL_FRESH_MS ? refused.code : null
+  if (refused === undefined || refused.at > now) return null
+  return now - refused.at <= REFUSAL_FRESH_MS ? refused.code : null
 }
 
 type Call = (...args: never[]) => Promise<unknown>
@@ -73,13 +79,14 @@ type Call = (...args: never[]) => Promise<unknown>
  * Wrapped by walking the client rather than by listing its methods: a call added later would
  * otherwise lose the seam silently, which is the failure this replaces.
  */
-function watching<T extends Call>(call: T): T {
+function watching<T extends Call>(call: T, remembered: boolean): T {
   return (async (...args: never[]) => {
     try {
       return await call(...args)
     } catch (error) {
       if (error instanceof ApiError) {
-        refused = { code: error.code, at: Date.now() }
+        const replied = error.answered || error.status !== undefined
+        if (remembered && replied) refused = { code: error.code, at: Date.now() }
         if (error.code === ERROR.NO_ACTOR) missing?.()
       }
       throw error
@@ -88,5 +95,5 @@ function watching<T extends Call>(call: T): T {
 }
 
 export const api = Object.fromEntries(
-  Object.entries(client).map(([name, call]) => [name, watching(call)]),
+  Object.entries(client).map(([name, call]) => [name, watching(call, name !== 'sendFeedback')]),
 ) as MolviaClient

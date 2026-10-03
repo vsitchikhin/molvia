@@ -16,10 +16,13 @@ import { pwaUpdateKey, type UpdatePhase } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 
-const refusal = vi.hoisted(() => ({ code: null as string | null }))
+const refusal = vi.hoisted(() => ({ code: null as string | null, asked: [] as number[] }))
 vi.mock('@/api', async (actual) => ({
   ...(await actual<typeof Api>()),
-  lastRefusal: () => refusal.code,
+  lastRefusal: (now: number) => {
+    refusal.asked.push(now)
+    return refusal.code
+  },
 }))
 
 type Props = Record<string, unknown>
@@ -426,6 +429,7 @@ describe('ScreenState', () => {
       setActivePinia(createPinia())
       useActorStore().state = 'ready'
       refusal.code = null
+      refusal.asked = []
     })
 
     afterEach(() => {
@@ -477,6 +481,31 @@ describe('ScreenState', () => {
       expect(sheet.shown).toBe(true)
       expect(sheet.entry).toEqual({ from: 'error', code: 'error.internal' })
       expect(render({ kind: 'error' }).emitted('retry')).toBeUndefined()
+    })
+
+    it('asks for the refusal as of the moment the error was shown, not of the tap (review №1)', async () => {
+      vi.useFakeTimers({ now: 1_000_000, toFake: ['Date'] })
+      const view = render({ kind: 'error' })
+      vi.setSystemTime(1_000_000 + 61_000)
+
+      await report(view)?.trigger('click')
+
+      expect(refusal.asked).toEqual([1_000_000])
+      vi.useRealTimers()
+    })
+
+    it('takes the moment again when the block turns to an error once more', async () => {
+      vi.useFakeTimers({ now: 1_000_000, toFake: ['Date'] })
+      const view = render({ kind: 'error' })
+      await view.setProps({ kind: 'offline', tone: 'warn' })
+      vi.setSystemTime(2_000_000)
+      await view.setProps({ kind: 'error', tone: undefined })
+      vi.setSystemTime(2_030_000)
+
+      await report(view)?.trigger('click')
+
+      expect(refusal.asked).toEqual([2_000_000])
+      vi.useRealTimers()
     })
 
     it('opens it without a code when no refusal is fresh', async () => {
