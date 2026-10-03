@@ -237,4 +237,30 @@ describe('startOwnerNotices — таймер раз в минуту', () => {
     expect(sent).toHaveLength(1)
     expect(log).toHaveBeenCalledWith('[molvia] owner: stopping, 2 notices given up')
   })
+
+  it('claim, повисший к концу времени остановки, обрывается, и это сказано (№16)', async () => {
+    vi.useFakeTimers()
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api, sent } = telegram()
+    // The API answers only when told to stop waiting: a lock in its database, say.
+    const claim = vi.fn(
+      (signal?: AbortSignal) =>
+        new Promise<OwnerNotices>((_resolve, reject) => {
+          signal?.addEventListener('abort', () => {
+            reject(new Error('aborted'))
+          })
+        }),
+    )
+    const stop = startOwnerNotices(
+      { claimOwnerNotices: claim } as unknown as MolviaBotClient,
+      api,
+      60_000,
+      50,
+    )
+    const stopped = stop()
+    await vi.advanceTimersByTimeAsync(OWNER_STOP_BUDGET_MS)
+    await stopped
+    expect(sent).toEqual([])
+    expect(log).toHaveBeenCalledWith('[molvia] owner: stopping, the claim under way given up')
+  })
 })

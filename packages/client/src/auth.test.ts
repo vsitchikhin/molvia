@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { LOGIN_HEADER, ERROR, ISSUE } from '@molvia/model'
-import { createClient, createBotClient } from './index'
+import { ApiError, createClient, createBotClient } from './index'
 
 const id = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const expiresAt = '2026-09-22T12:00:00Z'
@@ -153,6 +153,22 @@ describe('login clients', () => {
     expect(fetch.mock.calls[0]?.[1]?.body).toBe(
       JSON.stringify({ errorName: 'TypeError', handler: 'callback:rate' }),
     )
+  })
+
+  it("the owner's claim hears the caller's signal: the bot's stop has a deadline (MOL-143)", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(
+      async (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('aborted', 'AbortError'))
+          })
+        }),
+    )
+    const bot = createBotClient({ baseUrl: 'http://backend', fetch, secret })
+    const deadline = new AbortController()
+    const claim = bot.claimOwnerNotices(deadline.signal)
+    deadline.abort()
+    await expect(claim).rejects.toBeInstanceOf(ApiError)
   })
 
   it('a report that carries more than a kind is refused before it is sent (MOL-143)', async () => {

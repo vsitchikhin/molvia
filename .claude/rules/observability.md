@@ -68,10 +68,10 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   fingerprints waiting a failure is the log's alone; what waits when the process stops is lost. The
   tests wait on `failureRecorded`, never on a timer.
 - **The jobs of the API's timers are failures too** (В-1): the seven cleanups, the vectors of the
-  catalogue, the rating reminders and the rates' refresh, as `job:<name>`. The cleanups' runner hands
-  the error on — before, they logged «cleanup failed» without it. **A source of rates that does not
-  answer is not a failure**: it is logged inside as a warning and has its fallbacks; what escapes
-  the refresh is ours.
+  catalogue, the rating reminders and the rates' refresh, as `job:<name>`. The cleanups' runner
+  hands the error on — before, they logged «cleanup failed» without it. **A source of rates that
+  does not answer is not a failure**: it is logged inside as a warning and has its fallbacks; what
+  escapes the refresh is ours.
 - **The bot reports only its defects** (Р-5), by `POST /internal/failures` behind its secret: a
   throw in a handler, a message Telegram refuses as malformed (`TELEGRAM_400`), an answer of the API
   the contract does not read. Not the network, not Telegram's 403, 429 or 5xx, not the API's own
@@ -114,9 +114,11 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   they are marked handed, and a rollout, every stop, is when there is a batch — while
   `OWNER_STOP_BUDGET_MS` (20 s of the bot's 30 of `stop_grace_period`) lasts, then gives up the rest
   and says how many. Without the pauses nineteen messages went in a hundred milliseconds into one
-  chat, where Telegram allows about one a second. **A send hung when that time runs out is cut** (adversarial В1):
-  every send carries the stop's deadline as its signal and is raced against it, since a socket that
-  never answers held the stop past compose's thirty seconds and the kill said nothing.
+  chat, where Telegram allows about one a second. **The stop's deadline cuts what is under way**:
+  a send hung when it runs out is cut — it carries the deadline as its signal and is raced against
+  it, since a socket that never answered held the stop past compose's thirty seconds and the kill
+  said nothing (adversarial В1) — and so is a claim still waiting on the API (review №16): what the
+  API marked meanwhile goes with the process either way, and the log says so.
 - **`make failures`** (`dist/failures.js` in the API's image, as `gates`): the latest fingerprints,
   read only, the first six characters of each beside it — the message names a fingerprint by them.
 - **The API runs without `--enable-source-maps`** (В-6, measured): Node parses the whole map of

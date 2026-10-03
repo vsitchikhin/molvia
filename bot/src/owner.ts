@@ -58,8 +58,14 @@ export async function tellOwner(
 ): Promise<void> {
   let claimed
   try {
-    claimed = await api.claimOwnerNotices()
+    claimed = await api.claimOwnerNotices(deadline)
   } catch (error) {
+    // Cut by the stop's deadline (review №16): what the API marked meanwhile is lost with the
+    // process either way, and the log says so rather than a bare `aborted`.
+    if (deadline?.aborted) {
+      console.error('[molvia] owner: stopping, the claim under way given up')
+      return
+    }
     console.error(`[molvia] owner claim: ${error instanceof ApiError ? error.code : 'unexpected'}`)
     reportDefect(api, error, 'owner:claim')
     return

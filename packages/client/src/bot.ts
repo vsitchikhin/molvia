@@ -45,8 +45,11 @@ export interface MolviaBotClient {
   switchReminders(telegramUserId: TelegramUserId, change: ReminderSwitch): Promise<void>
   /** A failure of the bot's own, by its kind and handler (MOL-143): the API fingerprints it. */
   reportFailure(failure: BotFailure): Promise<void>
-  /** What the API has queued for the owner, already marked as handed (MOL-143). */
-  claimOwnerNotices(): Promise<OwnerNotices>
+  /**
+   * What the API has queued for the owner, already marked as handed (MOL-143). `signal` cuts the
+   * wait short — the bot's stop has a deadline of its own.
+   */
+  claimOwnerNotices(signal?: AbortSignal): Promise<OwnerNotices>
 }
 
 /** An internal client has no session and cannot attach its secret to an arbitrary API path. */
@@ -97,7 +100,10 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
       if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'failure')
       await request('/internal/failures', z.undefined(), { method: 'POST', body: body.data })
     },
-    claimOwnerNotices: async () =>
-      request('/internal/owner/claim', ownerNoticesSchema, { method: 'POST' }),
+    claimOwnerNotices: async (signal) =>
+      request('/internal/owner/claim', ownerNoticesSchema, {
+        method: 'POST',
+        ...(signal === undefined ? {} : { signal }),
+      }),
   }
 }
