@@ -37,6 +37,8 @@ services:
     # network, so the only way in is through a container.
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # The metrics' network too, for its exporter (MOL-145); the database still publishes no port.
+    networks: [default, metrics]
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 10s
@@ -62,12 +64,16 @@ services:
       OPEN_FOOD_FACTS_CONTACT: ${OPEN_FOOD_FACTS_CONTACT:-}
       # The receipt reader below (MOL-125); while it is down, receipts wait in the queue.
       RECEIPT_READER_URL: http://receipt-reader:8080
-      # Whom the bot tells of a new failure (MOL-143): the owner's Telegram id. Required as a line,
-      # as BOT_PULSE_URL is: a forgotten one would leave every failure silent and nobody would know.
-      # Empty, on purpose, keeps the failures in their table and tells nobody.
-      OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID?set OWNER_TELEGRAM_ID in .env.prod, or leave it empty to tell nobody}
+      # Whom the bot tells of a new failure (MOL-143): the owner's Telegram id, digits only. Required
+      # and filled since MOL-145 — the alarms of the metrics go to it too, so empty is no longer a way
+      # to tell nobody: compose refuses to start (review №3).
+      OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID:?set OWNER_TELEGRAM_ID in .env.prod — the failures and the alarms go to it}
       # Where `make failures` reads the phone's maps from, beside the PWA's build (MOL-144).
       APP_BASE_URL: https://${DOMAIN:?set DOMAIN}
+      # `/metrics` on a port of its own (MOL-145, В-1): the metrics' network scrapes it, and Caddy,
+      # which proxies only 3300, cannot reach it by any spelling of a path.
+      METRICS_PORT: 9464
+    networks: [default, metrics]
     depends_on:
       postgres:
         condition: service_healthy
@@ -142,7 +148,159 @@ services:
     depends_on:
       - backend
 
+  # ── The metrics (MOL-145) ──────────────────────────────────────────────────────────────────────
+  # VictoriaMetrics and three exporters on a network with no way out (`metrics`, `internal`): what
+  # sees the whole machine or the database can send nothing anywhere. Grafana stands in both, since
+  # its alarms go to Telegram, and publishes one port, on the loopback, for an SSH tunnel. None of
+  # them is in the rollout's check of the tag, and a rollback leaves them as they run (Р-11).
+
+  victoria:
+    logging: *logging
+    # VictoriaMetrics single with the scrape config of `deploy/victoria` baked in (В-2): a change to
+    # what is scraped is a merge, as any other.
+    image: ghcr.io/vsitchikhin/molvia-victoria:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: deploy/victoria/Dockerfile
+    restart: unless-stopped
+    command:
+      - -storageDataPath=/storage
+      - -retentionPeriod=30d
+      - -promscrape.config=/etc/victoria/scrape.yml
+      - -httpListenAddr=:8428
+    mem_limit: 256m
+    volumes:
+      - vmdata:/storage
+    networks: [metrics]
+
+  node-exporter:
+    logging: *logging
+    # The machine's memory, CPU, load and disk, read from its /proc, /sys and / mounted read-only.
+    # Not on the host's network — that would be a port outside — so the machine's network counters
+    # are not here: inside the container they would be the container's own (Р-7).
+    image: prom/node-exporter:v1.12.1
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+      - --no-collector.netdev
+      - --no-collector.netstat
+      - --no-collector.netclass
+      - --no-collector.sockstat
+      - --no-collector.arp
+    pid: host
+    read_only: true
+    mem_limit: 64m
+    volumes:
+      - /:/host:ro,rslave
+    networks: [metrics]
+
+  cadvisor:
+    logging: *logging
+    # Every container's memory, CPU and OOM; a restart is its CPU counter starting over (Р-4).
+    # Docker's socket is root on the machine, read-only or not; that is why it has no port and no way
+    # out (Р-8). `docker_only` and fifteen seconds between looks — below ten it eats a core — and only
+    # the groups the dashboard reads.
+    image: ghcr.io/google/cadvisor:v0.60.6
+    restart: unless-stopped
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=15s
+      - --enable_metrics=cpu,memory,oom_event
+      - --store_container_labels=false
+      - --whitelisted_container_labels=com.docker.compose.service
+    cpus: 0.5
+    mem_limit: 192m
+    # The OOM-killer is read from the kernel's log, and Debian and Ubuntu let only CAP_SYSLOG read it
+    # (`kernel.dmesg_restrict=1`): without it every OOM counts 0 in silence (review №1).
+    cap_add:
+      - SYSLOG
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks: [metrics]
+
+  postgres-exporter:
+    logging: *logging
+    # Connections, the size of the database, the longest transaction — figures, never a query's text
+    # (В-4). The database's own user (В-5): the exporter has no way out to take anything anywhere.
+    image: prometheuscommunity/postgres-exporter:v0.20.1
+    restart: unless-stopped
+    command:
+      - --collector.long_running_transactions
+    environment:
+      DATA_SOURCE_URI: postgres:5432/${POSTGRES_DB}?sslmode=disable
+      DATA_SOURCE_USER: ${POSTGRES_USER}
+      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
+    read_only: true
+    mem_limit: 64m
+    networks: [metrics]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  grafana:
+    logging: *logging
+    # Grafana with the dashboard, the alarms and their contact point of `deploy/grafana` baked in (В-2):
+    # what the repository says is what runs, and a change made in the interface is not kept (Р-10).
+    image: ghcr.io/vsitchikhin/molvia-grafana:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: deploy/grafana/Dockerfile
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      # Behind the tunnel and a password still: the tunnel is the door, the password the lock.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      # Grafana calls home by default; nothing of a third party sees this machine (Р-6).
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: 'false'
+      GF_ANALYTICS_FEEDBACK_LINKS_ENABLED: 'false'
+      GF_NEWS_NEWS_FEED_ENABLED: 'false'
+      GF_SECURITY_DISABLE_GRAVATAR: 'true'
+      GF_SNAPSHOTS_EXTERNAL_ENABLED: 'false'
+      GF_PLUGINS_PUBLIC_KEY_RETRIEVAL_DISABLED: 'true'
+      # Grafana fetches five plugins from grafana.com at every start unless told not to.
+      GF_PLUGINS_PREINSTALL_DISABLED: 'true'
+      # The alarms' own bot (В-3), never the product's: the login's token stays out of a container
+      # that goes to the internet. Whom it writes is the owner the failures go to (MOL-143), put
+      # into the contact point by `deploy/grafana/start.sh`.
+      ALERTS_BOT_TOKEN: ${ALERTS_BOT_TOKEN:?set ALERTS_BOT_TOKEN}
+      OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID:?set OWNER_TELEGRAM_ID in .env.prod — the failures and the alarms go to it}
+      # The alarms' pulse (adversarial А5): Grafana is the one that sends, and nothing else watched it.
+      # A rule that fires while Grafana counts and VictoriaMetrics answers pings the healthchecks.io
+      # check «molvia-alerts» every five minutes; its silence is healthchecks.io's own Telegram.
+      ALERTS_PULSE_URL: ${ALERTS_PULSE_URL:?set ALERTS_PULSE_URL — the alarms would be watched by nobody}
+    mem_limit: 384m
+    ports:
+      # The one port of the metrics, on the machine's loopback only: `ssh -L 3000:127.0.0.1:3000`.
+      - '127.0.0.1:${GRAFANA_PORT:-3000}:3000'
+    volumes:
+      - grafana_data:/var/lib/grafana
+    # Its own network for the way to Telegram (review №4): in `default` it stood beside Caddy, the API,
+    # the bot and the receipt reader, which asks nobody who calls.
+    networks: [alerts, metrics]
+    depends_on:
+      - victoria
+
+networks:
+  default: {}
+  # Grafana's alone: a way out to Telegram and healthchecks.io, and no neighbour (review №4).
+  alerts: {}
+  # No way out of it: neither an exporter nor VictoriaMetrics reaches the internet (Р-7).
+  metrics:
+    internal: true
+
 volumes:
   pgdata:
   caddy_data:
   caddy_config:
+  vmdata:
+  grafana_data:

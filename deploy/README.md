@@ -197,6 +197,11 @@ Caddy issues an internal certificate for `localhost`, hence `-k`. `LOG_DRIVER=js
 because Docker Desktop has no journald and refuses to start a container that asks for it. Tear
 it down with the same command ending in `down -v`.
 
+The metrics (MOL-145) need `GRAFANA_ADMIN_PASSWORD`, `ALERTS_BOT_TOKEN` and `OWNER_TELEGRAM_ID` as
+well; Grafana is then at `http://127.0.0.1:3000`. On Docker Desktop node_exporter refuses `/` mounted
+`rslave` — an override with `/:/host:ro` tries it there — and the disk's panels stay empty: the
+virtual machine has no `/` of the kind a server has.
+
 ## Erasing a person by hand (MOL-58)
 
 People erase themselves: `/delete` in the bot, one confirmation, done in one transaction. This
@@ -405,6 +410,101 @@ its first six characters. The frames are the bundle's — the function's name in
 the map in the image (`→ src/usecases/rate-item.ts:27:1`). The API runs without
 `--enable-source-maps` on purpose: the map costs it some 75 MB of memory for good (MOL-143, В-6).
 The bot's frames and another build's are left as they are.
+
+## Metrics (MOL-145)
+
+The checks above say that something is down, a failure that something broke. The metrics say how
+the machine is doing while nothing is either: whether the API is slower than yesterday, how much
+memory is left — there is no swap, so the end of it is the OOM-killer on the API or Postgres — when
+the disk fills, and what share of the answers is 5xx, which the watch does not see.
+
+VictoriaMetrics keeps thirty days of figures, scraped every fifteen seconds from the API's own port
+(9464, never through Caddy), node_exporter (the machine), cAdvisor (the containers) and
+postgres_exporter (the database). All four are on a network with no way out. Grafana draws them and
+sends the alarms; it is the only one with a port, on the machine's loopback. Nothing leaves the machine
+but the alarms, through Telegram, and the alarms' pulse, to healthchecks.io.
+
+### Looking
+
+```bash
+ssh -L 3000:127.0.0.1:3000 molvia     # then http://localhost:3000, admin and GRAFANA_ADMIN_PASSWORD
+```
+
+Dashboards → Molvia → «Молвия», four rows:
+
+- **API** — requests a minute; the share of 5xx and p50/p95 of a person's requests — no scanner's
+  404, no `/health`, no bot's poll, and for p95 no photo of a receipt, whose time is the phone's
+  network; answers by class — `aborted` is a client that left before the answer, the phone after 15 s,
+  the bot after 5; how late the event loop ran over the last minute; the process's memory; and the
+  routes of the last hour by their template — `unmatched` is every request no route answered, a 404,
+  with no path kept;
+- **Машина** — memory, CPU, load, the disk and how many days are left at the pace of the last week;
+- **Контейнеры** — memory against each one's limit, CPU, restarts and OOM over a day;
+- **Postgres** — connections against `max_connections`, the size, the queries running now, the oldest
+  open transaction, deadlocks and rollbacks. Never a query's text.
+
+The dashboard is read-only: a panel changed here cannot be saved. Change
+`deploy/grafana/dashboards/molvia.json` and merge — the image carries it.
+
+### The alarms
+
+Grafana writes to `OWNER_TELEGRAM_ID` through **the alarms' own bot**, `ALERTS_BOT_TOKEN` — never the
+product's bot, whose token is the login's and stays out of a container that goes to the internet.
+Write the alarms' bot `/start` once: a bot cannot write first. Every threshold is in
+`deploy/grafana/provisioning/alerting/rules.json`:
+
+| Alarm                 | When                                                        | What to look at                                                      |
+| --------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------- |
+| Память машины         | more than 85 % for 5 minutes                                | «Контейнеры» — who grew; `docker stats --no-stream`                  |
+| Диск машины           | more than 80 %                                              | `df -h /`, `docker system df`, `journalctl --disk-usage`             |
+| Доля 5xx              | more than 5 % of at least 20 answers to people in 5 minutes | `make failures` on the machine — what broke has its fingerprint      |
+| Время ответа API      | p95 to people above 1 s for 15 minutes, at least 20 answers | the routes' table; the event loop; Postgres — the oldest transaction |
+| Перезапуск контейнера | a container started over by itself — never a rollout        | `docker compose … logs --tail 100 <service>`                         |
+| Метрики молчат        | a target did not answer for 5 minutes                       | `docker compose … ps` — which of the five is down                    |
+
+Every rule also fires when it cannot be counted — VictoriaMetrics down — and says «нет данных».
+`✅ Прошло` comes when it is over. A firing alarm is repeated every six hours.
+
+**The alarms' pulse**: Grafana is the one that sends, so it is watched from outside too. «Тревоги
+живы» fires while Grafana counts its rules, VictoriaMetrics answers and reads Grafana's own figures,
+and no alarm failed on its way to Telegram within the hour with none delivered beside it; it pings the
+healthchecks.io check `molvia-alerts` every five or six minutes — never Telegram. Set the check at
+**period 5 min, grace 10 min**, with the Telegram integration, as the others of «Signals», and see it
+turn green after the first rollout: a check that never got a ping never raises an alarm. Its alarm
+means Grafana or VictoriaMetrics is down, or **the alarms do not reach Telegram** — the token revoked,
+the bot blocked or never given `/start`: `docker compose … logs --tail 50 grafana | grep -i notify`,
+then the contact point's Test. A token revoked while nothing fires is seen only once something does.
+
+**Removing an alarm** is `deleteRules` with its uid in the same merge: provisioning never deletes a rule
+by itself, and the old one would keep alarming from Grafana's volume.
+
+### Trying the alarm
+
+- **The way to Telegram**: Alerting → Contact points → `telegram` → Test. A message comes from the
+  alarms' bot.
+- **A rule end to end**, on the machine:
+  `docker compose -f docker-compose.prod.yml --env-file .env.prod stop node-exporter`; in about six
+  minutes «Метрики молчат: node», with memory and disk «нет данных» beside it; then `start
+node-exporter`, and `✅ Прошло` follows.
+
+### Where it is set
+
+- `GRAFANA_ADMIN_PASSWORD`, `ALERTS_BOT_TOKEN`, `ALERTS_PULSE_URL` and `OWNER_TELEGRAM_ID` (digits
+  only) in `~/molvia/.env.prod`; compose refuses to start without any of them. **The password is the
+  line's at every start** — change it there and restart Grafana
+  (`docker compose … up -d --force-recreate grafana`); Grafana itself keeps only the first. One it
+  refuses — shorter than four characters — stops Grafana rather than leave the old one open; take it
+  from `openssl rand -base64 24`.
+- The images `molvia-grafana` and `molvia-victoria` are built by the release with the others. **The
+  metrics never judge a rollout**: pulled before anything changes, a refusal of the registry a
+  warning; started only once the API answers healthy, a failure of theirs a warning in
+  `~/molvia/deploy.log` — `docker compose … ps` then. A rollback leaves them as they run — a tag from
+  before MOL-145 has no image of theirs.
+- **The first rollout with the metrics recreates Postgres** as well — its networks changed — so the
+  database is away for the seconds the API is.
+- **Grafana 13.0 and the chat id**: `deploy/grafana/start.sh` writes `OWNER_TELEGRAM_ID` into the
+  contact point as text before Grafana starts, since Grafana turned it into a number and refused it
+  (grafana/alerting #558). A Grafana that takes a numeric chat — after 13.0.2 — no longer needs it.
 
 ## Backups (MOL-70)
 

@@ -141,9 +141,20 @@ echo "deploying $tag over ${previous:-nothing}"
 # Pulled before anything changes: a tag the registry does not have leaves the machine as it was.
 IMAGE_TAG="$tag" "${compose[@]}" pull -q backend bot frontend receipt-reader
 
+# The metrics (MOL-145) are pulled before anything changes too, the upstream exporters included, but
+# they never judge a rollout (adversarial А4): a registry's refusal — Docker Hub's limit for an
+# anonymous pull — is a warning, and they are started only once the application is healthy.
+metrics=(victoria node-exporter cadvisor postgres-exporter grafana)
+IMAGE_TAG="$tag" "${compose[@]}" pull -q "${metrics[@]}" ||
+  echo "warning: the metrics' images were not all pulled" >&2
+
 bot_before="$(bot_state || true)"
 set_tag "$tag"
-if "${compose[@]}" up -d && wait_healthy "$tag"; then
+if "${compose[@]}" up -d postgres backend bot frontend receipt-reader && wait_healthy "$tag"; then
+  # A metrics container that cannot start — Grafana's loopback port held, a device missing — is said
+  # and the rollout stands: it rolled a healthy API back when `up -d` of everything judged it (А4).
+  "${compose[@]}" up -d "${metrics[@]}" ||
+    echo "warning: the metrics did not all start — the rollout stands; see \`docker compose ps\`" >&2
   # Unused images older than a week: a deploy a day leaves three behind each time.
   docker image prune -af --filter until=168h >/dev/null || true
   echo "deployed $tag"
@@ -157,9 +168,9 @@ fi
 echo "rolling back to $previous — a migration $tag applied stays applied" >&2
 bot_before="$(bot_state || true)"
 set_tag "$previous"
-# The services the tag check counts, not the receipt reader (MOL-125): a tag from before it has no
-# reader image, and `up -d` of everything would stop on the missing pull with the API left broken.
-# The reader keeps whatever runs — it holds nothing and answers any API alike.
+# The services the tag check counts, not the receipt reader (MOL-125) nor the metrics (MOL-145): a tag
+# from before them has no image of theirs, and `up -d` of everything would stop on the missing pull
+# with the API left broken. They keep whatever runs — none holds anything an older API cannot read.
 "${compose[@]}" up -d backend bot frontend || true
 wait_healthy "$previous" || echo "$previous is not healthy either — the machine needs hands" >&2
 exit 1
