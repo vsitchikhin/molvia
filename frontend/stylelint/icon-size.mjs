@@ -29,8 +29,9 @@
 //     element it takes its step from, no `font-size` in a style but a step, no bound one (Е2);
 //   - the steps themselves are declared in `_tokens.scss` alone: `--icon: 2rem` in a component would
 //     make every line above right and the icon 32 (В1) — nor set by a `:style` of any tag, nor under
-//     a name Sass builds that could be a step (Г1, Д1); no `@property` is registered outside the
-//     tokens at all (Е1, Ж2). Property names are matched whatever their case (Ж1).
+//     a name Sass builds that could be a step (Г1, Д1), nor registered by `@property` under such a
+//     name (Е1, Ж2; any other property is no business of the scale, review 26). Property names are
+//     matched whatever their case (Ж1).
 //
 // Which step is the role's — 20 for a row's chevron, 24 for a button's — is DESIGN.md's and review's:
 // the role is the place's, and one glyph stands in several (review 22, Е3).
@@ -133,8 +134,8 @@ const messages = ruleMessages(ruleName, {
     `.${name} is worn by an icon and by <${other}> (line ${line}). An icon's class is its own: a size ` +
     `in a rule of a shared class reaches the icon unchecked (MOL-173).`,
   property: (name) =>
-    `@property ${name} outside _tokens.scss. A step of the icon scale is the scale's, and a registered ` +
-    `initial value could give every icon another size: no property is registered in a component (MOL-173).`,
+    `@property ${name} outside _tokens.scss. A step of the icon scale is the scale's: a registered ` +
+    `initial value would give every icon another size (MOL-173).`,
   inherited: (what, name, line) =>
     `${what} on <${name}> (line ${line}), which an icon takes its step from. The icon would be drawn ` +
     `at it, off the scale (MOL-173).`,
@@ -227,10 +228,10 @@ export function templateTags(sfc) {
       attributes,
       // What the tag says of a font-size in the template: a static one, any bound one (Е2).
       staticSize: attributes.match(
-        /(?:^|\s)style=(?:"[^"]*font-size:\s*([^;"]+)|'[^']*font-size:\s*([^;']+))/i,
+        /(?:^|\s)style=(?:"(?:[^"]*[;\s])?font-size:\s*([^;"]+)|'(?:[^']*[;\s])?font-size:\s*([^;']+))/i,
       ),
       boundSize:
-        /(?:^|\s)(?::style|v-bind:style)=(?:"[^"]*(fontSize|font-size|\bfont\b)|'[^']*(fontSize|font-size|\bfont\b))/i.test(
+        /(?:^|\s)(?::style|v-bind:style)=(?:"[^"]*(fontSize|font-size|[{,]\s*'?font'?\s*:)|'[^']*(fontSize|font-size|[{,]\s*"?font"?\s*:))/i.test(
           attributes,
         ),
       sizeAttribute: icon ? attributes.match(SIZE_ATTRIBUTE)?.[1] : undefined,
@@ -440,6 +441,22 @@ const isMixin = (node) =>
 const fontSize = (node) => node.type === 'decl' && node.prop.toLowerCase() === 'font-size'
 const isStep = (value) => STEP.test(value.trim())
 
+// A name that is a step, or one Sass builds that could be: what stands before the `#{` is nothing,
+// `--`, or a start of `--icon` or `--state-glyph` (Д1, review 23).
+function maybeStep(name) {
+  const lower = name.toLowerCase()
+  if (STEP_NAME.test(lower)) return true
+  const at = lower.indexOf('#{')
+  if (at < 0) return false
+  const head = lower.slice(0, at)
+  return (
+    head === '' ||
+    '--icon'.startsWith(head) ||
+    '--state-glyph'.startsWith(head) ||
+    head.startsWith('--icon')
+  )
+}
+
 function resizes(prop, value) {
   // A minimum of nothing and a maximum of all leave a 1em icon as it is (review 20).
   if (/^min-/.test(prop) && /^(0|auto)$/.test(value)) return false
@@ -470,20 +487,13 @@ function rule(primary) {
       root.walkDecls((decl) => {
         // A custom property whose name Sass builds may be a step (Д1) when what stands before the `#{`
         // could begin one: nothing, `--`, or a start of `--icon` or `--state-glyph` (review 23).
-        const at = decl.prop.indexOf('#{')
-        const head = at < 0 ? '' : decl.prop.slice(0, at)
-        const maybe =
-          at >= 0 &&
-          (head === '' ||
-            '--icon'.startsWith(head) ||
-            '--state-glyph'.startsWith(head) ||
-            head.startsWith('--icon'))
-        if (STEP_NAME.test(decl.prop.toLowerCase()) || maybe) flag(decl, messages.token(decl.prop))
+        if (maybeStep(decl.prop)) flag(decl, messages.token(decl.prop))
       })
-      // A registered property may be a step, its name built by Sass too, and an initial value of its
-      // own would size every icon of the app (Е1, Ж2): none is registered outside the tokens.
+      // A step registered by `@property` — by its name, or by one Sass builds that could be a step —
+      // would size every icon of the app with its initial value (Е1, Ж2). Any other property is no
+      // business of the icon scale (review 26).
       root.walkAtRules((atRule) => {
-        if (atRule.name.toLowerCase() === 'property')
+        if (atRule.name.toLowerCase() === 'property' && maybeStep(atRule.params.trim()))
           flag(atRule, messages.property(atRule.params.trim()))
       })
     }
@@ -553,7 +563,7 @@ function rule(primary) {
     const ownSize = (tag) => {
       const set = reaching(tag).flatMap((entry) => direct(entry.node).filter(fontSize))
       const last = set[set.length - 1]?.value
-      if (last === undefined) return undefined
+      // One under a condition counts too, even with none set plainly beside it (Г4, З1).
       const any = all
         .filter((entry) => entry.selectors.some((s) => reaches(s, tag, true)))
         .flatMap((entry) => ownNodes(entry.node).filter(fontSize))
@@ -575,6 +585,13 @@ function rule(primary) {
             return same
               .flatMap((other) => ownNodes(other.node).filter(fontSize))
               .every((d) => isStep(d.value))
+          // No rule sets it: the style of an element of the template the prefix names may (З2).
+          const named = parse(prefix)
+          const inline = tags
+            .filter((tag) => !tag.icon && reaches(named, tag))
+            .map((tag) => (tag.staticSize?.[1] ?? tag.staticSize?.[2])?.trim())
+            .filter(Boolean)
+          if (inline.length) return inline.every(isStep)
         }
         return false
       })
@@ -649,8 +666,11 @@ function rule(primary) {
       ) {
         path.push(above)
         // Its style wins over its rules: a step there is the step (review 25).
+        // Its rules are read all the same: one with !important or under a condition may still give it
+        // a font-size of text (З1).
         const inline = (above.staticSize?.[1] ?? above.staticSize?.[2])?.trim()
-        size = inline ?? ownSize(above)
+        const ruled = ownSize(above)
+        size = inline !== undefined && (ruled === undefined || isStep(ruled)) ? inline : ruled
       }
       // The template on the way to the element the step comes from: its style wins over the rule (Е2).
       for (const element of path) {

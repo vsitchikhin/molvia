@@ -729,7 +729,7 @@ describe('molvia/icon-size, round 7', () => {
     ).toEqual(['font-size: 2rem', 'The icon «.d» (line 3)'])
   })
 
-  it('refuses any @property outside the tokens, a built name and capitals too (Ж2, Ж1)', async () => {
+  it('refuses @property of a step, by a built name and in capitals, and lets another through (Ж2, Ж1, review 26)', async () => {
     expect(
       await refused(
         sfc(
@@ -738,7 +738,7 @@ describe('molvia/icon-size, round 7', () => {
             `@PROPERTY --other { syntax: "<length>"; inherits: false; initial-value: 1px; }\n.c { ${ICON} }`,
         ),
       ),
-    ).toEqual(['@property --#{$n}', '@property --other'])
+    ).toEqual(['@property --#{$n}'])
   })
 
   it('takes font in a bound style of the wrapper for a font-size (Ж3)', async () => {
@@ -767,6 +767,47 @@ describe('molvia/icon-size, round 7', () => {
     expect(await refused(sfc('<IconX class="c" />', `.c { ${ICON} WIDTH: 2rem; }`))).toEqual([
       'WIDTH: 2rem',
     ])
+  })
+})
+
+describe('molvia/icon-size, round 8', () => {
+  it('lets @property of another property through, refuses one of a step (review 26)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<IconX class="c" />',
+          "@property --ring-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }\n" +
+            "@property --icon-md { syntax: '<length>'; inherits: false; initial-value: 1px; }\n" +
+            `.c { ${ICON} }`,
+        ),
+      ),
+    ).toEqual(['@property --icon-md'])
+  })
+
+  it('reads the rules of a wrapper with a step in its style: !important and @media there are text (З1)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="row" style="font-size: var(--icon-sm)"><IconInfo class="info" /></p>\n' +
+            '<p class="wide" style="font-size: var(--icon-sm)"><IconInfo class="more" /></p>',
+          '.info, .more { @include icon; }\n.row { font-size: var(--text-display) !important; }\n' +
+            '@media (width >= 40rem) { .wide { font-size: var(--text-display); } }',
+        ),
+      ),
+    ).toEqual(['The icon «.info» (line 2)', 'The icon «.more» (line 3)'])
+  })
+
+  it('takes the step in the style of the element a rule on svg names; reads no name as a font-size (З2)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="row" style="font-size: var(--icon-sm)"><IconInfo /></p>\n' +
+            '<p class="label" style="--label-font-size: 1rem"><IconX class="c" /></p>\n' +
+            `<p class="face" :style="{ 'font-family': face }"><IconY class="d" /></p>`,
+          `.row svg { @include icon; }\n.c, .d { ${ICON} }`,
+        ),
+      ),
+    ).toEqual([])
   })
 })
 
