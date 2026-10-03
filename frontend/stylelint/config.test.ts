@@ -66,4 +66,10 @@ describe('frontend/.stylelintrc.json', () => {
       ),
     ).toEqual([ALLOWED, ALLOWED, ALLOWED])
   })
+
+  it('refuses @extend: it carries a role where no check follows', async () => {
+    expect(await rules('%display {\n  margin: 0;\n}\n\n.a {\n  @extend %display;\n}\n')).toEqual([
+      'at-rule-disallowed-list',
+    ])
+  })
 })

@@ -16,7 +16,8 @@
 // the plugin loads, and from the file being linted, through any number of wrappers. Names are
 // compared as Sass compares them — a hyphen and an underscore are one character (Г1) — and found
 // however the include names them: through a namespace (`m.display-type`, Д1) or `sass:meta`
-// (`meta.apply(meta.get-mixin('display-type'))`, Д2).
+// (`meta.apply(meta.get-mixin('display-type'))`, Д2). `sass:meta` itself is refused — a mixin kept in
+// a variable carries the role under no name at all (Е2) — and so is `@extend`, by the config (Е3).
 
 import { readFileSync } from 'node:fs'
 import stylelint from 'stylelint'
@@ -43,7 +44,7 @@ const sassName = (name) => name.replaceAll('_', '-')
 
 // The mixin an `@include` draws in: the name after a namespace, or the one `meta.get-mixin` names.
 function includedName(params) {
-  const viaMeta = /get-mixin\(\s*['"]([\w-]+)['"]/.exec(params)
+  const viaMeta = /get-mixin\(\s*['"]?([\w-]+)/.exec(params)
   if (viaMeta) return viaMeta[1]
   return /^(?:[\w-]+\.)?([\w-]+)/.exec(params)?.[1]
 }
@@ -89,6 +90,8 @@ const messages = ruleMessages(ruleName, {
     `${prop} beside @include display-type: a display role is Nunito at its one weight, whole.`,
   placeholder: () =>
     `display-type in a placeholder: @extend would carry the role into a rule this check cannot see.`,
+  meta: () =>
+    `sass:meta applies a mixin under any name, a display role among them, past this check. Include it.`,
 })
 
 function rule(primary) {
@@ -114,6 +117,11 @@ function rule(primary) {
         }
       }
     }
+
+    root.walkAtRules('use', (use) => {
+      if (/sass:meta/.test(use.params))
+        report({ ruleName, result, node: use, message: messages.meta() })
+    })
 
     root.walkAtRules('include', (include) => {
       const name = includedName(include.params)

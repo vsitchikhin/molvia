@@ -48,6 +48,12 @@
         "message": "Colours and safe areas live in styles/_tokens.scss. Use var(--\u2026)."
       }
     ],
+    "at-rule-disallowed-list": [
+      ["extend"],
+      {
+        "message": "No @extend: it carries a rule — a display role among them — into selectors no check can follow (MOL-171). Include a mixin."
+      }
+    ],
     "no-descending-specificity": null,
     "custom-property-empty-line-before": null
   },

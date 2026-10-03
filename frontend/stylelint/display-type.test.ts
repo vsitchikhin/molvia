@@ -139,4 +139,12 @@ describe('molvia/display-type-whole', () => {
   it('does not take a percentage in a selector for a placeholder', async () => {
     expect(await refused('@keyframes k { 50% { @include display-type; margin: 0; } }')).toEqual([])
   })
+
+  it('refuses sass:meta, and finds the role in get-mixin without quotes', async () => {
+    expect(
+      await refused(
+        "@use 'sass:meta';\n.a { @include meta.apply(meta.get-mixin(display-type)); font-weight: var(--weight-bold); }",
+      ),
+    ).toEqual(['sass:meta', 'font-weight'])
+  })
 })
