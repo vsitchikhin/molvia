@@ -175,6 +175,10 @@ test('a segment scrolled under the pinned header stays under it, and the header 
   await page.setViewportSize({ width: 320, height: 568 })
   await page.emulateMedia({ colorScheme: 'light' })
   await signedIn(page, '/settings')
+  // The groups over «Тема» load by requests of their own and grow when they answer: measured before
+  // that, the word slid from under the header and the point missed it — now and then, on CI (MOL-171).
+  await expect(page.getByRole('switch', { name: 'Зарплата — в следующий месяц' })).toBeEnabled()
+  await expect(page.getByRole('switch', { name: 'Напоминать об оценке в Telegram' })).toBeEnabled()
   const bar = await page.locator('header.bar').boundingBox()
   if (!bar) throw new Error('no header')
   const word = scheme(page).locator('.word', { hasText: 'Тёмная' })
