@@ -17,6 +17,14 @@ export const FAILURE_ROUTE_MAX = 200
 export const FAILURE_FRAME_MAX = 300
 
 /**
+ * The longest frame a report may carry — longer than the kept one on purpose (adversarial Б2). The
+ * API takes the fingerprint from the frame before it cuts it, so the position is stripped whole; cut
+ * by the sender to the kept length first, `…index.js:48213:` reached the fingerprint and every build
+ * made the failure new.
+ */
+export const FAILURE_WIRE_FRAME_MAX = 1000
+
+/**
  * The counts in one build a known failure has to cross for the owner to hear of it again (MOL-143,
  * В-5): the first time says «it happened», these say «it keeps happening» — at most three more
  * messages a fingerprint a build, and silence while it does not grow.
@@ -33,7 +41,7 @@ export const failureNameSchema = z
   .max(FAILURE_NAME_MAX)
 /** A SQLSTATE or a driver's code, the shape `describeFailure` lets through. */
 export const failureCodeSchema = z.string().regex(/^[\dA-Z_]{1,64}$/)
-/** A frame of the stack below its header, as `describeFailure` cuts it. */
+/** A frame of the stack below its header, as `describeFailure` cuts it, as kept. */
 export const failureFrameSchema = z.string().min(1).max(FAILURE_FRAME_MAX)
 
 /**
@@ -44,7 +52,7 @@ export const failureFrameSchema = z.string().min(1).max(FAILURE_FRAME_MAX)
 export const botFailureSchema = z.strictObject({
   errorName: failureNameSchema,
   code: failureCodeSchema.optional(),
-  frames: z.array(failureFrameSchema).max(FAILURE_FRAMES).optional(),
+  frames: z.array(z.string().min(1).max(FAILURE_WIRE_FRAME_MAX)).max(FAILURE_FRAMES).optional(),
   handler: z.string().regex(/^[a-z_]{1,32}(?::[a-z_]{1,32})?$/),
 })
 export type BotFailure = z.infer<typeof botFailureSchema>

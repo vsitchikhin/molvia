@@ -4,7 +4,7 @@ import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
 import {
   FAILURE_FRAMES,
-  FAILURE_FRAME_MAX,
+  FAILURE_WIRE_FRAME_MAX,
   FAILURE_NAME_MAX,
   ISSUE,
   describeFailure,
@@ -68,7 +68,9 @@ export function botFailureOf(error: unknown, handler: string): BotFailure {
     ...(frames === undefined
       ? {}
       : {
-          frames: frames.slice(0, FAILURE_FRAMES).map((frame) => frame.slice(0, FAILURE_FRAME_MAX)),
+          frames: frames
+            .slice(0, FAILURE_FRAMES)
+            .map((frame) => frame.slice(0, FAILURE_WIRE_FRAME_MAX)),
         }),
     handler,
   }

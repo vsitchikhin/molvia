@@ -85,9 +85,10 @@ export function createFailureRepository(db: Conn): FailureRepository {
               // The latest frames and build: the line numbers are the ones of the build it is in now.
               frames: sql`excluded.frames`,
               lastSeenAt: sql`greatest(${failures.lastSeenAt}, excluded.last_seen_at)`,
-              count: sql`least(${failures.count} + excluded.count, ${COUNT_CEILING})`,
+              // Summed in bigint: in integer the sum overflows before `least` can cap it (adversarial Б1).
+              count: sql`least(${failures.count}::bigint + excluded.count, ${COUNT_CEILING})::integer`,
               buildCount: sql`case when ${failures.build} = excluded.build
-                then least(${failures.buildCount} + excluded.build_count, ${COUNT_CEILING})
+                then least(${failures.buildCount}::bigint + excluded.build_count, ${COUNT_CEILING})::integer
                 else excluded.build_count end`,
               build: sql`excluded.build`,
             },
