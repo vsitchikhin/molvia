@@ -168,7 +168,11 @@ export function phoneFailure({
   readonly build: string
 } {
   return {
-    summary: { errorName, ...(code === undefined ? {} : { code }), frames },
+    summary: {
+      errorName,
+      ...(code === undefined ? {} : { code }),
+      ...(frames === undefined ? {} : { frames }),
+    },
     place: { source: 'phone', route: `${catcher}:${screen}`, platform },
     build,
   }

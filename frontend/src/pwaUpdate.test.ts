@@ -7,6 +7,9 @@ import {
   holdsTyping,
   installPwaUpdate,
 } from '@/pwaUpdate'
+import { reportFailure } from '@/failures'
+
+vi.mock('@/failures', () => ({ reportFailure: vi.fn() }))
 
 type Handler = () => void
 
@@ -130,6 +133,25 @@ describe('an installed app taking a new version (MOL-46)', () => {
   it('registers the worker the build emits, at its scope', async () => {
     const { container } = await installed()
     expect(container.register).toHaveBeenCalledWith('/sw.js', { scope: '/' })
+  })
+
+  it("a registration that fails is reported as the worker's (MOL-144)", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const refused = new DOMException('Failed to register a ServiceWorker', 'SecurityError')
+    const container = new Container(null)
+    container.register.mockImplementationOnce(() => Promise.reject(refused))
+    installPwaUpdate({
+      serviceWorker: container as unknown as ServiceWorkerContainer,
+      script: '/sw.js',
+      scope: '/',
+      holdsTyping: () => false,
+      reload: vi.fn(),
+      mark: vi.fn(),
+      takeMark: () => null,
+      now: () => clock,
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(reportFailure).toHaveBeenCalledWith(refused, 'sw')
   })
 
   it('does not let a new version in while the app is looked at', async () => {

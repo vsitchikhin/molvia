@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
+import { describePhoneFailure } from '@molvia/model'
 import { createBarcodeReader, ReaderFailed, type ReaderWorker } from './barcodeReader'
 import type { ReaderReply, ReaderRequest } from './protocol'
 
 function fakeWorker() {
   const messages: ((event: MessageEvent<ReaderReply>) => void)[] = []
-  const errors: (() => void)[] = []
+  const errors: ((event?: ErrorEvent) => void)[] = []
   const sent: { request: ReaderRequest; transfer: Transferable[] }[] = []
   const terminate = vi.fn()
   const worker: ReaderWorker = {
@@ -19,8 +20,8 @@ function fakeWorker() {
   const reply = (data: ReaderReply) => {
     for (const listener of messages) listener(new MessageEvent('message', { data }))
   }
-  const crash = () => {
-    for (const listener of errors) listener()
+  const crash = (event?: ErrorEvent) => {
+    for (const listener of errors) listener(event)
   }
   const at = (index: number) => {
     const message = sent[index]
@@ -109,5 +110,59 @@ describe('createBarcodeReader', () => {
     reply({ id: 99, ok: true, code: '4850000000007' })
     reply({ id: at(0).request.id, ok: true, code: null })
     expect(await read).toBeNull()
+  })
+})
+
+describe('what failed in the worker travels to the page (MOL-144, Р-11)', () => {
+  it("a refusal carries the worker's error as the cause, described by the page's one rule", async () => {
+    const { worker, at, reply } = fakeWorker()
+    const read = createBarcodeReader(worker).read(frame())
+    reply({
+      id: at(0).request.id,
+      ok: false,
+      failure: {
+        name: 'RuntimeError',
+        message: 'unreachable',
+        stack:
+          'RuntimeError: unreachable\n    at decode (https://molvia.net/assets/barcodeWorker-Ab12Cd34.js:1:900)',
+      },
+    })
+    const failed = await read.catch((error: unknown) => error)
+    expect(failed).toBeInstanceOf(ReaderFailed)
+    const cause = (failed as ReaderFailed).cause
+    expect(describePhoneFailure(cause, 'https://molvia.net')).toEqual({
+      errorName: 'RuntimeError',
+      frames: ['at decode (/assets/barcodeWorker-Ab12Cd34.js:1:900)'],
+    })
+  })
+
+  it('a throw the worker did not catch is WorkerError at its place, without the message', async () => {
+    const { worker, crash } = fakeWorker()
+    const reader = createBarcodeReader(worker)
+    crash(
+      new ErrorEvent('error', {
+        message: 'Uncaught Error: secret',
+        filename: 'https://molvia.net/assets/barcodeWorker-Ab12Cd34.js',
+        lineno: 1,
+        colno: 42,
+      }),
+    )
+    const failed = await reader.read(frame()).catch((error: unknown) => error)
+    const cause = (failed as ReaderFailed).cause
+    expect(describePhoneFailure(cause, 'https://molvia.net')).toEqual({
+      errorName: 'WorkerError',
+      frames: ['at <anonymous> (/assets/barcodeWorker-Ab12Cd34.js:1:42)'],
+    })
+    expect(JSON.stringify(describePhoneFailure(cause, 'https://molvia.net'))).not.toContain(
+      'secret',
+    )
+  })
+
+  it('a refusal that says nothing has no cause', async () => {
+    const { worker, at, reply } = fakeWorker()
+    const read = createBarcodeReader(worker).read(frame())
+    reply({ id: at(0).request.id, ok: false })
+    const failed = await read.catch((error: unknown) => error)
+    expect((failed as ReaderFailed).cause).toBeUndefined()
   })
 })

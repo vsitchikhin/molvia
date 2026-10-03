@@ -1,6 +1,7 @@
 import { onScopeDispose, ref, watch, type Ref } from 'vue'
 import { barcodeSchema } from '@molvia/model'
-import { createBarcodeReader, type BarcodeReader } from '@/scanner/barcodeReader'
+import { reportFailure } from '@/failures'
+import { ReaderFailed, createBarcodeReader, type BarcodeReader } from '@/scanner/barcodeReader'
 import type { FrameSource } from '@/scanner/capture'
 import { createReadStreak } from '@/scanner/frames'
 
@@ -36,6 +37,14 @@ export function useBarcodeScan(options: {
     return reader
   }
 
+  /** What failed in the worker, when it said; the page's own throw otherwise (MOL-144, Р-11). */
+  function reported(error: unknown): void {
+    reportFailure(
+      error instanceof ReaderFailed && error.cause instanceof Error ? error.cause : error,
+      'scanner',
+    )
+  }
+
   function fail(): void {
     failed.value = true
     run++
@@ -54,8 +63,11 @@ export function useBarcodeScan(options: {
         const image = source.grab()
         if (!image) continue
         code = await active.read(image)
-      } catch {
-        if (current === run) fail()
+      } catch (error) {
+        if (current === run) {
+          reported(error)
+          fail()
+        }
         return
       }
       if (current !== run) return
@@ -80,8 +92,10 @@ export function useBarcodeScan(options: {
     const warming = readerNow()
     // Only the reader that is still ours fails the scan: one let go by `reset` rejects its warm
     // as it goes, and that must not mark the next one failed (adversarial Б).
-    warming.warm().catch(() => {
-      if (reader === warming) fail()
+    warming.warm().catch((error: unknown) => {
+      if (reader !== warming) return
+      reported(error)
+      fail()
     })
   }
 

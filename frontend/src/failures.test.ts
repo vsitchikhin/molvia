@@ -126,7 +126,19 @@ describe('что уходит и что нет (MOL-144)', () => {
     expect(sentText()).not.toMatch(/Ширакаци|evaluating/)
   })
 
-  it('не должно уйти: ни одного своего кадра — расширение, чужой скрипт', async () => {
+  it('пойманное экраном уходит и без кадров: у DOMException их часто нет (Р-2)', async () => {
+    const reports = failureReports(environment(sending))
+    const error = new DOMException('The quota has been exceeded.', 'QuotaExceededError')
+    Object.defineProperty(error, 'stack', { value: '' })
+    reports.report(error, 'sw')
+    await reports.flush()
+    expect(bodies[0]?.reports).toEqual([
+      expect.objectContaining({ errorName: 'QuotaExceededError', catcher: 'sw' }),
+    ])
+    expect(bodies[0]?.reports[0]).not.toHaveProperty('frames')
+  })
+
+  it('не должно уйти: окно услышало сбой без своего кадра — расширение, чужой скрипт', async () => {
     const reports = failureReports(environment(sending))
     reports.report(
       thrown('x', 'Xe', 'TypeError: x\n    at inject (chrome-extension://abc/content.js:1:2)'),
@@ -146,7 +158,7 @@ describe('что уходит и что нет (MOL-144)', () => {
     reports.report(thrown('again, another message'), 'screen')
     reports.report(thrown('other place', 'Zz'), 'screen')
     await reports.flush()
-    expect(bodies.flatMap((body) => body.reports.map((report) => report.frames[0]))).toEqual([
+    expect(bodies.flatMap((body) => body.reports.map((report) => report.frames?.[0]))).toEqual([
       'at Xe (/assets/index-BTCsHrpw.js:1:48213)',
       'at Zz (/assets/index-BTCsHrpw.js:1:48213)',
     ])

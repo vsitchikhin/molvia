@@ -60,9 +60,14 @@ describe('phoneFailureSchema — что телефон говорит о сбо�
     ['сборка не имя файла', { build: 'v0.2.0-4-gabc1234' }],
     ['платформа — User-Agent', { platform: 'Mozilla/5.0 (iPhone)' }],
     ['вид — фраза', { errorName: 'Купить сыр' }],
-    ['без кадров', { frames: [] }],
+    ['пустой список кадров', { frames: [] }],
   ])('%s — отказ', (_name, change) => {
     expect(phoneFailureSchema.safeParse({ ...REPORT, ...change }).success).toBe(false)
+  })
+
+  it('без кадров вовсе — можно: у DOMException регистрации их часто нет', () => {
+    const { frames: _frames, ...bare } = REPORT
+    expect(phoneFailureSchema.safeParse(bare).success).toBe(true)
   })
 
   it('сборка разработки — dev', () => {

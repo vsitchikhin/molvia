@@ -2,6 +2,7 @@ import { ApiError } from '@molvia/client'
 import {
   FAILURE_NAME_MAX,
   PHONE_FAILURES_KEPT,
+  PHONE_GLOBAL_CATCHERS,
   describePhoneFailure,
   ownFrame,
   phoneBuildSchema,
@@ -55,7 +56,7 @@ export interface FailureReports {
 
 /** The same failure on the phone — what the API fingerprints, as the phone can tell it. */
 function keyOf(report: PhoneFailure): string {
-  const top = (report.frames[0] ?? '').replace(/:\d+:\d+\)$/, ')')
+  const top = (report.frames?.[0] ?? '').replace(/:\d+:\d+\)$/, ')')
   const system = report.platform.split(' ')[0] ?? ''
   return [report.catcher, report.screen, report.errorName, report.code ?? '', top, system].join('|')
 }
@@ -84,8 +85,10 @@ function keep(reports: readonly PhoneFailure[]): void {
  * The phone's failures (MOL-144). **What leaves is the kind and the frames, never the message**: a
  * message carries a person's text, a field, an answer — the frames are brought to one shape and a
  * path of this origin (`describePhoneFailure`), and the screen, the build and the platform are the
- * app's own words. A failure with no frame of the app's own code is not sent at all (Р-2): an
- * extension, a script of Telegram's browser, `Script error.` of another origin.
+ * app's own words. What the window hears with no frame of the app's own code is not sent at all
+ * (Р-2): an extension, a script of Telegram's browser, `Script error.` of another origin. What Vue,
+ * a screen, the scanner or the worker's registration catches is the app's own wherever it was thrown,
+ * and goes with no frame too: a registration's `DOMException` often has none.
  *
  * **One failure once a page** (Р-5): a screen that shows its error again on every retry, a loop that
  * throws every frame, send it the first time only — the count is of pages that met it. **Kept until
@@ -132,12 +135,12 @@ export function failureReports(environment: FailureEnvironment): FailureReports 
     if (!phoneDefect(error)) return
     const summary = describePhoneFailure(error, environment.origin)
     const frames = summary.frames ?? []
-    if (!frames.some(ownFrame)) return
+    if (PHONE_GLOBAL_CATCHERS.includes(catcher) && !frames.some(ownFrame)) return
     const parsed = phoneFailureSchema.safeParse({
       errorName:
         summary.errorName.replace(/[^\w$.-]/g, '_').slice(0, FAILURE_NAME_MAX) || 'unknown',
       ...(summary.code === undefined ? {} : { code: summary.code }),
-      frames,
+      ...(frames.length === 0 ? {} : { frames }),
       catcher,
       screen: environment.screen(),
       build: environment.build,

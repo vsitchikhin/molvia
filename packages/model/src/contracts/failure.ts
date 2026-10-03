@@ -67,6 +67,13 @@ export const PHONE_CATCHERS = ['vue', 'window', 'rejection', 'screen', 'scanner'
 export type PhoneCatcher = (typeof PHONE_CATCHERS)[number]
 
 /**
+ * The catchers that hear the whole page, another origin's script and an extension included: a
+ * failure they hear is sent only with a frame of the app's own code (MOL-144, Р-2). The others are
+ * the app's own by where they stand.
+ */
+export const PHONE_GLOBAL_CATCHERS: readonly PhoneCatcher[] = ['window', 'rejection']
+
+/**
  * The screen a phone's failure happened on: a route's name (`feedbackRouteSchema`, which a test of
  * the router holds every name to), `login` behind the door of the login, `start` before the first
  * route is settled.
@@ -97,7 +104,11 @@ export const phoneFrameSchema = z
 export const phoneFailureSchema = z.strictObject({
   errorName: failureNameSchema,
   code: failureCodeSchema.optional(),
-  frames: z.array(phoneFrameSchema).min(1).max(FAILURE_FRAMES),
+  /**
+   * None where the browser gave none — a `DOMException` of a registration often has no frame — and
+   * then not at all rather than an empty list.
+   */
+  frames: z.array(phoneFrameSchema).min(1).max(FAILURE_FRAMES).optional(),
   catcher: z.enum(PHONE_CATCHERS),
   screen: phoneScreenSchema,
   build: phoneBuildSchema,
