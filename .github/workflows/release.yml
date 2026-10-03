@@ -44,6 +44,10 @@ jobs:
           - { name: bot, dockerfile: bot/Dockerfile }
           - { name: frontend, dockerfile: frontend/Dockerfile }
           - { name: receipt-reader, dockerfile: services/receipt-reader/Dockerfile }
+          # The metrics' two images with what they read baked in (MOL-145, В-2): a dashboard
+          # changed is a merge rolled out, never a file copied to the machine.
+          - { name: grafana, dockerfile: deploy/grafana/Dockerfile }
+          - { name: victoria, dockerfile: deploy/victoria/Dockerfile }
 
     steps:
       - uses: actions/checkout@v7
@@ -133,13 +137,13 @@ jobs:
             echo "::error::production runs ${version:-nothing}, not $short — a tag names the build that runs: set it on that commit, or re-run this job once $short rolls out"
             exit 1
           fi
-          for name in backend bot frontend receipt-reader; do
+          for name in backend bot frontend receipt-reader grafana victoria; do
             if ! docker buildx imagetools inspect "ghcr.io/$OWNER/molvia-$name:sha-$short" >/dev/null; then
               echo "::error::ghcr.io/$OWNER/molvia-$name:sha-$short is missing although production runs $short"
               exit 1
             fi
           done
-          for name in backend bot frontend receipt-reader; do
+          for name in backend bot frontend receipt-reader grafana victoria; do
             image="ghcr.io/$OWNER/molvia-$name"
             docker buildx imagetools create --tag "$image:$GITHUB_REF_NAME" "$image:sha-$short"
           done
