@@ -66,7 +66,8 @@ describe('phoneFailureSchema — что телефон говорит о сбо�
   })
 
   it('без кадров вовсе — можно: у DOMException регистрации их часто нет', () => {
-    const { frames: _frames, ...bare } = REPORT
+    const { frames, ...bare } = REPORT
+    expect(frames).not.toHaveLength(0)
     expect(phoneFailureSchema.safeParse(bare).success).toBe(true)
   })
 
