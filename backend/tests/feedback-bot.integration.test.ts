@@ -852,8 +852,16 @@ describe('уведомление о сообщении, которое конт�
 
     expect(claim.json()).toEqual({ to: OWNER, notices: [] })
     await Promise.all(recordings)
-    const recorded = await db.select({ route: failures.route }).from(failures)
-    expect(recorded).toEqual([{ route: 'POST /internal/owner/claim' }])
+    const recorded = await db
+      .select({ route: failures.route, name: failures.errorName, code: failures.code })
+      .from(failures)
+    expect(recorded).toEqual([
+      {
+        route: 'POST /internal/owner/claim',
+        name: 'OwnerNoticeUnreadable',
+        code: 'OWNER_NOTICE_UNREADABLE',
+      },
+    ])
     expect(await db.select().from(feedback).where(eq(feedback.id, thread))).toHaveLength(1)
   })
 })
