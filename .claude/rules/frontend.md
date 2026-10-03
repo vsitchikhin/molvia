@@ -39,9 +39,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `font-family: var(--font)`; `inherit` keeps Nunito (В2); a variant that stays in Nunito keeps its one
   weight (Б1). A mixin that includes the role is the role, learnt from `_mixins.scss` and the file
   itself through any number of wrappers, comments taken out, names compared as Sass compares them —
-  `display_type` is `display-type` (В1, Г1). Another rule for the same element elsewhere is beyond
-  what a linter can match (Б3), so the role is never put in a placeholder, alone or in a list of
-  selectors, where `@extend` would carry it into such a rule (В3, Г2). **A custom property read where none is declared is refused** by
+  `display_type` is `display-type` (В1, Г1), whether included by name, through a namespace
+  (`m.display-type`) or `sass:meta` (Д1, Д2). Another rule for the same element elsewhere is beyond
+  what a linter can match (Б3), so the role is never put in a placeholder, anywhere in a selector,
+  where `@extend` would carry it into such a rule (В3, Г2, Д3). The check reads the source, not the
+  compiled CSS: each round of review found a narrower way past it, and the last ones were deliberate. **A custom property read where none is declared is refused** by
   our own rule, `molvia/known-custom-property` (`frontend/stylelint/known-properties.mjs`):
   `var(--space-5)` stood on two screens, dropped as invalid, because the spacing list takes any
   `--space-*` by its shape. Known is a declaration made directly in a rule that is exactly `:root`, at the top
