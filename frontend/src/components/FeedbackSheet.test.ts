@@ -858,8 +858,8 @@ describe('the word «отзыв», «review»', () => {
 describe('a screenshot with the message (MOL-167)', () => {
   const screenshot = (bytes: string) => new File([bytes], 'shot.png', { type: 'image/png' })
   const base64 = (bytes: string) => btoa(bytes)
-  const tiles = (sheet: VueWrapper) => sheet.findAll('.tile img')
-  const note = (sheet: VueWrapper) => sheet.find('.pictures .note')
+  const tiles = (sheet: VueWrapper) => sheet.findAll('.picture-tile img')
+  const note = (sheet: VueWrapper) => sheet.find('.picture-note')
 
   async function attachFiles(sheet: VueWrapper, ...files: File[]): Promise<void> {
     const input = sheet.get<HTMLInputElement>('input[type="file"]')
@@ -995,7 +995,7 @@ describe('a screenshot with the message (MOL-167)', () => {
     await open(sheet)
 
     expect(tiles(sheet)).toHaveLength(0)
-    expect(sheet.find('.pictures .hint').exists()).toBe(true)
+    expect(sheet.find('.picture-hint').exists()).toBe(true)
   })
 
   it('waits while a picture is being drawn', async () => {
@@ -1012,7 +1012,7 @@ describe('a screenshot with the message (MOL-167)', () => {
 
     await attachFiles(sheet, screenshot('slow'))
     expect(button(sheet).text()).toBe(en.feedback.picture.adding)
-    expect(sheet.get('.add').attributes('aria-busy')).toBe('true')
+    expect(sheet.get('.picture-add').attributes('aria-busy')).toBe('true')
 
     finish({ jpeg: new Blob(['slow']), width: 100, height: 200 })
     await flushPromises()

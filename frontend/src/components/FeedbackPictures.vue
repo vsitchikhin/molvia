@@ -1,9 +1,9 @@
 <template>
   <div class="pictures">
-    <ul class="row" :aria-label="t('feedback.picture.list')">
-      <li v-for="(picture, index) in pictures" :key="picture.url" class="tile">
+    <ul class="picture-list" :aria-label="t('feedback.picture.list')">
+      <li v-for="(picture, index) in pictures" :key="picture.url" class="picture-tile">
         <img
-          class="shot"
+          class="picture-shot"
           :src="picture.url"
           :alt="t('feedback.picture.alt', { n: index + 1 })"
           :width="picture.width"
@@ -11,34 +11,34 @@
         />
         <button
           type="button"
-          class="remove"
+          class="picture-remove"
           :aria-label="t('feedback.picture.remove', { n: index + 1 })"
           :disabled="disabled"
           @click="$emit('remove', index)"
         >
-          <span class="cross" aria-hidden="true"><IconClose /></span>
+          <span class="picture-cross" aria-hidden="true"><IconClose /></span>
         </button>
       </li>
-      <li v-if="pictures.length < max" class="tile">
+      <li v-if="pictures.length < max" class="picture-tile">
         <!-- A label over a native file input: the system picker of the gallery, reached by a tap,
              by the keyboard and by a screen reader alike. -->
-        <label class="add" :class="{ busy: drawing }" :aria-busy="drawing">
+        <label class="picture-add" :class="{ 'picture-busy': drawing }" :aria-busy="drawing">
           <input
             ref="input"
-            class="file"
+            class="picture-file"
             type="file"
             accept="image/*"
             :multiple="max - pictures.length > 1"
             :disabled="disabled || drawing"
             @change="pick"
           />
-          <IconImagePlus class="add-icon" aria-hidden="true" />
+          <IconImagePlus class="picture-add-icon" aria-hidden="true" />
           <span>{{ drawing ? t('feedback.picture.adding') : t('feedback.picture.add') }}</span>
         </label>
       </li>
     </ul>
-    <p v-if="note" class="note" role="alert">{{ note }}</p>
-    <p v-else-if="pictures.length === 0" class="hint">{{ t('feedback.picture.hint') }}</p>
+    <p v-if="note" class="picture-note" role="alert">{{ note }}</p>
+    <p v-else-if="pictures.length === 0" class="picture-hint">{{ t('feedback.picture.hint') }}</p>
   </div>
 </template>
 
@@ -99,7 +99,7 @@ export default defineComponent({
   gap: var(--space-2);
 }
 
-.row {
+.picture-list {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
@@ -109,7 +109,7 @@ export default defineComponent({
 }
 
 // Wide enough for «Приложить» on one line, tall enough for a phone's screenshot standing up.
-.tile {
+.picture-tile {
   @include appear;
 
   position: relative;
@@ -117,7 +117,7 @@ export default defineComponent({
   height: calc(var(--touch-target) * 2.75);
 }
 
-.shot {
+.picture-shot {
   display: block;
   width: 100%;
   height: 100%;
@@ -130,7 +130,7 @@ export default defineComponent({
 }
 
 // The whole corner is the button, a thumb's size; only its circle is drawn.
-.remove {
+.picture-remove {
   @include touch-target;
 
   position: absolute;
@@ -151,7 +151,7 @@ export default defineComponent({
   }
 }
 
-.cross {
+.picture-cross {
   display: grid;
   place-items: center;
   width: var(--space-6);
@@ -165,7 +165,7 @@ export default defineComponent({
   }
 }
 
-.add {
+.picture-add {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -185,32 +185,32 @@ export default defineComponent({
     @include focus-ring;
   }
 
-  &.busy {
+  &.picture-busy {
     color: var(--text-muted);
     cursor: progress;
   }
 }
 
-.add-icon {
+.picture-add-icon {
   width: var(--space-6);
   height: var(--space-6);
 }
 
-.file {
+.picture-file {
   @include visually-hidden;
 }
 
-.hint,
-.note {
+.picture-hint,
+.picture-note {
   margin: 0;
   font-size: var(--text-footnote);
 }
 
-.hint {
+.picture-hint {
   color: var(--text-muted);
 }
 
-.note {
+.picture-note {
   @include appear;
 
   color: var(--bad-ink);
