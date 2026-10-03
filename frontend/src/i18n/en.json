@@ -1167,6 +1167,8 @@
     "receipt_not_photo": "This is not a photo of a receipt. Take it again",
     "receipt_too_large": "The photo is too large. Take the receipt again",
     "feedback_rate_limited": "That is a lot of messages for today. Your text is saved — send it tomorrow",
+    "feedback_picture_invalid": "The picture would not do — choose another one",
+    "feedback_picture_too_large": "The picture is too large — choose another one",
     "client_errors_rate_limited": "Too many failure reports. Try again in a minute"
   },
   "settings": {
@@ -1394,7 +1396,7 @@
       },
       "feedback": {
         "term": "Messages to the developer",
-        "text": "What you wrote in «Write to the developer» or in reply to the developer’s answer in the Molvia bot, its kind, and what goes with the text: the app version, the screen, the phone’s system and whether it is the app or a browser, the language, and from an error screen its code. And the developer’s replies, each with the number of the Telegram message it reached you as: that is how your answer joins the same conversation. Only the developer reads them. A copy of the message reaches the developer in Telegram without your name or account number, and stays in that chat even after the message is deleted here. Kept for a year from the last message of the conversation."
+        "text": "What you wrote in «Write to the developer» or in reply to the developer’s answer in the Molvia bot, its kind, and what goes with the text: the app version, the screen, the phone’s system and whether it is the app or a browser, the language, and from an error screen its code. Screenshots, if you attached them yourself: everything in the file but the picture is removed before it is sent, where it was taken included. A screenshot is kept only until it reaches the developer in Telegram, and no longer than a week; Telegram sees it, as it sees the text, and a copy stays in the developer’s chat. And the developer’s replies, each with the number of the Telegram message it reached you as: that is how your answer joins the same conversation. Only the developer reads them. A copy of the message reaches the developer in Telegram without your name or account number, and stays in that chat even after the message is deleted here. Kept for a year from the last message of the conversation."
       },
       "search": {
         "term": "Search picks",
@@ -1423,7 +1425,7 @@
     },
     "backups": {
       "title": "Where the data and its copies are",
-      "text": "The server is in Germany, with the host Contabo. Once a day the database is copied, encrypted, to Cloudflare storage in the EU; only the owner of Molvia can decrypt a copy. Copies live 14 days — fourteen days after erasure your data is gone from them too. If the server ever has to be restored from a copy, an erasure made less than a day before the failure may need repeating. Receipt photos and the lines cut out of them are not copied."
+      "text": "The server is in Germany, with the host Contabo. Once a day the database is copied, encrypted, to Cloudflare storage in the EU; only the owner of Molvia can decrypt a copy. Copies live 14 days — fourteen days after erasure your data is gone from them too. If the server ever has to be restored from a copy, an erasure made less than a day before the failure may need repeating. Receipt photos, the lines cut out of them and the screenshots sent to the developer are not copied."
     },
     "barcodes": {
       "title": "An unknown barcode",
@@ -1435,7 +1437,7 @@
     },
     "copy": {
       "title": "A copy of your data",
-      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue, the barcodes you linked and the receipts read — without their photos. A rating you withdrew is there too: without its review it stays with us, so the count of ratings given stays honest. What you removed and can still bring back is there as well, marked. The file holds no login keys."
+      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue, the barcodes you linked, the receipts read — without their photos — and your messages to the developer — without their screenshots. A rating you withdrew is there too: without its review it stays with us, so the count of ratings given stays honest. What you removed and can still bring back is there as well, marked. The file holds no login keys."
     },
     "erase": {
       "title": "Delete everything",

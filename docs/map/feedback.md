@@ -41,6 +41,8 @@ Rules: `.claude/rules/feedback.md`. A test beside its source, or mirroring it un
 
 ## frontend · other
 
+- `frontend/src/feedbackPicture.ts` — A picture from the gallery drawn anew for a message to the developer (MOL-167): the orientation applied, the longest side to 2 560, a JPEG under the API's limit by quality then size, nothing of the file but its pixels; a shape Telegram refuses or a file the browser cannot open refused by name.
+
 - `frontend/src/platform.ts` — The platform a message to the developer carries (MOL-147): `platformLine` — the system, the major version the browser still tells, app or browser — and `standalone()`, opened from the home screen, shared with the camera hint.
 
 ## e2e
