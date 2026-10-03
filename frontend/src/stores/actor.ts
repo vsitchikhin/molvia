@@ -20,6 +20,7 @@ import {
   leavingOwner,
   rememberIdentity,
 } from '@/stores/identity'
+import { reportFailure } from '@/failures'
 
 /**
  * What the identity is doing, so a screen can show the right one of its states.
@@ -144,6 +145,7 @@ export const useActorStore = defineStore('actor', () => {
   }
 
   function fail(error: unknown): void {
+    reportFailure(error, 'screen')
     state.value = navigator.onLine ? 'error' : 'offline'
     console.error('[molvia] личность не поднялась', error)
   }

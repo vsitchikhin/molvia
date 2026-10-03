@@ -3,6 +3,7 @@ import type { Ref } from 'vue'
 import { yerevanDate } from '@molvia/model'
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
+import { reportFailure } from '@/failures'
 
 export interface ExportState {
   readonly online: Ref<boolean>
@@ -103,7 +104,8 @@ export function useExport(): ExportState {
       file = new File([text], `molvia-${yerevanDate(exportedAt)}.json`, {
         type: 'application/json',
       })
-    } catch {
+    } catch (error) {
+      reportFailure(error, 'screen')
       if (mine.signal.aborted) return
       online.value = navigator.onLine
       failure.value = online.value ? 'error' : 'offline'

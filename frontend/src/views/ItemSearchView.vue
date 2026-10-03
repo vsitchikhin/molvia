@@ -330,6 +330,7 @@ import { useItemEntryStore } from '@/stores/itemEntry'
 import { useRecentItemsStore } from '@/stores/recentItems'
 import { dropSearchDraft, keepSearchDraft, recallSearchDraft } from '@/stores/searchDraft'
 import { focusScreenTitle } from '@/transitions'
+import { reportFailure } from '@/failures'
 
 /**
  * «Что взяли?» — entering an item is a lookup in the catalogue, not a text field: free text
@@ -538,6 +539,7 @@ export default defineComponent({
         goOn(asked)
         pickedByCode.value = { itemId: asked.entry.id, code: asked.code }
       } catch (error) {
+        reportFailure(error, 'screen')
         if (!alive || !stillAsked(asked)) return
         const full = error instanceof ApiError && error.code === ERROR.BARCODES_FULL
         // Offline or error is decided after the failure (MOL-19).

@@ -9,6 +9,7 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 import { read, write } from '@/stores/storage'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 import type { Score } from '@/stores/verdictDrafts'
+import { reportFailure } from '@/failures'
 
 /** `idle` — no identity, so no queue to ask for. */
 export type QueuePhase = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'offline'
@@ -261,7 +262,8 @@ export function useVerdictQueue(): VerdictQueue {
       // What was confirmed before this was asked for, the answer already knows.
       drafts.settle(askedAt)
       if (answer.value) pruneSkips(answer.value)
-    } catch {
+    } catch (error) {
+      reportFailure(error, 'screen')
       if (owner.value !== id) return
       // Decided after the failure: a connection lost while the answer was on its way is not
       // the server's fault, and is never drawn red.

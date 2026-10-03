@@ -234,3 +234,21 @@ describe('pageBuild — сборка страницы по имени её фа�
     expect(pageBuild(url, production)).toBe(build)
   })
 })
+
+describe('ошибка, которую показал экран, уходит (В-3)', () => {
+  // Every screen decides «error» or «offline» in its own catch, and the error stops there: it never
+  // reaches Vue's handler. A screen added later that forgets the call is the failure this replaces.
+  it('каждый файл, где экран выбирает «ошибку», зовёт reportFailure', () => {
+    const sources = import.meta.glob(['/src/**/*.{ts,vue}', '!/src/**/*.test.ts'], {
+      query: '?raw',
+      import: 'default',
+      eager: true,
+    })
+    const choosing = /\? '(?:error|failed|categories)' : 'offline'|\? 'offline' : 'error'/
+    const silent = Object.entries(sources)
+      .filter(([, text]) => choosing.test(text) && !text.includes('reportFailure('))
+      .map(([path]) => path)
+    expect(silent).toEqual([])
+    expect(Object.values(sources).filter((text) => choosing.test(text)).length).toBeGreaterThan(20)
+  })
+})

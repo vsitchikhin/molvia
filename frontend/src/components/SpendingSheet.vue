@@ -259,6 +259,7 @@ import { useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import type { SpendingFields } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { reportFailure } from '@/failures'
 
 type TripRow = Extract<JournalRow, { kind: 'trip' }>
 
@@ -516,6 +517,7 @@ export default defineComponent({
             amount: expense.amount ? money(expense.amount) : '',
           }))
       } catch (error) {
+        reportFailure(error, 'screen')
         const answered = error instanceof ApiError && error.answered
         items.value = !answered && !navigator.onLine ? 'offline' : 'error'
       }
