@@ -787,8 +787,10 @@ export default defineComponent({
   font-size: var(--text-title);
   font-variant-numeric: tabular-nums;
 
+  /* A sentence in the figure's place, not a figure: the text's face (Ф-7 keeps Nunito for figures). */
   &.missing {
     color: var(--text-muted);
+    font-family: var(--font);
     font-size: var(--text-callout);
     font-weight: var(--weight-medium);
   }
