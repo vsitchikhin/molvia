@@ -50,6 +50,17 @@
       </div>
     </section>
 
+    <!-- The icon scale (Ф-9, MOL-173): one chevron at every step, for a screen to be checked by. -->
+    <section class="group">
+      <h2 class="caption">{{ t('dev.kit.icons') }}</h2>
+      <div class="row">
+        <span v-for="step in iconSteps" :key="step.token" class="icon-step">
+          <IconChevronRight class="sample" :class="step.token" aria-hidden="true" />
+          <span class="px">{{ step.px }}</span>
+        </span>
+      </div>
+    </section>
+
     <section class="group">
       <h2 class="caption">{{ t('dev.kit.cards') }}</h2>
       <AppCard as="ul" list>
@@ -103,6 +114,7 @@ import {
   money,
   SETTINGS_CITIES,
 } from '@molvia/model'
+import IconChevronRight from '~icons/mdi/chevron-right'
 import IconClose from '~icons/mdi/close'
 import IconPlus from '~icons/mdi/plus'
 import IconRefresh from '~icons/mdi/refresh'
@@ -133,6 +145,7 @@ export default defineComponent({
     AppScreen,
     BarcodeScannerSheet,
     BottomSheet,
+    IconChevronRight,
     IconClose,
     IconPlus,
     IconRefresh,
@@ -151,6 +164,16 @@ export default defineComponent({
       t,
       ERROR,
       levels: Object.values(VERDICT_LEVEL),
+      iconSteps: [
+        { token: 'icon-xs', px: 14 },
+        { token: 'icon-sm', px: 18 },
+        { token: 'icon', px: 20 },
+        { token: 'icon-button', px: 22 },
+        { token: 'state-glyph', px: 22 },
+        { token: 'icon-md', px: 24 },
+        { token: 'icon-back', px: 26 },
+        { token: 'icon-tab', px: 27 },
+      ],
       units,
       // The handoff's real receipt, through the formatters: the sign belongs to the currency.
       figures: { price: formatMoney(money(57000n, 'AMD')) },
@@ -218,6 +241,55 @@ export default defineComponent({
 .figure {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.icon-step {
+  display: inline-grid;
+  justify-items: center;
+  gap: var(--space-1);
+  min-width: var(--touch-target);
+}
+
+.sample {
+  @include icon;
+}
+
+.icon-xs {
+  font-size: var(--icon-xs);
+}
+
+.icon-sm {
+  font-size: var(--icon-sm);
+}
+
+.icon {
+  font-size: var(--icon);
+}
+
+.icon-button {
+  font-size: var(--icon-button);
+}
+
+.state-glyph {
+  font-size: var(--state-glyph);
+}
+
+.icon-md {
+  font-size: var(--icon-md);
+}
+
+.icon-back {
+  font-size: var(--icon-back);
+}
+
+.icon-tab {
+  font-size: var(--icon-tab);
+}
+
+.px {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
 }
 
 .scanned {
