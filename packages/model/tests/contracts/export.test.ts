@@ -332,7 +332,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(9)
+    expect(wire.version).toBe(10)
     expect(wire.receipts[0]?.lines[0]?.quantity).toEqual({ value: '2.000', unit: 'piece' })
     expect(wire.feedback[1]).toMatchObject({ thread: 41, inReplyTo: 7, replies: [] })
     expect(wire.budgetPlans[0]?.plan).toEqual({
