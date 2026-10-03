@@ -4,6 +4,8 @@ paths:
   - 'packages/model/tests/contracts/feedback.test.ts'
   - 'backend/src/routes/feedback.ts'
   - 'backend/src/usecases/send-feedback*.ts'
+  - 'backend/src/usecases/feedback-from-bot*.ts'
+  - 'backend/tests/feedback-bot.integration.test.ts'
   - 'backend/src/db/feedback-repository.ts'
   - 'backend/tests/feedback.integration.test.ts'
   - 'frontend/src/components/FeedbackSheet.vue'
@@ -80,11 +82,14 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
 - **A thread is its first message and what follows** (В-1): `thread_id` is empty on the first and
   names it on a continuation, of the same person — a composite key holds that — and `in_reply_to`
   names the owner's reply a continuation answers. Continuations and replies are written by the bot's
-  half (MOL-148); a continuation from Telegram has no screen, platform or key. **Two things the schema
-  does not hold yet, and MOL-148 must, with its writer** (adversarial В5): that `thread_id` names a
-  first message and never a continuation — else `purgeStale` groups a fresh word under the wrong
-  head and takes the thread with it — and that `in_reply_to` is a reply in the same person's thread —
-  else erasing one person cascades into another's row. No row of either exists before MOL-148.
+  half (MOL-148); a continuation from Telegram has no screen, platform or page build. **The database
+  holds the thread, not the writer** (MOL-148, adversarial В5 of MOL-147): `thread_id` names a first
+  message of the same person and never a continuation — else `purgeStale` grouped a fresh word under
+  the wrong head and took the thread with it — by a key on the generated `head` / `thread_head`, since
+  a key cannot compare with a constant; `in_reply_to` names a reply to the same person — else erasing
+  one person cascaded into another's row — by `(in_reply_to, actor_id)`, so a reply carries its
+  message's `actor_id`; and a continuation, and only a continuation, answers a reply. The migration
+  came with the writer, `0043`, before the first row of either.
 - **The owner's replies are kept** (`feedback_replies`, Р-1) so the copy is whole and a continuation
   shows the owner what is answered; they go with their message by the cascade.
 - **A thread lives a year from its last message, the person's or the owner's** (В-4): `purgeStale`
@@ -94,10 +99,34 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
   section with the replies nested, `client_key` left out as the phone's key against a repeat.
 - **What `/privacy` says** — «Сообщения разработчику»: what is kept and attached, that only the owner
   reads, that a copy of the notice stays in the owner's Telegram without a name or an id even after
-  erasure (В-3), and the year. A change here is a change there.
-- **The owner's notice is not in MOL-147** (Р-7): when it was planned there was no channel to the
-  owner. MOL-143 has built it since — `owner_notices`, claimed by the bot (`observability.md`) — and
-  MOL-148 joins it as a kind of its own, with the reply. Until then a message waits in the table.
+  erasure (В-3), the year, and since MOL-148 a word written in reply in the bot and the number of the
+  Telegram message each reply went out as. A change here is a change there.
+- **The owner hears of every new message** (MOL-148, Р-6): a notice of kind `feedback` in the owner's
+  channel (`owner_notices`, `observability.md`), queued in the transaction of the write, only where
+  `OWNER_TELEGRAM_ID` is set, and never for a repeat. **It names its message by `feedback_id`** and
+  goes with it — erased with the person, purged with the thread's year (Р-5); unclaimed, it is not
+  dropped after a day as a failure's is, and it is handed again until the bot says it went
+  (`observability.md`, adversarial В1). Going with the person, it is theirs to the copy too: every
+  column of `owner_notices` is left out there with its reason — what it holds of them is the message,
+  in `feedback` word for word. A message written before MOL-148 has none (Р-13).
+- **The owner's reply and the person's answer to it are the bot's** (`bot.md`), and the API decides
+  which a text is (`feedbackFromBot`). **The reply lies under the person's latest word in the thread**
+  — that is what the owner answers — and «от 3 октября» is that word's day in the person's country's
+  zone (Р-3). **A continuation is a message of its thread**: the thread's kind and language, no screen,
+  platform or page build, the form's day limit, and no key: **the same words of the same person to
+  the same reply within a rolling day are a repeat**, looked for before the count — an update Telegram
+  hands over twice, or the word sent again after «ответьте ещё раз», is written once, and the same word
+  a day on is a new one (Р-7, adversarial В3, round 2 Г1). It is found by the message the reply
+  went out as — `feedback_replies.telegram_message_id`, looked for only beside the person (В-2).
+- **A reply's outcome is the bot's word after the send** (Р-4): `sent` with that message, `blocked`,
+  or `failed` — Telegram refused it otherwise, and it never reached the person nor keeps the thread
+  alive (adversarial В4); empty is «unknown». `gone` is not a value: a message gone has no reply to
+  mark. **A reply carries its thread** (`thread_id`, adversarial В5 of MOL-148): a continuation
+  answers a reply of its own thread only — not another thread of the same person, or `purgeStale`
+  took a fresh word with the old thread — by `(in_reply_to, actor_id, thread_key)`, `thread_key` the
+  generated `coalesce(thread_id, id)` of every message.
+- **The quote of a reply in «Продолжение» is one line** (`feedbackQuote`): a second line of the
+  reply read as the person's own words under it.
 
 ## The sheet and its two ways in
 

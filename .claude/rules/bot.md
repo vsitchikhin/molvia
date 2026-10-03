@@ -362,3 +362,62 @@ in `.scratch/tasks/requirements/MOL-103.md`.
   `off_blocked` — people whose reminders went from on to off that day, by how, with no id — and
   `make gates` prints them under the lever, as counts and no verdict: whether the reminder annoys.
 - **The switch is in the person's copy**: `remindersOff` of the account, file version 6.
+
+## «Написать разработчику» (MOL-148)
+
+The bot's half of the epic MOL-141: a message from the app reaches the owner, the owner's reply
+reaches the person, and the person's answer to it continues the thread. Decided in MOL-150 (В-1, В-3,
+Р-8…Р-12) and this task (В-1…В-4, Р-1…Р-14 in `.scratch/tasks/requirements/MOL-148.md`); the thread's
+storage is `feedback.md`.
+
+- **The owner's notice is one more kind of the owner's channel** (`observability.md`): «🐞 Сломалось ·
+  #fb42», the text, what went with it, the time in Yerevan; a continuation is «↩️ Продолжение · #fb42»
+  with the reply quoted by its first 200 characters. The kind in the sheet's own words; nothing of the
+  person, since the copy stays in the owner's chat for good.
+- **The tag ends the first line, and only there is it read** (`threadTagOf`, Р-3): the frame of a reply
+  quotes the owner's text, which may carry a tag of its own. It is the number of the thread's first
+  message, the same on every notice of a thread, so the hashtag shows the whole thread. **A change of
+  a key of `owner.feedback.*` must keep it there** — a test builds every kind and reads the tag back.
+- **A text written as a reply to a notice or to the frame of a reply goes to the API as it is**
+  (`feedback.ts`, `POST /internal/feedback/reply`): `ctx.from.id`, the message answered and the tag
+  of its first line. **No other reply goes** (adversarial В2): one to the greeting or a reminder is
+  the greeting's, and waiting on the API it got «сервер не ответил» when the API was down. The frame
+  is known by its last line, «Чтобы ответить, ответьте на это сообщение.», in any language the bot
+  speaks (`isReplyFrame`) — the bot reads its own message back, as it reads a tag. **A command is the
+  bot's** (В6): `/start` sent as a reply to the frame is a command, never a word to the developer. **What it is, the API decides** — the owner's reply on a tagged notice (only
+  `OWNER_TELEGRAM_ID` makes it one), a person's word on a reply they were sent, or nothing of ours —
+  and the bot acts on the answer. Nothing of ours is a `404`, and the update goes on to the greeting
+  as before: the composer stands before the login's catch-all. How long a text may be is the API's
+  too, by who writes: 3500 for the owner, 2000 for a person, as the form.
+- **The owner's reply goes to the person at once, not through a queue** (Р-10): the owner waits to see
+  it went. In the frame of the person's language — the language of their message, «Ответ на ваше
+  сообщение от 3 октября:», the text, «Чтобы ответить, ответьте на это сообщение.» — with sound: it is
+  what they wait for.
+- **Delivered is a reaction 👌 on the owner's message** (В-1): ✅ is not among the reactions Telegram
+  takes, and a refused reaction is the line «Доставлено.» instead. **A 403 is the person's block**:
+  the reply is marked `blocked`, their reminders go off by the path of MOL-103, and the owner reads
+  «Не дошло: человек заблокировал бота». **Any other refusal of Telegram is marked `failed`**
+  (adversarial В4) — the copy says the reply never reached the person, and it keeps no thread alive
+  — and the owner reads «Не отправлено… Ответьте ещё раз». **A broken connection marks nothing**
+  (review №8): Telegram may have taken the message before it broke, so the reply stays «unknown» and
+  the owner reads «Не знаю, дошло ли… человек может получить ответ дважды». Every other outcome — a thread gone, too long, nothing
+  visible, the person's day spent, the server silent — is one line under the message it answers; no
+  error is shown, and there are no buttons to keep.
+- **The person's answer finds its thread by the message it answers** (В-2): after the send the bot
+  tells the API which message the reply went out as (`POST /internal/feedback/delivered`), and a reply
+  to that message, from that account, is the thread's continuation — no number shown to the person,
+  and nobody else's chat holds that message. **The named price** (Р-4, Р-14): a mark lost between the
+  send and the API leaves that reply «unknown», and an answer to it is refused as nothing of ours —
+  so the owner gets no 👌 then, but «Доставлено, но… ответ человека на него не найдёт переписку»,
+  and does not wait for an answer that cannot come (review №2).
+- **The same word within a day is the same message** (adversarial В3, round 2 Г1): the same words of
+  the same person to the same reply within a rolling 24 hours are a repeat — «ответьте ещё раз» after
+  a lost answer writes it once, and so does Telegram handing the update over twice. A day on, the
+  same «Не работает» is a new word: taken for a repeat for good, it was «передали» and nothing.
+- **The frame is known by its last line, so that line is frozen like a tag** (round 2, Г3): a frame
+  stays in a person's chat for good. A new wording of `feedback.howToAnswer` moves the old one, in
+  every language, to `FRAME_LAST_LINES`, or every frame already sent stops being one and its answers
+  greet.
+- **A failure in the composer is `message:reply`** (`handlerOf`): apart from the greeting's `message`.
+- **Only text** (Р-9): a photo or a voice on a tagged notice says «Отвечать можно только текстом» —
+  the owner must not think it went; a person's photo is met with silence, as any photo was.

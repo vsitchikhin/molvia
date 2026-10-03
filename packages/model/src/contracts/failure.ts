@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { telegramUserIdSchema } from '#model/entities/actor'
 import { FAILURE_FRAMES } from '#model/support/failure'
+import { feedbackContinuedNoticeSchema, feedbackNoticeSchema } from './feedback'
 
 /**
  * Where a failure came from (MOL-143). `phone` joins with MOL-144; the bot has no build of its own
@@ -87,17 +88,27 @@ export const failureCountNoticeSchema = z.strictObject({
 
 /**
  * One message the API has queued for the owner (MOL-143, Р-9 of MOL-149) and handed to the bot. A
- * union by `kind`, so the feedback of MOL-148 joins as one more branch rather than a second channel.
+ * union by `kind`: the feedback of MOL-148 joins as two more branches rather than a second channel.
  */
 export const ownerNoticeSchema = z.discriminatedUnion('kind', [
   failureNoticeSchema,
   failureCountNoticeSchema,
+  feedbackNoticeSchema,
+  feedbackContinuedNoticeSchema,
 ])
 export type OwnerNotice = z.infer<typeof ownerNoticeSchema>
 export type OwnerNoticeKind = OwnerNotice['kind']
 export const OWNER_NOTICE_KINDS = [
   'failure',
   'failure_count',
+  'feedback',
+  'feedback_continued',
+] as const satisfies readonly OwnerNoticeKind[]
+
+/** The notices about a message to the developer: they name it, and go with it (MOL-148, Р-5). */
+export const FEEDBACK_NOTICE_KINDS = [
+  'feedback',
+  'feedback_continued',
 ] as const satisfies readonly OwnerNoticeKind[]
 
 /** The most notices one claim hands over: a minute of them, sent one by one. */
@@ -113,3 +124,13 @@ export const ownerNoticesSchema = z.strictObject({
   notices: z.array(ownerNoticeSchema).max(OWNER_NOTICES_PER_CLAIM),
 })
 export type OwnerNotices = z.infer<typeof ownerNoticesSchema>
+
+/**
+ * The messages to the developer whose notices the bot sent (MOL-148, adversarial В1), by their own
+ * numbers: a notice about a message is handed again until it is said to have gone. A failure's needs
+ * no word — the table keeps its count.
+ */
+export const ownerNoticesSentSchema = z.strictObject({
+  messages: z.array(z.int().positive()).min(1).max(OWNER_NOTICES_PER_CLAIM),
+})
+export type OwnerNoticesSent = z.infer<typeof ownerNoticesSentSchema>

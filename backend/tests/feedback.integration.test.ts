@@ -5,7 +5,8 @@ import { ERROR, FEEDBACK_DAY_LIMIT, ISSUE } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { VERSION } from '@/env'
 import { createFeedbackRepository } from '@/db/feedback-repository'
-import { feedback, feedbackReplies } from '@/db/schema'
+import { createErasureRepository } from '@/db/erasure-repository'
+import { actors, feedback, feedbackReplies } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
@@ -238,47 +239,64 @@ describe('POST /feedback (MOL-147)', () => {
   })
 })
 
+/** The thread a message is of — the first message's number — as a reply to it carries it. */
+async function threadOf(feedbackId: number): Promise<number> {
+  const [row] = await db
+    .select({ thread: feedback.threadKey })
+    .from(feedback)
+    .where(eq(feedback.id, feedbackId))
+  if (row === undefined) throw new Error('no message')
+  return row.thread
+}
+
+const monthsAgo = (months: number) => new Date(Date.now() - months * 30.5 * 86_400_000)
+
+async function aMessage(actorId: string, at: Date, thread?: { id: number; reply?: number }) {
+  const [row] = await db
+    .insert(feedback)
+    .values({
+      actorId,
+      kind: 'bug',
+      text: 'текст',
+      locale: 'ru',
+      apiBuild: 'dev',
+      threadId: thread?.id,
+      inReplyTo: thread?.reply,
+      createdAt: at,
+    })
+    .returning({ id: feedback.id })
+  if (row === undefined) throw new Error('no message')
+  return row.id
+}
+
+async function aReply(actorId: string, feedbackId: number, at: Date) {
+  const [row] = await db
+    .insert(feedbackReplies)
+    .values({
+      feedbackId,
+      actorId,
+      threadId: await threadOf(feedbackId),
+      text: 'ответ',
+      delivered: 'sent',
+      createdAt: at,
+    })
+    .returning({ id: feedbackReplies.id })
+  if (row === undefined) throw new Error('no reply')
+  return row.id
+}
+
 describe('срок — год от последнего сообщения нити (MOL-147, В-4 MOL-150)', () => {
-  const monthsAgo = (months: number) => new Date(Date.now() - months * 30.5 * 86_400_000)
-
-  async function aMessage(actorId: string, at: Date, thread?: { id: number; reply?: number }) {
-    const [row] = await db
-      .insert(feedback)
-      .values({
-        actorId,
-        kind: 'bug',
-        text: 'текст',
-        locale: 'ru',
-        apiBuild: 'dev',
-        threadId: thread?.id,
-        inReplyTo: thread?.reply,
-        createdAt: at,
-      })
-      .returning({ id: feedback.id })
-    if (row === undefined) throw new Error('no message')
-    return row.id
-  }
-
-  async function aReply(feedbackId: number, at: Date) {
-    const [row] = await db
-      .insert(feedbackReplies)
-      .values({ feedbackId, text: 'ответ', delivered: 'sent', createdAt: at })
-      .returning({ id: feedbackReplies.id })
-    if (row === undefined) throw new Error('no reply')
-    return row.id
-  }
-
   it('уходит нить, где всё старше года; живёт та, где хоть что-то моложе', async () => {
     const anna = await insertActor(db)
     const old = await aMessage(anna, monthsAgo(24))
-    await aReply(old, monthsAgo(23))
+    await aReply(anna, old, monthsAgo(23))
     const answered = await aMessage(anna, monthsAgo(24))
-    await aReply(answered, monthsAgo(2))
+    await aReply(anna, answered, monthsAgo(2))
     const continued = await aMessage(anna, monthsAgo(24))
-    const reply = await aReply(continued, monthsAgo(23))
+    const reply = await aReply(anna, continued, monthsAgo(23))
     await aMessage(anna, monthsAgo(1), { id: continued, reply })
     const lapsed = await aMessage(anna, monthsAgo(24))
-    const lapsedReply = await aReply(lapsed, monthsAgo(24))
+    const lapsedReply = await aReply(anna, lapsed, monthsAgo(24))
     await aMessage(anna, monthsAgo(13), { id: lapsed, reply: lapsedReply })
     const recent = await aMessage(anna, monthsAgo(11))
     const stale = await aMessage(anna, monthsAgo(13))
@@ -305,11 +323,180 @@ describe('срок — год от последнего сообщения ни�
     const anna = await insertActor(db)
     const boris = await insertActor(db)
     await aMessage(anna, monthsAgo(11))
-    await aReply(await aMessage(boris, monthsAgo(6)), monthsAgo(5))
+    await aReply(boris, await aMessage(boris, monthsAgo(6)), monthsAgo(5))
 
     await createFeedbackRepository(db).purgeStale()
 
     expect(await db.select().from(feedback)).toHaveLength(2)
     expect(await db.select().from(feedbackReplies)).toHaveLength(1)
+  })
+})
+
+/** The constraint a write broke, as Postgres names it — under drizzle's wrapper. */
+async function refusedBy(write: Promise<unknown>): Promise<string | undefined> {
+  try {
+    await write
+  } catch (error) {
+    const cause = (error as { cause?: { constraint_name?: string } }).cause
+    return cause?.constraint_name
+  }
+  return undefined
+}
+
+async function telegramOf(actorId: string) {
+  const [row] = await db
+    .select({ telegram: actors.telegramUserId })
+    .from(actors)
+    .where(eq(actors.id, actorId))
+  if (row === undefined) throw new Error('no actor')
+  return row.telegram
+}
+
+describe('схема нитей держит первое сообщение и одного человека (MOL-148, В5 ревью MOL-147)', () => {
+  const now = new Date()
+
+  it('продолжение не может отвечать на ответ чужой нити — стирание Анны не уносит Бориса (В5а)', async () => {
+    const anna = await insertActor(db)
+    const boris = await insertActor(db)
+    const replyToAnna = await aReply(anna, await aMessage(anna, now), now)
+    const borisFirst = await aMessage(boris, now)
+
+    expect(await refusedBy(aMessage(boris, now, { id: borisFirst, reply: replyToAnna }))).toBe(
+      'feedback_answers_own_reply',
+    )
+
+    const replyToBoris = await aReply(boris, borisFirst, now)
+    const borisContinued = await aMessage(boris, now, { id: borisFirst, reply: replyToBoris })
+    await createErasureRepository(db).erase(await telegramOf(anna), { dryRun: false })
+    const left = await db
+      .select({ id: feedback.id })
+      .from(feedback)
+      .where(eq(feedback.actorId, boris))
+    expect(left.map((row) => row.id).sort((a, b) => a - b)).toEqual([borisFirst, borisContinued])
+  })
+
+  it('продолжение называет только первое сообщение нити, не продолжение (В5б)', async () => {
+    const anna = await insertActor(db)
+    const first = await aMessage(anna, monthsAgo(24))
+    const reply = await aReply(anna, first, monthsAgo(23))
+    const continued = await aMessage(anna, monthsAgo(23), { id: first, reply })
+    const second = await aReply(anna, continued, monthsAgo(22))
+
+    expect(await refusedBy(aMessage(anna, now, { id: continued, reply: second }))).toBe(
+      'feedback_thread_is_owners',
+    )
+    // The same word, written under the first message, keeps the whole thread for a year.
+    await aMessage(anna, now, { id: first, reply: second })
+    await createFeedbackRepository(db).purgeStale()
+    expect(await db.select().from(feedback)).toHaveLength(3)
+  })
+
+  it('продолжение свежей нити не отвечает на ответ старой нити того же человека (В5 MOL-148)', async () => {
+    const anna = await insertActor(db)
+    const old = await aMessage(anna, monthsAgo(14))
+    const oldReply = await aReply(anna, old, monthsAgo(14))
+    const fresh = await aMessage(anna, now)
+    const freshReply = await aReply(anna, fresh, now)
+
+    expect(await refusedBy(aMessage(anna, now, { id: fresh, reply: oldReply }))).toBe(
+      'feedback_answers_own_reply',
+    )
+    // The same word answering its own thread's reply outlives the old thread's purge.
+    const word = await aMessage(anna, now, { id: fresh, reply: freshReply })
+    await createFeedbackRepository(db).purgeStale()
+    const left = await db.select({ id: feedback.id }).from(feedback)
+    expect(left.map((row) => row.id).sort((a, b) => a - b)).toEqual([fresh, word])
+  })
+
+  it('ответ не встаёт под сообщение с чужой нитью в своей колонке', async () => {
+    const anna = await insertActor(db)
+    const first = await aMessage(anna, now)
+    const second = await aMessage(anna, now)
+
+    expect(
+      await refusedBy(
+        db
+          .insert(feedbackReplies)
+          .values({ feedbackId: first, actorId: anna, threadId: second, text: 'ответ' }),
+      ),
+    ).toBe('feedback_replies_message_is_owners')
+  })
+
+  it('продолжение не встаёт в нить другого человека', async () => {
+    const anna = await insertActor(db)
+    const boris = await insertActor(db)
+    const annas = await aMessage(anna, now)
+    const reply = await aReply(boris, await aMessage(boris, now), now)
+
+    expect(await refusedBy(aMessage(boris, now, { id: annas, reply }))).toBe(
+      'feedback_thread_is_owners',
+    )
+  })
+
+  it('ответ стоит только под сообщением того же человека, что в его actor_id', async () => {
+    const anna = await insertActor(db)
+    const boris = await insertActor(db)
+    const annas = await aMessage(anna, now)
+
+    expect(await refusedBy(aReply(boris, annas, now))).toBe('feedback_replies_message_is_owners')
+  })
+
+  it('продолжение и только оно отвечает на ответ', async () => {
+    const anna = await insertActor(db)
+    const first = await aMessage(anna, now)
+    const reply = await aReply(anna, first, now)
+
+    expect(await refusedBy(aMessage(anna, now, { id: first }))).toBe(
+      'feedback_continuation_answers',
+    )
+    expect(
+      await refusedBy(
+        db.insert(feedback).values({
+          actorId: anna,
+          kind: 'bug',
+          text: 'текст',
+          locale: 'ru',
+          apiBuild: 'dev',
+          inReplyTo: reply,
+        }),
+      ),
+    ).toBe('feedback_continuation_answers')
+  })
+
+  it('id сообщения в Telegram один на человека, у разных людей может совпасть', async () => {
+    const anna = await insertActor(db)
+    const boris = await insertActor(db)
+    const annas = await aMessage(anna, now)
+    const borises = await aMessage(boris, now)
+    const sent = (actorId: string, feedbackId: number) =>
+      db.insert(feedbackReplies).values({
+        feedbackId,
+        actorId,
+        threadId: feedbackId,
+        text: 'ответ',
+        delivered: 'sent',
+        telegramMessageId: 9031,
+      })
+
+    await sent(anna, annas)
+    await sent(boris, borises)
+    expect(await refusedBy(sent(anna, annas))).toBe('feedback_replies_telegram_message_key')
+  })
+
+  it('исход «gone» база больше не принимает', async () => {
+    const anna = await insertActor(db)
+    const annas = await aMessage(anna, now)
+
+    expect(
+      await refusedBy(
+        db.insert(feedbackReplies).values({
+          feedbackId: annas,
+          actorId: anna,
+          threadId: annas,
+          text: 'ответ',
+          delivered: 'gone' as never,
+        }),
+      ),
+    ).toBe('feedback_replies_delivered_known')
   })
 })

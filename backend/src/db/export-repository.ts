@@ -71,6 +71,7 @@ export const EXPORT_COLUMNS: Readonly<
     | 'exchange_revisions'
     | 'income_revisions'
     | 'feedback_replies'
+    | 'owner_notices'
     | 'items'
     | 'item_barcodes'
     | 'store_memory'
@@ -375,11 +376,36 @@ export const EXPORT_COLUMNS: Readonly<
     omitted: {
       actor_id: OWNER,
       client_key: 'the phone’s key against sending one message twice, not what was said',
+      head: 'said by `thread`: a first message has none',
+      thread_head: 'said by `thread`: the key that holds a continuation to its first message',
+      thread_key:
+        'said by `thread`: the key that holds a continuation to a reply of its own thread',
     },
   },
   feedback_replies: {
     exported: ['id', 'text', 'delivered', 'created_at'],
-    omitted: { feedback_id: 'said by where the reply sits: under the message it answers' },
+    omitted: {
+      feedback_id: 'said by where the reply sits: under the message it answers',
+      actor_id: OWNER,
+      thread_id: 'said by where the reply sits: under a message of that thread',
+      telegram_message_id:
+        'which message the reply went out as in your chat, so your answer to it finds its thread; it means nothing outside that chat',
+    },
+  },
+  // The owner's notice of a message (MOL-148) goes with the message, so it is the person's too — and
+  // all it holds of them is the message itself, in `feedback` word for word.
+  owner_notices: {
+    exported: [],
+    omitted: {
+      id: 'the owner’s channel’s own number, not yours',
+      kind: 'a message or its continuation: said by the message in `feedback`',
+      payload: 'the message itself, already in `feedback` word for word',
+      feedback_id: 'said by the message it is about',
+      created_at: 'when the message was written: in `feedback`',
+      handed_at: 'when the owner’s bot took the notice — about the owner’s channel, not you',
+      sent_at: 'when the owner’s bot said it went — about the owner’s channel, not you',
+      tries: 'how many times the owner’s bot took it — about the owner’s channel, not you',
+    },
   },
   budget_plans: {
     exported: ['category_id', 'from_month', 'amount_minor', 'currency', 'percent', 'updated_at'],

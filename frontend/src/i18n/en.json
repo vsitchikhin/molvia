@@ -1396,7 +1396,7 @@
       },
       "feedback": {
         "term": "Messages to the developer",
-        "text": "What you wrote in «Write to the developer», its kind, and what goes with the text: the app version, the screen, the phone’s system and whether it is the app or a browser, the language, and from an error screen its code. And the developer’s replies. Only the developer reads them. A copy of the message reaches the developer in Telegram without your name or account number, and stays in that chat even after the message is deleted here. Kept for a year from the last message of the conversation."
+        "text": "What you wrote in «Write to the developer» or in reply to the developer’s answer in the Molvia bot, its kind, and what goes with the text: the app version, the screen, the phone’s system and whether it is the app or a browser, the language, and from an error screen its code. And the developer’s replies, each with the number of the Telegram message it reached you as: that is how your answer joins the same conversation. Only the developer reads them. A copy of the message reaches the developer in Telegram without your name or account number, and stays in that chat even after the message is deleted here. Kept for a year from the last message of the conversation."
       },
       "search": {
         "term": "Search picks",
