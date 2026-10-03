@@ -131,26 +131,36 @@ export const LINE_COMBINATIONS_MAX = 200_000
  * still costs a tenth of a second, and twelve of them stalled every request of the API for one. The
  * bench's busiest reading tries 122 161 (am-03).
  */
-export const READING_COMBINATIONS_MAX = 500_000
+export const READING_COMBINATIONS_MAX = 300_000
 
 /**
  * What every line may try whatever the reading has spent (review Р15): rows of an item's shape above
  * the list — a stamp, a code, a smudge — would otherwise drain the budget before the first item, and
  * every real line would keep its confusions. A real line tries a few thousand (am-05: 1 694 at most).
+ * The floors draw on a budget of their own (review Р18), or four hundred rows of junk under it would
+ * buy seconds again.
  */
 export const LINE_COMBINATIONS_FLOOR = 10_000
+export const FLOOR_COMBINATIONS_MAX = 200_000
 
-/** What a reading may still try. */
+/** What a reading may still try: its own budget, and the floors' beside it. */
 interface Budget {
   left: number
+  floors: number
 }
 
-// Takes `combinations` from the budget, or says the line is to be taken as read.
+// Takes `combinations` from a budget, or says the line is to be taken as read.
 function afford(budget: Budget, combinations: number): boolean {
   if (combinations > LINE_COMBINATIONS_MAX) return false
-  if (combinations > LINE_COMBINATIONS_FLOOR && combinations > budget.left) return false
-  budget.left -= combinations
-  return true
+  if (combinations <= budget.left) {
+    budget.left -= combinations
+    return true
+  }
+  if (combinations <= LINE_COMBINATIONS_FLOOR && combinations <= budget.floors) {
+    budget.floors -= combinations
+    return true
+  }
+  return false
 }
 
 // One pass over the figures of a line: every combination that satisfies paid + discount =
@@ -249,21 +259,21 @@ interface State {
 }
 
 /**
- * Past this many steps the total no longer chooses among the readings (review Р14, MOL-125): the
- * lines keep their first reading, as when no total was read. The search against the total grows with
- * every line whose figures read several ways, in the API's process; the bench's longest takes
- * 94 445 (am-03).
+ * Past this many steps the total no longer chooses among the readings (review Р14, 8): the lines keep
+ * their first reading, as when no total was read. The search runs in the API's process; the bench's
+ * longest takes 94 445 (am-03), ninety ordinary lines of a till with no shelf price fit, and the worst
+ * shape the review found — four hundred rows of junk and a total — costs half a second a reading.
  */
-export const RECONCILE_STEPS_MAX = 2_000_000
+export const RECONCILE_STEPS_MAX = 500_000
 
 /**
  * The readings the search carries from one line to the next: the cheapest — fewest swaps — when there
- * are more (review Р14). A till that prints no shelf price lets every swap of a line «fit» the line,
+ * are more (review Р14, 8). A till that prints no shelf price lets every swap of a line «fit» the line,
  * and the readings multiply by dozens a line; the cheapest are the ones the total would choose among.
- * The bench carries up to 9 732 (am-03) and reads the same with two thousand: thirty such lines are
- * settled against their total in under a second.
+ * The bench carries up to 9 732 (am-03) and reads the same with three hundred; thirty such lines are
+ * settled against their total in a tenth of a second, ninety in under a third.
  */
-export const RECONCILE_STATES_MAX = 2_000
+export const RECONCILE_STATES_MAX = 300
 
 function picksOf(state: State): (Candidate | null)[] {
   const picks: (Candidate | null)[] = []
@@ -284,6 +294,11 @@ function reconcile(
   const first = lists.map((list) => list[0] ?? null)
   if (total === null || !Number.isFinite(total)) return { picks: first, balanced: false }
 
+  // what the lines after each one come to as first read: a reading whose sum with them lands nearer
+  // the total is kept before another of the same cost when the beam is full (review П11)
+  const ahead = lists.map((_, i) =>
+    lists.slice(i + 1).reduce((sum, list) => sum + (list[0]?.paid ?? 0), 0),
+  )
   const start: State = { sum: 0, cost: 0, pick: null, prev: null, blank: -1 }
   let states = new Map<string, State>([['0|false', start]])
   let steps = 0
@@ -321,7 +336,16 @@ function reconcile(
     if (steps > RECONCILE_STEPS_MAX) return { picks: first, balanced: false }
     states =
       next.size > RECONCILE_STATES_MAX
-        ? new Map([...next].sort((a, b) => a[1].cost - b[1].cost).slice(0, RECONCILE_STATES_MAX))
+        ? new Map(
+            [...next]
+              .sort(
+                (a, b) =>
+                  a[1].cost - b[1].cost ||
+                  Math.abs(total - a[1].sum - (ahead[i] ?? 0)) -
+                    Math.abs(total - b[1].sum - (ahead[i] ?? 0)),
+              )
+              .slice(0, RECONCILE_STATES_MAX),
+          )
         : next
   }
 
@@ -462,6 +486,7 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
   const text = rows.map((r) => r.text).join('\n')
   const mapped = rows.map((r) => digits(r.text))
   const found: Found[] = []
+  let lastFigures = -1
   for (let i = 1; i < mapped.length; i++) {
     const row = mapped[i] ?? ''
     const figures = FIGURES.exec(row)
@@ -471,8 +496,14 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
     while (j > 0 && (mapped[j] ?? '').trim() === '') j-- // OCR leaves blank lines between the halves
     const headRow = mapped[j] ?? ''
     const head = ITEM.exec(headRow)?.[2] ?? headRow
-    const numbered = NUMBERED.test(headRow)
+    // the name row is cut out only between two items: right below the figures of the one before
+    // (review Р19) — above the first item is the head, whatever OCR reads at its edge
+    let above = j - 1
+    while (above > 0 && (mapped[above] ?? '').trim() === '') above--
+    const betweenItems = above >= 0 && above === lastFigures
+    const numbered = betweenItems && NUMBERED.test(headRow)
     const source = rows.filter((_, k) => (k === j && numbered) || k === i)
+    lastFigures = i
     if (figures !== null) {
       const mid = figures[3] ?? ''
       const weight = WEIGHT.exec(mid)
@@ -510,7 +541,7 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
 
   const printedTotal = TOTAL.exec(text)
   const total = printedTotal?.[1] === undefined ? null : hundredthsOf(printedTotal[1])
-  const budget: Budget = { left: READING_COMBINATIONS_MAX }
+  const budget: Budget = { left: READING_COMBINATIONS_MAX, floors: FLOOR_COMBINATIONS_MAX }
   const lists = settle(
     found.map((f) =>
       f.plain !== null
@@ -765,11 +796,47 @@ function articlesOf(rows: readonly TextRow[]): Article[] {
   })
 }
 
+interface Seam {
+  readonly mine: number
+  readonly theirs: number
+  /** Found by the rows after it rather than by every article after it: an overlap read worse. */
+  readonly loose: boolean
+}
+
+// How alike two rows read: 1 for the same text, 0 for nothing in common (Levenshtein over the longer).
+function likeness(a: string, b: string): number {
+  const x = a.replace(/\s+/g, '')
+  const y = b.replace(/\s+/g, '')
+  if (x === '' || y === '') return 0
+  let previous = Array.from({ length: y.length + 1 }, (_, k) => k)
+  for (let i = 1; i <= x.length; i++) {
+    const current = [i]
+    for (let k = 1; k <= y.length; k++) {
+      current[k] = Math.min(
+        (previous[k] ?? 0) + 1,
+        (current[k - 1] ?? 0) + 1,
+        (previous[k - 1] ?? 0) + (x.charAt(i - 1) === y.charAt(k - 1) ? 0 : 1),
+      )
+    }
+    previous = current
+  }
+  return 1 - (previous[y.length] ?? 0) / Math.max(x.length, y.length)
+}
+
+// The rows of an overlap read twice look alike even where OCR read one of them worse.
+const ALIKE = 0.7
+
+function rowAfter(rows: readonly TextRow[], at: number): string {
+  return rows.slice(at + 1).find((row) => row.text.trim() !== '')?.text ?? ''
+}
+
 function seamOf(
-  mine: readonly Article[],
-  theirs: readonly Article[],
+  rows: readonly TextRow[],
+  next: readonly TextRow[],
   same: (a: string, b: string) => boolean,
-): { mine: number; theirs: number } | null {
+): Seam | null {
+  const mine = articlesOf(rows)
+  const theirs = articlesOf(next)
   for (let i = mine.length - 1; i >= 0; i--) {
     const a = mine[i]
     if (a === undefined) continue
@@ -778,7 +845,13 @@ function seamOf(
     if (b === undefined || j > i) continue
     const later = theirs.slice(j + 1)
     const kept = mine.slice(i + 1).every((m) => later.some((t) => near(m.article, t.article)))
-    if (kept) return { mine: a.at, theirs: b.at }
+    if (kept) return { mine: a.at, theirs: b.at, loose: false }
+    // one row of the overlap read worse in the next part — an article two digits off, figures cut at
+    // its top edge (review Р17): the rows right after the seam still say it is the overlap, while two
+    // bags of one article have different items after them
+    if (likeness(rowAfter(rows, a.at), rowAfter(next, b.at)) >= ALIKE) {
+      return { mine: a.at, theirs: b.at, loose: true }
+    }
   }
   return null
 }
@@ -786,9 +859,19 @@ function seamOf(
 export function mergeParts(parts: readonly (readonly TextRow[])[]): TextRow[] {
   let rows = [...(parts[0] ?? [])]
   for (const next of parts.slice(1)) {
-    const mine = articlesOf(rows)
-    const theirs = articlesOf(next)
-    const seam = seamOf(mine, theirs, (a, b) => a === b) ?? seamOf(mine, theirs, near)
+    const seam = seamOf(rows, next, (a, b) => a === b) ?? seamOf(rows, next, near)
+    if (seam?.loose === true) {
+      // the text so far keeps its own reading of the overlap, read better; the next part goes on
+      // after as many rows as the overlap holds
+      let skip = rows.slice(seam.mine + 1).filter((row) => row.text.trim() !== '').length
+      let from = seam.theirs + 1
+      while (skip > 0 && from < next.length) {
+        if ((next[from]?.text.trim() ?? '') !== '') skip--
+        from++
+      }
+      rows = [...rows, ...next.slice(from)]
+      continue
+    }
     if (seam !== null) {
       rows = [...rows.slice(0, seam.mine + 1), ...next.slice(seam.theirs + 1)]
       continue

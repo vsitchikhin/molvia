@@ -422,3 +422,93 @@ describe('the seam of two parts (review Р7–Р9)', () => {
     expect(articles(merged)).toEqual(['1163903', '1163909', '1234567'])
   })
 })
+
+// Review round 3 of MOL-125.
+describe('a long receipt whose overlap the second part read worse (review Р17)', () => {
+  // am-05 shot in two parts, overlapping on items 9 and 10
+  const rows = (am05 as Fixture).readings[0]!.split('\n')
+  const firstEnd = rows.findIndex((row) => row.startsWith('0809/016189'))
+  const secondStart = rows.findIndex((row) => row.startsWith('9.Յոգուրտ'))
+  const joined = (edit: (row: string) => string) =>
+    parseReceiptText(
+      mergeParts([
+        rowsOf(rows.slice(0, firstEnd + 1).join('\n'), 0),
+        rowsOf(rows.slice(secondStart).map(edit).join('\n'), 1),
+      ]),
+    )
+  const whole = parse((am05 as Fixture).readings[0]!)
+  const skus = (r: ReceiptText) => r.lines.map((line) => line.sku)
+
+  it.each([
+    ['an article two digits off', (row: string) => row.replace('0809/016189', '0809/046139')],
+    [
+      'figures cut at its top edge',
+      (row: string) => row.replace('0809/016189 0,694q 342,66 386', '0809/01'),
+    ],
+  ])('%s: the lines of the whole reading, the overlap as the first part read it', (_, edit) => {
+    const got = joined(edit)
+    expect(skus(got)).toEqual(skus(whole))
+    expect(got.lines.map((line) => line.sumHundredths)).toEqual(
+      whole.lines.map((line) => line.sumHundredths),
+    )
+  })
+})
+
+describe('rows of junk by the hundred (review Р18)', () => {
+  const junk = (n: number) =>
+    Array.from(
+      { length: n },
+      (_, i) =>
+        `${String((i % 90) + 1)}. x\n0401/11${String(60_000 + i)} 1 ${'1'.repeat(9)},11/${'1'.repeat(9)}`,
+    ).join('\n')
+
+  it('cost no more than a hundred of them: the floors have a budget of their own', () => {
+    const started = performance.now()
+    expect(parse(`${junk(400)}\n${totalRow(1_000_000)}`).lines).toHaveLength(400)
+    expect(performance.now() - started).toBeLessThan(1_000)
+  })
+})
+
+describe('the name row of the first item, which has the head above it (review Р19)', () => {
+  it('is never cut out, whatever stray digit OCR read at the edge', () => {
+    const text = [
+      '1 Գնորդ՝ Իվան Պետրով, հեռ. 091 123456',
+      '3923/1122223 1Հտ 60 60',
+      '2.Կաթ',
+      '0401/1163909 2Հտ 740 370',
+    ].join('\n')
+    const lines = parse(text).lines
+    expect(lines.map((l) => l.rows.map((r) => r.text))).toEqual([
+      ['3923/1122223 1Հտ 60 60'],
+      ['2.Կաթ', '0401/1163909 2Հտ 740 370'],
+    ])
+  })
+})
+
+describe('the beam keeps the reading the total asks for (review П11)', () => {
+  it('thirty lines with confused digits in two of them: every sum put right', () => {
+    let seed = 7
+    const rnd = (k: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed % k
+    }
+    const swap: Record<string, string> = { 5: '6', 6: '5', 3: '8', 1: '4' }
+    let total = 0
+    const truth: number[] = []
+    const body = Array.from({ length: 30 }, (_, i) => {
+      const paid = 20_000 + rnd(200_000)
+      total += paid
+      truth.push(paid)
+      let printed = money(paid)
+      if (i === 4 || i === 20) {
+        const k = Array.from(printed).findIndex((c) => c in swap)
+        if (k >= 0)
+          printed = printed.slice(0, k) + (swap[printed.charAt(k)] ?? '') + printed.slice(k + 1)
+      }
+      return `${String(i + 1)}. item\n0401/1163${String(100 + i)} 1Հտ ${printed}/${money(Math.round(paid * 0.105))}`
+    })
+    const got = parse([...body, totalRow(total)].join('\n'))
+    expect(got.balanced).toBe(true)
+    expect(got.lines.map((line) => line.sumHundredths)).toEqual(truth)
+  })
+})
