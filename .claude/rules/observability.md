@@ -17,6 +17,10 @@ paths:
   - 'frontend/src/failures*.ts'
   - 'frontend/src/scanner/{barcodeReader,barcodeWorker,protocol}.ts'
   - 'e2e/client-errors*.ts'
+  - 'backend/src/metrics*.ts'
+  - 'backend/tests/metrics*.ts'
+  - 'deploy/grafana/**'
+  - 'deploy/victoria/**'
 ---
 
 # Failures of the API and the bot, and the owner's channel (MOL-143)
@@ -285,3 +289,66 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   printed as it is, and so is one a site does not answer for within ten seconds (review №4).
 - **Not here:** failures inside the service worker itself — it has nobody to send them; a message to
   the developer carrying a failure's fingerprint (MOL-147 sends the API's last code instead).
+
+## The metrics (MOL-145)
+
+The watch of MOL-142 says whether everything is down, the failures say what broke; neither said
+whether the API is slower than yesterday, how much memory is left — there is no swap, so the end of
+it is the OOM-killer on the API or Postgres — or when the disk fills, and the watch passes a site that
+fails every second request by design. MOL-149 decided the shape (В-3: VictoriaMetrics, Grafana and
+exporters on our own machine, behind an SSH tunnel, nothing leaving it); the owner's decisions of this
+task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
+
+- **A label is never what a request named** (Р-1): the method and the route's template, by the same
+  `routeOf` the failure's place is taken by, `HEAD` as `GET`; a request no route answered is
+  `*`/`unmatched`, one series a class of status — a path carries uuids and, decoded, a person's text,
+  and a series for each would be both a leak and a flood. Status is a class, `2xx`…`5xx`; the time is
+  a histogram by route alone. Written by hand in Prometheus's text format, no library.
+- **`/metrics` is on a port of its own, never the API's** (В-1): `METRICS_PORT`, 9464 in production,
+  unset in a copy and in end-to-end, where nothing listens. Caddy proxies only the API's port, so no
+  spelling of a path reaches it — closing `/api/metrics` in the Caddyfile would have rested on Caddy and
+  the router reading a path alike, and the router decodes `%6D`.
+- **What sees the whole machine or the database has no way out** (Р-7, Р-8): VictoriaMetrics,
+  node_exporter, cAdvisor and postgres_exporter are on `metrics`, an `internal` network; Postgres and
+  the API join it beside their own. cAdvisor reads Docker's socket — root on the machine — and
+  postgres_exporter logs in as the database's own user (В-5): neither can send anything anywhere.
+  node_exporter is not on the host's network, which would be a port outside, so the machine's network
+  counters are not there. **Grafana alone is in both**, for Telegram, and its one port is on the
+  loopback for the tunnel.
+- **Grafana calls nobody home** (Р-6): usage reports, update checks, the news, gravatar, plugin keys
+  and the five plugins it would install at every start are switched off — a test holds each setting.
+  No sign-up, no anonymous view, the admin's password a required line.
+- **What runs is what the repository says** (В-2, Р-10): the scrape config is baked into
+  `molvia-victoria`, the dashboard, the alarms and their contact point into `molvia-grafana`, both built
+  by the release with the others; the dashboard is read-only — a panel changed in the interface cannot
+  be saved, and a change is a merge. **Every threshold is in `rules.json`**, JSON so a test reads it without a
+  parser, and the test holds them at Р-6 of MOL-149. **Every figure the dashboard and the alarms read is
+  one the API writes or an exporter's list names** — a name renamed turns a test red, never a panel
+  quietly empty — and the API's process figures are read by `job="api"`, since the exporters write the
+  same names.
+- **A restart is a reset of the same container's CPU counter** (Р-4): a rollout makes a new container,
+  a new series, and starts nothing over. Two measured traps on the way: cAdvisor reads a container's
+  start once and never again, so a restart kept its old start time; and VictoriaMetrics' `changes()`
+  counts a series' first sample, so «the start changed» was every container of every rollout.
+  `resets()` was seen to catch the one container killed, and only it.
+- **The alarms speak when the figures stop** (Р-5): every rule is Alerting on no data and on an error
+  of the query — VictoriaMetrics down — and «Метрики молчат» is any target not answering five minutes.
+  The rules that need traffic (5xx, p95, restarts) end in `or on() vector(0)`, so a quiet night is not
+  «no data». **The price, named:** Grafana down is silence — it is the one that sends — and the watch of
+  MOL-142 sees the site, not the metrics.
+- **p95 leaves out the photo of a receipt and needs twenty requests** (Р-3): Fastify's time runs from
+  the headers to the answer, so `PUT /receipts/:receiptId/parts/:part` is the phone's network; one
+  slow request at night would be the p95 of five. The test holds that the route still exists.
+- **The alarms' own bot, never the product's** (В-3): `ALERTS_BOT_TOKEN` lives only in Grafana, a
+  container that goes to the internet, and the login's token never does. Whom it writes is
+  `OWNER_TELEGRAM_ID`, put into the contact point as text by `deploy/grafana/start.sh` — Grafana 13.0
+  makes a number of a value from the environment that looks like one, and its Telegram refused to start
+  (grafana/alerting #558, fixed after 13.0.2); in the repository and the public image there is no id.
+- **Postgres is read by its built-in collectors** (В-4): connections by state against
+  `max_connections`, the size, deadlocks, the oldest open transaction — never a query's text. «How many
+  run longer than a second» would take the deprecated `queries.yaml` and a file on the machine; the
+  count of active ones and the age of the oldest are what is shown, a snapshot every fifteen seconds —
+  a stuck query stays on the chart, a short burst between two looks does not.
+- **Not here:** the bot's figures (its pulse is MOL-142's, its memory cAdvisor's), logs (Р-5 of
+  MOL-149), anything about a person, a screen or an action — the product's events are the log of
+  MOL-31 alone — and a copy of the metrics: thirty days, lost with the machine.

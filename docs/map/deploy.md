@@ -42,7 +42,7 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 - `.github/workflows/watch.yml` — The outside watch (MOL-142): every five minutes `/api/health` and the page to the healthchecks.io check «molvia-up» — a `/fail` when three of four tries half a minute apart fail — and the certificate's term to «molvia-cert»; red only when it could not report.
 - `bin/bundle.mjs` — esbuild bundler for the API and bot images; the API also gets its forget, seed-catalogue, gates and failures tools.
 - `deploy/Caddyfile` — Caddy config: TLS for the domain, `/api` stripped and proxied to the API, internal routes closed, SPA fallback, headers, no access log.
-- `deploy/README.md` — Operations guide: new machine, deploys and the deploy key, login setup, local prod stack, erasure, seeding, gates, signals, backups and restore, the Postgres image and its move off alpine.
+- `deploy/README.md` — Operations guide: new machine, deploys and the deploy key, login setup, local prod stack, erasure, seeding, gates, signals, the metrics and their alarms (MOL-145), backups and restore, the Postgres image and its move off alpine.
 - `deploy/backup/backup.env.example` — Template of the server's `backup.env`: age recipient, R2 remote, healthchecks.io URL, retention days.
 - `deploy/backup/backup.sh` — Nightly backup: `pg_dump` in the container without the data of receipt photos and cut-out lines (MOL-125), encrypted to the owner's age key, streamed to R2, pinged to healthchecks.io.
 - `deploy/backup/molvia-backup.service` — systemd unit running the nightly backup script as the deploy user.

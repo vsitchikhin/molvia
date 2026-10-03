@@ -10,6 +10,8 @@ paths:
   - 'backend/src/routes/health.ts'
   - 'bot/src/pulse.ts'
   - '.env.prod.example'
+  - 'deploy/grafana/**'
+  - 'deploy/victoria/**'
 ---
 
 # Deployment
@@ -40,6 +42,16 @@ The shape worth knowing here:
   with the others; **a rollback starts `backend bot frontend` only** — a tag from before MOL-125 has no
   reader image, and `up -d` of everything would stop on the missing pull with the API left broken. The
   reader holds nothing and answers any API alike, so whatever runs of it stays.
+- **The metrics are five more services and two more images** (MOL-145): VictoriaMetrics,
+  node_exporter, cAdvisor and postgres_exporter on `metrics`, an `internal` network with no way out,
+  Grafana in both networks with its one port on `127.0.0.1:3000` for an SSH tunnel. `molvia-grafana`
+  and `molvia-victoria` carry what they read baked in and are built by the release beside the four;
+  the exporters are upstream images of exact tags. **Like the reader they are pulled but not in the
+  check of the tag, and a rollback leaves them as they run** — a tag from before MOL-145 has none of
+  their images. Each has a limit of memory, together under a gigabyte (Р-9), measured once production
+  ran them. `GRAFANA_ADMIN_PASSWORD` and `ALERTS_BOT_TOKEN` are required lines of `.env.prod`, and
+  Grafana needs `OWNER_TELEGRAM_ID` filled. The rules of what they measure are `observability.md`;
+  `deploy/README.md`, «Metrics».
 - **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
   exists only for trying the stack on a laptop, where Docker Desktop has no journald.
 - **The database is copied every night, encrypted, off the machine** (MOL-70): `pg_dump` inside the
@@ -136,7 +148,8 @@ The shape worth knowing here:
   - **A `/fail` is three failures in four tries half a minute apart**: it raises the alarm with no
     grace, and every merge leaves the API silent for seconds — a rollout fails one or two. All four
     had to fail at first, and a site failing three requests in four passed as well (adversarial
-    Б1). Failing every second request still passes: the share of 5xx is MOL-145's, a named price.
+    Б1). Failing every second request still passes: the share of 5xx is MOL-145's alarm, not the
+    watch's.
   - **One check, one state that can last.** healthchecks.io speaks only when a check flips, and a
     certificate «expiring in 13 days» is down for days: on `molvia-up` it kept a fall of the API
     silent the whole time (Б2). An unreadable certificate is the site's matter and pings nothing.
