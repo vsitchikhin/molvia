@@ -171,4 +171,19 @@ describe('molvia/display-type-whole', () => {
       ),
     ).toEqual([])
   })
+
+  it('refuses a @forward that renames by a prefix, and takes one that does not', async () => {
+    expect(
+      await refused("@forward 'mixins' as type-*;\n@forward 'mixins' show display-type;"),
+    ).toEqual(['@forward'])
+  })
+
+  it('tells _mixins.scss by its whole path: another styles/_mixins.scss is not it', async () => {
+    const other = fileURLToPath(
+      new URL('../src/components/chart/styles/_mixins.scss', import.meta.url),
+    )
+    expect(await refused('@mixin figure-type { @include display-type; }', other)).toEqual([
+      'figure-type',
+    ])
+  })
 })

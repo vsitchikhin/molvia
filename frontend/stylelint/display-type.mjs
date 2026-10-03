@@ -15,13 +15,16 @@
 //
 // A mixin that includes the role is the role (В1), through any number of wrappers. It may be written
 // in styles/_mixins.scss alone — the one place the plugin reads when it loads, so the place a wrapper
-// can live and the place it is looked for are one (Ж2, З1); written anywhere else it is refused. Names are
+// can live and the place it is looked for are one (Ж2, З1); written anywhere else it is refused, and
+// so is `@forward … as prefix-*`, which renames the role without a `@mixin` (И1). The file is told by
+// its whole path, not by a `styles/_mixins.scss` at the end of another one (И2). Names are
 // compared as Sass compares them — a hyphen and an underscore are one character (Г1) — and found
 // however the include names them: through a namespace (`m.display-type`, Д1) or `sass:meta`
 // (`meta.apply(meta.get-mixin('display-type'))`, Д2). `sass:meta` itself is refused — a mixin kept in
 // a variable carries the role under no name at all (Е2) — and so is `@extend`, by the config (Е3).
 
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import stylelint from 'stylelint'
 
 const {
@@ -83,9 +86,9 @@ export function roleMixins(source, known = new Set(['display-type'])) {
   return roles
 }
 
-const SHARED = roleMixins(
-  readFileSync(new URL('../src/styles/_mixins.scss', import.meta.url), 'utf8'),
-)
+const MIXINS_FILE = fileURLToPath(new URL('../src/styles/_mixins.scss', import.meta.url))
+
+const SHARED = roleMixins(readFileSync(MIXINS_FILE, 'utf8'))
 
 const messages = ruleMessages(ruleName, {
   rejected: (prop) =>
@@ -95,6 +98,8 @@ const messages = ruleMessages(ruleName, {
   wrapper: (name) =>
     `${name} wraps the display role: a wrapper lives in styles/_mixins.scss only, where this check ` +
     `learns it.`,
+  forward: () =>
+    `@forward … as renames every mixin it passes, a display role among them, past this check.`,
   meta: () =>
     `sass:meta applies a mixin under any name, a display role among them, past this check. Include it.`,
 })
@@ -123,7 +128,7 @@ function rule(primary) {
       }
     }
 
-    if (!root.source?.input.file?.endsWith('/styles/_mixins.scss')) {
+    if (root.source?.input.file !== MIXINS_FILE) {
       root.walkAtRules('mixin', (mixin) => {
         const name = sassName(/^[\w-]+/.exec(mixin.params)?.[0] ?? '')
         if (roles.has(name) && !SHARED.has(name)) {
@@ -131,6 +136,12 @@ function rule(primary) {
         }
       })
     }
+
+    root.walkAtRules('forward', (forward) => {
+      if (/\sas\s/.test(` ${forward.params} `)) {
+        report({ ruleName, result, node: forward, message: messages.forward() })
+      }
+    })
 
     root.walkAtRules('use', (use) => {
       if (/sass:meta/.test(use.params))
