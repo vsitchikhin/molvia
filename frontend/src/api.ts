@@ -37,8 +37,15 @@ export function onMissingActor(told: () => void): void {
   missing = told
 }
 
-/** The last refusal any call met, and when (MOL-147, В-1). */
-let refused: { readonly code: WireCode; readonly at: number } | undefined
+/**
+ * The last refusals any call met, and when (MOL-147, В-1) — newest last. More than one, since the
+ * question is asked as of a moment past: what an error screen was shown with, after other calls may
+ * have failed meanwhile — a retry, a queue sending, a check of who we are (adversarial Н4).
+ */
+const refusals: { readonly code: WireCode; readonly at: number }[] = []
+
+/** How many are kept: far more than fail between an error shown and a tap on its link. */
+const REFUSALS_KEPT = 32
 
 /** How long a refusal stays the reason of an error screen shown after it. */
 export const REFUSAL_FRESH_MS = 60_000
@@ -56,8 +63,8 @@ export const REFUSAL_FRESH_MS = 60_000
  * one: «too many today» is not why a screen broke (В3б).
  */
 export function lastRefusal(now: number = Date.now()): WireCode | null {
-  if (refused === undefined || refused.at > now) return null
-  return now - refused.at <= REFUSAL_FRESH_MS ? refused.code : null
+  const before = refusals.findLast((refusal) => refusal.at <= now)
+  return before !== undefined && now - before.at <= REFUSAL_FRESH_MS ? before.code : null
 }
 
 type Call = (...args: never[]) => Promise<unknown>
@@ -86,7 +93,10 @@ function watching<T extends Call>(call: T, remembered: boolean): T {
     } catch (error) {
       if (error instanceof ApiError) {
         const replied = error.answered || error.status !== undefined
-        if (remembered && replied) refused = { code: error.code, at: Date.now() }
+        if (remembered && replied) {
+          refusals.push({ code: error.code, at: Date.now() })
+          if (refusals.length > REFUSALS_KEPT) refusals.shift()
+        }
         if (error.code === ERROR.NO_ACTOR) missing?.()
       }
       throw error

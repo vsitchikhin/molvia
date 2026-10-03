@@ -86,6 +86,23 @@ test('from an error screen: «Сломалось», the screen and the code go w
   ])
 })
 
+// «Повторить» first — the first thing a person does — and it fails again: the screen stays as it was,
+// and its code is still the one it was shown with, not lost to the retry's own refusal (adversarial Н1).
+test('after «Повторить» failed again the code still goes with the message', async ({ page }) => {
+  await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await signedIn(page, '/')
+  await expect(page.getByRole('alert')).toContainText('Сервер не ответил')
+  const retried = page.waitForResponse((response) => response.url().endsWith('/api/advice'))
+  await page.getByRole('button', { name: 'Повторить' }).click()
+  await retried
+  await expect(page.getByRole('alert')).toContainText('Сервер не ответил')
+
+  await page.getByRole('button', { name: 'Сообщить о проблеме' }).click()
+  const sheet = await opened(page)
+
+  await expect(sheet.locator('.attached')).toContainText('код error.internal')
+})
+
 // The answer lost on its way back, the sheet closed and opened again from the same error: the
 // message may be the server's already, and it goes again whole — the same key with what went with
 // it — so the repeat is the same number, not a 409 and a second message (adversarial В1).

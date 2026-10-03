@@ -137,6 +137,25 @@ describe('последний отказ — код экрана ошибки в 
     expect(lastRefusal()).toBe(ISSUE.BODY_INVALID)
   })
 
+  it('отвечает на момент показа ошибки, даже если после него отказали другие вызовы (adversarial Н4)', async () => {
+    vi.useFakeTimers({ now: 1_000_000, toFake: ['Date'] })
+    const { api, lastRefusal } = await freshApi()
+    advice.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    await api.advice().catch(() => undefined)
+    const shown = Date.now() + 50
+
+    // «Повторить» упал снова, потом соседний вызов — 404.
+    vi.setSystemTime(1_010_000)
+    await api.advice().catch(() => undefined)
+    vi.setSystemTime(1_020_000)
+    me.mockRejectedValue(new ApiError(ERROR.NOT_FOUND))
+    await api.me().catch(() => undefined)
+
+    expect(lastRefusal(shown)).toBe(ERROR.INTERNAL)
+    expect(lastRefusal()).toBe(ERROR.NOT_FOUND)
+    vi.useRealTimers()
+  })
+
   it('не одалживает экрану ошибки отказ самой шторки — «много за сегодня» (adversarial В3б)', async () => {
     const { api, lastRefusal } = await freshApi()
     sendFeedback.mockRejectedValue(new ApiError(ERROR.FEEDBACK_RATE_LIMITED))
