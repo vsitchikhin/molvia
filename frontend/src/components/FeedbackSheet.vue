@@ -127,7 +127,7 @@ import {
   dropFeedbackDraft,
   keepFeedbackDraft,
   recallFeedbackDraft,
-  sentFeedbackKey,
+  feedbackSent,
 } from '@/stores/feedbackDraft'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 
@@ -384,7 +384,7 @@ export default defineComponent({
         frozen.value = stored.attached
       }
       // Or sent it, and it reached the owner: this is that very message, said as sent (round 6, У1).
-      if (sentFeedbackKey(actor.id) === clientKey.value) {
+      if (feedbackSent(actor.id, clientKey.value)) {
         phase.value = 'sent'
         return
       }

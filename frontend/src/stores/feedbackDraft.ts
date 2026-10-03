@@ -27,57 +27,69 @@ export interface FeedbackDraft {
 
 const keyOf = (owner: string): string => `molvia.feedback-draft.${owner}`
 
+/** How many keys of messages sent are kept beside the draft: far more than windows of one phone. */
+const SENT_KEPT = 8
+
 function isKind(value: unknown): value is FeedbackKind {
   return (FEEDBACK_KINDS as readonly unknown[]).includes(value)
 }
 
-export function recallFeedbackDraft(owner: string | null): FeedbackDraft | null {
-  if (owner === null) return null
+/** The shelf as it lies: a draft, the keys sent, or both. */
+function stored(owner: string): Record<string, unknown> {
   try {
     const value: unknown = JSON.parse(read(keyOf(owner)) ?? 'null')
-    if (!value || typeof value !== 'object') return null
-    const { kind, text, clientKey, attached } = value as Record<string, unknown>
-    if (typeof text !== 'string' || typeof clientKey !== 'string') return null
-    const sent = feedbackAttachedSchema.safeParse(attached)
-    return {
-      kind: isKind(kind) ? kind : '',
-      text,
-      clientKey,
-      ...(sent.success ? { attached: sent.data } : {}),
-    }
+    return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {}
   } catch {
-    return null
+    return {}
+  }
+}
+
+function sentOf(value: Record<string, unknown>): string[] {
+  return Array.isArray(value.sent)
+    ? value.sent.filter((key): key is string => typeof key === 'string')
+    : []
+}
+
+function store(owner: string, draft: FeedbackDraft | null, sent: readonly string[]): void {
+  if (draft === null && sent.length === 0) forget(keyOf(owner))
+  else write(keyOf(owner), JSON.stringify({ ...draft, ...(sent.length > 0 ? { sent } : {}) }))
+}
+
+export function recallFeedbackDraft(owner: string | null): FeedbackDraft | null {
+  if (owner === null) return null
+  const { kind, text, clientKey, attached } = stored(owner)
+  if (typeof text !== 'string' || typeof clientKey !== 'string') return null
+  const sent = feedbackAttachedSchema.safeParse(attached)
+  return {
+    kind: isKind(kind) ? kind : '',
+    text,
+    clientKey,
+    ...(sent.success ? { attached: sent.data } : {}),
   }
 }
 
 /** A draft with neither a kind nor a text is no draft: it is forgotten rather than kept empty. */
 export function keepFeedbackDraft(owner: string | null, draft: FeedbackDraft): void {
   if (owner === null) return
-  if (draft.kind === '' && draft.text === '') forget(keyOf(owner))
-  else write(keyOf(owner), JSON.stringify(draft))
+  store(owner, draft.kind === '' && draft.text === '' ? null : draft, sentOf(stored(owner)))
 }
 
 /**
- * Lets go of the draft that was sent — the one under `clientKey`, not one changed after it left —
- * and leaves in its place only the key it went under. A sheet still open in another window of the app
- * holds the same text under the same key, and sent from there with what its own opening attaches it
- * met `409` and a second message (round 6, У1); an empty shelf could not tell it the draft had left,
- * since text erased or a shelf that never kept it look the same. The next draft writes over it.
+ * Notes `clientKey` among the messages sent and lets go of the draft if it is still the one sent —
+ * not one changed after it left. A sheet still open in another window of the app holds that text
+ * under that key, and sent from there with what its own opening attaches it met `409` and a second
+ * message (round 6, У1); an empty shelf could not tell it the draft had left, since text erased or a
+ * shelf that never kept it look the same. The keys are kept beside the draft, not in its place: a new
+ * draft begun in the window that sent must not wipe what the other window asks about (review 6).
  */
 export function dropFeedbackDraft(owner: string | null, clientKey: string): void {
-  if (owner !== null && recallFeedbackDraft(owner)?.clientKey === clientKey) {
-    write(keyOf(owner), JSON.stringify({ sent: clientKey }))
-  }
+  if (owner === null) return
+  const draft = recallFeedbackDraft(owner)
+  const sent = [...sentOf(stored(owner)).filter((key) => key !== clientKey), clientKey]
+  store(owner, draft?.clientKey === clientKey ? null : draft, sent.slice(-SENT_KEPT))
 }
 
-/** The key the person's last message went under, if no draft has been begun since. */
-export function sentFeedbackKey(owner: string | null): string | null {
-  if (owner === null) return null
-  try {
-    const value: unknown = JSON.parse(read(keyOf(owner)) ?? 'null')
-    const sent = (value as { sent?: unknown } | null)?.sent
-    return typeof sent === 'string' ? sent : null
-  } catch {
-    return null
-  }
+/** Whether a message went under `clientKey` from this device and reached the owner. */
+export function feedbackSent(owner: string | null, clientKey: string): boolean {
+  return owner !== null && sentOf(stored(owner)).includes(clientKey)
 }

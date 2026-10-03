@@ -12,7 +12,7 @@ import { pwaUpdateKey, NO_UPDATE } from '@/pwaUpdate'
 import { routes } from '@/router'
 import FeedbackSheet from '@/components/FeedbackSheet.vue'
 import { useActorStore } from '@/stores/actor'
-import { recallFeedbackDraft, sentFeedbackKey } from '@/stores/feedbackDraft'
+import { feedbackSent, keepFeedbackDraft, recallFeedbackDraft } from '@/stores/feedbackDraft'
 import { useFeedbackSheetStore, type FeedbackEntry } from '@/stores/feedbackSheet'
 
 const sendFeedback =
@@ -382,7 +382,7 @@ describe('the draft (MOL-147, Р-2)', () => {
     await press(sheet)
 
     expect(recallFeedbackDraft(OWNER)).toBeNull()
-    expect(sentFeedbackKey(OWNER)).toBe(sendFeedback.mock.calls[0]?.[0].clientKey)
+    expect(feedbackSent(OWNER, sendFeedback.mock.calls[0]?.[0].clientKey ?? '')).toBe(true)
     expect(sheet.get('.sent').text()).toContain(en.feedback.sent.title)
     expect(sheet.get('.spoken').text()).toBe(`${en.feedback.sent.title}. ${en.feedback.sent.body}`)
     expect(sheet.text()).not.toContain('42')
@@ -519,7 +519,7 @@ describe('another window of the app with the same draft (round 5, Т1)', () => {
     const { sheet, draft } = await drafted()
     localStorage.setItem(
       `molvia.feedback-draft.${OWNER}`,
-      JSON.stringify({ sent: draft.clientKey }),
+      JSON.stringify({ sent: [draft.clientKey] }),
     )
 
     await press(sheet)
@@ -528,11 +528,31 @@ describe('another window of the app with the same draft (round 5, Т1)', () => {
     expect(sheet.find('.sent').exists()).toBe(true)
   })
 
+  it('still knows it sent when the window that sent it has begun a new draft since (review 6)', async () => {
+    const { sheet, draft } = await drafted()
+    // The other window sent this draft, then began another message.
+    localStorage.setItem(
+      `molvia.feedback-draft.${OWNER}`,
+      JSON.stringify({ sent: [draft.clientKey] }),
+    )
+    keepFeedbackDraft(OWNER, {
+      kind: 'idea',
+      text: 'Another thought',
+      clientKey: '2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e',
+    })
+
+    await press(sheet)
+
+    expect(sendFeedback).not.toHaveBeenCalled()
+    expect(sheet.find('.sent').exists()).toBe(true)
+    expect(recallFeedbackDraft(OWNER)?.text).toBe('Another thought')
+  })
+
   it('must not take a message sent under another key for this one', async () => {
     const { sheet } = await drafted()
     localStorage.setItem(
       `molvia.feedback-draft.${OWNER}`,
-      JSON.stringify({ sent: '7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f' }),
+      JSON.stringify({ sent: ['7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f'] }),
     )
 
     await press(sheet)
