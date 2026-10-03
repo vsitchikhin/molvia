@@ -169,11 +169,22 @@
   --ease-out: cubic-bezier(0.2, 0.8, 0.3, 1);
 
   /* ── Colour · light ───────────────────────────────────────────────────── */
+
+  /* Every pair that can meet is held by tokens.test.ts, in both schemes (MOL-172): two steps of
+     different roles and a category against a role at least 0.08 apart in OKLab, a mark 3:1 and text
+     4.5:1 on its ground, a tint 0.08 from --surface (not from --sunken or --surface-2, where a
+     word tells it). A value that fails there is changed, never excused. --text-muted is for the
+     three grounds, never a tint (under 4.5:1 there). */
   --sunken: #f3e8d6; /* the page ground; cards sit on it */
   --surface: #fffaf2;
   --surface-2: #f7efe1; /* input wells, sunken rows inside a card */
   --border: #e0d3bd;
-  --border-strong: #cbbb9f;
+  --border-strong: #cbbb9f; /* decoration, and the edge of a field — never data */
+
+  /* What carries meaning without a colour of its own: an unselected bar, «Остальные», the dash of
+     «no data», the off track of a switch — 3:1 on --surface, where --border-strong is 1.8:1
+     (Ф-3). */
+  --graphic: #746258;
 
   --text: #1f1c19;
   --text-muted: #6c6152;
@@ -182,47 +193,49 @@
   --accent: #b2622d; /* non-text use only: rules, active chrome, indicators */
   --accent-solid: #8c491a; /* filled controls that carry text — 6.5:1 with --on-accent */
   --accent-ink: #8c491a; /* the accent at body-text size — 4.5:1 on --surface */
-  --accent-tint: #ffe1d0;
+  --accent-tint: #ffce8c; /* only under something pressable */
 
   --good: #5d7239;
   --good-ink: #3f4f24;
-  --good-tint: #e5efd2;
+  --good-tint: #cae5b7;
 
-  --warn: #a2761c;
-  --warn-ink: #6d4d0a;
-  --warn-tint: #f9ecc9;
+  --warn: #9d7d13;
+  --warn-ink: #533302;
+  --warn-tint: #fef4ad;
 
-  --bad: #a5352a;
+  --bad: #ab2b2a;
   --bad-ink: #742018;
-  --bad-tint: #f8ddd6;
+  --bad-tint: #f9d8d3;
 
   /* ── Categories of spending (MOL-82) ──────────────────────────────────── */
 
   /* A colour never works alone — a name stands beside it — and none is red, olive, ochre or
      terracotta: those say «плохо», «хорошо», «внимание» and «здесь можно нажать». Every one is at
      least 3:1 on --surface, for an icon and a bar; none is used for text. The thirteen presets are
-     keyed as the model keys them; one's own categories take the palette by turn (`colour` 0–7). */
+     keyed as the model keys them; one's own categories take the palette by turn (`colour` 0–7).
+     Any two can meet in one ring, so any two stand 0.07 apart, and a category keeps its hue in
+     both schemes (MOL-218, `tokens.test.ts`). */
   --cat-groceries: #2e7d73;
   --cat-cafe: #8e4f93;
-  --cat-rent: #7b5534;
+  --cat-rent: #524569;
   --cat-home: #3d6d99;
   --cat-beauty: #c4587f;
-  --cat-transport: #5a5ea6;
-  --cat-telecom: #b86f26;
-  --cat-health: #3f8f84;
-  --cat-clothes: #9a76c0;
-  --cat-pets: #2c8197;
-  --cat-leisure: #627d86;
-  --cat-documents: #7d6b94;
+  --cat-transport: #474b9b;
+  --cat-telecom: #00566d;
+  --cat-health: #64978f;
+  --cat-clothes: #a466b2;
+  --cat-pets: #1b99d1;
+  --cat-leisure: #667c8e;
+  --cat-documents: #a783af;
   --cat-other: #8e8171;
-  --cat-own-0: #1f7a8c;
-  --cat-own-1: #9b4f6e;
-  --cat-own-2: #3f7d56;
-  --cat-own-3: #6a5aa8;
-  --cat-own-4: #3f5f99;
-  --cat-own-5: #946b8f;
-  --cat-own-6: #2f8a74;
-  --cat-own-7: #6b6b6b;
+  --cat-own-0: #018ea2;
+  --cat-own-1: #675886;
+  --cat-own-2: #5d6dc1;
+  --cat-own-3: #867ed1;
+  --cat-own-4: #1e3d6b;
+  --cat-own-5: #532268;
+  --cat-own-6: #069875;
+  --cat-own-7: #034445;
 
   /* How much of the category's colour the circle under its icon carries. */
   --cat-tint-share: 15%;
@@ -248,6 +261,7 @@
   --surface-2: #2a2521;
   --border: #3b342c;
   --border-strong: #524940;
+  --graphic: #857a6c;
 
   --text: #f5ece0;
   --text-muted: #a99a87;
@@ -256,41 +270,41 @@
   --accent: #e8925a;
   --accent-solid: #e8925a; /* on a dark ground the ink is dark, so the base tone already clears AA */
   --accent-ink: #f2ad7e;
-  --accent-tint: #3a2417;
+  --accent-tint: #4f3b2e;
 
   --good: #a6c077;
   --good-ink: #bdd493;
-  --good-tint: #2a3320;
+  --good-tint: #24431a;
 
-  --warn: #dfae4f;
-  --warn-ink: #edc673;
-  --warn-tint: #372b13;
+  --warn: #daac35;
+  --warn-ink: #f7ca6a;
+  --warn-tint: #3c2900;
 
-  --bad: #e8836f;
-  --bad-ink: #f2a494;
-  --bad-tint: #3b201b;
+  --bad: #e47696;
+  --bad-ink: #f4a3b7;
+  --bad-tint: #400d25;
 
   --cat-groceries: #5fb8aa;
   --cat-cafe: #d09bd6;
-  --cat-rent: #cfa47a;
+  --cat-rent: #a486d7;
   --cat-home: #93b8de;
-  --cat-beauty: #ee98b6;
-  --cat-transport: #a7aae6;
-  --cat-telecom: #f2b57a;
-  --cat-health: #9ad8cc;
-  --cat-clothes: #c9b2ea;
-  --cat-pets: #7cc6d8;
-  --cat-leisure: #a9c1c9;
-  --cat-documents: #bfb0d6;
+  --cat-beauty: #b47592;
+  --cat-transport: #767dd2;
+  --cat-telecom: #24a7cf;
+  --cat-health: #8de1d4;
+  --cat-clothes: #edabfc;
+  --cat-pets: #8ad4fe;
+  --cat-leisure: #bec3c7;
+  --cat-documents: #e3c5eb;
   --cat-other: #b3a593;
-  --cat-own-0: #72c1d1;
-  --cat-own-1: #dc9ab5;
-  --cat-own-2: #8fcaa1;
-  --cat-own-3: #b4a8e6;
-  --cat-own-4: #9bb2e3;
-  --cat-own-5: #d1aecd;
-  --cat-own-6: #7fcfb9;
-  --cat-own-7: #b5b5b5;
+  --cat-own-0: #40c8df;
+  --cat-own-1: #a69cbe;
+  --cat-own-2: #8fa2f7;
+  --cat-own-3: #bbb5ff;
+  --cat-own-4: #7890b5;
+  --cat-own-5: #9e6bb6;
+  --cat-own-6: #60d3ae;
+  --cat-own-7: #4b9898;
   --cat-tint-share: 22%;
 
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);

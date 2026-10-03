@@ -59,6 +59,12 @@ export default defineComponent({
   @media (hover: hover) {
     &:hover {
       background: var(--accent-tint);
+
+      /* Muted text is under 4.5:1 on a tint (MOL-172); the icon and the chevron are marks, 3:1. */
+      .label,
+      .value.none {
+        color: var(--text);
+      }
     }
   }
 
