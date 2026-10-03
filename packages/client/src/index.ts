@@ -53,6 +53,8 @@ import {
   chooseRemindersSchema,
   remindersSettingSchema,
   receiptBodySchema,
+  receiptRecordBodySchema,
+  receiptRecordedCodec,
   receiptDetailCodec,
   receiptSummaryCodec,
   receiptsResponseCodec,
@@ -125,6 +127,8 @@ import type {
   SalaryShift,
   ReceiptBody,
   ReceiptDetail,
+  ReceiptRecordBody,
+  ReceiptRecorded,
   ReceiptSummary,
   ReceiptsResponse,
   SpendingAmendBody,
@@ -413,6 +417,12 @@ export interface MolviaClient {
   removeReceipt(id: string): Promise<void>
   /** «Вернуть» within ten minutes of «Удалить чек». */
   restoreReceipt(id: string): Promise<ReceiptSummary>
+  /**
+   * «Записать» (MOL-126): the whole receipt as the phone holds it, its trip named by the phone. Sent
+   * again with the same trip — the same answer; `error.receipt_recorded_before` for a receipt recorded
+   * before, `error.receipt_not_ready` for one still being read.
+   */
+  recordReceipt(id: string, body: ReceiptRecordBody): Promise<ReceiptRecorded>
   /**
    * «Счета» (MOL-115): the accounts, their totals and how many operations fell out of them. Every
    * write below answers with the page whole — which of «удалить» and «убрать» it was is the server's.
@@ -897,6 +907,12 @@ export function createClient(options: ClientOptions): MolviaClient {
 
     restoreReceipt: async (id) =>
       request(`/receipts/${segment(id)}/restore`, receiptSummaryCodec, { method: 'POST' }),
+
+    recordReceipt: async (id, body) =>
+      request(`/receipts/${segment(id)}/record`, receiptRecordedCodec, {
+        method: 'POST',
+        body: encode(receiptRecordBodySchema, body),
+      }),
 
     moneyAccounts: () => request('/money/accounts', moneyAccountsCodec),
 

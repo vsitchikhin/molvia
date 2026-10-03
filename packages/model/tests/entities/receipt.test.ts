@@ -4,8 +4,11 @@ import {
   moneyOfHundredths,
   needsReshoot,
   receiptDateOf,
+  STORE_MEMORY_KEY_MAX_OCTETS,
   receiptCityOf,
   receiptLineOf,
+  receiptMomentOf,
+  storeMemoryWords,
   receiptTimeOf,
 } from '#model/entities/receipt'
 import type { ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
@@ -175,5 +178,40 @@ describe('the city of the address (MOL-126, Р-6)', () => {
     const late = [...rows(...Array.from({ length: 15 }, () => 'ՏՆՏԵՍԱԿԱՆ')), ...rows('ԳՅՈՒՄՐԻ')]
     expect(receiptCityOf(late)).toBeNull()
     expect(receiptCityOf([{ text: 'ԳՅՈՒՄՐԻ Գորկու 62', part: 1, line: 0 }])).toBeNull()
+  })
+})
+
+describe('what the shop’s memory knows a line by (MOL-126)', () => {
+  it('knows it by the article first, then by the line’s search key', () => {
+    const words = storeMemoryWords({ printed: 'Կաթ «Իգիթ» 3.2% 1լ', sku: '1163909' })
+    expect(words.map((word) => word.kind)).toEqual(['sku', 'text'])
+    expect(words[0]?.key).toBe('1163909')
+  })
+
+  it('folds what OCR reads two ways into one key, and knows a line with no article by text', () => {
+    const [one] = storeMemoryWords({ printed: 'ԵՐԵՎԱՆ', sku: null })
+    const [other] = storeMemoryWords({ printed: 'Երեւան', sku: null })
+    expect(one).toEqual(other)
+    expect(one?.kind).toBe('text')
+  })
+
+  it('remembers nothing of a line with no letters, and no text past the key’s length', () => {
+    expect(storeMemoryWords({ printed: '— ·', sku: '' })).toEqual([])
+    // the search key folds a doubled letter, so words rather than one letter over and over
+    const long = 'կաթ '.repeat(STORE_MEMORY_KEY_MAX_OCTETS / 3)
+    expect(storeMemoryWords({ printed: long, sku: '1' })).toEqual([{ kind: 'sku', key: '1' }])
+  })
+})
+
+describe('the moment a receipt prints', () => {
+  it('is its day and time on the till’s clock, +4 in Armenia', () => {
+    expect(receiptMomentOf('2026-09-26', '19:42', 'AM')).toEqual(
+      new Date('2026-09-26T15:42:00.000Z'),
+    )
+  })
+
+  it('is none without a time a clock shows', () => {
+    expect(receiptMomentOf('2026-09-26', null, 'AM')).toBeNull()
+    expect(receiptMomentOf('2026-09-26', '25:00', 'AM')).toBeNull()
   })
 })

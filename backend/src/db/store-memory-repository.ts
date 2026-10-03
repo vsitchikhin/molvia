@@ -73,11 +73,13 @@ export function createStoreMemoryRepository(db: Conn): StoreMemoryRepository {
     },
 
     async remember(actorId, tin, words) {
-      if (words.length === 0) return
+      // one word per key, the last said: a receipt may print one article on two lines
+      const last = [...new Map(words.map((word) => [memoryKey(word), word])).values()]
+      if (last.length === 0) return
       await db
         .insert(storeMemory)
         .values(
-          words.map((word) => ({
+          last.map((word) => ({
             id: randomUUID(),
             tin,
             kind: word.kind,

@@ -134,7 +134,8 @@ export function storeMemoryWords(line: {
   const words: StoreMemoryWord[] = []
   if (line.sku !== null && line.sku !== '') words.push({ kind: 'sku', key: line.sku })
   const text = toSearchKey(line.printed)
-  if (text !== '' && new TextEncoder().encode(text).length <= STORE_MEMORY_KEY_MAX_OCTETS) {
+  // a key with no letter is a rule or a dash: every such line would be one item
+  if (/\p{L}/u.test(text) && new TextEncoder().encode(text).length <= STORE_MEMORY_KEY_MAX_OCTETS) {
     words.push({ kind: 'text', key: text })
   }
   return words
@@ -251,6 +252,23 @@ export function receiptDateOf(text: ReceiptText, latest: string): string | null 
   const day = new Date(`${text.date}T00:00:00Z`)
   if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== text.date) return null
   return text.date >= '2000-01-01' && text.date <= latest ? text.date : null
+}
+
+/** Where a country's tills keep their clocks: Armenia is at +4 the year round. */
+export const RECEIPT_UTC_OFFSET: Readonly<Record<ReceiptCountry, string>> = { AM: '+04:00' }
+
+/**
+ * The moment a receipt prints, its day and time read on the till's clock (MOL-126): what a trip
+ * recorded from it is placed by among the person's purchases. `null` without a time.
+ */
+export function receiptMomentOf(
+  day: string,
+  time: string | null,
+  country: ReceiptCountry,
+): Date | null {
+  if (time === null || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return null
+  const moment = new Date(`${day}T${time}:00${RECEIPT_UTC_OFFSET[country]}`)
+  return Number.isNaN(moment.getTime()) ? null : moment
 }
 
 /** The time a receipt prints, if it is one a clock shows: `HH:MM` (review Р12). */

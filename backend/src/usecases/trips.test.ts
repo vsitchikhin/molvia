@@ -122,6 +122,7 @@ function fakeRepositories(
   return {
     trips: {
       start: unexpected('trips.start'),
+      recordFinished: unexpected('trips.recordFinished'),
       byId: unexpected('trips.byId'),
       lock: unexpected('trips.lock'),
       latestUnfinishedFor: unexpected('trips.latestUnfinishedFor'),
@@ -268,6 +269,8 @@ function fakeRepositories(
       list: unexpected('receipts.list'),
       one: unexpected('receipts.one'),
       recordedTwin: unexpected('receipts.recordedTwin'),
+      lockForRecord: unexpected('receipts.lockForRecord'),
+      markRecorded: unexpected('receipts.markRecorded'),
       remove: unexpected('receipts.remove'),
       restore: unexpected('receipts.restore'),
       purgeStale: unexpected('receipts.purgeStale'),

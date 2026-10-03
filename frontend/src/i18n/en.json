@@ -1166,6 +1166,9 @@
     "barcode_in_store": "This is a shop's own label — such a code is not saved to the catalogue",
     "receipt_not_photo": "This is not a photo of a receipt. Take it again",
     "receipt_too_large": "The photo is too large. Take the receipt again",
+    "receipt_not_ready": "The receipt has not been read yet, so it cannot be recorded",
+    "receipt_recorded_before": "This receipt has already been recorded",
+    "receipt_in_future": "The receipt's date has not come yet",
     "feedback_rate_limited": "That is a lot of messages for today. Your text is saved — send it tomorrow"
   },
   "settings": {

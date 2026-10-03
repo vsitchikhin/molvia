@@ -9,6 +9,7 @@ import {
 } from '@molvia/model'
 import type {
   Currency,
+  Money,
   ReceiptBody,
   ReceiptFailure,
   ReceiptLine,
@@ -104,6 +105,31 @@ export interface RecordedTwin {
   readonly recordedAt: Date
 }
 
+/** A receipt taken to be recorded (MOL-126): locked until the transaction ends. */
+export interface ReceiptToRecord {
+  readonly id: string
+  readonly status: ReceiptSummary['status']
+  readonly country: ReceiptSummary['country']
+  readonly currency: Currency
+  readonly tin: string | null
+  readonly receiptNo: string | null
+  readonly printedOn: string | null
+  readonly printedTime: string | null
+  readonly total: Money | null
+  readonly city: SettingsCity | null
+  readonly tripId: string | null
+  readonly lines: StoredReceiptLine[]
+}
+
+/** What recording a receipt writes back to it (MOL-126). */
+export interface RecordedReceipt {
+  readonly tripId: string
+  /** The purchase each recorded line became. */
+  readonly expenses: readonly { readonly position: number; readonly expenseId: string }[]
+  /** Lines recorded as read: their cut-out rows are confirmed, every other one goes (В-4). */
+  readonly confirmed: readonly number[]
+}
+
 export interface ReceiptRepository {
   /** «Отправить чек»: a new receipt, or the same one sent again; anything else under its id is a 409. */
   create(actorId: string, body: ReceiptBody): Promise<{ receipt: ReceiptSummary; created: boolean }>
@@ -122,6 +148,13 @@ export interface ReceiptRepository {
     actorId: string,
     id: string,
   ): Promise<(StoredReceipt & { readonly lines: StoredReceiptLine[] }) | null>
+  /** The owner's receipt, locked for recording: `null` for a missing, removed or someone else's one. */
+  lockForRecord(actorId: string, id: string): Promise<ReceiptToRecord | null>
+  /**
+   * The receipt recorded (MOL-126): its trip and purchases, its photo deleted (Т-9 of MOL-125), the
+   * rows cut out of the lines recorded as read confirmed with the text read, every other row deleted.
+   */
+  markRecorded(id: string, recorded: RecordedReceipt): Promise<void>
   /** The person's receipt of this tax number and number, recorded as purchases still there (Т-11). */
   recordedTwin(
     actorId: string,
@@ -377,6 +410,70 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         .where(eq(receiptLines.receiptId, own))
         .orderBy(asc(receiptLines.position))
       return { ...toStored(found), lines: lines.map((line) => toLine(line, found.row.currency)) }
+    },
+
+    async lockForRecord(actorId, id) {
+      const own = idOrNull(id)
+      if (own === null) return null
+      const [row] = await db
+        .select()
+        .from(receipts)
+        .where(
+          and(
+            eq(receipts.id, own),
+            eq(receipts.actorId, actorId),
+            sql`${receipts.deletedAt} is null`,
+          ),
+        )
+        .for('update')
+      if (row === undefined) return null
+      const lines = await db
+        .select()
+        .from(receiptLines)
+        .where(eq(receiptLines.receiptId, own))
+        .orderBy(asc(receiptLines.position))
+      return {
+        id: row.id,
+        status: row.status,
+        country: row.country,
+        currency: row.currency,
+        tin: row.tin,
+        receiptNo: row.receiptNo,
+        printedOn: row.printedOn,
+        printedTime: row.printedTime,
+        total: row.totalMinor === null ? null : { minor: row.totalMinor, currency: row.currency },
+        city: row.city,
+        tripId: row.tripId,
+        lines: lines.map((line) => toLine(line, row.currency)),
+      }
+    },
+
+    async markRecorded(id, recorded) {
+      await db
+        .update(receipts)
+        .set({ status: 'recorded', recordedAt: sql`clock_timestamp()`, tripId: recorded.tripId })
+        .where(eq(receipts.id, id))
+      for (const { position, expenseId } of recorded.expenses) {
+        await db
+          .update(receiptLines)
+          .set({ expenseId })
+          .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, position)))
+      }
+      await db.delete(receiptParts).where(eq(receiptParts.receiptId, id))
+      const confirmed = sql`${receiptLineImages.position} in (${sql.join(
+        [-1, ...recorded.confirmed].map((position) => sql`${position}`),
+        sql`, `,
+      )})`
+      await db
+        .delete(receiptLineImages)
+        .where(and(eq(receiptLineImages.receiptId, id), sql`not ${confirmed}`))
+      await db
+        .update(receiptLineImages)
+        .set({
+          confirmedText: sql`${receiptLineImages.readText}`,
+          confirmedAt: sql`clock_timestamp()`,
+        })
+        .where(eq(receiptLineImages.receiptId, id))
     },
 
     async recordedTwin(actorId, tin, receiptNo, except) {

@@ -15,11 +15,11 @@ Rules: `.claude/rules/receipts.md`. A test beside its source, or mirroring it un
 ## packages/client
 
 In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to go up), `receipts`,
-`receipt`, `removeReceipt`, `restoreReceipt`.
+`receipt`, `removeReceipt`, `restoreReceipt`, `recordReceipt` (MOL-126).
 
 ## backend · routes
 
-- `backend/src/routes/receipts.ts` — Routes of receipts (MOL-125): «Отправить чек», a part as a raw JPEG (the API's one body that is not JSON, in this scope only), the list, one receipt with its lines, «Удалить чек» and «Вернуть».
+- `backend/src/routes/receipts.ts` — Routes of receipts (MOL-125): «Отправить чек», a part as a raw JPEG (the API's one body that is not JSON, in this scope only), the list, one receipt with its lines, «Удалить чек» and «Вернуть», «Записать» (MOL-126).
 
 ## backend · receipts
 
@@ -31,6 +31,7 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 
 - `backend/src/usecases/receipts.ts` — Use cases of the owner's side: send, a part checked to be a photo (`error.receipt_not_photo`, `error.receipt_too_large`), list and one with the place by tax number, one as the review shows it — the memory laid over, the amounts of В-5, a price in doubt, the rate of its day, the receipt recorded before (MOL-126) — remove, restore.
 - `backend/src/usecases/bind-receipt-lines.ts` — `bindReceiptLines`: the lines of a parsed receipt to items, once, in the queue (MOL-126) — the catalogue's names in the till's language with the heading, then the search by the gloss (near found, far «проверьте»), else a new item named by the gloss.
+- `backend/src/usecases/record-receipt.ts` — `recordReceipt`, «Записать» (MOL-126): the receipt as the phone holds it written in one transaction — a finished trip on the receipt's day at its rate, purchases, new items (MOL-12), the shop's memory, the place's tax number, the photo gone, the rows of lines recorded as read confirmed (В-4); a repeat is the same answer, a receipt recorded before a 409.
 - `backend/src/usecases/read-receipts.ts` — `readQueuedReceipts`: the queue — every part in both page modes, joined, the reading that adds up kept, «переснимите» by `needsReshoot`, item lines cut out, the city of the address read, the lines bound (MOL-126); a reader away leaves the receipt queued, a photo it cannot read fails.
 
 ## backend · db
@@ -42,6 +43,7 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 ## backend · tests
 
 - `backend/tests/receipt-review.integration.test.ts` — Integration test of the review (MOL-126): the memory's own word, majority, tie and erased vote; the memory laid over the parse; В-5 and В-1; the place by tax number and city; the receipt recorded before; the rate of the receipt's day.
+- `backend/tests/receipt-record.integration.test.ts` — Integration test of «Записать»: the trip on the receipt's day, purchases and new items, memory and the place's tax number, the photo and the rows left, «Деньги» and «Оценки», a repeat, the receipt recorded before, the refusals, the lines left out in the trip's money.
 - `backend/tests/receipts.integration.test.ts` — Integration test of receipts: sending and parts with their refusals and repeats, the queue on the bench's reading of am-05 with a fake reader, «переснимите», a reader away, removal and the 28 days, the log through the server.
 
 ## services · receipt-reader
