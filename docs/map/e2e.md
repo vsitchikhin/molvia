@@ -11,6 +11,8 @@ that area's map; here are the shell's own specs and what every run stands on.
 - `e2e/live-region.ts` — Helper: records every announcement added to the app's live region, and reads what it holds now.
 - `e2e/motion.spec.ts` — Spec with motion on: a kept month just there, a day removed shrinking once and taking its gap, no second arrival after a move or the browser's own back, the charts' answer coming in.
 - `e2e/navigation.spec.ts` — Spec: the shell in a phone browser — tabs and system «back», the nested chevron, collapsing title, safe areas, moves and focus.
+- `e2e/client-errors.spec.ts` — A failure on the phone reaches the API (MOL-144): an answer of «Что брать» off the contract, the screen's «error», `POST /client-errors` answered `204`, and neither the API's answer nor the message in the body.
+- `e2e/client-errors-built.spec.ts` — Spec in the `pwa` project, against the built app (MOL-144): a failure names its build by the page's own script and its frames are paths under `/assets`.
 - `e2e/pwa-update.spec.ts` — Spec in the `pwa` project, against the built app: a new `sw.js` brings «Update», the tap reloads onto it, nothing reloads by itself; a first visit too, alone and beside another window.
 - `e2e/scheme.spec.ts` — Spec: the device's scheme (MOL-111) — chosen against the system both ways, drawn by the head's script without the app, «Системная» one line at 320 px, another window following.
 - `e2e/scroll.ts` — Helper: stands a control a given distance below the top of the window and reads where it stands, for «the page stayed».
