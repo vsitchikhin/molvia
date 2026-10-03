@@ -64,10 +64,10 @@ services:
       OPEN_FOOD_FACTS_CONTACT: ${OPEN_FOOD_FACTS_CONTACT:-}
       # The receipt reader below (MOL-125); while it is down, receipts wait in the queue.
       RECEIPT_READER_URL: http://receipt-reader:8080
-      # Whom the bot tells of a new failure (MOL-143): the owner's Telegram id. Required as a line,
-      # as BOT_PULSE_URL is: a forgotten one would leave every failure silent and nobody would know.
-      # Empty, on purpose, keeps the failures in their table and tells nobody.
-      OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID?set OWNER_TELEGRAM_ID in .env.prod, or leave it empty to tell nobody}
+      # Whom the bot tells of a new failure (MOL-143): the owner's Telegram id, digits only. Required
+      # and filled since MOL-145 — the alarms of the metrics go to it too, so empty is no longer a way
+      # to tell nobody: compose refuses to start (review №3).
+      OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID:?set OWNER_TELEGRAM_ID in .env.prod — the failures and the alarms go to it}
       # Where `make failures` reads the phone's maps from, beside the PWA's build (MOL-144).
       APP_BASE_URL: https://${DOMAIN:?set DOMAIN}
       # `/metrics` on a port of its own (MOL-145, В-1): the metrics' network scrapes it, and Caddy,
@@ -210,6 +210,10 @@ services:
       - --whitelisted_container_labels=com.docker.compose.service
     cpus: 0.5
     mem_limit: 192m
+    # The OOM-killer is read from the kernel's log, and Debian and Ubuntu let only CAP_SYSLOG read it
+    # (`kernel.dmesg_restrict=1`): without it every OOM counts 0 in silence (review №1).
+    cap_add:
+      - SYSLOG
     devices:
       - /dev/kmsg
     volumes:
@@ -269,19 +273,27 @@ services:
       # that goes to the internet. Whom it writes is the owner the failures go to (MOL-143), put
       # into the contact point by `deploy/grafana/start.sh`.
       ALERTS_BOT_TOKEN: ${ALERTS_BOT_TOKEN:?set ALERTS_BOT_TOKEN}
-      OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID:?Grafana's alarms need OWNER_TELEGRAM_ID}
+      OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID:?set OWNER_TELEGRAM_ID in .env.prod — the failures and the alarms go to it}
+      # The alarms' pulse (adversarial А5): Grafana is the one that sends, and nothing else watched it.
+      # A rule that fires while Grafana counts and VictoriaMetrics answers pings the healthchecks.io
+      # check «molvia-alerts» every five minutes; its silence is healthchecks.io's own Telegram.
+      ALERTS_PULSE_URL: ${ALERTS_PULSE_URL:?set ALERTS_PULSE_URL — the alarms would be watched by nobody}
     mem_limit: 384m
     ports:
       # The one port of the metrics, on the machine's loopback only: `ssh -L 3000:127.0.0.1:3000`.
       - '127.0.0.1:${GRAFANA_PORT:-3000}:3000'
     volumes:
       - grafana_data:/var/lib/grafana
-    networks: [default, metrics]
+    # Its own network for the way to Telegram (review №4): in `default` it stood beside Caddy, the API,
+    # the bot and the receipt reader, which asks nobody who calls.
+    networks: [alerts, metrics]
     depends_on:
       - victoria
 
 networks:
   default: {}
+  # Grafana's alone: a way out to Telegram and healthchecks.io, and no neighbour (review №4).
+  alerts: {}
   # No way out of it: neither an exporter nor VictoriaMetrics reaches the internet (Р-7).
   metrics:
     internal: true

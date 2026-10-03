@@ -4,9 +4,11 @@
  * the dashboard and the alarms read one that something writes — a name renamed in the API turns a
  * test red rather than a panel quietly empty.
  */
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
+import { ownerTelegramIdSchema } from '@/env'
 import { httpMetrics, processMetrics } from '@/metrics'
 import { compose, services } from './compose'
 
@@ -56,15 +58,24 @@ function ruleOf(uid: string): { expr: string; evaluator: string; threshold: numb
 /** The route the photo of a receipt is sent by — its time is the phone's network, not the API (Р-3). */
 const PHOTO_ROUTE = '/receipts/:receiptId/parts/:part'
 
+/**
+ * A person's requests (adversarial А7): not a scanner's 404, not the watch's `/health`, not the bot's
+ * minute polls — a background no person asked for diluted a person's 500s and slow answers.
+ */
+const PEOPLE = 'route!~"unmatched|/health|/internal/.*"'
+
 describe('the compose file', () => {
   it('publishes no port but Caddy’s and Grafana’s on the loopback', () => {
+    // Every entry under `ports:`, quoted any way or not at all (review №2): a test that read only
+    // single quotes let `- 9090:9090` through. The long form is refused, so nothing hides in it.
     const published = [...services()].flatMap(([name, block]) =>
       [
         ...(/^ {4}ports:\n((?: {6}(?:#.*|- .*)\n)+)/m.exec(block)?.[1] ?? '').matchAll(
-          /^ {6}- '([^']+)'$/gm,
+          /^ {6}- (.+)$/gm,
         ),
-      ].map((match) => `${name} ${match[1] ?? ''}`),
+      ].map((match) => `${name} ${(match[1] ?? '').replace(/^(['"])(.*)\1$/, '$2')}`),
     )
+    expect(compose).not.toMatch(/^ {6}- (?:target|published):/m)
     expect(published).toEqual([
       'frontend ${HTTP_PORT:-80}:80',
       'frontend ${HTTPS_PORT:-443}:443',
@@ -72,16 +83,23 @@ describe('the compose file', () => {
     ])
   })
 
-  it('keeps the metrics on a network with no way out, and Grafana alone in both', () => {
+  it('keeps the metrics on a network with no way out, and Grafana on its own way out', () => {
     expect(compose).toMatch(/^ {2}metrics:\n {4}internal: true$/m)
     const networks = new Map(
       [...services()].map(([name, block]) => [name, /^ {4}networks: \[(.*)\]$/m.exec(block)?.[1]]),
     )
     for (const name of ['victoria', 'node-exporter', 'cadvisor', 'postgres-exporter'])
       expect(networks.get(name), name).toBe('metrics')
-    expect(networks.get('grafana')).toBe('default, metrics')
-    // Neither the exporters' host network nor a privileged container (Р-7, Р-8).
+    // Not `default` (review №4): beside Caddy, the API, the bot and the receipt reader, which asks
+    // nobody who calls.
+    expect(networks.get('grafana')).toBe('alerts, metrics')
+    expect(compose).toMatch(/^ {2}alerts: \{\}$/m)
+    for (const [name, joined] of networks)
+      if (name !== 'grafana') expect(joined ?? '', name).not.toContain('alerts')
+    // Neither the exporters' host network nor a privileged container (Р-7, Р-8) — cAdvisor gets the
+    // one capability it reads the OOM-killer with (review №1).
     expect(compose).not.toMatch(/network_mode: host|privileged: true/)
+    expect(services().get('cadvisor')).toMatch(/^ {4}cap_add:\n {6}- SYSLOG$/m)
   })
 
   it('scrapes the API on the port the API is given, and not through Caddy', () => {
@@ -106,6 +124,9 @@ describe('the compose file', () => {
       "GF_USERS_ALLOW_SIGN_UP: 'false'",
       "GF_AUTH_ANONYMOUS_ENABLED: 'false'",
       "GF_PLUGINS_PREINSTALL_DISABLED: 'true'",
+      "GF_PLUGINS_PUBLIC_KEY_RETRIEVAL_DISABLED: 'true'",
+      "GF_SNAPSHOTS_EXTERNAL_ENABLED: 'false'",
+      "GF_ANALYTICS_FEEDBACK_LINKS_ENABLED: 'false'",
     ])
       expect(grafana).toContain(setting)
   })
@@ -119,6 +140,51 @@ describe('the compose file', () => {
     expect(read('deploy/grafana/start.sh')).toContain('OWNER_TELEGRAM_ID')
     expect(grafana).toMatch(/^ {6}OWNER_TELEGRAM_ID: /m)
     expect(notify).not.toMatch(/"chatid": "-?\d+"/)
+  })
+
+  it('reads the owner’s id by the API’s rule in Grafana’s start too (adversarial А5)', () => {
+    // A line the API took and start.sh refused stopped Grafana — every alarm — while the API ran.
+    for (const value of ['+123456789', '123456789.0', ' 123456789', '1.23456789e8', '-1', 'abc']) {
+      expect(ownerTelegramIdSchema.safeParse(value).success, value).toBe(false)
+      const start = spawnSync(
+        'sh',
+        [fileURLToPath(new URL('../../deploy/grafana/start.sh', import.meta.url))],
+        {
+          env: { PATH: process.env.PATH, OWNER_TELEGRAM_ID: value },
+          encoding: 'utf8',
+        },
+      )
+      expect([value, start.status, start.stderr]).toEqual([
+        value,
+        1,
+        'OWNER_TELEGRAM_ID must be a Telegram id: the alarms have nobody to write to\n',
+      ])
+    }
+    expect(ownerTelegramIdSchema.parse('123456789')).toBe(123456789)
+    // The same value passes start.sh's check: what stops it then is the image's file, absent here.
+    const start = spawnSync(
+      'sh',
+      [fileURLToPath(new URL('../../deploy/grafana/start.sh', import.meta.url))],
+      {
+        env: { PATH: process.env.PATH, OWNER_TELEGRAM_ID: '123456789' },
+        encoding: 'utf8',
+      },
+    )
+    expect(start.stderr).not.toContain('must be a Telegram id')
+  })
+
+  it('pulls the metrics before anything changes but lets only the application judge a rollout (adversarial А4)', () => {
+    const deploy = read('deploy/deploy.sh')
+    expect(deploy).toContain('metrics=(victoria node-exporter cadvisor postgres-exporter grafana)')
+    expect(deploy).toMatch(/pull -q "\$\{metrics\[@\]\}" \|\|/)
+    expect(deploy).toContain(
+      'if "${compose[@]}" up -d postgres backend bot frontend receipt-reader && wait_healthy "$tag"; then',
+    )
+    expect(deploy).toMatch(/up -d "\$\{metrics\[@\]\}" \|\|/)
+    // The list is the compose file's own services of the metrics.
+    for (const name of ['victoria', 'node-exporter', 'cadvisor', 'postgres-exporter', 'grafana'])
+      expect(services().has(name), name).toBe(true)
+    expect(deploy).not.toMatch(/if "\$\{compose\[@\]\}" up -d && /)
   })
 })
 
@@ -144,6 +210,12 @@ describe('the alarms', () => {
     expect([errors.evaluator, errors.threshold]).toEqual(['gt', 0.05])
     expect(errors.expr).toContain('[5m]')
     expect(errors.expr).toContain('>= 20')
+    // The share, its denominator and the twenty are all a person's requests (adversarial А7).
+    expect(errors.expr.match(/molvia_http_requests_total\{[^}]*\}/g)).toEqual([
+      `molvia_http_requests_total{${PEOPLE},status="5xx"}`,
+      `molvia_http_requests_total{${PEOPLE}}`,
+      `molvia_http_requests_total{${PEOPLE}}`,
+    ])
 
     const slow = ruleOf('molvia-p95')
     expect([slow.evaluator, slow.threshold, slow.rule.for]).toEqual(['gt', 1, '15m'])
@@ -158,13 +230,17 @@ describe('the alarms', () => {
     expect(restart.expr).not.toMatch(/\bchanges\(/)
   })
 
-  it('leave the photo of a receipt out of p95 by a route the API still has', () => {
-    expect(ruleOf('molvia-p95').expr).toContain(`route!="${PHOTO_ROUTE}"`)
+  it('read p95 of a person’s requests, the photo of a receipt left out by a route the API still has', () => {
+    const slow = `route!~"unmatched|/health|/internal/.*|${PHOTO_ROUTE}"`
+    expect(ruleOf('molvia-p95').expr.match(/molvia_http_\w+\{[^}]*\}/g)).toEqual([
+      `molvia_http_request_duration_seconds_bucket{${slow}}`,
+      `molvia_http_requests_total{${slow}}`,
+    ])
     expect(read('backend/src/routes/receipts.ts')).toContain(`'${PHOTO_ROUTE}'`)
   })
 
   it('speak when the figures stop, as when they cross (Р-5)', () => {
-    for (const rule of rules) {
+    for (const rule of rules.filter((candidate) => candidate.uid !== 'molvia-pulse')) {
       expect([rule.uid, rule.noDataState, rule.execErrState]).toEqual([
         rule.uid,
         'Alerting',
@@ -177,6 +253,53 @@ describe('the alarms', () => {
       'lt',
       1,
     ])
+  })
+})
+
+describe('the pulse of the alarms (adversarial А5)', () => {
+  it('fires while Grafana counts and VictoriaMetrics answers, and goes nowhere but its ping', () => {
+    const pulse = ruleOf('molvia-pulse')
+    expect([pulse.expr, pulse.evaluator, pulse.threshold]).toEqual([
+      'min(up{job="victoria"})',
+      'gt',
+      0,
+    ])
+    // VictoriaMetrics down or no figure is the pulse stopping — the silence healthchecks.io tells of.
+    expect([pulse.rule.noDataState, pulse.rule.execErrState]).toEqual(['OK', 'OK'])
+
+    const config = JSON.parse(notify) as {
+      contactPoints: {
+        name: string
+        receivers: { type: string; settings: { url?: string }; disableResolveMessage: boolean }[]
+      }[]
+      policies: {
+        receiver: string
+        routes?: {
+          receiver: string
+          object_matchers: string[][]
+          repeat_interval: string
+          continue: boolean
+        }[]
+      }[]
+    }
+    const point = config.contactPoints.find((candidate) => candidate.name === 'pulse')
+    // A resolved message would ping «alive» the moment the pulse stops.
+    expect(point?.receivers).toEqual([
+      expect.objectContaining({
+        type: 'webhook',
+        settings: expect.objectContaining({ url: '$__env{ALERTS_PULSE_URL}' }) as unknown,
+        disableResolveMessage: true,
+      }),
+    ])
+    expect(config.policies[0]?.routes).toEqual([
+      expect.objectContaining({
+        receiver: 'pulse',
+        object_matchers: [['pulse', '=', 'true']],
+        repeat_interval: '5m',
+        continue: false,
+      }),
+    ])
+    expect(services().get('grafana')).toMatch(/^ {6}ALERTS_PULSE_URL: \$\{ALERTS_PULSE_URL:\?/m)
   })
 })
 

@@ -139,13 +139,22 @@ previous="$(setting IMAGE_TAG)"
 echo "deploying $tag over ${previous:-nothing}"
 
 # Pulled before anything changes: a tag the registry does not have leaves the machine as it was.
-# The metrics' images too (MOL-145), but like the reader they are not in the check of the tag, and a
-# rollback leaves them as they run: a tag from before MOL-145 has none.
-IMAGE_TAG="$tag" "${compose[@]}" pull -q backend bot frontend receipt-reader grafana victoria
+IMAGE_TAG="$tag" "${compose[@]}" pull -q backend bot frontend receipt-reader
+
+# The metrics (MOL-145) are pulled before anything changes too, the upstream exporters included, but
+# they never judge a rollout (adversarial А4): a registry's refusal — Docker Hub's limit for an
+# anonymous pull — is a warning, and they are started only once the application is healthy.
+metrics=(victoria node-exporter cadvisor postgres-exporter grafana)
+IMAGE_TAG="$tag" "${compose[@]}" pull -q "${metrics[@]}" ||
+  echo "warning: the metrics' images were not all pulled" >&2
 
 bot_before="$(bot_state || true)"
 set_tag "$tag"
-if "${compose[@]}" up -d && wait_healthy "$tag"; then
+if "${compose[@]}" up -d postgres backend bot frontend receipt-reader && wait_healthy "$tag"; then
+  # A metrics container that cannot start — Grafana's loopback port held, a device missing — is said
+  # and the rollout stands: it rolled a healthy API back when `up -d` of everything judged it (А4).
+  "${compose[@]}" up -d "${metrics[@]}" ||
+    echo "warning: the metrics did not all start — the rollout stands; see \`docker compose ps\`" >&2
   # Unused images older than a week: a deploy a day leaves three behind each time.
   docker image prune -af --filter until=168h >/dev/null || true
   echo "deployed $tag"

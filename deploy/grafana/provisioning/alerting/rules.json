@@ -121,7 +121,7 @@
               "datasourceUid": "victoria",
               "model": {
                 "refId": "A",
-                "expr": "((sum(increase(molvia_http_requests_total{status=\"5xx\"}[5m])) / sum(increase(molvia_http_requests_total[5m]))) and on() (sum(increase(molvia_http_requests_total[5m])) >= 20)) or on() vector(0)",
+                "expr": "((sum(increase(molvia_http_requests_total{route!~\"unmatched|/health|/internal/.*\",status=\"5xx\"}[5m])) / sum(increase(molvia_http_requests_total{route!~\"unmatched|/health|/internal/.*\"}[5m]))) and on() (sum(increase(molvia_http_requests_total{route!~\"unmatched|/health|/internal/.*\"}[5m])) >= 20)) or on() vector(0)",
                 "instant": true,
                 "range": false
               }
@@ -152,7 +152,7 @@
           "execErrState": "Alerting",
           "for": "0s",
           "annotations": {
-            "summary": "{{ with $values.A }}{{ humanizePercentage .Value }}{{ else }}— нет данных{{ end }} ответов API за 5 минут — 5xx. Что именно — make failures."
+            "summary": "{{ with $values.A }}{{ humanizePercentage .Value }}{{ else }}— нет данных{{ end }} ответов людям за 5 минут — 5xx. Что именно — make failures."
           },
           "labels": {},
           "isPaused": false
@@ -171,7 +171,7 @@
               "datasourceUid": "victoria",
               "model": {
                 "refId": "A",
-                "expr": "(histogram_quantile(0.95, sum by (le) (rate(molvia_http_request_duration_seconds_bucket{route!=\"/receipts/:receiptId/parts/:part\"}[5m]))) and on() (sum(increase(molvia_http_requests_total{route!=\"/receipts/:receiptId/parts/:part\"}[5m])) >= 20)) or on() vector(0)",
+                "expr": "(histogram_quantile(0.95, sum by (le) (rate(molvia_http_request_duration_seconds_bucket{route!~\"unmatched|/health|/internal/.*|/receipts/:receiptId/parts/:part\"}[5m]))) and on() (sum(increase(molvia_http_requests_total{route!~\"unmatched|/health|/internal/.*|/receipts/:receiptId/parts/:part\"}[5m])) >= 20)) or on() vector(0)",
                 "instant": true,
                 "range": false
               }
@@ -202,7 +202,7 @@
           "execErrState": "Alerting",
           "for": "15m",
           "annotations": {
-            "summary": "p95 ответа API {{ with $values.A }}{{ humanizeDuration .Value }}{{ else }}— нет данных{{ end }} дольше 15 минут (без загрузки фото чека)."
+            "summary": "p95 ответа людям {{ with $values.A }}{{ humanizeDuration .Value }}{{ else }}— нет данных{{ end }} дольше 15 минут (без загрузки фото чека, служебных запросов и 404)."
           },
           "labels": {},
           "isPaused": false
@@ -305,6 +305,58 @@
             "summary": "{{ $labels.job }} не отвечает VictoriaMetrics 5 минут: его панели и тревоги слепы."
           },
           "labels": {},
+          "isPaused": false
+        },
+        {
+          "uid": "molvia-pulse",
+          "title": "Тревоги живы",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "datasourceUid": "victoria",
+              "model": {
+                "refId": "A",
+                "expr": "min(up{job=\"victoria\"})",
+                "instant": true,
+                "range": false
+              }
+            },
+            {
+              "refId": "C",
+              "relativeTimeRange": {
+                "from": 0,
+                "to": 0
+              },
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "A",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [0]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "OK",
+          "for": "0s",
+          "annotations": {
+            "summary": "Пульс тревог: Grafana считает правила, VictoriaMetrics отвечает. Идёт на healthchecks.io, не в Telegram."
+          },
+          "labels": {
+            "pulse": "true"
+          },
           "isPaused": false
         }
       ]

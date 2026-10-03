@@ -1,11 +1,12 @@
 # The dashboard of `deploy/grafana/dashboards`, read-only (MOL-145, Р-10): a panel changed in the
-# interface is not saved — change the JSON and merge.
+# interface is not saved — change the JSON and merge. A file removed takes its dashboard with it
+# (adversarial А6): what the repository no longer has does not stay behind in `grafana_data`.
 apiVersion: 1
 providers:
   - name: molvia
     folder: Molvia
     type: file
-    disableDeletion: true
+    disableDeletion: false
     allowUiUpdates: false
     updateIntervalSeconds: 0
     options:
