@@ -60,6 +60,10 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       # Optional: empty leaves the Open Food Facts hint off (MOL-162).
       OPEN_FOOD_FACTS_CONTACT: ${OPEN_FOOD_FACTS_CONTACT:-}
+      # Whom the bot tells of a new failure (MOL-143): the owner's Telegram id. Required as a line,
+      # as BOT_PULSE_URL is: a forgotten one would leave every failure silent and nobody would know.
+      # Empty, on purpose, keeps the failures in their table and tells nobody.
+      OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID?set OWNER_TELEGRAM_ID in .env.prod, or leave it empty to tell nobody}
     depends_on:
       postgres:
         condition: service_healthy
