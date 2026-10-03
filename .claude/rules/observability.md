@@ -115,7 +115,8 @@ decisions of this task are В-1…В-5 in `.scratch/tasks/requirements/MOL-143.m
   what it is** (a 400) is the bot's failure, `owner:send` — the owner hears that something did not go.
   **The named prices:** the word lost after a send that went, the owner reads it twice; Telegram away
   longer than a day, the message is the table's alone again. **A stored notice the contract no longer
-  reads is a failure of the API's** (`job:owner-notice`, round 3 Д1): a message's is the message lost.
+  reads is a failure of the API's** (round 3 Д1), placed as the request it came in,
+  `POST /internal/owner/claim` — the claim still answers `200` with the rest (review №13): a message's is the message lost.
   So a notice's payload changes only so the stored ones still read — a field added is optional, a
   bound only widens — or the notices waiting at a rollout go with it.
   Whom to write is `OWNER_TELEGRAM_ID` in the API's environment, never in the bot and never in a
