@@ -127,19 +127,21 @@ against the code in `.scratch/tasks/status/MOL-118/v2-feedback.md` (С-1…С-12
   must lose nothing. **Its key is the content's** (Р-2): a new `clientKey` with every change of the
   kind or the text, kept beside them, so a retry after a lost answer — a reload too — is the same
   message. A draft is forgotten only if it is still the one that was sent.
-- **Once it has left, what went with it stays with the key** (adversarial В1, В2): the server holds a
-  repeat to the whole message, so the draft keeps the screen, the code, the build, the language and
-  the platform the first send carried, and the sheet shows and sends them again until the kind or
-  the text changes — reopened from another screen, after another refusal or a new build, a lost
+- **Once it has left, what went with it stays with the key** (adversarial В1, В2): the server holds
+  a repeat to the whole message, so the draft keeps the screen, the code, the build, the language
+  and the platform the first send carried, and the sheet shows and sends them again until the kind
+  or the text changes — reopened from another screen, after another refusal or a new build, a lost
   answer would otherwise meet `409` and leave the owner two messages. Before the first send, and
-  after any edit, they are the opening's (Р-6). **A refusal in the API's own words lets them go**
-  (adversarial Н2): every write is one transaction, so nothing has left, and tomorrow's message from
-  the settings must not carry today's error screen; a lost answer, a bare status and the server's own
-  `error.internal` keep them. **A `2xx` whose body did not read is sent** (round 3, Ф1): cut off on its
-  way or shaped by a newer server, the message is written — read as a failure, a retry from another
-  screen met `409` and the owner got it twice.
-  **An error screen chooses «Сломалось» for its opening only** (В4): closed untouched, the draft
-  keeps the kind the person chose.
+  after any edit, they are the opening's (Р-6). **The day's limit lets them go** (adversarial Н2,
+  round 4 П3): a repeat is looked for before the count, so a `429` says no message is held under the
+  key, and tomorrow's message from the settings must not carry today's error screen. Nothing else
+  says it — a `401` or a `400` is refused before the write and knows nothing of an earlier send
+  whose answer was lost; a `409` takes a new key. **A `201` whose body did not read is sent** (round
+  3, Ф1; round 4, П1): cut off on its way or shaped by a newer server, the message is written. Only
+  `201`, as the login trusts it (`mayHaveStarted`): a portal's own `200` page taken for «sent»
+  erased a message that never left, and a `200` is a repeat, safe to send again. **An error screen
+  chooses «Сломалось» for its opening only** (В4): closed untouched, the draft keeps the kind the
+  person chose.
 - **The button says why it waits**, inactive and focusable, in the order a person can put it right:
   the kind, the text, the day's limit, the connection; then «Отправить», «Отправляем…» (pressed once
   however often), «Повторить» after a failure, «Готово» once sent. **The limit lives while the sheet
