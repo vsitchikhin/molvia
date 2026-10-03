@@ -61,14 +61,26 @@ A till that prints no shelf price lets every swap of a line fit the line, so onl
 fifteen ordinary lines held the API for 52 s before the beam (Р14), ninety now balance in a third of a
 second. A line past its ceiling is taken as read, unsettled.
 
+**Where only the total judges, the rate the lines share helps it** (review Р20): such a till has no line
+read with no swap, so the receipt's discount rate is taken from the lines as read, and a reading off it
+costs the total a quarter of a swap more — 816,32 read as 316,32 is put right rather than another line
+«fixed» to make up the difference. Only there: as an order of a line's readings the same rate «fixed»
+am-01's right sum to fit, 66 → 65 on the bench. **What nothing can tell apart is not vouched for**: a
+swap in the tens of luma barely moves the rate, and two such fixes cost the same; the total keeps one,
+and every line it changed from its reading is unsettled — highlighted for the person to check. The
+price: the line read wrong may stay settled beside it (one wrong line in 1–3 receipts of 15 on a
+generator of such receipts, each time with a highlighted line beside it).
+
 **A long receipt's seam must be one an overlap can make** (Р7–Р9): the last article of the text so far
 that the next part has (exactly, else one digit off), where the next part holds no more articles before
 it than the text so far does, and everything after it in the text so far is in the next part too.
 Another item's near article, or the first of two bags, makes no seam; an overlap of a name row only
-joins the parts without the rows both hold. **One row of the overlap read worse in the next part** — an
-article two digits off, figures cut at its top edge (Р17) — still makes the seam when the rows right
-after it read alike in both parts; the text so far then keeps its own reading of the overlap, and the
-next part goes on after as many rows.
+joins the parts without the rows both hold. **Rows of the overlap read worse in the next part** — an
+article two digits off, figures cut at its top edge, a name lost or split in two (Р17, Р21) — still make
+the seam when one of the first part's next two rows reads alike one of the next part's next three; the
+text so far then keeps its own reading of the overlap, and the next part goes on past the rows found
+alike in it — a row cut through at the first part's foot is found nowhere and moves nothing (review 9).
+Likeness reads a row's first 80 letters, and only at the last eight articles (Р22).
 
 **What is printed at the head is checked as a calendar and a clock** (Р10, Р12, Р13): a date of
 the calendar from 2000 to the server's tomorrow, a time `HH:MM` — OCR makes up «01.01.0000», which
