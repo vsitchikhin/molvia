@@ -17,3 +17,8 @@ Rules: `.claude/rules/observability.md`. A test beside its source, or mirroring 
 - `backend/src/usecases/owner-notices.ts` — Use case «Что сказать владельцу»: the notices waiting, handed to the bot with whom to write; nothing without an owner; a stored notice the contract no longer reads is said once and dropped.
 - `backend/tests/failures-api.integration.test.ts` — Integration test of failures through a real server: a 500 by its route's template and never the address, a person's text in the driver's message nowhere, a refusal not a failure, one notice a build, none without an owner; the bot's report and the owner's claim through `/internal`.
 - `backend/tests/failures.integration.test.ts` — Integration test of the two tables: the count by fingerprint and by build, ten at once, a notice in the same transaction, the 30 days, the queue handed out once, no key to `actors`.
+
+## bot
+
+- `bot/src/failure.ts` — The bot's failures (MOL-143): `handlerOf` — the kind of update and the prefix of its button or command, never its data or sender — what is a defect and what is the weather (network, Telegram, the API's own answers), the report by kind to the API, its own failure one line of the log.
+- `bot/src/owner.ts` — The owner's notices: claimed from the API every minute as the reminders are, sent one by one in Russian, a 429 ending the run; `ownerText` writes a new failure and a count reached.

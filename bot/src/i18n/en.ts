@@ -71,4 +71,11 @@ export const en: Dictionary = {
   'remind.resumed': '🔔 Reminders are on again.',
   'remind.gone': 'Nothing to turn on: the Molvia account is gone.',
   'remind.switchFailed': 'No answer came back. Please press again in a minute.',
+  'owner.failure.new': '🔴 New failure · {source}',
+  'owner.failure.again': '🟠 {count} times in this build already · {source}',
+  'owner.failure.what': '{kind} · {place}',
+  'owner.failure.nowhere': 'no route',
+  'owner.failure.build': 'Build {build}',
+  'owner.failure.buildPrint': 'Build {build} · {fingerprint}',
+  'owner.failure.more': 'Details — make failures',
 }

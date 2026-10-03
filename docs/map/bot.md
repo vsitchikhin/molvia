@@ -25,14 +25,14 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 ## bot
 
 - `bot/src/answer.ts` — How a button press is answered, for login, erasure and the reminder alike: `settle` writes an outcome, `settleKeeping` writes one and keeps the buttons, `refuse` shows over the message, the spinner, the keyboard.
-- `bot/src/assemble.ts` — Wires the bot: per-chat `sequentialize`, the erase, rate and switch composers before the login's, and the concurrent runner with the updates it handles named, a `getUpdates` retried at a pause growing linearly, its own log off and a failure logged by kind (`telegramFailure`); `introduce` asks `getMe` before it, retried the same way.
+- `bot/src/assemble.ts` — Wires the bot: per-chat `sequentialize`, the erase, rate and switch composers before the login's, a handler's failure by kind to the log and the API (MOL-143), and the concurrent runner with the updates it handles named, a `getUpdates` retried at a pause growing linearly, its own log off and a failure logged by kind (`telegramFailure`); `introduce` asks `getMe` before it, retried the same way.
 - `bot/src/bundle.test.ts` — Test of the bot as it ships (MOL-142): builds the bundle and checks that a class esbuild renamed keeps its name — node-fetch under grammY takes a signal only from a constructor called `AbortSignal`.
 - `bot/src/env.ts` — The bot's environment: the Telegram token read alone, `BOT_API_SECRET`, the API and app addresses, the pulse URL; a refusal names variables, never values.
 - `bot/src/erase.ts` — `/delete`: one question naming what goes and what stays, «Удалить навсегда» valid for ten minutes, erasing whoever pressed.
 - `bot/src/i18n.ts` — `t()`: a bot message by key in the sender's language through `pickLocale`, with `{name}` substitution.
 - `bot/src/i18n/en.ts` — The bot's English dictionary, mirroring the Russian one key for key.
 - `bot/src/i18n/ru.ts` — The bot's Russian dictionary, every message it sends; its keys are the `Dictionary` type.
-- `bot/src/index.ts` — The bot process's entry: exits quietly without a token or secret, builds the API client with a five-second timeout, starts the reminders with the pulse, learns who the bot is, runs until stopped; a failure the runner gives up on is logged by kind and exits 1.
+- `bot/src/index.ts` — The bot process's entry: exits quietly without a token or secret, builds the API client with a five-second timeout, starts the reminders with the pulse and the owner's notices (MOL-143), learns who the bot is, runs until stopped; a failure the runner gives up on is logged by kind and exits 1.
 - `bot/src/mute.ts` — The switch in the bot (MOL-103): «Не напоминать» and «Вернуть напоминания» for whoever pressed, the outcome written with the scale kept; `my_chat_member` of a block and an unblock.
 - `bot/src/rate.ts` — A press of 1–5 under a rating reminder (MOL-101): the verdict of whoever pressed, the outcome written under the question, the scale kept with the digit marked and the switch's row with it.
 - `bot/src/pulse.ts` — The bot's pulse (MOL-142): a ping to healthchecks.io after a claim went through, while a `getUpdates` succeeded within two minutes (`hearTelegram`), at most once in five minutes by a monotonic clock, the first a minute into the process; without a URL, nothing; the URL never logged.
