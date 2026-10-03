@@ -1,10 +1,11 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
-import { defineComponent, h, ref } from 'vue'
+import { describe, expect, it, vi } from 'vitest'
+import { defineComponent, h, nextTick, ref } from 'vue'
 import { ERROR } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import AppField from '@/components/AppField.vue'
+import { LINGER_MS } from '@/composables/useAnnouncer'
 
 type Props = InstanceType<typeof AppField>['$props']
 
@@ -220,7 +221,7 @@ describe('the count of what is left (MOL-147)', () => {
     view.unmount()
   })
 
-  it('says only its marks aloud — the count coming, 100, 20 and the end — through a region there from the start', async () => {
+  it('says what is left as a mark is passed on the way down — the count coming, 100, 20, the end', async () => {
     const view = counted('')
     const region = view.get('.counter-spoken')
     expect(region.attributes('aria-live')).toBe('polite')
@@ -244,6 +245,52 @@ describe('the count of what is left (MOL-147)', () => {
       '20 characters left',
       "That's the limit: 2000 characters",
     ])
+    view.unmount()
+  })
+
+  it('says what is truly left after a paste past two marks, not the mark (adversarial Н3)', async () => {
+    const view = counted('a'.repeat(1700))
+    await view.setProps({ modelValue: 'a'.repeat(1950) })
+    expect(view.get('.counter-spoken').text()).toBe('50 characters left')
+    view.unmount()
+  })
+
+  it('must not speak when the text gets shorter: erasing is heard by the field itself', async () => {
+    const view = counted('a'.repeat(1979))
+    await view.setProps({ modelValue: 'a'.repeat(1985) })
+    expect(view.get('.counter-spoken').text()).toBe('15 characters left')
+
+    await view.setProps({ modelValue: 'a'.repeat(1979) })
+
+    expect(view.get('.counter-spoken').text()).toBe('15 characters left')
+    expect(view.get('.counter').text()).toBe('21 characters left')
+    view.unmount()
+  })
+
+  it('lets its words go after a while, or browse mode would read them as still true', async () => {
+    vi.useFakeTimers()
+    const view = counted('a'.repeat(1799))
+    await view.setProps({ modelValue: 'a'.repeat(1800) })
+    expect(view.get('.counter-spoken').text()).toBe('200 characters left')
+
+    vi.advanceTimersByTime(LINGER_MS)
+    await nextTick()
+
+    expect(view.get('.counter-spoken').text()).toBe('')
+    view.unmount()
+    vi.useRealTimers()
+  })
+
+  it('takes its marks in order, whatever share is counted', async () => {
+    const view = render(
+      { modelValue: 'a'.repeat(1955), kind: 'multiline', counterFrom: 50 },
+      {},
+      { maxlength: '2000' },
+    )
+    await view.setProps({ modelValue: 'a'.repeat(1960) })
+    expect(view.get('.counter-spoken').text()).toBe('')
+    await view.setProps({ modelValue: 'a'.repeat(1981) })
+    expect(view.get('.counter-spoken').text()).toBe('19 characters left')
     view.unmount()
   })
 
