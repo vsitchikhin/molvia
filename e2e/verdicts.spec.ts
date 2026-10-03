@@ -19,6 +19,11 @@ interface Person {
  */
 async function person(page: Page): Promise<Person> {
   const id = await signedIn(page)
+  // The home a newcomer lands on asks for the queue too, and the app remembers its answer. Asked
+  // halfway through `bought`, it remembered one purchase of two, and «Оценки» opened on that one —
+  // the card on screen is kept when the fresh answer comes, on purpose — so the newest was not
+  // first (MOL-143, CI flake). The purchases start once the home has asked.
+  await page.waitForLoadState('networkidle')
   const headers = await asBrowser(page)
 
   return {
