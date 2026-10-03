@@ -65,6 +65,11 @@
   --weight-medium: 600;
   --weight-bold: 700;
 
+  /* Everything set in Nunito — titles, sums, figures that answer the screen — is this one weight
+     (MOL-171, Ф-7): 700 and 400 never meet it. Only the display-type mixin uses it, so Onest, which
+     has no 800, never asks for it. */
+  --weight-display: 800;
+
   /* ── Space ────────────────────────────────────────────────────────────── */
   --space-1: 0.25rem;
   --space-2: 0.5rem;

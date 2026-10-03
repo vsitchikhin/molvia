@@ -11,6 +11,14 @@
   min-width: var(--touch-target);
 }
 
+/// A title, a sum, a figure that answers the screen: Nunito, always at its one weight (MOL-171, Ф-7).
+/// The face and the weight come together, so a display role cannot be set without its weight — the
+/// linter allows --font-display and --weight-display nowhere else.
+@mixin display-type {
+  font-family: var(--font-display);
+  font-weight: var(--weight-display);
+}
+
 /// The target device is a phone; anything wider is the exception, so it is opt-in.
 @mixin wider-than-phone {
   @media (width >= 40rem) {
