@@ -210,15 +210,15 @@ export async function tellOwner(
       continue
     }
     if (notice.kind === 'feedback' || notice.kind === 'feedback_continued') {
-      const pictures = notice.pictures ?? 0
-      if (pictures > 0) {
+      let missed: number[] = []
+      if ((notice.pictures ?? 0) > 0) {
         const went = await sendPictures(api, telegram, to, notice, sent.message_id, {
           wait,
           pauseMs,
           deadline,
         })
         // Cut off: the notice goes again whole — the text twice, the price of a lost mark (Р-5).
-        if (went === 'cut') {
+        if (went.outcome === 'cut') {
           if (deadline?.aborted) {
             console.error(
               `[molvia] owner: stopping, ${String(notices.length - index)} notices given up`,
@@ -227,8 +227,15 @@ export async function tellOwner(
           }
           continue
         }
+        // A flood ends the run as it does on a text (review 4): the rest would meet the same 429.
+        if (went.outcome === 'flood') {
+          const left = notices.length - index - 1
+          if (left > 0) console.error(`[molvia] owner: 429 flood, ${String(left)} notices given up`)
+          return
+        }
+        missed = went.missed
       }
-      await saySent(api, notice.number, deadline)
+      await saySent(api, notice.number, missed, deadline)
     }
   }
 }
@@ -243,8 +250,9 @@ function pictureCaption(position: number, count: number, thread: number): string
  * so the owner's reply to a picture finds the thread as a reply to the notice does (MOL-167, Р-5).
  * The phone's JPEG goes as a file, a person's Telegram photo by its id: not forwarded, no sender
  * shown. A picture Telegram refuses, or one no longer there, is the log's and the rest go on: a
- * notice that could never go whole would be handed for good. `cut` — the connection broke or the stop
- * ran out of time, and nothing is said to have gone.
+ * notice that could never go whole would be handed for good — but it is `missed`, and the API does not
+ * mark it sent (adversarial А4). `cut` — the connection broke or the stop ran out of time, and
+ * nothing is said to have gone; `flood` — Telegram's 429, which ends the run.
  */
 async function sendPictures(
   api: MolviaBotClient,
@@ -253,10 +261,15 @@ async function sendPictures(
   notice: FeedbackNotice | FeedbackContinuedNotice,
   replyTo: number,
   { wait, pauseMs, deadline }: { wait: Wait; pauseMs: number; deadline?: AbortSignal | undefined },
-): Promise<'sent' | 'cut'> {
+): Promise<
+  | { readonly outcome: 'sent'; readonly missed: number[] }
+  | { readonly outcome: 'cut' }
+  | { readonly outcome: 'flood' }
+> {
   const count = notice.pictures ?? 0
+  const missed: number[] = []
   for (let position = 1; position <= count; position++) {
-    if (!(await wait(pauseMs))) return 'cut'
+    if (!(await wait(pauseMs))) return { outcome: 'cut' }
     let picture
     try {
       picture = await api.feedbackPicture(notice.number, position, deadline)
@@ -265,10 +278,11 @@ async function sendPictures(
         `[molvia] owner picture: ${error instanceof ApiError ? error.code : 'unexpected'}`,
       )
       reportDefect(api, error, 'owner:picture')
-      return 'cut'
+      return { outcome: 'cut' }
     }
     if (picture === null) {
       console.error('[molvia] owner picture: gone before it was sent')
+      missed.push(position)
       continue
     }
     const photo =
@@ -294,12 +308,16 @@ async function sendPictures(
     } catch (error) {
       console.error(`[molvia] owner picture: ${telegramFailure(error)}`)
       reportDefect(api, error, 'owner:picture')
-      if (deadline?.aborted) return 'cut'
-      if (error instanceof GrammyError && error.error_code !== 429) continue
-      return 'cut'
+      if (deadline?.aborted) return { outcome: 'cut' }
+      if (error instanceof GrammyError && error.error_code === 429) return { outcome: 'flood' }
+      if (error instanceof GrammyError) {
+        missed.push(position)
+        continue
+      }
+      return { outcome: 'cut' }
     }
   }
-  return 'sent'
+  return { outcome: 'sent', missed }
 }
 
 /**
@@ -310,10 +328,15 @@ async function sendPictures(
 async function saySent(
   api: MolviaBotClient,
   message: number,
+  missed: readonly number[],
   deadline?: AbortSignal,
 ): Promise<void> {
   try {
-    await api.ownerNoticesSent([message], deadline)
+    await api.ownerNoticesSent(
+      [message],
+      deadline,
+      missed.map((position) => ({ message, position })),
+    )
   } catch (error) {
     console.error(
       `[molvia] owner notice sent: ${error instanceof ApiError ? error.code : 'unexpected'}`,

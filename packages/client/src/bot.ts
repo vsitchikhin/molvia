@@ -63,7 +63,11 @@ export interface MolviaBotClient {
    * The notices about these messages went to the owner (MOL-148): they are not handed again. Until
    * this is said, the API hands them again ten minutes on.
    */
-  ownerNoticesSent(messages: readonly number[], signal?: AbortSignal): Promise<void>
+  ownerNoticesSent(
+    messages: readonly number[],
+    signal?: AbortSignal,
+    missed?: readonly { readonly message: number; readonly position: number }[],
+  ): Promise<void>
   /**
    * A text written to the bot as a reply to one of its messages (MOL-148): the API says what it was
    * — the owner's reply, a person's word in a thread — or `404`, nothing of ours.
@@ -146,8 +150,11 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
         body: body.data,
       })
     },
-    ownerNoticesSent: async (messages, signal) => {
-      const body = ownerNoticesSentSchema.safeParse({ messages })
+    ownerNoticesSent: async (messages, signal, missed) => {
+      const body = ownerNoticesSentSchema.safeParse({
+        messages,
+        ...(missed === undefined || missed.length === 0 ? {} : { missed }),
+      })
       if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'messages')
       await request('/internal/owner/sent', z.undefined(), {
         method: 'POST',

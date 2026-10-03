@@ -542,6 +542,14 @@ describe('tellOwner — снимки после уведомления (MOL-167,
 
     expect(made.filter((call) => call.method === 'sendPhoto')).toHaveLength(2)
     expect(ownerNoticesSent.mock.calls.map((call) => call[0] as unknown)).toEqual([[42], [43]])
+    // Gone or refused, a picture went to nobody: the API is told, and does not mark it sent (А4).
+    expect(ownerNoticesSent.mock.calls.map((call) => call[2] as unknown)).toEqual([
+      [{ message: 42, position: 1 }],
+      [
+        { message: 43, position: 1 },
+        { message: 43, position: 2 },
+      ],
+    ])
     expect((api.reportFailure as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toMatchObject({
       handler: 'owner:picture',
     })
@@ -561,5 +569,38 @@ describe('tellOwner — снимки после уведомления (MOL-167,
 
       expect(ownerNoticesSent).not.toHaveBeenCalled()
     }
+  })
+})
+
+describe('tellOwner — 429 на снимке кончает прогон, как на тексте (ревью 4)', () => {
+  it('следующее уведомление не отправляется, «ушло» не сказано', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const made: string[] = []
+    const bot = new Bot('42:TEST', { botInfo: { id: 42 } as UserFromGetMe })
+    const transformer: Transformer = (_prev, method) => {
+      made.push(method)
+      if (method === 'sendPhoto') {
+        return Promise.resolve({ ok: false, error_code: 429, description: 'flood' }) as never
+      }
+      return Promise.resolve({ ok: true, result: { message_id: 7 } }) as never
+    }
+    bot.api.config.use(transformer)
+    const ownerNoticesSent = vi.fn<MolviaBotClient['ownerNoticesSent']>(() => Promise.resolve())
+    const api = {
+      claimOwnerNotices: vi.fn(() =>
+        Promise.resolve({
+          to: OWNER,
+          notices: [{ ...MESSAGE, pictures: 1 }, CONTINUED],
+        }),
+      ),
+      ownerNoticesSent,
+      feedbackPicture: vi.fn(() => Promise.resolve({ source: 'phone' as const, jpeg: '/9j/2Q==' })),
+      reportFailure: vi.fn(() => Promise.resolve()),
+    } as unknown as MolviaBotClient
+
+    await tellOwner(api, bot.api, noWait)
+
+    expect(made).toEqual(['sendMessage', 'sendPhoto'])
+    expect(ownerNoticesSent).not.toHaveBeenCalled()
   })
 })
