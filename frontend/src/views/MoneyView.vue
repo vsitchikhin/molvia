@@ -190,10 +190,12 @@
     <!-- Wherever there is something to write it into, a slow answer and a broken server included
          (review Т-6), and offline on a month never read while another month names the categories. -->
     <template v-if="canWrite && phase !== 'idle'" #docked>
-      <AppButton ref="addButton" size="large" block @click="compose()">
-        <template #icon><IconPlus /></template>
-        {{ t('spending.summary.add') }}
-      </AppButton>
+      <div class="add">
+        <AppButton ref="addButton" size="large" block @click="compose()">
+          <template #icon><IconPlus /></template>
+          {{ t('spending.summary.add') }}
+        </AppButton>
+      </div>
     </template>
 
     <SpendingSheet
@@ -484,6 +486,11 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The dock keeps no padding of its own above or below: the screen's row does (as «Покупки»). */
+.add {
+  padding: var(--space-3) 0;
+}
+
 .content {
   display: flex;
   flex-direction: column;
