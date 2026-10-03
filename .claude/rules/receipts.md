@@ -6,9 +6,10 @@ paths:
   - 'packages/model/tests/contracts/receipt.test.ts'
   - 'backend/src/receipts/**'
   - 'backend/src/routes/receipts.ts'
-  - 'backend/src/usecases/{receipts,read-receipts}.ts'
-  - 'backend/src/db/receipts-repository.ts'
-  - 'backend/tests/receipts.integration.test.ts'
+  - 'backend/src/usecases/{receipts,read-receipts,bind-receipt-lines,record-receipt}.ts'
+  - 'backend/src/db/{receipts,store-memory}-repository.ts'
+  - 'backend/src/catalogue-seed-nodes.ts'
+  - 'backend/tests/{receipts,receipt-review,receipt-record}.integration.test.ts'
   - 'services/receipt-reader/**'
 ---
 
@@ -120,6 +121,100 @@ are thousandths. A float is a ratio that ranks candidates, never money.
 files in the reader, and join when their currencies do (MOL-89). Every alphabet at once is slower and
 mixes the scripts.
 
+## What a line is (MOL-126)
+
+**A line finds its item in five steps, the first that answers deciding** (MOL-114's order, approved
+30.09.2026): the shop's memory by the till's article («0401/**1163909**»); the shop's memory by the
+line as printed; the catalogue's names in the till's language, the customs heading printed on the line
+ruling out what the line cannot be (`createLineMatcher`); the catalogue search by the line's gloss;
+nothing — a new item named by the gloss. The answer's `match` is the handoff's four: `memory`,
+`search`, `weak` («проверьте») and `new`. The memory and a sure search are not told apart — the
+person's one action is to check and correct — and `weak` is a search found far (`near = false`, MOL-124
+В-4) or an item chosen by the heading alone.
+
+**The names and the search are found once, in the queue; the memory on every reading** (Р-1). A search
+with its meaning costs tens of milliseconds a line, nothing in the background and a second on every
+opening of a receipt; the memory changes with every receipt recorded, and the second receipt of a shop
+must know what the first taught without anything read again. Hence no `revision` on the wire: the
+record carries the whole receipt as the phone holds it (Р-4), and nothing the server suggested since is
+written in silently.
+
+**The matcher is MOL-114's `dict-match.mjs`, ported without improvements** (Р-7): on the bench's 152
+lines it gives the prototype's item and gloss line for line, in the seed's order and by name alike
+(`.scratch/tasks/status/MOL-126/parity.mjs`) — so the figure measured on receipts its rules never saw,
+54 of 70, still holds. The nodes come by name bytewise, so a tie is decided the same on every database.
+A change of a rule is measured as the parse's are.
+
+**An item is a node** (owner, 30.09.2026): barcodes (MOL-99), the shops' articles (the memory), customs
+headings (`item_hs`) and names in the countries' languages (`item_names`) all lead to it. **The names
+and headings are the seed's alone** (`catalogue-seed-nodes.ts`, Р-8), written blind during MOL-114:
+nobody types an Armenian name, and the memory learns what the seed lacks. They are not the person's
+search: it reads `items.name` as before.
+
+**The gloss is the dictionary of till words, in Russian** (`till-words-ru.ts`): the catalogue's
+language, so the search asks it whatever the receipt's; it is shown only on a receipt read out in
+Russian, and a receipt in English shows the line as printed (Т-3).
+
+## The shops' memory (MOL-126)
+
+**The memory is shared** (owner, 30.09.2026; it was personal, Р-2 of the epic): «1163909 at "Ереван
+Сити" is milk» is a fact about the shop, not about the person. A row is one person's word on one key —
+the article, or the line by its search key for a till that prints none (Dog City) — and is read so:
+**the person's own word first; else the item most people said, the later on a tie** (Р-2). One
+stranger's word is already the memory: a poisoned word is a line the person sees on the review, and a
+threshold would lose the first receipt of every shop.
+
+**Recording writes the person's word on every line recorded**, over their earlier one; a line left out
+teaches nothing. The price kept is the shelf price of a line recorded as read, the memory's argument
+where a figure reads two ways — «60 60» for «50 50» adds up either way — and it is a hint, never a
+correction (В-1): a price one confused digit off the remembered is `rememberedPrice` on the line, «
+проверьте», and the parse's figures stay as read. Putting the price into the parse is a change of the
+parse, measured on the bench, and is not done here.
+
+**Nobody's word is shown as someone's**: the answer is an item and, in doubt, a price — never who or
+when. Erasure leaves a word without its author, still counted, as an item outlives its author (MOL-58);
+the copy carries the person's own words.
+
+**There is no path for «a purchase's item changed later» yet** — a purchase's patch is its quantity and
+amount (`expensePatchSchema`). The memory is rewritten by the next receipt recorded at the shop; the
+change of an item, when it comes, writes the person's word as recording does.
+
+## Recording (MOL-126)
+
+**«Записать» is the whole receipt in one transaction** (`recordReceipt`): a trip finished on the
+receipt's day — not «today», and never the open trip — at the rate of that day by the trip's own rule
+(`tripRateOn`: the person's own, else the official one of that day, MOL-73's rule); the purchases with
+their own sums; new items through `createUnlessNamed` (MOL-12), one name on two lines one item; the
+person's words to the memory; the receipt's tax number to the place, if it has none — never rewritten;
+the photo deleted; the receipt `recorded`. The server works every figure out itself, the phone's are not
+trusted: the unit price is the purchase's own, and the lines are every line of the receipt once.
+
+**The trip's money is what was paid** (В-3): the printed total when it was read — the lines left out and
+those OCR lost included — else every line, a line left out at what it would have been recorded at
+(В-5). A purchase keeps what was paid for its line; the line's discount stays on the line and is shown
+beside the purchase (Р-9).
+
+**A trip from a receipt is dated by the receipt's day for «Деньги» and the accounts alike**: the rule
+that a `started_on` a day before the server's start is a wrong clock does not hold for a day the server
+checked when it wrote the receipt (`money-accounts-repository`). A receipt of a week ago is a purchase
+of a week ago.
+
+**The same trip sent again is the same answer, another trip a 409** — the phone names the trip, as every
+write offline (MOL-24). **The same receipt recorded before is refused** (Т-11,
+`error.receipt_recorded_before`): its seller's tax number and number, the person's, while its purchases
+are there — a trip removed lets it be recorded again. A receipt with no number is held by its id alone.
+
+**What a line is recorded at, before the person corrects it** (MOL-124 В-5, П-2, `receipt-sum.ts`): a
+line that adds up — what was paid; one that does not — the printed sum where the printed total confirms
+it, else quantity × price. Quantity × price is rounded half up to the digits the receipt prints — none
+when every amount on it is whole — once: 0,742 kg × 1 290 = 957,18 is 957 on a receipt of whole drams.
+The phone calls these very functions on the review (В-6 of MOL-124).
+
+**The place is found by the seller's tax number in a city** (Р-6): the one its address prints, if it is
+a city of the settings — «ԳՅՈՒՄՐԻ Գորկու 62» at the start of a row of the head, never «ԵՐԵՎԱՆ-ՍԻԹԻ»,
+the chain's name — else the person's own. «Ереван Сити» of Gyumri and of Yerevan are two places of one
+number; two of one name in one city are one place by the rule of `places`.
+
 ## «Переснимите» (В-4)
 
 A receipt fails as `reshoot` when no item line was read; or the total was read and the lines make up
@@ -188,12 +283,12 @@ not would otherwise be refused for good. Whether the data decodes is the reader'
 
 ## What lives how long
 
-| What                   | How long                                                                                       |
-| ---------------------- | ---------------------------------------------------------------------------------------------- |
-| A removed receipt      | ten minutes of «Вернуть», then the minute timer (П-8, as MOL-73)                               |
-| A receipt not recorded | 28 days after it arrived, whole (В-3) — by the server's clock, not the phone's                 |
-| The photo              | until the receipt is recorded (MOL-126 deletes it; the timer holds the promise if it does not) |
-| An item line cut out   | 28 days after the receipt is recorded (owner, 02.10.2026)                                      |
+| What                   | How long                                                                                        |
+| ---------------------- | ----------------------------------------------------------------------------------------------- |
+| A removed receipt      | ten minutes of «Вернуть», then the minute timer (П-8, as MOL-73)                                |
+| A receipt not recorded | 28 days after it arrived, whole (В-3) — by the server's clock, not the phone's                  |
+| The photo              | until the receipt is recorded: recording deletes it; the timer holds the promise if it does not |
+| An item line cut out   | 28 days after the receipt is recorded, and only a line recorded as read (В-4)                   |
 
 **Cut-out lines are item rows only** — a line's figures, and its name row only between two items:
 right below the figures of the one before, and with the item's number read on it — one or two digits
@@ -201,8 +296,11 @@ and then a letter, never a date or a phone (Р16, Р19). The first item's name r
 head is above it, and OCR reads a stray digit at the edge. A table gives its heading row only. Never
 the head where a customer's name is printed, never the total (review А5, А6): above the first item
 whose name OCR lost stands the head — the VAT, a buyer — and a table's last row runs on into a total
-whose word OCR misread. They are cut when the receipt is read, since the boxes are the reading's;
-recording writes the text a person confirmed (MOL-126).
+whose word OCR misread. They are cut when the receipt is read, since the boxes are the reading's.
+**Recording confirms the rows of a line recorded as read** (В-4, owner, 03.10.2026) — it added up, and
+neither its quantity nor its sum was changed — with the text read; every other row goes. The person
+never types Armenian letters, so «the text confirmed» is the text read, and a row whose figures were
+corrected would teach the reader its own mistake: a wrong label is worse than none.
 
 ## Privacy
 

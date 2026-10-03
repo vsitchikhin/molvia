@@ -30,7 +30,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   — they carry no foreign key, so no cascade reaches them — and the owner, adding one to
   `erasures` for the week they appeared (MOL-91). Catalogue items the
   person added stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
-  nulled (MOL-100), and **every place stays** (owner's decision 24.09.2026). People erase
+  nulled (MOL-100), the words they gave the shops' memory stay with `actor_id` nulled and still count
+  (MOL-126: a fact about the shop, never shown as anyone's), and **every place stays** (owner's decision 24.09.2026). People erase
   themselves through **two doors and one function**: `/delete` in the bot, and since MOL-94
   «Удалить мои данные» in the settings' group «Ваши данные», under «Скачать мои данные» (owner's
   decision В-2: the copy is one row above it). The second is `DELETE /actors/me` in the guarded
@@ -81,8 +82,9 @@ The detail behind the privacy lines of `CLAUDE.md`.
   it with `information_schema.columns`; a key alone would have let a new note on an exchange miss
   the copy in silence. A table that goes with the person through another — a version of an exchange, a
   purchase of a trip — is found by walking the graph of foreign keys, never across a key that lets
-  go (`ON DELETE SET NULL`: `items.created_by` and `item_barcodes.added_by` — the item and the code are
-  the catalogue's, and so are the tables under them; `item_barcodes` is listed by hand). A fully filled life holds each field of the file
+  go (`ON DELETE SET NULL`: `items.created_by`, `item_barcodes.added_by` and `store_memory.actor_id` —
+  the item, the code and the shop's memory are everyone's, and so are the tables under them;
+  `item_barcodes` and `store_memory` are listed by hand). A fully filled life holds each field of the file
   non-empty in some row, so a column mapped to the wrong field shows, and **every `…Id` in the file
   finds its row in the file** — found by walking the fields, not by a list, so a new reference
   without a section or a name in `catalogue` fails by itself (adversarial review 1, 2; review 11,

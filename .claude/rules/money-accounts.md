@@ -32,7 +32,9 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   earlier of the server's start and the device's finish — or a trip begun offline in the evening and
   delivered after midnight took the next day (owner's decision В-6, review Р2-3). A device's finish
   more than a day before the server's start is a wrong clock, not an evening offline, and the server's
-  day stands (adversarial Ж1). The month of
+  day stands (adversarial Ж1). **A trip recorded from a receipt is dated by the receipt's day**
+  (MOL-126): the server checked that day when it wrote the receipt, so a week-old receipt moves its
+  account a week back rather than today, as a wrong clock would. The month of
   «Деньги» still dates it by the finish. **The price, named** (adversarial Е2): a trip continued on
   later days moves its account on its first day, and one begun before an account's start and
   continued after it is history whole — the start line is drawn once, when the account is made. One loading of all four kinds (`operations`) feeds the balance,
