@@ -156,7 +156,10 @@ a screenshot with it MOL-167 (В-1…В-5, Р-1…Р-13 in `.scratch/tasks/requi
   holds that very message, pictures and all — the sheet says «sent» and lets the draft go, never «Не
   получилось» and a second message. Changed since, a `409` is the phone's own defect again. **The
   price**: a message sent without its pictures under a new key after one of them already left with
-  them is a second message. A picture the API refused is
+  them is a second message. And two windows pressing «Отправить» within one upload (adversarial,
+  round 4): the window that lost the pictures may write the message without them first, and the one
+  sending them meets a `409` it cannot read as «sent» — its «Повторить» is a second message, with the
+  pictures. Two windows and two presses in seconds, the second under «Снимки не сохранились». A picture the API refused is
   said under the pictures, never as a failure of the message. **The pictures go with the message
   sent, the sheet open or not** (adversarial А1): kept, the next message opened with a screenshot
   already sent, one kind away from sending it again. **«Another message» is the key's**, for the draft
