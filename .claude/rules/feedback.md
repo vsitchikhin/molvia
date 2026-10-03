@@ -105,18 +105,27 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
   channel (`owner_notices`, `observability.md`), queued in the transaction of the write, only where
   `OWNER_TELEGRAM_ID` is set, and never for a repeat. **It names its message by `feedback_id`** and
   goes with it — erased with the person, purged with the thread's year (Р-5); unclaimed, it is not
-  dropped after a day as a failure's is. Going with the person, it is theirs to the copy too: every
+  dropped after a day as a failure's is, and it is handed again until the bot says it went
+  (`observability.md`, adversarial В1). Going with the person, it is theirs to the copy too: every
   column of `owner_notices` is left out there with its reason — what it holds of them is the message,
   in `feedback` word for word. A message written before MOL-148 has none (Р-13).
 - **The owner's reply and the person's answer to it are the bot's** (`bot.md`), and the API decides
   which a text is (`feedbackFromBot`). **The reply lies under the person's latest word in the thread**
   — that is what the owner answers — and «от 3 октября» is that word's day in the person's country's
   zone (Р-3). **A continuation is a message of its thread**: the thread's kind and language, no screen,
-  platform or page build, the form's day limit, and a key made of the chat and the Telegram message,
-  so an update Telegram hands over twice is written once (Р-7). It is found by the message the reply
+  platform or page build, the form's day limit, and a key made of the chat, the reply answered and
+  the words — so an update Telegram hands over twice, or the same word sent again after the bot said
+  «ответьте ещё раз», is written once (Р-7, adversarial В3). It is found by the message the reply
   went out as — `feedback_replies.telegram_message_id`, looked for only beside the person (В-2).
-- **A reply's outcome is the bot's word after the send** (Р-4): `sent` with that message, or
-  `blocked`; empty is «unknown». `gone` is not a value: a message gone has no reply to mark.
+- **A reply's outcome is the bot's word after the send** (Р-4): `sent` with that message, `blocked`,
+  or `failed` — Telegram refused it otherwise, and it never reached the person nor keeps the thread
+  alive (adversarial В4); empty is «unknown». `gone` is not a value: a message gone has no reply to
+  mark. **A reply carries its thread** (`thread_id`, adversarial В5 of MOL-148): a continuation
+  answers a reply of its own thread only — not another thread of the same person, or `purgeStale`
+  took a fresh word with the old thread — by `(in_reply_to, actor_id, thread_key)`, `thread_key` the
+  generated `coalesce(thread_id, id)` of every message.
+- **The quote of a reply in «Продолжение» is one line** (`feedbackQuote`): a second line of the
+  reply read as the person's own words under it.
 
 ## The sheet and its two ways in
 
