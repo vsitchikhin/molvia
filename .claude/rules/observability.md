@@ -214,8 +214,8 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   was too few for a mobile operator's address, which thousands of phones share (adversarial А6) — and
   two hundred from everybody, the whole body refused past it with `429`, which the phone keeps its
   buffer through. The address is the one Caddy names last in `X-Forwarded-For`, believed only from
-  inside, **an IPv6 one by its `/56`** (review №2, adversarial Б4: one home connection has 2^64 in
-  its `/64`, and a flat's router is given a `/56`), the limit's key and
+  inside, **an IPv6 one by its `/48`** (review №2, adversarial Б4, В2: one home connection has 2^64 in
+  its `/64`, a flat's router is given a `/56`, and a free tunnel a whole `/48`), the limit's key and
   nothing else — in no log, in no table. **The channel can be silenced, not flooded** — the price,
   named: someone sending from many addresses takes the minute's two hundred, and the real phones'
   reports wait for the next start or `online`.
@@ -225,20 +225,28 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   minute; and a cap shared by everybody alone was spent by ten invented reports at the start of an
   hour, and the real failure after a rollout was told to nobody. The sender is the limit's key, the
   network, in memory alone. **What is held back is counted, never queued, and told by the minute
-  timer once the hour has room** (`failure_muted`, «🔕 Скрыто уведомлений о сбоях телефона: M»,
-  review №7) — not with the next failure, which may never come. The table counts all of them. **The
-  price, named:** a restart starts the hour over and forgets what was held — and a rollout is a
-  restart. **The API's and the bot's go first** (adversarial А5): the
+  timer at most once an hour, past the cap** (`failure_muted`, «🔕 Скрыто уведомлений о сбоях
+  телефона: M», review №7, round 3 В2) — not with the next failure, which may never come, and not when
+  the cap has room, which seven networks keeping it full never leave; it also says how many new
+  fingerprints the hour's rows had no room for. **The price, named:** seven networks — seven IPv4
+  addresses, seven `/48` — silence the names of the phone's new failures for an hour; the table keeps
+  them and the owner hears «скрыто M» every hour. Never silenced would take another bot: the phone's
+  failures one message a minute, with no cap. A restart starts the hour over and forgets what was
+  held — and a rollout is a restart. **The API's and the bot's go first** (adversarial А5): the
   claim hands them out before the phone's, and the reporter writes them first and keeps fifty of its
   two hundred places at most for the phone's — a stream of invented failures while the database was
   slow filled the queue, and the API's own was the log's alone. **The price, named:** past four in
   flight and fifty waiting, a burst of different new failures of phones is dropped with a warning —
   a real burst that wide is the app broken everywhere, and the first fifty say it.
-- **The phone adds at most a hundred new rows an hour** (`phoneRowBudget`, review №6): a fingerprint
-  is all the phone's words, so every invented report could be a new row — two hundred a minute, kept
-  thirty days and copied every night, a disk's worth. Past the hour a known fingerprint still counts
-  and a new one is not written, with a warning: some 72 000 rows in thirty days at most. The nightly
-  copy keeps the table: what is in it is bounded now.
+- **The phone adds at most ten new rows an hour from one sender and a thousand from everybody**
+  (`phoneRowBudget`, review №6, №8): a fingerprint is all the phone's words, so every invented report
+  could be a new row — two hundred a minute, kept thirty days and copied every night, a disk's worth.
+  Past the budget a known fingerprint still counts and a new one is not written, with a warning, and
+  the hour's summary says how many. A hundred shared by everybody alone was spent by two addresses in
+  two minutes, and every real new failure after a rollout was written nowhere for the hour
+  (adversarial В1). A place is taken before the write and given back if the row was there: four
+  writes run at once. **The price, named:** a hundred networks fill the hour; some 720 000 rows in
+  thirty days at most. The nightly copy keeps the table: what is in it is bounded.
 - **The scanner's worker carries no model** (`barcodes.md`), so its failure travels to the page as
   the error's name, message and stack and is described there by the one rule (Р-11) — the message
   never leaves the phone; a throw it did not catch is `WorkerError` at its file, line and column.
