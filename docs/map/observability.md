@@ -22,6 +22,10 @@ Rules: `.claude/rules/observability.md`. A test beside its source, or mirroring 
 - `backend/tests/client-errors.integration.test.ts` — Integration test of `POST /client-errors` (MOL-144): taken with no session and with a stranger's cookie, a row of `phone` with the page's build and platform, the owner's notice naming them; a message, a frame with the page's address or an origin, a User-Agent, an empty or too large batch refused; twenty a minute from an address, a forged header from outside not believed, the address in neither the log nor the table.
 - `backend/tests/failures.integration.test.ts` — Integration test of the two tables: the count by fingerprint and by build, ten at once, a notice in the same transaction, the 30 days, the queue handed out once, no key to `actors`.
 
+## frontend
+
+- `frontend/src/failures.ts` — The phone's own failures (MOL-144): whether a failure is the phone's (`phoneDefect` — not an API's word, not the weather), the kind and frames in one shape with no message, the screen, the page's build by its script's name (`pageBuild`) and the platform; one a failure a page, kept on the device up to twenty until there is an answer, sent at once, at start and on `online`; `reportFailure` is the call every catch makes.
+
 ## bin
 
 - `bin/failures.sh` — Script behind `make failures [LIMIT=20]`: the latest failures in this copy's database; the line for production in its header.

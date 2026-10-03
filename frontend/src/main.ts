@@ -9,7 +9,10 @@ import { installSheetEntryGuard } from '@/composables/useSheetHistory'
 import { installColorScheme } from '@/composables/useColorScheme'
 import { sessionEnded, useActorStore } from '@/stores/actor'
 import { forgetTheInviteDoor } from '@/stores/identity'
-import { onMissingActor, onServerVersion } from '@/api'
+import { api, onMissingActor, onServerVersion } from '@/api'
+import { installFailureReports, pageBuild } from '@/failures'
+import { platformLine } from '@/platform'
+import { useLoginStore } from '@/stores/login'
 import { forget, read, writeOwn } from '@/stores/storage'
 import { NO_UPDATE, holdsTyping, installPwaUpdate, pwaUpdateKey } from '@/pwaUpdate'
 import '@/styles/main.scss'
@@ -47,6 +50,32 @@ onServerVersion((version) => {
   update.serverVersion(version)
 })
 
+// The phone's own failures go to the API's table (MOL-144), from before the first route on: the
+// login screen breaks before there is a session. The screen is a route's name — `login` behind the
+// door, `start` until the app is mounted, since the door's store must not be raised by a failure.
+let mounted = false
+const failures = installFailureReports({
+  origin: window.location.origin,
+  build: pageBuild(import.meta.url, import.meta.env.PROD),
+  platform: () => platformLine(),
+  screen: () => {
+    if (!mounted) return 'start'
+    const route = router.currentRoute.value
+    if (useLoginStore().closed && route.meta.public !== true) return 'login'
+    return typeof route.name === 'string' ? route.name : 'start'
+  },
+  send: (body) => api.reportClientErrors(body),
+})
+window.addEventListener('error', (event) => {
+  failures.report(event.error, 'window')
+})
+window.addEventListener('unhandledrejection', (event) => {
+  failures.report(event.reason, 'rejection')
+})
+window.addEventListener('online', () => {
+  void failures.flush()
+})
+
 const app = createApp(App)
 
 // `index.html` ships `lang="ru"`, which is right until the app boots and wrong the moment the
@@ -59,10 +88,11 @@ applyDocumentLang()
 installColorScheme()
 
 // Nothing swallows a render error otherwise, and on a phone at a shelf a blank screen
-// is indistinguishable from a slow one. The console is the honest destination until
-// there are users worth reporting to a service about.
+// is indistinguishable from a slow one. The console for whoever has it open, and the API's table
+// for the owner (MOL-144).
 app.config.errorHandler = (error, _instance, info) => {
   console.error('[molvia]', info, error)
+  failures.report(error, 'vue')
 }
 
 app.use(createPinia()).use(router).use(i18n)
@@ -88,6 +118,9 @@ void settleColdStart(router)
     installHeightHold(router)
     installSheetEntryGuard(router)
     app.mount('#app')
+    mounted = true
+    // What an earlier launch caught with no connection goes now.
+    void failures.flush()
 
     // Raised right after the first paint rather than before it: the store carries the four
     // states a screen shows, so a person gets «loading» instead of a blank page while the
