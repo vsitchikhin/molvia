@@ -75,11 +75,23 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the handoff checked chosen pairs and missed more than it named, among them the light `graphic` 0.071 from `good`
   and the dark tints of accent and warn 0.030; a value that fails is changed. «Any two steps of
   different roles» is one rule rather than a list of pairs, since a tint against another role's mark
-  passes by lightness alone. Categories among themselves are not held (owner's В-1): 36 light and 62
-  dark pairs stand closer, and a name beside the dot tells them apart until MOL-218 measures which
-  meet in one donut. `--graphic` is the colour of data without one of its own; `--border-strong` is
+  passes by lightness alone. `--graphic` is the colour of data without one of its own; `--border-strong` is
   decoration and the edge of a field (Ф-3: `--border` there was 1.29:1 on the well). The math —
   WCAG luminance and Ottosson's OKLab — is the test's own thirty lines, no dependency.
+- **Any two categories stand 0.07 apart, and a category keeps its hue in both schemes** (MOL-218,
+  the same test). **Every pair, not a list** (owner's В-1): the ring orders its sectors by sum, not by
+  category, so its neighbours change from month to month; every account has all thirteen presets; and
+  a dot in the legend is matched against the whole ring. Before it 36 light and 62 dark pairs stood
+  closer than 0.08 — one's own colours were made as twins of the presets, «Транспорт» and «своя-3»
+  0.018 apart in the dark. **0.07, not the roles' 0.08** (owner's В-2): with seven presets kept
+  («Продукты», «Кафе», «Аренда», «Дом», «Красота», «Связь», «Прочее») and the dark colour the same hue
+  as the light, the measured ceiling is 0.074; 0.08 everywhere would have repainted all twenty-one. A
+  role's colour is a meaning, where a mistake is a wrong answer; a category's always has its name
+  beside it. **One hue within 10° OKLCH** in both schemes, so a category is one colour by day and by
+  night; a grey (chroma under 0.04 in either) has no hue to keep. The hues stay off the roles' —
+  green «Брать», yellow, brick, terracotta — which the test cannot see and the eye checks, as with the
+  olive «своя-2» of MOL-172. The palette was searched for in `.scratch/tasks/status/MOL-218/`, not by
+  hand; a colour changed later goes through the test, and a new one is looked for the same way.
 - **Nunito is one weight, 800, one file per subset** (MOL-171): the 400 and 600 files were the same
   variable font copied twice, and the precache fetched each URL. A sentence in a figure's place
   («Рынка нет» on the rate chart) is set in Onest, not Nunito at another weight.

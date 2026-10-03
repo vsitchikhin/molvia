@@ -312,8 +312,8 @@ never data, never status, never decoration. A chart series is `text` or `graphic
 good, warn, bad, `graphic` — and every category against every step of a role stand at least 0.08
 apart in OKLab, in both schemes; a mark and a category are 3:1 on `surface`, text 4.5:1 on its ground.
 `frontend/src/styles/tokens.test.ts` holds every pair, with no list of exceptions: a value that fails
-is changed, never excused (MOL-172). Categories among themselves are not held yet (MOL-218): today a
-name beside the colour tells two close ones apart.
+is changed, never excused (MOL-172). Any two categories stand at least 0.07 apart and a category keeps
+its hue in both schemes (MOL-218): the ring orders its sectors by sum, so any two may meet.
 
 **The Graphic Is Data Rule.** Anything that carries meaning — an unselected bar, the "Остальные"
 sector, the "no data" dash, the off track of a switch — is drawn in `graphic`, at least 3:1 on
