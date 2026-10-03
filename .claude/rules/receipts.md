@@ -45,26 +45,30 @@ honest figure is the one on receipts the rules never saw.
 | a line read untouched before the receipt's rate (Р5); the seam of parts (Р7–Р9) | 66, the same                                                                               |
 | **refused:** a discount without decimals taking no shelf price (Р4)             | 63 — OCR splits «86,9» into «86 9» (am-02), and the greedy group of the prototype reads it |
 
-**The search for a line's figures has a ceiling** (review, MOL-125): it grows as a power of the digits
-OCR can confuse in every field, and it runs in the API's process — twelve glued twelve-digit lines
-held every request for half a minute. A line past `LINE_COMBINATIONS_MAX` (200 000), or past what is
-left of `READING_COMBINATIONS_MAX` (500 000 a reading), is taken as read, unsettled. The bench's worst
-line tries 55 176 and its busiest reading 122 161 (am-03); the worst case now costs about half a
-second. **Every line may try `LINE_COMBINATIONS_FLOOR` (10 000) whatever the reading spent** (Р15):
-rows of an item's shape above the list — a stamp, a smudge — would otherwise drain the budget, and every
-real line would keep its confusions.
+**Every search of the parse has a ceiling, measured in time** (review 2, 8, Р14, Р15, Р18): it runs in
+the API's process, and every request waits while it does. On the review's worst shapes a reading now
+costs about half a second at most, and the bench reads the same.
 
-**The search against the total is bounded too** (Р14): a till that prints no shelf price lets every
-swap of a line fit the line, and the readings multiply by dozens a line — fifteen ordinary lines held
-the API for 52 s. The search carries the cheapest `RECONCILE_STATES_MAX` (2 000) readings from line to
-line and stops past `RECONCILE_STEPS_MAX` steps, the lines then keeping their first reading as when no
-total was read; thirty such lines balance in under a second, and the bench reads the same.
+| Ceiling                                                              | What it bounds                                                                                                                                                          | The bench uses                          |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `LINE_COMBINATIONS_MAX` 200 000                                      | the readings tried for one line's figures                                                                                                                               | 55 176 (am-03)                          |
+| `READING_COMBINATIONS_MAX` 300 000                                   | all lines of a reading                                                                                                                                                  | 122 161 (am-03)                         |
+| `LINE_COMBINATIONS_FLOOR` 10 000 of `FLOOR_COMBINATIONS_MAX` 200 000 | what a line may try once the reading's budget is spent — junk above the list drains it (Р15) without buying seconds with hundreds of rows (Р18)                         | —                                       |
+| `RECONCILE_STATES_MAX` 300                                           | the readings the search against the total carries from line to line: the cheapest, and at one cost the one whose sum with the lines ahead lands nearest the total (П11) | 9 732 carried, the same answer with 300 |
+| `RECONCILE_STEPS_MAX` 500 000                                        | the search against the total; past it the lines keep their first reading                                                                                                | 94 445 (am-03)                          |
+
+A till that prints no shelf price lets every swap of a line fit the line, so only the total judges:
+fifteen ordinary lines held the API for 52 s before the beam (Р14), ninety now balance in a third of a
+second. A line past its ceiling is taken as read, unsettled.
 
 **A long receipt's seam must be one an overlap can make** (Р7–Р9): the last article of the text so far
 that the next part has (exactly, else one digit off), where the next part holds no more articles before
 it than the text so far does, and everything after it in the text so far is in the next part too.
 Another item's near article, or the first of two bags, makes no seam; an overlap of a name row only
-joins the parts without the rows both hold.
+joins the parts without the rows both hold. **One row of the overlap read worse in the next part** — an
+article two digits off, figures cut at its top edge (Р17) — still makes the seam when the rows right
+after it read alike in both parts; the text so far then keeps its own reading of the overlap, and the
+next part goes on after as many rows.
 
 **What is printed at the head is checked as a calendar and a clock** (Р10, Р12, Р13): a date of
 the calendar from 2000 to the server's tomorrow, a time `HH:MM` — OCR makes up «01.01.0000», which
@@ -153,9 +157,10 @@ not would otherwise be refused for good. Whether the data decodes is the reader'
 | The photo              | until the receipt is recorded (MOL-126 deletes it; the timer holds the promise if it does not) |
 | An item line cut out   | 28 days after the receipt is recorded (owner, 02.10.2026)                                      |
 
-**Cut-out lines are item rows only** — a line's figures, and its name row only when the item's number
-was read on it — one or two digits and then a letter, never a date or a phone (Р16); a table's heading
-row only. Never the head where a customer's name is printed, never
+**Cut-out lines are item rows only** — a line's figures, and its name row only between two items:
+right below the figures of the one before, and with the item's number read on it — one or two digits
+and then a letter, never a date or a phone (Р16, Р19). The first item's name row is never cut: the head
+is above it, and OCR reads a stray digit at the edge. A table gives its heading row only. Never the head where a customer's name is printed, never
 the total (review А5, А6): above the first item whose name OCR lost stands the head — the VAT, a
 buyer — and a table's last row runs on into a total whose word OCR misread. They are cut when the
 receipt is read, since the boxes are the reading's; recording writes the text a person confirmed

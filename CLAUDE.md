@@ -427,8 +427,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **«Переснимите» is «too little read»** (`needsReshoot`, В-4) — never «the total did not match» alone.
 - **The reader away leaves a receipt queued; a photo it drops goes to the end with its attempt
   counted; a photo it cannot read fails** — never lost, never read forever; people read in turn.
-- **Every search of the parse has a ceiling** — a line's, a reading's, the total's
-  (`*_COMBINATIONS_*`, `RECONCILE_*`): it runs in the API's process.
+- **Every search of the parse has a ceiling, measured in time** — a line's, a reading's, the
+  total's (`*_COMBINATIONS_*`, `RECONCILE_*`): it runs in the API's process; half a second at worst.
 - **A photo lives until the receipt is recorded, a receipt not recorded 28 days, a cut-out item line
   28 days after recording** (В-3); **photos never enter the nightly copy** (В-2), never the log.
 
