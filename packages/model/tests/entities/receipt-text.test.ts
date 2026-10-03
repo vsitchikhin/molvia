@@ -520,3 +520,110 @@ describe('the beam keeps the reading the total asks for (review П11)', () => {
     expect(got.lines.map((line) => line.sumHundredths)).toEqual(truth)
   })
 })
+
+// Review round 4 of MOL-125.
+describe('two fixes of one digit the total cannot tell apart (review Р20)', () => {
+  const lines = (figures: readonly string[], total: string) =>
+    parse(
+      [
+        ...figures.map((f, i) => `${String(i + 1)}. item\n0401/116300${String(i)} 1Հտ ${f}`),
+        `Ընդամենը ${total}`,
+      ].join('\n'),
+    )
+
+  it('the rate the lines share chooses: 816,32 read as 316,32 is put right, not another line', () => {
+    const got = lines(
+      [
+        '2197,44/230,73',
+        '1430,72/150,23',
+        '1146,56/120,39',
+        '316,32/85,71',
+        '344,00/36,12',
+        '248,00/26,04',
+        '1517,76/159,36',
+        '1186,88/124,62',
+        '1856,96/194,98',
+        '1359,68/142,77',
+      ],
+      '12104.32',
+    )
+    expect(got.balanced).toBe(true)
+    expect([got.lines[3]!.sumHundredths, got.lines[9]!.sumHundredths]).toEqual([81_632, 135_968])
+  })
+
+  it('where nothing chooses — a swap in the tens of luma — the line the total changed is not vouched for', () => {
+    // 1 000,55 read as 1 000,65; 3 000,60 read right: «6 → 5» in either line meets the total
+    const got = lines(['1000,65/105,00', '2000,00/210,00', '3000,60/315,00'], '6001.15')
+    expect(got.balanced).toBe(true)
+    expect(got.lines.some((line) => !line.settled)).toBe(true)
+  })
+})
+
+describe('the seam with two blemishes in the overlap, or a cut row at the first part’s foot (review Р21, 9)', () => {
+  const rows = (am05 as Fixture).readings[0]!.split('\n')
+  const first = rows.slice(0, rows.findIndex((row) => row.startsWith('0809/016189')) + 1).join('\n')
+  const second = rows
+    .slice(rows.findIndex((row) => row.startsWith('9.Յոգուրտ')))
+    .map((row) => row.replace('0809/016189', '0809/046139'))
+  const joined = (part2: readonly string[]) =>
+    parseReceiptText(mergeParts([rowsOf(first, 0), rowsOf(part2.join('\n'), 1)]))
+  const whole = parse((am05 as Fixture).readings[0]!).lines.map((line) => line.sku)
+
+  it('item 10’s name lost at the next part’s top edge as well', () => {
+    expect(
+      joined(second.filter((row) => !row.startsWith('10,Դեղձ'))).lines.map((l) => l.sku),
+    ).toEqual(whole)
+  })
+
+  it('item 10’s name split into two rows there', () => {
+    const split = second.flatMap((row) =>
+      row.startsWith('10,Դեղձ') ? ['10,Դեղձ', '(հայկական) կգ'] : [row],
+    )
+    expect(joined(split).lines.map((l) => l.sku)).toEqual(whole)
+  })
+
+  it('a row cut through at the first part’s foot takes no name from the next part', () => {
+    const got = parseReceiptText(
+      mergeParts([
+        rowsOf(
+          [
+            '1.Կաթ',
+            '0401/1163909 2Հտ 740 370',
+            '2.Հաց սպիտակ',
+            '1905/1234567 1Հտ 300 300',
+            '~—— .,.',
+          ].join('\n'),
+          0,
+        ),
+        rowsOf(
+          [
+            '0401/1163909 2Հտ 740 370',
+            '2.Հաց սպիտակ',
+            '1905/1299967 1Հտ 300 300',
+            '3.Պանիր Լոռի',
+            '0406/7654321 1Հտ 2100 2100',
+          ].join('\n'),
+          1,
+        ),
+      ]),
+    )
+    expect(got.lines.map((line) => line.printed)).toEqual(['Կաթ', 'Հաց սպիտակ', 'Պանիր Լոռի'])
+  })
+})
+
+describe('rows of a thousand letters after the articles (review Р22)', () => {
+  it('cost a seam no more than its first eighty letters', () => {
+    let seed = 1
+    const letter = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return 'ԱԲԳԴԵԶԷԸ'.charAt((seed >> 16) % 8)
+    }
+    const long = () => Array.from({ length: 700 }, letter).join('')
+    const articles = Array.from({ length: 200 }, (_, i) => `0401/${String(1_100_000 + i * 37)}`)
+    const part1 = [...articles.map((a) => `${a} x\n${long()}`), '0401/9999999 x'].join('\n')
+    const part2 = articles.map((a) => `${a} x\n${long()}`).join('\n')
+    const started = performance.now()
+    mergeParts([rowsOf(part1, 0), rowsOf(part2, 1)])
+    expect(performance.now() - started).toBeLessThan(1_000)
+  })
+})

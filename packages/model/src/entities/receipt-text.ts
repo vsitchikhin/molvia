@@ -216,6 +216,27 @@ function mode(values: readonly number[]): number | null {
 
 const off = (a: number, rate: number): number => Math.round(Math.abs(a - rate) * 1000)
 
+/**
+ * The rate the lines as read share, for the total to choose by (review Р20): a till that prints no
+ * shelf price has no line read with no swap — its price is worked out — so `settle` has no rate to
+ * order by, and two fixes of one digit cost the total the same. The lines with their fewest swaps
+ * still say the rate, and a fix that leaves a line off it costs a little more there. Only there: as
+ * an order of a line's readings it «fixed» am-01's right sum to fit (65 of 162 on the bench).
+ */
+function asReadRate(all: readonly Candidate[][]): number | null {
+  return mode(
+    all
+      .flatMap((list) => {
+        const fewest = Math.min(...list.map((x) => x.swaps))
+        return list.filter((x) => x.swaps === fewest).slice(0, 1)
+      })
+      .map((x) => Math.round(x.rate * 1000) / 1000),
+  )
+}
+
+// What a reading off the rate the lines share costs the total beyond its swaps.
+const OFF_RATE_COST = 0.25
+
 function settle(all: Candidate[][]): Candidate[][] {
   const clean = all
     .flatMap((list) => list.filter((x) => x.swaps === 0).slice(0, 1))
@@ -256,6 +277,8 @@ interface State {
   readonly pick: Candidate | null
   readonly prev: State | null
   readonly blank: number
+  // another reading of the same cost reached the same sum: the total cannot tell which (review Р20)
+  readonly tied: boolean
 }
 
 /**
@@ -290,16 +313,18 @@ function reconcile(
   lists: readonly Candidate[][],
   total: number | null,
   printed: readonly string[],
-): { picks: (Candidate | null)[]; balanced: boolean } {
+  rate: number | null,
+): { picks: (Candidate | null)[]; balanced: boolean; tied: boolean } {
   const first = lists.map((list) => list[0] ?? null)
-  if (total === null || !Number.isFinite(total)) return { picks: first, balanced: false }
+  if (total === null || !Number.isFinite(total))
+    return { picks: first, balanced: false, tied: false }
 
   // what the lines after each one come to as first read: a reading whose sum with them lands nearer
   // the total is kept before another of the same cost when the beam is full (review П11)
   const ahead = lists.map((_, i) =>
     lists.slice(i + 1).reduce((sum, list) => sum + (list[0]?.paid ?? 0), 0),
   )
-  const start: State = { sum: 0, cost: 0, pick: null, prev: null, blank: -1 }
+  const start: State = { sum: 0, cost: 0, pick: null, prev: null, blank: -1, tied: false }
   let states = new Map<string, State>([['0|false', start]])
   let steps = 0
   for (const [i, list] of lists.entries()) {
@@ -309,12 +334,20 @@ function reconcile(
       const key = `${String(state.sum)}|${String(state.blank >= 0)}`
       const was = next.get(key)
       if (was === undefined || state.cost < was.cost) next.set(key, state)
+      else if (state.cost === was.cost && !was.tied) next.set(key, { ...was, tied: true })
     }
     for (const state of states.values()) {
       if (steps > RECONCILE_STEPS_MAX) break
       if (list.length === 0) {
         if (state.blank < 0) {
-          put({ sum: state.sum, cost: state.cost + 4, pick: null, prev: state, blank: i })
+          put({
+            sum: state.sum,
+            cost: state.cost + 4,
+            pick: null,
+            prev: state,
+            blank: i,
+            tied: state.tied,
+          })
         }
         continue
       }
@@ -326,14 +359,19 @@ function reconcile(
         if (sum > total) continue
         put({
           sum,
-          cost: state.cost + x.swaps + (k > 0 ? 0.5 : 0),
+          cost:
+            state.cost +
+            x.swaps +
+            (k > 0 ? 0.5 : 0) +
+            (rate !== null && off(x.rate, rate) > 5 ? OFF_RATE_COST : 0),
           pick: x,
           prev: state,
           blank: state.blank,
+          tied: state.tied,
         })
       }
     }
-    if (steps > RECONCILE_STEPS_MAX) return { picks: first, balanced: false }
+    if (steps > RECONCILE_STEPS_MAX) return { picks: first, balanced: false, tied: false }
     states =
       next.size > RECONCILE_STATES_MAX
         ? new Map(
@@ -359,8 +397,8 @@ function reconcile(
     if (ok && (best === null || state.cost < best.cost)) best = state
   }
   return best === null
-    ? { picks: first, balanced: false }
-    : { picks: picksOf(best), balanced: true }
+    ? { picks: first, balanced: false, tied: false }
+    : { picks: picksOf(best), balanced: true, tied: best.tied }
 }
 
 const ITEM = /^\s*(\d{1,2})\s*[.,]?\s*(\S.*)$/
@@ -549,10 +587,13 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
         : candidates(budget, f.qtyS, f.paidS, f.discS, f.priceS),
     ),
   )
-  const { picks, balanced } = reconcile(
+  // the shared rate counts in the total's choice only where `settle` had none to order by
+  const shared = lists.some((list) => list.some((x) => x.swaps === 0)) ? null : asReadRate(lists)
+  const { picks, balanced, tied } = reconcile(
     lists,
     total,
     found.map((f) => (f.plain !== null ? f.plain.join('') : f.paidS).replace(/\D/g, '')),
+    shared,
   )
   // what the total leaves goes to the one line with no reading only when the lines met the total —
   // otherwise «the rest» is a guess, and a line that took it would cover a receipt barely read
@@ -572,7 +613,9 @@ function cardReceipt(rows: readonly TextRow[]): ReceiptText {
       priceHundredths: finite(pick?.price ?? (f.priceS === null ? null : hundredthsOf(f.priceS))),
       sumHundredths: finite(pick?.paid ?? blankSum ?? hundredthsOf(f.paidS)),
       discountHundredths: finite(pick?.disc ?? hundredthsOf(f.discS)),
-      settled: pick !== null,
+      // when the total could not tell two fixes apart, a line it changed from its reading is not
+      // vouched for: highlighted for the person to check (review Р20)
+      settled: pick !== null && !(tied && pick !== lists[i]?.[0]),
       rows: f.rows,
     }
   })
@@ -804,9 +847,13 @@ interface Seam {
 }
 
 // How alike two rows read: 1 for the same text, 0 for nothing in common (Levenshtein over the longer).
+// Only the start of a row counts (review Р22): a row of a thousand letters — a picture read as text —
+// made one seam cost seconds, and a till's row is under a hundred.
+const LIKENESS_CHARS = 80
+
 function likeness(a: string, b: string): number {
-  const x = a.replace(/\s+/g, '')
-  const y = b.replace(/\s+/g, '')
+  const x = a.replace(/\s+/g, '').slice(0, LIKENESS_CHARS)
+  const y = b.replace(/\s+/g, '').slice(0, LIKENESS_CHARS)
   if (x === '' || y === '') return 0
   let previous = Array.from({ length: y.length + 1 }, (_, k) => k)
   for (let i = 1; i <= x.length; i++) {
@@ -826,8 +873,24 @@ function likeness(a: string, b: string): number {
 // The rows of an overlap read twice look alike even where OCR read one of them worse.
 const ALIKE = 0.7
 
-function rowAfter(rows: readonly TextRow[], at: number): string {
-  return rows.slice(at + 1).find((row) => row.text.trim() !== '')?.text ?? ''
+/**
+ * How far either part's rows after a seam are looked through for one read alike in the other: the
+ * first part's next two, the next part's next three — the overlap repeats them, one perhaps lost or
+ * split in two at the next part's top edge (review Р21).
+ */
+const SEAM_ROWS_MINE = 2
+const SEAM_ROWS_THEIRS = 3
+
+/** The last articles of the text so far a loose seam is looked for at: the overlap is at its end. */
+const LOOSE_SEAM_TRIES = 8
+
+// The non-empty rows after `at`, by their place.
+function rowsAfter(rows: readonly TextRow[], at: number, count: number): number[] {
+  const found: number[] = []
+  for (let k = at + 1; k < rows.length && found.length < count; k++) {
+    if ((rows[k]?.text.trim() ?? '') !== '') found.push(k)
+  }
+  return found
 }
 
 function seamOf(
@@ -846,14 +909,33 @@ function seamOf(
     const later = theirs.slice(j + 1)
     const kept = mine.slice(i + 1).every((m) => later.some((t) => near(m.article, t.article)))
     if (kept) return { mine: a.at, theirs: b.at, loose: false }
-    // one row of the overlap read worse in the next part — an article two digits off, figures cut at
-    // its top edge (review Р17): the rows right after the seam still say it is the overlap, while two
-    // bags of one article have different items after them
-    if (likeness(rowAfter(rows, a.at), rowAfter(next, b.at)) >= ALIKE) {
-      return { mine: a.at, theirs: b.at, loose: true }
-    }
+    // rows of the overlap read worse in the next part — an article two digits off, figures cut at its
+    // top edge, a name lost or split (review Р17, Р21): rows right after the seam still read alike in
+    // both parts, while two bags of one article have different items after them
+    if (i < mine.length - LOOSE_SEAM_TRIES) continue
+    const ours = rowsAfter(rows, a.at, SEAM_ROWS_MINE)
+    const theirsAfter = rowsAfter(next, b.at, SEAM_ROWS_THEIRS)
+    const alike = ours.some((k) =>
+      theirsAfter.some((q) => likeness(rows[k]?.text ?? '', next[q]?.text ?? '') >= ALIKE),
+    )
+    if (alike) return { mine: a.at, theirs: b.at, loose: true }
   }
   return null
+}
+
+/**
+ * Where the next part goes on after a loose seam: past the rows of the overlap the text so far keeps
+ * — each found read alike a little ahead in the next part. A row of the first part found nowhere is
+ * its bottom edge cut through, or a row the next part lost, and moves nothing (review 9).
+ */
+function pastOverlap(rows: readonly TextRow[], seam: Seam, next: readonly TextRow[]): number {
+  let from = seam.theirs + 1
+  for (const k of rowsAfter(rows, seam.mine, rows.length)) {
+    const ahead = rowsAfter(next, from - 1, SEAM_ROWS_THEIRS)
+    const q = ahead.find((at) => likeness(rows[k]?.text ?? '', next[at]?.text ?? '') >= ALIKE)
+    if (q !== undefined) from = q + 1
+  }
+  return from
 }
 
 export function mergeParts(parts: readonly (readonly TextRow[])[]): TextRow[] {
@@ -861,15 +943,8 @@ export function mergeParts(parts: readonly (readonly TextRow[])[]): TextRow[] {
   for (const next of parts.slice(1)) {
     const seam = seamOf(rows, next, (a, b) => a === b) ?? seamOf(rows, next, near)
     if (seam?.loose === true) {
-      // the text so far keeps its own reading of the overlap, read better; the next part goes on
-      // after as many rows as the overlap holds
-      let skip = rows.slice(seam.mine + 1).filter((row) => row.text.trim() !== '').length
-      let from = seam.theirs + 1
-      while (skip > 0 && from < next.length) {
-        if ((next[from]?.text.trim() ?? '') !== '') skip--
-        from++
-      }
-      rows = [...rows, ...next.slice(from)]
+      // the text so far keeps its own reading of the overlap, read better
+      rows = [...rows, ...next.slice(pastOverlap(rows, seam, next))]
       continue
     }
     if (seam !== null) {
