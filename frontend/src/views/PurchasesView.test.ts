@@ -255,6 +255,42 @@ describe('PurchasesView (MOL-128)', () => {
       expect(view.text()).toContain(ru.purchases.receipts_error)
     })
 
+    it('чек, доставленный этим телефоном целиком, — «разбираем», хоть список и прочитан раньше (Б1)', async () => {
+      const id = 'cccccccc-0000-4000-8000-000000000001'
+      const uploading = {
+        id,
+        status: 'uploading' as const,
+        failure: null,
+        parts: 2,
+        received: 1,
+        capturedAt: new Date(),
+        country: 'AM' as const,
+        language: 'ru' as const,
+        header: null,
+        total: null,
+        balanced: false,
+        lineCount: 0,
+        unsettled: 0,
+        place: null,
+        tripId: null,
+      }
+      receipts.mockResolvedValue({ receipts: [uploading] })
+      const stuck = await render()
+      expect(stuck.view.text()).toContain('не все части дошли')
+      while (mounted.length) mounted.pop()?.unmount()
+
+      const { view } = await render({
+        before: () => {
+          localStorage.setItem(
+            `molvia.receipt-delivered.${ME}`,
+            JSON.stringify({ [id]: Date.now() }),
+          )
+        },
+      })
+      expect(view.text()).not.toContain('не все части дошли')
+      expect(view.text()).toContain(ru.purchases.parsing_unknown)
+    })
+
     it('тап по «не принят» открывает шторку и ничего не удаляет (ревью 8)', async () => {
       const { view } = await render({
         before: () => {

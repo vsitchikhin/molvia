@@ -121,6 +121,21 @@ describe('receipt queue', () => {
     expect(photos.size).toBe(2)
   })
 
+  it('remembers a receipt delivered whole, kept on the phone, until the list says where it is (Б1)', async () => {
+    const queue = fresh()
+    await queue.capture(body(), shots(2))
+    putReceiptPart.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'Load failed', false))
+    await queue.flush()
+    // One part landed, one held: not whole yet.
+    expect(RECEIPT in queue.delivered).toBe(false)
+    await queue.flush()
+    expect(RECEIPT in queue.delivered).toBe(true)
+    // A restart still knows: the list read after it may be a connection away.
+    expect(RECEIPT in fresh().delivered).toBe(true)
+    useReceiptQueueStore().settleDelivered(new Set([RECEIPT]))
+    expect(RECEIPT in fresh().delivered).toBe(false)
+  })
+
   it('queues nothing for a receipt whose photos are not the parts it announces', async () => {
     const queue = fresh()
     expect(await queue.capture(body(RECEIPT, 2), shots(1))).toBe(false)

@@ -16,7 +16,7 @@ import { useLoginStore } from '@/stores/login'
 import { isIdentifier } from '@/stores/identity'
 import { HOLDS, doublingRetry, exclusively, isRecord, newKey } from '@/stores/queueing'
 import type { Loose } from '@/stores/queueing'
-import { read, writeEverywhere } from '@/stores/storage'
+import { read, write, writeEverywhere } from '@/stores/storage'
 
 /**
  * One write of a receipt, kept until the server has it (MOL-127): the receipt announced, each of its
@@ -72,6 +72,9 @@ interface Kept {
 
 const QUEUE_KEY = 'molvia.receipt-queue'
 const REJECTED_KEY = 'molvia.receipt-rejected'
+const DELIVERED_KEY = 'molvia.receipt-delivered'
+/** As long as the server keeps a receipt not recorded (В-3): nothing to remember past it. */
+const DELIVERED_MS = 28 * 24 * 60 * 60 * 1000
 
 /**
  * A part of a receipt the server no longer has — removed on another phone — has nowhere to go and is
@@ -181,6 +184,26 @@ function recallRejected(key: string): RejectedReceiptWrite[] {
   })
 }
 
+/** The receipts whose every part this phone delivered, by when the last one landed. */
+function recallDelivered(key: string): Record<string, number> {
+  const raw = read(key)
+  if (!raw) return {}
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return {}
+  }
+  if (!isRecord(parsed)) return {}
+  const since = Date.now() - DELIVERED_MS
+  return Object.fromEntries(
+    Object.entries(parsed).filter(
+      (entry): entry is [string, number] =>
+        isIdentifier(entry[0]) && typeof entry[1] === 'number' && entry[1] > since,
+    ),
+  )
+}
+
 /**
  * Runs `work` while no window is sending this owner's receipts — «Выйти» erases the queue and the
  * photos under it, as it does the trip's and the spendings' (MOL-57).
@@ -224,6 +247,13 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     readonly left: number
     readonly at: number
   } | null>(null)
+  /**
+   * The receipts this phone delivered whole (review 29, adversarial Б1): a list read before the last
+   * part landed still says «uploading», and such a receipt is being read, never «не все части
+   * дошли». The server never goes back to `uploading` after the last part, so the list read later
+   * says so itself; kept on the phone, since that read may be a restart away with no connection.
+   */
+  const delivered = ref<Record<string, number>>({})
   /** When «Отправить чек» last queued a receipt here: «Чек отправлен» stands for a moment (3d). */
   const sentAt = ref<number | null>(null)
   let ahead = false
@@ -238,6 +268,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     if (!id || ahead) return
     kept = recallKept(`${QUEUE_KEY}.${id}`)
     rejected.value = recallRejected(`${REJECTED_KEY}.${id}`)
+    delivered.value = recallDelivered(`${DELIVERED_KEY}.${id}`)
     show()
   }
 
@@ -275,6 +306,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     inFlight = null
     kept = []
     rejected.value = []
+    delivered.value = {}
     recorded.value = []
     lastRemoved.value = null
     sync(id)
@@ -292,7 +324,12 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
 
   window.addEventListener('storage', (event) => {
     const id = actor.id
-    if (id && (event.key === `${QUEUE_KEY}.${id}` || event.key === `${REJECTED_KEY}.${id}`)) {
+    if (
+      id &&
+      (event.key === `${QUEUE_KEY}.${id}` ||
+        event.key === `${REJECTED_KEY}.${id}` ||
+        event.key === `${DELIVERED_KEY}.${id}`)
+    ) {
       sync(id)
       landed.value++
     }
@@ -409,11 +446,34 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
           ...rejected.value,
           { key: newKey(), write, code: refusal, at: Date.now() },
         ]
+      } else if (
+        write.kind === 'part' &&
+        !kept.some(
+          (item) =>
+            (item.write.kind === 'create' || item.write.kind === 'part') &&
+            receiptOf(item.write) === write.id,
+        )
+      ) {
+        keepDelivered(owner, { ...delivered.value, [write.id]: Date.now() })
       }
       persist(owner)
       landed.value++
     }
     retry.reset()
+  }
+
+  function keepDelivered(owner: string, next: Record<string, number>): void {
+    delivered.value = next
+    write(`${DELIVERED_KEY}.${owner}`, JSON.stringify(next))
+  }
+
+  /** The list said where these are now: no older answer is in doubt about them any more. */
+  function settleDelivered(ids: ReadonlySet<string>): void {
+    const owner = actor.id
+    if (!owner) return
+    const now = recallDelivered(`${DELIVERED_KEY}.${owner}`)
+    if (!Object.keys(now).some((id) => ids.has(id))) return
+    keepDelivered(owner, Object.fromEntries(Object.entries(now).filter(([id]) => !ids.has(id))))
   }
 
   function unmark(owner: string, key: string): void {
@@ -569,6 +629,8 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     recorded,
     lastRemoved,
     sentAt,
+    delivered,
+    settleDelivered,
     flush,
     capture,
     remove,

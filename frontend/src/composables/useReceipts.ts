@@ -18,8 +18,8 @@ export const RECEIPT_POLL_MS = 5000
 /**
  * Where a receipt is, as «Покупки» say it (handoff 03): the queue of this phone says three of them —
  * waiting for a connection, sending, not accepted — the server the rest. `stuck` — the server holds a
- * receipt with parts missing and this phone has none of them to send: another phone's, or one whose
- * queue «Выйти» took (adversarial А2).
+ * receipt with parts missing, and this phone has none of them to send and did not deliver it whole:
+ * another phone's, or one whose queue «Выйти» took (adversarial А2, Б1).
  */
 export type ReceiptRowState =
   'waiting' | 'sending' | 'stuck' | 'rejected' | 'parsing' | 'parsed' | 'recording' | 'failed'
@@ -136,7 +136,9 @@ export function useReceipts(): ReceiptsScreen {
       let state: ReceiptRowState
       if (rejected) state = 'rejected'
       else if (sendingHere.has(summary.id)) state = online.value ? 'sending' : 'waiting'
-      else if (summary.status === 'uploading') state = 'stuck'
+      // Delivered whole from here: the list was read before the last part landed (review 29, Б1).
+      else if (summary.status === 'uploading')
+        state = summary.id in queue.delivered ? 'parsing' : 'stuck'
       else if (summary.status === 'parsed')
         state = recording.has(summary.id) ? 'recording' : 'parsed'
       else if (summary.status === 'failed') state = 'failed'
@@ -198,6 +200,9 @@ export function useReceipts(): ReceiptsScreen {
       if (lastRemoved) named.add(lastRemoved)
       void photoShelf(owner).keepOnly(named)
       drafts.keepOnly(named)
+      queue.settleDelivered(
+        new Set(answer.receipts.filter((one) => one.status !== 'uploading').map((one) => one.id)),
+      )
     },
   )
 
