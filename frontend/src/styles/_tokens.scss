@@ -36,6 +36,11 @@
   --font: 'Dram', 'Onest', system-ui, -apple-system, 'Segoe UI', roboto, sans-serif;
   --font-display: 'Dram', 'Nunito', var(--font);
 
+  /* A receipt's line as the till printed it (MOL-127, handoff 05): the system's face, which has
+     the glyphs of Armenian, Georgian and Serbian that Onest has not — one line of a fixed height,
+     so a word in another script does not move the row. */
+  --font-printed: system-ui, -apple-system, 'Segoe UI', sans-serif;
+
   /* Scale anchored on 17px body — the smallest size that stays readable at arm's length
      in bad light. Nothing in the interface is allowed below --text-caption. */
   --text-display: 2.125rem; /* 34 — large title, collapses to --text-headline */

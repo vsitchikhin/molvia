@@ -214,6 +214,8 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     readonly left: number
     readonly at: number
   } | null>(null)
+  /** When «Отправить чек» last queued a receipt here: «Чек отправлен» stands for a moment (3d). */
+  const sentAt = ref<number | null>(null)
   let ahead = false
   /** The key of the write a send is carrying right now: it is never taken out. */
   let inFlight: string | null = null
@@ -441,6 +443,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
         })),
       ]
     })
+    sentAt.value = Date.now()
     return true
   }
 
@@ -448,9 +451,10 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
    * «Удалить чек», without a question. A receipt nobody has begun to send never reached the server:
    * its writes are taken out of the queue, and «Вернуть» puts them back. Once a send has begun it may
    * be there, so the removal goes to the server, and 404 on it is done. A refusal about the receipt
-   * goes with it — there is nothing left to fix.
+   * goes with it — there is nothing left to fix. `quiet` — «Переснять» (П-3): no strip, and the
+   * photos of one that never left go at once.
    */
-  function remove(id: string): ReceiptUndo {
+  function remove(id: string, quiet = false): ReceiptUndo {
     let undo: ReceiptUndo = { id }
     change(() => {
       rejected.value = rejected.value.filter((item) => receiptOf(item.write) !== id)
@@ -470,7 +474,10 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
         return
       kept = [...kept, { key: newKey(), write: { kind: 'remove', id } }]
     })
-    lastRemoved.value = { undo, stamp: Date.now(), left: 0, at: Date.now() }
+    // «Переснять» removes the receipt it replaces with no strip: the person asked for a new one.
+    const owner = actor.id
+    if (!quiet) lastRemoved.value = { undo, stamp: Date.now(), left: 0, at: Date.now() }
+    else if (owner && undo.writes) void photoShelf(owner).drop(id)
     return undo
   }
 
@@ -540,6 +547,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     landed,
     recorded,
     lastRemoved,
+    sentAt,
     flush,
     capture,
     remove,
