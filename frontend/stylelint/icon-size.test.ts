@@ -19,7 +19,7 @@ async function refused(code: string, codeFilename = 'Probe.vue'): Promise<string
   return (results[0]?.warnings ?? []).map(
     (warning) =>
       warning.text.split(
-        / on an icon| has no| is sized by| is declared| is worn by| is drawn at/,
+        / on an icon| has no| is sized by| is declared| is worn by| on <[\w-]+> \(line| outside _tokens/,
       )[0] ?? '',
   )
 }
@@ -579,7 +579,7 @@ describe('molvia/icon-size, round 5', () => {
     ).toEqual(['width: 2rem', 'height: 2rem'])
   })
 
-  it('lets a rule that reaches an icon by * through with what sizes nothing (review 20)', async () => {
+  it('lets a rule that reaches an icon by * through with what sizes nothing, a box maximum aside (review 20, Е4)', async () => {
     expect(
       await refused(
         sfc(
@@ -587,7 +587,7 @@ describe('molvia/icon-size, round 5', () => {
           `.c { ${ICON} }\n.row > * { min-width: 0; max-width: 100%; @include appear(0); }`,
         ),
       ),
-    ).toEqual([])
+    ).toEqual(['max-width: 100%'])
   })
 
   it('takes a part of an svg for an icon’s only under an icon (review 21)', async () => {
@@ -623,7 +623,7 @@ describe('molvia/icon-size, round 5', () => {
     ).toEqual(['<IconCheck> (line 2)'])
   })
 
-  it('holds the role the import names: the row’s chevron is 20 (Д3)', async () => {
+  it('holds no role: a chevron at 27 is on the scale, its place is review’s (Д3, review 22)', async () => {
     expect(
       await refused(
         sfc(
@@ -632,7 +632,7 @@ describe('molvia/icon-size, round 5', () => {
           "import IconChevronRight from '~icons/mdi/chevron-right'\nimport IconStar from '~icons/mdi/star'",
         ),
       ),
-    ).toEqual(['The icon «.chevron» (line 2)'])
+    ).toEqual([])
   })
 
   it('takes the mixin of AppButton for an icon of its slot with a step of its own (Д4)', async () => {
@@ -641,6 +641,76 @@ describe('molvia/icon-size, round 5', () => {
         sfc(
           '<AppButton><IconPlus class="plus" /></AppButton>',
           '.plus { font-size: var(--icon-md); }',
+        ),
+      ),
+    ).toEqual([])
+  })
+})
+
+describe('molvia/icon-size, round 6', () => {
+  it('lets a chevron of a button or a pager through at 24: the role is the place’s (review 22, Е3)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<AppButton><IconChevronRight class="n" /></AppButton>\n<p class="pager"><IconChevronRight class="next" /></p>',
+          `.n { font-size: var(--icon-md); }\n.next { @include icon; font-size: var(--icon-md); }`,
+          "import IconChevronRight from '~icons/mdi/chevron-right'",
+        ),
+      ),
+    ).toEqual([])
+  })
+
+  it('refuses a built name only where it could be a step (review 23)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="a" />',
+          '.a { @each $c in a, b { --cat-#{$c}: red; } --#{$n}: 1px; --icon-#{$n}: 1px; --state-#{$n}: 1px; }',
+        ),
+      ),
+    ).toEqual(['--#{$n}', '--icon-#{$n}', '--state-#{$n}'])
+  })
+
+  it('refuses a step registered by @property outside the tokens (Е1)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<IconX class="c" />',
+          `@property --icon { syntax: "<length>"; inherits: false; initial-value: 32px; }\n.c { ${ICON} }`,
+        ),
+      ),
+    ).toEqual(['@property --icon'])
+  })
+
+  it('refuses a font-size in the template of the element an icon takes its step from (Е2)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<p class="row" style="font-size: var(--text-display)"><IconX /></p>\n<p class="row" :style="{ fontSize: big }"><IconY /></p>\n' +
+            '<p class="row" style="font-size: var(--icon)"><IconZ /></p>',
+          '.row { font-size: var(--icon-sm); }\n.row svg { @include icon; }',
+        ),
+      ),
+    ).toEqual(['font-size: var(--text-display)', 'A bound font-size'])
+  })
+
+  it('refuses a flex share and a maximum of the box on an icon (Е4)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<IconX class="c" />',
+          `.c { ${ICON} max-width: 100%; flex-shrink: 1; flex: 1; }\n.c.ok { flex: none; flex-shrink: 0; max-width: none; }`,
+        ),
+      ),
+    ).toEqual(['max-width: 100%', 'flex-shrink: 1', 'flex: 1'])
+  })
+
+  it('takes a disabled <Teleport> for no move (Е5)', async () => {
+    expect(
+      await refused(
+        sfc(
+          '<div class="page"><Teleport to="body" disabled><IconCheck /></Teleport></div>',
+          `.page svg { ${ICON} }`,
         ),
       ),
     ).toEqual([])

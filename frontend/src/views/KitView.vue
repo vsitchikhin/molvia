@@ -50,10 +50,10 @@
       </div>
     </section>
 
-    <!-- The icon scale (Ф-9, MOL-173): one shape at every step, for a screen to be checked by — not the
-         chevron, whose role is 20. The
-         step's class is on the wrapper — a class of this page on a child's root would reach
-         AppButton's own `.icon` — and written out: a class from `:class` sizes nothing to the linter. -->
+    <!-- The icon scale (Ф-9, MOL-173): one shape at every step, for a screen to be checked by — not a
+         chevron, which reads as a row's. The step's class is on the wrapper — a class of this page on
+         a child's root would reach AppButton's own `.icon` — and written out: a class from `:class`
+         sizes nothing to the linter. -->
     <section class="group">
       <h2 class="caption">{{ t('dev.kit.icons') }}</h2>
       <div class="row">

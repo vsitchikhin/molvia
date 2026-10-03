@@ -18,16 +18,21 @@
 //     step — the last rule of the file for the same element (Б2, В5);
 //   - on a rule that styles an icon — one whose last compound is `svg`, an icon's class, or that
 //     reaches an icon by any other means (`.row > *`, Г2), and one on a part of it (`path`) —
-//     `font-size` only `var(--icon*)` or `var(--state-glyph)`; width,
-//     height, their logical and min-/max- forms only 1em; no padding or border width (the old pencil
-//     was a box of 32 with a glyph of 16, А4, Б4), no scale, zoom, translate in depth, or transform but
-//     a turn or a shift; no `@include` but `icon` and `wider-than-phone`, whose body is read like the
-//     rule's (А6) — down a nested `@media` too (А2);
+//     `font-size` only `var(--icon*)` or `var(--state-glyph)`; width, height, their logical and
+//     min-/max- forms only 1em (a minimum of 0 or auto, a maximum of none pass); no padding or border
+//     width (the old pencil was a box of 32 with a glyph of 16, А4, Б4), no scale, zoom, translate in
+//     depth, or transform but a turn or a shift; no flex share but none (Е4: a shrinking icon is 16);
+//     no `@include` but `icon`, `wider-than-phone` and `appear`, whose bodies are read like the rule's
+//     (А6) — down a nested `@media` too (А2);
 //   - in the template: an icon's class is its own, worn by nothing else (В2); no `style` with a size,
-//     no `:style` or `v-bind="…"`, no `width=` or `height=` (А5, Б3);
+//     no `:style` or `v-bind="…"`, no `width=` or `height=` (А5, Б3); on the way from an icon to the
+//     element it takes its step from, no `font-size` in a style but a step, no bound one (Е2);
 //   - the steps themselves are declared in `_tokens.scss` alone: `--icon: 2rem` in a component would
 //     make every line above right and the icon 32 (В1) — nor set by a `:style` of any tag, nor under
-//     a name Sass interpolates (Г1).
+//     a name Sass builds that could be a step (Г1, Д1), nor registered by `@property` (Е1).
+//
+// Which step is the role's — 20 for a row's chevron, 24 for a button's — is DESIGN.md's and review's:
+// the role is the place's, and one glyph stands in several (review 22, Е3).
 //
 // An icon is a tag imported from `~icons/` under any name or registered under another in
 // `components` (Б5), a tag written `Icon…`/`icon-…`, or a `<component :is>` of an `icon` or a `glyph`
@@ -39,7 +44,9 @@
 // a size; an icon styled from another file or put into the slot of a component that sizes its slot
 // itself — `AppButton`, the one in `SIZED_SLOTS`; a step inherited through a component, which may set
 // a font-size of its own; specificity, which the order of the file stands in for; a `<component :is>`
-// named neither icon nor glyph; an SFC with no `<style>` block, which gives the rule no root.
+// named neither icon nor glyph; a `:style` or `v-bind` with an object from the script, which the rule
+// cannot read; an SFC with no `<style>` block, which gives the rule no root. A `<Teleport>` carries
+// its content out of the page around it, unless it is disabled (Д2, Е5).
 
 import stylelint from 'stylelint'
 
@@ -123,8 +130,12 @@ const messages = ruleMessages(ruleName, {
   shared: (name, other, line) =>
     `.${name} is worn by an icon and by <${other}> (line ${line}). An icon's class is its own: a size ` +
     `in a rule of a shared class reaches the icon unchecked (MOL-173).`,
-  role: (size, role, where) =>
-    `${where} is drawn at ${size}; its role takes ${role} — the row's chevron is 20 everywhere (Ф-9).`,
+  property: (name) =>
+    `@property ${name} outside _tokens.scss. A step of the icon scale is the scale's; a registered ` +
+    `initial value would give every icon another size (MOL-173).`,
+  inherited: (what, name, line) =>
+    `${what} on <${name}> (line ${line}), which an icon takes its step from. The icon would be drawn ` +
+    `at it, off the scale (MOL-173).`,
   token: (prop) =>
     `${prop} is declared outside _tokens.scss. A step of the icon scale is the scale's, never set ` +
     `again in a component (MOL-173).`,
@@ -142,8 +153,6 @@ const BOUND_STEP =
 const SIZE_ATTRIBUTE = /(?:^|\s)(?::|v-bind:)?(width|height)=/
 const BOUND_STYLE = /(?:^|\s)(?::style|v-bind:style|v-bind)=/
 const IMPORT = /import\s+(\w+)\s+from\s+['"]~icons\/([^'"]+)['"]/g
-// A role the import names: the row's chevron is 20 wherever it stands (Ф-9, Д3).
-const ROLE_STEP = { 'mdi/chevron-right': 'var(--icon)' }
 const COMPONENTS = /components\s*[:=]\s*\{([^}]*)\}/g
 
 const kebab = (name) => name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
@@ -161,8 +170,8 @@ function iconNames(sfc) {
   return names
 }
 
-// The classes a `:class` names: the keys of an object, shorthand ones too, and the strings in quotes. A class built from a
-// variable or a template string is named nowhere, and no rule reaches it.
+// The classes a `:class` names: the keys of an object, shorthand ones too, and the strings in
+// quotes. A class built from a variable or a template string is named nowhere: no rule reaches it.
 function boundClasses(match) {
   const expression = match?.[1] ?? match?.[2] ?? ''
   const names = new Set()
@@ -213,11 +222,15 @@ export function templateTags(sfc) {
       boundStep: BOUND_STEP.test(attributes),
       parent: stack[stack.length - 1],
       icon,
-      // Imported, the icon it is; else read off the house name, `IconChevronRight` → `mdi/chevron-right`.
-      iconId:
-        icons.get(name) ??
-        (/^Icon[A-Z]/.test(name) ? `mdi/${kebab(name.slice(4))}` : undefined) ??
-        (/^icon-/.test(name) ? `mdi/${name.slice(5)}` : undefined),
+      attributes,
+      // What the tag says of a font-size in the template: a static one, any bound one (Е2).
+      staticSize: attributes.match(
+        /(?:^|\s)style=(?:"[^"]*font-size:\s*([^;"]+)|'[^']*font-size:\s*([^;']+))/,
+      ),
+      boundSize:
+        /(?:^|\s)(?::style|v-bind:style)=(?:"[^"]*(fontSize|font-size)|'[^']*(fontSize|font-size))/.test(
+          attributes,
+        ),
       sizeAttribute: icon ? attributes.match(SIZE_ATTRIBUTE)?.[1] : undefined,
       boundStyle: icon && BOUND_STYLE.test(attributes),
     }
@@ -236,7 +249,14 @@ const isComponent = (tag) =>
 function up(tag) {
   let parent = tag.parent
   while (parent && TRANSPARENT.has(parent.name)) parent = parent.parent
-  return parent && /^teleport$/i.test(parent.name) ? undefined : parent
+  // A disabled one renders in place (Е5).
+  if (
+    parent &&
+    /^teleport$/i.test(parent.name) &&
+    !/(?:^|\s)(?::|v-bind:)?disabled\b/.test(parent.attributes)
+  )
+    return undefined
+  return parent && /^teleport$/i.test(parent.name) ? up(parent) : parent
 }
 
 // --- selectors ----------------------------------------------------------------------------------
@@ -424,7 +444,9 @@ const isStep = (value) => STEP.test(value.trim())
 function resizes(prop, value) {
   // A minimum of nothing and a maximum of all leave a 1em icon as it is (review 20).
   if (/^min-/.test(prop) && /^(0|auto)$/.test(value)) return false
-  if (/^max-/.test(prop) && /^(none|100%)$/.test(value)) return false
+  if (/^max-/.test(prop) && value === 'none') return false
+  // The mixin holds the icon at 1em with `flex: none`; a share of the row would squeeze it (Е4).
+  if (/^flex(-shrink|-grow|-basis)?$/.test(prop)) return !/^(none|0|auto|0 0 auto)$/.test(value)
   if (SIZE.test(prop)) return value !== '1em'
   if (PADDING.test(prop)) return !/^0(\s+0)*$/.test(value)
   if (BORDER.test(prop)) return !/^(0|none|hidden)(\s|$)/.test(value)
@@ -447,9 +469,22 @@ function rule(primary) {
     // The steps are the scale's: declared in _tokens.scss alone (В1).
     if (!root.source?.input.file?.endsWith('/styles/_tokens.scss')) {
       root.walkDecls((decl) => {
-        // A custom property whose name Sass builds may be any step (Д1): none is needed here.
-        if (STEP_NAME.test(decl.prop) || (decl.prop.includes('#{') && /^(--|#\{)/.test(decl.prop)))
-          flag(decl, messages.token(decl.prop))
+        // A custom property whose name Sass builds may be a step (Д1) when what stands before the `#{`
+        // could begin one: nothing, `--`, or a start of `--icon` or `--state-glyph` (review 23).
+        const at = decl.prop.indexOf('#{')
+        const head = at < 0 ? '' : decl.prop.slice(0, at)
+        const maybe =
+          at >= 0 &&
+          (head === '' ||
+            '--icon'.startsWith(head) ||
+            '--state-glyph'.startsWith(head) ||
+            head.startsWith('--icon'))
+        if (STEP_NAME.test(decl.prop) || maybe) flag(decl, messages.token(decl.prop))
+      })
+      // A registered step: an initial value of its own would size every icon of the app (Е1).
+      root.walkAtRules('property', (atRule) => {
+        if (STEP_NAME.test(atRule.params.trim()))
+          flag(atRule, messages.property(atRule.params.trim()))
       })
     }
 
@@ -606,17 +641,24 @@ function rule(primary) {
         )?.node ?? root
       const mixed = slotted || rules.some((entry) => direct(entry.node).some(isMixin))
       let size = ownSize(tag)
+      const path = []
       for (
         let above = up(tag);
         size === undefined && above && !isComponent(above);
         above = up(above)
       ) {
+        path.push(above)
         size = ownSize(above)
       }
+      // The template on the way to the element the step comes from: its style wins over the rule (Е2).
+      for (const element of path) {
+        const inline = (element.staticSize?.[1] ?? element.staticSize?.[2])?.trim()
+        if (inline && !isStep(inline))
+          flag(root, messages.inherited(`font-size: ${inline}`, element.name, element.line))
+        if (element.boundSize)
+          flag(root, messages.inherited('A bound font-size', element.name, element.line))
+      }
       const stepped = size !== undefined && isStep(size)
-      const role = ROLE_STEP[tag.iconId]
-      if (stepped && role && size.trim() !== role)
-        flag(anchor, messages.role(size.trim(), role, where))
       if (mixed && stepped) continue
       if (!mixed && !stepped && !rules.some((entry) => direct(entry.node).some(fontSize))) {
         flag(anchor, messages.unsized(where))
