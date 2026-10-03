@@ -440,9 +440,9 @@ export default defineComponent({
 }
 
 .figure {
-  font-family: var(--font-display);
+  @include display-type;
+
   font-size: var(--text-title);
-  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 

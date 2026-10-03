@@ -248,7 +248,7 @@ export default defineComponent({
   position: absolute;
   width: 3px;
   height: 1.125rem;
-  border-radius: 1px;
+  border-radius: var(--radius-mark);
   background: var(--text);
   transform: translateX(-50%);
 }
@@ -262,7 +262,7 @@ export default defineComponent({
 .mark {
   width: 3px;
   height: 0.875rem;
-  border-radius: 1px;
+  border-radius: var(--radius-mark);
   background: var(--text);
 }
 
