@@ -3,6 +3,7 @@ import { createBotClient } from '@molvia/client'
 import { assembleBot, introduce, startBot, telegramFailure } from './assemble'
 import { createPulse, hearTelegram } from './pulse'
 import { REMIND_EVERY_MS, startReminders } from './remind'
+import { startOwnerNotices } from './owner'
 import { botToken, readEnvironment, refusedNames } from './env'
 import type { RunnerHandle } from '@grammyjs/runner'
 import type { BotEnvironment } from './env'
@@ -74,12 +75,13 @@ const bot = assembleBot(botToken, { api, appUrl: environment.appBaseUrl })
 // a URL it never goes out. The listener goes in before the runner's first `getUpdates`.
 const pulse = createPulse(environment.pulseUrl, { listening: hearTelegram(bot) })
 // The rating reminders (MOL-101): every minute the API is asked who is due, and they are sent.
+const claims = createBotClient({
+  baseUrl: environment.apiBaseUrl,
+  secret: environment.secret,
+  timeoutMs: CLAIM_TIMEOUT_MS,
+})
 const stopReminders = startReminders(
-  createBotClient({
-    baseUrl: environment.apiBaseUrl,
-    secret: environment.secret,
-    timeoutMs: CLAIM_TIMEOUT_MS,
-  }),
+  claims,
   bot.api,
   environment.appBaseUrl,
   REMIND_EVERY_MS,
@@ -87,6 +89,9 @@ const stopReminders = startReminders(
     void pulse()
   },
 )
+
+// The owner's notices (MOL-143): failures the API queued, claimed every minute the same way.
+const stopOwnerNotices = startOwnerNotices(claims, bot.api)
 
 // The runner keeps fetching updates until it is told to stop, and a kill without this leaves
 // whatever it is holding half-handled. Compose sends SIGTERM on every deploy. A stop that comes
@@ -98,7 +103,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     stopping.abort()
     // Side by side, not one after the other (adversarial З): the runner stops taking updates while
     // the evening's last messages go out, and neither waits for the other inside the grace period.
-    void Promise.all([stopReminders(), runner?.stop()])
+    void Promise.all([stopReminders(), stopOwnerNotices(), runner?.stop()])
   })
 }
 

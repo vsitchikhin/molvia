@@ -3,16 +3,20 @@ import { z } from 'zod'
 import {
   DomainError,
   ERROR,
+  botFailureSchema,
   confirmLoginSchema,
   dueRemindersSchema,
   eraseMeSchema,
   loginPreviewCodec,
+  ownerNoticesSchema,
   rateFromBotSchema,
   switchRemindersFromBotSchema,
 } from '@molvia/model'
 import type {
+  BotFailure,
   DueReminders,
   LoginPreview,
+  OwnerNotices,
   RateFromBot,
   SwitchRemindersFromBot,
   TelegramUserId,
@@ -32,6 +36,8 @@ export function internalAuthRoutes(
     claimReminders(): Promise<DueReminders>
     rateFromBot(itemId: string, body: RateFromBot): Promise<void>
     switchReminders(body: SwitchRemindersFromBot): Promise<void>
+    reportFailure(body: BotFailure): Promise<void>
+    claimOwnerNotices(): Promise<OwnerNotices>
   },
 ): void {
   const digest = (value: string): Buffer => createHash('sha256').update(value).digest()
@@ -99,6 +105,17 @@ export function internalAuthRoutes(
       parseQuery(z.strictObject({}), request.query)
       await api.switchReminders(parseBody(switchRemindersFromBotSchema, request.body))
       return reply.code(204).send()
+    })
+    // The bot's own failures and the owner's channel (MOL-143): the same caller, the same secret.
+    // A report is the bot's word about itself; whose update it was never travels.
+    scope.post('/internal/failures', async (request, reply) => {
+      parseQuery(z.strictObject({}), request.query)
+      await api.reportFailure(parseBody(botFailureSchema, request.body))
+      return reply.code(204).send()
+    })
+    scope.post('/internal/owner/claim', { onRequest: refuseAnyBody }, async (request) => {
+      parseQuery(z.strictObject({}), request.query)
+      return ownerNoticesSchema.parse(await api.claimOwnerNotices())
     })
     done()
   })

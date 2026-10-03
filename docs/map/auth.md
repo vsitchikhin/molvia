@@ -20,7 +20,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 - `backend/src/routes/actors.ts` — Route `GET /actors/me` («who am I»), and `answerWithActor`, the one way an owner leaves the server; `GET /actors/me/export`, «Скачать мои данные» (MOL-93, `export-route.integration.test.ts`); `DELETE /actors/me`, «Удалить мои данные» (MOL-94, `erase-route.integration.test.ts`). Tests: `backend/tests/actors.integration.test.ts`.
 - `backend/src/routes/auth.ts` — Routes of the browser's login: start `POST /auth/login` (with `?again=1` from a device repeating a login), poll `GET /auth/login/:id`, and the way out `POST /auth/logout`. Tests: `backend/tests/login.integration.test.ts`.
 - `backend/src/routes/dev-login.ts` — Route `POST /dev/login`: the development sign-in seam with no Telegram, absent from the production bundle. Tests: `backend/tests/identity-hardening.integration.test.ts`.
-- `backend/src/routes/internal-auth.ts` — The bot's internal routes behind `BOT_API_SECRET`: preview, confirm and decline a login, `POST /internal/actors/erase`, and the rating reminder's `POST /internal/reminders/claim` and `PUT /internal/verdicts/:itemId` (MOL-101). Tests: `backend/tests/login.integration.test.ts`.
+- `backend/src/routes/internal-auth.ts` — The bot's internal routes behind `BOT_API_SECRET`: preview, confirm and decline a login, `POST /internal/actors/erase`, and the rating reminder's `POST /internal/reminders/claim` and `PUT /internal/verdicts/:itemId` (MOL-101), the bot's own failures `POST /internal/failures` and the owner's `POST /internal/owner/claim` (MOL-143). Tests: `backend/tests/login.integration.test.ts`.
 - `backend/src/routes/sessions.ts` — Routes of «Устройства» in the guarded scope: `GET /sessions` and `DELETE /sessions/:id`. Tests: `backend/tests/devices.integration.test.ts`.
 
 ## backend · usecases
@@ -45,7 +45,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 
 - `backend/src/cookie.ts` — The only module that reads or sets a cookie: the session, login and dev-account cookies, each set together with `no-store`; putting the session out takes back a term set earlier in the same answer (MOL-94).
 - `backend/src/device-name.ts` — Derives an «iPhone · Safari»-style device name from a `User-Agent` for session and login rows.
-- `backend/src/login-cleanup.ts` — The minute timer every expired-row cleanup hangs on — login requests, sessions and the undo windows.
+- `backend/src/login-cleanup.ts` — The minute timer every expired-row cleanup hangs on — login requests, sessions, the undo windows and the failures (MOL-143); a failure is handed on to be recorded.
 - `backend/src/login-config.ts` — Reads the login's environment — bot username and `BOT_API_SECRET`; neither means no real door, production requires both.
 - `backend/src/secret.ts` — `secretOrNull`: the one rule for what a session token or a login secret may look like, RFC 6265's cookie-octet.
 

@@ -10,6 +10,7 @@
     "forget": "tsx src/forget-cli.ts",
     "seed": "tsx src/seed-catalogue-cli.ts",
     "gates": "tsx src/gates-cli.ts",
+    "failures": "tsx src/failures-cli.ts",
     "bundle": "node ../bin/bundle.mjs backend",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

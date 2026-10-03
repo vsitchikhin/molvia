@@ -33,6 +33,11 @@ import {
   catalogueSubjectSchema,
   currencySchema,
   eventTypeSchema,
+  FAILURE_FRAMES,
+  FAILURE_NAME_MAX,
+  FAILURE_ROUTE_MAX,
+  FAILURE_SOURCES,
+  OWNER_NOTICE_KINDS,
   exchangeChannelSchema,
   incomeSourceSchema,
   itemKindSchema,
@@ -1675,6 +1680,81 @@ export const reminderDays = pgTable(
       'reminder_days_counts_non_negative',
       sql`least(${table.firstSteps}, ${table.secondSteps}, ${table.thirdSteps}, ${table.items}, ${table.rated}, ${table.offButton}, ${table.offSettings}, ${table.offBlocked}) >= 0`,
     ),
+  ],
+)
+
+/**
+ * Failures of the API and the bot, one row a fingerprint (MOL-143): the kind, the driver's code, the
+ * top frame without its position and the place — a route's template, a handler of the bot, a job —
+ * hashed together, so a failure that happens a thousand times is one row with a count.
+ *
+ * **A failure belongs to nobody** (Р-8 of MOL-149): no actor, no Telegram id, no address, no
+ * session, no query, no body and no message — what `describeFailure` lets through and nothing
+ * else. So there is no key to `actors`, erasure and the copy have nothing here to reach, and the
+ * privacy page has nothing to say. Kept 30 days after the last time it happened.
+ *
+ * `build` is the last build it happened in, and `build_count` how many times there: the owner hears
+ * of a fingerprint the first time in a build and at 10, 100 and 1000 (В-2, В-5).
+ */
+export const failures = pgTable(
+  'failures',
+  {
+    fingerprint: char('fingerprint', { length: 64 }).primaryKey(),
+    source: text('source').notNull(),
+    errorName: text('error_name').notNull(),
+    code: text('code'),
+    route: text('route'),
+    frames: text('frames').array().notNull(),
+    build: text('build').notNull(),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull(),
+    count: integer('count').notNull(),
+    buildCount: integer('build_count').notNull(),
+  },
+  (table) => [
+    check('failures_fingerprint_hex', sql`${table.fingerprint} ~ '^[0-9a-f]{64}$'`),
+    check('failures_source_known', oneOf(table.source, FAILURE_SOURCES)),
+    check(
+      'failures_lengths',
+      sql`char_length(${table.errorName}) between 1 and ${sql.raw(String(FAILURE_NAME_MAX))}
+          and (${table.code} is null or char_length(${table.code}) <= ${sql.raw(String(FAILURE_NAME_MAX))})
+          and (${table.route} is null or char_length(${table.route}) <= ${sql.raw(String(FAILURE_ROUTE_MAX))})
+          and cardinality(${table.frames}) <= ${sql.raw(String(FAILURE_FRAMES))}`,
+    ),
+    check(
+      'failures_counts',
+      sql`${table.count} >= ${table.buildCount} and ${table.buildCount} >= 1`,
+    ),
+    check('failures_seen_forward', sql`${table.lastSeenAt} >= ${table.firstSeenAt}`),
+    index('failures_last_seen_at').on(table.lastSeenAt),
+  ],
+)
+
+/**
+ * What the API has queued for the owner's Telegram and the bot has not yet taken (MOL-143, Р-9 of
+ * MOL-149): a kind and its fields, as `ownerNoticeSchema` reads them. The bot claims them every
+ * minute and the claim marks them handed in its own transaction — at most once, as the rating
+ * reminders are. Who the owner is lives in the API's environment, never here.
+ *
+ * Nothing in a notice about a failure belongs to a person, so there is no key to `actors`; the
+ * feedback of MOL-148 joins as one more kind and decides for itself what of its own is erased.
+ */
+export const ownerNotices = pgTable(
+  'owner_notices',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    kind: text('kind').notNull(),
+    payload: jsonb('payload').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    handedAt: timestamp('handed_at', { withTimezone: true }),
+  },
+  (table) => [
+    check('owner_notices_kind_known', oneOf(table.kind, OWNER_NOTICE_KINDS)),
+    check('owner_notices_payload_object', sql`jsonb_typeof(${table.payload}) = 'object'`),
+    check('owner_notices_payload_kind', sql`${table.payload} ->> 'kind' = ${table.kind}`),
+    index('owner_notices_waiting')
+      .on(table.id)
+      .where(sql`${table.handedAt} is null`),
   ],
 )
 

@@ -46,5 +46,5 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 ## backend · schema
 
 The tables are in the skeleton's schema: `receipts`, `receipt_parts`, `receipt_lines`,
-`receipt_line_images`, migration `0040_receipts`. Erasure takes them through `receipts`; the copy
+`receipt_line_images`, migration `0041_receipts`. Erasure takes them through `receipts`; the copy
 carries receipts and their lines, never a photo.

@@ -6,6 +6,7 @@ import { cityWhereNameRepeats, settingsCityOf } from '@molvia/model'
 import type { Reminder, ReminderItem } from '@molvia/model'
 import type { InlineKeyboardMarkup } from 'grammy/types'
 import { hasMessage, t } from './i18n'
+import { reportDefect } from './failure'
 
 /**
  * What a button of the scale carries: the item and the digit — and never whose verdict it is.
@@ -226,6 +227,7 @@ async function send(
       if (error instanceof Flooded) throw error
       const code = error instanceof GrammyError ? String(error.error_code) : 'unexpected failure'
       console.error(`[molvia] remind: ${code}`)
+      reportDefect(api, error, 'remind:send')
       if (error instanceof GrammyError && error.error_code === 403) {
         await blocked(api, telegramUserId)
         return
@@ -268,6 +270,7 @@ export async function remindDue(
     console.error(
       `[molvia] remind claim: ${error instanceof ApiError ? error.code : 'unexpected failure'}`,
     )
+    reportDefect(api, error, 'remind:claim')
     return
   }
   claimed()
@@ -284,7 +287,7 @@ export async function remindDue(
 }
 
 /** Waits `ms`, or less if `signal` aborts first: `true` for the whole wait, `false` for a cut. */
-async function sleep(ms: number, signal?: AbortSignal): Promise<boolean> {
+export async function sleep(ms: number, signal?: AbortSignal): Promise<boolean> {
   if (signal?.aborted) return false
   return new Promise((resolve) => {
     const timer = setTimeout(() => {

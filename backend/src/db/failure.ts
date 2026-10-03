@@ -1,28 +1,12 @@
 import { DrizzleQueryError } from 'drizzle-orm/errors'
-import { DomainError, ERROR } from '@molvia/model'
+import { DomainError, ERROR, describeFailure, failureCodeOf } from '@molvia/model'
+import type { FailureSummary } from '@molvia/model'
 
 /** A row pointed at something that is not there. */
 const FOREIGN_KEY_VIOLATION = '23503'
 
 /** A row claims what another row already holds. */
 const UNIQUE_VIOLATION = '23505'
-
-/**
- * `postgres` throws its own error class and drizzle wraps it: `DrizzleQueryError` carries the
- * query and its parameters, with the driver error underneath in `cause`. So the chain is
- * walked rather than the top level read — measured, not assumed. Looking only at the wrapper
- * made every foreign-key violation a 500, which is precisely what this file exists to stop.
- */
-function codeOf(error: unknown): string | undefined {
-  let current: unknown = error
-  for (let depth = 0; depth < 4; depth += 1) {
-    if (typeof current !== 'object' || current === null) return undefined
-    if ('code' in current && typeof current.code === 'string') return current.code
-    if (!('cause' in current)) return undefined
-    current = current.cause
-  }
-  return undefined
-}
 
 /**
  * Translates two Postgres failures, and deliberately no others.
@@ -49,62 +33,10 @@ export async function translateFailures<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run()
   } catch (error) {
-    const code = codeOf(error)
+    const code = failureCodeOf(error)
     if (code === FOREIGN_KEY_VIOLATION) throw new DomainError(ERROR.NOT_FOUND)
     if (code === UNIQUE_VIOLATION) throw new DomainError(ERROR.CONFLICT)
     throw error
-  }
-}
-
-/** What a failure may say about itself in a log or a terminal: its kind, never its content. */
-export interface FailureSummary {
-  readonly errorName: string
-  /** The driver's code — a SQLSTATE such as `23505`, or `CONNECTION_ENDED`. */
-  readonly code?: string
-  /** Where it was thrown: the stack's frames, without the message that heads it. */
-  readonly frames?: readonly string[]
-}
-
-/**
- * A failure described without a word of what it failed on (MOL-58).
- *
- * The message is the dangerous part, and it is dangerous for more than the driver. A
- * `DrizzleQueryError` carries the whole query and its parameters — what a person searched for,
- * their uuid, the hash of their session token — and `postgres` adds `detail` with the values of
- * the row; a `ZodError` quotes the input it refused. So nothing here reads a message: the name,
- * the code from the chain `codeOf` walks, and the frames of the stack.
- *
- * **The frames are what follows the stack's own header, and nothing is judged by its shape**
- * (adversarial П-1). Picking the lines that look like `    at …` let a person's text through: a
- * review is multi-line, it rides in the driver's message as a parameter, and a line of it written
- * as a frame — or as a whole invented one — landed in `frames`, with the rest of the parameters
- * behind it. V8 writes the stack as `name: message` and then the frames, so the header is cut off
- * whole, however many lines it spans; a stack that does not begin with it gives no frames at all
- * rather than a guess.
- */
-export function describeFailure(error: unknown): FailureSummary {
-  const errorName = error instanceof Error ? error.name : typeof error
-  const raw = codeOf(error)
-  const code = raw !== undefined && /^[\dA-Z_]{1,64}$/.test(raw) ? raw : undefined
-  let frames: string[] | undefined
-  if (error instanceof Error && typeof error.stack === 'string') {
-    // With no message V8 writes the name alone, and some runners still add `: ` after it.
-    const headers = error.message
-      ? [`${error.name}: ${error.message}`]
-      : [`${error.name}: `, error.name]
-    const header = headers.find((candidate) => error.stack?.startsWith(`${candidate}\n`))
-    if (header !== undefined) {
-      frames = error.stack
-        .slice(header.length + 1)
-        .split('\n')
-        .slice(0, 8)
-        .map((line) => line.trim())
-    }
-  }
-  return {
-    errorName,
-    ...(code === undefined ? {} : { code }),
-    ...(frames?.length ? { frames } : {}),
   }
 }
 
