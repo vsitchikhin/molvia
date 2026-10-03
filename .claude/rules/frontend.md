@@ -170,15 +170,18 @@ The detail behind the frontend lines of `CLAUDE.md`.
   only colours. A rule styles an icon when its last compound is `svg`, a part of an icon's svg
   (`path`, `*` or `:is(path, g)`, under a selector that reaches an icon or, past a descendant
   combinator, an element around one — И1: `.row path { transform: scale(1.6) }` drew a glyph of 18
-  at 28.8 in its box; a chart's own `<svg><rect>` is none, review 21) or an icon's class, or when it reaches an icon by any other means (Г2: `.row > *` sized it past
+  at 28.8 in its box; a chart's own `<svg><rect>` is none, review 21, and so is a part the template
+  writes in it named through a wrapper that holds an icon too — `.card rect` beside a chart, 27; the
+  price is `.card path` beside a chart's own `<path>`, read as the chart's) or an icon's class, or when it reaches an icon by any other means (Г2: `.row > *` sized it past
   every check). **Which step is the role's** — 20 for a row's chevron, 24 for a button's — is
   DESIGN.md's and review's, never the rule's: the role is the place's, and one glyph stands in
   several (`chevron-right` is the row's 20, the month's arrow 24 and a pager's «next»; a check by
   the import refused the two last and missed a chevron of another set, review 22, Е3).
   **`font-size` on an icon is a step of the icon scale**, never `--text-*`, `1em` or `inherit`.
-  **Width and height are 1em; there is no padding or border width, no scale, zoom, translate in
-  depth or transform but a turn or a shift, no contour of its own (`d` on a part redrew the glyph
-  at 27, И1), nor an `@include` but `icon`, `wider-than-phone` and
+  **Width and height are 1em; there is no padding or border width — on any side, `border-width:
+0 0 1px` is a border (28) — no scale, zoom, translate in depth or transform but a turn or a shift,
+  no contour of its own (`d` on a part redrew the glyph at 27, И1), no `overflow: visible`, clip or
+  mask (К1: a stroke let out of the box painted a glyph of 18 at 27, `clip-path: inset(25%)` at 9), nor an `@include` but `icon`, `wider-than-phone` and
   `appear`, which moves and fades and sizes nothing** — a minimum of `0`/`auto` and a maximum of
   `none` change no 1em icon and pass, as `.row > * { min-width: 0 }` must (review 20), but
   `max-width: 100%` squeezes it in a narrow box, and so does a flex share: on an icon `flex` and
