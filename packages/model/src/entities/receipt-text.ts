@@ -875,7 +875,7 @@ function articlesOf(rows: readonly TextRow[]): Article[] {
 // made one seam cost seconds, and a till's row is under a hundred.
 const LIKENESS_CHARS = 80
 
-function likeness(a: string, b: string): number {
+export function likeness(a: string, b: string): number {
   const x = a.replace(/\s+/g, '').slice(0, LIKENESS_CHARS)
   const y = b.replace(/\s+/g, '').slice(0, LIKENESS_CHARS)
   if (x === '' || y === '') return 0
@@ -933,11 +933,15 @@ function namesAbove(rows: readonly TextRow[], at: number): string[] {
 /**
  * Two articles misread one for the other stand under one item's name. Neighbours of one maker's line
  * are numbered in a row, and one pair in ten of them — 1160035 and 1160036 — differs by a swap OCR
- * makes (review Р25): the digits alone cannot tell them, the names can. A name lost leaves the digits.
+ * makes (review Р25): the digits alone cannot tell them, the names can. A name on one side only is no
+ * agreement: the top edge of a part cuts between an item's name and its figures as often as anywhere,
+ * and the strawberry yoghurt was lost there (review Р26). An item read twice with no name to agree is
+ * left to show as twice, unbalanced, rather than an item lost behind a balanced total. Only a till that
+ * prints no name above its articles at all leaves the digits to decide.
  */
 function namesAgree(rows: readonly TextRow[], at: number, next: readonly TextRow[], to: number) {
   const [mine, theirs] = [namesAbove(rows, at), namesAbove(next, to)]
-  if (mine.length === 0 || theirs.length === 0) return true
+  if (mine.length === 0 && theirs.length === 0) return true
   return mine.some((x) => theirs.some((y) => sameRow(x, y)))
 }
 
@@ -991,27 +995,40 @@ function alignedSeam(rows: readonly TextRow[], next: readonly TextRow[]): number
     .slice(0, OVERLAP_ROWS)
   const mineText = (i: number) => rows[tail[i] ?? 0]?.text ?? ''
   const theirText = (j: number) => next[head[j] ?? 0]?.text ?? ''
-  // rows read alike — an article misread only under one name; and the figures right below an item's
-  // name read alike in both are that item's, whatever article OCR made of them there
-  const alike = tail.map((_, i) =>
-    head.map((_, j) => {
+  // rows read alike — an article misread only under one name, or, where one part lost the name, right
+  // after the rows aligned above it (review Р21, Р26); and the figures right below an item's name read
+  // alike in both are that item's, whatever article OCR made of them there
+  const alike: boolean[][] = []
+  const aligned = (i: number, j: number) => alike[i]?.[j] === true
+  const placed = (i: number, j: number) => {
+    const mineNamed = namesAbove(rows, tail[i] ?? 0).length > 0
+    const theirNamed = namesAbove(next, head[j] ?? 0).length > 0
+    if (mineNamed && !theirNamed) return aligned(i - 2, j - 1) || aligned(i - 3, j - 1)
+    if (!mineNamed && theirNamed) return aligned(i - 1, j - 2) || aligned(i - 1, j - 3)
+    return false
+  }
+  for (let i = 0; i < tail.length; i++) {
+    const row: boolean[] = []
+    alike.push(row)
+    for (let j = 0; j < head.length; j++) {
       const [a, b] = [ARTICLE.exec(mineText(i))?.[1], ARTICLE.exec(theirText(j))?.[1]]
       const misreadOne =
         a !== undefined &&
         b !== undefined &&
         a !== b &&
         misread(a, b) &&
-        namesAgree(rows, tail[i] ?? 0, next, head[j] ?? 0)
-      const unarticled = mineText(i).replace(ARTICLE, ''),
-        theirs = theirText(j).replace(ARTICLE, '')
-      if (misreadOne && likeness(unarticled, theirs) >= ALIKE) return true
-      if (sameRow(mineText(i), theirText(j))) return true
+        (namesAgree(rows, tail[i] ?? 0, next, head[j] ?? 0) || placed(i, j))
+      const unarticled = mineText(i).replace(ARTICLE, '')
+      const theirs = theirText(j).replace(ARTICLE, '')
       const named =
         i > 0 && j > 0 && NUMBER.test(mineText(i - 1)) && sameRow(mineText(i - 1), theirText(j - 1))
-      return named && ARTICLE.test(mineText(i)) && ARTICLE.test(theirText(j))
-    }),
-  )
-  const isAlike = (i: number, j: number) => alike[i]?.[j] === true
+      row.push(
+        (misreadOne && likeness(unarticled, theirs) >= ALIKE) ||
+          sameRow(mineText(i), theirText(j)) ||
+          (named && a !== undefined && b !== undefined),
+      )
+    }
+  }
   // the longest common run, in order, by rows read alike
   const best = Array.from({ length: tail.length + 1 }, () =>
     Array.from({ length: head.length + 1 }, () => 0),
@@ -1019,7 +1036,7 @@ function alignedSeam(rows: readonly TextRow[], next: readonly TextRow[]): number
   for (let i = tail.length - 1; i >= 0; i--) {
     const row = best[i] ?? []
     for (let j = head.length - 1; j >= 0; j--) {
-      row[j] = isAlike(i, j)
+      row[j] = aligned(i, j)
         ? 1 + (best[i + 1]?.[j + 1] ?? 0)
         : Math.max(best[i + 1]?.[j] ?? 0, row[j + 1] ?? 0)
     }
@@ -1027,7 +1044,7 @@ function alignedSeam(rows: readonly TextRow[], next: readonly TextRow[]): number
   // walk it, and keep where the next part's rows were last aligned
   let [i, j, first, last, mineLast] = [0, 0, -1, -1, -1]
   while (i < tail.length && j < head.length) {
-    if (isAlike(i, j)) {
+    if (aligned(i, j)) {
       if (first < 0) first = j
       last = j
       mineLast = i

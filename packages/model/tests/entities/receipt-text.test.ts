@@ -4,7 +4,13 @@ import am03 from './receipt-text.am-03.json'
 import am04 from './receipt-text.am-04.json'
 import am05 from './receipt-text.am-05.json'
 import { needsReshoot } from '#model/entities/receipt'
-import { bestReading, mergeParts, parseReceiptText, rowsOf } from '#model/entities/receipt-text'
+import {
+  bestReading,
+  likeness,
+  mergeParts,
+  parseReceiptText,
+  rowsOf,
+} from '#model/entities/receipt-text'
 import type { ReceiptText, TextRow } from '#model/entities/receipt-text'
 
 /**
@@ -612,6 +618,15 @@ describe('the seam with two blemishes in the overlap, or a cut row at the first 
 })
 
 describe('rows of a thousand letters after the articles (review Р22)', () => {
+  // the work, not the clock (review 12): a row is compared by its first eighty letters only
+  it('are compared by their first eighty letters', () => {
+    const head = 'Կաթ«Մարիան»3,2%1լ'.repeat(6).slice(0, 80)
+    expect(likeness(`${head}${'Ա'.repeat(920)}`, `${head}${'Բ'.repeat(920)}`)).toBe(1)
+    expect(
+      likeness(`${head.slice(1)}Ա${'Ա'.repeat(920)}`, `${head}${'Ա'.repeat(920)}`),
+    ).toBeLessThan(1)
+  })
+
   it('cost a seam no more than its first eighty letters', () => {
     let seed = 1
     const letter = () => {
@@ -624,7 +639,8 @@ describe('rows of a thousand letters after the articles (review Р22)', () => {
     const part2 = articles.map((a) => `${a} x\n${long()}`).join('\n')
     const started = performance.now()
     mergeParts([rowsOf(part1, 0), rowsOf(part2, 1)])
-    expect(performance.now() - started).toBeLessThan(1_000)
+    // a backstop as loose as its neighbours': CI's machine is slower than any laptop
+    expect(performance.now() - started).toBeLessThan(5_000)
   })
 })
 
@@ -750,5 +766,27 @@ describe('a rule under the head and a rule above the total, with no overlap betw
     )
     expect(got.lines.map((line) => line.printed)).toEqual(['Կաթ', 'Հաց', 'Պանիր Լոռի'])
     expect(got.balanced).toBe(true)
+  })
+})
+
+// Review round 7 of MOL-125.
+describe('a part that starts at an item’s figures, its name left in the part before (review Р26)', () => {
+  const rows = (am05 as Fixture).readings[0]!.replace('0403/1160033', '0403/1160035').split('\n')
+  const name = rows.findIndex((row) => row.startsWith('9.Յոգուրտ'))
+  const figures = rows.findIndex((row) => row.startsWith('0403/1160036'))
+  const join = (part1: readonly string[], part2: readonly string[]) =>
+    parseReceiptText(mergeParts([rowsOf(part1.join('\n'), 0), rowsOf(part2.join('\n'), 1)]))
+  const whole = parse(rows.join('\n')).lines.map((line) => line.sku)
+
+  it('keeps the neighbour one swap of OCR off when the cut falls between its name and figures', () => {
+    expect(join(rows.slice(0, name + 1), rows.slice(figures)).lines.map((l) => l.sku)).toEqual(
+      whole,
+    )
+  })
+
+  it('keeps it when the next part lost the name at its edge and there is no overlap', () => {
+    expect(join(rows.slice(0, name), rows.slice(figures)).lines.map((l) => l.sku)).toEqual(
+      expect.arrayContaining(['1160035', '1160036']),
+    )
   })
 })
