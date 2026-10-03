@@ -156,6 +156,21 @@ describe('последний отказ — код экрана ошибки в 
     vi.useRealTimers()
   })
 
+  it('экран, упавший на обрыве, не получает чужой код минутной давности (раунд 3, Ф2)', async () => {
+    vi.useFakeTimers({ now: 1_000_000, toFake: ['Date'] })
+    const { api, lastRefusal } = await freshApi()
+    me.mockRejectedValue(new ApiError(ERROR.CONFLICT))
+    await api.me().catch(() => undefined)
+
+    vi.setSystemTime(1_040_000)
+    advice.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Load failed', false))
+    await api.advice().catch(() => undefined)
+
+    expect(lastRefusal(Date.now() + 50)).toBeNull()
+    expect(lastRefusal(1_000_500)).toBe(ERROR.CONFLICT)
+    vi.useRealTimers()
+  })
+
   it('не одалживает экрану ошибки отказ самой шторки — «много за сегодня» (adversarial В3б)', async () => {
     const { api, lastRefusal } = await freshApi()
     sendFeedback.mockRejectedValue(new ApiError(ERROR.FEEDBACK_RATE_LIMITED))
