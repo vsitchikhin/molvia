@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import stylelint from 'stylelint'
 import { describe, expect, it } from 'vitest'
+import { roleMixins } from './display-type.mjs'
 
 const config = {
   plugins: [fileURLToPath(new URL('./display-type.mjs', import.meta.url))],
@@ -67,5 +68,34 @@ describe('molvia/display-type-whole', () => {
 
   it('refuses all: unset beside the include', async () => {
     expect(await refused('.a { @include display-type; all: unset; }')).toEqual(['all'])
+  })
+
+  it('reads a mixin that wraps the role as the role, in the same file', async () => {
+    expect(
+      await refused(
+        '@mixin figure-type { @include display-type; font-variant-numeric: tabular-nums; }\n' +
+          '.a { @include figure-type; font-weight: var(--weight-regular); }',
+      ),
+    ).toEqual(['font-weight'])
+  })
+
+  it('learns the wrappers of the role through any number of them', () => {
+    expect([
+      ...roleMixins(
+        '@mixin a { @include display-type; }\n@mixin b { @include a; }\n@mixin c { @include touch-target; }',
+      ),
+    ]).toEqual(['display-type', 'a', 'b'])
+  })
+
+  it('takes only the text face as a face of its own: inherit keeps Nunito', async () => {
+    expect(
+      await refused(
+        '.a { @include display-type; .unit { font-family: inherit; font-weight: var(--weight-regular); } }',
+      ),
+    ).toEqual(['font-family', 'font-weight'])
+  })
+
+  it('refuses the role in a placeholder, where @extend would carry it out of sight', async () => {
+    expect(await refused('%display { @include display-type; }')).toEqual(['display-type'])
   })
 })

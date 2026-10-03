@@ -88,4 +88,13 @@ describe('molvia/known-custom-property', () => {
       ),
     ).toEqual(['--a'])
   })
+
+  it('takes no name from a block nested in :root, nor from a selector that only ends in :root', () => {
+    expect(
+      rootNames(
+        ':root {\n  --a: 1;\n\n  @media (prefers-color-scheme: dark) {\n    --b: 2;\n  }\n}\n\n' +
+          "[data-scheme='dark']:root {\n  --c: 3;\n}\n",
+      ),
+    ).toEqual(['--a'])
+  })
 })

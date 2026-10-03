@@ -45,24 +45,37 @@ function declaredIn(code) {
   return [...code.matchAll(DECLARATION)].map((m) => m[1])
 }
 
-// The names declared in the `:root { … }` blocks at the top level of a stylesheet — not in one
-// nested in a media query, not in `:root:not(…)` or under another selector.
+// The names declared directly in a rule whose selector is exactly `:root`, at the top level of a
+// stylesheet — not in one nested in a media query, not under `:root:not(…)` or `[…]:root`, and not in
+// a block nested inside `:root` itself (adversarial Б5, В4).
 export function rootNames(code) {
   const names = []
   let depth = 0
+  let statement = 0
   for (let i = 0; i < code.length; i++) {
-    if (code[i] === '{') depth++
-    else if (code[i] === '}') depth--
-    else if (depth === 0 && /^:root\s*\{/.test(code.slice(i, i + 64))) {
-      const start = code.indexOf('{', i)
-      let inner = 0
-      let end = start
-      for (; end < code.length; end++) {
-        if (code[end] === '{') inner++
-        if (code[end] === '}' && --inner === 0) break
+    const char = code[i]
+    if (char === '{') {
+      if (depth === 0 && code.slice(statement, i).trim() === ':root') {
+        let inner = 0
+        let end = i
+        for (; end < code.length; end++) {
+          if (code[end] === '{') inner++
+          if (code[end] === '}' && --inner === 0) break
+        }
+        let body = code.slice(i + 1, end)
+        for (let nested = /[^{};]*\{[^{}]*\}/; nested.test(body);) body = body.replace(nested, '')
+        names.push(...declaredIn(body))
+        i = end
+        statement = end + 1
+        continue
       }
-      names.push(...declaredIn(code.slice(start + 1, end)))
-      i = end
+      depth++
+      if (depth === 1) statement = i + 1
+    } else if (char === '}') {
+      depth--
+      if (depth === 0) statement = i + 1
+    } else if (char === ';' && depth === 0) {
+      statement = i + 1
     }
   }
   return names
