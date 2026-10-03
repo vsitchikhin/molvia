@@ -79,13 +79,18 @@ text so far is in the next part too. **One digit off by any other digit is the n
 list**: a maker numbers its flavours in a row, 1160033 and 1160036 are two yoghurts (Р23). **And one
 swap of OCR off is the same article only under the same name** (Р25): one pair of neighbours in ten,
 1160035 and 1160036, differs by a swap OCR makes, and only «8.Յոգուրտ … դեղձ» against «9.Յոգուրտ … ելակ»
-tells them. A name OCR lost leaves the digits to decide; a name split in two rows is read whole.
+tells them. A name split in two rows is read whole. **A name on one side only is no agreement**
+(Р26): the top edge of a part cuts between an item's name and its figures as often as anywhere, and
+the strawberry yoghurt was lost there under a balanced total. Only a till that prints no name above its
+articles at all leaves the digits to decide; an item read twice for want of a name shows twice,
+unbalanced — a loss behind «сошлось» is the worse error.
 
 **Where the articles do not show the overlap** — rows of it read worse in the next part: an article two
 digits off, figures cut at its top edge, a name lost or split, a row cut through at the first part's
 foot (Р17, Р21, 9, Р23) — the first part's last sixteen rows and the next part's first sixteen are
 aligned in order, the longest run of rows the overlap could hold twice (`sameRow`: read alike, not two
-numbers of the list, not two articles; an article misread by OCR's swaps only under one name; and the
+numbers of the list, not two articles; an article misread by OCR's swaps only under one name, or,
+where one part lost the name, right after the rows aligned above it (Р21, Р26); and the
 figures right below a name aligned are that item's, whatever article OCR made there). The run must be
 the first part's foot and the next part's top — end within the last three rows of the one, start within
 the first three of the other — or it is rows alike in the middle, a rule under the head and a rule above
