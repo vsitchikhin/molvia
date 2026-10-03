@@ -188,7 +188,9 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   is the app's wherever it was thrown, and goes with no frame too — a registration's `DOMException`
   has none.
 - **One failure once a page** (Р-5): a retry that shows the same error, a loop that throws every
-  frame, send it the first time only, so the count is of pages that met it. **Kept until our API has
+  frame, send it the first time only, so the count is of pages that met it. **A failure is the same
+  on the phone as in the API's fingerprint**, its build included (adversarial Д1): a report with no
+  frame kept from an old build no longer stands for the new build's. **Kept until our API has
   answered** (Р-7): `molvia.failures` on the shared shelf, twenty at most, one a failure; sent at once,
   at start and on `online`, **one window at a time** (`navigator.locks`, adversarial А3: two windows
   hearing `online` each sent the shared buffer whole). **The API's answer lets them go** — taken, or
@@ -248,7 +250,8 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   (adversarial В1); ten a sender were too few for a mobile operator's address, which thousands of
   phones share — one failure of a rollout is a dozen fingerprints, its screens times its systems
   (Г1). A place is taken before the write and given back if the row was there or the write failed
-  (review №9): four writes run at once, and an outage of the database held a place a report. **The
+  (review №9): four writes run at once, and an outage of the database held a place a report. So
+  are the notices a failed transaction took: the budget is spent inside it. **The
   prices, named:** seventeen networks fill the hour, some 720 000 rows in thirty days at most; and the
   sender is an address, so one subscriber of an operator sending sixty invented reports an hour takes
   the new rows of every phone behind the same address — telling phones apart would need a mark of the
