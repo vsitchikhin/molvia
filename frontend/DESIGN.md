@@ -310,18 +310,20 @@ never data, never status, never decoration. A chart series is `text` or `graphic
 
 **The Neighbouring Roles Rule.** Any two steps of different roles — accent (with `accent-solid`),
 good, warn, bad, `graphic` — and every category against every step of a role stand at least 0.08
-apart in OKLab, in both schemes; a mark and a category are 3:1 on `surface`, text 4.5:1 on its ground,
-and a tint, a fill with no edge, stands 0.08 from `surface` — a notice in a sheet or a card. On the page
-ground (`sunken`) the light good, warn and bad tints stand closer (0.071, 0.070, 0.040): a strip or a
-state's circle there is told by its icon and word, not by the edge of its fill.
-`frontend/src/styles/tokens.test.ts` holds every pair, with no list of exceptions: a value that fails
-is changed, never excused (MOL-172). Any two categories stand at least 0.07 apart and a category keeps
-its hue in both schemes (MOL-218): the ring orders its sectors by sum, so any two may meet.
+apart in OKLab, in both schemes; a mark and a category are 3:1 on `surface`, text 4.5:1 on its
+ground, and a tint, a fill with no edge, stands 0.08 from `surface` — a notice in a sheet or a card.
+On the page ground (`sunken`) the light good, warn and bad tints stand closer (0.071, 0.070, 0.040):
+a strip or a state's circle there is told by its icon and word, not by the edge of its fill. So is a
+mark on a well (`surface-2`: light warn and bad 0.071 and 0.055, dark 0.058 and 0.079) — «ждёт
+отправки» by its word. `frontend/src/styles/tokens.test.ts` holds every pair, with no list of
+exceptions: a value that fails is changed, never excused (MOL-172). Any two categories stand
+at least 0.07 apart and a category keeps its hue in both schemes (MOL-218): the ring orders its
+sectors by sum, so any two may meet.
 
 **The Graphic Is Data Rule.** Anything that carries meaning — an unselected bar, the "Остальные"
 sector, the "no data" dash, the off track of a switch — is drawn in `graphic`, at least 3:1 on
-`surface`. `border-strong` (1.8:1) is decoration only. The charts, the countdown of "Вернуть" and the
-switch still draw `border-strong` until their own tasks **(target)**.
+`surface`. `border-strong` (1.8:1) is decoration only. The charts, the countdown of "Вернуть" and
+the switch still draw `border-strong` until their own tasks **(target)**.
 
 **The Colour Never Alone Rule.** Beside every colour stands a word, a form or a figure: a verdict has
 its icon and word, a category its name, a plus or minus its sign and "лучше / хуже рынка".
