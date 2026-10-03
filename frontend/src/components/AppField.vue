@@ -63,9 +63,11 @@
     <AppReveal>
       <p v-if="failed" :id="`${id}-error`" class="error">{{ errorText ?? t(error ?? '') }}</p>
     </AppReveal>
-    <!-- Polite and there from the start, only its words changing: a region born with its words is
-         often not read (MOL-19). -->
-    <p v-if="counterFrom !== null" class="counter" aria-live="polite">{{ counter }}</p>
+    <!-- Read with the field when it is focused, not at every letter: two hundred announcements over
+         the echo of the typing drown it (MOL-147, review №4). -->
+    <p v-if="counterFrom !== null" :id="`${id}-counter`" class="counter">{{ counter.shown }}</p>
+    <!-- Said only at its marks, through a region there from the start, its words alone changing. -->
+    <p v-if="counterFrom !== null" class="counter-spoken" aria-live="polite">{{ counter.said }}</p>
   </div>
 </template>
 
@@ -77,6 +79,9 @@ import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import IconChevronDown from '~icons/mdi/chevron-down'
 import type { ErrorCode } from '@molvia/model'
 import AppReveal from '@/components/AppReveal.vue'
+
+/** How many characters left are said aloud, beside the moment the count comes and the end. */
+const SPOKEN_MARKS = [20, 100]
 
 export type FieldKind = 'text' | 'decimal' | 'digits' | 'multiline' | 'date' | 'select'
 
@@ -160,6 +165,7 @@ export default defineComponent({
         attrs['aria-describedby'],
         slots.suffix ? `${id}-suffix` : undefined,
         failed.value ? `${id}-error` : undefined,
+        counter.value.shown ? `${id}-counter` : undefined,
       ].filter(Boolean)
       return parts.length > 0 ? parts.join(' ') : undefined
     }
@@ -174,12 +180,16 @@ export default defineComponent({
     const shows = computed(() => props.kind === 'date' && !!props.display)
 
     // `maxlength` is read from `attrs`, which are not reactive: it does not change, the value does.
+    // What is said is the last mark passed, so it changes — and is read — only at the marks.
     const counter = computed(() => {
       const max = Number(attrs.maxlength)
-      if (props.counterFrom === null || !Number.isInteger(max)) return ''
+      if (props.counterFrom === null || !Number.isInteger(max)) return { shown: '', said: '' }
       const left = Math.max(max - props.modelValue.length, 0)
-      if (left > props.counterFrom) return ''
-      return left === 0 ? t('field.full', { max }) : t('field.left', { n: left }, left)
+      if (left > props.counterFrom) return { shown: '', said: '' }
+      const words = (n: number): string =>
+        n === 0 ? t('field.full', { max }) : t('field.left', { n }, n)
+      const mark = [0, ...SPOKEN_MARKS, props.counterFrom].find((at) => left <= at) ?? left
+      return { shown: words(left), said: words(mark) }
     })
 
     return { t, attrs, id, failed, shows, counter, control, describedBy, update }
@@ -320,6 +330,10 @@ textarea.control {
 
 .invalid .well {
   border-color: var(--bad);
+}
+
+.counter-spoken {
+  @include visually-hidden;
 }
 
 .counter {

@@ -212,9 +212,44 @@ describe('the count of what is left (MOL-147)', () => {
     view.unmount()
   })
 
-  it('is a polite region there from the start, so its first words are read', () => {
+  it('is read with the field, not announced at every letter (review №4)', () => {
+    const view = counted('a'.repeat(1866))
+    const counter = view.get('.counter')
+    expect(counter.attributes('aria-live')).toBeUndefined()
+    expect(view.get('textarea').attributes('aria-describedby')).toContain(counter.attributes('id'))
+    view.unmount()
+  })
+
+  it('says only its marks aloud — the count coming, 100, 20 and the end — through a region there from the start', async () => {
     const view = counted('')
-    expect(view.get('.counter').attributes('aria-live')).toBe('polite')
+    const region = view.get('.counter-spoken')
+    expect(region.attributes('aria-live')).toBe('polite')
+    expect(region.text()).toBe('')
+
+    const said: string[] = []
+    for (const length of [1799, 1800, 1801, 1899, 1900, 1950, 1979, 1980, 1999, 2000]) {
+      await view.setProps({ modelValue: 'a'.repeat(length) })
+      said.push(region.text())
+    }
+
+    expect(said).toEqual([
+      '',
+      '200 characters left',
+      '200 characters left',
+      '200 characters left',
+      '100 characters left',
+      '100 characters left',
+      '100 characters left',
+      '20 characters left',
+      '20 characters left',
+      "That's the limit: 2000 characters",
+    ])
+    view.unmount()
+  })
+
+  it('must not tie a silent count to the field', () => {
+    const view = counted('a'.repeat(10))
+    expect(view.get('textarea').attributes('aria-describedby')).toBeUndefined()
     view.unmount()
   })
 
