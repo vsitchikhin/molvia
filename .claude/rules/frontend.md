@@ -168,15 +168,17 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the 1.2em unplugin-icons writes — 24 for a chevron of 20, the next step up, which looks meant —
   and the mixin alone at the text it stands in. A rule on `svg` has the pair or neither, and then
   only colours. A rule styles an icon when its last compound is `svg`, a part of an icon's svg
-  (`path`, under a selector that reaches an icon — a chart's own `<svg><rect>` is none, review 21)
-  or an icon's class, or when it reaches an icon by any other means (Г2: `.row > *` sized it past
+  (`path`, `*` or `:is(path, g)`, under a selector that reaches an icon or, past a descendant
+  combinator, an element around one — И1: `.row path { transform: scale(1.6) }` drew a glyph of 18
+  at 28.8 in its box; a chart's own `<svg><rect>` is none, review 21) or an icon's class, or when it reaches an icon by any other means (Г2: `.row > *` sized it past
   every check). **Which step is the role's** — 20 for a row's chevron, 24 for a button's — is
   DESIGN.md's and review's, never the rule's: the role is the place's, and one glyph stands in
   several (`chevron-right` is the row's 20, the month's arrow 24 and a pager's «next»; a check by
   the import refused the two last and missed a chevron of another set, review 22, Е3).
   **`font-size` on an icon is a step of the icon scale**, never `--text-*`, `1em` or `inherit`.
   **Width and height are 1em; there is no padding or border width, no scale, zoom, translate in
-  depth or transform but a turn or a shift, nor an `@include` but `icon`, `wider-than-phone` and
+  depth or transform but a turn or a shift, no contour of its own (`d` on a part redrew the glyph
+  at 27, И1), nor an `@include` but `icon`, `wider-than-phone` and
   `appear`, which moves and fades and sizes nothing** — a minimum of `0`/`auto` and a maximum of
   `none` change no 1em icon and pass, as `.row > * { min-width: 0 }` must (review 20), but
   `max-width: 100%` squeezes it in a narrow box, and so does a flex share: on an icon `flex` and
