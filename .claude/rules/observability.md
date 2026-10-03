@@ -349,7 +349,8 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   quietly empty — and the API's process figures are read by `job="api"`, since the exporters write the
   same names. **A rule removed or renamed goes with `deleteRules` of its uid in the same merge**
   (adversarial А6): provisioning never deletes one by itself, and the old rule would keep alarming from
-  `grafana_data` with nothing in the repository to find it by. A dashboard's file removed takes the
+  `grafana_data` with nothing in the repository to find it by. A test holds it: every uid ever shipped
+  (`SHIPPED_RULES`) is in the groups or in `deleteRules`, and a new one joins the list. A dashboard's file removed takes the
   dashboard with it (`disableDeletion: false`).
 - **A restart is a reset of the same container's CPU counter** (Р-4): a rollout makes a new container,
   a new series, and starts nothing over. Two measured traps on the way: cAdvisor reads a container's

@@ -261,6 +261,37 @@ describe('the alarms', () => {
   })
 })
 
+/**
+ * Every alarm ever shipped, by its uid (adversarial А6 а). Provisioning never deletes a rule by itself:
+ * one taken out of `rules.json` kept alarming from `grafana_data`, with nothing in the repository to find
+ * it by. So a uid that leaves the groups goes to `deleteRules` of the same file, and a new one joins this
+ * list — never leaves it.
+ */
+const SHIPPED_RULES = [
+  'molvia-memory',
+  'molvia-disk',
+  'molvia-5xx',
+  'molvia-p95',
+  'molvia-restart',
+  'molvia-targets',
+  'molvia-pulse',
+]
+
+describe('a rule removed (adversarial А6 а)', () => {
+  it('is deleted in Grafana by the same file, never left alarming from its volume', () => {
+    const file = JSON.parse(read('deploy/grafana/provisioning/alerting/rules.json')) as {
+      deleteRules?: { orgId: number; uid: string }[]
+    }
+    const deleted = (file.deleteRules ?? []).map((rule) => rule.uid)
+    const shipped = rules.map((rule) => rule.uid)
+    expect(shipped.filter((uid) => !SHIPPED_RULES.includes(uid))).toEqual([])
+    expect(SHIPPED_RULES.filter((uid) => !shipped.includes(uid) && !deleted.includes(uid))).toEqual(
+      [],
+    )
+    expect(deleted.filter((uid) => shipped.includes(uid))).toEqual([])
+  })
+})
+
 describe('the pulse of the alarms (adversarial А5)', () => {
   it('fires while Grafana counts and VictoriaMetrics answers, and goes nowhere but its ping', () => {
     const pulse = ruleOf('molvia-pulse')
