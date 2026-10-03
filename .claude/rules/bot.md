@@ -419,5 +419,20 @@ storage is `feedback.md`.
   every language, to `FRAME_LAST_LINES`, or every frame already sent stops being one and its answers
   greet.
 - **A failure in the composer is `message:reply`** (`handlerOf`): apart from the greeting's `message`.
-- **Only text** (Р-9): a photo or a voice on a tagged notice says «Отвечать можно только текстом» —
-  the owner must not think it went; a person's photo is met with silence, as any photo was.
+- **The owner's reply is words only** (Р-9, MOL-167 Р-9): a photo — a caption too, which must not go
+  without its photo — a voice or a file on a tagged notice says «Отвечать можно только текстом», so
+  the owner does not think it went.
+- **A person's photo on a frame is a word of the thread** (MOL-167, Р-8, В-3): the largest size
+  Telegram keeps, by its `file_id` and `file_unique_id` — the bytes stay in Telegram, which strips a
+  photo's EXIF — and its caption as the text, or none. **A picture sent as a file is asked for again as
+  a photo** («Пришлите как фото»): a document keeps where and when it was taken. An album is a word a
+  photo — Telegram hands them over one by one, and the bot keeps nothing to glue them; anything else
+  that is not a word stays quiet, as before.
+- **A message's pictures follow its notice** (MOL-167, Р-5): each a photo replying to the notice,
+  captioned «Снимок 1 из 2 · #fb42» — the tag ends the caption's first line, so the owner's reply to a
+  picture finds the thread (`threadTagOf` reads `text ?? caption`). The phone's JPEG, fetched from
+  `GET /internal/feedback/:number/pictures/:position`, goes as a file; a person's photo by its id —
+  never forwarded, so no sender is shown. «Sent» is said after the last picture: a picture Telegram
+  refuses (400) or no longer there is the log's and the rest go on — a notice that could never go
+  whole would be handed for good — while a broken connection or a 429 says nothing, and the notice
+  comes again whole: the owner reads its text twice, the price a lost mark already has.

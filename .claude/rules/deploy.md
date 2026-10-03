@@ -51,7 +51,9 @@ The shape worth knowing here:
   at most a day, accepted for 0.1 and named on the page (owner's decision, 26.09.2026); a record of
   erasures that outlives the database is 0.2's, with the lawyer. **Receipt photos and the item lines
   cut out of them stay out of the copy** (`--exclude-table-data`, MOL-125 В-2): their tables come back
-  empty, and a receipt queued without its photo fails as `unreadable`. A missing copy is an alarm
+  empty, and a receipt queued without its photo fails as `unreadable`. **Nor do the pictures of a
+  message to the developer** (`feedback_pictures`, MOL-167): kept until the owner's Telegram has them,
+  a week at most; a notice waiting at a restore goes without them. A missing copy is an alarm
   (healthchecks.io), not a log line. `deploy/README.md`, «Backups».
 - **Migrations run when the API starts.** There is one instance, and a schema that lags
   the code deployed against it is the worse of the two failures. `make migrate`, the test

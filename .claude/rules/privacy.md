@@ -103,7 +103,9 @@ The detail behind the privacy lines of `CLAUDE.md`.
   their currency and unit, rates to six digits, days `YYYY-MM-DD`, moments in UTC, and a header
   `format: "molvia-export"`, `version` — a change of what goes in is a new version: 2 since the
   ladder of rating reminders joined it (MOL-101), 3 with a trip's sum from the receipt (MOL-78), 4
-  with an exchange's channel (MOL-137), 5 with the codes a person wrote (MOL-100). Its codec
+  with an exchange's channel (MOL-137), 5 with the codes a person wrote (MOL-100), 10 with what is left
+  of a message's pictures (MOL-167) — never a picture: its bytes live only until the owner's
+  Telegram has them. Its codec
   is looser than a screen's on purpose: a copy of what is stored is never refused by a rule a
   stored row predates — an event type since withdrawn, a rate outside today's band. **One
   snapshot:** one transaction, `repeatable read, read only`; it writes nothing, not even the log.

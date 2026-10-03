@@ -11,6 +11,8 @@ paths:
   - 'frontend/src/components/FeedbackSheet.vue'
   - 'frontend/src/stores/feedback*.ts'
   - 'frontend/src/platform.ts'
+  - 'frontend/src/feedbackPicture*.ts'
+  - 'backend/src/feedback/**'
   - 'e2e/feedback.spec.ts'
 ---
 
@@ -18,7 +20,8 @@ paths:
 
 The detail behind the feedback lines of `CLAUDE.md`. The epic is MOL-141, its decisions MOL-150
 (В-1…В-6, Р-1…Р-17 in `.scratch/tasks/requirements/MOL-150.md`); the message, its sheet and its two
-ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread continued — MOL-148.
+ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread continued — MOL-148,
+a screenshot with it MOL-167 (В-1…В-5, Р-1…Р-13 in `.scratch/tasks/requirements/MOL-167.md`).
 
 ## What a message is
 
@@ -29,6 +32,10 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
   (MOL-146): the schema has no default. Only the error screen opens the sheet on «Сломалось»,
   because there the person said so by tapping «Сообщить о проблеме».
 - **The text is `visibleText(2000)`** — the one rule of the domain for what draws, as a review's is.
+- **Words, a picture, or both** (MOL-167, В-3): «Сломалось» with a screenshot, its screen and its code
+  often says it all, and «пришлите скрин» in the bot is answered by a photo with no caption. A text
+  sent must still have something visible; a message with neither is refused — `text` absent from the
+  body, `''` in the row, and `feedback_says_something` holds it in the base.
 
 ## What goes with the text
 
@@ -76,6 +83,36 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
   `error.feedback_rate_limited`, `429`; the sheet keeps the text.
 - **The number is the server's**, an identity counting up — the `#fb42` the owner sees. The screen
   does not show it (Р-13).
+
+## A screenshot (MOL-167)
+
+- **Only what the person attaches, and only from the gallery** (MOL-150, В-6): a screen shows other
+  people's prices and one's own spendings — exactly what the epic forbade to attach in silence — so a
+  picture goes only by the person's own act, and they see it before sending. No snapshot of the page is
+  taken programmatically: a library and an inexact picture. At most `FEEDBACK_PICTURES_MAX` (3, В-2).
+- **The phone draws every picture anew** (`pictureFromFile`, Р-1): the orientation applied while
+  decoding, the longest side to `FEEDBACK_PICTURE_SIDE`, a JPEG at 0.85, then 0.7, then smaller, until it
+  fits `FEEDBACK_PICTURE_BYTES_MAX`. A canvas writes no EXIF, no place of shooting, no profile. What the
+  sheet shows is the drawing, never the file chosen.
+- **The API does not take the phone's word** (`pictureOf`, Р-2): a JPEG by its frame, sides
+  100…4 000 and no more than twenty times as long as wide (Telegram's limit for a photo), every APP
+  segment but JFIF's and every comment cut out — a client changed by hand must not carry where a photo
+  was taken. Not one — `error.feedback_picture_invalid`, `415`; too heavy —
+  `error.feedback_picture_too_large`, `413`; the text and the other pictures stay on the phone.
+- **One request** (Р-3): the pictures go in base64 in `POST /feedback`, written with the message in one
+  transaction, so a repeat compares them too — by `fingerprint`, the sha256 of the bytes kept, which
+  outlives them. The body's limit is the route's alone (`FEEDBACK_BODY_BYTES_MAX`), and too large by
+  its `Content-Length` says its own code before the body is read; every other route keeps a megabyte.
+  A separate upload would have needed a table of pictures waiting for their message.
+- **The bytes live only until the owner's Telegram has them** (В-1): the bot's word that the notice
+  went empties `image` and `telegram_file_id` in its transaction, and the minute timer empties what
+  the bot never took within `FEEDBACK_PICTURE_KEPT_DAYS` (7) — the bot away, or a copy with no owner.
+  What stays is a line: place, source, sides, size, when it went. The copy shows that line and never
+  a picture; the nightly copy has none of the table (`backup.sh`). The copy in the owner's chat stays,
+  as the text's does (В-3 of MOL-150), and `/privacy` says Telegram sees it.
+- **A photo from the bot is kept by Telegram's id** (Р-8): `source = telegram`, `fingerprint` its
+  `file_unique_id` — the same photo sent twice to the same reply within a day is one word.
+- **The day's limit is the message's** (Р-10): pictures do not count apart.
 
 ## Threads, replies, the term
 
