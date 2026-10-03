@@ -121,7 +121,7 @@ test('nothing rated yet: the newcomer is offered to act, and the cycle leads to 
 
   await page.goto('/')
 
-  await expect(page.getByRole('heading', { name: 'Record your first purchases' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Photograph your first receipt' })).toBeVisible()
   // No search before the first verdict: whatever it found would be «not rated yet».
   await expect(page.getByRole('searchbox')).toHaveCount(0)
   await page.getByRole('button', { name: /At home — «Ratings»/ }).click()
@@ -177,7 +177,7 @@ test('the skeleton is there while the answer is on its way, and the region says 
   await expect.poll(said).toContainEqual(expect.stringContaining('Loading…'))
 
   release()
-  await expect(page.getByRole('heading', { name: 'Record your first purchases' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Photograph your first receipt' })).toBeVisible()
   await expect(page.locator('.skeleton')).toHaveCount(0)
   // «Loading…» leaves the region with the skeleton: left behind, it is read in browse mode
   // under the answer (MOL-19, C3).
@@ -195,7 +195,7 @@ test('reports a failure instead of an empty screen, and recovers on retry', asyn
   await page.unroute('**/api/advice')
   await page.getByRole('button', { name: 'Try again' }).click()
 
-  await expect(page.getByRole('heading', { name: 'Record your first purchases' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Photograph your first receipt' })).toBeVisible()
 })
 
 // Офлайн на устройстве, которое здесь ещё не входило: пускать некуда — ни ящиков, ни ответов
@@ -230,7 +230,8 @@ test('the newcomer`s action is large enough to hit with a thumb, and in view', a
   await person(page)
   await page.goto('/')
 
-  const button = page.getByRole('button', { name: 'Record purchases' })
+  // With receipts the strip holds the camera (MOL-127, handoff v2 02).
+  const button = page.getByRole('button', { name: 'Photograph a receipt' })
   await expect(button).toBeInViewport({ ratio: 1 })
   await expect(button).toBeVisible()
 

@@ -5,6 +5,7 @@ import { defineComponent, h } from 'vue'
 import { RouterView, createRouter, createWebHistory } from 'vue-router'
 import { ERROR, currentTripResponseSchema, parseMoney, tripViewCodec } from '@molvia/model'
 import type {
+  ReceiptsResponse,
   AdviceResponse,
   PendingVerdicts,
   TripHistory,
@@ -24,6 +25,7 @@ const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
 const currentTrip = vi.fn<() => Promise<TripViewModel | null>>()
 const advice = vi.fn<() => Promise<AdviceResponse>>()
 const addExpense = vi.fn<() => Promise<unknown>>()
+const receipts = vi.fn<() => Promise<ReceiptsResponse>>()
 vi.mock('@/api', () => ({
   api: {
     advice: () => advice(),
@@ -35,6 +37,7 @@ vi.mock('@/api', () => ({
     finishTrip: () => new Promise(() => undefined),
     removeTrip: () => new Promise(() => undefined),
     addExpense: () => addExpense(),
+    receipts: () => receipts(),
   },
 }))
 
@@ -127,11 +130,12 @@ const App = defineComponent(() => () => h(RouterView))
 async function render({
   before,
   path = '/purchases',
-}: { before?: () => void; path?: string } = {}) {
+  country = 'AM',
+}: { before?: () => void; path?: string; country?: string } = {}) {
   localStorage.setItem('molvia.actor', ME)
   localStorage.setItem(
     `molvia.settings.${ME}`,
-    JSON.stringify({ country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+    JSON.stringify({ country, city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
   )
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -172,6 +176,19 @@ function remember(trips: TripHistoryEntry[] = []) {
 }
 
 const rows = (view: VueWrapper) => view.findAll('.recorded .purchase-row')
+
+/**
+ * «Записать вручную» — the second button of the strip: a person in Armenia takes receipts (MOL-127,
+ * Р-1), and the camera is the first.
+ */
+function byHand(view: VueWrapper) {
+  // In the strip of «Покупки», and a row under the cycle on the newcomer's «Что брать» (2a).
+  const found = view
+    .findAll('button')
+    .find((button) => button.text().includes(ru.purchases.manual_by_hand))
+  if (!found) throw new Error('нет «Записать вручную»')
+  return found
+}
 const openSheet = () => document.body.querySelector('dialog[open]')
 
 function inside(sheet: Element | null, text: string): HTMLButtonElement {
@@ -194,6 +211,8 @@ describe('PurchasesView (MOL-128)', () => {
     currentTrip.mockResolvedValue(null)
     addExpense.mockReset()
     addExpense.mockReturnValue(new Promise(() => undefined))
+    receipts.mockReset()
+    receipts.mockResolvedValue({ receipts: [] })
     advice.mockReset()
     advice.mockResolvedValue({
       geography: { country: 'AM', city: 'Гюмри' },
@@ -212,12 +231,108 @@ describe('PurchasesView (MOL-128)', () => {
     document.body.innerHTML = ''
   })
 
+  describe('без чека (Д-3, ревью 12)', () => {
+    it('человек не из страны чеков — одна кнопка «Записать покупки», камеры и чеков нет', async () => {
+      const { view } = await render({ country: 'GE' })
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).not.toContain(ru.purchases.capture)
+      expect(receipts).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('чеки (MOL-127)', () => {
+    it('пока список чеков не ответил, «пусто» не говорится (ревью 7)', async () => {
+      receipts.mockReturnValue(new Promise(() => undefined))
+      const { view } = await render()
+      expect(view.text()).not.toContain(ru.purchases.empty.title)
+      expect(view.find('.skeleton').exists()).toBe(true)
+    })
+
+    it('список чеков упал — «пусто» нет, есть тихая строка о чеках (ревью 7)', async () => {
+      receipts.mockRejectedValue(new Error('HTTP 500'))
+      const { view } = await render()
+      expect(view.text()).not.toContain(ru.purchases.empty.title)
+      expect(view.text()).toContain(ru.purchases.receipts_error)
+    })
+
+    it('чек, доставленный этим телефоном целиком, — «разбираем», хоть список и прочитан раньше (Б1)', async () => {
+      const id = 'cccccccc-0000-4000-8000-000000000001'
+      const uploading = {
+        id,
+        status: 'uploading' as const,
+        failure: null,
+        parts: 2,
+        received: 1,
+        capturedAt: new Date(),
+        country: 'AM' as const,
+        language: 'ru' as const,
+        header: null,
+        total: null,
+        balanced: false,
+        lineCount: 0,
+        unsettled: 0,
+        place: null,
+        tripId: null,
+      }
+      receipts.mockResolvedValue({ receipts: [uploading] })
+      const stuck = await render()
+      expect(stuck.view.text()).toContain('не все части дошли')
+      while (mounted.length) mounted.pop()?.unmount()
+
+      const { view } = await render({
+        before: () => {
+          localStorage.setItem(
+            `molvia.receipt-delivered.${ME}`,
+            JSON.stringify({ [id]: Date.now() }),
+          )
+        },
+      })
+      expect(view.text()).not.toContain('не все части дошли')
+      expect(view.text()).toContain(ru.purchases.parsing_unknown)
+    })
+
+    it('тап по «не принят» открывает шторку и ничего не удаляет (ревью 8)', async () => {
+      const { view } = await render({
+        before: () => {
+          localStorage.setItem(
+            `molvia.receipt-rejected.${ME}`,
+            JSON.stringify([
+              {
+                key: 'k1',
+                code: 'error.receipt_not_photo',
+                at: Date.now(),
+                write: {
+                  kind: 'create',
+                  body: {
+                    id: 'cccccccc-0000-4000-8000-000000000001',
+                    parts: 1,
+                    country: 'AM',
+                    language: 'ru',
+                    capturedAt: new Date().toISOString(),
+                  },
+                },
+              },
+            ]),
+          )
+        },
+      })
+      const row = view.findAll('.purchase-row').find((one) => one.text().includes('Не принят'))
+      expect(row).toBeDefined()
+      await row?.trigger('click')
+      await flushPromises()
+      expect(openSheet()?.textContent).toContain(ru.purchases.remove)
+      // Still there until «Убрать» in the sheet.
+      expect(localStorage.getItem(`molvia.receipt-rejected.${ME}`)).toContain('k1')
+    })
+  })
+
   describe('пусто — только когда это известно (MOL-77)', () => {
     it('сервер ответил: записей нет — «Здесь будут ваши покупки», без круга, кнопка внизу', async () => {
       const { view } = await render()
       expect(view.text()).toContain(ru.purchases.empty.title)
       expect(view.find('.circle').exists()).toBe(false)
-      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).toContain(ru.purchases.capture)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
     })
 
     it('до ответа — скелет, а не «пусто»; кнопка внизу уже есть', async () => {
@@ -225,7 +340,7 @@ describe('PurchasesView (MOL-128)', () => {
       const { view } = await render()
       expect(view.find('.skeleton').exists()).toBe(true)
       expect(view.text()).not.toContain(ru.purchases.empty.title)
-      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).toContain(ru.purchases.capture)
     })
 
     it('ошибка без памяти — красное с одной «Повторить», «пусто» нет', async () => {
@@ -631,7 +746,7 @@ describe('PurchasesView (MOL-128)', () => {
 
     it('без открытой — «Где вы?», и после старта открывается сама запись', async () => {
       const { view, router, queue } = await render()
-      await view.get('.dock button').trigger('click')
+      await byHand(view).trigger('click')
       await flushPromises()
       clock += 1000
       const sheet = openSheet()
@@ -657,7 +772,7 @@ describe('PurchasesView (MOL-128)', () => {
     it('есть открытая — спрашивает; «Продолжить» ведёт в неё и ничего не пишет', async () => {
       currentTrip.mockResolvedValue(openTrip())
       const { view, router, queue } = await render()
-      await view.get('.dock button').trigger('click')
+      await byHand(view).trigger('click')
       await flushPromises()
       clock += 1000
       const sheet = openSheet()
@@ -673,7 +788,7 @@ describe('PurchasesView (MOL-128)', () => {
     it('«Закончить и начать новую» puts nothing away until the new one starts (Р-2)', async () => {
       currentTrip.mockResolvedValue(openTrip())
       const { view, queue } = await render()
-      await view.get('.dock button').trigger('click')
+      await byHand(view).trigger('click')
       await flushPromises()
       clock += 1000
 
@@ -702,7 +817,7 @@ describe('PurchasesView (MOL-128)', () => {
     it('«Где вы?» dismissed after «Закончить и начать новую» — the open record stays', async () => {
       currentTrip.mockResolvedValue(openTrip())
       const { view, queue } = await render()
-      await view.get('.dock button').trigger('click')
+      await byHand(view).trigger('click')
       await flushPromises()
       clock += 1000
       inside(openSheet(), ru.purchases.manual_ask.finish).click()
@@ -724,7 +839,7 @@ describe('PurchasesView (MOL-128)', () => {
 
     /** «Записать покупки» → «Закончить и начать новую» → «Где вы?» at `place`. */
     async function replaceWith(view: VueWrapper, place: string, asked?: () => void): Promise<void> {
-      await view.get('.dock button').trigger('click')
+      await byHand(view).trigger('click')
       await flushPromises()
       clock += 1000
       expect(openSheet()?.textContent).toContain('Уже записываете «Рынок»')

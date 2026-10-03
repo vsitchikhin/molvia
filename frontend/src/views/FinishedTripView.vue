@@ -13,6 +13,23 @@
       >
     </ScreenState>
     <template v-else>
+      <!-- «Записали N покупок» (5o): once, on arrival from the review of a receipt. -->
+      <ScreenState
+        v-if="recorded !== null"
+        kind="empty"
+        tone="good"
+        inline
+        :icon="IconCheck"
+        :title="t('receipt.recorded.title', { n: recorded }, recorded)"
+        :body="t('receipt.recorded.body')"
+      >
+        <template #action>
+          <AppButton variant="ghost" @click="toVerdicts">
+            <template #icon><IconStar /></template>
+            {{ t('receipt.recorded.to_verdicts') }}
+          </AppButton>
+        </template>
+      </ScreenState>
       <ScreenState
         v-if="trouble === 'error'"
         kind="error"
@@ -102,6 +119,8 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue'
+import IconCheck from '~icons/mdi/check-circle-outline'
+import IconStar from '~icons/mdi/star-outline'
 import AppScreen from '@/components/AppScreen.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -126,10 +145,11 @@ export default defineComponent({
     TripRow,
     TripTotal,
     TripRateNotes,
+    IconStar,
     ItemDetailsSheet,
     ReceiptSheet,
   },
-  setup: useFinishedTrip,
+  setup: () => ({ ...useFinishedTrip(), IconCheck }),
 })
 </script>
 

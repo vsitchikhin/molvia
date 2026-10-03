@@ -11,6 +11,13 @@ paths:
   - 'backend/src/catalogue-seed-nodes.ts'
   - 'backend/tests/{receipts,receipt-review,receipt-record}.integration.test.ts'
   - 'services/receipt-reader/**'
+  - 'frontend/src/receipts/**'
+  - 'frontend/src/stores/{receiptQueue,receiptDrafts}.ts'
+  - 'frontend/src/composables/{useReceipts,useReceipt,useReceiptCapture}.ts'
+  - 'frontend/src/components/{Capture*,Receipt*,ItemPickSheet}.vue'
+  - 'frontend/src/views/ReceiptView.vue'
+  - 'e2e/receipts.spec.ts'
+  - 'bin/fake-receipt-reader.mjs'
 ---
 
 # Receipts: the photo, the reader, the lines
@@ -366,3 +373,93 @@ breaks in it answers 500 with no traceback, and a connection broken under a requ
 
 **A head is what a reading found**: a receipt failed before any reading answers `header: null`, not
 four nulls (review А11). What the phone reads as «read» is the `status`, never `header !== null`.
+
+## On the phone (MOL-127)
+
+Requirements, decisions and the measurement of the photo check: `.scratch/tasks/requirements/MOL-127.md`,
+`.scratch/tasks/research/MOL-127-photo-check.md`.
+
+- **The version «с чеком» is the country's, not a flag** (Р-1, `useReceiptCapture`): a person whose
+  settings name a country `receiptCountrySchema` reads gets the camera in the strip of «Что брать» and
+  «Покупки», «Записать вручную» beside it, the newcomer's (а) and (б); anyone else the version «без
+  чека» of MOL-128. A receipt of a country the server does not read would be refused by the schema,
+  and a button that always ends in «не принят» is worse than none.
+- **A photo is made ready before it is queued** (`preparePhoto`): upright by its EXIF, drawn under
+  `CANVAS_PIXELS_MAX` (16 Mp — iOS draws no larger canvas, and an iPhone 15 shoots 24 Mp, Р-11), brought
+  to `RECEIPT_PHOTO_SIDE` (3 200, П-7) and encoded as JPEG, which carries no EXIF and so no place. What
+  the server would refuse — not a picture, under 200 px, over 8 MB — is «файл не открылся» in the sheet,
+  never a queued part. **The edges of the receipt are the person's, on a step still to come** (В-2: four
+  corners and straightening, drawn by Claude Design — prompt 12 of MOL-118): until it lands the whole
+  frame goes, which the reader reads worse (MOL-114).
+- **No check of sharpness** (В-3, measured): the variance of the Laplacian put am-06 — the receipt the
+  check was for — highest of all, and its width (695 px) is am-03's (719), which reads 17 of 18. A check
+  that cannot tell a bad photo from a good one teaches «Оставить так». The narrow-receipt warning is
+  left for the edges step, with a threshold from the till's grid (600 px), not from the bench.
+- **The receipts' queue is MOL-24's** (`receiptQueue`): storage is the queue, one window sends under
+  `navigator.locks`, a lost connection, a 5xx, a portal, a `401` hold it; `413`/`415` and a photo the
+  phone lost are «не принят» and take the later parts of the receipt along. The receipt, its parts in
+  order, removal and «Вернуть», and «Записать» are writes of the one queue, so a part never overtakes
+  the receipt that names it and «Записать» never a removal. «Выйти» waits for it after the trip's and
+  the spendings' (`whileReceiptsAreStill`).
+- **The bytes are on a shelf of their own, in IndexedDB** (`photoShelf`): a database per owner, so
+  «Выйти» and erasure take it by its name (`forgetPhotos`, from `forgetOwner` and, awaited, from «Выйти»).
+  Written before the write that names them; read when the part is sent. **Kept until the receipt is
+  recorded, removed or gone from the server**, not until it is sent: the server gives no photo back, and
+  «не разобран» shows the parts from this phone — from another phone it says so. Each list read lets go of
+  what no receipt names any more, sparing the last ten minutes.
+- **«Покупки» is the queue and `GET /receipts`, one row per receipt** (`useReceipts`): the phone's state
+  first — «ждёт связи», «не принят», «запишем, когда появится связь» — then the server's; recorded is a
+  row of «Записаны» («· из чека»), being removed is nowhere. Asked every five seconds while one is read
+  and the screen is in view (Р-4). The list says «не сходится» only: «проверьте» is counted by the server
+  when a receipt is read (the memory over the parse), so it is the review's (Р-9).
+- **The review's arithmetic is the model's** (В-6, `receipts/review.ts`): «Строки», the difference, its
+  line and «Записать N» are `receiptBalance` over the server's `amount` or the person's edit; no sum is
+  the phone's own. **The edits are a draft on the phone** (`receiptDrafts`), only what was changed, so a
+  line left alone follows the server, which may still learn it from the memory; they work with no
+  connection, and the receipt itself is kept for the review offline (`useReceipt`). **«Записать» sends
+  the whole receipt under a trip the phone names**, through the queue: a double tap and a repeat are one
+  record, and with no connection the screen goes back to «Покупки» (Р-5) — from the place's sheet too,
+  once its step has landed (`afterStep`, review 34: a move made from its `onClosed` was dropped as a
+  second tap, and the person stayed on a locked review). **The day of the purchases is the server's
+  rule** (`isRateDay`, not after the phone's today — or the day the sheet opened with, while the server
+  takes it: a receipt printed after Yerevan's midnight on a phone west of it, adversarial В1). After the answer
+  `router.replace` gives way to the purchases, and «Записали N покупок» comes in the history's state —
+  said once, never on a reload.
+- **«Итог чека» is a button** (Р-8): OCR misses the total on half the receipts, and the trip's money is
+  the receipt's total (MOL-78); the person's total goes as `total`. **It turns В-5 again**: with the
+  person's total the amounts of the lines not edited are `recordedSums` over their figures and that
+  total, so a printed sum the total confirms is what is recorded (review 4).
+- **A figure edited is the person's figure**: «≠» of the reading goes with it, «проверьте» only
+  once the item is chosen (`confirmed`), and «Сохранить» with nothing changed writes no draft — the
+  line goes on following the server and the shop's memory (review 16). **The draft holds the figures
+  only once they changed** (`figures`, review 28): the sum in the field is prefilled, and written with
+  an item chosen it froze the line — the item and then the total recorded 890, the total and then the
+  item 980, for the same taps. Left alone, the line's sum is the server's or the person's total's,
+  whatever was edited around it. «Не записывать» and «Вернуть в запись» are written at once, with no
+  figure checked (review 17).
+- **While «Записать» waits the receipt is what was sent** (review 5, adversarial А1): no line, place,
+  total or removal opens; the answer moves only the review that asked, never a screen the person went
+  to meanwhile (А5). A removal of a recorded receipt (409) is done, never «не принят». **The price,
+  named** (adversarial round 2): a record the server answers 5xx again and again is held by MOL-24's
+  rule for good, the receipt locked and the receipts behind it waiting — as a trip's write holds its
+  queue. There is no «cancel the record»: the handoff has none, and a 5xx on one receipt is a defect
+  the owner hears of (MOL-143).
+- **«Не принят» is a photo's word**: only a refused announcement or part makes that row, dated by the
+  moment of the refusal; a tap opens the sheet with the reason and «Убрать», never removes by itself.
+  **A receipt the server holds with parts missing and this phone none of them** is «не все части
+  дошли», with «Удалить», and asked about by nobody: the list is asked again only while one is read
+  (adversarial А2). **Not one this phone delivered whole** (`delivered`, review 29, adversarial Б1):
+  the last part leaves the queue as it lands, and the list read before still says `uploading` — for a
+  moment always, for good when the next read fails at the till; the server never goes back to
+  `uploading` after the last part, so such a receipt is being read until the list says where it is.
+  Kept on the phone, for the read may be a restart away. A removal takes the parts still waiting out of the queue, and «Вернуть» puts them
+  back (А3).
+- **The line's sheet is its own** (`ReceiptLineSheet`), with the box of «За единицу» and «Тут дешевле»
+  of the purchase's sheet — the same keys and `useCheaperHint`: a line writes into a draft, the
+  purchase's sheet into the trip's queue, and one component for both would carry both. Its currency is
+  the receipt's, never chosen.
+- **The printed line is set in the system's face** (`--font-printed`): Onest has no Armenian, Georgian
+  or Serbian; one line of a fixed height, so a word in another script does not move the row.
+- **End-to-end reads with a fake** (`bin/fake-receipt-reader.mjs`, Р-7) — the bench's reading of am-05
+  for every photo — so a receipt taken in the browser goes the whole way; the copy's own Tesseract is
+  never asked by a run.

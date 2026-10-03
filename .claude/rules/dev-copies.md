@@ -31,7 +31,8 @@ the tasks. The command is in `docs/tracker.md`.
 The band is ten ports wide, so the neighbouring one is always free: a run at `+1` coexists
 with `make dev` instead of taking it over, and the built app a worker is tested against takes
 `+2` of the PWA's (MOL-132), and the fake of Open Food Facts the run's API asks takes the next of
-the API's, `+2` of its band (MOL-162). **A copy whose `.env` predates MOL-60 needs
+the API's, `+2` of its band (MOL-162); the copy's own Tesseract (`make reader`) is `+3`, and the
+fake receipt reader of a run `+4` of the band, the run's API `+3` (MOL-127). **A copy whose `.env` predates MOL-60 needs
 `bin/init-env.sh <index> --force` once** — `make setup` keeps an existing `.env`, and
 without the three `E2E_*` values playwright refuses to start and says exactly that.
 **`--force` carries `TELEGRAM_BOT_TOKEN` over**: everything else in the file is computed

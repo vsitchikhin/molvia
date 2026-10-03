@@ -32,6 +32,7 @@ const removeTrip = vi.fn<(tripId: string) => Promise<void>>()
 const restoreTrip = vi.fn()
 vi.mock('@/api', () => ({
   api: {
+    receipts: () => Promise.resolve({ receipts: [] }),
     currentTrip: () => currentTrip(),
     tripHistory: () => tripHistory(),
     pendingVerdicts: () => pendingVerdicts(),
@@ -206,6 +207,15 @@ async function render({ memory = null as TripViewModel | null, settings = true }
 /** The app as far as screens go: whichever the router is on. */
 const App = defineComponent(() => () => h(RouterView))
 
+/** «Записать вручную»: with receipts the camera is the strip's first button (MOL-127, Р-1). */
+function byHand(view: VueWrapper) {
+  const found = view
+    .findAll('.dock button')
+    .find((node) => node.text().includes(ru.purchases.manual_by_hand))
+  if (!found) throw new Error('нет «Записать вручную» в полосе')
+  return found
+}
+
 describe('TripView', () => {
   beforeEach(() => {
     localStorage.clear()
@@ -241,13 +251,13 @@ describe('TripView', () => {
   it('без похода предлагает начать, а не показывает пустой список', async () => {
     const { view } = await render()
     expect(view.text()).toContain(ru.purchases.empty.title)
-    expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+    expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
   })
 
   describe('без открытой записи — «Покупки» (MOL-77, MOL-128)', () => {
     it('«Начать поход» — в полосе над таб-баром, и кругов с «+» на экране нет', async () => {
       const { view } = await render()
-      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
       expect(view.find('.circle').exists()).toBe(false)
       // Призрачную «Историю походов» заменяет «Вся история» главной.
       expect(view.findAll('button').some((b) => b.text() === ru.trip.history.title)).toBe(false)
@@ -259,7 +269,7 @@ describe('TripView', () => {
       const { view } = await render()
       // No record known, so the screen is «Покупки», and its one red block says what failed.
       expect(view.text()).toContain(ru.purchases.error.title)
-      await view.get('.dock button').trigger('click')
+      await byHand(view).trigger('click')
       await flushPromises()
       expect(document.body.querySelector('dialog[open]')?.textContent).toContain(
         ru.trip.start.title,
@@ -286,7 +296,7 @@ describe('TripView', () => {
     it('при открытом походе в полосе — итог, а «Начать поход» нет', async () => {
       currentTrip.mockResolvedValue(trip(handoff()))
       const { view } = await render()
-      expect(view.get('.dock').text()).not.toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).not.toContain(ru.purchases.manual_by_hand)
     })
   })
 
@@ -583,7 +593,7 @@ describe('TripView', () => {
       inside(document.body.querySelector('dialog[open]'), ru.trip.finish_confirm.ok).click()
       await flushPromises()
 
-      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
       // На iOS фонового обмена нет: молчание здесь — это покупка, о которой никто не узнает.
       expect(view.text()).toContain('1 покупка ещё не отправлена')
     })
@@ -910,7 +920,7 @@ describe('TripView', () => {
       await flushPromises()
 
       // Поход закончился, а покупка так и не записана — спрятать её значит потерять.
-      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
       expect(view.text()).toContain(ru.trip.rejected.drop)
       expect(queue.rejected).toHaveLength(1)
     })
@@ -968,7 +978,7 @@ describe('TripView', () => {
       vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
       const { view } = await render()
 
-      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
       // Иначе поход, который сервер держит, но о котором не спросили, читается как «похода нет».
       // Своими словами главной: начать можно и без сети — и одно уведомление, а не два.
       expect(view.text()).toContain(ru.trip.history.offline_title)
@@ -993,7 +1003,7 @@ describe('TripView', () => {
     it('«Начать поход» пишет поход в очередь и рисует его сразу — сеть не ждём', async () => {
       recentPlaces.mockRejectedValue(new Error('Failed to fetch'))
       const { view, queue } = await render()
-      await view.get('.dock button').trigger('click')
+      await byHand(view).trigger('click')
       await flushPromises()
       clock += 1000
 
@@ -1019,7 +1029,7 @@ describe('TripView', () => {
         { id: 'aaaaaaaa-0000-4000-8000-000000000002', kind: 'store', name: 'Ереван Сити' },
       ])
       const { view, queue } = await render()
-      await view.get('.dock button').trigger('click')
+      await byHand(view).trigger('click')
       await flushPromises()
       clock += 1000
 
@@ -1052,7 +1062,7 @@ describe('TripView', () => {
       await flushPromises()
 
       expect(queue.pending.some((write) => write.kind === 'finish')).toBe(true)
-      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
       expect(view.findAll('.row')).toHaveLength(0)
     })
   })
@@ -1223,7 +1233,7 @@ describe('TripView', () => {
 
       expect(openSheet()).toBeNull()
       expect(queue.pending).toEqual([{ kind: 'delete', tripId: TRIP }])
-      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
       expect(view.get('.dock').text()).toContain('Запись удалена: Ереван Сити')
 
       await button(view, ru.trip.remove.restore).trigger('click')
@@ -1253,7 +1263,7 @@ describe('TripView', () => {
       inside(sheet, ru.trip.remove.action).click()
       await flushPromises()
       expect(queue.pending).toEqual([{ kind: 'delete', tripId: TRIP }])
-      expect(view.get('.dock').text()).toContain(ru.purchases.manual)
+      expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
     })
 
     it('«Завершить» у пустого похода предлагает удалить, а завершить — вторым (В-2)', async () => {

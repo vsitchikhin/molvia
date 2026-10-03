@@ -111,8 +111,9 @@ test('an offline trip keeps the context captured before another device changed s
     actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
   )
   await page.context().setOffline(true)
-  // The newcomer's «Что брать» holds «Записать покупки» in its strip (MOL-128).
-  await page.getByRole('button', { name: 'Записать покупки', exact: true }).click()
+  // The newcomer's «Что брать» holds «Записать вручную» under the cycle; the strip is the camera's
+  // (MOL-127).
+  await page.getByRole('button', { name: 'Записать вручную', exact: true }).click()
   const sheet = page.locator('dialog[open]')
   await expect(sheet).toBeVisible()
   await page.waitForTimeout(400)

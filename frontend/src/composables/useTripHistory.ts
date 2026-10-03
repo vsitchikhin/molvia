@@ -5,6 +5,7 @@ import type { Money } from '@molvia/model'
 import { useRouter } from 'vue-router'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
+import { useReceiptQueueStore } from '@/stores/receiptQueue'
 import { useActorStore } from '@/stores/actor'
 import { reportFailure } from '@/failures'
 import { useReconnect } from './useReconnect'
@@ -18,6 +19,8 @@ export interface HistoryRow {
   /** The server's count and sums (В-4); `null` where only the phone knows the row. */
   itemCount: number | null
   total: readonly Money[] | null
+  /** Recorded from a receipt (MOL-126): «· из чека» beside the count (MOL-127, С-5 of MOL-128). */
+  fromReceipt: boolean
 }
 interface TripHistoryScreen {
   t: ReturnType<typeof useI18n>['t']
@@ -37,6 +40,7 @@ const RETRY_PAUSE_MS = 400
 export function useTripHistory(): TripHistoryScreen {
   const history = useTripHistoryStore()
   const queue = useTripQueueStore()
+  const receipts = useReceiptQueueStore()
   const actor = useActorStore()
   const router = useRouter()
   const { t } = useI18n()
@@ -60,6 +64,7 @@ export function useTripHistory(): TripHistoryScreen {
           pending: false,
           itemCount: row.itemCount,
           total: row.total,
+          fromReceipt: row.fromReceipt,
         },
       ]),
     )
@@ -73,6 +78,7 @@ export function useTripHistory(): TripHistoryScreen {
         pending: false,
         itemCount: saved.expenses.length,
         total: saved.total,
+        fromReceipt: saved.receiptId !== null,
       })
     }
     for (const row of history.local) {
@@ -88,6 +94,7 @@ export function useTripHistory(): TripHistoryScreen {
           // holds of this record, and read as the total it was not (review Р-10).
           itemCount: null,
           total: null,
+          fromReceipt: false,
         })
     }
     // A removal still waiting takes the row off every list at once (MOL-76).
@@ -129,6 +136,21 @@ export function useTripHistory(): TripHistoryScreen {
   )
   useReconnect(() => {
     if (!loading.value) void load()
+  })
+  // A receipt recorded is a finished record the server made (MOL-127): «Записаны» is read again —
+  // after a load already on its way, which may have set out before the record landed (review 15).
+  let again = false
+  watch(
+    () => receipts.recorded.length,
+    () => {
+      if (loading.value) again = true
+      else void load()
+    },
+  )
+  watch(loading, (now) => {
+    if (now || !again) return
+    again = false
+    void load()
   })
   // A screen taken away ends its asking: a retry asleep in its pause would otherwise wake and go
   // for the history again with nobody to show it to (round 3, И1).

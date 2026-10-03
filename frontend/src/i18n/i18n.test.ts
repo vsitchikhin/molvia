@@ -110,7 +110,7 @@ describe('словарь: повторяющиеся тексты', () => {
     expect(duplicates(RU)).toEqual({
       // Один глагол у трёх шторок: закончить с балансом счёта, с цифрами штрихкода (MOL-98) и с
       // отправленным сообщением разработчику (MOL-147).
-      Готово: ['accounts.done', 'feedback.done', 'scanner.done'],
+      Готово: ['accounts.done', 'feedback.done', 'receipt.place.done', 'scanner.done'],
       // Строка входа и заголовок шторки, которую она открывает, — одни слова (MOL-147): человек
       // видит, что попал туда, куда нажал. И у ссылки экрана ошибки так же.
       'Написать разработчику': ['feedback.title', 'settings.feedback.label'],
@@ -137,11 +137,25 @@ describe('словарь: повторяющиеся тексты', () => {
         'accounts.sheet.save',
         'budget.sheet.save',
         'item.save_edit',
+        'receipt.line.save',
         'settings.save',
         'trip.receipt.sheet.save',
       ],
-      // Цена Р-2: одно состояние, написанное для трёх экранов.
-      'Сервер не ответил': ['advice.error.title', 'item.error.title', 'trip.error.title'],
+      // Цена Р-2: одно состояние, написанное для трёх экранов, и у просмотра чека своё (MOL-127).
+      'Сервер не ответил': [
+        'advice.error.title',
+        'item.error.title',
+        'receipt.review.error.title',
+        'trip.error.title',
+      ],
+      // Кнопка полосы и заголовок шторки, которую она открывает, — одни слова (MOL-127), как у
+      // «Написать разработчику».
+      'Сфотографировать чек': ['purchases.capture', 'receipt.capture.title'],
+      // Шторка места чека и шторка траты спрашивают о дне одним словом (MOL-127).
+      Когда: ['receipt.place.when', 'spending.sheet.date'],
+      // Выход с экрана чека, которого больше нет, и с шторки покупки без записи — одни слова о
+      // том же месте (MOL-127).
+      'К покупкам': ['item.no_trip.action', 'receipt.gone.action'],
       // Та же цена у офлайна: у настроек, у обменов, у доходов и у устройств своё состояние
       // (MOL-40, MOL-57, MOL-66).
       'Нет связи': [
@@ -182,7 +196,13 @@ describe('словарь: повторяющиеся тексты', () => {
       'Сейчас записано: {details}': ['exchange.sheet.current', 'income.sheet.current'],
       // «Деньги» (MOL-82): одно действие над отказом очереди — как у покупки похода; экран и
       // строка, которая к нему ведёт; «Прочее» и «Сумма» — одни слова у дохода и у траты.
-      Убрать: ['spending.categories.remove', 'spending.sheet.dismiss', 'trip.rejected.drop'],
+      // И «не принят» у чека — тот же отказ очереди (MOL-127).
+      Убрать: [
+        'purchases.remove',
+        'spending.categories.remove',
+        'spending.sheet.dismiss',
+        'trip.rejected.drop',
+      ],
       Категории: ['spending.categories.title', 'spending.categories_link'],
       Прочее: ['income.source.other', 'spending.category.other'],
       // И сегмент плана «Бюджета» — сумма против доли пришедшего (MOL-117).
@@ -225,7 +245,7 @@ describe('словарь: повторяющиеся тексты', () => {
     // проверка по обоим.
     expect(duplicates(EN)).toEqual({
       // One verb for two sheets, as in Russian: an account's balance, a barcode's digits (MOL-98).
-      Done: ['accounts.done', 'feedback.done', 'scanner.done'],
+      Done: ['accounts.done', 'feedback.done', 'receipt.place.done', 'scanner.done'],
       'Write to the developer': ['feedback.title', 'settings.feedback.label'],
       'Report a problem': ['feedback.title_error', 'state.report'],
       'Sending…': ['feedback.sending', 'spending.pending'],
@@ -236,6 +256,14 @@ describe('словарь: повторяющиеся тексты', () => {
         'trip.history.title',
       ],
       Finish: ['trip.finish', 'trip.finish_confirm.ok'],
+      // The receipt's sum of a record and the total of a receipt are one phrase in English (MOL-127).
+      'Receipt total': ['receipt.review.total', 'trip.receipt.sheet.title'],
+      'Photograph a receipt': ['purchases.capture', 'receipt.capture.title'],
+      When: ['receipt.place.when', 'spending.sheet.date'],
+      // «Товар» of a receipt line and a purchase not named yet: one word in English.
+      Item: ['receipt.line.product', 'trip.queued.unnamed'],
+      // «проверьте» on a receipt line and «сверить» of a check: one verb in English.
+      check: ['accounts.reconcile.note', 'receipt.review.tag_check'],
       // The screen's title and the way to it from «Where it went» (MOL-156), as in Russian.
       Charts: ['spending.charts.title', 'spending.summary.charts'],
       // «Куда ушли» on «Деньги» and «Куда ушло» on «Графики» (MOL-158): one phrase in English.
@@ -262,6 +290,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'accounts.sheet.save',
         'budget.sheet.save',
         'item.save_edit',
+        'receipt.line.save',
         'settings.save',
         'trip.receipt.sheet.save',
       ],
@@ -355,6 +384,7 @@ describe('словарь: плюральные формы', () => {
       'trip.rejected.orphaned',
       'trip.caveat.pending',
       'trip.unsent.title',
+      'purchases.issues_mismatch',
       'item.results_announced',
       'item.far_announced',
       'advice.ratings_count',
@@ -382,6 +412,9 @@ describe('словарь: плюральные формы', () => {
       'accounts.screen.uncounted',
       'accounts.account.more',
       'accounts.reconcile.cause_trip_unpriced_meta',
+      'receipt.capture.parts',
+      'receipt.review.record',
+      'receipt.recorded.title',
     ])
   })
 })

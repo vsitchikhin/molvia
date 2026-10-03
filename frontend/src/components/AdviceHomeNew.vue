@@ -4,18 +4,22 @@
          over a queue not yet answered told a person with twelve purchases they had none
          (adversarial В) — so until it answers, the skeleton; with no answer to be had, nothing. -->
     <div v-if="variant !== 'unknown'" class="intro">
-      <h2 class="intro-title">
-        {{ variant === 'pending' ? t('advice.home.pending.title') : t('advice.home.new.title') }}
-      </h2>
-      <p class="intro-body">
-        {{
-          variant === 'pending'
-            ? t('advice.home.pending.body')
-            : t('advice.home.new.body', { app: t('app.name') })
-        }}
-      </p>
+      <h2 class="intro-title">{{ t(INTRO[variant].title) }}</h2>
+      <p class="intro-body">{{ t(INTRO[variant].body, { app: t('app.name') }) }}</p>
     </div>
     <ScreenSkeleton v-else-if="asking" :groups="[70]" />
+
+    <!-- (б): the first receipt is being read (MOL-127) — its row, which leads to «Покупки». -->
+    <AppReveal>
+      <AppCard v-if="variant === 'parsing' && reading" class="pending" list>
+        <PurchaseRow
+          :icon="underWay?.state === 'parsing' ? IconSync : IconCloudUpload"
+          :title="t('purchases.group_working')"
+          :meta="underWayMeta"
+          @open="goTab('purchases')"
+        />
+      </AppCard>
+    </AppReveal>
 
     <!-- (в): purchases recorded and none rated — the one thing left to do, and where. -->
     <AppReveal>
@@ -38,8 +42,20 @@
         <button class="line link" type="button" @click="goTab('purchases')">
           <IconCart class="icon" aria-hidden="true" />
           <span class="text">
-            <span class="title">{{ t('advice.home.step_purchases_title') }}</span>
-            <span class="sub">{{ t('advice.home.step_purchases_body') }}</span>
+            <span class="title">{{
+              t(
+                country
+                  ? 'advice.home.step_purchases_capture_title'
+                  : 'advice.home.step_purchases_title',
+              )
+            }}</span>
+            <span class="sub">{{
+              t(
+                country
+                  ? 'advice.home.step_purchases_capture_body'
+                  : 'advice.home.step_purchases_body',
+              )
+            }}</span>
           </span>
           <IconChevronRight class="chevron" aria-hidden="true" />
         </button>
@@ -63,6 +79,13 @@
       </li>
     </AppCard>
 
+    <!-- With receipts the strip holds the camera, and the record typed by hand is a row of its own
+         under the cycle (2a): at the market, or with the receipt lost. -->
+    <div v-if="country" class="by-hand">
+      <ManualEntryButton by-hand @busy="$emit('busy', $event)" />
+      <p class="by-hand-note">{{ t('advice.home.manual_body') }}</p>
+    </div>
+
     <p class="trust">{{ t('advice.home.trust') }}</p>
   </div>
 </template>
@@ -74,11 +97,16 @@ import IconCart from '~icons/mdi/cart-outline'
 import IconChevronRight from '~icons/mdi/chevron-right'
 import IconLightbulb from '~icons/mdi/lightbulb-on-outline'
 import IconStar from '~icons/mdi/star-outline'
+import IconSync from '~icons/mdi/sync'
+import IconCloudUpload from '~icons/mdi/cloud-upload-outline'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
+import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import PurchaseRow from '@/components/PurchaseRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import { usePendingFrom } from '@/composables/usePendingFrom'
+import { useReceiptCapture } from '@/composables/useReceiptCapture'
+import { UNDER_WAY, useReceipts } from '@/composables/useReceipts'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
 import { useNavigation } from '@/navigation'
 
@@ -87,9 +115,10 @@ import { useNavigation } from '@/navigation'
  * new person meets, and an offer to act rather than «no data». Moved here from «Поход» (MOL-77):
  * the cycle is the same, and it starts where the app now opens.
  *
- * Without a receipt yet (В-7): (а) «Запишите первые покупки», or (в) «Осталось оценить» once
- * purchases wait for a verdict. The receipt's (б) comes with MOL-127. «Записать покупки» is not
- * here: it stands in the strip above the tab bar, under the thumb.
+ * With receipts (MOL-127, handoff v2 02): (а) «Сфотографируйте первый чек», (б) «Первый чек
+ * разбираем» while one is read, (в) «Осталось оценить» once purchases wait for a verdict; the camera
+ * stands in the strip, «Записать вручную» is a row under the cycle. Without (Д-3): (а) «Запишите
+ * первые покупки» or (в), and «Записать покупки» in the strip.
  *
  * Only the person's own data: other people's figures are behind access (MOL-31).
  */
@@ -102,20 +131,57 @@ export default defineComponent({
     IconChevronRight,
     IconLightbulb,
     IconStar,
+    ManualEntryButton,
     PurchaseRow,
     ScreenSkeleton,
+  },
+  emits: {
+    /** «Записать вручную» has a sheet up: the screen keeps this mounted meanwhile (review 6, Р-15). */
+    busy: (up: boolean) => typeof up === 'boolean',
   },
   setup() {
     const { t } = useI18n()
     const { goTab } = useNavigation()
     const queue = useVerdictQueue()
     const pending = computed(() => queue.count.value)
+    const { country } = useReceiptCapture()
+    const receipts = useReceipts()
+    // Only a receipt being sent or read: a refused or stuck one is not «разбираем» (А4, review 11).
+    const underWay = computed(() =>
+      country.value === null
+        ? null
+        : (receipts.rows.value.find((row) => UNDER_WAY.includes(row.state)) ?? null),
+    )
+    const reading = computed(() => underWay.value !== null)
+    const underWayMeta = computed(() => {
+      const row = underWay.value
+      if (!row) return null
+      const parts = t('receipt.capture.parts', { n: row.parts }, row.parts)
+      if (row.state === 'waiting') return t('purchases.waiting', { parts })
+      if (row.state === 'sending') return t('purchases.sending', { parts })
+      return t('purchases.parsing_unknown')
+    })
+    const INTRO = computed(() => ({
+      pending: { title: 'advice.home.pending.title', body: 'advice.home.pending.body' },
+      parsing: { title: 'advice.home.parsing.title', body: 'advice.home.parsing.body' },
+      new: country.value
+        ? { title: 'advice.home.new_capture.title', body: 'advice.home.new_capture.body' }
+        : { title: 'advice.home.new.title', body: 'advice.home.new.body' },
+    }))
     return {
       t,
       IconStar,
+      IconSync,
+      IconCloudUpload,
+      underWay,
+      underWayMeta,
       pending,
-      variant: computed<'pending' | 'new' | 'unknown'>(() => {
+      country,
+      reading,
+      INTRO,
+      variant: computed<'pending' | 'parsing' | 'new' | 'unknown'>(() => {
         if (pending.value > 0) return 'pending'
+        if (reading.value) return 'parsing'
         return queue.phase.value === 'empty' ? 'new' : 'unknown'
       }),
       asking: computed(() => queue.phase.value === 'loading'),
@@ -228,6 +294,17 @@ export default defineComponent({
 
   font-size: var(--icon);
   color: var(--text-muted);
+}
+
+.by-hand {
+  margin-top: var(--space-2);
+}
+
+.by-hand-note {
+  margin: 0 var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+  text-align: center;
 }
 
 .trust {

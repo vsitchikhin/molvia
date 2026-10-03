@@ -6,6 +6,7 @@ import AdviceView from '@/views/AdviceView.vue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 import FinishedTripView from '@/views/FinishedTripView.vue'
 import PurchasesView from '@/views/PurchasesView.vue'
+import ReceiptView from '@/views/ReceiptView.vue'
 import TripView from '@/views/TripView.vue'
 import ExchangeView from '@/views/ExchangeView.vue'
 import IncomesView from '@/views/IncomesView.vue'
@@ -30,6 +31,7 @@ export type RouteName =
   | 'advice'
   | 'purchases'
   | 'purchase-manual'
+  | 'purchase-receipt'
   | 'verdicts'
   | 'money'
   | 'money-spendings'
@@ -120,6 +122,14 @@ export const routes = [
     name: 'item-search',
     component: ItemSearchView,
     meta: { titleKey: 'item.search_title', parent: 'purchase-manual' },
+  },
+  // A receipt before it is recorded (MOL-127). Before the records by id: a static segment outranks
+  // a parameter, and `receipts` must never be read as a trip.
+  {
+    path: '/purchases/receipts/:receiptId',
+    name: 'purchase-receipt',
+    component: ReceiptView,
+    meta: { titleKey: 'receipt.review.title_loading', parent: 'purchases' },
   },
   {
     path: '/purchases/:tripId',

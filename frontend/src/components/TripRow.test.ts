@@ -46,6 +46,31 @@ const render = (over: Over = {}) =>
   mount(TripRow, { props: { row: row(over) }, global: { plugins: [createAppI18n('ru')] } })
 
 describe('TripRow', () => {
+  it('покупка из чека несёт под собой строку, как её напечатала касса (MOL-127, 5o)', () => {
+    const printed = 'ԿԱԹ ԱՇԽԱՐՀ 3.2% 1L'
+    const view = mount(TripRow, {
+      props: {
+        row: {
+          ...row(),
+          expense: {
+            id: 'eeeeeeee-0000-4000-8000-000000000001',
+            createdAt: new Date(),
+            item: milk,
+            quantity: parseQuantity('1', 'l'),
+            amount: parseMoney('590', 'AMD'),
+            unitPrice: null,
+            printed,
+            discount: null,
+          },
+        },
+      },
+      global: { plugins: [createAppI18n('ru')] },
+    })
+    expect(view.get('.printed').text()).toBe(printed)
+    // A purchase typed by hand has none, and no empty line stands in for it.
+    expect(render().find('.printed').exists()).toBe(false)
+  })
+
   it('печатает цену как на ценнике и цену за единицу — ради неё строка и существует', () => {
     const view = render()
     expect(plain(view)).toContain('0,9 л')

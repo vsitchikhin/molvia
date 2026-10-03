@@ -297,7 +297,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 - **Every write to a trip goes through the queue on the device (MOL-24)**, online or not; storage
   is the queue, one window sends at a time under `navigator.locks`, and a refusal other than the
-  ones that hold is set aside, never retried.
+  ones that hold is set aside, never retried. A receipt — its parts, removal, «Записать» — goes
+  through a queue of its own by the same rules (`receiptQueue`, MOL-127).
 - **A removed trip is marked** (MOL-76): «Вернуть» for ten minutes, **every reader filters the
   mark** except erasure, the timer and an account's «удалить или убрать».
 - **A trip names its own geography** (`context`, MOL-65): a start without one is
@@ -510,6 +511,13 @@ that are easiest to break; the file holds every rule of the area and the reason 
   another person's shelf price only with access and from three prices, their lower median.
 - **A place keeps no tax number**: the place of a seller is where its receipts were recorded, read as
   the memory is; a recorded receipt is not removed while its trip is there — its row dates the trip.
+- **On the phone (MOL-127) a receipt is the country's version, never a flag** (Р-1); its photo is
+  upright, under 16 Mp, at most 3 200 px and JPEG without EXIF before it is queued; **its bytes live
+  in IndexedDB until the receipt is recorded, removed or gone** — the server gives no photo back —
+  a database per owner that «Выйти» takes by its name.
+- **The review is the server's reading with the phone's draft over it** (MOL-127): the arithmetic
+  is the model's (В-6), «Записать» sends the whole receipt under a trip the phone names through the
+  queue, and `router.replace` gives way to the purchases.
 - **«Записать» is the whole receipt in one transaction** (`recordReceipt`): a trip finished on the
   receipt's day at its rate, its money the total the phone sends, else the printed one not below the
   lines, else the lines; the owner's lock first; the same trip again is the
@@ -803,8 +811,11 @@ database access. In a product about data integrity, two write paths will silentl
   `unitPrice()` and `convertMoney()` of `packages/model` — the very functions the server calls.
   At the shelf with no connection the price per litre is needed now, to decide whether to take
   the thing. **And «Тут дешевле» (MOL-92) compares that price with the person's own past ones
-  through `cheaperHint`** — the server sends the prices and cannot know what is typed. Once
-  written, every number on screen is the server's; the phone never adds up a total, not even for
+  through `cheaperHint`** — the server sends the prices and cannot know what is typed. **And a
+  receipt under review (MOL-127, В-6)**: before it is recorded, «Строки», «≠», the difference with
+  the total and «Записать N» are `receiptBalance` and the line rules of `receipt-sum.ts` — the
+  functions the server records by — and the edits are a draft on the phone that needs no connection.
+  Once written, every number on screen is the server's; the phone never adds up a total, not even for
   rows still in the queue.
 - Split components so they are not overloaded, but without five wrappers around one tag.
   One well-scoped component beats five trivial ones.

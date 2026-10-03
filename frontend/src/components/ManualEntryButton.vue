@@ -1,5 +1,9 @@
 <template>
-  <AppButton size="large" block @click="begin">
+  <!-- With receipts it is the quieter second way, «Записать вручную» under the camera (handoff 03). -->
+  <AppButton v-if="byHand" variant="ghost" block @click="begin">
+    {{ t('purchases.manual_by_hand') }}
+  </AppButton>
+  <AppButton v-else size="large" block @click="begin">
     <template #icon><IconPencil /></template>
     {{ t('purchases.manual') }}
   </AppButton>
@@ -57,6 +61,10 @@ import { useTripQueueStore } from '@/stores/tripQueue'
 export default defineComponent({
   name: 'ManualEntryButton',
   components: { AppButton, BottomSheet, IconPencil, StartTripSheet },
+  props: {
+    /** The version «с чеком» (Д-3): the second button of the strip, «Записать вручную». */
+    byHand: { type: Boolean, default: false },
+  },
   emits: {
     /** Whether a sheet of its own is up: the screen keeps the button mounted meanwhile (Р-15). */
     busy: (up: boolean) => typeof up === 'boolean',

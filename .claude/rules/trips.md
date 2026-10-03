@@ -48,6 +48,9 @@ The detail behind the trip lines of `CLAUDE.md`.
   shelf with no signal still knows where a purchase goes — but **the memory is for when the
   server cannot be asked, not instead of asking**: the sheet asks every time it opens, and a
   trip answered finished stops being the current one.
+- **A receipt has a queue of its own by these rules** (`receiptQueue`, MOL-127): the receipt, its
+  parts, removal and «Вернуть», and «Записать» — which makes a finished trip under an id the phone
+  names, so a repeat is the same trip. Its bytes are IndexedDB's, not a shelf's — `receipts.md`.
 
 ## Removing a trip
 

@@ -69,11 +69,12 @@ const recorded = (page: Page, place: string) =>
   page.locator('.recorded .purchase-row').filter({ hasText: place })
 
 /**
- * «Записать покупки» stands in the strip of «Покупки» and of the newcomer's «Что брать» (MOL-128);
- * once «Где вы?» is answered the record itself opens.
+ * «Записать вручную» stands in the strip of «Покупки» and under the cycle of the newcomer's «Что
+ * брать» — the camera is the first way in for a person in Armenia (MOL-127); once «Где вы?» is
+ * answered the record itself opens.
  */
 async function startTrip(page: Page, place: string): Promise<void> {
-  await page.getByRole('button', { name: 'Record purchases' }).click()
+  await page.getByRole('button', { name: 'Add by hand' }).click()
   await expect(sheet(page)).toContainText('Where are you?')
   // The sheet takes no tap while it rises.
   await page.waitForTimeout(400)
@@ -167,7 +168,7 @@ test.describe('the trip', () => {
     // Over on the phone at once — the record goes up to «Покупки» — and over on the server as soon
     // as the queue has been out (MOL-128).
     await expect(page).toHaveURL(/\/purchases$/)
-    await expect(page.getByRole('button', { name: 'Record purchases' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add by hand' })).toBeVisible()
     await expect.poll(setting.current).toBeNull()
 
     // «Записаны» lists the record just finished, and opens it.
@@ -216,7 +217,7 @@ test.describe('the trip', () => {
     await expect(sheet(page)).toContainText('1 item')
     await page.waitForTimeout(400)
     await sheet(page).getByRole('button', { name: 'Delete the entry' }).click()
-    await expect(page.getByRole('button', { name: 'Record purchases' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add by hand' })).toBeVisible()
     await expect.poll(setting.current).toBeNull()
 
     // Back as the record going on: first on «Покупки», and whole inside.
@@ -396,7 +397,7 @@ test.describe('the trip', () => {
     await context.setOffline(true)
     await finish(page)
     // The record is over on the phone at once, though nothing has reached the server.
-    await expect(page.getByRole('button', { name: 'Record purchases' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add by hand' })).toBeVisible()
     await expect(recorded(page, 'Рынок')).toBeVisible()
     expect(await setting.current()).not.toBeNull()
 
@@ -420,16 +421,18 @@ test.describe('the newcomer`s «Что брать» (MOL-77, MOL-128)', () => {
     { width: 390, height: 844 },
     { width: 375, height: 667 },
   ]) {
-    test(`greets a newcomer, and «Record purchases» is in view at ${String(size.width)}×${String(size.height)}`, async ({
+    test(`greets a newcomer, and «Photograph a receipt» is in view at ${String(size.width)}×${String(size.height)}`, async ({
       page,
     }) => {
       await page.setViewportSize(size)
       await signedIn(page)
 
-      await expect(page.getByRole('heading', { name: 'Record your first purchases' })).toBeVisible()
+      await expect(
+        page.getByRole('heading', { name: 'Photograph your first receipt' }),
+      ).toBeVisible()
       // Not a circle over the button any more: the only action is the button with words.
       await expect(page.locator('.circle')).toHaveCount(0)
-      const start = page.getByRole('button', { name: 'Record purchases' })
+      const start = page.getByRole('button', { name: 'Photograph a receipt' })
       await expect(start).toBeInViewport({ ratio: 1 })
 
       // The cycle's third step leads to «Ratings» as a change of tab.
@@ -438,11 +441,11 @@ test.describe('the newcomer`s «Что брать» (MOL-77, MOL-128)', () => {
     })
   }
 
-  test('keeps «Record purchases» in view with large text', async ({ page }) => {
+  test('keeps «Photograph a receipt» in view with large text', async ({ page }) => {
     await signedIn(page)
     await page.addStyleTag({ content: 'html { font-size: 130% }' })
-    await expect(page.getByRole('heading', { name: 'Record your first purchases' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Record purchases' })).toBeInViewport({
+    await expect(page.getByRole('heading', { name: 'Photograph your first receipt' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Photograph a receipt' })).toBeInViewport({
       ratio: 1,
     })
   })
@@ -455,8 +458,8 @@ test.describe('the newcomer`s «Что брать» (MOL-77, MOL-128)', () => {
     await page.setViewportSize({ width: 375, height: 667 })
     await signedIn(page)
     await page.addStyleTag({ content: 'html { font-size: 130% }' })
-    await expect(page.getByRole('heading', { name: 'Record your first purchases' })).toBeVisible()
-    const start = page.getByRole('button', { name: 'Record purchases' })
+    await expect(page.getByRole('heading', { name: 'Photograph your first receipt' })).toBeVisible()
+    const start = page.getByRole('button', { name: 'Photograph a receipt' })
 
     await page.evaluate(() => {
       window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' })

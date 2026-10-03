@@ -199,7 +199,48 @@
       "body": "Only one entry can be open. Continue this one — or finish it and start a new one.",
       "continue": "Continue «{place}»",
       "finish": "Finish and start a new one"
-    }
+    },
+    "capture": "Photograph a receipt",
+    "manual_by_hand": "Add by hand",
+    "group_working": "Reading",
+    "group_review": "Check and save",
+    "receipt_from": "Receipt from {day}, {time}",
+    "waiting": "{parts} · waiting for a connection",
+    "sending": "{parts} · sending",
+    "parsing_unknown": "reading · we’ll get the place from the receipt",
+    "parsing_known": "{day}, {time} · reading lines…",
+    "issues_mismatch": "{n} line doesn’t add up | {n} lines don’t add up",
+    "failed_meta": "couldn’t be read",
+    "reshoot_meta": "smooth it out and retake",
+    "recording_meta": "we’ll save it once you are online",
+    "rejected_title": "Photo from {day}, {time}",
+    "rejected_meta": "Not accepted: {reason}",
+    "remove": "Remove",
+    "reasons": {
+      "not_photo": "no receipt in the photo",
+      "too_large": "the photo is too large",
+      "lost": "the photo wasn’t kept on this phone",
+      "other": "the server didn’t take the receipt"
+    },
+    "recorded_receipt": "{count} · {day} · from a receipt",
+    "queued": {
+      "waiting": "The photos are on your phone. We’ll send them once you are online — nothing to do.",
+      "parsing": "Reading is under way — you can close the app. The ready receipt goes to “Check and save”.",
+      "sending": "The photos are going to the server. If you close the app, sending goes on the next time you open it.",
+      "stuck": "The server got only some parts of this receipt, and this phone has none of them. Delete the receipt and take it again.",
+      "rejected": "The server didn’t take this receipt: {reason}. Remove it and take it again."
+    },
+    "delete": "Delete receipt",
+    "delete_note": "The photo goes with it",
+    "deleted": "Receipt deleted with its photo",
+    "empty_capture": {
+      "body": "Photograph a receipt — we read the lines, you check them and save with one button. No receipt — “Add by hand”."
+    },
+    "error_capture": "You can still photograph a receipt or add by hand",
+    "stuck_meta": "{parts} · not all parts arrived",
+    "record_refused": "not saved — open it and fix it",
+    "receipts_error": "Receipts didn’t load — we’ll show them once the server answers",
+    "receipts_offline": "Offline · receipts from this phone"
   },
   "item": {
     "search_title": "What did you pick up?",
@@ -349,11 +390,13 @@
     },
     "error": {
       "title": "The server did not answer",
-      "body": "Verdicts are worked out on the server, there is no local copy"
+      "body": "Verdicts are worked out on the server, there is no local copy",
+      "body_capture": "The list didn’t load. You can still photograph a receipt"
     },
     "offline": {
       "title": "The list will show up once you are online",
-      "body": "Verdicts are worked out on the server — we will show the list the moment you are back"
+      "body": "Verdicts are worked out on the server — we will show the list the moment you are back",
+      "body_capture": "We’ll show the list as soon as you’re back online. You can photograph a receipt now"
     },
     "city_reloading": "City changed to {city} — reloading the list",
     "stale_other_city": "List for {oldCity} from {day} at {time}. Prices for {city} will appear when the connection returns.",
@@ -392,7 +435,18 @@
       "step_verdicts_body": "Give each purchase 1 to 5",
       "step_advice_title": "Here — «What to buy»",
       "step_advice_body": "What to take again, only if cheap, never — and where it is cheaper",
-      "trust": "Your own ratings and prices are free, other people’s come with access. There are no ads and no paid places here, and there never will be."
+      "trust": "Your own ratings and prices are free, other people’s come with access. There are no ads and no paid places here, and there never will be.",
+      "new_capture": {
+        "title": "Photograph your first receipt",
+        "body": "{app} reads and translates it — you check and save. And from your ratings it tells you at the shelf what to buy again and where it’s cheaper."
+      },
+      "parsing": {
+        "title": "Reading your first receipt",
+        "body": "Reading is under way — you can close the app. The receipt will appear in Purchases: check and save it there."
+      },
+      "step_purchases_capture_title": "Check it in Purchases",
+      "step_purchases_capture_body": "We read the receipt lines — you check them and save with one button",
+      "manual_body": "No receipt — at the market, or if it got lost"
     }
   },
   "verdict": {
@@ -1769,6 +1823,135 @@
     "cities_in": {
       "Гюмри": "in Gyumri",
       "Ереван": "in Yerevan"
+    }
+  },
+  "receipt": {
+    "capture": {
+      "title": "Photograph a receipt",
+      "hint_flat": "Smooth the receipt out and lay it on something dark",
+      "hint_top": "Shoot from above — the whole receipt in frame, no glare",
+      "hint_parts": "A long one — in parts, top to bottom, with a little overlap. Up to four parts",
+      "take": "Take photo",
+      "pick": "Choose photo",
+      "one_part": "A short receipt needs one photo. A long one — take the next part with a little overlap",
+      "parts_order": "Parts go top to bottom. Tap a part to retake or remove it",
+      "parts": "{n} part | {n} parts",
+      "part": "Part {n}",
+      "part_of": "Part {n} of {total}",
+      "part_aria": "Part {n}: retake or remove",
+      "add_part": "Next part",
+      "max": "Four parts is the limit. If the receipt didn’t fit, retake the parts from a little further away",
+      "retake": "Retake",
+      "remove_part": "Remove part",
+      "offline": "No connection — the photos wait on your phone and go by themselves",
+      "bad_file": "This file didn’t open as a photo. Choose a picture of the receipt — or take a new one",
+      "not_kept": "The photo wasn’t kept on this phone. Free some space and try again",
+      "preparing": "Preparing the photo…",
+      "send": "Send receipt",
+      "send_offline": "We’ll send it once you are online",
+      "sent": "Receipt sent",
+      "sent_offline": "The receipt is waiting for a connection — we’ll send it"
+    },
+    "sheet": {
+      "photos": "Receipt photos"
+    },
+    "review": {
+      "title_loading": "Receipt",
+      "title_no_place": "Receipt from {day}",
+      "place_line": "{city} · TIN {inn} · {day}",
+      "place_line_time": "{city} · TIN {inn} · {day}, {time}",
+      "place_line_no_tin": "{city} · {day}",
+      "place_missing": "Place not read · set it",
+      "count_hint": "{count} · tap to fix",
+      "tag_new": "new item",
+      "tag_check": "check",
+      "tag_skip": "not saved",
+      "issues_check": "to check: {n}",
+      "check_note": "on the receipt — “{text}”",
+      "qty_price": "{qty} × {price}",
+      "qty_price_discount": "{qty} × {price} − {discount}",
+      "mismatch": "≠ {printed}",
+      "lines": "Lines",
+      "total": "Receipt total",
+      "total_missing": "Total not read · set it",
+      "approx": "≈ {amount} at the {day} rate",
+      "diff": "{amount} off — probably in the “{line}” line. You can save it anyway",
+      "diff_unknown": "{amount} off — we couldn’t find the line. You can save it anyway",
+      "photo_note": "We delete the photo after saving — the lines stay",
+      "record": "Save {n} purchase | Save {n} purchases",
+      "record_offline": "We’ll save it once you are online",
+      "recording": "We’ll save it once you are online — the lines are kept on this phone",
+      "refused": "Not saved: {reason}. Fix it and save again",
+      "offline": "Offline · receipt from this phone. Line edits are kept here",
+      "error": {
+        "title": "The server didn’t answer",
+        "body": "The receipt is safe. Any line edits are kept on this phone"
+      },
+      "line_aria": "{name}, {qty}, {sum}"
+    },
+    "line": {
+      "title": "Receipt line",
+      "meta": "{n} of {total} · {place}",
+      "meta_no_place": "{n} of {total}",
+      "printed": "As printed",
+      "translation": "Translation: {text}",
+      "product": "Item",
+      "product_other": "Change",
+      "check_warn": "Not a sure match: the receipt says “{text}”. Check the item or pick another",
+      "name": "Name it",
+      "name_note": "The catalogue has no such item — saving adds it",
+      "find": "Find in the catalogue",
+      "price": "Price for all, as on the receipt",
+      "weight_hint": "{qty} × {price} — we work out the unit price",
+      "mismatch": "The receipt says {printed} for this line, but {qty} × {price} is {sum}. Fix the price or quantity — or leave it: it doesn’t stop saving",
+      "remembered": "Last time it was {price} here — check the digits",
+      "save": "Save",
+      "skip": "Don’t save this line",
+      "unskip": "Save this line",
+      "skipped": "This line isn’t saved. It stays in the receipt sum — it was paid for",
+      "discount_hint": "On the receipt: {price} − {discount}"
+    },
+    "pick": {
+      "title": "Pick an item",
+      "meta": "For the line “{printed}”",
+      "meta_translation": "For the line “{printed}” · translation “{text}”",
+      "keep_new": "Keep as a new item “{text}”",
+      "keep_new_note": "Saving adds it to the catalogue",
+      "note": "Items come from the catalogue only: the same Save button adds a new one",
+      "bad_name": "This name won’t do — make it shorter"
+    },
+    "place": {
+      "title": "Where was it?",
+      "missing": "The place wasn’t read on the receipt",
+      "read": "Read: {place}, {city}",
+      "when": "When",
+      "done": "Done",
+      "name": "Shop"
+    },
+    "recorded": {
+      "title": "Saved {n} purchase | Saved {n} purchases",
+      "body": "Rate them at home, in Ratings. Any line can be fixed right now too",
+      "to_verdicts": "To ratings",
+      "from_receipt": "from a receipt",
+      "printed_note": "Grey under each purchase — the line as printed. The photo is deleted"
+    },
+    "failed": {
+      "meta": "{parts} · taken {day}, {time}",
+      "title": "Couldn’t read it",
+      "body": "The lines in the photo can’t be made out — faint print and glare do that. Add the purchases by hand or retake the receipt.",
+      "reshoot_title": "Crumpled or in shadow",
+      "reshoot_body": "The lines in the photo bend and run together. Smooth the receipt out and retake it — or add the purchases by hand.",
+      "photos": "Receipt photos · top to bottom",
+      "photos_elsewhere": "The photo was taken on another phone — it isn’t here"
+    },
+    "duplicate": {
+      "title": "This receipt was saved on {day}",
+      "body": "It has the same number as a saved one. No need to save it twice — you can delete this one with its photo."
+    },
+    "gone": {
+      "title": "This receipt is gone",
+      "body": "It was deleted — perhaps on another phone.",
+      "action": "To purchases"
     }
   }
 }

@@ -678,7 +678,7 @@ test('«Scan a barcode» on the record: the scanner is up at once, and «back» 
       Promise.reject(new DOMException('no camera', 'NotFoundError'))
   })
   await open(page, '/')
-  await page.getByRole('button', { name: 'Record purchases' }).click()
+  await page.getByRole('button', { name: 'Add by hand' }).click()
   const where = page.locator('dialog[open]')
   await expect(where).toContainText('Where are you?')
   await page.waitForTimeout(400)
