@@ -3,16 +3,25 @@ import {
   ERROR,
   ISSUE,
   botApiSecretSchema,
+  botFailureSchema,
   confirmLoginSchema,
   dueRemindersSchema,
   eraseMeSchema,
   loginCodeSchema,
   loginPreviewCodec,
+  ownerNoticesSchema,
   rateFromBotSchema,
   switchRemindersFromBotSchema,
   verdictPathSchema,
 } from '@molvia/model'
-import type { DueReminders, LoginPreview, ReminderSwitch, TelegramUserId } from '@molvia/model'
+import type {
+  BotFailure,
+  DueReminders,
+  LoginPreview,
+  OwnerNotices,
+  ReminderSwitch,
+  TelegramUserId,
+} from '@molvia/model'
 import { ApiError, createTransport } from './transport'
 import type { ClientOptions } from './transport'
 
@@ -34,6 +43,10 @@ export interface MolviaBotClient {
    * same answer whether there was anyone or not; repeats are harmless.
    */
   switchReminders(telegramUserId: TelegramUserId, change: ReminderSwitch): Promise<void>
+  /** A failure of the bot's own, by its kind and handler (MOL-143): the API fingerprints it. */
+  reportFailure(failure: BotFailure): Promise<void>
+  /** What the API has queued for the owner, already marked as handed (MOL-143). */
+  claimOwnerNotices(): Promise<OwnerNotices>
 }
 
 /** An internal client has no session and cannot attach its secret to an arbitrary API path. */
@@ -79,5 +92,12 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
         body: body.data,
       })
     },
+    reportFailure: async (failure) => {
+      const body = botFailureSchema.safeParse(failure)
+      if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'failure')
+      await request('/internal/failures', z.undefined(), { method: 'POST', body: body.data })
+    },
+    claimOwnerNotices: async () =>
+      request('/internal/owner/claim', ownerNoticesSchema, { method: 'POST' }),
   }
 }

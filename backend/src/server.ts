@@ -21,6 +21,8 @@ import { VERSION, env, loginConfig } from '@/env'
 import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
 import { apiFailureReporter } from '@/failure-reporter'
+import { recordBotFailure } from '@/usecases/record-failure'
+import { claimOwnerNotices } from '@/usecases/owner-notices'
 import type { FailurePlace } from '@/usecases/record-failure'
 import { createFailureRepository } from '@/db/failures-repository'
 import { createOwnerNoticeRepository } from '@/db/owner-notices-repository'
@@ -583,6 +585,16 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       rateFromBot: (itemId, body) =>
         rateFromBot({ actors, items, verdicts, reminders }, itemId, body),
       switchReminders: (body) => switchRemindersFromBot(reminders, body, new Date()),
+      reportFailure: (body) =>
+        recordBotFailure(
+          { failures: createFailureRepository(db), owner, build: VERSION },
+          body,
+          new Date(),
+        ),
+      claimOwnerNotices: () =>
+        claimOwnerNotices(createOwnerNoticeRepository(db), owner, new Date(), (issue) => {
+          instance.log.error(describeFailure(issue), 'owner notice unreadable')
+        }),
     })
 
     // The development seam, and the guard is not `env.NODE_ENV` by accident (MOL-52, Р-14).

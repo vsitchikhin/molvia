@@ -4,9 +4,10 @@
  * owner's notice is queued once a build. The failing routes are the test's own, added to the
  * server it builds: the error handler of the root covers every route registered on it.
  */
+import { randomBytes } from 'node:crypto'
 import { sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { DomainError, ERROR } from '@molvia/model'
+import { DomainError, ERROR, ISSUE, ownerNoticesSchema } from '@molvia/model'
 import { failures, ownerNotices } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
@@ -18,6 +19,8 @@ const { db, close } = connectDrizzle()
 const REVIEW = 'Сыр так себе\n    at Аня, ул. Ширакаци 12'
 const PERSON_ID = '1f0e2c4a-5b6d-4e7f-8a9b-0c1d2e3f4a5b'
 const OWNER = 4242
+const botSecret = randomBytes(32).toString('base64url')
+const asBot = { authorization: `Bearer ${botSecret}` }
 
 let recordings: Promise<void>[] = []
 const lines: string[] = []
@@ -26,6 +29,7 @@ function serverFor(owner: number | null) {
   const app = buildServer({
     db,
     owner,
+    login: { username: 'molvia_bot', botSecret },
     failureRecorded: (recording) => recordings.push(recording),
     logStream: { write: (line) => lines.push(line) },
   })
@@ -137,5 +141,60 @@ describe('сбой API — в таблицу (MOL-143)', () => {
     const logged = lines.join('\n')
     expect(logged).toContain('"errorName":"TypeError"')
     expect(logged).not.toContain('boom"')
+  })
+})
+
+describe('бот и канал владельцу — /internal (MOL-143)', () => {
+  const report = { errorName: 'GrammyError', code: 'ETIMEDOUT', handler: 'callback:rate' }
+
+  it('сбой бота ложится его обработчиком и сборкой API', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/internal/failures',
+      headers: asBot,
+      payload: report,
+    })
+    expect(response.statusCode).toBe(204)
+    const [row] = await db.select().from(failures)
+    expect(row).toMatchObject({ source: 'bot', route: 'callback:rate', errorName: 'GrammyError' })
+  })
+
+  it('отчёт с лишним полем — 400, без секрета — 401, и ничего не пишется', async () => {
+    const extra = await app.inject({
+      method: 'POST',
+      url: '/internal/failures',
+      headers: asBot,
+      payload: { ...report, from: { id: 777, first_name: 'Аня' } },
+    })
+    expect(extra.statusCode).toBe(400)
+    expect(extra.json()).toMatchObject({ code: ISSUE.BODY_INVALID })
+    const stranger = await app.inject({
+      method: 'POST',
+      url: '/internal/failures',
+      payload: report,
+    })
+    expect(stranger.statusCode).toBe(401)
+    expect(await db.select().from(failures)).toEqual([])
+  })
+
+  it('claim отдаёт уведомление владельцу один раз', async () => {
+    await app.inject({ method: 'POST', url: '/internal/failures', headers: asBot, payload: report })
+    const claim = () => app.inject({ method: 'POST', url: '/internal/owner/claim', headers: asBot })
+
+    const first = ownerNoticesSchema.parse((await claim()).json())
+    expect(first).toMatchObject({
+      to: OWNER,
+      notices: [{ kind: 'failure', route: 'callback:rate' }],
+    })
+    expect(ownerNoticesSchema.parse((await claim()).json())).toEqual({ to: OWNER, notices: [] })
+  })
+
+  it('без владельца claim пуст и говорит, что писать некому', async () => {
+    const response = await quiet.inject({
+      method: 'POST',
+      url: '/internal/owner/claim',
+      headers: asBot,
+    })
+    expect(response.json()).toEqual({ to: null, notices: [] })
   })
 })
