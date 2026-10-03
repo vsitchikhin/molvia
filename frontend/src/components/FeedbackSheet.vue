@@ -123,7 +123,12 @@ import { newId } from '@/ids'
 import { platformLine } from '@/platform'
 import { usePwaUpdate } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
-import { dropFeedbackDraft, keepFeedbackDraft, recallFeedbackDraft } from '@/stores/feedbackDraft'
+import {
+  dropFeedbackDraft,
+  keepFeedbackDraft,
+  recallFeedbackDraft,
+  sentFeedbackKey,
+} from '@/stores/feedbackDraft'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 
 /** As long as the app's live region waits before its words (`useAnnouncer`). */
@@ -377,6 +382,11 @@ export default defineComponent({
       const stored = recallFeedbackDraft(actor.id)
       if (stored?.clientKey === clientKey.value && stored.attached !== undefined) {
         frozen.value = stored.attached
+      }
+      // Or sent it, and it reached the owner: this is that very message, said as sent (round 6, У1).
+      if (sentFeedbackKey(actor.id) === clientKey.value) {
+        phase.value = 'sent'
+        return
       }
       const message = body.value
       if (message === null) {

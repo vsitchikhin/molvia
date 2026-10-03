@@ -12,7 +12,7 @@ import { pwaUpdateKey, NO_UPDATE } from '@/pwaUpdate'
 import { routes } from '@/router'
 import FeedbackSheet from '@/components/FeedbackSheet.vue'
 import { useActorStore } from '@/stores/actor'
-import { recallFeedbackDraft } from '@/stores/feedbackDraft'
+import { recallFeedbackDraft, sentFeedbackKey } from '@/stores/feedbackDraft'
 import { useFeedbackSheetStore, type FeedbackEntry } from '@/stores/feedbackSheet'
 
 const sendFeedback =
@@ -382,6 +382,7 @@ describe('the draft (MOL-147, Р-2)', () => {
     await press(sheet)
 
     expect(recallFeedbackDraft(OWNER)).toBeNull()
+    expect(sentFeedbackKey(OWNER)).toBe(sendFeedback.mock.calls[0]?.[0].clientKey)
     expect(sheet.get('.sent').text()).toContain(en.feedback.sent.title)
     expect(sheet.get('.spoken').text()).toBe(`${en.feedback.sent.title}. ${en.feedback.sent.body}`)
     expect(sheet.text()).not.toContain('42')
@@ -512,6 +513,31 @@ describe('another window of the app with the same draft (round 5, Т1)', () => {
     await press(sheet)
 
     expect(sendFeedback.mock.calls[0]?.[0]).toMatchObject({ ...theirs, clientKey: draft.clientKey })
+  })
+
+  it("says sent without sending when the other window's send of it reached the owner (round 6, У1)", async () => {
+    const { sheet, draft } = await drafted()
+    localStorage.setItem(
+      `molvia.feedback-draft.${OWNER}`,
+      JSON.stringify({ sent: draft.clientKey }),
+    )
+
+    await press(sheet)
+
+    expect(sendFeedback).not.toHaveBeenCalled()
+    expect(sheet.find('.sent').exists()).toBe(true)
+  })
+
+  it('must not take a message sent under another key for this one', async () => {
+    const { sheet } = await drafted()
+    localStorage.setItem(
+      `molvia.feedback-draft.${OWNER}`,
+      JSON.stringify({ sent: '7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f' }),
+    )
+
+    await press(sheet)
+
+    expect(sendFeedback).toHaveBeenCalledOnce()
   })
 
   it('must not take what was sent under another key: that is another message', async () => {

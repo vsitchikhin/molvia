@@ -57,7 +57,27 @@ export function keepFeedbackDraft(owner: string | null, draft: FeedbackDraft): v
   else write(keyOf(owner), JSON.stringify(draft))
 }
 
-/** Forgets the draft that was sent — the one under `clientKey`, not one changed after it left. */
+/**
+ * Lets go of the draft that was sent — the one under `clientKey`, not one changed after it left —
+ * and leaves in its place only the key it went under. A sheet still open in another window of the app
+ * holds the same text under the same key, and sent from there with what its own opening attaches it
+ * met `409` and a second message (round 6, У1); an empty shelf could not tell it the draft had left,
+ * since text erased or a shelf that never kept it look the same. The next draft writes over it.
+ */
 export function dropFeedbackDraft(owner: string | null, clientKey: string): void {
-  if (owner !== null && recallFeedbackDraft(owner)?.clientKey === clientKey) forget(keyOf(owner))
+  if (owner !== null && recallFeedbackDraft(owner)?.clientKey === clientKey) {
+    write(keyOf(owner), JSON.stringify({ sent: clientKey }))
+  }
+}
+
+/** The key the person's last message went under, if no draft has been begun since. */
+export function sentFeedbackKey(owner: string | null): string | null {
+  if (owner === null) return null
+  try {
+    const value: unknown = JSON.parse(read(keyOf(owner)) ?? 'null')
+    const sent = (value as { sent?: unknown } | null)?.sent
+    return typeof sent === 'string' ? sent : null
+  } catch {
+    return null
+  }
 }

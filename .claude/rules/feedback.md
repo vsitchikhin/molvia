@@ -141,9 +141,11 @@ against the code in `.scratch/tasks/status/MOL-118/v2-feedback.md` (С-1…С-12
   `201`, as the login trusts it (`mayHaveStarted`): a portal's own `200` page taken for «sent»
   erased a message that never left, and a `200` is a repeat, safe to send again. **The draft is read
   again before a send** (round 5, Т1): another window of the app may have sent it under the same key
-  meanwhile, its answer lost, and what went with it then goes again. **An error screen chooses
-  «Сломалось» for its opening only** (В4): closed untouched, the draft keeps the kind the person
-  chose.
+  meanwhile, its answer lost, and what went with it then goes again. **A message sent leaves its key
+  in place of the draft** (round 6, У1): a sheet still open in another window holds the same text
+  under it, and says «sent» rather than send it again with its own opening. **An error screen
+  chooses «Сломалось» for its opening only** (В4): closed untouched, the draft keeps the kind the
+  person chose.
 - **The button says why it waits**, inactive and focusable, in the order a person can put it right:
   the kind, the text, the day's limit, the connection; then «Отправить», «Отправляем…» (pressed once
   however often), «Повторить» after a failure, «Готово» once sent. **The limit lives while the sheet
