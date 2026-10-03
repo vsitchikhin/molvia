@@ -81,12 +81,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
   decoration and the edge of a field (Ф-3: `--border` there was 1.29:1 on the well). The math —
   WCAG luminance and Ottosson's OKLab — is the test's own thirty lines, no dependency. **A tint stands
   0.08 from `--surface`** (adversarial А3): a fill with no edge — a notice in a sheet — that the eye
-  cannot tell from the sheet is no fill; the dark `bad-tint` of 157 v2 was 0.038. **`--text-muted` is
+  cannot tell from the sheet is no fill; the dark `bad-tint` of 157 v2 was 0.038. **Not from
+  `--sunken`** (review 5, way «а»): on the page ground the light good, warn and bad tints stand 0.071,
+  0.070 and 0.040 — a strip under the month's switcher, a state's circle — held by icon and word; to
+  hold them too the light `bad-tint` turns pink (`#fec5c7`, hue 28° → 16°), and that was not bought. **`--text-muted` is
   for the three grounds, never a tint** (А1): under 4.5:1 there in both schemes, and the tints cannot
   be lifted for it — in the dark they would have to sink to OKLab L 0.32 and part by saturation alone,
   the accent's turning brick; on a tint a secondary line is `--text` (the chosen account, the active
-  catalogue row, the hint of Open Food Facts). **The file is read as Sass reads it**: both kinds of
-  comment out, every declaration taken whatever its value, a short or upper-case hex expanded —
+  catalogue row, the hint of Open Food Facts, the account's row under the pointer). **The file is read as Sass reads it**: both kinds of
+  comment out in one pass — a `/*` inside a line comment opens nothing (round 2, Б3) — every declaration taken whatever its value, a short or upper-case hex expanded —
   Stylelint asks for the short form and `--fix` writes it — and a colour of the lists that is no hex
   (`oklch()`) fails by name: read by a pattern of six lower-case digits, such a category left the test
   green (А4, А5). The dot of a category on the chosen chip is under 3:1 on `--accent-tint` for six

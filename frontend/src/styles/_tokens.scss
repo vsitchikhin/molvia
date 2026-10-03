@@ -172,7 +172,7 @@
 
   /* Every pair that can meet is held by tokens.test.ts, in both schemes (MOL-172): two steps of
      different roles and a category against a role at least 0.08 apart in OKLab, a mark 3:1 and text
-     4.5:1 on its ground, a tint 0.08 from --surface. A value that fails there is changed, never
+     4.5:1 on its ground, a tint 0.08 from --surface (not --sunken). A value that fails there is changed, never
      excused. --text-muted is for the three grounds, never a tint (under 4.5:1 there). */
   --sunken: #f3e8d6; /* the page ground; cards sit on it */
   --surface: #fffaf2;
