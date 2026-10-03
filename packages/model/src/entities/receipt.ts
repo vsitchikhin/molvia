@@ -150,10 +150,16 @@ const CITY_WORDS: Readonly<Record<SettingsCity, string>> = {
   Ереван: '(?:երևան|երե[վւ]ան|yerevan)(?![\\p{L}-])(?!\\s*[-–]?\\s*(?:սիթի|city|сити))',
 }
 
+/**
+ * The start of a row before its city: marks and digits, one stray letter OCR reads at the paper's edge
+ * («է ԳՅՈՒՄՐԻ Գորկու 62»), and «ք.».
+ */
+const OPENING = '^[^\\p{L}]*(?:\\p{L}[^\\p{L}\\s]*\\s+[^\\p{L}]*)??(?:ք\\.?\\s*)?'
+
 /** A city opening a row of the head — the shop's address («ԳՅՈՒՄՐԻ Գորկու 62», «ք. Երևան, …»). */
 export const RECEIPT_CITIES: Readonly<Record<SettingsCity, RegExp>> = {
-  Гюмри: new RegExp(`^[^\\p{L}]*(?:ք\\.?\\s*)?${CITY_WORDS.Гюмри}`, 'iu'),
-  Ереван: new RegExp(`^[^\\p{L}]*(?:ք\\.?\\s*)?${CITY_WORDS.Ереван}`, 'iu'),
+  Гюмри: new RegExp(`${OPENING}${CITY_WORDS.Гюмри}`, 'iu'),
+  Ереван: new RegExp(`${OPENING}${CITY_WORDS.Ереван}`, 'iu'),
 }
 
 /** A city after «ք.» — «город» — anywhere in a row of the head («ՀՀ, ք. Երևան, …»). */
@@ -172,6 +178,13 @@ const CITY_ANYWHERE: Readonly<Record<SettingsCity, RegExp>> = {
 const HEAD_ROWS = 15
 
 /**
+ * A row of an item, where the head ends (round 4, Р4-В1): a table's customs heading «(2203) ԳՅՈՒՄՐԻ
+ * ԳԱՐԵՋՈՒՐ» — Dog City's items begin at its ninth row — a card's article «0401/1163909», or a card's
+ * item number before its name «3.Գյումրի …». An item named after a city is a line, not the address.
+ */
+const ITEM_ROW = /\(\d{4}\)|\d{4}\s*\/\s*\d{5,}|^\s*\d{1,3}\s*[.,]\s*\p{L}/u
+
+/**
  * The city a receipt's address prints, if it is one of the settings'; read in the first part only. A
  * city opening a row is the shop's address and decides. Else a city after «ք.» anywhere in a row —
  * «ՀՀ, ք. Երևան, …», «Շիրակի մարզ, ք. Գյումրի, …» (round 2, Р2-В4) — decides only when no other city
@@ -180,7 +193,9 @@ const HEAD_ROWS = 15
  * Two cities are no answer — the place is then looked for in the person's own city.
  */
 export function receiptCityOf(rows: readonly TextRow[]): SettingsCity | null {
-  const head = rows.filter((row) => row.part === 0).slice(0, HEAD_ROWS)
+  const first = rows.filter((row) => row.part === 0).slice(0, HEAD_ROWS)
+  const items = first.findIndex((row) => ITEM_ROW.test(row.text))
+  const head = items < 0 ? first : first.slice(0, items)
   const cities = Object.keys(RECEIPT_CITIES) as SettingsCity[]
   const opening = cities.filter((city) => head.some((row) => RECEIPT_CITIES[city].test(row.text)))
   if (opening.length === 1) return opening[0] ?? null
