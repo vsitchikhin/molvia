@@ -94,11 +94,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   in one pass — a `/*` inside a line comment opens nothing (round 2, Б3) — every declaration taken
   whatever its value, a short or upper-case hex expanded — Stylelint asks for the short form and
   `--fix` writes it — and a colour of the lists that is no hex (`oklch()`) fails by name: read by a
-  pattern of six lower-case digits, such a category left the test green (А4, А5). The dot of a
-  category on the chosen chip is under 3:1 on `--accent-tint` for ten light and three dark
-  categories (А2; six and one before the palette of MOL-218) — not held: the tint cannot be made
-  lighter without meeting `bad-tint`, the categories cannot all be darkened and stay 0.07 apart, and
-  the chip's form is MOL-198's.
+  pattern of six lower-case digits, such a category left the test green (А4, А5). The same one-pass
+  read is in the other readers of the file — `bin/design-md.mjs` and both plugins
+  (`withoutComments`, `roleMixins`). The dot of a category on the chosen chip is under 3:1 on
+  `--accent-tint` for ten light and three dark categories (А2; six and one before the palette of
+  MOL-218) — not held: the tint cannot be made lighter without meeting `bad-tint`, the categories
+  cannot all be darkened and stay 0.07 apart, and the chip's form is MOL-198's.
 - **Any two categories stand 0.07 apart, and a category keeps its hue in both schemes** (MOL-218,
   the same test). **Every pair, not a list** (owner's В-1): the ring orders its sectors by sum, not
   by category, so its neighbours change from month to month; every account has all thirteen presets;

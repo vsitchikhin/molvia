@@ -17,10 +17,12 @@ import prettier from 'prettier'
 const TOKENS = new URL('../frontend/src/styles/_tokens.scss', import.meta.url)
 
 // Both kinds of comment out, a line comment also at the end of a declaration: a value in one is not a
-// token, and Sass drops it from the CSS the page draws with.
-const scss = readFileSync(TOKENS, 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .replace(/(^|[\s;{}])\/\/[^\n]*/g, '$1')
+// token, and Sass drops it from the CSS the page draws with. One pass, as Sass reads them: a `/*`
+// inside a line comment opens nothing (MOL-172, adversarial Б3).
+const scss = readFileSync(TOKENS, 'utf8').replace(
+  /\/\*[\s\S]*?\*\/|(^|[\s;{}])\/\/[^\n]*/g,
+  (_comment, before) => before ?? '',
+)
 
 function block(source, opener) {
   const at = source.indexOf(opener)

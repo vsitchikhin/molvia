@@ -58,9 +58,13 @@ function includedName(params) {
 const PLACEHOLDER = /(^|[\s>+~(,])%/
 
 // The names of the mixins that include the role, directly or through another of them; comments are
-// taken out first, so neither a word nor a brace in one changes what a mixin includes.
+// taken out first, so neither a word nor a brace in one changes what a mixin includes — in one pass,
+// as Sass reads them: a `/*` inside a line comment opens nothing (MOL-172, adversarial Б3).
 export function roleMixins(source, known = new Set(['display-type'])) {
-  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[\s;{}])\/\/[^\n]*/g, '$1')
+  const code = source.replace(
+    /\/\*[\s\S]*?\*\/|(^|[\s;{}])\/\/[^\n]*/g,
+    (_comment, before) => before ?? '',
+  )
   const bodies = []
   for (const match of code.matchAll(MIXIN)) {
     let depth = 0
