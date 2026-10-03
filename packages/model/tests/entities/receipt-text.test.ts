@@ -821,3 +821,19 @@ describe('an item read twice at a seam, its article one swap of OCR off (review 
     expect(!got.balanced || wrong.every((line) => !line.settled)).toBe(true)
   })
 })
+
+// Review round 9 of MOL-125.
+describe('two flavours at one price numbered …5 and …6 in one photo (review Р28)', () => {
+  it('are read right and neither is highlighted: there is no seam to read one twice', () => {
+    const read = bestReading(
+      (am05 as Fixture).readings.map((text) =>
+        rowsOf(text.replace('0403/1160033', '0403/1160035'), 0),
+      ),
+    )
+    const yoghurts = read.lines.filter((line) => line.sku === '1160035' || line.sku === '1160036')
+    expect(yoghurts.map((line) => [line.sumHundredths, line.settled])).toEqual([
+      [29_000, true],
+      [29_000, true],
+    ])
+  })
+})

@@ -832,10 +832,18 @@ export function parseReceiptText(rows: readonly TextRow[]): ReceiptText {
  * bench lost four right lines to a reading chosen so).
  */
 function withTwins(read: ReceiptText): ReceiptText {
+  // only across a seam: in one photo an item has nowhere to be read twice, and two flavours of one
+  // price numbered …5 and …6 are two items read right (review Р28)
+  const parts = (line: ReceiptTextLine) => new Set(line.rows.map((row) => row.part))
+  const apart = (a: ReceiptTextLine, b: ReceiptTextLine) => {
+    const theirs = parts(b)
+    return [...parts(a)].some((part) => !theirs.has(part))
+  }
   const twin = (line: ReceiptTextLine) =>
     read.lines.some(
       (other) =>
         other !== line &&
+        apart(line, other) &&
         line.sku !== null &&
         other.sku !== null &&
         line.sku !== other.sku &&
