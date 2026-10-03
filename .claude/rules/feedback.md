@@ -139,9 +139,11 @@ against the code in `.scratch/tasks/status/MOL-118/v2-feedback.md` (С-1…С-12
   whose answer was lost; a `409` takes a new key. **A `201` whose body did not read is sent** (round
   3, Ф1; round 4, П1): cut off on its way or shaped by a newer server, the message is written. Only
   `201`, as the login trusts it (`mayHaveStarted`): a portal's own `200` page taken for «sent»
-  erased a message that never left, and a `200` is a repeat, safe to send again. **An error screen
-  chooses «Сломалось» for its opening only** (В4): closed untouched, the draft keeps the kind the
-  person chose.
+  erased a message that never left, and a `200` is a repeat, safe to send again. **The draft is read
+  again before a send** (round 5, Т1): another window of the app may have sent it under the same key
+  meanwhile, its answer lost, and what went with it then goes again. **An error screen chooses
+  «Сломалось» for its opening only** (В4): closed untouched, the draft keeps the kind the person
+  chose.
 - **The button says why it waits**, inactive and focusable, in the order a person can put it right:
   the kind, the text, the day's limit, the connection; then «Отправить», «Отправляем…» (pressed once
   however often), «Повторить» after a failure, «Готово» once sent. **The limit lives while the sheet
