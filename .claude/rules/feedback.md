@@ -6,6 +6,10 @@ paths:
   - 'backend/src/usecases/send-feedback*.ts'
   - 'backend/src/db/feedback-repository.ts'
   - 'backend/tests/feedback.integration.test.ts'
+  - 'frontend/src/components/FeedbackSheet.vue'
+  - 'frontend/src/stores/feedback*.ts'
+  - 'frontend/src/platform.ts'
+  - 'e2e/feedback.spec.ts'
 ---
 
 # Feedback: «Написать разработчику»
@@ -72,3 +76,45 @@ ways in are MOL-147, the bot's half — the owner's notice, the reply, a thread 
   erasure (В-3), and the year. A change here is a change there.
 - **The owner's notice is not in MOL-147** (Р-7): there is no channel to the owner yet (MOL-143), and
   MOL-148 builds it if it comes first. Until then a message waits in the table.
+
+## The sheet and its two ways in
+
+Drawn by handoff `design_handoff_mol_147`, variant А (the owner's В-16 «а» in MOL-118); checked
+against the code in `.scratch/tasks/status/MOL-118/v2-feedback.md` (С-1…С-12).
+
+- **One sheet for the app, `FeedbackSheet` in `App.vue`, opened through its store**
+  (`feedbackSheet.open`) — so an error screen anywhere opens it without a sheet of its own. Only
+  inside the app: the login screen has nobody to write.
+- **The kind is a `SegmentedControl` with nothing chosen** from the settings; from an error screen
+  «Сломалось» is chosen, since the link said so. The text may be typed first — the button then asks
+  for the kind. Two steps (variant Б) were drawn and not taken: a step inside one sheet needs an
+  entry of its own in the history, the most fragile place of the kit, for three short words.
+- **Two ways in.** «Написать разработчику» in «Настройки», group «О приложении» between the account
+  and «Ваши данные» — not «Связь», which in this app is the network. And «Сообщить о проблеме»
+  drawn by `ScreenState` itself, last and `ghost` under «Повторить» (and «Обновить»): **only for an
+  error of the whole screen** — an `inline` error is a section that failed while the screen works
+  (сверка С-1), — only while somebody is known (`actor.state === 'ready'`), and never inside a
+  `<dialog>`, since a sheet over a sheet the history does not hold (Р-5). No screen knows of it.
+- **What goes with the text is read from the body, not composed beside it** (Р-7, С-5, С-6): the
+  build as the server named it, whole — a short form shown and a long one sent would be a lie; the
+  title of the screen the sheet was opened over; the platform from `platformLine()` in words
+  (`feedback.systems.*`, a version only where there is one); the code only from an error screen.
+  **The screen and the code are the opening's, the kind and the text the draft's** (Р-6): begun on
+  an error, finished from the settings, it goes without the code, and the line says so first.
+- **The draft is the device's, under the person** (`molvia.feedback-draft.<id>`), from the first
+  letter until it is sent: no queue (MOL-150, В-2), so closing the sheet or losing the connection
+  must lose nothing. **Its key is the content's** (Р-2): a new `clientKey` with every change of the
+  kind or the text, kept beside them, so a retry after a lost answer — a reload too — is the same
+  message. A draft is forgotten only if it is still the one that was sent.
+- **The button says why it waits**, inactive and focusable, in the order a person can put it right:
+  the kind, the text, the day's limit, the connection; then «Отправить», «Отправляем…» (pressed once
+  however often), «Повторить» after a failure, «Готово» once sent. **The limit lives while the sheet
+  is open**: the server's day is rolling and the phone cannot know when it frees, so the next opening
+  asks again (С-8). **A `409` takes a new key before «Повторить»** (С-9): the same key would meet it
+  for ever, and it is a defect of the phone, never the person's.
+- **Sent is a block inside the sheet** with `role="status"` — the app's live region is outside the
+  modal dialog (С-10); no number (Р-13). Closing it puts the focus back on the way in.
+- **Kept for the kit, not copied here** (С-2): the pinned footer, a filled segment, an inactive
+  button without transparency and `StatusStrip` are the kit's tasks (MOL-170); the offline strip is a
+  line of the sheet in the meantime. The header is not pinned and the field has one height (С-3,
+  С-4): over the keyboard the sheet behaves as every other.

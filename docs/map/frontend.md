@@ -11,7 +11,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 
 - `frontend/src/components/AppButton.vue` — Kit button in five variants (primary, secondary, ghost, danger-ghost, icon), with busy, inactive and an icon slot.
 - `frontend/src/components/AppCard.vue` — Kit card: the surface of lists and blocks, with a chosen tag, the green «take» tone and an edge-to-edge list mode.
-- `frontend/src/components/AppField.vue` — Kit field: a native input, textarea, select or date with its label (or one only read out), error code, a mark before and a suffix after, and the right phone keyboard.
+- `frontend/src/components/AppField.vue` — Kit field: a native input, textarea, select or date with its label (or one only read out), error code, a mark before and a suffix after, the right phone keyboard, and the count of the last characters left when asked.
 - `frontend/src/components/AppReveal.vue` — Grows from nothing and shrinks back what pushes its neighbours — rows of a list, an error under a field, a block of a sheet; still for an answer read, a screen move, reduced motion.
 - `frontend/src/components/AppSwitch.vue` — Kit switch: a native checkbox read out as a switch, showing what the server holds and saying which way it was moved — for a setting saved on the tap.
 - `frontend/src/components/AppScreen.vue` — The frame every screen sits in: pinned row, collapsing large title, back chevron with its label, docked strip, identity notice.
@@ -19,7 +19,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/components/FloatingDock.vue` — Floating spot for the main action of a «Деньги» screen («Трата», «Обмен», «Доход») or «Вернуть» after a removal.
 - `frontend/src/components/SchemeGroup.vue` — «Тема» on the settings screen: «Системная · Светлая · Тёмная» of this device, taken on the tap, in every state of the screen.
 - `frontend/src/components/ScreenSkeleton.vue` — Loading state: bars in the geometry the screen gives, announcing «Loading…» through the live region.
-- `frontend/src/components/ScreenState.vue` — Every non-loading screen state (empty, error, offline, attention): icon circle by tone, texts, «Try again» and actions; «Обновить» first while a version waits.
+- `frontend/src/components/ScreenState.vue` — Every non-loading screen state (empty, error, offline, attention): icon circle by tone, texts, «Try again» and actions; «Обновить» first while a version waits; «Сообщить о проблеме» last under a full-screen error (MOL-147).
 - `frontend/src/components/SegmentedControl.vue` — Kit segmented control: a radio fieldset drawn as segments, for one choice out of up to four (unit, rate); `fit` gives each segment the width of its word.
 - `frontend/src/components/TabBar.vue` — The tab bar of the five sections («Что брать», «Покупки», «Оценки», «Деньги», «Настройки»), moving through `useNavigation`.
 - `frontend/src/components/UndoStrip.vue` — «Удалено · Вернуть» strip: ten seconds to take back a removal, paused under a finger or focus.

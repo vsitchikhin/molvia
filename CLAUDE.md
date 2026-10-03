@@ -379,6 +379,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   under the author's lock, `429`.
 - **A thread lives a year from its last message, the owner's reply included** (В-4), and goes with the
   person.
+- **One sheet, two ways in** (MOL-147): «О приложении» in the settings and «Сообщить о проблеме» drawn
+  by `ScreenState` — only a full-screen error, somebody known, not in a `<dialog>`; the draft is the
+  device's with no queue, and what goes with the text is read from the body it sends.
 
 ### The bot — `.claude/rules/bot.md`
 
