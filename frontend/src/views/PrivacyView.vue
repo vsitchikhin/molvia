@@ -33,6 +33,7 @@ const STORED = [
   'exchanges',
   'incomes',
   'spendings',
+  'receipts',
   'accounts',
   'places',
   'barcodes',

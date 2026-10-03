@@ -1274,7 +1274,7 @@
   },
   "privacy": {
     "title": "Data and privacy",
-    "revised": "Revised 2 October 2026",
+    "revised": "Revised 3 October 2026",
     "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
@@ -1297,6 +1297,10 @@
       "spendings": {
         "term": "Spending outside shop purchases",
         "text": "How much, in what, when, in which category, and «what» and «where» if you write them — and your own categories. Spending in another currency keeps the rate of its day, and a past month the rate of its last day, worked out from your exchanges. Only you see it."
+      },
+      "receipts": {
+        "term": "Receipts",
+        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; no outside service sees the receipt. The photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them."
       },
       "accounts": {
         "term": "Accounts",
@@ -1341,7 +1345,7 @@
     },
     "backups": {
       "title": "Where the data and its copies are",
-      "text": "The server is in Germany, with the host Contabo. Once a day the database is copied, encrypted, to Cloudflare storage in the EU; only the owner of Molvia can decrypt a copy. Copies live 14 days — fourteen days after erasure your data is gone from them too. If the server ever has to be restored from a copy, an erasure made less than a day before the failure may need repeating."
+      "text": "The server is in Germany, with the host Contabo. Once a day the database is copied, encrypted, to Cloudflare storage in the EU; only the owner of Molvia can decrypt a copy. Copies live 14 days — fourteen days after erasure your data is gone from them too. If the server ever has to be restored from a copy, an erasure made less than a day before the failure may need repeating. Receipt photos and the lines cut out of them are not copied."
     },
     "barcodes": {
       "title": "An unknown barcode",
@@ -1353,7 +1357,7 @@
     },
     "copy": {
       "title": "A copy of your data",
-      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue and the barcodes you linked. A rating you withdrew is there too: without its review it stays with us, so the count of ratings given stays honest. What you removed and can still bring back is there as well, marked. The file holds no login keys."
+      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue, the barcodes you linked and the receipts read — without their photos. A rating you withdrew is there too: without its review it stays with us, so the count of ratings given stays honest. What you removed and can still bring back is there as well, marked. The file holds no login keys."
     },
     "erase": {
       "title": "Delete everything",
