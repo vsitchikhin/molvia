@@ -67,20 +67,26 @@ costs the total a quarter of a swap more — 816,32 read as 316,32 is put right 
 «fixed» to make up the difference. Only there: as an order of a line's readings the same rate «fixed»
 am-01's right sum to fit, 66 → 65 on the bench. **What nothing can tell apart is not vouched for**: a
 swap in the tens of luma barely moves the rate, and two such fixes cost the same; the total keeps one,
-and every line it changed from its reading is unsettled — highlighted for the person to check. The
-price: the line read wrong may stay settled beside it (one wrong line in 1–3 receipts of 15 on a
-generator of such receipts, each time with a highlighted line beside it).
+and every line in doubt is unsettled — highlighted for the person to check: each line it changed, and
+each line with a reading of its own that differs by the same amount, which it could have changed instead
+(Р24) — the line OCR misread among them. On a generator of such receipts 1–3 in 15 «balance» wrong, and
+every wrong line is highlighted in each.
 
 **A long receipt's seam must be one an overlap can make** (Р7–Р9): the last article of the text so far
-that the next part has (exactly, else one digit off), where the next part holds no more articles before
-it than the text so far does, and everything after it in the text so far is in the next part too.
-Another item's near article, or the first of two bags, makes no seam; an overlap of a name row only
-joins the parts without the rows both hold. **Rows of the overlap read worse in the next part** — an
-article two digits off, figures cut at its top edge, a name lost or split in two (Р17, Р21) — still make
-the seam when one of the first part's next two rows reads alike one of the next part's next three; the
-text so far then keeps its own reading of the overlap, and the next part goes on past the rows found
-alike in it — a row cut through at the first part's foot is found nowhere and moves nothing (review 9).
-Likeness reads a row's first 80 letters, and only at the last eight articles (Р22).
+that the next part has (exactly, else one digit off by a swap OCR makes — 5↔6, 1↔4, 3↔8, 0↔9), where the
+next part holds no more articles before it than the text so far does, and everything after it in the
+text so far is in the next part too. **One digit off by any other digit is the next article of the
+list**: a maker numbers its flavours in a row, 1160033 and 1160036 are two yoghurts (Р23).
+
+**Where the articles do not show the overlap** — rows of it read worse in the next part: an article two
+digits off, figures cut at its top edge, a name lost or split, a row cut through at the first part's
+foot (Р17, Р21, 9, Р23) — the first part's last sixteen rows and the next part's first sixteen are
+aligned in order, the longest run of rows the overlap could hold twice (`sameRow`: read alike, not two
+numbers of the list, not two articles that differ but by OCR's swaps; and the figures right below a name
+aligned are that item's, whatever article OCR made there). The run must start within the next part's
+first three rows, or it is two items alike rather than an overlap; the next part goes on after the last
+row aligned, and the first part keeps its own reading of the overlap. No run — the parts are joined.
+Likeness reads a row's first 80 letters (Р22).
 
 **What is printed at the head is checked as a calendar and a clock** (Р10, Р12, Р13): a date of
 the calendar from 2000 to the server's tomorrow, a time `HH:MM` — OCR makes up «01.01.0000», which
