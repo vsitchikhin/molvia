@@ -97,7 +97,10 @@ export const ERROR = {
   RECEIPT_NOT_READY: 'error.receipt_not_ready',
   /** The same receipt — its seller's tax number and its number — recorded before, its purchases there (Т-11). */
   RECEIPT_RECORDED_BEFORE: 'error.receipt_recorded_before',
-  /** A receipt dated after today in Yerevan (MOL-126): the rule of the clock a spending has. */
+  /**
+   * A receipt dated after the latest day anywhere on Earth (`latestDay`, MOL-121 — the phone's today
+   * may be a day ahead of Yerevan's) — a day still to come (MOL-126).
+   */
   RECEIPT_IN_FUTURE: 'error.receipt_in_future',
   /**
    * A message to the developer past `FEEDBACK_DAY_LIMIT` in a rolling day (MOL-147). The sheet keeps

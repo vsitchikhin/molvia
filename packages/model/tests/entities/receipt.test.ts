@@ -169,6 +169,16 @@ describe('the city of the address (MOL-126, Р-6)', () => {
     expect(receiptCityOf(rows('ԵՐԵՎԱՆ Կոմիտասի 5'))).toBe('Ереван')
   })
 
+  it('reads the city after «ք.», the word for «город»', () => {
+    expect(receiptCityOf(rows('ք. Երևան, Արշակունյաց 34'))).toBe('Ереван')
+    expect(receiptCityOf(rows('Ք.ԳՅՈՒՄՐԻ ԳՈՐԿՈՒ 62'))).toBe('Гюмри')
+  })
+
+  it('does not take the chain in Latin or Cyrillic letters for the city either', () => {
+    expect(receiptCityOf(rows('YEREVAN CITY', 'Yerevan-City'))).toBeNull()
+    expect(receiptCityOf(rows('Ереван Сити'))).toBeNull()
+  })
+
   it('does not take the chain «Ереван Сити» or an item named after the capital for the city', () => {
     expect(receiptCityOf(rows(': ԵՐԵՎԱՆ-ՍԻԹԻ', 'ԵՐԵՎԱՆ ՍԻԹԻ'))).toBeNull()
     expect(receiptCityOf(rows('3.Յոգուրտ երեւան Փրոդաքթս 2%'))).toBeNull()

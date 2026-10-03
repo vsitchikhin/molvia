@@ -5,6 +5,8 @@ import {
   RECEIPT_PART_BYTES_MAX,
   RECEIPT_SIDE_MAX,
   RECEIPT_SIDE_MIN,
+  AGGREGATE_MIN_CONTRIBUTIONS,
+  hasSharedAccess,
   placeNameIdentity,
   priceInDoubt,
   receiptDigits,
@@ -63,36 +65,41 @@ export async function putReceiptPart(
 }
 
 /**
- * The place of a receipt not yet recorded (MOL-126 Т-7, Р-6): the one with its tax number in the city
- * its address prints, else in the person's own city — «Ереван Сити» of Gyumri and of Yerevan are two
- * places of one number. None, and the person names it on the review.
+ * The place of a receipt not yet recorded (MOL-126 Т-7, Р-6): where receipts of its seller were
+ * recorded in the city its address prints, else in the person's own — the person's own last choice
+ * first, else the place most people chose, the later on a tie, as the shop's memory is read. «Ереван
+ * Сити» of Gyumri and of Yerevan are two places of one tax number. None, and the person names it.
  */
 async function withPlaces(
-  places: ReceiptReviewRepositories['places'],
-  actor: Pick<Actor, 'country' | 'city'>,
+  receipts: ReceiptReviewRepositories['receipts'],
+  actor: Pick<Actor, 'id' | 'country' | 'city'>,
   stored: readonly StoredReceipt[],
 ): Promise<ReceiptSummary[]> {
   const open = stored.filter(({ receipt }) => receipt.place === null && receipt.header?.tin)
   const tins = [...new Set(open.map(({ receipt }) => receipt.header?.tin ?? ''))]
   const countries = [...new Set(open.map(({ receipt }) => receipt.country))]
   const found = (
-    await Promise.all(countries.map((country) => places.withTins(tins, country)))
+    await Promise.all(countries.map((country) => receipts.placesOfTins(actor.id, tins, country)))
   ).flat()
   return stored.map(({ receipt, city }) => {
     if (receipt.place !== null) return receipt
     const tin = receipt.header?.tin ?? null
     const where = city ?? (actor.country === receipt.country ? actor.city : null)
     if (tin === null || where === null) return receipt
-    const at = found.find(
+    const here = found.filter(
       (candidate) =>
         candidate.tin === tin &&
         candidate.place.country === receipt.country &&
         placeNameIdentity(candidate.place.city) === placeNameIdentity(where),
     )
+    const [at] = [...here].sort(
+      (a, b) =>
+        (b.ownLatest?.getTime() ?? 0) - (a.ownLatest?.getTime() ?? 0) ||
+        b.voters - a.voters ||
+        b.latest.getTime() - a.latest.getTime(),
+    )
     const place: ReceiptPlace | null =
-      at === undefined
-        ? null
-        : { id: at.place.id, name: at.place.name, city: at.place.city, tin: at.tin }
+      at === undefined ? null : { id: at.place.id, name: at.place.name, city: at.place.city, tin }
     return { ...receipt, place }
   })
 }
@@ -102,7 +109,7 @@ export async function receiptsOf(
   repositories: ReceiptReviewRepositories,
   actor: Actor,
 ): Promise<ReceiptSummary[]> {
-  return withPlaces(repositories.places, actor, await repositories.receipts.list(actor.id))
+  return withPlaces(repositories.receipts, actor, await repositories.receipts.list(actor.id))
 }
 
 /**
@@ -118,7 +125,7 @@ export async function receiptOfOwner(
 ): Promise<ReceiptDetail> {
   const found = await repositories.receipts.one(actor.id, id)
   if (found === null) throw new DomainError(ERROR.NOT_FOUND)
-  const [receipt] = await withPlaces(repositories.places, actor, [found])
+  const [receipt] = await withPlaces(repositories.receipts, actor, [found])
   if (receipt === undefined) throw new DomainError(ERROR.NOT_FOUND)
   const { lines, currency } = found
   const tin = receipt.header?.tin ?? null
@@ -144,7 +151,13 @@ export async function receiptOfOwner(
   ])
   const amounts = recordedSums(lines, receipt.total, digits)
 
-  const day = receipt.header?.date ?? todayOf(actor, new Date())
+  // a price the memory holds is someone's shelf price: one's own always; other people's only as
+  // their figures are — with access, and from three people (`AGGREGATE_MIN_CONTRIBUTIONS`)
+  const now = new Date()
+  const othersPricesOpen = (recalled: Recalled) =>
+    hasSharedAccess(actor, now) && recalled.voters >= AGGREGATE_MIN_CONTRIBUTIONS
+
+  const day = receipt.header?.date ?? todayOf(actor, now)
   const snapshot = await tripRateOn(
     repositories,
     actor,
@@ -153,7 +166,7 @@ export async function receiptOfOwner(
   )
   const number = receipt.header?.receiptNo ?? null
   const twin =
-    tin === null || number === null || receipt.status === 'recorded'
+    tin === null || number === null || receipt.tripId !== null
       ? null
       : await repositories.receipts.recordedTwin(actor.id, tin, number, receipt.id)
 
@@ -183,7 +196,9 @@ export async function receiptOfOwner(
         translation: line.translation,
         amount: amounts[i] ?? null,
         rememberedPrice:
-          remembered !== null && priceInDoubt(line.price, remembered.price)
+          remembered !== null &&
+          (remembered.own || othersPricesOpen(remembered)) &&
+          priceInDoubt(line.price, remembered.price)
             ? remembered.price
             : null,
       }

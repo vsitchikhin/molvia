@@ -231,6 +231,12 @@ export function tripPlaceOf(place: Place): TripPlace {
   return { id: place.id, kind: place.kind, name: place.name }
 }
 
+/** The receipt a trip was recorded from (MOL-126): its id, and each purchase's line as printed. */
+export interface TripReceiptSource {
+  readonly receiptId: string
+  readonly lines: ReadonlyMap<string, { readonly printed: string; readonly discount: Money | null }>
+}
+
 /**
  * Assembles the trip the screen shows. Pure: the rows are read by the caller, and every number
  * here comes from a rule the domain already owns — `unitPrice`, `tripTotal`, `convertMoney`.
@@ -240,12 +246,6 @@ export function tripPlaceOf(place: Place): TripPlace {
  * Error on purpose — a DomainError would reach the client as a 404, «not found», and a broken
  * server would read as a missing row with no line in the log.
  */
-/** The receipt a trip was recorded from (MOL-126): its id, and each purchase's line as printed. */
-export interface TripReceiptSource {
-  readonly receiptId: string
-  readonly lines: ReadonlyMap<string, { readonly printed: string; readonly discount: Money | null }>
-}
-
 export function tripViewOf(
   trip: Trip,
   place: Place,

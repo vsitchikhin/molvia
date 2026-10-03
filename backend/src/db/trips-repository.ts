@@ -93,6 +93,12 @@ export interface TripRepository {
    * open trip, so another one open does not stand in its way. A trip of this id already there is a
    * 409: a receipt recorded again is answered by the receipt, before this is called.
    */
+  /**
+   * The owner's lock of trips, to the end of the caller's transaction (MOL-126): «Записать» takes it
+   * before it looks for the same receipt recorded, so two shots of one receipt recorded at once see
+   * each other.
+   */
+  lockOwner(actorId: string): Promise<void>
   recordFinished(
     actorId: string,
     input: RecordedTrip,
@@ -327,6 +333,10 @@ export function createTripRepository(db: Conn): TripRepository {
           return { trip: toTrip(theRow(row, 'trips')), created: true }
         }),
       )
+    },
+
+    async lockOwner(actorId) {
+      await ownerLock(db, actorId)
     },
 
     async recordFinished(actorId, input, currency, snapshot, receipt) {

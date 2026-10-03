@@ -1,6 +1,6 @@
 -- What a receipt line is and where it goes (MOL-126): the catalogue's names in the tills' languages and
--- the customs headings an item is sold under (written by the seed), the seller's tax number of a place,
--- the shop's shared memory «tax number + article → item», and a receipt's lines bound to items and
+-- the customs headings an item is sold under (written by the seed), a receipt to the one trip it was
+-- recorded as, the shop's shared memory «tax number + article → item», and a receipt's lines bound to items and
 -- recorded as purchases. The memory outlives its author: erasure leaves a word without one.
 CREATE TABLE "item_hs" (
 	"item_id" uuid NOT NULL,
@@ -33,7 +33,6 @@ CREATE TABLE "store_memory" (
 	CONSTRAINT "store_memory_currency_known" CHECK ("store_memory"."price_currency" is null or "store_memory"."price_currency" in ('AMD', 'RUB', 'USD', 'EUR'))
 );
 --> statement-breakpoint
-ALTER TABLE "places" ADD COLUMN "tin" text;--> statement-breakpoint
 ALTER TABLE "receipt_lines" ADD COLUMN "item_id" uuid;--> statement-breakpoint
 ALTER TABLE "receipt_lines" ADD COLUMN "match" text;--> statement-breakpoint
 ALTER TABLE "receipt_lines" ADD COLUMN "translation" text;--> statement-breakpoint
@@ -50,7 +49,7 @@ CREATE INDEX "store_memory_actor_idx" ON "store_memory" USING btree ("actor_id")
 ALTER TABLE "receipt_lines" ADD CONSTRAINT "receipt_lines_item_id_items_id_fk" FOREIGN KEY ("item_id") REFERENCES "public"."items"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "receipt_lines" ADD CONSTRAINT "receipt_lines_expense_id_expenses_id_fk" FOREIGN KEY ("expense_id") REFERENCES "public"."expenses"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "receipts" ADD CONSTRAINT "receipts_trip_id_trips_id_fk" FOREIGN KEY ("trip_id") REFERENCES "public"."trips"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "places_tin_idx" ON "places" USING btree ("tin") WHERE "places"."tin" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "receipt_lines_expense_key" ON "receipt_lines" USING btree ("expense_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "receipts_trip_key" ON "receipts" USING btree ("trip_id") WHERE "receipts"."trip_id" is not null;--> statement-breakpoint
 ALTER TABLE "receipt_lines" ADD CONSTRAINT "receipt_lines_match_known" CHECK ("receipt_lines"."match" is null or "receipt_lines"."match" in ('search', 'weak', 'new'));--> statement-breakpoint
 ALTER TABLE "receipts" ADD CONSTRAINT "receipts_city_known" CHECK ("receipts"."city" is null or "receipts"."city" in ('Гюмри', 'Ереван'));

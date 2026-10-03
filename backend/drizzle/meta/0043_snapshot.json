@@ -1,5 +1,5 @@
 {
-  "id": "529ade14-2d70-4a23-8408-ede03409208a",
+  "id": "632202d9-946b-4578-81d2-9eabc7e84f9b",
   "prevId": "07c254f8-c190-403f-9814-b472360e9dba",
   "version": "7",
   "dialect": "postgresql",
@@ -2772,12 +2772,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "tin": {
-          "name": "tin",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -2787,22 +2781,6 @@
         }
       },
       "indexes": {
-        "places_tin_idx": {
-          "name": "places_tin_idx",
-          "columns": [
-            {
-              "expression": "tin",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"places\".\"tin\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "places_identity_key": {
           "name": "places_identity_key",
           "columns": [
@@ -3454,6 +3432,22 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "receipts_trip_key": {
+          "name": "receipts_trip_key",
+          "columns": [
+            {
+              "expression": "trip_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"receipts\".\"trip_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}

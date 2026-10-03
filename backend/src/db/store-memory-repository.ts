@@ -4,9 +4,15 @@ import type { Currency, Money, StoreMemoryKind, StoreMemoryWord } from '@molvia/
 import type { Conn } from './index'
 import { storeMemory } from './schema'
 
-/** What the memory says a key is: the item, and the shelf price it had. */
+/**
+ * What the memory says a key is: the item; whether it is the person's own word; how many people said
+ * that item; and the shelf price it had — the person's own when the word is theirs, else the latest
+ * one known for that item, a word with no price passed over.
+ */
 export interface Recalled {
   readonly itemId: string
+  readonly own: boolean
+  readonly voters: number
   readonly price: Money | null
 }
 
@@ -41,28 +47,39 @@ export function createStoreMemoryRepository(db: Conn): StoreMemoryRepository {
         kind: StoreMemoryKind
         key: string
         item_id: string
+        own: boolean
+        voters: number
         price_minor: string | null
         price_currency: Currency | null
       }>(sql`
-        select distinct on (kind, key) kind, key, item_id, price_minor::text, price_currency
+        select distinct on (kind, key) kind, key, item_id, own, voters,
+          case when own then price_minor else known_minor end::text as price_minor,
+          case when own then price_currency else known_currency end as price_currency
         from (
           select m.*,
             coalesce(m.actor_id = ${actorId}, false) as own,
-            count(*) over (partition by m.kind, m.key, m.item_id) as votes,
-            max(m.written_at) over (partition by m.kind, m.key, m.item_id) as latest
+            count(*) over item::int as voters,
+            max(m.written_at) over item as latest,
+            first_value(m.price_minor) over (item order by m.price_minor is null, m.written_at desc
+              rows between unbounded preceding and unbounded following) as known_minor,
+            first_value(m.price_currency) over (item order by m.price_minor is null, m.written_at desc
+              rows between unbounded preceding and unbounded following) as known_currency
           from ${storeMemory} m
           where m.tin = ${tin}
             and (m.kind, m.key) in (${sql.join(
               words.map((word) => sql`(${word.kind}, ${word.key})`),
               sql`, `,
             )})
+          window item as (partition by m.kind, m.key, m.item_id)
         ) words
-        order by kind, key, own desc, votes desc, latest desc, written_at desc, id`)
+        order by kind, key, own desc, voters desc, latest desc, written_at desc, id`)
       return new Map(
         rows.map((row) => [
           memoryKey(row),
           {
             itemId: row.item_id,
+            own: row.own,
+            voters: row.voters,
             price:
               row.price_minor === null || row.price_currency === null
                 ? null

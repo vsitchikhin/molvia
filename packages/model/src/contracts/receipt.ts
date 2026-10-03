@@ -9,6 +9,7 @@ import {
 } from '#model/entities/receipt'
 import { newItemSchema } from '#model/entities/item'
 import { newPlaceSchema } from '#model/entities/place'
+import { ERROR } from '#model/support/errors'
 import { LOCALES } from '#model/support/locale'
 import { citySchema } from '#model/values/geo'
 import { moneyCodec } from '#model/values/money'
@@ -155,8 +156,9 @@ export const receiptRecordLineSchema = z.discriminatedUnion('skip', [
  * «Записать» (MOL-126): the whole receipt as the phone holds it, never its edits alone — the server's
  * suggestions may have changed since it was looked at (Р-4). The trip is named by the phone, as every
  * write offline is (MOL-24): a record sent again from the queue meets its own trip. The place is one
- * of the catalogue, or a new store in a city of the receipt's country; the day is the receipt's, or the
- * one the person chose where it was not read.
+ * of the catalogue, or a new store in a city of the receipt's country — either held to the person's
+ * geography; the day is the one the person confirmed — the printed one, or their correction of it —
+ * and never one still to come anywhere on Earth (`latestDay`).
  */
 export const receiptRecordBodySchema = z.strictObject({
   tripId: deviceIdSchema,
@@ -165,6 +167,12 @@ export const receiptRecordBodySchema = z.strictObject({
     z.strictObject({ name: newPlaceSchema.shape.name, city: citySchema }),
   ]),
   purchasedOn: z.iso.date(),
+  /**
+   * The receipt's total as the phone holds it (owner, В-5 of the review, 03.10.2026): the printed one,
+   * or the person's correction of a total OCR misread. Absent — the server takes the printed one where
+   * it is not below the lines, else the lines.
+   */
+  total: moneyCodec.refine((value) => value.minor > 0n, { error: ERROR.INVALID_AMOUNT }).optional(),
   lines: z.array(receiptRecordLineSchema).max(500),
 })
 export type ReceiptRecordBody = z.output<typeof receiptRecordBodySchema>

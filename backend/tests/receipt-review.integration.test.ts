@@ -90,6 +90,13 @@ async function parsedReceipt(
   return id
 }
 
+/** A receipt of the seller recorded at a place: what names the place of its tax number. */
+async function recordedAt(actorId: string, placeId: string, at = new Date()): Promise<string> {
+  const trip = await insertTrip(db, { actorId, placeId })
+  await parsedReceipt(actorId, [], { status: 'recorded', recordedAt: at, tripId: trip })
+  return trip
+}
+
 async function review(actorId: string, id: string) {
   const cookie = await signIn(db, actorId)
   const response = await app.inject({
@@ -143,6 +150,8 @@ describe('the shops’ memory (Р-2)', () => {
     await memory.remember(me, TIN, [{ ...milkWord, itemId: light, price: amd(390) }])
     expect((await memory.recall(me, TIN, [milkWord])).get(memoryKey(milkWord))).toEqual({
       itemId: light,
+      own: true,
+      voters: 1,
       price: amd(390),
     })
     expect((await memory.recall(me, '57424557', [milkWord])).size).toBe(0)
@@ -215,10 +224,43 @@ describe('the review of a receipt', () => {
     expect(detail.lines.map((line) => line.rememberedPrice)).toEqual([amd(50), null])
   })
 
-  it('names the place by the tax number in the city its address prints, else the person’s', async () => {
+  // В6 of the adversarial review: a shelf price is someone's figure — the person's own always, other
+  // people's only with access and from three people
+  it('names another person’s remembered price only with access and from three people', async () => {
+    const me = await insertActor(db)
+    const bag = await insertItem(db, { name: 'Пакет-майка', searchKey: 'paket-maika' })
+    const others = [await insertActor(db), await insertActor(db), await insertActor(db)]
+    const word = { kind: 'sku' as const, key: '1122223', itemId: bag, price: amd(50) }
+    const doubted = async () =>
+      (
+        await review(
+          me,
+          await parsedReceipt(me, [
+            { printed: 'Պոլիէթիլենային տոպրակ', sku: '1122223', price: 60, sum: 60 },
+          ]),
+        )
+      ).lines[0]
+    await memory.remember(others[0] ?? me, TIN, [word])
+    expect((await doubted())?.rememberedPrice).toBeNull()
+    expect((await doubted())?.match).toBe('memory')
+
+    await memory.remember(others[1] ?? me, TIN, [word])
+    await memory.remember(others[2] ?? me, TIN, [{ ...word, price: null }])
+    expect((await doubted())?.rememberedPrice).toBeNull()
+    await db
+      .update(actors)
+      .set({ sharedUntil: new Date(Date.now() + 86_400_000) })
+      .where(eq(actors.id, me))
+    // three people, and the latest known price — a word with none passed over (review 10)
+    expect((await doubted())?.rememberedPrice).toEqual(amd(50))
+  })
+
+  it('names the place by the receipts of its seller recorded in the city its address prints, else the person’s', async () => {
     const me = await insertActor(db, { city: 'Гюмри' })
-    const gyumri = await insertPlace(db, { name: 'Ереван Сити', city: 'Гюмри', tin: TIN })
-    const yerevan = await insertPlace(db, { name: 'Ереван Сити', city: 'Ереван', tin: TIN })
+    const gyumri = await insertPlace(db, { name: 'Ереван Сити', city: 'Гюмри' })
+    const yerevan = await insertPlace(db, { name: 'Ереван Сити', city: 'Ереван' })
+    await recordedAt(await insertActor(db), gyumri)
+    await recordedAt(await insertActor(db), yerevan)
     const here = await parsedReceipt(me, [])
     const there = await parsedReceipt(me, [], { city: 'Ереван' })
     const unknown = await parsedReceipt(me, [], { tin: '57424557' })
@@ -248,10 +290,39 @@ describe('the review of a receipt', () => {
     )
   })
 
+  // В4 of the adversarial review: one wrong choice of place named it for everyone, for good
+  it('takes one’s own last place, else the place most people chose, and forgets a removed trip', async () => {
+    const [me, ann, boris, vera] = [
+      await insertActor(db),
+      await insertActor(db),
+      await insertActor(db),
+      await insertActor(db),
+    ]
+    const sas = await insertPlace(db, { name: 'SAS' })
+    const city = await insertPlace(db, { name: 'Ереван Сити' })
+    const wrong = await recordedAt(ann, sas, new Date('2026-09-20T10:00:00Z'))
+    const suggested = async (actorId: string) =>
+      (await review(actorId, await parsedReceipt(actorId, []))).receipt.place?.id ?? null
+
+    expect(await suggested(boris)).toBe(sas)
+    await recordedAt(boris, city, new Date('2026-09-21T10:00:00Z'))
+    // one to one: the later
+    expect(await suggested(vera)).toBe(city)
+    await recordedAt(vera, city, new Date('2026-09-22T10:00:00Z'))
+    await recordedAt(me, sas, new Date('2026-09-23T10:00:00Z'))
+    // two to two, but mine is mine
+    expect(await suggested(me)).toBe(sas)
+
+    // Ann's wrong trip removed: her word goes with it
+    await db.update(tripsTable).set({ deletedAt: new Date() }).where(eq(tripsTable.id, wrong))
+    const newcomer = await insertActor(db)
+    expect(await suggested(newcomer)).toBe(city)
+  })
+
   it('names the same receipt recorded before while its purchases are there (Т-11)', async () => {
     const me = await insertActor(db)
     const stranger = await insertActor(db)
-    const place = await insertPlace(db, { tin: TIN })
+    const place = await insertPlace(db)
     const trip = await insertTrip(db, { actorId: me, placeId: place })
     const first = await parsedReceipt(me, [], {
       status: 'recorded',

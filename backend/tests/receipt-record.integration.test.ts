@@ -195,7 +195,7 @@ describe('«Записать»', () => {
       .select()
       .from(places)
       .where(eq(places.id, trip?.placeId ?? ''))
-    expect(place).toMatchObject({ name: 'Ереван Сити', city: 'Гюмри', tin: TIN })
+    expect(place).toMatchObject({ name: 'Ереван Сити', city: 'Гюмри' })
 
     const bought = await db
       .select({ itemId: expenses.itemId, amount: expenses.amountMinor, qty: expenses.qtyMilli })
@@ -402,21 +402,103 @@ describe('«Записать»', () => {
     expect(history.trips.map((row) => [row.id, row.fromReceipt])).toEqual([[tripId, true]])
   })
 
-  it('is the owner’s alone, and keeps the tax number a place already has', async () => {
+  it('is the owner’s alone, and takes a place by its id only in the receipt’s geography (В8)', async () => {
     const me = await insertActor(db)
     const stranger = await insertActor(db)
-    const place = await insertPlace(db, { tin: '99999999' })
+    const place = await insertPlace(db)
+    const tbilisi = await insertPlace(db, { name: 'Carrefour', country: 'GE', city: 'Тбилиси' })
+    const nowhere = await insertPlace(db, { name: 'SAS', city: 'Ванадзор' })
     const milk = await insertItem(db)
     const id = await parsedReceipt(me, LINES.slice(0, 1))
-    const body = {
+    const body = (placeId: string) => ({
+      tripId: randomUUID(),
+      place: { id: placeId },
+      purchasedOn: '2026-09-26',
+      lines: [{ position: 0, skip: false, item: { id: milk }, quantity: null, amount: null }],
+    })
+    expect((await record(stranger, id, body(place))).statusCode).toBe(404)
+    for (const elsewhere of [tbilisi, nowhere]) {
+      const refused = await record(me, id, body(elsewhere))
+      expect([refused.statusCode, codeOf(refused)]).toEqual([409, ERROR.CONFLICT])
+    }
+    expect((await record(me, id, body(place))).statusCode).toBe(200)
+  })
+
+  it('takes the total the phone sends, else the printed one only where it is not below the lines (В-5)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    const body = (over: Record<string, unknown> = {}) => ({
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: amount(740) },
+        {
+          position: 1,
+          skip: false,
+          item: { id: milk },
+          quantity: pieces(1),
+          amount: amount(1_450),
+        },
+      ],
+      ...over,
+    })
+    const moneyOf = async (receipt: string, payload: ReturnType<typeof body>) => {
+      expect((await record(me, receipt, payload)).statusCode).toBe(200)
+      const [trip] = await db.select().from(trips).where(eq(trips.id, payload.tripId))
+      return trip?.receiptMinor
+    }
+    // misread below the lines (В5): 2 190 of lines, 190 printed — the lines
+    const low = await parsedReceipt(me, LINES.slice(0, 2), { totalMinor: 19_000n, receiptNo: '1' })
+    expect(await moneyOf(low, body())).toBe(219_000n)
+    // above the lines — a line OCR lost: the printed one
+    const lost = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: 250_000n,
+      receiptNo: '2',
+    })
+    expect(await moneyOf(lost, body())).toBe(250_000n)
+    // the person corrected the total on the review
+    const fixed = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: 319_000n,
+      receiptNo: '3',
+    })
+    expect(await moneyOf(fixed, body({ total: amount(2_190) }))).toBe(219_000n)
+  })
+
+  // review 1, В1, В2, В7: the receipt row holds the trip's date on the accounts, «из чека» and the
+  // guard against a second record — it goes with its trip, never before it
+  it('keeps a recorded receipt while its trip is there, and lets it be recorded again once the trip is gone', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    const id = await parsedReceipt(me, LINES.slice(0, 1))
+    const body = () => ({
       tripId: randomUUID(),
       place: { id: place },
       purchasedOn: '2026-09-26',
       lines: [{ position: 0, skip: false, item: { id: milk }, quantity: null, amount: null }],
-    }
-    expect((await record(stranger, id, body)).statusCode).toBe(404)
-    expect((await record(me, id, body)).statusCode).toBe(200)
-    const [kept] = await db.select().from(places).where(eq(places.id, place))
-    expect(kept?.tin).toBe('99999999')
+    })
+    const first = body()
+    expect((await record(me, id, first)).statusCode).toBe(200)
+    const cookie = await signIn(db, me)
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: `/receipts/${id}`,
+      headers: { cookie },
+    })
+    expect([removed.statusCode, codeOf(removed)]).toEqual([409, ERROR.CONFLICT])
+
+    // the trip marked removed may still come back: neither the old trip nor a new one
+    await db.update(trips).set({ deletedAt: new Date() }).where(eq(trips.id, first.tripId))
+    expect((await record(me, id, first)).statusCode).toBe(409)
+    expect((await record(me, id, body())).statusCode).toBe(409)
+
+    // removed for good: the receipt is recorded again, from its lines
+    await db.delete(trips).where(eq(trips.id, first.tripId))
+    const again = body()
+    expect((await record(me, id, again)).statusCode).toBe(200)
+    const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
+    expect([row?.status, row?.tripId]).toEqual(['recorded', again.tripId])
   })
 })

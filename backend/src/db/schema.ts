@@ -532,18 +532,9 @@ export const places = pgTable(
     name: varchar('name', { length: 200 }).notNull(),
     country: char('country', { length: 2 }).notNull(),
     city: varchar('city', { length: 120 }).notNull(),
-    /**
-     * The seller's tax number its receipts print (MOL-126): a receipt finds its place by it, in its city
-     * — one chain, one number, a place in each city. Set by the first receipt recorded at the place,
-     * never rewritten. Not the place's identity: a place exists without one.
-     */
-    tin: text('tin'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index('places_tin_idx')
-      .on(table.tin)
-      .where(sql`${table.tin} is not null`),
     /**
      * Identity, not spelling. Exact uniqueness let «SAS» and «sas» — and «Ёлки» written
      * with U+0401 against the same word with U+0415 U+0308 — become two places that look
@@ -1962,6 +1953,11 @@ export const receipts = pgTable(
   },
   (table) => [
     index('receipts_actor_created_idx').on(table.actorId, table.createdAt),
+    // One trip is one receipt's (MOL-126): what dates it on the accounts, names it «из чека» and
+    // finds a seller's place is read by the trip, each history row and each account a step.
+    uniqueIndex('receipts_trip_key')
+      .on(table.tripId)
+      .where(sql`${table.tripId} is not null`),
     // The queue: the oldest receipt waiting for the reader is one index step.
     index('receipts_queue_idx')
       .on(table.queuedAt)

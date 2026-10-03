@@ -123,6 +123,7 @@ function fakeRepositories(
     trips: {
       start: unexpected('trips.start'),
       recordFinished: unexpected('trips.recordFinished'),
+      lockOwner: unexpected('trips.lockOwner'),
       byId: unexpected('trips.byId'),
       lock: unexpected('trips.lock'),
       latestUnfinishedFor: unexpected('trips.latestUnfinishedFor'),
@@ -154,8 +155,6 @@ function fakeRepositories(
       byId: unexpected('places.byId'),
       byIds: unexpected('places.byIds'),
       recentFor: unexpected('places.recentFor'),
-      withTins: unexpected('places.withTins'),
-      giveTin: unexpected('places.giveTin'),
       ...overrides.places,
     },
     items: {
@@ -269,6 +268,7 @@ function fakeRepositories(
       list: unexpected('receipts.list'),
       one: unexpected('receipts.one'),
       recordedTwin: unexpected('receipts.recordedTwin'),
+      placesOfTins: unexpected('receipts.placesOfTins'),
       lockForRecord: unexpected('receipts.lockForRecord'),
       markRecorded: unexpected('receipts.markRecorded'),
       sourceOf: () => Promise.resolve(null),
