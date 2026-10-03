@@ -44,11 +44,14 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 
 ## frontend · other
 
-- `frontend/.stylelintrc.json` — Stylelint config: no literal colours, colour functions or safe areas; spacing, weight, size and radius only from tokens; Nunito only through `display-type`; the unknown-property plugin.
+- `frontend/.stylelintrc.json` — Stylelint config: no literal colours, colour functions or safe areas; spacing, weight, size, radius and the `font` shorthand only from tokens; Nunito only through `display-type`; both house plugins.
 - `frontend/DESIGN.md` — The style for Claude Design and for us: the token block generated from `_tokens.scss` by `bin/design-md.mjs`, then the named rules of colour, type, layout, shape and the kit.
 - `frontend/PRODUCT.md` — The product in one page for Claude Design: what it answers, who, where, tone, trust, anti-references.
 - `frontend/stylelint/known-properties.mjs` — Stylelint rule `molvia/known-custom-property`: a `var(--x)` must be declared in the tokens, `main.scss`, the mixins, its own file, or the list of properties set by script.
-- `frontend/stylelint/known-properties.test.ts` — Test: the rule takes tokens of either scheme, globals, a file's own property and one set by script; refuses an unknown name with or without a fallback, in a mixin's arguments and inside `calc`.
+- `frontend/stylelint/config.test.ts` — Test of the house config itself, through the real `.stylelintrc.json`: the kit passes; the `font` shorthand, a colour as a size, a number in a radius's `calc`, Nunito's axis and a literal in a mixin are refused.
+- `frontend/stylelint/display-type.mjs` — Stylelint rule `molvia/display-type-whole`: beside `@include display-type` no `font`, `font-family`, `font-weight` or `font-variation-settings`; a nested variant sets its own.
+- `frontend/stylelint/display-type.test.ts` — Test: a role with its size passes; the face, the weight, the axis or the shorthand beside the include — before or after it — is refused; a nested variant and a rule without the include are left alone.
+- `frontend/stylelint/known-properties.test.ts` — Test: the rule takes tokens, globals, a file's own property, one set by script and an interpolated name; refuses an unknown name with or without a fallback, in a mixin's arguments, inside `calc`, named only in a comment or only by the dark scheme.
 - `frontend/env.d.ts` — Ambient type references for Vite and the PWA plugin's client.
 - `frontend/index.html` — The PWA's HTML shell: viewport with keyboard resizing, per-scheme theme colours, the device's scheme set before the first paint, icons, the app mount.
 - `frontend/public/` — Static assets served as is: `favicon.svg` (the icon source), the rasterised app icons and the self-hosted font files.
