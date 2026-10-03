@@ -57,6 +57,14 @@ const envSchema = z.object({
     .min(1)
     .default(fileURLToPath(new URL(`../../.models/${model.name}`, import.meta.url))),
   /**
+   * The receipt reader's address (MOL-125): `services/receipt-reader` on the compose network, a copy's
+   * own on its band with `make reader`. Unset or empty, receipts are taken and wait in the queue.
+   */
+  RECEIPT_READER_URL: z
+    .union([z.literal(''), z.url({ protocol: /^https?$/ })])
+    .optional()
+    .transform((url) => (url === '' ? undefined : url)),
+  /**
    * Whom the bot writes about failures (MOL-143, Р-9 of MOL-149): the owner's Telegram id. Set in
    * production only — without it nothing is queued for anyone, so a copy's failures go to its table
    * and stay there. Empty is unset, as compose passes a variable it was not given.

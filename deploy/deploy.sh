@@ -139,7 +139,7 @@ previous="$(setting IMAGE_TAG)"
 echo "deploying $tag over ${previous:-nothing}"
 
 # Pulled before anything changes: a tag the registry does not have leaves the machine as it was.
-IMAGE_TAG="$tag" "${compose[@]}" pull -q backend bot frontend
+IMAGE_TAG="$tag" "${compose[@]}" pull -q backend bot frontend receipt-reader
 
 bot_before="$(bot_state || true)"
 set_tag "$tag"
@@ -157,6 +157,9 @@ fi
 echo "rolling back to $previous — a migration $tag applied stays applied" >&2
 bot_before="$(bot_state || true)"
 set_tag "$previous"
-"${compose[@]}" up -d || true
+# The services the tag check counts, not the receipt reader (MOL-125): a tag from before it has no
+# reader image, and `up -d` of everything would stop on the missing pull with the API left broken.
+# The reader keeps whatever runs — it holds nothing and answers any API alike.
+"${compose[@]}" up -d backend bot frontend || true
 wait_healthy "$previous" || echo "$previous is not healthy either — the machine needs hands" >&2
 exit 1

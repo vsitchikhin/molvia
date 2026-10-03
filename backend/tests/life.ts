@@ -16,6 +16,10 @@ import {
   moneyMonthRates,
   budgetPlans,
   ratingReminders,
+  receiptLineImages,
+  receiptLines,
+  receiptParts,
+  receipts,
   searchPicks,
   spendingCategories,
   spendings,
@@ -36,6 +40,7 @@ export async function aLife(
   incomeId: string
   spendingId: string
   accountId: string
+  receiptId: string
 }> {
   const ownItem = await insertItem(db, {
     name: 'Рынок-сыр',
@@ -132,6 +137,77 @@ export async function aLife(
     { id: spendingId, ...spending },
     { id: randomUUID(), ...spending, deletedAt: new Date() },
   ])
+  // Receipts photographed (MOL-125): one read and recorded — its photo, its lines, a line cut out —
+  // and one that failed and was removed.
+  const receiptId = randomUUID()
+  const at = new Date('2026-09-30T11:03:50Z')
+  await db.insert(receipts).values([
+    {
+      id: receiptId,
+      actorId,
+      status: 'recorded',
+      parts: 1,
+      country: 'AM',
+      language: 'ru',
+      currency: 'AMD',
+      capturedAt: at,
+      queuedAt: at,
+      readingAt: at,
+      readAt: at,
+      attempts: 1,
+      readerVersion: 'tesseract 5.5.0 · dc2c9f36ac9d',
+      layout: 'card',
+      tin: '01282006',
+      printedOn: '2026-09-30',
+      printedTime: '15:03',
+      receiptNo: '21410811',
+      totalMinor: 74_000n,
+      balanced: true,
+      recordedAt: at,
+    },
+    {
+      id: randomUUID(),
+      actorId,
+      status: 'failed',
+      failure: 'reshoot',
+      parts: 1,
+      country: 'AM',
+      language: 'ru',
+      currency: 'AMD',
+      capturedAt: at,
+      queuedAt: at,
+      deletedAt: at,
+    },
+  ])
+  await db.insert(receiptParts).values({
+    receiptId,
+    position: 1,
+    photo: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+    width: 700,
+    height: 3_200,
+  })
+  await db.insert(receiptLines).values({
+    receiptId,
+    position: 0,
+    printed: 'Կաթ «Իգիթ» 3.2% 1լ',
+    hs: '0401',
+    sku: '1163909',
+    qtyMilli: 2_000n,
+    qtyUnit: 'piece',
+    priceMinor: 37_000n,
+    sumMinor: 74_000n,
+    discountMinor: 0n,
+    settled: true,
+  })
+  await db.insert(receiptLineImages).values({
+    receiptId,
+    position: 0,
+    piece: 1,
+    image: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+    readText: '0401/1163909 2Հտ 740 370',
+    confirmedText: '0401/1163909 2Հտ 740 370',
+    confirmedAt: at,
+  })
   await db.insert(moneyMonthRates).values({
     actorId,
     month: '2026-08',
@@ -205,5 +281,5 @@ export async function aLife(
     threadId: message.id,
     inReplyTo: reply?.id,
   })
-  return { ownItem, exchangeId, incomeId, spendingId, accountId }
+  return { ownItem, exchangeId, incomeId, spendingId, accountId, receiptId }
 }

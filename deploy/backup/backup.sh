@@ -34,8 +34,12 @@ partial="$RCLONE_REMOTE/partial/$name"
 # copy goes up under partial/ and becomes a copy only once the whole pipe has exited cleanly.
 # The cutoff keeps it one PUT: rclone's multipart upload sends a CRC64NVME checksum that R2 answers
 # with 501 — what broke the run once the dump outgrew the default 100 KiB.
+# Receipt photos and the lines cut out of them stay out of the copy (MOL-125, В-2): their tables come
+# back empty from a restore. A photo carries a customer's name and lives only until the receipt is
+# recorded; a copy kept fourteen days would keep it longer than the promise on /privacy.
 docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres \
-  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' \
+  sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom \
+    --exclude-table-data=receipt_parts --exclude-table-data=receipt_line_images' \
   | age --encrypt --recipient "$AGE_RECIPIENT" \
   | rclone rcat --streaming-upload-cutoff 1G "$partial"
 

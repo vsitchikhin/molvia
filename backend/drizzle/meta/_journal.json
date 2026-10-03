@@ -295,6 +295,13 @@
       "when": 1791029151680,
       "tag": "0041_feedback",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1791030371974,
+      "tag": "0042_receipts",
+      "breakpoints": true
     }
   ]
 }

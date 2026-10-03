@@ -3,6 +3,7 @@ import {
   boolean,
   char,
   check,
+  customType,
   date,
   foreignKey,
   halfvec,
@@ -52,6 +53,11 @@ import {
   ratePreferenceSchema,
   SALARY_SHIFT_DAY_MAX,
   rateSourceSchema,
+  RECEIPT_PARTS_MAX,
+  RECEIPT_PART_BYTES_MAX,
+  receiptCountrySchema,
+  receiptFailureSchema,
+  receiptStatusSchema,
   SPENDING_CATEGORY_COLOURS,
   spendingPresetSchema,
 } from '@molvia/model'
@@ -74,6 +80,10 @@ import type {
   RateProvider,
   RatePreference,
   RateSource,
+  AppLocale,
+  ReceiptCountry,
+  ReceiptFailure,
+  ReceiptStatus,
   SpendingPreset,
 } from '@molvia/model'
 
@@ -1836,5 +1846,206 @@ export const ownerNotices = pgTable(
     index('owner_notices_waiting')
       .on(table.id)
       .where(sql`${table.handedAt} is null`),
+  ],
+)
+
+/** Bytes as Postgres keeps them: a receipt's photo and its cut-out lines (MOL-125). */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' })
+
+/**
+ * A receipt photographed on the phone and read on our server (MOL-125). Named by the device, as
+ * everything written offline is: a receipt sent twice from the queue is one receipt; «Переснять» is
+ * a new one. The head the reader found — the seller's tax number, the printed day, the number, the
+ * total — sits on the row; the lines are `receipt_lines`.
+ *
+ * What lives how long (В-3): a receipt not recorded goes whole 28 days after it arrived, a removed
+ * one after the ten minutes of «Вернуть», as everything of «Деньги» (П-8, MOL-73).
+ */
+export const receipts = pgTable(
+  'receipts',
+  {
+    id: uuid('id').primaryKey(),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'cascade' }),
+    status: text('status').$type<ReceiptStatus>().notNull(),
+    failure: text('failure').$type<ReceiptFailure>(),
+    parts: smallint('parts').notNull(),
+    country: char('country', { length: 2 }).$type<ReceiptCountry>().notNull(),
+    // The language the lines are to be read out in: the interface's, which nothing else keeps (П-4).
+    language: text('language').$type<AppLocale>().notNull(),
+    currency: char('currency', { length: 3 }).$type<Currency>().notNull(),
+    // The phone's moment of the shot; every other moment here is the server's.
+    capturedAt: timestamp('captured_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    queuedAt: timestamp('queued_at', { withTimezone: true }),
+    readingAt: timestamp('reading_at', { withTimezone: true }),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    // Readings begun: one cut short by a restart is begun again, twice at most.
+    attempts: smallint('attempts').notNull().default(0),
+    // Tesseract and its language files, as the reader names them — which model read (MOL-169).
+    readerVersion: text('reader_version'),
+    layout: text('layout').$type<'card' | 'table'>(),
+    tin: text('tin'),
+    printedOn: date('printed_on'),
+    printedTime: text('printed_time'),
+    receiptNo: text('receipt_no'),
+    // In the receipt's own currency.
+    totalMinor: bigint('total_minor', { mode: 'bigint' }),
+    balanced: boolean('balanced').notNull().default(false),
+    recordedAt: timestamp('recorded_at', { withTimezone: true }),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('receipts_actor_created_idx').on(table.actorId, table.createdAt),
+    // The queue: the oldest receipt waiting for the reader is one index step.
+    index('receipts_queue_idx')
+      .on(table.queuedAt)
+      .where(sql`${table.status} = 'queued' and ${table.deletedAt} is null`),
+    check('receipts_status_known', oneOf(table.status, receiptStatusSchema.options)),
+    check(
+      'receipts_failure_known',
+      sql`${table.failure} is null or ${oneOf(table.failure, receiptFailureSchema.options)}`,
+    ),
+    // A failure is said exactly when the receipt failed.
+    check(
+      'receipts_failure_of_failed',
+      sql`(${table.status} = 'failed') = (${table.failure} is not null)`,
+    ),
+    check(
+      'receipts_parts_range',
+      sql`${table.parts} between 1 and ${sql.raw(String(RECEIPT_PARTS_MAX))}`,
+    ),
+    check('receipts_country_known', oneOf(table.country, receiptCountrySchema.options)),
+    check('receipts_language_known', oneOf(table.language, LOCALES)),
+    check('receipts_currency_known', oneOf(table.currency, currencySchema.options)),
+    check(
+      'receipts_whole_when_queued',
+      sql`${table.status} = 'uploading' or ${table.queuedAt} is not null`,
+    ),
+    check('receipts_attempts_non_negative', sql`${table.attempts} >= 0`),
+    check(
+      'receipts_layout_known',
+      sql`${table.layout} is null or ${table.layout} in ('card', 'table')`,
+    ),
+    check(
+      'receipts_total_non_negative',
+      sql`${table.totalMinor} is null or ${table.totalMinor} >= 0`,
+    ),
+  ],
+)
+
+/**
+ * A receipt's photo, part by part, top to bottom (MOL-124 В-1): the JPEG the phone cropped to the
+ * receipt's edges. Kept until the receipt is recorded, removed or 28 days old — and never in the
+ * nightly copy of the database (В-2): a photo carries the customer's name.
+ */
+export const receiptParts = pgTable(
+  'receipt_parts',
+  {
+    receiptId: uuid('receipt_id')
+      .notNull()
+      .references(() => receipts.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    photo: bytea('photo').notNull(),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.receiptId, table.position] }),
+    check(
+      'receipt_parts_position_range',
+      sql`${table.position} between 1 and ${sql.raw(String(RECEIPT_PARTS_MAX))}`,
+    ),
+    check(
+      'receipt_parts_photo_size',
+      sql`octet_length(${table.photo}) between 1 and ${sql.raw(String(RECEIPT_PART_BYTES_MAX))}`,
+    ),
+    check('receipt_parts_sides_positive', sql`${table.width} > 0 and ${table.height} > 0`),
+  ],
+)
+
+/**
+ * The lines the reader laid a receipt out into, in the order printed (MOL-125): as printed, with the
+ * customs heading and the till's article, and the figures the receipt's own arithmetic chose. Every
+ * amount is in the receipt's currency. Machine output, written once per reading; a person's edits
+ * and the purchases are MOL-126's.
+ */
+export const receiptLines = pgTable(
+  'receipt_lines',
+  {
+    receiptId: uuid('receipt_id')
+      .notNull()
+      .references(() => receipts.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    printed: text('printed').notNull(),
+    hs: text('hs'),
+    sku: text('sku'),
+    qtyMilli: bigint('qty_milli', { mode: 'bigint' }),
+    qtyUnit: text('qty_unit').$type<BaseUnit>(),
+    priceMinor: bigint('price_minor', { mode: 'bigint' }),
+    sumMinor: bigint('sum_minor', { mode: 'bigint' }),
+    discountMinor: bigint('discount_minor', { mode: 'bigint' }),
+    settled: boolean('settled').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.receiptId, table.position] }),
+    check('receipt_lines_position_non_negative', sql`${table.position} >= 0`),
+    check(
+      'receipt_lines_quantity_whole',
+      sql`(${table.qtyMilli} is null) = (${table.qtyUnit} is null)`,
+    ),
+    check(
+      'receipt_lines_quantity_positive',
+      sql`${table.qtyMilli} is null or ${table.qtyMilli} > 0`,
+    ),
+    check(
+      'receipt_lines_unit_known',
+      sql`${table.qtyUnit} is null or ${oneOf(table.qtyUnit, baseUnitSchema.options)}`,
+    ),
+    check(
+      'receipt_lines_amounts_non_negative',
+      sql`coalesce(${table.priceMinor}, 0) >= 0 and coalesce(${table.sumMinor}, 0) >= 0 and coalesce(${table.discountMinor}, 0) >= 0`,
+    ),
+  ],
+)
+
+/**
+ * The item lines of a receipt cut out of its photo, row by row — the name and the figures, never
+ * the head with the customer's name nor the total — for retraining the reader (MOL-169, owner,
+ * 02.10.2026). Cut when the receipt is read; recording it (MOL-126) writes the text a person
+ * confirmed, and from then on a row lives 28 days. Never in the nightly copy (В-2).
+ */
+export const receiptLineImages = pgTable(
+  'receipt_line_images',
+  {
+    receiptId: uuid('receipt_id')
+      .notNull()
+      .references(() => receipts.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    // The row of the line: its name first, its figures after.
+    piece: smallint('piece').notNull(),
+    image: bytea('image').notNull(),
+    // What the reader read on this row; the text a person confirmed comes with the record.
+    readText: text('read_text').notNull(),
+    confirmedText: text('confirmed_text'),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.receiptId, table.position, table.piece] }),
+    index('receipt_line_images_confirmed_idx').on(table.confirmedAt),
+    check('receipt_line_images_piece_range', sql`${table.piece} between 0 and 3`),
+    check(
+      'receipt_line_images_confirmed_whole',
+      sql`(${table.confirmedText} is null) = (${table.confirmedAt} is null)`,
+    ),
   ],
 )

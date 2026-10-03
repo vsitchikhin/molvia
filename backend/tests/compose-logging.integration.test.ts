@@ -28,7 +28,13 @@ function services(): Map<string, string> {
 describe('docker-compose.prod.yml', () => {
   it('sends every service to the journal', () => {
     const found = services()
-    expect([...found.keys()].sort()).toEqual(['backend', 'bot', 'frontend', 'postgres'])
+    expect([...found.keys()].sort()).toEqual([
+      'backend',
+      'bot',
+      'frontend',
+      'postgres',
+      'receipt-reader',
+    ])
     for (const [, block] of found) expect(block).toMatch(/^ {4}logging: \*logging$/m)
   })
 

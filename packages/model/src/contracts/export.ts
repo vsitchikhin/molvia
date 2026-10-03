@@ -27,8 +27,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // exchange's `channel` (MOL-137). 5: `addedBarcodes`, the codes the person wrote to items of the
 // catalogue (MOL-100). 6: the account's `remindersOff`, whether and why the bot does not remind
 // (MOL-103). 7: `budgetPlans`, what the person plans a month of «Бюджет» at (MOL-117). 8: `feedback`,
-// what the person wrote to the developer and the owner's replies (MOL-147).
-export const EXPORT_VERSION = 8
+// what the person wrote to the developer and the owner's replies (MOL-147). 9: `receipts`,
+// the receipts photographed and what the reader laid them out into — never the photo (MOL-125).
+export const EXPORT_VERSION = 9
 
 const day = z.iso.date()
 
@@ -263,6 +264,49 @@ const spendingSchema = z.strictObject({
   removedAt: isoDate.nullable(),
 })
 
+/**
+ * A receipt photographed (MOL-125): what the reader found at its head and its lines as read. The
+ * photo and the lines cut out of it are not in the file — bytes of a picture, kept days and gone.
+ */
+const receiptSchema = z.strictObject({
+  id: z.uuid(),
+  status: z.string(),
+  failure: z.string().nullable(),
+  parts: z.int(),
+  country: z.string(),
+  language: z.string(),
+  currency: currencySchema,
+  capturedAt: isoDate,
+  createdAt: isoDate,
+  queuedAt: isoDate.nullable(),
+  readingAt: isoDate.nullable(),
+  readAt: isoDate.nullable(),
+  attempts: z.int(),
+  readerVersion: z.string().nullable(),
+  layout: z.string().nullable(),
+  tin: z.string().nullable(),
+  printedOn: day.nullable(),
+  printedTime: z.string().nullable(),
+  receiptNo: z.string().nullable(),
+  total: signedMoneyCodec.nullable(),
+  balanced: z.boolean(),
+  recordedAt: isoDate.nullable(),
+  removedAt: isoDate.nullable(),
+  lines: z.array(
+    z.strictObject({
+      position: z.int(),
+      printed: z.string(),
+      hs: z.string().nullable(),
+      sku: z.string().nullable(),
+      quantity: quantityCodec.nullable(),
+      price: signedMoneyCodec.nullable(),
+      sum: signedMoneyCodec.nullable(),
+      discount: signedMoneyCodec.nullable(),
+      settled: z.boolean(),
+    }),
+  ),
+})
+
 const spendingCategorySchema = z.strictObject({
   id: z.uuid(),
   preset: spendingPresetSchema.nullable(),
@@ -390,6 +434,7 @@ export const exportContentCodec = z.strictObject({
   exchanges: z.array(exchangeSchema),
   incomes: z.array(incomeSchema),
   spendings: z.array(spendingSchema),
+  receipts: z.array(receiptSchema),
   spendingCategories: z.array(spendingCategorySchema),
   monthRates: z.array(monthRateSchema),
   budgetPlans: z.array(budgetPlanSchema),
