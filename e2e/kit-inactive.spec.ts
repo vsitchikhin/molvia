@@ -78,8 +78,12 @@ test('an inactive switch takes the focus and holds against Space and a tap on it
 test('an inactive button takes the focus and does not light up under the pointer', async ({
   browser,
 }, info) => {
+  // The run's address, language and zone, and none of the phone's touch.
+  const { baseURL = '', locale = 'en-US', timezoneId = 'Asia/Yerevan' } = info.project.use
   const context = await browser.newContext({
-    ...info.project.use,
+    baseURL,
+    locale,
+    timezoneId,
     hasTouch: false,
     isMobile: false,
   })
