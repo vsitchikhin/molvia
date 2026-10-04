@@ -339,9 +339,9 @@ test('the bot’s messages turn off on the tap, each its own, and stay off after
     )
   await expect.poll(setting).toEqual({ off: 'chosen' })
   // one switch is one kind: the receipts' stays on
-  expect(await notices()).toEqual({ off: false })
+  expect(await notices()).toEqual({ off: false, blocked: false })
   await receipts.uncheck()
-  await expect.poll(notices).toEqual({ off: true })
+  await expect.poll(notices).toEqual({ off: true, blocked: false })
   await page.reload()
   await expect(reminders).not.toBeChecked()
   await expect(receipts).not.toBeChecked()
@@ -349,7 +349,7 @@ test('the bot’s messages turn off on the tap, each its own, and stay off after
   await reminders.check()
   await receipts.check()
   await expect.poll(setting).toEqual({ off: null })
-  await expect.poll(notices).toEqual({ off: false })
+  await expect.poll(notices).toEqual({ off: false, blocked: false })
   // «back» is the settings
   await page.goBack()
   await expect(page).toHaveURL(/\/settings$/)
