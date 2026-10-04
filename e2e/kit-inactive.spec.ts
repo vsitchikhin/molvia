@@ -73,9 +73,18 @@ test('an inactive switch takes the focus and holds against Space and a tap on it
   await expect(kit.getByRole('switch', { name: 'Off', exact: true })).toBeChecked()
 })
 
+// The phone profiles have no hover — `(hover: hover)` is false in both — so the pointer is a mouse
+// here, in a context of its own, or the check would hold by the media query alone.
 test('an inactive button takes the focus and does not light up under the pointer', async ({
-  page,
-}) => {
+  browser,
+}, info) => {
+  const context = await browser.newContext({
+    ...info.project.use,
+    hasTouch: false,
+    isMobile: false,
+  })
+  const page = await context.newPage()
+  expect(await page.evaluate(() => matchMedia('(hover: hover)').matches)).toBe(true)
   const kit = await section(page)
   const save = kit.getByRole('button', { name: 'Save', exact: true })
   const look = () =>
@@ -88,4 +97,5 @@ test('an inactive button takes the focus and does not light up under the pointer
   expect(await look()).toBe(rest)
   await save.focus()
   await expect(save).toBeFocused()
+  await context.close()
 })
