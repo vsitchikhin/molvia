@@ -372,8 +372,9 @@ breaks in it answers 500 with no traceback, and a connection broken under a requ
 (review А12).
 
 **How the person learned it was read is kept** (MOL-129, `receipts.heard`): `app` once the list or the
-review handed it over read, `bot` once the bot was handed it to tell — the first word stands. A read of
-the list writes only for a receipt read and not yet heard of. The rest is `bot.md`.
+review handed it over read **to a phone that asked with its page in view** (`?shown=1`), `bot` once the
+bot was handed it to tell — the first word stands. A read of the list writes only for a receipt read and
+not yet heard of, and a read asked hidden writes nothing. The rest is `bot.md`.
 
 **A head is what a reading found**: a receipt failed before any reading answers `header: null`, not
 four nulls (review А11). What the phone reads as «read» is the `status`, never `header !== null`.

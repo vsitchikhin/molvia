@@ -446,25 +446,40 @@ storage is `feedback.md`.
 ## «Чек разобран» (MOL-129)
 
 The bot's fourth thing: a receipt read reaches the person who left the screen. The owner's decisions
-of 04.10.2026 are В-1…В-3 and Р-1…Р-11 in `.scratch/tasks/requirements/MOL-129.md`; the texts are
+of 04.10.2026 are В-1…В-3 and Р-1…Р-13 in `.scratch/tasks/requirements/MOL-129.md`; the texts are
 handoff 08 (`design_handoff_mol_127_128_129_v2`).
 
-- **Only to whoever the phone did not hand it to** (owner, 30.09.2026: reading takes ~30 s, not
-  minutes). `receipts.heard` says how the person learned it was read: `app` — `GET /receipts` or
-  `GET /receipts/:id` answered it `parsed` or `failed`; `bot` — the bot was handed it. The first word
-  stands. The server does not know what is on the screen, but it knows what it handed over: «Покупки»
-  ask every five seconds while one is read and the page is in view, so `RECEIPT_TELL_AFTER_SECONDS`
-  (30) is six asks of margin. **The named price** (Р-1): a newcomer back on «Что брать», whose home
-  also reads the list but shows no «Посмотреть», is counted as told in the app.
+- **Only to whoever the phone did not hand it to with its page in view** (owner, 30.09.2026: reading
+  takes ~30 s, not minutes). `receipts.heard` says how the person learned it was read: `app` —
+  `GET /receipts` or `GET /receipts/:id` **with `?shown=1`** answered it `parsed` or `failed`; `bot` —
+  the bot was handed it. The first word stands. The server does not know what is on the screen, so
+  the phone says it: `shown` is `document.visibilityState` when the request leaves. **A list asked
+  hidden marks nothing** (adversarial А1): the same list is asked on `online` and on every write of a
+  queue that lands, with no look at the page, and a phone in the pocket on a shop's flaky connection
+  was «told in the app». «Покупки» ask every five seconds while one is read and the page is in view,
+  so `RECEIPT_TELL_AFTER_SECONDS` (30) is six asks of margin. **The named prices** (Р-1, review №2): a
+  newcomer back on «Что брать», whose home also reads the list but shows no «Посмотреть», is counted as
+  told in the app; and the mark is the answer **sent**, not the answer received — one lost to the
+  phone's timeout at a till marks `app`, and if the phone goes to the pocket before the next ask, no
+  message comes.
 - **The API decides and marks as it hands out, the bot only sends** — the rating reminder's rule
   (Р-1, Р-2 of MOL-101). `POST /internal/receipts/claim`, every minute, one statement: pick under
   `for update skip locked`, re-check `heard is null`, mark `bot` — two claims never share a receipt and
   a phone's mark landing first leaves it out. At most once: a bot that dies after the claim loses
-  that message. **Not after `RECEIPT_TELL_WITHIN_HOURS` (6)**: past it the answer waits in «Покупки», and
-  a bot back from an outage does not bring a day of receipts.
-- **Not to anyone who blocked the bot or turned it off** — `reminders_off = 'blocked'` (the block is
-  still the reminders' column, Р-9) or `receipt_notices_off`. **The rating reminders' switch does not
-  touch it** (В-2): a receipt read is the answer to the person's own act, as a login is.
+  that message. **A receipt removed or recorded between the claim and the send is told of all the
+  same** (review №2) — the button then opens «чека нет» or «уже записан»: the bot keeps nothing to check
+  it against, and a second look would be a second claim. **Not after `RECEIPT_TELL_WITHIN_HOURS` (6)**:
+  past it the answer waits in «Покупки», and a bot back from an outage does not bring a day of
+  receipts.
+- **Not to anyone who blocked the bot or turned it off** — `actors.bot_blocked_at` or
+  `receipt_notices_off`. **The block is a column of its own** (review №1, adversarial А2; it replaces
+  Р-9): MOL-103 keeps «chosen» over a block in `reminders_off` (В-1), so someone who turned the
+  reminders off and then blocked the bot had the block written nowhere — every receipt was handed to a
+  chat that refused it, marked `bot`, and the page said nothing. Telegram's block (`my_chat_member`
+  kicked, a 403) sets it once, any other word of the bot — an unblock, a press — clears it, the settings
+  never touch it; the migration carried over every `reminders_off = 'blocked'`. `reminders_off` keeps
+  its own `blocked` for the reminders as before. **The rating reminders' switch does not touch it**
+  (В-2): a receipt read is the answer to the person's own act, as a login is.
 - **Nothing of the receipt's money goes to Telegram**: the wire (`receiptNoticeSchema`) carries the
   chat, the receipt's id for the button, read or not, the language, the place's name, the day and the
   number of lines — no sum, no line, no tax number, so the bot could not print one. The place is the
@@ -472,6 +487,11 @@ handoff 08 (`design_handoff_mol_127_128_129_v2`).
   the person's), its name as the catalogue has it, no city; a name today's rule of visible text
   refuses goes as no place (`parsed_no_place`), and a notice the contract refuses is said as a
   failure (`ReceiptNoticeUnreadable`) — never a claim the bot cannot parse with the minute in it.
+  **The date goes too** — the receipt's, or the shot's; without a place it is all the message says of
+  the receipt, so the text about data and the switch's hint name it (adversarial А3).
+- **A second shot of a receipt recorded before is said to be one** (adversarial А4): `duplicate`,
+  by the review's own rule (`recordedTwin`, Т-11) — «…разобран, но он уже записан — второй раз
+  записывать не нужно» under «Открыть чек», never «запишите» over a screen that says «уже записан».
 - **The language is the receipt's** (П-4): the interface's when it was sent, `receipts.language` —
   the person's Telegram language is not kept. The count picks its form by `Intl.PluralRules`, the date
   is the printed one or the day of the shot in the person's zone, without the year.
@@ -483,11 +503,15 @@ handoff 08 (`design_handoff_mol_127_128_129_v2`).
   text. **On iPhone Telegram opens it in its own browser**, which holds no session, and the login
   gate stands before the receipt — accepted (В-1), to be checked on the owner's phone.
 - **Sent as the reminder is** (`deliver.ts`): a 429 waited out once up to ten seconds, longer ends the
-  run; a 403 marks the person `blocked` by MOL-103's path; any failure logged by its code, never the
-  chat.
+  run; a 403 marks the person blocked by MOL-103's path, which sets `bot_blocked_at` too; any failure
+  logged by its code, never the chat. **The claim is never cut short by a stop**: the API marks what it
+  hands out, and a claim given up midway loses those messages.
 - **The page «Бот»** (`/settings/bot`, В-2, В-3): in the settings «Бот в Telegram» stands where the
   group «Напоминания» was, and the page holds a switch a kind of the bot's messages — the rating
   reminders and «чек разобран» — each saved on the tap at its own address. The next kind is one more
   row. **A block is the bot's, not a kind's** (Р-10): one line above both, both switches inactive and
-  showing what the person chose — the reminders' «on», since a block never overwrites «chosen».
-- **In the copy**: a receipt's `heard` and `heardAt`, the account's `receiptNoticesOff` (version 13).
+  showing what the person chose; the receipts' answer carries `blocked`, since the reminders' cannot
+  say it over «chosen» (and a field added to theirs would fail an installed app's strict read). **No
+  connection is said once too, under the switches** (review №5), each naming it by `aria-describedby`.
+- **In the copy**: a receipt's `heard` and `heardAt`, the account's `receiptNoticesOff` and
+  `botBlockedAt` (version 13).

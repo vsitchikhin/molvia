@@ -18,6 +18,7 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 - `backend/src/usecases/rate-from-bot.ts` — Use case of a press of 1–5 under a reminder: the owner by the Telegram account that pressed, then `rateItem`; a new verdict is counted.
 - `backend/src/usecases/tell-receipts.ts` — Use case «Чек разобран» (MOL-129): the receipts read that no phone was handed, marked as told, worded with the place the review shows, the receipt's day and the night of the person's zone; a notice the contract refuses is said as a failure; the person's switch of these messages, read and chosen.
 - `backend/src/usecases/remind-ratings.ts` — Use case «Напомнить об оценке»: whose evening it is in their zone, which step `planReminder` says, and what the claim hands the bot.
+- `backend/tests/receipt-notices.integration.test.ts` — Integration test of «чек разобран» (MOL-129): heard in the app only on a list or review asked in view, the claim's window, place, day, language and duplicate, a block over «chosen», the switch and its address.
 - `backend/tests/reminders-switch.integration.test.ts` — Integration test of the switch (MOL-103): off is off, «on» starts the ladder over, `blocked` and `chosen`, the counters, the app's and the bot's routes.
 - `backend/tests/reminders.integration.test.ts` — Integration test: the evening's hour and day, the ladder with the owner's example, MOL-29, the counters, and the bot's two internal routes.
 
