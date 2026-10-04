@@ -10,8 +10,9 @@ paths:
   - 'packages/model/tests/{entities,contracts}/{auth,session,actor}.test.ts'
   - 'packages/client/src/**'
   - 'frontend/src/views/{LoginView,DevicesView,SettingsSignOut,SettingsErase}*'
+  - 'frontend/src/components/ConsentStep*'
   - 'frontend/src/components/{SignOutSheet,SessionEndSheet,IdentityNotice}*'
-  - 'frontend/src/stores/{identity,login,actor,signOut}*'
+  - 'frontend/src/stores/{identity,login,actor,signOut,consent}*'
   - 'frontend/src/composables/useSessions*'
   - 'frontend/src/{api,main}*.ts'
   - 'frontend/src/App.vue'
@@ -241,6 +242,67 @@ the round trip through Telegram, and ask whose account this turned out to be.
   this browser's session only, the stranger's other devices are theirs — and nothing is claimed,
   so a reload or a relaunch asks again instead of walking in. A way out that fails does not hold
   the way in: the new login replaces the cookie anyway, and the row left behind has no key.
+- **After the claim and before the app, the terms** (MOL-95, `privacy.md`): the door's phase
+  `consent`, drawn by `ConsentStep`, for whoever has not accepted this build's edition — a newcomer,
+  every owner before the step (once), and everybody again when the edition is raised. `closed` holds
+  it while the identity is `ready` and `consent.holds`; the phase is the skeleton while the server is
+  asked which edition was accepted, and the step's own error and offline states after a failure —
+  never the app on a guess. **The device remembers the edition under the owner**
+  (`molvia.consent.<owner>`, swept by `forgetOwner`, Р-6): remembering this build's, the door opens
+  with the identity and asks nothing — a request in front of every launch would be a skeleton in
+  front of every launch; remembering none or an older one, it waits for the server, since the edition
+  may have been accepted on another device. **Offline the step is never drawn from memory**: the app
+  opens on the drawer, as MOL-56 has it, and the step comes with the next answer. Another window's
+  accept opens the door here through `storage`. «Мне 16 лет или больше» comes before «Принимаю»
+  (В-3), **the tick held by the store** (adversarial А4) — the step's links lead to public routes,
+  which `App.vue` draws in the login's place, and the step mounted anew had lost it; «Не принимаю»
+  says the account is already there and offers «Выйти» and «Удалить мои данные», each through its
+  own sheet (В-4) — never an erasure on a «no» a slip of the thumb could cost an owner everything
+  for. The links under the login screen give way to the step's own, so each page is named once.
+  **The step never closes the door over an app already shown** (owner's decision on review №3): an
+  app opened on the drawer with no signal is still there when the answer naming the owner comes back
+  — a price may be typed in a sheet then — and the step waits for what `pwaUpdate` waits for, the app
+  hidden with no sheet open (`holdsTyping`), or the next launch (`shownTo`). **So a launch with a
+  connection does not show the app on the drawer to an owner whose acceptance of this edition the
+  device does not remember**: the skeleton while `me()` is asked, then the step — the app shown first
+  and then closed by the step was a flash on every first launch after an edition. Offline, `start`
+  goes to `offline` and the door opens on the drawer as before. **The writes of an owner not known to
+  have accepted any edition wait on the phone** (`login.writesHeld`, adversarial А1, owner's
+  decision): a newcomer left on the step, or an owner from before it, can record at the shelf with no
+  signal, and the queues sent it all the moment the server named them, under a step nobody had passed
+  and with no «16 или больше» said; they go after «Принимаю» — `App.vue` gives the occasion. An owner
+  who accepted an older edition sends as before (Р-4). **An owner not known to have accepted any
+  does not wait for the hiding** (adversarial Б1, owner's decision): everything a sheet writes
+  straight to the server — a rating into everybody's average, an exchange, an income, an account, a
+  code — went out for them in that window, so the step comes as soon as no sheet is open; the one
+  write left is the sheet open when the answer came. «Not known» is **the server's «none», never its
+  silence** (adversarial Г1 against В1, owner's decision): on the first launch of this build the
+  device remembers nobody, and closing the app on a lost question took the shelf from an owner on
+  record. **A failed question is asked again by time instead** — 5 s, doubling, a minute at most
+  (`CONSENT_RETRY_*`, the queues' `doublingRetry`) — besides `online` and the app looked at again,
+  so the window of one who accepted nothing ends with the next answer, not with an `online` a
+  wavering signal never sends. **The store's own questions are quiet** (adversarial Д1): the timer,
+  `online` and the app looked at again leave the step's error or offline state on the screen until an
+  answer comes — put to `loading`, the error blinked to the skeleton every minute, «Повторить» went
+  from under the thumb, the focus went to the title and the error was read out again; only «Повторить»
+  by hand shows the question. `close` is heard on the way down and looked at a task later, so a
+  chain of sheets — the next opened by the first one's `onClosed` — is not cut between them (review
+  №9). **Nor does an open door
+  shut on a new question** (review №7): the connection back, or an identity asked again after an
+  error, goes through `loading`, and the skeleton of a launch is only for an owner this page has not
+  shown the app to. **The question about the terms is asked again by the store** on `online` and on
+  the app looked at again (adversarial Б2) — with the app shown there is no step to retry it, and one
+  failure held the shelf's writes of an owner whose consent was on record. **The price, named**
+  (review №8): while the writes wait, the queues say what they say of any hold — «ждёт связи»,
+  «Уйдёт сама, как только появится связь» — with the connection up; the window ends with the last
+  sheet closed for one who accepted none, with the next answer for anyone else.
+  **The step comes before a login failure of this window** (adversarial А3): a neighbour's login
+  made the person known, and «Повторить» on the old failure began a login in Telegram for them. Its
+  full-screen error is the one error of somebody known behind the door, so **«Сообщить о проблеме»
+  opens the sheet there** (`App.vue` draws `FeedbackSheet` for the step too, adversarial А2), and it
+  stays drawn while the door is on the terms at all — the question asked again puts the phase to the
+  skeleton, and the sheet went with a screenshot in it (`login.onConsent`, Б3); a sheet asked for
+  where it is not drawn is let go rather than left to rise by itself later.
 - **Showing the app and writing into it are different rights** (adversarial Б1). The door may
   open on the drawer's name while the first `me()` is still in flight — that is what keeps a
   launch with a live session from flashing «Вход» — but a drawer says nothing about the cookie,

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import type { ActorView } from '@molvia/model'
@@ -7,7 +7,9 @@ import { api } from '@/api'
 import { forget, read, write } from '@/stores/storage'
 import { LOGIN_KEY } from '@/stores/identity'
 import { useActorStore } from '@/stores/actor'
+import { useConsentStore } from '@/stores/consent'
 import { reportFailure } from '@/failures'
+import { holdsTyping } from '@/pwaUpdate'
 
 /**
  * The login as the device remembers it — and the device remembers exactly three things.
@@ -53,7 +55,7 @@ export const POLL_INTERVAL_MS = 3000
 
 export type LoginFailure = 'unavailable' | 'rate_limited' | 'disabled' | 'error' | 'offline'
 
-export type LoginPhase = 'loading' | 'offer' | 'waiting' | 'welcome' | LoginFailure
+export type LoginPhase = 'loading' | 'offer' | 'waiting' | 'welcome' | 'consent' | LoginFailure
 
 interface Request {
   readonly id: string
@@ -117,6 +119,7 @@ function recall(): Kept {
 
 export const useLoginStore = defineStore('login', () => {
   const actor = useActorStore()
+  const consent = useConsentStore()
   const kept = recall()
   const request = ref<Request | null>(kept.request ?? null)
   const claimed = ref<string | null>(kept.claimed ?? null)
@@ -217,16 +220,93 @@ export const useLoginStore = defineStore('login', () => {
    * Держать дверь закрытой **всё время загрузки** было бы хуже, чем кажется: на каждом запуске
    * с живой сессией человек видел бы мелькнувший «Вход» — и поймал это не глаз, а сквозной тест.
    */
+  /**
+   * **The owner the app has been shown to in this page** (MOL-95, owner's decision on review №3).
+   * The step of the terms does not close the door over an app already on the screen: launched with
+   * no signal, the app opens on the drawer, and the answer that names the owner comes back while a
+   * price is being typed in a sheet — closed there, the sheet went and what was typed with it. The
+   * step waits for the moment `pwaUpdate` waits for: the app hidden and holding no typing, or the
+   * next launch. The price: until then the person uses the app with no edition accepted — the API
+   * refuses nothing without one anyway (Р-4), and the queues of one who never accepted wait (А1).
+   */
+  const shownTo = ref<string | null>(null)
+
+  const consentHolds = computed(() => consent.holds && shownTo.value !== (actor.actor?.id ?? null))
+
   const closed = computed(() => {
     if (blocked.value) return true
-    if (actor.state === 'ready') return false
+    // And then until the terms are accepted (MOL-95): the step after «чей это аккаунт».
+    if (actor.state === 'ready') return consentHolds.value
     // «Сессии нет» — это ответ, а не незнание: ящик на устройстве его не отменяет.
     if (actor.state === 'signed-out') return true
-    return actor.id === null
+    if (actor.id === null) return true
+    // Пока сервер отвечает, кто мы, приложение по ящику показывается только тому, чьё согласие с
+    // этой редакцией устройство помнит: иначе показанное приложение тут же сменил бы шаг (№3).
+    // Без связи `start` уходит в `offline`, и дверь открывается по ящику, как раньше. Уже открытая
+    // этому владельцу дверь на новом вопросе не закрывается: возврат связи и повтор после ошибки
+    // личности снова идут через `loading`, и лист с набранной ценой уходил на время `me()` (№7).
+    return (
+      (actor.state === 'idle' || actor.state === 'loading') &&
+      shownTo.value !== actor.id &&
+      !consent.remembers(actor.id)
+    )
   })
+
+  watch(closed, (now) => {
+    if (!now) shownTo.value = known.value
+  })
+  // Hidden, with no sheet open: nothing on the screen can be lost, and the step may close the door.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && !holdsTyping(document)) shownTo.value = null
+  })
+  /**
+   * **An owner not known to have accepted any edition does not wait for the app to be hidden**
+   * (adversarial Б1, owner's decision): in that window everything a sheet writes straight to the
+   * server — a rating into everybody's average, an exchange, a code — went out for a person who had
+   * said no «16 или больше». The step comes as soon as no sheet is open: what is being typed is still
+   * not lost (№3), and the sheet open now is the one write left. **Known none — said by the server**:
+   * a question that failed is no answer (adversarial Г1 against В1, owner's decision). On the first
+   * launch of this build the device remembers nobody, and an owner on record at the shelf lost the
+   * app to one lost request; the store asks again by time instead, and the server's «none» closes the
+   * window. An owner on record with an older edition waits for the hiding, as before.
+   */
+  const unacceptedAnswered = computed(() => consent.state === 'ready' && consent.unaccepted)
+  function letGoOfTheUnaccepted(): void {
+    if (unacceptedAnswered.value && !holdsTyping(document)) shownTo.value = null
+  }
+  watch(unacceptedAnswered, letGoOfTheUnaccepted)
+  // A sheet that closes may have been the last one — or a chain's first, whose `onClosed` opens the
+  // next (review №9): looked at a task later, once that one is `[open]`. `close` does not bubble, so
+  // it is caught on the way down.
+  document.addEventListener(
+    'close',
+    () => {
+      window.setTimeout(letGoOfTheUnaccepted, 0)
+    },
+    true,
+  )
+
+  /**
+   * **What the queues wait for before they send** (MOL-56, MOL-95): another window's login being
+   * caught up with, and an owner not known to have accepted any edition of the terms (adversarial
+   * А1) — the writes stay on the phone and go after «Принимаю».
+   */
+  const writesHeld = computed(() => rechecking.value || consent.unaccepted)
+
+  /**
+   * The door is shut on the terms — the step, its skeleton while the edition is asked again, or its
+   * error. What `App.vue` keeps the report sheet drawn by (adversarial Б3): a question asked again on
+   * `online` put the phase to `loading` and shut the sheet with a screenshot in it.
+   */
+  const onConsent = computed(() => actor.state === 'ready' && !blocked.value && consentHolds.value)
 
   const phase = computed<LoginPhase>(() => {
     if (actor.state === 'idle' || actor.state === 'loading' || rechecking.value) return 'loading'
+    // The terms come after the account is claimed and before the app (MOL-95) — and before a login
+    // failure of this window from before the session: a neighbour's login made this person known,
+    // and «Повторить» on that old failure sent them to Telegram again (adversarial А3).
+    if (onConsent.value)
+      return consent.state === 'loading' || consent.state === 'idle' ? 'loading' : 'consent'
     if (failure.value) return failure.value
     // The account in hand is asked about before the attempt that is still waiting: a session may
     // well have arrived while the screen was showing «ждём» — that is what А4 is (the answer that
@@ -515,6 +595,8 @@ export const useLoginStore = defineStore('login', () => {
     blocked,
     closed,
     rechecking,
+    writesHeld,
+    onConsent,
     starting,
     failure,
     request,

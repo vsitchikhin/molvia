@@ -1,1 +1,0 @@
-ALTER TABLE "actors" ADD COLUMN "receipt_notices_off" boolean DEFAULT false NOT NULL;

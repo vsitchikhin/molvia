@@ -314,4 +314,12 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     const link = view.findAll('a').find((one) => one.text() === en.privacy.title)
     expect(link?.attributes('href')).toBe('/privacy')
   })
+
+  it('and to «Terms of use» right under it (MOL-95)', async () => {
+    const view = await render()
+    const labels = view.findAll('a').map((one) => one.text())
+    expect(labels.indexOf(en.terms.title)).toBe(labels.indexOf(en.privacy.title) + 1)
+    const link = view.findAll('a').find((one) => one.text() === en.terms.title)
+    expect(link?.attributes('href')).toBe('/terms')
+  })
 })

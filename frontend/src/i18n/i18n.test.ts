@@ -163,6 +163,7 @@ describe('словарь: повторяющиеся тексты', () => {
       // (MOL-40, MOL-57, MOL-66).
       'Нет связи': [
         'bot.offline.title',
+        'consent.lost.title',
         'devices.offline.title',
         'exchange.offline.title',
         'income.offline.title',
@@ -304,6 +305,7 @@ describe('словарь: повторяющиеся тексты', () => {
       ],
       'No connection': [
         'bot.offline.title',
+        'consent.lost.title',
         'devices.offline.title',
         'exchange.offline.title',
         'income.offline.title',

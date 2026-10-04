@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { SESSION_COOKIE } from '@molvia/model'
+import { POLICY_VERSION, SESSION_COOKIE } from '@molvia/model'
 import type { Page, Request, Response } from '@playwright/test'
 
 /**
@@ -35,6 +35,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  */
 export const DEV_SEAM = /^(Sign in for development|Войти для разработки)$/
 const LOGIN_TITLE = /^(Sign in|Вход)$/
+/** The step of the door after the claim (MOL-95), in both languages, as the seam is. */
+export const AGE = /^(I am 16 or older|Мне 16 лет или больше)$/
+export const ACCEPT = /^(I accept|Принимаю)$/
 /**
  * Где старый `open()` уже упал бы — пять секунд `expect` по умолчанию. Не новый порог: дольше него
  * вход оставляет след в отчёте, короче — нет, потому что это обычная машина.
@@ -80,6 +83,15 @@ async function seamAnswer(page: Page): Promise<Response> {
 
 export async function open(page: Page, path = '/'): Promise<void> {
   const first = !(await page.context().cookies()).some((one) => one.name === SESSION_COOKIE)
+  // **WebKit keeps no `Secure` cookie on http://127.0.0.1** (`sheet.spec`, MOL-80): every request
+  // after the seam's answer comes in signed out, and the step's question about the terms (MOL-95)
+  // turned the page into the login screen before the sheet was ever opened. The step is not what the
+  // engine is there for — `consent.spec` holds it on Chromium — so here it is answered «accepted».
+  if (first && page.context().browser()?.browserType().name() === 'webkit') {
+    await page.route('**/api/actors/me/consent', (route) =>
+      route.fulfill({ json: { version: POLICY_VERSION } }),
+    )
+  }
   await page.goto(path)
   if (!first) return
   // Ответ шва и дверь ждутся порознь, потому что медленным бывает только первое (MOL-67).
@@ -118,6 +130,14 @@ export async function open(page: Page, path = '/'): Promise<void> {
     })
   }
   expect(answer.status(), 'шов разработки не впустил').toBe(201)
+  // **Новый владелец шва ещё не принял условия** (MOL-95): шаг стоит между входом и приложением, и
+  // тест проходит его, как человек, — галочкой и кнопкой. Свой спек у шага — `consent.spec`. Шов,
+  // вернувший владельца, чьё согласие устройство помнит, шага не показывает, поэтому ждётся одно
+  // из двух.
+  const age = page.getByRole('checkbox', { name: AGE })
+  const app = page.getByRole('heading', { level: 1 }).filter({ hasNotText: LOGIN_TITLE })
+  await expect(age.or(app), 'ответ шва пришёл, а ни шага согласия, ни приложения').toBeVisible()
+  if (await age.isVisible()) await acceptTerms(page)
   // **Дверь — прежние пять секунд, и поднимать их нельзя.** От ответа до неё — синхронная
   // цепочка (`settle`, `claim`) и одна отрисовка, ждать тут нечего; упала эта проверка — это
   // дефект входа (`verify()`, `claimed`, MOL-56), а не медленная машина. Заголовок экрана входа —
@@ -126,6 +146,12 @@ export async function open(page: Page, path = '/'): Promise<void> {
     page.getByRole('heading', { level: 1 }),
     'ответ шва пришёл, а дверь не открылась — это вход, а не стенд',
   ).not.toHaveText(LOGIN_TITLE)
+}
+
+/** «Мне 16 лет или больше» и «Принимаю» на шаге согласия (MOL-95). */
+export async function acceptTerms(page: Page): Promise<void> {
+  await page.getByRole('checkbox', { name: AGE }).check()
+  await page.getByRole('button', { name: ACCEPT }).click()
 }
 
 /** Открывает приложение, входит и отдаёт id владельца. */

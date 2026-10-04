@@ -2,6 +2,7 @@ import { START_LOCATION, createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw, RouterScrollBehavior } from 'vue-router'
 import SettingsView from '@/views/SettingsView.vue'
 import PrivacyView from '@/views/PrivacyView.vue'
+import TermsView from '@/views/TermsView.vue'
 import AdviceView from '@/views/AdviceView.vue'
 import ItemSearchView from '@/views/ItemSearchView.vue'
 import FinishedTripView from '@/views/FinishedTripView.vue'
@@ -50,6 +51,7 @@ export type RouteName =
   | 'purchase'
   | 'finished-search'
   | 'privacy'
+  | 'terms'
   | 'kit'
 
 declare module 'vue-router' {
@@ -244,6 +246,14 @@ export const routes = [
     name: 'privacy',
     component: PrivacyView,
     meta: { titleKey: 'privacy.title', parent: 'settings', public: true },
+  },
+  // Beside it, and open without a session for the same reason: it is read before saying yes to it
+  // (MOL-95).
+  {
+    path: '/terms',
+    name: 'terms',
+    component: TermsView,
+    meta: { titleKey: 'terms.title', parent: 'settings', public: true },
   },
   // Every piece of the kit in every state, and the sheet in a real history — for the eye in both
   // schemes and for the end-to-end tests, before any screen uses them (MOL-18). Development only:

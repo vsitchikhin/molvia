@@ -1,5 +1,5 @@
 {
-  "id": "6c65db05-817d-4067-8479-806360862761",
+  "id": "e58aed43-0250-45cc-b6e3-85bcd41ebaa4",
   "prevId": "7105fabd-5f6b-4f8d-9ca6-adc9212f1eb7",
   "version": "7",
   "dialect": "postgresql",
@@ -75,6 +75,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "consent_version": {
+          "name": "consent_version",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consented_at": {
+          "name": "consented_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -133,6 +145,14 @@
         "actors_reminders_off_known": {
           "name": "actors_reminders_off_known",
           "value": "\"actors\".\"reminders_off\" in ('chosen', 'blocked')"
+        },
+        "actors_consent_whole": {
+          "name": "actors_consent_whole",
+          "value": "(\"actors\".\"consent_version\" is null) = (\"actors\".\"consented_at\" is null)"
+        },
+        "actors_consent_version_positive": {
+          "name": "actors_consent_version_positive",
+          "value": "\"actors\".\"consent_version\" >= 1"
         }
       },
       "isRLSEnabled": false
@@ -3726,18 +3746,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "heard": {
-          "name": "heard",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "heard_at": {
-          "name": "heard_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "trip_id": {
           "name": "trip_id",
           "type": "uuid",
@@ -3820,22 +3828,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "receipts_untold_idx": {
-          "name": "receipts_untold_idx",
-          "columns": [
-            {
-              "expression": "read_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"receipts\".\"status\" in ('parsed', 'failed') and \"receipts\".\"heard\" is null and \"receipts\".\"deleted_at\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -3905,14 +3897,6 @@
         "receipts_layout_known": {
           "name": "receipts_layout_known",
           "value": "\"receipts\".\"layout\" is null or \"receipts\".\"layout\" in ('card', 'table')"
-        },
-        "receipts_heard_known": {
-          "name": "receipts_heard_known",
-          "value": "\"receipts\".\"heard\" is null or \"receipts\".\"heard\" in ('app', 'bot')"
-        },
-        "receipts_heard_when": {
-          "name": "receipts_heard_when",
-          "value": "(\"receipts\".\"heard\" is null) = (\"receipts\".\"heard_at\" is null)"
         },
         "receipts_total_non_negative": {
           "name": "receipts_total_non_negative",

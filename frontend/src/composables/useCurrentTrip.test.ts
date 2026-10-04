@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { tripViewCodec } from '@molvia/model'
+import { POLICY_VERSION, tripViewCodec } from '@molvia/model'
 import type { TripView } from '@molvia/model'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useActorStore } from '@/stores/actor'
@@ -54,6 +54,8 @@ function fresh() {
   localStorage.clear()
   sessionStorage.clear()
   localStorage.setItem('molvia.actor', ME)
+  // The owner accepted the terms on this device: the queue does not wait for them (MOL-95).
+  localStorage.setItem(`molvia.consent.${ME}`, String(POLICY_VERSION))
   setActivePinia(createPinia())
   // Приложение с осевшей личностью: очередь отправляет только по ответу сервера (MOL-56).
   useActorStore().state = 'ready'

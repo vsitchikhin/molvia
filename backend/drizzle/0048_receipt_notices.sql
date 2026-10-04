@@ -1,3 +1,4 @@
+ALTER TABLE "actors" ADD COLUMN "receipt_notices_off" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "receipts" ADD COLUMN "heard" text;--> statement-breakpoint
 ALTER TABLE "receipts" ADD COLUMN "heard_at" timestamp with time zone;--> statement-breakpoint
 CREATE INDEX "receipts_untold_idx" ON "receipts" USING btree ("read_at") WHERE "receipts"."status" in ('parsed', 'failed') and "receipts"."heard" is null and "receipts"."deleted_at" is null;--> statement-breakpoint

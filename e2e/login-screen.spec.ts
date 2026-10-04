@@ -3,6 +3,7 @@ import { randomInt } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { SESSION_COOKIE } from '@molvia/model'
 import type { APIRequestContext, Page } from '@playwright/test'
+import { acceptTerms } from './session'
 
 /**
  * Круг «вход начат в приложении → подтверждён в Telegram → приложение узнало человека», через
@@ -70,6 +71,8 @@ test('вход целиком, и человек оказывается там, 
   await expect(page.getByRole('heading', { name: 'Is this your account?' })).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Sections' })).toBeHidden()
   await page.getByRole('button', { name: 'Yes, that is me' }).click()
+  // Then the terms (MOL-95): a new account has accepted no edition.
+  await acceptTerms(page)
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Purchases')
   await expect(page).toHaveURL('/purchases')
@@ -122,6 +125,7 @@ test('сессия, которой не стало, поднимает экра�
     ),
   )
   await page.getByRole('button', { name: 'Sign in for development' }).click()
+  await acceptTerms(page)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('What to buy')
   await home
 

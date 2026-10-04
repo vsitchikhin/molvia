@@ -1,6 +1,6 @@
 {
-  "id": "6a639ede-7c72-4c03-b35d-d962948f93a0",
-  "prevId": "6c65db05-817d-4067-8479-806360862761",
+  "id": "c4f01598-c583-4283-ab43-48ec93ce6284",
+  "prevId": "e58aed43-0250-45cc-b6e3-85bcd41ebaa4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -82,6 +82,18 @@
           "notNull": true,
           "default": false
         },
+        "consent_version": {
+          "name": "consent_version",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consented_at": {
+          "name": "consented_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -140,6 +152,14 @@
         "actors_reminders_off_known": {
           "name": "actors_reminders_off_known",
           "value": "\"actors\".\"reminders_off\" in ('chosen', 'blocked')"
+        },
+        "actors_consent_whole": {
+          "name": "actors_consent_whole",
+          "value": "(\"actors\".\"consent_version\" is null) = (\"actors\".\"consented_at\" is null)"
+        },
+        "actors_consent_version_positive": {
+          "name": "actors_consent_version_positive",
+          "value": "\"actors\".\"consent_version\" >= 1"
         }
       },
       "isRLSEnabled": false

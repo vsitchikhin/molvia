@@ -54,6 +54,8 @@ import {
   chooseReceiptNoticesSchema,
   chooseRemindersSchema,
   receiptNoticesSettingSchema,
+  acceptConsentSchema,
+  consentSchema,
   remindersSettingSchema,
   receiptBodySchema,
   receiptRecordBodySchema,
@@ -129,6 +131,7 @@ import type {
   MoneyMonthView,
   ReceiptNoticesSetting,
   RemindersSetting,
+  Consent,
   SalaryShift,
   ReceiptBody,
   ReceiptDetail,
@@ -398,6 +401,10 @@ export interface MolviaClient {
   receiptNoticesSetting(): Promise<ReceiptNoticesSetting>
   /** Saved on the tap. Safe to repeat. */
   chooseReceiptNotices(on: boolean): Promise<ReceiptNoticesSetting>
+  /** The edition of the terms and the privacy page accepted (MOL-95): `version` null is none. */
+  consent(): Promise<Consent>
+  /** The edition the screen showed, accepted now. Safe to repeat: the row only ever goes up. */
+  acceptConsent(version: number): Promise<Consent>
   /**
    * «Сохранить» a new spending. Named by the device, so safe to repeat: `created` is `false` for
    * the same one again, `error.conflict` for the same identifier with anything else — or while it
@@ -886,6 +893,14 @@ export function createClient(options: ClientOptions): MolviaClient {
       request('/actors/me/receipt-notices', receiptNoticesSettingSchema, {
         method: 'PUT',
         body: encode(chooseReceiptNoticesSchema, { on }),
+      }),
+
+    consent: () => request('/actors/me/consent', consentSchema),
+
+    acceptConsent: async (version) =>
+      request('/actors/me/consent', consentSchema, {
+        method: 'PUT',
+        body: encode(acceptConsentSchema, { version }),
       }),
 
     recordSpending: async (body) => {
