@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import { PAUSE_MS, PING_TRIES, settingsOf, watch } from './watch'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { PAUSE_MS, PING_TRIES, REQUEST_TIMEOUT_MS, settingsOf, watch } from './watch'
 import type { Io } from './watch'
 import worker from './worker'
 
@@ -147,6 +147,124 @@ describe('watch', () => {
   })
 })
 
+/** A response whose status came and whose body broke: the connection reset after the head. */
+const headThenReset = (status: number): Response =>
+  new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.error(new TypeError('connection reset'))
+      },
+    }),
+    { status },
+  )
+
+describe('a body broken after the status', () => {
+  const io = (ping: () => Response): Io & { pings: () => number } => {
+    let pings = 0
+    return {
+      fetch: (input) =>
+        Promise.resolve().then(() => {
+          const url = urlOf(input)
+          if (url.startsWith(PING)) {
+            pings += 1
+            return ping()
+          }
+          return url.endsWith('/api/health') ? new Response(HEALTHY) : headThenReset(200)
+        }),
+      wait: async () => Promise.resolve(),
+      log: () => undefined,
+      pings: () => pings,
+    }
+  }
+
+  it('leaves a ping healthchecks.io answered 200 gone, once (adversarial А3)', async () => {
+    const rigged = io(() => headThenReset(200))
+    const round = await watch(SETTINGS, rigged)
+    expect(rigged.pings()).toBe(1)
+    expect(round.verdict).toEqual({ up: true })
+  })
+
+  it('leaves a page answered 200 a 200, not a 000', async () => {
+    const round = await watch(
+      SETTINGS,
+      io(() => new Response('OK')),
+    )
+    expect(round.attempts).toEqual([[]])
+  })
+})
+
+/**
+ * The machine down the way a dead VPS is (adversarial А2): packets dropped, so every request hangs
+ * until its own timeout. Timers and `AbortSignal.timeout` run on vitest's clock.
+ */
+describe('a machine that does not answer', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  function hanging(pingHangs: boolean) {
+    vi.useFakeTimers()
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
+      const controller = new AbortController()
+      setTimeout(() => {
+        controller.abort(new DOMException('timed out', 'TimeoutError'))
+      }, ms)
+      return controller.signal
+    })
+    const start = Date.now()
+    let failAt = -1
+    const signals: boolean[] = []
+    const hang = async (signal: AbortSignal | null | undefined): Promise<Response> =>
+      new Promise((_, reject) => {
+        signal?.addEventListener('abort', () => {
+          reject(signal.reason as Error)
+        })
+      })
+    const io: Io = {
+      fetch: async (input, init) => {
+        signals.push(init?.signal instanceof AbortSignal)
+        if (urlOf(input).startsWith(PING)) {
+          if (failAt < 0) failAt = Date.now() - start
+          return pingHangs ? hang(init?.signal) : Promise.resolve(new Response('OK'))
+        }
+        return hang(init?.signal)
+      },
+      wait: async (ms) =>
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, ms)
+        }),
+      log: () => undefined,
+    }
+    return { io, start, signals, failAt: () => failAt }
+  }
+
+  it('gives every request its timeout, and a request that ran out is 000', async () => {
+    const { io, signals } = hanging(false)
+    const round = watch(SETTINGS, io)
+    await vi.runAllTimersAsync()
+    expect((await round).attempts).toEqual(Array(4).fill(['health 000', 'pwa 000']))
+    expect(signals).toHaveLength(9)
+    expect(signals.every(Boolean)).toBe(true)
+  })
+
+  it('sends /fail 170 s into the round: four tries of two timeouts and three pauses', async () => {
+    const { io, failAt } = hanging(false)
+    const round = watch(SETTINGS, io)
+    await vi.runAllTimersAsync()
+    expect((await round).verdict.up).toBe(false)
+    expect(failAt()).toBe(4 * 2 * REQUEST_TIMEOUT_MS + 3 * PAUSE_MS)
+  })
+
+  it('fails by timeout in 217 s when healthchecks.io hangs too — well inside five minutes', async () => {
+    const { io, start } = hanging(true)
+    const round = watch(SETTINGS, io).catch((error: unknown) => error)
+    await vi.runAllTimersAsync()
+    expect(((await round) as Error).message).toBe('the ping to healthchecks.io did not go: timeout')
+    expect(Date.now() - start).toBe(217_000)
+  })
+})
+
 describe('settingsOf', () => {
   it('watches molvia.net unless told another domain', () => {
     expect(settingsOf({ HC_UP_URL: PING })).toEqual(SETTINGS)
@@ -163,6 +281,28 @@ describe('settingsOf', () => {
     } catch (error) {
       expect((error as Error).message).not.toContain('hc-ping')
     }
+  })
+})
+
+describe('the ping URL', () => {
+  it.each([
+    ['a query', 'https://hc-ping.com/pk/molvia-up?create=1'],
+    ['an empty query', 'https://hc-ping.com/0f1e2d3c-secret?'],
+    ['a fragment', 'https://hc-ping.com/0f1e2d3c-secret#molvia-up'],
+    ['a trailing slash', 'https://hc-ping.com/0f1e2d3c-secret/'],
+  ])('is refused with %s, which /fail cannot follow (adversarial А1)', (_, url) => {
+    expect(() => settingsOf({ HC_UP_URL: url })).toThrow(/^HC_UP_URL has a query, a fragment/)
+    try {
+      settingsOf({ HC_UP_URL: url })
+    } catch (error) {
+      expect((error as Error).message).not.toContain('hc-ping')
+    }
+  })
+
+  it('is taken by uuid or by ping key and slug', () => {
+    expect(settingsOf({ HC_UP_URL: PING }).pingUrl).toBe(PING)
+    const bySlug = 'https://hc-ping.com/pk/molvia-up'
+    expect(settingsOf({ HC_UP_URL: bySlug }).pingUrl).toBe(bySlug)
   })
 })
 

@@ -44,16 +44,36 @@ export interface Round {
  * The watch's settings, or a refusal: a round that cannot report is an error in the Worker's log,
  * never a silence nobody reads — the check then raises the alarm once its grace runs out. The URL
  * is never in a message: whoever has it can say «alive» for us.
+ *
+ * `/fail` is appended to the URL, so the URL must end in its path (adversarial А1): after a query
+ * or a fragment `/fail` lands in them, and healthchecks.io takes the path for a ping that says
+ * «up» — a site down on every try would never raise the alarm, not even by the grace.
  */
 export function settingsOf(environment: Environment): Settings {
   const pingUrl = environment.HC_UP_URL?.trim() ?? ''
-  if (!pingUrl.startsWith('https://')) {
+  const parsed = URL.canParse(pingUrl) ? new URL(pingUrl) : undefined
+  if (parsed?.protocol !== 'https:') {
     throw new Error(
       'HC_UP_URL is not an https URL, there is nowhere to report (deploy/README.md, «Signals»)',
     )
   }
+  // Read on the text, not the parsed URL: an empty `?` or `#` parses to nothing and still takes `/fail`.
+  if (pingUrl.includes('?') || pingUrl.includes('#') || pingUrl.endsWith('/')) {
+    throw new Error(
+      'HC_UP_URL has a query, a fragment or a trailing slash, so /fail cannot follow it (deploy/README.md, «Signals»)',
+    )
+  }
   const domain = environment.DOMAIN?.trim() ?? ''
   return { pingUrl, domain: domain === '' ? 'molvia.net' : domain }
+}
+
+/**
+ * A body nobody reads is let go, and a connection broken after the status changes nothing
+ * (adversarial А3): cancelling a stream already in error rejects, and a ping healthchecks.io had
+ * answered `200` was counted as not gone, or a page answered `200` as `000`.
+ */
+async function drop(response: Response): Promise<void> {
+  await response.body?.cancel().catch(() => undefined)
 }
 
 /**
@@ -67,7 +87,7 @@ async function ask(io: Io, url: string, read: boolean): Promise<Answer> {
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
     if (read) return { status: response.status, body: await response.text() }
-    await response.body?.cancel()
+    await drop(response)
     return { status: response.status, body: '' }
   } catch {
     return { status: 0, body: '' }
@@ -98,7 +118,7 @@ async function report(settings: Settings, verdict: Verdict, io: Io): Promise<voi
         ...(verdict.up ? {} : { method: 'POST', body: verdict.said }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       })
-      await response.body?.cancel()
+      await drop(response)
       if (response.ok) return
       failure = String(response.status)
     } catch (error) {
