@@ -249,8 +249,8 @@ export default defineComponent({
 
 /* The fill, the ring and the focus of a chosen row are a layer of their own, rounded as the list card,
    and the row stays square under them: rounded itself, the row bent the hairline the card draws as its
-   `border-top` (round 3, Р3-1; adversarial Б1), and was a tile in an `li` and a bent line straight in a
-   card. Rounded, the ring of a first or last row follows the card's corner instead of being cut (А3). */
+   `border-top` (round 3, Р3-1; adversarial Б1) — in an `li` a tile under a straight line, straight in
+   the card a line bent into its round. Rounded, the ring of a first or last row follows the card's corner instead of being cut (А3). */
 .selected::before {
   position: absolute;
   inset: 0;
@@ -273,7 +273,9 @@ export default defineComponent({
   }
 }
 
-.active {
+/* A chosen row takes its fill from its layer alone: the keyboard standing on the value already chosen drew
+   a square fill out past the rounded ring at every corner (adversarial В1). */
+.active:not(.selected) {
   background: var(--accent-tint);
 }
 </style>

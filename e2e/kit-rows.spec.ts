@@ -59,3 +59,24 @@ test('a chosen row keeps the card’s hairline above it straight', async ({ page
   expect(edge).toMatchObject({ hairline: '1px', left: '0px', right: '0px' })
   expect(edge.layer).not.toBe('0px')
 })
+
+// The keyboard standing on the value already chosen: the row's own square fill stood out past the round
+// ring at every corner (adversarial В1). The kit shows the two states apart, so the found row the
+// keyboard stands on is made chosen here, by the class the row draws it with.
+test('a chosen row the keyboard stands on takes its fill from its round layer alone', async ({
+  page,
+}) => {
+  await open(page, '/_kit')
+  const active = page.getByRole('listbox', { name: 'Found' }).getByRole('option').first()
+  await expect(active).toHaveClass(/\bactive\b/)
+  const fills = await active.evaluate(async (row) => {
+    const read = () => getComputedStyle(row).backgroundColor
+    const alone = read()
+    row.classList.add('selected')
+    await new Promise((done) => requestAnimationFrame(done))
+    return { alone, chosen: read(), layer: getComputedStyle(row, '::before').backgroundColor }
+  })
+  expect(fills.alone).not.toBe('rgba(0, 0, 0, 0)')
+  expect(fills.chosen).toBe('rgba(0, 0, 0, 0)')
+  expect(fills.layer).toBe(fills.alone)
+})
