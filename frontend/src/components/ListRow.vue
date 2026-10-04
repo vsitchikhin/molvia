@@ -243,18 +243,34 @@ export default defineComponent({
 }
 
 .selected {
-  /* Rounded as the list card is: the ring of a first or last row would be cut at the card's corners
-     (adversarial А3), and a ring in the middle of the list reads the same as a tile. */
+  position: relative;
+  isolation: isolate;
+}
+
+/* The fill, the ring and the focus of a chosen row are a layer of their own, rounded as the list card,
+   and the row stays square under them: rounded itself, the row bent the hairline the card draws as its
+   `border-top` (round 3, Р3-1; adversarial Б1), and was a tile in an `li` and a bent line straight in a
+   card. Rounded, the ring of a first or last row follows the card's corner instead of being cut (А3). */
+.selected::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   border-radius: var(--radius-lg);
   background: var(--accent-tint);
   box-shadow: inset 0 0 0 2px var(--accent);
+  content: '';
 }
 
-/* The focus of a chosen row stands inside its ring, the fill between them: on the ring itself it was
-   the same 2 px of the same colour, and the keyboard lost the row it stood on (adversarial А1, WCAG
-   2.4.7). Above the list card's own offset by weight, not by the order the sheets load in. */
+/* The focus of a chosen row stands inside its ring, the fill between them: on the ring itself it was the
+   same 2 px of the same colour, and the keyboard lost the row it stood on (adversarial А1, WCAG 2.4.7).
+   Drawn on the layer, so it follows its round; taken off the row above the list card's own offset by
+   weight, not by the order the sheets load in. */
 .list-row.selected:focus-visible {
-  outline-offset: -6px;
+  outline: none;
+
+  &::before {
+    @include focus-ring(-6px);
+  }
 }
 
 .active {

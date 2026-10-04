@@ -302,13 +302,16 @@ The detail behind the frontend lines of `CLAUDE.md`.
   unchanged, and it is read out by the role the row was given — `aria-checked` for a radio, a
   checkbox, a switch and their menu items, `aria-selected` for an option, a tab, a tree item and
   the cells of a grid (А4: the first tables left `menuitemcheckbox` and `treeitem` mute); a row with
-  no role says nothing, and says so while developing, so a picker gives its rows one. **The focus of
-  a chosen row stands inside its ring** (`outline-offset: -6px`, the fill between them): on `-2px`
-  it was the ring itself — 2 px of the same colour on the same place — and the keyboard lost the row
-  it stood on, where a radio group puts the focus first (adversarial А1, WCAG 2.4.7); chips draw it
-  the other way, the ring inside and the focus outside, which a list card clips. `e2e/kit-rows`
-  holds it in both engines. **A chosen row is rounded as the list card** (`--radius-lg`): square,
-  its ring was cut off at the card's corners on a first or last row (А3).
+  no role says nothing, and says so while developing, so a picker gives its rows one. **The fill, the ring and
+  the focus of a chosen row are a layer of its own** (`::before`), rounded as the list card, and the
+  row stays square under it: rounded itself, the row bent the hairline the card draws as its
+  `border-top` (round 3, Р3-1; adversarial Б1), a tile in an `li` and a bent line straight in a card;
+  square, its ring was cut at the card's corners on a first or last row (А3). **The focus stands
+  inside the ring** (`outline-offset: -6px` on the layer, the fill between them): on `-2px` it was the
+  ring itself — 2 px of the same colour on the same place — and the keyboard lost the row it stood on,
+  where a radio group puts the focus first (adversarial А1, WCAG 2.4.7); chips draw it the other way,
+  the ring inside and the focus outside, which a list card clips. `e2e/kit-rows` holds both in both
+  engines.
   **Active** is the row the keyboard stands on in a list a field owns (К-4): the fill without the
   ring, since the focus is in the field. Only a `div` row takes a button into its tail — a button
   inside a button is no HTML. `NavRow` without `to` is a button that opens a sheet and says so
