@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { SEARCH_KEY_TABLES, toSearchKey, unfinishedFoldSpellings } from '#model/support/search-key'
+import {
+  SEARCH_KEY_TABLES,
+  nameIdentity,
+  toSearchKey,
+  unfinishedFoldSpellings,
+} from '#model/support/search-key'
 import { INVISIBLE, visibleLine } from '#model/support/text'
 
 describe('toSearchKey', () => {
@@ -281,6 +286,21 @@ describe('toSearchKey · грузинский и сербский (MOL-109)', ()
     }
     expect(toSearchKey('Čips')).toBe(toSearchKey('чипс'))
     expect(toSearchKey('Đumbir')).toBe(toSearchKey('ђумбир'))
+  })
+
+  it('reads a háček past what draws nothing, as `nameIdentity` does (adversarial А4)', () => {
+    const zeroWidth = String.fromCodePoint(0x200b)
+    const softHyphen = String.fromCodePoint(0xad)
+    const wordJoiner = String.fromCodePoint(0x2060)
+    const caron = String.fromCodePoint(0x30c)
+    for (const [plain, hidden] of [
+      ['Čaj', `C${zeroWidth}${caron}aj`],
+      ['Žito', `Z${softHyphen}${caron}ito`],
+      ['Šljiva', `S${wordJoiner}${caron}ljiva`],
+    ] as const) {
+      expect(nameIdentity(hidden), plain).toBe(nameIdentity(plain))
+      expect(toSearchKey(hidden), plain).toBe(toSearchKey(plain))
+    }
   })
 
   it('leaves the other marks of Latin as they were: an acute on s or a caron on e is stripped', () => {

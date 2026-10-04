@@ -337,11 +337,15 @@ function foldToFixedPoint(text: string): string {
  * that writes an item has to validate the name before taking its key.
  */
 export function toSearchKey(text: string): string {
-  let decomposed = text.toLowerCase().normalize('NFD')
+  // What draws nothing goes first: «c», a zero-width space and «ˇ» is «č» to `nameIdentity`, which
+  // takes it out before it composes, and must be «č» here too — one identity, one key (adversarial
+  // А4). Taken out after the marks, as before MOL-109, it changes no key: nothing ignorable is a mark
+  // a pair could need.
+  let decomposed = text.toLowerCase().normalize('NFD').replace(IGNORABLE, '')
   for (const [from, to] of LATIN_MARKED) {
     decomposed = decomposed.replaceAll(from, to)
   }
-  const plain = decomposed.replace(MARK, '').replace(IGNORABLE, '')
+  const plain = decomposed.replace(MARK, '')
 
   let joined = plain
   for (const [from, to] of ARMENIAN_DIGRAPHS) {
