@@ -133,7 +133,7 @@
           <p class="partly-text">{{ partly }}</p>
           <AppButton v-if="country && !locked" variant="ghost" @click="retake">
             <template #icon><IconCamera /></template>
-            {{ t('receipt.review.partly_retake') }}
+            {{ t('receipt.capture.retake') }}
           </AppButton>
         </div>
         <AppCard class="block" list>

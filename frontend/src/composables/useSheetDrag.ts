@@ -19,8 +19,12 @@ const FLICK_WINDOW = 100
 /** Enough moves to reach back past the window at any rate a screen sends them. */
 const SAMPLES = 32
 
-/** Where a finger moves the caret and selects — never the sheet (owner's decision В-6). */
-const TYPING = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])'
+/**
+ * Where a finger moves the caret and selects — never the sheet (owner's decision В-6) — or drags a
+ * thing of the sheet's own: the corners of a receipt (MOL-222, `data-drags`).
+ */
+const TYPING =
+  'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [data-drags]'
 
 interface Sample {
   y: number

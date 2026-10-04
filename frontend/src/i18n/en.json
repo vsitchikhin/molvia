@@ -1959,6 +1959,23 @@
     }
   },
   "receipt": {
+    "edges": {
+      "title": "Receipt edges",
+      "hint": "Drag the corners to the receipt's edges. For a part of a long receipt — to the overlap line",
+      "not_found": "Couldn't find the edges — drag the corners to the receipt's edges yourself",
+      "corner": "Corner: {corner}. Move it with the arrow keys",
+      "corners": {
+        "top_left": "top left",
+        "top_right": "top right",
+        "bottom_right": "bottom right",
+        "bottom_left": "bottom left"
+      },
+      "turn": "Rotate",
+      "done": "Done",
+      "narrow": "The receipt is small — move closer or take it in parts",
+      "closer": "Move closer",
+      "keep": "Keep it"
+    },
     "capture": {
       "title": "Photograph a receipt",
       "hint_flat": "Smooth the receipt out and lay it on something dark",
@@ -2013,7 +2030,6 @@
       "photo_note": "We delete the photo after saving — the lines stay",
       "partly_total": "Not all of it was read: the lines make {lines} of {total}",
       "partly_lines": "Not all of it was read: {n} of {total} lines add up",
-      "partly_retake": "Retake",
       "to_developer": "Send the receipt to the developer",
       "record": "Save {n} purchase | Save {n} purchases",
       "record_offline": "We’ll save it once you are online",

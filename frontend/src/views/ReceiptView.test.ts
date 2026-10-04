@@ -442,7 +442,7 @@ describe('ReceiptView (MOL-127)', () => {
     const { view } = await render()
     const strip = view.get('.partly')
     expect(strip.text()).toContain('Прочитали не всё: строки дают')
-    expect(strip.text()).toContain(ru.receipt.review.partly_retake)
+    expect(strip.text()).toContain(ru.receipt.capture.retake)
     const record = button(view, 'Записать 2')
     expect(record.attributes('aria-disabled')).not.toBe('true')
   })

@@ -78,7 +78,8 @@ memory: erasure leaves its words without an author, the copy carries the person'
 - `frontend/src/composables/useReceiptCapture.ts` — The version «с чеком» (Д-3): the country of the settings, if the server reads it (Р-1).
 - `frontend/src/composables/useOnline.ts` — Whether the browser believes it is online, now and on every change — for words said ahead of time, never for a failure.
 - `frontend/src/components/CaptureButton.vue` — «Сфотографировать чек»: the strip's main action with receipts; from «Что брать» it opens «Покупки».
-- `frontend/src/components/CaptureSheet.vue` — «Сфотографировать чек» (handoff 04): the system camera or the gallery, up to four parts, the part's own sheet «Переснять / Убрать часть», «Отправить чек» into the queue; «Переснять» a receipt (П-3).
+- `frontend/src/components/CaptureSheet.vue` — «Сфотографировать чек» (handoff 04): the system camera or the gallery, every shot through «Края чека» (MOL-222), up to four parts, the part's own sheet «Переснять / Убрать часть», «Отправить чек» into the queue; «Переснять» a receipt (П-3).
+- `frontend/src/components/ReceiptEdgesSheet.vue` — «Края чека» (MOL-222) over the capture sheet: the photo with the four corners proposed, dragged with a loupe or moved by the arrows, «Повернуть», «Готово» straightening it off the page, «Чек мелкий» with «Подойти ближе / Оставить так»; «‹» gives the shot up.
 - `frontend/src/components/ReceiptWorkSheet.vue` — The sheet of a receipt in work (3f): where it is, its parts from this phone, «Удалить чек».
 - `frontend/src/components/ReceiptUndoStrip.vue` — «Чек удалён вместе с фото · Вернуть»: ten seconds on the screen, the queue's removal.
 - `frontend/src/components/ReceiptSentLine.vue` — «Чек отправлен» for a moment where «Вернуть» stands (3d).
