@@ -30,6 +30,18 @@ describe('MonthSwitcher', () => {
     expect(view.emitted('change')).toEqual([['2025']])
   })
 
+  // The arrow at the edge is the kit's inactive button: still in the focus order, and its tap goes
+  // nowhere (Ф-6, MOL-174) — never a native `disabled`, which would drop the focus resting on it.
+  it('keeps the arrow at the current month focusable, and its tap goes nowhere', async () => {
+    const view = switcher({ month: '2026-09', current: '2026-09' })
+    const [back, forward] = view.findAll('button')
+    expect(forward?.attributes('aria-disabled')).toBe('true')
+    expect(forward?.attributes('disabled')).toBeUndefined()
+    expect(back?.attributes('aria-disabled')).toBeUndefined()
+    await forward?.trigger('click')
+    expect(view.emitted('change')).toBeUndefined()
+  })
+
   it('in years, goes no further back than the first year with anything in it (Р-9)', async () => {
     const view = switcher({ unit: 'year', month: '2025', current: '2026', first: '2025' })
     const [back, forward] = view.findAll('button')

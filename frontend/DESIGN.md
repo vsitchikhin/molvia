@@ -322,8 +322,8 @@ sectors by sum, so any two may meet.
 
 **The Graphic Is Data Rule.** Anything that carries meaning — an unselected bar, the "Остальные"
 sector, the "no data" dash, the off track of a switch — is drawn in `graphic`, at least 3:1 on
-`surface`. `border-strong` (1.8:1) is decoration only. The charts, the countdown of "Вернуть" and
-the switch still draw `border-strong` until their own tasks **(target)**.
+`surface`. `border-strong` (1.8:1) is decoration only. The charts and the countdown of "Вернуть"
+still draw `border-strong` until their own tasks **(target)**.
 
 **The Colour Never Alone Rule.** Beside every colour stands a word, a form or a figure: a verdict has
 its icon and word, a category its name, a plus or minus its sign and "лучше / хуже рынка".
@@ -422,18 +422,19 @@ height on it.
 - **Shape:** pill, 44 high (52 as the main action of a sheet), 16 side padding, a 22 icon before the word.
 - **Primary:** `accent-solid` fill, `on-accent` text 700, rest shadow. One per screen.
 - **Secondary:** `surface` with a `border-strong` hairline, `text` 600.
-- **Tinted (target, new):** `accent-tint` fill, `accent-ink` text — "Вернуть", "Записать разницу", "Добавить счёт". The old handoffs called this "secondary"; it is a variant of its own.
+- **Tinted:** `accent-tint` fill, `accent-ink` text 600 — "Вернуть", "Записать разницу", "Добавить счёт". The old handoffs called this "secondary"; it is a variant of its own.
 - **Ghost / Danger ghost:** no fill, `accent-ink` / `bad-ink` text. "Убрать" a category is ghost, not danger: it erases nothing **(target)**.
-- **Icon:** a 44 circle on `surface-2`, its glyph 24.
-- **Inactive (target):** one look everywhere — solid `surface-2`, `text-muted`, still focusable (`aria-disabled`), and the words say why ("Выберите оценку"). No opacity.
+- **Icon:** a 44 circle on `surface-2`, its glyph 24 in `text`; inactive, in `text-muted`.
+- **Inactive:** one look everywhere — `text-muted` 600, still focusable (`aria-disabled`), and the words say why ("Выберите оценку"). No opacity. A variant with a fill turns `surface-2`; ghost and danger ghost keep no fill, so a sheet's footer never shows two grey pills.
 - **Focus:** a 2 px `accent` ring, 2 px out.
 
-### Selection (target)
+### Selection
 
-One grammar: the selected thing gets a fill and a weight, not only a hue. The active tab has a filled
-MDI icon and a 700 label; inactive tabs are outlined, 600. A selected segment is filled
-`accent-solid` with `on-accent`. A selected chip has the `accent-tint` fill and an `accent` ring, and
-its weight does not change on selection, so the row never reflows under the thumb.
+One grammar: the selected thing gets a fill or a form, not only a hue. A selected segment is filled
+`accent-solid` with `on-accent`. A selected chip has the `accent-tint` fill and an `accent` ring. A
+switch that is on carries a ✓ on its knob. Weights do not change on selection — every segment and
+every chip is 600 — so the row never reflows under the thumb. **(target)** The active tab has a
+filled MDI icon and a 700 label; inactive tabs are outlined, 600.
 
 ### Cards / Lists
 
@@ -448,7 +449,8 @@ its weight does not change on selection, so the row never reflows under the thum
 
 - **Field:** a 44 well on `surface-2`, radius 14, hairline `border-strong`; label above in 13/600 `text-muted`; focus turns the edge `accent` with a 2 px `accent-tint` halo; the error is a word from the registry under the field. Never `type="number"`.
 - **SearchField (target, one):** a pill well on `surface-2`, a magnifier left, "Очистить" or the scanner right. One look for every search in the app.
-- **Segmented control:** a `surface-2` track, segments 38 that answer the thumb over the full 44.
+- **Segmented control:** a `surface-2` track, segments 38 that answer the thumb over the full 44, radius 11 (`radius` less the inset). Inactive: one stop, the arrows walk the focus without choosing; the selected one on `surface` with a `graphic` edge and its word in `text`, the others `text-muted`.
+- **Switch:** a 52 × 32 track, `graphic` off and `accent-solid` on with a ✓ on the knob. Inactive: a `surface-2` well with a `border-strong` edge and a `text-muted` knob, still focusable.
 
 ### Verdict badge (signature)
 

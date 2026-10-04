@@ -101,7 +101,8 @@ export default defineConfig({
   // nothing about the screen that matters. The other projects are the same phone: with a camera,
   // for the scanner (MOL-98), and against the built app, for what needs a worker. The sheet runs on
   // an iPhone's engine as well (MOL-80): Safari does not focus a tapped button, and only WebKit
-  // shows what the sheet gives focus back to. The rest of the suite stays on one engine — a second
+  // shows what the sheet gives focus back to — and «not now» of the kit (MOL-174), held by what the
+  // engine sends for an arrow, Space and a tap. The rest of the suite stays on one engine — a second
   // run of everything would double the wait at every push for differences no other screen has.
   projects: [
     {
@@ -119,7 +120,11 @@ export default defineConfig({
       use: { ...devices['Pixel 7'], baseURL: `http://127.0.0.1:${previewPort}` },
       testMatch: /(pwa-update|client-errors-built)\.spec\.ts$/,
     },
-    { name: 'iphone', use: { ...devices['iPhone 14'] }, testMatch: 'sheet.spec.ts' },
+    {
+      name: 'iphone',
+      use: { ...devices['iPhone 14'] },
+      testMatch: /(sheet|kit-inactive)\.spec\.ts$/,
+    },
   ],
 
   webServer: [

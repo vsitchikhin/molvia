@@ -54,7 +54,7 @@ afterEach(() => {
 it('is on by default and says how the reminders work', async () => {
   const view = await render()
   expect(switchOf(view).element.checked).toBe(true)
-  expect(switchOf(view).attributes('disabled')).toBeUndefined()
+  expect(switchOf(view).attributes('aria-disabled')).toBeUndefined()
   expect(view.text()).toContain(en.settings.reminders.hint)
   expect(view.text()).not.toContain(en.settings.reminders.blocked)
 })
@@ -62,7 +62,7 @@ it('is on by default and says how the reminders work', async () => {
 it('waits for the server before it can be moved, showing «on» as nearly everyone has it (review №1)', async () => {
   read.mockReturnValue(new Promise(() => undefined))
   const view = await render()
-  expect(switchOf(view).attributes('disabled')).toBeDefined()
+  expect(switchOf(view).attributes('aria-disabled')).toBe('true')
   expect(switchOf(view).element.checked).toBe(true)
   expect(view.text()).not.toContain(en.settings.reminders.blocked)
 })
@@ -71,7 +71,7 @@ it('an answer read moves nothing: the switch is not live until a finger moved it
   read.mockResolvedValue({ off: 'chosen' })
   const view = await render()
   expect(switchOf(view).element.checked).toBe(false)
-  expect(switchOf(view).classes()).not.toContain('live')
+  expect(view.get('.switch').classes()).not.toContain('live')
 })
 
 it('turns off on the tap and saves at once; on again the same way', async () => {
@@ -90,7 +90,7 @@ it('off by a blocked bot: says so, and the switch is inactive — only an unbloc
   read.mockResolvedValue({ off: 'blocked' })
   const view = await render()
   expect(switchOf(view).element.checked).toBe(false)
-  expect(switchOf(view).attributes('disabled')).toBeDefined()
+  expect(switchOf(view).attributes('aria-disabled')).toBe('true')
   expect(view.text()).toContain(en.settings.reminders.blocked)
   expect(describedBy(view)).toContain(en.settings.reminders.blocked)
 })
@@ -115,7 +115,7 @@ it('waits offline: the switch is inactive and says why, to a screen reader too',
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
   read.mockRejectedValue(new TypeError('network'))
   const view = await render()
-  expect(switchOf(view).attributes('disabled')).toBeDefined()
+  expect(switchOf(view).attributes('aria-disabled')).toBe('true')
   expect(view.text()).toContain(en.settings.tap.offline)
   expect(view.text()).not.toContain(en.state.retry)
   expect(describedBy(view)).toContain(en.settings.tap.offline)
