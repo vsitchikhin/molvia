@@ -7,7 +7,7 @@
     @retry="retry"
   />
 
-  <!-- No «Повторить»: the step asks again by itself when the connection is back (MOL-19). -->
+  <!-- No «Повторить»: the store asks again by itself when the connection is back (MOL-19). -->
   <ScreenState
     v-else-if="consent.state === 'offline'"
     kind="offline"
@@ -108,7 +108,6 @@ import EraseSheet from '@/components/EraseSheet.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SignOutSheet from '@/components/SignOutSheet.vue'
 import { useOnline } from '@/composables/useOnline'
-import { useReconnect } from '@/composables/useReconnect'
 import { useConsentStore } from '@/stores/consent'
 import { useSignOutStore } from '@/stores/signOut'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -154,8 +153,6 @@ export default defineComponent({
       const key = `consent.changes.${String(POLICY_VERSION)}`
       return updated.value && i18n.te(key) ? t(key) : null
     })
-
-    useReconnect(() => void consent.retry())
 
     // The way out is a sheet of its own, opened once this one is put away (`onClosed`).
     const signOut = useSignOutStore()

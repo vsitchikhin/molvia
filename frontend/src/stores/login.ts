@@ -242,8 +242,14 @@ export const useLoginStore = defineStore('login', () => {
     if (actor.id === null) return true
     // Пока сервер отвечает, кто мы, приложение по ящику показывается только тому, чьё согласие с
     // этой редакцией устройство помнит: иначе показанное приложение тут же сменил бы шаг (№3).
-    // Без связи `start` уходит в `offline`, и дверь открывается по ящику, как раньше.
-    return (actor.state === 'idle' || actor.state === 'loading') && !consent.remembers(actor.id)
+    // Без связи `start` уходит в `offline`, и дверь открывается по ящику, как раньше. Уже открытая
+    // этому владельцу дверь на новом вопросе не закрывается: возврат связи и повтор после ошибки
+    // личности снова идут через `loading`, и лист с набранной ценой уходил на время `me()` (№7).
+    return (
+      (actor.state === 'idle' || actor.state === 'loading') &&
+      shownTo.value !== actor.id &&
+      !consent.remembers(actor.id)
+    )
   })
 
   watch(closed, (now) => {
@@ -253,6 +259,22 @@ export const useLoginStore = defineStore('login', () => {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden' && !holdsTyping(document)) shownTo.value = null
   })
+  /**
+   * **An owner known to have accepted no edition does not wait for the app to be hidden** (adversarial
+   * Б1, owner's decision): in that window everything a sheet writes straight to the server — a
+   * rating into everybody's average, an exchange, a code — went out for a person who had said no
+   * «16 или больше». The step comes as soon as no sheet is open: what is being typed is still not
+   * lost (№3), and the sheet open now is the one write left. An owner on record with an older
+   * edition waits for the hiding, as before.
+   */
+  function letGoOfTheUnaccepted(): void {
+    if (consent.state === 'ready' && consent.unaccepted && !holdsTyping(document)) {
+      shownTo.value = null
+    }
+  }
+  watch(() => consent.state === 'ready' && consent.unaccepted, letGoOfTheUnaccepted)
+  // A sheet that closes may have been the last one: `close` does not bubble, so it is caught on the way down.
+  document.addEventListener('close', letGoOfTheUnaccepted, true)
 
   /**
    * **What the queues wait for before they send** (MOL-56, MOL-95): another window's login being
@@ -261,12 +283,19 @@ export const useLoginStore = defineStore('login', () => {
    */
   const writesHeld = computed(() => rechecking.value || consent.unaccepted)
 
+  /**
+   * The door is shut on the terms — the step, its skeleton while the edition is asked again, or its
+   * error. What `App.vue` keeps the report sheet drawn by (adversarial Б3): a question asked again on
+   * `online` put the phase to `loading` and shut the sheet with a screenshot in it.
+   */
+  const onConsent = computed(() => actor.state === 'ready' && !blocked.value && consentHolds.value)
+
   const phase = computed<LoginPhase>(() => {
     if (actor.state === 'idle' || actor.state === 'loading' || rechecking.value) return 'loading'
     // The terms come after the account is claimed and before the app (MOL-95) — and before a login
     // failure of this window from before the session: a neighbour's login made this person known,
     // and «Повторить» on that old failure sent them to Telegram again (adversarial А3).
-    if (actor.state === 'ready' && !blocked.value && consentHolds.value)
+    if (onConsent.value)
       return consent.state === 'loading' || consent.state === 'idle' ? 'loading' : 'consent'
     if (failure.value) return failure.value
     // The account in hand is asked about before the attempt that is still waiting: a session may
@@ -557,6 +586,7 @@ export const useLoginStore = defineStore('login', () => {
     closed,
     rechecking,
     writesHeld,
+    onConsent,
     starting,
     failure,
     request,

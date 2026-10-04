@@ -164,6 +164,16 @@ export const useConsentStore = defineStore('consent', () => {
     if (who && (state.value === 'error' || state.value === 'offline')) await load(who)
   }
 
+  /**
+   * **The question is asked again by the store itself** (adversarial Б2): the connection back, or the
+   * app looked at again. With the app shown before the step there is no step on the screen to retry
+   * it, and one failed question held the shelf's writes of an owner whose consent was on record.
+   */
+  window.addEventListener('online', () => void retry())
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void retry()
+  })
+
   /** Another window accepted: the door opens here too, with no request of its own. */
   window.addEventListener('storage', (event) => {
     const who = owner.value

@@ -172,7 +172,8 @@ describe('the step does not close the door over an app already shown (MOL-95, re
     expect(login.closed).toBe(false)
   })
 
-  it('shown offline, the app stays when the signal is back; the step comes once it is hidden with no sheet open', async () => {
+  /** Shown on the drawer with no signal; the signal back, and `me()` answers when told to. */
+  async function shownOffline() {
     claimedHere()
     online(false)
     const actor = useActorStore()
@@ -180,26 +181,111 @@ describe('the step does not close the door over an app already shown (MOL-95, re
     await actor.start()
     await flush()
     expect(login.closed).toBe(false)
-
     online(true)
+    return { actor, login }
+  }
+
+  function aSheet(): HTMLDialogElement {
+    const sheet = document.createElement('dialog')
+    sheet.setAttribute('open', '')
+    document.body.append(sheet)
+    return sheet
+  }
+
+  it('the signal back: the door stays open for the whole of `me()`, not shut by its skeleton (№7)', async () => {
+    const { actor, login } = await shownOffline()
+    let named: (view: ActorView) => void = () => undefined
+    me.mockReturnValue(new Promise((resolve) => (named = resolve)))
+    consent.mockResolvedValue({ version: POLICY_VERSION })
+    const starting = actor.start()
+    await flush()
+    expect(actor.state).toBe('loading')
+    expect(login.closed).toBe(false)
+    named(MINE)
+    await starting
+    await flush()
+    expect(login.closed).toBe(false)
+  })
+
+  it('and so after an identity that could not be checked, asked again (№7)', async () => {
+    claimedHere()
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const actor = useActorStore()
+    const login = useLoginStore()
+    await actor.start()
+    await flush()
+    expect(actor.state).toBe('error')
+    expect(login.closed).toBe(false)
+    me.mockReset().mockReturnValue(new Promise(() => undefined))
+    void actor.start()
+    await flush()
+    expect(actor.state).toBe('loading')
+    expect(login.closed).toBe(false)
+  })
+
+  it('one who accepted nothing: over an open sheet the door waits, and the step comes as the last sheet closes (Б1)', async () => {
+    const { actor, login } = await shownOffline()
+    const sheet = aSheet()
     me.mockResolvedValue(MINE)
     consent.mockResolvedValue({ version: null })
     await actor.start()
     await flush()
     expect(useConsentStore().holds).toBe(true)
-    // A price may be being typed in a sheet right now: the door does not close over it.
+    // A price may be being typed in that sheet: the door does not close over it.
     expect(login.closed).toBe(false)
 
-    const sheet = document.createElement('dialog')
-    sheet.setAttribute('open', '')
-    document.body.append(sheet)
+    sheet.removeAttribute('open')
+    sheet.dispatchEvent(new Event('close'))
+    expect(login.closed).toBe(true)
+    expect(login.phase).toBe('consent')
+  })
+
+  it('one who accepted nothing, with no sheet open: the step at once — nothing written past it (Б1)', async () => {
+    const { actor, login } = await shownOffline()
+    me.mockResolvedValue(MINE)
+    consent.mockResolvedValue({ version: null })
+    await actor.start()
+    await flush()
+    expect(login.closed).toBe(true)
+    expect(login.phase).toBe('consent')
+  })
+
+  it('not known yet (the question failed): the app stays until hidden with no sheet open', async () => {
+    const { actor, login } = await shownOffline()
+    me.mockResolvedValue(MINE)
+    consent.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    await actor.start()
+    await flush()
+    expect(useConsentStore().state).toBe('error')
+    expect(login.closed).toBe(false)
+
+    const sheet = aSheet()
     visibility('hidden')
     expect(login.closed).toBe(false)
-
     sheet.remove()
     visibility('hidden')
     expect(login.closed).toBe(true)
-    expect(login.phase).toBe('consent')
+  })
+
+  it('a failed question is asked again when the signal is back, and the shelf’s writes go (Б2)', async () => {
+    const { actor, login } = await shownOffline()
+    spend()
+    online(false)
+    me.mockResolvedValue(MINE)
+    consent.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'transport', false))
+    online(true)
+    await actor.start()
+    await flush()
+    expect(login.writesHeld).toBe(true)
+
+    consent.mockResolvedValue({ version: POLICY_VERSION })
+    window.dispatchEvent(new Event('online'))
+    await flush()
+    // Asked again (stores of earlier tests listen to `online` too, so not counted by calls).
+    expect(useConsentStore().accepted).toBe(POLICY_VERSION)
+    expect(login.writesHeld).toBe(false)
+    await useSpendingQueueStore().flush()
+    expect(recordSpending).toHaveBeenCalledTimes(1)
   })
 })
 

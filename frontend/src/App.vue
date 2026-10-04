@@ -47,7 +47,7 @@ export default defineComponent({
     // Whether the app is shown at all, or the login screen instead. The rule lives in the login
     // store, where it can be read and tested without mounting the app (MOL-56).
     const closed = computed(() => login.closed)
-    const feedbackDrawn = computed(() => !closed.value || login.phase === 'consent')
+    const feedbackDrawn = computed(() => !closed.value || login.onConsent)
     // A sheet asked for where it is not drawn opens nothing — and must not rise by itself later, on
     // another screen, when it is (adversarial А2).
     const feedback = useFeedbackSheetStore()

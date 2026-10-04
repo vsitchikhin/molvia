@@ -126,6 +126,31 @@ test('«Report a problem» on the step’s error opens the sheet there, and noth
   await expect(page.locator('dialog[open]')).toHaveCount(0)
 })
 
+test('the report being written on the step’s error stays when the question is asked again (Б3)', async ({
+  page,
+}) => {
+  await page.route('**/api/actors/me/consent', (route) =>
+    route.request().method() === 'GET' ? route.abort('failed') : route.continue(),
+  )
+  await page.goto('/')
+  await page.getByRole('button', { name: DEV_SEAM }).click()
+  await expect(page.getByRole('heading', { name: 'Could not open the terms' })).toBeVisible()
+  await page.getByRole('button', { name: 'Report a problem' }).click()
+  await risen(page)
+  const sheet = page.locator('dialog[open]')
+  await sheet.getByRole('textbox', { name: 'Message' }).fill('Экран условий не открывается')
+
+  const asked = page.waitForRequest(
+    (request) => request.url().endsWith('/api/actors/me/consent') && request.method() === 'GET',
+  )
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await asked
+  await page.waitForTimeout(500)
+  await expect(sheet.getByRole('textbox', { name: 'Message' })).toHaveValue(
+    'Экран условий не открывается',
+  )
+})
+
 test('«Terms of use» opens by its address without a session, and from the login screen', async ({
   page,
 }) => {
