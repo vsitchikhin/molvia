@@ -311,6 +311,30 @@ describe('what healthchecks.io says', () => {
     expect(rigged.pings()).toBe(1)
   })
 
+  it('tries a ping not taken again — rate limited is not «no check» (R4-1)', async () => {
+    let answer = 0
+    const answers = ['OK (rate limited)', 'OK']
+    const rigged: Io = {
+      ...io('unused'),
+      fetch: (input) =>
+        Promise.resolve().then(() =>
+          urlOf(input).startsWith(PING)
+            ? new Response(answers[Math.min((answer += 1) - 1, answers.length - 1)])
+            : new Response(urlOf(input).endsWith('/api/health') ? HEALTHY : '<!doctype html>'),
+        ),
+    }
+    await expect(watch(SETTINGS, rigged)).resolves.toBeDefined()
+    expect(answer).toBe(2)
+  })
+
+  it('fails by its words when no try was taken, never as «no check»', async () => {
+    const rigged = io('OK (rate limited)')
+    await expect(watch(SETTINGS, rigged)).rejects.toThrow(
+      'the ping to healthchecks.io did not go: «OK (rate limited)»',
+    )
+    expect(rigged.pings()).toBe(PING_TRIES)
+  })
+
   it('takes a plain OK, with the line feed it may end in, for a ping delivered', async () => {
     await expect(watch(SETTINGS, io('OK\n'))).resolves.toBeDefined()
   })

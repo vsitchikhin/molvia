@@ -46,15 +46,24 @@ jobs:
             exit 1
           fi
 
-          # healthchecks.io answers 200 to a check it does not have, saying `OK (not found)` (R3-2 of
-          # MOL-221): its words are read, and a ping to no check is a run that could not report.
+          # healthchecks.io answers every ping with 200 and says what became of it (MOL-221): `OK`;
+          # `OK (not found)` — no such check, a run that could not report; anything else, such as
+          # `OK (rate limited)`, was not taken and is tried again, a second, two and four apart.
           ping() {
             local said
-            said="$(curl -fsS -m 10 --retry 3 "$@")"
-            if [[ "$said" != OK ]]; then
-              echo "::error::the ping to healthchecks.io reached no check: $said"
-              exit 1
-            fi
+            for pause in 1 2 4 0; do
+              said="$(curl -fsS -m 10 --retry 3 "$@")"
+              case "$said" in
+                OK) return 0 ;;
+                'OK (not found)')
+                  echo "::error::the ping to healthchecks.io reached no check: $said"
+                  exit 1
+                  ;;
+              esac
+              sleep "$pause"
+            done
+            echo "::error::the ping to healthchecks.io was not taken: $said"
+            exit 1
           }
 
           # The term is a check of its own (adversarial Б2 of MOL-142): «expires in 13 days» is a
