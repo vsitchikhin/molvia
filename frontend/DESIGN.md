@@ -156,6 +156,7 @@ spacing:
   4: '16px'
   6: '24px'
   8: '32px'
+  tail: 'calc(var(--space-4) + var(--icon) + var(--space-3))'
 components:
   button-primary:
     backgroundColor: '{colors.accent-solid}'

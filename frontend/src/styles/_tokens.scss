@@ -83,6 +83,10 @@
   --space-6: 1.5rem;
   --space-8: 2rem;
 
+  /* From a list card's right edge to the end of a row's amount — the row's inset, its chevron and the
+     gap before it: a sum over the rows stands in their column (MOL-176). */
+  --space-tail: calc(var(--space-4) + var(--icon) + var(--space-3));
+
   /* ── Shape ────────────────────────────────────────────────────────────── */
   --radius-sm: 0.5rem;
   --radius: 0.875rem;

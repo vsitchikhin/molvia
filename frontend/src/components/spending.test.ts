@@ -340,7 +340,7 @@ describe('refused spendings, apart from the journal', () => {
   })
 })
 
-/** A line of «Траты» as its row says it (MOL-176): what `SpendingRow` drew by itself, read here. */
+/** A line of «Траты» as its row says it (MOL-176): what the journal's own row drew by itself, read here. */
 describe('a line of the journal as its row says it', () => {
   const { t } = createAppI18n('ru').global
   const groceries: SpendingCategoryView = {

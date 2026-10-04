@@ -36,14 +36,10 @@
             <h2 class="day-head">{{ t('spending.list.refused') }}</h2>
             <AppCard v-if="refused.length > 0" as="ul" list>
               <AppReveal group>
-                <SpendingRow
+                <OperationRow
                   v-for="row in refused"
                   :key="row.key"
-                  :row="row"
-                  :category="categoryOf(row)"
-                  :category-name="categoryNameOf(row)"
-                  :spend-currency="spendCurrency"
-                  :when="dayTitle(row.spending.spentOn)"
+                  v-bind="rowOf(row, spendCurrency, dayTitle(row.spending.spentOn))"
                   :data-row="row.key"
                   @open="open(row, row.spending.spentOn)"
                 />
@@ -119,13 +115,10 @@
               </h2>
               <AppCard as="ul" list>
                 <AppReveal group>
-                  <SpendingRow
+                  <OperationRow
                     v-for="row in day.rows"
                     :key="row.key"
-                    :row="row"
-                    :category="categoryOf(row)"
-                    :category-name="categoryNameOf(row)"
-                    :spend-currency="month.spendCurrency"
+                    v-bind="rowOf(row, month.spendCurrency)"
                     :data-row="row.key"
                     @open="open(row, day.day)"
                   />
@@ -206,7 +199,7 @@ import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconPlus from '~icons/mdi/plus'
 import IconWallet from '~icons/mdi/wallet-outline'
 import { formatEstimate, monthOf as monthOfDay } from '@molvia/model'
-import type { Money, MoneyMonthView, SpendingCategoryView } from '@molvia/model'
+import type { Currency, Money, MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
@@ -214,13 +207,14 @@ import AppScreen from '@/components/AppScreen.vue'
 import FloatingDock from '@/components/FloatingDock.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NewCategorySheet from '@/components/NewCategorySheet.vue'
+import OperationRow from '@/components/OperationRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
-import SpendingRow from '@/components/SpendingRow.vue'
 import SpendingSheet from '@/components/SpendingSheet.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import type { JournalRow } from '@/components/spending'
+import { journalRowProps } from '@/components/spending'
+import type { JournalRow, OperationRowProps } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
 import { calendarDay, shiftDay } from '@/days'
 
@@ -241,9 +235,9 @@ export default defineComponent({
     IconPlus,
     MonthSwitcher,
     NewCategorySheet,
+    OperationRow,
     ScreenSkeleton,
     ScreenState,
-    SpendingRow,
     SpendingSheet,
     TripUndoStrip,
     UndoStrip,
@@ -283,6 +277,17 @@ export default defineComponent({
     function categoryNameOf(row: JournalRow): string {
       const category = categoryOf(row)
       return category ? screen.nameOf(category) : t('spending.category.other')
+    }
+    /** `when` — the day, where rows of different days stand together: «Не приняты». */
+    function rowOf(row: JournalRow, spendCurrency: Currency, when = ''): OperationRowProps {
+      return journalRowProps(row, {
+        t,
+        locale: locale.value,
+        category: categoryOf(row),
+        categoryName: categoryNameOf(row),
+        spendCurrency,
+        when,
+      })
     }
 
     /**
@@ -328,7 +333,9 @@ export default defineComponent({
     /** The first refusal marked in the journal, brought into view and given the focus. */
     function toMarked(): void {
       const key = screen.refusedInJournal.value[0]
-      const row = key ? document.querySelector<HTMLElement>(`.day [data-row="${key}"] .body`) : null
+      const row = key
+        ? document.querySelector<HTMLElement>(`.day [data-row="${key}"] .list-row`)
+        : null
       if (!row) return
       const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
       row.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' })
@@ -377,8 +384,7 @@ export default defineComponent({
       month,
       whole,
       approx,
-      categoryOf,
-      categoryNameOf,
+      rowOf,
       dayTitle,
       rangeOf,
       sentinel,
@@ -470,12 +476,13 @@ export default defineComponent({
   gap: var(--space-2);
 }
 
+/* The day's sum stands over the rows' sums (157 v2 02 п. 4, MOL-176 В-1). */
 .day-head {
   display: flex;
   justify-content: space-between;
   gap: var(--space-3);
   margin: 0;
-  padding: var(--space-1) var(--space-1) 0;
+  padding: var(--space-1) var(--space-tail) 0 var(--space-1);
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);

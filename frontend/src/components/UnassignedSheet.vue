@@ -20,12 +20,8 @@
         <OperationRow
           v-for="row in visible"
           :key="`${row.id}-${row.side ?? ''}`"
-          :operation="row"
-          :categories="categories"
-          :name-of="nameOf"
-          :account-name="accountName"
-          :meta="metaOf(row)"
-          @open="openRow"
+          v-bind="rowOf(row)"
+          @open="openRow(row)"
         />
       </AppReveal>
     </AppCard>
@@ -72,7 +68,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
 import OperationSheet from '@/components/OperationSheet.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { shortDay } from '@/components/accounts'
+import { operationRowProps, shortDay } from '@/components/accounts'
 import type { Removed } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useOwnCategories } from '@/composables/useOwnCategories'
@@ -172,6 +168,17 @@ export default defineComponent({
     }
 
     const accountName = (id: string) => store.accounts.find((one) => one.id === id)?.name ?? null
+    /** Out of any account: the operation's own amount, and «what · when» under it. */
+    const rowOf = (row: AccountOperationView) => ({
+      ...operationRowProps(row, {
+        t,
+        locale: locale.value,
+        categories: categories.value,
+        nameOf,
+        accountName,
+      }),
+      meta: metaOf(row),
+    })
 
     /** «Кофе и сэндвич · 21 сент.»: what it was and its day, as the journal of the month says. */
     function metaOf(row: AccountOperationView): string {
@@ -208,8 +215,7 @@ export default defineComponent({
       state,
       categories,
       nameOf,
-      accountName,
-      metaOf,
+      rowOf,
       operationOpen,
       operation,
       openRow,
