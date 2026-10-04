@@ -89,23 +89,31 @@ describe('frontend/.stylelintrc.json', () => {
   })
 
   // Caps are the kit's caption, written once (MOL-175, В-1 «б»): 52 copies had grown three spacings.
-  it('refuses caps anywhere but the kit caption', async () => {
-    const DISALLOWED = 'declaration-property-value-disallowed-list'
-    expect(
-      await rules(
-        '.a {\n  text-transform: uppercase;\n}\n\n.b {\n  font-variant: all-small-caps;\n}\n\n' +
-          '.c {\n  font-variant-caps: small-caps;\n}\n',
-      ),
-    ).toEqual([DISALLOWED, DISALLOWED, DISALLOWED])
-    // CSS reads a property and a keyword in any case: the rule must too (adversarial А-1).
-    expect(await rules('.a {\n  TEXT-TRANSFORM: uppercase;\n}\n')).toContain(DISALLOWED)
-    expect(await rules('.a {\n  text-transform: UPPERCASE;\n}\n')).toContain(DISALLOWED)
-    expect(await rules('.a {\n  font-variant-caps: normal;\n}\n')).toEqual([])
-    expect(await rules('.a {\n  text-transform: none;\n}\n')).toEqual([])
+  // The property is refused, not its value: a value can come through a variable, a map, an
+  // interpolation or a custom property, and a check of the text never sees it (adversarial А2, Р2-2).
+  it('refuses the case and the caps of letters anywhere but the kit caption', async () => {
+    const REFUSED = 'property-disallowed-list'
+    const ways = [
+      '.a {\n  text-transform: uppercase;\n}\n',
+      '.a {\n  TEXT-TRANSFORM: uppercase;\n}\n',
+      '$caps: uppercase;\n\n.a {\n  text-transform: $caps;\n}\n',
+      "@use 'sass:map';\n\n$case: (caption: uppercase);\n\n.a {\n  text-transform: map.get($case, caption);\n}\n",
+      ".a {\n  text-transform: #{'upper' + 'case'};\n}\n",
+      '.a {\n  --case: uppercase;\n\n  text-transform: var(--case);\n}\n',
+      '.a {\n  font-variant: all-small-caps;\n}\n',
+      '.a {\n  font-variant-caps: small-caps;\n}\n',
+      ".a {\n  font-feature-settings: 'smcp';\n}\n",
+    ]
+    for (const code of ways) expect(await rules(code), code).toContain(REFUSED)
+    // Figures in columns are another property, and stay everyone's.
+    expect(await rules('.a {\n  font-variant-numeric: tabular-nums;\n}\n')).toEqual([])
     const caption = `${FRONTEND}src/components/SectionCaption.vue`
     const sfc = (css: string) =>
       `<template><p /></template>\n\n<style scoped lang="scss">\n${css}</style>\n`
     expect(await rules(sfc('.a {\n  text-transform: uppercase;\n}\n'), caption)).toEqual([])
-    expect(await rules(sfc('.a {\n  scroll-behavior: smooth;\n}\n'), caption)).toEqual([DISALLOWED])
+    // The kit caption keeps every other check: a smooth scroll is refused there too.
+    expect(await rules(sfc('.a {\n  scroll-behavior: smooth;\n}\n'), caption)).toEqual([
+      'declaration-property-value-disallowed-list',
+    ])
   })
 })
