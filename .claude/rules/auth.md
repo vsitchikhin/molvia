@@ -281,7 +281,11 @@ the round trip through Telegram, and ask whose account this turned out to be.
   record. **A failed question is asked again by time instead** — 5 s, doubling, a minute at most
   (`CONSENT_RETRY_*`, the queues' `doublingRetry`) — besides `online` and the app looked at again,
   so the window of one who accepted nothing ends with the next answer, not with an `online` a
-  wavering signal never sends. `close` is heard on the way down and looked at a task later, so a
+  wavering signal never sends. **The store's own questions are quiet** (adversarial Д1): the timer,
+  `online` and the app looked at again leave the step's error or offline state on the screen until an
+  answer comes — put to `loading`, the error blinked to the skeleton every minute, «Повторить» went
+  from under the thumb, the focus went to the title and the error was read out again; only «Повторить»
+  by hand shows the question. `close` is heard on the way down and looked at a task later, so a
   chain of sheets — the next opened by the first one's `onClosed` — is not cut between them (review
   №9). **Nor does an open door
   shut on a new question** (review №7): the connection back, or an identity asked again after an
