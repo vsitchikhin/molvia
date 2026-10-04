@@ -476,7 +476,9 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   `GET /receipts/:id/settled`** (`receiptSettled`, round 3 Г1), which reads under the owner's lock and
   the receipt's row in the order «Записать» takes them: the phone gives a send up after its 15 s, and
   the server finishes it all the same — a record still in its transaction is waited for and read as
-  done. Recorded, the
+  done. It answers the trip the receipt is recorded as, and the review goes there on that answer alone:
+  a read of the receipt after it failed on the same connection and left the tap unanswered (round 4,
+  Д1). Recorded, the
   screen goes to its purchases; no answer — the dock says why, «no connection» or «the server did not
   answer» by `navigator.onLine` after the failure (MOL-19, Б3), until the connection or the receipt
   changes, and nothing opens. **The receipt the server calls recorded lets go of the phone's part of

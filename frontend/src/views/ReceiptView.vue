@@ -466,15 +466,17 @@ export default defineComponent({
         return
       }
       checking.value = true
+      const settled: { tripId: string | null } = { tripId: null }
       try {
         await queue.cancelChecked(asked, async () => {
           // Answered once no «Записать» of it is still running on the server either — one the phone
-          // gave up on by its timeout included (Г1). Recorded, the receipt read again takes the screen
-          // to its purchases.
-          const { recorded } = await api.receiptSettled(asked)
-          if (recorded) void kept.retry()
-          return !recorded
+          // gave up on by its timeout included (Г1).
+          settled.tripId = (await api.receiptSettled(asked)).tripId
+          return settled.tripId === null
         })
+        // Recorded: its purchases on this answer alone — a read of the receipt after it could fail on
+        // the same connection and leave the tap unanswered (round 4, Д1).
+        if (settled.tripId !== null && id.value === asked) toPurchases(asked, settled.tripId)
       } catch (error) {
         if (id.value !== asked) return
         if (error instanceof ApiError && error.answered && error.code === ERROR.NOT_FOUND) {
@@ -526,14 +528,17 @@ export default defineComponent({
 
     // Recorded on another phone while this one looked, or by a send whose answer was lost: its
     // purchases are where to go, and nothing of it waits on the phone any more (MOL-169, А2).
+    function toPurchases(receiptId: string, tripId: string): void {
+      queue.settleRecorded(new Set([receiptId]))
+      drafts.forget(receiptId)
+      if (actor.id) void photoShelf(actor.id).drop(receiptId)
+      void router.replace({ name: 'purchase', params: { tripId } })
+    }
     watch(
       () => detail.value?.receipt,
       (receipt) => {
-        if (receipt?.status !== 'recorded' || !receipt.tripId) return
-        queue.settleRecorded(new Set([receipt.id]))
-        drafts.forget(receipt.id)
-        if (actor.id) void photoShelf(actor.id).drop(receipt.id)
-        void router.replace({ name: 'purchase', params: { tripId: receipt.tripId } })
+        if (receipt?.status === 'recorded' && receipt.tripId)
+          toPurchases(receipt.id, receipt.tripId)
       },
     )
 

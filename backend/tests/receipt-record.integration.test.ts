@@ -305,10 +305,11 @@ describe('«Записать»', () => {
     await running
     await elsewhere.end()
     const first = await asked
-    expect([first.statusCode, first.json()]).toEqual([200, { recorded: false }])
+    expect([first.statusCode, first.json()]).toEqual([200, { tripId: null }])
 
+    const tripId = randomUUID()
     const recorded = await record(me, id, {
-      tripId: randomUUID(),
+      tripId,
       place: { id: place },
       purchasedOn: '2026-09-26',
       lines: [
@@ -316,7 +317,7 @@ describe('«Записать»', () => {
       ],
     })
     expect(recorded.statusCode).toBe(200)
-    expect((await settled()).json()).toEqual({ recorded: true })
+    expect((await settled()).json()).toEqual({ tripId })
 
     // Someone else's receipt is not there, as for every read of a receipt.
     const other = await insertActor(db)

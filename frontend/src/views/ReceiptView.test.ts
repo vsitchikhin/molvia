@@ -20,6 +20,7 @@ import { useReceiptQueueStore } from '@/stores/receiptQueue'
 const receipt = vi.fn<(id: string) => Promise<ReceiptDetail>>()
 const recordReceipt = vi.fn<(id: string, body: ReceiptRecordBody) => Promise<{ tripId: string }>>()
 const receipts = vi.fn<() => Promise<{ receipts: ReceiptDetail['receipt'][] }>>()
+const receiptSettled = vi.fn<(id: string) => Promise<{ tripId: string | null }>>()
 const keepOnly = vi.fn<(named: ReadonlySet<string>) => Promise<void>>()
 // Every other call of the API hangs: the screens behind this one load and never answer.
 vi.mock('@/api', () => ({
@@ -28,10 +29,7 @@ vi.mock('@/api', () => ({
     {
       get: (_target, name) => {
         if (name === 'receipt') return (id: string) => receipt(id)
-        // The check of «Отменить запись» reads what the receipt says, as the server's own read does.
-        if (name === 'receiptSettled')
-          return (id: string) =>
-            receipt(id).then((one) => ({ recorded: one.receipt.tripId !== null }))
+        if (name === 'receiptSettled') return (id: string) => receiptSettled(id)
         if (name === 'recordReceipt')
           return (id: string, body: ReceiptRecordBody) => recordReceipt(id, body)
         if (name === 'receipts') return () => receipts()
@@ -148,6 +146,11 @@ describe('ReceiptView (MOL-127)', () => {
     recordReceipt.mockResolvedValue({ tripId: TRIP })
     receipts.mockReset()
     receipts.mockResolvedValue({ receipts: [] })
+    // The check of «Отменить запись» reads what the receipt says, as the server's own read does.
+    receiptSettled.mockReset()
+    receiptSettled.mockImplementation((id) =>
+      receipt(id).then((one) => ({ tripId: one.receipt.tripId })),
+    )
     keepOnly.mockReset()
     keepOnly.mockResolvedValue(undefined)
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
@@ -314,6 +317,26 @@ describe('ReceiptView (MOL-127)', () => {
     expect(queue.pending).toEqual([])
     expect(queue.rejected).toEqual([])
     expect(recordReceipt).not.toHaveBeenCalled()
+  })
+
+  it('recorded, the check takes the screen to its purchases on its own answer, with no read after it (round 4, Д1)', async () => {
+    recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'x', false))
+    const first = await render()
+    await button(first.view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    while (mounted.length) mounted.pop()?.unmount()
+
+    // The same bad connection: every read of the receipt fails, the check alone gets through.
+    receipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'x', false))
+    const { view, router } = await render()
+    receiptSettled.mockReset()
+    receiptSettled.mockResolvedValue({ tripId: TRIP })
+    await button(view, ru.receipt.review.cancel_record).trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('purchase')
+    expect(router.currentRoute.value.params.tripId).toBe(TRIP)
+    expect(useReceiptQueueStore().pending).toEqual([])
+    expect(useReceiptDraftsStore().draftOf(ID)).toBeNull()
   })
 
   it('a begun record with no answer from the server is not cancelled, and the dock says why (MOL-169, А1)', async () => {
