@@ -86,7 +86,15 @@
           kind="attention"
           inline
           :title="t(reshoot ? 'receipt.failed.reshoot_title' : 'receipt.failed.title')"
-          :body="t(reshoot ? 'receipt.failed.reshoot_body' : 'receipt.failed.body')"
+          :body="
+            t(
+              country
+                ? reshoot
+                  ? 'receipt.failed.reshoot_body'
+                  : 'receipt.failed.body'
+                : 'receipt.failed.manual_body',
+            )
+          "
         />
         <p class="caption">{{ t('receipt.failed.photos') }}</p>
         <p v-if="photos.length === 0" class="note">{{ t('receipt.failed.photos_elsewhere') }}</p>
@@ -167,9 +175,11 @@
           </AppButton>
           <p v-if="!online && !recording" class="under">{{ t('receipt.review.record_offline') }}</p>
         </template>
-        <template v-else-if="docked === 'failed' && country">
+        <!-- A record by hand is everyone's; a retake is the camera's, the country's that reads
+             receipts — a receipt taken before a move to Georgia or Serbia is retaken nowhere (MOL-109, Б3). -->
+        <template v-else-if="docked === 'failed'">
           <ManualEntryButton />
-          <AppButton variant="ghost" block @click="retake">
+          <AppButton v-if="country" variant="ghost" block @click="retake">
             <template #icon><IconCamera /></template>
             {{ t('receipt.capture.retake') }}
           </AppButton>

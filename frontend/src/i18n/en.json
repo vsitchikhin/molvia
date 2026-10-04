@@ -1954,6 +1954,7 @@
       "body": "The lines in the photo can’t be made out — faint print and glare do that. Add the purchases by hand or retake the receipt.",
       "reshoot_title": "Crumpled or in shadow",
       "reshoot_body": "The lines in the photo bend and run together. Smooth the receipt out and retake it — or add the purchases by hand.",
+      "manual_body": "The lines in the photo can’t be made out. You can record the purchases by hand.",
       "photos": "Receipt photos · top to bottom",
       "photos_elsewhere": "The photo was taken on another phone — it isn’t here"
     },

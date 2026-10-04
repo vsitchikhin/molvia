@@ -242,6 +242,19 @@ describe('PurchasesView (MOL-128)', () => {
       expect(view.text()).not.toContain(ru.purchases.receipts_error)
     })
 
+    it('у человека из Грузии «пусто» — только после ответа о чеках; сбой списка сказан (MOL-109, Б1)', async () => {
+      receipts.mockReturnValue(new Promise(() => undefined))
+      const waiting = await render({ country: 'GE' })
+      expect(waiting.view.text()).not.toContain(ru.purchases.empty.title)
+      expect(waiting.view.find('.skeleton').exists()).toBe(true)
+      while (mounted.length) mounted.pop()?.unmount()
+
+      receipts.mockRejectedValue(new Error('HTTP 500'))
+      const failed = await render({ country: 'GE' })
+      expect(failed.view.text()).not.toContain(ru.purchases.empty.title)
+      expect(failed.view.text()).toContain(ru.purchases.receipts_error)
+    })
+
     it('армянский чек, снятый до переезда в Грузию, — в «Покупках», чтобы записать или удалить (MOL-109, А2)', async () => {
       receipts.mockResolvedValue({
         receipts: [

@@ -286,7 +286,8 @@ export default defineComponent({
     const shown = computed<'list' | 'loading' | 'empty'>(() => {
       if (rows.value.length > 0 || receiptRows.value.length > 0 || trouble.value !== null)
         return 'list'
-      const receiptsKnown = !country.value || receipts.knownEmpty.value
+      // Asked of everyone since MOL-109 (А2), so known empty only once answered, for everyone (Б1).
+      const receiptsKnown = receipts.knownEmpty.value
       if (history.answeredEmpty) {
         if (open.value || pending.value > 0) return 'list'
         if (receiptsKnown) return 'empty'

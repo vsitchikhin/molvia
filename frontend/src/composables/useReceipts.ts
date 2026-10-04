@@ -5,7 +5,6 @@ import type { Money, ReceiptSummary, WireCode } from '@molvia/model'
 import { api } from '@/api'
 import { useKeptAnswer } from '@/composables/useKeptAnswer'
 import { useOnline } from '@/composables/useOnline'
-import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { photoShelf } from '@/receipts/photoShelf'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
@@ -87,7 +86,6 @@ export function useReceipts(): ReceiptsScreen {
   const queue = useReceiptQueueStore()
   const drafts = useReceiptDraftsStore()
   const online = useOnline()
-  const { country } = useReceiptCapture()
 
   const kept = useKeptAnswer({
     key: 'molvia.receipts',
@@ -218,8 +216,8 @@ export function useReceipts(): ReceiptsScreen {
     rows,
     knownEmpty: computed(() => kept.answer.value !== null && rows.value.length === 0),
     trouble: computed(() => {
-      // Said only where receipts are the screen's: to a person who takes them, or who holds one.
-      if (!country.value && rows.value.length === 0) return null
+      // Said to everyone, as everyone is asked (MOL-109, Б1): a receipt taken before a move is on its
+      // way to «Покупки» like any other, and «пусто» over a list that failed would hide it.
       const stale = kept.stale.value
       if (stale === 'error' || stale === 'offline') return stale
       const phase = kept.phase.value
