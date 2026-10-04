@@ -109,7 +109,7 @@
     />
     <p v-if="history.stale && rows.length > 0" class="memory">{{ t('trip.history.cached') }}</p>
     <!-- The receipts' own trouble, quietly: the screen's red block is the history's (review 7). -->
-    <p v-if="country && receipts.trouble.value" class="memory">
+    <p v-if="receipts.trouble.value" class="memory">
       {{
         t(
           receipts.trouble.value === 'offline'
@@ -262,10 +262,12 @@ export default defineComponent({
      * else is on the screen: purchases waiting for a verdict were made somewhere, and a record open
      * on the phone is a purchase on its way.
      */
-    // Receipts (MOL-127): the version «с чеком» for a person whose country the server reads (Р-1).
+    // Receipts (MOL-127): the version «с чеком» — the camera — for a person whose country the server
+    // reads (Р-1); the receipts a person holds are shown whatever the country, since one taken before a
+    // move to Georgia or Serbia is still to be recorded or removed (MOL-109, adversarial А2).
     const { country } = useReceiptCapture()
     const receipts = useReceipts()
-    const receiptRows = computed(() => (country.value ? receipts.rows.value : []))
+    const receiptRows = computed(() => receipts.rows.value)
     const working = computed(() => receiptRows.value.filter((row) => WORKING.includes(row.state)))
     const review = computed(() => receiptRows.value.filter((row) => !WORKING.includes(row.state)))
     // The sheet follows the live row: a receipt read while it is up says so (review 21).

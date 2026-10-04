@@ -1937,6 +1937,7 @@
       "missing": "The place wasn’t read on the receipt",
       "read": "Read: {place}, {city}",
       "when": "When",
+      "city": "City",
       "done": "Done",
       "name": "Shop"
     },

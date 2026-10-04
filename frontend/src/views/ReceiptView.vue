@@ -205,6 +205,7 @@
     <ReceiptPlaceSheet
       v-if="detail"
       v-model:open="placeOpen"
+      :country="detail.receipt.country"
       :current="place"
       :read="!!detail.receipt.place && !placeChosen"
       :day="day"
