@@ -9,7 +9,7 @@
   >
     <span class="count" aria-hidden="true">{{ left }}</span>
     <span class="text">{{ text }}</span>
-    <AppButton ref="button" variant="secondary" class="restore" @click="restore">
+    <AppButton ref="button" variant="tinted" class="restore" @click="restore">
       <template #icon><IconUndo /></template>
       {{ action }}
     </AppButton>

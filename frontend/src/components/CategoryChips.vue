@@ -45,8 +45,9 @@ import { categoryColour } from '@/components/spending'
  * The categories of a spending as chips (MOL-82, handoff 02): radios in a fieldset, so arrows move
  * the choice and the group is read by its legend. Nothing is chosen until the person chooses —
  * guessing a category is not allowed — and the order is fixed, never by frequency: a chip must not
- * move from under the finger. Chosen is «here», the accent, not the category's colour. The last
- * chip makes a category of one's own (В-1).
+ * move from under the finger. Chosen is «here», the accent, not the category's colour — a fill and
+ * a ring, never a weight: every chip is at 600, so the row does not reflow on a tap (Ф-5, MOL-174).
+ * The last chip makes a category of one's own (В-1).
  */
 export default defineComponent({
   name: 'CategoryChips',
@@ -101,10 +102,11 @@ export default defineComponent({
   border: 0;
   border-radius: var(--radius-pill);
   background: var(--surface-2);
-  box-shadow: inset 0 0 0 var(--hairline) var(--border);
+  box-shadow: inset 0 0 0 var(--hairline) var(--border-strong);
   color: var(--text);
   font: inherit;
   font-size: var(--text-callout);
+  font-weight: var(--weight-medium);
   cursor: pointer;
   transition:
     background-color var(--dur-fast) var(--ease-out),
@@ -113,7 +115,6 @@ export default defineComponent({
   &.on {
     background: var(--accent-tint);
     box-shadow: inset 0 0 0 2px var(--accent);
-    font-weight: var(--weight-bold);
   }
 
   &:has(.radio:focus-visible),

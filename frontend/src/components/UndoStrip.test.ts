@@ -65,6 +65,11 @@ describe('UndoStrip', () => {
     expect(strip.emitted('expire')).toBeUndefined()
   })
 
+  // Ф-12, MOL-174: «Вернуть» is the tinted button — the handoffs' «secondary» is the kit's outlined one.
+  it('draws «Вернуть» as the tinted button', () => {
+    expect(render().find('button').classes()).toContain('tinted')
+  })
+
   it('«Вернуть» takes the removal back and stops the count', async () => {
     const strip = render()
     await strip.find('button').trigger('click')

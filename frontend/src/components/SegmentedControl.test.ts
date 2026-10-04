@@ -71,12 +71,107 @@ describe('SegmentedControl', () => {
       props: { modelValue: 'l', options: UNITS, legend: 'Unit', fit: true },
     })
     expect(fit.classes()).toContain('fit')
-    // Each word carries itself for the semibold reserved under it.
-    expect(fit.findAll('.word').map((word) => word.attributes('data-word'))).toEqual([
-      'kg',
-      'l',
-      'pc',
-    ])
+  })
+
+  describe('inactive (Ф-6, MOL-174)', () => {
+    function inactive(attachTo?: HTMLElement) {
+      return mount(SegmentedControl, {
+        props: { modelValue: 'l', options: UNITS, legend: 'Unit', inactive: true },
+        ...(attachTo ? { attachTo } : {}),
+      })
+    }
+    const checked = (view: ReturnType<typeof inactive>) =>
+      view.findAll('input').map((input) => (input.element as HTMLInputElement).checked)
+
+    it('marks every radio unavailable without taking any out of reach', () => {
+      const view = inactive()
+      expect(view.classes()).toContain('inactive')
+      expect(view.attributes('disabled')).toBeUndefined()
+      expect(view.findAll('input').map((input) => input.attributes('aria-disabled'))).toEqual([
+        'true',
+        'true',
+        'true',
+      ])
+    })
+
+    it('must not fire: a tap moves no choice and reports none', () => {
+      const host = document.body.appendChild(document.createElement('div'))
+      const view = inactive(host)
+      const tap = new MouseEvent('click', { bubbles: true, cancelable: true })
+      view.findAll('input')[0]?.element.dispatchEvent(tap)
+      expect(tap.defaultPrevented).toBe(true)
+      expect(view.emitted('update:modelValue')).toBeUndefined()
+      view.unmount()
+      host.remove()
+    })
+
+    // Adversarial А2: the arrow takes the focus round every option, so each is heard, and checks none.
+    it('walks the focus over every radio by the arrows, choosing none', () => {
+      const host = document.body.appendChild(document.createElement('div'))
+      const view = inactive(host)
+      const radios = view.findAll('input').map((input) => input.element as HTMLInputElement)
+      const press = (key: string) => {
+        const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+        document.activeElement?.dispatchEvent(event)
+        return event
+      }
+      radios[1]?.focus()
+      expect(press('ArrowRight').defaultPrevented).toBe(true)
+      expect(document.activeElement).toBe(radios[2])
+      press('ArrowDown')
+      expect(document.activeElement).toBe(radios[0])
+      press('ArrowLeft')
+      press('ArrowUp')
+      expect(document.activeElement).toBe(radios[1])
+      expect(checked(view)).toEqual([false, true, false])
+      view.unmount()
+      host.remove()
+    })
+
+    // Р2-А3: an arrow with a modifier is the browser's (Alt+← is «back») — the live group lets it by.
+    it('must not fire: an arrow with Alt, Ctrl or Meta is left to the browser', () => {
+      const host = document.body.appendChild(document.createElement('div'))
+      const view = inactive(host)
+      const radios = view.findAll('input').map((input) => input.element as HTMLInputElement)
+      radios[1]?.focus()
+      for (const modifier of ['altKey', 'ctrlKey', 'metaKey']) {
+        const event = new KeyboardEvent('keydown', {
+          key: 'ArrowRight',
+          [modifier]: true,
+          bubbles: true,
+          cancelable: true,
+        })
+        radios[1]?.dispatchEvent(event)
+        expect(event.defaultPrevented).toBe(false)
+        expect(document.activeElement).toBe(radios[1])
+      }
+      view.unmount()
+      host.remove()
+    })
+
+    it('must not fire: a change that got past it anyway is put back, and nothing is said', async () => {
+      const view = inactive()
+      await view.findAll('input')[2]?.setValue(true)
+      expect(checked(view)).toEqual([false, true, false])
+      expect(view.emitted('update:modelValue')).toBeUndefined()
+    })
+
+    it('answers again once it is not inactive', async () => {
+      const view = inactive()
+      await view.setProps({ inactive: false })
+      expect(view.find('input').attributes('aria-disabled')).toBeUndefined()
+      await view.findAll('input')[0]?.setValue(true)
+      expect(view.emitted('update:modelValue')).toEqual([['kg']])
+    })
+
+    it('draws a native disabled the same, out of the focus order', () => {
+      const view = mount(SegmentedControl, {
+        props: { modelValue: 'l', options: UNITS, legend: 'Unit', disabled: true },
+      })
+      expect(view.classes()).toContain('inactive')
+      expect(view.attributes('disabled')).toBeDefined()
+      expect(view.find('input').attributes('aria-disabled')).toBeUndefined()
+    })
   })
 
   it('reads out the spoken name, not the sign', () => {

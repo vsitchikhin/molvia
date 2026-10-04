@@ -60,11 +60,11 @@
             })
           }}
         </p>
-        <p class="difference" :class="{ stale: recountPending }">
+        <p class="difference">
           <span class="difference-label">{{ t('accounts.reconcile.difference') }}</span>
           <span class="difference-figure">{{ signed(result.difference) }}</span>
         </p>
-        <!-- A muted difference says what it waits for (adversarial round 3, Н4). -->
+        <!-- What the difference waits for is said in words, never by dimming it (round 3, Н4; Ф-6). -->
         <p v-if="recountPending" class="hint">{{ t('accounts.reconcile.recounting') }}</p>
         <p v-if="tripsHeld" class="hint">{{ t('accounts.reconcile.trips_held') }}</p>
         <AppButton variant="ghost" @click="again">
@@ -882,15 +882,6 @@ export default defineComponent({
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius);
   background: var(--surface-2);
-  transition: opacity var(--dur) var(--ease-out);
-
-  &.stale {
-    opacity: var(--opacity-stale);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
 }
 
 .difference-label {

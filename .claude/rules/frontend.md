@@ -226,6 +226,42 @@ The detail behind the frontend lines of `CLAUDE.md`.
   read; an SFC with no `<style>` block, which gives the rule no root to run on. A circle around an
   icon is sized as a shape; the glyph in it is the icon (the pencil of «Настройки» was a 32 svg
   with padding, now 18 in a 32 circle).
+- **Not now is one look, and chosen is a form** (MOL-174, Ф-5, Ф-6). «Inactive» had four looks —
+  0.35 on the month's arrow, 0.45 on `AppButton`, 0.5 (`--opacity-stale`) on the switch, the trash
+  of an exchange and the difference of a reconciliation, and none at all on a disabled segment —
+  and a dimmed button reads as a live one under a cloud, while a dimmed knob in the dark is not
+  seen. **Inactive is `text-muted` at 600 with no opacity, in the focus order**: `AppButton`,
+  `SegmentedControl` and `AppSwitch` take `inactive`, which is `aria-disabled` plus a cancelled
+  click — a tap, a tap on the label and Space all put the control back. An inactive group of
+  segments is one stop whose arrows walk the focus over every radio by hand and choose none
+  (adversarial А2: an arrow cancelled whole left two of three options unheard); an arrow with Alt,
+  Ctrl or Meta is the browser's, as in a live group (Р2-А3). `e2e/kit-inactive`
+  holds it in Chromium and WebKit, since the component tests send their own events. A native
+  `disabled` is drawn the same and stays for a moment, until a screen trades it for `inactive`
+  with the words saying why. **`busy` alone keeps the look of the action**, as on master — it is the one
+  at work, and saying so is the screen's: its words («Сохраняем…») or a status line («Готовим
+  фото…»); where the screen says nothing — among others «Удалить навсегда», «Не тот товар», «Выйти»,
+  the login; round 4 counted nine — only `aria-busy` does (round 3, Р3-А1), a limit, not a promise; **`busy` with `disabled` is drawn as not now**, as master
+  drew it dimmed: «Сохранить» of a sheet that keeps its words while it sends had nothing else to
+  show it (round 2, Р2-А1 — round 1 had drawn it live). A look of its own for `busy` is MOL-225's. **The form of the variant stays** (owner's В-1 «а»): a button with
+  a fill goes to `surface-2`, a ghost or danger-ghost keeps no fill — two grey pills in a sheet's
+  footer read as two buttons of equal weight. The price, accepted (А4): the `surface-2` pill stands
+  1.10:1 on a sheet, so in a footer that sends, primary and ghost read as two muted words; an edge
+  would make it a secondary, which is `surface` with a `border-strong` edge. **The lift of a floating
+  action is the dock's, not a state's** (reviews 1 and 6): `FloatingDock` gives `--shadow-md` to
+  whatever it holds, live or not, by a weight above any variant's shadow — lifted only when
+  inactive, a dead «Восстановить» floated above the live one; the kit drops an inactive primary's
+  rest shadow by a light `:where`. The hover and the press are written on `:not(:disabled, [aria-disabled])`,
+  since `aria-disabled` is still `:enabled` and an inactive primary lit up under the pointer. A button that is only an icon draws its glyph in `text`, inactive in
+  `text-muted` (owner's В-15 «а») — `text-muted` for both made the month's arrow at the edge look
+  like the live one. **Chosen is a fill or a form, never a weight**: a segment is filled
+  `accent-solid` with `on-accent` (the old white segment on `surface-2` was not seen in the dark),
+  and an inactive one keeps its choice by a `graphic` edge and its word in `text` — the
+  `border-strong` edge of the handoff stood 1.65:1 and brought Н-3 back (А1, Graphic Is Data),
+  a switch carries a ✓ of `--icon-xs` on its knob (owner's В-2 «а»; the handoff's 16 is no step),
+  every chip and every segment is at 600, so nothing reflows under the thumb. **`--opacity-stale`
+  means one thing: a previous answer left while the next is on its way** (К-11) — the searches;
+  the difference of a reconciliation waits in words («Пересчитаем, когда…»), not dimmed (116 v2).
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
   `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a

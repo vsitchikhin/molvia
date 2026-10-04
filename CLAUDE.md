@@ -462,6 +462,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   and a category against a role 0.08 OKLab apart, marks 3:1, text 4.5:1, both schemes; a value that
   fails is changed, never excused. Data without a colour of its own is `--graphic`. **Any two
   categories 0.07 apart, one hue in both schemes** (MOL-218): a ring puts any two side by side.
+- **Not now is one look: `text-muted` at 600, in focus (`inactive` = `aria-disabled`), never opacity**
+  (MOL-174); a button keeps its variant's fill or none (В-1). **Chosen is a fill or a form, never a
+  weight.** `--opacity-stale` is only a previous answer while the next is on its way.
 - **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
   `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the
   failure; polite states speak through the one live region in `App.vue`.
@@ -532,7 +535,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **End-to-end runs in CI, not on the push** (MOL-164): a pull request merges only on both jobs
   green, and a test green only on a retry is red there.
 - **Every spec comes in through `open()` in `e2e/session.ts`.**
-- **The sheet alone also runs on WebKit** (`iphone`, MOL-80); a test it cannot run says why.
+- **The sheet and the kit's «not now» also run on WebKit** (`iphone`, MOL-80, MOL-174); a test it
+  cannot run says why.
 - **Words said out loud are taken by a locator outside the live region**, never muted with
   `.first()`.
 
