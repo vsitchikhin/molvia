@@ -44,9 +44,8 @@
     "declaration-property-value-disallowed-list": [
       {
         "scroll-behavior": ["smooth"],
-        "text-transform": ["/uppercase/"],
-        "font-variant": ["/caps/"],
-        "font-variant-caps": ["/./"]
+        "/^text-transform$/i": ["/uppercase/i"],
+        "/^font-variant(-caps)?$/i": ["/caps/i"]
       },
       {
         "message": "%s: \"%s\" is refused here. A smooth scroll: a scroll with behavior 'auto' takes it from the CSS, and the sheet's compensation would slide (MOL-136) — pass behavior: 'smooth' where the eye follows. Caps: they are the kit's caption, SectionCaption, and nobody else's (MOL-175)."

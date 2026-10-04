@@ -267,7 +267,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   a hover here and none there — and a caps caption had grown 52 copies with three spacings to the
   card (8, 12, 16) and a 4 at the side on half of them. **`SectionCaption` is the one place caps are
   drawn**: Stylelint refuses `text-transform: uppercase`, `font-variant` with caps and
-  `font-variant-caps` in every other file (owner's В-1 «б»), so a new copy cannot grow back. A group's
+  `font-variant-caps` in every other file (owner's В-1 «б»), so a new copy cannot grow back — the
+  property and the keyword in any case, as CSS reads them (adversarial А-1: `TEXT-TRANSFORM` passed a
+  rule written in lower case). Out of its sight, by design: what Stylelint does not read — a
+  template's `style`, which no file writes today, and a `:style` bound from the script. A group's
   caption carries its own 4 at the side and 8 above the card; `inset` is a card's own title, placed by
   the card. The space above a caption is the screen's, set by its own class on the root — the
   caption's place is written in `:where()`, weaker than any class, because an equal selector would

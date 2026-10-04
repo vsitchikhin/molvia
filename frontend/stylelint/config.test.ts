@@ -97,6 +97,10 @@ describe('frontend/.stylelintrc.json', () => {
           '.c {\n  font-variant-caps: small-caps;\n}\n',
       ),
     ).toEqual([DISALLOWED, DISALLOWED, DISALLOWED])
+    // CSS reads a property and a keyword in any case: the rule must too (adversarial А-1).
+    expect(await rules('.a {\n  TEXT-TRANSFORM: uppercase;\n}\n')).toContain(DISALLOWED)
+    expect(await rules('.a {\n  text-transform: UPPERCASE;\n}\n')).toContain(DISALLOWED)
+    expect(await rules('.a {\n  font-variant-caps: normal;\n}\n')).toEqual([])
     expect(await rules('.a {\n  text-transform: none;\n}\n')).toEqual([])
     const caption = `${FRONTEND}src/components/SectionCaption.vue`
     const sfc = (css: string) =>
