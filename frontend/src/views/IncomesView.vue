@@ -358,8 +358,4 @@ export default defineComponent({
 .month:last-of-type {
   padding-bottom: calc(var(--space-8) + var(--space-8) + var(--space-6));
 }
-
-.add {
-  box-shadow: var(--shadow-md);
-}
 </style>
