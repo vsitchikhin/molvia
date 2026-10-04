@@ -120,6 +120,7 @@ import {
   spendingCategoriesOf,
 } from '@/usecases/spendings'
 import { chooseSalaryShift, moneyMonthOf, salaryShiftOf } from '@/usecases/money-month'
+import { acceptConsent, consentOf } from '@/usecases/consent'
 import { moneyChartMonthOf } from '@/usecases/money-chart-month'
 import { moneyBudgetOf, setBudgetPlan } from '@/usecases/money-budget'
 import { moneyChartYearOf } from '@/usecases/money-chart-year'
@@ -144,6 +145,7 @@ import { createSettingsRepository } from '@/db/settings-repository'
 import { saveSettings } from '@/usecases/save-settings'
 import { settingsRoute } from '@/routes/settings'
 import { remindersRoutes } from '@/routes/reminders'
+import { consentRoutes } from '@/routes/consent'
 import { startTrip } from '@/usecases/start-trip'
 import { removeTrip, restoreTrip } from '@/usecases/remove-trip'
 import { startLogin } from '@/usecases/start-login'
@@ -841,6 +843,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       remindersRoutes(guarded, {
         setting: (owner) => remindersSettingOf(reminders, { id: owner }),
         choose: (owner, body) => chooseReminders(reminders, { id: owner }, body, new Date()),
+      })
+      consentRoutes(guarded, {
+        consent: (owner) => consentOf(actors, { id: owner }),
+        accept: (owner, body) => acceptConsent(actors, { id: owner }, body),
       })
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items, embedder }, actorId, query),

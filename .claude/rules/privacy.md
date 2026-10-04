@@ -2,9 +2,11 @@
 paths:
   - 'backend/src/db/{erasure-repository,export-repository,failure,schema}.ts'
   - 'backend/src/{forget,forget-cli,server,index}*.ts'
-  - 'backend/src/usecases/{erase-me,export-mine}.ts'
+  - 'backend/src/usecases/{erase-me,export-mine,consent}.ts'
+  - 'backend/src/routes/consent.ts'
+  - 'packages/model/src/contracts/consent.ts'
   - 'backend/drizzle/*.sql'
-  - 'backend/tests/{erasure,erase-route,export,export-route,life,forget-bundle,request-log,login-log,compose-logging}*.ts'
+  - 'backend/tests/{erasure,erase-route,export,export-route,life,forget-bundle,request-log,login-log,compose-logging,consent}*.ts'
   - 'packages/model/src/contracts/export.ts'
   - 'frontend/src/{components/YourDataGroup,components/EraseSheet,composables/useExport}*'
   - 'bin/forget-actor.sh'

@@ -6,11 +6,17 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 ## packages/model
 
 - `packages/model/src/contracts/export.ts` — Contract of «Скачать мои данные» (MOL-93): the file whole — header, version and a section for everything erasure removes — with money, quantity and rates as decimal strings and no enum or band a stored row may predate.
+- `packages/model/src/contracts/consent.ts` — Contract of the consent to the terms and the privacy page (MOL-95): `POLICY_VERSION`, raised by hand for a change that matters; the edition a person accepted, the body that accepts one, and `consentNeeded` — whether this build asks.
 
 ## backend · usecases
 
 - `backend/src/usecases/export-mine.ts` — Use case of «Скачать мои данные» (MOL-93): the owner's own snapshot, dated with the file's format and version; an owner erased meanwhile is «no owner».
 - `backend/src/usecases/erase-me.ts` — Use case of erasing oneself, behind the bot's `/delete` and «Удалить мои данные» (MOL-94): erase the owner behind a Telegram id; nobody to erase is not an error. Tests: `backend/tests/erase-route.integration.test.ts`.
+- `backend/src/usecases/consent.ts` — Use cases of the consent (MOL-95): the edition the owner accepted, and accepting the one the screen showed — never lowering the one on the row.
+
+## backend · routes
+
+- `backend/src/routes/consent.ts` — Routes `GET`/`PUT /actors/me/consent` (MOL-95): its own address beside `/actors/me`, which an installed app reads strictly; `no-store`.
 
 ## backend · db
 
@@ -26,6 +32,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 ## backend · tests
 
 - `backend/tests/compose-logging.integration.test.ts` — Integration test: every service of `docker-compose.prod.yml` logs to the journal, and Postgres keeps row values out of its own log.
+- `backend/tests/consent.integration.test.ts` — Integration test: the consent is empty for an owner before it, accepted with the server's moment, a repeat keeps the first moment, an older edition never lowers the row, the bounds are `400`, the database refuses half a consent, and `/actors/me` carries none of it (MOL-95).
 - `backend/tests/erase-route.integration.test.ts` — Integration test: `POST /internal/actors/erase` erases the owner with their sessions, answers a repeat and a stranger with the same 204, needs the bot secret; `DELETE /actors/me` erases the session's owner with every session and puts the cookie out, a repeat is `401`, nobody else is touched (MOL-94).
 - `backend/tests/erasure.integration.test.ts` — Integration test: erasure leaves no row of the person anywhere, keeps items and places, counts the week, and orders its locks against a login.
 - `backend/tests/export-route.integration.test.ts` — Integration test: `GET /actors/me/export` answers the owner's own file with `no-store` and `attachment`, refuses a named owner, and needs a session.
