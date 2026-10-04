@@ -1,6 +1,6 @@
 <template>
   <AppScreen :title="t('privacy.title')">
-    <template #subtitle>{{ t('privacy.revised') }}</template>
+    <template #subtitle>{{ revised }}</template>
     <p class="summary">{{ t('privacy.summary') }}</p>
 
     <h2>{{ t('privacy.stored.title') }}</h2>
@@ -21,10 +21,11 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
+import { revisedOn } from '@/views/policy'
 
 /** What is kept, in the order of how personal it is: the account, then what it did. */
 const STORED = [
@@ -44,6 +45,7 @@ const STORED = [
   'visits',
   'devices',
   'settings',
+  'consent',
 ]
 const PARTS = ['logs', 'failures', 'backups', 'barcodes', 'storage', 'copy', 'erase']
 
@@ -59,8 +61,8 @@ export default defineComponent({
   name: 'PrivacyView',
   components: { AppScreen, AppCard },
   setup() {
-    const { t } = useI18n()
-    return { t, STORED, PARTS }
+    const { t, locale } = useI18n()
+    return { t, STORED, PARTS, revised: computed(() => revisedOn(t, locale.value)) }
   },
 })
 </script>

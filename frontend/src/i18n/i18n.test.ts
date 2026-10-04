@@ -159,6 +159,7 @@ describe('словарь: повторяющиеся тексты', () => {
       // Та же цена у офлайна: у настроек, у обменов, у доходов и у устройств своё состояние
       // (MOL-40, MOL-57, MOL-66).
       'Нет связи': [
+        'consent.lost.title',
         'devices.offline.title',
         'exchange.offline.title',
         'income.offline.title',
@@ -295,6 +296,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'trip.receipt.sheet.save',
       ],
       'No connection': [
+        'consent.lost.title',
         'devices.offline.title',
         'exchange.offline.title',
         'income.offline.title',

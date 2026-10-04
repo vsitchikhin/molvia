@@ -11,9 +11,11 @@ paths:
   - 'frontend/src/{components/YourDataGroup,components/EraseSheet,composables/useExport}*'
   - 'bin/forget-actor.sh'
   - 'bot/src/erase*.ts'
-  - 'frontend/src/views/PrivacyView*'
+  - 'frontend/src/views/{PrivacyView,TermsView,policy}*'
+  - 'frontend/src/components/ConsentStep*'
+  - 'frontend/src/stores/consent*'
   - 'backend/src/open-food-facts/**'
-  - 'e2e/{privacy,export,erase}.spec.ts'
+  - 'e2e/{privacy,export,erase,consent}.spec.ts'
   - 'deploy/Caddyfile'
   - 'docker-compose.prod.yml'
 ---
