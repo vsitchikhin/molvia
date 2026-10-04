@@ -87,4 +87,21 @@ describe('frontend/.stylelintrc.json', () => {
       'at-rule-disallowed-list',
     ])
   })
+
+  // Caps are the kit's caption, written once (MOL-175, В-1 «б»): 52 copies had grown three spacings.
+  it('refuses caps anywhere but the kit caption', async () => {
+    const DISALLOWED = 'declaration-property-value-disallowed-list'
+    expect(
+      await rules(
+        '.a {\n  text-transform: uppercase;\n}\n\n.b {\n  font-variant: all-small-caps;\n}\n\n' +
+          '.c {\n  font-variant-caps: small-caps;\n}\n',
+      ),
+    ).toEqual([DISALLOWED, DISALLOWED, DISALLOWED])
+    expect(await rules('.a {\n  text-transform: none;\n}\n')).toEqual([])
+    const caption = `${FRONTEND}src/components/SectionCaption.vue`
+    const sfc = (css: string) =>
+      `<template><p /></template>\n\n<style scoped lang="scss">\n${css}</style>\n`
+    expect(await rules(sfc('.a {\n  text-transform: uppercase;\n}\n'), caption)).toEqual([])
+    expect(await rules(sfc('.a {\n  scroll-behavior: smooth;\n}\n'), caption)).toEqual([DISALLOWED])
+  })
 })

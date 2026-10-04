@@ -1,7 +1,7 @@
 <template>
   <AppCard as="section" list class="losses" :aria-labelledby="headingId">
     <div class="head">
-      <h2 :id="headingId" class="caption">{{ t('exchange.vs_market.title') }}</h2>
+      <SectionCaption :id="headingId" inset>{{ t('exchange.vs_market.title') }}</SectionCaption>
       <p class="total" :class="{ negative: losses.total.minor < 0n }">
         {{ signedAmount(losses.total, locale, { plus: true, estimate: true }) }}
       </p>
@@ -52,6 +52,7 @@ import type { ExchangeLossesView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import { signedAmount } from '@/components/accounts'
 import { signedPercent } from '@/components/charts'
+import SectionCaption from '@/components/SectionCaption.vue'
 
 /**
  * «Обмены против рынка» (MOL-74, owner's decision В-1; on «Обмен денег» and against the market since
@@ -64,7 +65,7 @@ import { signedPercent } from '@/components/charts'
  */
 export default defineComponent({
   name: 'ExchangeLosses',
-  components: { AppCard },
+  components: { AppCard, SectionCaption },
   props: {
     losses: {
       type: Object as PropType<ExchangeLossesView>,
@@ -85,15 +86,6 @@ export default defineComponent({
   display: grid;
   gap: var(--space-1);
   padding: var(--space-4) var(--space-4) var(--space-1);
-}
-
-.caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .total {

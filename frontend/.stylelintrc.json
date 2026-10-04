@@ -42,9 +42,14 @@
       }
     ],
     "declaration-property-value-disallowed-list": [
-      { "scroll-behavior": ["smooth"] },
       {
-        "message": "A scroll with behavior 'auto' takes it from the CSS, and the sheet's compensation would slide (MOL-136). Pass behavior: 'smooth' where the eye follows."
+        "scroll-behavior": ["smooth"],
+        "text-transform": ["/uppercase/"],
+        "font-variant": ["/caps/"],
+        "font-variant-caps": ["/./"]
+      },
+      {
+        "message": "%s: \"%s\" is refused here. A smooth scroll: a scroll with behavior 'auto' takes it from the CSS, and the sheet's compensation would slide (MOL-136) — pass behavior: 'smooth' where the eye follows. Caps: they are the kit's caption, SectionCaption, and nobody else's (MOL-175)."
       }
     ],
     "function-disallowed-list": [
@@ -70,6 +75,17 @@
         "color-named": null,
         "declaration-property-value-allowed-list": null,
         "function-disallowed-list": null
+      }
+    },
+    {
+      "files": ["**/components/SectionCaption.vue"],
+      "rules": {
+        "declaration-property-value-disallowed-list": [
+          { "scroll-behavior": ["smooth"] },
+          {
+            "message": "A scroll with behavior 'auto' takes it from the CSS, and the sheet's compensation would slide (MOL-136). Pass behavior: 'smooth' where the eye follows."
+          }
+        ]
       }
     },
     {

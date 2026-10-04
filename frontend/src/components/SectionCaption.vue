@@ -14,8 +14,8 @@ const TAGS = ['h2', 'h3', 'p', 'span'] as const
 export type CaptionTag = (typeof TAGS)[number]
 
 /**
- * The caps caption of the kit (Ф-12, MOL-175): 11/700, `text-muted`, and the one place caps are drawn
- * outside the verdict badge — the linter refuses `text-transform: uppercase` anywhere else.
+ * The caps caption of the kit (Ф-12, MOL-175): 11/700, `text-muted`, and the one place caps are drawn —
+ * the linter refuses them anywhere else, where 52 copies had grown three spacings (В-1 «б»).
  *
  *   as    — the tag: the screen knows whether this is a heading of its outline (`h2`, `h3` in a sheet)
  *           or only a label (`p`, `span` inside a card's head row);

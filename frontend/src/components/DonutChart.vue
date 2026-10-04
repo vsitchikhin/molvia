@@ -1,6 +1,6 @@
 <template>
   <AppCard as="section" class="card" :aria-labelledby="`${id}-title`">
-    <h2 :id="`${id}-title`" class="caption">{{ heading }}</h2>
+    <SectionCaption :id="`${id}-title`" inset>{{ heading }}</SectionCaption>
     <div class="figure">
       <!-- A tap on the ring chooses the sector under it; the legend's radios say the same. -->
       <div ref="ringBox" class="ring-box" @click="tapRing">
@@ -53,6 +53,7 @@ import AppCard from '@/components/AppCard.vue'
 import DonutRing, { CHOSEN_THICKER } from '@/components/DonutRing.vue'
 import type { RingSector } from '@/components/DonutRing.vue'
 import { categoryColour } from '@/components/spending'
+import SectionCaption from '@/components/SectionCaption.vue'
 
 /**
  * What a ring draws: the month's answer as it is, or the year's with its categories named (MOL-160,
@@ -84,7 +85,7 @@ const THICKNESS = 12
  */
 export default defineComponent({
   name: 'DonutChart',
-  components: { AppCard, DonutRing },
+  components: { AppCard, DonutRing, SectionCaption },
   props: {
     charts: { type: Object as PropType<DonutData>, required: true },
     /** Over the total in the centre: «Сентябрь · идёт», «2026 · 9 месяцев». */
@@ -253,15 +254,6 @@ export default defineComponent({
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
-}
-
-.caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .figure {

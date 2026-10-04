@@ -1,6 +1,8 @@
 <template>
   <AppCard as="section" class="verdict" :aria-labelledby="titleId">
-    <p class="context">{{ t('verdict.context', { when: day, place }) }}</p>
+    <SectionCaption as="p" inset class="context">{{
+      t('verdict.context', { when: day, place })
+    }}</SectionCaption>
     <h2 :id="titleId" ref="title" class="question" tabindex="-1">
       {{ card.name }}<br />{{ t('verdict.question_tail') }}
     </h2>
@@ -42,6 +44,7 @@ import { placeLabel } from '@/components/placeLabel'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { purchaseDay } from '@/days'
 import { SCORES } from '@/components/rating'
+import SectionCaption from '@/components/SectionCaption.vue'
 import type { Score, VerdictDraft } from '@/stores/verdictDrafts'
 
 /** The review's own bound (`newVerdictSchema`), kept by the field so it cannot be passed. */
@@ -71,7 +74,7 @@ function domainCode(code: WireCode | null | undefined): ErrorCode | null {
  */
 export default defineComponent({
   name: 'VerdictCard',
-  components: { AppButton, AppCard, AppField, RatingScale },
+  components: { AppButton, AppCard, AppField, RatingScale, SectionCaption },
   props: {
     card: { type: Object as PropType<PendingVerdict>, required: true },
     /** What the phone kept for this item: words typed before, or a refusal to show. */
@@ -167,15 +170,6 @@ export default defineComponent({
 <style scoped lang="scss">
 .verdict {
   padding: var(--space-6) var(--space-4);
-}
-
-.context {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .question {

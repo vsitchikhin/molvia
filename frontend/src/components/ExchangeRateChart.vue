@@ -1,6 +1,6 @@
 <template>
   <AppCard v-if="pair" as="section" class="rate-chart" :aria-labelledby="headingId">
-    <h2 :id="headingId" class="caption">{{ title }}</h2>
+    <SectionCaption :id="headingId" inset>{{ title }}</SectionCaption>
     <p class="legend" aria-hidden="true">
       <span class="key"
         ><span class="swatch line"></span>{{ t('exchange.rate_chart.legend_market') }}</span
@@ -228,6 +228,7 @@ import type {
   RateChartMonths,
 } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { shortMonth, signedPercent } from '@/components/charts'
 import { useChartPointer } from '@/composables/useChartPointer'
@@ -269,7 +270,7 @@ const LABEL_SPACE_PX = 8
  */
 export default defineComponent({
   name: 'ExchangeRateChart',
-  components: { AppCard, SegmentedControl },
+  components: { AppCard, SectionCaption, SegmentedControl },
   props: {
     chart: { type: Object as PropType<ExchangeRateChartView>, required: true },
     months: { type: Number as PropType<RateChartMonths>, default: 12 },
@@ -723,15 +724,6 @@ export default defineComponent({
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
-}
-
-.caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .legend {
