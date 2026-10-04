@@ -454,8 +454,9 @@ export default defineComponent({
      * A record whose send has begun may have landed with its answer lost (adversarial А1–А4): opened
      * as if it had not, the review offered «Удалить» on a recorded receipt and edits that would never
      * be written. So it is cancelled only on this check's own answer — never a read that set out
-     * before it and came back meanwhile (round 2, Б2) — asked once no send of it is on its way
-     * (`cancelChecked`, Б1). Recorded, the screen goes to its purchases; no answer, nothing opens.
+     * before it and came back meanwhile (round 2, Б2) — asked once no send of it is on its way here
+     * (`cancelChecked`, Б1) nor running on the server (`receiptSettled`, Г1). Recorded, the screen
+     * goes to its purchases; no answer, nothing opens.
      */
     async function cancelRecord(): Promise<void> {
       const asked = id.value
@@ -467,8 +468,12 @@ export default defineComponent({
       checking.value = true
       try {
         await queue.cancelChecked(asked, async () => {
-          const answer = await kept.write(asked, () => api.receipt(asked))
-          return answer.receipt.status === 'parsed'
+          // Answered once no «Записать» of it is still running on the server either — one the phone
+          // gave up on by its timeout included (Г1). Recorded, the receipt read again takes the screen
+          // to its purchases.
+          const { recorded } = await api.receiptSettled(asked)
+          if (recorded) void kept.retry()
+          return !recorded
         })
       } catch (error) {
         if (id.value !== asked) return

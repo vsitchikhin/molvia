@@ -13,7 +13,13 @@ import {
   storeMemoryWords,
   toSearchKey,
 } from '@molvia/model'
-import type { Actor, Money, ReceiptRecordBody, ReceiptRecorded } from '@molvia/model'
+import type {
+  Actor,
+  Money,
+  ReceiptRecordBody,
+  ReceiptRecorded,
+  ReceiptSettled,
+} from '@molvia/model'
 import type { StoredReceiptLine } from '@/db/receipts-repository'
 import type { MemoryWord } from '@/db/store-memory-repository'
 import type { Transact } from '@/db/unit-of-work'
@@ -87,6 +93,25 @@ function receiptMoney(
  * Sent again with the same trip — the same answer; with another — a 409. The same receipt recorded
  * before, its purchases still there — `error.receipt_recorded_before`.
  */
+/**
+ * «Отменить запись» asks this before it lets a begun record go (MOL-169, adversarial Г1): the phone
+ * gives a send up after its timeout, and the server finishes it all the same. Read under the owner's
+ * lock and the receipt's row, taken in the order «Записать» takes them, a record already in its
+ * transaction is waited for and read as done, never as not yet. 404 for a receipt not the person's.
+ */
+export function receiptSettled(
+  transact: Transact,
+  actor: Actor,
+  id: string,
+): Promise<ReceiptSettled> {
+  return transact(async ({ trips, receipts }) => {
+    await trips.lockOwner(actor.id)
+    const held = await receipts.lockForRecord(actor.id, id)
+    if (held === null) throw new DomainError(ERROR.NOT_FOUND)
+    return { recorded: held.tripId !== null }
+  })
+}
+
 export async function recordReceipt(
   transact: Transact,
   actor: Actor & Today,

@@ -58,6 +58,7 @@ import {
   receiptBodySchema,
   receiptRecordBodySchema,
   receiptRecordedCodec,
+  receiptSettledCodec,
   receiptDetailCodec,
   receiptSummaryCodec,
   receiptsResponseCodec,
@@ -134,6 +135,7 @@ import type {
   ReceiptDetail,
   ReceiptRecordBody,
   ReceiptRecorded,
+  ReceiptSettled,
   ReceiptSummary,
   ReceiptsResponse,
   SpendingAmendBody,
@@ -438,6 +440,8 @@ export interface MolviaClient {
    * before, `error.receipt_not_ready` for one still being read.
    */
   recordReceipt(id: string, body: ReceiptRecordBody): Promise<ReceiptRecorded>
+  /** «Отменить запись» (MOL-169, Г1): recorded or not, once no «Записать» of it is still running. */
+  receiptSettled(id: string): Promise<ReceiptSettled>
   /**
    * «Счета» (MOL-115): the accounts, their totals and how many operations fell out of them. Every
    * write below answers with the page whole — which of «удалить» and «убрать» it was is the server's.
@@ -931,6 +935,7 @@ export function createClient(options: ClientOptions): MolviaClient {
     receipts: () => request('/receipts', receiptsResponseCodec),
 
     receipt: (id) => request(`/receipts/${segment(id)}`, receiptDetailCodec),
+    receiptSettled: (id) => request(`/receipts/${segment(id)}/settled`, receiptSettledCodec),
 
     removeReceipt: async (id) => {
       noContent(await exchange(`/receipts/${segment(id)}`, z.undefined(), { method: 'DELETE' }))

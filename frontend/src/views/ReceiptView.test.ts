@@ -28,6 +28,10 @@ vi.mock('@/api', () => ({
     {
       get: (_target, name) => {
         if (name === 'receipt') return (id: string) => receipt(id)
+        // The check of «Отменить запись» reads what the receipt says, as the server's own read does.
+        if (name === 'receiptSettled')
+          return (id: string) =>
+            receipt(id).then((one) => ({ recorded: one.receipt.tripId !== null }))
         if (name === 'recordReceipt')
           return (id: string, body: ReceiptRecordBody) => recordReceipt(id, body)
         if (name === 'receipts') return () => receipts()

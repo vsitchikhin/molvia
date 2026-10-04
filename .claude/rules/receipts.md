@@ -467,17 +467,22 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   that stayed — and edits no record would ever carry. **The check's own answer**, never the shown one:
   a read that set out before the tap and came back during the check said «not recorded» of a send
   that landed after it set out (Б2). **Under the lock**, so no send of it is on its way in this window
-  or another when the server answers (Б1); a begun record is taken only through it. Recorded, the
+  or another when the server answers (Б1); a begun record is taken only through it. **And asked of
+  `GET /receipts/:id/settled`** (`receiptSettled`, round 3 Г1), which reads under the owner's lock and
+  the receipt's row in the order «Записать» takes them: the phone gives a send up after its 15 s, and
+  the server finishes it all the same — a record still in its transaction is waited for and read as
+  done. Recorded, the
   screen goes to its purchases; no answer — the dock says why, «no connection» or «the server did not
   answer» by `navigator.onLine` after the failure (MOL-19, Б3), until the connection or the receipt
   changes, and nothing opens. **The receipt the server calls recorded lets go of the phone's part of
   it** (`settleRecorded`, from the list of «Покупки» and from the review): a record waiting and a
   refusal of one — a 409 after a cancel — would otherwise name it for good, with its photo and draft,
   and no row to remove them from (review 1, А2). **The price, named:** a WebView with no
-  `navigator.locks` takes no lock, and another window's send may still be committing as the check is
-  answered; so may a record of the same receipt from another phone. Then the cancel opens, «Удалить»
-  meets a recorded receipt (409, «done») and an edit is not written — the next «Записать» is a 409 and
-  the review goes to the purchases of the first. A record refused
+  `navigator.locks` takes no lock, and another window's send may still be on its way as the check is
+  answered; a record of the same receipt from another phone, or one whose body reached the server but
+  whose handler has not yet taken the owner's lock — milliseconds — may land after it. Then the cancel
+  opens, «Удалить» meets a recorded receipt (409, «done») and an edit is not written — the next
+  «Записать» is a 409 and the review goes to the purchases of the first. A record refused
   otherwise is not touched: the next «Записать» takes its place.
 - **«Не принят» is a photo's word**: only a refused announcement or part makes that row, dated by the
   moment of the refusal; a tap opens the sheet with the reason and «Убрать», never removes by itself.

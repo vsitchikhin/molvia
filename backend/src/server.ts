@@ -57,7 +57,7 @@ import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
 import { readQueuedReceipts } from '@/usecases/read-receipts'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
-import { recordReceipt } from '@/usecases/record-receipt'
+import { receiptSettled, recordReceipt } from '@/usecases/record-receipt'
 import type { ReadReport } from '@/usecases/read-receipts'
 import {
   putReceiptPart,
@@ -908,6 +908,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         remove: (actorId, id) => removeReceipt(receipts, actorId, id),
         restore: (actorId, id) => restoreReceipt(receipts, actorId, id),
         record: (actor, id, body) => recordReceipt(transact, actor, id, body),
+        settled: (actor, id) => receiptSettled(transact, actor, id),
       })
       spendingRoutes(guarded, {
         record: (actor, body) => recordSpending(tripData, actor, body),
