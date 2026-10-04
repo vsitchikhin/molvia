@@ -376,6 +376,99 @@ describe('receipt queue', () => {
     })
   })
 
+  describe('«Отменить запись» (MOL-169, В-5)', () => {
+    const OTHER_TRIP = 'dddddddd-0000-4000-8000-000000000002'
+
+    it('a record that never left is taken out, and nothing is sent', async () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const queue = fresh()
+      queue.record(RECEIPT, recordBody())
+      expect(queue.cancelRecord(RECEIPT)).toBe(true)
+      expect(queue.pending).toEqual([])
+      expect(localStorage.getItem(`molvia.receipt-queue.${ME}`)).toBe('[]')
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+      await queue.flush()
+      expect(recordReceipt).not.toHaveBeenCalled()
+    })
+
+    it('a record the server answered 5xx is taken out too, and the receipts behind it go on', async () => {
+      recordReceipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'x'))
+      const queue = fresh()
+      queue.record(RECEIPT, recordBody())
+      await queue.flush()
+      await queue.capture(body(SECOND, 1), shots(1))
+      await queue.flush()
+      expect(queue.pending).toHaveLength(3)
+      expect(calls).not.toContain(`create ${SECOND}`)
+
+      expect(queue.cancelRecord(RECEIPT)).toBe(true)
+      await queue.flush()
+      expect(queue.pending).toEqual([])
+      expect(calls.filter((call) => !call.startsWith('record'))).toEqual([
+        `create ${SECOND}`,
+        `part ${SECOND} 1`,
+      ])
+    })
+
+    it('a record sent again after the cancel names another trip; a conflict is set aside, not held', async () => {
+      recordReceipt
+        .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'x', false))
+        .mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'x'))
+      const queue = fresh()
+      queue.record(RECEIPT, recordBody())
+      await settled()
+      queue.cancelRecord(RECEIPT)
+      await settled()
+      queue.record(RECEIPT, recordBody(OTHER_TRIP))
+      await queue.flush()
+      expect(recordReceipt.mock.calls.map((call) => call[1].tripId)).toEqual([TRIP, OTHER_TRIP])
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toMatchObject([
+        { code: ERROR.CONFLICT, write: { kind: 'record', id: RECEIPT } },
+      ])
+    })
+
+    it('the record a send carries right now stays, and lands', async () => {
+      let land: (answer: { tripId: string }) => void = () => undefined
+      recordReceipt.mockImplementationOnce(() => new Promise((resolve) => (land = resolve)))
+      const queue = fresh()
+      queue.record(RECEIPT, recordBody())
+      await settled()
+      expect(queue.carrying).toBe(RECEIPT)
+      expect(queue.cancelRecord(RECEIPT)).toBe(false)
+      expect(queue.pending).toHaveLength(1)
+      land({ tripId: TRIP })
+      await queue.flush()
+      expect(queue.carrying).toBeNull()
+      expect(queue.recorded).toEqual([{ receiptId: RECEIPT, tripId: TRIP, count: 1 }])
+    })
+
+    it('takes only this receipt’s record, never its removal or another receipt’s', () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const queue = fresh()
+      queue.record(RECEIPT, recordBody())
+      queue.record(SECOND, recordBody(OTHER_TRIP))
+      queue.remove(SECOND)
+      expect(queue.cancelRecord(SECOND)).toBe(true)
+      expect(queue.cancelRecord(SECOND)).toBe(false)
+      expect(queue.pending).toEqual([
+        { kind: 'record', id: RECEIPT, body: recordBody() },
+        { kind: 'remove', id: SECOND },
+      ])
+    })
+
+    it('another window sees the cancel through storage', () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      const first = fresh()
+      first.record(RECEIPT, recordBody())
+      const second = fresh()
+      expect(second.pending).toHaveLength(1)
+      second.cancelRecord(RECEIPT)
+      window.dispatchEvent(new StorageEvent('storage', { key: `molvia.receipt-queue.${ME}` }))
+      expect(first.pending).toEqual([])
+    })
+  })
+
   it('a broken entry is dropped alone', () => {
     localStorage.setItem(
       `molvia.receipt-queue.${ME}`,

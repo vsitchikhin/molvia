@@ -439,11 +439,14 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   figure checked (review 17).
 - **While «Записать» waits the receipt is what was sent** (review 5, adversarial А1): no line, place,
   total or removal opens; the answer moves only the review that asked, never a screen the person went
-  to meanwhile (А5). A removal of a recorded receipt (409) is done, never «не принят». **The price,
-  named** (adversarial round 2): a record the server answers 5xx again and again is held by MOL-24's
-  rule for good, the receipt locked and the receipts behind it waiting — as a trip's write holds its
-  queue. There is no «cancel the record»: the handoff has none, and a 5xx on one receipt is a defect
-  the owner hears of (MOL-143).
+  to meanwhile (А5). A removal of a recorded receipt (409) is done, never «не принят». **«Отменить
+  запись» takes it back** (MOL-169, owner's В-5): a record the server answers 5xx again and again is
+  held by MOL-24's rule, the receipt locked and the receipts behind it waiting, so the dock offers to
+  take it out of the queue — the review open again, its draft whole. **Any record but the one a send
+  carries right now** (`carrying`), one begun before included: its answer lost, it may have landed,
+  and the server holds that — the next «Записать» names another trip, a receipt recorded under one is a
+  409, and the review, reading the receipt again on the queue's answer, goes to its purchases. A
+  record refused otherwise is not touched: the next «Записать» takes its place.
 - **«Не принят» is a photo's word**: only a refused announcement or part makes that row, dated by the
   moment of the refusal; a tap opens the sheet with the reason and «Убрать», never removes by itself.
   **A receipt the server holds with parts missing and this phone none of them** is «не все части

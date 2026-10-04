@@ -259,6 +259,8 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
   let ahead = false
   /** The key of the write a send is carrying right now: it is never taken out. */
   let inFlight: string | null = null
+  /** The receipt that write is about, for a screen to offer nothing it cannot take back. */
+  const carrying = ref<string | null>(null)
 
   function show(): void {
     pending.value = kept.map((item) => item.write)
@@ -304,6 +306,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
   function load(id: string | null): void {
     ahead = false
     inFlight = null
+    carrying.value = null
     kept = []
     rejected.value = []
     delivered.value = {}
@@ -410,6 +413,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
         persist(owner)
       }
       inFlight = head.key
+      carrying.value = receiptOf(head.write)
       try {
         await send(owner, head.write)
       } catch (error) {
@@ -428,6 +432,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
         }
       } finally {
         inFlight = null
+        carrying.value = null
       }
       if (actor.id !== owner) return
 
@@ -608,6 +613,25 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     })
   }
 
+  /**
+   * «Отменить запись» (MOL-169, owner's В-5): the record of this receipt out of the queue, the review
+   * open again with its draft. Any record but the one a send carries right now — one begun before,
+   * whose answer was lost or was a 5xx, too: it may have landed, and the server holds that, since the
+   * next «Записать» names another trip and a receipt recorded under one is a 409. False — it was on
+   * its way, and stays.
+   */
+  function cancelRecord(id: string): boolean {
+    let taken = false
+    change(() => {
+      const left = kept.filter(
+        (item) => item.key === inFlight || !(item.write.kind === 'record' && item.write.id === id),
+      )
+      taken = left.length < kept.length
+      kept = left
+    })
+    return taken
+  }
+
   /** «Убрать» a refusal: the write is gone for good; a receipt the server may hold is removed too. */
   function dismiss(item: RejectedReceiptWrite): void {
     const id = receiptOf(item.write)
@@ -627,6 +651,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     rejected,
     landed,
     recorded,
+    carrying,
     lastRemoved,
     sentAt,
     delivered,
@@ -637,6 +662,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     restore,
     forgetRemoved,
     record,
+    cancelRecord,
     dismiss,
   }
 })

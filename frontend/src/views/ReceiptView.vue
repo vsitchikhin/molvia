@@ -154,7 +154,12 @@
     <template v-if="detail && docked" #docked>
       <div class="dock">
         <template v-if="docked === 'record'">
-          <p v-if="recording" class="under">{{ t('receipt.review.recording') }}</p>
+          <template v-if="recording">
+            <p class="under">{{ t('receipt.review.recording') }}</p>
+            <AppButton v-if="cancellable" variant="ghost" block @click="cancelRecord">
+              {{ t('receipt.review.cancel_record') }}
+            </AppButton>
+          </template>
           <AppButton
             v-else
             size="large"
@@ -409,6 +414,10 @@ export default defineComponent({
       )
       return refusal ? t('receipt.review.refused', { reason: t(refusal.code) }) : null
     })
+    /** «Отменить запись» (MOL-169, В-5): any record still waiting, never the one a send carries. */
+    const cancellable = computed(
+      () => recording.value && !sending.value && queue.carrying !== id.value,
+    )
     /**
      * While «Записать» waits in the queue — or is being sent — the receipt is what was sent: an edit
      * made now would not reach the server (review 5), nor would a removal (adversarial А1).
@@ -553,6 +562,8 @@ export default defineComponent({
       dayOf,
       positions,
       recording,
+      cancellable,
+      cancelRecord: () => void queue.cancelRecord(id.value),
       refused,
       docked,
       photos,

@@ -227,6 +227,52 @@ describe('ReceiptView (MOL-127)', () => {
     expect(sheet()).toBeNull()
   })
 
+  it('«Отменить запись» opens a record the server answered 5xx: lines, removal and «Записать» are back (MOL-169)', async () => {
+    recordReceipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'x'))
+    const first = await render()
+    await button(first.view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    expect(first.router.currentRoute.value.name).toBe('purchases')
+    while (mounted.length) mounted.pop()?.unmount()
+
+    const { view } = await render()
+    expect(view.text()).toContain(ru.receipt.review.recording)
+    await button(view, ru.receipt.review.cancel_record).trigger('click')
+    await flushPromises()
+    expect(view.text()).not.toContain(ru.receipt.review.recording)
+    expect(button(view, ru.purchases.delete).exists()).toBe(true)
+    expect(button(view, 'Записать 2 покупки').exists()).toBe(true)
+    await view.get('.receipt-line').trigger('click')
+    await flushPromises()
+    expect(sheet()).not.toBeNull()
+  })
+
+  it('a record cancelled after its answer was lost, and the server had written it: the receipt read again goes to its purchases', async () => {
+    recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'x', false))
+    const first = await render()
+    await button(first.view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    while (mounted.length) mounted.pop()?.unmount()
+
+    const { view, router } = await render()
+    await button(view, ru.receipt.review.cancel_record).trigger('click')
+    await flushPromises()
+    // The first send had landed: the record under another trip is a conflict, and the receipt says so.
+    recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'x'))
+    const written = detail()
+    receipt.mockResolvedValue({
+      ...written,
+      receipt: { ...written.receipt, status: 'recorded', tripId: TRIP },
+    })
+    await button(view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    expect(recordReceipt.mock.calls[1]?.[1].tripId).not.toBe(
+      recordReceipt.mock.calls[0]?.[1].tripId,
+    )
+    expect(router.currentRoute.value.name).toBe('purchase')
+    expect(router.currentRoute.value.params.tripId).toBe(TRIP)
+  })
+
   it('«Переснять»: the sheet replaces this receipt, and «sent» takes the screen up (review 2, 31)', async () => {
     receipt.mockResolvedValue(detail({ status: 'failed' }))
     const { view, router } = await render()
