@@ -168,8 +168,10 @@ The shape worth knowing here:
   - **Never GitHub's cron for the site** (MOL-221): `*/5` ran on this repository every two to six
     hours, so `molvia-up` went down after every ping and a fall would have waited for hours.
     Cloudflare is already ours (DNS, R2), its cron runs on time. A Worker cannot read a certificate
-    — `fetch` only checks it, a bad one is a `000` — so the term stays on GitHub, hourly: its check
-    waits a day and an hour, and the worst gap measured was six hours.
+    — `fetch` only checks it, a bad one fails the request — so the term stays on GitHub, hourly:
+    its check waits a day and an hour, and the worst gap measured was six hours. A request
+    Cloudflare could not complete may come back as its own code, `530` for a name that does not
+    resolve: any answer but `200` fails, so the rule holds as it was.
   - **The rule lives once** (MOL-221, В-4): three of four is `deploy/watch/src/site.ts`, tested, and
     `watch.yml` checks the certificate alone — a second copy in bash would drift from what watches.
     The alarm is tried on the Worker itself, `DOMAIN` set to `molvia.invalid` by hand; every rollout

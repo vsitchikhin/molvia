@@ -297,12 +297,12 @@ says so itself, with no grace: a `/fail` within five minutes and the minute and 
 six hours — six runs in the first day, the longest gap six hours fourteen minutes — so `molvia-up`
 went down after every ping and a real fall would have waited for hours. Cloudflare's cron runs on
 time, and Cloudflare is already ours: the domain's DNS and the copies' bucket. A Worker cannot read a
-certificate, though — `fetch` only checks it, and a bad one is a `000` like the network — so the
-term stays on GitHub, hourly: its check waits a day and an hour.
+certificate, though — `fetch` only checks it, and a bad one fails the request — so the term stays
+on GitHub, hourly: its check waits a day and an hour.
 
 - **What the watch checks.** `GET /api/health` is `200` with `"status":"ok"` — `/health` answers
   `503` whenever it is not ok, the database down included, with the same body. `GET /` is `200`.
-  curl checks the certificate's chain and name on every request, so a bad certificate is a `000`.
+  `fetch` checks the certificate's chain and name on every request, so a bad certificate fails it.
   The certificate's term, more than fourteen days, is a check of its own: Caddy renews it itself
   but silently fails to when DNS breaks, and «expires in 13 days» is a state that holds for days —
   on the site's check it kept a fall of the API silent, since healthchecks.io speaks only when a
@@ -381,6 +381,9 @@ certificate that really ends.
 - `health 502`, `health 000`, `pwa 000` — the API, Caddy or the machine: `ssh molvia` first; if that
   hangs too, it is the machine, and Contabo's panel. A rollout gone wrong is in
   `tail ~/molvia/deploy.log`.
+- A code from `520` to `530` on both lines is Cloudflare's own word, not Caddy's: the Worker's request
+  did not get through. `530` is a name that does not resolve — the A record of `molvia.net` in
+  Cloudflare's DNS; the trial on `molvia.invalid` said `health 530 pwa 530`.
 - No ping for twenty minutes and no `/fail` — the Worker: its log names a round that failed by its
   kind (the secret, a ping that did not go), and no round at all is Cloudflare's matter:
   https://www.cloudflarestatus.com.

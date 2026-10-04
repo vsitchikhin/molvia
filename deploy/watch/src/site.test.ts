@@ -28,6 +28,13 @@ describe('readSite', () => {
     ])
   })
 
+  it("takes Cloudflare's own code for a request it could not complete as a failure", () => {
+    expect(readSite({ status: 530, body: 'error code: 1016' }, { status: 530, body: '' })).toEqual([
+      'health 530',
+      'pwa 530',
+    ])
+  })
+
   it('names a page that is not 200 — a redirect too', () => {
     expect(readSite(OK, { status: 502, body: '' })).toEqual(['pwa 502'])
     expect(readSite(OK, { status: 301, body: '' })).toEqual(['pwa 301'])

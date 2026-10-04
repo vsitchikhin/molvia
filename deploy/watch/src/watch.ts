@@ -55,8 +55,8 @@ export function settingsOf(environment: Environment): Settings {
 }
 
 /**
- * A redirect is not followed — it is not the page, and curl did not follow one either. A bad
- * certificate fails the request, so it is a `000` like the network.
+ * A redirect is not followed — it is not the page, and curl did not follow one either. A request
+ * that fails — a bad certificate too — is a `000`, unless Cloudflare answers it with its own code.
  */
 async function ask(io: Io, url: string, read: boolean): Promise<Answer> {
   try {

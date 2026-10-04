@@ -7,7 +7,11 @@
 export const ATTEMPTS = 4
 export const FAILURES_TO_ALARM = 3
 
-/** One answer as the watch saw it; `0` is no answer at all — the network, a timeout, a bad certificate. */
+/**
+ * One answer as the watch saw it; `0` is no answer at all — the network, a timeout. A request
+ * Cloudflare itself could not complete may come back as its own code instead: a name that does not
+ * resolve is `530` (seen trying the alarm on `molvia.invalid`). Either is a failure.
+ */
 export interface Answer {
   readonly status: number
   readonly body: string
