@@ -41,7 +41,7 @@ CLAUDE.md      ядро правил: архитектура, границы с�
 .claude/rules/ правила областей с разбором, грузятся по путям (ниже)
 .claude/hooks/ хуки Claude Code; settings.json рядом их подключает (запрет форс-пуша, MOL-220)
 docs/          эта карта и карта кода (docs/map/)
-deploy/        как разворачивается прод
+deploy/        как разворачивается прод; deploy/watch — сторож доступности, Worker Cloudflare (MOL-221)
 frontend/ backend/ bot/ packages/ services/   три приложения и общий домен
 ```
 

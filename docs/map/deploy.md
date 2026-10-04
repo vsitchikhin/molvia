@@ -35,11 +35,21 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 
 - `bot/Dockerfile` — Bot image: builds the single-file bundle and ships it alone on Node.
 
+## deploy · watch
+
+- `deploy/watch/src/site.ts` — The outside watch's rule (MOL-221): what is wrong with `/api/health` and the page, a line each, and three failures of four tries as a `/fail` saying what the last saw.
+- `deploy/watch/src/watch.ts` — One round of the watch: the settings from the Worker's environment (a `HC_UP_URL` missing, not in the form `/fail` can follow or an endpoint — an error), up to four tries half a minute apart, what the tries saw logged before the ping to «molvia-up» or its `/fail`, tried again and failing by its kind, never its URL; a ping healthchecks.io took for no check (`OK (not found)`) fails at once. Tests: `deploy/watch/tests/watch.test.ts`, `deploy/watch/tests/site.test.ts`.
+- `deploy/watch/src/worker.ts` — The Worker «molvia-watch»: Cloudflare's cron calls `scheduled` every five minutes; the platform's `fetch`, timer and console.
+- `deploy/watch/tests/bundle.test.ts` — Test of the Worker as it ships: one module that imports nothing and exports the scheduled handler.
+- `deploy/watch/tests/site.test.ts` — Unit test of the rule: what makes an answer wrong, Cloudflare's own codes, three of four.
+- `deploy/watch/tests/watch.test.ts` — Test of a round: tries, pauses and timeouts on a fake clock, the ping and `/fail`, what healthchecks.io says, the form of the ping URL, the Worker without its secret.
+- `deploy/watch/deploy.sh` — Rolls the Worker out through Cloudflare's API: the bundle with `DOMAIN` and the secret kept, the cron, off `*.workers.dev`; run by the release and by `make watcher`.
+
 ## repository
 
 - `.env.prod.example` — Template of the server's `.env.prod`: domain, Postgres credentials, the production bot's token and username, the bot–API secret, the bot's pulse URL, Grafana's password and the alarms' bot (MOL-145).
-- `.github/workflows/release.yml` — Release workflow: after green CI on master builds the six images — the receipt reader's and the metrics' two (MOL-145) too — and rolls them out over ssh; a version tag names built images.
-- `.github/workflows/watch.yml` — The outside watch (MOL-142): every five minutes `/api/health` and the page to the healthchecks.io check «molvia-up» — a `/fail` when three of four tries half a minute apart fail — and the certificate's term to «molvia-cert»; red only when it could not report.
+- `.github/workflows/release.yml` — Release workflow: after green CI on master builds the six images — the receipt reader's and the metrics' two (MOL-145) too — and rolls them out over ssh; a version tag names built images; the outside watch goes to Cloudflare in a job of its own (MOL-221).
+- `.github/workflows/watch.yml` — The certificate's term from outside (MOL-142, MOL-221): hourly, more than fourteen days left to the healthchecks.io check «molvia-cert», fewer a `/fail`; red only when it could not report. The site is the Worker's, `deploy/watch/`.
 - `bin/bundle.mjs` — esbuild bundler for the API and bot images; the API also gets its forget, seed-catalogue, gates and failures tools.
 - `deploy/Caddyfile` — Caddy config: TLS for the domain, `/api` stripped and proxied to the API, internal routes closed, SPA fallback, headers, no access log.
 - `deploy/README.md` — Operations guide: new machine, deploys and the deploy key, login setup, local prod stack, erasure, seeding, gates, signals, the metrics and their alarms (MOL-145), backups and restore, the Postgres image and its move off alpine.

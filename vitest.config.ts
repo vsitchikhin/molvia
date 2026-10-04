@@ -9,6 +9,7 @@ export default defineConfig({
       'backend/vitest.config.ts',
       'backend/vitest.integration.config.ts',
       'bot',
+      'deploy/watch',
       'frontend',
     ],
     coverage: {

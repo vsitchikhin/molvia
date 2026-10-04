@@ -1,19 +1,20 @@
 name: Watch
 
-# Production seen from outside, every five minutes (MOL-142; owner's decision В-4 of MOL-149): the
-# API with its database and the page go to the healthchecks.io check «molvia-up», the certificate's
-# term to «molvia-cert». All well is a ping; anything wrong is a ping to `/fail` saying what. A ping
-# that never comes — GitHub, the runner or this job down — is the alarm too, once the check's grace
-# runs out. The alarm reaches the owner through healthchecks.io's own Telegram integration, never
-# our bot: a machine that is down takes the bot with it. It only ever reads; nothing here can touch
-# production. deploy/README.md, «Signals».
+# The certificate's term seen from outside (MOL-142; MOL-221): more than fourteen days left is a ping
+# to the healthchecks.io check «molvia-cert», fewer is its `/fail` saying when it ends. The site
+# itself — the API with its database and the page — is watched by the Worker on Cloudflare
+# (`deploy/watch`): GitHub ran this schedule every two to six hours instead of every five minutes,
+# which a certificate's term can bear and an availability watch cannot. A day without a ping is the
+# alarm too. It only ever reads; nothing here can touch production. deploy/README.md, «Signals».
 on:
+  # Hourly, off the top of the hour, where GitHub's queue is longest: the check waits a day and an
+  # hour, and the longest gap GitHub left between runs here was six hours.
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '17 * * * *'
   workflow_dispatch:
     inputs:
       domain:
-        description: 'Domain to watch; another one tries the alarm all the way to Telegram'
+        description: 'Domain whose certificate to read'
         required: true
         default: molvia.net
 
@@ -30,83 +31,54 @@ jobs:
     # Never in a fork: it has no secret, and nothing of its own to watch.
     if: github.repository == 'vsitchikhin/molvia'
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 2
     steps:
-      # Red only when the job could not report — a secret missing, or a ping that did not go. A site
-      # that is down is a `/fail` and a green run: a red one would add GitHub's e-mail to Telegram.
+      # Red only when the job could not report — the secret missing, or a ping that did not go. A
+      # certificate about to end is a `/fail` and a green run: a red one would add GitHub's e-mail
+      # to Telegram.
       - env:
-          HC_UP_URL: ${{ secrets.HC_UP_URL }}
           HC_CERT_URL: ${{ secrets.HC_CERT_URL }}
           DOMAIN: ${{ inputs.domain || 'molvia.net' }}
         shell: bash
         run: |
-          for secret in HC_UP_URL HC_CERT_URL; do
-            if [[ -z "${!secret}" ]]; then
-              echo "::error::the secret $secret is not set, there is nowhere to report (deploy/README.md, «Signals»)"
-              exit 1
-            fi
-          done
-
-          # What is wrong with the site, a line each; nothing when all is well. curl itself checks
-          # the certificate's chain and name, so an invalid one is `000`.
-          site() {
-            local answer code
-            answer="$(curl -sS -m 10 -w '\n%{http_code}' "https://$DOMAIN/api/health" 2>/dev/null)" || answer=$'\n000'
-            code="${answer##*$'\n'}"
-            if [[ "$code" != 200 || "${answer%$'\n'*}" != *'"status":"ok"'* ]]; then
-              echo "health $code"
-            fi
-            code="$(curl -sS -m 10 -o /dev/null -w '%{http_code}' "https://$DOMAIN/" 2>/dev/null)" || code=000
-            if [[ "$code" != 200 ]]; then
-              echo "pwa $code"
-            fi
-            return 0
-          }
-
-          # Every merge is a rollout, and `up -d` leaves the API silent for seconds, while `/fail`
-          # raises the alarm at once, with no grace. So one failure is not believed: once a check
-          # sees one, four are made half a minute apart, and three of them failing is a `/fail`. A
-          # rollout fails one or two; a site failing three requests of four is down for most people
-          # (adversarial Б1). One failing every second request still passes — that is MOL-145's
-          # share of 5xx, not an availability watch's.
-          failed=0
-          seen=""
-          for attempt in 1 2 3 4; do
-            found="$(site)"
-            if [[ -z "$found" ]]; then
-              if ((attempt == 1)); then
-                break
-              fi
-            else
-              failed=$((failed + 1))
-              seen="$found"
-              echo "attempt $attempt: ${found//$'\n'/; }"
-            fi
-            if ((attempt < 4)); then
-              sleep 30
-            fi
-          done
-
-          if ((failed < 3)); then
-            curl -fsS -m 10 --retry 3 -o /dev/null "$HC_UP_URL"
-            echo "$DOMAIN is well"
-          else
-            curl -fsS -m 10 --retry 3 -o /dev/null --data-raw "$seen" "$HC_UP_URL/fail"
-            echo "::warning::$DOMAIN: ${seen//$'\n'/; }"
+          if [[ -z "$HC_CERT_URL" ]]; then
+            echo "::error::the secret HC_CERT_URL is not set, there is nowhere to report (deploy/README.md, «Signals»)"
+            exit 1
           fi
 
-          # The certificate's term is a check of its own (adversarial Б2): «expires in 13 days» is a
+          # healthchecks.io answers every ping with 200 and says what became of it (MOL-221): `OK`;
+          # `OK (not found)` — no such check, a run that could not report; anything else, such as
+          # `OK (rate limited)`, was not taken and is tried again, a second, two and four apart.
+          ping() {
+            local said
+            for pause in 1 2 4 0; do
+              said="$(curl -fsS -m 10 --retry 3 "$@")"
+              case "$said" in
+                OK) return 0 ;;
+                'OK (not found)')
+                  echo "::error::the ping to healthchecks.io reached no check: $said"
+                  exit 1
+                  ;;
+              esac
+              sleep "$pause"
+            done
+            echo "::error::the ping to healthchecks.io was not taken: $said"
+            exit 1
+          }
+
+          # The term is a check of its own (adversarial Б2 of MOL-142): «expires in 13 days» is a
           # state that holds for days, and healthchecks.io speaks only when a check flips — on one
           # check with the site, it would have kept a fall of the API silent all that time. Caddy
           # renews by itself but fails silently when DNS does, hence fourteen days ahead. A
-          # certificate that could not be read is the site's matter, already said above: it
-          # reports nothing here, and the check's day of grace waits for a run that can read it.
+          # certificate that could not be read is the site's matter, the Worker's to say: it reports
+          # nothing here, and the check's day of grace waits for a run that can read it.
           pem="$(timeout 15 openssl s_client -servername "$DOMAIN" -connect "$DOMAIN:443" </dev/null 2>/dev/null)" || pem=""
           if ! end="$(openssl x509 -noout -enddate <<<"$pem" 2>/dev/null)"; then
             echo "::warning::$DOMAIN: the certificate could not be read"
           elif openssl x509 -noout -checkend 1209600 <<<"$pem" >/dev/null; then
-            curl -fsS -m 10 --retry 3 -o /dev/null "$HC_CERT_URL"
+            ping "$HC_CERT_URL"
+            echo "$DOMAIN: the certificate ends ${end#notAfter=}"
           else
-            curl -fsS -m 10 --retry 3 -o /dev/null --data-raw "cert expires ${end#notAfter=}" "$HC_CERT_URL/fail"
+            ping --data-raw "cert expires ${end#notAfter=}" "$HC_CERT_URL/fail"
             echo "::warning::$DOMAIN: the certificate expires ${end#notAfter=}"
           fi
