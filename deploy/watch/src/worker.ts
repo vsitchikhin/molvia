@@ -9,18 +9,17 @@ import type { Environment } from '@/watch'
 export default {
   async scheduled(_controller: unknown, environment: Environment): Promise<void> {
     const settings = settingsOf(environment)
-    const { attempts, verdict } = await watch(settings, {
+    await watch(settings, {
       // Called through a closure: Workers refuse a `fetch` detached from the global scope.
       fetch: async (input, init) => fetch(input, init),
       wait: async (ms) =>
         new Promise<void>((resolve) => {
           setTimeout(resolve, ms)
         }),
+      log: (line, warn) => {
+        if (warn) console.warn(line)
+        else console.log(line)
+      },
     })
-    attempts.forEach((wrong, index) => {
-      if (wrong.length > 0) console.warn(`attempt ${String(index + 1)}: ${wrong.join('; ')}`)
-    })
-    if (verdict.up) console.log(`${settings.domain} is well`)
-    else console.warn(`${settings.domain}: ${verdict.said.replaceAll('\n', '; ')}`)
   },
 }

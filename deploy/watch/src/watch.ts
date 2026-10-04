@@ -30,6 +30,8 @@ export interface Settings {
 export interface Io {
   readonly fetch: typeof globalThis.fetch
   readonly wait: (ms: number) => Promise<void>
+  /** A line for the Worker's log; `warn` for what went wrong. */
+  readonly log: (line: string, warn: boolean) => void
 }
 
 export interface Round {
@@ -107,9 +109,18 @@ async function report(settings: Settings, verdict: Verdict, io: Io): Promise<voi
   throw new Error(`the ping to healthchecks.io did not go: ${failure}`)
 }
 
+/**
+ * What the tries saw is logged before the ping: a round whose ping did not go still says what the
+ * site did, and that round's alarm comes only by the check's grace.
+ */
 export async function watch(settings: Settings, io: Io): Promise<Round> {
   const attempts = await look(settings.domain, io)
   const verdict = judge(attempts)
+  attempts.forEach((wrong, index) => {
+    if (wrong.length > 0) io.log(`attempt ${String(index + 1)}: ${wrong.join('; ')}`, true)
+  })
+  if (verdict.up) io.log(`${settings.domain} is well`, false)
+  else io.log(`${settings.domain}: ${verdict.said.replaceAll('\n', '; ')}`, true)
   await report(settings, verdict, io)
   return { attempts, verdict }
 }

@@ -20,6 +20,7 @@ function rig(tries: readonly Site[], pings: readonly (number | 'network')[] = [2
   let attempt = -1
   let ping = -1
   const waits: number[] = []
+  const logged: string[] = []
   const reports: { url: string; method: string; body: string }[] = []
   const answer = (url: string, init: RequestInit | undefined): Response => {
     if (url.startsWith(PING)) {
@@ -50,8 +51,11 @@ function rig(tries: readonly Site[], pings: readonly (number | 'network')[] = [2
       waits.push(ms)
       return Promise.resolve()
     },
+    log: (line, warn) => {
+      logged.push(`${warn ? 'warn' : 'log'}: ${line}`)
+    },
   }
-  return { io, fetch, waits, reports, tries: () => attempt + 1 }
+  return { io, fetch, waits, reports, logged, tries: () => attempt + 1 }
 }
 
 describe('watch', () => {
@@ -109,6 +113,28 @@ describe('watch', () => {
     await watch(SETTINGS, io)
     expect(reports).toHaveLength(3)
     expect(waits).toEqual([1_000, 2_000])
+  })
+
+  it('logs what the tries saw, the site well or not', async () => {
+    const well = rig(['well'])
+    await watch(SETTINGS, well.io)
+    expect(well.logged).toEqual(['log: molvia.net is well'])
+
+    const down = rig(['api down', 'unreachable'])
+    await watch(SETTINGS, down.io)
+    expect(down.logged).toEqual([
+      'warn: attempt 1: health 503',
+      'warn: attempt 2: health 000; pwa 000',
+      'warn: attempt 3: health 000; pwa 000',
+      'warn: attempt 4: health 000; pwa 000',
+      'warn: molvia.net: health 000; pwa 000',
+    ])
+  })
+
+  it('has logged what the site did when the ping then does not go', async () => {
+    const { io, logged } = rig(['api down'], ['network'])
+    await expect(watch(SETTINGS, io)).rejects.toThrow('did not go: network')
+    expect(logged.at(-1)).toBe('warn: molvia.net: health 503')
   })
 
   it('fails the round when no ping went, naming its kind and never the URL', async () => {

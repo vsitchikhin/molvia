@@ -38,8 +38,8 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 ## deploy · watch
 
 - `deploy/watch/src/site.ts` — The outside watch's rule (MOL-221): what is wrong with `/api/health` and the page, a line each, and three failures of four tries as a `/fail` saying what the last saw.
-- `deploy/watch/src/watch.ts` — One round of the watch: the settings from the Worker's environment (no `HC_UP_URL` — an error), up to four tries half a minute apart, the ping to «molvia-up» or its `/fail`, tried again and failing by its kind, never its URL.
-- `deploy/watch/src/worker.ts` — The Worker «molvia-watch»: Cloudflare's cron calls `scheduled` every five minutes; logs what a failed try saw.
+- `deploy/watch/src/watch.ts` — One round of the watch: the settings from the Worker's environment (no `HC_UP_URL` — an error), up to four tries half a minute apart, what the tries saw logged before the ping to «molvia-up» or its `/fail`, tried again and failing by its kind, never its URL.
+- `deploy/watch/src/worker.ts` — The Worker «molvia-watch»: Cloudflare's cron calls `scheduled` every five minutes; the platform's `fetch`, timer and console.
 - `deploy/watch/src/bundle.test.ts` — Test of the Worker as it ships: one module that imports nothing and exports the scheduled handler.
 - `deploy/watch/deploy.sh` — Rolls the Worker out through Cloudflare's API: the bundle with `DOMAIN` and the secret kept, the cron, off `*.workers.dev`; run by the release and by `make watcher`.
 
