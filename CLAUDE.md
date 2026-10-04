@@ -465,6 +465,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Not now is one look: `text-muted` at 600, in focus (`inactive` = `aria-disabled`), never opacity**
   (MOL-174); a button keeps its variant's fill or none (В-1). **Chosen is a fill or a form, never a
   weight.** `--opacity-stale` is only a previous answer while the next is on its way.
+- **A row is `ListRow` or `NavRow`, a caps caption `SectionCaption` — caps nowhere else, the linter
+  holds it** (MOL-175): the chevron is «opens something to go on with» — a screen or a sheet with
+  fields (В-14) — never on a row that acts or asks to confirm, never mixed in one card; a caption's
+  place is in `:where()`, the screen's class sets the space above it.
 - **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
   `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the
   failure; polite states speak through the one live region in `App.vue`.

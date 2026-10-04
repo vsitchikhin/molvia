@@ -221,6 +221,38 @@ components:
     rounded: '{rounded.pill}'
     height: '28px'
     typography: '{typography.caption}'
+  section-caption:
+    textColor: '{colors.text-muted}'
+    padding: '0 4px'
+    typography: '{typography.caption}'
+  list-row:
+    textColor: '{colors.text}'
+    height: '64px'
+    padding: '12px 16px'
+    typography: '{typography.headline}'
+  nav-row:
+    textColor: '{colors.text}'
+    height: '52px'
+    padding: '0 12px 0 16px'
+    typography: '{typography.headline}'
+  note:
+    backgroundColor: '{colors.surface-2}'
+    textColor: '{colors.text-muted}'
+    rounded: '{rounded.default}'
+    padding: '8px 12px'
+    typography: '{typography.footnote}'
+  note-warn:
+    backgroundColor: '{colors.warn-tint}'
+    textColor: '{colors.warn-ink}'
+    rounded: '{rounded.default}'
+    padding: '8px 12px'
+    typography: '{typography.footnote}'
+  tag:
+    backgroundColor: '{colors.surface-2}'
+    textColor: '{colors.text-muted}'
+    rounded: '{rounded.pill}'
+    padding: '4px 8px'
+    typography: '{typography.label}'
   sheet:
     backgroundColor: '{colors.surface}'
     rounded: '{rounded.sheet}'
@@ -351,7 +383,7 @@ over a neutral, highly legible text face with real Cyrillic.
 - **Body** (Onest 400, 17, 1.45): everything read.
 - **Callout** (Onest 400, 15): a row's second line.
 - **Label / Footnote** (Onest 600 / 400, 13): field labels, meta, unit prices.
-- **Caption** (Onest 700, 11, caps, +0.06em): group captions only; tab labels 11/600 without caps.
+- **Caption** (Onest 700, 11, caps, +0.06em): group captions and a card's own title (`SectionCaption`), nowhere else; tab labels 11/600 without caps.
 
 ### Named Rules
 
@@ -440,9 +472,11 @@ filled MDI icon and a 700 label; inactive tabs are outlined, 600.
 
 - **Card:** `surface`, radius 20, 16 padding, `border` hairline, rest shadow.
 - **List card:** the same with no padding; rows divided by a hairline; focus drawn inside the row.
-- **ListRow (target, new):** icon 24 · title 17/600 · meta 13 · tail (amount, button or a 20 chevron); 64 high.
-- **SectionCaption (target, new):** caps 11/700, `text-muted`, 4 from the left, 8 above its card.
-- **NavRow (target, new):** "icon · label · value · ›" — the entry into a nested screen.
+- **ListRow:** icon 24 · title 17/600 (an ellipsis, or wrapped) · meta 13 in two lines at most · tail (an amount, or a 44 button on a row that is no control) · a 20 chevron; 64 high. Destructive: title and icon `bad-ink`. Inactive: `text-muted`, still focusable, the meta says why. Selected: the `accent-tint` fill, a 2 `accent` ring and a ✓ in place of the chevron. Active under the keyboard (a list a field owns): the fill without the ring. Hover `surface-2`.
+- **The Chevron Goes On Rule.** A chevron means the row opens something to go on with — a screen, or a sheet with fields. A row that acts at once or asks to confirm has none, and one card never mixes the two (the owner's В-14).
+- **SectionCaption:** caps 11/700, `text-muted`, 4 from the left, 8 above its card; a mark before the words (the verdict's dot, 24) and a tail on the right (a month's sum, 13/600). Inside a card, as the card's own title, it has no 4 and no 8. Caps are drawn nowhere else.
+- **NavRow:** "icon · label · value · ›", 52 — the entry into a nested screen, or a button opening a sheet. The chevron always.
+- **Note:** an 18 icon and 13 words on `surface-2`, radius 14, 8 / 12; `warn` on its tint. A tag in a row: a pill of 13/600, plain, `warn` or `bad`.
 - **OperationRow (target, one):** one row for spendings, an account's log and a reconciliation; a chevron on every pressable row or on none; amounts aligned in one column.
 
 ### Inputs / Fields
