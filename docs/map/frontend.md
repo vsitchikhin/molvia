@@ -18,6 +18,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/components/BottomSheet.vue` — The sheet: a native modal `<dialog>` rising from the bottom, closed through its history entry; stacks with «‹» instead of ×.
 - `frontend/src/components/FloatingDock.vue` — Floating spot for the main action of a «Деньги» screen («Трата», «Обмен», «Доход») or «Вернуть» after a removal.
 - `frontend/src/components/ListRow.vue` — Kit row of a list, 64: icon, title, meta in two lines, a tail and the chevron of «opens something to go on with» (В-14); a button, a router link or a div; destructive, inactive with words why, selected read out by its role, active under the keyboard.
+- `frontend/src/components/NavRow.vue` — Kit entry row, 52: «icon · label · value · ›», a router link to a screen or a button opening a sheet (`aria-haspopup`); the chevron always.
 - `frontend/src/components/SchemeGroup.vue` — «Тема» on the settings screen: «Системная · Светлая · Тёмная» of this device, taken on the tap, in every state of the screen.
 - `frontend/src/components/ScreenSkeleton.vue` — Loading state: bars in the geometry the screen gives, announcing «Loading…» through the live region.
 - `frontend/src/components/ScreenState.vue` — Every non-loading screen state (empty, error, offline, attention): icon circle by tone, texts, «Try again» and actions; «Обновить» first while a version waits; «Сообщить о проблеме» last under a full-screen error (MOL-147).
