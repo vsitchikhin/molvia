@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import {
   DomainError,
   ERROR,
@@ -14,6 +14,7 @@ import type {
   Place,
   ReceiptBody,
   ReceiptFailure,
+  ReceiptHeard,
   ReceiptLine,
   ReceiptParsedMatch,
   ReceiptPlace,
@@ -99,6 +100,8 @@ export interface StoredReceipt {
   readonly receipt: ReceiptSummary
   readonly currency: Currency
   readonly city: ReceiptCity | null
+  /** How the person learned it was read (MOL-129); `null` — not yet, or not read. */
+  readonly heard: ReceiptHeard | null
 }
 
 /**
@@ -169,6 +172,11 @@ export interface ReceiptRepository {
     actorId: string,
     id: string,
   ): Promise<(StoredReceipt & { readonly lines: StoredReceiptLine[] }) | null>
+  /**
+   * The phone was handed these receipts read (MOL-129): nobody will be told of them in Telegram. The
+   * first word stands — one the bot already told of stays `bot`, and a repeat moves no moment.
+   */
+  heardInApp(actorId: string, ids: readonly string[]): Promise<void>
   /** The owner's receipt, locked for recording: `null` for a missing, removed or someone else's one. */
   lockForRecord(actorId: string, id: string): Promise<ReceiptToRecord | null>
   /**
@@ -285,7 +293,12 @@ function toSummary({
 }
 
 function toStored(found: SummaryRow): StoredReceipt {
-  return { receipt: toSummary(found), currency: found.row.currency, city: found.row.city }
+  return {
+    receipt: toSummary(found),
+    currency: found.row.currency,
+    city: found.row.city,
+    heard: found.row.heard,
+  }
 }
 
 function toLine(row: typeof receiptLines.$inferSelect, currency: Currency): StoredReceiptLine {
@@ -440,6 +453,20 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         .where(eq(receiptLines.receiptId, own))
         .orderBy(asc(receiptLines.position))
       return { ...toStored(found), lines: lines.map((line) => toLine(line, found.row.currency)) }
+    },
+
+    async heardInApp(actorId, ids) {
+      if (ids.length === 0) return
+      await db
+        .update(receipts)
+        .set({ heard: 'app', heardAt: sql`clock_timestamp()` })
+        .where(
+          and(
+            eq(receipts.actorId, actorId),
+            inArray(receipts.id, [...ids]),
+            sql`${receipts.status} in ('parsed', 'failed') and ${receipts.heard} is null`,
+          ),
+        )
     },
 
     async lockForRecord(actorId, id) {

@@ -111,12 +111,33 @@ async function withPlaces(
   })
 }
 
+/**
+ * The phone is handed these receipts as they stand (MOL-129): one read and not yet heard of is heard
+ * of now, in the app, and «чек разобран» will not follow. An ordinary list writes nothing.
+ */
+async function handedOver(
+  receipts: ReceiptReviewRepositories['receipts'],
+  actorId: string,
+  stored: readonly StoredReceipt[],
+): Promise<void> {
+  const fresh = stored.filter(
+    ({ receipt, heard }) =>
+      heard === null && (receipt.status === 'parsed' || receipt.status === 'failed'),
+  )
+  await receipts.heardInApp(
+    actorId,
+    fresh.map(({ receipt }) => receipt.id),
+  )
+}
+
 /** «Покупки»: the person's receipts, each with its place where its tax number tells it (MOL-126). */
 export async function receiptsOf(
   repositories: ReceiptReviewRepositories,
   actor: Actor,
 ): Promise<ReceiptSummary[]> {
-  return withPlaces(repositories.receipts, actor, await repositories.receipts.list(actor.id))
+  const stored = await repositories.receipts.list(actor.id)
+  await handedOver(repositories.receipts, actor.id, stored)
+  return withPlaces(repositories.receipts, actor, stored)
 }
 
 /**
@@ -132,6 +153,7 @@ export async function receiptOfOwner(
 ): Promise<ReceiptDetail> {
   const found = await repositories.receipts.one(actor.id, id)
   if (found === null) throw new DomainError(ERROR.NOT_FOUND)
+  await handedOver(repositories.receipts, actor.id, [found])
   const [receipt] = await withPlaces(repositories.receipts, actor, [found])
   if (receipt === undefined) throw new DomainError(ERROR.NOT_FOUND)
   const { lines, currency } = found

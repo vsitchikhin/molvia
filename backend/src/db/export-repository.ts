@@ -302,6 +302,8 @@ export const EXPORT_COLUMNS: Readonly<
       'balanced',
       'city',
       'recorded_at',
+      'heard',
+      'heard_at',
       'trip_id',
       'deleted_at',
     ],
@@ -990,6 +992,8 @@ export function createExportRepository(db: Db): ExportRepository {
               balanced: row.balanced,
               city: row.city,
               recordedAt: row.recordedAt,
+              heard: row.heard,
+              heardAt: row.heardAt,
               tripId: row.tripId,
               removedAt: row.deletedAt,
               lines: (linesOf.get(row.id) ?? []).map((line) => ({

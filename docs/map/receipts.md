@@ -45,6 +45,7 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 
 - `backend/tests/receipt-review.integration.test.ts` — Integration test of the review (MOL-126): the memory's own word, majority, tie and erased vote; the memory laid over the parse; В-5 and В-1; the place by tax number and city; the receipt recorded before; the rate of the receipt's day.
 - `backend/tests/receipt-record.integration.test.ts` — Integration test of «Записать»: the trip on the receipt's day, purchases and new items, memory and the place's tax number, the photo and the rows left, «Деньги» and «Оценки», a repeat, the receipt recorded before, the refusals, the lines left out in the trip's money.
+- `backend/tests/receipt-notices.integration.test.ts` — Integration test of «чек разобран» (MOL-129): a receipt read is heard of in the app once the list or the review hands it over, the first word stands.
 - `backend/tests/receipts.integration.test.ts` — Integration test of receipts: sending and parts with their refusals and repeats, the queue on the bench's reading of am-05 with a fake reader, «переснимите», a reader away, removal and the 28 days, the log through the server.
 
 ## services · receipt-reader

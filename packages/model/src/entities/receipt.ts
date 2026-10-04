@@ -72,6 +72,27 @@ export const receiptFailureSchema = z.enum(['reshoot', 'unreadable'])
 export type ReceiptFailure = z.infer<typeof receiptFailureSchema>
 
 /**
+ * How the person learned their receipt was read (MOL-129): `app` — the phone was handed it read, by
+ * the list of «Покупки» or the review; `bot` — it was not, and the bot said so. Whichever came first;
+ * nothing comes after it.
+ */
+export const receiptHeardSchema = z.enum(['app', 'bot'])
+export type ReceiptHeard = z.infer<typeof receiptHeardSchema>
+
+/**
+ * «Чек разобран» goes only to someone who left the screen (owner, 30.09.2026): a receipt read this
+ * long ago that no phone was handed read. «Покупки» ask every five seconds while one is read and the
+ * screen is in view (`RECEIPT_POLL_MS`), so this is six asks of margin for a poor connection.
+ */
+export const RECEIPT_TELL_AFTER_SECONDS = 30
+
+/**
+ * …and no later than this after it was read: past it the answer waits in «Покупки», and a bot back
+ * from a long outage does not bring a day of receipts at once.
+ */
+export const RECEIPT_TELL_WITHIN_HOURS = 6
+
+/**
  * The countries a receipt is read in, with Tesseract's languages for each, as MOL-114 measured them:
  * one country's set, never every script at once, which is slower and confuses the alphabets.
  * Georgia (`kat+eng`) and Serbia (`srp+srp_latn+eng`) join with their currencies (MOL-89); the
