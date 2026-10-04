@@ -783,6 +783,24 @@ describe('лишних выдач нет (адверсариальный В, р�
     // 21:00 in Yerevan is 19:00 in Belgrade
     expect(asked(await evening('2026-07-14', '21:00'))).toEqual({ [milan.tg]: ['Ајвар'] })
   })
+
+  it('и зимой — в 19:00 по Белграду, на час позже летнего: пояс по имени, а не смещением (MOL-109)', async () => {
+    const milan = await person({ country: 'RS', city: 'Белград' })
+    await bought(milan, await item('Ајвар'), yerevan('2027-01-13', '12:00'))
+
+    // 21:00 in Yerevan is 18:00 in Belgrade (winter, UTC+1): not yet — summer's offset would say yes
+    expect(asked(await evening('2027-01-14', '21:00'))).toEqual({})
+    // 22:00 in Yerevan is 19:00 in Belgrade
+    expect(asked(await evening('2027-01-14', '22:00'))).toEqual({ [milan.tg]: ['Ајвар'] })
+  })
+
+  it('человек из Тбилиси — в 19:00, как Ереван: пояс тот же круглый год (MOL-109)', async () => {
+    const nino = await person({ country: 'GE', city: 'Тбилиси' })
+    await bought(nino, await item('Боржоми'), yerevan('2027-01-13', '12:00'))
+
+    expect(asked(await evening('2027-01-14', '18:59'))).toEqual({})
+    expect(asked(await evening('2027-01-14', '19:00'))).toEqual({ [nino.tg]: ['Боржоми'] })
+  })
 })
 
 describe('две выдачи одной минуты разом (ревью Т-6: «даже при двух процессах бота»)', () => {
