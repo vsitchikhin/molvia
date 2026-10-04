@@ -18,7 +18,7 @@ import type {
   ReceiptParsedMatch,
   ReceiptPlace,
   ReceiptSummary,
-  SettingsCity,
+  ReceiptCity,
   TripReceiptSource,
 } from '@molvia/model'
 import { translateFailures } from './failure'
@@ -51,7 +51,7 @@ export interface ReceiptHead {
   readonly balanced: boolean
   readonly layout: 'card' | 'table'
   /** The city of the settings its address prints (MOL-126, Р-6). */
-  readonly city: SettingsCity | null
+  readonly city: ReceiptCity | null
 }
 
 /** What the parse found a line to be (MOL-126): an item and how, and the line word by word. */
@@ -98,7 +98,7 @@ export interface StoredReceiptLine extends ReceiptLine {
 export interface StoredReceipt {
   readonly receipt: ReceiptSummary
   readonly currency: Currency
-  readonly city: SettingsCity | null
+  readonly city: ReceiptCity | null
 }
 
 /**
@@ -134,7 +134,7 @@ export interface ReceiptToRecord {
   readonly printedOn: string | null
   readonly printedTime: string | null
   readonly total: Money | null
-  readonly city: SettingsCity | null
+  readonly city: ReceiptCity | null
   /** The trip it was recorded as, until that trip is removed for good. */
   readonly tripId: string | null
   /** That trip is there and not marked removed. */

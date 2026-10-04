@@ -479,6 +479,13 @@ describe('словарь: города', () => {
       expect(EN[`place.cities_in.${city}`], city).toBeDefined()
     }
   })
+
+  it('у каждого города настроек есть родительный — «Что брать» называет город им (MOL-109)', () => {
+    for (const city of SETTINGS_CITIES) {
+      expect(RU[`advice.cities_genitive.${city}`], city).toBeDefined()
+      expect(EN[`advice.cities_genitive.${city}`], city).toBeDefined()
+    }
+  })
 })
 
 describe('словарь: реестр ошибок', () => {

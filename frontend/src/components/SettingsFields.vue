@@ -70,7 +70,7 @@
 import { computed, defineComponent, useId } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { actorSettingsSchema, currencySchema, SETTINGS_CITIES } from '@molvia/model'
+import { actorSettingsSchema, COUNTRY_CITIES, currencySchema } from '@molvia/model'
 import type { ActorSettings } from '@molvia/model'
 import IconInfo from '~icons/mdi/information-outline'
 import AppCard from '@/components/AppCard.vue'
@@ -90,7 +90,7 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t } = useI18n()
-    const cities: readonly string[] = SETTINGS_CITIES
+    const cities: readonly string[] = COUNTRY_CITIES.AM
     const currencyFields = ['spendCurrency', 'incomeCurrency'] as const
     /**
      * The geography the form opened on. A city outside today's two — a settings row written

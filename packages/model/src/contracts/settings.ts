@@ -1,11 +1,38 @@
 import { z } from 'zod'
-import { countrySchema, citySchema } from '#model/values/geo'
+import { countrySchema, citySchema, COUNTRY_TIME_ZONES } from '#model/values/geo'
 import { currencySchema } from '#model/values/money'
 import { ISSUE } from '#model/support/errors'
 import { placeNameIdentity } from '#model/values/place-identity'
 
-export const SETTINGS_CITIES = ['Гюмри', 'Ереван'] as const
-export type SettingsCity = (typeof SETTINGS_CITIES)[number]
+/**
+ * The countries a person may choose, and the cities of each (MOL-89, MOL-109): Armenia from 0.1,
+ * Georgia and Serbia from 0.2. A city is its Russian name — the key of a place and of the words a
+ * screen prints it with. The first city of a country is the one a change of country lands on, and
+ * the one a newcomer whose phone lives in that country starts in.
+ */
+export const SETTINGS_COUNTRIES = ['AM', 'GE', 'RS'] as const
+export type SettingsCountry = (typeof SETTINGS_COUNTRIES)[number]
+
+export const COUNTRY_CITIES = {
+  AM: ['Гюмри', 'Ереван'],
+  GE: ['Тбилиси', 'Батуми'],
+  RS: ['Белград', 'Нови-Сад'],
+} as const satisfies Readonly<Record<SettingsCountry, readonly [string, ...string[]]>>
+export type SettingsCity = (typeof COUNTRY_CITIES)[SettingsCountry][number]
+
+/** Every city of every country, in the order of the countries. */
+export const SETTINGS_CITIES: readonly SettingsCity[] = SETTINGS_COUNTRIES.flatMap(
+  (country) => COUNTRY_CITIES[country],
+)
+
+export function isSettingsCountry(country: string): country is SettingsCountry {
+  return SETTINGS_COUNTRIES.some((known) => known === country)
+}
+
+/** The cities a country offers, or none for a country the settings do not. */
+export function citiesOf(country: string): readonly SettingsCity[] {
+  return isSettingsCountry(country) ? COUNTRY_CITIES[country] : []
+}
 
 /**
  * The city of the settings a stored spelling is (MOL-120, adversarial А2), or `null` for one the
@@ -48,12 +75,25 @@ export function sameSettings(a: ActorSettings, b: ActorSettings): boolean {
   )
 }
 
+/**
+ * Where a newcomer starts (MOL-109, В-3): the country their phone's time zone lives in, at its first
+ * city, else Gyumri — as every account began before Georgia and Serbia. A guess, never asked about:
+ * the settings change it in one tap, and it beats landing a person from Belgrade in Gyumri, where
+ * their first trip would write a shop.
+ */
+export function firstGeography(zone: string | undefined): SettingsGeography {
+  const country =
+    SETTINGS_COUNTRIES.find((known) => zone !== undefined && COUNTRY_TIME_ZONES[known] === zone) ??
+    'AM'
+  return { country, city: COUNTRY_CITIES[country][0] }
+}
+
 export function geographyKey(value: Pick<ActorSettings, 'country' | 'city'>): string {
   return JSON.stringify([value.country, value.city])
 }
 
 /**
- * Whether a geography may be written down at all: one of today's two cities, or exactly the
+ * Whether a geography may be written down at all: a city of its own country, or exactly the
  * one the person already has — a historical row from before the form existed stays usable,
  * and so does an offline trip that carries the settings of the day it was started.
  *
@@ -68,7 +108,7 @@ export function geographyAllowed(
 ): boolean {
   return (
     (value.country === held.country && value.city === held.city) ||
-    (value.country === 'AM' && SETTINGS_CITIES.some((city) => city === value.city))
+    citiesOf(value.country).some((city) => city === value.city)
   )
 }
 

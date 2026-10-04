@@ -402,7 +402,11 @@
     "stale_other_city": "List for {oldCity} from {day} at {time}. Prices for {city} will appear when the connection returns.",
     "cities_genitive": {
       "Гюмри": "Gyumri",
-      "Ереван": "Yerevan"
+      "Ереван": "Yerevan",
+      "Тбилиси": "Tbilisi",
+      "Батуми": "Batumi",
+      "Белград": "Belgrade",
+      "Нови-Сад": "Novi Sad"
     },
     "search": {
       "label": "Search the catalogue",
@@ -1822,7 +1826,11 @@
     "in_unknown_city": "{place} ({city})",
     "cities_in": {
       "Гюмри": "in Gyumri",
-      "Ереван": "in Yerevan"
+      "Ереван": "in Yerevan",
+      "Тбилиси": "in Tbilisi",
+      "Батуми": "in Batumi",
+      "Белград": "in Belgrade",
+      "Нови-Сад": "in Novi Sad"
     }
   },
   "receipt": {

@@ -120,13 +120,38 @@ describe('settings and offline trip context', () => {
   })
 
   it('requires a session and rejects unsupported new geography while preserving historical values', async () => {
-    const owner = await insertActor(db, { country: 'GE', city: 'Тбилиси' })
+    const owner = await insertActor(db, { country: 'RU', city: 'Москва' })
     const cookie = await signIn(db, owner)
-    const legacy = { ...initial, country: 'GE', city: 'Тбилиси' }
+    const legacy = { ...initial, country: 'RU', city: 'Москва' }
     expect((await save('', legacy, legacy)).statusCode).toBe(401)
     expect((await save(cookie, legacy, { ...legacy, incomeCurrency: 'AMD' })).statusCode).toBe(200)
-    expect((await save(cookie, legacy, { ...legacy, city: 'Батуми' })).statusCode).toBe(400)
+    expect((await save(cookie, legacy, { ...legacy, city: 'Казань' })).statusCode).toBe(400)
     expect((await save(cookie, { ...legacy, incomeCurrency: 'AMD' }, initial)).statusCode).toBe(200)
+  })
+
+  it('moves a person to Georgia and Serbia, a city of each only under its own country (MOL-109)', async () => {
+    const owner = await insertActor(db)
+    const cookie = await signIn(db, owner)
+    const batumi = { ...initial, country: 'GE', city: 'Батуми' }
+    expect((await save(cookie, initial, { ...initial, city: 'Тбилиси' })).statusCode).toBe(400)
+    expect((await save(cookie, initial, { ...batumi, city: 'Нови-Сад' })).statusCode).toBe(400)
+    expect((await save(cookie, initial, batumi)).statusCode).toBe(200)
+    const noviSad = { ...initial, country: 'RS', city: 'Нови-Сад' }
+    expect((await save(cookie, batumi, noviSad)).statusCode).toBe(200)
+    expect(await db.select({ country: actors.country, city: actors.city }).from(actors)).toEqual([
+      { country: 'RS', city: 'Нови-Сад' },
+    ])
+    const trip = await app.inject({
+      method: 'POST',
+      url: '/trips',
+      headers: { cookie },
+      payload: { id: randomUUID(), context: batumi, place: { kind: 'store', name: 'Spar' } },
+    })
+    // an offline start made in Batumi before the move to Novi Sad is still Batumi's
+    expect(trip.statusCode).toBe(201)
+    expect(await db.select({ country: places.country, city: places.city }).from(places)).toEqual([
+      { country: 'GE', city: 'Батуми' },
+    ])
   })
 
   it('starts a queued trip in its captured city/currencies after another device changes settings', async () => {
@@ -169,7 +194,7 @@ describe('settings and offline trip context', () => {
   })
 
   it('refuses a trip in a geography the settings would refuse, and keeps the historical one', async () => {
-    const owner = await insertActor(db, { country: 'GE', city: 'Тбилиси' })
+    const owner = await insertActor(db, { country: 'RU', city: 'Москва' })
     const cookie = await signIn(db, owner)
     const start = async (context: ActorSettings, name: string) =>
       app.inject({
@@ -178,10 +203,10 @@ describe('settings and offline trip context', () => {
         headers: { cookie },
         payload: { id: randomUUID(), context, place: { kind: 'store', name } },
       })
-    const legacy = { ...initial, country: 'GE', city: 'Тбилиси' }
+    const legacy = { ...initial, country: 'RU', city: 'Москва' }
     // «No context» and «a context nothing may be written under» are one answer, because they
     // are one question for the person — and a 400 would have taken the trip's purchases with
-    // it (review 2, замечание 9).
+    // it (review 2, замечание 9). Batumi is a city of the settings — of Georgia's, not Armenia's.
     const refused = await start({ ...initial, city: 'Батуми' }, 'Гудвилл')
     expect(refused.statusCode).toBe(409)
     expect(refused.json()).toMatchObject({ code: ERROR.TRIP_CONTEXT_REQUIRED })
@@ -192,7 +217,7 @@ describe('settings and offline trip context', () => {
     // today's two, which is what an offline start made before a move carries.
     expect((await start(legacy, 'Гудвилл')).statusCode).toBe(201)
     expect((await start(initial, 'SAS')).statusCode).toBe(409)
-    expect(await db.select({ city: places.city }).from(places)).toEqual([{ city: 'Тбилиси' }])
+    expect(await db.select({ city: places.city }).from(places)).toEqual([{ city: 'Москва' }])
   })
 
   it('finds a place whose city was written in another case, and ignores a stray query parameter', async () => {
