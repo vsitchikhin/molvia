@@ -162,6 +162,7 @@ describe('словарь: повторяющиеся тексты', () => {
       // Та же цена у офлайна: у настроек, у обменов, у доходов и у устройств своё состояние
       // (MOL-40, MOL-57, MOL-66).
       'Нет связи': [
+        'bot.offline.title',
         'devices.offline.title',
         'exchange.offline.title',
         'income.offline.title',
@@ -192,6 +193,8 @@ describe('словарь: повторяющиеся тексты', () => {
         'exchange.load_error.body',
         'income.load_error.body',
       ],
+      // Две подстраницы настроек, одно и то же «не загрузилось» (MOL-129).
+      'Сервер не ответил. Попробуйте ещё раз.': ['bot.load_error.body', 'devices.load_error.body'],
       'Не получилось. Проверьте связь и попробуйте ещё раз': ['exchange.failed', 'income.failed'],
       Валюта: ['accounts.sheet.currency', 'exchange.sheet.currency', 'income.sheet.currency'],
       'Прежние версии': ['exchange.sheet.history', 'income.sheet.history'],
@@ -300,6 +303,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'trip.receipt.sheet.save',
       ],
       'No connection': [
+        'bot.offline.title',
         'devices.offline.title',
         'exchange.offline.title',
         'income.offline.title',
@@ -319,6 +323,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'exchange.load_error.body',
         'income.load_error.body',
       ],
+      'The server did not answer. Try again.': ['bot.load_error.body', 'devices.load_error.body'],
       'That did not work. Check the connection and try again': ['exchange.failed', 'income.failed'],
       Currency: ['accounts.sheet.currency', 'exchange.sheet.currency', 'income.sheet.currency'],
       'Earlier versions': ['exchange.sheet.history', 'income.sheet.history'],

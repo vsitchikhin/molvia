@@ -51,7 +51,9 @@ import {
   monthSchema,
   yearSchema,
   salaryShiftSchema,
+  chooseReceiptNoticesSchema,
   chooseRemindersSchema,
+  receiptNoticesSettingSchema,
   remindersSettingSchema,
   receiptBodySchema,
   receiptRecordBodySchema,
@@ -125,6 +127,7 @@ import type {
   MoneyChartMonthView,
   MoneyChartYearView,
   MoneyMonthView,
+  ReceiptNoticesSetting,
   RemindersSetting,
   SalaryShift,
   ReceiptBody,
@@ -391,6 +394,10 @@ export interface MolviaClient {
   remindersSetting(): Promise<RemindersSetting>
   /** Saved on the tap; turned on, the reminders start over. Safe to repeat. */
   chooseReminders(on: boolean): Promise<RemindersSetting>
+  /** «Сообщать, что чек разобран» (MOL-129, В-2): `off` — the person turned it off. */
+  receiptNoticesSetting(): Promise<ReceiptNoticesSetting>
+  /** Saved on the tap. Safe to repeat. */
+  chooseReceiptNotices(on: boolean): Promise<ReceiptNoticesSetting>
   /**
    * «Сохранить» a new spending. Named by the device, so safe to repeat: `created` is `false` for
    * the same one again, `error.conflict` for the same identifier with anything else — or while it
@@ -871,6 +878,14 @@ export function createClient(options: ClientOptions): MolviaClient {
       request('/actors/me/reminders', remindersSettingSchema, {
         method: 'PUT',
         body: encode(chooseRemindersSchema, { on }),
+      }),
+
+    receiptNoticesSetting: () => request('/actors/me/receipt-notices', receiptNoticesSettingSchema),
+
+    chooseReceiptNotices: async (on) =>
+      request('/actors/me/receipt-notices', receiptNoticesSettingSchema, {
+        method: 'PUT',
+        body: encode(chooseReceiptNoticesSchema, { on }),
       }),
 
     recordSpending: async (body) => {

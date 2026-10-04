@@ -282,7 +282,7 @@ it('«Тема» stands in every state, under «Напоминания» and ove
   me.mockResolvedValue(initial)
   const loaded = captions(await render())
   const at = loaded.indexOf(en.settings.group_scheme)
-  expect(loaded[at - 1]).toBe(en.settings.group_reminders)
+  expect(loaded[at - 1]).toBe(en.settings.group_bot)
   expect(loaded[at + 1]).toBe(en.settings.group_account)
 })
 
