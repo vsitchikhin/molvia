@@ -62,7 +62,9 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   ticked, «Принимаю» (`acceptTerms`); one request more before the door, and never the seam accepting
   by itself, which would make the step invisible in every working copy, as the seam once made the
   login screen. `consent.spec` is the step's own and presses the seam itself, as `login-screen.spec`
-  does.
+  does. **On WebKit `open()` answers the step's question itself, «accepted»**: the engine keeps no
+  `Secure` cookie on the loopback (below), so the question went out signed out and its `401` put the
+  page back on the login screen before any sheet was opened.
 - **A worker needs a build, so one spec runs against one** (MOL-132): the project `pwa` is the same
   phone against `vite build` + `vite preview` in `frontend/dist-e2e`, on the next port of the band
   (`E2E_PWA_PORT + 1`, derived, so no `.env` has to be made again), and holds only

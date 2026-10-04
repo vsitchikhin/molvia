@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { SESSION_COOKIE } from '@molvia/model'
+import { POLICY_VERSION, SESSION_COOKIE } from '@molvia/model'
 import type { Page, Request, Response } from '@playwright/test'
 
 /**
@@ -83,6 +83,15 @@ async function seamAnswer(page: Page): Promise<Response> {
 
 export async function open(page: Page, path = '/'): Promise<void> {
   const first = !(await page.context().cookies()).some((one) => one.name === SESSION_COOKIE)
+  // **WebKit keeps no `Secure` cookie on http://127.0.0.1** (`sheet.spec`, MOL-80): every request
+  // after the seam's answer comes in signed out, and the step's question about the terms (MOL-95)
+  // turned the page into the login screen before the sheet was ever opened. The step is not what the
+  // engine is there for — `consent.spec` holds it on Chromium — so here it is answered «accepted».
+  if (first && page.context().browser()?.browserType().name() === 'webkit') {
+    await page.route('**/api/actors/me/consent', (route) =>
+      route.fulfill({ json: { version: POLICY_VERSION } }),
+    )
+  }
   await page.goto(path)
   if (!first) return
   // Ответ шва и дверь ждутся порознь, потому что медленным бывает только первое (MOL-67).
