@@ -275,11 +275,15 @@ the round trip through Telegram, and ask whose account this turned out to be.
   does not wait for the hiding** (adversarial Б1, owner's decision): everything a sheet writes
   straight to the server — a rating into everybody's average, an exchange, an income, an account, a
   code — went out for them in that window, so the step comes as soon as no sheet is open; the one
-  write left is the sheet open when the answer came. «Not known» is the server's «none», **or its
-  silence with the connection up** (adversarial В1): one lost question kept the window open, online;
-  the step's error then offers «Повторить». Offline the app stays. `close` is heard on the way down
-  and looked at a task later, so a chain of sheets — the next opened by the first one's `onClosed` —
-  is not cut between them (review №9). **Nor does an open door
+  write left is the sheet open when the answer came. «Not known» is **the server's «none», never its
+  silence** (adversarial Г1 against В1, owner's decision): on the first launch of this build the
+  device remembers nobody, and closing the app on a lost question took the shelf from an owner on
+  record. **A failed question is asked again by time instead** — 5 s, doubling, a minute at most
+  (`CONSENT_RETRY_*`, the queues' `doublingRetry`) — besides `online` and the app looked at again,
+  so the window of one who accepted nothing ends with the next answer, not with an `online` a
+  wavering signal never sends. `close` is heard on the way down and looked at a task later, so a
+  chain of sheets — the next opened by the first one's `onClosed` — is not cut between them (review
+  №9). **Nor does an open door
   shut on a new question** (review №7): the connection back, or an identity asked again after an
   error, goes through `loading`, and the skeleton of a launch is only for an owner this page has not
   shown the app to. **The question about the terms is asked again by the store** on `online` and on
