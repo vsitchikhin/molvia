@@ -62,6 +62,7 @@ import {
   RECEIPT_PART_BYTES_MAX,
   receiptCountrySchema,
   receiptFailureSchema,
+  receiptHeardSchema,
   receiptParsedMatchSchema,
   receiptStatusSchema,
   storeMemoryKindSchema,
@@ -91,6 +92,7 @@ import type {
   AppLocale,
   ReceiptCountry,
   ReceiptFailure,
+  ReceiptHeard,
   ReceiptParsedMatch,
   ReceiptStatus,
   ReceiptCity,
@@ -282,6 +284,17 @@ export const actors = pgTable(
      * with it. Beside the settings, as `salary_shift_day` is, and for the same reason (Р-1).
      */
     remindersOff: text('reminders_off').$type<RemindersOff>(),
+    /**
+     * «Сообщать, что чек разобран» turned off by the person (MOL-129, В-2): a switch of its own on
+     * the page «Бот», never the rating reminders'. A block of the bot stays in `reminders_off`.
+     */
+    receiptNoticesOff: boolean('receipt_notices_off').notNull().default(false),
+    /**
+     * Since when the person has the bot blocked in Telegram (MOL-129, review №1); empty — not
+     * blocked, or not that we heard. Its own column because MOL-103 keeps «chosen» over a block in
+     * `reminders_off`, and «чек разобран» must not go to a blocked chat whatever the reminders are.
+     */
+    botBlockedAt: timestamp('bot_blocked_at', { withTimezone: true }),
     /**
      * Which edition of «Условия использования» and «Данные и приватность» the person accepted, and
      * when (MOL-95): `POLICY_VERSION` of the page they were shown, and the server's moment. Empty for
@@ -2120,6 +2133,10 @@ export const receipts = pgTable(
     // The city of the settings its address prints (MOL-126, Р-6), where its place is looked for.
     city: text('city').$type<ReceiptCity>(),
     recordedAt: timestamp('recorded_at', { withTimezone: true }),
+    // How the person learned it was read (MOL-129): the phone was handed it, or the bot said so —
+    // whichever came first. «Чек разобран» goes only to whoever was not handed it.
+    heard: text('heard').$type<ReceiptHeard>(),
+    heardAt: timestamp('heard_at', { withTimezone: true }),
     // The purchases it was recorded as (MOL-126); gone with the trip's final removal.
     tripId: uuid('trip_id').references(() => trips.id, { onDelete: 'set null' }),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -2139,6 +2156,12 @@ export const receipts = pgTable(
     index('receipts_queue_idx')
       .on(table.queuedAt)
       .where(sql`${table.status} = 'queued' and ${table.deletedAt} is null`),
+    // The bot's claim (MOL-129): receipts read that nobody has been told of yet, by when they were.
+    index('receipts_untold_idx')
+      .on(table.readAt)
+      .where(
+        sql`${table.status} in ('parsed', 'failed') and ${table.heard} is null and ${table.deletedAt} is null`,
+      ),
     check('receipts_status_known', oneOf(table.status, receiptStatusSchema.options)),
     check(
       'receipts_failure_known',
@@ -2169,6 +2192,11 @@ export const receipts = pgTable(
       'receipts_layout_known',
       sql`${table.layout} is null or ${table.layout} in ('card', 'table')`,
     ),
+    check(
+      'receipts_heard_known',
+      sql`${table.heard} is null or ${oneOf(table.heard, receiptHeardSchema.options)}`,
+    ),
+    check('receipts_heard_when', sql`(${table.heard} is null) = (${table.heardAt} is null)`),
     check(
       'receipts_total_non_negative',
       sql`${table.totalMinor} is null or ${table.totalMinor} >= 0`,

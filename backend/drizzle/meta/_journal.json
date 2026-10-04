@@ -337,6 +337,13 @@
       "when": 1791103322509,
       "tag": "0047_actor_consent",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1791129125757,
+      "tag": "0048_receipt_notices",
+      "breakpoints": true
     }
   ]
 }

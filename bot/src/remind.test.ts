@@ -7,8 +7,8 @@ import type { MolviaBotClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { Reminder } from '@molvia/model'
 import { t } from './i18n'
+import { RETRY_AFTER_CAP_SECONDS } from './deliver'
 import {
-  RETRY_AFTER_CAP_SECONDS,
   SCALE_DATA,
   SWITCH_DATA,
   keyboardOf,

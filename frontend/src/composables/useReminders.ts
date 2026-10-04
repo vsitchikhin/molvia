@@ -10,7 +10,7 @@ export interface RemindersState extends Omit<TapSettingState<RemindersOff | null
 }
 
 /**
- * «Напоминать об оценке в Telegram» on the settings screen (MOL-103): saved on the tap, beside the
+ * «Напоминать об оценке» on the page «Бот» (MOL-103, MOL-129): saved on the tap, beside the
  * form and never in it (Р-1). Turned off it is `chosen`; turned on it starts over, whatever turned
  * it off — a blocked bot included.
  */

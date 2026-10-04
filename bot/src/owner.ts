@@ -5,7 +5,7 @@ import type { MolviaBotClient } from '@molvia/client'
 import type { FeedbackContinuedNotice, FeedbackNotice, OwnerNotice } from '@molvia/model'
 import { t } from './i18n'
 import { telegramFailure } from './assemble'
-import { sleep } from './remind'
+import { sleep } from './deliver'
 import { reportDefect } from './failure'
 
 /**

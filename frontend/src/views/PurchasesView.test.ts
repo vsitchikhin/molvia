@@ -25,7 +25,7 @@ const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()
 const currentTrip = vi.fn<() => Promise<TripViewModel | null>>()
 const advice = vi.fn<() => Promise<AdviceResponse>>()
 const addExpense = vi.fn<() => Promise<unknown>>()
-const receipts = vi.fn<() => Promise<ReceiptsResponse>>()
+const receipts = vi.fn<(options?: { shown?: boolean }) => Promise<ReceiptsResponse>>()
 vi.mock('@/api', () => ({
   api: {
     advice: () => advice(),
@@ -37,7 +37,7 @@ vi.mock('@/api', () => ({
     finishTrip: () => new Promise(() => undefined),
     removeTrip: () => new Promise(() => undefined),
     addExpense: () => addExpense(),
-    receipts: () => receipts(),
+    receipts: (options?: { shown?: boolean }) => receipts(options),
   },
 }))
 
@@ -997,5 +997,27 @@ describe('PurchasesView (MOL-128)', () => {
     })
     await flushPromises()
     expect(view.text()).toContain('1 покупка ещё не отправлена')
+  })
+
+  describe('«увидел в приложении» — только со страницей на виду (MOL-129, adversarial А1)', () => {
+    it('asks with `shown` in view and without it hidden: the connection back, a queue landing', async () => {
+      let visibility: DocumentVisibilityState = 'visible'
+      vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility)
+      const { queue } = await render()
+      expect(receipts).toHaveBeenLastCalledWith({ shown: true })
+
+      // the phone in the pocket, the shop's connection flapping
+      visibility = 'hidden'
+      window.dispatchEvent(new Event('online'))
+      await flushPromises()
+      expect(receipts).toHaveBeenLastCalledWith({ shown: false })
+
+      // a purchase typed offline lands in the background
+      const asked = receipts.mock.calls.length
+      queue.landed++
+      await flushPromises()
+      expect(receipts.mock.calls.length).toBe(asked + 1)
+      expect(receipts).toHaveBeenLastCalledWith({ shown: false })
+    })
   })
 })

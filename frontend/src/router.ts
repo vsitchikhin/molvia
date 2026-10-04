@@ -12,6 +12,7 @@ import TripView from '@/views/TripView.vue'
 import ExchangeView from '@/views/ExchangeView.vue'
 import IncomesView from '@/views/IncomesView.vue'
 import DevicesView from '@/views/DevicesView.vue'
+import BotView from '@/views/BotView.vue'
 import VerdictsView from '@/views/VerdictsView.vue'
 import MoneySpendingsView from '@/views/MoneySpendingsView.vue'
 import MoneyBudgetView from '@/views/MoneyBudgetView.vue'
@@ -45,6 +46,7 @@ export type RouteName =
   | 'exchange'
   | 'incomes'
   | 'devices'
+  | 'bot'
   | 'item-search'
   | 'purchase'
   | 'finished-search'
@@ -95,6 +97,12 @@ export const routes = [
     name: 'devices',
     component: DevicesView,
     meta: { titleKey: 'devices.title', parent: 'settings' },
+  },
+  {
+    path: '/settings/bot',
+    name: 'bot',
+    component: BotView,
+    meta: { titleKey: 'bot.title', parent: 'settings' },
   },
   {
     path: '/',
