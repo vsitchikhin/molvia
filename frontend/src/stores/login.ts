@@ -260,21 +260,33 @@ export const useLoginStore = defineStore('login', () => {
     if (document.visibilityState === 'hidden' && !holdsTyping(document)) shownTo.value = null
   })
   /**
-   * **An owner known to have accepted no edition does not wait for the app to be hidden** (adversarial
-   * Б1, owner's decision): in that window everything a sheet writes straight to the server — a
-   * rating into everybody's average, an exchange, a code — went out for a person who had said no
-   * «16 или больше». The step comes as soon as no sheet is open: what is being typed is still not
-   * lost (№3), and the sheet open now is the one write left. An owner on record with an older
+   * **An owner not known to have accepted any edition does not wait for the app to be hidden**
+   * (adversarial Б1, owner's decision): in that window everything a sheet writes straight to the
+   * server — a rating into everybody's average, an exchange, a code — went out for a person who had
+   * said no «16 или больше». The step comes as soon as no sheet is open: what is being typed is still
+   * not lost (№3), and the sheet open now is the one write left. **Known none, or not known at all
+   * with the connection up** (adversarial В1): one lost question kept the whole window open, online,
+   * and the step's own error offers «Повторить» while the store asks again by itself. Offline the app
+   * stays — the shelf with no signal is the product's main scenario. An owner on record with an older
    * edition waits for the hiding, as before.
    */
+  const unacceptedAnswered = computed(
+    () => (consent.state === 'ready' || consent.state === 'error') && consent.unaccepted,
+  )
   function letGoOfTheUnaccepted(): void {
-    if (consent.state === 'ready' && consent.unaccepted && !holdsTyping(document)) {
-      shownTo.value = null
-    }
+    if (unacceptedAnswered.value && !holdsTyping(document)) shownTo.value = null
   }
-  watch(() => consent.state === 'ready' && consent.unaccepted, letGoOfTheUnaccepted)
-  // A sheet that closes may have been the last one: `close` does not bubble, so it is caught on the way down.
-  document.addEventListener('close', letGoOfTheUnaccepted, true)
+  watch(unacceptedAnswered, letGoOfTheUnaccepted)
+  // A sheet that closes may have been the last one — or a chain's first, whose `onClosed` opens the
+  // next (review №9): looked at a task later, once that one is `[open]`. `close` does not bubble, so
+  // it is caught on the way down.
+  document.addEventListener(
+    'close',
+    () => {
+      window.setTimeout(letGoOfTheUnaccepted, 0)
+    },
+    true,
+  )
 
   /**
    * **What the queues wait for before they send** (MOL-56, MOL-95): another window's login being

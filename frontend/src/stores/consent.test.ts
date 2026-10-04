@@ -236,6 +236,39 @@ describe('the step does not close the door over an app already shown (MOL-95, re
 
     sheet.removeAttribute('open')
     sheet.dispatchEvent(new Event('close'))
+    await flush()
+    expect(login.closed).toBe(true)
+    expect(login.phase).toBe('consent')
+  })
+
+  it('a chain of sheets — the next opened by the first one’s `onClosed` — is not cut between them (№9)', async () => {
+    const { actor, login } = await shownOffline()
+    const first = aSheet()
+    me.mockResolvedValue(MINE)
+    consent.mockResolvedValue({ version: null })
+    await actor.start()
+    await flush()
+    expect(login.closed).toBe(false)
+
+    first.removeAttribute('open')
+    first.dispatchEvent(new Event('close'))
+    const next = aSheet()
+    await flush()
+    expect(login.closed).toBe(false)
+
+    next.removeAttribute('open')
+    next.dispatchEvent(new Event('close'))
+    await flush()
+    expect(login.closed).toBe(true)
+  })
+
+  it('a question lost with the connection up is no reason to keep the app: the step’s error, with no sheet open (В1)', async () => {
+    const { actor, login } = await shownOffline()
+    me.mockResolvedValue(MINE)
+    consent.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'lost on the way', false))
+    await actor.start()
+    await flush()
+    expect(useConsentStore().state).toBe('error')
     expect(login.closed).toBe(true)
     expect(login.phase).toBe('consent')
   })
@@ -250,13 +283,16 @@ describe('the step does not close the door over an app already shown (MOL-95, re
     expect(login.phase).toBe('consent')
   })
 
-  it('not known yet (the question failed): the app stays until hidden with no sheet open', async () => {
+  it('not known yet because the signal went again: the app stays until hidden with no sheet open', async () => {
     const { actor, login } = await shownOffline()
     me.mockResolvedValue(MINE)
-    consent.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    consent.mockImplementation(() => {
+      online(false)
+      return Promise.reject(new ApiError(ERROR.INTERNAL, 'transport', false))
+    })
     await actor.start()
     await flush()
-    expect(useConsentStore().state).toBe('error')
+    expect(useConsentStore().state).toBe('offline')
     expect(login.closed).toBe(false)
 
     const sheet = aSheet()
