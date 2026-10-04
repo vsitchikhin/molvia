@@ -5,6 +5,7 @@ import {
   botApiSecretSchema,
   botFailureSchema,
   confirmLoginSchema,
+  dueReceiptNoticesSchema,
   dueRemindersSchema,
   eraseMeSchema,
   feedbackFromBotAnswerSchema,
@@ -21,6 +22,7 @@ import {
 } from '@molvia/model'
 import type {
   BotFailure,
+  DueReceiptNotices,
   DueReminders,
   FeedbackFromBot,
   FeedbackFromBotAnswer,
@@ -52,6 +54,11 @@ export interface MolviaBotClient {
    * same answer whether there was anyone or not; repeats are harmless.
    */
   switchReminders(telegramUserId: TelegramUserId, change: ReminderSwitch): Promise<void>
+  /**
+   * «Чек разобран» due now, already marked as told by the API (MOL-129). `signal` cuts the wait
+   * short, as the owner's notices' does.
+   */
+  claimReceiptNotices(signal?: AbortSignal): Promise<DueReceiptNotices>
   /** A failure of the bot's own, by its kind and handler (MOL-143): the API fingerprints it. */
   reportFailure(failure: BotFailure): Promise<void>
   /**
@@ -179,6 +186,11 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
         throw error
       }
     },
+    claimReceiptNotices: async (signal) =>
+      request('/internal/receipts/claim', dueReceiptNoticesSchema, {
+        method: 'POST',
+        ...(signal === undefined ? {} : { signal }),
+      }),
     claimOwnerNotices: async (signal) =>
       request('/internal/owner/claim', ownerNoticesSchema, {
         method: 'POST',

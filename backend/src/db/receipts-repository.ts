@@ -6,6 +6,8 @@ import {
   RECEIPT_CURRENCY,
   RECEIPT_KEEP_DAYS,
   RECEIPT_READ_ATTEMPTS,
+  RECEIPT_TELL_AFTER_SECONDS,
+  RECEIPT_TELL_WITHIN_HOURS,
   RECEIPT_UNDO_MINUTES,
 } from '@molvia/model'
 import type {
@@ -20,12 +22,21 @@ import type {
   ReceiptPlace,
   ReceiptSummary,
   ReceiptCity,
+  TelegramUserId,
   TripReceiptSource,
 } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
-import { places, receiptLineImages, receiptLines, receiptParts, receipts, trips } from './schema'
+import {
+  actors,
+  places,
+  receiptLineImages,
+  receiptLines,
+  receiptParts,
+  receipts,
+  trips,
+} from './schema'
 
 export interface ReceiptPart {
   readonly photo: Buffer
@@ -119,6 +130,16 @@ export interface TinPlace {
   readonly latest: Date
 }
 
+/** A receipt read that the bot is to tell of (MOL-129), with whose it is. */
+export interface UntoldReceipt extends StoredReceipt {
+  readonly actor: {
+    readonly id: string
+    readonly telegramUserId: TelegramUserId
+    readonly country: string
+    readonly city: string
+  }
+}
+
 /** The same receipt — tax number and number — recorded before, its purchases not removed (Т-11). */
 export interface RecordedTwin {
   readonly receiptId: string
@@ -177,6 +198,12 @@ export interface ReceiptRepository {
    * first word stands — one the bot already told of stays `bot`, and a repeat moves no moment.
    */
   heardInApp(actorId: string, ids: readonly string[]): Promise<void>
+  /**
+   * «Чек разобран» (MOL-129): receipts read `RECEIPT_TELL_AFTER_SECONDS` to `RECEIPT_TELL_WITHIN_HOURS`
+   * ago that no phone was handed, not removed, of someone who has not blocked the bot — marked as told
+   * by the bot in the same statement that picks them (at most once, MOL-101 Р-2), the oldest first.
+   */
+  claimUntold(limit: number): Promise<UntoldReceipt[]>
   /** The owner's receipt, locked for recording: `null` for a missing, removed or someone else's one. */
   lockForRecord(actorId: string, id: string): Promise<ReceiptToRecord | null>
   /**
@@ -467,6 +494,49 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             sql`${receipts.status} in ('parsed', 'failed') and ${receipts.heard} is null`,
           ),
         )
+    },
+
+    async claimUntold(limit) {
+      return db.transaction(async (tx) => {
+        // two claims at once take different rows (`skip locked`), and a phone's mark that lands first
+        // leaves the row out: the update re-reads `heard` under the row's lock
+        const told = await tx.execute<{ id: string }>(sql`
+          update ${receipts} r set heard = 'bot', heard_at = clock_timestamp()
+          from (
+            select due.id from ${receipts} due join ${actors} a on a.id = due.actor_id
+            where due.status in ('parsed', 'failed') and due.heard is null and due.deleted_at is null
+              and due.read_at <= clock_timestamp() - make_interval(secs => ${RECEIPT_TELL_AFTER_SECONDS})
+              and due.read_at > clock_timestamp() - make_interval(hours => ${RECEIPT_TELL_WITHIN_HOURS})
+              and a.reminders_off is distinct from 'blocked'
+            order by due.read_at, due.id
+            limit ${limit}
+            for update of due skip locked
+          ) picked
+          where r.id = picked.id and r.heard is null
+          returning r.id`)
+        const ids = told.map(({ id }) => id)
+        if (ids.length === 0) return []
+        const rows = await tx
+          .select({
+            ...summaryColumns,
+            telegramUserId: actors.telegramUserId,
+            actorCountry: actors.country,
+            actorCity: actors.city,
+          })
+          .from(receipts)
+          .innerJoin(actors, eq(actors.id, receipts.actorId))
+          .where(inArray(receipts.id, ids))
+          .orderBy(asc(receipts.readAt), asc(receipts.id))
+        return rows.map((row) => ({
+          ...toStored(row),
+          actor: {
+            id: row.row.actorId,
+            telegramUserId: row.telegramUserId,
+            country: row.actorCountry,
+            city: row.actorCity,
+          },
+        }))
+      })
     },
 
     async lockForRecord(actorId, id) {

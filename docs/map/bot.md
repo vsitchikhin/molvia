@@ -6,6 +6,7 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 ## packages/model
 
 - `packages/model/src/contracts/reminder.ts` — Wire contract of the rating reminder (MOL-101): what a claim hands the bot — the chat, up to three items with place and days ago, the total — and the body of a press of 1–5; the switch's setting, its body and the bot's change (MOL-103).
+- `packages/model/src/contracts/receipt-notice.ts` — Wire contract of «чек разобран» (MOL-129): what a claim hands the bot — the chat, the receipt for the button, read or not, its language, place, day and number of lines, and whether it comes without a sound; never a sum, a line or a tax number.
 - `packages/model/src/entities/reminder.ts` — The reminder's ladder (MOL-101): 19:00 to 22:00 of the person's day, three items, steps after 3 and 7 days, a six-month pause, and `planReminder` deciding which step is due; the switch (MOL-103): `chosen` or `blocked`, and `switchReminders` deciding where a change leaves it.
 
 ## backend
@@ -14,6 +15,7 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 - `backend/src/routes/reminders.ts` — Routes `GET`/`PUT /actors/me/reminders` (MOL-103): «Напоминать об оценке в Telegram», saved on the tap beside the settings.
 - `backend/src/usecases/reminders-switch.ts` — Use cases of the switch (MOL-103): read it, choose it in the settings, and the bot's change — a button, a block, an unblock.
 - `backend/src/usecases/rate-from-bot.ts` — Use case of a press of 1–5 under a reminder: the owner by the Telegram account that pressed, then `rateItem`; a new verdict is counted.
+- `backend/src/usecases/tell-receipts.ts` — Use case «Чек разобран» (MOL-129): the receipts read that no phone was handed, marked as told, worded with the place the review shows, the receipt's day and the night of the person's zone; a notice the contract refuses is said as a failure.
 - `backend/src/usecases/remind-ratings.ts` — Use case «Напомнить об оценке»: whose evening it is in their zone, which step `planReminder` says, and what the claim hands the bot.
 - `backend/tests/reminders-switch.integration.test.ts` — Integration test of the switch (MOL-103): off is off, «on» starts the ladder over, `blocked` and `chosen`, the counters, the app's and the bot's routes.
 - `backend/tests/reminders.integration.test.ts` — Integration test: the evening's hour and day, the ladder with the owner's example, MOL-29, the counters, and the bot's two internal routes.

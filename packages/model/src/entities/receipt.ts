@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { EXCHANGE_UNDO_MINUTES } from '#model/entities/exchange'
 import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
 import { COUNTRY_CITIES } from '#model/contracts/settings'
+import { localClock } from '#model/entities/reminder'
 import { toSearchKey } from '#model/support/search-key'
 import { MINOR_EXPONENT } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
@@ -91,6 +92,20 @@ export const RECEIPT_TELL_AFTER_SECONDS = 30
  * from a long outage does not bring a day of receipts at once.
  */
 export const RECEIPT_TELL_WITHIN_HOURS = 6
+
+/**
+ * The night of the person's zone, when «чек разобран» comes without a sound: a receipt is read half
+ * a minute after it is sent, by day, so one read at night was held by a reader that was away — and
+ * nobody is waiting for it at 3 a.m.
+ */
+export const RECEIPT_TELL_QUIET_FROM_HOUR = 22
+export const RECEIPT_TELL_QUIET_UNTIL_HOUR = 8
+
+/** Whether «чек разобран» at `now` comes without a sound, by the hour of `timeZone`. */
+export function tellsQuietly(now: Date, timeZone: string): boolean {
+  const { hour } = localClock(now, timeZone)
+  return hour >= RECEIPT_TELL_QUIET_FROM_HOUR || hour < RECEIPT_TELL_QUIET_UNTIL_HOUR
+}
 
 /**
  * The countries a receipt is read in, with Tesseract's languages for each, as MOL-114 measured them:

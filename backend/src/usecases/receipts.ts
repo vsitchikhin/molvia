@@ -77,8 +77,8 @@ export async function putReceiptPart(
  * first, else the place most people chose, the later on a tie, as the shop's memory is read. «Ереван
  * Сити» of Gyumri and of Yerevan are two places of one tax number. None, and the person names it.
  */
-async function withPlaces(
-  receipts: ReceiptReviewRepositories['receipts'],
+export async function withPlaces(
+  receipts: Pick<ReceiptRepository, 'placesOfTins'>,
   actor: Pick<Actor, 'id' | 'country' | 'city'>,
   stored: readonly StoredReceipt[],
 ): Promise<ReceiptSummary[]> {
