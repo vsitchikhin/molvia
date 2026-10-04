@@ -11,9 +11,6 @@ import { signedIn } from './session'
 const sheet = (page: Page) => page.locator('dialog[open]')
 /** «Края чека» (MOL-222), over the capture sheet. */
 const edges = (page: Page) => page.locator('dialog[open]').filter({ hasText: 'Receipt edges' })
-/** The capture sheet, whatever is over it. */
-const capturing = (page: Page) =>
-  page.locator('dialog[open]').filter({ hasText: 'Photograph a receipt' })
 
 /** Every shot passes «Края чека»: «Done» once its sheet has come up. */
 async function edged(page: Page): Promise<void> {
