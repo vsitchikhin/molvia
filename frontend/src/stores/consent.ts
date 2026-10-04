@@ -103,7 +103,11 @@ export const useConsentStore = defineStore('consent', () => {
     asking = quietly
     try {
       const answer = await api.consent()
-      if (mine === revision && owner.value === who) {
+      // Any answer about this owner is taken, a question since replaced included (review, round 6):
+      // a quiet one overtaken by «Повторить» was dropped, and the tap's failure then showed an error
+      // over an answer already given. `settle` only goes upwards, and a later failure of the newer
+      // question is dropped by the revision it moves.
+      if (owner.value === who && of.value === who) {
         again.cancel()
         again.reset()
         settle(who, answer.version)

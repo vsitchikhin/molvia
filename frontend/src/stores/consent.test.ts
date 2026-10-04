@@ -338,6 +338,33 @@ describe('the step does not close the door over an app already shown (MOL-95, re
     }
   })
 
+  it('a quiet answer overtaken by «Повторить» still counts, whatever becomes of the tap (round 6)', async () => {
+    claimedHere()
+    me.mockResolvedValue(MINE)
+    consent.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'lost on the way', false))
+    const actor = useActorStore()
+    const step = useConsentStore()
+    await actor.start()
+    await flush()
+    expect(step.state).toBe('error')
+
+    let quiet: (value: Consent) => void = () => undefined
+    consent.mockReturnValueOnce(new Promise((resolve) => (quiet = resolve)))
+    window.dispatchEvent(new Event('online'))
+    let tapped: (error: unknown) => void = () => undefined
+    consent.mockReturnValueOnce(new Promise((_resolve, reject) => (tapped = reject)))
+    void step.retry()
+    expect(step.state).toBe('loading')
+
+    quiet({ version: POLICY_VERSION })
+    await flush()
+    expect(step.state).toBe('ready')
+    tapped(new ApiError(ERROR.INTERNAL))
+    await flush()
+    expect(step.state).toBe('ready')
+    expect(step.accepted).toBe(POLICY_VERSION)
+  })
+
   it('«Повторить» by hand shows the question being asked', async () => {
     claimedHere()
     me.mockResolvedValue(MINE)
