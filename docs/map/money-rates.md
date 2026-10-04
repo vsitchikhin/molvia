@@ -76,7 +76,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 - `frontend/src/components/IncomeSheet.vue` — «Записать доход» sheet: amount, currency, source, day, «сколько было до» where it weighs; also amends an income.
 - `frontend/src/components/MarketRatesCard.vue` — «Курсы по данным ЦБ РА» on «Обмен денег» (MOL-137): per currency the official rate and each channel's latest figures to sell and to buy, dated, the best starred and said.
 - `frontend/src/components/OperationCardHead.vue` — Head of an exchange or income card: the day, «исправлен …» and the bin, kept outside the card's button.
-- `frontend/src/components/OperationSkeleton.vue` — Loading placeholder of exchange or income cards, drawn in `ScreenSkeleton`'s slot so the list does not jump.
+- `frontend/src/components/OperationSkeleton.vue` — Loading placeholder drawn in `ScreenSkeleton`'s slot so the list does not jump: exchange or income cards, or the rows of `OperationRow` (`form="rows"`, MOL-176).
 
 ## frontend · composables
 

@@ -320,6 +320,33 @@ The detail behind the frontend lines of `CLAUDE.md`.
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
   — rows had drawn them at 11/700, 11/600 and 13/600. Screens move onto them in their own tasks.
+- **An operation is one row, `OperationRow`, and it knows no operation** (MOL-176, Ф-12). «Траты» drew
+  `SpendingRow`, an account's journal, «не попали» and a check drew an `OperationRow` bound to
+  `AccountOperationView`, and the two parted on everything seen: the chevron on purchases alone or on
+  every row, a title at 400 cut to «…», a circle of 36 in the accent for purchases, a tag of 11/700.
+  **The words are functions beside the data** — `journalRowProps` in `spending.ts` for a line of the
+  month, `operationRowProps` in `accounts.ts` for the journal (`inAccount`) and out of any account —
+  and every rule of them has a unit test: the sign (U+2212 out, «+» in), «≈» and whole units where a
+  rate of its day counted it, «не посчитано», the money of another currency under the amount with
+  «списано» or without, «Прочее · сверка» by the note in either language. Until this task those rules
+  lived in a component's `computed` and nothing but one e2e name read them. A check's reason takes the
+  circle from the same function and keeps its own words, with no tail — its title says the sum.
+  **On `ListRow`, by two things the kit gained**: `tint`, the icon of 24 in a circle of 40
+  (`--row-circle`) in a category's colour on `--cat-tint-share`, or `muted` (`surface-2`,
+  `text-muted`) for an income, an exchange, a spending whose category the phone does not know —
+  never the accent, which is «press here» (Ф-4): purchases take the circle of «Продукты»; and `#below`,
+  the tag under the meta, since in the meta it would be cut with it. **The chevron is on every row** —
+  every one opens a sheet to go on with — so the amounts end in one column; a sum over the rows stands
+  in it by `--space-tail` (the row's inset, the chevron and the gap: the day's sum of «Траты»). **The
+  title wraps, the meta has two lines and breaks a word longer than the column** rather than cutting
+  it at the side, **the amount and the line under it never wrap or cut** (Е-11), and a tag on a narrow
+  row breaks inside its pill rather than standing over the amount. **The amount is never coloured**:
+  only a balance below zero is «плохо», on the balance's card (116 v2 2d). **The price, named**: on a
+  phone of 320 with a long amount the title has some seventy pixels and breaks inside words, and the
+  other half of an exchange in the meta may end in «…»; at 390 nothing does. `e2e/kit-rows` holds the
+  column, the skeleton's bars in it and nothing cut at 390 and 320, in both engines. **Its skeleton is
+  `OperationSkeleton form="rows"`**, the same geometry in bars of `--border` on `--surface` (Ф-13);
+  the screens take it with MOL-178.
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
   `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a
