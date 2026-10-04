@@ -185,9 +185,10 @@ export const receiptRecordedCodec = z.strictObject({
 export type ReceiptRecorded = z.output<typeof receiptRecordedCodec>
 
 /**
- * The trip the receipt is recorded as, its purchases still there, or none — read once no «Записать» of
- * it is still running on the server (MOL-169, adversarial Г1): what «Отменить запись» asks before it
- * lets a begun record go, and where the review goes when it is recorded (round 4, Д1).
+ * The trip the receipt was recorded as — until that trip is removed for good, so one only marked removed,
+ * which «Вернуть» may still bring back, too — or none; read once no «Записать» of it is still running on
+ * the server (MOL-169, adversarial Г1): what «Отменить запись» asks before it lets a begun record go,
+ * and where the review goes when it is recorded (round 4, Д1; review 8).
  */
 export const receiptSettledCodec = z.strictObject({ tripId: z.uuid().nullable() })
 export type ReceiptSettled = z.output<typeof receiptSettledCodec>
