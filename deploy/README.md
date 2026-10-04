@@ -274,23 +274,31 @@ whole; without it, until now. A day is Yerevan's; a moment needs its offset.
 
 In a working copy the same thing is `make gates FROM=2026-10-05 [TO=2026-10-31]`.
 
-## Signals (MOL-142)
+## Signals (MOL-142, MOL-221)
 
 Four checks at healthchecks.io tell the owner in Telegram that something in production is down.
 They go through healthchecks.io's own Telegram integration, never through our bot: a machine that
-is down takes the bot with it. healthchecks.io and GitHub see the server's address and nothing of
+is down takes the bot with it. healthchecks.io, Cloudflare and GitHub see the server's address and nothing of
 anyone's data.
 
 | Check            | Who pings                                                                   | Period · grace  | Silence or `/fail` means                                                                               |
 | ---------------- | --------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------ |
-| `molvia-up`      | `.github/workflows/watch.yml`, from GitHub, every five minutes              | 10 min · 10 min | the API with its database or the page — or GitHub itself                                               |
-| `molvia-cert`    | the same run                                                                | 1 day · 1 hour  | the certificate has fourteen days left or fewer — or a day of runs that could not read it              |
+| `molvia-up`      | the Worker `molvia-watch` on Cloudflare (`watch/`), every five minutes      | 10 min · 10 min | the API with its database or the page — or the Worker, or Cloudflare itself                            |
+| `molvia-cert`    | `.github/workflows/watch.yml`, from GitHub, hourly                          | 1 day · 1 hour  | the certificate has fourteen days left or fewer — or a day of runs that could not read it              |
 | `molvia-bot`     | the bot, after a claim of reminders, while it hears Telegram, every 5–6 min | 6 min · 9 min   | the bot is down, does not hear Telegram or cannot reach the API — and then nobody can sign in (MOL-54) |
 | `molvia-backups` | `backup/backup.sh`, nightly                                                 | 1 day · 1 hour  | no copy of the database tonight (Backups, below)                                                       |
 
-The periods are a little longer than the pings' rhythm — GitHub's cron runs late, the bot beats every
-five to six minutes — so the panel is not yellow with «late» all the time; period and grace add up to
-the time before an alarm, twenty minutes for the site and fifteen for the bot.
+The periods are a little longer than the pings' rhythm — the bot beats every five to six minutes — so
+the panel is not yellow with «late» all the time; period and grace add up to the time a silent watch
+takes to become an alarm, twenty minutes for the site and fifteen for the bot. A site that is down
+says so itself, with no grace: a `/fail` within five minutes and the minute and a half of its tries.
+
+**Why the site is not GitHub's** (MOL-221). GitHub's cron ran `*/5` on this repository every two to
+six hours — six runs in the first day, the longest gap six hours fourteen minutes — so `molvia-up`
+went down after every ping and a real fall would have waited for hours. Cloudflare's cron runs on
+time, and Cloudflare is already ours: the domain's DNS and the copies' bucket. A Worker cannot read a
+certificate, though — `fetch` only checks it, and a bad one is a `000` like the network — so the
+term stays on GitHub, hourly: its check waits a day and an hour.
 
 - **What the watch checks.** `GET /api/health` is `200` with `"status":"ok"` — `/health` answers
   `503` whenever it is not ok, the database down included, with the same body. `GET /` is `200`.
@@ -312,14 +320,16 @@ the time before an alarm, twenty minutes for the site and fifteen for the bot.
   back the bot hears it within seconds, whether it was running or starting then; grammY's own
   retries doubled the pause, and half an hour of Telegram down left the sign-in dead for another
   quarter to half an hour.
-- **A run is red only when it could not report** — a secret missing, or a ping that did not go. A
-  site that is down is a `/fail` and a green run.
-- **The prices, accepted** (MOL-149): GitHub's cron runs late under load and now and then skips a
-  run, so a fall is noticed within twenty minutes, not five; an outage of GitHub Actions is a false
-  `molvia-up`. **A partial failure is not seen**: a site failing every second request passes three
-  checks in four — that is the share of 5xx MOL-145 watches, not availability. GitHub switches the
-  schedule off in a public repository after sixty days without a commit — Actions → Watch → «Enable
-  workflow» brings it back.
+- **A round fails only when it could not report** — the secret missing, or a ping that did not go
+  after four tries; the Worker's log then says which, by its kind, and the check raises the alarm
+  once its grace runs out. A site that is down is a `/fail` and a round that went well. `watch.yml`
+  is the same: red only when it could not report, or GitHub's e-mail would come on top of Telegram.
+- **The prices, accepted** (MOL-149, MOL-221): an outage of Cloudflare's Workers is a false
+  `molvia-up`, and Cloudflare sees what GitHub saw — the server's address and its answers. **A
+  partial failure is not seen**: a site failing every second request passes three checks in four —
+  that is the share of 5xx MOL-145 watches, not availability. GitHub switches the schedule of
+  `watch.yml` off in a public repository after sixty days without a commit — Actions → Watch →
+  «Enable workflow» brings it back.
 - **The bot's pulse is not in `/health`** on purpose: after every rollout the API would know nothing
   of the bot for its first minute, and the rollout would roll back.
 
@@ -327,8 +337,18 @@ the time before an alarm, twenty minutes for the site and fifteen for the bot.
 
 - The checks are the owner's healthchecks.io account, the one the backups report to, each with the
   Telegram integration.
-- The watch's ping URLs are the repository secrets `HC_UP_URL` and `HC_CERT_URL`
-  (`gh secret set …`). Without either, every run is red.
+- `molvia-up`'s ping URL is the Worker's secret `HC_UP_URL`, set on Cloudflare once — Workers & Pages
+  → `molvia-watch` → Settings → Variables and Secrets, or `PUT …/workers/scripts/molvia-watch/secrets`
+  — and kept by every rollout. Without it every round throws, `HC_UP_URL is not an https URL`, and
+  the check goes down by its grace. Its plain variable `DOMAIN` is set again by every rollout.
+- **The Worker is rolled out by the release** after green CI on master (`watcher` in `release.yml`),
+  with the environment `production`'s secret `CLOUDFLARE_API_TOKEN` — an account token, «Workers
+  Scripts: Edit» and nothing else — and its variable `CLOUDFLARE_ACCOUNT_ID`. By hand, with the same
+  two in the shell: `make watcher`. A commit master has moved past stands aside, and the next green
+  one rolls out. An account that never opened Workers & Pages in the dashboard has no `workers.dev`
+  subdomain, and Cloudflare refuses the cron until it has one — opening the page once makes it.
+- `molvia-cert`'s ping URL is the repository secret `HC_CERT_URL` (`gh secret set …`). Without it,
+  every run is red.
 - `molvia-bot`'s ping URL is `BOT_PULSE_URL` in `~/molvia/.env.prod`, handed to the bot by
   `docker-compose.prod.yml`. **The line is required**: without it compose refuses to start, since
   a check that never got a ping stays «new» and never raises an alarm — a forgotten line would go
@@ -337,28 +357,33 @@ the time before an alarm, twenty minutes for the site and fifteen for the bot.
 - **The URLs are kept like secrets**: whoever has one can say «alive» for us. They are printed
   nowhere — not in a log, not here.
 - **After setting a check up, see it turn green.** A new check is grey until its first ping and
-  raises nothing while grey: `molvia-up` and `molvia-cert` after the first run, `molvia-bot` one to
-  two minutes after the bot starts.
+  raises nothing while grey: `molvia-up` after the Worker's first round, `molvia-cert` after the
+  first run, `molvia-bot` one to two minutes after the bot starts.
 
 ### Trying the alarm
 
-```bash
-gh workflow run watch.yml -f domain=molvia.invalid
-```
+On the Worker itself, so the alarm tried is the one that runs: Workers & Pages → `molvia-watch` →
+Settings → Variables and Secrets → `DOMAIN` = `molvia.invalid`, deploy. Within five minutes its round
+makes four tries, a minute and a half, then a `/fail` and a message in Telegram. `DOMAIN` back to
+`molvia.net` — or `make watcher`, which sets it — and the next round puts `molvia-up` back up.
 
-A minute and a half of tries, then a `/fail` and a message in Telegram. The next scheduled run puts
-`molvia-up` back up. `molvia-cert` stays as it was: an unreadable certificate sends it nothing.
+The certificate's way: `gh workflow run watch.yml -f domain=molvia.invalid` sends `molvia-cert`
+nothing — an unreadable certificate is the site's matter — so a `/fail` of it is tried only by a
+certificate that really ends.
 
 ### When an alarm comes
 
-**`molvia-up`.** Actions → Watch → the latest run: its warning names what failed.
+**`molvia-up`.** The `/fail` names what failed, and so does the Worker's log: Workers & Pages →
+`molvia-watch` → Logs, each try that failed and the round's verdict.
 
 - `health 503` — the API runs and the database does not answer: `ssh molvia`, then
   `docker compose -f docker-compose.prod.yml --env-file .env.prod ps postgres` and its `logs`.
 - `health 502`, `health 000`, `pwa 000` — the API, Caddy or the machine: `ssh molvia` first; if that
   hangs too, it is the machine, and Contabo's panel. A rollout gone wrong is in
   `tail ~/molvia/deploy.log`.
-- No run at all in Actions for twenty minutes — GitHub, not us: https://www.githubstatus.com.
+- No ping for twenty minutes and no `/fail` — the Worker: its log names a round that failed by its
+  kind (the secret, a ping that did not go), and no round at all is Cloudflare's matter:
+  https://www.cloudflarestatus.com.
 
 **`molvia-cert`.** The `/fail` says when it expires. Caddy's renewal failed:
 `docker compose … logs frontend | grep -i acme`, and check the domain's A record in Cloudflare. No

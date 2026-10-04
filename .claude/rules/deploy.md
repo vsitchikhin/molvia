@@ -149,10 +149,11 @@ The shape worth knowing here:
   starts the 0.2 cohort. **`/api/health` names the build** — `git describe --long`,
   `v0.1.1-3-g1a2b3c4`.
 - **Production is watched from outside, never from the machine (MOL-142; MOL-149, В-4).** A watch on
-  the same machine does not notice the machine is down. `.github/workflows/watch.yml` asks every
-  five minutes for `/api/health` and the page and pings the healthchecks.io check `molvia-up` — or
-  its `/fail`, saying what; the certificate's term goes to a check of its own, `molvia-cert`; the
-  bot pings `molvia-bot`. The alarm is healthchecks.io's own Telegram integration, never our bot,
+  the same machine does not notice the machine is down. **The Worker `molvia-watch` on Cloudflare**
+  (`deploy/watch`, MOL-221) asks every five minutes for `/api/health` and the page and pings the
+  healthchecks.io check `molvia-up` — or its `/fail`, saying what; the certificate's term goes to a
+  check of its own, `molvia-cert`, from `.github/workflows/watch.yml` hourly; the bot pings
+  `molvia-bot`. The alarm is healthchecks.io's own Telegram integration, never our bot,
   which lies down with the machine. **`/health` is `503` whenever it is not `ok`**, with the same
   body: a 200 saying «degraded» is a database down that a watch reading the status never sees. The
   rollout reads the body and is unchanged by it.
@@ -164,8 +165,23 @@ The shape worth knowing here:
   - **One check, one state that can last.** healthchecks.io speaks only when a check flips, and a
     certificate «expiring in 13 days» is down for days: on `molvia-up` it kept a fall of the API
     silent the whole time (Б2). An unreadable certificate is the site's matter and pings nothing.
-  - **A run is red only when it could not report**, or GitHub's e-mail would come on top of
-    Telegram.
+  - **Never GitHub's cron for the site** (MOL-221): `*/5` ran on this repository every two to six
+    hours, so `molvia-up` went down after every ping and a fall would have waited for hours.
+    Cloudflare is already ours (DNS, R2), its cron runs on time. A Worker cannot read a certificate
+    — `fetch` only checks it, a bad one is a `000` — so the term stays on GitHub, hourly: its check
+    waits a day and an hour, and the worst gap measured was six hours.
+  - **The rule lives once** (MOL-221, В-4): three of four is `deploy/watch/src/site.ts`, tested, and
+    `watch.yml` checks the certificate alone — a second copy in bash would drift from what watches.
+    The alarm is tried on the Worker itself, `DOMAIN` set to `molvia.invalid` by hand; every rollout
+    sets it back.
+  - **The Worker ships with the release** (`watcher`, В-2): after green CI on master, beside the
+    rollout and never judging it, by Cloudflare's API with no wrangler (В-1). The token is an
+    account's «Workers Scripts: Edit» in the environment `production` — Cloudflare does not narrow
+    it to one Worker. A rollout keeps the secret `HC_UP_URL` (`keep_bindings`), and a commit master
+    has moved past stands aside: the Worker carries no version to compare.
+  - **A round fails only when it could not report**, by its kind and never its URL — the secret
+    missing, a ping not gone after four tries; `watch.yml` is red only then, or GitHub's e-mail
+    would come on top of Telegram.
   - **A check that never got a ping never raises an alarm** — it stays «new» (В1). So
     `BOT_PULSE_URL` is required in `.env.prod` (`${…?}` in compose) and only empty on purpose, and
     a check set up is seen turning green.
@@ -173,8 +189,9 @@ The shape worth knowing here:
     the rollout would roll back. What its pulse proves is in `bot.md`.
   - The periods sit a little above the pings' rhythm, so «late» does not light the panel all day;
     period plus grace is the time to an alarm. Every ping URL is kept like a secret — whoever has
-    one can say «alive» — and printed nowhere. The prices, accepted by the owner: a fall is noticed
-    within twenty minutes, not five, since GitHub's cron runs late; GitHub down is a false alarm.
+    one can say «alive» — and printed nowhere. The prices, accepted by the owner: a fall is a `/fail`
+    within five minutes and the tries' minute and a half; a silent watch is an alarm in twenty;
+    Cloudflare's Workers down is a false alarm.
     `deploy/README.md`, «Signals».
 - **A failed deploy puts the previous image back, not the schema.** Pending migrations run in
   one transaction, so a migration that fails leaves the schema as it was and the old image
