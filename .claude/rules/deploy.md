@@ -176,8 +176,10 @@ The shape worth knowing here:
     Node, and in one TypeScript program Node's types reach every file — `process`, `clearImmediate`
     or a `setTimeout(…).unref()` would type-check and pass every test, then fail on Workers in the
     first round, or the first pause. So `deploy/watch/tsconfig.json` types the source by the web
-    platform alone (`WebWorker`, no `types`), and `tsconfig.test.json` adds Node for the tests; the
-    module's lint reads the tests by the second. A list of forbidden names closed only what it named.
+    platform alone (`WebWorker`, no `types`), and the tests live apart in `deploy/watch/tests/`, typed
+    by their own `tsconfig.json` with Node. A list of forbidden names closed only what it named; and
+    tests beside the source would have gone to the lint's default project, which takes eight files
+    and then fails on the Vitest config (round 3, R3-3).
   - **The rule lives once** (MOL-221, В-4): three of four is `deploy/watch/src/site.ts`, tested, and
     `watch.yml` checks the certificate alone — a second copy in bash would drift from what watches.
     The alarm is tried on the Worker itself, `DOMAIN` set to `molvia.invalid` by hand; every rollout
@@ -199,7 +201,9 @@ The shape worth knowing here:
     period plus grace is the time to an alarm. Every ping URL is kept like a secret — whoever has
     one can say «alive» — and printed nowhere; the Worker keeps logs and no traces, whose spans
     would carry the URL. The ping URL ends in its path: `/fail` after a query or a fragment is a
-    ping saying «up», so a round refuses one (adversarial А1). The prices, accepted by the owner: a
+    ping saying «up», and after an endpoint (`/0`, `/start`, `/log`) a `400`, so a round refuses
+    them (adversarial А1, R3-1). **healthchecks.io's words are read**: a check it does not have is
+    `200 OK (not found)`, and taken for delivered it left a check made anew grey for good (R3-2). The prices, accepted by the owner: a
     fall is a `/fail` within five minutes and the round's tries — 90 s when the failure answers at
     once, 170 s when the machine does not answer and every request waits its ten seconds (А2); a
     silent watch is an alarm in twenty; Cloudflare's Workers down is a false alarm.

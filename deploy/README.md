@@ -343,8 +343,11 @@ on GitHub, hourly: its check waits a day and an hour.
 - `molvia-up`'s ping URL is the Worker's secret `HC_UP_URL`, set on Cloudflare once — Workers & Pages
   → `molvia-watch` → Settings → Variables and Secrets, or `PUT …/workers/scripts/molvia-watch/secrets`
   — and kept by every rollout. It is the check's URL exactly as healthchecks.io gives it: `/fail` is
-  appended to it, so a query, a fragment, a trailing slash or a form the URL parser rewrites is
-  refused by every round. Without it every round throws, `HC_UP_URL is not an https URL`, and
+  appended to it, so a query, a fragment, a trailing slash, an endpoint of healthchecks.io (`/0`,
+  `/start`, `/log`) or a form the URL parser rewrites is refused by every round. **A check made
+  anew is a new URL**: healthchecks.io answers a ping to a check it no longer has with `200 OK (not
+found)`, the round reads it and fails, `reached no check`, and the new check stays grey — a grey
+  check never alarms. Put its URL into the secret, and `HC_CERT_URL` likewise. Without it every round throws, `HC_UP_URL is not an https URL`, and
   the check goes down by its grace. Its plain variable `DOMAIN` is set again by every rollout.
 - **The Worker is rolled out by the release** after green CI on master (`watcher` in `release.yml`),
   with the environment `production`'s secret `CLOUDFLARE_API_TOKEN` — an account token, «Workers
