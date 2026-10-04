@@ -141,6 +141,20 @@ describe('ListRow', () => {
       expect(view.attributes('aria-checked')).toBe('false')
     })
 
+    // Every role ARIA reads a choice on (adversarial А4): a menu's checkbox, a switch, a tree, a grid.
+    it.each(['menuitemcheckbox', 'switch'])('a chosen %s says aria-checked', (role) => {
+      const view = mount(ListRow, { props: { title: 'Архив', selected: true }, attrs: { role } })
+      expect(view.attributes('aria-checked')).toBe('true')
+    })
+
+    it.each(['treeitem', 'columnheader', 'rowheader'])('a chosen %s says aria-selected', (role) => {
+      const view = mount(ListRow, {
+        props: { as: 'div', title: 'Продукты', selected: true },
+        attrs: { role },
+      })
+      expect(view.attributes('aria-selected')).toBe('true')
+    })
+
     it('is read out as selected in a listbox', () => {
       const view = mount(ListRow, {
         props: { as: 'div', title: 'Молоко', selected: true },

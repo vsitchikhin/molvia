@@ -39,8 +39,16 @@ const TAGS = ['button', 'router-link', 'div'] as const
 export type RowTag = (typeof TAGS)[number]
 
 /** Roles whose choice is read out as checked, and those read out as selected. */
-const CHECKED = new Set(['radio', 'menuitemradio', 'checkbox'])
-const SELECTED = new Set(['option', 'gridcell', 'row', 'tab'])
+const CHECKED = new Set(['radio', 'menuitemradio', 'checkbox', 'menuitemcheckbox', 'switch'])
+const SELECTED = new Set([
+  'option',
+  'gridcell',
+  'row',
+  'tab',
+  'treeitem',
+  'columnheader',
+  'rowheader',
+])
 
 /**
  * A row of a list (Ф-12, MOL-175): an icon of 24, a title 17/600, a meta of 13 in up to two lines, a
@@ -99,7 +107,9 @@ export default defineComponent({
       // Drawn and not read out is the chosen-by-colour Ф-5 refuses: a picker gives its rows a role.
       watchEffect(() => {
         if (props.selected && state.value === null) {
-          console.warn('[ListRow] a selected row needs a role (radio, option…) to be read out')
+          console.warn(
+            '[ListRow] a selected row needs a role that carries a choice (radio, option…)',
+          )
         }
       })
     }
@@ -233,8 +243,18 @@ export default defineComponent({
 }
 
 .selected {
+  /* Rounded as the list card is: the ring of a first or last row would be cut at the card's corners
+     (adversarial А3), and a ring in the middle of the list reads the same as a tile. */
+  border-radius: var(--radius-lg);
   background: var(--accent-tint);
   box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* The focus of a chosen row stands inside its ring, the fill between them: on the ring itself it was
+   the same 2 px of the same colour, and the keyboard lost the row it stood on (adversarial А1, WCAG
+   2.4.7). Above the list card's own offset by weight, not by the order the sheets load in. */
+.list-row.selected:focus-visible {
+  outline-offset: -6px;
 }
 
 .active {
