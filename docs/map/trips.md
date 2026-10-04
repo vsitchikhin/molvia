@@ -5,7 +5,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 
 ## packages/model
 
-- `packages/model/src/contracts/settings.ts` — Contract of the four settings (country, city, two currencies): `SETTINGS_CITIES`, `settingsCityOf` (the settings' city a stored spelling folds to, MOL-120), `geographyAllowed`, the update body with its base.
+- `packages/model/src/contracts/settings.ts` — Contract of the four settings (country, city, two currencies): `SETTINGS_COUNTRIES` and `COUNTRY_CITIES` (Armenia, Georgia, Serbia, MOL-109), `settingsCityOf` (the settings' city a stored spelling folds to, MOL-120), `geographyAllowed`, `firstGeography` (a newcomer's by the phone's zone), the update body with its base.
 - `packages/model/src/contracts/trip.ts` — Wire contract of trips: start/add/finish/restore/rate-choice bodies, `deviceIdSchema`, trip view and history codecs (a history row with `itemCount` and `total`, MOL-128), recent places.
 - `packages/model/src/entities/expense.ts` — Entity of a trip purchase: item required, quantity and amount optional; the new-row and patch schemas.
 - `packages/model/src/entities/place.ts` — Entity of a place (shop or venue) with its country and city; the schema a new place is named by.

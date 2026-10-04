@@ -245,7 +245,7 @@ components:
 
 **Creative North Star: "The Shelf in Bad Light"**
 
-Molvia answers one question for emigrants in Armenia: _what is worth buying, and where_. Every
+Molvia answers one question for emigrants in Armenia, Georgia and Serbia: _what is worth buying, and where_. Every
 screen is designed from one moment — a phone in one hand at a supermarket shelf, under shop lamps
 at eight in the evening, the other hand holding a basket. Desktop is derived from that, never the
 other way round.
