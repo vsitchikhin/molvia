@@ -47,7 +47,7 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 
 - `.env.prod.example` — Template of the server's `.env.prod`: domain, Postgres credentials, the production bot's token and username, the bot–API secret, the bot's pulse URL, Grafana's password and the alarms' bot (MOL-145).
 - `.github/workflows/release.yml` — Release workflow: after green CI on master builds the six images — the receipt reader's and the metrics' two (MOL-145) too — and rolls them out over ssh; a version tag names built images; the outside watch goes to Cloudflare in a job of its own (MOL-221).
-- `.github/workflows/watch.yml` — The outside watch (MOL-142): every five minutes `/api/health` and the page to the healthchecks.io check «molvia-up» — a `/fail` when three of four tries half a minute apart fail — and the certificate's term to «molvia-cert»; red only when it could not report.
+- `.github/workflows/watch.yml` — The certificate's term from outside (MOL-142, MOL-221): hourly, more than fourteen days left to the healthchecks.io check «molvia-cert», fewer a `/fail`; red only when it could not report. The site is the Worker's, `deploy/watch/`.
 - `bin/bundle.mjs` — esbuild bundler for the API and bot images; the API also gets its forget, seed-catalogue, gates and failures tools.
 - `deploy/Caddyfile` — Caddy config: TLS for the domain, `/api` stripped and proxied to the API, internal routes closed, SPA fallback, headers, no access log.
 - `deploy/README.md` — Operations guide: new machine, deploys and the deploy key, login setup, local prod stack, erasure, seeding, gates, signals, the metrics and their alarms (MOL-145), backups and restore, the Postgres image and its move off alpine.
