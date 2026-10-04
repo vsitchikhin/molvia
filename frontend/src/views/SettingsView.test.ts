@@ -58,6 +58,13 @@ beforeEach(() => {
 afterEach(() => {
   for (const view of views.splice(0)) view.unmount()
 })
+/** The form's fields in their order: country, city, spend currency, income currency (MOL-109). */
+const field = (view: VueWrapper, at: 'country' | 'city' | 'spend' | 'income') =>
+  view.findAll('select')[['country', 'city', 'spend', 'income'].indexOf(at)]
+const options = (view: VueWrapper, at: 'country' | 'city') =>
+  field(view, at)
+    ?.findAll('option')
+    .map((option) => option.attributes('value'))
 
 it('loads without invented fields, and keeps a focusable inactive save action', async () => {
   me.mockReturnValue(new Promise(() => undefined))
@@ -85,15 +92,15 @@ it('offline with memory keeps fields editable and explains when save becomes pos
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
   me.mockRejectedValue(new TypeError('network'))
   const view = await render()
-  await view.get('select').setValue('Ереван')
+  await field(view, 'city')?.setValue('Ереван')
   expect(view.text()).toContain(en.settings.offline.strip)
   expect(view.get('.actions button').attributes('aria-disabled')).toBe('true')
   expect(view.find('[role="alert"]').exists()).toBe(false)
 })
 it('shows changed fields and matching currencies, then clears badges on success', async () => {
   const view = await render()
-  await view.get('select').setValue('Ереван')
-  await view.findAll('select')[2]?.setValue('AMD')
+  await field(view, 'city')?.setValue('Ереван')
+  await field(view, 'income')?.setValue('AMD')
   expect(view.findAll('.badge')).toHaveLength(2)
   expect(view.text()).toContain(en.settings.same_currencies)
   expect(view.find('.draft').exists()).toBe(false)
@@ -106,46 +113,81 @@ it('shows changed fields and matching currencies, then clears badges on success'
 it('preserves an unsupported saved city while allowing currency changes', async () => {
   me.mockResolvedValue({ ...initial, city: 'Ванадзор, Лорийская область' })
   const view = await render()
-  expect((view.get('select').element as HTMLSelectElement).value).toBe(
+  expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe(
     'Ванадзор, Лорийская область',
   )
   // Д1: the whole name is readable above the field, and it says why it is in the list at all.
   const kept = view.get('.kept')
   expect(kept.text()).toContain('Ванадзор, Лорийская область')
   expect(kept.text()).toContain(en.settings.city_not_listed)
-  expect(view.get('select').attributes('aria-describedby')).toContain(kept.attributes('id'))
-  await view.findAll('select')[2]?.setValue('EUR')
+  expect(field(view, 'city')?.attributes('aria-describedby')).toContain(kept.attributes('id'))
+  await field(view, 'income')?.setValue('EUR')
   expect(view.get('.actions button').attributes('aria-disabled')).toBeUndefined()
 })
 
 it('Б1: an unsupported city can be returned to, and keeps its own country', async () => {
   // Its option used to disappear on the first change, and the body the form built for it
-  // named Armenia — which the server answers 400 to.
-  const legacy = { ...initial, country: 'GE', city: 'Тбилиси' }
+  // named Armenia — which the server answers 400 to. A country the settings do not offer stays
+  // in the list of countries too (MOL-109).
+  const legacy = { ...initial, country: 'RU', city: 'Москва' }
   me.mockResolvedValue(legacy)
   const view = await render(false)
-  const city = view.get('select')
-  await city.setValue('Ереван')
-  expect(view.findAll('select option').map((option) => option.attributes('value'))).toContain(
-    'Тбилиси',
-  )
-  await city.setValue('Тбилиси')
+  expect(options(view, 'country')).toEqual(['RU', 'AM', 'GE', 'RS'])
+  expect(options(view, 'city')).toEqual(['Москва'])
+  await field(view, 'country')?.setValue('AM')
+  expect(options(view, 'city')).toEqual(['Гюмри', 'Ереван'])
+  expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Гюмри')
+  await field(view, 'country')?.setValue('RU')
+  expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Москва')
   expect(view.find('.kept').exists()).toBe(true)
   save.mockResolvedValue(legacy)
   expect(view.get('.actions button').attributes('aria-disabled')).toBe('true')
   expect(view.find('.badge').exists()).toBe(false)
 })
 
+it('moves to Georgia: the cities follow the country, the first one chosen (MOL-109)', async () => {
+  const view = await render()
+  expect(options(view, 'country')).toEqual(['AM', 'GE', 'RS'])
+  expect(
+    field(view, 'country')
+      ?.findAll('option')
+      .map((option) => option.text()),
+  ).toEqual([en.settings.countries.AM, en.settings.countries.GE, en.settings.countries.RS])
+  await field(view, 'country')?.setValue('GE')
+  expect(options(view, 'city')).toEqual(['Тбилиси', 'Батуми'])
+  expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Тбилиси')
+  await field(view, 'city')?.setValue('Батуми')
+  // both fields changed, and nothing is said about a city outside the list
+  expect(view.findAll('.badge')).toHaveLength(2)
+  expect(view.find('.kept').exists()).toBe(false)
+  save.mockResolvedValue({ ...initial, country: 'GE', city: 'Батуми' })
+  await view.get('.actions button').trigger('click')
+  await flushPromises()
+  expect(save).toHaveBeenCalledWith({
+    previous: expect.objectContaining({ country: 'AM', city: 'Гюмри' }),
+    settings: expect.objectContaining({ country: 'GE', city: 'Батуми' }),
+  })
+  expect(view.text()).toContain(en.settings.saved)
+})
+
+it('choosing the country it already has changes nothing (MOL-109)', async () => {
+  const view = await render()
+  await field(view, 'city')?.setValue('Ереван')
+  await field(view, 'country')?.setValue('AM')
+  expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Ереван')
+  expect(view.findAll('.badge')).toHaveLength(1)
+})
+
 it('names the country and the currencies of a conflict in the words the form uses', async () => {
   const view = await render()
   // The same choice on both devices, which is what a conflict is since Б2.
-  await view.findAll('select')[1]?.setValue('EUR')
+  await field(view, 'spend')?.setValue('EUR')
   save.mockRejectedValue(new ApiError(ERROR.CONFLICT))
   me.mockResolvedValue({ ...initial, spendCurrency: 'USD' })
   await view.get('.actions button').trigger('click')
   await flushPromises()
   const said = en.settings.conflict.body
-    .replace('{country}', en.settings.armenia)
+    .replace('{country}', en.settings.countries.AM)
     .replace('{city}', 'Гюмри')
     .replace('{spendCurrency}', en.settings.currencies.USD)
     .replace('{incomeCurrency}', en.settings.currencies.RUB)
@@ -154,7 +196,7 @@ it('names the country and the currencies of a conflict in the words the form use
 
 it('replaces a previous write error with the offline notice when the connection drops', async () => {
   const view = await render()
-  await view.get('select').setValue('Ереван')
+  await field(view, 'city')?.setValue('Ереван')
   save.mockRejectedValue(new ApiError(ERROR.INTERNAL))
   await view.get('.actions button').trigger('click')
   await flushPromises()

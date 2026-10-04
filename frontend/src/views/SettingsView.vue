@@ -225,13 +225,16 @@ export default defineComponent({
     YourDataGroup,
   },
   setup() {
-    const { t } = useI18n()
+    const i18n = useI18n()
+    const { t } = i18n
     /**
      * The same words the form beside it uses: the notice printed `AM` and `AMD` where the
      * fields say «Армения» and «Армянский драм · AMD», and it is the line a person decides by.
      */
     const saidIn = (value: ActorSettings): Record<string, string> => ({
-      country: value.country === 'AM' ? t('settings.armenia') : value.country,
+      country: i18n.te(`settings.countries.${value.country}`)
+        ? t(`settings.countries.${value.country}`)
+        : value.country,
       city: value.city,
       spendCurrency: t(`settings.currencies.${value.spendCurrency}`),
       incomeCurrency: t(`settings.currencies.${value.incomeCurrency}`),

@@ -3,10 +3,23 @@
     <section class="group">
       <h2 class="caption">{{ t('settings.group_place') }}</h2>
       <AppCard class="card">
-        <p class="country">
-          <span class="label">{{ t('settings.country') }}</span>
-          {{ modelValue.country === 'AM' ? t('settings.armenia') : modelValue.country }}
-        </p>
+        <div>
+          <AppField
+            :model-value="modelValue.country"
+            :label="t('settings.country')"
+            kind="select"
+            :options="countryOptions"
+            :aria-describedby="describedBy('country')"
+            @update:model-value="change('country', $event)"
+          >
+            <template v-if="changed('country')" #label-extra>
+              <span class="badge" aria-hidden="true">{{ t('settings.changed') }}</span>
+            </template>
+          </AppField>
+          <span v-if="changed('country')" :id="`${id}-country-changed`" class="hidden">
+            {{ t(uncertain ? 'settings.changed' : 'settings.changed_announced') }}
+          </span>
+        </div>
         <div>
           <!-- A city the two of 0.1 do not carry: the person keeps it (В-4а) and is told why it
                is there, with the whole of it readable — a native select clips it (кадр 5b). -->
@@ -70,7 +83,13 @@
 import { computed, defineComponent, useId } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { actorSettingsSchema, COUNTRY_CITIES, currencySchema } from '@molvia/model'
+import {
+  actorSettingsSchema,
+  citiesOf,
+  currencySchema,
+  isSettingsCountry,
+  SETTINGS_COUNTRIES,
+} from '@molvia/model'
 import type { ActorSettings } from '@molvia/model'
 import IconInfo from '~icons/mdi/information-outline'
 import AppCard from '@/components/AppCard.vue'
@@ -89,15 +108,15 @@ export default defineComponent({
     'update:modelValue': (value: ActorSettings) => actorSettingsSchema.safeParse(value).success,
   },
   setup(props, { emit }) {
-    const { t } = useI18n()
-    const cities: readonly string[] = COUNTRY_CITIES.AM
+    const i18n = useI18n()
+    const { t } = i18n
     const currencyFields = ['spendCurrency', 'incomeCurrency'] as const
     /**
-     * The geography the form opened on. A city outside today's two — a settings row written
-     * before the form existed — stays in the list and keeps its own country, so choosing it
-     * again is a geography that has not changed rather than a body the server answers 400 to
-     * (adversarial Б1). Its option used to vanish on the first change, and nothing but
-     * «Отменить» brought it back.
+     * The geography the form opened on. A city its country does not offer — a settings row written
+     * before the form existed — stays in the list under its own country, so choosing it again is
+     * a geography that has not changed rather than a body the server answers 400 to (adversarial
+     * Б1). Its option used to vanish on the first change, and nothing but «Отменить» brought it
+     * back. Its country too, when the settings offer no such country at all (MOL-109).
      */
     // Read once: with no base the form is the one it was mounted with. The sheet that has no
     // base mounts these fields afresh at every opening (`TripContextSheet`), which is what
@@ -106,26 +125,48 @@ export default defineComponent({
     // (MOL-65, review 3, Ж2).
     const opened = { country: props.modelValue.country, city: props.modelValue.city }
     const origin = computed(() => props.base ?? opened)
-    const historical = computed(() => (cities.includes(origin.value.city) ? null : origin.value))
-    const cityOptions = computed(() =>
-      (historical.value ? [historical.value.city, ...cities] : cities).map((city) => ({
-        value: city,
-        label: city,
-      })),
+    const historical = computed(() =>
+      citiesOf(origin.value.country).some((city) => city === origin.value.city)
+        ? null
+        : origin.value,
     )
+    const countryName = (country: string): string =>
+      i18n.te(`settings.countries.${country}`) ? t(`settings.countries.${country}`) : country
+    const countryOptions = computed(() => {
+      const kept = historical.value?.country
+      const countries: readonly string[] = SETTINGS_COUNTRIES
+      return (
+        kept !== undefined && !isSettingsCountry(kept) ? [kept, ...countries] : countries
+      ).map((country) => ({ value: country, label: countryName(country) }))
+    })
+    const cityOptions = computed(() => {
+      const cities: readonly string[] = citiesOf(props.modelValue.country)
+      const kept = historical.value
+      return (kept?.country === props.modelValue.country ? [kept.city, ...cities] : cities).map(
+        (city) => ({ value: city, label: city }),
+      )
+    })
     const currencyOptions = computed(() =>
       currencySchema.options.map((currency) => ({
         value: currency,
         label: t(`settings.currencies.${currency}`),
       })),
     )
-    function change(field: 'city' | 'spendCurrency' | 'incomeCurrency', next: string): void {
+    /**
+     * A city is chosen among its country's, so a change of country lands on that country's first
+     * city — or on the kept one, when the country is its own — and the form is never left with a
+     * city of another country, which the server would refuse.
+     */
+    function cityOnArrival(country: string): string {
+      const kept = historical.value
+      return kept?.country === country ? kept.city : (citiesOf(country)[0] ?? '')
+    }
+    function change(field: keyof ActorSettings, next: string): void {
+      if (field === 'country' && next === props.modelValue.country) return
       const value = actorSettingsSchema.safeParse({
         ...props.modelValue,
         [field]: next,
-        ...(field === 'city'
-          ? { country: next === historical.value?.city ? historical.value.country : 'AM' }
-          : {}),
+        ...(field === 'country' ? { city: cityOnArrival(next) } : {}),
       })
       if (value.success) emit('update:modelValue', value.data)
     }
@@ -135,12 +176,13 @@ export default defineComponent({
     const describedBy = (field: keyof ActorSettings): string =>
       [
         ...(field === 'city' && historical.value ? [`${id}-city-kept`] : []),
-        `${id}-${field}-hint`,
+        ...(field === 'country' ? [] : [`${id}-${field}-hint`]),
         ...(changed(field) ? [`${id}-${field}-changed`] : []),
       ].join(' ')
     return {
       t,
       id,
+      countryOptions,
       cityOptions,
       currencyOptions,
       currencyFields,
@@ -175,19 +217,6 @@ export default defineComponent({
 .card {
   display: grid;
   gap: var(--space-4);
-}
-
-.country {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.label {
-  display: block;
-  margin-bottom: var(--space-1);
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
 }
 
 .hint,

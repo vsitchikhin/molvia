@@ -1236,7 +1236,11 @@
   "settings": {
     "title": "Settings",
     "country": "Country",
-    "armenia": "Armenia",
+    "countries": {
+      "AM": "Armenia",
+      "GE": "Georgia",
+      "RS": "Serbia"
+    },
     "city": "City",
     "spendCurrency": "Spending currency",
     "incomeCurrency": "Conversion currency",

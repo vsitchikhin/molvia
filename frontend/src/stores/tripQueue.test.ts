@@ -201,7 +201,7 @@ describe('trip queue', () => {
     // question rather than a 400, and the queue must not set the start aside with every
     // purchase behind it (MOL-65, review 2, замечание 9).
     startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_CONTEXT_REQUIRED, 'context unusable'))
-    const stale = { ...here, country: 'GE', city: 'Тбилиси' } as const
+    const stale = { ...here, country: 'RU', city: 'Москва' } as const
     const queue = fresh()
     queue.enqueue(started(TRIP, 'Ереван Сити', stale))
     queue.enqueue(add(MILK))
@@ -222,7 +222,7 @@ describe('trip queue', () => {
 
   it('keeps the question while its start waits, through another window and through a purchase', async () => {
     startTrip.mockRejectedValue(new ApiError(ERROR.TRIP_CONTEXT_REQUIRED, 'context unusable'))
-    const stale = { ...here, country: 'GE', city: 'Тбилиси' } as const
+    const stale = { ...here, country: 'RU', city: 'Москва' } as const
     const queue = fresh()
     queue.enqueue(started(TRIP, 'Ереван Сити', stale))
     await queue.flush()
