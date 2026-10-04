@@ -44,11 +44,11 @@ under `packages/model/tests/`, is covered by the source's entry.
 
 ## deploy · watch
 
-- `deploy/watch/eslint.config.js` — Outside watch lint config (MOL-221): the shared preset plus no `node:*` in the source — it runs on Cloudflare Workers; the tests typed by `tsconfig.test.json`.
+- `deploy/watch/eslint.config.js` — Outside watch lint config (MOL-221): the shared preset plus no `node:*` in the source — it runs on Cloudflare Workers; the tests typed by `tests/tsconfig.json`, the Vitest config by the default project.
 - `deploy/watch/package.json` — Outside watch package: no dependencies; bundle (esbuild, one ES module), lint and test scripts.
 - `deploy/watch/tsconfig.json` — Outside watch TypeScript config of the source: the web platform alone (`WebWorker`, no Node types), so Node's API is a type error; `@/` to `src`.
-- `deploy/watch/tsconfig.test.json` — Outside watch TypeScript config of the tests and the Vitest config: the source's, plus Node's types; read by the module's lint for the tests.
-- `deploy/watch/vitest.config.ts` — Outside watch Vitest project: tests beside the source, Node environment.
+- `deploy/watch/tests/tsconfig.json` — Outside watch TypeScript config of the tests and the Vitest config: the source's, plus Node's types; a directory of its own, so the lint finds it without the default project.
+- `deploy/watch/vitest.config.ts` — Outside watch Vitest project: tests in `tests/`, apart from the source by its types, Node environment.
 
 ## repository
 

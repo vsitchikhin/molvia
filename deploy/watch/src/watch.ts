@@ -51,6 +51,13 @@ export interface Round {
  * must be written as `fetch` will send it (round 2, R2-1): the parser reads a trailing `\` as `/`
  * and folds `/.`, so a text that only looks right would still ping `…//fail` or `…/`.
  */
+/**
+ * healthchecks.io's own endpoints after a check (round 3, R3-1): an exit code, `start`, `log`,
+ * `fail`. `/fail` after any of them is `400 invalid url format` (measured 04.10.2026), so the alarm
+ * would never go — and `/0` pings «up» like the check itself, so nothing looks wrong until then.
+ */
+const ENDPOINT = /\/(\d+|start|log|fail)$/
+
 export function settingsOf(environment: Environment): Settings {
   const pingUrl = environment.HC_UP_URL?.trim() ?? ''
   const parsed = URL.canParse(pingUrl) ? new URL(pingUrl) : undefined
@@ -64,10 +71,11 @@ export function settingsOf(environment: Environment): Settings {
     parsed.href !== pingUrl ||
     pingUrl.includes('?') ||
     pingUrl.includes('#') ||
-    parsed.pathname.endsWith('/')
+    parsed.pathname.endsWith('/') ||
+    ENDPOINT.test(parsed.pathname)
   ) {
     throw new Error(
-      'HC_UP_URL is not the check URL /fail can follow: a query, a fragment, a trailing slash or a form the URL parser rewrites (deploy/README.md, «Signals»)',
+      'HC_UP_URL is not the check URL /fail can follow: a query, a fragment, a trailing slash, an endpoint or a form the URL parser rewrites (deploy/README.md, «Signals»)',
     )
   }
   const domain = environment.DOMAIN?.trim() ?? ''
@@ -115,21 +123,42 @@ async function look(domain: string, io: Io): Promise<string[][]> {
   return attempts
 }
 
-/** A ping that did not go after every try fails the round, by its kind and never by its URL. */
+/**
+ * What healthchecks.io says to a ping it took: `OK`. A check that does not exist — removed, made
+ * anew under another UUID — is `200` too, saying `OK (not found)` (round 3, R3-2, measured
+ * 04.10.2026). Its words are read: «delivered» to no check is a round that could not report.
+ * A body that broke after the `200` is taken for `OK` (adversarial А3): the ping arrived.
+ */
+async function heard(response: Response): Promise<string> {
+  const said = await response.text().catch(() => 'OK')
+  return said.trim()
+}
+
+/**
+ * A ping that did not go after every try fails the round, by its kind and never by its URL; one
+ * that reached no check fails it at once, with healthchecks.io's own words — trying again changes
+ * nothing.
+ */
 async function report(settings: Settings, verdict: Verdict, io: Io): Promise<void> {
   const url = verdict.up ? settings.pingUrl : `${settings.pingUrl}/fail`
   let failure = ''
   for (let attempt = 1; attempt <= PING_TRIES; attempt += 1) {
+    let said: string | undefined
     try {
       const response = await io.fetch(url, {
         ...(verdict.up ? {} : { method: 'POST', body: verdict.said }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       })
-      await drop(response)
-      if (response.ok) return
-      failure = String(response.status)
+      if (!response.ok) {
+        await drop(response)
+        failure = String(response.status)
+      } else said = await heard(response)
     } catch (error) {
       failure = error instanceof Error && error.name === 'TimeoutError' ? 'timeout' : 'network'
+    }
+    if (said === 'OK') return
+    if (said !== undefined) {
+      throw new Error(`the ping to healthchecks.io reached no check: «${said.slice(0, 40)}»`)
     }
     if (attempt < PING_TRIES) await io.wait(1_000 * 2 ** (attempt - 1))
   }

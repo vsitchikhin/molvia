@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { PAUSE_MS, PING_TRIES, REQUEST_TIMEOUT_MS, settingsOf, watch } from './watch'
-import type { Io } from './watch'
-import worker from './worker'
+import { PAUSE_MS, PING_TRIES, REQUEST_TIMEOUT_MS, settingsOf, watch } from '@/watch'
+import type { Io } from '@/watch'
+import worker from '@/worker'
 
 const PING = 'https://hc-ping.com/0f1e2d3c-secret'
 const SETTINGS = { pingUrl: PING, domain: 'molvia.net' }
@@ -284,6 +284,38 @@ describe('settingsOf', () => {
   })
 })
 
+describe('what healthchecks.io says', () => {
+  const io = (said: string): Io & { pings: () => number } => {
+    let pings = 0
+    return {
+      fetch: (input) =>
+        Promise.resolve().then(() => {
+          const url = urlOf(input)
+          if (url.startsWith(PING)) {
+            pings += 1
+            return new Response(said)
+          }
+          return new Response(url.endsWith('/api/health') ? HEALTHY : '<!doctype html>')
+        }),
+      wait: async () => Promise.resolve(),
+      log: () => undefined,
+      pings: () => pings,
+    }
+  }
+
+  it('fails the round at once when the ping reached no check (R3-2)', async () => {
+    const rigged = io('OK (not found)')
+    await expect(watch(SETTINGS, rigged)).rejects.toThrow(
+      'the ping to healthchecks.io reached no check: «OK (not found)»',
+    )
+    expect(rigged.pings()).toBe(1)
+  })
+
+  it('takes a plain OK, with the line feed it may end in, for a ping delivered', async () => {
+    await expect(watch(SETTINGS, io('OK\n'))).resolves.toBeDefined()
+  })
+})
+
 describe('the ping URL', () => {
   it.each([
     ['a query', 'https://hc-ping.com/pk/molvia-up?create=1'],
@@ -294,6 +326,10 @@ describe('the ping URL', () => {
     ['a trailing «/.», folded to a slash (R2-1)', 'https://hc-ping.com/0f1e2d3c-secret/.'],
     ['a path the parser rewrites', 'https://hc-ping.com/pk/../0f1e2d3c-secret'],
     ['a host written in capitals', 'https://HC-PING.com/0f1e2d3c-secret'],
+    ['an exit code after the check (R3-1)', 'https://hc-ping.com/0f1e2d3c-secret/0'],
+    ['«start» after the check (R3-1)', 'https://hc-ping.com/0f1e2d3c-secret/start'],
+    ['«log» after the check (R3-1)', 'https://hc-ping.com/0f1e2d3c-secret/log'],
+    ['«fail» itself (R3-1)', 'https://hc-ping.com/0f1e2d3c-secret/fail'],
   ])('is refused with %s, which /fail cannot follow (adversarial А1)', (_, url) => {
     expect(() => settingsOf({ HC_UP_URL: url })).toThrow(/^HC_UP_URL is not the check URL/)
     try {

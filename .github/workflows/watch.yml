@@ -46,6 +46,17 @@ jobs:
             exit 1
           fi
 
+          # healthchecks.io answers 200 to a check it does not have, saying `OK (not found)` (R3-2 of
+          # MOL-221): its words are read, and a ping to no check is a run that could not report.
+          ping() {
+            local said
+            said="$(curl -fsS -m 10 --retry 3 "$@")"
+            if [[ "$said" != OK ]]; then
+              echo "::error::the ping to healthchecks.io reached no check: $said"
+              exit 1
+            fi
+          }
+
           # The term is a check of its own (adversarial Б2 of MOL-142): «expires in 13 days» is a
           # state that holds for days, and healthchecks.io speaks only when a check flips — on one
           # check with the site, it would have kept a fall of the API silent all that time. Caddy
@@ -56,9 +67,9 @@ jobs:
           if ! end="$(openssl x509 -noout -enddate <<<"$pem" 2>/dev/null)"; then
             echo "::warning::$DOMAIN: the certificate could not be read"
           elif openssl x509 -noout -checkend 1209600 <<<"$pem" >/dev/null; then
-            curl -fsS -m 10 --retry 3 -o /dev/null "$HC_CERT_URL"
+            ping "$HC_CERT_URL"
             echo "$DOMAIN: the certificate ends ${end#notAfter=}"
           else
-            curl -fsS -m 10 --retry 3 -o /dev/null --data-raw "cert expires ${end#notAfter=}" "$HC_CERT_URL/fail"
+            ping --data-raw "cert expires ${end#notAfter=}" "$HC_CERT_URL/fail"
             echo "::warning::$DOMAIN: the certificate expires ${end#notAfter=}"
           fi

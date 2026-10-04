@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { judge, readSite } from './site'
+import { judge, readSite } from '@/site'
 
 const OK = { status: 200, body: '{"status":"ok","version":"v0.1.3-45-gfebb22c8","database":"up"}' }
 const PAGE = { status: 200, body: '' }
