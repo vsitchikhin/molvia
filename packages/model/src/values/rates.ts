@@ -181,8 +181,29 @@ export function formatRateBeside(
  * Where an official rate was read. The cache keeps the provider so that one pair is never built
  * from two sources — a rouble from one bank against a dollar from another is nobody's rate.
  */
-export const rateProviderSchema = z.enum(['cba', 'cbr', 'erapi'])
+export const rateProviderSchema = z.enum(['cba', 'cbr', 'erapi', 'nbg'])
 export type RateProvider = z.infer<typeof rateProviderSchema>
+
+/**
+ * The central bank of a currency's own country, where it is not the dram's (MOL-110, owner's
+ * decision В-1: «the first source of truth for a country's currency is that country's central
+ * bank»): the lari is the National Bank of Georgia's. Every other currency is the Central Bank of
+ * Armenia's, as it always was.
+ */
+export const HOME_BANK: Readonly<Partial<Record<Currency, RateProvider>>> = Object.freeze({
+  GEL: 'nbg',
+})
+
+/**
+ * The bank whose rate is a pair's official one — the one a trip takes while it is fresh and calls
+ * `official`, every other publisher being a `fallback`: the bank of the pair's currency that has one
+ * of its own, and the Central Bank of Armenia otherwise. The National Bank of Georgia publishes the
+ * dram, the rouble, the dollar and the euro beside the lari, so a pair with the lari is built from
+ * its one answer.
+ */
+export function homeBankOf(base: Currency, quote: Currency): RateProvider {
+  return HOME_BANK[base] ?? HOME_BANK[quote] ?? 'cba'
+}
 
 /** One published rate: how many drams one unit of `currency` was worth on `date` in Yerevan. */
 export interface AmdRate {
@@ -388,8 +409,8 @@ export function isRateFresh(date: string, today: string): boolean {
   return days >= -1 && days <= OFFICIAL_RATE_FRESH_DAYS
 }
 
-// Tie-breaking order: the central bank first, then the other central bank, then the aggregator.
-const PROVIDER_ORDER: readonly RateProvider[] = ['cba', 'cbr', 'erapi']
+// Tie-breaking order after the pair's own bank: the central banks, then the aggregator.
+const PROVIDER_ORDER: readonly RateProvider[] = ['cba', 'cbr', 'nbg', 'erapi']
 
 /**
  * The rate of `base` in `quote` built from rates against the dram: quote per one base, as the
@@ -455,9 +476,9 @@ function latestOf<Row extends AmdRate>(rows: readonly Row[]): Row[] {
 /**
  * The official rate a trip started on `today` snapshots (MOL-39, В-7, Р-18).
  *
- * The Central Bank of Armenia while its latest rate is at most a week old — a Friday rate on
+ * The pair's own bank (`homeBankOf`) while its latest rate is at most a week old — a Friday rate on
  * Sunday is the right answer, not a stale one. Past that, whichever provider has the freshest
- * rate for both halves of the pair, the central bank winning a tie: an open source is taken only
+ * rate for both halves of the pair, the pair's bank winning a tie: another source is taken only
  * for being newer, and a trip built on it is marked `fallback`. Rows dated after `today` are
  * ignored — a bank that sets tomorrow's rate today has not made it today's.
  *
@@ -471,9 +492,11 @@ export function pickOfficialRate(
   today: string,
 ): OfficialRate | null {
   const needed = new Set<Currency>([base, quote])
-  const candidates = PROVIDER_ORDER.flatMap((provider) => {
+  const home = homeBankOf(base, quote)
+  const order = [home, ...PROVIDER_ORDER.filter((provider) => provider !== home)]
+  const candidates = order.flatMap((provider) => {
     const own = rows.filter((row) => row.provider === provider && row.date <= today)
-    const source = provider === 'cba' ? 'official' : 'fallback'
+    const source = provider === home ? 'official' : 'fallback'
     const latest = latestOf(own)
     const rate = rateFromAmd(base, quote, latest, source)
     if (!rate) return []
@@ -489,7 +512,7 @@ export function pickOfficialRate(
     return [{ provider, pick: { rate, provider, jumped, previous }, date }]
   })
 
-  const central = candidates.find((candidate) => candidate.provider === 'cba')
+  const central = candidates.find((candidate) => candidate.provider === home)
   if (central && isRateFresh(central.date, today)) return central.pick
 
   const freshest = candidates.reduce<(typeof candidates)[number] | null>(

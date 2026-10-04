@@ -177,7 +177,8 @@ describe('ограничения official_rates', () => {
 
   it('не принимает драм против драма, чужую валюту и чужого поставщика', async () => {
     await expect(insert({ ...ok, currency: 'AMD' })).rejects.toThrow()
-    await expect(insert({ ...ok, currency: 'GEL' })).rejects.toThrow()
+    // The lari came with MOL-110; the pound nobody asked for.
+    await expect(insert({ ...ok, currency: 'GBP' })).rejects.toThrow()
     await expect(insert({ ...ok, provider: 'rate.am' })).rejects.toThrow()
   })
 

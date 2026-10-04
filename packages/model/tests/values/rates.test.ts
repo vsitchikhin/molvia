@@ -12,6 +12,7 @@ import {
   exchangeRateSchema,
   formatRate,
   formatRateBeside,
+  homeBankOf,
   isRateDay,
   isRateFresh,
   isRateJump,
@@ -379,6 +380,59 @@ describe('pickOfficialRate', () => {
   it('has nothing for an empty cache or for spending what one earns', () => {
     expect(pick('RUB', 'AMD', [], sunday)).toBeNull()
     expect(pick('AMD', 'AMD', cba18, sunday)).toBeNull()
+  })
+
+  describe('лари — банк страны валюты (MOL-110, В-1)', () => {
+    const nbg = [
+      amd('GEL', '139.35', '2026-09-19', 'nbg'),
+      amd('RUB', '4.3489', '2026-09-19', 'nbg'),
+    ]
+    const cba = [amd('GEL', '139.36', sunday), amd('RUB', '4.3123', sunday)]
+
+    it('пара с лари — НБ Грузии, official, даже когда ЦБ РА на день свежее', () => {
+      const pickedRate = pickOfficialRate('GEL', 'RUB', [...cba, ...nbg], sunday)
+      expect(pickedRate?.provider).toBe('nbg')
+      expect(pickedRate?.rate).toMatchObject({
+        source: 'official',
+        asOf: yerevanMidnight('2026-09-19'),
+      })
+      expect(pick('AMD', 'GEL', [...cba, ...nbg], sunday)?.source).toBe('official')
+    })
+
+    it('НБ Грузии молчит больше недели — ЦБ РА, но fallback', () => {
+      const old = [amd('GEL', '139.00', '2026-09-11', 'nbg')]
+      const pickedRate = pickOfficialRate('GEL', 'AMD', [...old, ...cba], sunday)
+      expect(pickedRate?.provider).toBe('cba')
+      expect(pickedRate?.rate.source).toBe('fallback')
+      // Ровно неделя — ещё его.
+      expect(pickOfficialRate('GEL', 'AMD', [...old, ...cba], '2026-09-18')?.provider).toBe('nbg')
+    })
+
+    it('пара без лари остаётся у ЦБ РА, строки НБ Грузии ему не мешают', () => {
+      const pickedRate = pickOfficialRate('RUB', 'AMD', [...nbg, ...cba18], sunday)
+      expect(pickedRate?.provider).toBe('cba')
+      expect(pickedRate?.rate.source).toBe('official')
+    })
+
+    it('ЦБ РА молчит — НБ Грузии для драма стоит за ЦБ РФ и перед агрегатором', () => {
+      const rows = [
+        amd('RUB', '4.3123', '2026-09-01'),
+        amd('RUB', '4.35', '2026-09-19', 'nbg'),
+        amd('RUB', '4.36', '2026-09-19', 'erapi'),
+      ]
+      expect(pickOfficialRate('RUB', 'AMD', rows, sunday)?.provider).toBe('nbg')
+      const cbr = amd('RUB', '4.34', '2026-09-19', 'cbr')
+      expect(pickOfficialRate('RUB', 'AMD', [...rows, cbr], sunday)?.provider).toBe('cbr')
+    })
+  })
+})
+
+describe('homeBankOf (MOL-110)', () => {
+  it('лари — НБ Грузии с любой стороны пары, остальное — ЦБ РА', () => {
+    expect(homeBankOf('GEL', 'RUB')).toBe('nbg')
+    expect(homeBankOf('AMD', 'GEL')).toBe('nbg')
+    expect(homeBankOf('RUB', 'AMD')).toBe('cba')
+    expect(homeBankOf('USD', 'EUR')).toBe('cba')
   })
 })
 

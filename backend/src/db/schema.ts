@@ -53,6 +53,8 @@ import {
   marketSideSchema,
   placeKindSchema,
   rateChoiceSchema,
+  HOME_BANK,
+  MARKET_CURRENCIES,
   rateProviderSchema,
   ratePreferenceSchema,
   SALARY_SHIFT_DAY_MAX,
@@ -164,6 +166,18 @@ function hexDigest(column: AnyPgColumn) {
 /** A quantity unit is nullable in several tables; the list is the same everywhere. */
 function unitKnownOrNull(column: AnyPgColumn) {
   return sql`${column} is null or ${oneOf(column, baseUnitSchema.options)}`
+}
+
+/**
+ * `homeBankOf` of a pair in SQL, written from the model's `HOME_BANK` so the check of a trip's
+ * source can never name another bank than the domain does (MOL-110).
+ */
+function homeBankSql(base: AnyPgColumn, quote: AnyPgColumn) {
+  const banks = Object.entries(HOME_BANK).map(
+    ([currency, bank]) =>
+      sql`when ${base} = ${sql.raw(`'${currency}'`)} or ${quote} = ${sql.raw(`'${currency}'`)} then ${sql.raw(`'${bank}'`)}`,
+  )
+  return sql`(case ${sql.join(banks, sql` `)} else 'cba' end)`
 }
 
 /** Currency is nullable wherever the amount beside it is. */
@@ -787,14 +801,15 @@ export const trips = pgTable(
       sql`${table.rateProvider} is null or ${oneOf(table.rateProvider, rateProviderSchema.options)}`,
     ),
     // A publisher for every published rate, and none for a rate nobody published — and the two
-    // say the same thing: the source *is* the publisher («official» is the central bank of
-    // Armenia and nothing else), so «fallback by cba» or «official by erapi» is not a state but a
-    // contradiction (MOL-22, В2-11). On a personal rate and on no rate at all the second
+    // say the same thing: the source *is* the publisher («official» is the pair's own bank,
+    // `homeBankOf`: the National Bank of Georgia for the lari, the Central Bank of Armenia for the
+    // rest, MOL-110), so «fallback by cba» on a pair of drams or «official by erapi» is not a state
+    // but a contradiction (MOL-22, В2-11). On a personal rate and on no rate at all the second
     // expression is null and the check passes.
     check(
       'trips_rate_provider_matches_source',
       sql`(${table.rateSource} is null or ${table.rateSource} = 'personal') = (${table.rateProvider} is null)
-        and ((${table.rateSource} = 'official') = (${table.rateProvider} = 'cba')) is not false`,
+        and ((${table.rateSource} = 'official') = (${table.rateProvider} = ${homeBankSql(table.rateBase, table.rateQuote)})) is not false`,
     ),
     check(
       'trips_rate_source_known',
@@ -1102,10 +1117,9 @@ export const marketRates = pgTable(
     primaryKey({ columns: [table.channel, table.currency, table.side, table.rateDate] }),
     check('market_rates_channel_known', oneOf(table.channel, marketChannelSchema.options)),
     check('market_rates_side_known', oneOf(table.side, marketSideSchema.options)),
-    check(
-      'market_rates_currency_foreign',
-      sql`${oneOf(table.currency, currencySchema.options)} and ${table.currency} <> 'AMD'`,
-    ),
+    // The currencies of the files and no other (MOL-110): the lari is in none of them, and a mirror
+    // holds what it mirrors.
+    check('market_rates_currency_foreign', oneOf(table.currency, MARKET_CURRENCIES)),
     check('market_rates_positive', sql`${table.scaled} > 0`),
   ],
 )
