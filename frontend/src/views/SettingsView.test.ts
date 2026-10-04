@@ -263,7 +263,7 @@ it.each([
   expect(entry?.attributes('href')).toBe('/settings/devices')
   expect(view.text()).toContain(en.settings.group_account)
 })
-it('«Тема» stands in every state, under «Напоминания» and over «Аккаунт» (MOL-111)', async () => {
+it('«Тема» stands in every state, under «Бот» and over «Аккаунт» (MOL-111)', async () => {
   const captions = (view: VueWrapper) => view.findAll('h2').map((caption) => caption.text())
   const loading = await (async () => {
     me.mockReturnValue(new Promise(() => undefined))

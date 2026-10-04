@@ -10,8 +10,7 @@
       />
     </label>
     <p :id="`${id}-hint`" class="hint">{{ hint }}</p>
-    <p v-if="offline" :id="`${id}-offline`" class="hint">{{ t('settings.tap.offline') }}</p>
-    <p v-else-if="saveFailed" class="failed" role="alert">
+    <p v-if="saveFailed" class="failed" role="alert">
       <IconAlert aria-hidden="true" />{{ t('settings.tap.save_failed') }}
     </p>
   </li>
@@ -27,7 +26,7 @@ import AppSwitch from '@/components/AppSwitch.vue'
 /**
  * One kind of the bot's messages on the page «Бот» (MOL-129, В-2): its switch, saved on the tap, and
  * what it does. Inactive while saving, without a connection, or under a block of the bot — which the
- * page says once, above the list, and names to a screen reader here through `blockedBy`.
+ * page says once for every switch and names to a screen reader here through `notedBy`.
  */
 export default defineComponent({
   name: 'BotSwitchRow',
@@ -37,20 +36,15 @@ export default defineComponent({
     hint: { type: String, required: true },
     checked: { type: Boolean, required: true },
     inactive: { type: Boolean, default: false },
-    offline: { type: Boolean, default: false },
     saveFailed: { type: Boolean, default: false },
-    /** The id of the line saying the bot is blocked, while it is. */
-    blockedBy: { type: String as PropType<string | null>, default: null },
+    /** The page's own lines about every switch at once — the block, no connection — by their ids. */
+    notedBy: { type: Array as PropType<readonly string[]>, default: () => [] },
   },
   emits: { toggle: (on: boolean) => typeof on === 'boolean' },
   setup(props) {
     const { t } = useI18n()
     const id = useId()
-    const described = computed(() =>
-      [`${id}-hint`, props.blockedBy, props.offline ? `${id}-offline` : null]
-        .filter(Boolean)
-        .join(' '),
-    )
+    const described = computed(() => [`${id}-hint`, ...props.notedBy].join(' '))
     return { t, id, described }
   },
 })

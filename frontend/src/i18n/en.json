@@ -1111,7 +1111,7 @@
     },
     "receipts": {
       "label": "Tell me when a receipt is read",
-      "hint": "If you left the screen while it was being read. The message names the shop and the number of items — no sums, no products."
+      "hint": "If you left the screen while it was being read. The message names the shop or the receipt’s date and the number of items — no sums, no products."
     },
     "load_error": {
       "title": "The bot settings did not load",
@@ -1475,7 +1475,7 @@
       },
       "receipts": {
         "term": "Receipts",
-        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; no outside service sees the receipt. The photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them. If you left the screen while a receipt was being read, the Molvia bot tells you in Telegram that it is ready: the message names the shop and the number of items — no sums, no products — and Telegram sees it. Kept here: how you learned the receipt was ready — in the app or from the bot — and whether that message is off."
+        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; no outside service sees the receipt. The photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them. If you left the screen while a receipt was being read, the Molvia bot tells you in Telegram that it is ready: the message names the shop or the receipt’s date and the number of items — no sums, no products — and Telegram sees that message. Kept here: how you learned the receipt was ready — in the app or from the bot — and whether that message is off."
       },
       "accounts": {
         "term": "Accounts",
@@ -1495,7 +1495,7 @@
       },
       "reminders": {
         "term": "Rating reminders",
-        "text": "When the bot last reminded you to rate your purchases, and which reminder in a row it was — so that it writes less often if you do not answer. And whether the reminders are off — by you, or because you blocked the bot. The message itself carries the item and the shop to Telegram: otherwise the question would not say what it is about."
+        "text": "When the bot last reminded you to rate your purchases, and which reminder in a row it was — so that it writes less often if you do not answer. And whether the reminders are off — by you, or because you blocked the bot — and since when the bot is blocked. The message itself carries the item and the shop to Telegram: otherwise the question would not say what it is about."
       },
       "feedback": {
         "term": "Messages to the developer",

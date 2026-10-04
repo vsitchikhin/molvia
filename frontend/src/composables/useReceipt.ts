@@ -23,7 +23,7 @@ export function useReceipt(id: Ref<string>): KeptAnswer<ReceiptDetail> & { gone:
     subject: id,
     ask: async (asked) => {
       try {
-        const answer = await api.receipt(asked)
+        const answer = await api.receipt(asked, { shown: document.visibilityState === 'visible' })
         gone.value = false
         return answer
       } catch (error) {

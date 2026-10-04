@@ -651,3 +651,14 @@ describe('атрибут lang', () => {
     expect(document.documentElement.lang).toBe('xx')
   })
 })
+
+describe('«чек разобран» — что уходит в Telegram, названо (MOL-129, adversarial А3)', () => {
+  it('текст о данных и подсказка выключателя называют и дату чека: без места сообщение — это дата', () => {
+    for (const text of [ru.privacy.stored.receipts.text, ru.bot.receipts.hint]) {
+      expect(text).toContain('магазин или дата чека и число позиций')
+    }
+    for (const text of [en.privacy.stored.receipts.text, en.bot.receipts.hint]) {
+      expect(text).toContain('the shop or the receipt’s date and the number of items')
+    }
+  })
+})

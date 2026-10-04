@@ -29,23 +29,24 @@
           :label="t('bot.reminders.label')"
           :hint="t('bot.reminders.hint')"
           :checked="reminders.off.value !== 'chosen'"
-          :inactive="blocked || reminders.saving.value || !reminders.online.value"
-          :offline="!reminders.online.value"
+          :inactive="blocked || reminders.saving.value || !online"
           :save-failed="reminders.saveFailed.value"
-          :blocked-by="blocked ? `${id}-blocked` : null"
+          :noted-by="notes"
           @toggle="chooseReminders"
         />
         <BotSwitchRow
           :label="t('bot.receipts.label')"
           :hint="t('bot.receipts.hint')"
           :checked="notices.off.value === false"
-          :inactive="blocked || notices.saving.value || !notices.online.value"
-          :offline="!notices.online.value"
+          :inactive="blocked || notices.saving.value || !online"
           :save-failed="notices.saveFailed.value"
-          :blocked-by="blocked ? `${id}-blocked` : null"
+          :noted-by="notes"
           @toggle="chooseNotices"
         />
       </AppCard>
+      <!-- Said once for every switch, as the block is (review №5), and under them: a note goes under
+           the control it is about (MOL-136). -->
+      <p v-if="!online" :id="`${id}-offline`" class="note">{{ t('settings.tap.offline') }}</p>
     </section>
   </AppScreen>
 </template>
@@ -78,7 +79,15 @@ export default defineComponent({
     const id = useId()
     const reminders = useReminders()
     const notices = useReceiptNotices()
-    const blocked = computed(() => reminders.off.value === 'blocked')
+    // The block is the bot's (review №1): the reminders' column says it only over «on», so the
+    // receipts' answer carries it too — a block over «chosen» is there alone.
+    const blocked = computed(() => notices.blocked.value || reminders.off.value === 'blocked')
+    const online = computed(() => reminders.online.value && notices.online.value)
+    const notes = computed(() =>
+      [blocked.value ? `${id}-blocked` : null, online.value ? null : `${id}-offline`].filter(
+        (note): note is string => note !== null,
+      ),
+    )
 
     // Four states (MOL-19): the page shows both switches or neither, and offline or error is decided
     // after the failure — a failure of either read is the page's.
@@ -99,7 +108,19 @@ export default defineComponent({
     function chooseNotices(on: boolean): void {
       void notices.choose(!on)
     }
-    return { t, id, reminders, notices, blocked, phase, retry, chooseReminders, chooseNotices }
+    return {
+      t,
+      id,
+      reminders,
+      notices,
+      blocked,
+      online,
+      notes,
+      phase,
+      retry,
+      chooseReminders,
+      chooseNotices,
+    }
   },
 })
 </script>
@@ -113,6 +134,13 @@ export default defineComponent({
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
+}
+
+.note {
+  margin: var(--space-3) 0 0;
+  padding: 0 var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
 }
 
 .blocked {

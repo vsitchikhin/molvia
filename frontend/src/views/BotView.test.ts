@@ -61,9 +61,9 @@ beforeEach(() => {
   for (const fake of [readReminders, chooseReminders, readNotices, chooseNotices]) fake.mockReset()
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
   readReminders.mockResolvedValue({ off: null })
-  readNotices.mockResolvedValue({ off: false })
+  readNotices.mockResolvedValue({ off: false, blocked: false })
   chooseReminders.mockImplementation((on) => Promise.resolve({ off: on ? null : 'chosen' }))
-  chooseNotices.mockImplementation((on) => Promise.resolve({ off: !on }))
+  chooseNotices.mockImplementation((on) => Promise.resolve({ off: !on, blocked: false }))
 })
 afterEach(() => {
   for (const view of views.splice(0)) view.unmount()
@@ -106,7 +106,7 @@ describe('«Telegram bot» (MOL-129, В-2)', () => {
 
   it('under a block: one line for both, both inactive, each showing the person’s choice (Р-10)', async () => {
     readReminders.mockResolvedValue({ off: 'blocked' })
-    readNotices.mockResolvedValue({ off: true })
+    readNotices.mockResolvedValue({ off: true, blocked: true })
     const view = await render()
     expect(view.text()).toContain(en.bot.blocked)
     // a block never overwrites «chosen»: the reminders were on before it
@@ -119,6 +119,20 @@ describe('«Telegram bot» (MOL-129, В-2)', () => {
     await receipts(view).trigger('click')
     await flushPromises()
     expect(chooseNotices).not.toHaveBeenCalled()
+  })
+
+  it('a block over «chosen» is said all the same — the receipts’ answer carries it (review №1, А2)', async () => {
+    readReminders.mockResolvedValue({ off: 'chosen' })
+    readNotices.mockResolvedValue({ off: false, blocked: true })
+    const view = await render()
+    expect(view.text()).toContain(en.bot.blocked)
+    // each switch shows what the person chose
+    expect(reminders(view).element.checked).toBe(false)
+    expect(receipts(view).element.checked).toBe(true)
+    for (const control of [reminders(view), receipts(view)]) {
+      expect(control.attributes('aria-disabled')).toBe('true')
+      expect(describedBy(view, control)).toContain(en.bot.blocked)
+    }
   })
 
   it('off by the person: no word about a block', async () => {
@@ -176,5 +190,7 @@ describe('the four states (MOL-19)', () => {
       expect(control.attributes('aria-disabled')).toBe('true')
       expect(describedBy(view, control)).toContain(en.settings.tap.offline)
     }
+    // said once for both, as the block is (review №5)
+    expect(view.text().split(en.settings.tap.offline)).toHaveLength(2)
   })
 })
