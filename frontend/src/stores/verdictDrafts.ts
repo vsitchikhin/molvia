@@ -222,7 +222,7 @@ export const useVerdictDraftsStore = defineStore('verdictDrafts', () => {
     // с кнопкой тут было бы хуже: кнопка зовёт эту же отправку и ничего не изменит, пока
     // личность не осела. А осядет она сама — по `online`, по возвращению во вкладку или по
     // «Повторить» на плашке личности.
-    if (actor.state !== 'ready' || login.rechecking) {
+    if (actor.state !== 'ready' || login.writesHeld) {
       held.value = 'offline'
       return Promise.resolve()
     }

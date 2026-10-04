@@ -90,6 +90,8 @@ function deps(world: World = {}) {
     byTelegramUserId: () => Promise.reject(new Error('byTelegramUserId was not expected')),
     update: () => Promise.reject(new Error('update was not expected')),
     lockAccount: () => Promise.reject(new Error('lockAccount was not expected')),
+    consentVersion: () => Promise.reject(new Error('consentVersion was not expected')),
+    acceptConsent: () => Promise.reject(new Error('acceptConsent was not expected')),
   }
 
   const verdicts: VerdictRepository = {

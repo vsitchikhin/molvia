@@ -45,9 +45,18 @@ describe('routes', () => {
     expect(route.meta.public).toBe(true)
   })
 
-  it('no other route is drawn without a session (MOL-56, MOL-58)', () => {
+  it('«Terms of use» sits beside it, nested under the settings and public (MOL-95)', async () => {
+    const route = await resolveAt('/terms')
+    expect(route.name).toBe('terms')
+    expect(route.meta.parent).toBe('settings')
+    expect(route.meta.tab).toBeUndefined()
+    expect(route.meta.public).toBe(true)
+  })
+
+  it('no other route is drawn without a session (MOL-56, MOL-58, MOL-95)', () => {
     expect(named.filter((route) => route.meta.public).map((route) => route.name)).toEqual([
       'privacy',
+      'terms',
     ])
   })
 

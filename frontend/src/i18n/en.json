@@ -1445,7 +1445,6 @@
   },
   "privacy": {
     "title": "Data and privacy",
-    "revised": "Revised 3 October 2026",
     "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
     "stored": {
       "title": "What we keep",
@@ -1512,6 +1511,10 @@
       "settings": {
         "term": "Your settings",
         "text": "Country, city, currencies, and the day you changed the currency of conversion."
+      },
+      "consent": {
+        "term": "Consent to the terms",
+        "text": "Which edition of the Terms of use and of this page you accepted, and when — so that we can ask you again when they change in a way that matters. We keep neither your age nor your date of birth."
       }
     },
     "logs": {
@@ -1541,6 +1544,80 @@
     "erase": {
       "title": "Delete everything",
       "text": "In Settings, «Delete my data», or send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they, the items you added to the shared catalogue and the barcodes you linked stay, without your name. Deleting from Settings also erases the copies on the phone you deleted from; on other devices, and after /delete, they may remain: to remove them, delete the app there or clear the site's data — or sign out there in Settings beforehand. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data. It is there so that whether Molvia gets used is counted honestly."
+    }
+  },
+  "terms": {
+    "title": "Terms of use",
+    "what": {
+      "title": "What this is",
+      "text": "Molvia is an app where people note what is worth buying, and where. One person makes it. It is not a shop and not an advertisement."
+    },
+    "who": {
+      "title": "Who may use it",
+      "text": "You must be 16 or older. You sign in with your Telegram — there is no other way."
+    },
+    "yours": {
+      "title": "Your records",
+      "text": "Your purchases, spendings, exchanges and accounts are seen by you alone. Others see ratings and prices without a name, and only once at least three people have recorded them. In detail — «Data and privacy»."
+    },
+    "write": {
+      "title": "What to write",
+      "text": "What you bought and tried yourself. Do not write what you know to be false, or anyone else’s personal data — not in names, not in notes, not in messages to the developer."
+    },
+    "catalogue": {
+      "title": "The shared catalogue",
+      "text": "The items and barcodes you add become part of the shared catalogue and stay in it without your name, even if you delete your account."
+    },
+    "ads": {
+      "title": "No advertising",
+      "text": "There is no advertising and no paid placement in the answers — not now, not later."
+    },
+    "warranty": {
+      "title": "No warranty",
+      "text": "Ratings are people’s opinions, prices are what they recorded. The app is provided as is. What to buy is your decision."
+    },
+    "free": {
+      "title": "Your own is free",
+      "text": "Recording and seeing your own data is free, always. If access to other people’s figures ever becomes paid, a new edition will appear here, and the app will ask you again."
+    },
+    "changes": {
+      "title": "Deletion and changes",
+      "text": "You can delete everything at any time: in Settings, or with /delete in the bot. If the terms or «Data and privacy» change in a way that matters, the app will ask for your consent again the next time you open it."
+    },
+    "contact": {
+      "title": "Contact",
+      "text": "«Write to the developer» in Settings."
+    }
+  },
+  "policy": {
+    "revised": "Revised {day}"
+  },
+  "consent": {
+    "title": "Terms and privacy",
+    "body": "Your purchases are seen by you alone. Others see prices and ratings without a name — and only once at least three people have recorded them. No ads, no trackers.",
+    "updated": {
+      "title": "The terms have changed",
+      "body": "Read what changed and accept the new edition — you cannot go on without it.",
+      "changes": "What changed"
+    },
+    "age": "I am 16 or older",
+    "accept": "I accept",
+    "decline": "I do not accept",
+    "offline": "You cannot accept without the internet — connect, and the button will work.",
+    "error": "Could not save your consent. Try again.",
+    "failed": {
+      "title": "Could not open the terms",
+      "body": "The server did not say whether you have accepted the terms. Try again."
+    },
+    "lost": {
+      "title": "No connection",
+      "body": "Checking whether you have accepted the terms needs the internet. The screen will try again by itself when the connection is back."
+    },
+    "leave": {
+      "title": "Molvia cannot be used without consent",
+      "body": "Your account already exists: it holds your Telegram id and everything you recorded before. You can sign out — and come back when you decide. Or you can delete all your data now.",
+      "erase": "Delete my data…",
+      "back": "Back to the terms"
     }
   },
   "accounts": {

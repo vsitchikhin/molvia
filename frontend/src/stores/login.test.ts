@@ -1,21 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { ApiError } from '@molvia/client'
-import { ERROR, ISSUE } from '@molvia/model'
-import type { ActorView, LoginPoll, LoginStarted } from '@molvia/model'
+import { ERROR, ISSUE, POLICY_VERSION } from '@molvia/model'
+import type { ActorView, Consent, LoginPoll, LoginStarted } from '@molvia/model'
 import { sessionEnded, useActorStore } from '@/stores/actor'
+import { useConsentStore } from '@/stores/consent'
 import { useLoginStore } from '@/stores/login'
 
 const startLogin = vi.fn<(options?: { readonly again?: boolean }) => Promise<LoginStarted>>()
 const pollLogin = vi.fn<(id: string) => Promise<LoginPoll>>()
 const logout = vi.fn<() => Promise<void>>()
 const me = vi.fn<() => Promise<ActorView>>()
+const consent = vi.fn<() => Promise<Consent>>()
+const acceptConsent = vi.fn<(version: number) => Promise<Consent>>()
 vi.mock('@/api', () => ({
   api: {
     startLogin: (options?: { readonly again?: boolean }) => startLogin(options),
     pollLogin: (id: string) => pollLogin(id),
     logout: () => logout(),
     me: () => me(),
+    consent: () => consent(),
+    acceptConsent: (version: number) => acceptConsent(version),
   },
   onMissingActor: () => undefined,
 }))
@@ -76,6 +81,11 @@ beforeEach(() => {
   logout.mockReset()
   logout.mockResolvedValue(undefined)
   me.mockReset()
+  // Everybody here has accepted the terms already: the step after the claim is MOL-95's own block.
+  consent.mockReset()
+  consent.mockResolvedValue({ version: POLICY_VERSION })
+  acceptConsent.mockReset()
+  acceptConsent.mockImplementation((version) => Promise.resolve({ version }))
   online(true)
 })
 
@@ -921,5 +931,139 @@ describe('что лежит на устройстве, проверяется', 
     const { login } = await signedOut()
 
     expect(login.phase).toBe('offer')
+  })
+})
+
+describe('условия и приватность — шаг после «чей это аккаунт» (MOL-95)', () => {
+  const CONSENT = `molvia.consent.${MINE.id}`
+
+  /** Владелец уже признан на этом устройстве: остаётся только шаг согласия. */
+  async function claimedLaunch(remembered?: number) {
+    localStorage.setItem(KEY, JSON.stringify({ claimed: MINE.id }))
+    localStorage.setItem(OWNER, MINE.id)
+    if (remembered !== undefined) localStorage.setItem(CONSENT, String(remembered))
+    setActivePinia(createPinia())
+    const actor = useActorStore()
+    me.mockResolvedValue(MINE)
+    const login = useLoginStore()
+    await actor.start()
+    await flush()
+    return { actor, login }
+  }
+
+  async function flush(): Promise<void> {
+    for (let i = 0; i < 5; i += 1) await Promise.resolve()
+  }
+
+  it('не принявший ни одной редакции — дверь закрыта на шаге согласия; «Принимаю» её открывает', async () => {
+    consent.mockResolvedValue({ version: null })
+    const { login } = await claimedLaunch()
+    expect(login.closed).toBe(true)
+    expect(login.phase).toBe('consent')
+
+    await useConsentStore().accept()
+
+    expect(acceptConsent).toHaveBeenCalledWith(POLICY_VERSION)
+    expect(login.closed).toBe(false)
+    expect(localStorage.getItem(CONSENT)).toBe(String(POLICY_VERSION))
+  })
+
+  it('пока сервер не ответил, какую редакцию приняли, — скелет, а не приложение', async () => {
+    let answer: (value: Consent) => void = () => undefined
+    consent.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+    const { login } = await claimedLaunch()
+    expect(login.closed).toBe(true)
+    expect(login.phase).toBe('loading')
+    answer({ version: POLICY_VERSION })
+    await flush()
+    expect(login.closed).toBe(false)
+  })
+
+  it('устройство помнит текущую редакцию — дверь не ждёт и сервер не спрашивают (Р-6)', async () => {
+    const { login } = await claimedLaunch(POLICY_VERSION)
+    expect(consent).not.toHaveBeenCalled()
+    expect(login.closed).toBe(false)
+  })
+
+  it('не помнит — спрашивает сервер: её могли принять на другом устройстве', async () => {
+    const { login } = await claimedLaunch()
+    expect(consent).toHaveBeenCalledTimes(1)
+    expect(login.closed).toBe(false)
+  })
+
+  it('память другого владельца ничего не открывает', async () => {
+    localStorage.setItem(`molvia.consent.${STRANGER.id}`, String(POLICY_VERSION))
+    consent.mockResolvedValue({ version: null })
+    const { login } = await claimedLaunch()
+    expect(login.phase).toBe('consent')
+  })
+
+  it('сборка старше редакции на сервере не спрашивает о тексте, которого не может показать', async () => {
+    consent.mockResolvedValue({ version: POLICY_VERSION + 1 })
+    const { login } = await claimedLaunch()
+    expect(login.closed).toBe(false)
+  })
+
+  it('сервер не ответил — дверь закрыта на шаге с «Повторить», а не открыта наугад', async () => {
+    consent.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const { login } = await claimedLaunch()
+    const step = useConsentStore()
+    expect(login.phase).toBe('consent')
+    expect(step.state).toBe('error')
+
+    consent.mockResolvedValue({ version: POLICY_VERSION })
+    await step.retry()
+    expect(login.closed).toBe(false)
+  })
+
+  it('без связи на запуске приложение открывается по ящику, как раньше, — шаг придёт со следующим ответом', async () => {
+    localStorage.setItem(KEY, JSON.stringify({ claimed: MINE.id }))
+    localStorage.setItem(OWNER, MINE.id)
+    setActivePinia(createPinia())
+    const actor = useActorStore()
+    online(false)
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'transport', false))
+    const login = useLoginStore()
+    await actor.start()
+    await flush()
+    expect(actor.state).toBe('offline')
+    expect(consent).not.toHaveBeenCalled()
+    expect(login.closed).toBe(false)
+  })
+
+  it('«Принимаю» не прошло — дверь остаётся закрытой, и шаг говорит почему', async () => {
+    consent.mockResolvedValue({ version: null })
+    acceptConsent.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const { login } = await claimedLaunch()
+    const step = useConsentStore()
+    await step.accept()
+    expect(step.failure).toBe('error')
+    expect(login.closed).toBe(true)
+    expect(localStorage.getItem(CONSENT)).toBeNull()
+  })
+
+  it('приняли в соседнем окне — дверь открывается и здесь, без своего запроса', async () => {
+    consent.mockResolvedValue({ version: null })
+    const { login } = await claimedLaunch()
+    expect(login.closed).toBe(true)
+
+    localStorage.setItem(CONSENT, String(POLICY_VERSION))
+    window.dispatchEvent(new StorageEvent('storage', { key: CONSENT }))
+    expect(login.closed).toBe(false)
+    expect(acceptConsent).not.toHaveBeenCalled()
+  })
+
+  it('сначала «чей это аккаунт», потом условия: непризнанный владелец видит вопрос, а не шаг', async () => {
+    consent.mockResolvedValue({ version: null })
+    localStorage.setItem(OWNER, MINE.id)
+    setActivePinia(createPinia())
+    const actor = useActorStore()
+    me.mockResolvedValue(MINE)
+    const login = useLoginStore()
+    await actor.start()
+    await flush()
+    expect(login.phase).toBe('welcome')
+    login.confirm()
+    expect(login.phase).toBe('consent')
   })
 })

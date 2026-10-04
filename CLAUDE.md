@@ -365,6 +365,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   counted against a dry run, **and every column exported or left out with its reason**
   (`EXPORT_COLUMNS`); stored, never counted; the removed marked; no secret.
 - **Locks are taken in one order everywhere**: the account, then the request rows, then the owner.
+- **The terms and the privacy page are accepted an edition at a time** (MOL-95): `POLICY_VERSION`
+  is raised by hand only for a change that matters, any other edit is a new revision `policy.test.ts`
+  holds; the edition and its moment on the owner, only ever raised; which edition to ask about is the
+  build's, and the API refuses nothing without it — the step is the door's, after the claim, never
+  closing over an app already shown, and the queues of one who accepted none wait on the phone.
 - **No third-party trackers or analytics**; any third-party script that sees data is a decision.
   onnxruntime's telemetry is off (`ORT_DISABLE_TELEMETRY`, MOL-105).
 - **Logs live fourteen days and carry no address and no query**; a failure is logged by its kind
