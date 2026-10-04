@@ -75,6 +75,16 @@ export const en: Dictionary = {
   'remind.resumed': '🔔 Reminders are on again.',
   'remind.gone': 'Nothing to turn on: the Molvia account is gone.',
   'remind.switchFailed': 'No answer came back. Please press again in a minute.',
+  'receipt.parsed': 'Your {place} receipt is ready: {count}. Take a look and save them.',
+  'receipt.parsed_no_place':
+    'Your receipt from {date} is ready: {count}. Take a look and save them.',
+  'receipt.failed':
+    'We couldn’t read your receipt from {date}. You can retake it or add the purchases by hand.',
+  'receipt.view': 'View receipt',
+  'receipt.open': 'Open receipt',
+  'receipt.items.one': '{n} item',
+  'receipt.items.few': '{n} items',
+  'receipt.items.many': '{n} items',
   'owner.failure.new': '🔴 New failure · {source}',
   'owner.failure.again': '🟠 {count} times in this build already · {source}',
   'owner.failure.what': '{kind} · {place}',

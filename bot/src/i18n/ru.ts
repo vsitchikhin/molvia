@@ -162,6 +162,20 @@ export const ru = {
   'remind.gone': 'Включать нечего: аккаунта в Molvia больше нет.',
   'remind.switchFailed': 'Не дождался ответа. Нажмите ещё раз через минуту.',
   /**
+   * «Чек разобран» (MOL-129, handoff 08): in the receipt's language — the interface's when it was
+   * sent (П-4). The place as the catalogue names it, in «ёлочках»; no sum, no line, no item. The
+   * date is the receipt's, without the year; the count is a form of `receipt.items.*`.
+   */
+  'receipt.parsed': 'Чек из «{place}» разобран: {count}. Посмотрите и запишите.',
+  'receipt.parsed_no_place': 'Чек от {date} разобран: {count}. Посмотрите и запишите.',
+  'receipt.failed':
+    'Чек от {date} не удалось прочитать. Можно переснять или записать покупки вручную.',
+  'receipt.view': 'Посмотреть чек',
+  'receipt.open': 'Открыть чек',
+  'receipt.items.one': '{n} позиция',
+  'receipt.items.few': '{n} позиции',
+  'receipt.items.many': '{n} позиций',
+  /**
    * A failure, told to the owner (MOL-143): the first time in a build, then at 10, 100 and 1000
    * there. Russian always — the owner's language is not kept. The kind and the place are the
    * table's own words, a class name and a route's template, and are printed as they are.

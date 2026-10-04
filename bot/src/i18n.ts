@@ -20,9 +20,9 @@ const DICTIONARIES: Readonly<Record<AppLocale, Dictionary>> = { ru, en }
  * Telegram's `language_code` is an IETF tag like any other, and a person without one in their
  * profile is an ordinary case rather than a failure — Russian by default, as everywhere.
  *
- * Substitution is `{name}` and nothing else. No plural rule lives here: the only counted thing
- * the bot says is the age of a login request, and its forms are four keys of the dictionary —
- * see `when.ts` for why that is enough.
+ * Substitution is `{name}` and nothing else. No plural rule lives here: the age of a login request
+ * has four keys of its own (see `when.ts` for why that is enough), and the lines of a receipt pick
+ * their form by `Intl.PluralRules` where they are counted (`receipt.ts`, MOL-129).
  */
 export function t(
   languageCode: string | undefined,
