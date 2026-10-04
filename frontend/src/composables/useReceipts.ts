@@ -90,7 +90,8 @@ export function useReceipts(): ReceiptsScreen {
   const kept = useKeptAnswer({
     key: 'molvia.receipts',
     subject: ref('all'),
-    ask: () => api.receipts(),
+    // In view or not is the phone's word (MOL-129, А1): a list asked hidden says nothing of the person.
+    ask: () => api.receipts({ shown: document.visibilityState === 'visible' }),
     codec: receiptsResponseCodec,
     kept: 1,
   })

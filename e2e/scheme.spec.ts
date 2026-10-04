@@ -175,11 +175,11 @@ test('a segment scrolled under the pinned header stays under it, and the header 
   await page.setViewportSize({ width: 320, height: 568 })
   await page.emulateMedia({ colorScheme: 'light' })
   await signedIn(page, '/settings')
-  // The groups over «Тема» load by requests of their own, and their answers redraw them (the switches
-  // come enabled, their descriptions change). Measured before that, the point once missed the header
-  // on CI (MOL-171) — the exact move was not caught; measured after, nothing over the word is pending.
+  // The group over «Тема» loads by a request of its own, and its answer redraws it (the switch comes
+  // enabled, its description changes). Measured before that, the point once missed the header on CI
+  // (MOL-171) — the exact move was not caught; measured after, nothing over the word is pending. The
+  // bot's row (MOL-129) is a link that loads nothing.
   await expect(page.getByRole('switch', { name: 'Зарплата — в следующий месяц' })).toBeEnabled()
-  await expect(page.getByRole('switch', { name: 'Напоминать об оценке в Telegram' })).toBeEnabled()
   const bar = await page.locator('header.bar').boundingBox()
   if (!bar) throw new Error('no header')
   const word = scheme(page).locator('.word', { hasText: 'Тёмная' })

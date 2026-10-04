@@ -191,3 +191,11 @@ export type ReceiptRecorded = z.output<typeof receiptRecordedCodec>
  */
 export const receiptSettledCodec = z.strictObject({ recorded: z.boolean() })
 export type ReceiptSettled = z.output<typeof receiptSettledCodec>
+
+/**
+ * The query of `GET /receipts` and `GET /receipts/:id` (MOL-129, adversarial А1): `shown=1` — the
+ * phone asks with its page in view, so a receipt it is answered read is heard of in the app and
+ * «чек разобран» will not follow. A list asked hidden — the connection back, a queue landing — says
+ * nothing of the person, and leaves the bot to tell them.
+ */
+export const receiptReadQuerySchema = z.strictObject({ shown: z.literal('1').optional() })

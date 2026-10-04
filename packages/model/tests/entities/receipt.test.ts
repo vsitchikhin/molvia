@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  tellsQuietly,
   RESHOOT_TOTAL_SHARE,
   moneyOfHundredths,
   needsReshoot,
@@ -518,5 +519,23 @@ describe('an item named after a city never names the receipt’s city (MOL-126)'
     ]) {
       expect(receiptCityOf(rows('ԵՐԵՎԱՆ-ՍԻԹԻ', address, 'ՀՎՀՀ:01282006'), words)).toBe('Гюмри')
     }
+  })
+})
+
+describe('«чек разобран» without a sound at night (MOL-129)', () => {
+  it('rings from 08:00 to 21:59 of the person’s zone, and is quiet from 22:00 to 07:59', () => {
+    // Yerevan is UTC+4 all year
+    const at = (utc: string) => tellsQuietly(new Date(utc), 'Asia/Yerevan')
+    expect(at('2026-10-04T03:59:59Z')).toBe(true)
+    expect(at('2026-10-04T04:00:00Z')).toBe(false)
+    expect(at('2026-10-04T17:59:59Z')).toBe(false)
+    expect(at('2026-10-04T18:00:00Z')).toBe(true)
+  })
+
+  it('follows Belgrade’s summer time', () => {
+    // 20:30 UTC is 22:30 in summer (UTC+2), night, and 21:30 in winter (UTC+1), still evening
+    expect(tellsQuietly(new Date('2026-07-01T19:30:00Z'), 'Europe/Belgrade')).toBe(false)
+    expect(tellsQuietly(new Date('2026-07-01T20:30:00Z'), 'Europe/Belgrade')).toBe(true)
+    expect(tellsQuietly(new Date('2026-12-01T20:30:00Z'), 'Europe/Belgrade')).toBe(false)
   })
 })

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  receiptReadQuerySchema,
   DomainError,
   ERROR,
   RECEIPT_PART_BYTES_MAX,
@@ -21,15 +22,16 @@ import type {
   ReceiptSummary,
 } from '@molvia/model'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import { parseBody } from '@/parse'
+import { parseBody, parseQuery } from '@/parse'
 import type { Today } from '@/usecases/today'
 
 export interface ReceiptsApi {
   send(actorId: string, body: ReceiptBody): Promise<{ receipt: ReceiptSummary; created: boolean }>
   putPart(actorId: string, id: string, part: string, photo: Buffer): Promise<ReceiptSummary>
-  list(actor: Actor): Promise<ReceiptSummary[]>
+  /** `shown` — the phone asked with its page in view (MOL-129, А1): what it is handed read is heard. */
+  list(actor: Actor, shown: boolean): Promise<ReceiptSummary[]>
   /** The review reads the rate of the receipt's day, and «today» is the phone's (MOL-121). */
-  one(actor: Actor & Today, id: string): Promise<ReceiptDetail>
+  one(actor: Actor & Today, id: string, shown: boolean): Promise<ReceiptDetail>
   remove(actorId: string, id: string): Promise<void>
   restore(actorId: string, id: string): Promise<ReceiptSummary>
   /** «Записать» (MOL-126): the receipt's day and «today» are the phone's (MOL-121). */
@@ -41,6 +43,11 @@ export interface ReceiptsApi {
 /** A receipt is the person's own: private always, never in a shared cache. */
 function privately(reply: FastifyReply) {
   return reply.header('cache-control', 'no-store')
+}
+
+/** Whether the phone asked with its page in view (`?shown=1`, MOL-129, А1). */
+function shownOf(request: FastifyRequest): boolean {
+  return parseQuery(receiptReadQuerySchema, request.query).shown === '1'
 }
 
 function ownerOf(request: FastifyRequest): string {
@@ -134,7 +141,9 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
     /** «Покупки»: the person's receipts, the newest first, the removed ones left out. */
     scope.get('/receipts', { exposeHeadRoute: false }, async (request, reply) =>
       privately(reply).send(
-        z.encode(receiptsResponseCodec, { receipts: await api.list(actorOf(request)) }),
+        z.encode(receiptsResponseCodec, {
+          receipts: await api.list(actorOf(request), shownOf(request)),
+        }),
       ),
     )
 
@@ -144,7 +153,10 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
       { exposeHeadRoute: false },
       async (request, reply) =>
         privately(reply).send(
-          z.encode(receiptDetailCodec, await api.one(askingOf(request), request.params.receiptId)),
+          z.encode(
+            receiptDetailCodec,
+            await api.one(askingOf(request), request.params.receiptId, shownOf(request)),
+          ),
         ),
     )
 

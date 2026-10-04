@@ -265,6 +265,19 @@ export function createReminderRepository(db: Conn): ReminderRepository {
           reminders_off: RemindersOff | null
         }>(sql`select id, country, reminders_off from actors where ${where} for no key update`)
         if (!row) return undefined
+        // Whether the bot is blocked is a fact of its own (MOL-129, review №1): a block over
+        // «chosen» leaves `reminders_off` as it is (В-1), yet «чек разобран» must know of it. Telegram's
+        // block writes it; any other word of the bot — an unblock, a press — is from someone who has
+        // not blocked it. The settings know nothing of it.
+        if (change === 'blocked') {
+          await tx.execute(sql`
+            update actors set bot_blocked_at = clock_timestamp()
+            where id = ${row.id}::uuid and bot_blocked_at is null`)
+        } else if (via === 'bot') {
+          await tx.execute(sql`
+            update actors set bot_blocked_at = null
+            where id = ${row.id}::uuid and bot_blocked_at is not null`)
+        }
         const next = switchReminders(row.reminders_off, change, via)
         if (next === row.reminders_off) return next
 
