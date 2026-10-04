@@ -77,7 +77,7 @@ describe('SegmentedControl', () => {
     function inactive(attachTo?: HTMLElement) {
       return mount(SegmentedControl, {
         props: { modelValue: 'l', options: UNITS, legend: 'Unit', inactive: true },
-        attachTo,
+        ...(attachTo ? { attachTo } : {}),
       })
     }
     const checked = (view: ReturnType<typeof inactive>) =>
