@@ -25,6 +25,13 @@ export interface CohortReturn {
    * forecast — decided only for those whose window has closed (adversarial А).
    */
   readonly withoutAccess: number
+  /**
+   * Their fourth week is over and access reached it, but they objected to being counted (MOL-96):
+   * off now, or back on only after that week began — its rows erased or never written. Out of both
+   * halves, or the rate fell with every objection and read «stop» for a reason unrelated to the
+   * hypothesis; named, so how many the cohort lost to objections is seen.
+   */
+  readonly optedOut: number
 }
 
 export interface EventRepository {
@@ -87,6 +94,9 @@ export interface EventRepository {
    * Counted before, a person who came last week read as one who did not come back — and the more
    * people arrive, the harder that pulls the gate towards «stop». The ones still waiting are
    * named beside the cohort, not in it; so are those without access.
+   *
+   * **And not those who objected to being counted** (MOL-96): out of both halves, named beside
+   * them — or every objection lowered the rate and nothing said why.
    */
   weekFourReturn(subject: CatalogueSubject, from: Date, to: Date): Promise<CohortReturn>
 }
@@ -184,15 +194,17 @@ export function createEventRepository(db: Conn): EventRepository {
         returned: number
         pending: number
         without_access: number
+        opted_out: number
       }>(sql`
         with appeared as (
-          select ${actors.id} as actor_id, ${actors.createdAt} as started, ${actors.sharedUntil} as shared_until
+          select ${actors.id} as actor_id, ${actors.createdAt} as started, ${actors.sharedUntil} as shared_until,
+            ${actors.analyticsOffAt} as off_at, ${actors.analyticsOnAt} as on_at
           from ${actors}
           where ${actors.createdAt} >= ${from.toISOString()}::timestamptz
             and ${actors.createdAt} <  ${to.toISOString()}::timestamptz
         ),
         closed as (
-          select actor_id, started, shared_until
+          select actor_id, started, shared_until, off_at, on_at
           from appeared
           -- Time first, access after (MOL-91, adversarial А). A fourth week still going is no
           -- answer yet, as gate 0.2 keeps its open windows out: counted now, a person who came
@@ -201,8 +213,8 @@ export function createEventRepository(db: Conn): EventRepository {
           -- 4» eighteen days early, and moved to «waiting» the day access was granted.
           where started + interval '672 hours' <= now()
         ),
-        cohort as (
-          select actor_id, started
+        with_access as (
+          select actor_id, started, off_at, on_at
           from closed
           -- Only those who could have answered the question (Р-24). The numerator is behind
           -- a paid door — advice_viewed is written in the shared mode alone — so counting
@@ -218,6 +230,15 @@ export function createEventRepository(db: Conn): EventRepository {
           -- that is a task, not a line.
           where shared_until >= started + interval '504 hours'
         ),
+        cohort as (
+          select actor_id, started
+          from with_access
+          -- Not those who objected to being counted (MOL-96), out of both halves. Back on counts
+          -- again only from before the fourth week began: switched off later, that week's rows were
+          -- erased, and switched on later, part of it was never written (Р-3).
+          where off_at is null
+            and (on_at is null or on_at <= started + interval '504 hours')
+        ),
         came_back as (
           select distinct c.actor_id
           from cohort c
@@ -231,7 +252,8 @@ export function createEventRepository(db: Conn): EventRepository {
           (select count(*) from cohort)::int as cohort_size,
           (select count(*) from came_back)::int as returned,
           (select count(*) from appeared)::int - (select count(*) from closed)::int as pending,
-          (select count(*) from closed)::int - (select count(*) from cohort)::int as without_access
+          (select count(*) from closed)::int - (select count(*) from with_access)::int as without_access,
+          (select count(*) from with_access)::int - (select count(*) from cohort)::int as opted_out
       `)
 
       const row = rows[0]
@@ -240,6 +262,7 @@ export function createEventRepository(db: Conn): EventRepository {
         returned: row?.returned ?? 0,
         pending: row?.pending ?? 0,
         withoutAccess: row?.without_access ?? 0,
+        optedOut: row?.opted_out ?? 0,
       }
     },
   }

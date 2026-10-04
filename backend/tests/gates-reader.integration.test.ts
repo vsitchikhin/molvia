@@ -36,8 +36,8 @@ describe('the gates reader', () => {
 
     const report = await reader.read(window)
 
-    expect(report.ratings).toEqual({ cohortSize: 1, reached: 0, pending: 1 })
-    const waiting = { cohortSize: 0, returned: 0, pending: 1, withoutAccess: 1 }
+    expect(report.ratings).toEqual({ cohortSize: 1, reached: 0, pending: 1, optedOut: 0 })
+    const waiting = { cohortSize: 0, returned: 0, pending: 1, withoutAccess: 1, optedOut: 0 }
     expect(report.products).toEqual(waiting)
     expect(report.venues).toEqual(waiting)
     expect(report.erased.count).toBe(0)

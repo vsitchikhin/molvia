@@ -139,6 +139,8 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
       share(ratings.reached, ratings.cohortSize),
     ),
     row(`still inside their ${days} days`, [String(ratings.pending), 'not counted yet']),
+    // Objected to being counted (MOL-96, В-2): named, or the share fell with each objection.
+    row('opted out of the statistics', [String(ratings.optedOut), 'in neither half']),
     '',
     heading('0.3', "do they come back for other people's data?", GATE_RETURN_STOP_PERCENT),
     row('products   back in week 4', share(products.returned, products.cohortSize)),
@@ -146,6 +148,7 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
     // The cohort is people, not what they looked at: the two halves wait and lack access alike.
     row('week 4 not over yet', [String(products.pending), 'not counted yet']),
     row('no access in week 4', [String(products.withoutAccess), 'not in the cohort']),
+    row('opted out of the statistics', [String(products.optedOut), 'in neither half']),
     '',
     row('erased', [String(report.erased.count), erasedWeeks(report.erased)]),
     '',

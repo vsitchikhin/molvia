@@ -7,9 +7,9 @@ const NOW = new Date('2026-11-20T10:03:00Z')
 
 const REPORT: GatesReport = {
   readAt: NOW,
-  ratings: { cohortSize: 12, reached: 3, pending: 4 },
-  products: { cohortSize: 5, returned: 1, pending: 3, withoutAccess: 8 },
-  venues: { cohortSize: 5, returned: 0, pending: 3, withoutAccess: 8 },
+  ratings: { cohortSize: 12, reached: 3, pending: 4, optedOut: 1 },
+  products: { cohortSize: 5, returned: 1, pending: 3, withoutAccess: 8, optedOut: 2 },
+  venues: { cohortSize: 5, returned: 0, pending: 3, withoutAccess: 8, optedOut: 2 },
   erased: { count: 2, firstWeek: '2026-10-05', lastWeek: '2026-11-16' },
   logins: {
     firstDay: '2026-10-05',
@@ -185,12 +185,14 @@ describe('gates — чтение ворот вручную', () => {
       '0.2  do strangers fill the base?                    stop below 20 %',
       '     gave 5 ratings within 14 days       3 of 12     25.0 %',
       '     still inside their 14 days          4          not counted yet',
+      '     opted out of the statistics         1          in neither half',
       '',
       "0.3  do they come back for other people's data?     stop below 15 %",
       '     products   back in week 4           1 of 5      20.0 %',
       '     venues     back in week 4           0 of 5       0.0 %',
       '     week 4 not over yet                 3          not counted yet',
       '     no access in week 4                 8          not in the cohort',
+      '     opted out of the statistics         2          in neither half',
       '',
       '     erased                              2          appeared the weeks of 2026-10-05 … 2026-11-16, in neither half',
       '',
@@ -256,10 +258,10 @@ describe('gates — чтение ворот вручную', () => {
   })
 
   it('пустая когорта — «—», а не 0 % и не NaN', async () => {
-    const empty = { cohortSize: 0, returned: 0, pending: 2, withoutAccess: 0 }
+    const empty = { cohortSize: 0, returned: 0, pending: 2, withoutAccess: 0, optedOut: 0 }
     const { exit, lines } = run(['--from', '2026-10-05'], {
       ...REPORT,
-      ratings: { cohortSize: 0, reached: 0, pending: 10 },
+      ratings: { cohortSize: 0, reached: 0, pending: 10, optedOut: 0 },
       products: empty,
       venues: empty,
     })
@@ -279,7 +281,7 @@ describe('gates — чтение ворот вручную', () => {
   ])('%i из %i — %s: вниз до десятой, через порог не переносит', async (part, whole, percent) => {
     const { exit, lines } = run(['--from', '2026-10-05'], {
       ...REPORT,
-      ratings: { cohortSize: whole, reached: part, pending: 0 },
+      ratings: { cohortSize: whole, reached: part, pending: 0, optedOut: 0 },
     })
     await exit
     const line = lines.find((text) => text.includes('gave 5 ratings')) ?? ''
