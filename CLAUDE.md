@@ -444,6 +444,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   **the settings never lift a block** (В-5), and «on» starts the ladder over unless it reminded
   today. Whoever writes to the bot has not blocked it. In the app it is its own address, never the
   settings form.
+- **«Чек разобран» goes only to whoever the phone did not hand the receipt read within 30 s**
+  (MOL-129, `receipts.heard`): the API marks and hands it out in one statement, at most once, within
+  6 h; no sum, no line; the receipt's language; its own switch on the page «Бот» (`/settings/bot`),
+  never the rating reminders'.
 - **Telegram updates are never logged whole.**
 
 ### Frontend — `.claude/rules/frontend.md`
