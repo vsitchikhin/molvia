@@ -1101,6 +1101,27 @@
       "body": "The list of devices will be here when the connection is back."
     }
   },
+  "bot": {
+    "title": "Telegram bot",
+    "group_messages": "Messages",
+    "blocked": "The bot is blocked in Telegram, so no messages arrive. Unblock the bot and they come back.",
+    "reminders": {
+      "label": "Remind me to rate",
+      "hint": "The evening after a purchase the bot asks how it was. Leave it unanswered and it asks less often, then keeps quiet for half a year."
+    },
+    "receipts": {
+      "label": "Tell me when a receipt is read",
+      "hint": "If you left the screen while it was being read. The message names the shop or the receipt’s date and the number of items — no sums, no products."
+    },
+    "load_error": {
+      "title": "The bot settings did not load",
+      "body": "The server did not answer. Try again."
+    },
+    "offline": {
+      "title": "No connection",
+      "body": "The bot settings will be here when the connection is back."
+    }
+  },
   "sign_out": {
     "title": "Sign out of Molvia on this device?",
     "body": "Everything Molvia saved on this device will be erased. Nothing is lost on the server: sign in with Telegram and it all comes back.",
@@ -1339,7 +1360,7 @@
       "hand_over": "Save or send"
     },
     "group_money": "Money",
-    "group_reminders": "Reminders",
+    "group_bot": "Bot",
     "group_scheme": "Theme",
     "scheme": {
       "system": "System",
@@ -1358,10 +1379,8 @@
       "day_option": "from day {day}",
       "hint": "A salary received on this day or later counts in «Came in» of the next month. The day it came in and the account balances stay as they are."
     },
-    "reminders": {
-      "label": "Remind me to rate in Telegram",
-      "hint": "The evening after a purchase the bot asks how it was. Leave it unanswered and it asks less often, then keeps quiet for half a year.",
-      "blocked": "The bot is blocked in Telegram, so the reminders turned off by themselves. Unblock the bot and they come back."
+    "bot": {
+      "hint": "Reminders and receipts"
     },
     "erase": {
       "label": "Delete my data",
@@ -1474,7 +1493,7 @@
       },
       "receipts": {
         "term": "Receipts",
-        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; no outside service sees the receipt. The photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them."
+        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; no outside service sees the receipt. The photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them. If you left the screen while a receipt was being read, the Molvia bot tells you in Telegram that it is ready: the message names the shop or the receipt’s date and the number of items — no sums, no products — and Telegram sees that message. Kept here: how you learned the receipt was ready — in the app or from the bot — and whether that message is off."
       },
       "accounts": {
         "term": "Accounts",
@@ -1494,7 +1513,7 @@
       },
       "reminders": {
         "term": "Rating reminders",
-        "text": "When the bot last reminded you to rate your purchases, and which reminder in a row it was — so that it writes less often if you do not answer. And whether the reminders are off — by you, or because you blocked the bot. The message itself carries the item and the shop to Telegram: otherwise the question would not say what it is about."
+        "text": "When the bot last reminded you to rate your purchases, and which reminder in a row it was — so that it writes less often if you do not answer. And whether the reminders are off — by you, or because you blocked the bot — and since when the bot is blocked. The message itself carries the item and the shop to Telegram: otherwise the question would not say what it is about."
       },
       "feedback": {
         "term": "Messages to the developer",

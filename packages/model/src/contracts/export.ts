@@ -4,6 +4,7 @@ import { isoDate } from './trip'
 import { incomeSourceSchema } from '#model/entities/income'
 import { itemKindSchema } from '#model/entities/item'
 import { placeKindSchema } from '#model/entities/place'
+import { receiptHeardSchema } from '#model/entities/receipt'
 import { REMINDERS_OFF } from '#model/entities/reminder'
 import { spendingPresetSchema } from '#model/entities/spending-category'
 import { rateChoiceSchema } from '#model/entities/trip'
@@ -33,7 +34,10 @@ export const EXPORT_FORMAT = 'molvia-export'
 // `storeMemory`, the words the person gave the shops' memory (MOL-126). 11: a message's `pictures`,
 // what is left of each once it reached the owner (MOL-167). 12: the account's `consentVersion` and
 // `consentedAt`, which edition of the terms and the privacy page the person accepted, and when (MOL-95).
-export const EXPORT_VERSION = 12
+// 13: a receipt's `heard` and `heardAt`, how the person learned it was read — on the phone or from the
+// bot — and the account's `receiptNoticesOff` and `botBlockedAt`, whether the bot is to say so and
+// since when it is blocked (MOL-129).
+export const EXPORT_VERSION = 13
 
 const day = z.iso.date()
 
@@ -109,6 +113,8 @@ const accountSchema = z.strictObject({
   ratePreference: ratePreferenceSchema,
   salaryShiftDay: z.int().nullable(),
   remindersOff: z.enum(REMINDERS_OFF).nullable(),
+  receiptNoticesOff: z.boolean(),
+  botBlockedAt: isoDate.nullable(),
   consentVersion: z.int().nullable(),
   consentedAt: isoDate.nullable(),
   sharedUntil: isoDate.nullable(),
@@ -298,6 +304,8 @@ const receiptSchema = z.strictObject({
   balanced: z.boolean(),
   city: z.string().nullable(),
   recordedAt: isoDate.nullable(),
+  heard: receiptHeardSchema.nullable(),
+  heardAt: isoDate.nullable(),
   tripId: z.uuid().nullable(),
   removedAt: isoDate.nullable(),
   lines: z.array(

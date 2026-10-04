@@ -63,8 +63,22 @@
     <!-- Saved on the tap, beside the form and never under its «Сохранить»: the form's four fields
          are also a trip's context (MOL-134, Н-1, В-5). -->
     <SalaryShiftGroup class="group" />
-    <!-- The same, for the bot's rating reminders (MOL-103, Р-1). -->
-    <RemindersGroup class="group" />
+    <!-- The bot's messages, a switch each, on a page of their own (MOL-129, В-2). -->
+    <section class="group">
+      <h2 class="caption">{{ t('settings.group_bot') }}</h2>
+      <AppCard as="ul" list>
+        <li>
+          <RouterLink class="entry" :to="{ name: 'bot' }">
+            <IconRobot class="entry-icon" aria-hidden="true" />
+            <span class="entry-text">
+              <span class="entry-label">{{ t('bot.title') }}</span>
+              <span class="entry-hint">{{ t('settings.bot.hint') }}</span>
+            </span>
+            <IconChevron class="entry-chevron" aria-hidden="true" />
+          </RouterLink>
+        </li>
+      </AppCard>
+    </section>
     <!-- This device's own, not the account's: nothing goes to the server (MOL-111). -->
     <SchemeGroup class="group" />
     <!-- Outside the form's states: the way into the account does not depend on whether its
@@ -179,13 +193,13 @@ import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconRefresh from '~icons/mdi/refresh'
 import IconChevron from '~icons/mdi/chevron-right'
 import IconDevices from '~icons/mdi/devices'
+import IconRobot from '~icons/mdi/robot-outline'
 import IconLogout from '~icons/mdi/logout'
 import IconMessage from '~icons/mdi/message-text-outline'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
-import RemindersGroup from '@/components/RemindersGroup.vue'
 import SalaryShiftGroup from '@/components/SalaryShiftGroup.vue'
 import SchemeGroup from '@/components/SchemeGroup.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
@@ -213,11 +227,11 @@ export default defineComponent({
     IconChevron,
     IconCloud,
     IconDevices,
+    IconRobot,
     IconLogout,
     IconMessage,
     IconPencil,
     IconRefresh,
-    RemindersGroup,
     SalaryShiftGroup,
     SchemeGroup,
     ScreenSkeleton,

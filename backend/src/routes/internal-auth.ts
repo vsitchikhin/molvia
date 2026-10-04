@@ -6,6 +6,7 @@ import {
   FEEDBACK_PICTURES_MAX,
   botFailureSchema,
   confirmLoginSchema,
+  dueReceiptNoticesSchema,
   dueRemindersSchema,
   eraseMeSchema,
   feedbackFromBotAnswerSchema,
@@ -20,6 +21,7 @@ import {
 } from '@molvia/model'
 import type {
   BotFailure,
+  DueReceiptNotices,
   DueReminders,
   FeedbackFromBot,
   FeedbackFromBotAnswer,
@@ -53,6 +55,7 @@ export function internalAuthRoutes(
     claimReminders(): Promise<DueReminders>
     rateFromBot(itemId: string, body: RateFromBot): Promise<void>
     switchReminders(body: SwitchRemindersFromBot): Promise<void>
+    claimReceiptNotices(): Promise<DueReceiptNotices>
     reportFailure(body: BotFailure): Promise<void>
     claimOwnerNotices(): Promise<OwnerNotices>
     ownerNoticesSent(body: OwnerNoticesSent): Promise<void>
@@ -126,6 +129,11 @@ export function internalAuthRoutes(
       parseQuery(z.strictObject({}), request.query)
       await api.switchReminders(parseBody(switchRemindersFromBotSchema, request.body))
       return reply.code(204).send()
+    })
+    // «Чек разобран» (MOL-129): the receipts read that no phone was handed, marked as told on the way.
+    scope.post('/internal/receipts/claim', { onRequest: refuseAnyBody }, async (request) => {
+      parseQuery(z.strictObject({}), request.query)
+      return dueReceiptNoticesSchema.parse(await api.claimReceiptNotices())
     })
     // The bot's own failures and the owner's channel (MOL-143): the same caller, the same secret.
     // A report is the bot's word about itself; whose update it was never travels.
