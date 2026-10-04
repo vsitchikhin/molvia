@@ -71,8 +71,11 @@ The log's writer, the cohort and both gate queries are pinned in `.claude/rules/
   rather than calendar days (Р-20). The visit is counted by intent, not by catch (Р-21).
 - **The 0.3 cohort is those whose access reached their fourth week** (`actors.shared_until`,
   Р-24) — approximate on purpose, erring towards «stop».
-- **The log does not outlive the person** (MOL-58): erasure is the one written exception to
-  append-only.
+- **The log does not outlive the person, nor their objection** (MOL-58, MOL-96): erasure and
+  «Учитывать меня в статистике» turned off are the two written exceptions to append-only.
+- **An objection takes a person out of both gates** (MOL-96): `actors.analytics_off_at`; off erases
+  their log under its lock and «Что брать» writes nothing more; each gate names them in a line of its
+  own, after time and access; back on counts in 0.3 only from before week four (`analytics_on_at`).
 - **The 0.2 gate is `VerdictRepository.reachedRatings`** (MOL-49): the one reader of `verdicts`
   without `deleted_at IS NULL`; its `from` is the release of 0.2, passed by the caller; a window
   still open is left out; a verdict counts from when the server received it.

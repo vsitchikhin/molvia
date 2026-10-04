@@ -11,12 +11,12 @@ paths:
   - 'backend/src/{gates,gates-cli}*.ts'
   - 'bin/gates.sh'
   - 'backend/src/usecases/{advice,rate-item,amend-verdict,withdraw-verdict,pending-verdicts,own-prices}*.ts'
-  - 'backend/src/routes/{advice,verdicts}.ts'
-  - 'backend/tests/{advice,verdicts,ratings-gate,events,pending,gates-reader}*.ts'
+  - 'backend/src/{routes,usecases}/{advice,verdicts,analytics}.ts'
+  - 'backend/tests/{advice,verdicts,ratings-gate,events,pending,gates-reader,analytics}*.ts'
   - 'backend/drizzle/*{events,verdict,advice}*.sql'
   - 'frontend/src/views/{AdviceView,VerdictsView}*'
   - 'frontend/src/components/{Advice*,adviceRow*,Verdict*,rating*,RatingScale*}'
-  - 'frontend/src/composables/{useAdvice,useVerdictQueue,useCheaperHint}*'
+  - 'frontend/src/composables/{useAdvice,useVerdictQueue,useCheaperHint,useAnalytics}*'
   - 'frontend/src/stores/{verdictDrafts,ownPrices}*'
   - 'e2e/{advice,verdicts}.spec.ts'
 ---
@@ -30,8 +30,8 @@ The detail behind the gate and «Что брать» lines of `CLAUDE.md`.
 The `events` table is that groundwork, and it holds only what no domain table can answer:
 whether someone came back, and to look at what. The 0.2 threshold is a query over
 verdicts, not an event — anything a domain table already knows must never be duplicated
-into the log. Nothing updates or deletes from it — with one written exception, erasing a person
-(MOL-58, below) — the gate queries are its only readers, and each is pinned by an integration
+into the log. Nothing updates or deletes from it — with two written exceptions, erasing a person
+(MOL-58) and their objection to being counted (MOL-96), both below — the gate queries are its only readers, and each is pinned by an integration
 test, boundary days included.
 
 **The one writer is «Что брать», once a day per owner (MOL-31).** MOL-8 was going to record
@@ -80,10 +80,39 @@ they are: the log is append-only, and they were true when they were made.
 
 **The question MOL-6 left open is answered: the log does not outlive the person** (MOL-58,
 owner's decision 20.09.2026). The log points at `actors` with a real foreign key, so an owner
-with events could not be deleted; erasing a person on request is now the single written
-exception to append-only, and their rows go with them. The right to be erased outweighs a gate,
+with events could not be deleted; erasing a person on request is a written exception to
+append-only, and their rows go with them — one of two, the other is an objection (MOL-96, below). The right to be erased outweighs a gate,
 and a lost row there is the lesser harm. Whether the log could instead be anonymised to keep the
 gates is 0.2's question, and an anonymisation that can be reversed is still personal data.
+
+**An objection to being counted takes a person out of both gates** (MOL-96, owner's decisions
+04.10.2026). The log and the gates rest on a legitimate interest, not on consent («Персональные
+данные», 5.1), so they are on for everyone and the person may object — «Учитывать меня в
+статистике», the first row of «Ваши данные», saved on the tap at `PUT /actors/me/analytics` with no
+sheet (В-3), as the bot's switches are. **Off erases every row of the person's log at once** (В-1),
+every type, in the transaction that marks the objection (`actors.analytics_off_at`) — the second
+written exception to append-only: the gates stop counting them, so the rows have no reader left, and
+an objection to a legitimate interest takes what it gathered (GDPR, the bar of section 2, art.
+17(1)(c)). **The writer reads the objection after the lock**: the switch takes the log's own
+advisory lock, so a visit being written either lands first and goes with the erasure, or waits and
+finds the objection; a person who is not there still fails on the foreign key, as before. **Out of
+both halves, never the numerator alone**: ten people, three back, two object — one of them back —
+reads 2 of 10 if only the rows go, a gate pulled towards «stop» by objections rather than the
+hypothesis; 2 of 8 with «opted out 2» is the truth. **Gate 0.2 too** (В-2): «счётчики ворот» are the
+same legitimate interest, so a count over verdicts is analytics as much as the log; there the
+objection is read as it stands now — the verdicts are not erased, so back on, the person counts
+again. **Gate 0.3 counts someone back on only if they were back before their fourth week began**
+(`actors.analytics_on_at` at or before `created_at + 504 h`, Р-3): off later, that week's rows were
+erased; back later, part of it was never written — counted, they would read as not having come back.
+Both moments are kept, the first objection's and the last return's, and a repeat moves neither.
+**The order of the lines is time, access, the objection**: waiting stays waiting — they may still be
+back before week four — and without access stays without access, so «opted out» says exactly how many
+the cohort lost to objections; `appeared = waiting + without access + opted out + cohort`. **What has
+no person behind it is not touched** (Р-4): `login_days`, `reminder_days`, `erasures`, `failures` keep
+no id, and there is nobody to leave out. The bot has no command for it (Р-6). The copy of one's data
+carries both moments (version 14), erasure takes them with the row, and `/privacy` says it under
+«Отметки о визитах» — a new revision, not a new edition (Р-5): a right was added, not data, a
+recipient or a purpose.
 
 **The 0.2 gate is `VerdictRepository.reachedRatings` (MOL-49):** of those who appeared in a
 window, how many have `GATE_RATINGS` rows in `verdicts` within `GATE_RATINGS_WINDOW_HOURS` of
@@ -111,8 +140,9 @@ cohort — counted, a person who came last week read as one who did not come bac
 people arrived the harder the gate leaned towards «stop». **Time first, access after**: whoever's
 fourth week is not over is waiting, with access or without — it can still be granted — and «no
 access in week 4» is said only of a week that is over (adversarial А: judged by today's access, a
-newcomer read «no access» eighteen days early). Those waiting, those without access and the erased
-of the weeks the window touches are each a line of their own, in neither fraction.
+newcomer read «no access» eighteen days early). Those waiting, those without access, those who
+objected to being counted (MOL-96, under each gate) and the erased of the weeks the window touches
+are each a line of their own, in neither fraction.
 **The login's funnel is the third block** (MOL-68, rules in `auth.md`): the logins begun on the days
 the window touches — not the people who appeared, since those lost at the door never appear — with
 «began» (starts less a device's repeats), «got in» and «lost» beside their `n`, the line

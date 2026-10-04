@@ -1529,7 +1529,7 @@
       },
       "visits": {
         "term": "Visit marks",
-        "text": "Whether you opened “What to buy” — at most once a day. This is how we learn whether people come back."
+        "text": "Whether you opened “What to buy” — at most once a day. This is how we learn whether people come back. You can turn them off in the settings, “Count me in the statistics”: past marks are deleted at once, no new ones are written, and you are no longer counted in whether people use Molvia — by marks or by ratings."
       },
       "devices": {
         "term": "Sign-in devices",
@@ -1537,7 +1537,7 @@
       },
       "settings": {
         "term": "Your settings",
-        "text": "Country, city, currencies, and the day you changed the currency of conversion."
+        "text": "Country, city, currencies, and the day you changed the currency of conversion — and when you turned “Count me in the statistics” off and back on."
       },
       "consent": {
         "term": "Consent to the terms",
