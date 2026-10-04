@@ -111,6 +111,7 @@ async function aFullLife(actorId: string, telegramUserId: number) {
       incomeCurrencySince: at(0),
       salaryShiftDay: 25,
       remindersOff: 'chosen',
+      receiptNoticesOff: true,
       sharedUntil: at(1),
     })
     .where(eq(actors.id, actorId))

@@ -200,10 +200,15 @@ export interface ReceiptRepository {
   heardInApp(actorId: string, ids: readonly string[]): Promise<void>
   /**
    * «Чек разобран» (MOL-129): receipts read `RECEIPT_TELL_AFTER_SECONDS` to `RECEIPT_TELL_WITHIN_HOURS`
-   * ago that no phone was handed, not removed, of someone who has not blocked the bot — marked as told
+   * ago that no phone was handed, not removed, of someone who has neither blocked the bot nor turned
+   * these messages off — marked as told
    * by the bot in the same statement that picks them (at most once, MOL-101 Р-2), the oldest first.
    */
   claimUntold(limit: number): Promise<UntoldReceipt[]>
+  /** Whether the person turned «Сообщать, что чек разобран» off (MOL-129, В-2). */
+  noticesOff(actorId: string): Promise<boolean>
+  /** «Сообщать, что чек разобран» on the tap; what is stored after it. */
+  chooseNotices(actorId: string, off: boolean): Promise<boolean>
   /** The owner's receipt, locked for recording: `null` for a missing, removed or someone else's one. */
   lockForRecord(actorId: string, id: string): Promise<ReceiptToRecord | null>
   /**
@@ -507,7 +512,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             where due.status in ('parsed', 'failed') and due.heard is null and due.deleted_at is null
               and due.read_at <= clock_timestamp() - make_interval(secs => ${RECEIPT_TELL_AFTER_SECONDS})
               and due.read_at > clock_timestamp() - make_interval(hours => ${RECEIPT_TELL_WITHIN_HOURS})
-              and a.reminders_off is distinct from 'blocked'
+              and a.reminders_off is distinct from 'blocked' and not a.receipt_notices_off
             order by due.read_at, due.id
             limit ${limit}
             for update of due skip locked
@@ -537,6 +542,23 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           },
         }))
       })
+    },
+
+    async noticesOff(actorId) {
+      const [row] = await db
+        .select({ off: actors.receiptNoticesOff })
+        .from(actors)
+        .where(eq(actors.id, actorId))
+      return row?.off ?? false
+    },
+
+    async chooseNotices(actorId, off) {
+      const [row] = await db
+        .update(actors)
+        .set({ receiptNoticesOff: off })
+        .where(eq(actors.id, actorId))
+        .returning({ off: actors.receiptNoticesOff })
+      return row?.off ?? off
     },
 
     async lockForRecord(actorId, id) {

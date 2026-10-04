@@ -284,6 +284,11 @@ export const actors = pgTable(
      * with it. Beside the settings, as `salary_shift_day` is, and for the same reason (Р-1).
      */
     remindersOff: text('reminders_off').$type<RemindersOff>(),
+    /**
+     * «Сообщать, что чек разобран» turned off by the person (MOL-129, В-2): a switch of its own on
+     * the page «Бот», never the rating reminders'. A block of the bot stays in `reminders_off`.
+     */
+    receiptNoticesOff: boolean('receipt_notices_off').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.

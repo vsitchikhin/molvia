@@ -285,3 +285,57 @@ describe('POST /internal/receipts/claim', () => {
     }
   })
 })
+
+describe('«Сообщать, что чек разобран» (В-2)', () => {
+  function choose(me: Owner, payload: unknown) {
+    return app.inject({
+      method: 'PUT',
+      url: '/actors/me/receipt-notices',
+      headers: { cookie: me.cookie },
+      payload: payload as Record<string, unknown>,
+    })
+  }
+
+  it('is on for everyone to begin with, and the person’s own address answers it', async () => {
+    const me = await owner()
+    const response = await get(me, '/actors/me/receipt-notices')
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.json()).toEqual({ off: false })
+  })
+
+  it('turned off, hands nothing over and marks nothing; turned on again, hands it over', async () => {
+    const me = await owner()
+    const id = await receipt(me.id, 'parsed')
+    expect((await choose(me, { on: false })).json()).toEqual({ off: true })
+    expect(await claimed()).toEqual([])
+    expect(await heardOf(id)).toEqual({ heard: null, heardAt: null })
+    expect((await choose(me, { on: true })).json()).toEqual({ off: false })
+    expect(await claimed()).toEqual([expect.objectContaining({ receiptId: id })])
+  })
+
+  it('is the person’s own: one turned off leaves another’s on', async () => {
+    const me = await owner()
+    const other = await owner()
+    await choose(me, { on: false })
+    expect((await get(other, '/actors/me/receipt-notices')).json()).toEqual({ off: false })
+  })
+
+  it('must not touch the rating reminders, nor they it', async () => {
+    const me = await owner()
+    await choose(me, { on: false })
+    const [row] = await db
+      .select({ remindersOff: actors.remindersOff })
+      .from(actors)
+      .where(eq(actors.id, me.id))
+    expect(row?.remindersOff).toBeNull()
+  })
+
+  it('refuses a body that is not a choice, and anyone not signed in', async () => {
+    const me = await owner()
+    expect((await choose(me, { on: 'yes' })).statusCode).toBe(400)
+    expect((await choose(me, { on: true, off: true })).statusCode).toBe(400)
+    const anonymous = await app.inject({ method: 'GET', url: '/actors/me/receipt-notices' })
+    expect(anonymous.statusCode).toBe(401)
+  })
+})

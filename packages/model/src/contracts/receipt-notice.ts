@@ -32,3 +32,15 @@ export const dueReceiptNoticesSchema = z.strictObject({
   notices: z.array(receiptNoticeSchema).max(RECEIPT_NOTICES_PER_CLAIM),
 })
 export type DueReceiptNotices = z.infer<typeof dueReceiptNoticesSchema>
+
+/**
+ * `GET` and the answer of `PUT /actors/me/receipt-notices` (MOL-129, В-2): «Сообщать, что чек
+ * разобран», a switch of its own on the page «Бот», saved on the tap — as the rating reminders'
+ * (MOL-103 Р-1), never a field of the settings' form. A block of the bot is the reminders' answer.
+ */
+export const receiptNoticesSettingSchema = z.strictObject({ off: z.boolean() })
+export type ReceiptNoticesSetting = z.infer<typeof receiptNoticesSettingSchema>
+
+/** The body of `PUT /actors/me/receipt-notices`. */
+export const chooseReceiptNoticesSchema = z.strictObject({ on: z.boolean() })
+export type ChooseReceiptNotices = z.infer<typeof chooseReceiptNoticesSchema>

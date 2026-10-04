@@ -32,7 +32,8 @@ export const EXPORT_FORMAT = 'molvia-export'
 // 10: a receipt's `city` and `tripId`, a line's item, `match`, `translation` and purchase, and
 // `storeMemory`, the words the person gave the shops' memory (MOL-126). 11: a message's `pictures`,
 // what is left of each once it reached the owner (MOL-167). 12: a receipt's `heard` and `heardAt`,
-// how the person learned it was read — on the phone or from the bot (MOL-129).
+// how the person learned it was read — on the phone or from the bot — and the account's
+// `receiptNoticesOff`, whether the bot is to say so (MOL-129).
 export const EXPORT_VERSION = 12
 
 const day = z.iso.date()
@@ -109,6 +110,7 @@ const accountSchema = z.strictObject({
   ratePreference: ratePreferenceSchema,
   salaryShiftDay: z.int().nullable(),
   remindersOff: z.enum(REMINDERS_OFF).nullable(),
+  receiptNoticesOff: z.boolean(),
   sharedUntil: isoDate.nullable(),
   createdAt: isoDate,
   updatedAt: isoDate,

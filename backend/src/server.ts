@@ -24,7 +24,11 @@ import { apiFailureReporter } from '@/failure-reporter'
 import type { HttpMetrics } from '@/metrics'
 import { botFailure, phoneReportLimit, takePhoneFailures } from '@/usecases/record-failure'
 import { claimOwnerNotices } from '@/usecases/owner-notices'
-import { claimReceiptNotices } from '@/usecases/tell-receipts'
+import {
+  chooseReceiptNotices,
+  claimReceiptNotices,
+  receiptNoticesOf,
+} from '@/usecases/tell-receipts'
 import type { FailurePlace } from '@/usecases/record-failure'
 import { createFailureRepository } from '@/db/failures-repository'
 import { createOwnerNoticeRepository } from '@/db/owner-notices-repository'
@@ -145,6 +149,7 @@ import { createSettingsRepository } from '@/db/settings-repository'
 import { saveSettings } from '@/usecases/save-settings'
 import { settingsRoute } from '@/routes/settings'
 import { remindersRoutes } from '@/routes/reminders'
+import { receiptNoticesRoutes } from '@/routes/receipt-notices'
 import { startTrip } from '@/usecases/start-trip'
 import { removeTrip, restoreTrip } from '@/usecases/remove-trip'
 import { startLogin } from '@/usecases/start-login'
@@ -758,7 +763,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         rateFromBot({ actors, items, verdicts, reminders }, itemId, body),
       switchReminders: (body) => switchRemindersFromBot(reminders, body, new Date()),
       claimReceiptNotices: () =>
-        claimReceiptNotices(createReceiptRepository(db), new Date(), (issue) => {
+        claimReceiptNotices(receipts, new Date(), (issue) => {
           // A receipt marked as told whose message the contract refuses: that message is lost, and
           // the owner hears of the failure, placed as the request it happened in (as MOL-148's).
           failures.report(
@@ -853,6 +858,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       remindersRoutes(guarded, {
         setting: (owner) => remindersSettingOf(reminders, { id: owner }),
         choose: (owner, body) => chooseReminders(reminders, { id: owner }, body, new Date()),
+      })
+      receiptNoticesRoutes(guarded, {
+        setting: (owner) => receiptNoticesOf(receipts, owner),
+        choose: (owner, body) => chooseReceiptNotices(receipts, owner, body),
       })
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items, embedder }, actorId, query),

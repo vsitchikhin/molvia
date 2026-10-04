@@ -6,7 +6,12 @@ import {
   tellsQuietly,
   timeZoneOf,
 } from '@molvia/model'
-import type { DueReceiptNotices, ReceiptNotice } from '@molvia/model'
+import type {
+  ChooseReceiptNotices,
+  DueReceiptNotices,
+  ReceiptNotice,
+  ReceiptNoticesSetting,
+} from '@molvia/model'
 import type { ReceiptRepository, UntoldReceipt } from '@/db/receipts-repository'
 import { withPlaces } from './receipts'
 
@@ -68,4 +73,24 @@ function noticeOf(told: UntoldReceipt, placeName: string | null, now: Date) {
     lineCount: receipt.lineCount,
     silent: tellsQuietly(now, zone),
   })
+}
+
+/** `GET /actors/me/receipt-notices` (MOL-129, В-2): whether «чек разобран» is turned off. */
+export async function receiptNoticesOf(
+  receipts: Pick<ReceiptRepository, 'noticesOff'>,
+  owner: string,
+): Promise<ReceiptNoticesSetting> {
+  return { off: await receipts.noticesOff(owner) }
+}
+
+/**
+ * `PUT /actors/me/receipt-notices`, saved on the tap. Turned on over a blocked bot it is on all the
+ * same — the person's choice — and the page says why nothing comes: only an unblock lifts a block.
+ */
+export async function chooseReceiptNotices(
+  receipts: Pick<ReceiptRepository, 'chooseNotices'>,
+  owner: string,
+  { on }: ChooseReceiptNotices,
+): Promise<ReceiptNoticesSetting> {
+  return { off: await receipts.chooseNotices(owner, !on) }
 }

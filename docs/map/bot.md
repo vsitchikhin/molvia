@@ -12,10 +12,11 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 ## backend
 
 - `backend/src/db/reminders-repository.ts` — Repository of the rating reminder (MOL-101): everyone reminded with their ladder, the claim that moves the ladder only if it still stands where it was found, the switch under the owner's row with the ladder gone on «on» (MOL-103), and the counters of `reminder_days`.
+- `backend/src/routes/receipt-notices.ts` — Routes `GET`/`PUT /actors/me/receipt-notices` (MOL-129, В-2): «Сообщать, что чек разобран», saved on the tap on the page «Бот».
 - `backend/src/routes/reminders.ts` — Routes `GET`/`PUT /actors/me/reminders` (MOL-103): «Напоминать об оценке в Telegram», saved on the tap beside the settings.
 - `backend/src/usecases/reminders-switch.ts` — Use cases of the switch (MOL-103): read it, choose it in the settings, and the bot's change — a button, a block, an unblock.
 - `backend/src/usecases/rate-from-bot.ts` — Use case of a press of 1–5 under a reminder: the owner by the Telegram account that pressed, then `rateItem`; a new verdict is counted.
-- `backend/src/usecases/tell-receipts.ts` — Use case «Чек разобран» (MOL-129): the receipts read that no phone was handed, marked as told, worded with the place the review shows, the receipt's day and the night of the person's zone; a notice the contract refuses is said as a failure.
+- `backend/src/usecases/tell-receipts.ts` — Use case «Чек разобран» (MOL-129): the receipts read that no phone was handed, marked as told, worded with the place the review shows, the receipt's day and the night of the person's zone; a notice the contract refuses is said as a failure; the person's switch of these messages, read and chosen.
 - `backend/src/usecases/remind-ratings.ts` — Use case «Напомнить об оценке»: whose evening it is in their zone, which step `planReminder` says, and what the claim hands the bot.
 - `backend/tests/reminders-switch.integration.test.ts` — Integration test of the switch (MOL-103): off is off, «on» starts the ladder over, `blocked` and `chosen`, the counters, the app's and the bot's routes.
 - `backend/tests/reminders.integration.test.ts` — Integration test: the evening's hour and day, the ladder with the owner's example, MOL-29, the counters, and the bot's two internal routes.

@@ -29,6 +29,7 @@ const file: ExportFile = {
     ratePreference: 'personal',
     salaryShiftDay: 25,
     remindersOff: null,
+    receiptNoticesOff: false,
     sharedUntil: null,
     createdAt: at,
     updatedAt: at,
