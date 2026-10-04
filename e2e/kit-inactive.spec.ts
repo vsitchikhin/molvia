@@ -11,12 +11,10 @@ import { open } from './session'
  * Run in the phone's Chromium and in the iPhone's WebKit (review 3).
  */
 
-/** The kit's own section of chosen and inactive things. */
-async function section(page: Page): Promise<Locator> {
+/** A section of the kit, by its caption: chosen and inactive things unless named otherwise. */
+async function section(page: Page, name = 'Chosen and inactive'): Promise<Locator> {
   await open(page, '/_kit')
-  const found = page.locator('section', {
-    has: page.getByRole('heading', { name: 'Chosen and inactive' }),
-  })
+  const found = page.locator('section', { has: page.getByRole('heading', { name }) })
   await expect(found).toBeVisible()
   return found
 }
@@ -102,4 +100,28 @@ test('an inactive button takes the focus and does not light up under the pointer
   await save.focus()
   await expect(save).toBeFocused()
   await context.close()
+})
+
+// A row that is not now (MOL-175): a link the engine would follow on Enter and on a tap, held by the
+// cancelled click alone — beside a live one, so the hold is the row's and not a kit that follows nothing.
+test('an inactive row takes the focus, and neither Enter nor a tap follows it', async ({
+  page,
+}) => {
+  const kit = await section(page, 'Rows and captions')
+  const followed = () => new URL(page.url()).searchParams.get('followed')
+  const row = kit.getByRole('link', { name: /^Download my data/ })
+  await expect(row).toHaveAttribute('aria-disabled', 'true')
+
+  await row.focus()
+  await expect(row).toBeFocused()
+  await page.keyboard.press('Enter')
+  await row.tap({ force: true })
+  // Two frames: a move the router started has landed by then.
+  await page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  )
+  expect(followed()).toBeNull()
+
+  await kit.getByRole('link', { name: /^A link that goes on/ }).tap()
+  await expect.poll(followed).toBe('live')
 })

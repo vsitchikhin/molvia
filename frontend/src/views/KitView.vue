@@ -132,14 +132,155 @@
       </div>
     </section>
 
+    <!-- Rows and captions (MOL-175): every state of a row, the chevron only where something goes
+         on (В-14), the three captions, an entry, a note and a tag. -->
+    <section class="group">
+      <SectionCaption class="caption">{{ t('dev.kit.rows') }}</SectionCaption>
+      <div>
+        <SectionCaption as="h3">{{ t('dev.kit.caption_group') }}</SectionCaption>
+        <AppCard as="ul" list>
+          <li>
+            <ListRow
+              :icon="IconWallet"
+              :title="t('dev.kit.row_cash')"
+              :meta="t('dev.kit.row_cash_meta')"
+              next
+            >
+              <template #tail>{{ figures.balance }}</template>
+            </ListRow>
+          </li>
+          <li>
+            <ListRow
+              :icon="IconCart"
+              :title="t('dev.kit.row_long')"
+              :meta="t('dev.kit.row_long_meta')"
+              wrap
+              next
+            />
+          </li>
+          <li>
+            <ListRow
+              :icon="IconDownload"
+              :title="t('dev.kit.row_download')"
+              :meta="t('dev.kit.row_download_meta')"
+            />
+          </li>
+          <li>
+            <ListRow
+              :icon="IconDelete"
+              :title="t('dev.kit.row_erase')"
+              :meta="t('dev.kit.row_erase_meta')"
+              danger
+            />
+          </li>
+          <li>
+            <ListRow
+              as="router-link"
+              :to="{ query: { followed: 'inactive' } }"
+              :icon="IconDownload"
+              :title="t('dev.kit.row_download')"
+              :meta="t('dev.kit.row_offline')"
+              inactive
+            />
+          </li>
+          <li>
+            <ListRow
+              as="router-link"
+              :to="{ query: { followed: 'live' } }"
+              :icon="IconDevices"
+              :title="t('dev.kit.row_link')"
+              :meta="t('dev.kit.row_link_meta')"
+              next
+            />
+          </li>
+          <li>
+            <ListRow
+              as="div"
+              :icon="IconPhone"
+              :title="t('dev.kit.row_device')"
+              :meta="t('dev.kit.row_device_meta')"
+            >
+              <template #tail>
+                <AppButton variant="danger-ghost">{{ t('devices.end') }}</AppButton>
+              </template>
+            </ListRow>
+          </li>
+        </AppCard>
+      </div>
+      <div>
+        <SectionCaption as="h3">{{ t('dev.kit.caption_picker') }}</SectionCaption>
+        <AppCard list role="radiogroup" :aria-label="t('dev.kit.caption_picker')">
+          <ListRow
+            v-for="account in accounts"
+            :key="account.id"
+            role="radio"
+            :title="account.name"
+            :meta="account.meta"
+            :selected="picked === account.id"
+            @click="picked = account.id"
+          >
+            <template #tail>{{ account.balance }}</template>
+          </ListRow>
+        </AppCard>
+      </div>
+      <div>
+        <SectionCaption as="h3">{{ t('dev.kit.caption_found') }}</SectionCaption>
+        <AppCard list role="listbox" :aria-label="t('dev.kit.caption_found')">
+          <ListRow
+            v-for="(found, index) in foundRows"
+            :id="`kit-found-${String(index)}`"
+            :key="found"
+            as="div"
+            role="option"
+            :title="found"
+            :meta="t('dev.kit.sample_meta')"
+            :active="index === 0"
+            :selected="false"
+            next
+          />
+        </AppCard>
+      </div>
+      <div>
+        <SectionCaption as="h3">
+          <template #mark><VerdictBadge level="take" compact large /></template>
+          {{ t('advice.group_take') }}
+        </SectionCaption>
+        <AppCard>{{ t('dev.kit.sample_milk') }}</AppCard>
+      </div>
+      <div>
+        <SectionCaption as="h3"
+          >{{ t('dev.kit.caption_month') }}<template #tail>{{ figures.month }}</template>
+        </SectionCaption>
+        <AppCard as="ul" list>
+          <li>
+            <NavRow
+              :to="{ query: { followed: 'entry' } }"
+              :icon="IconDevices"
+              :label="t('dev.kit.nav_devices')"
+              value="3"
+            />
+          </li>
+          <li>
+            <NavRow
+              :icon="IconWallet"
+              :label="t('dev.kit.nav_account')"
+              :value="t('dev.kit.row_cash')"
+              @click="sheetOpen = true"
+            />
+          </li>
+        </AppCard>
+      </div>
+      <AppNote>{{ t('dev.kit.note_plain') }}</AppNote>
+      <AppNote tone="warn" :icon="IconAlert">{{ t('dev.kit.note_warn') }}</AppNote>
+      <div class="row">
+        <AppTag>{{ t('dev.kit.tag_savings') }}</AppTag>
+        <AppTag tone="warn" :icon="IconUpload">{{ t('dev.kit.tag_sending') }}</AppTag>
+        <AppTag tone="bad">{{ t('dev.kit.tag_refused') }}</AppTag>
+      </div>
+    </section>
+
     <section class="group">
       <SectionCaption class="caption">{{ t('dev.kit.cards') }}</SectionCaption>
-      <AppCard as="ul" list>
-        <li v-for="n in 12" :key="n" class="line">
-          <span>{{ t('dev.kit.sample_milk') }}</span>
-          <span class="figure">{{ figures.price }}</span>
-        </li>
-      </AppCard>
       <AppCard as="section" tone="take">
         <VerdictBadge level="take" />
         <p class="name">{{ t('dev.kit.sample_milk') }}</p>
@@ -186,19 +327,31 @@ import {
   COUNTRY_CITIES,
 } from '@molvia/model'
 import type { SpendingCategoryView } from '@molvia/model'
+import IconAlert from '~icons/mdi/alert-outline'
+import IconCart from '~icons/mdi/cart-outline'
+import IconDevices from '~icons/mdi/cellphone-link'
+import IconPhone from '~icons/mdi/cellphone'
 import IconClose from '~icons/mdi/close'
+import IconUpload from '~icons/mdi/cloud-upload-outline'
+import IconDelete from '~icons/mdi/delete-outline'
+import IconDownload from '~icons/mdi/download-outline'
 import IconPlus from '~icons/mdi/plus'
 import IconRefresh from '~icons/mdi/refresh'
 import IconShape from '~icons/mdi/shape-outline'
+import IconWallet from '~icons/mdi/wallet-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
+import AppNote from '@/components/AppNote.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import AppSwitch from '@/components/AppSwitch.vue'
+import AppTag from '@/components/AppTag.vue'
 import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CategoryChips from '@/components/CategoryChips.vue'
+import ListRow from '@/components/ListRow.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
+import NavRow from '@/components/NavRow.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import VerdictBadge from '@/components/VerdictBadge.vue'
@@ -218,8 +371,10 @@ export default defineComponent({
     AppButton,
     AppCard,
     AppField,
+    AppNote,
     AppScreen,
     AppSwitch,
+    AppTag,
     BarcodeScannerSheet,
     BottomSheet,
     CategoryChips,
@@ -227,7 +382,9 @@ export default defineComponent({
     IconPlus,
     IconRefresh,
     IconShape,
+    ListRow,
     MonthSwitcher,
+    NavRow,
     SectionCaption,
     SegmentedControl,
     VerdictBadge,
@@ -256,7 +413,35 @@ export default defineComponent({
       },
       units,
       // The handoff's real receipt, through the formatters: the sign belongs to the currency.
-      figures: { price: formatMoney(money(57000n, 'AMD')) },
+      figures: {
+        balance: formatMoney(money(4230000n, 'AMD')),
+        month: formatMoney(money(12000000n, 'RUB')),
+      },
+      // Icons a row draws at its own step are handed to it as components.
+      IconAlert,
+      IconCart,
+      IconDelete,
+      IconDevices,
+      IconDownload,
+      IconPhone,
+      IconUpload,
+      IconWallet,
+      accounts: computed(() => [
+        {
+          id: 'card',
+          name: t('dev.kit.row_card'),
+          meta: t('dev.kit.row_card_meta'),
+          balance: formatMoney(money(11820000n, 'AMD')),
+        },
+        {
+          id: 'cash',
+          name: t('dev.kit.row_cash'),
+          meta: t('dev.kit.row_cash_meta'),
+          balance: formatMoney(money(4230000n, 'AMD')),
+        },
+      ]),
+      picked: ref('card'),
+      foundRows: computed(() => [t('dev.kit.sample_milk'), t('dev.kit.row_long')]),
       sign: currencySign('AMD'),
       quantity: ref('1'),
       price: ref('57о'),
@@ -330,14 +515,6 @@ export default defineComponent({
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-}
-
-.line {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  font-weight: var(--weight-medium);
 }
 
 .figure {
