@@ -83,7 +83,7 @@ describe('SegmentedControl', () => {
     const checked = (view: ReturnType<typeof inactive>) =>
       view.findAll('input').map((input) => (input.element as HTMLInputElement).checked)
 
-    it('keeps every radio in the focus order, said to be unavailable', () => {
+    it('marks every radio unavailable without taking any out of reach', () => {
       const view = inactive()
       expect(view.classes()).toContain('inactive')
       expect(view.attributes('disabled')).toBeUndefined()
@@ -105,12 +105,31 @@ describe('SegmentedControl', () => {
       host.remove()
     })
 
-    it('must not fire: an arrow moves no choice', async () => {
+    // Adversarial А2: the arrow takes the focus round every option, so each is heard, and checks none.
+    it('walks the focus over every radio by the arrows, choosing none', () => {
+      const host = document.body.appendChild(document.createElement('div'))
+      const view = inactive(host)
+      const radios = view.findAll('input').map((input) => input.element as HTMLInputElement)
+      const press = (key: string) => {
+        const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+        document.activeElement?.dispatchEvent(event)
+        return event
+      }
+      radios[1]?.focus()
+      expect(press('ArrowRight').defaultPrevented).toBe(true)
+      expect(document.activeElement).toBe(radios[2])
+      press('ArrowDown')
+      expect(document.activeElement).toBe(radios[0])
+      press('ArrowLeft')
+      press('ArrowUp')
+      expect(document.activeElement).toBe(radios[1])
+      expect(checked(view)).toEqual([false, true, false])
+      view.unmount()
+      host.remove()
+    })
+
+    it('must not fire: a change that got past it anyway is put back, and nothing is said', async () => {
       const view = inactive()
-      const arrow = new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true })
-      view.findAll('input')[1]?.element.dispatchEvent(arrow)
-      expect(arrow.defaultPrevented).toBe(true)
-      // An engine that changed it anyway: the owner's choice is put back, and nothing is said.
       await view.findAll('input')[2]?.setValue(true)
       expect(checked(view)).toEqual([false, true, false])
       expect(view.emitted('update:modelValue')).toBeUndefined()

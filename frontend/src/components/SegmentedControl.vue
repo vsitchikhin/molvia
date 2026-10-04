@@ -42,7 +42,8 @@ export interface Segment {
 /** More than this stops fitting a phone's width; the handoff sends it to a `<select>`. */
 const MOST = 4
 
-const ARROWS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'])
+/** Where an arrow takes the focus: as the platform moves the choice, back or forth, round the end. */
+const ARROWS: Record<string, -1 | 1> = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }
 
 /**
  * One choice out of a few — the unit in the sheet (kg · l · pc), the rate (mine · official).
@@ -69,10 +70,11 @@ export default defineComponent({
      */
     disabled: { type: Boolean, default: false },
     /**
-     * The choice cannot be made now, and the screen says why (Ф-6, MOL-174; handoff 81 4a): every
-     * radio stays in the focus order with `aria-disabled`, and neither a tap nor an arrow moves the
-     * choice. `disabled` is drawn the same and takes the radios out of the order — for a moment, as
-     * while the message is on its way.
+     * The choice cannot be made now, and the screen says why (Ф-6, MOL-174; handoff 81 4a): the
+     * group stays one stop with `aria-disabled` on every radio, the arrows walk the focus over all of
+     * them without choosing — so every option is heard — and a tap moves nothing. `disabled` is
+     * drawn the same and takes the radios out of the order — for a moment, as while the message is
+     * on its way.
      */
     inactive: { type: Boolean, default: false },
     /**
@@ -94,9 +96,21 @@ export default defineComponent({
     function hold(event: MouseEvent): void {
       if (props.inactive) event.preventDefault()
     }
-    /** For an engine that moves the choice by an arrow without a click. */
+    /**
+     * The arrow's own move is the choice and the focus at once; inactive, only the focus goes —
+     * by hand, since a radio given the focus by a script is not checked (adversarial А2: cancelled
+     * whole, the two other options could not be reached at all).
+     */
     function holdArrows(event: KeyboardEvent): void {
-      if (props.inactive && ARROWS.has(event.key)) event.preventDefault()
+      const by = ARROWS[event.key]
+      if (!props.inactive || by === undefined) return
+      event.preventDefault()
+      const radio = event.target as HTMLInputElement
+      const radios = [
+        ...(radio.closest('.track')?.querySelectorAll<HTMLInputElement>('.radio') ?? []),
+      ]
+      const at = radios.indexOf(radio)
+      radios[(at + by + radios.length) % radios.length]?.focus()
     }
     function choose(value: string, event: Event): void {
       if (!props.inactive) {
@@ -202,8 +216,10 @@ export default defineComponent({
   box-shadow: var(--shadow-sm);
 }
 
-/* Not now (handoff 81 4a): the chosen one keeps its place by an edge, not by the fill of a choice
-   that can be made; no opacity (Ф-6). */
+/* Not now (handoff 81 4a): the chosen one keeps its place by an edge and its word, not by the fill
+   of a choice that can be made; no opacity (Ф-6). The edge is `graphic` — it carries meaning, and
+   `border-strong` at 1.65:1 lost the choice in bad light, the very Н-3 of this control (adversarial
+   А1) — and the chosen word stays `text` beside the others' `text-muted`. */
 .inactive .segment {
   color: var(--text-muted);
   cursor: default;
@@ -211,7 +227,8 @@ export default defineComponent({
 
 .inactive .on {
   background: var(--surface);
-  box-shadow: inset 0 0 0 var(--hairline) var(--border-strong);
+  box-shadow: inset 0 0 0 var(--hairline) var(--graphic);
+  color: var(--text);
 }
 
 .radio {
