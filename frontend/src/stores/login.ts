@@ -7,6 +7,7 @@ import { api } from '@/api'
 import { forget, read, write } from '@/stores/storage'
 import { LOGIN_KEY } from '@/stores/identity'
 import { useActorStore } from '@/stores/actor'
+import { useConsentStore } from '@/stores/consent'
 import { reportFailure } from '@/failures'
 
 /**
@@ -53,7 +54,7 @@ export const POLL_INTERVAL_MS = 3000
 
 export type LoginFailure = 'unavailable' | 'rate_limited' | 'disabled' | 'error' | 'offline'
 
-export type LoginPhase = 'loading' | 'offer' | 'waiting' | 'welcome' | LoginFailure
+export type LoginPhase = 'loading' | 'offer' | 'waiting' | 'welcome' | 'consent' | LoginFailure
 
 interface Request {
   readonly id: string
@@ -117,6 +118,7 @@ function recall(): Kept {
 
 export const useLoginStore = defineStore('login', () => {
   const actor = useActorStore()
+  const consent = useConsentStore()
   const kept = recall()
   const request = ref<Request | null>(kept.request ?? null)
   const claimed = ref<string | null>(kept.claimed ?? null)
@@ -219,7 +221,8 @@ export const useLoginStore = defineStore('login', () => {
    */
   const closed = computed(() => {
     if (blocked.value) return true
-    if (actor.state === 'ready') return false
+    // And then until the terms are accepted (MOL-95): the step after «чей это аккаунт».
+    if (actor.state === 'ready') return consent.holds
     // «Сессии нет» — это ответ, а не незнание: ящик на устройстве его не отменяет.
     if (actor.state === 'signed-out') return true
     return actor.id === null
@@ -234,6 +237,10 @@ export const useLoginStore = defineStore('login', () => {
     // wins, and it says so by naming the owner it has just refused.
     if (actor.state === 'ready' && blocked.value && known.value !== refusedOwner.value)
       return 'welcome'
+    // The terms come after the account is claimed and before the app (MOL-95); the skeleton while
+    // the server is asked which edition was accepted, the step's own states after that.
+    if (actor.state === 'ready' && !blocked.value && consent.holds)
+      return consent.state === 'loading' || consent.state === 'idle' ? 'loading' : 'consent'
     if (starting.value || request.value) return 'waiting'
     // Not a skeleton: an identity that could not be checked is «no connection» or «try again»,
     // and a screen without all four of its states is what MOL-19 exists to prevent.

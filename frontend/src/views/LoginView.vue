@@ -65,6 +65,9 @@
         </template>
       </ScreenState>
 
+      <!-- Сразу за «чей это аккаунт» и до приложения — условия и приватность (MOL-95). -->
+      <ConsentStep v-else-if="phase === 'consent'" />
+
       <ScreenState
         v-else-if="phase === 'unavailable'"
         kind="attention"
@@ -123,8 +126,12 @@
          ломается так же, как любой экран (MOL-132, В-1). -->
     <UpdateBand class="update" />
 
-    <!-- What is kept and how to have it erased is read before signing in (MOL-58). -->
-    <RouterLink class="privacy" :to="{ name: 'privacy' }">{{ t('privacy.title') }}</RouterLink>
+    <!-- What is kept and how to have it erased is read before signing in (MOL-58), and so are the
+         terms it is accepted with (MOL-95) — the step of consent names both itself, once. -->
+    <nav v-if="phase !== 'consent'" class="documents">
+      <RouterLink :to="{ name: 'privacy' }">{{ t('privacy.title') }}</RouterLink>
+      <RouterLink :to="{ name: 'terms' }">{{ t('terms.title') }}</RouterLink>
+    </nav>
   </div>
 </template>
 
@@ -136,6 +143,7 @@ import IconCheck from '~icons/mdi/check'
 import IconSend from '~icons/mdi/send'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import ConsentStep from '@/components/ConsentStep.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import UpdateBand from '@/components/UpdateBand.vue'
@@ -164,6 +172,7 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    ConsentStep,
     IconAlert,
     IconCheck,
     ScreenSkeleton,
@@ -349,13 +358,19 @@ export default defineComponent({
   border-top: var(--hairline) solid var(--border);
 }
 
-.privacy {
+.documents {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   justify-content: center;
-  min-height: var(--touch-target);
+  gap: 0 var(--space-6);
   margin-bottom: calc(var(--space-2) + var(--safe-bottom));
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
+
+  a {
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-target);
+    color: var(--text-muted);
+    font-size: var(--text-footnote);
+  }
 }
 </style>
