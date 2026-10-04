@@ -24,8 +24,8 @@ paths:
 
 The detail behind the receipt lines of `CLAUDE.md`. Reading a receipt on our server came in with
 MOL-125, after the measurement of MOL-114 (`.scratch/tasks/research/MOL-114.md`) chose how. Binding
-the lines to the catalogue and recording them is MOL-126, the screens are MOL-127, retraining the
-reader is MOL-169.
+the lines to the catalogue and recording them is MOL-126, the screens are MOL-127; retraining the
+reader was measured in MOL-169 and not built (below).
 
 ## How a receipt is read
 
@@ -268,6 +268,17 @@ one wrong tap on the sheet sent every receipt of the seller to «SAS». A remove
 with it. «Ереван Сити» of Gyumri and of Yerevan are two places of one number; two of one name in one
 city are one place by the rule of `places`. **A place picked by its id is held to the receipt's
 geography as a new one is** (review 3, В8): the receipt's country and a city of the settings.
+
+## Retraining the reader (MOL-169): measured, not built
+
+**A retrained `hye` does not replace Debian's** (owner's stop, 04.10.2026; `.scratch/tasks/research/MOL-169.md`).
+Fine-tuning starts from the float `tessdata_best/hye`, which reads the bench 54 of 162 against the
+`tessdata_fast` model's 66; synthetic lines in free faces, in the tills' own Arial AMU, and the bench's
+real lines labelled by В-2 «б» never passed 57 — and whole words of a figure row go to `rus`, which no
+retraining of `hye` touches. **As a second reader** — two more readings among `bestReading`'s candidates —
+it gave 70–72 and lost nothing, every line gained on the delivery till (am-06), still 7 of 46 there.
+Worth coming back to with a new receipt of that till and after the edges of MOL-222; the bench and its
+scripts are kept. The cut-out lines are still kept and confirmed (В-4), with no reader of them yet.
 
 ## «Переснимите» (В-4)
 
