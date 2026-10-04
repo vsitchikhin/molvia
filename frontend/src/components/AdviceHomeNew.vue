@@ -34,7 +34,7 @@
       </AppCard>
     </AppReveal>
 
-    <p class="caption">{{ t('advice.home.next') }}</p>
+    <SectionCaption as="p" class="caption">{{ t('advice.home.next') }}</SectionCaption>
     <!-- The cycle explains the tab bar too: every step wears its tab's icon. The steps that lead
          to another tab are buttons; the last is this screen, and nothing to tap. -->
     <AppCard as="ol" list>
@@ -104,6 +104,7 @@ import AppReveal from '@/components/AppReveal.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import PurchaseRow from '@/components/PurchaseRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { usePendingFrom } from '@/composables/usePendingFrom'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { UNDER_WAY, useReceipts } from '@/composables/useReceipts'
@@ -134,6 +135,7 @@ export default defineComponent({
     ManualEntryButton,
     PurchaseRow,
     ScreenSkeleton,
+    SectionCaption,
   },
   emits: {
     /** «Записать вручную» has a sheet up: the screen keeps this mounted meanwhile (review 6, Р-15). */
@@ -223,12 +225,7 @@ export default defineComponent({
 }
 
 .caption {
-  margin: var(--space-6) var(--space-1) var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  margin-top: var(--space-6);
 }
 
 .line {

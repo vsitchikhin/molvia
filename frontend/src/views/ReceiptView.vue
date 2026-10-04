@@ -96,7 +96,7 @@
             )
           "
         />
-        <p class="caption">{{ t('receipt.failed.photos') }}</p>
+        <SectionCaption as="p" class="caption">{{ t('receipt.failed.photos') }}</SectionCaption>
         <p v-if="photos.length === 0" class="note">{{ t('receipt.failed.photos_elsewhere') }}</p>
         <figure v-for="(url, index) in photos" :key="url" class="part">
           <figcaption class="part-caption">
@@ -273,6 +273,7 @@ import ReceiptTotal from '@/components/ReceiptTotal.vue'
 import ReceiptTotalSheet from '@/components/ReceiptTotalSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { useOnline } from '@/composables/useOnline'
 import { useReceipt } from '@/composables/useReceipt'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
@@ -319,6 +320,7 @@ export default defineComponent({
     ReceiptTotalSheet,
     ScreenSkeleton,
     ScreenState,
+    SectionCaption,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -699,12 +701,7 @@ export default defineComponent({
 }
 
 .caption {
-  margin: var(--space-6) var(--space-1) var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  margin-top: var(--space-6);
 }
 
 .block {

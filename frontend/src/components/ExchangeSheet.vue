@@ -87,7 +87,7 @@
       <!-- What the exchange said before: the rate of a past exchange is a fact, and the trace is
            what explains a trip that took another rate (MOL-42, В-3). -->
       <section v-if="editing && editing.history.length > 0" class="history">
-        <h3 class="caption">{{ t('exchange.sheet.history') }}</h3>
+        <SectionCaption as="h3">{{ t('exchange.sheet.history') }}</SectionCaption>
         <ul class="versions">
           <li v-for="version in editing.history" :key="version.replacedAt.getTime()">
             {{ versionOf(version) }}
@@ -161,6 +161,7 @@ import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAccountChoice } from '@/composables/useAccountChoice'
 import { useAccountsStore } from '@/stores/accounts'
@@ -191,6 +192,7 @@ export default defineComponent({
     AppReveal,
     BottomSheet,
     HeldFromAccounts,
+    SectionCaption,
     SegmentedControl,
   },
   props: {
@@ -583,15 +585,6 @@ export default defineComponent({
   margin: var(--space-2) 0 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
-}
-
-.caption {
-  margin: 0 0 var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .versions {

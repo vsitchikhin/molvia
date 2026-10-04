@@ -1,7 +1,7 @@
 <template>
   <AppScreen :title="t('dev.kit.title')">
     <section class="group">
-      <h2 class="caption">{{ t('dev.kit.buttons') }}</h2>
+      <SectionCaption class="caption">{{ t('dev.kit.buttons') }}</SectionCaption>
       <div class="row">
         <AppButton>{{ t('item.save') }}</AppButton>
         <AppButton variant="secondary">{{ t('trip.finish') }}</AppButton>
@@ -28,7 +28,7 @@
     <!-- Ф-5, Ф-6 (MOL-174): chosen is a form, not only a hue; not now is one look in every control —
          in the focus order, `text-muted`, no opacity. -->
     <section class="group">
-      <h2 class="caption">{{ t('dev.kit.selection') }}</h2>
+      <SectionCaption class="caption">{{ t('dev.kit.selection') }}</SectionCaption>
       <div class="row">
         <AppButton inactive>{{ t('settings.save') }}</AppButton>
         <AppButton variant="secondary" inactive>{{ t('trip.finish') }}</AppButton>
@@ -65,7 +65,7 @@
     </section>
 
     <section class="group">
-      <h2 class="caption">{{ t('dev.kit.fields') }}</h2>
+      <SectionCaption class="caption">{{ t('dev.kit.fields') }}</SectionCaption>
       <AppField v-model="quantity" :label="t('item.quantity')" kind="decimal" />
       <AppField
         v-model="price"
@@ -82,7 +82,7 @@
     </section>
 
     <section class="group">
-      <h2 class="caption">{{ t('dev.kit.badges') }}</h2>
+      <SectionCaption class="caption">{{ t('dev.kit.badges') }}</SectionCaption>
       <div class="row">
         <VerdictBadge v-for="level in levels" :key="level" :level="level" />
         <VerdictBadge v-for="level in levels" :key="`${level}-dot`" :level="level" compact />
@@ -95,7 +95,7 @@
          a child's root would reach AppButton's own `.icon` — and written out: a class from `:class`
          sizes nothing to the linter. -->
     <section class="group">
-      <h2 class="caption">{{ t('dev.kit.icons') }}</h2>
+      <SectionCaption class="caption">{{ t('dev.kit.icons') }}</SectionCaption>
       <div class="row">
         <span class="icon-step step-icon-xs">
           <IconShape class="sample" aria-hidden="true" />
@@ -133,7 +133,7 @@
     </section>
 
     <section class="group">
-      <h2 class="caption">{{ t('dev.kit.cards') }}</h2>
+      <SectionCaption class="caption">{{ t('dev.kit.cards') }}</SectionCaption>
       <AppCard as="ul" list>
         <li v-for="n in 12" :key="n" class="line">
           <span>{{ t('dev.kit.sample_milk') }}</span>
@@ -199,6 +199,7 @@ import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CategoryChips from '@/components/CategoryChips.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import VerdictBadge from '@/components/VerdictBadge.vue'
 import VerdictCard from '@/components/VerdictCard.vue'
@@ -227,6 +228,7 @@ export default defineComponent({
     IconRefresh,
     IconShape,
     MonthSwitcher,
+    SectionCaption,
     SegmentedControl,
     VerdictBadge,
     VerdictCard,
@@ -310,13 +312,9 @@ export default defineComponent({
   margin-bottom: var(--space-6);
 }
 
+/* A section's caption stands 8 above what it names, as on a screen: the section's gap takes 4 back. */
 .caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  margin-bottom: calc(var(--space-2) - var(--space-3));
 }
 
 .toggle {

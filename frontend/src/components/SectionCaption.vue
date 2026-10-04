@@ -1,6 +1,6 @@
 <template>
   <component :is="as" ref="root" class="section-caption" :class="{ inset }">
-    <span v-if="$slots.mark" class="mark"><slot name="mark" /></span>
+    <span v-if="$slots.mark" class="mark" aria-hidden="true"><slot name="mark" /></span>
     <span class="words"><slot /></span>
     <span v-if="$slots.tail" class="tail"><slot name="tail" /></span>
   </component>
@@ -22,12 +22,15 @@ export type CaptionTag = (typeof TAGS)[number]
  *   inset — inside a card, the title of the card itself: no 4 at the sides and no 8 below, the card's
  *           own padding and gap place it (В-1 «б»). Without it, a group's caption: 4 from the left and
  *           8 above its card, carried here, so the screens stop drawing 8, 12 and 16;
- *   #mark — before the words: the verdict's dot of 24 over a group of «Что брать»;
+ *   #mark — before the words: the verdict's dot of 24 over a group of «Что брать». Hidden from a screen
+ *           reader: a mark repeats the words beside it, and named, every heading was read twice;
  *   #tail — after them, on the right, in words and figures, not caps: the month's sum of «Доходы».
  *
  * Both slots stand inside the tag, so a heading is named by all of it — «Сентябрь 120 000 ₽». The
- * space above the caption, 24 between groups, is the screen's. `focus()` is for the screen that sends
- * the focus to a caption once the row that held it is gone («Устройства»).
+ * space above the caption, 24 between groups, is the screen's, set by a class of its own on the root;
+ * and in a container with a `gap` the caption and its card stand in a block of their own, or the gap
+ * adds to the 8. `focus()` is for the screen that sends the focus to a caption once the row that held
+ * it is gone («Устройства»).
  */
 export default defineComponent({
   name: 'SectionCaption',
@@ -39,15 +42,14 @@ export default defineComponent({
     },
     inset: { type: Boolean, default: false },
   },
-  expose: ['focus'],
-  setup() {
+  setup(_props, { expose }) {
     const root = ref<HTMLElement | null>(null)
-    return {
-      root,
+    expose({
       focus: () => {
         root.value?.focus()
       },
-    }
+    })
+    return { root }
   },
 })
 </script>
@@ -57,8 +59,6 @@ export default defineComponent({
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin: 0 0 var(--space-2);
-  padding: 0 var(--space-1);
   color: var(--text-muted);
   font-size: var(--text-caption);
   font-weight: var(--weight-bold);
@@ -71,7 +71,14 @@ export default defineComponent({
   }
 }
 
-.inset {
+/* The place, apart and weaker than any class: the screen sets the space above a caption with its own
+   class on this root, and an equal selector would win by the order the sheets happen to load in. */
+:where(.section-caption) {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-1);
+}
+
+:where(.section-caption.inset) {
   margin: 0;
   padding: 0;
 }
@@ -90,7 +97,9 @@ span.section-caption {
 }
 
 .tail {
+  min-width: 0;
   margin-left: auto;
+  text-align: right;
   color: var(--text);
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);

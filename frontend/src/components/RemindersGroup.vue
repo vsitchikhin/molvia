@@ -1,6 +1,6 @@
 <template>
   <section class="group">
-    <h2 class="caption">{{ t('settings.group_reminders') }}</h2>
+    <SectionCaption>{{ t('settings.group_reminders') }}</SectionCaption>
     <AppCard class="card">
       <label class="row">
         <span class="label">{{ t('settings.reminders.label') }}</span>
@@ -41,6 +41,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppSwitch from '@/components/AppSwitch.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { useReminders } from '@/composables/useReminders'
 
 /**
@@ -51,7 +52,7 @@ import { useReminders } from '@/composables/useReminders'
  */
 export default defineComponent({
   name: 'RemindersGroup',
-  components: { AppButton, AppCard, AppReveal, AppSwitch, IconAlert },
+  components: { AppButton, AppCard, AppReveal, AppSwitch, IconAlert, SectionCaption },
   setup() {
     const { t } = useI18n()
     const id = useId()
@@ -74,16 +75,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.caption {
-  margin: 0 0 var(--space-3);
-  padding: var(--space-1) var(--space-1) 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-}
-
 .card {
   display: flex;
   flex-direction: column;

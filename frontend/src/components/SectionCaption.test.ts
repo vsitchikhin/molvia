@@ -45,6 +45,7 @@ describe('SectionCaption', () => {
     const parts = view.element.children
     expect([...parts].map((part) => part.className)).toEqual(['mark', 'words', 'tail'])
     expect(view.text()).toBe('Сентябрь120 000 ₽')
+    expect(view.get('.mark').attributes('aria-hidden')).toBe('true')
   })
 
   it('draws neither a mark nor a tail it was not given', () => {

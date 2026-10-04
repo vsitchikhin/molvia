@@ -72,25 +72,27 @@
         </AppButton>
 
         <template v-if="reasons.length > 0">
-          <h3 class="caption">
-            {{ t('accounts.reconcile.causes_title', { date: shortDay(result.since) }) }}
-          </h3>
-          <AppCard as="ul" list>
-            <AppReveal group>
-              <OperationRow
-                v-for="reason in reasons"
-                :key="`${reason.kind}-${reason.operation.id}-${reason.operation.side ?? ''}`"
-                :operation="reason.operation"
-                :categories="categories"
-                :name-of="nameOf"
-                :account-name="accountName"
-                :title="reasonTitle(reason)"
-                :meta="reasonMeta(reason)"
-                plain
-                @open="openReason"
-              />
-            </AppReveal>
-          </AppCard>
+          <section>
+            <SectionCaption as="h3">
+              {{ t('accounts.reconcile.causes_title', { date: shortDay(result.since) }) }}
+            </SectionCaption>
+            <AppCard as="ul" list>
+              <AppReveal group>
+                <OperationRow
+                  v-for="reason in reasons"
+                  :key="`${reason.kind}-${reason.operation.id}-${reason.operation.side ?? ''}`"
+                  :operation="reason.operation"
+                  :categories="categories"
+                  :name-of="nameOf"
+                  :account-name="accountName"
+                  :title="reasonTitle(reason)"
+                  :meta="reasonMeta(reason)"
+                  plain
+                  @open="openReason"
+                />
+              </AppReveal>
+            </AppCard>
+          </section>
           <p class="hint">{{ t('accounts.reconcile.causes_hint') }}</p>
         </template>
         <div v-else class="none">
@@ -204,6 +206,7 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
 import OperationIncomeSheet from '@/components/OperationIncomeSheet.vue'
 import OperationSheet from '@/components/OperationSheet.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { parseSigned, shortDay as dayOf, signedAmount } from '@/components/accounts'
 import { asTyped } from '@/components/spending'
@@ -249,6 +252,7 @@ export default defineComponent({
     OperationIncomeSheet,
     OperationRow,
     OperationSheet,
+    SectionCaption,
     UndoStrip,
   },
   props: {
@@ -895,15 +899,6 @@ export default defineComponent({
   font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .none {
