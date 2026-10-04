@@ -42,6 +42,13 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `bot/tsconfig.json` — Bot TypeScript config: the shared base with Node types and `@/` to `src`.
 - `bot/vitest.config.ts` — Bot Vitest project: tests beside the source, Node environment.
 
+## deploy · watch
+
+- `deploy/watch/eslint.config.js` — Outside watch lint config (MOL-221): the shared preset plus no `node:*` in the source — it runs on Cloudflare Workers.
+- `deploy/watch/package.json` — Outside watch package: no dependencies; bundle (esbuild, one ES module), lint and test scripts.
+- `deploy/watch/tsconfig.json` — Outside watch TypeScript config: the shared base with Node types for the tests and `@/` to `src`.
+- `deploy/watch/vitest.config.ts` — Outside watch Vitest project: tests beside the source, Node environment.
+
 ## repository
 
 - `.editorconfig` — Editor settings: UTF-8, LF, two-space indent, tabs in the Makefile.
@@ -64,7 +71,7 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `docker-compose.yml` — Development stack: this copy's Postgres on the loopback, named by the copy's index; the receipt reader only under the `receipts` profile (`make reader`).
 - `eslint.config.base.js` — Shared lint preset every module opts into: type-aware rules, the alias-or-sibling import shape, the `deny` helper.
 - `eslint.config.js` — Root lint config: only `e2e/` and the repository's own config files; each module lints itself.
-- `package.json` — Root workspace: the module list and the repository-wide dev, lint, format, typecheck, test and e2e scripts, shared dev tools.
+- `package.json` — Root workspace: the module list, the outside watch among them (MOL-221), and the repository-wide dev, lint, format, typecheck, test and e2e scripts, shared dev tools.
 - `services/README.md` — What `services/` is: non-TypeScript services, outside the workspaces and never reaching the database — the receipt reader the API calls.
 - `tsconfig.base.json` — Shared strict TypeScript options every module extends.
 - `tsconfig.json` — Root TypeScript config: type-checks `e2e/` and the root config files.

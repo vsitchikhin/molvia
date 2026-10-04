@@ -35,6 +35,13 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 
 - `bot/Dockerfile` — Bot image: builds the single-file bundle and ships it alone on Node.
 
+## deploy · watch
+
+- `deploy/watch/src/site.ts` — The outside watch's rule (MOL-221): what is wrong with `/api/health` and the page, a line each, and three failures of four tries as a `/fail` saying what the last saw.
+- `deploy/watch/src/watch.ts` — One round of the watch: the settings from the Worker's environment (no `HC_UP_URL` — an error), up to four tries half a minute apart, the ping to «molvia-up» or its `/fail`, tried again and failing by its kind, never its URL.
+- `deploy/watch/src/worker.ts` — The Worker «molvia-watch»: Cloudflare's cron calls `scheduled` every five minutes; logs what a failed try saw.
+- `deploy/watch/src/bundle.test.ts` — Test of the Worker as it ships: one module that imports nothing and exports the scheduled handler.
+
 ## repository
 
 - `.env.prod.example` — Template of the server's `.env.prod`: domain, Postgres credentials, the production bot's token and username, the bot–API secret, the bot's pulse URL, Grafana's password and the alarms' bot (MOL-145).
