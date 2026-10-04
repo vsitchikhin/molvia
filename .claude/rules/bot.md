@@ -461,7 +461,10 @@ handoff 08 (`design_handoff_mol_127_128_129_v2`).
   newcomer back on «Что брать», whose home also reads the list but shows no «Посмотреть», is counted as
   told in the app; and the mark is the answer **sent**, not the answer received — one lost to the
   phone's timeout at a till marks `app`, and if the phone goes to the pocket before the next ask, no
-  message comes.
+  message comes; and **a version of the app from before `shown` marks nothing at all** (review №8,
+  adversarial Б2) — an installed app takes a new version only hidden or by «Обновить» (`pwaUpdate.ts`),
+  so for its first session after the rollout the bot tells of every receipt, to someone looking at it
+  too. Nothing tells that request from a new app's asked hidden, and the window is one session.
 - **The API decides and marks as it hands out, the bot only sends** — the rating reminder's rule
   (Р-1, Р-2 of MOL-101). `POST /internal/receipts/claim`, every minute, one statement: pick under
   `for update skip locked`, re-check `heard is null`, mark `bot` — two claims never share a receipt and
