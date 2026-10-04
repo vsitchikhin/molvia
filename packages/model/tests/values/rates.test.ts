@@ -208,8 +208,12 @@ describe('todayFrom (MOL-121)', () => {
     expect(todayFrom('2027-01-01', instant)).toBe('2026-09-29')
   })
 
-  it('without a day — the bot, an old page, rubbish — counts by Yerevan’s', () => {
+  it('without a day — the bot, an old page, rubbish — counts by the zone it is given', () => {
     for (const sent of [undefined, '', 'today', '2026-9-28', '2026-02-31', ' 2026-09-28']) {
+      // 22:30 in Belgrade (summer), 00:30 in Tbilisi (MOL-109)
+      expect(todayFrom(sent, instant, 'Europe/Belgrade')).toBe('2026-09-28')
+      expect(todayFrom(sent, instant, 'Asia/Tbilisi')).toBe('2026-09-29')
+      // and Yerevan's for a person whose country has no zone
       expect(todayFrom(sent, instant)).toBe('2026-09-29')
     }
   })

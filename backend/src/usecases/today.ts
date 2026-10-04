@@ -15,12 +15,18 @@ export interface Today {
   readonly zone?: string
 }
 
-/** «Today» for this request: the phone's, or Yerevan's where the phone did not say. */
+/**
+ * «Today» for this request: the phone's, or its country's where the phone did not say (the hook that
+ * read the request, MOL-109) — Yerevan's only for a caller with no request: the server's own jobs.
+ */
 export function todayOf(owner: Today, now: Date): string {
   return owner.today ?? yerevanDate(now)
 }
 
-/** The day of a moment the server stamped, in the phone's zone — Yerevan's where it named none. */
+/**
+ * The day of a moment the server stamped, in the phone's zone — its country's where it named none,
+ * Yerevan's for a caller with no request.
+ */
 export function dayOfMoment(owner: Today, instant: Date): string {
   return dayIn(instant, owner.zone)
 }
