@@ -1208,7 +1208,9 @@
       "row_device": "iPhone · Safari",
       "row_device_meta": "Not pressable: its tail holds its own button",
       "note_plain": "The income currency and the spending currency are the same — no rate to count.",
-      "note_warn": "The city is not on the list — the prices will be seen by you alone."
+      "note_warn": "The city is not on the list — the prices will be seen by you alone.",
+      "caption_goes_on": "Goes on",
+      "caption_acts": "Acts at once or asks"
     },
     "login_seam": "Sign in for development",
     "login_insecure": "Signing in needs https: run make certs"

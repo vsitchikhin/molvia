@@ -102,25 +102,32 @@ test('an inactive button takes the focus and does not light up under the pointer
   await context.close()
 })
 
-// A row that is not now (MOL-175): a link the engine would follow on Enter and on a tap, held by the
-// cancelled click alone — beside a live one, so the hold is the row's and not a kit that follows nothing.
-test('an inactive row takes the focus, and neither Enter nor a tap follows it', async ({
+// A row that is not now (MOL-175). Its link has no address (review Р-1): Enter on an anchor with no
+// `href` sends no click, so that step holds the missing address, and a middle click opens no tab; a
+// tap does reach the row, and the cancelled click is what holds it there. Beside a live one, so the
+// hold is the row's and not a kit that follows nothing.
+test('an inactive row takes the focus, and neither Enter, a middle click nor a tap follows it', async ({
   page,
+  context,
 }) => {
   const kit = await section(page, 'Rows and captions')
   const followed = () => new URL(page.url()).searchParams.get('followed')
   const row = kit.getByRole('link', { name: /^Download my data/ })
   await expect(row).toHaveAttribute('aria-disabled', 'true')
+  await expect(row).not.toHaveAttribute('href')
 
   await row.focus()
   await expect(row).toBeFocused()
   await page.keyboard.press('Enter')
+  const pages = context.pages().length
+  await row.click({ button: 'middle', force: true })
   await row.tap({ force: true })
   // Two frames: a move the router started has landed by then.
   await page.evaluate(
     () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
   )
   expect(followed()).toBeNull()
+  expect(context.pages()).toHaveLength(pages)
 
   await kit.getByRole('link', { name: /^A link that goes on/ }).tap()
   await expect.poll(followed).toBe('live')

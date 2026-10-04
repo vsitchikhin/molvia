@@ -136,8 +136,9 @@
          on (В-14), the three captions, an entry, a note and a tag. -->
     <section class="group">
       <SectionCaption class="caption">{{ t('dev.kit.rows') }}</SectionCaption>
+      <!-- В-14: rows that go on and rows that act stand in cards of their own, never mixed. -->
       <div>
-        <SectionCaption as="h3">{{ t('accounts.title') }}</SectionCaption>
+        <SectionCaption as="h3">{{ t('dev.kit.caption_goes_on') }}</SectionCaption>
         <AppCard as="ul" list>
           <li>
             <ListRow
@@ -158,6 +159,21 @@
               next
             />
           </li>
+          <li>
+            <ListRow
+              as="router-link"
+              :to="{ query: { followed: 'live' } }"
+              :icon="IconDevices"
+              :title="t('dev.kit.row_link')"
+              :meta="t('dev.kit.row_link_meta')"
+              next
+            />
+          </li>
+        </AppCard>
+      </div>
+      <div>
+        <SectionCaption as="h3">{{ t('dev.kit.caption_acts') }}</SectionCaption>
+        <AppCard as="ul" list>
           <li>
             <ListRow
               :icon="IconDownload"
@@ -181,16 +197,6 @@
               :title="t('settings.export.label')"
               :meta="t('settings.export.offline')"
               inactive
-            />
-          </li>
-          <li>
-            <ListRow
-              as="router-link"
-              :to="{ query: { followed: 'live' } }"
-              :icon="IconDevices"
-              :title="t('dev.kit.row_link')"
-              :meta="t('dev.kit.row_link_meta')"
-              next
             />
           </li>
           <li>
