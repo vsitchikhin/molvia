@@ -189,6 +189,7 @@ import RemindersGroup from '@/components/RemindersGroup.vue'
 import SalaryShiftGroup from '@/components/SalaryShiftGroup.vue'
 import SchemeGroup from '@/components/SchemeGroup.vue'
 import SettingsFields from '@/components/SettingsFields.vue'
+import { countryLabel } from '@/components/placeLabel'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SignOutSheet from '@/components/SignOutSheet.vue'
@@ -232,9 +233,7 @@ export default defineComponent({
      * fields say «Армения» and «Армянский драм · AMD», and it is the line a person decides by.
      */
     const saidIn = (value: ActorSettings): Record<string, string> => ({
-      country: i18n.te(`settings.countries.${value.country}`)
-        ? t(`settings.countries.${value.country}`)
-        : value.country,
+      country: countryLabel(value.country, i18n),
       city: value.city,
       spendCurrency: t(`settings.currencies.${value.spendCurrency}`),
       incomeCurrency: t(`settings.currencies.${value.incomeCurrency}`),

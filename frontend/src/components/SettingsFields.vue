@@ -94,6 +94,7 @@ import type { ActorSettings } from '@molvia/model'
 import IconInfo from '~icons/mdi/information-outline'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
+import { countryLabel } from '@/components/placeLabel'
 
 export default defineComponent({
   name: 'SettingsFields',
@@ -130,14 +131,12 @@ export default defineComponent({
         ? null
         : origin.value,
     )
-    const countryName = (country: string): string =>
-      i18n.te(`settings.countries.${country}`) ? t(`settings.countries.${country}`) : country
     const countryOptions = computed(() => {
       const kept = historical.value?.country
       const countries: readonly string[] = SETTINGS_COUNTRIES
       return (
         kept !== undefined && !isSettingsCountry(kept) ? [kept, ...countries] : countries
-      ).map((country) => ({ value: country, label: countryName(country) }))
+      ).map((country) => ({ value: country, label: countryLabel(country, i18n) }))
     })
     const cityOptions = computed(() => {
       const cities: readonly string[] = citiesOf(props.modelValue.country)
@@ -154,12 +153,12 @@ export default defineComponent({
     )
     /**
      * A city is chosen among its country's, so a change of country lands on that country's first
-     * city — or on the kept one, when the country is its own — and the form is never left with a
-     * city of another country, which the server would refuse.
+     * city — or, back in the country the form opened on, on the city it opened on, listed or not
+     * (adversarial А3: Ереван → Грузия → Армения was Гюмри, «изменено», and saved so) — and the form
+     * is never left with a city of another country, which the server would refuse.
      */
     function cityOnArrival(country: string): string {
-      const kept = historical.value
-      return kept?.country === country ? kept.city : (citiesOf(country)[0] ?? '')
+      return origin.value.country === country ? origin.value.city : (citiesOf(country)[0] ?? '')
     }
     function change(field: keyof ActorSettings, next: string): void {
       if (field === 'country' && next === props.modelValue.country) return

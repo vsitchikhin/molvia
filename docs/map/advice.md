@@ -72,7 +72,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 - `frontend/src/components/VerdictCard.vue` — One card of «Оценки»: the item, where and when it was bought, the scale and an optional review.
 - `frontend/src/components/VerdictEditSheet.vue` — Sheet from «Что брать»: rate an item, change one's rating or «Снять оценку», talking to the API directly.
 - `frontend/src/components/adviceRow.ts` — Helpers of «Что брать» rows: the three row types, how places read, unit price and rating text, one's own score.
-- `frontend/src/components/placeLabel.ts` — «Ереван Сити в Гюмри»: a place with its city in the prepositional case, bracketed where the dictionary has none (MOL-120); whether a city is printed is the domain's `cityWhereNameRepeats`.
+- `frontend/src/components/placeLabel.ts` — «Ереван Сити в Гюмри»: a place with its city in the prepositional case, bracketed where the dictionary has none (MOL-120); whether a city is printed is the domain's `cityWhereNameRepeats`. `countryLabel`: a country of the settings by its name, any other by its code (MOL-109).
 - `frontend/src/components/rating.ts` — The `Score` type and the list of scale keys shared by the card of «Оценки» and the edit sheet.
 
 ## frontend · composables

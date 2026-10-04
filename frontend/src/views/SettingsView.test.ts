@@ -133,6 +133,8 @@ it('Б1: an unsupported city can be returned to, and keeps its own country', asy
   me.mockResolvedValue(legacy)
   const view = await render(false)
   expect(options(view, 'country')).toEqual(['RU', 'AM', 'GE', 'RS'])
+  // a country the settings never offered is named by its code (`countryLabel`)
+  expect(field(view, 'country')?.findAll('option')[0]?.text()).toBe('RU')
   expect(options(view, 'city')).toEqual(['Москва'])
   await field(view, 'country')?.setValue('AM')
   expect(options(view, 'city')).toEqual(['Гюмри', 'Ереван'])
@@ -176,6 +178,17 @@ it('the country is described by its change alone, never by an empty list (MOL-10
   await field(view, 'country')?.setValue('RS')
   const said = field(view, 'country')?.attributes('aria-describedby') ?? ''
   expect(view.find(`#${said}`).text()).toBe(en.settings.changed_announced)
+})
+
+it('back to its own country, the form is back on its own city: nothing changed (MOL-109, А3)', async () => {
+  me.mockResolvedValue({ ...initial, city: 'Ереван' })
+  const view = await render(false)
+  await field(view, 'country')?.setValue('GE')
+  expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Тбилиси')
+  await field(view, 'country')?.setValue('AM')
+  expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Ереван')
+  expect(view.find('.badge').exists()).toBe(false)
+  expect(view.get('.actions button').attributes('aria-disabled')).toBe('true')
 })
 
 it('choosing the country it already has changes nothing (MOL-109)', async () => {

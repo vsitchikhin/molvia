@@ -1,33 +1,26 @@
 import { randomUUID } from 'node:crypto'
-import { COUNTRY_CITIES, firstGeography, newActorSchema, SETTINGS_COUNTRIES } from '@molvia/model'
-import type { Actor, NewActor, SettingsCountry, TelegramUserId } from '@molvia/model'
+import { firstGeography, newActorSchema, SETTINGS_COUNTRIES, timeZoneOf } from '@molvia/model'
+import type { Actor, NewActor, TelegramUserId } from '@molvia/model'
 import type { ActorRepository } from '@/db/actors-repository'
 
 /**
  * Four columns are NOT NULL, so the server names them before the person has seen the settings.
- * The country and its first city are the ones the phone's time zone lives in (MOL-109, В-3) — a
- * person from Belgrade does not start in Gyumri — and Gyumri for every other zone, as every
- * account began before. The currencies stay the dram and the author's ruble until the lari and the
- * dinar come (MOL-110); the settings change all four in a tap.
- *
- * Parsed here rather than merely typed: a later edit that breaks the shape should fail when
- * the module loads, not on somebody's first visit.
+ * The country and its first city are `firstGeography`'s — the ones the phone's time zone lives in
+ * (MOL-109, В-3): a person from Belgrade does not start in Gyumri, and every other zone does, as
+ * every account began before. The currencies stay the dram and the author's ruble until the lari
+ * and the dinar come (MOL-110); the settings change all four in a tap.
  */
-const FIRST_VISITS: Readonly<Record<SettingsCountry, NewActor>> = Object.freeze(
-  Object.fromEntries(
-    SETTINGS_COUNTRIES.map((country) => [
-      country,
-      Object.freeze(
-        newActorSchema.parse({
-          country,
-          city: COUNTRY_CITIES[country][0],
-          spendCurrency: 'AMD',
-          incomeCurrency: 'RUB',
-        }),
-      ),
-    ]),
-  ) as Record<SettingsCountry, NewActor>,
-)
+function firstVisit(zone: string | undefined): NewActor {
+  return newActorSchema.parse({
+    ...firstGeography(zone),
+    spendCurrency: 'AMD',
+    incomeCurrency: 'RUB',
+  })
+}
+
+// Parsed for every country at load as well: a later edit that breaks the shape should fail when the
+// module loads, not on somebody's first visit.
+for (const country of SETTINGS_COUNTRIES) firstVisit(timeZoneOf(country) ?? undefined)
 
 /**
  * The identifier is issued here, not brought by the device: a client that named its own could
@@ -43,5 +36,5 @@ export async function createActor(
   telegramUserId: TelegramUserId,
   zone?: string,
 ): Promise<Actor> {
-  return actors.create(randomUUID(), telegramUserId, FIRST_VISITS[firstGeography(zone).country])
+  return actors.create(randomUUID(), telegramUserId, firstVisit(zone))
 }
