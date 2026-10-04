@@ -490,4 +490,4 @@ handoff 08 (`design_handoff_mol_127_128_129_v2`).
   reminders and «чек разобран» — each saved on the tap at its own address. The next kind is one more
   row. **A block is the bot's, not a kind's** (Р-10): one line above both, both switches inactive and
   showing what the person chose — the reminders' «on», since a block never overwrites «chosen».
-- **In the copy**: a receipt's `heard` and `heardAt`, the account's `receiptNoticesOff` (version 12).
+- **In the copy**: a receipt's `heard` and `heardAt`, the account's `receiptNoticesOff` (version 13).
