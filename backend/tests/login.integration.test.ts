@@ -8,6 +8,7 @@ import {
   LOGIN_HEADER,
   LOGIN_LIFETIME_SECONDS,
   SESSION_COOKIE,
+  ZONE_HEADER,
   loginStartedCodec,
   loginPollCodec,
   loginPreviewCodec,
@@ -111,6 +112,25 @@ describe('Telegram login over HTTP', () => {
     expect(repeat.statusCode).toBe(404)
     expect(repeat.headers['set-cookie']).toBeUndefined()
     expect(await db.select().from(sessions)).toHaveLength(1)
+  })
+
+  it('starts a newcomer in the country of the zone the phone collects with (MOL-109, В-3)', async () => {
+    const collect = async (zone: string) => {
+      const request = await start()
+      expect((await confirm(request.code)).statusCode).toBe(204)
+      const signedIn = await app.inject({
+        method: 'GET',
+        url: `/auth/login/${request.id}`,
+        headers: { ...request.headers, [ZONE_HEADER]: zone },
+      })
+      const view = loginPollCodec.parse(signedIn.json())
+      if (view.status !== 'authenticated') throw new Error('not signed in')
+      return [view.actor.country, view.actor.city]
+    }
+    expect(await collect('Asia/Tbilisi')).toEqual(['GE', 'Тбилиси'])
+    expect(await collect('Europe/Belgrade')).toEqual(['RS', 'Белград'])
+    // a zone the runtime does not know is no zone: Gyumri, as before
+    expect(await collect('Mars/Olympus')).toEqual(['AM', 'Гюмри'])
   })
 
   it('returns existing settings and purchases on another device', async () => {

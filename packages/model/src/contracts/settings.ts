@@ -81,7 +81,10 @@ export function sameSettings(a: ActorSettings, b: ActorSettings): boolean {
  * the settings change it in one tap, and it beats landing a person from Belgrade in Gyumri, where
  * their first trip would write a shop.
  */
-export function firstGeography(zone: string | undefined): SettingsGeography {
+export function firstGeography(zone: string | undefined): {
+  readonly country: SettingsCountry
+  readonly city: SettingsCity
+} {
   const country =
     SETTINGS_COUNTRIES.find((known) => zone !== undefined && COUNTRY_TIME_ZONES[known] === zone) ??
     'AM'

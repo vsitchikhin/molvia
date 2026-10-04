@@ -22,18 +22,23 @@ function mintToken(): string {
   return randomBytes(32).toString('base64url')
 }
 
-/** The caller proves the Telegram identity; defaults remain owned by createActor. */
+/**
+ * The caller proves the Telegram identity; defaults remain owned by createActor, and the phone's
+ * zone reaches only a newcomer's — an account that exists keeps the settings it has.
+ */
 export async function signIn(
   actors: ActorRepository,
   sessions: SessionRepository,
   telegramUserId: TelegramUserId,
   deviceName: string | null = null,
+  zone?: string,
 ): Promise<SignedIn> {
   const actor =
     (await actors.byTelegramUserId(telegramUserId)) ??
     (await createActor(
       { create: (id, telegramId, input) => actors.createIfMissing(id, telegramId, input) },
       telegramUserId,
+      zone,
     ))
 
   const token = mintToken()
