@@ -240,8 +240,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `disabled` is drawn the same and stays for a moment, until a screen trades it for `inactive`
   with the words saying why. **`busy` alone keeps the look of the action**, as on master — it is the one
   at work, and saying so is the screen's: its words («Сохраняем…») or a status line («Готовим
-  фото…»); where the screen says nothing — «Удалить навсегда», the login — only `aria-busy` does
-  (round 3, Р3-А1), a limit, not a promise; **`busy` with `disabled` is drawn as not now**, as master
+  фото…»); where the screen says nothing — among others «Удалить навсегда», «Не тот товар», «Выйти»,
+  the login; round 4 counted nine — only `aria-busy` does (round 3, Р3-А1), a limit, not a promise; **`busy` with `disabled` is drawn as not now**, as master
   drew it dimmed: «Сохранить» of a sheet that keeps its words while it sends had nothing else to
   show it (round 2, Р2-А1 — round 1 had drawn it live). A look of its own for `busy` is not the
   kit's yet. **The form of the variant stays** (owner's В-1 «а»): a button with
