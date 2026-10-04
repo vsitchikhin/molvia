@@ -262,7 +262,10 @@ export function officialRatesRefresh({
       const answers = new Map<string, readonly AmdRate[]>()
       for (const day of days) {
         const answer = await bank.fetchOn(day)
+        // Tomorrow is a bank setting its rate the evening before — the hourly answer writes it; past
+        // tomorrow is the archive being wrong (Р-25), and refuses the walk.
         if (answer.date > today) {
+          if (isRateFresh(answer.date, today)) continue
           throw new FeedError(bank.provider, `archive: ${answer.date} is in the future`)
         }
         answers.set(answer.date, answer.rates)

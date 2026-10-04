@@ -635,6 +635,7 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
     const askedOn: string[] = []
     const warnings: { details: Record<string, unknown>; message: string }[] = []
     const state = { latest: 0, rub: 4_348_959n }
+    let dated = inForce
     const nbg: HomeBankFeed = {
       provider: 'nbg',
       fetchLatest: () => {
@@ -643,7 +644,7 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
       },
       fetchOn: (day) => {
         askedOn.push(day)
-        return day === failOn ? Promise.reject(cutOff()) : Promise.resolve(lari(inForce(day)))
+        return day === failOn ? Promise.reject(cutOff()) : Promise.resolve(lari(dated(day)))
       },
     }
     const cba = feed('cba')
@@ -704,6 +705,10 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
       cbr: cbr.state,
       pass: (ms: number) => {
         clock += ms
+      },
+      /** Which day the archive answers a day with. */
+      override: (answer: (day: string) => string) => {
+        dated = answer
       },
     }
   }
@@ -791,6 +796,24 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
     home.pass(HISTORY_EVERY_MS)
     await home.run()
     expect(home.askedOn.length - walked).toBe(ARCHIVE_RECENT_DAYS + 1)
+  })
+
+  it('архив отдал завтрашний курс на сегодня — день пропущен, проход не отвергнут; позже завтра — отвергнут', async () => {
+    const tomorrow = '2026-09-20'
+    const home = homeHarness({ cached: [], failOn: null })
+    const answers = new Map<string, string>([[SATURDAY, tomorrow]])
+    home.override((day) => answers.get(day) ?? inForce(day))
+    for (let run = 0; run < 20; run += 1) {
+      await home.run()
+      home.pass(60_000)
+    }
+    expect(home.warnings.map((warning) => warning.message)).not.toContain('official history failed')
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-18')).toBe(true)
+
+    const broken = homeHarness()
+    broken.override(() => '2026-09-25')
+    await broken.run()
+    expect(broken.warnings.map((warning) => warning.message)).toContain('official history failed')
   })
 
   it('сбой посреди порции — строка в логе, порция не пишется, повтор через шесть часов с того же места', async () => {
