@@ -156,10 +156,12 @@ export default defineComponent({
   }
 }
 
-/* After every variant, so it wins over each of them. `busy` alone keeps the look of the action — it
-   is the one at work, and its words say so («Сохраняем…»); `busy` with `disabled` is drawn as not
-   now, as master drew it dimmed: a sheet that keeps its «Сохранить» while it sends has nothing else
-   to show it (adversarial round 2, Р2-А1). A look of its own for `busy` is not the kit's yet. */
+/* After every variant, so it wins over each of them. `busy` alone keeps the look of the action, as
+   on master: it is the one at work, and saying so is the screen's — its words («Сохраняем…») or a
+   status line; where the screen says nothing, only `aria-busy` does (round 3, Р3-А1: «Удалить
+   навсегда», the login). `busy` with `disabled` is drawn as not now, as master drew it dimmed: a
+   sheet that keeps its «Сохранить» while it sends has nothing else to show it (round 2, Р2-А1). A
+   look of its own for `busy` is not the kit's yet. */
 .button:disabled,
 .button[aria-disabled='true']:not([aria-busy='true']) {
   background: var(--surface-2);

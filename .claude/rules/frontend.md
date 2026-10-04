@@ -238,8 +238,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   Ctrl or Meta is the browser's, as in a live group (Р2-А3). `e2e/kit-inactive`
   holds it in Chromium and WebKit, since the component tests send their own events. A native
   `disabled` is drawn the same and stays for a moment, until a screen trades it for `inactive`
-  with the words saying why. **`busy` alone keeps the look of the action** — it is the one at work,
-  and its words say so («Сохраняем…»); **`busy` with `disabled` is drawn as not now**, as master
+  with the words saying why. **`busy` alone keeps the look of the action**, as on master — it is the one
+  at work, and saying so is the screen's: its words («Сохраняем…») or a status line («Готовим
+  фото…»); where the screen says nothing — «Удалить навсегда», the login — only `aria-busy` does
+  (round 3, Р3-А1), a limit, not a promise; **`busy` with `disabled` is drawn as not now**, as master
   drew it dimmed: «Сохранить» of a sheet that keeps its words while it sends had nothing else to
   show it (round 2, Р2-А1 — round 1 had drawn it live). A look of its own for `busy` is not the
   kit's yet. **The form of the variant stays** (owner's В-1 «а»): a button with
