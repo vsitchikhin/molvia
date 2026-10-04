@@ -156,24 +156,30 @@ export default defineComponent({
   }
 }
 
-/* After every variant, so it wins over each of them; `aria-busy` keeps the look of the action. */
-.button:disabled,
+/* After every variant, so it wins over each of them; `aria-busy` keeps the look of the action, with
+   `disabled` too — the sending sheets write both (adversarial А3). */
+.button:disabled:not([aria-busy='true']),
 .button[aria-disabled='true']:not([aria-busy='true']) {
   background: var(--surface-2);
-  box-shadow: none;
   color: var(--text-muted);
   font-weight: var(--weight-medium);
   cursor: not-allowed;
 }
 
-.ghost:disabled,
-.danger-ghost:disabled,
+/* The rest shadow is a live primary's. Light in weight (`:where`), so a place that lifts what it
+   holds over the cards — the floating dock — keeps its lift on an inactive one (review 1). */
+.primary:where(:disabled:not([aria-busy='true']), [aria-disabled='true']:not([aria-busy='true'])) {
+  box-shadow: none;
+}
+
+.ghost:disabled:not([aria-busy='true']),
+.danger-ghost:disabled:not([aria-busy='true']),
 .ghost[aria-disabled='true']:not([aria-busy='true']),
 .danger-ghost[aria-disabled='true']:not([aria-busy='true']) {
   background: transparent;
 }
 
-.secondary:disabled,
+.secondary:disabled:not([aria-busy='true']),
 .secondary[aria-disabled='true']:not([aria-busy='true']) {
   border-color: transparent;
 }

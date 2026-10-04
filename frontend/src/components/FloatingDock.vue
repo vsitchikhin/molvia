@@ -48,12 +48,12 @@ export default defineComponent({
     pointer-events: auto;
   }
 
-  // An inactive action lies over the cards, and half-transparent it reads as a smudge on them:
-  // drawn solid and muted instead — the strip above says why (handoff MOL-81, 02).
-  > :slotted([aria-disabled='true']:not([aria-busy='true'])) {
-    background: var(--surface-2);
-    color: var(--text-muted);
-    opacity: 1;
+  // An inactive action lies over the cards too, and without its lift it reads as a smudge on them
+  // (handoff MOL-81, 02): the look is the kit's, the lift the dock's — by a weight above the kit's
+  // light `box-shadow: none`, whatever order the two sheets come in (MOL-174, review 1).
+  > :slotted([aria-disabled='true']:not([aria-busy='true'])),
+  > :slotted(:disabled:not([aria-busy='true'])) {
+    box-shadow: var(--shadow-md);
   }
 }
 </style>
