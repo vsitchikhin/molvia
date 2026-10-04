@@ -169,6 +169,17 @@
               next
             />
           </li>
+          <li>
+            <ListRow
+              as="router-link"
+              :to="{ query: { followed: 'inactive' } }"
+              :icon="IconDevices"
+              :title="t('dev.kit.row_link_inactive')"
+              :meta="t('dev.kit.row_link_offline')"
+              next
+              inactive
+            />
+          </li>
         </AppCard>
       </div>
       <div>
@@ -187,16 +198,6 @@
               :title="t('settings.erase.label')"
               :meta="t('dev.kit.row_erase_meta')"
               danger
-            />
-          </li>
-          <li>
-            <ListRow
-              as="router-link"
-              :to="{ query: { followed: 'inactive' } }"
-              :icon="IconDownload"
-              :title="t('settings.export.label')"
-              :meta="t('settings.export.offline')"
-              inactive
             />
           </li>
           <li>

@@ -112,7 +112,7 @@ test('an inactive row takes the focus, and neither Enter, a middle click nor a t
 }) => {
   const kit = await section(page, 'Rows and captions')
   const followed = () => new URL(page.url()).searchParams.get('followed')
-  const row = kit.getByRole('link', { name: /^Download my data/ })
+  const row = kit.getByRole('link', { name: /^A link while offline/ })
   await expect(row).toHaveAttribute('aria-disabled', 'true')
   await expect(row).not.toHaveAttribute('href')
 
