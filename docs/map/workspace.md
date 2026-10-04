@@ -42,6 +42,14 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `bot/tsconfig.json` — Bot TypeScript config: the shared base with Node types and `@/` to `src`.
 - `bot/vitest.config.ts` — Bot Vitest project: tests beside the source, Node environment.
 
+## deploy · watch
+
+- `deploy/watch/eslint.config.js` — Outside watch lint config (MOL-221): the shared preset plus no `node:*` in the source — it runs on Cloudflare Workers; the tests typed by `tests/tsconfig.json`, the Vitest config by the default project.
+- `deploy/watch/package.json` — Outside watch package: no dependencies; bundle (esbuild, one ES module), lint and test scripts.
+- `deploy/watch/tsconfig.json` — Outside watch TypeScript config of the source: the web platform alone (`WebWorker`, no Node types), so Node's API is a type error; `@/` to `src`.
+- `deploy/watch/tests/tsconfig.json` — Outside watch TypeScript config of the tests and the Vitest config: the source's, plus Node's types; a directory of its own, so the lint finds it without the default project.
+- `deploy/watch/vitest.config.ts` — Outside watch Vitest project: tests in `tests/`, apart from the source by its types, Node environment.
+
 ## repository
 
 - `.editorconfig` — Editor settings: UTF-8, LF, two-space indent, tabs in the Makefile.
@@ -54,7 +62,7 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `.nvmrc` — The Node major version, 22.
 - `.prettierignore` — What Prettier leaves alone: builds, the lockfile, the shared links, hooks, recorded rate-provider responses.
 - `.prettierrc.json` — Prettier settings: no semicolons, single quotes, width 100, trailing commas.
-- `Makefile` — The canonical entry point: setup, stack, the receipt reader, database, migrate, forget, seed, gates, dev, format, lint, typecheck, test, check, certs, icons.
+- `Makefile` — The canonical entry point: setup, stack, the receipt reader, database, migrate, forget, seed, gates, dev, format, lint, typecheck, test, check, the outside watch to Cloudflare (`watcher`), certs, icons.
 - `bin/check-code-map.mjs` — Refuses a code map that lies: a file it does not cover, a path that does not exist, a file with two homes; run by `npm run lint`.
 - `bin/design-md.mjs` — The token block of `frontend/DESIGN.md` from `_tokens.scss`, through Prettier: `--write` in `npm run format`, `--check` in `npm run lint`.
 - `bin/init-env.sh` — Generates this copy's `.env` from its index: ports — the receipt reader's too — databases, compose project; keeps bot settings across `--force`.
@@ -64,7 +72,7 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `docker-compose.yml` — Development stack: this copy's Postgres on the loopback, named by the copy's index; the receipt reader only under the `receipts` profile (`make reader`).
 - `eslint.config.base.js` — Shared lint preset every module opts into: type-aware rules, the alias-or-sibling import shape, the `deny` helper.
 - `eslint.config.js` — Root lint config: only `e2e/` and the repository's own config files; each module lints itself.
-- `package.json` — Root workspace: the module list and the repository-wide dev, lint, format, typecheck, test and e2e scripts, shared dev tools.
+- `package.json` — Root workspace: the module list, the outside watch among them (MOL-221), and the repository-wide dev, lint, format, typecheck, test and e2e scripts, shared dev tools.
 - `services/README.md` — What `services/` is: non-TypeScript services, outside the workspaces and never reaching the database — the receipt reader the API calls.
 - `tsconfig.base.json` — Shared strict TypeScript options every module extends.
 - `tsconfig.json` — Root TypeScript config: type-checks `e2e/` and the root config files.

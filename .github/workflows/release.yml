@@ -254,3 +254,60 @@ jobs:
           # An automatic rollout names its commit; a rollback by hand may go to an image that
           # predates the version and calls itself 0.0.0.
           if [[ -n "$BUILT" ]]; then grep -q "\"version\":\"v[^\"]*-g${BUILT:0:7}" <<<"$health"; fi
+
+  watcher:
+    name: the outside watch to Cloudflare
+    # The same commits as the images: a green CI of a push to master (MOL-221). Apart from the
+    # rollout on purpose — neither waits for the other, and a failure here leaves production as it is.
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # The environment holds the Cloudflare token and admits master alone.
+    environment:
+      name: production
+    concurrency:
+      group: watcher
+      cancel-in-progress: false
+    env:
+      BUILT: ${{ github.event.workflow_run.head_sha }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # CI runs side by side, so an older commit may get here after a newer one. The Worker carries
+      # no version to compare, so a commit master has moved past stands aside: the newer one's own
+      # release rolls the watch out — or, if its CI fails, the next green one does.
+      - name: still master's head
+        id: head
+        run: |
+          head="$(git ls-remote origin refs/heads/master | cut -f1)"
+          if [[ "$head" != "$BUILT" ]]; then
+            echo "::notice::master is at ${head:0:7} now, past ${BUILT:0:7}: its release rolls the watch out"
+            echo "skip=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v7
+        if: steps.head.outputs.skip != 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - if: steps.head.outputs.skip != 'true'
+        run: npm ci
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
+
+      - name: roll out
+        if: steps.head.outputs.skip != 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: deploy/watch/deploy.sh

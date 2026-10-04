@@ -569,10 +569,12 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The Postgres image is an exact tag and part of the contract** (MOL-105): ICU, `vector` and
   glibc; a tag that moves glibc or ICU comes with a migration that rebuilds the text indexes, as
   `0038`. **A migration skipped by its stamp stops the boot** (`assertEveryMigrationApplied`).
-- **Production is watched from outside** (MOL-142): `watch.yml` every five minutes and the bot's
-  pulse — after a claim, while it hears Telegram, never in its first minute — to healthchecks.io
-  and its own Telegram, never our bot; **`/health` is `503` whenever it is not `ok`**, and the bot
-  is not in it; a check that never got a ping never alarms, so `BOT_PULSE_URL` is required.
+- **Production is watched from outside** (MOL-142): a Worker on Cloudflare every five minutes, never
+  GitHub's cron, which came hours late (MOL-221; the certificate stays on `watch.yml`, hourly), and
+  the bot's pulse — after a claim, while it hears Telegram, never in its first minute — to
+  healthchecks.io and its own Telegram, never our bot; **`/health` is `503` whenever it is not
+  `ok`**, and the bot is not in it; a check that never got a ping never alarms, so `BOT_PULSE_URL`
+  is required.
 - **The metrics never judge a rollout** (MOL-145, adversarial А4): pulled before anything changes,
   started only once the application is healthy, a failure of theirs a warning; a rollback leaves them as
   they run. The one port they publish is Grafana's, on the loopback.

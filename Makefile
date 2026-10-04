@@ -17,7 +17,7 @@ NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json i
 # The heavy checks of every copy on this machine take turns, the push's among them (MOL-139).
 ONE_AT_A_TIME = ./bin/one-at-a-time.sh "make $@"
 
-.PHONY: help setup hooks up down reup ps logs psql migrate forget seed gates failures db-reset dev format lint typecheck test e2e check prod-build certs icons ports
+.PHONY: help setup hooks up down reup ps logs psql migrate forget seed gates failures db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -148,6 +148,9 @@ prod-build: ## Build the production images without deploying them
 	DOMAIN=localhost POSTGRES_DB=molvia POSTGRES_USER=molvia POSTGRES_PASSWORD=build \
 	TELEGRAM_BOT_TOKEN=build TELEGRAM_BOT_USERNAME=build_bot BOT_API_SECRET=build BOT_PULSE_URL= \
 	docker compose -f docker-compose.prod.yml build
+
+watcher: ## Roll the outside watch out to Cloudflare by hand: needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID (MOL-221)
+	./deploy/watch/deploy.sh
 
 certs: ## Issue a locally trusted dev certificate, for testing the camera on a phone
 	@command -v mkcert >/dev/null || { \
