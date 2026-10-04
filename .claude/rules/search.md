@@ -6,6 +6,7 @@ paths:
   - 'packages/model/tests/entities/item.test.ts'
   - 'packages/model/tests/contracts/catalogue.test.ts'
   - 'backend/src/db/{items,item-embeddings,search-picks,seed}-repository.ts'
+  - 'backend/src/db/rekey.ts'
   - 'backend/src/embeddings/**'
   - 'backend/src/usecases/{embed-items,query-meaning}*.ts'
   - 'backend/src/{catalogue-seed,seed-catalogue,seed-catalogue-cli}*.ts'
@@ -85,12 +86,46 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   `INVISIBLE` in `text.ts`**, that the name's measure and the key both strip: two copies
   drifted twice — the Hangul fillers in MOL-12, U+13441 in MOL-27, each time a valid name
   whose key its own schema refused, a 500. A test walks every code point to hold them equal.
-- **The tables are frozen, and changing one is a migration.** So are the rules that fold and
-  decide `c`. The key is stored, so an edit after the first row is written makes every
-  accumulated key foreign — silently, with no error and no log line. MOL-11 changed the
-  alphabet without one only because no key was stored yet — no production, no real catalogue
-  in any copy; MOL-27 widened `INVISIBLE` under the same condition. Same standing as `MINOR_EXPONENT`. Retuning the thresholds is a
-  different thing and does not touch the alphabet.
+- **Georgian and Serbian are in the tables too (MOL-109)**, since both countries are in the
+  settings from 0.2. Georgian has a table of its own, collapsed as the Armenian one is — the
+  ejectives with their plain pairs, `ჯ` as `j` — so «ბორჯომი», «Боржоми» and `Borjomi` are one
+  key, `borjomi`. Serbian Cyrillic is rows of the Cyrillic table (`ђ`/`џ` `dj`, `ћ` `ch`, `љ` `lj`,
+  `њ` `nj`, `ј` `j`), and its Latin meets it: `č` and `ć` are `ch`, `š` `sh`, `ž` `j` — resolved
+  after NFD and **before the marks are stripped** (`LATIN_MARKED`), since stripped first `č` was a
+  `c` and the fold made it `k`; `đ` has no decomposition and is a row of its own. So «ćevapi»,
+  «ћевапи» and «чевапи» are one key, and so are «džem», «џем» and «джем». Only those four marked
+  letters: Polish `ś` and Czech `ě` keep what NFD gives. What draws nothing is taken out **before**
+  the pairs are read, as `nameIdentity` takes it out before it composes — a zero-width space between
+  `c` and `ˇ` gave one identity two keys and «Предложить товар» a second «Čaj» (adversarial А4).
+  **The price, pinned in `search-key.test.ts`** (review, remark 3): Serbian `c` is always `ц`, but
+  a Latin `c` is decided by the letter after it — `pljeskavica` is `pljeskavika`, «пљескавица»
+  `pljeskaviцa` — and `ј` is the `j` of its Latin where Russian `й` is `i` and `я` `ia`: «ајвар» and
+  «айвар», «ракија» and «ракия» are one edit apart, found near, not one key. The fold has no
+  language to tell a Serbian `c` from an English one, and the tables are frozen. **Serbian Latin
+  typed without its marks is far from the label** (adversarial А1, owner's В-4 «а», 04.10.2026): one
+  key cannot be both «чевапчичи» and «cevapcici», since `č` is `ч` and a bare `c` at once, and the
+  Russian query was chosen — the person is Russian-speaking, a label and Open Food Facts write the
+  marks. «cevapcici» and «secer» are found whole by meaning, «cevap» as it is typed not at all, and
+  without the model (its first seconds, the phone offline) by nothing. Pinned in `search-key.test.ts`.
+- **The tables are frozen; a change reaches the stored keys at the API's start** (MOL-109, В-2).
+  So are the rules that fold and decide `c`. The key is stored, so an edit after the first row is
+  written makes every accumulated key foreign — silently, with no error and no log line. The key
+  is TypeScript and a migration is SQL, so no migration can recompute it: `rekeyItems`
+  (`backend/src/db/rekey.ts`) runs after the migrations, rewrites every `items.search_key` that
+  differs from `toSearchKey(name)` under a lock against writes, and stops the boot on a failure as a
+  migration does. It writes nothing when the tables did not change. **What it cannot bring back** is
+  a key whose source is not stored: a remembered pick (`search_picks` keeps the query's key alone)
+  and the shops' memory by the text of a line (`store_memory` of kind `text` keeps
+  `toSearchKey(line.printed)`, not the line) — both are forgotten under letters that changed, named
+  prices; the second costs nothing while receipts are Armenian and a change leaves the Armenian
+  table and Cyrillic alone (review, remark 4). **A rollback past a rekeying build is a rename for
+  the data** (adversarial А5): the image put back looks a name up by its own tables' key, misses the
+  row rewritten, and `createUnlessNamed` may write a twin; the next start of the new build rekeys
+  again, and a twin made meanwhile is found by `nameIdentity` and merged by hand. Accepted: a
+  rollback is rare, a twin is seen, and holding the old key beside the new would be a second column
+  for one deploy. MOL-11 and MOL-27 changed the alphabet before any
+  key was stored; MOL-109 is the first change the recompute carried. Same standing as
+  `MINOR_EXPONENT`. Retuning the thresholds is a different thing and does not touch the alphabet.
 - **Candidates come from `word_similarity`, never `similarity`.** `similarity` compares
   whole strings, so a long name dilutes the match: «малако» scored 0.158 against
   «Молоко «Ашхар»» and ranked «Марианна» above it. `word_similarity` compares against the
@@ -432,7 +467,9 @@ shows what it moves.
   the kefir stays below the threshold; a section of the seed as data would be a task of its own.
   **Armenian and Georgian shelf words find the wrong thing, near** — the model reads them by their
   spelling: «կաթնամթերք» is «Матнакаш», «ձուկ» «Лук-порей», «ბოსტნეული» «Бастурма», and Serbian
-  «meso» «Пакеты мусорные»; others find nothing. Armenian names are still found by their letters
+  «meso» «Пакеты мусорные»; others find nothing. Since MOL-109 the letters of Georgian and Serbian
+  answer too, as wrong: «ხილი» is `hili`, «Хлеб белый» two edits away, and «piće» `piche`, the start
+  of «Печенье». Armenian names are still found by their letters
   through the alphabet above. Russian words of a shelf with no word of its kind in the names find
   nothing — «бытовая химия», «гигиена», «приправы». Eight words of the corpus have their nearest
   name within 0.006 of the threshold, and five of them answer otherwise on x86 — CI and production —

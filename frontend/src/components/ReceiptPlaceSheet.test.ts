@@ -9,8 +9,9 @@ import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 
+const recentPlaces = vi.fn(() => Promise.resolve([] as { id: string; name: string }[]))
 vi.mock('@/api', () => ({
-  api: { recentPlaces: () => Promise.resolve([]) },
+  api: { recentPlaces: () => recentPlaces() },
 }))
 
 const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
@@ -36,6 +37,7 @@ async function render(day: string) {
   const view = mount(ReceiptPlaceSheet, {
     props: {
       open: true,
+      country: 'AM',
       current: { id: PLACE, name: 'Ереван Сити', city: 'Гюмри' },
       read: true,
       day,
@@ -82,5 +84,87 @@ describe('ReceiptPlaceSheet (MOL-127): the day of the purchases', () => {
   it('the phone’s today passes', async () => {
     const { button } = await render('2026-10-03')
     expect(button?.disabled).toBe(false)
+  })
+})
+
+describe('ReceiptPlaceSheet (MOL-109, adversarial А2): a receipt of another country than the settings', () => {
+  /** A person whose settings moved to Tbilisi, with an Armenian receipt taken before. */
+  async function away(current: { name: string; city: string } | null) {
+    localStorage.setItem('molvia.actor', ME)
+    localStorage.setItem(
+      `molvia.settings.${ME}`,
+      JSON.stringify({
+        country: 'GE',
+        city: 'Тбилиси',
+        spendCurrency: 'AMD',
+        incomeCurrency: 'RUB',
+      }),
+    )
+    recentPlaces.mockResolvedValue([{ id: PLACE, name: 'Carrefour' }])
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    useActorStore().state = 'ready'
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/purchases')
+    const view = mount(ReceiptPlaceSheet, {
+      props: {
+        open: true,
+        country: 'AM',
+        current,
+        read: current !== null,
+        day: '2026-09-26',
+        action: ACTION,
+      },
+      global: { plugins: [router, pinia, createAppI18n('ru')] },
+      attachTo: document.body,
+    })
+    mounted.push(view)
+    await flushPromises()
+    return view
+  }
+
+  afterEach(() => {
+    for (const view of mounted.splice(0)) view.unmount()
+    localStorage.clear()
+  })
+
+  const select = () => document.body.querySelector<HTMLSelectElement>('dialog[open] select')
+
+  async function record(view: Awaited<ReturnType<typeof away>>, name: string) {
+    await view.get('input:not([type="date"])').setValue(name)
+    await flushPromises()
+    const button = [...document.body.querySelectorAll('dialog[open] button')].find((node) =>
+      node.textContent.includes(ACTION),
+    ) as HTMLButtonElement
+    // the sheet takes no press until it has risen (BottomSheet): its clock moves on
+    vi.spyOn(performance, 'now').mockReturnValue(60_000)
+    button.click()
+    await flushPromises()
+    return (view.emitted('chosen') as [[{ name: string; city: string }, string]] | undefined)?.[0]
+  }
+
+  it('offers the receipt country’s cities, not the settings’ Tbilisi, and its new shop is there', async () => {
+    const view = await away(null)
+    expect([...(select()?.options ?? [])].map((option) => option.value)).toEqual([
+      'Гюмри',
+      'Ереван',
+    ])
+    const [place] = (await record(view, 'Ереван Сити')) ?? []
+    expect(place).toEqual({ name: 'Ереван Сити', city: 'Гюмри' })
+  })
+
+  it('takes the city read off the receipt first', async () => {
+    await away({ name: 'SAS', city: 'Ереван' })
+    expect(select()?.value).toBe('Ереван')
+  })
+
+  it('does not offer the shops of Tbilisi: the server would refuse them', async () => {
+    await away(null)
+    expect(document.body.querySelector('dialog[open]')?.textContent).not.toContain('Carrefour')
+  })
+
+  it('must not fire: a receipt of the person’s own country has no city field', async () => {
+    await render('2026-09-26')
+    expect(select()).toBeNull()
   })
 })

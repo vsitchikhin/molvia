@@ -22,3 +22,13 @@ export function placeLabel(name: string, city: string | null, words: Words): str
     ? words.t('place.in_city', { place: name, where: words.t(key, {}) })
     : words.t('place.in_unknown_city', { place: name, city })
 }
+
+/**
+ * «Грузия» for `GE` (MOL-109): a country of the settings by its name, one the settings never offered
+ * — a row from before the form — by its code. One rule for the form and for the notice of a conflict,
+ * which says the account's settings in the words the form beside it uses.
+ */
+export function countryLabel(country: string, words: Words): string {
+  const key = `settings.countries.${country}`
+  return words.te(key) ? words.t(key, {}) : country
+}

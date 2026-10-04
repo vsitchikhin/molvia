@@ -765,10 +765,41 @@ describe('лишних выдач нет (адверсариальный В, р�
     await bought(anna, await item('Молоко'), yerevan('2026-07-13', '10:00'))
     const { repository, reads } = counting()
 
-    for (const time of ['00:00', '12:00', '18:59', '22:00']) {
+    // Outside every evening of every country: in July 22:00 in Yerevan is 20:00 in Belgrade, an
+    // evening, so the last minute outside them all is Belgrade's 22:00 — midnight here (MOL-109).
+    for (const time of ['00:00', '12:00', '18:59']) {
       expect(asked(await evening('2026-07-14', time, repository))).toEqual({})
     }
     expect(reads()).toBe(0)
+  })
+
+  it('человек из Белграда — в 19:00 по Белграду, не по Еревану (MOL-109)', async () => {
+    const milan = await person({ country: 'RS', city: 'Белград' })
+    // 10:00 in Belgrade on the 13th — yesterday for the evening of the 14th
+    await bought(milan, await item('Ајвар'), yerevan('2026-07-13', '12:00'))
+
+    // 19:00 in Yerevan is 17:00 in Belgrade (summer): not yet
+    expect(asked(await evening('2026-07-14', '19:00'))).toEqual({})
+    // 21:00 in Yerevan is 19:00 in Belgrade
+    expect(asked(await evening('2026-07-14', '21:00'))).toEqual({ [milan.tg]: ['Ајвар'] })
+  })
+
+  it('и зимой — в 19:00 по Белграду, на час позже летнего: пояс по имени, а не смещением (MOL-109)', async () => {
+    const milan = await person({ country: 'RS', city: 'Белград' })
+    await bought(milan, await item('Ајвар'), yerevan('2027-01-13', '12:00'))
+
+    // 21:00 in Yerevan is 18:00 in Belgrade (winter, UTC+1): not yet — summer's offset would say yes
+    expect(asked(await evening('2027-01-14', '21:00'))).toEqual({})
+    // 22:00 in Yerevan is 19:00 in Belgrade
+    expect(asked(await evening('2027-01-14', '22:00'))).toEqual({ [milan.tg]: ['Ајвар'] })
+  })
+
+  it('человек из Тбилиси — в 19:00, как Ереван: пояс тот же круглый год (MOL-109)', async () => {
+    const nino = await person({ country: 'GE', city: 'Тбилиси' })
+    await bought(nino, await item('Боржоми'), yerevan('2027-01-13', '12:00'))
+
+    expect(asked(await evening('2027-01-14', '18:59'))).toEqual({})
+    expect(asked(await evening('2027-01-14', '19:00'))).toEqual({ [nino.tg]: ['Боржоми'] })
   })
 })
 

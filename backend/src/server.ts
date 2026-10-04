@@ -734,7 +734,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         if (!login) throw new DomainError(ERROR.LOGIN_DISABLED)
         return startLogin(loginRequests, login.username, name, again)
       },
-      poll: (id, secret) => completeLogin(authTransactOn(db), id, secret),
+      poll: (id, secret, zone) => completeLogin(authTransactOn(db), id, secret, zone),
       logout: (token) => logout(sessions, token),
     })
     internalAuthRoutes(instance, {
@@ -808,7 +808,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     // file.
     if (process.env.NODE_ENV !== 'production') {
       devLoginRoute(instance, {
-        signIn: (telegramUserId, name) => signIn(actors, sessions, telegramUserId, name),
+        signIn: (telegramUserId, name, zone) =>
+          signIn(actors, sessions, telegramUserId, name, zone),
       })
     }
 

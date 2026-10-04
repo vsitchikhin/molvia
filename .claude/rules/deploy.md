@@ -181,4 +181,6 @@ The shape worth knowing here:
   finds what it knew. One that succeeded while something else failed stays applied, and the
   previous image then runs on the new schema: an added column costs it nothing, a dropped or
   renamed one breaks it. **So a migration that drops or renames goes out in two merges** — the
-  code stops reading the thing first, the schema loses it after.
+  code stops reading the thing first, the schema loses it after. **The search keys recomputed at
+  the start** (`rekeyItems`, MOL-109) stay too: the image put back looks a name up by its own key and
+  may write a twin until the next start — a named price, `search.md`.

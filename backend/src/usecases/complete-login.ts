@@ -11,6 +11,7 @@ export async function completeLogin(
   transact: AuthTransact,
   id: string,
   secret: string,
+  zone?: string,
 ): Promise<CompletedLogin> {
   return transact(async ({ actors, sessions, requests }) => {
     // The account's lock before the request's row, the order erasure takes them in (MOL-58,
@@ -31,7 +32,13 @@ export async function completeLogin(
     if (consumed?.telegramUserId === null || consumed === null) {
       throw new DomainError(ERROR.LOGIN_UNAVAILABLE)
     }
-    const signedIn = await signIn(actors, sessions, consumed.telegramUserId, consumed.deviceName)
+    const signedIn = await signIn(
+      actors,
+      sessions,
+      consumed.telegramUserId,
+      consumed.deviceName,
+      zone,
+    )
     return { status: 'authenticated', signedIn }
   })
 }

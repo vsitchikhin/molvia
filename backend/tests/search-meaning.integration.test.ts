@@ -161,9 +161,11 @@ const SHELF_ANSWERS: readonly (readonly [string, string | null, boolean, Answer?
   ['фрукты', 'Пастила фруктовая', true],
   ['цитрусовые', 'Апельсины', true],
   ['միրգ', 'Маргарин', true],
-  ['ხილი', null, false],
-  ['voće', 'Вода', false],
-  ['воће', 'Вода', false],
+  // MOL-109: Georgian and Serbian are letters of the key now — ხილი is `hili`, two edits from «белый»;
+  // voće and воће are `voche`, three from «Вода», and find nothing where they found it by ć → ц.
+  ['ხილი', 'Хлеб белый', false],
+  ['voće', null, false],
+  ['воће', null, false],
   ['выпечка', 'Бумага для выпечки', true],
   ['хлебобулочные', 'Хлебцы', true],
   ['hleb', 'Хлеб', true], // at the threshold
@@ -195,7 +197,7 @@ const SHELF_ANSWERS: readonly (readonly [string, string | null, boolean, Answer?
   ['газировка', 'Лимонад', true],
   ['безалкогольное', 'Пиво безалкогольное', true],
   ['горячие напитки', 'Чай холодный', true],
-  ['piće', 'Пицца', true],
+  ['piće', 'Печенье', true], // MOL-109: `piche` starts «Печенье» within an edit, as `piцe` did «Пицца»
   ['алкоголь', 'Водка', true],
   ['выпивка', null, false, ['Водка', true]], // either way: ARM, x86
   ['спиртное', 'Водка', true],

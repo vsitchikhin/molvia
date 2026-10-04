@@ -5,7 +5,9 @@ import {
   LOGIN_COOKIE,
   LOGIN_HEADER,
   SESSION_COOKIE,
+  ZONE_HEADER,
   actorViewSchema,
+  isTimeZone,
   loginPollCodec,
   loginStartQuerySchema,
   loginStartedCodec,
@@ -33,7 +35,7 @@ export function authRoutes(
   app: FastifyInstance,
   api: {
     start(deviceName: string | null, again: boolean): Promise<StartedLogin>
-    poll(id: string, secret: string): Promise<CompletedLogin>
+    poll(id: string, secret: string, zone: string | undefined): Promise<CompletedLogin>
     logout(token: string): Promise<void>
   },
 ): void {
@@ -61,7 +63,13 @@ export function authRoutes(
         parseQuery(z.strictObject({}), request.query)
         const sent = readCookieValues(request.headers.cookie, LOGIN_COOKIE)
         if (sent.length !== 1) throw new DomainError(ERROR.LOGIN_UNAVAILABLE)
-        const result = await api.poll(request.params.id, sent[0] ?? '')
+        // The phone's zone starts a newcomer in its country (MOL-109, В-3); one it cannot name, none.
+        const zone = request.headers[ZONE_HEADER.toLowerCase()]
+        const result = await api.poll(
+          request.params.id,
+          sent[0] ?? '',
+          typeof zone === 'string' && isTimeZone(zone) ? zone : undefined,
+        )
         if (result.status === 'pending') return reply.send(z.encode(loginPollCodec, result))
         const { actor, token, expiresAt } = result.signedIn
         const body = z.encode(loginPollCodec, {

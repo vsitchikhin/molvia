@@ -402,7 +402,11 @@
     "stale_other_city": "List for {oldCity} from {day} at {time}. Prices for {city} will appear when the connection returns.",
     "cities_genitive": {
       "Гюмри": "Gyumri",
-      "Ереван": "Yerevan"
+      "Ереван": "Yerevan",
+      "Тбилиси": "Tbilisi",
+      "Батуми": "Batumi",
+      "Белград": "Belgrade",
+      "Нови-Сад": "Novi Sad"
     },
     "search": {
       "label": "Search the catalogue",
@@ -1232,7 +1236,11 @@
   "settings": {
     "title": "Settings",
     "country": "Country",
-    "armenia": "Armenia",
+    "countries": {
+      "AM": "Armenia",
+      "GE": "Georgia",
+      "RS": "Serbia"
+    },
     "city": "City",
     "spendCurrency": "Spending currency",
     "incomeCurrency": "Conversion currency",
@@ -1822,7 +1830,11 @@
     "in_unknown_city": "{place} ({city})",
     "cities_in": {
       "Гюмри": "in Gyumri",
-      "Ереван": "in Yerevan"
+      "Ереван": "in Yerevan",
+      "Тбилиси": "in Tbilisi",
+      "Батуми": "in Batumi",
+      "Белград": "in Belgrade",
+      "Нови-Сад": "in Novi Sad"
     }
   },
   "receipt": {
@@ -1925,6 +1937,7 @@
       "missing": "The place wasn’t read on the receipt",
       "read": "Read: {place}, {city}",
       "when": "When",
+      "city": "City",
       "done": "Done",
       "name": "Shop"
     },
@@ -1941,6 +1954,7 @@
       "body": "The lines in the photo can’t be made out — faint print and glare do that. Add the purchases by hand or retake the receipt.",
       "reshoot_title": "Crumpled or in shadow",
       "reshoot_body": "The lines in the photo bend and run together. Smooth the receipt out and retake it — or add the purchases by hand.",
+      "manual_body": "The lines in the photo can’t be made out. You can record the purchases by hand.",
       "photos": "Receipt photos · top to bottom",
       "photos_elsewhere": "The photo was taken on another phone — it isn’t here"
     },
