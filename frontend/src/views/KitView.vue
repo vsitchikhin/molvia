@@ -137,13 +137,13 @@
     <section class="group">
       <SectionCaption class="caption">{{ t('dev.kit.rows') }}</SectionCaption>
       <div>
-        <SectionCaption as="h3">{{ t('dev.kit.caption_group') }}</SectionCaption>
+        <SectionCaption as="h3">{{ t('accounts.title') }}</SectionCaption>
         <AppCard as="ul" list>
           <li>
             <ListRow
               :icon="IconWallet"
               :title="t('dev.kit.row_cash')"
-              :meta="t('dev.kit.row_cash_meta')"
+              :meta="t('accounts.for_spending')"
               next
             >
               <template #tail>{{ figures.balance }}</template>
@@ -161,14 +161,14 @@
           <li>
             <ListRow
               :icon="IconDownload"
-              :title="t('dev.kit.row_download')"
+              :title="t('settings.export.label')"
               :meta="t('dev.kit.row_download_meta')"
             />
           </li>
           <li>
             <ListRow
               :icon="IconDelete"
-              :title="t('dev.kit.row_erase')"
+              :title="t('settings.erase.label')"
               :meta="t('dev.kit.row_erase_meta')"
               danger
             />
@@ -178,8 +178,8 @@
               as="router-link"
               :to="{ query: { followed: 'inactive' } }"
               :icon="IconDownload"
-              :title="t('dev.kit.row_download')"
-              :meta="t('dev.kit.row_offline')"
+              :title="t('settings.export.label')"
+              :meta="t('settings.export.offline')"
               inactive
             />
           </li>
@@ -208,8 +208,8 @@
         </AppCard>
       </div>
       <div>
-        <SectionCaption as="h3">{{ t('dev.kit.caption_picker') }}</SectionCaption>
-        <AppCard list role="radiogroup" :aria-label="t('dev.kit.caption_picker')">
+        <SectionCaption as="h3">{{ t('accounts.picker.row_trip') }}</SectionCaption>
+        <AppCard list role="radiogroup" :aria-label="t('accounts.picker.row_trip')">
           <ListRow
             v-for="account in accounts"
             :key="account.id"
@@ -224,8 +224,8 @@
         </AppCard>
       </div>
       <div>
-        <SectionCaption as="h3">{{ t('dev.kit.caption_found') }}</SectionCaption>
-        <AppCard list role="listbox" :aria-label="t('dev.kit.caption_found')">
+        <SectionCaption as="h3">{{ t('item.group_found') }}</SectionCaption>
+        <AppCard list role="listbox" :aria-label="t('item.group_found')">
           <ListRow
             v-for="(found, index) in foundRows"
             :id="`kit-found-${String(index)}`"
@@ -256,14 +256,14 @@
             <NavRow
               :to="{ query: { followed: 'entry' } }"
               :icon="IconDevices"
-              :label="t('dev.kit.nav_devices')"
+              :label="t('devices.title')"
               value="3"
             />
           </li>
           <li>
             <NavRow
               :icon="IconWallet"
-              :label="t('dev.kit.nav_account')"
+              :label="t('accounts.picker.row_spending')"
               :value="t('dev.kit.row_cash')"
               @click="sheetOpen = true"
             />
@@ -273,9 +273,9 @@
       <AppNote>{{ t('dev.kit.note_plain') }}</AppNote>
       <AppNote tone="warn" :icon="IconAlert">{{ t('dev.kit.note_warn') }}</AppNote>
       <div class="row">
-        <AppTag>{{ t('dev.kit.tag_savings') }}</AppTag>
-        <AppTag tone="warn" :icon="IconUpload">{{ t('dev.kit.tag_sending') }}</AppTag>
-        <AppTag tone="bad">{{ t('dev.kit.tag_refused') }}</AppTag>
+        <AppTag>{{ t('accounts.savings_tag') }}</AppTag>
+        <AppTag tone="warn" :icon="IconUpload">{{ t('spending.pending') }}</AppTag>
+        <AppTag tone="bad">{{ t('spending.refused') }}</AppTag>
       </div>
     </section>
 
@@ -430,13 +430,13 @@ export default defineComponent({
         {
           id: 'card',
           name: t('dev.kit.row_card'),
-          meta: t('dev.kit.row_card_meta'),
+          meta: t('accounts.savings'),
           balance: formatMoney(money(11820000n, 'AMD')),
         },
         {
           id: 'cash',
           name: t('dev.kit.row_cash'),
-          meta: t('dev.kit.row_cash_meta'),
+          meta: t('accounts.for_spending'),
           balance: formatMoney(money(4230000n, 'AMD')),
         },
       ]),
