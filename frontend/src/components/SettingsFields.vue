@@ -173,12 +173,13 @@ export default defineComponent({
     const changed = (field: keyof ActorSettings): boolean =>
       !!props.base && props.base[field] !== props.modelValue[field]
     const id = useId()
-    const describedBy = (field: keyof ActorSettings): string =>
+    // The country has no hint of its own: unchanged, it is described by nothing, not by `""`.
+    const describedBy = (field: keyof ActorSettings): string | undefined =>
       [
         ...(field === 'city' && historical.value ? [`${id}-city-kept`] : []),
         ...(field === 'country' ? [] : [`${id}-${field}-hint`]),
         ...(changed(field) ? [`${id}-${field}-changed`] : []),
-      ].join(' ')
+      ].join(' ') || undefined
     return {
       t,
       id,

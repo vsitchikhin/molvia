@@ -170,6 +170,14 @@ it('moves to Georgia: the cities follow the country, the first one chosen (MOL-1
   expect(view.text()).toContain(en.settings.saved)
 })
 
+it('the country is described by its change alone, never by an empty list (MOL-109)', async () => {
+  const view = await render()
+  expect(field(view, 'country')?.attributes('aria-describedby')).toBeUndefined()
+  await field(view, 'country')?.setValue('RS')
+  const said = field(view, 'country')?.attributes('aria-describedby') ?? ''
+  expect(view.find(`#${said}`).text()).toBe(en.settings.changed_announced)
+})
+
 it('choosing the country it already has changes nothing (MOL-109)', async () => {
   const view = await render()
   await field(view, 'city')?.setValue('Ереван')
