@@ -12,20 +12,7 @@
 import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppScreen from '@/components/AppScreen.vue'
-import { revisedOn } from '@/views/policy'
-
-const PARTS = [
-  'what',
-  'who',
-  'yours',
-  'write',
-  'catalogue',
-  'ads',
-  'warranty',
-  'free',
-  'changes',
-  'contact',
-]
+import { TERMS_PARTS, revisedOn } from '@/views/policy'
 
 /**
  * «Условия использования» (MOL-95, owner's decision В-2): the rules of the service beside the page
@@ -39,7 +26,7 @@ export default defineComponent({
   components: { AppScreen },
   setup() {
     const { t, locale } = useI18n()
-    return { t, PARTS, revised: computed(() => revisedOn(t, locale.value)) }
+    return { t, PARTS: TERMS_PARTS, revised: computed(() => revisedOn(t, locale.value)) }
   },
 })
 </script>

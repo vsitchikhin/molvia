@@ -3,12 +3,20 @@ import { describe, expect, it } from 'vitest'
 import { POLICY_VERSION } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
-import { POLICY_REVISION } from './policy'
+import { POLICY_REVISION, PRIVACY_PARTS, PRIVACY_STORED, TERMS_PARTS } from './policy'
 
-/** Both pages in both languages, as they are filed — any edit, a comma included, changes it. */
+/**
+ * Both pages in both languages, as they are filed, and the parts each shows — any edit, a comma or
+ * a part taken out included, changes it.
+ */
 function digestOfPages(): string {
   return createHash('sha256')
-    .update(JSON.stringify([ru.privacy, ru.terms, en.privacy, en.terms]))
+    .update(
+      JSON.stringify([
+        [PRIVACY_STORED, PRIVACY_PARTS, TERMS_PARTS],
+        [ru.privacy, ru.terms, en.privacy, en.terms],
+      ]),
+    )
     .digest('hex')
 }
 

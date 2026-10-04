@@ -25,29 +25,7 @@ import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
-import { revisedOn } from '@/views/policy'
-
-/** What is kept, in the order of how personal it is: the account, then what it did. */
-const STORED = [
-  'telegram',
-  'purchases',
-  'exchanges',
-  'incomes',
-  'spendings',
-  'receipts',
-  'accounts',
-  'places',
-  'barcodes',
-  'ratings',
-  'reminders',
-  'feedback',
-  'search',
-  'visits',
-  'devices',
-  'settings',
-  'consent',
-]
-const PARTS = ['logs', 'failures', 'backups', 'barcodes', 'storage', 'copy', 'erase']
+import { PRIVACY_PARTS, PRIVACY_STORED, revisedOn } from '@/views/policy'
 
 /**
  * «Данные и приватность» (MOL-58): what is kept, why, for how long, and how to have it erased.
@@ -62,7 +40,12 @@ export default defineComponent({
   components: { AppScreen, AppCard },
   setup() {
     const { t, locale } = useI18n()
-    return { t, STORED, PARTS, revised: computed(() => revisedOn(t, locale.value)) }
+    return {
+      t,
+      STORED: PRIVACY_STORED,
+      PARTS: PRIVACY_PARTS,
+      revised: computed(() => revisedOn(t, locale.value)),
+    }
   },
 })
 </script>
