@@ -103,7 +103,10 @@ export default defineComponent({
      */
     function holdArrows(event: KeyboardEvent): void {
       const by = ARROWS[event.key]
-      if (!props.inactive || by === undefined) return
+      // With a modifier the arrow is the browser's or the system's (Alt+← is «back»), and a live
+      // group lets it by too (adversarial round 2, Р2-А3).
+      const modified = event.altKey || event.ctrlKey || event.metaKey
+      if (!props.inactive || by === undefined || modified) return
       event.preventDefault()
       const radio = event.target as HTMLInputElement
       const radios = [

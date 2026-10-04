@@ -128,6 +128,27 @@ describe('SegmentedControl', () => {
       host.remove()
     })
 
+    // Р2-А3: an arrow with a modifier is the browser's (Alt+← is «back») — the live group lets it by.
+    it('must not fire: an arrow with Alt, Ctrl or Meta is left to the browser', () => {
+      const host = document.body.appendChild(document.createElement('div'))
+      const view = inactive(host)
+      const radios = view.findAll('input').map((input) => input.element as HTMLInputElement)
+      radios[1]?.focus()
+      for (const modifier of ['altKey', 'ctrlKey', 'metaKey']) {
+        const event = new KeyboardEvent('keydown', {
+          key: 'ArrowRight',
+          [modifier]: true,
+          bubbles: true,
+          cancelable: true,
+        })
+        radios[1]?.dispatchEvent(event)
+        expect(event.defaultPrevented).toBe(false)
+        expect(document.activeElement).toBe(radios[1])
+      }
+      view.unmount()
+      host.remove()
+    })
+
     it('must not fire: a change that got past it anyway is put back, and nothing is said', async () => {
       const view = inactive()
       await view.findAll('input')[2]?.setValue(true)
