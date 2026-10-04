@@ -51,6 +51,25 @@ const REPORT: GatesReport = {
     offSettings: 1,
     offBlocked: 0,
   },
+  receipts: {
+    firstDay: '2026-10-05',
+    lastDay: '2026-11-20',
+    read: 29,
+    readPartly: 8,
+    reshoot: 3,
+    unreadable: 1,
+    recorded: 26,
+    lines: 214,
+    linesEdited: 61,
+    linesSkipped: 12,
+    linesItem: 38,
+    linesFigures: 19,
+    within5m: 9,
+    within15m: 7,
+    within1h: 4,
+    within1d: 5,
+    later: 1,
+  },
 }
 
 function run(argv: string[], report: GatesReport | Error = REPORT) {
@@ -101,6 +120,28 @@ describe('gates — чтение ворот вручную', () => {
     expect(block[1]).toContain('the day 2026-10-05 in Yerevan')
     expect(block.find((line) => line.includes('rated by a press'))).toBe(
       '     rated by a press in the bot         0 of 0     —',
+    )
+  })
+
+  it('чеки: доля правок округляется вверх — у черты «больше трети» не печатается под ней (MOL-222)', async () => {
+    const { exit, lines } = run(['--from', '2026-10-05'], {
+      ...REPORT,
+      receipts: { ...REPORT.receipts, lines: 3_000, linesEdited: 1_000 },
+    })
+    await exit
+    const edited = lines.find((line) => line.includes('lines put right'))
+    expect(edited).toContain('1000 of 3000')
+    expect(edited).toContain('33.4 %')
+  })
+
+  it('чеки без единого — нули и прочерк вместо доли (MOL-222)', async () => {
+    const { exit, lines } = run(['--from', '2026-10-05'], {
+      ...REPORT,
+      receipts: { ...REPORT.receipts, recorded: 0, lines: 0, linesEdited: 0 },
+    })
+    await exit
+    expect(lines.find((line) => line.includes('lines put right'))).toBe(
+      '     lines put right                     0 of 0     —',
     )
   })
 
@@ -218,6 +259,23 @@ describe('gates — чтение ворот вручную', () => {
       '     turned off under a reminder         2          people',
       '     turned off in the settings          1          people',
       '     blocked the bot                     0          people, reminders off by it',
+      '',
+      '0.2r does the scanner spare typing?                 stop above 33.3 % after 4 weeks',
+      '     receipts read                       41         days 2026-10-05 … 2026-11-20 in Yerevan',
+      '       with their lines                  29',
+      '       in part                           8          to the review all the same',
+      '       not one line found                3          «переснимите»',
+      '       unreadable                        1',
+      '     receipts recorded                   26',
+      '     lines put right                     61 of 214   28.6 %',
+      '       left out                          12',
+      '       another item                      38',
+      '       quantity or sum                   19',
+      '     sent to recorded, within 5 min      9          receipts',
+      '       15 min                            7',
+      '       1 hour                            4',
+      '       1 day                             5',
+      '       later                             1',
     ])
     expect(lines.join('\n')).not.toMatch(/STOP|pass|fail/)
   })
