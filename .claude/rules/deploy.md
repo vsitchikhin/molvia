@@ -203,10 +203,12 @@ The shape worth knowing here:
     would carry the URL. The ping URL ends in its path: `/fail` after a query or a fragment is a
     ping saying «up», and after an endpoint (`/0`, `/start`, `/log`) a `400`, so a round refuses
     them (adversarial А1, R3-1). **healthchecks.io's words are read**: a check it does not have is
-    `200 OK (not found)`, and taken for delivered it left a check made anew grey for good (R3-2). The prices, accepted by the owner: a
-    fall is a `/fail` within five minutes and the round's tries — 90 s when the failure answers at
-    once, 170 s when the machine does not answer and every request waits its ten seconds (А2); a
-    silent watch is an alarm in twenty; Cloudflare's Workers down is a false alarm.
+    `200 OK (not found)`, and taken for delivered it left a check made anew grey for good (R3-2),
+    so it fails the round at once; any other word but `OK`, such as `OK (rate limited)`, is a ping
+    not taken and is tried again (R4-1). The prices, accepted by the owner: a fall is a `/fail`
+    within five minutes and the round's tries — 90 s when the failure answers at once, 170 s when
+    the machine does not answer and every request waits its ten seconds (А2); a silent watch is an
+    alarm in twenty; Cloudflare's Workers down is a false alarm.
     `deploy/README.md`, «Signals».
 - **A failed deploy puts the previous image back, not the schema.** Pending migrations run in
   one transaction, so a migration that fails leaves the schema as it was and the old image
