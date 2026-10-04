@@ -48,3 +48,15 @@ export const eventSchema = z.discriminatedUnion('type', [
 ])
 export type EventInput = z.infer<typeof eventSchema>
 export type EventPayload = Extract<EventInput, { payload: unknown }>['payload']
+
+/**
+ * `GET` and the answer of `PUT /actors/me/analytics` (MOL-96): «Учитывать меня в статистике», the
+ * person's objection to being counted — saved on the tap at its own address, as the bot's switches
+ * are (MOL-103 Р-1). Off, the log about them is erased and stops, and neither gate counts them.
+ */
+export const analyticsSettingSchema = z.strictObject({ off: z.boolean() })
+export type AnalyticsSetting = z.infer<typeof analyticsSettingSchema>
+
+/** The body of `PUT /actors/me/analytics`. */
+export const chooseAnalyticsSchema = z.strictObject({ on: z.boolean() })
+export type ChooseAnalytics = z.infer<typeof chooseAnalyticsSchema>
