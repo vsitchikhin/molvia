@@ -128,6 +128,14 @@
             · {{ t('receipt.review.issues_check', { n: checks }) }}</template
           >
         </p>
+        <!-- Read in part (MOL-222, В-1): what was «переснимите» — said, and recorded all the same. -->
+        <div v-if="partly" class="partly">
+          <p class="partly-text">{{ partly }}</p>
+          <AppButton v-if="country && !locked" variant="ghost" @click="retake">
+            <template #icon><IconCamera /></template>
+            {{ t('receipt.review.partly_retake') }}
+          </AppButton>
+        </div>
         <AppCard class="block" list>
           <ReceiptLineRow
             v-for="one in lines"
@@ -150,6 +158,10 @@
           <IconImageOff class="note-icon" aria-hidden="true" />
           {{ t('receipt.review.photo_note') }}
         </p>
+        <AppButton v-if="shelved.length > 0" variant="ghost" block @click="toDeveloper">
+          <template #icon><IconMessage /></template>
+          {{ t('receipt.review.to_developer') }}
+        </AppButton>
         <!-- Not while «Записать» waits: the purchases are on their way, and a removal behind them
              would meet a recorded receipt (adversarial А1). -->
         <AppButton v-if="!locked" variant="danger-ghost" block class="delete" @click="remove">
@@ -202,6 +214,11 @@
           <AppButton v-if="country" variant="ghost" block @click="retake">
             <template #icon><IconCamera /></template>
             {{ t('receipt.capture.retake') }}
+          </AppButton>
+          <!-- A till read badly is one to learn (MOL-222, В-2): its photos, seen before they go. -->
+          <AppButton v-if="shelved.length > 0" variant="ghost" block @click="toDeveloper">
+            <template #icon><IconMessage /></template>
+            {{ t('receipt.review.to_developer') }}
           </AppButton>
         </template>
         <AppButton
@@ -277,9 +294,17 @@ import IconChevronRight from '~icons/mdi/chevron-right'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconImageOff from '~icons/mdi/image-off-outline'
+import IconMessage from '~icons/mdi/message-text-outline'
 import IconReceiptCheck from '~icons/mdi/receipt-text-check-outline'
 import { ApiError } from '@molvia/client'
-import { ERROR, RECEIPT_CURRENCY, receiptDigits, yerevanDate } from '@molvia/model'
+import {
+  ERROR,
+  RECEIPT_CURRENCY,
+  formatMoney,
+  readPartly,
+  receiptDigits,
+  yerevanDate,
+} from '@molvia/model'
 import type { Money } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -306,6 +331,7 @@ import { afterStep, useNavigation } from '@/navigation'
 import { photoShelf } from '@/receipts/photoShelf'
 import { recordBody, reviewBalance, reviewDay, reviewLines, reviewPlace } from '@/receipts/review'
 import { useActorStore } from '@/stores/actor'
+import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
 import { placeIdOf } from '@/stores/receiptDrafts'
 import type { LineDraft, PlaceDraft } from '@/stores/receiptDrafts'
@@ -334,6 +360,7 @@ export default defineComponent({
     IconCloudOff,
     IconDelete,
     IconImageOff,
+    IconMessage,
     ManualEntryButton,
     PurchaseRow,
     ReceiptLineRow,
@@ -508,25 +535,59 @@ export default defineComponent({
       return null
     })
 
-    // The photos of a receipt not read, from this phone (Т-4): the server gives none back.
+    // The photos of a receipt from this phone (Т-4): the server gives none back. Shown for one not read,
+    // and kept for «Отправить чек разработчику» on either (MOL-222, В-2).
+    const shelved = ref<readonly Blob[]>([])
     const photos = ref<string[]>([])
     function letGo(): void {
       for (const url of photos.value) URL.revokeObjectURL(url)
       photos.value = []
+      shelved.value = []
     }
     watch(
       () => [status.value, id.value] as const,
       async ([now, asked]) => {
         letGo()
         const owner = actor.id
-        if (now !== 'failed' || !owner) return
+        if ((now !== 'failed' && now !== 'parsed') || !owner) return
         const parts = await photoShelf(owner).parts(asked)
-        if (status.value === 'failed' && id.value === asked)
-          photos.value = parts.map((part) => URL.createObjectURL(part))
+        if (status.value !== now || id.value !== asked) return
+        shelved.value = parts
+        if (now === 'failed') photos.value = parts.map((part) => URL.createObjectURL(part))
       },
       { immediate: true },
     )
     onBeforeUnmount(letGo)
+
+    const feedback = useFeedbackSheetStore()
+    function toDeveloper(): void {
+      feedback.open({ from: 'receipt' }, shelved.value)
+    }
+
+    /**
+     * Read in part (MOL-222, В-1): the model's own rule, of what the server read — never of the edits —
+     * said with what it read against the printed total, or how many lines added up without one.
+     */
+    const partly = computed(() => {
+      const one = detail.value
+      if (!one || one.lines.length === 0 || !readPartly(one.lines, one.receipt.total)) return null
+      const total = one.receipt.total
+      if (total !== null && total.minor > 0n) {
+        let read = 0n
+        for (const line of one.lines) {
+          if (line.sum?.currency === total.currency && line.sum.minor <= total.minor)
+            read += line.sum.minor
+        }
+        return t('receipt.review.partly_total', {
+          lines: formatMoney({ minor: read, currency: total.currency }, locale.value),
+          total: formatMoney(total, locale.value),
+        })
+      }
+      return t('receipt.review.partly_lines', {
+        n: one.lines.filter((line) => line.settled).length,
+        total: one.lines.length,
+      })
+    })
 
     // Recorded on another phone while this one looked, or by a send whose answer was lost: its
     // purchases are where to go, and nothing of it waits on the phone any more (MOL-169, А2).
@@ -653,6 +714,9 @@ export default defineComponent({
       refused,
       docked,
       photos,
+      shelved,
+      partly,
+      toDeveloper,
       online,
       country,
       opened,
@@ -758,6 +822,26 @@ export default defineComponent({
   @include icon;
 
   font-size: var(--icon-sm);
+}
+
+.partly {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 var(--space-3);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border-radius: var(--radius);
+  color: var(--warn-ink);
+  background: var(--warn-tint);
+}
+
+.partly-text {
+  flex: 1 1 12rem;
+  margin: 0;
+  font-size: var(--text-footnote);
+  font-weight: var(--weight-medium);
 }
 
 .refused {

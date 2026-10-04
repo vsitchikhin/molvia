@@ -316,6 +316,9 @@ export default defineComponent({
         const lost = (draft?.pictures ?? 0) > pictures.value.length
         if (lost) pictureNote.value = t('feedback.picture.lost')
         leftWithPictures.value = lost && draft?.attached !== undefined
+        // a receipt's photos (MOL-222, В-2): added as a picture chosen is, and as removable
+        const photos = sheet.takePhotos()
+        if (photos.length > 0) void attach(photos)
         focusFirst()
       },
     )
@@ -361,7 +364,7 @@ export default defineComponent({
       if (phase.value === 'failed') phase.value = 'idle'
     }
 
-    async function attach(files: File[]): Promise<void> {
+    async function attach(files: readonly Blob[]): Promise<void> {
       pictureNote.value = null
       drawing.value = true
       try {
