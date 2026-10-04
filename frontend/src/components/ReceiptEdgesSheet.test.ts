@@ -7,6 +7,7 @@ import ReceiptEdgesSheet from '@/components/ReceiptEdgesSheet.vue'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
+import type * as StraightenExports from '@/receipts/straighten'
 import type { Quad } from '@/receipts/warp'
 
 // No canvas in happy-dom: the geometry is `warp.test.ts`'s, the pixels end-to-end's.
@@ -15,7 +16,7 @@ const straighten =
   vi.fn<(photo: HTMLCanvasElement, quad: Quad) => Promise<HTMLCanvasElement | null>>()
 const turnedPhoto = vi.fn<(photo: HTMLCanvasElement) => HTMLCanvasElement | null>()
 vi.mock('@/receipts/straighten', async (actual) => ({
-  ...(await actual<typeof import('@/receipts/straighten')>()),
+  ...(await actual<typeof StraightenExports>()),
   proposeCorners: (photo: HTMLCanvasElement) => proposeCorners(photo),
   straighten: (photo: HTMLCanvasElement, quad: Quad) => straighten(photo, quad),
   turnedPhoto: (photo: HTMLCanvasElement) => turnedPhoto(photo),
