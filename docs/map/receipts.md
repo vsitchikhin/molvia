@@ -15,11 +15,11 @@ Rules: `.claude/rules/receipts.md`. A test beside its source, or mirroring it un
 ## packages/client
 
 In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to go up), `receipts`,
-`receipt`, `removeReceipt`, `restoreReceipt`, `recordReceipt` (MOL-126).
+`receipt`, `removeReceipt`, `restoreReceipt`, `recordReceipt` (MOL-126), `receiptSettled` (MOL-169).
 
 ## backend · routes
 
-- `backend/src/routes/receipts.ts` — Routes of receipts (MOL-125): «Отправить чек», a part as a raw JPEG (the API's one body that is not JSON, in this scope only), the list, one receipt with its lines, «Удалить чек» and «Вернуть», «Записать» (MOL-126).
+- `backend/src/routes/receipts.ts` — Routes of receipts (MOL-125): «Отправить чек», a part as a raw JPEG (the API's one body that is not JSON, in this scope only), the list, one receipt with its lines, «Удалить чек» and «Вернуть», «Записать» (MOL-126), the trip it is recorded as, for «Отменить запись» (MOL-169).
 
 ## backend · receipts
 
@@ -32,7 +32,7 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 
 - `backend/src/usecases/receipts.ts` — Use cases of the owner's side: send, a part checked to be a photo (`error.receipt_not_photo`, `error.receipt_too_large`), list and one with the place by tax number, one as the review shows it — the memory laid over, the amounts of В-5, a price in doubt, the rate of its day, the receipt recorded before (MOL-126) — remove, restore.
 - `backend/src/usecases/bind-receipt-lines.ts` — `bindReceiptLines`: the lines of a parsed receipt to items, once, in the queue (MOL-126) — the catalogue's names in the till's language with the heading, then the search by the gloss (near found, far «проверьте»), else a new item named by the gloss.
-- `backend/src/usecases/record-receipt.ts` — `recordReceipt`, «Записать» (MOL-126): the receipt as the phone holds it written in one transaction — a finished trip on the receipt's day at its rate, purchases, new items (MOL-12), the shop's memory, the place's tax number, the photo gone, the rows of lines recorded as read confirmed (В-4); a repeat is the same answer, a receipt recorded before a 409.
+- `backend/src/usecases/record-receipt.ts` — `recordReceipt`, «Записать» (MOL-126): the receipt as the phone holds it written in one transaction — a finished trip on the receipt's day at its rate, purchases, new items (MOL-12), the shop's memory, the place's tax number, the photo gone, the rows of lines recorded as read confirmed (В-4); a repeat is the same answer, a receipt recorded before a 409; `receiptSettled` — the trip a receipt is recorded as, or none, under the same locks, so a record still running is waited for (MOL-169, Г1).
 - `backend/src/usecases/read-receipts.ts` — `readQueuedReceipts`: the queue — every part in both page modes, joined, the reading that adds up kept, «переснимите» by `needsReshoot`, item lines cut out, the city of the address read, the lines bound (MOL-126); a reader away leaves the receipt queued, a photo it cannot read fails.
 
 ## backend · db
@@ -67,7 +67,7 @@ memory: erasure leaves its words without an author, the copy carries the person'
 - `frontend/src/receipts/photoShelf.ts` — `photoShelf`: the bytes of the parts in IndexedDB, a database per owner, kept until the receipt is recorded, removed or gone (Т-4) — the server gives no photo back; `keepOnly` spares the last ten minutes; `forgetPhotos` for «Выйти» and erasure.
 - `frontend/src/receipts/photo.ts` — `preparePhoto`: a file upright by its EXIF, drawn under the 16 Mp a canvas of iOS takes (Р-11), brought to `RECEIPT_PHOTO_SIDE` (3 200, П-7) and encoded as JPEG without EXIF; what the server would refuse is «файл не открылся» here.
 - `frontend/src/receipts/review.ts` — The review as it stands: each line the server's reading with the person's edit over it, «Строки» and the difference by `receiptBalance` of the model (В-6), the place and the day, and the body of «Записать» — every line once.
-- `frontend/src/stores/receiptQueue.ts` — The receipts' queue by the rules of MOL-24: the receipt, its parts in order, removal and «Вернуть», «Записать» under a trip the phone names; 413/415 and a lost photo «не принят»; «Выйти» waits for it (`whileReceiptsAreStill`).
+- `frontend/src/stores/receiptQueue.ts` — The receipts' queue by the rules of MOL-24: the receipt, its parts in order, removal and «Вернуть», «Записать» under a trip the phone names, and «Отменить запись» of one still waiting (MOL-169); 413/415 and a lost photo «не принят»; «Выйти» waits for it (`whileReceiptsAreStill`).
 - `frontend/src/stores/receiptDrafts.ts` — The edits of a receipt before it is recorded, on the phone and with no connection (Т-9): lines, the place and day, a corrected total.
 - `frontend/src/composables/useReceipts.ts` — The receipts of «Покупки»: the queue and `GET /receipts` as one row each, the phone's state first; asked every five seconds while one is read (Р-4); every list lets the photos and drafts of what it no longer names go.
 - `frontend/src/composables/useReceipt.ts` — One receipt for the review, kept on the phone for offline; `gone` when the server has none for this person.

@@ -18,7 +18,7 @@ import {
   trips,
 } from '@/db/schema'
 import { buildServer } from '@/server'
-import { connectDrizzle } from './db'
+import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
 
 /**
@@ -270,6 +270,63 @@ describe('«Записать»', () => {
 
     const other = await record(me, id, body(randomUUID()))
     expect([other.statusCode, codeOf(other)]).toEqual([409, ERROR.CONFLICT])
+  })
+
+  it('answers «recorded?» only once a record still running has ended (MOL-169, Г1)', async () => {
+    const me = await insertActor(db)
+    const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+    const id = await parsedReceipt(me, LINES.slice(0, 1))
+    const place = await insertPlace(db, { name: 'Ереван Сити' })
+    const cookie = await signIn(db, me)
+    const settled = () =>
+      app.inject({ method: 'GET', url: `/receipts/${id}/settled`, headers: { cookie } })
+
+    // A «Записать» the phone gave up on, still in its transaction on a connection of its own (the
+    // test's one connection would make the read wait for a connection, not the lock): it holds the
+    // owner's lock first.
+    const elsewhere = connect()
+    let locked: () => void = () => undefined
+    const holding = new Promise<void>((resolve) => (locked = resolve))
+    let finish: () => void = () => undefined
+    const running = elsewhere.begin(async (tx) => {
+      await tx`select pg_advisory_xact_lock(hashtext('trips'), hashtext(${me}))`
+      locked()
+      await new Promise<void>((resolve) => (finish = resolve))
+    })
+    await holding
+    let answered = false
+    const asked = settled().then((response) => {
+      answered = true
+      return response
+    })
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(answered).toBe(false)
+    finish()
+    await running
+    await elsewhere.end()
+    const first = await asked
+    expect([first.statusCode, first.json()]).toEqual([200, { tripId: null }])
+
+    const tripId = randomUUID()
+    const recorded = await record(me, id, {
+      tripId,
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: amount(740) },
+      ],
+    })
+    expect(recorded.statusCode).toBe(200)
+    expect((await settled()).json()).toEqual({ tripId })
+
+    // Someone else's receipt is not there, as for every read of a receipt.
+    const other = await insertActor(db)
+    const theirs = await app.inject({
+      method: 'GET',
+      url: `/receipts/${id}/settled`,
+      headers: { cookie: await signIn(db, other) },
+    })
+    expect([theirs.statusCode, codeOf(theirs)]).toEqual([404, ERROR.NOT_FOUND])
   })
 
   it('refuses the same receipt recorded before while its purchases are there (Т-11)', async () => {

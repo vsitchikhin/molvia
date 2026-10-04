@@ -14,9 +14,14 @@ import ReceiptPlaceSheet from '@/components/ReceiptPlaceSheet.vue'
 import { stepBack } from '@/navigation'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
+import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
+import { useReceiptQueueStore } from '@/stores/receiptQueue'
 
 const receipt = vi.fn<(id: string) => Promise<ReceiptDetail>>()
 const recordReceipt = vi.fn<(id: string, body: ReceiptRecordBody) => Promise<{ tripId: string }>>()
+const receipts = vi.fn<() => Promise<{ receipts: ReceiptDetail['receipt'][] }>>()
+const receiptSettled = vi.fn<(id: string) => Promise<{ tripId: string | null }>>()
+const keepOnly = vi.fn<(named: ReadonlySet<string>) => Promise<void>>()
 // Every other call of the API hangs: the screens behind this one load and never answer.
 vi.mock('@/api', () => ({
   api: new Proxy(
@@ -24,9 +29,10 @@ vi.mock('@/api', () => ({
     {
       get: (_target, name) => {
         if (name === 'receipt') return (id: string) => receipt(id)
+        if (name === 'receiptSettled') return (id: string) => receiptSettled(id)
         if (name === 'recordReceipt')
           return (id: string, body: ReceiptRecordBody) => recordReceipt(id, body)
-        if (name === 'receipts') return () => Promise.resolve({ receipts: [] })
+        if (name === 'receipts') return () => receipts()
         if (name === 'recentPlaces') return () => Promise.resolve([])
         return () => new Promise(() => undefined)
       },
@@ -39,7 +45,7 @@ vi.mock('@/receipts/photoShelf', () => ({
     get: () => Promise.resolve(null),
     parts: () => Promise.resolve([]),
     drop: () => Promise.resolve(),
-    keepOnly: () => Promise.resolve(),
+    keepOnly: (named: ReadonlySet<string>) => keepOnly(named),
   }),
   forgetPhotos: () => Promise.resolve(),
 }))
@@ -138,6 +144,15 @@ describe('ReceiptView (MOL-127)', () => {
     receipt.mockResolvedValue(detail())
     recordReceipt.mockReset()
     recordReceipt.mockResolvedValue({ tripId: TRIP })
+    receipts.mockReset()
+    receipts.mockResolvedValue({ receipts: [] })
+    // The check of «Отменить запись» reads what the receipt says, as the server's own read does.
+    receiptSettled.mockReset()
+    receiptSettled.mockImplementation((id) =>
+      receipt(id).then((one) => ({ tripId: one.receipt.tripId })),
+    )
+    keepOnly.mockReset()
+    keepOnly.mockResolvedValue(undefined)
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     clock = 0
     vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -225,6 +240,195 @@ describe('ReceiptView (MOL-127)', () => {
     await view.get('.receipt-line').trigger('click')
     await flushPromises()
     expect(sheet()).toBeNull()
+  })
+
+  it('«Отменить запись» opens a record the server answered 5xx: lines, removal and «Записать» are back (MOL-169)', async () => {
+    recordReceipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'x'))
+    const first = await render()
+    await button(first.view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    expect(first.router.currentRoute.value.name).toBe('purchases')
+    while (mounted.length) mounted.pop()?.unmount()
+
+    const { view } = await render()
+    expect(view.text()).toContain(ru.receipt.review.recording)
+    await button(view, ru.receipt.review.cancel_record).trigger('click')
+    await flushPromises()
+    expect(view.text()).not.toContain(ru.receipt.review.recording)
+    expect(button(view, ru.purchases.delete).exists()).toBe(true)
+    expect(button(view, 'Записать 2 покупки').exists()).toBe(true)
+    await view.get('.receipt-line').trigger('click')
+    await flushPromises()
+    expect(sheet()).not.toBeNull()
+  })
+
+  it('a record cancelled after its answer was lost, and the server had written it: the receipt read again goes to its purchases', async () => {
+    recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'x', false))
+    const first = await render()
+    await button(first.view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    while (mounted.length) mounted.pop()?.unmount()
+
+    const { view, router } = await render()
+    await button(view, ru.receipt.review.cancel_record).trigger('click')
+    await flushPromises()
+    // The first send had landed: the record under another trip is a conflict, and the receipt says so.
+    recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'x'))
+    const written = detail()
+    receipt.mockResolvedValue({
+      ...written,
+      receipt: { ...written.receipt, status: 'recorded', tripId: TRIP },
+    })
+    await button(view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    expect(recordReceipt.mock.calls[1]?.[1].tripId).not.toBe(
+      recordReceipt.mock.calls[0]?.[1].tripId,
+    )
+    expect(router.currentRoute.value.name).toBe('purchase')
+    expect(router.currentRoute.value.params.tripId).toBe(TRIP)
+  })
+
+  it('a begun record the server has written: «Отменить запись» goes to its purchases, and nothing of it waits (MOL-169, А1, А2)', async () => {
+    recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'x', false))
+    const first = await render()
+    await button(first.view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    while (mounted.length) mounted.pop()?.unmount()
+
+    // Opened with no connection: the receipt from the phone, as it was before the send.
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    receipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'x', false))
+    const { view, router } = await render()
+    expect(view.text()).toContain(ru.receipt.review.recording)
+    // Back online, the server says it was written by that send.
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    const written = detail()
+    receipt.mockReset()
+    receipt.mockResolvedValue({
+      ...written,
+      receipt: { ...written.receipt, status: 'recorded', tripId: TRIP },
+    })
+    recordReceipt.mockClear()
+    await button(view, ru.receipt.review.cancel_record).trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('purchase')
+    expect(router.currentRoute.value.params.tripId).toBe(TRIP)
+    const queue = useReceiptQueueStore()
+    expect(queue.pending).toEqual([])
+    expect(queue.rejected).toEqual([])
+    expect(recordReceipt).not.toHaveBeenCalled()
+  })
+
+  it('recorded, the check takes the screen to its purchases on its own answer, with no read after it (round 4, Д1)', async () => {
+    recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'x', false))
+    const first = await render()
+    await button(first.view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    while (mounted.length) mounted.pop()?.unmount()
+
+    // The same bad connection: every read of the receipt fails, the check alone gets through.
+    receipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'x', false))
+    const { view, router } = await render()
+    receiptSettled.mockReset()
+    receiptSettled.mockResolvedValue({ tripId: TRIP })
+    await button(view, ru.receipt.review.cancel_record).trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('purchase')
+    expect(router.currentRoute.value.params.tripId).toBe(TRIP)
+    expect(useReceiptQueueStore().pending).toEqual([])
+    expect(useReceiptDraftsStore().draftOf(ID)).toBeNull()
+  })
+
+  it('a begun record with no answer from the server is not cancelled, and the dock says why (MOL-169, А1)', async () => {
+    recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'x', false))
+    const first = await render()
+    await button(first.view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    while (mounted.length) mounted.pop()?.unmount()
+
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    receipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'x', false))
+    const { view } = await render()
+    await button(view, ru.receipt.review.cancel_record).trigger('click')
+    await flushPromises()
+    expect(view.text()).toContain(ru.receipt.review.cancel_record_offline)
+    expect(view.text()).toContain(ru.receipt.review.recording)
+    expect(useReceiptQueueStore().pending).toHaveLength(1)
+    expect(view.findAll('button').some((one) => one.text().includes(ru.purchases.delete))).toBe(
+      false,
+    )
+  })
+
+  it('a check decides by its own answer, never a read that set out before it (round 2, Б2)', async () => {
+    recordReceipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'x'))
+    const first = await render()
+    await button(first.view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    while (mounted.length) mounted.pop()?.unmount()
+
+    const { view } = await render()
+    // A read sets out before the tap (back in view) and answers «parsed» only after the check failed.
+    let early: (answer: ReceiptDetail) => void = () => undefined
+    receipt.mockImplementationOnce(() => new Promise((resolve) => (early = resolve)))
+    const before = receipt.mock.calls.length
+    window.dispatchEvent(new Event('online'))
+    expect(receipt.mock.calls.length).toBe(before + 1)
+    // The check's own read answers last, and fails: the early «parsed» came in while it was out.
+    let lost: (error: unknown) => void = () => undefined
+    receipt.mockImplementationOnce(() => new Promise((_, reject) => (lost = reject)))
+    await button(view, ru.receipt.review.cancel_record).trigger('click')
+    await flushPromises()
+    expect(receipt.mock.calls.length).toBe(before + 2)
+    early(detail())
+    await flushPromises()
+    lost(new ApiError(ERROR.INTERNAL, 'x', false))
+    await flushPromises()
+    expect(useReceiptQueueStore().pending).toHaveLength(1)
+    expect(view.text()).toContain(ru.receipt.review.cancel_record_failed)
+    expect(view.text()).toContain(ru.receipt.review.recording)
+    expect(view.findAll('button').some((one) => one.text().includes(ru.purchases.delete))).toBe(
+      false,
+    )
+  })
+
+  it('online, a server that does not answer the check is said so, and the words go once online changes (round 2, Б3)', async () => {
+    recordReceipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'x'))
+    const first = await render()
+    await button(first.view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    while (mounted.length) mounted.pop()?.unmount()
+
+    const { view } = await render()
+    receipt.mockImplementationOnce(() => Promise.reject(new ApiError(ERROR.INTERNAL, 'x')))
+    await button(view, ru.receipt.review.cancel_record).trigger('click')
+    await flushPromises()
+    expect(view.text()).toContain(ru.receipt.review.cancel_record_failed)
+    expect(view.text()).not.toContain(ru.receipt.review.cancel_record_offline)
+    expect(useReceiptQueueStore().pending).toHaveLength(1)
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    expect(view.text()).not.toContain(ru.receipt.review.cancel_record_failed)
+  })
+
+  it('«Покупки» let go of a receipt the server says is recorded: its refusal, photos and draft (MOL-169, review 1, А2)', async () => {
+    recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'x'))
+    const { view, router } = await render()
+    useReceiptDraftsStore().setTotal(ID, parseMoney('900', 'AMD'))
+    await button(view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    expect(useReceiptQueueStore().rejected).toHaveLength(1)
+
+    const written = detail()
+    receipts.mockResolvedValue({
+      receipts: [{ ...written.receipt, status: 'recorded', tripId: TRIP }],
+    })
+    await router.replace('/purchases')
+    await flushPromises()
+    expect(receipts).toHaveBeenCalled()
+    expect(useReceiptQueueStore().rejected).toEqual([])
+    expect(keepOnly.mock.calls.at(-1)?.[0].has(ID)).toBe(false)
+    expect(useReceiptDraftsStore().draftOf(ID)).toBeNull()
   })
 
   it('not read, after a move to Georgia: a record by hand, no retake, and the words say so (MOL-109, Б3)', async () => {

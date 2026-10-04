@@ -8,6 +8,7 @@ import {
   receiptDetailCodec,
   receiptRecordBodySchema,
   receiptRecordedCodec,
+  receiptSettledCodec,
   receiptSummaryCodec,
   receiptsResponseCodec,
 } from '@molvia/model'
@@ -17,6 +18,7 @@ import type {
   ReceiptDetail,
   ReceiptRecordBody,
   ReceiptRecorded,
+  ReceiptSettled,
   ReceiptSummary,
 } from '@molvia/model'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
@@ -34,6 +36,8 @@ export interface ReceiptsApi {
   restore(actorId: string, id: string): Promise<ReceiptSummary>
   /** «Записать» (MOL-126): the receipt's day and «today» are the phone's (MOL-121). */
   record(actor: Actor & Today, id: string, body: ReceiptRecordBody): Promise<ReceiptRecorded>
+  /** «Отменить запись» (MOL-169, Г1): recorded or not, once no «Записать» of it is still running. */
+  settled(actor: Actor, id: string): Promise<ReceiptSettled>
 }
 
 /** A receipt is the person's own: private always, never in a shared cache. */
@@ -152,6 +156,19 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
           z.encode(
             receiptDetailCodec,
             await api.one(askingOf(request), request.params.receiptId, shownOf(request)),
+          ),
+        ),
+    )
+
+    /** Recorded or not, once no «Записать» of it is still running: the check of «Отменить запись». */
+    scope.get<{ Params: { receiptId: string } }>(
+      '/receipts/:receiptId/settled',
+      { exposeHeadRoute: false },
+      async (request, reply) =>
+        privately(reply).send(
+          z.encode(
+            receiptSettledCodec,
+            await api.settled(actorOf(request), request.params.receiptId),
           ),
         ),
     )

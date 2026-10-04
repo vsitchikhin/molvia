@@ -187,6 +187,9 @@ export function useReceipts(): ReceiptsScreen {
     (answer) => {
       const owner = actor.id
       if (!answer || !owner) return
+      queue.settleRecorded(
+        new Set(answer.receipts.filter((one) => one.status === 'recorded').map((one) => one.id)),
+      )
       const named = new Set([
         ...answer.receipts.filter((one) => one.status !== 'recorded').map((one) => one.id),
         ...queue.pending.map(receiptOf),

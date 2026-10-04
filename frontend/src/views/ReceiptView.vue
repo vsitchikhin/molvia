@@ -162,7 +162,27 @@
     <template v-if="detail && docked" #docked>
       <div class="dock">
         <template v-if="docked === 'record'">
-          <p v-if="recording" class="under">{{ t('receipt.review.recording') }}</p>
+          <template v-if="recording">
+            <p class="under">{{ t('receipt.review.recording') }}</p>
+            <AppButton
+              v-if="cancellable"
+              variant="ghost"
+              block
+              :busy="checking"
+              @click="cancelRecord"
+            >
+              {{ t('receipt.review.cancel_record') }}
+            </AppButton>
+            <p v-if="cancelRefused" class="under">
+              {{
+                t(
+                  cancelRefused === 'offline'
+                    ? 'receipt.review.cancel_record_offline'
+                    : 'receipt.review.cancel_record_failed',
+                )
+              }}
+            </p>
+          </template>
           <AppButton
             v-else
             size="large"
@@ -258,7 +278,8 @@ import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconImageOff from '~icons/mdi/image-off-outline'
 import IconReceiptCheck from '~icons/mdi/receipt-text-check-outline'
-import { RECEIPT_CURRENCY, receiptDigits, yerevanDate } from '@molvia/model'
+import { ApiError } from '@molvia/client'
+import { ERROR, RECEIPT_CURRENCY, receiptDigits, yerevanDate } from '@molvia/model'
 import type { Money } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -274,10 +295,12 @@ import ReceiptTotalSheet from '@/components/ReceiptTotalSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import { api } from '@/api'
 import { useOnline } from '@/composables/useOnline'
 import { useReceipt } from '@/composables/useReceipt'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { calendarDay, dayOfAnyYear, localDay } from '@/days'
+import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
 import { afterStep, useNavigation } from '@/navigation'
 import { photoShelf } from '@/receipts/photoShelf'
@@ -422,6 +445,56 @@ export default defineComponent({
       )
       return refusal ? t('receipt.review.refused', { reason: t(refusal.code) }) : null
     })
+    /** «Отменить запись» (MOL-169, В-5): any record still waiting, never the one a send carries. */
+    const cancellable = computed(
+      () => recording.value && !sending.value && queue.carrying !== id.value,
+    )
+    const checking = ref(false)
+    /** Why a begun record was not cancelled: no connection, or the server did not answer (MOL-19). */
+    const cancelRefused = ref<'offline' | 'error' | null>(null)
+    /**
+     * A record whose send has begun may have landed with its answer lost (adversarial А1–А4): opened
+     * as if it had not, the review offered «Удалить» on a recorded receipt and edits that would never
+     * be written. So it is cancelled only on this check's own answer — never a read that set out
+     * before it and came back meanwhile (round 2, Б2) — asked once no send of it is on its way here
+     * (`cancelChecked`, Б1) nor running on the server (`receiptSettled`, Г1). Recorded, the screen
+     * goes to its purchases; no answer, nothing opens.
+     */
+    async function cancelRecord(): Promise<void> {
+      const asked = id.value
+      cancelRefused.value = null
+      if (!queue.recordBegun(asked)) {
+        queue.cancelRecord(asked)
+        return
+      }
+      checking.value = true
+      const settled: { tripId: string | null } = { tripId: null }
+      try {
+        await queue.cancelChecked(asked, async () => {
+          // Answered once no «Записать» of it is still running on the server either — one the phone
+          // gave up on by its timeout included (Г1).
+          settled.tripId = (await api.receiptSettled(asked)).tripId
+          return settled.tripId === null
+        })
+        // Recorded: its purchases on this answer alone — a read of the receipt after it could fail on
+        // the same connection and leave the tap unanswered (round 4, Д1).
+        if (settled.tripId !== null && id.value === asked) toPurchases(asked, settled.tripId)
+      } catch (error) {
+        if (id.value !== asked) return
+        if (error instanceof ApiError && error.answered && error.code === ERROR.NOT_FOUND) {
+          void kept.retry()
+          return
+        }
+        reportFailure(error, 'screen')
+        cancelRefused.value = navigator.onLine ? 'error' : 'offline'
+      } finally {
+        checking.value = false
+      }
+    }
+    // Said until the connection or the receipt changes: either may open the way (round 2, review 4).
+    watch([online, () => detail.value], () => {
+      cancelRefused.value = null
+    })
     /**
      * While «Записать» waits in the queue — or is being sent — the receipt is what was sent: an edit
      * made now would not reach the server (review 5), nor would a removal (adversarial А1).
@@ -455,12 +528,19 @@ export default defineComponent({
     )
     onBeforeUnmount(letGo)
 
-    // Recorded on another phone while this one looked: its purchases are where to go.
+    // Recorded on another phone while this one looked, or by a send whose answer was lost: its
+    // purchases are where to go, and nothing of it waits on the phone any more (MOL-169, А2).
+    function toPurchases(receiptId: string, tripId: string): void {
+      queue.settleRecorded(new Set([receiptId]))
+      drafts.forget(receiptId)
+      if (actor.id) void photoShelf(actor.id).drop(receiptId)
+      void router.replace({ name: 'purchase', params: { tripId } })
+    }
     watch(
       () => detail.value?.receipt,
       (receipt) => {
         if (receipt?.status === 'recorded' && receipt.tripId)
-          void router.replace({ name: 'purchase', params: { tripId: receipt.tripId } })
+          toPurchases(receipt.id, receipt.tripId)
       },
     )
 
@@ -566,6 +646,10 @@ export default defineComponent({
       dayOf,
       positions,
       recording,
+      cancellable,
+      checking,
+      cancelRefused,
+      cancelRecord: () => void cancelRecord(),
       refused,
       docked,
       photos,
