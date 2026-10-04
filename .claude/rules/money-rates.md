@@ -81,6 +81,50 @@ snapshot, and an inverse or a cross is rounded there to the snapshot's six digit
   the same way (review П-4); a hole a failed week leaves closes
   itself within a day.
 
+## The lari and its own bank (MOL-110)
+
+**A currency's official rate is its own country's central bank's** (owner's decision В-1, 04.10.2026:
+«the first source of truth for a country's currency is that country's central bank»). The lari is
+the National Bank of Georgia's (`nbg`); the dram, the rouble, the dollar and the euro stay the Central
+Bank of Armenia's. `HOME_BANK` in the model is the one list, and `homeBankOf(base, quote)` the one
+rule: a pair with the lari — the NBG, any other — the CBA.
+
+- **`official` is the pair's own bank, `fallback` every other publisher** — the CBA too, for the lari.
+  `pickOfficialRate` takes the pair's bank while it is fresh (the week of MOL-39), else the freshest of
+  the rest that has both halves, the CBA, the Bank of Russia, the NBG, er-api in that order on a tie;
+  the NBG thus stands behind the Bank of Russia for a pair of drams when the CBA is silent. The trip's
+  CHECK says the same in SQL, written from `HOME_BANK` (`homeBankSql`), and `tripSchema` in the domain.
+- **The NBG quotes everything in lari, the dram per 1000**, so every currency comes into drams inside
+  its one answer, as the Bank of Russia's does, and the cache stays «one currency against the dram».
+  The number is `rateFormated`, the decimal as the bank prints it; the day is the answer's `date`, the
+  day the rate is in force — set the evening before, a Saturday's holding to Monday's evening.
+- **Asked every hour, whatever the CBA did** (`homeBanks`): it is the official source of its pairs,
+  and nothing stands in for it but the others' rows already in the cache — the CBA writes the lari
+  every hour itself. Its jump is judged by its own five, as the CBA's: a home bank is never measured
+  against another.
+- **Its archive is walked a day a request** (В-3): the API answers any day with the rate in force on
+  it and has no range — measured. Since `OFFICIAL_HISTORY_FROM`, `ARCHIVE_DAYS_PER_RUN` (120) days a
+  run — some fifteen hourly runs for the two years, not twelve minutes in one, since the market waits
+  behind the official refresh — on from where the last run stopped (`archiveNext`, in memory: a Sunday
+  asked is written as its Saturday, and the cache would ask it again); then once a day the last
+  `ARCHIVE_RECENT_DAYS`. After a restart the walk starts from the first hole longer than
+  `ARCHIVE_GAP_DAYS` (`archiveWalkFrom`): the NBG's longest holiday is the six days of early January.
+  Only the days the cache lacks are written; a failure is a line in the log and asked again in six
+  hours, as the CBA's archive.
+- **The CBA's archive carries the lari too**: every working day since 2022, the same days as the
+  dollar — measured on 04.10.2026 (1199 of 1199).
+- **The market is the three currencies of its files** (`MARKET_CURRENCIES`: RUB, USD, EUR), never every
+  currency of the product: none of the three files carries the lari, a reader asking for it would
+  refuse them all, and `market_rates` refuses it too. Lari against drams is «Без сравнения»; the block
+  «Курсы по данным ЦБ РА» keeps the three.
+- **The words name the bank of the pair** (В-2): «ЦБ РА», «НБ Грузии», and a fallback by its own name —
+  `bankWords` on the phone, the domain's `homeBankOf` by the name of an exchange's card. The strings of
+  the market stay «ЦБ РА»: the market is Armenian only. The accounts' line names each bank once.
+- **The sign is «₾» in every language** (`SIGN` in `money.ts`): Russian CLDR prints «ლ», an old letter.
+  No face of its own — it comes from the system font, as «₽» does.
+- **The dinar is MOL-230**: the National Bank of Serbia has neither the dram nor the lari, and gives a
+  program its rates only by a login on application; its open sources are that task's first step.
+
 ## The person's own rate, from exchanges
 
 **The person's own rate comes from exchanges, never from a number typed in (MOL-40).** The plan's
