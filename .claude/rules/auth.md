@@ -271,13 +271,26 @@ the round trip through Telegram, and ask whose account this turned out to be.
   decision): a newcomer left on the step, or an owner from before it, can record at the shelf with no
   signal, and the queues sent it all the moment the server named them, under a step nobody had passed
   and with no «16 или больше» said; they go after «Принимаю» — `App.vue` gives the occasion. An owner
-  who accepted an older edition sends as before (Р-4). The price, named: a write made by hand in a
-  sheet (`Предложить товар`) still goes, in the window an app shown on the drawer waits for its step.
+  who accepted an older edition sends as before (Р-4). **An owner known to have accepted none does
+  not wait for the hiding** (adversarial Б1, owner's decision): everything a sheet writes straight to
+  the server — a rating into everybody's average, an exchange, an income, an account, a code — went
+  out for them in that window, so the step comes as soon as no sheet is open (`close` is heard on
+  the way down); the one write left is the sheet open when the answer came. **Nor does an open door
+  shut on a new question** (review №7): the connection back, or an identity asked again after an
+  error, goes through `loading`, and the skeleton of a launch is only for an owner this page has not
+  shown the app to. **The question about the terms is asked again by the store** on `online` and on
+  the app looked at again (adversarial Б2) — with the app shown there is no step to retry it, and one
+  failure held the shelf's writes of an owner whose consent was on record. **The price, named**
+  (review №8): while the writes wait, the queues say what they say of any hold — «ждёт связи»,
+  «Уйдёт сама, как только появится связь» — with the connection up; the window ends with the last
+  sheet closed for one who accepted none, with the next answer for anyone else.
   **The step comes before a login failure of this window** (adversarial А3): a neighbour's login
   made the person known, and «Повторить» on the old failure began a login in Telegram for them. Its
   full-screen error is the one error of somebody known behind the door, so **«Сообщить о проблеме»
-  opens the sheet there** (`App.vue` draws `FeedbackSheet` for the step too, adversarial А2) — and a
-  sheet asked for where it is not drawn is let go rather than left to rise by itself later.
+  opens the sheet there** (`App.vue` draws `FeedbackSheet` for the step too, adversarial А2), and it
+  stays drawn while the door is on the terms at all — the question asked again puts the phase to the
+  skeleton, and the sheet went with a screenshot in it (`login.onConsent`, Б3); a sheet asked for
+  where it is not drawn is let go rather than left to rise by itself later.
 - **Showing the app and writing into it are different rights** (adversarial Б1). The door may
   open on the drawer's name while the first `me()` is still in flight — that is what keeps a
   launch with a live session from flashing «Вход» — but a drawer says nothing about the cookie,

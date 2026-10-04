@@ -159,7 +159,9 @@ The detail behind the privacy lines of `CLAUDE.md`.
   languages; **any other edit of either page is a new revision** (`frontend/src/views/policy.ts`: the
   day both pages are subtitled with and the sha-256 of their text in both languages), and
   `policy.test.ts` fails until the revision is moved — the lists of the parts each page shows are in
-  the fingerprint too, kept in `policy.ts` beside it (review №5); the day is not, and the hint asks
+  the fingerprint too, kept in `policy.ts` beside it (review №5), and so is the `<template>` of both
+  pages, read as written (adversarial Б4: the summary taken out of the page left everything green);
+  the day is not, and the hint asks
   for it: a digest pasted with the day left is a price named, not held — so a page cannot change in
   silence, and a line
   added by a task about data does not put everybody through the screen again (nine edits in the nine
