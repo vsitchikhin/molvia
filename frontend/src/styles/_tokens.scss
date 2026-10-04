@@ -135,6 +135,9 @@
   --skeleton-line: 0.8125rem; /* 13 */
   --skeleton-sub: 0.5625rem; /* 9 */
 
+  /* The circle under the icon of an operation's row (MOL-176): its skeleton takes the same. */
+  --row-circle: 2.5rem; /* 40 */
+
   /* The circle of a screen state and the icon in it. */
   --state-circle: 2.375rem; /* 38 */
   --state-glyph: 1.375rem; /* 22 */

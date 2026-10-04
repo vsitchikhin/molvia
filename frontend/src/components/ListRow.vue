@@ -12,7 +12,15 @@
     :aria-selected="state === 'selected' ? String(selected) : undefined"
     @click="click"
   >
-    <component :is="icon" v-if="icon" class="icon" aria-hidden="true" />
+    <span
+      v-if="icon && tint"
+      class="circle"
+      :class="{ muted }"
+      :style="circleStyle"
+      aria-hidden="true"
+      ><component :is="icon" class="icon"
+    /></span>
+    <component :is="icon" v-else-if="icon" class="icon" aria-hidden="true" />
     <span class="words">
       <span class="title"
         ><slot name="title">{{ title }}</slot></span
@@ -20,6 +28,7 @@
       <span v-if="meta || $slots.meta" class="meta"
         ><slot name="meta">{{ meta }}</slot></span
       >
+      <span v-if="$slots.below" class="below"><slot name="below" /></span>
     </span>
     <span v-if="$slots.tail" class="tail"><slot name="tail" /></span>
     <IconCheck v-if="selected" class="check" aria-hidden="true" />
@@ -57,6 +66,8 @@ const SELECTED = new Set([
  *   as       — `button`, `router-link` (with `to`) or `div`. Only a `div` may hold a button in its
  *              tail: a button inside a button is no HTML, and a screen reader hears one of them;
  *   icon     — a component, drawn here at its step, so no screen can draw it at another;
+ *   tint     — the icon stands in a circle of 40 (MOL-176): a colour — a category's, on its
+ *              `cat-tint-share` — or `muted`, `surface-2` under `text-muted`, for what has no colour;
  *   wrap     — the title breaks onto lines instead of ending in «…»;
  *   next     — the chevron (the owner's В-14 «а»): the row opens something to go on with — a screen, a
  *              sheet with fields. A row that acts at once or asks to confirm has none, and one card
@@ -70,6 +81,9 @@ const SELECTED = new Set([
  *              was given — `aria-checked` for a radio, `aria-selected` for an option — never only seen;
  *   active   — the row the keyboard stands on in a list a field owns (`aria-activedescendant`, К-4):
  *              the fill without the ring, since the focus is in the field.
+ *
+ * The slot `below` stands under the meta, in the column of the words — a tag, «Отправляем…»: in the
+ * meta it would be cut with it at two lines.
  */
 export default defineComponent({
   name: 'ListRow',
@@ -84,6 +98,7 @@ export default defineComponent({
     title: { type: String, default: '' },
     meta: { type: String, default: '' },
     icon: { type: [Object, Function] as PropType<Component>, default: undefined },
+    tint: { type: String, default: '' },
     wrap: { type: Boolean, default: false },
     next: { type: Boolean, default: false },
     danger: { type: Boolean, default: false },
@@ -113,6 +128,15 @@ export default defineComponent({
         }
       })
     }
+    const muted = computed(() => props.tint === 'muted')
+    const circleStyle = computed(() =>
+      props.tint === '' || muted.value
+        ? undefined
+        : {
+            color: props.tint,
+            background: `color-mix(in oklch, ${props.tint} var(--cat-tint-share), var(--surface))`,
+          },
+    )
     function click(event: MouseEvent): void {
       if (props.inactive) {
         // Stopped as well as prevented, as the kit's button: nothing above hears a row that is not now.
@@ -123,7 +147,7 @@ export default defineComponent({
       emit('click', event)
       if (link && !event.defaultPrevented) void link.navigate(event)
     }
-    return { link, tag, state, click }
+    return { link, tag, state, muted, circleStyle, click }
   },
 })
 </script>
@@ -176,6 +200,24 @@ export default defineComponent({
   color: var(--text-muted);
 }
 
+.circle {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--row-circle);
+  height: var(--row-circle);
+  border-radius: var(--radius-pill);
+
+  .icon {
+    color: inherit;
+  }
+
+  &.muted {
+    background: var(--surface-2);
+    color: var(--text-muted);
+  }
+}
+
 .words {
   display: grid;
   flex: 1;
@@ -202,6 +244,11 @@ export default defineComponent({
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
+}
+
+.below {
+  justify-self: start;
+  margin-top: var(--space-1);
 }
 
 .tail {

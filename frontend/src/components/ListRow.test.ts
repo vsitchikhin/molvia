@@ -186,4 +186,54 @@ describe('ListRow', () => {
     expect(mount(ListRow, { props: { danger: true } }).classes()).toContain('danger')
     expect(mount(ListRow, { props: { wrap: true } }).classes()).toContain('wrap')
   })
+
+  describe('a circle under the icon (MOL-176)', () => {
+    it('stands only with a tint, the icon inside it', () => {
+      const plain = mount(ListRow, { props: { title: 'Наличные', icon: IconWallet } })
+      expect(plain.find('.circle').exists()).toBe(false)
+      expect(plain.find('.icon').exists()).toBe(true)
+
+      const tinted = mount(ListRow, {
+        props: { title: 'Такси', icon: IconWallet, tint: 'var(--cat-transport)' },
+      })
+      expect(tinted.find('.circle .icon').exists()).toBe(true)
+      expect(tinted.findAll('.icon')).toHaveLength(1)
+    })
+
+    it('takes the colour of its tint, and that colour on its share for the ground', () => {
+      const view = mount(ListRow, {
+        props: { title: 'Такси', icon: IconWallet, tint: 'var(--cat-transport)' },
+      })
+      expect(view.get('.circle').attributes('style')).toContain('color: var(--cat-transport)')
+      // happy-dom drops `color-mix` from a style it parses: the ground is read where it is made.
+      const { circleStyle } = view.vm as unknown as { circleStyle: { background: string } }
+      expect(circleStyle.background).toBe(
+        'color-mix(in oklch, var(--cat-transport) var(--cat-tint-share), var(--surface))',
+      )
+    })
+
+    it('muted is the ground of no colour, drawn by the class alone', () => {
+      const view = mount(ListRow, { props: { title: 'Обмен', icon: IconWallet, tint: 'muted' } })
+      expect(view.get('.circle').classes()).toContain('muted')
+      expect(view.get('.circle').attributes('style')).toBeUndefined()
+    })
+
+    it('draws nothing without an icon', () => {
+      const view = mount(ListRow, { props: { title: 'Такси', tint: 'muted' } })
+      expect(view.find('.circle').exists()).toBe(false)
+    })
+  })
+
+  it('stands what is below under the meta, in the column of the words', () => {
+    const view = mount(ListRow, {
+      props: { title: 'Такси', meta: 'Транспорт' },
+      slots: { below: () => h('span', { class: 'tag' }, 'Отправляем…') },
+    })
+    expect(view.get('.words .meta + .below .tag').text()).toBe('Отправляем…')
+    expect(
+      mount(ListRow, { props: { title: 'Такси' } })
+        .find('.below')
+        .exists(),
+    ).toBe(false)
+  })
 })
