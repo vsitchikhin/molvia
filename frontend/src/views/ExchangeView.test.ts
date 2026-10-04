@@ -15,6 +15,9 @@ import type {
 } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
+
+/** A text of the dictionary with the bank of a pair without the lari named in it (MOL-110). */
+const cba = (text: string): string => text.replace('{bank}', en.exchange.card_source_cba)
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import ExchangeView from './ExchangeView.vue'
@@ -259,7 +262,7 @@ describe('ExchangeView: the four states', () => {
     exchanges.mockResolvedValue(overview({ wallet: null, exchanges: [] }))
     const view = await render()
     expect(view.text()).toContain(en.exchange.empty.title)
-    expect(view.text()).toContain(en.exchange.empty.body)
+    expect(view.text()).toContain(cba(en.exchange.empty.body))
     expect(view.text()).toContain(en.exchange.record)
   })
 })
@@ -300,7 +303,7 @@ describe('ExchangeView: the rate and the list', () => {
       }),
     )
     const view = await render()
-    expect(view.text()).toContain(en.exchange.estimated)
+    expect(view.text()).toContain(cba(en.exchange.estimated))
     const [line] = view.findAll('.costs li')
     // The rate names both currencies; a «$:» in front of it said one of them twice (MOL-81).
     expect(line?.text()).toMatch(/^89\.04 ₽\/\$ · /)
@@ -378,7 +381,7 @@ describe('ExchangeView: the rate and the list', () => {
     exchanges.mockResolvedValue(overview())
     const plain = await render()
     expect(plain.text()).not.toContain('Counting in')
-    expect(plain.text()).not.toContain(en.exchange.estimated)
+    expect(plain.text()).not.toContain(cba(en.exchange.estimated))
   })
 
   it('compares with the bank in words — more, less, or nothing to compare with', async () => {
@@ -404,7 +407,7 @@ describe('ExchangeView: the rate and the list', () => {
     expect(cards[0]?.get('.difference').text()).toBe('֏8,754 more than the central bank')
     expect(cards[1]?.get('.difference').text()).toBe('֏5,000 less than the central bank')
     // Nothing to compare with is one line in place of three: no bank's rate and no difference.
-    expect(cards[2]?.get('.missing').text()).toBe(en.exchange.card_no_official)
+    expect(cards[2]?.get('.missing').text()).toBe(cba(en.exchange.card_no_official))
     expect(cards[2]?.find('.difference').exists()).toBe(false)
     expect(cards[2]?.findAll('.plate .line')).toHaveLength(1)
     expect(view.text()).not.toMatch(/commission/i)
@@ -415,7 +418,36 @@ describe('ExchangeView: the rate and the list', () => {
       overview({ exchanges: [row({ official: null, officialDoubtful: true })] }),
     )
     const view = await render()
-    expect(view.get('article .missing').text()).toBe(en.exchange.card_doubtful)
+    expect(view.get('article .missing').text()).toBe(cba(en.exchange.card_doubtful))
+  })
+
+  it('у обмена рублей на лари без курса дня называет НБ Грузии, а не ЦБ РА (MOL-110)', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [
+          row({
+            received: { minor: 31_200n, currency: 'GEL' },
+            rate: null,
+            official: null,
+          }),
+          row({
+            id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5f',
+            received: { minor: 31_200n, currency: 'GEL' },
+            rate: null,
+            official: null,
+            officialDoubtful: true,
+          }),
+        ],
+      }),
+    )
+    const view = await render()
+    const cards = view.findAll('article')
+    expect(cards[0]?.get('.missing').text()).toBe(
+      'No National Bank of Georgia rate for this day — nothing to compare with',
+    )
+    expect(cards[1]?.get('.missing').text()).toBe(
+      'The National Bank of Georgia rate of that day is in doubt — no comparison',
+    )
   })
 
   it('names an open source when the bank of that day was not the central bank', async () => {
@@ -956,7 +988,9 @@ describe('ExchangeView: against the market of the day (MOL-137)', () => {
       }),
     )
     const view = await render()
-    expect(view.get('article .official .missing').text()).toBe(en.exchange.card_no_official_short)
+    expect(view.get('article .official .missing').text()).toBe(
+      cba(en.exchange.card_no_official_short),
+    )
   })
 
   it('without a market the central bank stands as it did', async () => {

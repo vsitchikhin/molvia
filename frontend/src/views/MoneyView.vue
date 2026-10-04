@@ -245,7 +245,7 @@ import SpendingSheet from '@/components/SpendingSheet.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { pageOrder } from '@/components/accounts'
-import { budgetAmount, rateWords } from '@/components/spending'
+import { bankWords, budgetAmount, rateWords } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
 import { useReconnect } from '@/composables/useReconnect'
 import { calendarDay } from '@/days'
@@ -426,7 +426,10 @@ export default defineComponent({
       }
       return value.rate.source === 'personal'
         ? t('spending.rate_live_mine', { rate })
-        : t('spending.rate_live_official', { rate })
+        : t('spending.rate_live_official', {
+            rate,
+            bank: bankWords(value.rate.base, value.rate.quote, t),
+          })
     })
 
     /**

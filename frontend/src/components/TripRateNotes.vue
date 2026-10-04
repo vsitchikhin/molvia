@@ -8,12 +8,12 @@
       <AppButton variant="ghost" @click="choosing = true">{{ t('trip.rate.choose') }}</AppButton>
     </div>
 
-    <!-- Not the central bank of Armenia. Named, not hinted at: the person trusts the number by
+    <!-- Not the pair's own bank (MOL-110). Named, not hinted at: the person trusts the number by
          where it came from, and the aggregator's terms require its name beside it. -->
     <!-- Never «Источник:» with nothing after it: a rate whose publisher is unknown says nothing
          about its source at all (раунд 2, Д1). -->
     <p v-if="fallback && sourceName" class="note good">
-      {{ t('trip.rate.fallback') }}
+      {{ t('trip.rate.fallback', { bank: homeName }) }}
       <a v-if="link" class="link" :href="link" target="_blank" rel="noopener noreferrer">{{
         sourceName
       }}</a>
@@ -33,7 +33,7 @@
 import { computed, defineComponent, ref } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatRate, formatRateBeside, yerevanDate } from '@molvia/model'
+import { formatRate, formatRateBeside, homeBankOf, yerevanDate } from '@molvia/model'
 import type { RateProvider, TripView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import TripRateSheet from '@/components/TripRateSheet.vue'
@@ -70,6 +70,11 @@ export default defineComponent({
     const link = computed(() => (provider.value ? LINKS[provider.value] : undefined))
 
     const fallback = computed(() => props.trip.rate?.source === 'fallback')
+    /** The bank whose rate this pair's official one is — named as the one that is silent (MOL-110). */
+    const homeName = computed(() => {
+      const rate = props.trip.rate
+      return rate ? t(`trip.rate.source_${homeBankOf(rate.base, rate.quote)}`) : ''
+    })
 
     /** The day a rate is dated by, as that day of Yerevan — never the moment of its midnight (Ж″). */
     const dayOf = (asOf: Date): string =>
@@ -81,7 +86,7 @@ export default defineComponent({
       const date = dayOf(rate.asOf)
       return fallback.value
         ? t('trip.rate.stale_fallback', { date })
-        : t('trip.rate.stale_official', { date })
+        : t('trip.rate.stale_official', { date, bank: sourceName.value })
     })
 
     const jump = computed(() => {
@@ -102,7 +107,7 @@ export default defineComponent({
         : t('trip.rate.jump_alone', { rate: now })
     })
 
-    return { t, choosing, fallback, sourceName, link, stale, jump }
+    return { t, choosing, fallback, homeName, sourceName, link, stale, jump }
   },
 })
 </script>

@@ -204,7 +204,7 @@ test('a trip started by the old app asks for its city and currencies before it i
     .toBe('Старый магазин')
 })
 
-test('moves to Georgia: the city list follows the country, and «Что брать» answers for Batumi (MOL-109)', async ({
+test('moves to Georgia: the city list follows the country, the lari is a spending currency, and «Что брать» answers for Batumi (MOL-109, MOL-110)', async ({
   page,
 }) => {
   await signedIn(page)
@@ -216,6 +216,8 @@ test('moves to Georgia: the city list follows the country, and «Что брат
   await expect(city).toHaveValue('Тбилиси')
   await expect(city.locator('option')).toHaveText(['Тбилиси', 'Батуми'])
   await city.selectOption('Батуми')
+  const spending = page.getByLabel('Валюта трат', { exact: true })
+  await spending.selectOption({ label: 'Грузинский лари · GEL' })
   await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
   await expect(
     page.locator('.dock').getByText('Настройки сохранены', { exact: true }),
@@ -229,6 +231,7 @@ test('moves to Georgia: the city list follows the country, and «Что брат
   await page.reload()
   await expect(country).toHaveValue('GE')
   await expect(city).toHaveValue('Батуми')
+  await expect(spending).toHaveValue('GEL')
 })
 
 test('lost save responses remain uncertain until a read confirms the result', async ({

@@ -211,14 +211,14 @@ import SectionCaption from '@/components/SectionCaption.vue'
 import UnassignedSheet from '@/components/UnassignedSheet.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { countedWhen, pageOrder, removedOf, shortDay, signedAmount } from '@/components/accounts'
-import { rateWords } from '@/components/spending'
+import { bankWords, rateWords } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 
 /** The order the rate line names the currencies in (handoff 02). */
-const RATE_ORDER: readonly Currency[] = ['RUB', 'USD', 'EUR', 'AMD']
+const RATE_ORDER: readonly Currency[] = ['RUB', 'USD', 'EUR', 'GEL', 'AMD']
 
 /**
  * «Счета» (MOL-123, handoff 02): where the money lies — the totals in the spending currency, the
@@ -315,9 +315,13 @@ export default defineComponent({
       const words = ordered.map((rate) => rateWords(rate, locale.value, t)).join(' · ')
       const sources = new Set(ordered.map((rate) => rate.source === 'personal'))
       if (sources.size > 1) return t('accounts.screen.rate_mixed', { rates: words })
-      return sources.has(true)
-        ? t('accounts.screen.rate', { rates: words })
-        : t('accounts.screen.rate_official', { rates: words })
+      if (sources.has(true)) return t('accounts.screen.rate', { rates: words })
+      // Each bank once, in the order of the rates (MOL-110): «ЦБ РА и НБ Грузии».
+      const banks = [...new Set(ordered.map((rate) => bankWords(rate.base, rate.quote, t)))]
+      return t('accounts.screen.rate_official', {
+        rates: words,
+        bank: banks.join(t('accounts.screen.rate_banks_and')),
+      })
     })
 
     const showRemoved = ref(false)
