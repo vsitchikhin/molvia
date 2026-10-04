@@ -12,8 +12,10 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/components/AppButton.vue` — Kit button in six variants (primary, secondary, tinted, ghost, danger-ghost, icon), with busy, one inactive look and an icon slot.
 - `frontend/src/components/AppCard.vue` — Kit card: the surface of lists and blocks, with a chosen tag, the green «take» tone and an edge-to-edge list mode.
 - `frontend/src/components/AppField.vue` — Kit field: a native input, textarea, select or date with its label (or one only read out), error code, a mark before and a suffix after, the right phone keyboard, and the count of the last characters left when asked.
+- `frontend/src/components/AppNote.vue` — Kit note: an icon of 18 and words of 13 on `surface-2`, or `warn` on its tint; the strip's shape, no live region.
 - `frontend/src/components/AppReveal.vue` — Grows from nothing and shrinks back what pushes its neighbours — rows of a list, an error under a field, a block of a sheet; still for an answer read, a screen move, reduced motion.
 - `frontend/src/components/AppSwitch.vue` — Kit switch: a native checkbox read out as a switch, showing what the server holds and saying which way it was moved — for a setting saved on the tap; a ✓ on the knob when on, `inactive` focusable.
+- `frontend/src/components/AppTag.vue` — Kit tag in a row: a pill of 13/600, plain, warn or bad, with an optional icon of 14.
 - `frontend/src/components/AppScreen.vue` — The frame every screen sits in: pinned row, collapsing large title, back chevron with its label, docked strip, identity notice.
 - `frontend/src/components/BottomSheet.vue` — The sheet: a native modal `<dialog>` rising from the bottom, closed through its history entry; stacks with «‹» instead of ×.
 - `frontend/src/components/FloatingDock.vue` — Floating spot for the main action of a «Деньги» screen («Трата», «Обмен», «Доход») or «Вернуть» after a removal.
