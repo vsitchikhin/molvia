@@ -53,6 +53,33 @@ describe('createActor', () => {
     expect(actor.spendCurrency).toBe('AMD')
   })
 
+  it('starts a newcomer in the country of the phone’s zone, at its first city (MOL-109, В-3)', async () => {
+    const written: NewActor[] = []
+    const actors = fakeActors({
+      create: (id, telegramUserId, input) => {
+        written.push(input)
+        return Promise.resolve(actorFrom(id, telegramUserId, input))
+      },
+    })
+
+    for (const zone of ['Asia/Tbilisi', 'Europe/Belgrade', 'Asia/Yerevan', 'Europe/Moscow']) {
+      await createActor(actors, TELEGRAM_ID, zone)
+    }
+    await createActor(actors, TELEGRAM_ID)
+
+    expect(written.map(({ country, city }) => [country, city])).toEqual([
+      ['GE', 'Тбилиси'],
+      ['RS', 'Белград'],
+      ['AM', 'Гюмри'],
+      ['AM', 'Гюмри'],
+      ['AM', 'Гюмри'],
+    ])
+    // the currencies wait for the lari and the dinar (MOL-110)
+    for (const input of written) {
+      expect([input.spendCurrency, input.incomeCurrency]).toEqual(['AMD', 'RUB'])
+    }
+  })
+
   it('issues the identifier itself, and a different one every time', async () => {
     // The device never names it: this is the only proof of identity in 0.1, so a client
     // that chose its own could choose someone else's.

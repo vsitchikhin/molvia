@@ -102,11 +102,11 @@ const mounted: VueWrapper[] = []
 const App = defineComponent(() => () => h(RouterView))
 const sheet = () => document.body.querySelector('dialog[open]')
 
-async function render() {
+async function render(where = { country: 'AM', city: 'Гюмри' }) {
   localStorage.setItem('molvia.actor', ME)
   localStorage.setItem(
     `molvia.settings.${ME}`,
-    JSON.stringify({ country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+    JSON.stringify({ ...where, spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
   )
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -225,6 +225,16 @@ describe('ReceiptView (MOL-127)', () => {
     await view.get('.receipt-line').trigger('click')
     await flushPromises()
     expect(sheet()).toBeNull()
+  })
+
+  it('not read, after a move to Georgia: a record by hand, no retake, and the words say so (MOL-109, Б3)', async () => {
+    receipt.mockResolvedValue(detail({ status: 'failed' }))
+    const { view } = await render({ country: 'GE', city: 'Тбилиси' })
+    expect(view.text()).toContain(ru.receipt.failed.manual_body)
+    expect(view.text()).not.toContain(ru.receipt.failed.body)
+    const dock = view.get('.dock')
+    expect(dock.text()).toContain(ru.purchases.manual)
+    expect(dock.text()).not.toContain(ru.receipt.capture.retake)
   })
 
   it('«Переснять»: the sheet replaces this receipt, and «sent» takes the screen up (review 2, 31)', async () => {

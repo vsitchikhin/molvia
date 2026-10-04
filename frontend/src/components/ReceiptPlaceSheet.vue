@@ -38,6 +38,14 @@
       />
 
       <AppField
+        v-if="!home"
+        v-model="away"
+        :label="t('receipt.place.city')"
+        kind="select"
+        :options="cityOptions"
+      />
+
+      <AppField
         v-model="when"
         :label="t('receipt.place.when')"
         kind="date"
@@ -61,7 +69,16 @@ import { computed, defineComponent, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCheck from '~icons/mdi/check'
-import { drawsNothing, isRateDay, latestDay, newPlaceSchema, pastedLine } from '@molvia/model'
+import {
+  citiesOf,
+  drawsNothing,
+  isRateDay,
+  latestDay,
+  newPlaceSchema,
+  pastedLine,
+  settingsCityOf,
+} from '@molvia/model'
+import type { ReceiptCountry } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -85,6 +102,8 @@ export default defineComponent({
   components: { AppButton, AppField, BottomSheet, IconCheck },
   props: {
     open: { type: Boolean, required: true },
+    /** The country the receipt was read in: its place is a place of that country. */
+    country: { type: String as PropType<ReceiptCountry>, required: true },
     /** The place the receipt holds now: read, or chosen before. */
     current: { type: Object as PropType<PlaceDraft | null>, default: null },
     /** Whether the server read it off the receipt. */
@@ -117,10 +136,23 @@ export default defineComponent({
       return props.day > today && props.day <= latestDay(new Date()) ? props.day : today
     })
 
-    const city = computed(() => actor.settings?.city ?? '')
+    /**
+     * A receipt of the person's own country takes a shop of their city, as «Где вы?» does. One of
+     * another — taken in Gyumri before the settings moved to Tbilisi (MOL-109, adversarial А2) — takes
+     * a shop of its own country: the recent shops of Tbilisi and a new one there the server refuses,
+     * so they are not offered, and the city is chosen among the receipt country's, the one it was
+     * read in first.
+     */
+    const home = computed(() => actor.settings?.country === props.country)
+    const away = ref('')
+    const cityOptions = computed(() =>
+      citiesOf(props.country).map((one) => ({ value: one, label: one })),
+    )
+    const city = computed(() => (home.value ? (actor.settings?.city ?? '') : away.value))
     const choices = computed(() => {
       const list: { key: string; place: PlaceDraft }[] = []
       if (props.current) list.push({ key: 'current', place: props.current })
+      if (!home.value) return list
       for (const place of places.places) {
         if (props.current && placeIdOf(props.current) === place.id) continue
         list.push({ key: place.id, place: { id: place.id, name: place.name, city: city.value } })
@@ -135,6 +167,11 @@ export default defineComponent({
         when.value = props.day
         name.value = ''
         chosen.value = props.current ? 'current' : null
+        const read = props.current ? settingsCityOf(props.current.city) : null
+        away.value =
+          read !== null && citiesOf(props.country).includes(read)
+            ? read
+            : (citiesOf(props.country)[0] ?? '')
         void places.refresh().catch(() => undefined)
       },
       { immediate: true },
@@ -162,6 +199,9 @@ export default defineComponent({
     return {
       t,
       NAME_MAX,
+      home,
+      away,
+      cityOptions,
       choices,
       chosen,
       name,

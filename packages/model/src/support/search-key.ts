@@ -13,7 +13,9 @@ import { INVISIBLE } from './text'
 /**
  * Frozen on purpose. The key is stored, so editing the table after the first row is written
  * makes every accumulated key foreign — and it does so silently, with no error and no log
- * line. Change it only together with a migration that recomputes the column.
+ * line. Since MOL-109 the API recomputes every stored key that drifted from this function when
+ * it starts (`rekeyItems`), so a change lands on every database with the build that carries it;
+ * what it cannot bring back is a remembered pick, which keeps only the query's old key.
  *
  * Values are the folded ones (see LATIN_FOLDS): «ж» is j rather than zh because the fork
  * is what the fold exists to remove.
@@ -60,6 +62,14 @@ const CYRILLIC: Readonly<Record<string, string>> = Object.freeze({
   ї: 'i',
   є: 'e',
   ґ: 'g',
+  // Serbian (MOL-109), written as its Latin is: «шљиве» and «šljive» are one key. ћ and ч both
+  // give ch, as č and ć do, and џ is дж — `dj`, the same as đ and dž.
+  ђ: 'dj',
+  ј: 'j',
+  љ: 'lj',
+  њ: 'nj',
+  ћ: 'ch',
+  џ: 'dj',
 })
 
 /**
@@ -114,7 +124,76 @@ const ARMENIAN: Readonly<Record<string, string>> = Object.freeze({
   ֆ: 'f',
 })
 
-const LETTERS: Readonly<Record<string, string>> = Object.freeze({ ...CYRILLIC, ...ARMENIAN })
+/**
+ * Georgian, Mkhedruli (MOL-109): Georgia is a country of the settings from 0.2, and the table is what
+ * lets «ბორჯომი», «Боржоми» and «Borjomi» be one key, `borjomi`. Collapsed the way the Armenian
+ * one is: the ejectives merge with their plain pairs — კ/ქ/ყ give k, ტ/თ give t, პ/ფ give p, ჭ/ჩ give
+ * ch, წ/ც give ц — and ჯ is j, as «ж» and «Borjomi» write it. Mtavruli capitals lowercase into these.
+ */
+const GEORGIAN: Readonly<Record<string, string>> = Object.freeze({
+  ა: 'a',
+  ბ: 'b',
+  გ: 'g',
+  დ: 'd',
+  ე: 'e',
+  ვ: 'v',
+  ზ: 'z',
+  თ: 't',
+  ი: 'i',
+  კ: 'k',
+  ლ: 'l',
+  მ: 'm',
+  ნ: 'n',
+  ო: 'o',
+  პ: 'p',
+  ჟ: 'j',
+  რ: 'r',
+  ს: 's',
+  ტ: 't',
+  უ: 'u',
+  ფ: 'p',
+  ქ: 'k',
+  ღ: 'g',
+  ყ: 'k',
+  შ: 'sh',
+  ჩ: 'ch',
+  ც: 'ц',
+  ძ: 'dz',
+  წ: 'ц',
+  ჭ: 'ch',
+  ხ: 'h',
+  ჯ: 'j',
+  ჰ: 'h',
+})
+
+/**
+ * Latin letters no decomposition reaches (MOL-109): Serbian and Croatian «đ» is a letter of its own,
+ * not a d with a mark, so NFD leaves it and only a row brings it to the `dj` of «ђ».
+ */
+const LATIN: Readonly<Record<string, string>> = Object.freeze({
+  đ: 'dj',
+})
+
+const LETTERS: Readonly<Record<string, string>> = Object.freeze({
+  ...CYRILLIC,
+  ...ARMENIAN,
+  ...GEORGIAN,
+  ...LATIN,
+})
+
+/**
+ * Serbian and Croatian Latin (MOL-109): a letter with a háček or an acute is a letter of its own,
+ * spelt as its Cyrillic is — č and ć are ч and ћ, `ch`; š is ш, `sh`; ž is ж, `j` — so «čokolada»
+ * and «чоколада», «ćevapi», «ћевапи» and «чевапи» are one key, and dž comes out as the `dj` of «џ» and
+ * «дж». Resolved after NFD, while the letter is still its base and its mark: stripped of the mark
+ * first, č was a c and the fold made it k.
+ */
+const LATIN_MARKED: readonly (readonly [string, string])[] = Object.freeze([
+  ['c\u030C', 'ch'],
+  ['c\u0301', 'ch'],
+  ['s\u030C', 'sh'],
+  ['z\u030C', 'j'],
+] as const)
 
 /**
  * One letter written with two code points, so it is resolved before the per-character pass:
@@ -250,7 +329,7 @@ function foldToFixedPoint(text: string): string {
  * A character the table does not know keeps itself, lowercased and stripped of marks.
  * Dropping it instead would be worse: a name written entirely in an unknown script would
  * produce an empty key. The flip side is that such a name is then reachable only from its
- * own script — `ბორჯომი` is 7 away from `borjomi`, well past any threshold.
+ * own script — as `ბორჯომი` was 7 away from `borjomi` before Georgian had a table (MOL-109).
  *
  * **The key is empty for input that carries nothing but separators**, and that is on
  * purpose: the function cannot invent content. What keeps an unbuildable item out of the
@@ -258,7 +337,16 @@ function foldToFixedPoint(text: string): string {
  * that writes an item has to validate the name before taking its key.
  */
 export function toSearchKey(text: string): string {
-  const plain = text.toLowerCase().normalize('NFD').replace(MARK, '').replace(IGNORABLE, '')
+  // What draws nothing goes first, before the decomposition, as `nameIdentity` takes it out before
+  // it composes: «c», a zero-width space and «ˇ» is «č» to it and must be «č» here too (adversarial
+  // А4), and so must marks on both sides of one — NFD does not reorder across it, NFC after it is gone
+  // does (round 2, Б2). One identity, one key. Taken out after the marks, as before MOL-109, it
+  // changed no key: nothing ignorable is a mark a pair could need.
+  let decomposed = text.toLowerCase().replace(IGNORABLE, '').normalize('NFD')
+  for (const [from, to] of LATIN_MARKED) {
+    decomposed = decomposed.replaceAll(from, to)
+  }
+  const plain = decomposed.replace(MARK, '')
 
   let joined = plain
   for (const [from, to] of ARMENIAN_DIGRAPHS) {
@@ -326,6 +414,9 @@ export function unfinishedFoldSpellings(word: string): string[] {
 export const SEARCH_KEY_TABLES = Object.freeze({
   cyrillic: CYRILLIC,
   armenian: ARMENIAN,
+  georgian: GEORGIAN,
+  latin: LATIN,
+  latinMarked: LATIN_MARKED,
   latinFolds: LATIN_FOLDS,
   armenianDigraphs: ARMENIAN_DIGRAPHS,
 })

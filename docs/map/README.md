@@ -84,7 +84,7 @@ support types, the shared integration tests, the migrations.
 ### backend · other
 
 - `backend/src/env.ts` — The API's environment: loads the copy's `.env`, validates ports — the metrics' too (MOL-145) — database, rate refresh, build version and login configuration.
-- `backend/src/index.ts` — The API process's entry: migrations at boot, the scheduled official-rate refresh, then listening — and, where `METRICS_PORT` is set, the metrics' own port (MOL-145).
+- `backend/src/index.ts` — The API process's entry: migrations at boot, the search keys recomputed after them (MOL-109), the scheduled official-rate refresh, then listening — and, where `METRICS_PORT` is set, the metrics' own port (MOL-145).
 - `backend/src/parse.ts` — The parse seam for body, query and path, shared by routes and use cases; `InvalidBody` and the resource-id parse.
 - `backend/src/server.ts` — `buildServer`, the API's composition point: the request log of method and path, the central error handler, `no-store` on auth paths, the build on every answer, all routes and timers wired.
 

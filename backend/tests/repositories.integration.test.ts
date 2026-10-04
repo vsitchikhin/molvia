@@ -198,6 +198,37 @@ describe('справочник', () => {
     expect(first).toMatchObject({ created: true, item: { createdBy: null } })
     expect(again).toEqual({ ...first, created: false })
   })
+
+  it('«Čaj» с невидимым знаком между C и гачеком — тот же товар, не второй (MOL-109, А4)', async () => {
+    const input = {
+      kind: 'product' as const,
+      name: 'Čaj',
+      barcodes: [],
+      defaultUnit: 'kg' as const,
+    }
+    const hidden = `C${String.fromCodePoint(0x200b)}${String.fromCodePoint(0x30c)}aj`
+
+    const first = await catalogue.createUnlessNamed(input, null)
+    const again = await catalogue.createUnlessNamed({ ...input, name: hidden }, null)
+
+    expect(first).toMatchObject({ created: true })
+    expect(again).toEqual({ ...first, created: false })
+
+    // marks on both sides of what draws nothing: the same name once it is gone (round 2, Б2)
+    const caron = String.fromCodePoint(0x30c)
+    const dot = String.fromCodePoint(0x323)
+    const zws = String.fromCodePoint(0x200b)
+    const reordered = await catalogue.createUnlessNamed(
+      { ...input, name: `C${dot}${caron}aj` },
+      null,
+    )
+    const split = await catalogue.createUnlessNamed(
+      { ...input, name: `C${caron}${zws}${dot}aj` },
+      null,
+    )
+    expect(reordered).toMatchObject({ created: true })
+    expect(split).toEqual({ ...reordered, created: false })
+  })
 })
 
 describe('места', () => {

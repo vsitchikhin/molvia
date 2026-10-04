@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { EXCHANGE_UNDO_MINUTES } from '#model/entities/exchange'
 import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
-import type { SettingsCity } from '#model/contracts/settings'
+import { COUNTRY_CITIES } from '#model/contracts/settings'
 import { toSearchKey } from '#model/support/search-key'
 import { MINOR_EXPONENT } from '#model/values/money'
 import type { Currency, Money } from '#model/values/money'
@@ -80,6 +80,13 @@ export type ReceiptFailure = z.infer<typeof receiptFailureSchema>
 export const receiptCountrySchema = z.enum(['AM'])
 export type ReceiptCountry = z.infer<typeof receiptCountrySchema>
 
+/**
+ * The cities a receipt names, as a word of its head: Armenia's, since only Armenian receipts are read
+ * (MOL-109, Р-5) — a person in Tbilisi records an Armenian receipt in Gyumri or Yerevan.
+ */
+export const RECEIPT_CITIES = COUNTRY_CITIES.AM
+export type ReceiptCity = (typeof RECEIPT_CITIES)[number]
+
 export const RECEIPT_LANGUAGES: Readonly<Record<ReceiptCountry, string>> = { AM: 'hye+rus+eng' }
 export const RECEIPT_CURRENCY: Readonly<Record<ReceiptCountry, Currency>> = { AM: 'AMD' }
 
@@ -145,19 +152,19 @@ export function storeMemoryWords(line: {
  * The cities of the settings as a receipt prints them, as a word (Р-6): a place is the shop in its city.
  * «ԵՐԵՎԱՆ-ՍԻԹԻ», «YEREVAN CITY» is the chain's name, not the city.
  */
-const CITY_WORDS: Readonly<Record<SettingsCity, string>> = {
+const CITY_WORDS: Readonly<Record<ReceiptCity, string>> = {
   Гюмри: '(?:գյումրի|gyumri)(?![\\p{L}-])',
   Ереван: '(?:երևան|երե[վւ]ան|yerevan)(?![\\p{L}-])(?!\\s*[-–]?\\s*(?:սիթի|city|сити))',
 }
 
 /** A city named anywhere in a row of the head, a word of its own: an address, or an item's name. */
-const CITY_ANYWHERE: Readonly<Record<SettingsCity, RegExp>> = {
+const CITY_ANYWHERE: Readonly<Record<ReceiptCity, RegExp>> = {
   Гюмри: new RegExp(`(?<!\\p{L})${CITY_WORDS.Гюмри}`, 'iu'),
   Ереван: new RegExp(`(?<!\\p{L})${CITY_WORDS.Ереван}`, 'iu'),
 }
 
 /** The city after «ք.», քաղաք — a mark an address has and an item's name never does. */
-const CITY_MARKED: Readonly<Record<SettingsCity, RegExp>> = {
+const CITY_MARKED: Readonly<Record<ReceiptCity, RegExp>> = {
   Гюмри: new RegExp(`(?<!\\p{L})ք\\.\\s*${CITY_WORDS.Гюмри}`, 'iu'),
   Ереван: new RegExp(`(?<!\\p{L})ք\\.\\s*${CITY_WORDS.Ереван}`, 'iu'),
 }
@@ -215,12 +222,12 @@ function headEnd(rows: readonly TextRow[]): number {
 export function receiptCityOf(
   rows: readonly TextRow[],
   productWords: ReadonlySet<string> = NO_WORDS,
-): SettingsCity | null {
+): ReceiptCity | null {
   const first = rows.filter((row) => row.part === 0)
   const head = first.slice(0, headEnd(first))
   // the chain's site, «www.yerevan-city.am», however OCR read it — «Ww Yerevan: СПу. ат» — names no city
   const lines = head.filter((row) => !isSiteRow(row.text))
-  const cities = Object.keys(CITY_ANYWHERE) as SettingsCity[]
+  const cities = Object.keys(CITY_ANYWHERE) as ReceiptCity[]
   // the city an address names — the one city named in the head at all: an item named after another
   // city, or a chain's legal address beside its shop's, is two cities and no answer (rounds 3–10)
   const named = cities.filter((city) => lines.some((row) => CITY_ANYWHERE[city].test(row.text)))

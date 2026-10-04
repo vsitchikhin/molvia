@@ -221,7 +221,8 @@ The lever of gate 0.2: the day after a purchase the bot asks «вчера · Е�
   (`REMINDER_HOUR`, `REMINDER_LAST_HOUR`). An evening missed entirely is lost, never sent at night;
   a step is due until sent, so it comes the next evening. Days in SQL are turned into instants by
   Postgres with the zone named — never the session's `timezone`. A country without a zone is not
-  reminded; a test holds every country the settings accept to having one.
+  reminded; a test holds every country the settings accept to having one — Tbilisi's and
+  Belgrade's since MOL-109, Belgrade's with its summer time, so the evening is theirs all year.
 - **A message an item, at most three a day, only the first one rings** (В-1). The freshest three;
   under the last, how many more wait in «Оценки» with the link — as text, since Telegram refuses an
   inline button to an `http://` address and a copy in development has one.

@@ -198,6 +198,33 @@ test('a trip started by the old app asks for its city and currencies before it i
     .toBe('Старый магазин')
 })
 
+test('moves to Georgia: the city list follows the country, and «Что брать» answers for Batumi (MOL-109)', async ({
+  page,
+}) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  const country = page.getByLabel('Страна', { exact: true })
+  const city = page.getByLabel('Город', { exact: true })
+  await expect(country).toHaveValue('AM')
+  await country.selectOption({ label: 'Грузия' })
+  await expect(city).toHaveValue('Тбилиси')
+  await expect(city.locator('option')).toHaveText(['Тбилиси', 'Батуми'])
+  await city.selectOption('Батуми')
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(
+    page.locator('.dock').getByText('Настройки сохранены', { exact: true }),
+  ).toBeVisible()
+  const headers = await asBrowser(page)
+  const advice = await page.request.get('/api/advice', { headers })
+  expect(((await advice.json()) as { geography: unknown }).geography).toEqual({
+    country: 'GE',
+    city: 'Батуми',
+  })
+  await page.reload()
+  await expect(country).toHaveValue('GE')
+  await expect(city).toHaveValue('Батуми')
+})
+
 test('lost save responses remain uncertain until a read confirms the result', async ({
   page,
 }, testInfo) => {

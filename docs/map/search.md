@@ -7,7 +7,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 
 - `packages/model/src/contracts/catalogue.ts` — Wire contract of the catalogue: the search query and its bound, the entry allowlist, the answer with `near`, the «Предложить товар» body.
 - `packages/model/src/entities/item.ts` — Entity: a catalogue item — kind, name, search key, barcodes, unit — and the schema of a new item.
-- `packages/model/src/support/search-key.ts` — `toSearchKey`, the frozen alphabet that folds any spelling of a name to one key, `unfinishedFoldSpellings` for a word typed halfway through a fold, and `nameIdentity` for duplicates.
+- `packages/model/src/support/search-key.ts` — `toSearchKey`, the frozen alphabet — Cyrillic with Serbian, Armenian, Georgian, Serbian Latin (MOL-109) — that folds any spelling of a name to one key, `unfinishedFoldSpellings` for a word typed halfway through a fold, and `nameIdentity` for duplicates.
 - `packages/model/src/support/synonyms.ts` — The synonym dictionary (`synonymKeys`) and the word-of-the-kind rules: adjective and noun patterns, `WORD_BREAK`, `kindKey`.
 - `packages/model/src/support/text.ts` — Visible-text rules shared by every name: `INVISIBLE`, `visibleLine`/`visibleText`, `pastedLine` for what a paste brings along.
 
@@ -34,6 +34,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 - `backend/src/db/kind-word.ts` — `kindAt`: where the word of the kind stands in a name, the one SQL spelling of `kindKey` (MOL-45) — read by the search's synonyms and by «Тут дешевле»'s items of a kind (MOL-92).
 - `backend/src/db/item-embeddings-repository.ts` — Repository of item vectors (MOL-105): the items without one of a model, and the vectors written — another model's replaced, an item gone skipped.
 - `backend/src/db/items-repository.ts` — Repository of items: the ranked search (candidates, distance, units, synonyms, picks, `near`) and `createUnlessNamed`. Tests: `backend/tests/search.integration.test.ts`.
+- `backend/src/db/rekey.ts` — `rekeyItems`: at the API's start, every stored search key brought to what `toSearchKey` gives its name today, under a lock against writes (MOL-109). Tests: `backend/tests/rekey.integration.test.ts`.
 - `backend/src/db/search-picks-repository.ts` — Repository of remembered picks: a query and the item taken after it, and the person's own word (`admits`). Tests: `backend/tests/search-picks.integration.test.ts`.
 - `backend/src/db/seed-repository.ts` — Repository writing the seed in one transaction: adds new names, reports those kept and twins under another spelling. Tests: `backend/tests/seed-catalogue.integration.test.ts`.
 
@@ -49,6 +50,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 ## backend · tests
 
 - `backend/tests/catalogue.integration.test.ts` — Integration test: both catalogue routes through the server — the door, the query bound, the wire answer, no event, proposal dedup.
+- `backend/tests/rekey.integration.test.ts` — Integration test: a key drifted from today's tables is rewritten, a current one left, a second start writes nothing (MOL-109).
 - `backend/tests/search-corpus.integration.test.ts` — Integration test: the whole corpora and the owner's shelf through the real search, every answer pinned whole, near and far included.
 - `backend/tests/search-meaning.integration.test.ts` — Integration test: the search by meaning on the seed with the real model — shelf words, the owner's words unmoved, nothing near for things absent, other models unread, the HNSW plan, the server and the writer.
 - `backend/tests/search-picks.integration.test.ts` — Integration test: a pick is one row per person, query key and item, counted up, in the caller's transaction, within the key length.

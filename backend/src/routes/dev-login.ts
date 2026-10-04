@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto'
-import { DomainError, ERROR, telegramUserIdSchema } from '@molvia/model'
+import { DomainError, ERROR, ZONE_HEADER, isTimeZone, telegramUserIdSchema } from '@molvia/model'
 import type { TelegramUserId } from '@molvia/model'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { answerWithActor } from '@/routes/actors'
@@ -99,7 +99,9 @@ function accountOf(request: FastifyRequest): TelegramUserId | null {
 
 export function devLoginRoute(
   app: FastifyInstance,
-  api: { signIn(id: TelegramUserId, deviceName: string | null): Promise<SignedIn> },
+  api: {
+    signIn(id: TelegramUserId, deviceName: string | null, zone?: string): Promise<SignedIn>
+  },
 ): void {
   app.post(
     '/dev/login',
@@ -118,9 +120,12 @@ export function devLoginRoute(
       const telegramUserId = remembered ?? randomInt(1, 2 ** 40)
       // Named like a real login's device (MOL-57): without it every session of a working copy —
       // and every one the end-to-end suite makes — reads «unknown device» in «Устройства».
+      // A newcomer starts where the phone's zone is, as through the real door (MOL-109).
+      const zone = request.headers[ZONE_HEADER.toLowerCase()]
       const { actor, token, expiresAt } = await api.signIn(
         telegramUserId,
         deviceName(request.headers['user-agent']),
+        typeof zone === 'string' && isTimeZone(zone) ? zone : undefined,
       )
 
       // Written back even when it was read, so a year of development never runs the cookie out

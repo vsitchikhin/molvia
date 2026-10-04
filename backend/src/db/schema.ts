@@ -56,7 +56,7 @@ import {
   rateProviderSchema,
   ratePreferenceSchema,
   SALARY_SHIFT_DAY_MAX,
-  SETTINGS_CITIES,
+  RECEIPT_CITIES,
   rateSourceSchema,
   RECEIPT_PARTS_MAX,
   RECEIPT_PART_BYTES_MAX,
@@ -93,7 +93,7 @@ import type {
   ReceiptFailure,
   ReceiptParsedMatch,
   ReceiptStatus,
-  SettingsCity,
+  ReceiptCity,
   StoreMemoryKind,
   SpendingPreset,
 } from '@molvia/model'
@@ -2103,7 +2103,7 @@ export const receipts = pgTable(
     totalMinor: bigint('total_minor', { mode: 'bigint' }),
     balanced: boolean('balanced').notNull().default(false),
     // The city of the settings its address prints (MOL-126, Р-6), where its place is looked for.
-    city: text('city').$type<SettingsCity>(),
+    city: text('city').$type<ReceiptCity>(),
     recordedAt: timestamp('recorded_at', { withTimezone: true }),
     // The purchases it was recorded as (MOL-126); gone with the trip's final removal.
     tripId: uuid('trip_id').references(() => trips.id, { onDelete: 'set null' }),
@@ -2148,7 +2148,7 @@ export const receipts = pgTable(
     check('receipts_attempts_non_negative', sql`${table.attempts} >= 0`),
     check(
       'receipts_city_known',
-      sql`${table.city} is null or ${oneOf(table.city, SETTINGS_CITIES)}`,
+      sql`${table.city} is null or ${oneOf(table.city, RECEIPT_CITIES)}`,
     ),
     check(
       'receipts_layout_known',

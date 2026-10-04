@@ -183,7 +183,7 @@ import {
   currencySign,
   formatMoney,
   money,
-  SETTINGS_CITIES,
+  COUNTRY_CITIES,
 } from '@molvia/model'
 import type { SpendingCategoryView } from '@molvia/model'
 import IconClose from '~icons/mdi/close'
@@ -259,8 +259,8 @@ export default defineComponent({
       quantity: ref('1'),
       price: ref('57о'),
       review: ref(''),
-      city: ref(SETTINGS_CITIES[0]),
-      cities: SETTINGS_CITIES.map((city) => ({ value: city, label: city })),
+      city: ref<string>(COUNTRY_CITIES.AM[0]),
+      cities: COUNTRY_CITIES.AM.map((city) => ({ value: city, label: city })),
       date: ref('2026-09-19'),
       unit: ref('l'),
       toggles: reactive([

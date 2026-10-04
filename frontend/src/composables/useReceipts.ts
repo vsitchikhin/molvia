@@ -5,7 +5,6 @@ import type { Money, ReceiptSummary, WireCode } from '@molvia/model'
 import { api } from '@/api'
 import { useKeptAnswer } from '@/composables/useKeptAnswer'
 import { useOnline } from '@/composables/useOnline'
-import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { photoShelf } from '@/receipts/photoShelf'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
@@ -74,8 +73,10 @@ export interface ReceiptsScreen {
  * «запишем, когда появится связь» — then the server's. A recorded receipt is a row of «Записаны»
  * and not here; one being removed is nowhere.
  *
- * **Asked only of a person who takes receipts** (Р-1): for anyone else the answer is an empty list
- * with no request. **Asked again every few seconds only while one is being read** (Р-4, adversarial
+ * **Asked of everyone** (MOL-109, adversarial А2): the camera is for a person whose country the
+ * server reads (Р-1), but a receipt taken before a move to Georgia or Serbia is still theirs to look
+ * at, record or remove — asked only of the first, it vanished from «Покупки» and went with its 28
+ * days, its photos held on the phone. **Asked again every few seconds only while one is being read** (Р-4, adversarial
  * А2) and the screen is in view: there is no push, and nothing else moves by itself. The answer is
  * kept on the phone, so offline the list stands as last read. Every list read lets the photo shelf
  * and the drafts go of receipts nothing names any more (Т-4).
@@ -85,19 +86,13 @@ export function useReceipts(): ReceiptsScreen {
   const queue = useReceiptQueueStore()
   const drafts = useReceiptDraftsStore()
   const online = useOnline()
-  const { country } = useReceiptCapture()
 
   const kept = useKeptAnswer({
     key: 'molvia.receipts',
     subject: ref('all'),
-    ask: () => (country.value ? api.receipts() : Promise.resolve({ receipts: [] })),
+    ask: () => api.receipts(),
     codec: receiptsResponseCodec,
     kept: 1,
-  })
-
-  // The settings come after the first paint: a country known only then is asked about then.
-  watch(country, (now, before) => {
-    if (now && !before) void kept.retry()
   })
 
   const rows = computed<ReceiptRow[]>(() => {
@@ -190,7 +185,7 @@ export function useReceipts(): ReceiptsScreen {
     () => kept.answer.value,
     (answer) => {
       const owner = actor.id
-      if (!answer || !owner || !country.value) return
+      if (!answer || !owner) return
       const named = new Set([
         ...answer.receipts.filter((one) => one.status !== 'recorded').map((one) => one.id),
         ...queue.pending.map(receiptOf),
@@ -221,7 +216,8 @@ export function useReceipts(): ReceiptsScreen {
     rows,
     knownEmpty: computed(() => kept.answer.value !== null && rows.value.length === 0),
     trouble: computed(() => {
-      if (!country.value) return null
+      // Said to everyone, as everyone is asked (MOL-109, Б1): a receipt taken before a move is on its
+      // way to «Покупки» like any other, and «пусто» over a list that failed would hide it.
       const stale = kept.stale.value
       if (stale === 'error' || stale === 'offline') return stale
       const phase = kept.phase.value
