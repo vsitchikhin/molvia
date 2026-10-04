@@ -286,6 +286,16 @@
       </div>
     </section>
 
+    <!-- One row of an operation (MOL-176): every row with its chevron and its amount in one column,
+         the words put together by the same functions the screens use. -->
+    <section class="group">
+      <SectionCaption class="caption">{{ t('dev.kit.operations') }}</SectionCaption>
+      <AppCard as="ul" list>
+        <OperationRow v-for="(row, index) in operations" :key="index" v-bind="row" />
+      </AppCard>
+      <OperationSkeleton form="rows" :count="3" />
+    </section>
+
     <section class="group">
       <SectionCaption class="caption">{{ t('dev.kit.cards') }}</SectionCaption>
       <AppCard as="section" tone="take">
@@ -333,7 +343,7 @@ import {
   money,
   COUNTRY_CITIES,
 } from '@molvia/model'
-import type { SpendingCategoryView } from '@molvia/model'
+import type { AccountOperationView, SpendingCategoryView } from '@molvia/model'
 import IconAlert from '~icons/mdi/alert-outline'
 import IconCart from '~icons/mdi/cart-outline'
 import IconDevices from '~icons/mdi/cellphone-link'
@@ -359,8 +369,13 @@ import CategoryChips from '@/components/CategoryChips.vue'
 import ListRow from '@/components/ListRow.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NavRow from '@/components/NavRow.vue'
+import OperationRow from '@/components/OperationRow.vue'
+import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import { operationRowProps } from '@/components/accounts'
+import { journalRowProps } from '@/components/spending'
+import type { JournalRow } from '@/components/spending'
 import VerdictBadge from '@/components/VerdictBadge.vue'
 import VerdictCard from '@/components/VerdictCard.vue'
 
@@ -392,13 +407,149 @@ export default defineComponent({
     ListRow,
     MonthSwitcher,
     NavRow,
+    OperationRow,
+    OperationSkeleton,
     SectionCaption,
     SegmentedControl,
     VerdictBadge,
     VerdictCard,
   },
   setup() {
-    const { t } = useI18n()
+    const { t, locale } = useI18n()
+    const categories: SpendingCategoryView[] = (['groceries', 'cafe', 'transport'] as const).map(
+      (preset, index) => ({
+        id: `00000000-0000-4000-8000-00000000010${String(index)}`,
+        preset,
+        name: null,
+        colour: null,
+        archived: false,
+      }),
+    )
+    const [groceries, cafe, transport] = categories
+    const categoryName = (category: SpendingCategoryView) =>
+      t(`spending.category.${category.preset ?? 'other'}`)
+
+    /** «Траты» and an account's journal, through the functions the screens use (MOL-176). */
+    const operations = computed(() => {
+      const spent = (row: JournalRow, category: SpendingCategoryView | undefined) =>
+        journalRowProps(row, {
+          t,
+          locale: locale.value,
+          category: category ?? null,
+          categoryName: category ? categoryName(category) : t('spending.category.other'),
+          spendCurrency: 'AMD',
+        })
+      const manual = (
+        id: number,
+        amount: bigint,
+        currency: 'AMD' | 'RUB',
+        category: SpendingCategoryView | undefined,
+        patch: Partial<Extract<JournalRow, { kind: 'manual' }>> & { note?: string; place?: string },
+      ): JournalRow => ({
+        kind: 'manual',
+        key: String(id),
+        spending: {
+          id: `00000000-0000-4000-8000-00000000020${String(id)}`,
+          spentOn: '2026-09-30',
+          amount: money(amount, currency),
+          categoryId: category?.id ?? '',
+          note: patch.note ?? null,
+          place: patch.place ?? null,
+          rate: null,
+          accountId: null,
+          debited: null,
+          revision: 1,
+          amendedAt: null,
+        },
+        counted: patch.counted ?? null,
+        mark: patch.mark ?? null,
+        refusal: null,
+        local: patch.local ?? false,
+      })
+      const logged = (patch: Partial<AccountOperationView>) =>
+        operationRowProps(
+          {
+            kind: 'spending',
+            id: '00000000-0000-4000-8000-000000000301',
+            side: null,
+            day: '2026-09-25',
+            at: new Date('2026-09-25T09:00:00Z'),
+            accountId: 'card',
+            amounts: [],
+            moved: null,
+            approximate: false,
+            debited: null,
+            inBalance: true,
+            unpriced: 0,
+            revision: 1,
+            items: null,
+            categoryId: null,
+            note: null,
+            place: null,
+            source: null,
+            counterpart: null,
+            ...patch,
+          },
+          {
+            t,
+            locale: locale.value,
+            categories,
+            nameOf: categoryName,
+            accountName: () => t('dev.kit.row_cash'),
+            inAccount: true,
+          },
+        )
+      return [
+        spent(
+          manual(1, 120000n, 'AMD', transport, {
+            place: 'Yandex Go',
+            mark: 'waiting',
+            local: true,
+          }),
+          transport,
+        ),
+        spent(
+          manual(2, 45000n, 'RUB', cafe, { place: 'Coffeeman', counted: money(208000n, 'AMD') }),
+          cafe,
+        ),
+        spent(manual(3, 4500n, 'RUB', cafe, {}), cafe),
+        spent(
+          {
+            kind: 'trip',
+            key: 'trip',
+            tripId: 'trip',
+            placeName: 'SAS',
+            items: 5,
+            amount: money(348000n, 'AMD'),
+            counted: null,
+          },
+          groceries,
+        ),
+        spent(manual(4, 1240050n, 'AMD', groceries, { note: t('dev.kit.row_long') }), groceries),
+        spent(manual(5, 180000n, 'AMD', transport, { mark: 'refused' }), transport),
+        logged({
+          kind: 'income',
+          source: 'salary',
+          amounts: [money(9961500n, 'RUB')],
+          moved: money(9961500n, 'RUB'),
+        }),
+        logged({
+          kind: 'exchange',
+          side: 'given',
+          amounts: [money(-3246753n, 'RUB')],
+          moved: money(-3246753n, 'RUB'),
+          counterpart: { accountId: 'cash', amount: money(15600000n, 'AMD') },
+        }),
+        logged({
+          categoryId: groceries?.id ?? null,
+          place: 'Yandex Lavka',
+          amounts: [money(-233185n, 'RUB')],
+          moved: money(-989100n, 'AMD'),
+          approximate: true,
+          debited: money(989100n, 'AMD'),
+        }),
+      ]
+    })
     const units = computed(() => [
       { value: 'kg', label: t('item.unit_kg') },
       { value: 'l', label: t('item.unit_l') },
@@ -465,15 +616,9 @@ export default defineComponent({
       ]),
       // The current month at the edge: «›» is the inactive arrow.
       month: ref('2026-10'),
-      categories: (['groceries', 'cafe', 'transport'] as const).map((preset, index) => ({
-        id: `00000000-0000-4000-8000-00000000010${String(index)}`,
-        preset,
-        name: null,
-        colour: null,
-        archived: false,
-      })),
-      categoryName: (category: SpendingCategoryView) =>
-        t(`spending.category.${category.preset ?? 'other'}`),
+      categories,
+      categoryName,
+      operations,
       category: ref<string | null>('00000000-0000-4000-8000-000000000101'),
       sheetOpen: ref(false),
       scannerOpen: ref(false),

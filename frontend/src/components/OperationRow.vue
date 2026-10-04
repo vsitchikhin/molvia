@@ -64,6 +64,12 @@ export default defineComponent({
   @include visually-hidden;
 }
 
+/* On a narrow phone a tag breaks inside its pill rather than standing over the amount; the item's
+   own selector outweighs the kit's `nowrap` whatever order the sheets load in. */
+li .tag {
+  white-space: normal;
+}
+
 .sums {
   display: grid;
   justify-items: end;

@@ -80,3 +80,70 @@ test('a chosen row the keyboard stands on takes its fill from its round layer al
   expect(fills.chosen).toBe('rgba(0, 0, 0, 0)')
   expect(fills.layer).toBe(fills.alone)
 })
+
+// One row of an operation (MOL-176, Ф-12): every row has its chevron, so the amounts end in one column
+// — and the bars of its skeleton end there too, or the list would jump as the answer comes.
+test('the amounts of operation rows stand in one column, where their skeleton’s stand', async ({
+  page,
+}) => {
+  await open(page, '/_kit')
+  const section = page.locator('section', {
+    has: page.getByRole('heading', { name: 'Operation row' }),
+  })
+  await expect(section.locator('.amount').first()).toBeVisible()
+  const edges = await section.evaluate((root) => {
+    const right = (selector: string) =>
+      [...root.querySelectorAll(selector)].map((one) => one.getBoundingClientRect().right)
+    return { rows: right('.list-row .amount'), bars: right('.row .amount') }
+  })
+  expect(edges.rows.length).toBeGreaterThan(5)
+  expect(edges.bars.length).toBe(3)
+  for (const edge of [...edges.rows, ...edges.bars]) expect(edge).toBeCloseTo(edges.rows[0] ?? 0, 0)
+})
+
+// Е-11: a row cut its title, the day in its meta and the sum in it to «…». On the phone the title breaks
+// onto lines and the meta, the amount and the line under it are whole; on a phone of 320, where the
+// words have a hundred pixels, still no amount, line under it or tag is cut or stands over another.
+for (const width of [390, 320])
+  test(`at ${String(width)} nothing of an operation row is cut or overlaps — the title breaks instead`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 720 })
+    await open(page, '/_kit')
+    const section = page.locator('section', {
+      has: page.getByRole('heading', { name: 'Operation row' }),
+    })
+    await expect(section.locator('.amount').first()).toBeVisible()
+    const look = await section.evaluate((root) => {
+      const cut = (one: Element) =>
+        one.scrollWidth > one.clientWidth || one.scrollHeight > one.clientHeight + 1
+      const rows = [...root.querySelectorAll('.list-row')]
+      const over = rows.filter((row) => {
+        const words = row.querySelector('.words')?.getBoundingClientRect()
+        const tail = row.querySelector('.tail')?.getBoundingClientRect()
+        const below = row.querySelector('.below > *')?.getBoundingClientRect()
+        return Boolean(words && tail && below && below.right > tail.left)
+      })
+      const titles = rows.flatMap((row) => {
+        const title = row.querySelector('.title')
+        if (!title) return []
+        const lines =
+          title.getBoundingClientRect().height / parseFloat(getComputedStyle(title).lineHeight)
+        return [{ cut: cut(title), lines }]
+      })
+      return {
+        tailsCut: [
+          ...root.querySelectorAll('.list-row .amount, .list-row .sub, .list-row .tag'),
+        ].filter(cut).length,
+        overlaps: over.length,
+        metasCut: [...root.querySelectorAll('.list-row .meta')].filter(cut).length,
+        titlesCut: titles.filter((one) => one.cut).length,
+        longest: Math.max(...titles.map((one) => one.lines)),
+        page: document.documentElement.scrollWidth,
+      }
+    })
+    expect(look).toMatchObject({ tailsCut: 0, overlaps: 0, titlesCut: 0, page: width })
+    expect(look.longest).toBeGreaterThanOrEqual(2)
+    // Two lines are the meta's on a phone of 390; on 320 the other half of an exchange may end in «…».
+    if (width === 390) expect(look.metasCut).toBe(0)
+  })

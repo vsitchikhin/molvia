@@ -236,9 +236,12 @@ export default defineComponent({
   white-space: normal;
 }
 
+/* A word longer than the column breaks rather than being cut at the side: the two lines end in «…», the
+   middle of a word never in nothing (MOL-176, Е-11). */
 .meta {
   display: -webkit-box;
   overflow: hidden;
+  overflow-wrap: anywhere;
   color: var(--text-muted);
   font-size: var(--text-footnote);
   -webkit-box-orient: vertical;
