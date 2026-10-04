@@ -48,12 +48,13 @@ export default defineComponent({
     pointer-events: auto;
   }
 
-  // An inactive action lies over the cards, and half-transparent it reads as a smudge on them:
-  // drawn solid and muted instead — the strip above says why (handoff MOL-81, 02).
-  > :slotted([aria-disabled='true']:not([aria-busy='true'])) {
-    background: var(--surface-2);
-    color: var(--text-muted);
-    opacity: 1;
+  // The lift is the place's, not a state's (MOL-174, reviews 1 and 6): whatever stands here floats
+  // over the cards by one shadow, live or not — an inactive action without it reads as a smudge on
+  // them (handoff MOL-81, 02), and one lifted only when inactive floated above the live one. `[class]`
+  // for the weight: above a variant's own shadow and the kit's `box-shadow: none` of an inactive
+  // primary, whatever order the sheets come in; everything placed here is a component with a class.
+  > :slotted([class]) {
+    box-shadow: var(--shadow-md);
   }
 }
 </style>

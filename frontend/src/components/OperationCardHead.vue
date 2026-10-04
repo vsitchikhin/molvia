@@ -71,20 +71,20 @@ export default defineComponent({
   border: 0;
   border-radius: var(--radius);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text);
   cursor: pointer;
 
   &:hover:not(:disabled) {
     background: var(--surface-2);
-    color: var(--text);
   }
 
   &:focus-visible {
     @include focus-ring;
   }
 
+  /* The pair of the kit's icon button (В-15): live in `text`, not now in `text-muted` — no opacity. */
   &:disabled {
-    opacity: var(--opacity-stale);
+    color: var(--text-muted);
     cursor: default;
   }
 

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull, lt, or, sql } from 'drizzle-orm'
 import { actorSchema, telegramUserIdSchema } from '@molvia/model'
 import type { Actor, ActorPatch, NewActor, TelegramUserId } from '@molvia/model'
 import { translateFailures } from './failure'
@@ -37,6 +37,16 @@ export interface ActorRepository {
    * released as soon as it is taken. `create` and `createIfMissing` take it themselves.
    */
   lockAccount(telegramUserId: TelegramUserId): Promise<void>
+
+  /** The edition of the terms and the privacy page this owner accepted (MOL-95), or none. */
+  consentVersion(id: string): Promise<number | null>
+
+  /**
+   * Accepts an edition (MOL-95) and answers the one now on the row. **Only ever upwards**: the same
+   * edition again — a second window, a repeat after a lost answer — keeps its first moment, and an
+   * older one, from a build that has not updated, changes nothing. The moment is the database's.
+   */
+  acceptConsent(id: string, version: number): Promise<number | null>
 }
 
 /**
@@ -53,6 +63,15 @@ function toActor(row: typeof actors.$inferSelect): Actor {
 // integration tests point it at their own database, and the composition point in
 // server.ts points it at the real one.
 export function createActorRepository(db: Conn): ActorRepository {
+  async function consentVersion(id: string): Promise<number | null> {
+    if (idOrNull(id) === null) return null
+    const [row] = await db
+      .select({ version: actors.consentVersion })
+      .from(actors)
+      .where(eq(actors.id, id))
+    return row?.version ?? null
+  }
+
   return {
     async create(id, telegramUserId, input) {
       // Judged before the row exists, as everywhere else on a write path (MOL-52, А1). The
@@ -134,6 +153,24 @@ export function createActorRepository(db: Conn): ActorRepository {
 
       const [row] = await db.select().from(actors).where(eq(actors.id, id)).limit(1)
       return row ? toActor(row) : null
+    },
+
+    consentVersion,
+
+    async acceptConsent(id, version) {
+      if (idOrNull(id) === null) return null
+      // The condition is in the `WHERE`, so two windows accepting at once write once (MOL-95).
+      const [row] = await db
+        .update(actors)
+        .set({ consentVersion: version, consentedAt: sql`now()` })
+        .where(
+          and(
+            eq(actors.id, id),
+            or(isNull(actors.consentVersion), lt(actors.consentVersion, version)),
+          ),
+        )
+        .returning({ version: actors.consentVersion })
+      return row ? row.version : consentVersion(id)
     },
 
     async update(id, patch) {

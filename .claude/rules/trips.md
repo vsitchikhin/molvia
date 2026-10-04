@@ -198,9 +198,16 @@ and so does one naming a geography nothing may be written under — **one answer
 without a retry** until they name the city and the currencies, because nothing else knows where
 that trip was. A 400 there would have been the end of that trip: the queue sets a start it cannot
 send aside, and the purchases behind it go too. **What a trip may name is the rule the settings
-refuse by** — `geographyAllowed`: one's own current city, or AM with one of `SETTINGS_CITIES`.
-`places` is a table everyone shares, and «the country is fixed as Armenia» must not be held by
-the form alone. The city is read by the fold
+refuse by** — `geographyAllowed`: one's own current geography, or a city of its own country in
+`COUNTRY_CITIES` — Armenia (Гюмри, Ереван), Georgia (Тбилиси, Батуми), Serbia (Белград, Нови-Сад),
+MOL-109. «Батуми» under `AM` is refused: `places` is a table everyone shares, and which cities a
+country has must not be held by the form alone. **The form chooses the country first** and the
+city among its country's; a change of country lands on that country's first city, or on the kept
+one when the country is its own (Б1), so the form never holds a city of another country. A city
+or a country the settings do not offer stays in its list, under its own country. **A newcomer
+starts where the phone's zone is** (`firstGeography`, В-3): the zone the login is collected with
+picks the country and its first city, every other zone Gyumri; the currencies stay the dram and
+the ruble until MOL-110, and an account that exists is never moved by it. The city is read by the fold
 `places.ensure` stores it under, never by the exact spelling, or a shop written «гюмри» once
 falls out of its own owner's prices. **The form's draft belongs to the account and not to the
 window**: it is kept under the owner's key on the device, as verdict drafts are, because the

@@ -248,6 +248,42 @@ describe('общий режим', () => {
     expect(await expenses.placePricesFor(ownPrices(me, [itemId]))).toHaveLength(1)
   })
 
+  it('на двух странах: чужие цены только своего города, свои — отовсюду, свой город первым (MOL-109, Р-26)', async () => {
+    // Одноимённый «Carrefour» в Тбилиси и в Гюмри — два места; человек живёт в Тбилиси.
+    const me = await insertActor(db, { country: 'GE', city: 'Тбилиси' })
+    const itemId = await insertItem(db)
+    const tbilisi = await insertPlace(db, { name: 'Carrefour', country: 'GE', city: 'Тбилиси' })
+    const gyumri = await insertPlace(db, { name: 'Carrefour', country: 'AM', city: 'Гюмри' })
+    const erevan = await insertPlace(db, { name: 'SAS', country: 'AM', city: 'Ереван' })
+    const usd = (minor: number): Money => ({ minor: BigInt(minor), currency: 'USD' })
+    for (const minor of [500, 510, 520]) {
+      await bought(
+        await insertActor(db, { country: 'GE', city: 'Тбилиси' }),
+        itemId,
+        tbilisi,
+        usd(minor),
+      )
+      await bought(await insertActor(db), itemId, gyumri, amd(minor * 100))
+    }
+    // свой ереванский чек дешевле — и всё равно после своего города
+    await bought(me, itemId, erevan, amd(100_000))
+    const inTbilisi = { ...sharedPrices(me, [itemId]), country: 'GE', city: 'Тбилиси' }
+
+    const rows = await expenses.placePricesFor(inTbilisi)
+    expect(rows.map((row) => [row.placeName, row.placeCity])).toEqual([
+      ['Carrefour', 'Тбилиси'],
+      ['SAS', 'Ереван'],
+    ])
+
+    // Тот же человек, будь он в Гюмри: тбилисские чужие цены ему не видны, гюмрийские — да.
+    const inGyumri = { ...sharedPrices(me, [itemId]), country: 'AM', city: 'Гюмри' }
+    const there = await expenses.placePricesFor(inGyumri)
+    expect(there.map((row) => [row.placeName, row.placeCity])).toEqual([
+      ['Carrefour', 'Гюмри'],
+      ['SAS', 'Ереван'],
+    ])
+  })
+
   it('усредняет медиану по троим и отступает к своей на двоих', async () => {
     const me = await insertActor(db)
     const placeId = await insertPlace(db)

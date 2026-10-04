@@ -57,6 +57,13 @@
           <IconChevron class="entry-chevron" aria-hidden="true" />
         </RouterLink>
       </li>
+      <li>
+        <RouterLink class="entry" :to="{ name: 'terms' }">
+          <IconTerms class="entry-icon" aria-hidden="true" />
+          <span class="entry-label">{{ t('terms.title') }}</span>
+          <IconChevron class="entry-chevron" aria-hidden="true" />
+        </RouterLink>
+      </li>
     </AppCard>
     <EraseSheet
       v-model:open="eraseOpen"
@@ -77,6 +84,7 @@ import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconDownload from '~icons/mdi/tray-arrow-down'
 import IconShield from '~icons/mdi/shield-account-outline'
+import IconTerms from '~icons/mdi/file-document-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
@@ -86,8 +94,8 @@ import { useExport } from '@/composables/useExport'
 import { useSignOutStore } from '@/stores/signOut'
 
 /**
- * «Ваши данные» (MOL-93, В-2): the copy of everything kept, erasing all of it (MOL-94) and the page
- * that says what is kept. Turning off the log (MOL-96) joins them here.
+ * «Ваши данные» (MOL-93, В-2): the copy of everything kept, erasing all of it (MOL-94), the page
+ * that says what is kept and the terms beside it (MOL-95). Turning off the log (MOL-96) joins them here.
  */
 export default defineComponent({
   name: 'YourDataGroup',
@@ -102,6 +110,7 @@ export default defineComponent({
     IconDelete,
     IconDownload,
     IconShield,
+    IconTerms,
   },
   setup() {
     const { t } = useI18n()

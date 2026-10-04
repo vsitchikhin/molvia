@@ -49,7 +49,7 @@ afterEach(() => {
 it('is off by default, with no day to choose', async () => {
   const view = await render()
   expect(switchOf(view).element.checked).toBe(false)
-  expect(switchOf(view).attributes('disabled')).toBeUndefined()
+  expect(switchOf(view).attributes('aria-disabled')).toBeUndefined()
   expect(view.find('select').exists()).toBe(false)
   expect(view.text()).toContain(en.settings.salary_shift.hint)
 })
@@ -88,7 +88,7 @@ it('waits offline: the switch is inactive and says why', async () => {
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
   read.mockRejectedValue(new TypeError('network'))
   const view = await render()
-  expect(switchOf(view).attributes('disabled')).toBeDefined()
+  expect(switchOf(view).attributes('aria-disabled')).toBe('true')
   expect(view.text()).toContain(en.settings.tap.offline)
   expect(view.text()).not.toContain(en.state.retry)
 })

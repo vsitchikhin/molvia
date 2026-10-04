@@ -14,6 +14,7 @@ import {
   parseQuantity,
   pendingVerdictCodec,
 } from '@molvia/model'
+import { POLICY_VERSION } from '@molvia/model'
 import type { ActorView, CatalogueEntry, PendingVerdict, Rating } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
@@ -133,6 +134,8 @@ beforeEach(() => {
   rateItem.mockReset()
   localStorage.clear()
   sessionStorage.clear()
+  // The owner accepted the terms on this device: the drafts do not wait for them (MOL-95).
+  localStorage.setItem(`molvia.consent.${OWNER}`, String(POLICY_VERSION))
   online(true)
   me.mockResolvedValue(initial)
   clock = 0

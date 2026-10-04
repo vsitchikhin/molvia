@@ -56,7 +56,7 @@ import {
   rateProviderSchema,
   ratePreferenceSchema,
   SALARY_SHIFT_DAY_MAX,
-  SETTINGS_CITIES,
+  RECEIPT_CITIES,
   rateSourceSchema,
   RECEIPT_PARTS_MAX,
   RECEIPT_PART_BYTES_MAX,
@@ -93,7 +93,7 @@ import type {
   ReceiptFailure,
   ReceiptParsedMatch,
   ReceiptStatus,
-  SettingsCity,
+  ReceiptCity,
   StoreMemoryKind,
   SpendingPreset,
 } from '@molvia/model'
@@ -282,6 +282,15 @@ export const actors = pgTable(
      * with it. Beside the settings, as `salary_shift_day` is, and for the same reason (Р-1).
      */
     remindersOff: text('reminders_off').$type<RemindersOff>(),
+    /**
+     * Which edition of «Условия использования» and «Данные и приватность» the person accepted, and
+     * when (MOL-95): `POLICY_VERSION` of the page they were shown, and the server's moment. Empty for
+     * whoever has not accepted any — every owner before this column, who passes the screen once. A
+     * later acceptance overwrites both and an earlier one changes nothing; erasure takes them with
+     * the row.
+     */
+    consentVersion: smallint('consent_version'),
+    consentedAt: timestamp('consented_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.
@@ -307,6 +316,12 @@ export const actors = pgTable(
       sql`${table.salaryShiftDay} between 1 and ${sql.raw(String(SALARY_SHIFT_DAY_MAX))}`,
     ),
     check('actors_reminders_off_known', oneOf(table.remindersOff, REMINDERS_OFF)),
+    // A version without its moment, or a moment of no version, is a consent nobody can show.
+    check(
+      'actors_consent_whole',
+      sql`(${table.consentVersion} is null) = (${table.consentedAt} is null)`,
+    ),
+    check('actors_consent_version_positive', sql`${table.consentVersion} >= 1`),
   ],
 )
 
@@ -2103,7 +2118,7 @@ export const receipts = pgTable(
     totalMinor: bigint('total_minor', { mode: 'bigint' }),
     balanced: boolean('balanced').notNull().default(false),
     // The city of the settings its address prints (MOL-126, Р-6), where its place is looked for.
-    city: text('city').$type<SettingsCity>(),
+    city: text('city').$type<ReceiptCity>(),
     recordedAt: timestamp('recorded_at', { withTimezone: true }),
     // The purchases it was recorded as (MOL-126); gone with the trip's final removal.
     tripId: uuid('trip_id').references(() => trips.id, { onDelete: 'set null' }),
@@ -2148,7 +2163,7 @@ export const receipts = pgTable(
     check('receipts_attempts_non_negative', sql`${table.attempts} >= 0`),
     check(
       'receipts_city_known',
-      sql`${table.city} is null or ${oneOf(table.city, SETTINGS_CITIES)}`,
+      sql`${table.city} is null or ${oneOf(table.city, RECEIPT_CITIES)}`,
     ),
     check(
       'receipts_layout_known',

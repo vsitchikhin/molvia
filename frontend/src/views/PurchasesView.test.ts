@@ -176,6 +176,8 @@ function remember(trips: TripHistoryEntry[] = []) {
 }
 
 const rows = (view: VueWrapper) => view.findAll('.recorded .purchase-row')
+/** The headings of the screen's groups: «Разбираем», «Посмотреть и записать». */
+const captions = (view: VueWrapper) => view.findAll('p.caption').map((caption) => caption.text())
 
 /**
  * «Записать вручную» — the second button of the strip: a person in Armenia takes receipts (MOL-127,
@@ -236,7 +238,50 @@ describe('PurchasesView (MOL-128)', () => {
       const { view } = await render({ country: 'GE' })
       expect(view.get('.dock').text()).toContain(ru.purchases.manual)
       expect(view.get('.dock').text()).not.toContain(ru.purchases.capture)
-      expect(receipts).not.toHaveBeenCalled()
+      expect(captions(view)).not.toContain(ru.purchases.group_review)
+      expect(view.text()).not.toContain(ru.purchases.receipts_error)
+    })
+
+    it('у человека из Грузии «пусто» — только после ответа о чеках; сбой списка сказан (MOL-109, Б1)', async () => {
+      receipts.mockReturnValue(new Promise(() => undefined))
+      const waiting = await render({ country: 'GE' })
+      expect(waiting.view.text()).not.toContain(ru.purchases.empty.title)
+      expect(waiting.view.find('.skeleton').exists()).toBe(true)
+      while (mounted.length) mounted.pop()?.unmount()
+
+      receipts.mockRejectedValue(new Error('HTTP 500'))
+      const failed = await render({ country: 'GE' })
+      expect(failed.view.text()).not.toContain(ru.purchases.empty.title)
+      expect(failed.view.text()).toContain(ru.purchases.receipts_error)
+    })
+
+    it('армянский чек, снятый до переезда в Грузию, — в «Покупках», чтобы записать или удалить (MOL-109, А2)', async () => {
+      receipts.mockResolvedValue({
+        receipts: [
+          {
+            id: 'cccccccc-0000-4000-8000-000000000001',
+            status: 'parsed',
+            failure: null,
+            parts: 1,
+            received: 1,
+            capturedAt: new Date('2026-09-26T16:00:00.000Z'),
+            country: 'AM',
+            language: 'ru',
+            header: null,
+            total: { minor: 74_000n, currency: 'AMD' },
+            balanced: true,
+            lineCount: 1,
+            unsettled: 0,
+            place: null,
+            tripId: null,
+          },
+        ],
+      })
+      const { view } = await render({ country: 'GE' })
+      expect(receipts).toHaveBeenCalled()
+      expect(captions(view)).toContain(ru.purchases.group_review)
+      // the camera stays the Armenian person's
+      expect(view.get('.dock').text()).not.toContain(ru.purchases.capture)
     })
   })
 

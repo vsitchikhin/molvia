@@ -394,7 +394,13 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   settings name a country `receiptCountrySchema` reads gets the camera in the strip of «Что брать» and
   «Покупки», «Записать вручную» beside it, the newcomer's (а) and (б); anyone else the version «без
   чека» of MOL-128. A receipt of a country the server does not read would be refused by the schema,
-  and a button that always ends in «не принят» is worse than none.
+  and a button that always ends in «не принят» is worse than none. **The camera is the country's;
+  the receipts held are everyone's** (MOL-109, adversarial А2, Б1, Б3): an Armenian receipt taken
+  before the settings moved to Georgia or Serbia is still to be recorded or removed, so `GET
+/receipts` is asked of everyone, «Покупки» say «пусто» only once it answered and its failure in the
+  quiet line for everyone. Its place («Где купили?») is of the receipt's country — that country's
+  cities, the one read first, no recent shop of another; a receipt not read offers a record by hand
+  and no retake, in words that promise only that.
 - **A photo is made ready before it is queued** (`preparePhoto`): upright by its EXIF, drawn under
   `CANVAS_PIXELS_MAX` (16 Mp — iOS draws no larger canvas, and an iPhone 15 shoots 24 Mp, Р-11), brought
   to `RECEIPT_PHOTO_SIDE` (3 200, П-7) and encoded as JPEG, which carries no EXIF and so no place. What

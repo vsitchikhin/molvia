@@ -139,6 +139,10 @@ export const ru = {
   'remind.placeInBrackets': '{place} ({city})',
   'remind.in.Гюмри': 'в Гюмри',
   'remind.in.Ереван': 'в Ереване',
+  'remind.in.Тбилиси': 'в Тбилиси',
+  'remind.in.Батуми': 'в Батуми',
+  'remind.in.Белград': 'в Белграде',
+  'remind.in.Нови-Сад': 'в Нови-Саде',
   /** Under the last message of the day, when more items wait than the three asked about. */
   'remind.more': 'Ещё {n} ждут в «Оценках»: {url}',
   /** Written under the question after a press; the scale stays, so a slip is one more press. */

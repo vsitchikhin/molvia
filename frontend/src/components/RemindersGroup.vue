@@ -6,7 +6,7 @@
         <span class="label">{{ t('settings.reminders.label') }}</span>
         <AppSwitch
           :checked="!off"
-          :disabled="off === undefined || off === 'blocked' || saving || !online"
+          :inactive="off === undefined || off === 'blocked' || saving || !online"
           :aria-describedby="described"
           @toggle="toggle"
         />

@@ -153,7 +153,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Armenian is in the table**; `ու` and `և` are resolved before the per-character pass.
   **What draws nothing is one list, `INVISIBLE` in `text.ts`**, for the measure and the key alike.
 - **The key is never an identity**: a duplicate is decided by `nameIdentity` (MOL-12).
-- **The tables and the fold rules are frozen: changing one after a key is stored is a migration.**
+- **The tables and the fold rules are frozen; Georgian and Serbian are in them** (MOL-109): a
+  change reaches the stored keys by `rekeyItems` at the API's start, never by SQL; it forgets the
+  picks and the shops' memory by text under the keys it changed, and a rollback past it is a rename.
 - **Candidates come from `search_key %> $1` only** — the one form that reaches the GIN index — at
   `word_similarity` > 0.15, with the threshold set locally inside the query's transaction.
 - **Ranking is by minimum Levenshtein word against word**, a budget of 2; sizes, units and
@@ -363,6 +365,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   counted against a dry run, **and every column exported or left out with its reason**
   (`EXPORT_COLUMNS`); stored, never counted; the removed marked; no secret.
 - **Locks are taken in one order everywhere**: the account, then the request rows, then the owner.
+- **The terms and the privacy page are accepted an edition at a time** (MOL-95): `POLICY_VERSION`
+  is raised by hand only for a change that matters, any other edit is a new revision `policy.test.ts`
+  holds; the edition and its moment on the owner, only ever raised; which edition to ask about is the
+  build's, and the API refuses nothing without it — the step is the door's, after the claim, never
+  closing over an app already shown, and the queues of one who accepted none wait on the phone.
 - **No third-party trackers or analytics**; any third-party script that sees data is a decision.
   onnxruntime's telemetry is off (`ORT_DISABLE_TELEMETRY`, MOL-105).
 - **Logs live fourteen days and carry no address and no query**; a failure is logged by its kind
@@ -460,6 +467,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   and a category against a role 0.08 OKLab apart, marks 3:1, text 4.5:1, both schemes; a value that
   fails is changed, never excused. Data without a colour of its own is `--graphic`. **Any two
   categories 0.07 apart, one hue in both schemes** (MOL-218): a ring puts any two side by side.
+- **Not now is one look: `text-muted` at 600, in focus (`inactive` = `aria-disabled`), never opacity**
+  (MOL-174); a button keeps its variant's fill or none (В-1). **Chosen is a fill or a form, never a
+  weight.** `--opacity-stale` is only a previous answer while the next is on its way.
 - **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
   `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the
   failure; polite states speak through the one live region in `App.vue`.
@@ -530,7 +540,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **End-to-end runs in CI, not on the push** (MOL-164): a pull request merges only on both jobs
   green, and a test green only on a retry is red there.
 - **Every spec comes in through `open()` in `e2e/session.ts`.**
-- **The sheet alone also runs on WebKit** (`iphone`, MOL-80); a test it cannot run says why.
+- **The sheet and the kit's «not now» also run on WebKit** (`iphone`, MOL-80, MOL-174); a test it
+  cannot run says why.
 - **Words said out loud are taken by a locator outside the live region**, never muted with
   `.first()`.
 

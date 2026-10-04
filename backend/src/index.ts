@@ -4,6 +4,7 @@ import { getDb } from '@/db'
 import { describeMigrationFailure } from '@/db/failure'
 import { startEmbedder } from '@/embeddings/embedder'
 import { migrateToLatest } from '@/db/migrate'
+import { rekeyItems } from '@/db/rekey'
 import { createMarketRateRepository } from '@/db/market-rates-repository'
 import { createRateRepository } from '@/db/rates-repository'
 import { cbaFeed } from '@/rates/cba'
@@ -44,6 +45,16 @@ try {
   await migrateToLatest()
 } catch (error) {
   app.log.error(describeMigrationFailure(error), 'migrations failed')
+  process.exit(1)
+}
+
+// The search keys the tables of this build give (MOL-109): part of bringing the database to the
+// code, so it stops the boot as a migration does — a rollout that fails here rolls back.
+try {
+  const rekeyed = await rekeyItems(getDb())
+  if (rekeyed > 0) app.log.info({ rekeyed }, 'search keys recomputed')
+} catch (error) {
+  app.log.error(describeMigrationFailure(error), 'search keys failed')
   process.exit(1)
 }
 

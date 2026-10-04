@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { geographyAllowed, SETTINGS_CITIES } from '#model/contracts/settings'
+import { geographyAllowed, SETTINGS_CITIES, SETTINGS_COUNTRIES } from '#model/contracts/settings'
 import { COUNTRY_TIME_ZONES, timeZoneOf } from '#model/values/geo'
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -17,6 +17,17 @@ describe('timeZoneOf (MOL-101)', () => {
         }
       }
     }
+  })
+
+  it('reads Tbilisi and Belgrade in their own zones (MOL-109)', () => {
+    expect(timeZoneOf('GE')).toBe('Asia/Tbilisi')
+    expect(timeZoneOf('RS')).toBe('Europe/Belgrade')
+  })
+
+  it('gives every country of the settings a zone of its own, so a zone names one country', () => {
+    const zones = SETTINGS_COUNTRIES.map((country) => timeZoneOf(country))
+    expect(zones).not.toContain(null)
+    expect(new Set(zones).size).toBe(zones.length)
   })
 
   it('names zones the runtime knows', () => {

@@ -5,6 +5,7 @@
       <div class="row">
         <AppButton>{{ t('item.save') }}</AppButton>
         <AppButton variant="secondary">{{ t('trip.finish') }}</AppButton>
+        <AppButton variant="tinted">{{ t('spending.restore') }}</AppButton>
         <AppButton variant="ghost">{{ t('verdict.skip') }}</AppButton>
         <AppButton variant="danger-ghost">{{ t('item.delete') }}</AppButton>
         <AppButton variant="icon" :label="t('sheet.close')"><IconClose /></AppButton>
@@ -22,6 +23,45 @@
         <AppButton inactive>{{ t('settings.save') }}</AppButton>
         <AppButton disabled>{{ t('verdict.save') }}</AppButton>
       </div>
+    </section>
+
+    <!-- Ф-5, Ф-6 (MOL-174): chosen is a form, not only a hue; not now is one look in every control —
+         in the focus order, `text-muted`, no opacity. -->
+    <section class="group">
+      <h2 class="caption">{{ t('dev.kit.selection') }}</h2>
+      <div class="row">
+        <AppButton inactive>{{ t('settings.save') }}</AppButton>
+        <AppButton variant="secondary" inactive>{{ t('trip.finish') }}</AppButton>
+        <AppButton variant="tinted" inactive>{{ t('spending.restore') }}</AppButton>
+        <AppButton variant="ghost" inactive>{{ t('verdict.skip') }}</AppButton>
+        <AppButton variant="danger-ghost" inactive>{{ t('item.delete') }}</AppButton>
+        <AppButton variant="icon" :label="t('sheet.close')" inactive><IconClose /></AppButton>
+      </div>
+      <SegmentedControl v-model="unit" :legend="t('dev.kit.segment_fit')" :options="units" fit />
+      <SegmentedControl
+        v-model="unit"
+        :legend="t('dev.kit.segment_inactive')"
+        :options="units"
+        inactive
+      />
+      <div class="row">
+        <label v-for="toggle in toggles" :key="toggle.key" class="toggle">
+          <AppSwitch
+            :checked="toggle.on"
+            :inactive="toggle.inactive"
+            @toggle="toggle.on = $event"
+          />
+          {{ t(`dev.kit.${toggle.key}`) }}
+        </label>
+      </div>
+      <MonthSwitcher :month="month" current="2026-10" @change="month = $event" />
+      <CategoryChips
+        v-model="category"
+        :categories="categories"
+        :name-of="categoryName"
+        :legend="t('spending.sheet.category')"
+        :add-label="t('spending.sheet.add_category')"
+      />
     </section>
 
     <section class="group">
@@ -135,7 +175,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from 'vue'
+import { computed, defineComponent, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   ERROR,
@@ -143,8 +183,9 @@ import {
   currencySign,
   formatMoney,
   money,
-  SETTINGS_CITIES,
+  COUNTRY_CITIES,
 } from '@molvia/model'
+import type { SpendingCategoryView } from '@molvia/model'
 import IconClose from '~icons/mdi/close'
 import IconPlus from '~icons/mdi/plus'
 import IconRefresh from '~icons/mdi/refresh'
@@ -153,8 +194,11 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
 import AppScreen from '@/components/AppScreen.vue'
+import AppSwitch from '@/components/AppSwitch.vue'
 import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import CategoryChips from '@/components/CategoryChips.vue'
+import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import VerdictBadge from '@/components/VerdictBadge.vue'
 import VerdictCard from '@/components/VerdictCard.vue'
@@ -174,12 +218,15 @@ export default defineComponent({
     AppCard,
     AppField,
     AppScreen,
+    AppSwitch,
     BarcodeScannerSheet,
     BottomSheet,
+    CategoryChips,
     IconClose,
     IconPlus,
     IconRefresh,
     IconShape,
+    MonthSwitcher,
     SegmentedControl,
     VerdictBadge,
     VerdictCard,
@@ -212,10 +259,28 @@ export default defineComponent({
       quantity: ref('1'),
       price: ref('57о'),
       review: ref(''),
-      city: ref(SETTINGS_CITIES[0]),
-      cities: SETTINGS_CITIES.map((city) => ({ value: city, label: city })),
+      city: ref<string>(COUNTRY_CITIES.AM[0]),
+      cities: COUNTRY_CITIES.AM.map((city) => ({ value: city, label: city })),
       date: ref('2026-09-19'),
       unit: ref('l'),
+      toggles: reactive([
+        { key: 'switch_off', on: false, inactive: false },
+        { key: 'switch_on', on: true, inactive: false },
+        { key: 'switch_inactive_off', on: false, inactive: true },
+        { key: 'switch_inactive_on', on: true, inactive: true },
+      ]),
+      // The current month at the edge: «›» is the inactive arrow.
+      month: ref('2026-10'),
+      categories: (['groceries', 'cafe', 'transport'] as const).map((preset, index) => ({
+        id: `00000000-0000-4000-8000-00000000010${String(index)}`,
+        preset,
+        name: null,
+        colour: null,
+        archived: false,
+      })),
+      categoryName: (category: SpendingCategoryView) =>
+        t(`spending.category.${category.preset ?? 'other'}`),
+      category: ref<string | null>('00000000-0000-4000-8000-000000000101'),
       sheetOpen: ref(false),
       scannerOpen: ref(false),
       scanned: ref(''),
@@ -252,6 +317,14 @@ export default defineComponent({
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  font-size: var(--text-callout);
 }
 
 .row {

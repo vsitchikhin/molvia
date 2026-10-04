@@ -574,8 +574,4 @@ export default defineComponent({
   padding: 0;
   list-style: none;
 }
-
-.add {
-  box-shadow: var(--shadow-md);
-}
 </style>

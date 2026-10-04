@@ -391,7 +391,7 @@ describe('a check and the operations of its reasons', () => {
     })
     await settle()
     expect(button(view, en.spending.restore)).toBeDefined()
-    expect(view.get('.difference').classes()).toContain('stale')
+    expect(view.text()).toContain(en.accounts.reconcile.recounting)
   })
 
   it('a difference above zero opens the sheet of an income, filled — nothing written yet (В-5)', async () => {

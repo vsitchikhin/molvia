@@ -34,6 +34,8 @@ function fakeActors(overrides: Partial<ActorRepository> = {}): ActorRepository {
     byTelegramUserId: () => Promise.reject(new Error('byTelegramUserId was not expected')),
     update: () => Promise.reject(new Error('update was not expected')),
     lockAccount: () => Promise.reject(new Error('lockAccount was not expected')),
+    consentVersion: () => Promise.reject(new Error('consentVersion was not expected')),
+    acceptConsent: () => Promise.reject(new Error('acceptConsent was not expected')),
     ...overrides,
   }
 }
@@ -90,6 +92,20 @@ describe('вход', () => {
     expect(actor.telegramUserId).toBe(TELEGRAM_ID)
     expect(actor.spendCurrency).toBe('AMD')
     expect(actor.city).toBe('Гюмри')
+  })
+
+  it('нового из Белграда заводит в Белграде; вернувшегося пояс не двигает (MOL-109)', async () => {
+    const actors = fakeActors({
+      byTelegramUserId: () => Promise.resolve(null),
+      createIfMissing: (id, telegramUserId, input) =>
+        Promise.resolve(actorFrom(id, telegramUserId, input)),
+    })
+    const { actor } = await signIn(actors, fakeSessions(), TELEGRAM_ID, null, 'Europe/Belgrade')
+    expect([actor.country, actor.city]).toEqual(['RS', 'Белград'])
+
+    const known = fakeActors({ byTelegramUserId: () => Promise.resolve(returning) })
+    const back = await signIn(known, fakeSessions(), TELEGRAM_ID, null, 'Europe/Belgrade')
+    expect([back.actor.country, back.actor.city]).toEqual([returning.country, returning.city])
   })
 
   it('выдаёт сессию тому же владельцу, и каждый раз новый токен', async () => {

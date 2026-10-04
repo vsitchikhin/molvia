@@ -3,7 +3,6 @@
     <AppButton
       variant="icon"
       :label="t(unit === 'year' ? 'spending.year_prev' : 'spending.month_prev')"
-      class="step"
       :inactive="!previous"
       @click="previous && $emit('change', previous)"
     >
@@ -13,7 +12,6 @@
     <AppButton
       variant="icon"
       :label="t(unit === 'year' ? 'spending.year_next' : 'spending.month_next')"
-      class="step"
       :inactive="!next"
       @click="next && $emit('change', next)"
     >
@@ -44,7 +42,8 @@ function nextMonth(month: string): string {
  * «‹ Сентябрь 2026 ›» (MOL-82, handoff 01), or «‹ 2026 ›» (MOL-160). The future is not a month to
  * look at; the past of a month has no lower bound — the server names no first month, and an empty one
  * says so itself (Р-1) — and of a year goes back as far as there is anything (Р-9). No swipe:
- * a gesture here would fight the system «back» on iOS.
+ * a gesture here would fight the system «back» on iOS. The arrows are the kit's icon button, and
+ * the one at the edge is its inactive look — focusable, `text-muted`, no opacity (Ф-6, MOL-174).
  */
 export default defineComponent({
   name: 'MonthSwitcher',
@@ -97,22 +96,11 @@ export default defineComponent({
 }
 
 .month {
+  min-width: 0;
   margin: 0;
   font-size: var(--text-headline);
   font-weight: var(--weight-medium);
   text-align: center;
-}
-
-.step {
-  background: transparent;
-  color: var(--accent-ink);
-
-  &:hover {
-    background: var(--accent-tint);
-  }
-
-  &[aria-disabled='true'] {
-    opacity: 0.35;
-  }
+  white-space: nowrap;
 }
 </style>

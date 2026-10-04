@@ -372,7 +372,7 @@ export const useSpendingQueueStore = defineStore('spendingQueue', () => {
 
   /** One run at a time, and only once the server has said who we are (MOL-56). */
   function flush(): Promise<void> {
-    if (actor.state !== 'ready' || login.rechecking) {
+    if (actor.state !== 'ready' || login.writesHeld) {
       if (actor.state === 'error') retry.later()
       return Promise.resolve()
     }

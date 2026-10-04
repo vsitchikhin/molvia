@@ -127,3 +127,11 @@ it('names the country and the copies, and what a restore would undo (MOL-70)', a
   // Owner's decision В-4: a restore can bring back an erasure of the last day, and the page says so.
   expect(ru.privacy.backups.text).toMatch(/меньше чем за сутки до сбоя/)
 })
+
+it('says the consent is kept — the edition and when — and nothing of the age (MOL-95)', async () => {
+  const view = await render()
+  expect(view.text()).toContain(ru.privacy.stored.consent.text)
+  expect(ru.privacy.stored.consent.text).toMatch(/Возраст и дату рождения мы не храним/)
+  // The subtitle is the revision written in code, not a sentence of the dictionary.
+  expect(view.text()).toContain('Редакция от 4 октября 2026')
+})

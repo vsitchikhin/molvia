@@ -56,7 +56,9 @@ export async function remindRatings(
   failed: (error: unknown) => void,
   quiet: QuietToday,
 ): Promise<DueReminders> {
-  // Outside every evening there is nothing to ask the database (review Т-5): 21 hours of 24.
+  // Outside every evening there is nothing to ask the database (review Т-5): Yerevan's and Tbilisi's
+  // evening and Belgrade's two or three hours later (MOL-109) leave 19 hours of 24 closed in summer,
+  // 18 in winter.
   const open = Object.values(COUNTRY_TIME_ZONES).some((zone) =>
     isReminderHour(localClock(now, zone).hour),
   )

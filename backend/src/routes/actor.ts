@@ -5,6 +5,7 @@ import {
   TODAY_HEADER,
   ZONE_HEADER,
   isTimeZone,
+  timeZoneOf,
   todayFrom,
 } from '@molvia/model'
 import type { Actor } from '@molvia/model'
@@ -28,10 +29,14 @@ declare module 'fastify' {
     sessionId: string
     /**
      * The phone's today the request named (`TODAY_HEADER`, MOL-121), held to the days that are
-     * today somewhere — or Yerevan's, where it named none. What «today» of money is counted by.
+     * today somewhere — or the day of the person's country, where it named none (MOL-109). What
+     * «today» of money is counted by.
      */
     today: string
-    /** The phone's time zone the request named (`ZONE_HEADER`), or none: Yerevan's then. */
+    /**
+     * The phone's time zone the request named (`ZONE_HEADER`), else the person's country's
+     * (MOL-109); none only for a country without one, and Yerevan's is taken then.
+     */
     zone: string | undefined
   }
 }
@@ -104,11 +109,20 @@ export function withActor(app: FastifyInstance, lookup: SessionLookup): void {
     request.actor = authenticated.actor
     request.actorId = authenticated.actor.id
     request.sessionId = authenticated.sessionId
-    // One value or none: a header sent twice is no day to believe, and Yerevan's is taken.
-    const named = request.headers[TODAY_HEADER.toLowerCase()]
-    request.today = todayFrom(typeof named === 'string' ? named : undefined, new Date())
+    // One value or none: a header sent twice is no day to believe. Where the phone said nothing —
+    // the bot, a page older than the headers — the person's country decides, not Yerevan: a person
+    // in Belgrade is there whether the request names it or not (MOL-109).
     const zone = request.headers[ZONE_HEADER.toLowerCase()]
-    request.zone = typeof zone === 'string' && isTimeZone(zone) ? zone : undefined
+    request.zone =
+      typeof zone === 'string' && isTimeZone(zone)
+        ? zone
+        : (timeZoneOf(authenticated.actor.country) ?? undefined)
+    const named = request.headers[TODAY_HEADER.toLowerCase()]
+    request.today = todayFrom(
+      typeof named === 'string' ? named : undefined,
+      new Date(),
+      request.zone,
+    )
 
     // The sliding term, and it is set here rather than by the use case because a use case knows
     // nothing about HTTP. `setSessionCookie` sends `no-store` with it, so whichever handle this

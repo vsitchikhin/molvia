@@ -6,7 +6,7 @@
         <span class="label">{{ t('settings.salary_shift.label') }}</span>
         <AppSwitch
           :checked="!!day"
-          :disabled="day === undefined || saving || !online"
+          :inactive="day === undefined || saving || !online"
           :aria-describedby="online ? `${id}-hint` : `${id}-hint ${id}-offline`"
           @toggle="toggle"
         />

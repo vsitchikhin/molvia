@@ -9,7 +9,7 @@ afterEach(() => {
 })
 
 describe('AppButton', () => {
-  it.each<ButtonVariant>(['primary', 'secondary', 'ghost', 'danger-ghost'])(
+  it.each<ButtonVariant>(['primary', 'secondary', 'tinted', 'ghost', 'danger-ghost'])(
     'draws the %s look',
     (variant) => {
       const view = mount(AppButton, { props: { variant }, slots: { default: 'Go' } })
