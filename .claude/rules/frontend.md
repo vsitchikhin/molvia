@@ -226,6 +226,27 @@ The detail behind the frontend lines of `CLAUDE.md`.
   read; an SFC with no `<style>` block, which gives the rule no root to run on. A circle around an
   icon is sized as a shape; the glyph in it is the icon (the pencil of «Настройки» was a 32 svg
   with padding, now 18 in a 32 circle).
+- **Not now is one look, and chosen is a form** (MOL-174, Ф-5, Ф-6). «Inactive» had four looks —
+  0.35 on the month's arrow, 0.45 on `AppButton`, 0.5 (`--opacity-stale`) on the switch, the trash
+  of an exchange and the difference of a reconciliation, and none at all on a disabled segment —
+  and a dimmed button reads as a live one under a cloud, while a dimmed knob in the dark is not
+  seen. **Inactive is `text-muted` at 600 with no opacity, in the focus order**: `AppButton`,
+  `SegmentedControl` and `AppSwitch` take `inactive`, which is `aria-disabled` plus a cancelled
+  click — a tap, a tap on the label, Space and the click a browser sends for a radio's arrow all
+  put the control back (checked in Chromium and WebKit); a native `disabled` is drawn the same and
+  stays for a moment such as sending, until a screen trades it for `inactive` with the words saying
+  why. **The form of the variant stays** (owner's В-1 «а»): a button with a fill goes to
+  `surface-2`, a ghost or danger-ghost keeps no fill — two grey pills in a sheet's footer read as
+  two buttons of equal weight. The hover and the press are written on `:not(:disabled,
+[aria-disabled='true'])`, since `aria-disabled` is still `:enabled` and an inactive primary lit up
+  under the pointer. A button that is only an icon draws its glyph in `text`, inactive in
+  `text-muted` (owner's В-15 «а») — `text-muted` for both made the month's arrow at the edge look
+  like the live one. **Chosen is a fill and a ring, never a weight**: a segment is filled
+  `accent-solid` with `on-accent` (the old white segment on `surface-2` was not seen in the dark),
+  a switch carries a ✓ of `--icon-xs` on its knob (owner's В-2 «а»; the handoff's 16 is no step),
+  every chip and every segment is at 600, so nothing reflows under the thumb. **`--opacity-stale`
+  means one thing: a previous answer left while the next is on its way** (К-11) — the searches;
+  the difference of a reconciliation waits in words («Пересчитаем, когда…»), not dimmed (116 v2).
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
   `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a
