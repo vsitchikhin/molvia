@@ -64,6 +64,10 @@ memory: erasure leaves its words without an author, the copy carries the person'
 
 ## frontend · the phone (MOL-127)
 
+- `frontend/src/receipts/warp.ts` — The receipt straightened by its four corners (MOL-222), with no DOM so the bench runs it: the corners in reading order, «Повернуть» as a turn of them, the receipt's own size, the corners on whole pixels and the box when square enough (`snapped`), the perspective and a warp from sixteen neighbours — or the photo's own pixels copied.
+- `frontend/src/receipts/edges.ts` — Where the receipt is on the photo (MOL-222, Т-2): a grey copy at most 640 long and its colour, the candidates the bench measured (bright, enclosed, flattened, paper), and the corners proposed — paper's, else the photo's own.
+- `frontend/src/receipts/straighten.ts` — «Края чека» on the page: the corners proposed on a small copy, the photo turned a quarter, the receipt cut out and straightened in the worker — on the page when the worker fails — and `RECEIPT_PHOTO_NARROW`.
+- `frontend/src/receipts/warpWorker.ts` — The warp off the page: the pixels of the box around the corners in, the receipt straight out.
 - `frontend/src/receipts/photoShelf.ts` — `photoShelf`: the bytes of the parts in IndexedDB, a database per owner, kept until the receipt is recorded, removed or gone (Т-4) — the server gives no photo back; `keepOnly` spares the last ten minutes; `forgetPhotos` for «Выйти» and erasure.
 - `frontend/src/receipts/photo.ts` — `preparePhoto`: a file upright by its EXIF, drawn under the 16 Mp a canvas of iOS takes (Р-11), brought to `RECEIPT_PHOTO_SIDE` (3 200, П-7) and encoded as JPEG without EXIF; what the server would refuse is «файл не открылся» here.
 - `frontend/src/receipts/review.ts` — The review as it stands: each line the server's reading with the person's edit over it, «Строки» and the difference by `receiptBalance` of the model (В-6), the place and the day, and the body of «Записать» — every line once.
