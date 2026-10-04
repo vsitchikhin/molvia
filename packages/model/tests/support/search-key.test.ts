@@ -229,8 +229,64 @@ describe('toSearchKey', () => {
   })
 
   it('lets a script it does not know keep itself instead of dropping it', () => {
-    // Georgian has no table here. Dropping its letters would produce an empty key.
-    expect(toSearchKey('ხაჭაპური')).toBe('ხაჭაპური')
+    // Hebrew has no table here. Dropping its letters would produce an empty key.
+    expect(toSearchKey('חלב')).toBe('חלב')
+  })
+})
+
+describe('toSearchKey · грузинский и сербский (MOL-109)', () => {
+  it('brings a Georgian name to the key of its Russian and Latin spellings', () => {
+    expect(toSearchKey('ხაჭაპური')).toBe(toSearchKey('хачапури'))
+    expect(toSearchKey('ბორჯომი')).toBe(toSearchKey('Боржоми'))
+    expect(toSearchKey('ბორჯომი')).toBe(toSearchKey('Borjomi'))
+    expect(toSearchKey('ჩურჩხელა')).toBe(toSearchKey('чурчхела'))
+  })
+
+  it('reads Mtavruli capitals as the letters they are', () => {
+    expect(toSearchKey('ᲩᲘᲖᲘ')).toBe(toSearchKey('ჩიზი'))
+  })
+
+  it('makes one key of a Serbian word in Cyrillic, in Latin and in Russian', () => {
+    for (const [cyrillic, latin, russian] of [
+      ['ћевапи', 'ćevapi', 'чевапи'],
+      ['чоколада', 'čokolada', 'чоколада'],
+      ['џем', 'džem', 'джем'],
+      ['шунка', 'šunka', 'шунка'],
+      ['жито', 'žito', 'жито'],
+    ] as const) {
+      expect(toSearchKey(latin), latin).toBe(toSearchKey(cyrillic))
+      expect(toSearchKey(russian), russian).toBe(toSearchKey(cyrillic))
+    }
+    for (const [cyrillic, latin] of [
+      ['шљиве', 'šljive'],
+      ['ђумбир', 'đumbir'],
+      ['њоки', 'njoki'],
+      ['ајвар', 'ajvar'],
+      ['ћевапчићи', 'ćevapčići'],
+    ] as const) {
+      expect(toSearchKey(latin), latin).toBe(toSearchKey(cyrillic))
+    }
+  })
+
+  it('reads a háček or an acute whether the letter came precomposed or decomposed', () => {
+    for (const [precomposed, base, mark] of [
+      ['č', 'c', 0x30c],
+      ['ć', 'c', 0x301],
+      ['š', 's', 0x30c],
+      ['ž', 'z', 0x30c],
+    ] as const) {
+      const decomposed = `${base}${String.fromCodePoint(mark)}`
+      expect(toSearchKey(`${precomposed}ips`)).toBe(toSearchKey(`${decomposed}ips`))
+      expect(toSearchKey(`${precomposed.toUpperCase()}ips`)).toBe(toSearchKey(`${decomposed}ips`))
+    }
+    expect(toSearchKey('Čips')).toBe(toSearchKey('чипс'))
+    expect(toSearchKey('Đumbir')).toBe(toSearchKey('ђумбир'))
+  })
+
+  it('leaves the other marks of Latin as they were: an acute on s or a caron on e is stripped', () => {
+    // Only the four Serbian letters are letters of their own; Polish ś, Czech ě keep what NFD gives.
+    expect(toSearchKey('ślad')).toBe('slad')
+    expect(toSearchKey('něco')).toBe('neko')
   })
 })
 
@@ -328,6 +384,12 @@ describe('полнота таблиц', () => {
     ['ї', 'i'],
     ['є', 'e'],
     ['ґ', 'g'],
+    ['ђ', 'dj'],
+    ['ј', 'j'],
+    ['љ', 'lj'],
+    ['њ', 'nj'],
+    ['ћ', 'ch'],
+    ['џ', 'dj'],
   ]
 
   const ARMENIAN: readonly (readonly [string, string])[] = [
@@ -371,11 +433,64 @@ describe('полнота таблиц', () => {
     ['ֆ', 'f'],
   ]
 
+  const GEORGIAN: readonly (readonly [string, string])[] = [
+    ['ა', 'a'],
+    ['ბ', 'b'],
+    ['გ', 'g'],
+    ['დ', 'd'],
+    ['ე', 'e'],
+    ['ვ', 'v'],
+    ['ზ', 'z'],
+    ['თ', 't'],
+    ['ი', 'i'],
+    ['კ', 'k'],
+    ['ლ', 'l'],
+    ['მ', 'm'],
+    ['ნ', 'n'],
+    ['ო', 'o'],
+    ['პ', 'p'],
+    ['ჟ', 'j'],
+    ['რ', 'r'],
+    ['ს', 's'],
+    ['ტ', 't'],
+    ['უ', 'u'],
+    ['ფ', 'p'],
+    ['ქ', 'k'],
+    ['ღ', 'g'],
+    ['ყ', 'k'],
+    ['შ', 'sh'],
+    ['ჩ', 'ch'],
+    ['ც', 'ц'],
+    ['ძ', 'dz'],
+    ['წ', 'ц'],
+    ['ჭ', 'ch'],
+    ['ხ', 'h'],
+    ['ჯ', 'j'],
+    ['ჰ', 'h'],
+  ]
+
+  const LATIN: readonly (readonly [string, string])[] = [['đ', 'dj']]
+
+  const LATIN_MARKED: readonly (readonly [string, string])[] = [
+    ['č', 'ch'],
+    ['ć', 'ch'],
+    ['š', 'sh'],
+    ['ž', 'j'],
+  ]
+
   it.each(CYRILLIC)('кириллица: «%s» даёт «%s»', (letter, expected) => {
     expect(through(letter)).toBe(expected)
   })
 
   it.each(ARMENIAN)('армянский: «%s» даёт «%s»', (letter, expected) => {
+    expect(through(letter)).toBe(expected)
+  })
+
+  it.each(GEORGIAN)('грузинский: «%s» даёт «%s»', (letter, expected) => {
+    expect(through(letter)).toBe(expected)
+  })
+
+  it.each([...LATIN, ...LATIN_MARKED])('латиница: «%s» даёт «%s»', (letter, expected) => {
     expect(through(letter)).toBe(expected)
   })
 
@@ -388,20 +503,34 @@ describe('полнота таблиц', () => {
     expect(Object.keys(SEARCH_KEY_TABLES.armenian).sort()).toEqual(
       ARMENIAN.map(([letter]) => letter).sort(),
     )
+    expect(Object.keys(SEARCH_KEY_TABLES.georgian).sort()).toEqual(
+      GEORGIAN.map(([letter]) => letter).sort(),
+    )
+    expect(Object.keys(SEARCH_KEY_TABLES.latin).sort()).toEqual(
+      LATIN.map(([letter]) => letter).sort(),
+    )
+    expect(SEARCH_KEY_TABLES.latinMarked.map(([letter]) => letter.normalize('NFC')).sort()).toEqual(
+      LATIN_MARKED.map(([letter]) => letter).sort(),
+    )
   })
 
-  it('не держит букву в обеих таблицах сразу', () => {
+  it('не держит букву в двух таблицах сразу', () => {
     // The two are merged into one record, so a key in both would silently take the second
     // value. This is the same remark that closed MOL-4 about merging two ISSUE registries.
-    const cyrillic = new Set(CYRILLIC.map(([letter]) => letter))
-    const shared = ARMENIAN.filter(([letter]) => cyrillic.has(letter))
-    expect(shared).toEqual([])
+    const letters = [...CYRILLIC, ...ARMENIAN, ...GEORGIAN, ...LATIN].map(([letter]) => letter)
+    expect(new Set(letters).size).toBe(letters.length)
   })
 
   it('держит значения уже сведёнными', () => {
     // A row written as `zh` or `ts` would work by accident — the fold would clean it up on
     // the way out. It must not be written that way: the table is the statement of record.
-    for (const [letter, value] of [...CYRILLIC, ...ARMENIAN]) {
+    for (const [letter, value] of [
+      ...CYRILLIC,
+      ...ARMENIAN,
+      ...GEORGIAN,
+      ...LATIN,
+      ...LATIN_MARKED,
+    ]) {
       for (const fork of ['zh', 'ts', 'kh', 'shch', 'sch', 'gh', 'ck', 'ph', 'x', 'q', 'w', 'y']) {
         expect(value, `«${letter}»`).not.toContain(fork)
       }
