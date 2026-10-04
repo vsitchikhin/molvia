@@ -132,6 +132,9 @@ describe('словарь: повторяющиеся тексты', () => {
       Деньги: ['nav.money', 'settings.group_money', 'spending.title'],
       // Заголовок экрана и ссылка на него с карточки «Куда ушли» (MOL-156).
       Графики: ['spending.charts.title', 'spending.summary.charts'],
+      // Поле города в настройках и в «Где купили?» для чека другой страны (MOL-109, А2): одно поле,
+      // две шторки, у каждой свой ключ.
+      Город: ['receipt.place.city', 'settings.city'],
       // The settings handoff names its own save action, independently of purchase editing.
       Сохранить: [
         'accounts.sheet.save',
@@ -266,6 +269,8 @@ describe('словарь: повторяющиеся тексты', () => {
       check: ['accounts.reconcile.note', 'receipt.review.tag_check'],
       // The screen's title and the way to it from «Where it went» (MOL-156), as in Russian.
       Charts: ['spending.charts.title', 'spending.summary.charts'],
+      // The city of the settings and of «Where was it?» for another country's receipt, as in Russian.
+      City: ['receipt.place.city', 'settings.city'],
       // «Куда ушли» on «Деньги» and «Куда ушло» on «Графики» (MOL-158): one phrase in English.
       'Where it went': ['spending.categories_title', 'spending.charts.where_title'],
       // A month after «после», after «к» and after «в»: three cases in Russian, one name in
