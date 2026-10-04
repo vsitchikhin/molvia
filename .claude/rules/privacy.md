@@ -158,7 +158,10 @@ The detail behind the privacy lines of `CLAUDE.md`.
   new purpose, a change of the terms — and then `consent.changes.<edition>` says what changed in both
   languages; **any other edit of either page is a new revision** (`frontend/src/views/policy.ts`: the
   day both pages are subtitled with and the sha-256 of their text in both languages), and
-  `policy.test.ts` fails until the revision is moved — so a page cannot change in silence, and a line
+  `policy.test.ts` fails until the revision is moved — the lists of the parts each page shows are in
+  the fingerprint too, kept in `policy.ts` beside it (review №5); the day is not, and the hint asks
+  for it: a digest pasted with the day left is a price named, not held — so a page cannot change in
+  silence, and a line
   added by a task about data does not put everybody through the screen again (nine edits in the nine
   days before). The edition is written in `policy.ts` too, so raising it is an edit of the revision.
   **What is kept is the edition and its moment on the owner** (`actors.consent_version`,
@@ -171,7 +174,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   asked by the server, an old build would show its old text and ask in a circle. **The API refuses
   nothing without it** (Р-4): the basis of the purchases and ratings is the contract, the consent is
   its record, and a refusal would have reached the queue at the shelf and the bot to stop only
-  `curl`. The step itself is the door's (`auth.md`). The text is a draft until the hour with the
+  `curl`. **The phone holds what the API does not** (adversarial А1): the queues of an owner who has
+  accepted no edition wait on the device until «Принимаю» (`auth.md`). The step itself is the door's (`auth.md`). The text is a draft until the hour with the
   lawyer (MOL-97); what the lawyer says is a new edition.
 - **No third-party trackers or analytics, and so no cookie banner** (MOL-58). There are two
   cookies, both strictly necessary: the session and the five-minute one of a login in progress

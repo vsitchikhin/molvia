@@ -254,11 +254,30 @@ the round trip through Telegram, and ask whose account this turned out to be.
   may have been accepted on another device. **Offline the step is never drawn from memory**: the app
   opens on the drawer, as MOL-56 has it, and the step comes with the next answer. Another window's
   accept opens the door here through `storage`. «Мне 16 лет или больше» comes before «Принимаю»
-  (В-3); «Не принимаю» says the account is already there and offers «Выйти» and «Удалить мои данные»,
-  each through its own sheet (В-4) — never an erasure on a «no» a slip of the thumb could cost an
-  owner everything for. The queues are not held by the step: they go by the identity, as before, and
-  a purchase from the shelf leaves while the person reads the new text. The links under the login
-  screen give way to the step's own, so each page is named once.
+  (В-3), **the tick held by the store** (adversarial А4) — the step's links lead to public routes,
+  which `App.vue` draws in the login's place, and the step mounted anew had lost it; «Не принимаю»
+  says the account is already there and offers «Выйти» and «Удалить мои данные», each through its
+  own sheet (В-4) — never an erasure on a «no» a slip of the thumb could cost an owner everything
+  for. The links under the login screen give way to the step's own, so each page is named once.
+  **The step never closes the door over an app already shown** (owner's decision on review №3): an
+  app opened on the drawer with no signal is still there when the answer naming the owner comes back
+  — a price may be typed in a sheet then — and the step waits for what `pwaUpdate` waits for, the app
+  hidden with no sheet open (`holdsTyping`), or the next launch (`shownTo`). **So a launch with a
+  connection does not show the app on the drawer to an owner whose acceptance of this edition the
+  device does not remember**: the skeleton while `me()` is asked, then the step — the app shown first
+  and then closed by the step was a flash on every first launch after an edition. Offline, `start`
+  goes to `offline` and the door opens on the drawer as before. **The writes of an owner not known to
+  have accepted any edition wait on the phone** (`login.writesHeld`, adversarial А1, owner's
+  decision): a newcomer left on the step, or an owner from before it, can record at the shelf with no
+  signal, and the queues sent it all the moment the server named them, under a step nobody had passed
+  and with no «16 или больше» said; they go after «Принимаю» — `App.vue` gives the occasion. An owner
+  who accepted an older edition sends as before (Р-4). The price, named: a write made by hand in a
+  sheet (`Предложить товар`) still goes, in the window an app shown on the drawer waits for its step.
+  **The step comes before a login failure of this window** (adversarial А3): a neighbour's login
+  made the person known, and «Повторить» on the old failure began a login in Telegram for them. Its
+  full-screen error is the one error of somebody known behind the door, so **«Сообщить о проблеме»
+  opens the sheet there** (`App.vue` draws `FeedbackSheet` for the step too, adversarial А2) — and a
+  sheet asked for where it is not drawn is let go rather than left to rise by itself later.
 - **Showing the app and writing into it are different rights** (adversarial Б1). The door may
   open on the drawer's name while the first `me()` is still in flight — that is what keeps a
   launch with a live session from flashing «Вход» — but a drawer says nothing about the cookie,
