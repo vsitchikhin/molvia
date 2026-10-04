@@ -243,8 +243,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
   фото…»); where the screen says nothing — among others «Удалить навсегда», «Не тот товар», «Выйти»,
   the login; round 4 counted nine — only `aria-busy` does (round 3, Р3-А1), a limit, not a promise; **`busy` with `disabled` is drawn as not now**, as master
   drew it dimmed: «Сохранить» of a sheet that keeps its words while it sends had nothing else to
-  show it (round 2, Р2-А1 — round 1 had drawn it live). A look of its own for `busy` is not the
-  kit's yet. **The form of the variant stays** (owner's В-1 «а»): a button with
+  show it (round 2, Р2-А1 — round 1 had drawn it live). A look of its own for `busy` is MOL-225's. **The form of the variant stays** (owner's В-1 «а»): a button with
   a fill goes to `surface-2`, a ghost or danger-ghost keeps no fill — two grey pills in a sheet's
   footer read as two buttons of equal weight. The price, accepted (А4): the `surface-2` pill stands
   1.10:1 on a sheet, so in a footer that sends, primary and ghost read as two muted words; an edge

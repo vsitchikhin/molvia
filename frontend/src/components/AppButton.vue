@@ -161,7 +161,7 @@ export default defineComponent({
    status line; where the screen says nothing, only `aria-busy` does — among others «Удалить
    навсегда», «Не тот товар», the login (round 3, Р3-А1; round 4 counted nine). `busy` with `disabled` is drawn as not now, as master drew it dimmed: a
    sheet that keeps its «Сохранить» while it sends has nothing else to show it (round 2, Р2-А1). A
-   look of its own for `busy` is not the kit's yet. */
+   look of its own for `busy` is MOL-225's. */
 .button:disabled,
 .button[aria-disabled='true']:not([aria-busy='true']) {
   background: var(--surface-2);
