@@ -630,11 +630,14 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
 
   /**
    * «Отменить запись» (MOL-169, owner's В-5): the record of this receipt out of the queue, the review
-   * open again with its draft. Never the one a send carries right now; one begun before only
-   * `checked` — once a fresh answer of the server says the receipt is not recorded (`recordBegun`).
-   * False — it stays.
+   * open again with its draft. Never the one a send carries right now; one begun before only through
+   * `cancelChecked`, on the server's word under the queue's lock (`recordBegun`). False — it stays.
    */
-  function cancelRecord(id: string, checked = false): boolean {
+  function cancelRecord(id: string): boolean {
+    return takeRecord(id, false)
+  }
+
+  function takeRecord(id: string, checked: boolean): boolean {
     let taken = false
     change(() => {
       const left = kept.filter(
@@ -645,6 +648,23 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
       )
       taken = left.length < kept.length
       kept = left
+    })
+    return taken
+  }
+
+  /**
+   * A begun record cancelled on the server's word that the receipt is not recorded — asked under the
+   * lock every window sends under, so no send of it is still on its way, in this window or another,
+   * when the server answers (adversarial Б1: a second window asked while the first one's send was
+   * still committing, heard «not recorded», and opened «Удалить» over purchases about to land).
+   * `notRecorded` asks the server; whatever it throws comes out of here.
+   */
+  async function cancelChecked(id: string, notRecorded: () => Promise<boolean>): Promise<boolean> {
+    const owner = actor.id
+    if (!owner) return false
+    let taken = false
+    await exclusively(`${QUEUE_KEY}.${owner}`, async () => {
+      if (await notRecorded()) taken = takeRecord(id, true)
     })
     return taken
   }
@@ -699,6 +719,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     record,
     recordBegun,
     cancelRecord,
+    cancelChecked,
     settleRecorded,
     dismiss,
   }

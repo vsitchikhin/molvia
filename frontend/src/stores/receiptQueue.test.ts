@@ -406,7 +406,7 @@ describe('receipt queue', () => {
       expect(queue.cancelRecord(RECEIPT)).toBe(false)
       await settled()
       expect(queue.pending).toHaveLength(3)
-      expect(queue.cancelRecord(RECEIPT, true)).toBe(true)
+      expect(await queue.cancelChecked(RECEIPT, () => Promise.resolve(true))).toBe(true)
       await queue.flush()
       expect(queue.pending).toEqual([])
       expect(calls.filter((call) => !call.startsWith('record'))).toEqual([
@@ -422,7 +422,7 @@ describe('receipt queue', () => {
       const queue = fresh()
       queue.record(RECEIPT, recordBody())
       await settled()
-      queue.cancelRecord(RECEIPT, true)
+      await queue.cancelChecked(RECEIPT, () => Promise.resolve(true))
       await settled()
       queue.record(RECEIPT, recordBody(OTHER_TRIP))
       await queue.flush()
@@ -493,6 +493,44 @@ describe('receipt queue', () => {
       expect(queue.pending).toEqual([{ kind: 'remove', id: SECOND }])
       // Kept so after a reload: storage is the queue.
       expect(fresh('idle').rejected).toEqual([])
+    })
+
+    it('a checked cancel asks the server only once another window’s send has ended (round 2, Б1)', async () => {
+      // happy-dom has no `navigator.locks`: one that queues requests of a name, as a browser does
+      const held = new Map<string, Promise<unknown>>()
+      const request = (name: string, work: () => Promise<unknown>) => {
+        const run = (held.get(name) ?? Promise.resolve()).then(work, work)
+        held.set(
+          name,
+          run.catch(() => undefined),
+        )
+        return run
+      }
+      Object.defineProperty(navigator, 'locks', { value: { request }, configurable: true })
+      try {
+        let land: (answer: { tripId: string }) => void = () => undefined
+        recordReceipt.mockImplementationOnce(() => new Promise((resolve) => (land = resolve)))
+        const first = fresh()
+        first.record(RECEIPT, recordBody())
+        await settled()
+        expect(first.carrying).toBe(RECEIPT)
+
+        const second = fresh('idle')
+        const asked: string[] = []
+        const cancel = second.cancelChecked(RECEIPT, () => {
+          asked.push(first.carrying ?? 'nothing on its way')
+          return Promise.resolve(true)
+        })
+        await settled()
+        expect(asked).toEqual([])
+        land({ tripId: TRIP })
+        await cancel
+        // Asked after the send ended: its record was out of the queue, nothing to take.
+        expect(asked).toEqual(['nothing on its way'])
+        expect(first.recorded).toEqual([{ receiptId: RECEIPT, tripId: TRIP, count: 1 }])
+      } finally {
+        Reflect.deleteProperty(navigator, 'locks')
+      }
     })
 
     it('another window sees the cancel through storage', () => {

@@ -173,7 +173,15 @@
             >
               {{ t('receipt.review.cancel_record') }}
             </AppButton>
-            <p v-if="cancelLater" class="under">{{ t('receipt.review.cancel_record_offline') }}</p>
+            <p v-if="cancelRefused" class="under">
+              {{
+                t(
+                  cancelRefused === 'offline'
+                    ? 'receipt.review.cancel_record_offline'
+                    : 'receipt.review.cancel_record_failed',
+                )
+              }}
+            </p>
           </template>
           <AppButton
             v-else
@@ -270,7 +278,8 @@ import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconImageOff from '~icons/mdi/image-off-outline'
 import IconReceiptCheck from '~icons/mdi/receipt-text-check-outline'
-import { RECEIPT_CURRENCY, receiptDigits, yerevanDate } from '@molvia/model'
+import { ApiError } from '@molvia/client'
+import { ERROR, RECEIPT_CURRENCY, receiptDigits, yerevanDate } from '@molvia/model'
 import type { Money } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -285,6 +294,7 @@ import ReceiptTotal from '@/components/ReceiptTotal.vue'
 import ReceiptTotalSheet from '@/components/ReceiptTotalSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import { api } from '@/api'
 import { useOnline } from '@/composables/useOnline'
 import { useReceipt } from '@/composables/useReceipt'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
@@ -437,34 +447,43 @@ export default defineComponent({
       () => recording.value && !sending.value && queue.carrying !== id.value,
     )
     const checking = ref(false)
-    const cancelLater = ref(false)
+    /** Why a begun record was not cancelled: no connection, or the server did not answer (MOL-19). */
+    const cancelRefused = ref<'offline' | 'error' | null>(null)
     /**
      * A record whose send has begun may have landed with its answer lost (adversarial А1–А4): opened
      * as if it had not, the review offered «Удалить» on a recorded receipt and edits that would never
-     * be written. So it is cancelled only on a fresh answer that the receipt is not recorded; a
-     * recorded one takes the screen to its purchases, and with no answer it stays as it is.
+     * be written. So it is cancelled only on this check's own answer — never a read that set out
+     * before it and came back meanwhile (round 2, Б2) — asked once no send of it is on its way
+     * (`cancelChecked`, Б1). Recorded, the screen goes to its purchases; no answer, nothing opens.
      */
     async function cancelRecord(): Promise<void> {
       const asked = id.value
-      cancelLater.value = false
+      cancelRefused.value = null
       if (!queue.recordBegun(asked)) {
         queue.cancelRecord(asked)
         return
       }
       checking.value = true
-      const before = kept.fetchedAt.value?.getTime() ?? 0
       try {
-        await kept.retry()
+        await queue.cancelChecked(asked, async () => {
+          const answer = await kept.write(asked, () => api.receipt(asked))
+          return answer.receipt.status === 'parsed'
+        })
+      } catch (error) {
+        if (id.value !== asked) return
+        if (error instanceof ApiError && error.answered && error.code === ERROR.NOT_FOUND) {
+          void kept.retry()
+          return
+        }
+        cancelRefused.value = navigator.onLine ? 'error' : 'offline'
       } finally {
         checking.value = false
       }
-      if (id.value !== asked) return
-      if ((kept.fetchedAt.value?.getTime() ?? 0) <= before) {
-        cancelLater.value = true
-        return
-      }
-      if (detail.value?.receipt.status === 'parsed') queue.cancelRecord(asked, true)
     }
+    // Said until the connection or the receipt changes: either may open the way (round 2, review 4).
+    watch([online, () => detail.value], () => {
+      cancelRefused.value = null
+    })
     /**
      * While «Записать» waits in the queue — or is being sent — the receipt is what was sent: an edit
      * made now would not reach the server (review 5), nor would a removal (adversarial А1).
@@ -615,7 +634,7 @@ export default defineComponent({
       recording,
       cancellable,
       checking,
-      cancelLater,
+      cancelRefused,
       cancelRecord: () => void cancelRecord(),
       refused,
       docked,

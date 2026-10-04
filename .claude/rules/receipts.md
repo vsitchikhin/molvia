@@ -460,18 +460,24 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   запись» takes it back** (MOL-169, owner's В-5): a record the server answers 5xx again and again is
   held by MOL-24's rule, the receipt locked and the receipts behind it waiting, so the dock offers to
   take it out of the queue — the review open again, its draft whole. **A record no send has begun
-  goes at once; one begun goes only on a fresh answer that the receipt is not recorded**
-  (`recordBegun`, `cancelRecord(id, checked)`; adversarial А1–А4): its answer lost, it may have landed,
-  and opened as if it had not, the review offered «Удалить» on a recorded receipt — whose 409 is
-  «done», so «Чек удалён» stood over purchases that stayed — and edits no record would ever carry.
-  Recorded, the screen goes to its purchases; no answer — the dock says it can be cancelled once
-  online, and nothing opens. Begun is the mark in storage, so a send another window carries is begun
-  here too (review 2). **The receipt the server calls recorded lets go of the phone's part of it**
-  (`settleRecorded`, from the list of «Покупки» and from the review): a record waiting and a refusal of
-  one — a 409 after a cancel — would otherwise name it for good, with its photo and draft, and no row
-  to remove them from (review 1, А2). **The price, named:** a send still committing as the check is
-  answered «not recorded» — seconds — leaves the cancel open; the next «Записать» is a 409, the review
-  goes to the purchases of the first, and an edit made in between is not written. A record refused
+  goes at once; one begun goes only on the check's own answer that the receipt is not recorded,
+  asked under the lock every window sends under** (`recordBegun`, `cancelChecked`; adversarial А1–А4,
+  round 2 Б1–Б2): its answer lost, it may have landed, and opened as if it had not, the review
+  offered «Удалить» on a recorded receipt — whose 409 is «done», so «Чек удалён» stood over purchases
+  that stayed — and edits no record would ever carry. **The check's own answer**, never the shown one:
+  a read that set out before the tap and came back during the check said «not recorded» of a send
+  that landed after it set out (Б2). **Under the lock**, so no send of it is on its way in this window
+  or another when the server answers (Б1); a begun record is taken only through it. Recorded, the
+  screen goes to its purchases; no answer — the dock says why, «no connection» or «the server did not
+  answer» by `navigator.onLine` after the failure (MOL-19, Б3), until the connection or the receipt
+  changes, and nothing opens. **The receipt the server calls recorded lets go of the phone's part of
+  it** (`settleRecorded`, from the list of «Покупки» and from the review): a record waiting and a
+  refusal of one — a 409 after a cancel — would otherwise name it for good, with its photo and draft,
+  and no row to remove them from (review 1, А2). **The price, named:** a WebView with no
+  `navigator.locks` takes no lock, and another window's send may still be committing as the check is
+  answered; so may a record of the same receipt from another phone. Then the cancel opens, «Удалить»
+  meets a recorded receipt (409, «done») and an edit is not written — the next «Записать» is a 409 and
+  the review goes to the purchases of the first. A record refused
   otherwise is not touched: the next «Записать» takes its place.
 - **«Не принят» is a photo's word**: only a refused announcement or part makes that row, dated by the
   moment of the refusal; a tap opens the sheet with the reason and «Убрать», never removes by itself.
