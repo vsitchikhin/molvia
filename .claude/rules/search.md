@@ -101,7 +101,12 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   a Latin `c` is decided by the letter after it — `pljeskavica` is `pljeskavika`, «пљескавица»
   `pljeskaviцa` — and `ј` is the `j` of its Latin where Russian `й` is `i` and `я` `ia`: «ајвар» and
   «айвар», «ракија» and «ракия» are one edit apart, found near, not one key. The fold has no
-  language to tell a Serbian `c` from an English one, and the tables are frozen.
+  language to tell a Serbian `c` from an English one, and the tables are frozen. **Serbian Latin
+  typed without its marks is far from the label** (adversarial А1, owner's В-4 «а», 04.10.2026): one
+  key cannot be both «чевапчичи» and «cevapcici», since `č` is `ч` and a bare `c` at once, and the
+  Russian query was chosen — the person is Russian-speaking, a label and Open Food Facts write the
+  marks. «cevapcici» and «secer» are found whole by meaning, «cevap» as it is typed not at all, and
+  without the model (its first seconds, the phone offline) by nothing. Pinned in `search-key.test.ts`.
 - **The tables are frozen; a change reaches the stored keys at the API's start** (MOL-109, В-2).
   So are the rules that fold and decide `c`. The key is stored, so an edit after the first row is
   written makes every accumulated key foreign — silently, with no error and no log line. The key

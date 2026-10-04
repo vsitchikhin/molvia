@@ -300,6 +300,17 @@ describe('toSearchKey · грузинский и сербский (MOL-109)', ()
     expect([toSearchKey('ракија'), toSearchKey('ракия')]).toEqual(['rakija', 'rakia'])
   })
 
+  it('the price of В-1, pinned: Serbian Latin typed without its marks is not the label’s key (В-4, А1)', () => {
+    // One key cannot be both «чевапчичи» and «cevapcici»: «č» is «ч» and a bare «c» at once. The
+    // owner chose the Russian query (В-4 «а», 04.10.2026); a whole word typed bare is found by meaning.
+    expect([toSearchKey('Ćevapčići'), toSearchKey('cevapcici')]).toEqual([
+      'chevapchichi',
+      'цevapцiцi',
+    ])
+    expect([toSearchKey('Šećer'), toSearchKey('secer')]).toEqual(['shecher', 'seцer'])
+    expect(toSearchKey('Ćevapčići')).toBe(toSearchKey('чевапчичи'))
+  })
+
   it('reads a háček past what draws nothing, as `nameIdentity` does (adversarial А4)', () => {
     const zeroWidth = String.fromCodePoint(0x200b)
     const softHyphen = String.fromCodePoint(0xad)
