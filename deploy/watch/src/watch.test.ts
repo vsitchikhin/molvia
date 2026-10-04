@@ -290,8 +290,12 @@ describe('the ping URL', () => {
     ['an empty query', 'https://hc-ping.com/0f1e2d3c-secret?'],
     ['a fragment', 'https://hc-ping.com/0f1e2d3c-secret#molvia-up'],
     ['a trailing slash', 'https://hc-ping.com/0f1e2d3c-secret/'],
+    ['a trailing backslash, a slash to the parser (R2-1)', 'https://hc-ping.com/0f1e2d3c-secret\\'],
+    ['a trailing «/.», folded to a slash (R2-1)', 'https://hc-ping.com/0f1e2d3c-secret/.'],
+    ['a path the parser rewrites', 'https://hc-ping.com/pk/../0f1e2d3c-secret'],
+    ['a host written in capitals', 'https://HC-PING.com/0f1e2d3c-secret'],
   ])('is refused with %s, which /fail cannot follow (adversarial А1)', (_, url) => {
-    expect(() => settingsOf({ HC_UP_URL: url })).toThrow(/^HC_UP_URL has a query, a fragment/)
+    expect(() => settingsOf({ HC_UP_URL: url })).toThrow(/^HC_UP_URL is not the check URL/)
     try {
       settingsOf({ HC_UP_URL: url })
     } catch (error) {

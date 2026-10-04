@@ -47,7 +47,9 @@ export interface Round {
  *
  * `/fail` is appended to the URL, so the URL must end in its path (adversarial А1): after a query
  * or a fragment `/fail` lands in them, and healthchecks.io takes the path for a ping that says
- * «up» — a site down on every try would never raise the alarm, not even by the grace.
+ * «up» — a site down on every try would never raise the alarm, not even by the grace. And the URL
+ * must be written as `fetch` will send it (round 2, R2-1): the parser reads a trailing `\` as `/`
+ * and folds `/.`, so a text that only looks right would still ping `…//fail` or `…/`.
  */
 export function settingsOf(environment: Environment): Settings {
   const pingUrl = environment.HC_UP_URL?.trim() ?? ''
@@ -57,10 +59,15 @@ export function settingsOf(environment: Environment): Settings {
       'HC_UP_URL is not an https URL, there is nowhere to report (deploy/README.md, «Signals»)',
     )
   }
-  // Read on the text, not the parsed URL: an empty `?` or `#` parses to nothing and still takes `/fail`.
-  if (pingUrl.includes('?') || pingUrl.includes('#') || pingUrl.endsWith('/')) {
+  // An empty `?` or `#` parses to nothing and still takes `/fail`, so they are read on the text.
+  if (
+    parsed.href !== pingUrl ||
+    pingUrl.includes('?') ||
+    pingUrl.includes('#') ||
+    parsed.pathname.endsWith('/')
+  ) {
     throw new Error(
-      'HC_UP_URL has a query, a fragment or a trailing slash, so /fail cannot follow it (deploy/README.md, «Signals»)',
+      'HC_UP_URL is not the check URL /fail can follow: a query, a fragment, a trailing slash or a form the URL parser rewrites (deploy/README.md, «Signals»)',
     )
   }
   const domain = environment.DOMAIN?.trim() ?? ''
