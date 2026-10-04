@@ -23,7 +23,7 @@
     <section v-else class="group">
       <!-- Under a block nothing comes, whatever the switches say: said once, for every kind (Р-10). -->
       <p v-if="blocked" :id="`${id}-blocked`" class="blocked">{{ t('bot.blocked') }}</p>
-      <h2 class="caption">{{ t('bot.group_messages') }}</h2>
+      <SectionCaption>{{ t('bot.group_messages') }}</SectionCaption>
       <AppCard as="ul" list>
         <BotSwitchRow
           :label="t('bot.reminders.label')"
@@ -59,6 +59,7 @@ import AppScreen from '@/components/AppScreen.vue'
 import BotSwitchRow from '@/components/BotSwitchRow.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { useReceiptNotices } from '@/composables/useReceiptNotices'
 import { useReminders } from '@/composables/useReminders'
 
@@ -73,7 +74,7 @@ import { useReminders } from '@/composables/useReminders'
  */
 export default defineComponent({
   name: 'BotView',
-  components: { AppCard, AppScreen, BotSwitchRow, ScreenSkeleton, ScreenState },
+  components: { AppCard, AppScreen, BotSwitchRow, ScreenSkeleton, ScreenState, SectionCaption },
   setup() {
     const { t } = useI18n()
     const id = useId()
@@ -126,16 +127,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.caption {
-  margin: 0 0 var(--space-3);
-  padding: var(--space-1) var(--space-1) 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-}
-
 .note {
   margin: var(--space-3) 0 0;
   padding: 0 var(--space-1);

@@ -53,7 +53,7 @@
 
       <template v-else-if="journal && account">
         <AppCard class="balance">
-          <p class="caption">{{ t('accounts.balance') }}</p>
+          <SectionCaption as="p" inset>{{ t('accounts.balance') }}</SectionCaption>
           <p class="figure" :class="{ negative: account.balance.minor < 0n }" aria-live="polite">
             {{ money(account.balance) }}
           </p>
@@ -67,30 +67,36 @@
           <IconArchive class="strip-icon" aria-hidden="true" />{{ archivedLine }}
         </p>
 
-        <h2 class="group-caption">{{ t('accounts.account.operations') }}</h2>
-        <AppCard v-if="journal.rows.length === 0" class="empty">
-          <p class="empty-title">{{ t('accounts.no_operations') }}</p>
-          <p class="footnote">{{ t('accounts.account.empty.body') }}</p>
-        </AppCard>
-        <AppReveal group>
-          <section v-for="day in days" :key="day.day" class="day">
-            <h3 class="day-head">{{ dayTitle(day.day) }}</h3>
-            <AppCard as="ul" list>
-              <AppReveal group>
-                <OperationRow
-                  v-for="row in day.rows"
-                  :key="`${row.id}-${row.side ?? ''}`"
-                  :operation="row"
-                  :categories="categories"
-                  :name-of="nameOf"
-                  :account-name="accountName"
-                  in-account
-                  @open="openRow"
-                />
-              </AppReveal>
+        <section class="operations">
+          <SectionCaption class="group-caption">{{
+            t('accounts.account.operations')
+          }}</SectionCaption>
+          <div class="days">
+            <AppCard v-if="journal.rows.length === 0" class="empty">
+              <p class="empty-title">{{ t('accounts.no_operations') }}</p>
+              <p class="footnote">{{ t('accounts.account.empty.body') }}</p>
             </AppCard>
-          </section>
-        </AppReveal>
+            <AppReveal group>
+              <section v-for="day in days" :key="day.day" class="day">
+                <h3 class="day-head">{{ dayTitle(day.day) }}</h3>
+                <AppCard as="ul" list>
+                  <AppReveal group>
+                    <OperationRow
+                      v-for="row in day.rows"
+                      :key="`${row.id}-${row.side ?? ''}`"
+                      :operation="row"
+                      :categories="categories"
+                      :name-of="nameOf"
+                      :account-name="accountName"
+                      in-account
+                      @open="openRow"
+                    />
+                  </AppReveal>
+                </AppCard>
+              </section>
+            </AppReveal>
+          </div>
+        </section>
         <div v-if="journal.cursor" ref="sentinel" class="more">
           <p v-if="more === 'loading'" class="footnote">{{ t('state.loading') }}</p>
           <AppButton v-else-if="more === 'failed'" variant="ghost" @click="loadMore">
@@ -173,6 +179,7 @@ import OperationSheet from '@/components/OperationSheet.vue'
 import ReconcileSheet from '@/components/ReconcileSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { countedWhen, shortDay, signedAmount } from '@/components/accounts'
 import type { Removed } from '@/components/spending'
@@ -211,6 +218,7 @@ export default defineComponent({
     ReconcileSheet,
     ScreenSkeleton,
     ScreenState,
+    SectionCaption,
     UndoStrip,
   },
   setup() {
@@ -475,18 +483,14 @@ export default defineComponent({
   padding: var(--space-4);
 }
 
-.caption,
 .group-caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  margin-top: var(--space-3);
 }
 
-.group-caption {
-  padding: var(--space-3) var(--space-1) 0;
+/* The caption and the days in a block of their own: in the content's gap the 8 under it would be 20. */
+.days {
+  display: grid;
+  gap: var(--space-3);
 }
 
 .figure {

@@ -123,7 +123,7 @@ export default defineConfig({
     {
       name: 'iphone',
       use: { ...devices['iPhone 14'] },
-      testMatch: /(sheet|kit-inactive)\.spec\.ts$/,
+      testMatch: /(sheet|kit-inactive|kit-rows)\.spec\.ts$/,
     },
   ],
 

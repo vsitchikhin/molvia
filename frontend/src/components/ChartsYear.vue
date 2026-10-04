@@ -63,7 +63,9 @@
       />
 
       <AppCard as="section" class="chart-card" :aria-labelledby="`${id}-spent`">
-        <h2 :id="`${id}-spent`" class="caption">{{ t('spending.charts.spent_title') }}</h2>
+        <SectionCaption :id="`${id}-spent`" inset>{{
+          t('spending.charts.spent_title')
+        }}</SectionCaption>
         <BarChart
           v-model="spentAt"
           :bars="spentBars"
@@ -82,7 +84,9 @@
 
       <AppCard as="section" class="chart-card" :aria-labelledby="`${id}-flow`">
         <div class="head">
-          <h2 :id="`${id}-flow`" class="caption">{{ t('spending.charts.income_title') }}</h2>
+          <SectionCaption :id="`${id}-flow`" inset>{{
+            t('spending.charts.income_title')
+          }}</SectionCaption>
           <p class="legend" aria-hidden="true">
             <span class="key outline"></span>{{ t('spending.income') }}
             <span class="key filled"></span>{{ t('spending.charts.spent_legend') }}
@@ -132,9 +136,9 @@
       </AppCard>
 
       <AppCard v-if="series" as="section" class="chart-card" :aria-labelledby="`${id}-category`">
-        <h2 :id="`${id}-category`" class="caption">
+        <SectionCaption :id="`${id}-category`" inset>
           {{ t('spending.charts.category_months_title') }}
-        </h2>
+        </SectionCaption>
         <AppField
           :model-value="series.category.id"
           kind="select"
@@ -202,6 +206,7 @@ import {
   signedPercent,
 } from '@/components/charts'
 import { categoryColour } from '@/components/spending'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyChartYear } from '@/composables/useMoneyCharts'
 import { calendarDay } from '@/days'
@@ -234,6 +239,7 @@ export default defineComponent({
     MonthSwitcher,
     ScreenSkeleton,
     ScreenState,
+    SectionCaption,
   },
   props: {
     year: { type: String, required: true },
@@ -661,15 +667,6 @@ export default defineComponent({
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
-}
-
-.caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .legend {

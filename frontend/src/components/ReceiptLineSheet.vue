@@ -7,7 +7,7 @@
       <div v-if="skip" class="plate quiet">{{ t('receipt.line.skipped') }}</div>
 
       <div class="plate printed-box">
-        <span class="caps">{{ t('receipt.line.printed') }}</span>
+        <SectionCaption as="span" inset>{{ t('receipt.line.printed') }}</SectionCaption>
         <span class="printed" :lang="lang">{{ line.line.printed }}</span>
         <span v-if="line.line.translation" class="translation">{{
           t('receipt.line.translation', { text: line.line.translation })
@@ -147,6 +147,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import ItemPickSheet from '@/components/ItemPickSheet.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { formatRating, unitPriceText } from '@/components/adviceRow'
 import { receiptText } from '@/components/receipt'
@@ -177,6 +178,7 @@ export default defineComponent({
     IconChevronRight,
     IconMagnify,
     ItemPickSheet,
+    SectionCaption,
     SegmentedControl,
   },
   props: {
@@ -511,14 +513,6 @@ export default defineComponent({
   display: grid;
   gap: var(--space-1);
   background: var(--surface-2);
-}
-
-.caps {
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .printed {

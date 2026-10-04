@@ -65,10 +65,9 @@
              server's. -->
         <AppReveal group>
           <section v-for="month in overview.months" :key="month.month" class="month">
-            <h2 class="month-head">
-              <span class="caption">{{ monthOf(month.month) }}</span>
-              <span class="sums">{{ sumsOf(month.sums) }}</span>
-            </h2>
+            <SectionCaption class="month-head"
+              >{{ monthOf(month.month) }}<template #tail>{{ sumsOf(month.sums) }}</template>
+            </SectionCaption>
             <ul class="cards">
               <AppReveal group>
                 <li v-for="income in month.incomes" :key="income.id">
@@ -139,6 +138,7 @@ import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import { asTyped } from '@/components/spending'
 import ScreenState from '@/components/ScreenState.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { incomesOf, useIncomes } from '@/composables/useIncomes'
@@ -166,6 +166,7 @@ export default defineComponent({
     OperationSkeleton,
     ScreenSkeleton,
     ScreenState,
+    SectionCaption,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -319,30 +320,6 @@ export default defineComponent({
 
 .month + .month {
   margin-top: var(--space-4);
-}
-
-.month-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin: 0 0 var(--space-2);
-}
-
-.caption {
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-}
-
-.sums {
-  min-width: 0;
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
 }
 
 .cards {

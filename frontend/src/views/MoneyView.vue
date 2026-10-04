@@ -82,7 +82,7 @@
         <template v-else-if="month">
           <AppCard class="spent">
             <p class="spent-head">
-              <span class="caption">{{ t('spending.spent') }}</span>
+              <SectionCaption as="span" inset>{{ t('spending.spent') }}</SectionCaption>
               <span v-if="change" class="change">{{ change }}</span>
             </p>
             <p class="figure">{{ whole(month.spent) }}</p>
@@ -240,6 +240,7 @@ import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import SpendingSheet from '@/components/SpendingSheet.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
@@ -274,6 +275,7 @@ export default defineComponent({
     NewCategorySheet,
     ScreenSkeleton,
     ScreenState,
+    SectionCaption,
     SpendingSheet,
     TripUndoStrip,
     UndoStrip,
@@ -531,14 +533,6 @@ export default defineComponent({
   justify-content: space-between;
   gap: var(--space-3);
   margin: 0;
-}
-
-.caption {
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .change {

@@ -1,6 +1,6 @@
 <template>
   <AppCard v-if="shown.length > 0" class="market">
-    <h2 class="caption">{{ t('exchange.market.title') }}</h2>
+    <SectionCaption inset>{{ t('exchange.market.title') }}</SectionCaption>
     <p class="hint">{{ t('exchange.market.hint') }}</p>
     <table v-for="row in shown" :key="row.currency" class="table">
       <caption class="currency">
@@ -61,6 +61,7 @@ import IconStar from '~icons/mdi/star'
 import { formatRate, yerevanDate } from '@molvia/model'
 import type { ExchangeRate, MarketToday } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { calendarDay } from '@/days'
 
 /**
@@ -72,7 +73,7 @@ import { calendarDay } from '@/days'
  */
 export default defineComponent({
   name: 'MarketRatesCard',
-  components: { AppCard, IconStar },
+  components: { AppCard, IconStar, SectionCaption },
   props: {
     rows: { type: Array as PropType<MarketToday[]>, required: true },
   },
@@ -101,15 +102,6 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-}
-
-.caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .hint {

@@ -1,6 +1,8 @@
 <template>
   <AppCard as="section" class="card" :aria-labelledby="`${id}-title`">
-    <h2 :id="`${id}-title`" class="caption">{{ t('spending.charts.vs_usual_title') }}</h2>
+    <SectionCaption :id="`${id}-title`" inset>{{
+      t('spending.charts.vs_usual_title')
+    }}</SectionCaption>
     <template v-if="charts.usual">
       <p class="note">{{ note }}</p>
       <ul v-if="rows.length > 0" class="rows">
@@ -54,6 +56,7 @@ import {
   signedPercent,
 } from '@/components/charts'
 import { categoryColour } from '@/components/spending'
+import SectionCaption from '@/components/SectionCaption.vue'
 
 /**
  * «Против обычного» of «Графики → Месяц» (MOL-158, handoff MOL-157 03): the categories that went
@@ -67,7 +70,7 @@ import { categoryColour } from '@/components/spending'
  */
 export default defineComponent({
   name: 'DeviationBars',
-  components: { AppCard, IconDown, IconUp, IconWait },
+  components: { AppCard, IconDown, IconUp, IconWait, SectionCaption },
   props: {
     charts: { type: Object as PropType<MoneyChartMonthView>, required: true },
     nameOf: {
@@ -149,15 +152,6 @@ export default defineComponent({
   display: grid;
   gap: var(--space-2);
   padding: var(--space-4);
-}
-
-.caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .note {
