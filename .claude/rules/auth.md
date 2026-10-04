@@ -271,11 +271,15 @@ the round trip through Telegram, and ask whose account this turned out to be.
   decision): a newcomer left on the step, or an owner from before it, can record at the shelf with no
   signal, and the queues sent it all the moment the server named them, under a step nobody had passed
   and with no «16 или больше» said; they go after «Принимаю» — `App.vue` gives the occasion. An owner
-  who accepted an older edition sends as before (Р-4). **An owner known to have accepted none does
-  not wait for the hiding** (adversarial Б1, owner's decision): everything a sheet writes straight to
-  the server — a rating into everybody's average, an exchange, an income, an account, a code — went
-  out for them in that window, so the step comes as soon as no sheet is open (`close` is heard on
-  the way down); the one write left is the sheet open when the answer came. **Nor does an open door
+  who accepted an older edition sends as before (Р-4). **An owner not known to have accepted any
+  does not wait for the hiding** (adversarial Б1, owner's decision): everything a sheet writes
+  straight to the server — a rating into everybody's average, an exchange, an income, an account, a
+  code — went out for them in that window, so the step comes as soon as no sheet is open; the one
+  write left is the sheet open when the answer came. «Not known» is the server's «none», **or its
+  silence with the connection up** (adversarial В1): one lost question kept the window open, online;
+  the step's error then offers «Повторить». Offline the app stays. `close` is heard on the way down
+  and looked at a task later, so a chain of sheets — the next opened by the first one's `onClosed` —
+  is not cut between them (review №9). **Nor does an open door
   shut on a new question** (review №7): the connection back, or an identity asked again after an
   error, goes through `loading`, and the skeleton of a launch is only for an owner this page has not
   shown the app to. **The question about the terms is asked again by the store** on `online` and on
