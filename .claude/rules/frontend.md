@@ -232,17 +232,25 @@ The detail behind the frontend lines of `CLAUDE.md`.
   and a dimmed button reads as a live one under a cloud, while a dimmed knob in the dark is not
   seen. **Inactive is `text-muted` at 600 with no opacity, in the focus order**: `AppButton`,
   `SegmentedControl` and `AppSwitch` take `inactive`, which is `aria-disabled` plus a cancelled
-  click — a tap, a tap on the label, Space and the click a browser sends for a radio's arrow all
-  put the control back (checked in Chromium and WebKit); a native `disabled` is drawn the same and
-  stays for a moment such as sending, until a screen trades it for `inactive` with the words saying
-  why. **The form of the variant stays** (owner's В-1 «а»): a button with a fill goes to
-  `surface-2`, a ghost or danger-ghost keeps no fill — two grey pills in a sheet's footer read as
-  two buttons of equal weight. The hover and the press are written on `:not(:disabled,
-[aria-disabled='true'])`, since `aria-disabled` is still `:enabled` and an inactive primary lit up
-  under the pointer. A button that is only an icon draws its glyph in `text`, inactive in
+  click — a tap, a tap on the label and Space all put the control back. An inactive group of
+  segments is one stop whose arrows walk the focus over every radio by hand and choose none
+  (adversarial А2: an arrow cancelled whole left two of three options unheard). `e2e/kit-inactive`
+  holds it in Chromium and WebKit, since the component tests send their own events. A native
+  `disabled` is drawn the same and stays for a moment, until a screen trades it for `inactive`
+  with the words saying why; **`busy` keeps the look of the action, with `disabled` too** — the
+  sending sheets write both (А3). **The form of the variant stays** (owner's В-1 «а»): a button with
+  a fill goes to `surface-2`, a ghost or danger-ghost keeps no fill — two grey pills in a sheet's
+  footer read as two buttons of equal weight. The price, accepted (А4): the `surface-2` pill stands
+  1.10:1 on a sheet, so in a footer that sends, primary and ghost read as two muted words; an edge
+  would make it a secondary, which is `surface` with a `border-strong` edge. The rest shadow of an
+  inactive primary goes by a light `:where`, so the floating dock keeps its lift on whatever it
+  holds (review 1). The hover and the press are written on `:not(:disabled, [aria-disabled])`,
+  since `aria-disabled` is still `:enabled` and an inactive primary lit up under the pointer. A button that is only an icon draws its glyph in `text`, inactive in
   `text-muted` (owner's В-15 «а») — `text-muted` for both made the month's arrow at the edge look
-  like the live one. **Chosen is a fill and a ring, never a weight**: a segment is filled
+  like the live one. **Chosen is a fill or a form, never a weight**: a segment is filled
   `accent-solid` with `on-accent` (the old white segment on `surface-2` was not seen in the dark),
+  and an inactive one keeps its choice by a `graphic` edge and its word in `text` — the
+  `border-strong` edge of the handoff stood 1.65:1 and brought Н-3 back (А1, Graphic Is Data),
   a switch carries a ✓ of `--icon-xs` on its knob (owner's В-2 «а»; the handoff's 16 is no step),
   every chip and every segment is at 600, so nothing reflows under the thumb. **`--opacity-stale`
   means one thing: a previous answer left while the next is on its way** (К-11) — the searches;

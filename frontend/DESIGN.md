@@ -449,7 +449,7 @@ filled MDI icon and a 700 label; inactive tabs are outlined, 600.
 
 - **Field:** a 44 well on `surface-2`, radius 14, hairline `border-strong`; label above in 13/600 `text-muted`; focus turns the edge `accent` with a 2 px `accent-tint` halo; the error is a word from the registry under the field. Never `type="number"`.
 - **SearchField (target, one):** a pill well on `surface-2`, a magnifier left, "Очистить" or the scanner right. One look for every search in the app.
-- **Segmented control:** a `surface-2` track, segments 38 that answer the thumb over the full 44, radius 11 (`radius` less the inset). Inactive: still focusable, the selected one on `surface` with a `border-strong` edge, every word `text-muted`.
+- **Segmented control:** a `surface-2` track, segments 38 that answer the thumb over the full 44, radius 11 (`radius` less the inset). Inactive: one stop, the arrows walk the focus without choosing; the selected one on `surface` with a `graphic` edge and its word in `text`, the others `text-muted`.
 - **Switch:** a 52 × 32 track, `graphic` off and `accent-solid` on with a ✓ on the knob. Inactive: a `surface-2` well with a `border-strong` edge and a `text-muted` knob, still focusable.
 
 ### Verdict badge (signature)
