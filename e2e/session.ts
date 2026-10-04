@@ -35,6 +35,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  */
 export const DEV_SEAM = /^(Sign in for development|Войти для разработки)$/
 const LOGIN_TITLE = /^(Sign in|Вход)$/
+/** The step of the door after the claim (MOL-95), in both languages, as the seam is. */
+export const AGE = /^(I am 16 or older|Мне 16 лет или больше)$/
+export const ACCEPT = /^(I accept|Принимаю)$/
 /**
  * Где старый `open()` уже упал бы — пять секунд `expect` по умолчанию. Не новый порог: дольше него
  * вход оставляет след в отчёте, короче — нет, потому что это обычная машина.
@@ -118,6 +121,14 @@ export async function open(page: Page, path = '/'): Promise<void> {
     })
   }
   expect(answer.status(), 'шов разработки не впустил').toBe(201)
+  // **Новый владелец шва ещё не принял условия** (MOL-95): шаг стоит между входом и приложением, и
+  // тест проходит его, как человек, — галочкой и кнопкой. Свой спек у шага — `consent.spec`. Шов,
+  // вернувший владельца, чьё согласие устройство помнит, шага не показывает, поэтому ждётся одно
+  // из двух.
+  const age = page.getByRole('checkbox', { name: AGE })
+  const app = page.getByRole('heading', { level: 1 }).filter({ hasNotText: LOGIN_TITLE })
+  await expect(age.or(app), 'ответ шва пришёл, а ни шага согласия, ни приложения').toBeVisible()
+  if (await age.isVisible()) await acceptTerms(page)
   // **Дверь — прежние пять секунд, и поднимать их нельзя.** От ответа до неё — синхронная
   // цепочка (`settle`, `claim`) и одна отрисовка, ждать тут нечего; упала эта проверка — это
   // дефект входа (`verify()`, `claimed`, MOL-56), а не медленная машина. Заголовок экрана входа —
@@ -126,6 +137,12 @@ export async function open(page: Page, path = '/'): Promise<void> {
     page.getByRole('heading', { level: 1 }),
     'ответ шва пришёл, а дверь не открылась — это вход, а не стенд',
   ).not.toHaveText(LOGIN_TITLE)
+}
+
+/** «Мне 16 лет или больше» и «Принимаю» на шаге согласия (MOL-95). */
+export async function acceptTerms(page: Page): Promise<void> {
+  await page.getByRole('checkbox', { name: AGE }).check()
+  await page.getByRole('button', { name: ACCEPT }).click()
 }
 
 /** Открывает приложение, входит и отдаёт id владельца. */
