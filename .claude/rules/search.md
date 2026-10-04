@@ -94,16 +94,31 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   after NFD and **before the marks are stripped** (`LATIN_MARKED`), since stripped first `č` was a
   `c` and the fold made it `k`; `đ` has no decomposition and is a row of its own. So «ćevapi»,
   «ћевапи» and «чевапи» are one key, and so are «džem», «џем» and «джем». Only those four marked
-  letters: Polish `ś` and Czech `ě` keep what NFD gives.
+  letters: Polish `ś` and Czech `ě` keep what NFD gives. What draws nothing is taken out **before**
+  the pairs are read, as `nameIdentity` takes it out before it composes — a zero-width space between
+  `c` and `ˇ` gave one identity two keys and «Предложить товар» a second «Čaj» (adversarial А4).
+  **The price, pinned in `search-key.test.ts`** (review, remark 3): Serbian `c` is always `ц`, but
+  a Latin `c` is decided by the letter after it — `pljeskavica` is `pljeskavika`, «пљескавица»
+  `pljeskaviцa` — and `ј` is the `j` of its Latin where Russian `й` is `i` and `я` `ia`: «ајвар» and
+  «айвар», «ракија» and «ракия» are one edit apart, found near, not one key. The fold has no
+  language to tell a Serbian `c` from an English one, and the tables are frozen.
 - **The tables are frozen; a change reaches the stored keys at the API's start** (MOL-109, В-2).
   So are the rules that fold and decide `c`. The key is stored, so an edit after the first row is
   written makes every accumulated key foreign — silently, with no error and no log line. The key
   is TypeScript and a migration is SQL, so no migration can recompute it: `rekeyItems`
   (`backend/src/db/rekey.ts`) runs after the migrations, rewrites every `items.search_key` that
   differs from `toSearchKey(name)` under a lock against writes, and stops the boot on a failure as a
-  migration does. It writes nothing when the tables did not change. **What it cannot bring back is
-  a remembered pick**: `search_picks` keeps the query's key alone, so a pick under a key whose
-  letters changed is forgotten — a named price. MOL-11 and MOL-27 changed the alphabet before any
+  migration does. It writes nothing when the tables did not change. **What it cannot bring back** is
+  a key whose source is not stored: a remembered pick (`search_picks` keeps the query's key alone)
+  and the shops' memory by the text of a line (`store_memory` of kind `text` keeps
+  `toSearchKey(line.printed)`, not the line) — both are forgotten under letters that changed, named
+  prices; the second costs nothing while receipts are Armenian and a change leaves the Armenian
+  table and Cyrillic alone (review, remark 4). **A rollback past a rekeying build is a rename for
+  the data** (adversarial А5): the image put back looks a name up by its own tables' key, misses the
+  row rewritten, and `createUnlessNamed` may write a twin; the next start of the new build rekeys
+  again, and a twin made meanwhile is found by `nameIdentity` and merged by hand. Accepted: a
+  rollback is rare, a twin is seen, and holding the old key beside the new would be a second column
+  for one deploy. MOL-11 and MOL-27 changed the alphabet before any
   key was stored; MOL-109 is the first change the recompute carried. Same standing as
   `MINOR_EXPONENT`. Retuning the thresholds is a different thing and does not touch the alphabet.
 - **Candidates come from `word_similarity`, never `similarity`.** `similarity` compares

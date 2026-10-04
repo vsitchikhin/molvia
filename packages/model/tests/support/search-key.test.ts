@@ -288,6 +288,18 @@ describe('toSearchKey · грузинский и сербский (MOL-109)', ()
     expect(toSearchKey('Đumbir')).toBe(toSearchKey('ђумбир'))
   })
 
+  it('the price, pinned: a Latin c and ј against Russian stay one edit apart, not one key (замечание 3)', () => {
+    // Serbian c is always ц, but a Latin c is decided by the letter after it (MOL-11) — before a, o, u
+    // it is k, for Coca-Cola — and ј is j as its Latin, where Russian й is i and я ia. The tables are
+    // frozen and the fold has no language to tell Serbian from English: found within an edit, «рядом».
+    expect([toSearchKey('pljeskavica'), toSearchKey('пљескавица')]).toEqual([
+      'pljeskavika',
+      'pljeskaviцa',
+    ])
+    expect([toSearchKey('ајвар'), toSearchKey('айвар')]).toEqual(['ajvar', 'aivar'])
+    expect([toSearchKey('ракија'), toSearchKey('ракия')]).toEqual(['rakija', 'rakia'])
+  })
+
   it('reads a háček past what draws nothing, as `nameIdentity` does (adversarial А4)', () => {
     const zeroWidth = String.fromCodePoint(0x200b)
     const softHyphen = String.fromCodePoint(0xad)

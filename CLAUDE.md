@@ -154,8 +154,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   **What draws nothing is one list, `INVISIBLE` in `text.ts`**, for the measure and the key alike.
 - **The key is never an identity**: a duplicate is decided by `nameIdentity` (MOL-12).
 - **The tables and the fold rules are frozen; Georgian and Serbian are in them** (MOL-109): a
-  change reaches the stored keys by `rekeyItems` at the API's start, never by SQL, and forgets the
-  picks under the keys it changed.
+  change reaches the stored keys by `rekeyItems` at the API's start, never by SQL; it forgets the
+  picks and the shops' memory by text under the keys it changed, and a rollback past it is a rename.
 - **Candidates come from `search_key %> $1` only** — the one form that reaches the GIN index — at
   `word_similarity` > 0.15, with the threshold set locally inside the query's transaction.
 - **Ranking is by minimum Levenshtein word against word**, a budget of 2; sizes, units and
