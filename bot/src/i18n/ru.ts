@@ -170,6 +170,10 @@ export const ru = {
   'receipt.parsed_no_place': 'Чек от {date} разобран: {count}. Посмотрите и запишите.',
   'receipt.failed':
     'Чек от {date} не удалось прочитать. Можно переснять или записать покупки вручную.',
+  'receipt.duplicate':
+    'Чек из «{place}» разобран, но он уже записан — второй раз записывать не нужно.',
+  'receipt.duplicate_no_place':
+    'Чек от {date} разобран, но он уже записан — второй раз записывать не нужно.',
   'receipt.view': 'Посмотреть чек',
   'receipt.open': 'Открыть чек',
   'receipt.items.one': '{n} позиция',

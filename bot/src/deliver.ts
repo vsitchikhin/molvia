@@ -57,7 +57,7 @@ export async function deliver(
     console.error(`[molvia] ${label}: ${code}`)
     reportDefect(api, error, `${label}:send`)
     if (error instanceof GrammyError && error.error_code === 403) {
-      await blocked(api, telegramUserId)
+      await blocked(api, telegramUserId, label)
       return 'blocked'
     }
     return 'failed'
@@ -65,16 +65,16 @@ export async function deliver(
 }
 
 /**
- * The bot was blocked: the person's reminders go off (MOL-103). Telegram's `my_chat_member` usually
- * says so first; this is for a block the bot did not hear about, while it was down. A failure is
- * the log's, by its code — the next message's 403 asks again.
+ * The bot was blocked: the API marks it so (`bot_blocked_at`, MOL-129) and turns the reminders off
+ * (MOL-103). Telegram's `my_chat_member` usually says so first; this is for a block the bot did not
+ * hear about, while it was down. A failure is the log's, by its code — the next 403 asks again.
  */
-async function blocked(api: MolviaBotClient, telegramUserId: number): Promise<void> {
+async function blocked(api: MolviaBotClient, telegramUserId: number, label: string): Promise<void> {
   try {
     await api.switchReminders(telegramUserId, 'blocked')
   } catch (error) {
     console.error(
-      `[molvia] remind blocked: ${error instanceof ApiError ? error.code : 'unexpected failure'}`,
+      `[molvia] ${label} blocked: ${error instanceof ApiError ? error.code : 'unexpected failure'}`,
     )
   }
 }

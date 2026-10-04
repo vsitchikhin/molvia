@@ -10,9 +10,6 @@ import { reportDefect } from './failure'
 import { Flooded, deliver, sleep } from './deliver'
 import type { Wait } from './deliver'
 
-export { RETRY_AFTER_CAP_SECONDS, sleep } from './deliver'
-export type { Wait } from './deliver'
-
 /**
  * What a button of the scale carries: the item and the digit — and never whose verdict it is.
  * That is `ctx.from.id`, Telegram's word for who pressed, so a message forwarded to someone else

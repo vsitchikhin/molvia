@@ -18,6 +18,7 @@ const notice = (patch: Partial<ReceiptNotice> = {}): ReceiptNotice => ({
   place: 'Ереван Сити',
   day: '2026-09-27',
   lineCount: 7,
+  duplicate: false,
   silent: false,
   ...patch,
 })
@@ -103,6 +104,26 @@ describe('текст «чек разобран» (хендофф 08)', () => {
     )
   })
 
+  it('второй снимок записанного чека — «уже записан», не «запишите», и кнопка «Открыть» (А4)', () => {
+    expect(receiptText(notice({ duplicate: true }))).toBe(
+      'Чек из «Ереван Сити» разобран, но он уже записан — второй раз записывать не нужно.',
+    )
+    expect(receiptText(notice({ duplicate: true, place: null }))).toBe(
+      'Чек от 27 сентября разобран, но он уже записан — второй раз записывать не нужно.',
+    )
+    expect(receiptText(notice({ duplicate: true, language: 'en' }))).toBe(
+      'Your Ереван Сити receipt is read, but it is saved already — no need to save it again.',
+    )
+    const button = receiptMessage(notice({ duplicate: true }), APP).keyboard?.inline_keyboard.flat()
+    expect(button?.map(({ text }) => text)).toEqual(['Открыть чек'])
+  })
+
+  it('не разобран — сообщение «не прочитали», даже если такой же чек записан', () => {
+    expect(receiptText(notice({ outcome: 'failed', duplicate: true }))).toMatch(
+      /^Чек от 27 сентября не удалось прочитать/,
+    )
+  })
+
   it('формы числа: 1, 2, 5, 11, 21, 22', () => {
     const count = (n: number) =>
       /: (.+)\. Посмотрите/u.exec(receiptText(notice({ lineCount: n })))?.[1]
@@ -122,6 +143,7 @@ describe('текст «чек разобран» (хендофф 08)', () => {
       notice({ place: null }),
       notice({ outcome: 'failed' }),
       notice({ language: 'en', place: null }),
+      notice({ duplicate: true }),
     ]) {
       const digits = receiptText(one).match(/\d+/g) ?? []
       expect(

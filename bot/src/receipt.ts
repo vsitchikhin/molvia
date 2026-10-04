@@ -37,8 +37,14 @@ function dateOf(language: string, day: string): string {
 
 /** The words of the message: the place where the review knows it, else the day; never a sum. */
 export function receiptText(notice: ReceiptNotice): string {
-  const { language, place, day, lineCount, outcome } = notice
+  const { language, place, day, lineCount, outcome, duplicate } = notice
   if (outcome === 'failed') return t(language, 'receipt.failed', { date: dateOf(language, day) })
+  // a second shot of a receipt recorded before: the review says «уже записан» (adversarial А4)
+  if (duplicate) {
+    return place === null
+      ? t(language, 'receipt.duplicate_no_place', { date: dateOf(language, day) })
+      : t(language, 'receipt.duplicate', { place })
+  }
   const count = lines(language, lineCount)
   return place === null
     ? t(language, 'receipt.parsed_no_place', { date: dateOf(language, day), count })
@@ -59,7 +65,10 @@ export function receiptMessage(
   notice: ReceiptNotice,
   appUrl: string,
 ): { readonly text: string; readonly keyboard?: InlineKeyboard } {
-  const label = t(notice.language, notice.outcome === 'failed' ? 'receipt.open' : 'receipt.view')
+  const label = t(
+    notice.language,
+    notice.outcome === 'failed' || notice.duplicate ? 'receipt.open' : 'receipt.view',
+  )
   const url = receiptUrl(appUrl, notice.receiptId)
   const text = receiptText(notice)
   return url.startsWith('https://')
@@ -80,6 +89,8 @@ export async function tellReceipts(
 ): Promise<void> {
   let due: ReceiptNotice[]
   try {
+    // Never cut short by a stop: the API marks what it hands out, so a claim given up on midway
+    // loses those receipts' messages — its own thirty seconds are the bound.
     due = (await api.claimReceiptNotices()).notices
   } catch (error) {
     console.error(
