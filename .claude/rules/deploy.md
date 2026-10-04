@@ -172,10 +172,12 @@ The shape worth knowing here:
     its check waits a day and an hour, and the worst gap measured was six hours. A request
     Cloudflare could not complete may come back as its own code, `530` for a name that does not
     resolve: any answer but `200` fails, so the rule holds as it was.
-  - **Node stays out of the Worker's source** (adversarial А4): the tests run on Node, and one
-    TypeScript program gives every file its types, so `process` or `Buffer` would type-check and
-    pass every test, then be a ReferenceError on Workers at every round. `no-restricted-globals`
-    in the module's lint and the bundle's test hold them out.
+  - **Node stays out of the Worker's source by its types** (adversarial А4, R2-2): the tests run on
+    Node, and in one TypeScript program Node's types reach every file — `process`, `clearImmediate`
+    or a `setTimeout(…).unref()` would type-check and pass every test, then fail on Workers in the
+    first round, or the first pause. So `deploy/watch/tsconfig.json` types the source by the web
+    platform alone (`WebWorker`, no `types`), and `tsconfig.test.json` adds Node for the tests; the
+    module's lint reads the tests by the second. A list of forbidden names closed only what it named.
   - **The rule lives once** (MOL-221, В-4): three of four is `deploy/watch/src/site.ts`, tested, and
     `watch.yml` checks the certificate alone — a second copy in bash would drift from what watches.
     The alarm is tried on the Worker itself, `DOMAIN` set to `molvia.invalid` by hand; every rollout

@@ -5,32 +5,30 @@ import { base, deny } from '../../eslint.config.base.js'
 
 const tsconfigRootDir = fileURLToPath(new URL('.', import.meta.url))
 
-const WEB_PLATFORM =
-  'The watch runs on Cloudflare Workers: what it uses is the web platform, not Node.'
-
 export default ts.config(
   ...base({ tsconfigRootDir }),
   {
     files: ['src/**/*.ts'],
     ignores: ['src/**/*.test.ts'],
-    rules: {
-      ...deny(['node:*'], WEB_PLATFORM),
-      // Node's globals type-check here — the tests run on Node, and one TypeScript program sees
-      // their types everywhere — and run in every test, then fail on Workers at the first round
-      // (adversarial А4). The linter is what holds them out of the source.
-      'no-restricted-globals': [
-        'error',
-        ...[
-          'process',
-          'Buffer',
-          'global',
-          'require',
-          'module',
-          '__dirname',
-          '__filename',
-          'setImmediate',
-        ].map((name) => ({ name, message: WEB_PLATFORM })),
-      ],
+    rules: deny(
+      ['node:*'],
+      'The watch runs on Cloudflare Workers: what it uses is the web platform, not Node.',
+    ),
+  },
+  // The source is typed by the web platform alone (`tsconfig.json`), so Node's API there is a type
+  // error. The tests run on Node and are typed by `tsconfig.test.json`, which the source's project
+  // does not include. Set for every file: the parser keeps one project service per module, made
+  // with the options of the first file it reads.
+  {
+    files: ['**/*.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: ['src/*.test.ts', '*.config.ts'],
+          defaultProject: 'tsconfig.test.json',
+        },
+        tsconfigRootDir,
+      },
     },
   },
   prettier,

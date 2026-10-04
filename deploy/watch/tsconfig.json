@@ -1,9 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2023"],
-    "types": ["node"],
+    "lib": ["ES2023", "WebWorker"],
+    "types": [],
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src/**/*.ts", "*.config.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
 }

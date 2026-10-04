@@ -340,11 +340,11 @@ on GitHub, hourly: its check waits a day and an hour.
 
 - The checks are the owner's healthchecks.io account, the one the backups report to, each with the
   Telegram integration.
-- `molvia-up`'s ping URL is the Worker's secret `HC_UP_URL` — the check's URL as healthchecks.io
-  gives it, with no query, fragment or trailing slash, since `/fail` is appended to it; a round
-  refuses one that has them — set on Cloudflare once — Workers & Pages
+- `molvia-up`'s ping URL is the Worker's secret `HC_UP_URL`, set on Cloudflare once — Workers & Pages
   → `molvia-watch` → Settings → Variables and Secrets, or `PUT …/workers/scripts/molvia-watch/secrets`
-  — and kept by every rollout. Without it every round throws, `HC_UP_URL is not an https URL`, and
+  — and kept by every rollout. It is the check's URL exactly as healthchecks.io gives it: `/fail` is
+  appended to it, so a query, a fragment, a trailing slash or a form the URL parser rewrites is
+  refused by every round. Without it every round throws, `HC_UP_URL is not an https URL`, and
   the check goes down by its grace. Its plain variable `DOMAIN` is set again by every rollout.
 - **The Worker is rolled out by the release** after green CI on master (`watcher` in `release.yml`),
   with the environment `production`'s secret `CLOUDFLARE_API_TOKEN` — an account token, «Workers
