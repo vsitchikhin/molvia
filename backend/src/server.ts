@@ -24,6 +24,11 @@ import { apiFailureReporter } from '@/failure-reporter'
 import type { HttpMetrics } from '@/metrics'
 import { botFailure, phoneReportLimit, takePhoneFailures } from '@/usecases/record-failure'
 import { claimOwnerNotices } from '@/usecases/owner-notices'
+import {
+  chooseReceiptNotices,
+  claimReceiptNotices,
+  receiptNoticesOf,
+} from '@/usecases/tell-receipts'
 import type { FailurePlace } from '@/usecases/record-failure'
 import { createFailureRepository } from '@/db/failures-repository'
 import { createOwnerNoticeRepository } from '@/db/owner-notices-repository'
@@ -145,6 +150,7 @@ import { createSettingsRepository } from '@/db/settings-repository'
 import { saveSettings } from '@/usecases/save-settings'
 import { settingsRoute } from '@/routes/settings'
 import { remindersRoutes } from '@/routes/reminders'
+import { receiptNoticesRoutes } from '@/routes/receipt-notices'
 import { consentRoutes } from '@/routes/consent'
 import { startTrip } from '@/usecases/start-trip'
 import { removeTrip, restoreTrip } from '@/usecases/remove-trip'
@@ -758,6 +764,16 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       rateFromBot: (itemId, body) =>
         rateFromBot({ actors, items, verdicts, reminders }, itemId, body),
       switchReminders: (body) => switchRemindersFromBot(reminders, body, new Date()),
+      claimReceiptNotices: () =>
+        claimReceiptNotices(receipts, new Date(), (issue) => {
+          // A receipt marked as told whose message the contract refuses: that message is lost, and
+          // the owner hears of the failure, placed as the request it happened in (as MOL-148's).
+          failures.report(
+            issue,
+            { source: 'api', route: 'POST /internal/receipts/claim' },
+            'receipt notice unreadable',
+          )
+        }),
       // Through the same gate as the API's own (adversarial А3): answered at once, never waited on.
       reportFailure: (body) => {
         const { summary, place } = botFailure(body)
@@ -845,6 +861,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         setting: (owner) => remindersSettingOf(reminders, { id: owner }),
         choose: (owner, body) => chooseReminders(reminders, { id: owner }, body, new Date()),
       })
+      receiptNoticesRoutes(guarded, {
+        setting: (owner) => receiptNoticesOf(receipts, owner),
+        choose: (owner, body) => chooseReceiptNotices(receipts, owner, body),
+      })
       consentRoutes(guarded, {
         consent: (owner) => consentOf(actors, { id: owner }),
         accept: (owner, body) => acceptConsent(actors, { id: owner }, body),
@@ -903,8 +923,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           if (queued) receiptQueue?.nudge()
           return receipt
         },
-        list: (actor) => receiptsOf(tripData, actor),
-        one: (actor, id) => receiptOfOwner(tripData, actor, id),
+        list: (actor, shown) => receiptsOf(tripData, actor, shown),
+        one: (actor, id, shown) => receiptOfOwner(tripData, actor, id, shown),
         remove: (actorId, id) => removeReceipt(receipts, actorId, id),
         restore: (actorId, id) => restoreReceipt(receipts, actorId, id),
         record: (actor, id, body) => recordReceipt(transact, actor, id, body),

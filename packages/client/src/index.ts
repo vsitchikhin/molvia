@@ -51,7 +51,9 @@ import {
   monthSchema,
   yearSchema,
   salaryShiftSchema,
+  chooseReceiptNoticesSchema,
   chooseRemindersSchema,
+  receiptNoticesSettingSchema,
   acceptConsentSchema,
   consentSchema,
   remindersSettingSchema,
@@ -127,6 +129,7 @@ import type {
   MoneyChartMonthView,
   MoneyChartYearView,
   MoneyMonthView,
+  ReceiptNoticesSetting,
   RemindersSetting,
   Consent,
   SalaryShift,
@@ -394,6 +397,10 @@ export interface MolviaClient {
   remindersSetting(): Promise<RemindersSetting>
   /** Saved on the tap; turned on, the reminders start over. Safe to repeat. */
   chooseReminders(on: boolean): Promise<RemindersSetting>
+  /** «Сообщать, что чек разобран» (MOL-129, В-2): `off` — the person turned it off. */
+  receiptNoticesSetting(): Promise<ReceiptNoticesSetting>
+  /** Saved on the tap. Safe to repeat. */
+  chooseReceiptNotices(on: boolean): Promise<ReceiptNoticesSetting>
   /** The edition of the terms and the privacy page accepted (MOL-95): `version` null is none. */
   consent(): Promise<Consent>
   /** The edition the screen showed, accepted now. Safe to repeat: the row only ever goes up. */
@@ -426,9 +433,13 @@ export interface MolviaClient {
     part: number,
     photo: Blob | Uint8Array<ArrayBuffer>,
   ): Promise<ReceiptSummary>
-  receipts(): Promise<ReceiptsResponse>
+  /**
+   * `shown` — asked with the page in view (MOL-129, А1): a receipt answered read is then heard of in
+   * the app, and the bot does not tell of it.
+   */
+  receipts(options?: { readonly shown?: boolean }): Promise<ReceiptsResponse>
   /** One receipt with its lines; `error.not_found` for a missing, removed or someone else's one. */
-  receipt(id: string): Promise<ReceiptDetail>
+  receipt(id: string, options?: { readonly shown?: boolean }): Promise<ReceiptDetail>
   removeReceipt(id: string): Promise<void>
   /** «Вернуть» within ten minutes of «Удалить чек». */
   restoreReceipt(id: string): Promise<ReceiptSummary>
@@ -880,6 +891,14 @@ export function createClient(options: ClientOptions): MolviaClient {
         body: encode(chooseRemindersSchema, { on }),
       }),
 
+    receiptNoticesSetting: () => request('/actors/me/receipt-notices', receiptNoticesSettingSchema),
+
+    chooseReceiptNotices: async (on) =>
+      request('/actors/me/receipt-notices', receiptNoticesSettingSchema, {
+        method: 'PUT',
+        body: encode(chooseReceiptNoticesSchema, { on }),
+      }),
+
     consent: () => request('/actors/me/consent', consentSchema),
 
     acceptConsent: async (version) =>
@@ -928,9 +947,11 @@ export function createClient(options: ClientOptions): MolviaClient {
         timeout: RECEIPT_PART_TIMEOUT_MS,
       }),
 
-    receipts: () => request('/receipts', receiptsResponseCodec),
+    receipts: (options) =>
+      request(`/receipts${options?.shown ? '?shown=1' : ''}`, receiptsResponseCodec),
 
-    receipt: (id) => request(`/receipts/${segment(id)}`, receiptDetailCodec),
+    receipt: (id, options) =>
+      request(`/receipts/${segment(id)}${options?.shown ? '?shown=1' : ''}`, receiptDetailCodec),
 
     removeReceipt: async (id) => {
       noContent(await exchange(`/receipts/${segment(id)}`, z.undefined(), { method: 'DELETE' }))
