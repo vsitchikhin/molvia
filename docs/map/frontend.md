@@ -12,14 +12,19 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/components/AppButton.vue` — Kit button in six variants (primary, secondary, tinted, ghost, danger-ghost, icon), with busy, one inactive look and an icon slot.
 - `frontend/src/components/AppCard.vue` — Kit card: the surface of lists and blocks, with a chosen tag, the green «take» tone and an edge-to-edge list mode.
 - `frontend/src/components/AppField.vue` — Kit field: a native input, textarea, select or date with its label (or one only read out), error code, a mark before and a suffix after, the right phone keyboard, and the count of the last characters left when asked.
+- `frontend/src/components/AppNote.vue` — Kit note: an icon of 18 and words of 13 on `surface-2`, or `warn` on its tint; the strip's shape, no live region.
 - `frontend/src/components/AppReveal.vue` — Grows from nothing and shrinks back what pushes its neighbours — rows of a list, an error under a field, a block of a sheet; still for an answer read, a screen move, reduced motion.
 - `frontend/src/components/AppSwitch.vue` — Kit switch: a native checkbox read out as a switch, showing what the server holds and saying which way it was moved — for a setting saved on the tap; a ✓ on the knob when on, `inactive` focusable.
+- `frontend/src/components/AppTag.vue` — Kit tag in a row: a pill of 13/600, plain, warn or bad, with an optional icon of 14.
 - `frontend/src/components/AppScreen.vue` — The frame every screen sits in: pinned row, collapsing large title, back chevron with its label, docked strip, identity notice.
 - `frontend/src/components/BottomSheet.vue` — The sheet: a native modal `<dialog>` rising from the bottom, closed through its history entry; stacks with «‹» instead of ×.
 - `frontend/src/components/FloatingDock.vue` — Floating spot for the main action of a «Деньги» screen («Трата», «Обмен», «Доход») or «Вернуть» after a removal.
+- `frontend/src/components/ListRow.vue` — Kit row of a list, 64: icon, title, meta in two lines, a tail and the chevron of «opens something to go on with» (В-14); a button, a router link or a div; destructive, inactive with words why, selected read out by its role, active under the keyboard.
+- `frontend/src/components/NavRow.vue` — Kit entry row, 52: «icon · label · value · ›», a router link to a screen or a button opening a sheet (`aria-haspopup`); the chevron always.
 - `frontend/src/components/SchemeGroup.vue` — «Тема» on the settings screen: «Системная · Светлая · Тёмная» of this device, taken on the tap, in every state of the screen.
 - `frontend/src/components/ScreenSkeleton.vue` — Loading state: bars in the geometry the screen gives, announcing «Loading…» through the live region.
 - `frontend/src/components/ScreenState.vue` — Every non-loading screen state (empty, error, offline, attention): icon circle by tone, texts, «Try again» and actions; «Обновить» first while a version waits; «Сообщить о проблеме» last under a full-screen error (MOL-147).
+- `frontend/src/components/SectionCaption.vue` — Kit caps caption: a group's caption 4 from the left and 8 above its card, or `inset` as a card's own title; a mark before the words and a tail on the right, inside the heading; the one place caps are drawn.
 - `frontend/src/components/SegmentedControl.vue` — Kit segmented control: a radio fieldset drawn as segments, the chosen one filled, for one choice out of up to four (unit, rate); `fit` gives each segment the width of its word, `inactive` holds the choice in focus.
 - `frontend/src/components/TabBar.vue` — The tab bar of the five sections («Что брать», «Покупки», «Оценки», «Деньги», «Настройки»), moving through `useNavigation`.
 - `frontend/src/components/UndoStrip.vue` — «Удалено · Вернуть» strip: ten seconds to take back a removal, paused under a finger or focus.

@@ -47,6 +47,17 @@
         "message": "A scroll with behavior 'auto' takes it from the CSS, and the sheet's compensation would slide (MOL-136). Pass behavior: 'smooth' where the eye follows."
       }
     ],
+    "property-disallowed-list": [
+      [
+        "/^text-transform$/i",
+        "/^font-variant$/i",
+        "/^font-variant-caps$/i",
+        "/^font-feature-settings$/i"
+      ],
+      {
+        "message": "%s is refused here. A letter's case and its caps are the kit's caption, SectionCaption, and nobody else's (MOL-175): refused as a property, so a variable, a map or a custom property cannot carry them past the check."
+      }
+    ],
     "function-disallowed-list": [
       ["env", "rgb", "rgba", "hsl", "hsla", "hwb", "lab", "lch", "oklab", "oklch", "color"],
       {
@@ -70,6 +81,12 @@
         "color-named": null,
         "declaration-property-value-allowed-list": null,
         "function-disallowed-list": null
+      }
+    },
+    {
+      "files": ["**/components/SectionCaption.vue"],
+      "rules": {
+        "property-disallowed-list": null
       }
     },
     {

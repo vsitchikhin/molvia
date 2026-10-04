@@ -6,6 +6,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { actorCodec, ERROR } from '@molvia/model'
 import type { ActorView, SettingsUpdate } from '@molvia/model'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -292,7 +293,7 @@ describe('«Write to the developer» (MOL-147)', () => {
 
   it('stands in «About the app», between the account and your data', async () => {
     const view = await render()
-    const captions = view.findAll('h2.caption').map((caption) => caption.text())
+    const captions = view.findAllComponents(SectionCaption).map((caption) => caption.text())
 
     expect(captions.slice(captions.indexOf(en.settings.group_account))).toEqual([
       en.settings.group_account,

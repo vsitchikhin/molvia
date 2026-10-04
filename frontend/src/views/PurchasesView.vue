@@ -33,7 +33,7 @@
     <!-- Receipts (MOL-127, handoff 03): in work, then to look at and record — each section only
          when it has a row. -->
     <template v-if="working.length > 0">
-      <p class="caption">{{ t('purchases.group_working') }}</p>
+      <SectionCaption as="p" class="caption">{{ t('purchases.group_working') }}</SectionCaption>
       <AppCard class="block" list>
         <AppReveal group>
           <PurchaseRow
@@ -50,7 +50,7 @@
       </AppCard>
     </template>
     <template v-if="review.length > 0">
-      <p class="caption">{{ t('purchases.group_review') }}</p>
+      <SectionCaption as="p" class="caption">{{ t('purchases.group_review') }}</SectionCaption>
       <AppCard class="block" list>
         <AppReveal group>
           <PurchaseRow
@@ -120,7 +120,7 @@
     </p>
 
     <template v-if="rows.length > 0">
-      <p class="caption">{{ t('purchases.group_recorded') }}</p>
+      <SectionCaption as="p" class="caption">{{ t('purchases.group_recorded') }}</SectionCaption>
       <AppCard class="recorded" list>
         <AppReveal group>
           <PurchaseRow
@@ -192,6 +192,7 @@ import ReceiptUndoStrip from '@/components/ReceiptUndoStrip.vue'
 import ReceiptWorkSheet from '@/components/ReceiptWorkSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import TripNotices from '@/components/TripNotices.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
@@ -233,6 +234,7 @@ export default defineComponent({
     ReceiptWorkSheet,
     ScreenSkeleton,
     ScreenState,
+    SectionCaption,
     TripNotices,
     TripUndoStrip,
   },
@@ -471,12 +473,7 @@ export default defineComponent({
 }
 
 .caption {
-  margin: var(--space-6) var(--space-1) var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  margin-top: var(--space-6);
 }
 
 .memory {

@@ -2,7 +2,9 @@
   <div class="total">
     <div class="figures">
       <div class="sums">
-        <p class="caption">{{ trip?.receipt ? t('trip.receipt.total') : t('trip.total') }}</p>
+        <SectionCaption as="p" inset class="caption">{{
+          trip?.receipt ? t('trip.receipt.total') : t('trip.total')
+        }}</SectionCaption>
         <!-- Flipped, the big number is the conversion — and it keeps every sign of being one:
            «≈», the muted colour, and the exact sum beside it (handoff «Валюты», В2-5). -->
         <p class="sum" :class="{ guess: flipped }">{{ big }}</p>
@@ -54,6 +56,7 @@ import {
 import type { Money, TripView } from '@molvia/model'
 import { calendarDay } from '@/days'
 import { read, writeEverywhere } from '@/stores/storage'
+import SectionCaption from '@/components/SectionCaption.vue'
 
 const FLIPPED = 'molvia.total-flipped'
 
@@ -82,6 +85,7 @@ const FLIPPED = 'molvia.total-flipped'
  */
 export default defineComponent({
   name: 'TripTotal',
+  components: { SectionCaption },
   props: {
     /** The trip as the server answered it; null while it is still only on the phone. */
     trip: { type: Object as PropType<TripView | null>, default: null },
@@ -337,15 +341,6 @@ export default defineComponent({
 
 .sums {
   min-width: 0;
-}
-
-.caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .sum {

@@ -1,6 +1,6 @@
 <template>
   <section class="group">
-    <h2 class="caption">{{ t('settings.group_data') }}</h2>
+    <SectionCaption>{{ t('settings.group_data') }}</SectionCaption>
     <AppCard as="ul" list>
       <li>
         <!-- Inactive rather than disabled, as «Сохранить» is: it keeps its focus and its hint. -->
@@ -89,6 +89,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import EraseSheet from '@/components/EraseSheet.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExport } from '@/composables/useExport'
 import { useSignOutStore } from '@/stores/signOut'
@@ -111,6 +112,7 @@ export default defineComponent({
     IconDownload,
     IconShield,
     IconTerms,
+    SectionCaption,
   },
   setup() {
     const { t } = useI18n()
@@ -149,15 +151,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.caption {
-  margin: 0 0 var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-}
-
 .entry {
   display: flex;
   align-items: center;

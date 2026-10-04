@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { ReceiptNoticesSetting, RemindersSetting } from '@molvia/model'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -73,7 +74,7 @@ afterEach(() => {
 describe('«Telegram bot» (MOL-129, В-2)', () => {
   it('is a switch a kind of message, both on to begin with, each saying what it does', async () => {
     const view = await render()
-    expect(view.get('h2.caption').text()).toBe(en.bot.group_messages)
+    expect(view.getComponent(SectionCaption).text()).toBe(en.bot.group_messages)
     expect(reminders(view).element.checked).toBe(true)
     expect(receipts(view).element.checked).toBe(true)
     expect(describedBy(view, reminders(view))).toEqual([en.bot.reminders.hint])

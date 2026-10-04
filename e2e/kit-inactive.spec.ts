@@ -11,12 +11,10 @@ import { open } from './session'
  * Run in the phone's Chromium and in the iPhone's WebKit (review 3).
  */
 
-/** The kit's own section of chosen and inactive things. */
-async function section(page: Page): Promise<Locator> {
+/** A section of the kit, by its caption: chosen and inactive things unless named otherwise. */
+async function section(page: Page, name = 'Chosen and inactive'): Promise<Locator> {
   await open(page, '/_kit')
-  const found = page.locator('section', {
-    has: page.getByRole('heading', { name: 'Chosen and inactive' }),
-  })
+  const found = page.locator('section', { has: page.getByRole('heading', { name }) })
   await expect(found).toBeVisible()
   return found
 }
@@ -102,4 +100,35 @@ test('an inactive button takes the focus and does not light up under the pointer
   await save.focus()
   await expect(save).toBeFocused()
   await context.close()
+})
+
+// A row that is not now (MOL-175). Its link has no address (review Р-1): Enter on an anchor with no
+// `href` sends no click, so that step holds the missing address, and a middle click opens no tab; a
+// tap does reach the row, and the cancelled click is what holds it there. Beside a live one, so the
+// hold is the row's and not a kit that follows nothing.
+test('an inactive row takes the focus, and neither Enter, a middle click nor a tap follows it', async ({
+  page,
+  context,
+}) => {
+  const kit = await section(page, 'Rows and captions')
+  const followed = () => new URL(page.url()).searchParams.get('followed')
+  const row = kit.getByRole('link', { name: /^A link while offline/ })
+  await expect(row).toHaveAttribute('aria-disabled', 'true')
+  await expect(row).not.toHaveAttribute('href')
+
+  await row.focus()
+  await expect(row).toBeFocused()
+  await page.keyboard.press('Enter')
+  const pages = context.pages().length
+  await row.click({ button: 'middle', force: true })
+  await row.tap({ force: true })
+  // Two frames: a move the router started has landed by then.
+  await page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  )
+  expect(followed()).toBeNull()
+  expect(context.pages()).toHaveLength(pages)
+
+  await kit.getByRole('link', { name: /^A link that goes on/ }).tap()
+  await expect.poll(followed).toBe('live')
 })

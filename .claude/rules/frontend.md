@@ -262,6 +262,64 @@ The detail behind the frontend lines of `CLAUDE.md`.
   every chip and every segment is at 600, so nothing reflows under the thumb. **`--opacity-stale`
   means one thing: a previous answer left while the next is on its way** (К-11) — the searches;
   the difference of a reconciliation waits in words («Пересчитаем, когда…»), not dimmed (116 v2).
+- **A row is `ListRow` or `NavRow`, a caps caption is `SectionCaption`** (MOL-175, Ф-12). A row of a
+  list had been drawn anew on every screen — five heights (44, 52, 60, 64), a title at 400 or at 600,
+  a hover here and none there — and a caps caption had grown 52 copies with three spacings to the
+  card (8, 12, 16) and a 4 at the side on half of them. **`SectionCaption` is the one place caps are
+  drawn**: Stylelint refuses `text-transform`, `font-variant`, `font-variant-caps` and
+  `font-feature-settings` as properties in every other file (owner's В-1 «б»), whatever their value
+  and in any case, so a new copy cannot grow back. **The property, not its value**: a check of the
+  value read the text of the declaration, and a Sass variable, a map, an interpolated value or a
+  custom property of the component carried caps past it — round 2 of review drew all four in a real
+  browser (А2, Р2-2); `TEXT-TRANSFORM` had passed a rule written in lower case before that (А-1).
+  `font-variant-numeric` — figures in columns — is another property and everyone's. Out of its
+  sight, by design: a property name Sass interpolates (`text-#{…}`), which Stylelint skips as
+  non-standard syntax, and what Stylelint does not read — a template's `style`, which no file writes
+  today, and a `:style` bound from the script. A group's
+  caption carries its own 4 at the side and 8 above the card; `inset` is a card's own title, placed by
+  the card. The space above a caption is the screen's, set by its own class on the root — the
+  caption's place is written in `:where()`, weaker than any class, because an equal selector would
+  win by the order the sheets happen to load in; and in a container with a `gap` the caption and its
+  card stand in a block of their own, or the gap adds to the 8 (the replacement found eleven such
+  places). `#mark` (the verdict's dot) is hidden from a screen reader — a mark repeats the words
+  beside it, and named, every group heading was read twice; `#tail` (a month's sum) stands inside
+  the heading, so the heading is named «Сентябрь 120 000 ₽». The tone of a caption — the verdict's
+  ink on «Что брать» — is the screen's class, not a prop of the kit (124 v2 is the one coloured one).
+  **The chevron means «opens something to go on with»** (owner's В-14 «а»): a screen or a sheet with
+  fields. A row that acts at once («Скачать мои данные») or asks to confirm («Удалить», «Выйти») has
+  none, and one card never mixes the two — then «Политика» moves out of «Ваши данные», and «Написать
+  разработчику», a sheet with fields, gets one though 147 drew it without. `ListRow` takes it as an
+  explicit `next`, never guessed from the tag, since the card decides and not the tag; `NavRow`, an
+  entry, always has it. That a card does not mix is held by review and DESIGN.md: only the whole
+  screen shows it, as only the place shows an icon's role (MOL-173). **The row's icon is a prop,
+  drawn in the row** at `--icon-md`, so `molvia/icon-size` sees it in one file and no screen draws a
+  22 beside a 24. **A row's button look is taken off in `:where()`**: the hairline `AppCard list`
+  draws between rows is a `border-top`, and an equal selector reset it by load order (`AdviceHomeNew`
+  had met it). **Inactive** is the kit's not now (MOL-174): `aria-disabled`, focusable, the click
+  cancelled and stopped — a link is followed nowhere, and has no `href`, or a middle click or a long
+  press would open it in a tab (review Р-1); `e2e/kit-inactive` holds a tap (the cancelled click),
+  Enter and a middle click (no address) in Chromium and WebKit. **Selected** is the fill, the ring and a ✓ in place of the chevron, the weight
+  unchanged, and it is read out by the role the row was given — `aria-checked` for a radio, a
+  checkbox, a switch and their menu items, `aria-selected` for an option, a tab, a tree item and
+  the cells of a grid (А4: the first tables left `menuitemcheckbox` and `treeitem` mute); a row with
+  no role says nothing, and says so while developing, so a picker gives its rows one. **The fill, the ring and
+  the focus of a chosen row are a layer of its own** (`::before`), rounded as the list card, and the
+  row stays square under it: rounded itself, the row bent the hairline the card draws as its
+  `border-top` (round 3, Р3-1; adversarial Б1) — in an `li` a tile under a straight line, straight in the card a line bent into its round;
+  square, its ring was cut at the card's corners on a first or last row (А3). **The focus stands
+  inside the ring** (`outline-offset: -6px` on the layer, the fill between them): on `-2px` it was the
+  ring itself — 2 px of the same colour on the same place — and the keyboard lost the row it stood on,
+  where a radio group puts the focus first (adversarial А1, WCAG 2.4.7); chips draw it the other way,
+  the ring inside and the focus outside, which a list card clips. `e2e/kit-rows` holds both in both
+  engines.
+  **Active** is the row the keyboard stands on in a list a field owns (К-4): the fill without the
+  ring, since the focus is in the field; on a chosen row the fill is the layer's alone — the row's own
+  square fill stood out past the round ring at every corner (adversarial В1). Only a `div` row takes a button into its tail — a button
+  inside a button is no HTML. `NavRow` without `to` is a button that opens a sheet and says so
+  (`aria-haspopup="dialog"`). **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
+  handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
+  its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
+  — rows had drawn them at 11/700, 11/600 and 13/600. Screens move onto them in their own tasks.
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
   `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a

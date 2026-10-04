@@ -83,7 +83,7 @@
       />
 
       <section v-if="editing && editing.history.length > 0" class="history">
-        <h3 class="caption">{{ t('income.sheet.history') }}</h3>
+        <SectionCaption as="h3">{{ t('income.sheet.history') }}</SectionCaption>
         <ul class="versions">
           <li v-for="version in editing.history" :key="version.replacedAt.getTime()">
             {{ versionOf(version) }}
@@ -152,6 +152,7 @@ import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { useAccountChoice } from '@/composables/useAccountChoice'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { shown } from '@/composables/useItemDetails'
@@ -180,6 +181,7 @@ export default defineComponent({
     AppReveal,
     BottomSheet,
     HeldFromAccounts,
+    SectionCaption,
   },
   props: {
     open: { type: Boolean, required: true },
@@ -476,15 +478,6 @@ export default defineComponent({
   margin: var(--space-2) 0 0;
   color: var(--text-muted);
   font-size: var(--text-footnote);
-}
-
-.caption {
-  margin: 0 0 var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .versions {
