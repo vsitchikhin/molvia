@@ -42,10 +42,17 @@ function seller(name: string): TinPlace {
   }
 }
 
-function repository(receipts: UntoldReceipt[], places: TinPlace[] = []) {
+function repository(receipts: UntoldReceipt[], places: TinPlace[] = [], twin = false) {
   return {
     claimUntold: vi.fn(() => Promise.resolve(receipts)),
     placesOfTins: vi.fn(() => Promise.resolve(places)),
+    recordedTwin: vi.fn(() =>
+      Promise.resolve(
+        twin
+          ? { receiptId: 'r0', tripId: 't0', recordedAt: new Date('2026-10-01T10:00:00Z') }
+          : null,
+      ),
+    ),
   }
 }
 
@@ -65,9 +72,31 @@ describe('claimReceiptNotices (MOL-129)', () => {
         place: 'Ереван Сити',
         day: '2026-10-03',
         lineCount: 7,
+        duplicate: false,
         silent: false,
       },
     ])
+  })
+
+  it('says a second shot of a receipt recorded before is one (adversarial А4)', async () => {
+    const receipt = untold({
+      header: { tin: '01234567', date: '2026-10-03', time: null, receiptNo: '417' },
+    })
+    const twin = repository([receipt], [], true)
+    const { notices } = await claimReceiptNotices(twin, AT, vi.fn())
+    expect(notices[0]?.duplicate).toBe(true)
+    expect(twin.recordedTwin).toHaveBeenCalledWith('a1', '01234567', '417', receipt.receipt.id)
+  })
+
+  it('asks nothing about a twin without a number to know it by', async () => {
+    const twin = repository(
+      [untold({ header: { tin: '01234567', date: null, time: null, receiptNo: null } })],
+      [],
+      true,
+    )
+    const { notices } = await claimReceiptNotices(twin, AT, vi.fn())
+    expect(notices[0]?.duplicate).toBe(false)
+    expect(twin.recordedTwin).not.toHaveBeenCalled()
   })
 
   it('comes without a sound at night in the person’s zone', async () => {

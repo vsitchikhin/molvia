@@ -1,5 +1,5 @@
 {
-  "id": "c4f01598-c583-4283-ab43-48ec93ce6284",
+  "id": "107eb535-8ef6-4f1a-9722-3471b1ca1c06",
   "prevId": "e58aed43-0250-45cc-b6e3-85bcd41ebaa4",
   "version": "7",
   "dialect": "postgresql",
@@ -81,6 +81,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "bot_blocked_at": {
+          "name": "bot_blocked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "consent_version": {
           "name": "consent_version",

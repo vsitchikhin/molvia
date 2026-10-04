@@ -269,7 +269,7 @@ function fakeRepositories(
       one: unexpected('receipts.one'),
       heardInApp: unexpected('receipts.heardInApp'),
       claimUntold: unexpected('receipts.claimUntold'),
-      noticesOff: unexpected('receipts.noticesOff'),
+      noticesOf: unexpected('receipts.noticesOf'),
       chooseNotices: unexpected('receipts.chooseNotices'),
       recordedTwin: unexpected('receipts.recordedTwin'),
       placesOfTins: unexpected('receipts.placesOfTins'),

@@ -19,6 +19,11 @@ export const receiptNoticeSchema = z.strictObject({
   /** The receipt's day: printed on it, else the day of the shot in the person's zone. */
   day: z.iso.date(),
   lineCount: z.int().min(0),
+  /**
+   * The same receipt — tax number and number — is recorded already (Т-11, adversarial А4): the
+   * review says «уже записан», so the message must not say «запишите».
+   */
+  duplicate: z.boolean(),
   /** Night in the person's zone: the message comes without a sound. */
   silent: z.boolean(),
 })
@@ -36,9 +41,14 @@ export type DueReceiptNotices = z.infer<typeof dueReceiptNoticesSchema>
 /**
  * `GET` and the answer of `PUT /actors/me/receipt-notices` (MOL-129, В-2): «Сообщать, что чек
  * разобран», a switch of its own on the page «Бот», saved on the tap — as the rating reminders'
- * (MOL-103 Р-1), never a field of the settings' form. A block of the bot is the reminders' answer.
+ * (MOL-103 Р-1), never a field of the settings' form. A block of the bot travels here, since the
+ * reminders' answer cannot say it over «chosen».
  */
-export const receiptNoticesSettingSchema = z.strictObject({ off: z.boolean() })
+export const receiptNoticesSettingSchema = z.strictObject({
+  off: z.boolean(),
+  /** The bot is blocked in Telegram: nothing comes whatever the switches say (review №1). */
+  blocked: z.boolean(),
+})
 export type ReceiptNoticesSetting = z.infer<typeof receiptNoticesSettingSchema>
 
 /** The body of `PUT /actors/me/receipt-notices`. */

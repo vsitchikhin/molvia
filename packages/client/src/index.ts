@@ -433,9 +433,13 @@ export interface MolviaClient {
     part: number,
     photo: Blob | Uint8Array<ArrayBuffer>,
   ): Promise<ReceiptSummary>
-  receipts(): Promise<ReceiptsResponse>
+  /**
+   * `shown` — asked with the page in view (MOL-129, А1): a receipt answered read is then heard of in
+   * the app, and the bot does not tell of it.
+   */
+  receipts(options?: { readonly shown?: boolean }): Promise<ReceiptsResponse>
   /** One receipt with its lines; `error.not_found` for a missing, removed or someone else's one. */
-  receipt(id: string): Promise<ReceiptDetail>
+  receipt(id: string, options?: { readonly shown?: boolean }): Promise<ReceiptDetail>
   removeReceipt(id: string): Promise<void>
   /** «Вернуть» within ten minutes of «Удалить чек». */
   restoreReceipt(id: string): Promise<ReceiptSummary>
@@ -943,9 +947,11 @@ export function createClient(options: ClientOptions): MolviaClient {
         timeout: RECEIPT_PART_TIMEOUT_MS,
       }),
 
-    receipts: () => request('/receipts', receiptsResponseCodec),
+    receipts: (options) =>
+      request(`/receipts${options?.shown ? '?shown=1' : ''}`, receiptsResponseCodec),
 
-    receipt: (id) => request(`/receipts/${segment(id)}`, receiptDetailCodec),
+    receipt: (id, options) =>
+      request(`/receipts/${segment(id)}${options?.shown ? '?shown=1' : ''}`, receiptDetailCodec),
 
     removeReceipt: async (id) => {
       noContent(await exchange(`/receipts/${segment(id)}`, z.undefined(), { method: 'DELETE' }))

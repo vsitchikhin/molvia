@@ -36,7 +36,7 @@ export class ReceiptNoticeUnreadable extends Error {
  * `unreadable`, never a claim the bot cannot parse with the receipts of the minute in it.
  */
 export async function claimReceiptNotices(
-  receipts: Pick<ReceiptRepository, 'claimUntold' | 'placesOfTins'>,
+  receipts: Pick<ReceiptRepository, 'claimUntold' | 'placesOfTins' | 'recordedTwin'>,
   now: Date,
   unreadable: (failure: ReceiptNoticeUnreadable) => void,
 ): Promise<DueReceiptNotices> {
@@ -50,7 +50,12 @@ export async function claimReceiptNotices(
     if (first === undefined) continue
     const placed = await withPlaces(receipts, first.actor, own)
     for (const [i, told] of own.entries()) {
-      const notice = noticeOf(told, placed[i]?.place?.name ?? null, now)
+      const notice = noticeOf(
+        told,
+        placed[i]?.place?.name ?? null,
+        await recordedBefore(receipts, told),
+        now,
+      )
       if (notice.success) notices.push(notice.data)
       else unreadable(new ReceiptNoticeUnreadable(notice.error))
     }
@@ -58,7 +63,18 @@ export async function claimReceiptNotices(
   return { notices }
 }
 
-function noticeOf(told: UntoldReceipt, placeName: string | null, now: Date) {
+/** A second shot of a receipt recorded before (Т-11) — the review's `duplicateOf`, by the same rule. */
+async function recordedBefore(
+  receipts: Pick<ReceiptRepository, 'recordedTwin'>,
+  { receipt, actor }: UntoldReceipt,
+): Promise<boolean> {
+  const tin = receipt.header?.tin ?? null
+  const number = receipt.header?.receiptNo ?? null
+  if (tin === null || number === null || receipt.tripId !== null) return false
+  return (await receipts.recordedTwin(actor.id, tin, number, receipt.id)) !== null
+}
+
+function noticeOf(told: UntoldReceipt, placeName: string | null, duplicate: boolean, now: Date) {
   const { receipt, actor } = told
   // the person's day: their country's zone, else the receipt's — every country of the settings has one
   const zone = timeZoneOf(actor.country) ?? timeZoneOf(receipt.country) ?? 'UTC'
@@ -71,16 +87,17 @@ function noticeOf(told: UntoldReceipt, placeName: string | null, now: Date) {
     place: place.success ? place.data : null,
     day: receipt.header?.date ?? localClock(receipt.capturedAt, zone).day,
     lineCount: receipt.lineCount,
+    duplicate,
     silent: tellsQuietly(now, zone),
   })
 }
 
 /** `GET /actors/me/receipt-notices` (MOL-129, В-2): whether «чек разобран» is turned off. */
 export async function receiptNoticesOf(
-  receipts: Pick<ReceiptRepository, 'noticesOff'>,
+  receipts: Pick<ReceiptRepository, 'noticesOf'>,
   owner: string,
 ): Promise<ReceiptNoticesSetting> {
-  return { off: await receipts.noticesOff(owner) }
+  return receipts.noticesOf(owner)
 }
 
 /**
@@ -92,5 +109,5 @@ export async function chooseReceiptNotices(
   owner: string,
   { on }: ChooseReceiptNotices,
 ): Promise<ReceiptNoticesSetting> {
-  return { off: await receipts.chooseNotices(owner, !on) }
+  return receipts.chooseNotices(owner, !on)
 }

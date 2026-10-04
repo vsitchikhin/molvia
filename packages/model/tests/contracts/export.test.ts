@@ -30,6 +30,7 @@ const file: ExportFile = {
     salaryShiftDay: 25,
     remindersOff: null,
     receiptNoticesOff: false,
+    botBlockedAt: null,
     consentVersion: 1,
     consentedAt: at,
     sharedUntil: null,

@@ -290,6 +290,12 @@ export const actors = pgTable(
      */
     receiptNoticesOff: boolean('receipt_notices_off').notNull().default(false),
     /**
+     * Since when the person has the bot blocked in Telegram (MOL-129, review №1); empty — not
+     * blocked, or not that we heard. Its own column because MOL-103 keeps «chosen» over a block in
+     * `reminders_off`, and «чек разобран» must not go to a blocked chat whatever the reminders are.
+     */
+    botBlockedAt: timestamp('bot_blocked_at', { withTimezone: true }),
+    /**
      * Which edition of «Условия использования» and «Данные и приватность» the person accepted, and
      * when (MOL-95): `POLICY_VERSION` of the page they were shown, and the server's moment. Empty for
      * whoever has not accepted any — every owner before this column, who passes the screen once. A

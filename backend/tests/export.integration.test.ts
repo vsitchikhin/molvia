@@ -112,6 +112,7 @@ async function aFullLife(actorId: string, telegramUserId: number) {
       salaryShiftDay: 25,
       remindersOff: 'chosen',
       receiptNoticesOff: true,
+      botBlockedAt: at(3),
       consentVersion: 1,
       consentedAt: at(2),
       sharedUntil: at(1),
