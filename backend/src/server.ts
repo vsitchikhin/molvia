@@ -30,6 +30,7 @@ import {
   receiptNoticesOf,
 } from '@/usecases/tell-receipts'
 import type { FailurePlace } from '@/usecases/record-failure'
+import { analyticsOf, chooseAnalytics } from '@/usecases/analytics'
 import { createFailureRepository } from '@/db/failures-repository'
 import { createOwnerNoticeRepository } from '@/db/owner-notices-repository'
 import { healthRoutes } from '@/routes/health'
@@ -151,6 +152,7 @@ import { saveSettings } from '@/usecases/save-settings'
 import { settingsRoute } from '@/routes/settings'
 import { remindersRoutes } from '@/routes/reminders'
 import { receiptNoticesRoutes } from '@/routes/receipt-notices'
+import { analyticsRoutes } from '@/routes/analytics'
 import { consentRoutes } from '@/routes/consent'
 import { startTrip } from '@/usecases/start-trip'
 import { removeTrip, restoreTrip } from '@/usecases/remove-trip'
@@ -864,6 +866,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       receiptNoticesRoutes(guarded, {
         setting: (owner) => receiptNoticesOf(receipts, owner),
         choose: (owner, body) => chooseReceiptNotices(receipts, owner, body),
+      })
+      analyticsRoutes(guarded, {
+        setting: (owner) => analyticsOf(events, owner),
+        choose: (owner, body) => chooseAnalytics(events, owner, body),
       })
       consentRoutes(guarded, {
         consent: (owner) => consentOf(actors, { id: owner }),
