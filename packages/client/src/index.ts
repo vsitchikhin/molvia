@@ -52,6 +52,8 @@ import {
   yearSchema,
   salaryShiftSchema,
   chooseRemindersSchema,
+  acceptConsentSchema,
+  consentSchema,
   remindersSettingSchema,
   receiptBodySchema,
   receiptRecordBodySchema,
@@ -126,6 +128,7 @@ import type {
   MoneyChartYearView,
   MoneyMonthView,
   RemindersSetting,
+  Consent,
   SalaryShift,
   ReceiptBody,
   ReceiptDetail,
@@ -391,6 +394,10 @@ export interface MolviaClient {
   remindersSetting(): Promise<RemindersSetting>
   /** Saved on the tap; turned on, the reminders start over. Safe to repeat. */
   chooseReminders(on: boolean): Promise<RemindersSetting>
+  /** The edition of the terms and the privacy page accepted (MOL-95): `version` null is none. */
+  consent(): Promise<Consent>
+  /** The edition the screen showed, accepted now. Safe to repeat: the row only ever goes up. */
+  acceptConsent(version: number): Promise<Consent>
   /**
    * «Сохранить» a new spending. Named by the device, so safe to repeat: `created` is `false` for
    * the same one again, `error.conflict` for the same identifier with anything else — or while it
@@ -871,6 +878,14 @@ export function createClient(options: ClientOptions): MolviaClient {
       request('/actors/me/reminders', remindersSettingSchema, {
         method: 'PUT',
         body: encode(chooseRemindersSchema, { on }),
+      }),
+
+    consent: () => request('/actors/me/consent', consentSchema),
+
+    acceptConsent: async (version) =>
+      request('/actors/me/consent', consentSchema, {
+        method: 'PUT',
+        body: encode(acceptConsentSchema, { version }),
       }),
 
     recordSpending: async (body) => {

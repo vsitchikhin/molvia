@@ -1,6 +1,6 @@
 <template>
   <AppScreen :title="t('privacy.title')">
-    <template #subtitle>{{ t('privacy.revised') }}</template>
+    <template #subtitle>{{ revised }}</template>
     <p class="summary">{{ t('privacy.summary') }}</p>
 
     <h2>{{ t('privacy.stored.title') }}</h2>
@@ -21,31 +21,11 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppScreen from '@/components/AppScreen.vue'
 import AppCard from '@/components/AppCard.vue'
-
-/** What is kept, in the order of how personal it is: the account, then what it did. */
-const STORED = [
-  'telegram',
-  'purchases',
-  'exchanges',
-  'incomes',
-  'spendings',
-  'receipts',
-  'accounts',
-  'places',
-  'barcodes',
-  'ratings',
-  'reminders',
-  'feedback',
-  'search',
-  'visits',
-  'devices',
-  'settings',
-]
-const PARTS = ['logs', 'failures', 'backups', 'barcodes', 'storage', 'copy', 'erase']
+import { PRIVACY_PARTS, PRIVACY_STORED, revisedOn } from '@/views/policy'
 
 /**
  * «Данные и приватность» (MOL-58): what is kept, why, for how long, and how to have it erased.
@@ -59,8 +39,13 @@ export default defineComponent({
   name: 'PrivacyView',
   components: { AppScreen, AppCard },
   setup() {
-    const { t } = useI18n()
-    return { t, STORED, PARTS }
+    const { t, locale } = useI18n()
+    return {
+      t,
+      STORED: PRIVACY_STORED,
+      PARTS: PRIVACY_PARTS,
+      revised: computed(() => revisedOn(t, locale.value)),
+    }
   },
 })
 </script>

@@ -6,11 +6,17 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 ## packages/model
 
 - `packages/model/src/contracts/export.ts` — Contract of «Скачать мои данные» (MOL-93): the file whole — header, version and a section for everything erasure removes — with money, quantity and rates as decimal strings and no enum or band a stored row may predate.
+- `packages/model/src/contracts/consent.ts` — Contract of the consent to the terms and the privacy page (MOL-95): `POLICY_VERSION`, raised by hand for a change that matters; the edition a person accepted, the body that accepts one, and `consentNeeded` — whether this build asks.
 
 ## backend · usecases
 
 - `backend/src/usecases/export-mine.ts` — Use case of «Скачать мои данные» (MOL-93): the owner's own snapshot, dated with the file's format and version; an owner erased meanwhile is «no owner».
 - `backend/src/usecases/erase-me.ts` — Use case of erasing oneself, behind the bot's `/delete` and «Удалить мои данные» (MOL-94): erase the owner behind a Telegram id; nobody to erase is not an error. Tests: `backend/tests/erase-route.integration.test.ts`.
+- `backend/src/usecases/consent.ts` — Use cases of the consent (MOL-95): the edition the owner accepted, and accepting the one the screen showed — never lowering the one on the row.
+
+## backend · routes
+
+- `backend/src/routes/consent.ts` — Routes `GET`/`PUT /actors/me/consent` (MOL-95): its own address beside `/actors/me`, which an installed app reads strictly; `no-store`.
 
 ## backend · db
 
@@ -26,6 +32,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 ## backend · tests
 
 - `backend/tests/compose-logging.integration.test.ts` — Integration test: every service of `docker-compose.prod.yml` logs to the journal, and Postgres keeps row values out of its own log.
+- `backend/tests/consent.integration.test.ts` — Integration test: the consent is empty for an owner before it, accepted with the server's moment, a repeat keeps the first moment, an older edition never lowers the row, the bounds are `400`, the database refuses half a consent, and `/actors/me` carries none of it (MOL-95).
 - `backend/tests/erase-route.integration.test.ts` — Integration test: `POST /internal/actors/erase` erases the owner with their sessions, answers a repeat and a stranger with the same 204, needs the bot secret; `DELETE /actors/me` erases the session's owner with every session and puts the cookie out, a repeat is `401`, nobody else is touched (MOL-94).
 - `backend/tests/erasure.integration.test.ts` — Integration test: erasure leaves no row of the person anywhere, keeps items and places, counts the week, and orders its locks against a login.
 - `backend/tests/export-route.integration.test.ts` — Integration test: `GET /actors/me/export` answers the owner's own file with `no-store` and `attachment`, refuses a named owner, and needs a session.
@@ -38,19 +45,27 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 ## frontend · views
 
 - `frontend/src/views/PrivacyView.vue` — «Данные и приватность» screen: a static page of what is kept, why, for how long and how to erase it; opens without a session.
+- `frontend/src/views/TermsView.vue` — «Условия использования» (MOL-95): the rules of the service and the age of 16, beside the privacy page under one edition; opens without a session.
+- `frontend/src/views/policy.ts` — The revision of both pages (MOL-95, В-1): the day and the fingerprint of their text, which `policy.test.ts` holds to every edit, and «Редакция от …» they are subtitled with.
 
 ## frontend · components
 
 - `frontend/src/components/EraseSheet.vue` — Sheet «Удалить все ваши данные?» (MOL-94): the bot's words for what goes and what stays, what happens to the copies on the devices, one press «Удалить навсегда»; inactive offline.
+- `frontend/src/components/ConsentStep.vue` — «Условия и приватность», the door's step after the claim (MOL-95): both documents, «Мне 16 лет или больше» before «Принимаю», «Условия обновились» for an older edition; «Не принимаю» leads to «Выйти» or «Удалить мои данные», each with its own sheet.
 - `frontend/src/components/YourDataGroup.vue` — «Ваши данные» on the settings (MOL-93, В-2): «Скачать мои данные» with its states and «Сохранить или отправить» for a second tap, «Удалить мои данные» under it (MOL-94), and the link to «Данные и приватность».
 
 ## frontend · composables
 
 - `frontend/src/composables/useExport.ts` — «Скачать мои данные» (MOL-93, В-1): the file from the server, then the share sheet, a second tap when the phone refused it that late or it was closed, a download on a computer or where no sheet can take a file; named by `exportedAt`, cancelled when the screen goes; offline or error decided after the failure.
 
+## frontend · stores
+
+- `frontend/src/stores/consent.ts` — Store: the edition the owner the server named has accepted (MOL-95) — remembered under the owner so the door does not wait on every launch, asked of the server otherwise, `holds` while this build's edition is not accepted; «Принимаю», «Повторить», another window's accept.
+
 ## e2e
 
 - `e2e/erase.spec.ts` — End-to-end: «Удалить мои данные» from the settings erases the person and this device, says so once on the login screen, and the next sign-in is a new account; on a session ended meanwhile it erases nothing and says so (MOL-94).
+- `e2e/consent.spec.ts` — End-to-end: a newcomer of the seam meets the terms after the claim, reads «Условия использования» and comes back, cannot accept without the age, comes in and is not asked again; «Не принимаю» leads out through «Выйти»; the terms open by their address and from the login screen (MOL-95).
 - `e2e/export.spec.ts` — End-to-end: «Скачать мои данные» downloads the file of one's own where no sheet can take it, and hands it over on a second tap where the phone refused the first.
 - `e2e/privacy.spec.ts` — End-to-end: «Данные и приватность» opens by its address without a session, from the login screen and from the settings.
 
