@@ -3,8 +3,9 @@ import { calendarDay } from '@/days'
 /**
  * The revision of «Условия использования» and «Данные и приватность» (MOL-95, owner's decision В-1):
  * the day both pages say they were last edited, and the fingerprint of their text in every language
- * on that day, with the lists of the parts each shows. **Any edit of either page is a new revision**, and `policy.test.ts` will not let the
- * text change without one — so nothing on them changes in silence.
+ * on that day, with the lists of the parts each shows and the templates that draw them. **Any edit
+ * of either page is a new revision**, and `policy.test.ts` will not let the text change without one
+ * — so nothing on them changes in silence.
  *
  * **A revision is not an edition.** The edition a person accepts is `POLICY_VERSION` of the model,
  * raised by hand only for a change that matters — a new kind of data, a new recipient, a new purpose,
@@ -15,7 +16,7 @@ import { calendarDay } from '@/days'
 export const POLICY_REVISION = {
   day: '2026-10-04',
   version: 1,
-  digest: '40f4beececbc44d8417f1ac739ba848e4c290e393584f24604d9f5b85354c69d',
+  digest: '830dcbb1443ed168571de7ea7e997bcf122477d26be62fe1507131515d2bcbcc',
 } as const
 
 // Which parts each page shows, in order — here and not in the pages, so the fingerprint holds them

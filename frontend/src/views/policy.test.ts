@@ -5,9 +5,21 @@ import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { POLICY_REVISION, PRIVACY_PARTS, PRIVACY_STORED, TERMS_PARTS } from './policy'
 
+/** The templates of both pages, as written: what they draw outside the lists (adversarial Б4). */
+const sources = import.meta.glob<string>(['./PrivacyView.vue', './TermsView.vue'], {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+})
+function templates(): string[] {
+  return Object.keys(sources)
+    .sort()
+    .map((path) => /<template>[\s\S]*<\/template>/.exec(sources[path] ?? '')?.[0] ?? '')
+}
+
 /**
- * Both pages in both languages, as they are filed, and the parts each shows — any edit, a comma or
- * a part taken out included, changes it.
+ * Both pages in both languages, as they are filed, the parts each shows and the templates that draw
+ * them — any edit, a comma, a part or a line of the template taken out included, changes it.
  */
 function digestOfPages(): string {
   return createHash('sha256')
@@ -15,12 +27,18 @@ function digestOfPages(): string {
       JSON.stringify([
         [PRIVACY_STORED, PRIVACY_PARTS, TERMS_PARTS],
         [ru.privacy, ru.terms, en.privacy, en.terms],
+        templates(),
       ]),
     )
     .digest('hex')
 }
 
 describe('the revision of the terms and the privacy page (MOL-95, В-1)', () => {
+  it('reads both templates, whole', () => {
+    expect(templates()).toHaveLength(2)
+    for (const template of templates()) expect(template).toMatch(/^<template>[\s\S]+<\/template>$/)
+  })
+
   it('moves with every edit of their text', () => {
     expect(
       digestOfPages(),
