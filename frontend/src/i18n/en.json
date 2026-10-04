@@ -1978,6 +1978,7 @@
       "record_offline": "We’ll save it once you are online",
       "recording": "We’ll save it once you are online — the lines are kept on this phone",
       "cancel_record": "Cancel saving",
+      "cancel_record_offline": "You can cancel once online: the record may already have reached the server",
       "refused": "Not saved: {reason}. Fix it and save again",
       "offline": "Offline · receipt from this phone. Line edits are kept here",
       "error": {

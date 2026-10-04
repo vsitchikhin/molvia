@@ -164,9 +164,16 @@
         <template v-if="docked === 'record'">
           <template v-if="recording">
             <p class="under">{{ t('receipt.review.recording') }}</p>
-            <AppButton v-if="cancellable" variant="ghost" block @click="cancelRecord">
+            <AppButton
+              v-if="cancellable"
+              variant="ghost"
+              block
+              :busy="checking"
+              @click="cancelRecord"
+            >
               {{ t('receipt.review.cancel_record') }}
             </AppButton>
+            <p v-if="cancelLater" class="under">{{ t('receipt.review.cancel_record_offline') }}</p>
           </template>
           <AppButton
             v-else
@@ -429,6 +436,35 @@ export default defineComponent({
     const cancellable = computed(
       () => recording.value && !sending.value && queue.carrying !== id.value,
     )
+    const checking = ref(false)
+    const cancelLater = ref(false)
+    /**
+     * A record whose send has begun may have landed with its answer lost (adversarial А1–А4): opened
+     * as if it had not, the review offered «Удалить» on a recorded receipt and edits that would never
+     * be written. So it is cancelled only on a fresh answer that the receipt is not recorded; a
+     * recorded one takes the screen to its purchases, and with no answer it stays as it is.
+     */
+    async function cancelRecord(): Promise<void> {
+      const asked = id.value
+      cancelLater.value = false
+      if (!queue.recordBegun(asked)) {
+        queue.cancelRecord(asked)
+        return
+      }
+      checking.value = true
+      const before = kept.fetchedAt.value?.getTime() ?? 0
+      try {
+        await kept.retry()
+      } finally {
+        checking.value = false
+      }
+      if (id.value !== asked) return
+      if ((kept.fetchedAt.value?.getTime() ?? 0) <= before) {
+        cancelLater.value = true
+        return
+      }
+      if (detail.value?.receipt.status === 'parsed') queue.cancelRecord(asked, true)
+    }
     /**
      * While «Записать» waits in the queue — or is being sent — the receipt is what was sent: an edit
      * made now would not reach the server (review 5), nor would a removal (adversarial А1).
@@ -462,12 +498,16 @@ export default defineComponent({
     )
     onBeforeUnmount(letGo)
 
-    // Recorded on another phone while this one looked: its purchases are where to go.
+    // Recorded on another phone while this one looked, or by a send whose answer was lost: its
+    // purchases are where to go, and nothing of it waits on the phone any more (MOL-169, А2).
     watch(
       () => detail.value?.receipt,
       (receipt) => {
-        if (receipt?.status === 'recorded' && receipt.tripId)
-          void router.replace({ name: 'purchase', params: { tripId: receipt.tripId } })
+        if (receipt?.status !== 'recorded' || !receipt.tripId) return
+        queue.settleRecorded(new Set([receipt.id]))
+        drafts.forget(receipt.id)
+        if (actor.id) void photoShelf(actor.id).drop(receipt.id)
+        void router.replace({ name: 'purchase', params: { tripId: receipt.tripId } })
       },
     )
 
@@ -574,7 +614,9 @@ export default defineComponent({
       positions,
       recording,
       cancellable,
-      cancelRecord: () => void queue.cancelRecord(id.value),
+      checking,
+      cancelLater,
+      cancelRecord: () => void cancelRecord(),
       refused,
       docked,
       photos,

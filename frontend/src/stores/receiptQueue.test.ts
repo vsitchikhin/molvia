@@ -391,7 +391,7 @@ describe('receipt queue', () => {
       expect(recordReceipt).not.toHaveBeenCalled()
     })
 
-    it('a record the server answered 5xx is taken out too, and the receipts behind it go on', async () => {
+    it('a record the server answered 5xx is taken out once checked, and the receipts behind it go on', async () => {
       recordReceipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'x'))
       const queue = fresh()
       queue.record(RECEIPT, recordBody())
@@ -400,8 +400,13 @@ describe('receipt queue', () => {
       await queue.flush()
       expect(queue.pending).toHaveLength(3)
       expect(calls).not.toContain(`create ${SECOND}`)
+      expect(queue.recordBegun(RECEIPT)).toBe(true)
 
-      expect(queue.cancelRecord(RECEIPT)).toBe(true)
+      // Begun, it may have landed: unchecked it stays (adversarial А1); the review checks first.
+      expect(queue.cancelRecord(RECEIPT)).toBe(false)
+      await settled()
+      expect(queue.pending).toHaveLength(3)
+      expect(queue.cancelRecord(RECEIPT, true)).toBe(true)
       await queue.flush()
       expect(queue.pending).toEqual([])
       expect(calls.filter((call) => !call.startsWith('record'))).toEqual([
@@ -417,7 +422,7 @@ describe('receipt queue', () => {
       const queue = fresh()
       queue.record(RECEIPT, recordBody())
       await settled()
-      queue.cancelRecord(RECEIPT)
+      queue.cancelRecord(RECEIPT, true)
       await settled()
       queue.record(RECEIPT, recordBody(OTHER_TRIP))
       await queue.flush()
@@ -455,6 +460,39 @@ describe('receipt queue', () => {
         { kind: 'record', id: RECEIPT, body: recordBody() },
         { kind: 'remove', id: SECOND },
       ])
+    })
+
+    it('a send another window began is begun here too, and stays without the check (adversarial А4)', async () => {
+      let land: (answer: { tripId: string }) => void = () => undefined
+      recordReceipt.mockImplementationOnce(() => new Promise((resolve) => (land = resolve)))
+      const first = fresh()
+      first.record(RECEIPT, recordBody())
+      await settled()
+      expect(first.carrying).toBe(RECEIPT)
+      const second = fresh('idle')
+      expect(second.carrying).toBeNull()
+      expect(second.recordBegun(RECEIPT)).toBe(true)
+      expect(second.cancelRecord(RECEIPT)).toBe(false)
+      expect(second.pending).toHaveLength(1)
+      land({ tripId: TRIP })
+      await first.flush()
+      expect(first.recorded).toEqual([{ receiptId: RECEIPT, tripId: TRIP, count: 1 }])
+    })
+
+    it('a receipt the server says is recorded lets its waiting record and its refusal go (review 1, А2)', async () => {
+      recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.CONFLICT, 'x'))
+      const queue = fresh()
+      queue.record(RECEIPT, recordBody())
+      await queue.flush()
+      expect(queue.rejected).toHaveLength(1)
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      queue.record(SECOND, recordBody(OTHER_TRIP))
+      queue.remove(SECOND)
+      queue.settleRecorded(new Set([RECEIPT, SECOND]))
+      expect(queue.rejected).toEqual([])
+      expect(queue.pending).toEqual([{ kind: 'remove', id: SECOND }])
+      // Kept so after a reload: storage is the queue.
+      expect(fresh('idle').rejected).toEqual([])
     })
 
     it('another window sees the cancel through storage', () => {

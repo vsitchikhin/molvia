@@ -614,22 +614,57 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
   }
 
   /**
-   * «Отменить запись» (MOL-169, owner's В-5): the record of this receipt out of the queue, the review
-   * open again with its draft. Any record but the one a send carries right now — one begun before,
-   * whose answer was lost or was a 5xx, too: it may have landed, and the server holds that, since the
-   * next «Записать» names another trip and a receipt recorded under one is a 409. False — it was on
-   * its way, and stays.
+   * Whether a send of this receipt's record has begun, in this window or another: the mark is in
+   * storage, set before the send. Such a record may have landed with its answer lost, so it is
+   * cancelled only once the server says the receipt is not recorded (MOL-169, adversarial А1–А4).
    */
-  function cancelRecord(id: string): boolean {
+  function recordBegun(id: string): boolean {
+    sync(actor.id)
+    return kept.some(
+      (item) =>
+        item.write.kind === 'record' &&
+        item.write.id === id &&
+        (item.attempted === true || item.key === inFlight),
+    )
+  }
+
+  /**
+   * «Отменить запись» (MOL-169, owner's В-5): the record of this receipt out of the queue, the review
+   * open again with its draft. Never the one a send carries right now; one begun before only
+   * `checked` — once a fresh answer of the server says the receipt is not recorded (`recordBegun`).
+   * False — it stays.
+   */
+  function cancelRecord(id: string, checked = false): boolean {
     let taken = false
     change(() => {
       const left = kept.filter(
-        (item) => item.key === inFlight || !(item.write.kind === 'record' && item.write.id === id),
+        (item) =>
+          item.key === inFlight ||
+          (item.attempted === true && !checked) ||
+          !(item.write.kind === 'record' && item.write.id === id),
       )
       taken = left.length < kept.length
       kept = left
     })
     return taken
+  }
+
+  /**
+   * The server says these receipts are recorded: a record still waiting for one of them, and a refusal
+   * of one — a 409 after a record cancelled had landed — have nothing left to do, and would keep the
+   * receipt's photo and draft on the phone with no row to remove them from (review 1, adversarial А2).
+   */
+  function settleRecorded(ids: ReadonlySet<string>): void {
+    const owner = actor.id
+    if (!owner) return
+    sync(owner)
+    const done = (write: ReceiptWrite) => write.kind === 'record' && ids.has(write.id)
+    const left = kept.filter((item) => item.key === inFlight || !done(item.write))
+    const refused = rejected.value.filter((item) => !done(item.write))
+    if (left.length === kept.length && refused.length === rejected.value.length) return
+    kept = left
+    rejected.value = refused
+    persist(owner)
   }
 
   /** «Убрать» a refusal: the write is gone for good; a receipt the server may hold is removed too. */
@@ -662,7 +697,9 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     restore,
     forgetRemoved,
     record,
+    recordBegun,
     cancelRecord,
+    settleRecorded,
     dismiss,
   }
 })
