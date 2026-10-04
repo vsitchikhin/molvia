@@ -1,5 +1,5 @@
 <template>
-  <fieldset class="segmented" :class="{ fit }" :disabled="disabled">
+  <fieldset class="segmented" :class="{ fit, inactive: inactive || disabled }" :disabled="disabled">
     <legend class="legend" :class="{ hidden: hideLegend }">{{ legend }}</legend>
     <div class="track">
       <label
@@ -14,14 +14,14 @@
           :name="name"
           :value="option.value"
           :checked="option.value === modelValue"
-          @change="$emit('update:modelValue', option.value)"
+          :aria-disabled="inactive ? 'true' : undefined"
+          @click="hold"
+          @keydown="holdArrows"
+          @change="choose(option.value, $event)"
         />
-        <span
-          class="word"
-          :data-word="option.label"
-          :aria-hidden="option.spoken ? 'true' : undefined"
-          >{{ option.label }}</span
-        >
+        <span class="word" :aria-hidden="option.spoken ? 'true' : undefined">{{
+          option.label
+        }}</span>
         <span v-if="option.spoken" class="spoken">{{ option.spoken }}</span>
       </label>
     </div>
@@ -42,6 +42,8 @@ export interface Segment {
 /** More than this stops fitting a phone's width; the handoff sends it to a `<select>`. */
 const MOST = 4
 
+const ARROWS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'])
+
 /**
  * One choice out of a few — the unit in the sheet (kg · l · pc), the rate (mine · official).
  *
@@ -49,6 +51,9 @@ const MOST = 4
  * choice, the group is announced by its legend, and a tap anywhere on the segment selects it.
  * The radios are hidden from the eye, not from the page — `display: none` would take them out of
  * the keyboard order along with everything they give.
+ *
+ * **Chosen is a fill** (Ф-5, MOL-174): `accent-solid` with `on-accent`, every word at 600, so the
+ * chosen unit is seen in the dark too and no segment changes width on a tap.
  */
 export default defineComponent({
   name: 'SegmentedControl',
@@ -64,6 +69,13 @@ export default defineComponent({
      */
     disabled: { type: Boolean, default: false },
     /**
+     * The choice cannot be made now, and the screen says why (Ф-6, MOL-174; handoff 81 4a): every
+     * radio stays in the focus order with `aria-disabled`, and neither a tap nor an arrow moves the
+     * choice. `disabled` is drawn the same and takes the radios out of the order — for a moment, as
+     * while the message is on its way.
+     */
+    inactive: { type: Boolean, default: false },
+    /**
      * Each segment as wide as its word, the room left shared out evenly — for words of unequal
      * length, where even thirds cut the longest: «Системная · Светлая · Тёмная» on a 320 px phone
      * (MOL-111, the owner's В-1). iOS calls it `apportionsSegmentWidthsByContent`.
@@ -73,11 +85,31 @@ export default defineComponent({
   emits: {
     'update:modelValue': (value: string) => typeof value === 'string',
   },
-  setup(props) {
+  setup(props, { emit }) {
     if (import.meta.env.DEV && props.options.length > MOST) {
       console.warn(`[SegmentedControl] ${String(props.options.length)} segments: use a <select>`)
     }
-    return { name: useId() }
+    const name = useId()
+    /** A cancelled click puts the radio back: a tap, and the click a browser sends for an arrow. */
+    function hold(event: MouseEvent): void {
+      if (props.inactive) event.preventDefault()
+    }
+    /** For an engine that moves the choice by an arrow without a click. */
+    function holdArrows(event: KeyboardEvent): void {
+      if (props.inactive && ARROWS.has(event.key)) event.preventDefault()
+    }
+    function choose(value: string, event: Event): void {
+      if (!props.inactive) {
+        emit('update:modelValue', value)
+        return
+      }
+      // Whatever got past the two above: the choice stays the one the owner holds.
+      const track = (event.target as HTMLElement).closest('.track')
+      for (const radio of track?.querySelectorAll<HTMLInputElement>('.radio') ?? []) {
+        radio.checked = radio.value === props.modelValue
+      }
+    }
+    return { name, hold, holdArrows, choose }
   },
 })
 </script>
@@ -128,8 +160,9 @@ export default defineComponent({
   flex: 1;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: calc(var(--radius) - var(--segment-inset));
   color: var(--text-muted);
+  font-weight: var(--weight-medium);
   cursor: pointer;
   transition:
     background-color var(--dur-fast) var(--ease-out),
@@ -156,32 +189,29 @@ export default defineComponent({
   z-index: 1;
 }
 
-/* Its word is its basis, never wrapped; the semibold of the chosen one is reserved under every
-   word, or the segments would shift by a pixel on each tap. */
+/* Its word is its basis, never wrapped; every word is at one weight, so nothing shifts on a tap. */
 .fit .segment {
   flex: 1 1 auto;
   padding: 0 var(--space-2);
   white-space: nowrap;
 }
 
-.fit .word {
-  display: inline-flex;
-  flex-direction: column;
-
-  &::before {
-    height: 0;
-    overflow: hidden;
-    font-weight: var(--weight-medium);
-    visibility: hidden;
-    content: attr(data-word);
-  }
+.on {
+  background: var(--accent-solid);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-sm);
 }
 
-.on {
+/* Not now (handoff 81 4a): the chosen one keeps its place by an edge, not by the fill of a choice
+   that can be made; no opacity (Ф-6). */
+.inactive .segment {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.inactive .on {
   background: var(--surface);
-  color: var(--text);
-  font-weight: var(--weight-medium);
-  box-shadow: var(--shadow-sm);
+  box-shadow: inset 0 0 0 var(--hairline) var(--border-strong);
 }
 
 .radio {

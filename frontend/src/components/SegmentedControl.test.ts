@@ -71,12 +71,67 @@ describe('SegmentedControl', () => {
       props: { modelValue: 'l', options: UNITS, legend: 'Unit', fit: true },
     })
     expect(fit.classes()).toContain('fit')
-    // Each word carries itself for the semibold reserved under it.
-    expect(fit.findAll('.word').map((word) => word.attributes('data-word'))).toEqual([
-      'kg',
-      'l',
-      'pc',
-    ])
+  })
+
+  describe('inactive (Ф-6, MOL-174)', () => {
+    function inactive(attachTo?: HTMLElement) {
+      return mount(SegmentedControl, {
+        props: { modelValue: 'l', options: UNITS, legend: 'Unit', inactive: true },
+        attachTo,
+      })
+    }
+    const checked = (view: ReturnType<typeof inactive>) =>
+      view.findAll('input').map((input) => (input.element as HTMLInputElement).checked)
+
+    it('keeps every radio in the focus order, said to be unavailable', () => {
+      const view = inactive()
+      expect(view.classes()).toContain('inactive')
+      expect(view.attributes('disabled')).toBeUndefined()
+      expect(view.findAll('input').map((input) => input.attributes('aria-disabled'))).toEqual([
+        'true',
+        'true',
+        'true',
+      ])
+    })
+
+    it('must not fire: a tap moves no choice and reports none', () => {
+      const host = document.body.appendChild(document.createElement('div'))
+      const view = inactive(host)
+      const tap = new MouseEvent('click', { bubbles: true, cancelable: true })
+      view.findAll('input')[0]?.element.dispatchEvent(tap)
+      expect(tap.defaultPrevented).toBe(true)
+      expect(view.emitted('update:modelValue')).toBeUndefined()
+      view.unmount()
+      host.remove()
+    })
+
+    it('must not fire: an arrow moves no choice', async () => {
+      const view = inactive()
+      const arrow = new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true })
+      view.findAll('input')[1]?.element.dispatchEvent(arrow)
+      expect(arrow.defaultPrevented).toBe(true)
+      // An engine that changed it anyway: the owner's choice is put back, and nothing is said.
+      await view.findAll('input')[2]?.setValue(true)
+      expect(checked(view)).toEqual([false, true, false])
+      expect(view.emitted('update:modelValue')).toBeUndefined()
+    })
+
+    it('answers again once it is not inactive', async () => {
+      const view = inactive()
+      await view.setProps({ inactive: false })
+      expect(view.find('input').attributes('aria-disabled')).toBeUndefined()
+      await view.findAll('input')[0]?.setValue(true)
+      expect(view.emitted('update:modelValue')).toEqual([['kg']])
+    })
+
+    it('draws a native disabled the same, out of the focus order', () => {
+      const view = mount(SegmentedControl, {
+        props: { modelValue: 'l', options: UNITS, legend: 'Unit', disabled: true },
+      })
+      expect(view.classes()).toContain('inactive')
+      expect(view.attributes('disabled')).toBeDefined()
+      expect(view.find('input').attributes('aria-disabled')).toBeUndefined()
+    })
   })
 
   it('reads out the spoken name, not the sign', () => {
