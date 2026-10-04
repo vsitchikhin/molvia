@@ -4,7 +4,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR, POLICY_VERSION, parseMoney } from '@molvia/model'
 import type { ActorView, Consent, LoginPoll, LoginStarted, SpendingBody } from '@molvia/model'
 import { useActorStore } from '@/stores/actor'
-import { useConsentStore } from '@/stores/consent'
+import { CONSENT_RETRY_FIRST_MS, useConsentStore } from '@/stores/consent'
 import { useLoginStore } from '@/stores/login'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 
@@ -262,25 +262,74 @@ describe('the step does not close the door over an app already shown (MOL-95, re
     expect(login.closed).toBe(true)
   })
 
-  it('a question lost with the connection up is no reason to keep the app: the step’s error, with no sheet open (В1)', async () => {
+  it('a question lost with the connection up keeps the app; asked again by time, the server’s «none» brings the step (Г1, В1)', async () => {
     const { actor, login } = await shownOffline()
     me.mockResolvedValue(MINE)
-    consent.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'lost on the way', false))
-    await actor.start()
-    await flush()
-    expect(useConsentStore().state).toBe('error')
-    expect(login.closed).toBe(true)
-    expect(login.phase).toBe('consent')
+    consent
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'lost on the way', false))
+      .mockResolvedValue({ version: null })
+    vi.useFakeTimers()
+    try {
+      await actor.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(useConsentStore().state).toBe('error')
+      // Not known is no answer: the owner may well be on record (the first launch of this build).
+      expect(login.closed).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(CONSENT_RETRY_FIRST_MS)
+      expect(useConsentStore().state).toBe('ready')
+      expect(login.closed).toBe(true)
+      expect(login.phase).toBe('consent')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
-  it('one who accepted nothing, with no sheet open: the step at once — nothing written past it (Б1)', async () => {
+  it('an owner on record keeps the shelf through a lost question, and the writes go once it is answered (Г1)', async () => {
     const { actor, login } = await shownOffline()
+    spend()
     me.mockResolvedValue(MINE)
-    consent.mockResolvedValue({ version: null })
-    await actor.start()
-    await flush()
-    expect(login.closed).toBe(true)
-    expect(login.phase).toBe('consent')
+    consent
+      .mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'lost on the way', false))
+      .mockResolvedValue({ version: POLICY_VERSION })
+    vi.useFakeTimers()
+    try {
+      await actor.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(login.closed).toBe(false)
+      expect(login.writesHeld).toBe(true)
+
+      await vi.advanceTimersByTimeAsync(CONSENT_RETRY_FIRST_MS)
+      expect(login.closed).toBe(false)
+      expect(login.writesHeld).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+    await useSpendingQueueStore().flush()
+    expect(recordSpending).toHaveBeenCalledTimes(1)
+  })
+
+  it('asked again by time no sooner than the first pause, and less often each time', async () => {
+    const { actor } = await shownOffline()
+    me.mockResolvedValue(MINE)
+    consent.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'lost on the way', false))
+    vi.useFakeTimers()
+    try {
+      await actor.start()
+      await vi.advanceTimersByTimeAsync(0)
+      const asked = consent.mock.calls.length
+      await vi.advanceTimersByTimeAsync(CONSENT_RETRY_FIRST_MS - 1)
+      expect(consent.mock.calls.length).toBe(asked)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(consent.mock.calls.length).toBe(asked + 1)
+      // The second pause is twice the first.
+      await vi.advanceTimersByTimeAsync(CONSENT_RETRY_FIRST_MS * 2 - 1)
+      expect(consent.mock.calls.length).toBe(asked + 1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(consent.mock.calls.length).toBe(asked + 2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('not known yet because the signal went again: the app stays until hidden with no sheet open', async () => {

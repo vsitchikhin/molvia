@@ -4,7 +4,15 @@ import { POLICY_VERSION, consentNeeded } from '@molvia/model'
 import { api } from '@/api'
 import { reportFailure } from '@/failures'
 import { useActorStore } from '@/stores/actor'
+import { doublingRetry } from '@/stores/queueing'
 import { read, write } from '@/stores/storage'
+
+/**
+ * How soon a question that failed with the connection up is asked again (adversarial Г1, owner's
+ * decision 04.10.2026): 5 s, doubling, never more than a minute.
+ */
+export const CONSENT_RETRY_FIRST_MS = 5_000
+export const CONSENT_RETRY_LAST_MS = 60_000
 
 /** Whether the edition this owner accepted is known, being asked about, or could not be. */
 export type ConsentState = 'idle' | 'loading' | 'ready' | 'error' | 'offline'
@@ -54,6 +62,13 @@ export const useConsentStore = defineStore('consent', () => {
   const aged = ref(false)
   /** Bumped by every new question, so an answer about a question since replaced is dropped. */
   let revision = 0
+  /**
+   * **A failed question is asked again by time** (adversarial Г1 against В1, owner's decision): the
+   * app shown stays on the step's error — an owner on record at the shelf must not lose it to one
+   * lost request — and so the window of one who accepted nothing is closed by the next answer, not
+   * by an `online` a wavering signal never sends.
+   */
+  const again = doublingRetry(() => void retry(), CONSENT_RETRY_FIRST_MS, CONSENT_RETRY_LAST_MS)
 
   function settle(who: string, version: number | null): void {
     revision += 1
@@ -79,12 +94,17 @@ export const useConsentStore = defineStore('consent', () => {
     state.value = 'loading'
     try {
       const answer = await api.consent()
-      if (mine === revision && owner.value === who) settle(who, answer.version)
+      if (mine === revision && owner.value === who) {
+        again.cancel()
+        again.reset()
+        settle(who, answer.version)
+      }
     } catch (error) {
       if (mine !== revision || owner.value !== who) return
       reportFailure(error, 'screen')
       // Read after the failure, never before it (MOL-19).
       state.value = navigator.onLine ? 'error' : 'offline'
+      again.later()
     }
   }
 
@@ -92,7 +112,11 @@ export const useConsentStore = defineStore('consent', () => {
     owner,
     (who) => {
       failure.value = null
-      if (who !== of.value) aged.value = false
+      if (who !== of.value) {
+        aged.value = false
+        again.cancel()
+        again.reset()
+      }
       if (who === null) {
         revision += 1
         of.value = null

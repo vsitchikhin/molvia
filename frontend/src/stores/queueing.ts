@@ -53,19 +53,26 @@ export interface Retry {
   cancel(): void
 }
 
-/** The doubling pause of a queue, which tries only while the browser believes it is online. */
-export function doublingRetry(attempt: () => void): Retry {
+/**
+ * The doubling pause of a queue, which tries only while the browser believes it is online. Its
+ * bounds are a queue's unless given: a question the door waits on asks sooner (MOL-95).
+ */
+export function doublingRetry(
+  attempt: () => void,
+  first = RETRY_FIRST_MS,
+  last = RETRY_LAST_MS,
+): Retry {
   let timer: ReturnType<typeof setTimeout> | undefined
-  let delay = RETRY_FIRST_MS
+  let delay = first
   return {
     later() {
       if (!navigator.onLine) return
       clearTimeout(timer)
       timer = setTimeout(attempt, delay)
-      delay = Math.min(delay * 2, RETRY_LAST_MS)
+      delay = Math.min(delay * 2, last)
     },
     reset() {
-      delay = RETRY_FIRST_MS
+      delay = first
     },
     cancel() {
       clearTimeout(timer)
