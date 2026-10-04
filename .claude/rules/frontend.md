@@ -234,17 +234,23 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `SegmentedControl` and `AppSwitch` take `inactive`, which is `aria-disabled` plus a cancelled
   click — a tap, a tap on the label and Space all put the control back. An inactive group of
   segments is one stop whose arrows walk the focus over every radio by hand and choose none
-  (adversarial А2: an arrow cancelled whole left two of three options unheard). `e2e/kit-inactive`
+  (adversarial А2: an arrow cancelled whole left two of three options unheard); an arrow with Alt,
+  Ctrl or Meta is the browser's, as in a live group (Р2-А3). `e2e/kit-inactive`
   holds it in Chromium and WebKit, since the component tests send their own events. A native
   `disabled` is drawn the same and stays for a moment, until a screen trades it for `inactive`
-  with the words saying why; **`busy` keeps the look of the action, with `disabled` too** — the
-  sending sheets write both (А3). **The form of the variant stays** (owner's В-1 «а»): a button with
+  with the words saying why. **`busy` alone keeps the look of the action** — it is the one at work,
+  and its words say so («Сохраняем…»); **`busy` with `disabled` is drawn as not now**, as master
+  drew it dimmed: «Сохранить» of a sheet that keeps its words while it sends had nothing else to
+  show it (round 2, Р2-А1 — round 1 had drawn it live). A look of its own for `busy` is not the
+  kit's yet. **The form of the variant stays** (owner's В-1 «а»): a button with
   a fill goes to `surface-2`, a ghost or danger-ghost keeps no fill — two grey pills in a sheet's
   footer read as two buttons of equal weight. The price, accepted (А4): the `surface-2` pill stands
   1.10:1 on a sheet, so in a footer that sends, primary and ghost read as two muted words; an edge
-  would make it a secondary, which is `surface` with a `border-strong` edge. The rest shadow of an
-  inactive primary goes by a light `:where`, so the floating dock keeps its lift on whatever it
-  holds (review 1). The hover and the press are written on `:not(:disabled, [aria-disabled])`,
+  would make it a secondary, which is `surface` with a `border-strong` edge. **The lift of a floating
+  action is the dock's, not a state's** (reviews 1 and 6): `FloatingDock` gives `--shadow-md` to
+  whatever it holds, live or not, by a weight above any variant's shadow — lifted only when
+  inactive, a dead «Восстановить» floated above the live one; the kit drops an inactive primary's
+  rest shadow by a light `:where`. The hover and the press are written on `:not(:disabled, [aria-disabled])`,
   since `aria-disabled` is still `:enabled` and an inactive primary lit up under the pointer. A button that is only an icon draws its glyph in `text`, inactive in
   `text-muted` (owner's В-15 «а») — `text-muted` for both made the month's arrow at the edge look
   like the live one. **Chosen is a fill or a form, never a weight**: a segment is filled
