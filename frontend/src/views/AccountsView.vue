@@ -52,7 +52,7 @@
 
         <template v-else>
           <AppCard class="total">
-            <p class="caption">{{ t('accounts.total') }}</p>
+            <SectionCaption as="p" inset>{{ t('accounts.total') }}</SectionCaption>
             <p class="figure" :class="{ negative: overview.totals.total.minor < 0n }">
               ≈ {{ estimate(overview.totals.total) }}
             </p>
@@ -97,7 +97,7 @@
 
           <AppReveal group>
             <section v-for="group in groups" :key="group.key" class="group">
-              <h2 class="group-caption">{{ group.title }}</h2>
+              <SectionCaption class="group-caption">{{ group.title }}</SectionCaption>
               <AppCard as="ul" list>
                 <AppReveal group>
                   <AccountLine
@@ -207,6 +207,7 @@ import AppScreen from '@/components/AppScreen.vue'
 import FloatingDock from '@/components/FloatingDock.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import UnassignedSheet from '@/components/UnassignedSheet.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { countedWhen, pageOrder, removedOf, shortDay, signedAmount } from '@/components/accounts'
@@ -244,6 +245,7 @@ export default defineComponent({
     IconUndo,
     ScreenSkeleton,
     ScreenState,
+    SectionCaption,
     UnassignedSheet,
     UndoStrip,
   },
@@ -459,18 +461,8 @@ export default defineComponent({
   padding: var(--space-4);
 }
 
-.caption,
 .group-caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-}
-
-.group-caption {
-  padding: var(--space-2) var(--space-1) var(--space-2);
+  margin-top: var(--space-2);
 }
 
 .figure {

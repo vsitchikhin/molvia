@@ -1,6 +1,6 @@
 <template>
   <section class="group">
-    <h2 class="caption">{{ t('settings.group_scheme') }}</h2>
+    <SectionCaption>{{ t('settings.group_scheme') }}</SectionCaption>
     <SegmentedControl
       :model-value="scheme"
       :options="options"
@@ -17,6 +17,7 @@
 <script lang="ts">
 import { computed, defineComponent, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
+import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import type { Segment } from '@/components/SegmentedControl.vue'
 import { useColorScheme } from '@/composables/useColorScheme'
@@ -33,7 +34,7 @@ const SCHEMES: readonly Scheme[] = ['system', 'light', 'dark']
  */
 export default defineComponent({
   name: 'SchemeGroup',
-  components: { SegmentedControl },
+  components: { SectionCaption, SegmentedControl },
   setup() {
     const { t } = useI18n()
     const { scheme, choose } = useColorScheme()
@@ -50,16 +51,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.caption {
-  margin: 0 0 var(--space-3);
-  padding: var(--space-1) var(--space-1) 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-}
-
 .hint {
   margin: var(--space-2) 0 0;
   padding: 0 var(--space-1);

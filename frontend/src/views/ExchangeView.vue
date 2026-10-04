@@ -77,7 +77,9 @@
         />
 
         <AppCard class="rate">
-          <p class="caption">{{ t('exchange.my_rate') }}</p>
+          <SectionCaption as="p" inset class="rate-caption">{{
+            t('exchange.my_rate')
+          }}</SectionCaption>
           <template v-if="overview.wallet">
             <p class="figure">{{ rateOf(overview.wallet.rate) }}</p>
             <p class="meta">
@@ -139,7 +141,7 @@
 
         <!-- Incomes alone can make the rate (MOL-66): then there is the card, and no list. -->
         <section v-if="overview.exchanges.length > 0" class="exchanges">
-          <h2 class="caption">{{ t('exchange.list_title') }}</h2>
+          <SectionCaption>{{ t('exchange.list_title') }}</SectionCaption>
           <!-- A list, so a screen reader says how many and moves item by item (review Т-5). -->
           <ul class="cards">
             <AppReveal group>
@@ -225,6 +227,7 @@ import FloatingDock from '@/components/FloatingDock.vue'
 import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExchangeWords } from '@/composables/useExchangeWords'
@@ -259,6 +262,7 @@ export default defineComponent({
     OperationSkeleton,
     ScreenSkeleton,
     ScreenState,
+    SectionCaption,
     SegmentedControl,
   },
   setup() {
@@ -474,13 +478,8 @@ export default defineComponent({
   margin-bottom: var(--space-4);
 }
 
-.caption {
-  margin: 0 0 var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+.rate-caption {
+  margin-bottom: var(--space-2);
 }
 
 .figure {
@@ -553,17 +552,10 @@ export default defineComponent({
 /* Not `.list`: a scoped class of this screen lands on the root of a child card too, and `AppCard
    list` took this one's padding for «Обмен» (MOL-159). */
 .exchanges {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
   margin-top: var(--space-6);
 
   // Room for «Обмен» under the last card: it floats over the list, as «Трата» does on the month.
   padding-bottom: calc(var(--space-8) + var(--space-8) + var(--space-6));
-}
-
-.exchanges .caption {
-  margin: 0;
 }
 
 .cards {

@@ -16,7 +16,7 @@
       <span class="verb">{{ t('exchange.edit_on', { date: dayOf(exchange) }) }}</span>
       <span class="sums">
         <span class="side">
-          <span class="caption">{{ t('exchange.card_given') }}</span>
+          <SectionCaption as="span" inset>{{ t('exchange.card_given') }}</SectionCaption>
           <span class="amount">{{ moneyOf(exchange.given) }}</span>
           <span v-if="givenName" class="account">
             {{ t('accounts.card_from', { name: givenName }) }}
@@ -24,7 +24,7 @@
         </span>
         <span class="arrow" aria-hidden="true"><IconArrow /></span>
         <span class="side received">
-          <span class="caption">{{ t('exchange.card_received') }}</span>
+          <SectionCaption as="span" inset>{{ t('exchange.card_received') }}</SectionCaption>
           <span class="amount">{{ moneyOf(exchange.received) }}</span>
           <span v-if="receivedName" class="account">
             {{ t('accounts.card_to', { name: receivedName }) }}
@@ -81,6 +81,7 @@ import IconNote from '~icons/mdi/note-text-outline'
 import type { ExchangeView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import OperationCardHead from '@/components/OperationCardHead.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { useExchangeWords } from '@/composables/useExchangeWords'
 import { dayWords, purchaseDay } from '@/days'
 import { useAccountsStore } from '@/stores/accounts'
@@ -92,7 +93,7 @@ import { useAccountsStore } from '@/stores/accounts'
  */
 export default defineComponent({
   name: 'ExchangeCard',
-  components: { AppCard, IconArrow, IconNote, OperationCardHead },
+  components: { AppCard, IconArrow, IconNote, OperationCardHead, SectionCaption },
   props: {
     exchange: { type: Object as PropType<ExchangeView>, required: true },
     /** The phone's today, held by the screen and asked again when it comes back (adversarial Н). */
@@ -200,14 +201,6 @@ export default defineComponent({
     align-items: flex-start;
     text-align: left;
   }
-}
-
-.caption {
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .account {

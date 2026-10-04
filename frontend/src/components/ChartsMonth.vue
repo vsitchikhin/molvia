@@ -52,7 +52,9 @@
       <DeviationBars class="answer" :charts="onScreen ?? charts" :name-of="nameOf" />
       <AppCard as="section" class="card" :aria-labelledby="`${id}-pace`">
         <div class="head">
-          <h2 :id="`${id}-pace`" class="caption">{{ t('spending.charts.pace_title') }}</h2>
+          <SectionCaption :id="`${id}-pace`" inset>{{
+            t('spending.charts.pace_title')
+          }}</SectionCaption>
           <p class="legend" aria-hidden="true">
             <span class="key solid"></span>{{ monthWord }}
             <template v-if="charts.pace.usual">
@@ -94,6 +96,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen } from '@/components/accounts'
 import { longMonth, monthGenitive, signedPercent } from '@/components/charts'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { useMoneyChartMonth } from '@/composables/useMoneyCharts'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { calendarDay } from '@/days'
@@ -115,6 +118,7 @@ export default defineComponent({
     PaceLine,
     ScreenSkeleton,
     ScreenState,
+    SectionCaption,
   },
   props: {
     month: { type: String, required: true },
@@ -322,15 +326,6 @@ export default defineComponent({
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
-}
-
-.caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .legend {

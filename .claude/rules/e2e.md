@@ -85,8 +85,9 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   video is drawn rather than kept, and what each spec holds — `.claude/rules/barcodes.md`.
 - **The sheet also runs on an iPhone's engine** (`iphone`, `devices['iPhone 14']`, MOL-80), and
   so does «not now» of the kit (`kit-inactive.spec.ts`, MOL-174): it is held by what the engine
-  sends for a radio's arrow, Space and a tap on a label, which only a real engine shows. Nothing
-  else runs on WebKit. WebKit shows what Chromium hides: Safari does not focus a tapped
+  sends for a radio's arrow, Space and a tap on a label, which only a real engine shows; and the
+  kit's rows (`kit-rows.spec.ts`, MOL-175): a focus ring is the engine's own drawing, and happy-dom
+  computes no style. Nothing else runs on WebKit. WebKit shows what Chromium hides: Safari does not focus a tapped
   button, so a closed `<dialog>` has nothing to give focus back to, and only there does the sheet's
   own return of focus get tested. The rest of the suite stays on one engine — a second run of
   everything would double the wait at every push for differences no other screen has. Two kinds of

@@ -4,8 +4,8 @@
     <template #meta>{{ t('accounts.picker.meta') }}</template>
 
     <div class="groups" role="radiogroup" :aria-label="title">
-      <template v-for="section in sections" :key="section.key">
-        <h3 class="caption">{{ section.title }}</h3>
+      <section v-for="section in sections" :key="section.key">
+        <SectionCaption as="h3" class="caption">{{ section.title }}</SectionCaption>
         <ul class="card">
           <li v-for="account in section.accounts" :key="account.id">
             <button
@@ -26,7 +26,7 @@
             </button>
           </li>
         </ul>
-      </template>
+      </section>
       <ul class="card">
         <li>
           <button
@@ -57,6 +57,7 @@ import IconCheck from '~icons/mdi/check'
 import type { Currency, MoneyAccountView } from '@molvia/model'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { pickerGroups, signedAmount } from '@/components/accounts'
+import SectionCaption from '@/components/SectionCaption.vue'
 
 /**
  * «Счёт» — the choice of an account, over the sheet of an operation (MOL-123, handoff 06): the
@@ -66,7 +67,7 @@ import { pickerGroups, signedAmount } from '@/components/accounts'
  */
 export default defineComponent({
   name: 'AccountPickerSheet',
-  components: { BottomSheet, IconCheck },
+  components: { BottomSheet, IconCheck, SectionCaption },
   props: {
     open: { type: Boolean, required: true },
     title: { type: String, required: true },
@@ -122,13 +123,9 @@ export default defineComponent({
   gap: var(--space-2);
 }
 
+/* A caption and its card stand in a section of their own: in the groups' gap the 8 under it would be 16. */
 .caption {
-  margin: var(--space-2) var(--space-1) 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  margin-top: var(--space-2);
 }
 
 .card {

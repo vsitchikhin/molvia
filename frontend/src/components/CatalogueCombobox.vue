@@ -32,7 +32,7 @@
     <slot name="before" />
 
     <template v-if="expanded">
-      <p :id="`${id}-heading`" class="heading">{{ heading }}</p>
+      <SectionCaption :id="`${id}-heading`" as="p" class="heading">{{ heading }}</SectionCaption>
       <ul
         :id="`${id}-list`"
         ref="list"
@@ -72,6 +72,7 @@ import IconChevronRight from '~icons/mdi/chevron-right'
 import IconMagnify from '~icons/mdi/magnify'
 import { CATALOGUE_QUERY_MAX } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
+import SectionCaption from '@/components/SectionCaption.vue'
 
 /**
  * The field of «Что взяли?» and the list under it — an editable combobox by the ARIA 1.2
@@ -92,7 +93,7 @@ import type { CatalogueEntry } from '@molvia/model'
  */
 export default defineComponent({
   name: 'CatalogueCombobox',
-  components: { IconChevronRight, IconMagnify },
+  components: { IconChevronRight, IconMagnify, SectionCaption },
   props: {
     modelValue: { type: String, required: true },
     items: { type: Array as PropType<CatalogueEntry[]>, required: true },
@@ -268,13 +269,7 @@ export default defineComponent({
 }
 
 .heading {
-  margin: var(--space-6) 0 var(--space-2);
-  padding: 0 var(--space-1);
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  margin-top: var(--space-6);
 }
 
 .list {

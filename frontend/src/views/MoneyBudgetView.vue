@@ -100,26 +100,28 @@
         </AppCard>
 
         <template v-if="unplanned.length > 0">
-          <h2 class="group">{{ t('budget.unplanned') }}</h2>
-          <AppCard as="ul" list>
-            <li v-for="row in unplanned" :key="row.categoryId">
-              <!-- A removed category is no choice (review 7): its spending is shown, a plan is not offered. -->
-              <div v-if="row.archived" class="row still">
-                <span class="head">
-                  <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
-                  <span class="name">{{ row.name }}</span>
-                  <span class="left">{{ row.spent }}</span>
-                </span>
-              </div>
-              <button v-else type="button" class="row" @click="edit(row.categoryId, null)">
-                <span class="head">
-                  <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
-                  <span class="name">{{ row.name }}</span>
-                  <span class="left">{{ row.spent }}</span>
-                </span>
-              </button>
-            </li>
-          </AppCard>
+          <div>
+            <SectionCaption class="group">{{ t('budget.unplanned') }}</SectionCaption>
+            <AppCard as="ul" list>
+              <li v-for="row in unplanned" :key="row.categoryId">
+                <!-- A removed category is no choice (review 7): its spending is shown, a plan is not offered. -->
+                <div v-if="row.archived" class="row still">
+                  <span class="head">
+                    <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
+                    <span class="name">{{ row.name }}</span>
+                    <span class="left">{{ row.spent }}</span>
+                  </span>
+                </div>
+                <button v-else type="button" class="row" @click="edit(row.categoryId, null)">
+                  <span class="head">
+                    <span class="dot" :style="{ background: row.colour }" aria-hidden="true"></span>
+                    <span class="name">{{ row.name }}</span>
+                    <span class="left">{{ row.spent }}</span>
+                  </span>
+                </button>
+              </li>
+            </AppCard>
+          </div>
         </template>
 
         <AppButton v-if="choosable.length > 0" variant="secondary" block @click="choose">
@@ -180,6 +182,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen } from '@/components/accounts'
 import { budgetAmount, categoryColour } from '@/components/spending'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyBudget } from '@/composables/useMoneyBudget'
@@ -202,6 +205,7 @@ export default defineComponent({
     MonthSwitcher,
     ScreenSkeleton,
     ScreenState,
+    SectionCaption,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -512,14 +516,9 @@ export default defineComponent({
   }
 }
 
+/* The caption and its card stand in a block of their own: in the content's gap the 8 under it would be 20. */
 .group {
-  margin: 0;
-  padding: var(--space-3) var(--space-1) 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  margin-top: var(--space-3);
 }
 
 li + li {

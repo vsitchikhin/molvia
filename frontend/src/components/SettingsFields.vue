@@ -1,7 +1,7 @@
 <template>
   <fieldset class="fields" :disabled="disabled">
     <section class="group">
-      <h2 class="caption">{{ t('settings.group_place') }}</h2>
+      <SectionCaption>{{ t('settings.group_place') }}</SectionCaption>
       <AppCard class="card">
         <div>
           <AppField
@@ -50,7 +50,7 @@
       </AppCard>
     </section>
     <section class="group">
-      <h2 class="caption">{{ t('settings.group_currencies') }}</h2>
+      <SectionCaption>{{ t('settings.group_currencies') }}</SectionCaption>
       <AppCard class="card">
         <div v-for="field in currencyFields" :key="field">
           <AppField
@@ -95,10 +95,11 @@ import IconInfo from '~icons/mdi/information-outline'
 import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
 import { countryLabel } from '@/components/placeLabel'
+import SectionCaption from '@/components/SectionCaption.vue'
 
 export default defineComponent({
   name: 'SettingsFields',
-  components: { AppCard, AppField, IconInfo },
+  components: { AppCard, AppField, IconInfo, SectionCaption },
   props: {
     modelValue: { type: Object as PropType<ActorSettings>, required: true },
     base: { type: Object as PropType<ActorSettings | null>, default: null },
@@ -202,16 +203,6 @@ export default defineComponent({
   margin: 0;
   padding: 0;
   border: 0;
-}
-
-.caption {
-  margin: 0 0 var(--space-3);
-  padding: var(--space-1) var(--space-1) 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .card {

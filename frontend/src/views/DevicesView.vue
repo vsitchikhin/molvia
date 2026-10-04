@@ -21,7 +21,7 @@
     />
 
     <section v-else-if="list" class="list">
-      <h2 ref="caption" class="caption" tabindex="-1">{{ t('devices.list_title') }}</h2>
+      <SectionCaption ref="caption" tabindex="-1">{{ t('devices.list_title') }}</SectionCaption>
       <AppCard as="ul" list>
         <AppReveal group>
           <li v-for="session in list.sessions" :key="session.id" class="row">
@@ -75,6 +75,7 @@ import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import SessionEndSheet from '@/components/SessionEndSheet.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useSessions } from '@/composables/useSessions'
@@ -98,6 +99,7 @@ export default defineComponent({
     AppScreen,
     ScreenSkeleton,
     ScreenState,
+    SectionCaption,
     SessionEndSheet,
   },
   setup() {
@@ -114,7 +116,7 @@ export default defineComponent({
 
     // The button that opened the sheet goes with its row, so the focus has nowhere to return:
     // it goes to the heading of the list, and what happened is said out loud.
-    const caption = ref<HTMLElement | null>(null)
+    const caption = ref<{ focus: () => void } | null>(null)
     const announce = useAnnouncer()
     let unsay: (() => void) | undefined
     onUnmounted(() => unsay?.())
@@ -173,19 +175,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.caption {
-  margin: 0 0 var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
 .row {
   display: flex;
   align-items: center;

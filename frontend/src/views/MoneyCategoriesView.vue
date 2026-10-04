@@ -42,52 +42,60 @@
           {{ t('spending.categories.add') }}
         </AppButton>
 
-        <h2 class="caption">{{ t('spending.categories.live') }}</h2>
-        <AppCard as="ul" list>
-          <AppReveal group>
-            <li v-for="category in live" :key="category.id" class="row">
-              <span
-                class="dot"
-                :style="{ background: colourOf(category) }"
-                aria-hidden="true"
-              ></span>
-              <span class="name">
-                {{ nameOf(category) }}
-                <span v-if="!category.preset" class="own">{{ t('spending.categories.own') }}</span>
-                <span v-if="waiting(category.id)" class="waiting">{{ t('spending.pending') }}</span>
-              </span>
-              <AppButton
-                variant="danger-ghost"
-                :aria-label="t('spending.categories.remove_label', { name: nameOf(category) })"
-                @click="queue.archiveCategory(category.id, true)"
-              >
-                {{ t('spending.categories.remove') }}
-              </AppButton>
-            </li>
-          </AppReveal>
-        </AppCard>
-
-        <template v-if="archived.length > 0">
-          <h2 class="caption">{{ t('spending.categories.archived') }}</h2>
+        <section class="group">
+          <SectionCaption class="caption">{{ t('spending.categories.live') }}</SectionCaption>
           <AppCard as="ul" list>
             <AppReveal group>
-              <li v-for="category in archived" :key="category.id" class="row">
+              <li v-for="category in live" :key="category.id" class="row">
                 <span
                   class="dot"
                   :style="{ background: colourOf(category) }"
                   aria-hidden="true"
                 ></span>
-                <span class="name">{{ nameOf(category) }}</span>
+                <span class="name">
+                  {{ nameOf(category) }}
+                  <span v-if="!category.preset" class="own">{{
+                    t('spending.categories.own')
+                  }}</span>
+                  <span v-if="waiting(category.id)" class="waiting">{{
+                    t('spending.pending')
+                  }}</span>
+                </span>
                 <AppButton
-                  variant="ghost"
-                  :aria-label="t('spending.categories.restore_label', { name: nameOf(category) })"
-                  @click="queue.archiveCategory(category.id, false)"
+                  variant="danger-ghost"
+                  :aria-label="t('spending.categories.remove_label', { name: nameOf(category) })"
+                  @click="queue.archiveCategory(category.id, true)"
                 >
-                  {{ t('spending.restore') }}
+                  {{ t('spending.categories.remove') }}
                 </AppButton>
               </li>
             </AppReveal>
           </AppCard>
+        </section>
+
+        <template v-if="archived.length > 0">
+          <section class="group">
+            <SectionCaption class="caption">{{ t('spending.categories.archived') }}</SectionCaption>
+            <AppCard as="ul" list>
+              <AppReveal group>
+                <li v-for="category in archived" :key="category.id" class="row">
+                  <span
+                    class="dot"
+                    :style="{ background: colourOf(category) }"
+                    aria-hidden="true"
+                  ></span>
+                  <span class="name">{{ nameOf(category) }}</span>
+                  <AppButton
+                    variant="ghost"
+                    :aria-label="t('spending.categories.restore_label', { name: nameOf(category) })"
+                    @click="queue.archiveCategory(category.id, false)"
+                  >
+                    {{ t('spending.restore') }}
+                  </AppButton>
+                </li>
+              </AppReveal>
+            </AppCard>
+          </section>
         </template>
         <p class="note">{{ t('spending.categories.note') }}</p>
       </template>
@@ -111,6 +119,7 @@ import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { categoriesWith, categoryColour } from '@/components/spending'
+import SectionCaption from '@/components/SectionCaption.vue'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -133,6 +142,7 @@ export default defineComponent({
     NewCategorySheet,
     ScreenSkeleton,
     ScreenState,
+    SectionCaption,
   },
   setup() {
     const { t } = useI18n()
@@ -218,14 +228,9 @@ export default defineComponent({
   padding: var(--space-4);
 }
 
+/* A caption and its card stand in a block of their own: in the content's gap the 8 under it would be 20. */
 .caption {
-  margin: 0;
-  padding: var(--space-3) var(--space-1) 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
+  margin-top: var(--space-3);
 }
 
 .row {

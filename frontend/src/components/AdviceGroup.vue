@@ -1,13 +1,12 @@
 <template>
   <section class="group" :class="GROUPS[level].tone">
-    <h2 class="head">
-      <!-- The circle repeats what the word beside it says: named again, a screen reader would
-           read every group heading twice. -->
-      <span v-if="level !== 'unrated'" aria-hidden="true" class="mark"
+    <SectionCaption class="caption">
+      <!-- The circle repeats what the word beside it says: the caption hides it from a screen reader. -->
+      <template v-if="level !== 'unrated'" #mark
         ><VerdictBadge :level="level" compact large
-      /></span>
-      <span class="caption">{{ t(GROUPS[level].title) }}</span>
-    </h2>
+      /></template>
+      {{ t(GROUPS[level].title) }}
+    </SectionCaption>
     <slot />
   </section>
 </template>
@@ -17,6 +16,7 @@ import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { VerdictLevel } from '@molvia/model'
+import SectionCaption from '@/components/SectionCaption.vue'
 import VerdictBadge from '@/components/VerdictBadge.vue'
 
 /**
@@ -52,7 +52,7 @@ type GroupLevel = VerdictLevel | 'unrated'
  */
 export default defineComponent({
   name: 'AdviceGroup',
-  components: { VerdictBadge },
+  components: { SectionCaption, VerdictBadge },
   props: {
     level: { type: String as PropType<GroupLevel>, required: true },
   },
@@ -73,26 +73,7 @@ export default defineComponent({
   border-top: var(--hairline) solid var(--border);
 }
 
-.mark {
-  display: inline-flex;
-}
-
-.head {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  margin: 0 0 var(--space-2);
-  padding: 0 var(--space-1);
-}
-
-.caption {
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  line-height: 1;
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-}
-
+/* The tone of the group's word is the screen's (124 v2): the kit's caption has none. */
 .take .caption {
   color: var(--good-ink);
 }

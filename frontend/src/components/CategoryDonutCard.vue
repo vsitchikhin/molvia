@@ -6,7 +6,7 @@
       :aria-label="top.length > 0 ? label : undefined"
     >
       <span class="heading">
-        <span class="caption">{{ t('spending.categories_title') }}</span>
+        <SectionCaption as="span" inset>{{ t('spending.categories_title') }}</SectionCaption>
         <span class="charts-link">
           {{ t('spending.summary.charts') }}<IconChevron class="chevron" aria-hidden="true" />
         </span>
@@ -47,6 +47,7 @@ import AppCard from '@/components/AppCard.vue'
 import DonutRing from '@/components/DonutRing.vue'
 import type { RingSector } from '@/components/DonutRing.vue'
 import { categoryColour } from '@/components/spending'
+import SectionCaption from '@/components/SectionCaption.vue'
 
 /** How many sectors are named beside the ring; the rest are counted (handoff MOL-157, 01). */
 const NAMED = 3
@@ -61,7 +62,7 @@ const NAMED = 3
  */
 export default defineComponent({
   name: 'CategoryDonutCard',
-  components: { AppCard, DonutRing, IconChevron },
+  components: { AppCard, DonutRing, IconChevron, SectionCaption },
   props: {
     month: { type: Object as PropType<MoneyMonthView>, required: true },
     nameOf: {
@@ -165,14 +166,6 @@ export default defineComponent({
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-}
-
-.caption {
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .charts-link {

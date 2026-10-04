@@ -84,7 +84,7 @@
     <!-- Outside the form's states: the way into the account does not depend on whether its
          settings loaded (MOL-57). -->
     <section class="group">
-      <h2 class="caption">{{ t('settings.group_account') }}</h2>
+      <SectionCaption>{{ t('settings.group_account') }}</SectionCaption>
       <AppCard as="ul" list>
         <li>
           <RouterLink class="entry" :to="{ name: 'devices' }">
@@ -107,7 +107,7 @@
          and «Удалить мои данные» do, so there is no chevron. Offline it opens all the same: written
          now, sent once there is a connection. -->
     <section class="group">
-      <h2 class="caption">{{ t('settings.group_app') }}</h2>
+      <SectionCaption>{{ t('settings.group_app') }}</SectionCaption>
       <AppCard as="ul" list>
         <li>
           <button
@@ -202,6 +202,7 @@ import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import SalaryShiftGroup from '@/components/SalaryShiftGroup.vue'
 import SchemeGroup from '@/components/SchemeGroup.vue'
+import SectionCaption from '@/components/SectionCaption.vue'
 import SettingsFields from '@/components/SettingsFields.vue'
 import { countryLabel } from '@/components/placeLabel'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
@@ -235,6 +236,7 @@ export default defineComponent({
     SchemeGroup,
     ScreenSkeleton,
     ScreenState,
+    SectionCaption,
     SettingsFields,
     SignOutSheet,
     YourDataGroup,
@@ -390,15 +392,6 @@ export default defineComponent({
 
 .group {
   margin-top: var(--space-6);
-}
-
-.caption {
-  margin: 0 0 var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
 }
 
 .entry {
