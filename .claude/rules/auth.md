@@ -10,8 +10,9 @@ paths:
   - 'packages/model/tests/{entities,contracts}/{auth,session,actor}.test.ts'
   - 'packages/client/src/**'
   - 'frontend/src/views/{LoginView,DevicesView,SettingsSignOut,SettingsErase}*'
+  - 'frontend/src/components/ConsentStep*'
   - 'frontend/src/components/{SignOutSheet,SessionEndSheet,IdentityNotice}*'
-  - 'frontend/src/stores/{identity,login,actor,signOut}*'
+  - 'frontend/src/stores/{identity,login,actor,signOut,consent}*'
   - 'frontend/src/composables/useSessions*'
   - 'frontend/src/{api,main}*.ts'
   - 'frontend/src/App.vue'
@@ -241,6 +242,23 @@ the round trip through Telegram, and ask whose account this turned out to be.
   this browser's session only, the stranger's other devices are theirs — and nothing is claimed,
   so a reload or a relaunch asks again instead of walking in. A way out that fails does not hold
   the way in: the new login replaces the cookie anyway, and the row left behind has no key.
+- **After the claim and before the app, the terms** (MOL-95, `privacy.md`): the door's phase
+  `consent`, drawn by `ConsentStep`, for whoever has not accepted this build's edition — a newcomer,
+  every owner before the step (once), and everybody again when the edition is raised. `closed` holds
+  it while the identity is `ready` and `consent.holds`; the phase is the skeleton while the server is
+  asked which edition was accepted, and the step's own error and offline states after a failure —
+  never the app on a guess. **The device remembers the edition under the owner**
+  (`molvia.consent.<owner>`, swept by `forgetOwner`, Р-6): remembering this build's, the door opens
+  with the identity and asks nothing — a request in front of every launch would be a skeleton in
+  front of every launch; remembering none or an older one, it waits for the server, since the edition
+  may have been accepted on another device. **Offline the step is never drawn from memory**: the app
+  opens on the drawer, as MOL-56 has it, and the step comes with the next answer. Another window's
+  accept opens the door here through `storage`. «Мне 16 лет или больше» comes before «Принимаю»
+  (В-3); «Не принимаю» says the account is already there and offers «Выйти» and «Удалить мои данные»,
+  each through its own sheet (В-4) — never an erasure on a «no» a slip of the thumb could cost an
+  owner everything for. The queues are not held by the step: they go by the identity, as before, and
+  a purchase from the shelf leaves while the person reads the new text. The links under the login
+  screen give way to the step's own, so each page is named once.
 - **Showing the app and writing into it are different rights** (adversarial Б1). The door may
   open on the drawer's name while the first `me()` is still in flight — that is what keeps a
   launch with a live session from flashing «Вход» — but a drawer says nothing about the cookie,

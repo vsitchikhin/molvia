@@ -150,6 +150,29 @@ The detail behind the privacy lines of `CLAUDE.md`.
   (adversarial Б).
   `/privacy` says what the copy holds — the removed and the withdrawn included — under «Копия ваших
   данных», and names the row by its words.
+- **The terms and the privacy page are accepted, an edition at a time** (MOL-95, owner's decisions
+  04.10.2026). Two pages under one edition: «Данные и приватность» and «Условия использования»
+  (`/terms`, В-2), both open without a session, the age of 16 in the terms. **Two marks, not one**
+  (В-1): `POLICY_VERSION` (`packages/model/src/contracts/consent.ts`) is the edition a person
+  accepts, **raised by hand only for a change that matters** — a new kind of data, a new recipient, a
+  new purpose, a change of the terms — and then `consent.changes.<edition>` says what changed in both
+  languages; **any other edit of either page is a new revision** (`frontend/src/views/policy.ts`: the
+  day both pages are subtitled with and the sha-256 of their text in both languages), and
+  `policy.test.ts` fails until the revision is moved — so a page cannot change in silence, and a line
+  added by a task about data does not put everybody through the screen again (nine edits in the nine
+  days before). The edition is written in `policy.ts` too, so raising it is an edit of the revision.
+  **What is kept is the edition and its moment on the owner** (`actors.consent_version`,
+  `consented_at`, both or neither, the database's clock), only ever raised — an older build's
+  acceptance never lowers it; erasure takes them with the row and the copy carries both (version
+  12). No age and no date of birth: the edition accepted says it. Its own address, `GET`/`PUT
+/actors/me/consent` (Р-5), since an installed app reads `/actors/me` strictly. **Which edition to
+  ask about is the build's** (Р-3, `consentNeeded`): the person accepts the text the phone shows, so
+  a phone compares what was accepted with its own `POLICY_VERSION` and sends the edition it showed;
+  asked by the server, an old build would show its old text and ask in a circle. **The API refuses
+  nothing without it** (Р-4): the basis of the purchases and ratings is the contract, the consent is
+  its record, and a refusal would have reached the queue at the shelf and the bot to stop only
+  `curl`. The step itself is the door's (`auth.md`). The text is a draft until the hour with the
+  lawyer (MOL-97); what the lawyer says is a new edition.
 - **No third-party trackers or analytics, and so no cookie banner** (MOL-58). There are two
   cookies, both strictly necessary: the session and the five-minute one of a login in progress
   (MOL-54); what the phone keeps in its storage is the queue and the drafts the app needs to work.
