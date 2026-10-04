@@ -324,6 +324,12 @@ describe('toSearchKey · грузинский и сербский (MOL-109)', ()
       expect(nameIdentity(hidden), plain).toBe(nameIdentity(plain))
       expect(toSearchKey(hidden), plain).toBe(toSearchKey(plain))
     }
+    // marks on both sides of what draws nothing are reordered once it is gone (round 2, Б2)
+    const dotBelow = String.fromCodePoint(0x323)
+    const reordered = `C${dotBelow}${caron}aj`
+    const split = `C${caron}${zeroWidth}${dotBelow}aj`
+    expect(nameIdentity(split)).toBe(nameIdentity(reordered))
+    expect(toSearchKey(split)).toBe(toSearchKey(reordered))
   })
 
   it('leaves the other marks of Latin as they were: an acute on s or a caron on e is stripped', () => {
