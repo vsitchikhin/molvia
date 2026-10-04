@@ -22,10 +22,10 @@
 import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger-ghost' | 'icon'
+export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost' | 'danger-ghost' | 'icon'
 
 /**
- * Every button of 0.1, in the five looks the handoff has. A button and only a button: a move
+ * Every button of the kit, in its six looks. A button and only a button: a move
  * between screens goes through `useNavigation` in the click handler, so no variant renders a
  * link that would write the history past the rules of «back».
  *
@@ -35,6 +35,12 @@ export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger-ghost' |
  * for voice control.
  *
  * Network-backed actions can be busy; inactive keeps the action focusable and described.
+ *
+ * **Inactive is one look** (Ф-6, MOL-174): `text-muted` at 600 with no opacity, on `surface-2` where
+ * the live button has a fill and on nothing where it has none — the form of the variant stays, so a
+ * ghost under an inactive primary is not a second grey pill (the owner's В-1). `disabled` draws the
+ * same; it differs only in leaving the focus order, which the screens trade for `inactive` along
+ * with the words saying why.
  */
 export default defineComponent({
   name: 'AppButton',
@@ -84,18 +90,11 @@ export default defineComponent({
     filter var(--dur-fast) var(--ease-out),
     background-color var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out),
-    opacity var(--dur-fast) var(--ease-out);
+    box-shadow var(--dur-fast) var(--ease-out);
   -webkit-tap-highlight-color: transparent;
 
   &:focus-visible {
     @include focus-ring;
-  }
-
-  &:disabled,
-  &[aria-disabled='true']:not([aria-busy='true']) {
-    opacity: 0.45;
-    cursor: not-allowed;
   }
 }
 
@@ -110,6 +109,12 @@ export default defineComponent({
   border: var(--hairline) solid var(--border-strong);
   background: var(--surface);
   color: var(--text);
+  font-weight: var(--weight-medium);
+}
+
+.tinted {
+  background: var(--accent-tint);
+  color: var(--accent-ink);
   font-weight: var(--weight-medium);
 }
 
@@ -137,17 +142,40 @@ export default defineComponent({
   }
 }
 
-/* Only an icon: a 44px circle, its glyph a step larger than one beside a word (MOL-118 В-15). */
+/* Only an icon: a 44px circle, its glyph a step larger than one beside a word, in `text` while it
+   can be pressed and `text-muted` when it cannot (MOL-118 В-15). */
 .icon {
   padding: 0;
   border-radius: 50%;
   background: var(--surface-2);
-  color: var(--text-muted);
+  color: var(--text);
 
   // Its own glyph only: `.icon .glyph` would take any ancestor wearing `icon`.
   & > .glyph {
     font-size: var(--icon-md);
   }
+}
+
+/* After every variant, so it wins over each of them; `aria-busy` keeps the look of the action. */
+.button:disabled,
+.button[aria-disabled='true']:not([aria-busy='true']) {
+  background: var(--surface-2);
+  box-shadow: none;
+  color: var(--text-muted);
+  font-weight: var(--weight-medium);
+  cursor: not-allowed;
+}
+
+.ghost:disabled,
+.danger-ghost:disabled,
+.ghost[aria-disabled='true']:not([aria-busy='true']),
+.danger-ghost[aria-disabled='true']:not([aria-busy='true']) {
+  background: transparent;
+}
+
+.secondary:disabled,
+.secondary[aria-disabled='true']:not([aria-busy='true']) {
+  border-color: transparent;
 }
 
 .large {
@@ -159,26 +187,32 @@ export default defineComponent({
   width: 100%;
 }
 
+/* `aria-disabled` is still `:enabled`: the press and the hover read both, or an inactive button
+   lit up under the pointer as a live one does. */
 @media (hover: hover) {
-  .primary:enabled:hover {
+  .primary:not(:disabled, [aria-disabled='true']):hover {
     filter: brightness(1.06);
   }
 
-  .secondary:enabled:hover {
+  .tinted:not(:disabled, [aria-disabled='true']):hover {
+    filter: brightness(0.97);
+  }
+
+  .secondary:not(:disabled, [aria-disabled='true']):hover {
     background: var(--surface-2);
   }
 
-  .ghost:enabled:hover {
+  .ghost:not(:disabled, [aria-disabled='true']):hover {
     background: var(--accent-tint);
   }
 
-  .icon:enabled:hover {
+  .icon:not(:disabled, [aria-disabled='true']):hover {
     background: var(--border);
-    color: var(--text);
   }
 }
 
-.primary:enabled:active {
+.primary:not(:disabled, [aria-disabled='true']):active,
+.tinted:not(:disabled, [aria-disabled='true']):active {
   filter: brightness(0.94);
 }
 
