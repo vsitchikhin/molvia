@@ -128,7 +128,7 @@ describe('ReceiptPlaceSheet (MOL-109, adversarial А2): a receipt of another cou
     localStorage.clear()
   })
 
-  const select = () => document.body.querySelector('dialog[open] select')
+  const select = () => document.body.querySelector<HTMLSelectElement>('dialog[open] select')
 
   async function record(view: Awaited<ReturnType<typeof away>>, name: string) {
     await view.get('input:not([type="date"])').setValue(name)
