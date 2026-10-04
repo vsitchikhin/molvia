@@ -6,9 +6,11 @@ tracker — that niche is taken. Everyone counts money; nobody answers whether t
 **The rule that holds it together.** Cheap but bad is never recommended anywhere; good is looked up
 at its lowest price.
 
-**Who.** Russian-speaking emigrants in Armenia — Gyumri and Yerevan first. They earn in roubles and
-spend in drams, read Armenian labels with difficulty, and do not yet know which shop has what.
-Interface language: Russian first, English mirrored; Armenian names appear in data.
+**Who.** Russian-speaking emigrants in Armenia — Gyumri and Yerevan first — and, from 0.2, in
+Georgia (Tbilisi, Batumi) and Serbia (Belgrade, Novi Sad). They earn in roubles and spend in the
+local currency, read Armenian, Georgian or Serbian labels with difficulty, and do not yet know
+which shop has what. Interface language: Russian first, English mirrored; Armenian, Georgian and
+Serbian names appear in data.
 
 **Where and how.** A phone in one hand at a shelf, the other holding a basket, under shop lamps or
 in the evening at home in the dark scheme. Short sessions: find a thing, see the verdict, record a

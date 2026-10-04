@@ -201,7 +201,10 @@ export interface OwnKindQuery {
  */
 const PLACES_PER_ITEM = 50
 
-/** The day of a moment the phone named no zone for is Yerevan's (MOL-121). */
+/**
+ * The day of a moment with no zone is Yerevan's (MOL-121): a request always has one since MOL-109 —
+ * the phone's, else its person's country's — so this is a caller with no request.
+ */
 const YEREVAN = 'Asia/Yerevan'
 
 /**

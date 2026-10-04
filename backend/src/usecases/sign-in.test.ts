@@ -94,6 +94,20 @@ describe('вход', () => {
     expect(actor.city).toBe('Гюмри')
   })
 
+  it('нового из Белграда заводит в Белграде; вернувшегося пояс не двигает (MOL-109)', async () => {
+    const actors = fakeActors({
+      byTelegramUserId: () => Promise.resolve(null),
+      createIfMissing: (id, telegramUserId, input) =>
+        Promise.resolve(actorFrom(id, telegramUserId, input)),
+    })
+    const { actor } = await signIn(actors, fakeSessions(), TELEGRAM_ID, null, 'Europe/Belgrade')
+    expect([actor.country, actor.city]).toEqual(['RS', 'Белград'])
+
+    const known = fakeActors({ byTelegramUserId: () => Promise.resolve(returning) })
+    const back = await signIn(known, fakeSessions(), TELEGRAM_ID, null, 'Europe/Belgrade')
+    expect([back.actor.country, back.actor.city]).toEqual([returning.country, returning.city])
+  })
+
   it('выдаёт сессию тому же владельцу, и каждый раз новый токен', async () => {
     const written: { actorId: string; token: string }[] = []
     const actors = fakeActors({ byTelegramUserId: () => Promise.resolve(returning) })

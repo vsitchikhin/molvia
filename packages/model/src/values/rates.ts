@@ -334,12 +334,13 @@ function offsetOf(instant: Date, zone: string): number {
 /**
  * Today as a request names it (`TODAY_HEADER`, MOL-121): the phone's day, held to the days that are
  * today somewhere at `instant` — a phone with a wrong clock is brought to the nearest of them, since
- * «today» is the person's now and not a fact they typed. Nothing sent, or not a day, and it is
- * Yerevan's: the bot, a page older than the header.
+ * «today» is the person's now and not a fact they typed. Nothing sent, or not a day — the bot, a
+ * page older than the header — and it is the day in `zone`, the person's country's (MOL-109), or
+ * Yerevan's for a country with none.
  */
-export function todayFrom(sent: string | undefined, instant: Date): string {
+export function todayFrom(sent: string | undefined, instant: Date, zone?: string): string {
   if (sent === undefined || !isRateDay(sent)) {
-    return yerevanDate(instant)
+    return dayIn(instant, zone)
   }
   const earliest = earliestDay(instant)
   const latest = latestDay(instant)

@@ -20,6 +20,8 @@ import {
   tripViewCodec,
   unassignedOperationsCodec,
   yerevanDate,
+  ZONE_HEADER,
+  dayIn,
   yerevanMidnight,
 } from '@molvia/model'
 import type { CachedRate, MoneyAccountsResponse } from '@molvia/model'
@@ -1109,6 +1111,27 @@ describe('день сверки — день телефона (MOL-121)', () => 
     expect(await checkedOn(latestDay(now))).toBe(latestDay(now))
     expect(await checkedOn('вчера')).toBe(yerevanDate(now))
     expect(await checkedOn('2020-01-01')).toBe(earliestDay(now))
+  })
+
+  it('без дня от телефона — день страны человека, а не Еревана; пояс телефона — его день (MOL-109)', async () => {
+    const me = await owner()
+    await db.update(actors).set({ country: 'RS', city: 'Белград' }).where(eq(actors.id, me.id))
+    const { id } = await addAccount(me)
+    async function checkedOn(headers: Record<string, string>): Promise<string> {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/money/accounts/${id}/checks`,
+        headers: { cookie: me.cookie, ...headers },
+        payload: { id: randomUUID(), fact: amd('100000') },
+      })
+      expect(response.statusCode, response.body).toBe(200)
+      return accountCheckCodec.parse(response.json()).checkedOn
+    }
+    const now = new Date()
+    expect(await checkedOn({})).toBe(dayIn(now, 'Europe/Belgrade'))
+    expect(await checkedOn({ [TODAY_HEADER]: 'вчера' })).toBe(dayIn(now, 'Europe/Belgrade'))
+    // the phone's own zone outranks the country: a person on a trip is where the phone is
+    expect(await checkedOn({ [ZONE_HEADER]: 'Asia/Tokyo' })).toBe(dayIn(now, 'Asia/Tokyo'))
   })
 
   it('ровная сверка днём телефона закрывает окно и для того, что записано этим днём до неё (И)', async () => {

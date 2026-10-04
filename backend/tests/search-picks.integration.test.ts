@@ -80,13 +80,14 @@ describe('запоминание пары «запрос → позиция»', 
     expect((await rows()).map((row) => row.queryKey.length)).toEqual([600])
   })
 
-  it('считает октеты, а не символы: грузинский ключ упирается раньше', async () => {
-    // A letter the tables do not know keeps itself. Georgian is three octets in UTF-8, so
-    // 301 characters are 903 octets — well inside `varchar(600)`, past the CHECK.
+  it('считает октеты, а не символы: тайский ключ упирается раньше', async () => {
+    // A letter the tables do not know keeps itself. Thai is three octets in UTF-8, so 301
+    // characters are 903 octets — well inside `varchar(600)`, past the CHECK. (Georgian was the
+    // example until MOL-109 gave it a table: its key is Latin now.)
     const actorId = await insertActor(db)
     const itemId = await insertItem(db)
 
-    await expect(picks.remember(actorId, 'აბ'.repeat(150) + 'ა', itemId)).resolves.toBeUndefined()
+    await expect(picks.remember(actorId, 'กข'.repeat(150) + 'ก', itemId)).resolves.toBeUndefined()
 
     expect(await rows()).toHaveLength(0)
   })
