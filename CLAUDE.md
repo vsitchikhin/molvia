@@ -79,6 +79,9 @@ The log's writer, the cohort and both gate queries are pinned in `.claude/rules/
 - **Both gates are read by `dist/gates.js`** (MOL-91), `make gates FROM=…` in a copy: `n` beside
   every share, the stop line printed and no verdict; gate 0.3 closes its window as 0.2 does; the
   erased leave one number, by week of arrival, in `erasures`.
+- **The scanner's measure is `receipt_days`** (MOL-222): how readings ended, and at «Записать» the lines
+  put right against what the review showed and the time from the server taking the receipt — by day,
+  no id; read as the block «0.2r» of `make gates`, stop above a third of the lines after four weeks.
 - **The login's funnel is `login_days`** (MOL-68): counted in each step's own transaction, by the
   day the login began, with no id at all; a device's repeat says `again=1`, so «began» is people
   rather than taps; a second way in is filed above `LOGIN_SECOND_WAY_PERCENT` (25 %) lost, read as
@@ -392,7 +395,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `ctx.from.id`, the message answered and the tag `#fb42` of its first line — the only place the tag
   is read; only `OWNER_TELEGRAM_ID` makes it a reply, and a person's word finds its thread by the
   message the reply went out as. Delivered is 👌 — ✅ is not a reaction Telegram takes.
-- **A screenshot only by the person's own act, from the gallery, seen before sending** (MOL-167): the
+- **A screenshot only by the person's own act, from the gallery — or a receipt's photo from this phone
+  (MOL-222) — seen before sending** (MOL-167): the
   phone draws it anew and the API keeps nothing but the picture whatever the phone did — every segment
   walked, metadata cut wherever it stands, nothing after the end; the picture lives only until the
   owner's Telegram has it, a week at most, never in the nightly copy or the person's copy — its line
@@ -514,7 +518,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   database and no disk; the API holds the queue, the photos and the parse, one receipt at a time.
 - **The parse is MOL-114's prototype, measured on the bench** (`receipt-text.ts`, `score.mjs`): a rule
   changed is run on the bench's truth before and after; amounts in hundredths, never floats.
-- **«Переснимите» is «too little read»** (`needsReshoot`, В-4) — never «the total did not match» alone.
+- **Every receipt with a line in it is read** (MOL-222, В-1): «переснимите» only when not one line was
+  found, and it names no cause it does not know; read in part (`readPartly`, the model's) is a hint on
+  the review, never a refusal — the person's corrections are the measure of 0.2.
 - **The reader away leaves a receipt queued; a photo it drops goes to the end with its attempt
   counted; a photo it cannot read fails** — never lost, never read forever; people read in turn.
 - **Every search of the parse has a ceiling, measured in time** — a line's, a reading's, the
@@ -531,7 +537,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A place keeps no tax number**: the place of a seller is where its receipts were recorded, read as
   the memory is; a recorded receipt is not removed while its trip is there — its row dates the trip.
 - **On the phone (MOL-127) a receipt is the country's version, never a flag** (Р-1); its photo is
-  upright, under 16 Mp, at most 3 200 px and JPEG without EXIF before it is queued; **its bytes live
+  upright, under 16 Mp, **cut out at «Края чека»** — corners proposed by the bench's winner, moved by the
+  person, a square receipt cut as the photo's own pixels and only a tilt warped (MOL-222) — at most
+  3 200 px and JPEG without EXIF before it is queued; **its bytes live
   in IndexedDB until the receipt is recorded, removed or gone** — the server gives no photo back —
   a database per owner that «Выйти» takes by its name.
 - **The review is the server's reading with the phone's draft over it** (MOL-127): the arithmetic
