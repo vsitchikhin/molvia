@@ -282,6 +282,15 @@ export const actors = pgTable(
      * with it. Beside the settings, as `salary_shift_day` is, and for the same reason (Р-1).
      */
     remindersOff: text('reminders_off').$type<RemindersOff>(),
+    /**
+     * Which edition of «Условия использования» and «Данные и приватность» the person accepted, and
+     * when (MOL-95): `POLICY_VERSION` of the page they were shown, and the server's moment. Empty for
+     * whoever has not accepted any — every owner before this column, who passes the screen once. A
+     * later acceptance overwrites both and an earlier one changes nothing; erasure takes them with
+     * the row.
+     */
+    consentVersion: smallint('consent_version'),
+    consentedAt: timestamp('consented_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.
@@ -307,6 +316,12 @@ export const actors = pgTable(
       sql`${table.salaryShiftDay} between 1 and ${sql.raw(String(SALARY_SHIFT_DAY_MAX))}`,
     ),
     check('actors_reminders_off_known', oneOf(table.remindersOff, REMINDERS_OFF)),
+    // A version without its moment, or a moment of no version, is a consent nobody can show.
+    check(
+      'actors_consent_whole',
+      sql`(${table.consentVersion} is null) = (${table.consentedAt} is null)`,
+    ),
+    check('actors_consent_version_positive', sql`${table.consentVersion} >= 1`),
   ],
 )
 
