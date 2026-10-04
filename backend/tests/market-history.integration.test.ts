@@ -99,7 +99,8 @@ describe('the market against the official history since 2022 (MOL-137, review А
     const run = hours()
     await run.run()
     await run.run()
-    expect(await db.$count(officialRates)).toBe(3588)
+    // Four currencies since MOL-110: the lari is in the central bank's archive every working day.
+    expect(await db.$count(officialRates)).toBe(1196 * 4)
     expect(await db.$count(marketRates, eq(marketRates.channel, 'banksAll'))).toBe(1196 * 6)
     expect(run.refused).toEqual([])
     expect(run.asked).toEqual([null, 'daily'])

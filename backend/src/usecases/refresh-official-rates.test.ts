@@ -5,13 +5,18 @@ import type { PastRate } from '@/db/rates-repository'
 import { FeedError } from '@/rates/feed'
 import type { Published, RateFeed } from '@/rates/feed'
 import {
+  ARCHIVE_DAYS_PER_RUN,
+  ARCHIVE_GAP_DAYS,
+  ARCHIVE_RECENT_DAYS,
   FALLBACK_AFTER_FAILURES,
   HISTORY_EVERY_MS,
   HISTORY_RETRY_MS,
   OFFICIAL_HISTORY_FROM,
+  archiveWalkFrom,
   missingDays,
   officialRatesRefresh,
 } from './refresh-official-rates'
+import type { HomeBankFeed } from './refresh-official-rates'
 
 // Saturday 19.09.2026, noon in Yerevan; the central bank's latest is Friday's.
 const NOW = new Date('2026-09-19T08:00:00.000Z')
@@ -600,5 +605,205 @@ describe('the history of the central bank (MOL-137)', () => {
     history.pass(1)
     await history.run()
     expect(history.inserted).toHaveLength(1)
+  })
+})
+
+describe('банк страны: НБ Грузии (MOL-110)', () => {
+  const HOUR = 60 * 60 * 1000
+  const SATURDAY = '2026-09-19'
+
+  const lari = (date: string, rub = 4_348_959n): Published => ({
+    provider: 'nbg',
+    date,
+    rates: [
+      { provider: 'nbg', currency: 'RUB', date, scaled: rub },
+      { provider: 'nbg', currency: 'GEL', date, scaled: 139_349_516n },
+    ],
+  })
+
+  /** The day before `day` when `day` is a Sunday: the bank answers a day off with Saturday's rate. */
+  const inForce = (day: string): string => {
+    const at = new Date(`${day}T00:00:00.000Z`)
+    return at.getUTCDay() === 0
+      ? new Date(at.getTime() - 86_400_000).toISOString().slice(0, 10)
+      : day
+  }
+
+  function homeHarness({ cached = [] as CachedRate[], failOn = null as string | null } = {}) {
+    let clock = NOW.getTime()
+    const cache: CachedRate[] = [...cached]
+    const askedOn: string[] = []
+    const warnings: { details: Record<string, unknown>; message: string }[] = []
+    const state = { latest: 0, rub: 4_348_959n }
+    const nbg: HomeBankFeed = {
+      provider: 'nbg',
+      fetchLatest: () => {
+        state.latest += 1
+        return Promise.resolve(lari(SATURDAY, state.rub))
+      },
+      fetchOn: (day) => {
+        askedOn.push(day)
+        return day === failOn ? Promise.reject(cutOff()) : Promise.resolve(lari(inForce(day)))
+      },
+    }
+    const cba = feed('cba')
+    const cbr = feed('cbr')
+    const run = officialRatesRefresh({
+      primary: cba.feed,
+      fallbacks: [cbr.feed],
+      homeBanks: [nbg],
+      rates: {
+        upsert: (rates) => {
+          cache.push(...rates)
+          return Promise.resolve()
+        },
+        latestOnOrBefore: () => Promise.resolve(cache),
+        history: (provider, currencies, date) =>
+          Promise.resolve(
+            new Map(
+              currencies.map((currency) => [
+                currency,
+                cache
+                  .filter(
+                    (row) =>
+                      row.provider === provider && row.currency === currency && row.date < date,
+                  )
+                  .sort((a, b) => (a.date < b.date ? 1 : -1))
+                  .map((row) => ({ date: row.date, scaled: row.scaled })),
+              ]),
+            ),
+          ),
+      },
+      log: {
+        warn: (details, message) =>
+          warnings.push({ details: details as Record<string, unknown>, message }),
+      },
+      now: () => new Date(clock),
+      history: {
+        feed: { fetchRange: () => Promise.resolve([]) },
+        rates: {
+          between: (provider, from, to) =>
+            Promise.resolve(
+              cache
+                .filter((row) => row.provider === provider && row.date >= from && row.date <= to)
+                .sort((a, b) => (a.date < b.date ? -1 : 1)),
+            ),
+          insertMissing: (rates) => {
+            cache.push(...rates)
+            return Promise.resolve(rates.length)
+          },
+        },
+      },
+    })
+    return {
+      run,
+      cache,
+      askedOn,
+      warnings,
+      state,
+      cbr: cbr.state,
+      pass: (ms: number) => {
+        clock += ms
+      },
+    }
+  }
+
+  describe('archiveWalkFrom', () => {
+    const today = '2026-09-19'
+    it('пустой кеш или первый день далеко от начала — с начала истории', () => {
+      expect(archiveWalkFrom([], OFFICIAL_HISTORY_FROM, today)).toBe(OFFICIAL_HISTORY_FROM)
+      expect(archiveWalkFrom([today], OFFICIAL_HISTORY_FROM, today)).toBe(OFFICIAL_HISTORY_FROM)
+    })
+
+    it('дыра длиннее праздников — со дня после её начала; праздник в шесть дней — не дыра', () => {
+      expect(ARCHIVE_GAP_DAYS).toBe(10)
+      const kept = ['2022-01-01', '2022-01-07', '2022-01-08', '2022-03-01', today]
+      expect(archiveWalkFrom(kept, OFFICIAL_HISTORY_FROM, today)).toBe('2022-01-09')
+      expect(
+        archiveWalkFrom(['2022-01-01', '2022-01-11', today], OFFICIAL_HISTORY_FROM, today),
+      ).toBe('2022-01-12')
+    })
+
+    it('без дыр — последний месяц', () => {
+      expect(ARCHIVE_RECENT_DAYS).toBe(31)
+      const kept = ['2026-08-10', '2026-08-15', '2026-08-25', '2026-09-04', '2026-09-14', today]
+      expect(archiveWalkFrom(kept, '2026-08-10', today)).toBe('2026-08-19')
+      expect(archiveWalkFrom(['2026-09-10', today], '2026-09-10', today)).toBe('2026-09-10')
+    })
+  })
+
+  it('спрашивается каждый час, когда ЦБ РА в порядке, и пишется; запасные не спрошены', async () => {
+    const home = homeHarness()
+    await home.run()
+    home.pass(HOUR)
+    await home.run()
+    expect(home.state.latest).toBe(2)
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === SATURDAY)).toBe(true)
+    expect(home.cbr.asked).toBe(0)
+  })
+
+  it('скачок меряется по его же курсам, а не по ЦБ РА', async () => {
+    const own = ['2026-09-15', '2026-09-16', '2026-09-17'].map((date): CachedRate => ({
+      provider: 'nbg',
+      currency: 'RUB',
+      date,
+      scaled: 4_348_000n,
+      jump: false,
+    }))
+    const home = homeHarness({ cached: own })
+    home.state.rub = 6_000_000n
+    await home.run()
+    const written = home.cache.find(
+      (row) => row.provider === 'nbg' && row.currency === 'RUB' && row.date === SATURDAY,
+    )
+    expect(written?.jump).toBe(true)
+  })
+
+  it('архив идёт порциями с начала истории, каждая следующая — с места, где кончилась прошлая', async () => {
+    const home = homeHarness()
+    await home.run()
+    expect(home.askedOn).toHaveLength(ARCHIVE_DAYS_PER_RUN)
+    expect(home.askedOn[0]).toBe(OFFICIAL_HISTORY_FROM)
+    const last = home.askedOn.at(-1) ?? ''
+    home.pass(HOUR)
+    await home.run()
+    expect(home.askedOn[ARCHIVE_DAYS_PER_RUN]).toBe(
+      new Date(Date.parse(`${last}T00:00:00.000Z`) + 86_400_000).toISOString().slice(0, 10),
+    )
+  })
+
+  it('дошёл до сегодня — следующий раз через сутки и только последний месяц', async () => {
+    const home = homeHarness()
+    // A walk cut short goes on at the next run, whenever it comes: a minute apart keeps the day.
+    for (let run = 0; run < 20; run += 1) {
+      await home.run()
+      home.pass(60_000)
+    }
+    const walked = home.askedOn.length
+    expect(home.askedOn.at(-1)).toBe(SATURDAY)
+    // Каждый день от начала истории — ровно один раз.
+    expect(new Set(home.askedOn).size).toBe(walked)
+    // Воскресенье спрошено, но его ответ — суббота: строки воскресенья нет.
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-13')).toBe(
+      false,
+    )
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-12')).toBe(true)
+    home.pass(HISTORY_EVERY_MS)
+    await home.run()
+    expect(home.askedOn.length - walked).toBe(ARCHIVE_RECENT_DAYS + 1)
+  })
+
+  it('сбой посреди порции — строка в логе, порция не пишется, повтор через шесть часов с того же места', async () => {
+    const home = homeHarness({ failOn: '2022-01-05' })
+    await home.run()
+    expect(home.warnings.map((warning) => warning.message)).toContain('official history failed')
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date < '2026-01-01')).toBe(false)
+    const asked = home.askedOn.length
+    home.pass(HISTORY_RETRY_MS - 1)
+    await home.run()
+    expect(home.askedOn).toHaveLength(asked)
+    home.pass(1)
+    await home.run()
+    expect(home.askedOn[asked]).toBe(OFFICIAL_HISTORY_FROM)
   })
 })

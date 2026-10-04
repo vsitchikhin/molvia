@@ -265,9 +265,10 @@ describe('the archive of the official rate', () => {
     'utf8',
   )
 
-  it('reads every working day of September, three currencies each, oldest first', () => {
+  it('reads every working day of September, four currencies each, oldest first', () => {
     const rates = parseCbaRange(xml)
-    expect(rates).toHaveLength(20 * 3)
+    // The lari came with MOL-110: the archive was asked again for the same days, with it.
+    expect(rates).toHaveLength(20 * 4)
     expect(rates[0]).toEqual({
       provider: 'cba',
       currency: 'USD',
@@ -276,9 +277,9 @@ describe('the archive of the official rate', () => {
     })
     expect(rates.at(-1)).toEqual({
       provider: 'cba',
-      currency: 'RUB',
+      currency: 'GEL',
       date: '2026-09-29',
-      scaled: 4_318_700n,
+      scaled: 139_420_000n,
     })
   })
 
