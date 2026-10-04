@@ -191,6 +191,12 @@ export default defineComponent({
   .live:not(.inactive, .selected, .active):hover {
     background: var(--surface-2);
   }
+
+  /* The muted circle is the hover's own fill: under the pointer it turns the other way, or it is gone
+     (adversarial А3). */
+  .live:not(.inactive, .selected, .active):hover .circle.muted {
+    background: var(--surface);
+  }
 }
 
 .icon {
@@ -254,10 +260,16 @@ export default defineComponent({
   margin-top: var(--space-1);
 }
 
+/* The tail takes at most two fifths of the row, unless what it holds cannot be narrower — an amount
+   never wraps — and gives way down to that: a line under an amount wraps there, and the words keep the
+   rest. Taken whole, a long line under the amount left the title no width at all and pushed the chevron
+   past the card (MOL-176, adversarial А1, А2). */
 .tail {
   display: inline-flex;
-  flex: none;
+  flex: 0 1 auto;
   align-items: center;
+  min-width: min-content;
+  max-width: 40%;
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
 }

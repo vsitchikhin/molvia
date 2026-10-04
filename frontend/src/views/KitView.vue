@@ -373,7 +373,7 @@ import OperationRow from '@/components/OperationRow.vue'
 import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
-import { operationRowProps } from '@/components/accounts'
+import { operationRowProps, shortDay } from '@/components/accounts'
 import { journalRowProps } from '@/components/spending'
 import type { JournalRow } from '@/components/spending'
 import VerdictBadge from '@/components/VerdictBadge.vue'
@@ -548,6 +548,39 @@ export default defineComponent({
           approximate: true,
           debited: money(989100n, 'AMD'),
         }),
+        // A ruble card, paid in drams with no «списано» typed; kopecks from a dram card; a trip paid in
+        // two currencies — the longest lines under an amount, which once left the title no width at all
+        // and pushed the chevron past the card (adversarial А1, А2).
+        logged({
+          categoryId: transport?.id ?? null,
+          amounts: [money(-12000000n, 'AMD')],
+          moved: money(-2400000n, 'RUB'),
+          approximate: true,
+        }),
+        logged({
+          categoryId: cafe?.id ?? null,
+          amounts: [money(-2499950n, 'RUB')],
+          moved: money(-11999760n, 'AMD'),
+          approximate: true,
+        }),
+        logged({
+          kind: 'trip',
+          place: 'SAS',
+          items: 4,
+          amounts: [money(-233185n, 'RUB'), money(-2499n, 'EUR')],
+          moved: money(-1105000n, 'AMD'),
+          approximate: true,
+        }),
+        // A reason of a check: its title says the sum, the row has no tail (review Р2-1).
+        {
+          ...logged({ kind: 'trip', place: 'SAS', items: 4, unpriced: 2 }),
+          title: t('accounts.reconcile.cause_trip_unpriced', {
+            date: shortDay('2026-09-25', locale.value),
+          }),
+          meta: t('accounts.reconcile.cause_trip_unpriced_meta', { place: 'SAS', n: 2 }, 2),
+          amount: null,
+          sub: null,
+        },
       ]
     })
     const units = computed(() => [

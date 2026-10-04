@@ -102,8 +102,11 @@ test('the amounts of operation rows stand in one column, where their skeleton’
 })
 
 // Е-11: a row cut its title, the day in its meta and the sum in it to «…». On the phone the title breaks
-// onto lines and the meta, the amount and the line under it are whole; on a phone of 320, where the
-// words have a hundred pixels, still no amount, line under it or tag is cut or stands over another.
+// onto lines and the meta, the amount and the line under it are whole; on a phone of 320 still no
+// amount, line under it or tag is cut or stands over another. A long line under an amount — drams from a
+// ruble card, a trip in two currencies — once took the whole row: the title 0 px wide, the chevron past
+// the card, which cut it (adversarial А1, А2). The line wraps now and the words keep their part; every
+// chevron, the one of a row with no tail too (review Р2-1), stands in one place inside the card.
 for (const width of [390, 320])
   test(`at ${String(width)} nothing of an operation row is cut or overlaps — the title breaks instead`, async ({
     page,
@@ -131,7 +134,16 @@ for (const width of [390, 320])
           title.getBoundingClientRect().height / parseFloat(getComputedStyle(title).lineHeight)
         return [{ cut: cut(title), lines }]
       })
+      const card = root.querySelector('ul')?.getBoundingClientRect()
+      const chevrons = rows.map(
+        (row) => row.querySelector('.chevron')?.getBoundingClientRect().right ?? Number.NaN,
+      )
       return {
+        narrowest: Math.min(
+          ...rows.map((row) => row.querySelector('.words')?.getBoundingClientRect().width ?? 0),
+        ),
+        chevronsOut: chevrons.filter((one) => !(one <= (card?.right ?? 0))).length,
+        chevronsApart: chevrons.filter((one) => Math.abs(one - (chevrons[0] ?? 0)) > 0.5).length,
         tailsCut: [
           ...root.querySelectorAll('.list-row .amount, .list-row .sub, .list-row .tag'),
         ].filter(cut).length,
@@ -142,7 +154,16 @@ for (const width of [390, 320])
         page: document.documentElement.scrollWidth,
       }
     })
-    expect(look).toMatchObject({ tailsCut: 0, overlaps: 0, titlesCut: 0, page: width })
+    expect(look).toMatchObject({
+      chevronsOut: 0,
+      chevronsApart: 0,
+      tailsCut: 0,
+      overlaps: 0,
+      titlesCut: 0,
+      page: width,
+    })
+    // Two fifths of the row at most go to the tail, unless its amount needs more: the words keep the rest.
+    expect(look.narrowest).toBeGreaterThanOrEqual(width === 320 ? 40 : 90)
     expect(look.longest).toBeGreaterThanOrEqual(2)
     // Two lines are the meta's on a phone of 390; on 320 the other half of an exchange may end in «…».
     if (width === 390) expect(look.metasCut).toBe(0)

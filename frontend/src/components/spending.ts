@@ -510,7 +510,9 @@ export function journalRowProps(
   // Not counted yet is not «не посчитано» — that says no rate of the day was known; a row still on
   // the phone says «Отправляем…» already (review Т-8).
   if (money.currency !== context.spendCurrency && !(row.kind === 'manual' && row.local))
-    sub = row.counted ? `≈ ${formatEstimate(row.counted, locale)}` : t('spending.uncounted_row', {})
+    sub = row.counted
+      ? `≈\u00a0${formatEstimate(row.counted, locale)}`
+      : t('spending.uncounted_row', {})
 
   const mark = row.kind === 'manual' ? row.mark : null
   const look = trip ? { icon: tripIcon, tint: tripTint(category) } : spendingLook(category)

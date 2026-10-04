@@ -79,10 +79,12 @@ li .tag {
   white-space: nowrap;
 }
 
+/* The line under the amount wraps — between its parts, never inside a figure — so the tail gives way
+   to the words on a narrow row (adversarial А1, А2); its lines end where the amount does. */
 .sub {
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-weight: var(--weight-regular);
-  white-space: nowrap;
+  text-align: end;
 }
 </style>
