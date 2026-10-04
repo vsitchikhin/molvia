@@ -10,10 +10,11 @@
   <template v-else>
     <RouterView />
     <TabBar v-if="route.meta.tab" />
-    <!-- «Написать разработчику» — one sheet for the app, opened from the settings and from any error
-         screen (MOL-147); only where somebody is known to write it. -->
-    <FeedbackSheet v-if="!closed" />
   </template>
+  <!-- «Написать разработчику» — one sheet for the app, opened from the settings and from any error
+       screen (MOL-147); only where somebody is known to write it — behind the door, that is the step
+       of the terms and its full-screen error (MOL-95, adversarial А2). -->
+  <FeedbackSheet v-if="feedbackDrawn" />
 </template>
 
 <script lang="ts">
@@ -27,6 +28,7 @@ import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
+import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import { useSignOutStore } from '@/stores/signOut'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -45,6 +47,13 @@ export default defineComponent({
     // Whether the app is shown at all, or the login screen instead. The rule lives in the login
     // store, where it can be read and tested without mounting the app (MOL-56).
     const closed = computed(() => login.closed)
+    const feedbackDrawn = computed(() => !closed.value || login.phase === 'consent')
+    // A sheet asked for where it is not drawn opens nothing — and must not rise by itself later, on
+    // another screen, when it is (adversarial А2).
+    const feedback = useFeedbackSheetStore()
+    watch([() => feedback.shown, feedbackDrawn], ([shown, drawn]) => {
+      if (shown && !drawn) feedback.shown = false
+    })
     // The login takes the router's place without a move, so no move takes the page's hold away:
     // held, the login was drawn scrolled off the window, all of it above it on an iPhone (MOL-138,
     // adversarial А).
@@ -78,11 +87,19 @@ export default defineComponent({
     // Every settling of the identity is an occasion: «ready» is what the queue held on a `401`
     // has been waiting for (MOL-24, `HOLDS`), and «error» is what starts its doubling retry.
     watch(() => actor.state, send)
+    // And the moment the writes stop waiting — another window caught up with, or the terms accepted
+    // by an owner who had accepted none (MOL-95, adversarial А1).
+    watch(
+      () => login.writesHeld,
+      (held) => {
+        if (!held) send()
+      },
+    )
     // A «Выйти» whose answer was lost is settled by the server's next answer, on this launch or
     // the next (MOL-57, adversarial Б2) — the store listens from the start, whatever screen is open.
     useSignOutStore()
 
-    return { closed, route: useRoute(), announcements: provideAnnouncer() }
+    return { closed, feedbackDrawn, route: useRoute(), announcements: provideAnnouncer() }
   },
 })
 </script>

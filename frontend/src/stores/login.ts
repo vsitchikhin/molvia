@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import type { ActorView } from '@molvia/model'
@@ -9,6 +9,7 @@ import { LOGIN_KEY } from '@/stores/identity'
 import { useActorStore } from '@/stores/actor'
 import { useConsentStore } from '@/stores/consent'
 import { reportFailure } from '@/failures'
+import { holdsTyping } from '@/pwaUpdate'
 
 /**
  * The login as the device remembers it — and the device remembers exactly three things.
@@ -219,17 +220,54 @@ export const useLoginStore = defineStore('login', () => {
    * Держать дверь закрытой **всё время загрузки** было бы хуже, чем кажется: на каждом запуске
    * с живой сессией человек видел бы мелькнувший «Вход» — и поймал это не глаз, а сквозной тест.
    */
+  /**
+   * **The owner the app has been shown to in this page** (MOL-95, owner's decision on review №3).
+   * The step of the terms does not close the door over an app already on the screen: launched with
+   * no signal, the app opens on the drawer, and the answer that names the owner comes back while a
+   * price is being typed in a sheet — closed there, the sheet went and what was typed with it. The
+   * step waits for the moment `pwaUpdate` waits for: the app hidden and holding no typing, or the
+   * next launch. The price: until then the person uses the app with no edition accepted — the API
+   * refuses nothing without one anyway (Р-4), and the queues of one who never accepted wait (А1).
+   */
+  const shownTo = ref<string | null>(null)
+
+  const consentHolds = computed(() => consent.holds && shownTo.value !== (actor.actor?.id ?? null))
+
   const closed = computed(() => {
     if (blocked.value) return true
     // And then until the terms are accepted (MOL-95): the step after «чей это аккаунт».
-    if (actor.state === 'ready') return consent.holds
+    if (actor.state === 'ready') return consentHolds.value
     // «Сессии нет» — это ответ, а не незнание: ящик на устройстве его не отменяет.
     if (actor.state === 'signed-out') return true
-    return actor.id === null
+    if (actor.id === null) return true
+    // Пока сервер отвечает, кто мы, приложение по ящику показывается только тому, чьё согласие с
+    // этой редакцией устройство помнит: иначе показанное приложение тут же сменил бы шаг (№3).
+    // Без связи `start` уходит в `offline`, и дверь открывается по ящику, как раньше.
+    return (actor.state === 'idle' || actor.state === 'loading') && !consent.remembers(actor.id)
   })
+
+  watch(closed, (now) => {
+    if (!now) shownTo.value = known.value
+  })
+  // Hidden, with no sheet open: nothing on the screen can be lost, and the step may close the door.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && !holdsTyping(document)) shownTo.value = null
+  })
+
+  /**
+   * **What the queues wait for before they send** (MOL-56, MOL-95): another window's login being
+   * caught up with, and an owner not known to have accepted any edition of the terms (adversarial
+   * А1) — the writes stay on the phone and go after «Принимаю».
+   */
+  const writesHeld = computed(() => rechecking.value || consent.unaccepted)
 
   const phase = computed<LoginPhase>(() => {
     if (actor.state === 'idle' || actor.state === 'loading' || rechecking.value) return 'loading'
+    // The terms come after the account is claimed and before the app (MOL-95) — and before a login
+    // failure of this window from before the session: a neighbour's login made this person known,
+    // and «Повторить» on that old failure sent them to Telegram again (adversarial А3).
+    if (actor.state === 'ready' && !blocked.value && consentHolds.value)
+      return consent.state === 'loading' || consent.state === 'idle' ? 'loading' : 'consent'
     if (failure.value) return failure.value
     // The account in hand is asked about before the attempt that is still waiting: a session may
     // well have arrived while the screen was showing «ждём» — that is what А4 is (the answer that
@@ -237,10 +275,6 @@ export const useLoginStore = defineStore('login', () => {
     // wins, and it says so by naming the owner it has just refused.
     if (actor.state === 'ready' && blocked.value && known.value !== refusedOwner.value)
       return 'welcome'
-    // The terms come after the account is claimed and before the app (MOL-95); the skeleton while
-    // the server is asked which edition was accepted, the step's own states after that.
-    if (actor.state === 'ready' && !blocked.value && consent.holds)
-      return consent.state === 'loading' || consent.state === 'idle' ? 'loading' : 'consent'
     if (starting.value || request.value) return 'waiting'
     // Not a skeleton: an identity that could not be checked is «no connection» or «try again»,
     // and a screen without all four of its states is what MOL-19 exists to prevent.
@@ -522,6 +556,7 @@ export const useLoginStore = defineStore('login', () => {
     blocked,
     closed,
     rechecking,
+    writesHeld,
     starting,
     failure,
     request,

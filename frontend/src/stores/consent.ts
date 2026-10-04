@@ -45,6 +45,13 @@ export const useConsentStore = defineStore('consent', () => {
   const accepting = ref(false)
   /** What became of the last «Принимаю», for the screen to say. */
   const failure = ref<'error' | 'offline' | null>(null)
+  /**
+   * «Мне 16 лет или больше», ticked. Here and not in the step (adversarial А4): the step's own links
+   * lead to `/terms` and `/privacy`, which `App.vue` draws in the login's place, and the step comes
+   * back mounted anew — the tick the person gave before reading went with it. Held for the page's
+   * life and for this owner only; never sent and never kept.
+   */
+  const aged = ref(false)
   /** Bumped by every new question, so an answer about a question since replaced is dropped. */
   let revision = 0
 
@@ -85,6 +92,7 @@ export const useConsentStore = defineStore('consent', () => {
     owner,
     (who) => {
       failure.value = null
+      if (who !== of.value) aged.value = false
       if (who === null) {
         revision += 1
         of.value = null
@@ -106,6 +114,32 @@ export const useConsentStore = defineStore('consent', () => {
       owner.value !== null &&
       (of.value !== owner.value || state.value !== 'ready' || consentNeeded(accepted.value)),
   )
+
+  /**
+   * **What the queues wait for: an owner not known to have accepted any edition** (adversarial А1,
+   * owner's decision 04.10.2026). A newcomer left on the step, or an owner from before it, can open
+   * the app with no signal — the door opens on the drawer — and record at the shelf; without this the
+   * queues sent it all the moment the server named them, under a step nobody had passed and with no
+   * «16 или больше» said. Nothing is lost: the writes wait on the phone and go after «Принимаю». An
+   * owner who accepted an older edition sends as before (Р-4): their consent is on record.
+   */
+  const unaccepted = computed(() => {
+    const who = owner.value
+    if (who === null) return false
+    // Before the store has settled on this owner, what the device remembers of them is the answer:
+    // a queue asked in the same tick the server named them must not wait on a mere ordering.
+    return of.value === who ? accepted.value === null : recall(who) === null
+  })
+
+  /**
+   * Whether this device remembers that `who` accepted this build's edition — the question the door
+   * asks while the identity is still being asked (owner's decision on review №3): without it the app
+   * would be shown on the drawer and then closed under the person by the step.
+   */
+  function remembers(who: string): boolean {
+    const kept = recall(who)
+    return kept !== null && !consentNeeded(kept)
+  }
 
   /** «Принимаю»: this build's edition, the one the screen showed. */
   async function accept(): Promise<void> {
@@ -138,5 +172,16 @@ export const useConsentStore = defineStore('consent', () => {
     if (kept !== null) settle(who, kept)
   })
 
-  return { state, accepted, holds, accepting, failure, accept, retry }
+  return {
+    state,
+    accepted,
+    holds,
+    unaccepted,
+    accepting,
+    failure,
+    aged,
+    remembers,
+    accept,
+    retry,
+  }
 })

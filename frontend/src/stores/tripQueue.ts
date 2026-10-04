@@ -931,7 +931,7 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
     // Молчащий сервер при живой связи по-прежнему пробуется сам, с удваивающейся паузой: без
     // этого покупка, застрявшая за порталом магазина, ждала бы возвращения во вкладку, а
     // `online` за порталом не приходит вовсе — `onLine` там всё время `true` (MOL-24, Р-5).
-    if (actor.state !== 'ready' || login.rechecking) {
+    if (actor.state !== 'ready' || login.writesHeld) {
       if (actor.state === 'error') retryLater()
       return Promise.resolve()
     }
