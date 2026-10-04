@@ -1,4 +1,4 @@
-import { GrammyError, InlineKeyboard } from 'grammy'
+import { InlineKeyboard } from 'grammy'
 import type { Api } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
@@ -7,6 +7,11 @@ import type { Reminder, ReminderItem } from '@molvia/model'
 import type { InlineKeyboardMarkup } from 'grammy/types'
 import { hasMessage, t } from './i18n'
 import { reportDefect } from './failure'
+import { Flooded, deliver, sleep } from './deliver'
+import type { Wait } from './deliver'
+
+export { RETRY_AFTER_CAP_SECONDS, sleep } from './deliver'
+export type { Wait } from './deliver'
 
 /**
  * What a button of the scale carries: the item and the digit — and never whose verdict it is.
@@ -162,31 +167,13 @@ export function reminderText(
 }
 
 /**
- * The longest a 429 is waited out (review Т-4). Telegram names the wait in `retry_after`; a wait
- * longer than this is flood control over the whole bot, and a retry before it ends is refused for
- * certain — so the run stops there instead (adversarial З). A stop on deploy has thirty seconds
- * (`stop_grace_period`), and the rest of the evening's messages are still to go.
- */
-export const RETRY_AFTER_CAP_SECONDS = 10
-
-/** Waits `ms`; `false` when a stop cut the wait short. */
-export type Wait = (ms: number) => Promise<boolean>
-
-/** Telegram asked for longer than we wait: every message after this one would be refused too. */
-class Flooded extends Error {}
-
-/**
  * One reminder: a message an item, the freshest first (В-1). Only the first one rings; the others
  * arrive silently, so an evening of three questions is one notification. «Не напоминать» goes under
  * the last one alone (MOL-103, В-2): one line in the chat, not three.
  *
- * A failure is logged by its code and nothing else — no chat, no name (the privacy page). The
- * reminder is already marked as sent by the API (Р-2), so what fails here is not claimed again:
- * **Too Many Requests (429) is waited out once**, as Telegram asks, since at 19:00 everybody in
- * Armenia is one batch — unless it asks for longer than `RETRY_AFTER_CAP_SECONDS`, which ends the
- * run (`Flooded`), or a stop cuts the wait short, which gives that message up. Anything else is
- * given up. **Blocked (403) ends this person's messages and turns their reminders off** (MOL-103,
- * Р-5): without it the API handed them out again every evening, to fail the same way.
+ * The reminder is already marked as sent by the API (Р-2); how a message is sent — a 429 waited out
+ * once, a failure logged by its code, a 403 turning the reminders off — is `deliver`'s. **Blocked
+ * ends this person's messages** of the evening.
  */
 async function send(
   api: MolviaBotClient,
@@ -213,41 +200,8 @@ async function send(
           disable_notification: index > 0,
         },
       )
-    try {
-      try {
-        await message()
-      } catch (error) {
-        if (!(error instanceof GrammyError) || error.error_code !== 429) throw error
-        const seconds = error.parameters.retry_after ?? 1
-        if (seconds > RETRY_AFTER_CAP_SECONDS) throw new Flooded()
-        if (!(await wait(seconds * 1000))) throw error
-        await message()
-      }
-    } catch (error) {
-      if (error instanceof Flooded) throw error
-      const code = error instanceof GrammyError ? String(error.error_code) : 'unexpected failure'
-      console.error(`[molvia] remind: ${code}`)
-      reportDefect(api, error, 'remind:send')
-      if (error instanceof GrammyError && error.error_code === 403) {
-        await blocked(api, telegramUserId)
-        return
-      }
-    }
-  }
-}
-
-/**
- * The bot was blocked: the person's reminders go off (MOL-103). Telegram's `my_chat_member` usually
- * says so first; this is for a block the bot did not hear about, while it was down. A failure is
- * the log's, by its code — the next evening's 403 asks again.
- */
-async function blocked(api: MolviaBotClient, telegramUserId: number): Promise<void> {
-  try {
-    await api.switchReminders(telegramUserId, 'blocked')
-  } catch (error) {
-    console.error(
-      `[molvia] remind blocked: ${error instanceof ApiError ? error.code : 'unexpected failure'}`,
-    )
+    // a block ends this person's messages: the rest would be refused the same way
+    if ((await deliver(api, telegramUserId, message, wait, 'remind')) === 'blocked') return
   }
 }
 
@@ -284,22 +238,6 @@ export async function remindDue(
       return
     }
   }
-}
-
-/** Waits `ms`, or less if `signal` aborts first: `true` for the whole wait, `false` for a cut. */
-export async function sleep(ms: number, signal?: AbortSignal): Promise<boolean> {
-  if (signal?.aborted) return false
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      signal?.removeEventListener('abort', cut)
-      resolve(true)
-    }, ms)
-    const cut = (): void => {
-      clearTimeout(timer)
-      resolve(false)
-    }
-    signal?.addEventListener('abort', cut, { once: true })
-  })
 }
 
 /** How often the bot asks: the API decides whose evening it is, to the minute. */
