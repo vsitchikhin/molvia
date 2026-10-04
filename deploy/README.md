@@ -291,7 +291,10 @@ anyone's data.
 The periods are a little longer than the pings' rhythm — the bot beats every five to six minutes — so
 the panel is not yellow with «late» all the time; period and grace add up to the time a silent watch
 takes to become an alarm, twenty minutes for the site and fifteen for the bot. A site that is down
-says so itself, with no grace: a `/fail` within five minutes and the minute and a half of its tries.
+says so itself, with no grace: a `/fail` within five minutes and the round's tries — a minute and a
+half when the failure answers at once, two minutes fifty seconds when the machine does not answer
+at all and every request waits out its ten seconds (adversarial А2 of MOL-221). A round lasts at
+most 217 seconds, with healthchecks.io silent too, so two never overlap.
 
 **Why the site is not GitHub's** (MOL-221). GitHub's cron ran `*/5` on this repository every two to
 six hours — six runs in the first day, the longest gap six hours fourteen minutes — so `molvia-up`
@@ -337,7 +340,9 @@ on GitHub, hourly: its check waits a day and an hour.
 
 - The checks are the owner's healthchecks.io account, the one the backups report to, each with the
   Telegram integration.
-- `molvia-up`'s ping URL is the Worker's secret `HC_UP_URL`, set on Cloudflare once — Workers & Pages
+- `molvia-up`'s ping URL is the Worker's secret `HC_UP_URL` — the check's URL as healthchecks.io
+  gives it, with no query, fragment or trailing slash, since `/fail` is appended to it; a round
+  refuses one that has them — set on Cloudflare once — Workers & Pages
   → `molvia-watch` → Settings → Variables and Secrets, or `PUT …/workers/scripts/molvia-watch/secrets`
   — and kept by every rollout. Without it every round throws, `HC_UP_URL is not an https URL`, and
   the check goes down by its grace. Its plain variable `DOMAIN` is set again by every rollout.
@@ -364,7 +369,8 @@ on GitHub, hourly: its check waits a day and an hour.
 
 On the Worker itself, so the alarm tried is the one that runs: Workers & Pages → `molvia-watch` →
 Settings → Variables and Secrets → `DOMAIN` = `molvia.invalid`, deploy. Within five minutes its round
-makes four tries, a minute and a half, then a `/fail` and a message in Telegram. `DOMAIN` back to
+makes four tries — a minute and a half, since a name that does not resolve fails at once — then a
+`/fail` and a message in Telegram. `DOMAIN` back to
 `molvia.net` — or `make watcher`, which sets it — and the next round puts `molvia-up` back up.
 
 The certificate's way: `gh workflow run watch.yml -f domain=molvia.invalid` sends `molvia-cert`

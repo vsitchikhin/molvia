@@ -172,6 +172,10 @@ The shape worth knowing here:
     its check waits a day and an hour, and the worst gap measured was six hours. A request
     Cloudflare could not complete may come back as its own code, `530` for a name that does not
     resolve: any answer but `200` fails, so the rule holds as it was.
+  - **Node stays out of the Worker's source** (adversarial А4): the tests run on Node, and one
+    TypeScript program gives every file its types, so `process` or `Buffer` would type-check and
+    pass every test, then be a ReferenceError on Workers at every round. `no-restricted-globals`
+    in the module's lint and the bundle's test hold them out.
   - **The rule lives once** (MOL-221, В-4): three of four is `deploy/watch/src/site.ts`, tested, and
     `watch.yml` checks the certificate alone — a second copy in bash would drift from what watches.
     The alarm is tried on the Worker itself, `DOMAIN` set to `molvia.invalid` by hand; every rollout
@@ -191,9 +195,12 @@ The shape worth knowing here:
     the rollout would roll back. What its pulse proves is in `bot.md`.
   - The periods sit a little above the pings' rhythm, so «late» does not light the panel all day;
     period plus grace is the time to an alarm. Every ping URL is kept like a secret — whoever has
-    one can say «alive» — and printed nowhere. The prices, accepted by the owner: a fall is a `/fail`
-    within five minutes and the tries' minute and a half; a silent watch is an alarm in twenty;
-    Cloudflare's Workers down is a false alarm.
+    one can say «alive» — and printed nowhere; the Worker keeps logs and no traces, whose spans
+    would carry the URL. The ping URL ends in its path: `/fail` after a query or a fragment is a
+    ping saying «up», so a round refuses one (adversarial А1). The prices, accepted by the owner: a
+    fall is a `/fail` within five minutes and the round's tries — 90 s when the failure answers at
+    once, 170 s when the machine does not answer and every request waits its ten seconds (А2); a
+    silent watch is an alarm in twenty; Cloudflare's Workers down is a false alarm.
     `deploy/README.md`, «Signals».
 - **A failed deploy puts the previous image back, not the schema.** Pending migrations run in
   one transaction, so a migration that fails leaves the schema as it was and the old image

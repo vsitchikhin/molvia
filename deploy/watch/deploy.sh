@@ -35,13 +35,14 @@ call() {
 }
 
 # `DOMAIN` is set again by every rollout: changed by hand on Cloudflare to try the alarm, it comes
-# back here. The secret stays as it was.
+# back here. The secret stays as it was. The log keeps what the code writes — the domain and what
+# the tries saw; traces stay off, since a subrequest's span would carry the ping URL whole.
 metadata="$(jq -cn --arg date "$COMPATIBILITY_DATE" '{
   main_module: "worker.js",
   compatibility_date: $date,
   bindings: [{ type: "plain_text", name: "DOMAIN", text: "molvia.net" }],
   keep_bindings: ["secret_text"],
-  observability: { enabled: true }
+  observability: { enabled: true, logs: { enabled: true }, traces: { enabled: false } }
 }')"
 
 call PUT '' \
