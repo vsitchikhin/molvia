@@ -266,11 +266,16 @@ The detail behind the frontend lines of `CLAUDE.md`.
   list had been drawn anew on every screen — five heights (44, 52, 60, 64), a title at 400 or at 600,
   a hover here and none there — and a caps caption had grown 52 copies with three spacings to the
   card (8, 12, 16) and a 4 at the side on half of them. **`SectionCaption` is the one place caps are
-  drawn**: Stylelint refuses `text-transform: uppercase`, `font-variant` with caps and
-  `font-variant-caps` in every other file (owner's В-1 «б»), so a new copy cannot grow back — the
-  property and the keyword in any case, as CSS reads them (adversarial А-1: `TEXT-TRANSFORM` passed a
-  rule written in lower case). Out of its sight, by design: what Stylelint does not read — a
-  template's `style`, which no file writes today, and a `:style` bound from the script. A group's
+  drawn**: Stylelint refuses `text-transform`, `font-variant`, `font-variant-caps` and
+  `font-feature-settings` as properties in every other file (owner's В-1 «б»), whatever their value
+  and in any case, so a new copy cannot grow back. **The property, not its value**: a check of the
+  value read the text of the declaration, and a Sass variable, a map, an interpolated value or a
+  custom property of the component carried caps past it — round 2 of review drew all four in a real
+  browser (А2, Р2-2); `TEXT-TRANSFORM` had passed a rule written in lower case before that (А-1).
+  `font-variant-numeric` — figures in columns — is another property and everyone's. Out of its
+  sight, by design: a property name Sass interpolates (`text-#{…}`), which Stylelint skips as
+  non-standard syntax, and what Stylelint does not read — a template's `style`, which no file writes
+  today, and a `:style` bound from the script. A group's
   caption carries its own 4 at the side and 8 above the card; `inset` is a card's own title, placed by
   the card. The space above a caption is the screen's, set by its own class on the root — the
   caption's place is written in `:where()`, weaker than any class, because an equal selector would
@@ -291,10 +296,19 @@ The detail behind the frontend lines of `CLAUDE.md`.
   22 beside a 24. **A row's button look is taken off in `:where()`**: the hairline `AppCard list`
   draws between rows is a `border-top`, and an equal selector reset it by load order (`AdviceHomeNew`
   had met it). **Inactive** is the kit's not now (MOL-174): `aria-disabled`, focusable, the click
-  cancelled and stopped — a link is followed nowhere; `e2e/kit-inactive` holds Enter and a tap in
-  Chromium and WebKit. **Selected** is the fill, the ring and a ✓ in place of the chevron, the weight
-  unchanged, and it is read out by the role the row was given — `aria-checked` for a radio,
-  `aria-selected` for an option; a row with no role says nothing, so a picker gives its rows one.
+  cancelled and stopped — a link is followed nowhere, and has no `href`, or a middle click or a long
+  press would open it in a tab (review Р-1); `e2e/kit-inactive` holds a tap (the cancelled click),
+  Enter and a middle click (no address) in Chromium and WebKit. **Selected** is the fill, the ring and a ✓ in place of the chevron, the weight
+  unchanged, and it is read out by the role the row was given — `aria-checked` for a radio, a
+  checkbox, a switch and their menu items, `aria-selected` for an option, a tab, a tree item and
+  the cells of a grid (А4: the first tables left `menuitemcheckbox` and `treeitem` mute); a row with
+  no role says nothing, and says so while developing, so a picker gives its rows one. **The focus of
+  a chosen row stands inside its ring** (`outline-offset: -6px`, the fill between them): on `-2px`
+  it was the ring itself — 2 px of the same colour on the same place — and the keyboard lost the row
+  it stood on, where a radio group puts the focus first (adversarial А1, WCAG 2.4.7); chips draw it
+  the other way, the ring inside and the focus outside, which a list card clips. `e2e/kit-rows`
+  holds it in both engines. **A chosen row is rounded as the list card** (`--radius-lg`): square,
+  its ring was cut off at the card's corners on a first or last row (А3).
   **Active** is the row the keyboard stands on in a list a field owns (К-4): the fill without the
   ring, since the focus is in the field. Only a `div` row takes a button into its tail — a button
   inside a button is no HTML. `NavRow` without `to` is a button that opens a sheet and says so
