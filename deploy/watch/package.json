@@ -1,0 +1,12 @@
+{
+  "name": "@molvia/watch",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bundle": "esbuild src/worker.ts --bundle --format=esm --platform=neutral --target=es2023 --outfile=dist/worker.js --log-level=warning",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run"
+  }
+}
