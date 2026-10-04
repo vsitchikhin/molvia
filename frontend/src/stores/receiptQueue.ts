@@ -259,6 +259,8 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
   let ahead = false
   /** The key of the write a send is carrying right now: it is never taken out. */
   let inFlight: string | null = null
+  /** The receipt that write is about, for a screen to offer nothing it cannot take back. */
+  const carrying = ref<string | null>(null)
 
   function show(): void {
     pending.value = kept.map((item) => item.write)
@@ -304,6 +306,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
   function load(id: string | null): void {
     ahead = false
     inFlight = null
+    carrying.value = null
     kept = []
     rejected.value = []
     delivered.value = {}
@@ -410,6 +413,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
         persist(owner)
       }
       inFlight = head.key
+      carrying.value = receiptOf(head.write)
       try {
         await send(owner, head.write)
       } catch (error) {
@@ -428,6 +432,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
         }
       } finally {
         inFlight = null
+        carrying.value = null
       }
       if (actor.id !== owner) return
 
@@ -608,6 +613,80 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     })
   }
 
+  /**
+   * Whether a send of this receipt's record has begun, in this window or another: the mark is in
+   * storage, set before the send. Such a record may have landed with its answer lost, so it is
+   * cancelled only once the server says the receipt is not recorded (MOL-169, adversarial А1–А4).
+   */
+  function recordBegun(id: string): boolean {
+    sync(actor.id)
+    return kept.some(
+      (item) =>
+        item.write.kind === 'record' &&
+        item.write.id === id &&
+        (item.attempted === true || item.key === inFlight),
+    )
+  }
+
+  /**
+   * «Отменить запись» (MOL-169, owner's В-5): the record of this receipt out of the queue, the review
+   * open again with its draft. Never the one a send carries right now; one begun before only through
+   * `cancelChecked`, on the server's word under the queue's lock (`recordBegun`). False — it stays.
+   */
+  function cancelRecord(id: string): boolean {
+    return takeRecord(id, false)
+  }
+
+  function takeRecord(id: string, checked: boolean): boolean {
+    let taken = false
+    change(() => {
+      const left = kept.filter(
+        (item) =>
+          item.key === inFlight ||
+          (item.attempted === true && !checked) ||
+          !(item.write.kind === 'record' && item.write.id === id),
+      )
+      taken = left.length < kept.length
+      kept = left
+    })
+    return taken
+  }
+
+  /**
+   * A begun record cancelled on the server's word that the receipt is not recorded — asked under the
+   * lock every window sends under, so no send of it is still on its way, in this window or another,
+   * when the server answers (adversarial Б1: a second window asked while the first one's send was
+   * still committing, heard «not recorded», and opened «Удалить» over purchases about to land).
+   * `notRecorded` asks the server; whatever it throws comes out of here.
+   */
+  async function cancelChecked(id: string, notRecorded: () => Promise<boolean>): Promise<boolean> {
+    const owner = actor.id
+    if (!owner) return false
+    let taken = false
+    await exclusively(`${QUEUE_KEY}.${owner}`, async () => {
+      if (await notRecorded()) taken = takeRecord(id, true)
+    })
+    return taken
+  }
+
+  /**
+   * The server says these receipts are recorded: a record still waiting for one of them, and a refusal
+   * of one — a 409 after a record cancelled had landed — have nothing left to do, and would keep the
+   * receipt's photo and draft on the phone with no row to remove them from (review 1, adversarial А2).
+   */
+  function settleRecorded(ids: ReadonlySet<string>): void {
+    const owner = actor.id
+    if (!owner) return
+    sync(owner)
+    const done = (write: ReceiptWrite) => write.kind === 'record' && ids.has(write.id)
+    const left = kept.filter((item) => item.key === inFlight || !done(item.write))
+    const refused = rejected.value.filter((item) => !done(item.write))
+    if (left.length === kept.length && refused.length === rejected.value.length) return
+    kept = left
+    rejected.value = refused
+    persist(owner)
+  }
+
   /** «Убрать» a refusal: the write is gone for good; a receipt the server may hold is removed too. */
   function dismiss(item: RejectedReceiptWrite): void {
     const id = receiptOf(item.write)
@@ -627,6 +706,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     rejected,
     landed,
     recorded,
+    carrying,
     lastRemoved,
     sentAt,
     delivered,
@@ -637,6 +717,10 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     restore,
     forgetRemoved,
     record,
+    recordBegun,
+    cancelRecord,
+    cancelChecked,
+    settleRecorded,
     dismiss,
   }
 })

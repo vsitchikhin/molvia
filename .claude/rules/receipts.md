@@ -24,8 +24,8 @@ paths:
 
 The detail behind the receipt lines of `CLAUDE.md`. Reading a receipt on our server came in with
 MOL-125, after the measurement of MOL-114 (`.scratch/tasks/research/MOL-114.md`) chose how. Binding
-the lines to the catalogue and recording them is MOL-126, the screens are MOL-127, retraining the
-reader is MOL-169.
+the lines to the catalogue and recording them is MOL-126, the screens are MOL-127; retraining the
+reader was measured in MOL-169 and not built (below).
 
 ## How a receipt is read
 
@@ -269,6 +269,17 @@ with it. «Ереван Сити» of Gyumri and of Yerevan are two places of on
 city are one place by the rule of `places`. **A place picked by its id is held to the receipt's
 geography as a new one is** (review 3, В8): the receipt's country and a city of the settings.
 
+## Retraining the reader (MOL-169): measured, not built
+
+**A retrained `hye` does not replace Debian's** (owner's stop, 04.10.2026; `.scratch/tasks/research/MOL-169.md`).
+Fine-tuning starts from the float `tessdata_best/hye`, which reads the bench 54 of 162 against the
+`tessdata_fast` model's 66; synthetic lines in free faces, in the tills' own Arial AMU, and the bench's
+real lines labelled by В-2 «б» never passed 57 — and whole words of a figure row go to `rus`, which no
+retraining of `hye` touches. **As a second reader** — two more readings among `bestReading`'s candidates —
+it gave 70–72 and lost nothing, every line gained on the delivery till (am-06), still 7 of 46 there.
+Worth coming back to with a new receipt of that till and after the edges of MOL-222; the bench and its
+scripts are kept. The cut-out lines are still kept and confirmed (В-4), with no reader of them yet.
+
 ## «Переснимите» (В-4)
 
 A receipt fails as `reshoot` when no item line was read; or the total was read and the lines make up
@@ -450,11 +461,36 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   figure checked (review 17).
 - **While «Записать» waits the receipt is what was sent** (review 5, adversarial А1): no line, place,
   total or removal opens; the answer moves only the review that asked, never a screen the person went
-  to meanwhile (А5). A removal of a recorded receipt (409) is done, never «не принят». **The price,
-  named** (adversarial round 2): a record the server answers 5xx again and again is held by MOL-24's
-  rule for good, the receipt locked and the receipts behind it waiting — as a trip's write holds its
-  queue. There is no «cancel the record»: the handoff has none, and a 5xx on one receipt is a defect
-  the owner hears of (MOL-143).
+  to meanwhile (А5). A removal of a recorded receipt (409) is done, never «не принят». **«Отменить
+  запись» takes it back** (MOL-169, owner's В-5): a record the server answers 5xx again and again is
+  held by MOL-24's rule, the receipt locked and the receipts behind it waiting, so the dock offers to
+  take it out of the queue — the review open again, its draft whole. **A record no send has begun
+  goes at once; one begun goes only on the check's own answer that the receipt is not recorded,
+  asked under the lock every window sends under** (`recordBegun`, `cancelChecked`; adversarial А1–А4,
+  round 2 Б1–Б2): its answer lost, it may have landed, and opened as if it had not, the review
+  offered «Удалить» on a recorded receipt — whose 409 is «done», so «Чек удалён» stood over purchases
+  that stayed — and edits no record would ever carry. **The check's own answer**, never the shown one:
+  a read that set out before the tap and came back during the check said «not recorded» of a send
+  that landed after it set out (Б2). **Under the lock**, so no send of it is on its way in this window
+  or another when the server answers (Б1); a begun record is taken only through it. **And asked of
+  `GET /receipts/:id/settled`** (`receiptSettled`, round 3 Г1), which reads under the owner's lock and
+  the receipt's row in the order «Записать» takes them: the phone gives a send up after its 15 s, and
+  the server finishes it all the same — a record still in its transaction is waited for and read as
+  done. It answers the trip the receipt is recorded as, and the review goes there on that answer alone:
+  a read of the receipt after it failed on the same connection and left the tap unanswered (round 4,
+  Д1). Recorded, the
+  screen goes to its purchases; no answer — the dock says why, «no connection» or «the server did not
+  answer» by `navigator.onLine` after the failure (MOL-19, Б3), until the connection or the receipt
+  changes, and nothing opens. **The receipt the server calls recorded lets go of the phone's part of
+  it** (`settleRecorded`, from the list of «Покупки» and from the review): a record waiting and a
+  refusal of one — a 409 after a cancel — would otherwise name it for good, with its photo and draft,
+  and no row to remove them from (review 1, А2). **The price, named:** a WebView with no
+  `navigator.locks` takes no lock, and another window's send may still be on its way as the check is
+  answered; a record of the same receipt from another phone, or one whose body reached the server but
+  whose handler has not yet taken the owner's lock — milliseconds — may land after it. Then the cancel
+  opens, «Удалить» meets a recorded receipt (409, «done») and an edit is not written — the next
+  «Записать» is a 409 and the review goes to the purchases of the first. A record refused
+  otherwise is not touched: the next «Записать» takes its place.
 - **«Не принят» is a photo's word**: only a refused announcement or part makes that row, dated by the
   moment of the refusal; a tap opens the sheet with the reason and «Убрать», never removes by itself.
   **A receipt the server holds with parts missing and this phone none of them** is «не все части

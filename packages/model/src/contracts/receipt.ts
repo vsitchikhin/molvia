@@ -185,6 +185,15 @@ export const receiptRecordedCodec = z.strictObject({
 export type ReceiptRecorded = z.output<typeof receiptRecordedCodec>
 
 /**
+ * The trip the receipt was recorded as — until that trip is removed for good, so one only marked removed,
+ * which «Вернуть» may still bring back, too — or none; read once no «Записать» of it is still running on
+ * the server (MOL-169, adversarial Г1): what «Отменить запись» asks before it lets a begun record go,
+ * and where the review goes when it is recorded (round 4, Д1; review 8).
+ */
+export const receiptSettledCodec = z.strictObject({ tripId: z.uuid().nullable() })
+export type ReceiptSettled = z.output<typeof receiptSettledCodec>
+
+/**
  * The query of `GET /receipts` and `GET /receipts/:id` (MOL-129, adversarial А1): `shown=1` — the
  * phone asks with its page in view, so a receipt it is answered read is heard of in the app and
  * «чек разобран» will not follow. A list asked hidden — the connection back, a queue landing — says
