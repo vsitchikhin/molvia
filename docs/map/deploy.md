@@ -41,11 +41,12 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 - `deploy/watch/src/watch.ts` — One round of the watch: the settings from the Worker's environment (no `HC_UP_URL` — an error), up to four tries half a minute apart, the ping to «molvia-up» or its `/fail`, tried again and failing by its kind, never its URL.
 - `deploy/watch/src/worker.ts` — The Worker «molvia-watch»: Cloudflare's cron calls `scheduled` every five minutes; logs what a failed try saw.
 - `deploy/watch/src/bundle.test.ts` — Test of the Worker as it ships: one module that imports nothing and exports the scheduled handler.
+- `deploy/watch/deploy.sh` — Rolls the Worker out through Cloudflare's API: the bundle with `DOMAIN` and the secret kept, the cron, off `*.workers.dev`; run by the release and by `make watcher`.
 
 ## repository
 
 - `.env.prod.example` — Template of the server's `.env.prod`: domain, Postgres credentials, the production bot's token and username, the bot–API secret, the bot's pulse URL, Grafana's password and the alarms' bot (MOL-145).
-- `.github/workflows/release.yml` — Release workflow: after green CI on master builds the six images — the receipt reader's and the metrics' two (MOL-145) too — and rolls them out over ssh; a version tag names built images.
+- `.github/workflows/release.yml` — Release workflow: after green CI on master builds the six images — the receipt reader's and the metrics' two (MOL-145) too — and rolls them out over ssh; a version tag names built images; the outside watch goes to Cloudflare in a job of its own (MOL-221).
 - `.github/workflows/watch.yml` — The outside watch (MOL-142): every five minutes `/api/health` and the page to the healthchecks.io check «molvia-up» — a `/fail` when three of four tries half a minute apart fail — and the certificate's term to «molvia-cert»; red only when it could not report.
 - `bin/bundle.mjs` — esbuild bundler for the API and bot images; the API also gets its forget, seed-catalogue, gates and failures tools.
 - `deploy/Caddyfile` — Caddy config: TLS for the domain, `/api` stripped and proxied to the API, internal routes closed, SPA fallback, headers, no access log.
