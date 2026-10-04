@@ -2,6 +2,35 @@
   <section class="group">
     <SectionCaption>{{ t('settings.group_data') }}</SectionCaption>
     <AppCard as="ul" list>
+      <!-- First in the group (MOL-96): what is counted about the person, before what is done with it. -->
+      <li class="switch-item">
+        <label class="switch-row">
+          <IconStatistics class="entry-icon" aria-hidden="true" />
+          <span class="entry-label">{{ t('settings.analytics.label') }}</span>
+          <AppSwitch
+            :checked="analytics.off.value === false"
+            :inactive="
+              analytics.off.value === undefined || analytics.saving.value || !analytics.online.value
+            "
+            :aria-describedby="
+              analytics.online.value ? `${id}-analytics` : `${id}-analytics ${id}-analytics-offline`
+            "
+            @toggle="(on: boolean) => analytics.choose(!on)"
+          />
+        </label>
+        <p :id="`${id}-analytics`" class="switch-hint">{{ t('settings.analytics.hint') }}</p>
+        <p v-if="!analytics.online.value" :id="`${id}-analytics-offline`" class="switch-hint">
+          {{ t('settings.tap.offline') }}
+        </p>
+        <p v-else-if="analytics.saveFailed.value" class="failed" role="alert">
+          <IconAlert aria-hidden="true" />{{ t('settings.tap.save_failed') }}
+        </p>
+        <div v-else-if="analytics.failure.value === 'error'" class="failed">
+          <IconAlert aria-hidden="true" />
+          <span>{{ t('settings.tap.load_error') }}</span>
+          <AppButton variant="ghost" @click="analytics.retry">{{ t('state.retry') }}</AppButton>
+        </div>
+      </li>
       <li>
         <!-- Inactive rather than disabled, as «Сохранить» is: it keeps its focus and its hint. -->
         <button
@@ -84,19 +113,22 @@ import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconDownload from '~icons/mdi/tray-arrow-down'
 import IconShield from '~icons/mdi/shield-account-outline'
+import IconStatistics from '~icons/mdi/chart-box-outline'
 import IconTerms from '~icons/mdi/file-document-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
+import AppSwitch from '@/components/AppSwitch.vue'
 import EraseSheet from '@/components/EraseSheet.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import { useAnalytics } from '@/composables/useAnalytics'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExport } from '@/composables/useExport'
 import { useSignOutStore } from '@/stores/signOut'
 
 /**
- * «Ваши данные» (MOL-93, В-2): the copy of everything kept, erasing all of it (MOL-94), the page
- * that says what is kept and the terms beside it (MOL-95). Turning off the log (MOL-96) joins them here.
+ * «Ваши данные» (MOL-93, В-2): whether the person is counted (MOL-96), the copy of everything kept,
+ * erasing all of it (MOL-94), the page that says what is kept and the terms beside it (MOL-95).
  */
 export default defineComponent({
   name: 'YourDataGroup',
@@ -104,6 +136,7 @@ export default defineComponent({
     AppButton,
     AppCard,
     AppReveal,
+    AppSwitch,
     EraseSheet,
     IconAlert,
     IconChevron,
@@ -111,6 +144,7 @@ export default defineComponent({
     IconDelete,
     IconDownload,
     IconShield,
+    IconStatistics,
     IconTerms,
     SectionCaption,
   },
@@ -145,7 +179,18 @@ export default defineComponent({
     watch(eraseOpen, (open) => {
       if (!open) signOut.stay()
     })
-    return { t, id: useId(), row, ...exporting, retry, handOverFromCard, signOut, eraseOpen }
+    const analytics = useAnalytics()
+    return {
+      t,
+      id: useId(),
+      row,
+      ...exporting,
+      retry,
+      handOverFromCard,
+      signOut,
+      eraseOpen,
+      analytics,
+    }
   },
 })
 </script>
@@ -207,6 +252,31 @@ export default defineComponent({
 .entry-hint {
   color: var(--text-muted);
   font-size: var(--text-footnote);
+}
+
+// The switch's own row: the label is a `<label>`, so a tap on the words moves it too.
+.switch-item {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target-lg);
+  cursor: pointer;
+}
+
+.switch-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
+}
+
+.switch-item .failed {
+  margin: 0;
 }
 
 // The colour of an action that ends something, as «Выйти» beside it (MOL-57).

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import {
   actorCodec,
+  analyticsSettingSchema,
   receiptNoticesSettingSchema,
   remindersSettingSchema,
   salaryShiftSchema,
@@ -313,6 +314,29 @@ test('«зарплата — в следующий месяц» saves on the tap
   await expect(day).toHaveValue('28')
   await toggle.uncheck()
   await expect(day).toHaveCount(0)
+})
+
+test('«Учитывать меня в статистике» turns off on the tap and stays off after a reload (MOL-96)', async ({
+  page,
+}) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  const counted = page.getByRole('switch', { name: 'Учитывать меня в статистике' })
+  await expect(counted).toBeChecked()
+  await expect(counted).toBeEnabled()
+  await counted.uncheck()
+  // no sheet asks first (В-3)
+  await expect(page.locator('dialog[open]')).toHaveCount(0)
+  const headers = await asBrowser(page)
+  const setting = async () =>
+    analyticsSettingSchema.parse(
+      await (await page.request.get('/api/actors/me/analytics', { headers })).json(),
+    )
+  await expect.poll(setting).toEqual({ off: true })
+  await page.reload()
+  await expect(counted).not.toBeChecked()
+  await counted.check()
+  await expect.poll(setting).toEqual({ off: false })
 })
 
 test('the bot’s messages turn off on the tap, each its own, and stay off after a reload (MOL-103, MOL-129)', async ({

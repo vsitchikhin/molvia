@@ -5,15 +5,23 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
+import type { AnalyticsSetting } from '@molvia/model'
 import YourDataGroup from './YourDataGroup.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
+import { useActorStore } from '@/stores/actor'
 
 const exportMine =
   vi.fn<(options?: { signal?: AbortSignal }) => Promise<{ text: string; exportedAt: Date }>>()
+const readAnalytics = vi.fn<() => Promise<AnalyticsSetting>>()
+const chooseAnalytics = vi.fn<(on: boolean) => Promise<AnalyticsSetting>>()
 vi.mock('@/api', () => ({
-  api: { exportMine: (options?: { signal?: AbortSignal }) => exportMine(options) },
+  api: {
+    exportMine: (options?: { signal?: AbortSignal }) => exportMine(options),
+    analyticsSetting: () => readAnalytics(),
+    chooseAnalytics: (on: boolean) => chooseAnalytics(on),
+  },
 }))
 
 const FILE_TEXT = '{\n  "format": "molvia-export",\n  "version": 1\n}'
@@ -28,6 +36,7 @@ async function render() {
   // «Удалить мои данные» shares the store of «Выйти» (MOL-94).
   const pinia = createPinia()
   setActivePinia(pinia)
+  useActorStore().id = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/settings')
   const view = mount(YourDataGroup, {
@@ -63,6 +72,8 @@ function pointer(coarse: boolean): void {
 beforeEach(() => {
   vi.restoreAllMocks()
   exportMine.mockReset().mockResolvedValue(ANSWER)
+  readAnalytics.mockReset().mockResolvedValue({ off: false })
+  chooseAnalytics.mockReset().mockImplementation((on) => Promise.resolve({ off: !on }))
   share.mockReset().mockResolvedValue(undefined)
   canShare.mockReset()
   shareable(true)
@@ -321,5 +332,87 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     expect(labels.indexOf(en.terms.title)).toBe(labels.indexOf(en.privacy.title) + 1)
     const link = view.findAll('a').find((one) => one.text() === en.terms.title)
     expect(link?.attributes('href')).toBe('/terms')
+  })
+})
+
+describe('«Count me in the statistics» (MOL-96)', () => {
+  const counted = (view: VueWrapper) => view.get<HTMLInputElement>('input[role="switch"]')
+
+  function describedBy(view: VueWrapper): string[] {
+    const ids = (counted(view).attributes('aria-describedby') ?? '').split(' ')
+    return ids.map((id) => view.find(`[id="${id}"]`).text())
+  }
+
+  it('is on until the person objects, first in the group, and says that the past marks go', async () => {
+    const view = await render()
+    const first = view.get('li')
+    expect(first.text()).toContain(en.settings.analytics.label)
+    expect(counted(view).element.checked).toBe(true)
+    expect(counted(view).attributes('aria-disabled')).toBeUndefined()
+    expect(describedBy(view)).toEqual([en.settings.analytics.hint])
+  })
+
+  it('waits for the server before it can be moved', async () => {
+    readAnalytics.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(counted(view).attributes('aria-disabled')).toBe('true')
+    await counted(view).trigger('click')
+    await flushPromises()
+    expect(chooseAnalytics).not.toHaveBeenCalled()
+  })
+
+  it('turns off on the tap with no sheet, and back on (В-3)', async () => {
+    const view = await render()
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(chooseAnalytics).toHaveBeenLastCalledWith(false)
+    expect(counted(view).element.checked).toBe(false)
+    expect(document.querySelector('dialog[open]')).toBeNull()
+
+    await counted(view).setValue(true)
+    await flushPromises()
+    expect(chooseAnalytics).toHaveBeenLastCalledWith(true)
+    expect(counted(view).element.checked).toBe(true)
+  })
+
+  it('shows the objection the server holds', async () => {
+    readAnalytics.mockResolvedValue({ off: true })
+    const view = await render()
+    expect(counted(view).element.checked).toBe(false)
+  })
+
+  it('puts the switch back where the server holds it when the answer does not come', async () => {
+    chooseAnalytics.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(counted(view).element.checked).toBe(true)
+    expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
+  })
+
+  it('offline: waits, and says why — never red', async () => {
+    const view = await render()
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    expect(counted(view).attributes('aria-disabled')).toBe('true')
+    expect(describedBy(view)).toEqual([en.settings.analytics.hint, en.settings.tap.offline])
+    expect(view.find('[role="alert"]').exists()).toBe(false)
+    await counted(view).trigger('click')
+    await flushPromises()
+    expect(chooseAnalytics).not.toHaveBeenCalled()
+  })
+
+  it('a failed read offers «Try again», which asks again', async () => {
+    readAnalytics.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+    expect(view.text()).toContain(en.settings.tap.load_error)
+    expect(counted(view).attributes('aria-disabled')).toBe('true')
+    const retry = view.findAll('button').find((button) => button.text() === en.state.retry)
+    await retry?.trigger('click')
+    await flushPromises()
+    expect(readAnalytics).toHaveBeenCalledTimes(2)
+    expect(counted(view).element.checked).toBe(true)
+    expect(view.text()).not.toContain(en.settings.tap.load_error)
   })
 })

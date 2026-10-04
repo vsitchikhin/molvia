@@ -1349,6 +1349,10 @@
     "group_account": "Account",
     "sign_out": "Sign out",
     "group_data": "Your data",
+    "analytics": {
+      "label": "Count me in the statistics",
+      "hint": "Marks that you opened “What to buy”, and the count of ratings — this is how we learn whether Molvia is needed. Turn it off and past marks are deleted."
+    },
     "export": {
       "label": "Download my data",
       "hint": "Your records, ratings and settings, in one file",
