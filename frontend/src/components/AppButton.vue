@@ -156,9 +156,11 @@ export default defineComponent({
   }
 }
 
-/* After every variant, so it wins over each of them; `aria-busy` keeps the look of the action, with
-   `disabled` too — the sending sheets write both (adversarial А3). */
-.button:disabled:not([aria-busy='true']),
+/* After every variant, so it wins over each of them. `busy` alone keeps the look of the action — it
+   is the one at work, and its words say so («Сохраняем…»); `busy` with `disabled` is drawn as not
+   now, as master drew it dimmed: a sheet that keeps its «Сохранить» while it sends has nothing else
+   to show it (adversarial round 2, Р2-А1). A look of its own for `busy` is not the kit's yet. */
+.button:disabled,
 .button[aria-disabled='true']:not([aria-busy='true']) {
   background: var(--surface-2);
   color: var(--text-muted);
@@ -168,18 +170,18 @@ export default defineComponent({
 
 /* The rest shadow is a live primary's. Light in weight (`:where`), so a place that lifts what it
    holds over the cards — the floating dock — keeps its lift on an inactive one (review 1). */
-.primary:where(:disabled:not([aria-busy='true']), [aria-disabled='true']:not([aria-busy='true'])) {
+.primary:where(:disabled, [aria-disabled='true']:not([aria-busy='true'])) {
   box-shadow: none;
 }
 
-.ghost:disabled:not([aria-busy='true']),
-.danger-ghost:disabled:not([aria-busy='true']),
+.ghost:disabled,
+.danger-ghost:disabled,
 .ghost[aria-disabled='true']:not([aria-busy='true']),
 .danger-ghost[aria-disabled='true']:not([aria-busy='true']) {
   background: transparent;
 }
 
-.secondary:disabled:not([aria-busy='true']),
+.secondary:disabled,
 .secondary[aria-disabled='true']:not([aria-busy='true']) {
   border-color: transparent;
 }
