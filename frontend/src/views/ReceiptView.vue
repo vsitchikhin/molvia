@@ -299,6 +299,7 @@ import { useOnline } from '@/composables/useOnline'
 import { useReceipt } from '@/composables/useReceipt'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { calendarDay, dayOfAnyYear, localDay } from '@/days'
+import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
 import { afterStep, useNavigation } from '@/navigation'
 import { photoShelf } from '@/receipts/photoShelf'
@@ -475,6 +476,7 @@ export default defineComponent({
           void kept.retry()
           return
         }
+        reportFailure(error, 'screen')
         cancelRefused.value = navigator.onLine ? 'error' : 'offline'
       } finally {
         checking.value = false
