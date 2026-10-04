@@ -52,6 +52,13 @@ describe('SectionCaption', () => {
     const view = mount(SectionCaption, { slots: { default: 'Обмены' } })
     expect(view.find('.mark').exists()).toBe(false)
     expect(view.find('.tail').exists()).toBe(false)
+    expect(view.classes()).not.toContain('tailed')
+  })
+
+  // The month's caps of 11 and its sum of 13 share a baseline, as «Доходы» drew them (review Р2-5).
+  it('stands the words and the tail on one baseline', () => {
+    const view = mount(SectionCaption, { slots: { default: 'Сентябрь', tail: '120 000 ₽' } })
+    expect(view.classes()).toContain('tailed')
   })
 
   it('marks the title of a card as inset', () => {

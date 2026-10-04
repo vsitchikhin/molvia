@@ -1,5 +1,5 @@
 <template>
-  <component :is="as" ref="root" class="section-caption" :class="{ inset }">
+  <component :is="as" ref="root" class="section-caption" :class="{ inset, tailed: !!$slots.tail }">
     <span v-if="$slots.mark" class="mark" aria-hidden="true"><slot name="mark" /></span>
     <span class="words"><slot /></span>
     <span v-if="$slots.tail" class="tail"><slot name="tail" /></span>
@@ -62,7 +62,6 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-caption);
   font-weight: var(--weight-bold);
-  line-height: var(--leading-tight);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
 
@@ -85,6 +84,16 @@ export default defineComponent({
 
 span.section-caption {
   display: inline-flex;
+}
+
+/* Words of 11 and a sum of 13 stand on one line by their baseline, as the month of «Доходы» did; a
+   mark — the verdict's dot of 24 — stays centred beside them. */
+.tailed {
+  align-items: baseline;
+
+  .mark {
+    align-self: center;
+  }
 }
 
 .mark {
