@@ -80,6 +80,52 @@ test('«I do not accept» shows the account is there and leads out through «Sig
   await expect(page.getByRole('button', { name: 'Sign in with Telegram' })).toBeVisible()
 })
 
+test('the age ticked survives reading the terms (adversarial А4)', async ({ page }) => {
+  await newcomer(page)
+  const age = page.getByRole('checkbox', { name: AGE })
+  await age.check()
+  await page.getByRole('link', { name: 'Terms of use' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Terms of use')
+  await page.goBack()
+  await expect(page.getByRole('heading', { name: 'Terms and privacy' })).toBeVisible()
+  await expect(age).toBeChecked()
+  await expect(page.getByRole('button', { name: ACCEPT })).not.toHaveAttribute(
+    'aria-disabled',
+    'true',
+  )
+})
+
+test('«Report a problem» on the step’s error opens the sheet there, and nothing rises after (А2)', async ({
+  page,
+}) => {
+  let refused = false
+  await page.route('**/api/actors/me/consent', async (route) => {
+    if (route.request().method() === 'GET' && !refused) {
+      refused = true
+      await route.abort('failed')
+      return
+    }
+    await route.continue()
+  })
+  await page.goto('/')
+  await page.getByRole('button', { name: DEV_SEAM }).click()
+  await expect(page.getByRole('heading', { name: 'Could not open the terms' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Report a problem' }).click()
+  await risen(page)
+  const sheet = page.locator('dialog[open]')
+  await expect(sheet.getByRole('heading', { name: 'Report a problem' })).toBeVisible()
+  await sheet.getByRole('button', { name: 'Close' }).click()
+  await expect(sheet).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Try again' }).click()
+  await page.getByRole('checkbox', { name: AGE }).check()
+  await page.getByRole('button', { name: ACCEPT }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What to buy')
+  await page.waitForTimeout(500)
+  await expect(page.locator('dialog[open]')).toHaveCount(0)
+})
+
 test('«Terms of use» opens by its address without a session, and from the login screen', async ({
   page,
 }) => {

@@ -38,7 +38,7 @@
         </RouterLink>
       </nav>
       <label class="age">
-        <input v-model="aged" type="checkbox" />
+        <input v-model="consent.aged" type="checkbox" />
         <span>{{ t('consent.age') }}</span>
       </label>
       <p v-if="!online" class="warn">{{ t('consent.offline') }}</p>
@@ -48,7 +48,12 @@
       </p>
     </div>
     <template #action>
-      <AppButton block :busy="consent.accepting" :inactive="!aged || !online" @click="accept">
+      <AppButton
+        block
+        :busy="consent.accepting"
+        :inactive="!consent.aged || !online"
+        @click="accept"
+      >
         {{ t('consent.accept') }}
       </AppButton>
       <AppButton block variant="ghost" aria-haspopup="dialog" @click="leaveOpen = true">
@@ -142,7 +147,6 @@ export default defineComponent({
     const { t } = i18n
     const consent = useConsentStore()
     const online = useOnline()
-    const aged = ref(false)
 
     // An edition accepted before is the person coming back to a text that changed.
     const updated = computed(() => consent.accepted !== null)
@@ -191,7 +195,6 @@ export default defineComponent({
       t,
       consent,
       online,
-      aged,
       updated,
       changes,
       IconShield,
