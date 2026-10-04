@@ -151,6 +151,28 @@ test('the report being written on the step’s error stays when the question is 
   )
 })
 
+test('the step’s error stays still while the store asks again by itself (Д1)', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.route('**/api/actors/me/consent', (route) =>
+    route.request().method() === 'GET' ? route.abort('failed') : route.continue(),
+  )
+  await page.goto('/')
+  await page.getByRole('button', { name: DEV_SEAM }).click()
+  const failed = page.getByRole('heading', { name: 'Could not open the terms' })
+  await expect(failed).toBeVisible()
+  const retry = page.getByRole('button', { name: 'Try again' })
+  await retry.focus()
+
+  // Nobody taps anything; the store asks again in five seconds, and fails again.
+  await page.waitForRequest(
+    (request) => request.url().endsWith('/api/actors/me/consent') && request.method() === 'GET',
+    { timeout: 8_000 },
+  )
+  await page.waitForTimeout(500)
+  await expect(failed).toBeVisible()
+  await expect(retry).toBeFocused()
+})
+
 test('«Terms of use» opens by its address without a session, and from the login screen', async ({
   page,
 }) => {

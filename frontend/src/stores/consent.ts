@@ -68,7 +68,9 @@ export const useConsentStore = defineStore('consent', () => {
    * lost request — and so the window of one who accepted nothing is closed by the next answer, not
    * by an `online` a wavering signal never sends.
    */
-  const again = doublingRetry(() => void retry(), CONSENT_RETRY_FIRST_MS, CONSENT_RETRY_LAST_MS)
+  const again = doublingRetry(() => void retry(true), CONSENT_RETRY_FIRST_MS, CONSENT_RETRY_LAST_MS)
+  /** A question asked in the background is in flight: the next occasion does not ask twice. */
+  let asking = false
 
   function settle(who: string, version: number | null): void {
     revision += 1
@@ -81,7 +83,13 @@ export const useConsentStore = defineStore('consent', () => {
     if (accepted.value !== null) write(keyOf(who), String(accepted.value))
   }
 
-  async function load(who: string): Promise<void> {
+  /**
+   * `quietly`: asked again by the store itself — the timer, `online`, the app looked at again — with
+   * the step's error or offline state left on the screen until an answer comes (adversarial Д1).
+   * Put to `loading`, the step blinked to the skeleton by itself every minute, «Повторить» went from
+   * under the thumb, the focus went to the title and the error was read out again as a new alert.
+   */
+  async function load(who: string, quietly = false): Promise<void> {
     const remembered = recall(who)
     if (remembered !== null && !consentNeeded(remembered)) {
       settle(who, remembered)
@@ -91,7 +99,8 @@ export const useConsentStore = defineStore('consent', () => {
     const mine = revision
     of.value = who
     accepted.value = remembered
-    state.value = 'loading'
+    if (!quietly) state.value = 'loading'
+    asking = quietly
     try {
       const answer = await api.consent()
       if (mine === revision && owner.value === who) {
@@ -105,6 +114,8 @@ export const useConsentStore = defineStore('consent', () => {
       // Read after the failure, never before it (MOL-19).
       state.value = navigator.onLine ? 'error' : 'offline'
       again.later()
+    } finally {
+      if (mine === revision) asking = false
     }
   }
 
@@ -183,9 +194,12 @@ export const useConsentStore = defineStore('consent', () => {
   }
 
   /** «Повторить», or the connection back: the question is asked again. */
-  async function retry(): Promise<void> {
+  /** «Повторить» shows the skeleton; the store's own occasions ask `quietly`. */
+  async function retry(quietly = false): Promise<void> {
     const who = owner.value
-    if (who && (state.value === 'error' || state.value === 'offline')) await load(who)
+    if (!who || (state.value !== 'error' && state.value !== 'offline')) return
+    if (quietly && asking) return
+    await load(who, quietly)
   }
 
   /**
@@ -193,9 +207,9 @@ export const useConsentStore = defineStore('consent', () => {
    * app looked at again. With the app shown before the step there is no step on the screen to retry
    * it, and one failed question held the shelf's writes of an owner whose consent was on record.
    */
-  window.addEventListener('online', () => void retry())
+  window.addEventListener('online', () => void retry(true))
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') void retry()
+    if (document.visibilityState === 'visible') void retry(true)
   })
 
   /** Another window accepted: the door opens here too, with no request of its own. */

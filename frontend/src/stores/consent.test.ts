@@ -309,6 +309,49 @@ describe('the step does not close the door over an app already shown (MOL-95, re
     expect(recordSpending).toHaveBeenCalledTimes(1)
   })
 
+  it('asked again by itself, the step’s error stays on the screen until an answer (Д1)', async () => {
+    claimedHere()
+    me.mockResolvedValue(MINE)
+    consent.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'lost on the way', false))
+    vi.useFakeTimers()
+    try {
+      const actor = useActorStore()
+      const login = useLoginStore()
+      const step = useConsentStore()
+      await actor.start()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(step.state).toBe('error')
+
+      let answer: (value: Consent) => void = () => undefined
+      consent.mockReturnValue(new Promise((resolve) => (answer = resolve)))
+      await vi.advanceTimersByTimeAsync(CONSENT_RETRY_FIRST_MS)
+      // The timer asked, `online` comes too, and nothing on the screen moved.
+      window.dispatchEvent(new Event('online'))
+      expect(step.state).toBe('error')
+      expect(login.phase).toBe('consent')
+
+      answer({ version: null })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(step.state).toBe('ready')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('«Повторить» by hand shows the question being asked', async () => {
+    claimedHere()
+    me.mockResolvedValue(MINE)
+    consent.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'lost on the way', false))
+    const actor = useActorStore()
+    const step = useConsentStore()
+    await actor.start()
+    await flush()
+    expect(step.state).toBe('error')
+    consent.mockReturnValue(new Promise(() => undefined))
+    void step.retry()
+    expect(step.state).toBe('loading')
+  })
+
   it('asked again by time no sooner than the first pause, and less often each time', async () => {
     const { actor } = await shownOffline()
     me.mockResolvedValue(MINE)
