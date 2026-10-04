@@ -4,7 +4,9 @@
     class="list-row"
     :class="{ live: tag !== 'div', wrap, danger, inactive, selected, active }"
     :type="tag === 'button' ? 'button' : undefined"
-    :href="link?.href.value"
+    :href="inactive ? undefined : link?.href.value"
+    :role="link && inactive ? 'link' : undefined"
+    :tabindex="link && inactive ? 0 : undefined"
     :aria-disabled="inactive && tag !== 'div' ? 'true' : undefined"
     :aria-checked="state === 'checked' ? String(selected) : undefined"
     :aria-selected="state === 'selected' ? String(selected) : undefined"
@@ -26,7 +28,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent } from 'vue'
+import { computed, defineComponent, watchEffect } from 'vue'
 import type { Component, PropType } from 'vue'
 import { useLink } from 'vue-router'
 import type { RouteLocationRaw } from 'vue-router'
@@ -53,7 +55,9 @@ const SELECTED = new Set(['option', 'gridcell', 'row', 'tab'])
  *              never mixes the two (DESIGN.md; held by review, the card is the screen's);
  *   danger   — the title and the icon in `bad-ink`: the row destroys;
  *   inactive — not now (Ф-6, MOL-174): focusable, `aria-disabled`, a press reaching nobody, the link
- *              followed nowhere; the meta says why;
+ *              followed nowhere — a link loses its `href` too, or a middle click or a long press would
+ *              open it in a tab, and keeps its role and its place in the focus order by hand; the meta
+ *              says why;
  *   selected — the fill, the ring and a ✓ (Ф-5), the weight unchanged; read out by the role the row
  *              was given — `aria-checked` for a radio, `aria-selected` for an option — never only seen;
  *   active   — the row the keyboard stands on in a list a field owns (`aria-activedescendant`, К-4):
@@ -90,6 +94,15 @@ export default defineComponent({
       if (SELECTED.has(role)) return 'selected'
       return null
     })
+    if (import.meta.env.DEV) {
+      if (link && props.to === undefined) console.warn('[ListRow] a link row needs `to`')
+      // Drawn and not read out is the chosen-by-colour Ф-5 refuses: a picker gives its rows a role.
+      watchEffect(() => {
+        if (props.selected && state.value === null) {
+          console.warn('[ListRow] a selected row needs a role (radio, option…) to be read out')
+        }
+      })
+    }
     function click(event: MouseEvent): void {
       if (props.inactive) {
         // Stopped as well as prevented, as the kit's button: nothing above hears a row that is not now.

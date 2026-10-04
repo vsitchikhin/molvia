@@ -109,6 +109,10 @@ describe('ListRow', () => {
         global: { plugins: [router] },
       })
       expect(view.attributes('aria-disabled')).toBe('true')
+      // No address to take: a middle click or a long press would open it in a tab (review 1).
+      expect(view.attributes('href')).toBeUndefined()
+      expect(view.attributes('role')).toBe('link')
+      expect(view.attributes('tabindex')).toBe('0')
       await view.trigger('click')
       await flushPromises()
       expect(router.currentRoute.value.path).toBe('/')
@@ -146,10 +150,20 @@ describe('ListRow', () => {
       expect(view.attributes('aria-checked')).toBeUndefined()
     })
 
-    it('names no state on a row with no role to carry it', () => {
+    it('names no state on a row with no role to carry it, and says so while developing', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
       const view = mount(ListRow, { props: { title: 'Карта', selected: true } })
       expect(view.attributes('aria-checked')).toBeUndefined()
       expect(view.attributes('aria-selected')).toBeUndefined()
+      expect(warn).toHaveBeenCalledOnce()
+      warn.mockRestore()
+    })
+
+    it('stays quiet when the role carries the choice', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      mount(ListRow, { props: { title: 'Карта', selected: true }, attrs: { role: 'radio' } })
+      expect(warn).not.toHaveBeenCalled()
+      warn.mockRestore()
     })
   })
 
