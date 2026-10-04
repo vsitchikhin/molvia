@@ -320,7 +320,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     await view.get('input').setValue('185000')
     await button(view, en.accounts.reconcile.check)?.trigger('click')
     await flushPromises()
-    expect(view.get('.difference').classes()).toContain('stale')
+    expect(view.text()).toContain(en.accounts.reconcile.recounting)
     expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
 
     checkAccount.mockResolvedValue(answer('185000', '185000'))
@@ -343,7 +343,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     await view.get('input').setValue('9000')
     await button(view, en.accounts.reconcile.check)?.trigger('click')
     await flushPromises()
-    expect(view.get('.difference').classes()).not.toContain('stale')
+    expect(view.text()).not.toContain(en.accounts.reconcile.recounting)
     expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
     expect(view.text()).toContain(en.accounts.reconcile.trips_held)
 
@@ -353,7 +353,6 @@ describe('ReconcileSheet (handoff 05)', () => {
     await view.get('input').setValue('9000')
     await button(view, en.accounts.reconcile.check)?.trigger('click')
     await flushPromises()
-    expect(view.get('.difference').classes()).toContain('stale')
     expect(view.text()).toContain(en.accounts.reconcile.recounting)
     expect(view.text()).not.toContain(en.accounts.reconcile.trips_held)
   })
@@ -369,7 +368,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     await button(view, en.accounts.reconcile.check)?.trigger('click')
     await flushPromises()
     // Counted without it — honest — but its money cannot become «Прочее».
-    expect(view.get('.difference').classes()).not.toContain('stale')
+    expect(view.text()).not.toContain(en.accounts.reconcile.recounting)
     expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
     expect(view.text()).toContain(en.accounts.reconcile.trips_held)
 
@@ -397,7 +396,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     // The open trip was finished on another phone: the payment leaves, its answer still out.
     trips.elsewhere = null
     await flushPromises()
-    expect(view.get('.difference').classes()).toContain('stale')
+    expect(view.text()).toContain(en.accounts.reconcile.recounting)
     expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
     expect(checkAccount).toHaveBeenCalledTimes(1)
   })
@@ -419,7 +418,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     await view.get('input').setValue('8800')
     await button(view, en.accounts.reconcile.check)?.trigger('click')
     await flushPromises()
-    expect(view.get('.difference').classes()).toContain('stale')
+    expect(view.text()).toContain(en.accounts.reconcile.recounting)
     expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
 
     // Behind a question of «Поход»: not waited on, named, and nothing written over it.
@@ -428,7 +427,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     await view.get('input').setValue('8800')
     await button(view, en.accounts.reconcile.check)?.trigger('click')
     await flushPromises()
-    expect(view.get('.difference').classes()).not.toContain('stale')
+    expect(view.text()).not.toContain(en.accounts.reconcile.recounting)
     expect(button(view, /Record the difference/)?.attributes('disabled')).toBeDefined()
     expect(view.text()).toContain(en.accounts.reconcile.trips_held)
   })
