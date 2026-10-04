@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import {
   DomainError,
   ERROR,
@@ -33,10 +34,12 @@ import {
   places,
   receiptLineImages,
   receiptLines,
+  receiptDays,
   receiptParts,
   receipts,
   trips,
 } from './schema'
+import { yerevanDay } from './yerevan-week'
 
 export interface ReceiptPart {
   readonly photo: Buffer
@@ -87,6 +90,8 @@ export type ReadOutcome =
       readonly readerVersion: string
       readonly head: ReceiptHead
       readonly lines: readonly ReceiptLine[]
+      /** The lines make up too little of the receipt (`readPartly`, MOL-222): counted, never stored. */
+      readonly partly: boolean
       /** One for each line, in their order. */
       readonly bindings: readonly LineBinding[]
       readonly images: readonly LineImage[]
@@ -173,7 +178,54 @@ export interface RecordedReceipt {
   readonly expenses: readonly { readonly position: number; readonly expenseId: string }[]
   /** Lines recorded as read: their cut-out rows are confirmed, every other one goes (В-4). */
   readonly confirmed: readonly number[]
+  /** What the person put right before recording, counted in `receipt_days` (MOL-222). */
+  readonly edits: ReceiptEdits
 }
+
+/**
+ * The lines of a receipt recorded and those the person put right against what the review showed: left
+ * out, another item, the quantity or the sum changed. A line is edited once however many of the three.
+ */
+export interface ReceiptEdits {
+  readonly lines: number
+  readonly edited: number
+  readonly skipped: number
+  readonly item: number
+  readonly figures: number
+}
+
+/** What a reading or a record adds to its day of `receipt_days`, by column. */
+type ReceiptDayCounts = Partial<Record<Exclude<keyof typeof receiptDays.$inferInsert, 'day'>, SQL>>
+
+/**
+ * Adds to the row of `day` of `receipt_days` (MOL-222), read from `source` as `login_days` is counted
+ * (MOL-68): in the transaction of what it counts, the last statement of it, so what is rolled back is
+ * not counted.
+ */
+async function tally(db: Conn, counts: ReceiptDayCounts, day: SQL, source: SQL = sql``) {
+  const entries = Object.entries(counts).map(([key, value]) => ({
+    name: sql.identifier(receiptDays[key as keyof ReceiptDayCounts].name),
+    value,
+  }))
+  if (entries.length === 0) return
+  const key = sql.identifier(receiptDays.day.name)
+  await db.execute(sql`
+    insert into ${receiptDays} (${key}, ${sql.join(
+      entries.map((entry) => entry.name),
+      sql`, `,
+    )})
+    select ${day}, ${sql.join(
+      entries.map((entry) => entry.value),
+      sql`, `,
+    )} ${source}
+    on conflict (${key}) do update set ${sql.join(
+      entries.map(({ name }) => sql`${name} = ${receiptDays}.${name} + excluded.${name}`),
+      sql`, `,
+    )}`)
+}
+
+/** Today in Yerevan, by the database's clock: the day a reading ended on. */
+const today = (): SQL => yerevanDay(sql`clock_timestamp()`)
 
 export interface ReceiptRepository {
   /** «Отправить чек»: a new receipt, or the same one sent again; anything else under its id is a 409. */
@@ -631,6 +683,31 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           confirmedAt: sql`clock_timestamp()`,
         })
         .where(eq(receiptLineImages.receiptId, id))
+      // how long from the server taking the receipt to its record: both the server's clock (Р-6)
+      const took = sql`${receipts.recordedAt} - ${receipts.createdAt}`
+      const within = (bound: string, below: string | null): SQL =>
+        below === null
+          ? sql`(${took} <= interval '${sql.raw(bound)}')::int`
+          : sql`(${took} > interval '${sql.raw(below)}' and ${took} <= interval '${sql.raw(bound)}')::int`
+      const { edits } = recorded
+      await tally(
+        db,
+        {
+          recorded: sql`1`,
+          lines: sql`${edits.lines}::int`,
+          linesEdited: sql`${edits.edited}::int`,
+          linesSkipped: sql`${edits.skipped}::int`,
+          linesItem: sql`${edits.item}::int`,
+          linesFigures: sql`${edits.figures}::int`,
+          within5m: within('5 minutes', null),
+          within15m: within('15 minutes', '5 minutes'),
+          within1h: within('1 hour', '15 minutes'),
+          within1d: within('1 day', '1 hour'),
+          later: sql`(${took} > interval '1 day')::int`,
+        },
+        yerevanDay(receipts.recordedAt),
+        sql`from ${receipts} where ${receipts.id} = ${id}`,
+      )
     },
 
     async sourceOf(tripId) {
@@ -807,14 +884,19 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async requeueInterrupted() {
-      await db
-        .update(receipts)
-        .set({
-          status: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then 'failed' else 'queued' end`,
-          failure: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then 'unreadable' end`,
-          readAt: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then clock_timestamp() end`,
-        })
-        .where(eq(receipts.status, 'reading'))
+      await db.transaction(async (tx) => {
+        const moved = await tx
+          .update(receipts)
+          .set({
+            status: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then 'failed' else 'queued' end`,
+            failure: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then 'unreadable' end`,
+            readAt: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then clock_timestamp() end`,
+          })
+          .where(eq(receipts.status, 'reading'))
+          .returning({ status: receipts.status })
+        const failed = moved.filter((row) => row.status === 'failed').length
+        if (failed > 0) await tally(tx, { unreadable: sql`${failed}::int` }, today())
+      })
     },
 
     async claimNext() {
@@ -872,15 +954,19 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async retry(id) {
-      await db
-        .update(receipts)
-        .set({
-          status: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then 'failed' else 'queued' end`,
-          failure: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then 'unreadable' end`,
-          readAt: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then clock_timestamp() end`,
-          queuedAt: sql`clock_timestamp()`,
-        })
-        .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+      await db.transaction(async (tx) => {
+        const [moved] = await tx
+          .update(receipts)
+          .set({
+            status: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then 'failed' else 'queued' end`,
+            failure: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then 'unreadable' end`,
+            readAt: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then clock_timestamp() end`,
+            queuedAt: sql`clock_timestamp()`,
+          })
+          .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+          .returning({ status: receipts.status })
+        if (moved?.status === 'failed') await tally(tx, { unreadable: sql`1` }, today())
+      })
     },
 
     async finish(id, outcome) {
@@ -908,7 +994,11 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         // a reading is written whole: what an earlier one left goes first
         await tx.delete(receiptLines).where(eq(receiptLines.receiptId, id))
         await tx.delete(receiptLineImages).where(eq(receiptLineImages.receiptId, id))
-        if (outcome.kind !== 'parsed') return
+        if (outcome.kind !== 'parsed') {
+          const failed = outcome.failure === 'reshoot' ? 'reshoot' : 'unreadable'
+          await tally(tx, { [failed]: sql`1` }, today())
+          return
+        }
         if (outcome.lines.length > 0) {
           await tx.insert(receiptLines).values(
             outcome.lines.map((line, position) => ({
@@ -934,6 +1024,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             .insert(receiptLineImages)
             .values(outcome.images.map((image) => ({ receiptId: id, ...image })))
         }
+        await tally(tx, outcome.partly ? { readPartly: sql`1` } : { read: sql`1` }, today())
       })
     },
   }

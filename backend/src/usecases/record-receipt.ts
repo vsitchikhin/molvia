@@ -20,9 +20,11 @@ import type {
   ReceiptRecorded,
   ReceiptSettled,
 } from '@molvia/model'
-import type { StoredReceiptLine } from '@/db/receipts-repository'
+import type { ReceiptEdits, StoredReceiptLine } from '@/db/receipts-repository'
 import type { MemoryWord } from '@/db/store-memory-repository'
 import type { Transact } from '@/db/unit-of-work'
+import { shownLines } from './receipts'
+import type { ShownLines } from './receipts'
 import { tripRateOn } from './start-trip'
 import type { Today } from './today'
 
@@ -31,18 +33,52 @@ type RecordedLine = Extract<ReceiptRecordBody['lines'][number], { skip: false }>
 const sameMoney = (a: Money | null, b: Money | null) =>
   a === null || b === null ? a === b : a.minor === b.minor && a.currency === b.currency
 
+const sameQuantity = (a: StoredReceiptLine['quantity'], b: StoredReceiptLine['quantity']) =>
+  a === null || b === null ? a === b : a.milli === b.milli && a.unit === b.unit
+
 /**
  * A line recorded as it was read (В-4): it added up, and the person changed neither its quantity nor
  * what was paid. Its cut-out rows keep the text read as their confirmed text; its shelf price is what
  * the memory keeps.
  */
 function asRead(stored: StoredReceiptLine, line: RecordedLine): boolean {
-  const quantity = stored.quantity
-  const same =
-    line.quantity === null || quantity === null
-      ? line.quantity === quantity
-      : line.quantity.milli === quantity.milli && line.quantity.unit === quantity.unit
-  return stored.settled && same && sameMoney(line.amount, stored.sum)
+  return (
+    stored.settled &&
+    sameQuantity(line.quantity, stored.quantity) &&
+    sameMoney(line.amount, stored.sum)
+  )
+}
+
+/**
+ * What the person put right against what the review showed (MOL-222, Р-6): «не записывать», another item
+ * — a new one named where an item was shown, or a catalogue's where none or another was — and the
+ * quantity or the sum changed. A new item kept new under another name is not an edit: the reading gave
+ * no name to correct, only a gloss.
+ */
+function editsOf(
+  body: ReceiptRecordBody,
+  stored: readonly StoredReceiptLine[],
+  shown: ShownLines,
+): ReceiptEdits {
+  let [edited, skipped, item, figures] = [0, 0, 0, 0]
+  for (const line of body.lines) {
+    const read = stored[line.position]
+    if (read === undefined) continue
+    if (line.skip) {
+      edited += 1
+      skipped += 1
+      continue
+    }
+    const was = shown.itemIds[line.position] ?? null
+    const otherItem = 'id' in line.item ? line.item.id !== was : was !== null
+    const otherFigures =
+      !sameQuantity(line.quantity, read.quantity) ||
+      !sameMoney(line.amount, shown.amounts[line.position] ?? null)
+    if (otherItem) item += 1
+    if (otherFigures) figures += 1
+    if (otherItem || otherFigures) edited += 1
+  }
+  return { lines: body.lines.length, edited, skipped, item, figures }
 }
 
 /**
@@ -156,6 +192,16 @@ export async function recordReceipt(
       throw new DomainError(ERROR.CONFLICT)
     }
 
+    // read before the memory is taught by this very record: the edits are against what was shown
+    const shown = await shownLines(
+      repositories,
+      actor.id,
+      held.tin,
+      held.lines,
+      held.total,
+      held.currency,
+    )
+
     const recorded = body.lines
       .filter((line): line is RecordedLine => !line.skip)
       .sort((a, b) => a.position - b.position)
@@ -233,7 +279,12 @@ export async function recordReceipt(
       }
     }
     if (held.tin !== null) await storeMemory.remember(actor.id, held.tin, words)
-    await receipts.markRecorded(held.id, { tripId: trip.id, expenses: written, confirmed })
+    await receipts.markRecorded(held.id, {
+      tripId: trip.id,
+      expenses: written,
+      confirmed,
+      edits: editsOf(body, held.lines, shown),
+    })
     return answer(trip.id)
   })
 }

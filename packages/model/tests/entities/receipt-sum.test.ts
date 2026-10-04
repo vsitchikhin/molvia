@@ -3,6 +3,8 @@ import {
   lineAddsUp,
   lineProduct,
   priceInDoubt,
+  READ_PARTLY_TOTAL_SHARE,
+  readPartly,
   receiptBalance,
   receiptDigits,
   recordedSums,
@@ -194,5 +196,45 @@ describe('a price in doubt by the memory (В-1)', () => {
     expect(priceInDoubt(null, amd(50))).toBe(false)
     expect(priceInDoubt(amd(50), null)).toBe(false)
     expect(priceInDoubt(amd(50), rub(60))).toBe(false)
+  })
+})
+
+describe('read only in part — the «переснимите» of before, a hint now (MOL-222, В-1)', () => {
+  const read = (sum: Money | null, settled = true) => ({ sum, settled })
+
+  it('is no lines at all', () => {
+    expect(readPartly([], amd(1_000))).toBe(true)
+    expect(readPartly([], null)).toBe(true)
+  })
+
+  it(`with the total read, is below ${String(READ_PARTLY_TOTAL_SHARE * 100)} % of it: exactly the share, a luma under`, () => {
+    expect(readPartly([read(amd(700))], amd(1_000))).toBe(false)
+    expect(readPartly([read(amd(699.99))], amd(1_000))).toBe(true)
+  })
+
+  it('with the total read, one lost line of many is not it (am-03: 0,97)', () => {
+    expect(readPartly([read(amd(970))], amd(1_000))).toBe(false)
+  })
+
+  it('with the total read, counts a line whose sum was lost as nothing', () => {
+    expect(readPartly([read(null), read(amd(500))], amd(1_000))).toBe(true)
+  })
+
+  it('counts no sum past the total, nor one in another currency (review Р11)', () => {
+    expect(readPartly([read(amd(2_000))], amd(1_000))).toBe(true)
+    expect(readPartly([read(rub(1_000))], amd(1_000))).toBe(true)
+  })
+
+  it('with no total, is fewer than half the lines adding up: half is enough', () => {
+    expect(readPartly([read(amd(1)), read(amd(1), false)], null)).toBe(false)
+    expect(readPartly([read(amd(1)), read(amd(1), false), read(amd(1), false)], null)).toBe(true)
+  })
+
+  it('must not fire on a short receipt whose total was missed but whose lines add up (am-01)', () => {
+    expect(readPartly([read(amd(1)), read(amd(1)), read(amd(1))], null)).toBe(false)
+  })
+
+  it('takes a total of zero for no total', () => {
+    expect(readPartly([read(amd(1))], amd(0))).toBe(false)
   })
 })

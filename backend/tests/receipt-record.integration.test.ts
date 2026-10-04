@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { ERROR, receiptRecordedCodec, tripHistoryCodec, tripViewCodec } from '@molvia/model'
@@ -10,6 +10,7 @@ import {
   expenses,
   items,
   places,
+  receiptDays,
   receiptLineImages,
   receiptLines,
   receiptParts,
@@ -49,6 +50,8 @@ interface Line {
   readonly qty?: number
   readonly price: number
   readonly sum: number
+  /** The item the queue bound the line to (MOL-126). */
+  readonly itemId?: string
 }
 
 /** A receipt the queue laid out: one part still held, a row cut out of each line. */
@@ -97,7 +100,8 @@ async function parsedReceipt(
         sumMinor: BigInt(line.sum * 100),
         discountMinor: 0n,
         settled: line.price * (line.qty ?? 1) === line.sum,
-        match: 'new' as const,
+        itemId: line.itemId ?? null,
+        match: line.itemId === undefined ? ('new' as const) : ('search' as const),
       })),
     )
     await db.insert(receiptLineImages).values(
@@ -270,6 +274,8 @@ describe('«Записать»', () => {
 
     const other = await record(me, id, body(randomUUID()))
     expect([other.statusCode, codeOf(other)]).toEqual([409, ERROR.CONFLICT])
+    // the repeat is the same record: counted once (MOL-222)
+    expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 1, lines: 1 }])
   })
 
   it('answers «recorded?» only once a record still running has ended (MOL-169, Г1)', async () => {
@@ -575,5 +581,116 @@ describe('«Записать»', () => {
     expect((await record(me, id, again)).statusCode).toBe(200)
     const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
     expect([row?.status, row?.tripId]).toEqual(['recorded', again.tripId])
+  })
+
+  // MOL-222: the measure of 0.2 — what the person put right against what the review showed
+  it('counts the lines put right against what the review showed, each line once', async () => {
+    const me = await insertActor(db)
+    const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+    const cheese = await insertItem(db, { name: 'Сыр Лори', searchKey: 'syr lori' })
+    const place = await insertPlace(db, { name: 'Ереван Сити' })
+    const line = (
+      position: number,
+      item: Record<string, string>,
+      qty = 1,
+      drams = 100,
+    ): Record<string, unknown> => ({
+      position,
+      skip: false,
+      item,
+      quantity: pieces(qty),
+      amount: amount(drams),
+    })
+    // the first receipt teaches the shop's memory: article «7000005» is the cheese
+    const first = await parsedReceipt(
+      me,
+      [{ printed: 'ՊԱՆԻՐ', sku: '7000005', price: 100, sum: 100 }],
+      { receiptNo: '1' },
+    )
+    expect(
+      (
+        await record(me, first, {
+          tripId: randomUUID(),
+          place: { id: place },
+          purchasedOn: '2026-09-26',
+          lines: [line(0, { id: cheese })],
+        })
+      ).statusCode,
+    ).toBe(200)
+    // shown nothing, the cheese chosen: an item put right
+    expect(await db.select().from(receiptDays)).toMatchObject([
+      { recorded: 1, lines: 1, linesEdited: 1, linesItem: 1, linesFigures: 0, linesSkipped: 0 },
+    ])
+    await db.delete(receiptDays)
+
+    const second = await parsedReceipt(
+      me,
+      [
+        { printed: 'Կաթ', sku: '7000000', price: 100, sum: 100, itemId: milk },
+        { printed: 'Հաց', sku: '7000001', price: 100, sum: 100 },
+        { printed: 'Կաթ 2', sku: '7000002', price: 100, sum: 100, itemId: milk },
+        { printed: 'Ձու', sku: '7000003', price: 100, sum: 100 },
+        { printed: 'Տոպրակ', sku: '7000004', price: 100, sum: 100 },
+        { printed: 'ՊԱՆԻՐ', sku: '7000005', price: 100, sum: 100 },
+      ],
+      { receiptNo: '2' },
+    )
+    const response = await record(me, second, {
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        // as shown: the parse's milk
+        line(0, { id: milk }),
+        // as shown: new, named by the person — the reading gave no name to correct
+        line(1, { name: 'Хлеб' }),
+        // another item and another sum: one line edited, counted in both kinds
+        line(2, { id: cheese }, 1, 90),
+        // the quantity put right
+        line(3, { name: 'Яйца' }, 2, 100),
+        { position: 4, skip: true },
+        // the cheese the memory showed, left as it is
+        line(5, { id: cheese }),
+      ],
+    })
+    expect(response.statusCode).toBe(200)
+    expect(await db.select().from(receiptDays)).toMatchObject([
+      { recorded: 1, lines: 6, linesEdited: 3, linesSkipped: 1, linesItem: 1, linesFigures: 2 },
+    ])
+  })
+
+  it('counts the time from the server taking the receipt to its record, by the bucket', async () => {
+    const me = await insertActor(db)
+    const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+    const place = await insertPlace(db, { name: 'Ереван Сити' })
+    const ago = async (receiptNo: string, interval: string) => {
+      const id = await parsedReceipt(me, LINES.slice(0, 1), { receiptNo })
+      await db.execute(
+        sql`update receipts set created_at = now() - ${interval}::interval where id = ${id}`,
+      )
+      const response = await record(me, id, {
+        tripId: randomUUID(),
+        place: { id: place },
+        purchasedOn: '2026-09-26',
+        lines: [
+          {
+            position: 0,
+            skip: false,
+            item: { id: milk },
+            quantity: pieces(2),
+            amount: amount(740),
+          },
+        ],
+      })
+      expect(response.statusCode).toBe(200)
+    }
+    await ago('1', '4 minutes 50 seconds')
+    await ago('2', '5 minutes 10 seconds')
+    await ago('3', '59 minutes')
+    await ago('4', '23 hours')
+    await ago('5', '2 days')
+    expect(await db.select().from(receiptDays)).toMatchObject([
+      { recorded: 5, within5m: 1, within15m: 1, within1h: 1, within1d: 1, later: 1 },
+    ])
   })
 })

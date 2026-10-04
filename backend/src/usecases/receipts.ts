@@ -15,13 +15,14 @@ import {
 } from '@molvia/model'
 import type {
   Actor,
+  Currency,
   Money,
   ReceiptBody,
   ReceiptDetail,
   ReceiptPlace,
   ReceiptSummary,
 } from '@molvia/model'
-import type { ReceiptRepository, StoredReceipt } from '@/db/receipts-repository'
+import type { ReceiptRepository, StoredReceipt, StoredReceiptLine } from '@/db/receipts-repository'
 import { memoryKey } from '@/db/store-memory-repository'
 import type { Recalled } from '@/db/store-memory-repository'
 import type { TripRepositories } from '@/db/unit-of-work'
@@ -143,6 +144,57 @@ export async function receiptsOf(
   return withPlaces(repositories.receipts, actor, stored)
 }
 
+/** Each line as the review first shows it, before the person touches anything. */
+export interface ShownLines {
+  /** What the shops' memory holds for the line, `null` — nothing. */
+  readonly memory: readonly (Recalled | null)[]
+  /** The item shown: the memory's over the parse's, `null` — a new one, or one no longer there. */
+  readonly itemIds: readonly (string | null)[]
+  readonly names: ReadonlyMap<string, string>
+  /** What the line is recorded at unless the person changes it (В-5). */
+  readonly amounts: readonly (Money | null)[]
+}
+
+/**
+ * The lines as the review shows them before any edit: the shop's memory laid over what the parse
+ * found — the article first, then the line as printed — and what each will be recorded at (В-5). One
+ * reading for the review and for «Записать», which counts the person's edits against it (MOL-222):
+ * an item the memory put there and the person left is not an edit.
+ */
+export async function shownLines(
+  repositories: Pick<ReceiptReviewRepositories, 'storeMemory' | 'items'>,
+  actorId: string,
+  tin: string | null,
+  lines: readonly StoredReceiptLine[],
+  total: Money | null,
+  currency: Currency,
+): Promise<ShownLines> {
+  const words = lines.map(storeMemoryWords)
+  const recalled =
+    tin === null
+      ? new Map<string, Recalled>()
+      : await repositories.storeMemory.recall(actorId, tin, words.flat(), currency)
+  const memory = words.map(
+    (own) =>
+      own.map((word) => recalled.get(memoryKey(word))).find((hit) => hit !== undefined) ?? null,
+  )
+  const found = lines.map((line, i) => memory[i]?.itemId ?? line.itemId)
+  const known = new Set(found.filter((itemId): itemId is string => itemId !== null))
+  const names = new Map(
+    (await repositories.items.byIds([...known])).map((item) => [item.id, item.name]),
+  )
+  const digits = receiptDigits(currency, [
+    total,
+    ...lines.flatMap((line) => [line.price, line.sum, line.discount]),
+  ])
+  return {
+    memory,
+    itemIds: found.map((itemId) => (itemId !== null && names.has(itemId) ? itemId : null)),
+    names,
+    amounts: recordedSums(lines, total, digits),
+  }
+}
+
 /**
  * One receipt with its lines, as the review shows them (MOL-126): the shop's memory laid over what
  * the parse found — the article first, then the line as printed — the item's name, what each line
@@ -163,26 +215,14 @@ export async function receiptOfOwner(
   const { lines, currency } = found
   const tin = receipt.header?.tin ?? null
 
-  const words = lines.map(storeMemoryWords)
-  const recalled =
-    tin === null
-      ? new Map<string, Recalled>()
-      : await repositories.storeMemory.recall(actor.id, tin, words.flat(), currency)
-  const memory = words.map(
-    (own) =>
-      own.map((word) => recalled.get(memoryKey(word))).find((hit) => hit !== undefined) ?? null,
-  )
-  const itemIds = lines.map((line, i) => memory[i]?.itemId ?? line.itemId)
-  const known = new Set(itemIds.filter((itemId): itemId is string => itemId !== null))
-  const names = new Map(
-    (await repositories.items.byIds([...known])).map((item) => [item.id, item.name]),
-  )
-
-  const digits = receiptDigits(currency, [
+  const { memory, itemIds, names, amounts } = await shownLines(
+    repositories,
+    actor.id,
+    tin,
+    lines,
     receipt.total,
-    ...lines.flatMap((line) => [line.price, line.sum, line.discount]),
-  ])
-  const amounts = recordedSums(lines, receipt.total, digits)
+    currency,
+  )
 
   // a price the memory holds is someone's shelf price: one's own always; other people's only as
   // their figures are — with access, and from three prices, their lower median (round 2, Р2-В3)
