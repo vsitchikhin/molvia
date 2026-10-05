@@ -136,8 +136,13 @@ rule: a pair with the lari — the NBG, any other — the CBA.
   adversarial round 5): a weekend, a holiday, the days a bank hung on one date. A bank that hung for
   weeks and spoke again leaves a stretch no walk can fill, and counted a hole it was walked every hour
   for ever; known for good, a bank that froze and thawed would never give back days it does have. So
-  the stretch is asked once a day, as in the first version of the walk. Kept in memory with
-  `archiveNext`, and only for a walk whose days were written. After a restart the walk starts from the first hole
+  a day of the last `ARCHIVE_THAW_DAYS` (a quarter) is known until the next day's look, and asked
+  again then — a bank frozen that long gives its days back the day after it thaws, for at most a
+  portion a day; an older one until a restart of the API (review 8): forgotten daily, a hole of 2024
+  sent the walk from it to today every day, a portion an hour, some nine hundred requests a day and
+  growing. A month was the first bound and lost the days of a bank frozen for five weeks (adversarial
+  round 6, П3). Kept in memory
+  with `archiveNext`, and only for a walk whose days were written. After a restart the walk starts from the first hole
   longer than `ARCHIVE_GAP_DAYS` (`archiveWalkFrom`): the longest stretch without
   a rate in the archive of 2022–2026 is six days, Easter 2026 — measured on 05.10.2026, every day
   asked. Only the days the cache lacks are written; a day the bank answers with tomorrow's rate, set

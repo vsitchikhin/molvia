@@ -52,6 +52,14 @@ export const ARCHIVE_GAP_DAYS = 10
 /** With no hole, how far back the daily walk still looks: a failed week closes itself. */
 export const ARCHIVE_RECENT_DAYS = 31
 
+/**
+ * How long a day the archive answered with an earlier one is asked again every day (review 7, 8,
+ * adversarial round 5, П3): a quarter. A bank frozen up to that long gives its days back the day
+ * after it thaws, for at most a portion a day; a stretch older stays known until a restart of the
+ * API — forgotten daily, a hole of 2024 cost some nine hundred requests a day, and growing.
+ */
+export const ARCHIVE_THAW_DAYS = 90
+
 const DAY_MS = 24 * 60 * 60 * 1000
 
 function dayAfter(day: string, days = 1): string {
@@ -240,9 +248,10 @@ export function officialRatesRefresh({
    * The days a country bank has no rate of its own, as its archive said: asked, it answered with an
    * earlier day — a weekend, a holiday, the days it hung on one date (review 7). Known, they are no
    * hole: a bank that hung for weeks and spoke again left a stretch no walk can fill, and counted a
-   * hole it was walked every hour for ever. Until the next day's look, never longer: a bank frozen
-   * for a while answers so for days it does have, and they come back once it thaws. In memory, as
-   * `archiveNext`: after a restart one walk asks the stretch again and knows it again.
+   * hole it was walked every hour for ever. A day of the last `ARCHIVE_THAW_DAYS` until the next
+   * day's look: a bank frozen for a while answers so for days it does have, and they come back once it
+   * thaws; an older one until a restart. In memory, as `archiveNext`: after a restart one walk asks the stretch
+   * again and knows it again.
    */
   const archiveEmpty = new Map<RateProvider, Set<string>>()
 
@@ -300,9 +309,15 @@ export function officialRatesRefresh({
     if (!history) return
     const at = archiveAt.get(bank.provider)
     if (at !== undefined && now().getTime() - at < HISTORY_EVERY_MS) return
-    // Known until the next day's look only (adversarial round 5, П3): a bank frozen for a while
-    // answers its stuck day for days it does have, and those come back once it thaws.
-    if (at !== undefined) archiveEmpty.get(bank.provider)?.clear()
+    // A quarter's are known until the next day's look only (adversarial round 5, П3): a bank frozen
+    // for a while answers its stuck day for days it does have, and those come back once it thaws.
+    // Older ones until a restart (review 8): forgotten daily, a hole of 2024 sent the walk from it to
+    // today every day, a portion an hour — some nine hundred requests a day, and growing.
+    if (at !== undefined) {
+      const recent = dayAfter(today, -ARCHIVE_THAW_DAYS)
+      const empty = archiveEmpty.get(bank.provider)
+      for (const day of empty ?? []) if (day >= recent) empty?.delete(day)
+    }
     try {
       const kept = await history.rates.between(bank.provider, OFFICIAL_HISTORY_FROM, today)
       const next = archiveNext.get(bank.provider)

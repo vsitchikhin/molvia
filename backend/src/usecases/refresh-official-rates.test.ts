@@ -958,6 +958,30 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
     expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-01')).toBe(true)
   })
 
+  it('давняя дыра банка не гонит проход от неё до сегодня каждые сутки (ревью 8)', async () => {
+    const home = homeHarness()
+    // В марте 2024 банк висел три недели: на каждый день отвечал курсом 29.02.2024.
+    home.override((day) =>
+      day >= '2024-03-01' && day <= '2024-03-21' ? '2024-02-29' : inForce(day),
+    )
+    for (let run = 0; run < 25; run += 1) {
+      await home.run()
+      home.pass(60_000)
+    }
+    const perDay: number[] = []
+    for (let dayOf = 0; dayOf < 3; dayOf += 1) {
+      const before = home.askedOn.length
+      for (let hour = 0; hour < 24; hour += 1) {
+        home.pass(HOUR)
+        await home.run()
+      }
+      perDay.push(home.askedOn.length - before)
+    }
+    // Только суточный взгляд на месяц (с днями перед ним), а не проход от марта 2024.
+    expect(perDay.every((asked) => asked <= ARCHIVE_RECENT_DAYS + 1 + ARCHIVE_GAP_DAYS)).toBe(true)
+    expect(home.warnings).toEqual([])
+  })
+
   it('архив отдал завтрашний курс на сегодня — день пропущен, проход не отвергнут; позже завтра — отвергнут', async () => {
     const tomorrow = '2026-09-20'
     const home = homeHarness({ cached: [], failOn: null })
