@@ -241,12 +241,15 @@ export default defineComponent({
   }
 }
 
+/* A block, so each of its lines takes its width and a bar of a share of it is seen: as a column
+   aligned to the end, a line shrank to its content — nothing — and the bars with it. */
 .tail {
-  display: flex;
   flex: none;
-  flex-direction: column;
-  align-items: flex-end;
   width: 22%;
+
+  .line {
+    justify-content: flex-end;
+  }
 }
 
 .amount {

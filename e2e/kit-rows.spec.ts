@@ -180,10 +180,15 @@ test('the amounts of operation rows stand in one column, where their skeleton’
   const edges = await section.evaluate((root) => {
     const right = (selector: string) =>
       [...root.querySelectorAll(selector)].map((one) => one.getBoundingClientRect().right)
-    return { rows: right('.list-row .amount'), bars: right('.row .amount') }
+    const widths = [...root.querySelectorAll('.row .amount')].map(
+      (one) => one.getBoundingClientRect().width,
+    )
+    return { rows: right('.list-row .amount'), bars: right('.row .amount'), widths }
   })
   expect(edges.rows.length).toBeGreaterThan(5)
   expect(edges.bars.length).toBe(3)
+  // A bar of no width ends there too (MOL-178): the bars must be seen.
+  for (const width of edges.widths) expect(width).toBeGreaterThan(20)
   for (const edge of [...edges.rows, ...edges.bars]) expect(edge).toBeCloseTo(edges.rows[0] ?? 0, 0)
 })
 
@@ -337,7 +342,14 @@ for (const width of [390, 320])
           answer: box('[data-part="under"] .list-row .amount').right,
           bars: box('[data-part="under"] .row .amount').right,
         },
+        // Seen at all: a bar of no width stands at the right edge too, and passed the line above.
+        widths: [...root.querySelectorAll('[data-part="under"] .row .tail .bar')].map(
+          (bar) => bar.getBoundingClientRect().width,
+        ),
       }
     })
-    for (const { answer, bars } of Object.values(parts)) expect(bars).toBeCloseTo(answer, 0)
+    const { widths, ...pairs } = parts
+    for (const { answer, bars } of Object.values(pairs)) expect(bars).toBeCloseTo(answer, 0)
+    expect(widths).toHaveLength(2)
+    for (const one of widths) expect(one).toBeGreaterThan(20)
   })
