@@ -88,8 +88,12 @@ anonymised to keep the gates is 0.2's question, and an anonymisation that can be
 personal data.
 
 **An objection to being counted takes a person out of both gates** (MOL-96, owner's decisions
-04.10.2026). The log and the gates rest on a legitimate interest, not on consent («Персональные
-данные», 5.1), so they are on for everyone and the person may object — «Учитывать меня в
+04.10.2026). The log and the gates rested on a legitimate interest, not on consent («Персональные
+данные», 5.1), so they are on for everyone and the person may object. **Armenia's law has no
+legitimate interest** (art. 8, MOL-97): from edition 2 of the terms (MOL-236, before `v0.2.0`) the log
+and the count over verdicts rest on the consent «Принимаю» names, and the switch is its withdrawal —
+the mechanics stay; until that edition the log has no Armenian basis, a price named in «Персональные
+данные», 2.1, and before 0.2 production holds the owner alone. The switch is «Учитывать меня в
 статистике», the first row of «Ваши данные», saved on the tap at `PUT /actors/me/analytics` with no
 sheet (В-3), as the bot's switches are. **The switch is drawn only as the server's answer**
 (adversarial А1, Р2-А1) — on «Бот» and «Зарплата» too, whose rows take the same quiet line
@@ -118,13 +122,14 @@ live region only when it does not take the focus, which reads it (№10). **Off 
 the person's log at once** (В-1), every type, in the transaction that marks the objection
 (`actors.analytics_off_at`) — the second written exception to append-only: the gates stop counting
 them, so the rows have no reader left, and an objection to a legitimate interest takes what it
-gathered (GDPR, the bar of section 2, art. 17(1)(c)). **The writer reads the objection after the
+gathered (GDPR, the bar of section 2, art. 17(1)(c)) — as a withdrawn consent does in Armenia (art. 21
+§6: stop, and destroy within ten working days). **The writer reads the objection after the
 lock**: the switch takes the log's own advisory lock, so a visit being written either lands first
 and goes with the erasure, or waits and finds the objection; a person who is not there still fails
 on the foreign key, as before. **Out of both halves, never the numerator alone**: ten people, three
 back, two object — one of them back — reads 2 of 10 if only the rows go, a gate pulled towards
 «stop» by objections rather than the hypothesis; 2 of 8 with «opted out 2» is the truth. **Gate 0.2
-too** (В-2): «счётчики ворот» are the same legitimate interest, so a count over verdicts is
+too** (В-2): «счётчики ворот» rest on the same basis as the log, so a count over verdicts is
 analytics as much as the log; there the objection is read as it stands now — the verdicts are not
 erased, so back on, the person counts again. **Gate 0.3 counts someone back on only if they were
 back before their fourth week began** (`actors.analytics_on_at` at or before `created_at + 504 h`,

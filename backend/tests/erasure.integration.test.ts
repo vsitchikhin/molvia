@@ -510,6 +510,8 @@ describe('страж схемы', () => {
       where ccu.table_name = 'actors' and kcu.constraint_schema = 'public'
       order by 1`)
 
+    // Red here is a person's new data: it also adds its row to the record of processing
+    // (Confluence 12091393, MOL-97) in the same PR — nothing but this line reminds of it.
     expect(references.map((row) => row.reference)).toEqual([...ACTOR_REFERENCES].sort())
   })
 })

@@ -369,7 +369,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   and «Удалить мои данные» in the settings (`DELETE /actors/me`, MOL-94) — in one transaction; catalogue items stay
   with `created_by` nulled, every place stays, and one is added to `erasures` — a count by week of
   arrival, no id (MOL-91). **A new table that points at `actors` must join
-  erasure** — a test holds `ACTOR_REFERENCES` to every foreign key.
+  erasure** — a test holds `ACTOR_REFERENCES` to every foreign key — **and the record of processing**
+  (Confluence 12091393, MOL-97) in the same PR, as must a new recipient; nothing holds that one.
 - **The copy is what erasure takes** (`GET /actors/me/export`, MOL-93): a section per erased table,
   counted against a dry run, **and every column exported or left out with its reason**
   (`EXPORT_COLUMNS`); stored, never counted; the removed marked; no secret.

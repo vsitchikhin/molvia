@@ -188,12 +188,18 @@ The detail behind the privacy lines of `CLAUDE.md`.
   «Реестр обработки персональных данных», 12091393): a row per processing — the data, the purpose, the
   basis by country, the term and the constant or timer that holds it, who sees it, erasure and the
   copy. **A new table or column that is a person's adds its row in the same PR**, as it joins erasure
-  and the copy; a new recipient adds a line to the processors or third parties. **Armenia's law knows
+  and the copy; a new recipient adds a line to the processors or third parties. Erasure and the copy are
+  held by tests, the record by nothing but a comment beside those tests and a line in `CLAUDE.md` — a
+  named price: a recipient arrives outside the schema (Open Food Facts, healthchecks.io) and may not
+  load this file at all. **Armenia's law knows
   two bases only — consent or a law** (art. 8): there is no legitimate interest, so whatever the
-  service does not need to work rests on «Принимаю», and its text names it (art. 10, MOL-236). **There is
+  service does not need to work — the visit log, the withdrawn verdicts gate 0.2 counts — rests on
+  «Принимаю» **from edition 2** (MOL-236, before `v0.2.0`), whose text names it (art. 10). Until then
+  the log has no Armenian basis: a price named in «Персональные данные», 2.1, with production the
+  owner's alone before 0.2. **There is
   no lawyer** (owner's decision В-1, 05.10.2026): where the text reads two ways, the strict reading is
   taken and the risk named in 3244067, section 2.1; a lawyer is called on a complaint or a letter from
-  an authority, a breach, money, or 1.0 (the brief is `.scratch/tasks/questions/MOL-97-lawyer.md`).
+  an authority, a breach, money, a country beyond the three, or 1.0 (the brief is `.scratch/tasks/questions/MOL-97-lawyer.md`).
   **A breach follows «Порядок при утечке персональных данных»** (12124161): Armenia — at once, in
   public, to the police and the Agency, with no threshold of risk (art. 21 §4); Georgia and Serbia —
   72 hours to their authority; every incident goes into the page's log, notified or not.
