@@ -175,6 +175,30 @@ describe('выключение', () => {
   })
 })
 
+describe('стирание', () => {
+  it('выключение и «Удалить мои данные» разом не встают в замок и не оставляют строк (ревью 1, №2)', async () => {
+    // Erasure never takes the log's lock, and the switch holds nothing erasure needs while it
+    // waits for the row: no cycle. Held by a test, should erasure ever take that lock.
+    for (let round = 0; round < 20; round += 1) {
+      const me = await owner()
+      await openAdvice(me)
+      const [off, erase] = await Promise.all([
+        app.inject({
+          method: 'PUT',
+          url: '/actors/me/analytics',
+          headers: { cookie: me.cookie },
+          payload: { on: false },
+        }),
+        app.inject({ method: 'DELETE', url: '/actors/me', headers: { cookie: me.cookie } }),
+      ])
+      expect([200, 401]).toContain(off.statusCode)
+      expect(erase.statusCode).toBe(204)
+      expect(await rowsOf(me.id)).toHaveLength(0)
+      expect(await moments(me.id)).toBeUndefined()
+    }
+  })
+})
+
 describe('включение обратно', () => {
   it('журнал начинается заново, а момент включения записан (Р-3)', async () => {
     const me = await owner()
@@ -185,6 +209,17 @@ describe('включение обратно', () => {
     expect(after?.onAt).toBeInstanceOf(Date)
     await openAdvice(me)
     expect(await rowsOf(me.id)).toHaveLength(1)
+  })
+
+  it('после «выкл → вкл → выкл» момент возражения — последний: истории нет (ревью 1, №1, А3)', async () => {
+    const me = await owner()
+    await choose(me, false)
+    await choose(me, true)
+    await choose(me, false)
+    const now = await moments(me.id)
+    expect(now?.offAt).toBeInstanceOf(Date)
+    expect(now?.onAt).toBeInstanceOf(Date)
+    expect(now?.offAt?.getTime()).toBeGreaterThanOrEqual(now?.onAt?.getTime() ?? Infinity)
   })
 
   it('«включить» у того, кто не выключал, не ставит момента включения', async () => {
