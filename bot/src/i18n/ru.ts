@@ -210,6 +210,7 @@ export const ru = {
   'owner.merge.pair': '«{from}» → «{into}»',
   'owner.merge.place': 'место {pair} · {city}',
   'owner.merge.more': '…и ещё {count}',
+  'owner.merge.cut': '…и ещё {count} не влезли в сообщение — все: make merge-candidates',
   'owner.merge.moreLater': '…и ещё {count} — назову в следующие утра',
   'owner.merge.undo': 'Отменить — make unmerge ID=номер',
   /**

@@ -7,7 +7,14 @@ import type { MolviaBotClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { OwnerNotice, OwnerNotices } from '@molvia/model'
 import { FEEDBACK_KINDS } from '@molvia/model'
-import { OWNER_STOP_BUDGET_MS, ownerText, startOwnerNotices, tellOwner, threadTagOf } from './owner'
+import {
+  MERGE_TEXT_MAX,
+  OWNER_STOP_BUDGET_MS,
+  ownerText,
+  startOwnerNotices,
+  tellOwner,
+  threadTagOf,
+} from './owner'
 
 const OWNER = 4242
 const NEW: OwnerNotice = {
@@ -670,6 +677,40 @@ describe('ownerText — утренний отчёт склейки (MOL-106)', (
   it('says the candidates past the printed ones come on the mornings after', () => {
     const text = ownerText({ ...NIGHT, merged: 0, mergedPairs: [], candidates: 3 })
     expect(text).toContain('…и ещё 2 — назову в следующие утра')
+  })
+
+  it('holds within what Telegram takes, and sends the cut candidates to the list (review №9)', () => {
+    const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+    const long = (n: number) => `${'Молоко ультрапастеризованное '.repeat(3)}${String(n)}`
+    const city = 'Г'.repeat(120)
+    for (const subject of ['item', 'place'] as const) {
+      const text = ownerText({
+        kind: 'catalogue_merged',
+        day: '2026-10-06',
+        mode: 'report',
+        merged: 10,
+        candidates: 12,
+        mergedPairs: Array.from({ length: 10 }, (_, i) => ({
+          subject,
+          from: long(i),
+          into: long(i + 50),
+          ...(subject === 'place' ? { city } : {}),
+          fromId: id(i),
+          intoId: id(i + 50),
+        })),
+        candidatePairs: Array.from({ length: 10 }, (_, i) => ({
+          subject,
+          from: long(i + 100),
+          into: long(i + 150),
+          ...(subject === 'place' ? { city } : {}),
+          fromId: id(i + 100),
+          intoId: id(i + 150),
+        })),
+      })
+      expect(text.length).toBeLessThanOrEqual(MERGE_TEXT_MAX)
+      expect(text).toContain('не влезли в сообщение — все: make merge-candidates')
+      expect(text).toContain('…и ещё 2 — назову в следующие утра')
+    }
   })
 
   it('still says the night ran when nothing merged', () => {

@@ -109,6 +109,7 @@ export const en: Dictionary = {
   'owner.merge.pair': '«{from}» → «{into}»',
   'owner.merge.place': 'place {pair} · {city}',
   'owner.merge.more': '…and {count} more',
+  'owner.merge.cut': '…and {count} more past the message — all: make merge-candidates',
   'owner.merge.moreLater': '…and {count} more — on the mornings to come',
   'owner.merge.undo': 'Undo — make unmerge ID=number',
   'feedback.frame': 'A reply to your message of {date}:',

@@ -86,8 +86,17 @@ function pairText(
 }
 
 /**
+ * The longest morning's report: Telegram takes 4096 characters and answers 400 past them, and a report
+ * refused is lost — it is handed once (review №9, adversarial Б2). Room is left for the closing lines.
+ */
+export const MERGE_TEXT_MAX = 4000
+const MERGE_TEXT_TAIL = 300
+
+/**
  * The morning's report of the night's merge (MOL-106): sent every morning, nothing merged included —
- * it is also the word that the night ran. In `report` mode it says what would have merged (В-3).
+ * it is also the word that the night ran. In `report` mode it says what would have merged (В-3). Pairs
+ * are printed while the message holds them; the rest are counted, and a candidate cut for length is
+ * named by `make merge-candidates`, which lists every one named and still apart.
  */
 function mergedText(notice: CatalogueMergedNotice): string {
   const on = notice.mode === 'on'
@@ -98,29 +107,46 @@ function mergedText(notice: CatalogueMergedNotice): string {
       candidates: notice.candidates,
     }),
   ]
+  let length = lines[0]?.length ?? 0
+  const fits = (block: readonly string[]): boolean => {
+    const more = block.reduce((sum, line) => sum + line.length + 1, 0)
+    if (length + more > MERGE_TEXT_MAX - MERGE_TEXT_TAIL) return false
+    lines.push(...block)
+    length += more
+    return true
+  }
+
   if (notice.mergedPairs.length > 0) {
-    lines.push('', t(undefined, on ? 'owner.merge.merged' : 'owner.merge.wouldMerge'))
+    fits(['', t(undefined, on ? 'owner.merge.merged' : 'owner.merge.wouldMerge')])
+    let printed = 0
     for (const pair of notice.mergedPairs) {
       const text = pairText(pair.subject, pair.from, pair.into, pair.city)
-      lines.push(pair.id === undefined ? text : `#${String(pair.id)} ${text}`)
       // Only reported: its ids, so a false pair can be looked at, or merged and undone for good.
-      if (pair.id === undefined && pair.fromId !== undefined && pair.intoId !== undefined) {
-        lines.push(`FROM=${pair.fromId} INTO=${pair.intoId}`)
-      }
+      const ids =
+        pair.id === undefined && pair.fromId !== undefined && pair.intoId !== undefined
+          ? [`FROM=${pair.fromId} INTO=${pair.intoId}`]
+          : []
+      if (!fits([pair.id === undefined ? text : `#${String(pair.id)} ${text}`, ...ids])) break
+      printed += 1
     }
-    const rest = notice.merged - notice.mergedPairs.length
+    const rest = notice.merged - printed
     if (rest > 0) lines.push(t(undefined, 'owner.merge.more', { count: rest }))
   }
   if (notice.candidatePairs.length > 0) {
-    lines.push('', t(undefined, 'owner.merge.candidates'))
+    fits(['', t(undefined, 'owner.merge.candidates')])
+    let printed = 0
     for (const pair of notice.candidatePairs) {
-      lines.push(
+      const block = [
         pairText(pair.subject, pair.from, pair.into, pair.city),
         `make merge FROM=${pair.fromId} INTO=${pair.intoId}`,
-      )
+      ]
+      if (!fits(block)) break
+      printed += 1
     }
-    const rest = notice.candidates - notice.candidatePairs.length
-    if (rest > 0) lines.push(t(undefined, 'owner.merge.moreLater', { count: rest }))
+    const cut = notice.candidatePairs.length - printed
+    if (cut > 0) lines.push(t(undefined, 'owner.merge.cut', { count: cut }))
+    const later = notice.candidates - notice.candidatePairs.length
+    if (later > 0) lines.push(t(undefined, 'owner.merge.moreLater', { count: later }))
   }
   if (on && notice.mergedPairs.length > 0) lines.push('', t(undefined, 'owner.merge.undo'))
   return lines.join('\n')
