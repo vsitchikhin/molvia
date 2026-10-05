@@ -38,6 +38,7 @@ made the names up (MOL-114). What reads is a chain of cheap parts:
 | Reading       | Tesseract 5, Debian's `tessdata_fast`, page modes 4 and 6                                | `services/receipt-reader` |
 | Figures       | the till's layout or its class code, the line's arithmetic, the discount rate, the total | `receipt-text.ts`         |
 | «Переснимите» | not one item line found; read in part is the review's hint                               | `needsReshoot`            |
+| No items      | a section printed with no items: a sum to record, never «переснимите» (MOL-227)          | `departmentReceipt`       |
 
 **The parse is a port, measured on the bench.** `receipt-text.ts` began as MOL-114's `hybrid.mjs` in
 TypeScript, line for line on the bench's readings (`.scratch/tasks/status/MOL-125/parity.mjs`); the
@@ -339,8 +340,12 @@ print Tesseract misreads, found 14 lines of which 2 add up and showed none of th
 found 11 with 9 right. Now the person sees them and puts them right, and **those corrections are the
 measure of 0.2** (`receipt_days`, below) — a till read badly is one to learn (MOL-169), never one to
 refuse. **The total alone decides nothing**: OCR missed it on 9 of the bench's 16 readings, most of
-them good ones. **«Переснимите» names no cause it does not know** — «Не нашли ни одной строки» and the
-advice, not «смят или в тени»: the owner's three shots of 04.10 were none of those.
+them good ones. **«Переснимите» asserts no cause it does not know** — «Не нашли ни одной строки» and the
+advice, not «смят или в тени»: the owner's three shots of 04.10 were none of those. **It names the ones it
+may be, faint print among them** (MOL-227, owner's В-2 «а»): «так бывает, когда чек смят, в тени или
+напечатан бледно» — and a retake fixes no faint print (the delivery till WIN-…, am-06, read alike on every
+shot, larger, thicker, retrained), so for that one the advice is a record by hand; «Прочитали не всё» says
+the same — «если печать бледная, переснимать не нужно — поправьте строки» — beside its «Переснять».
 
 **What a person can do with a receipt read badly** (В-2): «Отправить чек разработчику» on the failure
 and at the foot of the review, while its photos are on this phone — they go into «Написать
@@ -349,7 +354,8 @@ and at the foot of the review, while its photos are on this phone — they go in
 ## The measure of 0.2: what people put right (MOL-222)
 
 **`receipt_days` counts, by day in Yerevan and with no id of anyone**, as `login_days` does (MOL-68):
-how readings ended (`read`, `read_partly`, `reshoot`, `unreadable` — the attempts' cap included), and
+how readings ended (`read`, `read_partly`, `reshoot`, `no_items` — MOL-227 — `unreadable`, the attempts'
+cap included), and
 at «Записать» the lines of the receipt, those put right, and each kind — left out, another item than
 the review showed, the quantity or the sum changed — a line counted once however many; receipts whose
 **total** was put right (`totals_corrected`) — one that differs from the total read: opened, checked and
@@ -392,6 +398,49 @@ that add up and «in part»: `lines: 0` of every «переснимите» sent
 **Receipts that failed as `reshoot` before MOL-222 say «Не нашли ни одной строки»**, though some had
 lines under the old rule (am-06: 14): the price, named — before 0.2 only the owner is on production,
 and those receipts are taken again (Т-10).
+
+## A receipt with no items (MOL-227)
+
+**A sole trader's terminal prints no items at all**: its section «Բաժին 1», the turnover tax with the
+section's sum, the total, the payment, the tax number, the day — ten receipts of one trader on the bench
+(am-15…am-24, two tills, a bold print and a thin one). Read whole, it said «переснимите», though another
+shot reads the same. **It is a sum to record** (owner, 04.10.2026: «с чеков мелких частников можем хотя бы
+сумму забирать»): a trip on the receipt's day whose money is the total (MOL-78), its purchases added later
+in the record if the person wants them — «Добавить позицию» is already there (В-1 «а»); the review adds no
+line (MOL-222 Р-14 stays where it was).
+
+**Told by what is printed, only where no reading found a line** (`departmentReceipt`, from `bestReading`): a
+section «Բաժին» (and OCR's «Ււսժին», «Բայժին») and nothing an item prints anywhere — the class code, a
+heading «(3824)», an article «0401/1163909», a table's heading. Dog City and KFC print «Բաժին» too, over
+their items. On the bench: 10 of 10 of the trader's receipts, 0 of 25 readings with items — the seven of
+them where the parse found no line among them, which stay «переснимите». **The price, named** (Р-7): a
+receipt with items whose every mark OCR lost and whose «Բաժին» it read is recorded as a sum; the person
+sees the photo and «В чеке нет списка товаров».
+
+**Its head is the terminal's, read there only** (Р-2): the three layouts keep theirs, measured in rounds.
+The tax number is eight digits before the till's registration number — «CUCC: 57311783 Գ/Ը: 31028805»,
+however OCR read the word — or after «ՀՎՀՀ», **never the receipt's own number «ԿՀ: 00000049»**, which the
+card's rule took on nine of ten; the day is DD-MM-YY; the fiscal number in capitals. **A field the two
+readings read apart is not read** — psm 4 «87311783» against psm 6 «57311783» is no tax number. **The total
+is the amount two of three agree on** — the section's sum, «Ընդամենը», the payment (Р-3): «Ընդամենը 550.09»
+read once is outvoted by «550 00» twice, and one source alone is no total, since a wrong sum on a trip is
+worse than none the person sees and types. **Two receipts on one photo** print two moments (am-21): whose
+total, time and number it is nobody can tell, so none is read. The bench, before → after: «no items» 0 → 10,
+the tax number right 1 → 9 (none wrong), the total 2 → 7 (none wrong), the day 0 → 8, the fiscal number
+0 → 3; not one field of any other reading moved (`.scratch/tasks/status/MOL-227/score.mts`).
+
+**«Без товаров» is a `parsed` receipt with no lines** (`withoutItems`, Р-1): since MOL-222 a receipt is read
+only with a line in it, so an empty one is this and nothing else — no status, no failure, no field on the
+wire; `layout` is `department`. It is counted as `no_items`, never `read_partly` (`readPartly` of no lines
+is true). **The review** says «В чеке нет списка товаров — запишем сумму», draws the total without «Строки»
+and with no difference, and «Записать сумму» waits for a total — **a trip with no money and no purchase is
+refused by the server** (`error.receipt_total_required`, Р-4), the phone only keeps the button from a tap;
+the same holds for a receipt whose every line is left out and whose total nobody knows. After the record
+«Записали сумму по чеку», no «К оценкам»: there is nothing to rate. «Покупки» say «без товаров · {day}»,
+the bot «товаров в нём нет — можно записать сумму», and a trip with money and no purchase is «сумма по
+чеку» in «Записаны», «Деньги» and an account, never «0 позиций» (Р-6). **Two shots of one such receipt
+are two records** where the fiscal number was not read (Р-8, the price): «ԿՀ» is one and the same on both
+tills of one trader. End-to-end, the fake reader answers a square photo with such a receipt.
 
 ## The reader holds nothing
 
