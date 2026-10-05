@@ -44,6 +44,19 @@ import IconCloseCircle from '~icons/mdi/close-circle'
 import IconMagnify from '~icons/mdi/magnify'
 
 /**
+ * Whether the platform closes this dialog on Esc, in its own words: `closedBy` is the state it worked
+ * out — `none` for a dialog beside the page or one marked to be stepped through, `closerequest` or `any`
+ * otherwise, whatever the attribute says (round 4, Г1: a dialog beside the page marked `closerequest`
+ * closes too). An engine without it knows no `closedby` and closes a modal dialog alone.
+ */
+function closedBy(dialog: HTMLDialogElement): string {
+  // Typed as always there, and an engine before it has not got it.
+  const answer: unknown = Reflect.get(dialog, 'closedBy')
+  if (typeof answer === 'string') return answer
+  return dialog.matches(':modal') ? 'closerequest' : 'none'
+}
+
+/**
  * The one search field of the app (Ф-12, MOL-177): a pill on `surface-2` with the edge of a field,
  * a magnifier at the left, the screen's action or «Очистить» at the right, a hint under it.
  *
@@ -111,18 +124,12 @@ export default defineComponent({
       // товар» lost the receipt's words and stayed open (adversarial А3). Taken here, the text stays and
       // the dialog gets the close request the platform would have made: a `cancel` it may prevent — a
       // sheet does, and closes through the history — else it is closed (round 2, Б1: a `cancel` from a
-      // script closes nothing by itself). Only where the platform makes one: a modal dialog that does not
-      // ask to be stepped through (`closedby="none"`) — a dialog beside the page keeps its Esc (round 3,
-      // В1). Its owner's own Esc — a combobox's — comes first.
+      // script closes nothing by itself). Only where the platform makes one, by its own answer (round 3,
+      // В1; round 4, Г1). Its owner's own Esc — a combobox's — comes first.
       escape: (event: KeyboardEvent) => {
         if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented) return
         const dialog = input.value?.closest('dialog')
-        if (
-          !dialog?.matches(':modal') ||
-          dialog.getAttribute('closedby')?.toLowerCase() === 'none'
-        ) {
-          return
-        }
+        if (!dialog?.open || closedBy(dialog) === 'none') return
         event.preventDefault()
         if (dialog.dispatchEvent(new Event('cancel', { cancelable: true }))) dialog.close()
       },

@@ -131,9 +131,17 @@ describe('SearchField', () => {
     // the receipt's words and stayed open. In a sheet Esc is «back» (MOL-80).
     // happy-dom matches no `:modal`: a dialog shown as modal is one here by its own word — the engines
     // themselves are held by the adversarial probes of round 3 (Chromium and WebKit).
-    function inSheet(open: boolean, attrs: Record<string, unknown> = {}, modal = open) {
+    // `closedBy` is the engine's own answer, which happy-dom has not got: given, it is the engines'
+    // state; left out, the field falls back on the modal alone, as an engine without it does.
+    function inSheet(
+      open: boolean,
+      attrs: Record<string, unknown> = {},
+      modal = open,
+      closedBy?: string,
+    ) {
       const sheet = document.createElement('dialog')
       if (open) sheet.setAttribute('open', '')
+      if (closedBy !== undefined) Object.defineProperty(sheet, 'closedBy', { value: closedBy })
       const matches = sheet.matches.bind(sheet)
       vi.spyOn(sheet, 'matches').mockImplementation((selector) =>
         selector === ':modal' ? modal : matches(selector),
@@ -184,25 +192,28 @@ describe('SearchField', () => {
       }
     })
 
-    // The platform closes neither on Esc: a dialog beside the page, and one to be stepped through, not
-    // waved away (round 3, В1).
-    it('must not take Esc in a dialog that is not modal, or that asks to be closed by nothing', () => {
-      for (const [modal, closedBy] of [
-        [false, null],
-        [true, 'none'],
-        [true, 'NONE'],
+    // What the platform closes on Esc, by its own answer (rounds 3 and 4, В1 and Г1): a dialog beside the
+    // page or one to be stepped through keeps its Esc, and one beside the page marked to close does close.
+    it('takes Esc only where the platform closes the dialog on it', () => {
+      for (const [modal, closedBy, taken] of [
+        [false, undefined, false],
+        [true, undefined, true],
+        [false, 'none', false],
+        [true, 'none', false],
+        [false, 'closerequest', true],
+        [false, 'any', true],
+        [true, 'closerequest', true],
       ] as const) {
-        const { sheet, heard, view } = inSheet(true, {}, modal)
-        if (closedBy) sheet.setAttribute('closedby', closedBy)
+        const { sheet, heard, view } = inSheet(true, {}, modal, closedBy)
         const event = new KeyboardEvent('keydown', {
           key: 'Escape',
           bubbles: true,
           cancelable: true,
         })
         view.get('input').element.dispatchEvent(event)
-        expect(event.defaultPrevented).toBe(false)
-        expect(heard).toEqual([])
-        expect(sheet.open).toBe(true)
+        expect(event.defaultPrevented, `${String(modal)} ${String(closedBy)}`).toBe(taken)
+        expect(heard).toEqual(taken ? ['cancel'] : [])
+        expect(sheet.open).toBe(!taken)
         view.unmount()
         sheet.remove()
       }

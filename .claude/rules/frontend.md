@@ -332,9 +332,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   lost the receipt's words and stayed open (adversarial А3); the field prevents that Esc and makes the
   close request the platform would have: a `cancel` the dialog may prevent — a sheet does, and closes
   through the history — else the dialog is closed, since a `cancel` from a script closes nothing by
-  itself (round 2, Б1) — and only where the platform makes one, a modal dialog not marked
-  `closedby="none"` (round 3, В1: a dialog beside the page, or one to be stepped through, keeps its Esc);
-  unless its owner took the key first. Outside a dialog Esc is the platform's,
+  itself (round 2, Б1) — and only where the platform makes one, by its own answer `dialog.closedBy`:
+  not `none` (round 3, В1: a dialog beside the page or one to be stepped through keeps its Esc; round 4,
+  Г1: one beside the page marked `closerequest` or `any` is closed, and the attribute is the platform's
+  to read, not ours); an engine without the property knows no `closedby` and closes a modal dialog
+  alone. Unless its owner took the key first. Outside a dialog Esc is the platform's,
   the combobox's «let go of the row» before it. **The focus of a field is one mixin, `field-focus`**, which `AppField` takes too. **The field
   is only a field**: a combobox gives it its role, its `aria-*` and its keys, and every attribute but
   `class` and `style` lands on the `<input>` — so the two simple searches carry no listbox they have
