@@ -51,6 +51,7 @@
       <AppButton
         block
         :busy="consent.accepting"
+        :busy-label="t('consent.accept_busy')"
         :inactive="!consent.aged || !online"
         @click="accept"
       >

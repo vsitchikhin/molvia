@@ -10,7 +10,13 @@
     <p v-if="failed" class="failed" role="alert">{{ t('devices.end_failed') }}</p>
 
     <template #footer>
-      <AppButton variant="danger-ghost" block :disabled="busy" @click="$emit('confirm')">
+      <AppButton
+        variant="danger-ghost"
+        block
+        :busy="busy"
+        :busy-label="t('devices.end_sheet.confirm_busy')"
+        @click="$emit('confirm')"
+      >
         {{ t('devices.end_sheet.confirm') }}
       </AppButton>
     </template>

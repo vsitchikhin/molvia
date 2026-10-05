@@ -345,6 +345,7 @@
       "detach_question": "Unlink code {code} from «{name}»?",
       "detach_hint": "Nobody will find it by this code any more",
       "detach": "Unlink",
+      "detach_busy": "Unlinking…",
       "bind_named": "«{name}» is already in the catalogue. Link code {code} to it?"
     }
   },
@@ -851,7 +852,8 @@
     "remove_sheet": {
       "title": "Delete the exchange?",
       "body": "A deleted exchange no longer counts in the rate of new purchases. Past purchases do not change",
-      "confirm": "Delete"
+      "confirm": "Delete",
+      "confirm_busy": "Deleting…"
     },
     "removed": "Exchange deleted: {amounts}",
     "restore": "Bring back",
@@ -1012,7 +1014,8 @@
     "remove_sheet": {
       "title": "Remove this income?",
       "body": "Past purchases do not change. If this income was part of your rate, new purchases will be counted without it",
-      "confirm": "Remove income"
+      "confirm": "Remove income",
+      "confirm_busy": "Removing income…"
     },
     "removed": "Income removed: {amount}",
     "restore": "Bring back",
@@ -1090,7 +1093,8 @@
       "title": "End the session on {device}?",
       "title_unknown": "End the session on an unknown device?",
       "body": "Molvia will ask to sign in with Telegram again on that device. This cannot be undone from here.",
-      "confirm": "End session"
+      "confirm": "End session",
+      "confirm_busy": "Ending…"
     },
     "end_failed": "Could not end that session. Check the connection and try again.",
     "ended": "The session on {device} has ended",
@@ -1132,6 +1136,7 @@
     "body": "Everything Molvia saved on this device will be erased. Nothing is lost on the server: sign in with Telegram and it all comes back.",
     "unsent": "{n} entry has not been sent or was not accepted and will be lost | {n} entries have not been sent or were not accepted and will be lost",
     "confirm": "Sign out and erase",
+    "confirm_busy": "Signing out…",
     "offline": "Signing out needs a connection: without one the session on the server cannot be ended.",
     "error": "Could not sign out: the server did not answer. Try again."
   },
@@ -1142,6 +1147,7 @@
     "devices": "What is saved on this device is erased. Copies on other devices stay until the app or the site data is deleted there.",
     "final": "This cannot be undone. You can download a copy first: «Download my data».",
     "confirm": "Delete for good",
+    "confirm_busy": "Deleting…",
     "offline": "Deleting needs a connection.",
     "error": "Could not delete: the server did not answer. Try again.",
     "signed_out": "This sign-in has already ended, and this tap deleted nothing. If you have already deleted your data — here, in the bot or on another device — it is gone; if not, sign in and delete it again.",
@@ -1642,6 +1648,7 @@
     },
     "age": "I am 16 or older",
     "accept": "I accept",
+    "accept_busy": "Saving…",
     "decline": "I do not accept",
     "offline": "You cannot accept without the internet — connect, and the button will work.",
     "error": "Could not save your consent. Try again.",
@@ -2018,6 +2025,7 @@
       "not_kept": "The photo wasn’t kept on this phone. Free some space and try again",
       "preparing": "Preparing the photo…",
       "send": "Send receipt",
+      "send_busy": "Sending the receipt…",
       "send_offline": "We’ll send it once you are online",
       "sent": "Receipt sent",
       "sent_offline": "The receipt is waiting for a connection — we’ll send it"
