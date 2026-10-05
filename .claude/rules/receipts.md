@@ -133,15 +133,15 @@ its own figures, the terminal's over them. It reads only from the first code to 
 nothing of the head or the payment is an item, and it is chosen only where it finds more lines than the
 two layouts — a receipt with no «Դաս» is read as before.
 
-| What OCR does                                            | What the reading does                                                                                                                                                                                         |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| «աս, 56.10», «Դաս՝ 56 10», «Դաս. 5610», «нии‘ 5610»      | a class read with its point anywhere on the receipt is the receipt's class                                                                                                                                    |
-| the code row lost whole («Ан Ц 56. յ wit 70211»)         | the row of figures is still an item, of the receipt's class where every code read is one class of services; the first item too: its figures within three rows above the first code begin the list (review А2) |
-| «1 հաս 1300 1300» — «հատ» read «հաս» after a count       | a unit, never a code: no mark right after a count, none whose figure goes on — «5610.00x», «1000մլ» (А3–А5)                                                                                                   |
-| «393191դրա» for 3 931.91, «x10» for ×1.0, «-» for «=»    | the terminal's sum has two decimals always, its count one; a till's figure without its point costs one swap                                                                                                   |
-| «4 հատ 688.09 688.09»                                    | the line's arithmetic, as the card's (`candidates`)                                                                                                                                                           |
-| the price lost («1 հատ Ա 120»)                           | the sum alone, unsettled: it says nothing of the line's arithmetic                                                                                                                                            |
-| Latin or Cyrillic smudges in a name («Ստրիպս Thuin ‘Al») | a word with no Armenian letter is dropped from a name that has Armenian words                                                                                                                                 |
+| What OCR does                                            | What the reading does                                                                                                                                                                                                                                              |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| «աս, 56.10», «Դաս՝ 56 10», «Դաս. 5610», «нии‘ 5610»      | a class read with its point anywhere on the receipt is the receipt's class                                                                                                                                                                                         |
+| the code row lost whole («Ан Ц 56. յ wit 70211»)         | the row of figures is still an item, of the receipt's class where every code read is one class of services; the first item too: its figures within three rows above the first code begin the list, and on the terminal the name rows over them (reviews А2, Б1)    |
+| «1 հաս 1300 1300», «Բաքեթ 5610 5610», «Կվաս 1000 մլ»     | a mark is the word «Դաս» — at most one letter before «աս» — and its class no figure that goes on: no amount after it, «5610 00х», «5610.00x», no unit of volume or weight; the article's letters glued to it, «56.10Ն/Կ», are the article's (reviews А3–А5, Б2–Б5) |
+| «393191դրա» for 3 931.91, «x10» for ×1.0, «-» for «=»    | the terminal's sum has two decimals always, its count one; a till's figure without its point costs one swap                                                                                                                                                        |
+| «4 հատ 688.09 688.09»                                    | the line's arithmetic, as the card's (`candidates`)                                                                                                                                                                                                                |
+| the price lost («1 հատ Ա 120»)                           | the sum alone, unsettled: it says nothing of the line's arithmetic                                                                                                                                                                                                 |
+| Latin or Cyrillic smudges in a name («Ստրիպս Thuin ‘Al») | a word with no Armenian letter is dropped from a name that has Armenian words                                                                                                                                                                                      |
 
 **The rules were picked on one receipt, KFC's two prints** (am-14, am-14t: 8 of 8 each, balanced; the bench
 80 → 96 of 228, not one line of the readings before lost, no line on the ten sole traders' receipts with no
@@ -153,7 +153,7 @@ neither layout reads (`receiptCityOf`, review А6): a dish named after a city is
 
 **The price, named:** the terminal's print loses its tax number and fiscal number to OCR, so its two prints
 of one purchase are recorded as two receipts if both are shot (В-3); with no article the shop's memory
-there is by the line's text only; a name ending in «աս» before a bare number, «Կվաս 1000», still reads as a code «1000».
+there is by the line's text only.
 
 **Amounts are counted in hundredths, not in minor units.** A till prints hundredths whatever the
 currency; `moneyOfHundredths` turns them into the currency's minor units by its exponent. Quantities
