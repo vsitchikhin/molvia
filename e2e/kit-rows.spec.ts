@@ -125,7 +125,15 @@ for (const width of [390, 320])
         const words = row.querySelector('.words')?.getBoundingClientRect()
         const tail = row.querySelector('.tail')?.getBoundingClientRect()
         const below = row.querySelector('.below > *')?.getBoundingClientRect()
-        return Boolean(words && tail && below && below.right > tail.left)
+        // Over it, not beside or above it: under the words the tail is on a line of its own.
+        return Boolean(
+          words &&
+          tail &&
+          below &&
+          below.right > tail.left &&
+          below.bottom > tail.top &&
+          below.top < tail.bottom,
+        )
       })
       const titles = rows.flatMap((row) => {
         const title = row.querySelector('.title')
@@ -138,7 +146,15 @@ for (const width of [390, 320])
       const chevrons = rows.map(
         (row) => row.querySelector('.chevron')?.getBoundingClientRect().right ?? Number.NaN,
       )
+      // A narrow row stands its tail under the words, on a line of its own (owner's choice on Б1, Б2).
+      const under = rows.filter((row) => {
+        const words = row.querySelector('.words')?.getBoundingClientRect()
+        const tail = row.querySelector('.tail')?.getBoundingClientRect()
+        return Boolean(words && tail && tail.top >= words.bottom - 1)
+      }).length
       return {
+        tails: root.querySelectorAll('.list-row .tail').length,
+        under,
         narrowest: Math.min(
           ...rows.map((row) => row.querySelector('.words')?.getBoundingClientRect().width ?? 0),
         ),
@@ -162,8 +178,10 @@ for (const width of [390, 320])
       titlesCut: 0,
       page: width,
     })
-    // Two fifths of the row at most go to the tail, unless its amount needs more: the words keep the rest.
-    expect(look.narrowest).toBeGreaterThanOrEqual(width === 320 ? 40 : 90)
+    // On 320 the card is under 22rem: every tail under its words, and the words the whole width. On 390
+    // (a card of 358) the tails stand beside the words, at most 45 % of the row unless an amount needs more.
+    expect(look.under).toBe(width === 320 ? look.tails : 0)
+    expect(look.narrowest).toBeGreaterThanOrEqual(width === 320 ? 150 : 80)
     expect(look.longest).toBeGreaterThanOrEqual(2)
     // Two lines are the meta's on a phone of 390; on 320 the other half of an exchange may end in «…».
     if (width === 390) expect(look.metasCut).toBe(0)

@@ -60,6 +60,12 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The row lays itself out by its own width (`ListRow`, `@container row`): narrow, the amount goes under
+   the words. */
+li {
+  container: row / inline-size;
+}
+
 .verb {
   @include visually-hidden;
 }

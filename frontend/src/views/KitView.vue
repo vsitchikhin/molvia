@@ -571,6 +571,13 @@ export default defineComponent({
           moved: money(-1105000n, 'AMD'),
           approximate: true,
         }),
+        // A salary with its kopecks: an amount wider than the tail's share (adversarial round 2, Б2).
+        logged({
+          kind: 'income',
+          source: 'salary',
+          amounts: [money(12345678n, 'RUB')],
+          moved: money(12345678n, 'RUB'),
+        }),
         // A reason of a check: its title says the sum, the row has no tail (review Р2-1).
         {
           ...logged({ kind: 'trip', place: 'SAS', items: 4, unpriced: 2 }),

@@ -260,18 +260,59 @@ export default defineComponent({
   margin-top: var(--space-1);
 }
 
-/* The tail takes at most two fifths of the row, unless what it holds cannot be narrower — an amount
-   never wraps — and gives way down to that: a line under an amount wraps there, and the words keep the
-   rest. Taken whole, a long line under the amount left the title no width at all and pushed the chevron
-   past the card (MOL-176, adversarial А1, А2). */
+/* The tail takes at most 45 % of the row, unless what it holds cannot be narrower — an amount never
+   wraps — and gives way down to that: a line under an amount wraps between its parts, and the words keep
+   the rest. Taken whole, a long line under the amount left the title no width at all and pushed the
+   chevron past the card (MOL-176, adversarial А1, А2); at two fifths it broke a line the words had room
+   to give (round 2, Б3). */
 .tail {
   display: inline-flex;
   flex: 0 1 auto;
   align-items: center;
   min-width: min-content;
-  max-width: 40%;
+  max-width: 45%;
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
+}
+
+/* In a narrow container named `row` the tail goes under the words, on a line of its own at the right —
+   where the amounts end, so the column holds — and the words take the whole width: beside them an amount
+   of a phone of 320 left the words forty pixels, and a salary with kopecks none (MOL-176, owner's choice
+   on adversarial Б1, Б2). 22rem (352): from there beside the tail's 45 % the words keep some 80 px, a
+   «Продукты» on its line; below it the word broke — the cards of «Деньги» on a phone of 390 and 412, 326
+   and 348 in their gutter of 32. The handoff's card of 390 (358) keeps the amount beside. The container
+   is the caller's — `OperationRow` sets it — so every row of a card is laid out alike. No row gap: a row
+   with no tail is not a line taller. */
+@container row (width < 22rem) {
+  .list-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0 var(--space-3);
+  }
+
+  .circle,
+  .list-row > .icon {
+    grid-row: 1 / span 2;
+  }
+
+  .words {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .tail {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    max-width: none;
+    margin-top: var(--space-1);
+  }
+
+  .chevron,
+  .check {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
 }
 
 .chevron {
