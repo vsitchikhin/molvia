@@ -13,12 +13,14 @@
     <span v-if="variant === 'icon'" class="glyph" aria-hidden="true"><slot /></span>
     <template v-else>
       <span v-if="$slots.icon" class="glyph" aria-hidden="true"><slot name="icon" /></span>
-      <!-- Both words in one cell, the one not shown kept by its width: the button is as wide as the
-           wider word, and does not jump under the thumb when the work starts or ends. -->
-      <span v-if="busyLabel !== undefined" class="words">
+      <!-- A block button is as wide as its place, so its word is swapped. Any other holds both words
+           in one cell, the one not shown kept by its width: as wide as the wider word, it does not
+           jump under the thumb when the work starts or ends. -->
+      <span v-if="busyLabel !== undefined && !block" class="words">
         <span :class="{ unseen: busy }" :aria-hidden="busy || undefined"><slot /></span>
         <span :class="{ unseen: !busy }" :aria-hidden="!busy || undefined">{{ busyLabel }}</span>
       </span>
+      <template v-else-if="busy && busyLabel !== undefined">{{ busyLabel }}</template>
       <slot v-else />
     </template>
   </button>

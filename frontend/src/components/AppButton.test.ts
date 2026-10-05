@@ -185,6 +185,19 @@ describe('AppButton at work', () => {
     expect(view.attributes('aria-label')).toBe('Refreshing…')
   })
 
+  it('swaps the word of a block button, which is as wide as its place', async () => {
+    const view = mount(AppButton, {
+      props: { block: true, busyLabel: 'Deleting…' },
+      slots: { default: 'Delete for good' },
+    })
+    expect(view.find('.words').exists()).toBe(false)
+    expect(view.text()).toBe('Delete for good')
+    await view.setProps({ busy: true })
+    expect(view.text()).toBe('Deleting…')
+    await view.setProps({ busy: false })
+    expect(view.text()).toBe('Delete for good')
+  })
+
   it('must not fire: a button with no word of work has no second cell', () => {
     const view = mount(AppButton, { slots: { default: 'Save' } })
     expect(view.find('.words').exists()).toBe(false)
