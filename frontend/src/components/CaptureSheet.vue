@@ -88,18 +88,27 @@
 
     <template #footer>
       <div v-if="parts.length === 0" class="pair">
-        <AppButton variant="secondary" size="large" :busy="preparing" @click="ask(pick, null)">
+        <!-- Not now while a photo is made ready: the work is the photo's, and the line above says it. -->
+        <AppButton variant="secondary" size="large" :inactive="preparing" @click="ask(pick, null)">
           <template #icon><IconImage /></template>
           {{ t('receipt.capture.pick') }}
         </AppButton>
-        <AppButton size="large" :busy="preparing" @click="ask(take, null)">
+        <AppButton size="large" :inactive="preparing" @click="ask(take, null)">
           <template #icon><IconCamera /></template>
           {{ t('receipt.capture.take') }}
         </AppButton>
       </div>
       <template v-else>
-        <!-- Busy, not disabled, while a photo is made ready: the button says it is working. -->
-        <AppButton size="large" block :busy="sending || preparing" @click="send">
+        <!-- At work while it sends, in its own word; not now while a photo is made ready, which the
+             line above says. -->
+        <AppButton
+          size="large"
+          block
+          :busy="sending"
+          :busy-label="t('receipt.capture.send_busy')"
+          :inactive="preparing"
+          @click="send"
+        >
           {{ t('receipt.capture.send') }}
         </AppButton>
         <p v-if="!online" class="under">{{ t('receipt.capture.send_offline') }}</p>
@@ -130,7 +139,12 @@
         <AppButton variant="danger-ghost" size="large" @click="removePart">
           {{ t('receipt.capture.remove_part') }}
         </AppButton>
-        <AppButton size="large" :busy="preparing" @click="ask(take, chosen)">
+        <AppButton
+          size="large"
+          :busy="preparing"
+          :busy-label="t('receipt.capture.preparing')"
+          @click="ask(take, chosen)"
+        >
           {{ t('receipt.capture.retake') }}
         </AppButton>
       </div>

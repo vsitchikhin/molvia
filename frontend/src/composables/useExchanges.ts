@@ -48,6 +48,8 @@ export interface Exchanges {
   readonly gone: Ref<boolean>
   /** The last «Вернуть» brought the exchange back — said out loud, the button being gone. */
   readonly restored: Ref<boolean>
+  /** «Вернуть» in the air — the one write of `busy` that button says it is at work on (MOL-225). */
+  readonly restoring: Ref<boolean>
   retry(): Promise<void>
   /** Resolves `null` when the server holds another exchange under this name (В-6). */
   record(body: ExchangeBody): Promise<ExchangesResponse | null>
@@ -96,6 +98,7 @@ export function useExchanges(): Exchanges {
   const vanished = ref(false)
   const gone = ref(false)
   const restored = ref(false)
+  const restoring = ref(false)
   let latest = 0
 
   const current = (): ExchangesResponse | null => overview.value
@@ -183,6 +186,7 @@ export function useExchanges(): Exchanges {
     vanished,
     gone,
     restored,
+    restoring,
     retry: load,
     async record(body) {
       hush()
@@ -262,6 +266,7 @@ export function useExchanges(): Exchanges {
       const exchange = removed.value
       if (!exchange || busy.value) return
       busy.value = true
+      restoring.value = true
       failed.value = false
       gone.value = false
       try {
@@ -281,6 +286,7 @@ export function useExchanges(): Exchanges {
         }
       } finally {
         busy.value = false
+        restoring.value = false
       }
     },
   }

@@ -19,9 +19,43 @@
           <template #icon><IconRefresh /></template>
           {{ t('state.retry') }}
         </AppButton>
-        <AppButton busy>{{ t('settings.saving') }}</AppButton>
         <AppButton inactive>{{ t('settings.save') }}</AppButton>
         <AppButton disabled>{{ t('verdict.save') }}</AppButton>
+      </div>
+    </section>
+
+    <!-- MOL-225: at work is the button's own word in its own look, as wide as the wider word. -->
+    <section class="group">
+      <SectionCaption class="caption">{{ t('dev.kit.busy') }}</SectionCaption>
+      <label class="toggle">
+        <AppSwitch :checked="working" @toggle="working = $event" />
+        {{ t('dev.kit.busy') }}
+      </label>
+      <div class="row">
+        <AppButton :busy="working" :busy-label="t('settings.saving')">
+          {{ t('item.save') }}
+        </AppButton>
+        <AppButton variant="secondary" :busy="working" :busy-label="t('settings.saving')">
+          <template #icon><IconRefresh /></template>
+          {{ t('state.retry') }}
+        </AppButton>
+        <AppButton variant="tinted" :busy="working" :busy-label="t('settings.saving')">
+          {{ t('spending.restore') }}
+        </AppButton>
+        <AppButton variant="ghost" :busy="working" :busy-label="t('settings.saving')">
+          {{ t('verdict.skip') }}
+        </AppButton>
+        <AppButton variant="danger-ghost" :busy="working" :busy-label="t('settings.saving')">
+          {{ t('item.delete') }}
+        </AppButton>
+        <AppButton
+          variant="icon"
+          :label="t('sheet.close')"
+          :busy="working"
+          :busy-label="t('settings.saving')"
+        >
+          <IconClose />
+        </AppButton>
       </div>
     </section>
 
@@ -692,6 +726,7 @@ export default defineComponent({
       cities: COUNTRY_CITIES.AM.map((city) => ({ value: city, label: city })),
       date: ref('2026-09-19'),
       unit: ref('l'),
+      working: ref(false),
       toggles: reactive([
         { key: 'switch_off', on: false, inactive: false },
         { key: 'switch_on', on: true, inactive: false },

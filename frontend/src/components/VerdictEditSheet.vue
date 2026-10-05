@@ -26,11 +26,26 @@
       <!-- There before its words, with only the text changing: a live region born together with
            what it says is often not read at all (MOL-19). -->
       <p class="line" :class="{ failed: Boolean(failure) }" role="status">{{ status }}</p>
-      <AppButton size="large" block :disabled="!ready || sending" @click="save">
+      <AppButton
+        size="large"
+        block
+        :busy="sending && !withdrawing"
+        :busy-label="t('verdict.sending')"
+        :inactive="withdrawing"
+        :disabled="!ready && !sending"
+        @click="save"
+      >
         {{ mine ? t('verdict.save') : t('advice.edit.save_new') }}
       </AppButton>
       <template v-if="mine">
-        <AppButton variant="danger-ghost" block :disabled="sending" @click="withdraw">
+        <AppButton
+          variant="danger-ghost"
+          block
+          :busy="withdrawing"
+          :busy-label="t('advice.edit.withdrawing')"
+          :inactive="sending && !withdrawing"
+          @click="withdraw"
+        >
           {{ t('advice.edit.withdraw') }}
         </AppButton>
         <p class="hint">
@@ -128,6 +143,8 @@ export default defineComponent({
     const score = ref<Score | null>(props.ownScore)
     const review = ref(props.ownReview ?? '')
     const sending = ref(false)
+    // Which of the two is at work: «Снять оценку» and «Сохранить» share `sending` (adversarial Р1-А2).
+    const withdrawing = ref(false)
     const failure = ref<WireCode | 'offline' | 'failed' | null>(null)
     const unsupported = ref(false)
 
@@ -160,8 +177,9 @@ export default defineComponent({
       return t(SPOKEN[code] ?? 'advice.edit.failed')
     })
 
-    async function send(run: () => Promise<unknown>): Promise<void> {
+    async function send(run: () => Promise<unknown>, taking = false): Promise<void> {
       sending.value = true
+      withdrawing.value = taking
       failure.value = null
       // «Тут дешевле» remembered before this verdict no longer says what the item is (MOL-92).
       forgetOwnPrices(currentIdentity(), [props.itemId])
@@ -177,6 +195,7 @@ export default defineComponent({
         failure.value = code && code in SPOKEN ? code : navigator.onLine ? 'failed' : 'offline'
       } finally {
         sending.value = false
+        withdrawing.value = false
       }
     }
 
@@ -217,7 +236,7 @@ export default defineComponent({
 
     function withdraw(): void {
       if (sending.value || !props.mine) return
-      void send(() => api.withdrawVerdict(props.itemId))
+      void send(() => api.withdrawVerdict(props.itemId), true)
     }
 
     return {
@@ -227,6 +246,7 @@ export default defineComponent({
       score,
       review,
       sending,
+      withdrawing,
       failure,
       unsupported,
       ready,

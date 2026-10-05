@@ -164,18 +164,17 @@
           block
           :inactive="!online || !form.dirty || form.loading || form.unknown"
           :busy="form.saving"
+          :busy-label="t('settings.saving')"
           :aria-describedby="notice || !online ? `${id}-notice` : undefined"
           @click="form.save"
         >
           <template v-if="form.saveError && online && !form.saving" #icon><IconRefresh /></template>
           {{
-            form.saving
-              ? t('settings.saving')
-              : form.saveError && online
-                ? t('state.retry')
-                : form.conflict
-                  ? t('settings.overwrite')
-                  : t('settings.save')
+            form.saveError && online
+              ? t('state.retry')
+              : form.conflict
+                ? t('settings.overwrite')
+                : t('settings.save')
           }}
         </AppButton>
       </div>

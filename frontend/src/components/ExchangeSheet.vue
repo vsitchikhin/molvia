@@ -104,12 +104,14 @@
         <p class="conflict">{{ t('exchange.sheet.amend_conflict') }}</p>
         <p class="conflict current">{{ currentOf(editing) }}</p>
       </div>
-      <AppButton size="large" block :busy="sending" :disabled="sending" @click="submit">
-        {{
-          sending
-            ? t('exchange.sheet.saving')
-            : t(editing ? 'exchange.sheet.save_amend' : 'exchange.sheet.save')
-        }}
+      <AppButton
+        size="large"
+        block
+        :busy="sending"
+        :busy-label="t('exchange.sheet.saving')"
+        @click="submit"
+      >
+        {{ t(editing ? 'exchange.sheet.save_amend' : 'exchange.sheet.save') }}
       </AppButton>
     </template>
   </BottomSheet>

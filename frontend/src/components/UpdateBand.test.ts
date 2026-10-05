@@ -61,6 +61,8 @@ describe('«Вышла новая версия · Обновить» (MOL-132)',
 
     const button = view.get('button')
     expect(button.attributes('aria-busy')).toBe('true')
+    // Its own word while it works (MOL-225), the action's kept by its width and out of hearing.
+    expect(button.find('.words > :not([aria-hidden])').text()).toBe('Updating…')
     await button.trigger('click')
 
     expect(update.apply).not.toHaveBeenCalled()

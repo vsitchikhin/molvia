@@ -98,12 +98,14 @@
         <p class="conflict">{{ t('income.sheet.amend_conflict') }}</p>
         <p class="conflict current">{{ currentOf(editing) }}</p>
       </div>
-      <AppButton size="large" block :busy="sending" :disabled="sending" @click="submit">
-        {{
-          sending
-            ? t('income.sheet.saving')
-            : t(editing ? 'income.sheet.save_amend' : 'income.sheet.save')
-        }}
+      <AppButton
+        size="large"
+        block
+        :busy="sending"
+        :busy-label="t('income.sheet.saving')"
+        @click="submit"
+      >
+        {{ t(editing ? 'income.sheet.save_amend' : 'income.sheet.save') }}
       </AppButton>
     </template>
   </BottomSheet>

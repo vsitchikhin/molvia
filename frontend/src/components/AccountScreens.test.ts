@@ -583,6 +583,61 @@ describe('AccountSheet (handoff 03)', () => {
     })
   })
 
+  // MOL-225, adversarial Р1-А1: «Удалить» and «Сохранить» share one write. The pressed one says its
+  // work and keeps the focus; «Сохранить» is not now, and says no «Сохраняем…» nobody asked for.
+  it('«Delete account» on a slow line says «Deleting…» and keeps the focus; «Save» is not now and silent', async () => {
+    const spare = account('Spare')
+    removeMoneyAccount.mockReturnValue(new Promise(() => undefined))
+    const view = await mounted(
+      AccountSheet,
+      { open: true, account: spare, spendCurrency: 'AMD' },
+      withAccounts([spare]),
+    )
+    const remove = button(view, en.accounts.sheet.delete)
+    if (!remove) throw new Error('no «Delete account»')
+    ;(remove.element as HTMLButtonElement).focus()
+    await remove.trigger('click')
+    await flushPromises()
+
+    expect(remove.text()).toBe(en.accounts.sheet.deleting)
+    expect(remove.attributes('aria-busy')).toBe('true')
+    expect(remove.attributes('disabled')).toBeUndefined()
+    expect(document.activeElement).toBe(remove.element)
+    const save = button(view, en.accounts.sheet.save)
+    expect(save?.attributes('aria-busy')).toBeUndefined()
+    expect(save?.attributes('aria-disabled')).toBe('true')
+    expect(button(view, en.accounts.sheet.saving)).toBeUndefined()
+  })
+
+  // Р1-А3: the line drops while the write hangs. The button at work keeps the focus — a native
+  // `disabled` would put it on the page — and its glyph: no «no network» beside «Сохраняем…».
+  it('the connection gone while «Save» works: the button keeps the focus, its word and its glyph', async () => {
+    const card = account('Card ₽', 'RUB')
+    const view = await mounted(
+      AccountSheet,
+      { open: true, account: card, spendCurrency: 'AMD' },
+      withAccounts([card]),
+    )
+    const { api } = await import('@/api')
+    ;(api as unknown as Record<string, unknown>).amendMoneyAccount = vi.fn(
+      () => new Promise(() => undefined),
+    )
+    const save = button(view, en.accounts.sheet.save)
+    if (!save) throw new Error('no «Save»')
+    const glyph = save.get('.glyph').html()
+    ;(save.element as HTMLButtonElement).focus()
+    await save.trigger('click')
+    await flushPromises()
+    expect(save.text()).toBe(en.accounts.sheet.saving)
+
+    await view.setProps({ online: false })
+    expect(save.attributes('disabled')).toBeUndefined()
+    expect(save.attributes('aria-busy')).toBe('true')
+    expect(save.text()).toBe(en.accounts.sheet.saving)
+    expect(save.get('.glyph').html()).toBe(glyph)
+    expect(document.activeElement).toBe(save.element)
+  })
+
   it('review 5: a save goes over the version the form was filled from, not a newer one read since', async () => {
     const amendMoneyAccount = vi.fn()
     const card = account('Card ₽', 'RUB')

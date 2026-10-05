@@ -6,7 +6,13 @@
     </template>
     <template v-else>
       <p class="title">{{ t('update.ready') }}</p>
-      <AppButton variant="secondary" class="apply" :busy="phase === 'applying'" @click="apply">
+      <AppButton
+        variant="secondary"
+        class="apply"
+        :busy="phase === 'applying'"
+        :busy-label="t('update.applying')"
+        @click="apply"
+      >
         <template #icon><IconUpdate /></template>
         {{ t('update.apply') }}
       </AppButton>
