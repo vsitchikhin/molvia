@@ -33,7 +33,8 @@ export interface VerdictRepository {
   amend(actorId: string, itemId: string, patch: VerdictPatch): Promise<Verdict | null>
   /**
    * Takes the person's verdict on a product back. The row stays, for the 0.2 gate and for the
-   * reminder, which skips a purchase made before it (schema, `deleted_at`); the text goes. `false` when there was nothing of theirs to take.
+   * reminder, which skips a purchase made before it (schema, `deleted_at`); the text goes.
+   * `false` when there was nothing of theirs to take.
    */
   withdraw(actorId: string, itemId: string): Promise<boolean>
   forItem(actorId: string, itemId: string, placeId: string | null): Promise<Verdict | null>
@@ -447,8 +448,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             max(${verdicts.score}) filter (where ${mine}) as own_score,
             max(${verdicts.review}) filter (where ${mine}) as own_review
           from ${verdicts}
-          -- A withdrawn verdict is kept for the 0.2 gate and the reminder: it is nobody's opinion, so
-          -- it is neither a score nor a contribution here.
+          -- A withdrawn verdict is kept for the 0.2 gate and the reminder: it is nobody's
+          -- opinion, so it is neither a score nor a contribution here.
           where ${verdicts.deletedAt} is null
             ${scope === 'own' ? sql`and ${mine}` : sql``}
             ${only ? sql`and ${inArray(verdicts.itemId, only)}` : sql``}

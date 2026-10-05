@@ -153,9 +153,9 @@ added, not data, a recipient or a purpose.
 
 **The 0.2 gate is `VerdictRepository.reachedRatings` (MOL-49):** of those who appeared in a
 window, how many have `GATE_RATINGS` rows in `verdicts` within `GATE_RATINGS_WINDOW_HOURS` of
-`actors.created_at` — the same axis and the same hours as 0.3. It is one of two readers of
-`verdicts` without `deleted_at IS NULL`, with the reminder (MOL-101): «rated five, took one back» is
-five (MOL-27). **Its
+`actors.created_at` — the same axis and the same hours as 0.3. It is one of two readers that act
+on a withdrawn verdict, with the reminder (MOL-101) — the copy only shows it, `put` brings it back:
+«rated five, took one back» is five (MOL-27). **Its
 `from` is the release of 0.2, and the caller passes it** — sign-in is open since 0.1, so
 counting from the first actor would fill the denominator with people who had nothing of 0.2
 to use (MOL-51). **A window still open is left out of the cohort**: counted, someone who came
