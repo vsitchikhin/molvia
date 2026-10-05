@@ -317,7 +317,7 @@ moment of «Отправить».
 positions of the lines whose item differs from the one the review showed and whose figures differ
 from the ones the server showed before any edit — never the ones a total typed since would show: the
 draft keeps no order of edits, and a line typed before a total that confirms it was lost from the
-measure (adversarial Б3). Only the phone knows what it showed — the shops' memory is shared and learns
+measure (adversarial Б3). **The price, named:** a line opened after a total put right and saved with the sum that total confirms is counted as figures put right. Only the phone knows what it showed — the shops' memory is shared and learns
 from every record, so between a review and its «Записать» another record (the person's own, queued
 before it, or anyone's in the chain) changes what the server would show now (adversarial А6). A number
 of the measure, never money: the server takes positions of recorded lines only. **A phone of an
