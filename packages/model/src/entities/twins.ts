@@ -66,6 +66,12 @@ export interface NameParts {
   readonly words: readonly string[]
   /** The scripts the name's letters are written in, sorted: `cyrillic`, `latin latin`… once each. */
   readonly scripts: readonly string[]
+  /**
+   * The name as it is written, only case, spacing, punctuation and «ё» aside — not the search key,
+   * which folds a double letter, «й» and a soft sign: «Римма» and «Рима» are one key and two shops
+   * (adversarial З1). What a proper name is compared by.
+   */
+  readonly letters: string
 }
 
 const SCRIPTS: readonly (readonly [string, RegExp])[] = [
@@ -104,6 +110,12 @@ export function nameParts(name: string): NameParts {
     words: key === '' ? [] : key.split(' ').filter((word) => !/^\d+$/u.test(word)),
     // Of the words: a unit after a number, «1 l», is no script of the name.
     scripts: scriptsOf(rest),
+    letters: name
+      .normalize('NFC')
+      .toLowerCase()
+      .replaceAll('ё', 'е')
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim(),
   }
 }
 
@@ -124,6 +136,8 @@ export interface Spelling {
    * 0.902 to «Булочки для бургеров» where «Milo» stands at 0.48 to «Мыло» (review №6).
    */
   readonly sameScripts: boolean
+  /** Whether the two are one spelling, case, spacing, punctuation and «ё» aside (`NameParts.letters`). */
+  readonly sameLetters: boolean
 }
 
 /**
@@ -171,7 +185,7 @@ export function twinSpelling(a: NameParts, b: NameParts): Spelling | null {
   if (found === undefined) return null
   const sameScripts =
     a.scripts.length === b.scripts.length && a.scripts.every((script, i) => script === b.scripts[i])
-  return { ...found, sameScripts }
+  return { ...found, sameScripts, sameLetters: a.letters === b.letters }
 }
 
 function bitCount(mask: number): number {
@@ -206,8 +220,9 @@ export interface TwinPair {
   /**
    * A proper name — a place's. One letter apart is two shops there, and the model reads a proper name
    * by its letters: «Маркет Ширак» and «Маркет Шираз» at 0.942, «Магнит» and «Магнат» at 0.919
-   * (adversarial Ж1). So a proper name merges by itself only with no edit at all — a double space, a
-   * hyphen, «ё» — and one letter apart is a candidate.
+   * (adversarial Ж1). So a proper name merges by itself only as one spelling — a double space, a
+   * hyphen, «ё» — and one letter apart is a candidate, by the letters as written, never by the key, which
+   * folds «Римма» into «Рима» (adversarial З1).
    */
   readonly properName?: boolean
 }
@@ -219,7 +234,7 @@ export function twinVerdict({ spelling, sameUnit, meaning, properName }: TwinPai
     spelling.sameScripts &&
     meaning !== null &&
     spelling.worst <= TWIN_MERGE.worst &&
-    spelling.edits <= (properName === true ? 0 : TWIN_MERGE.edits) &&
+    (properName === true ? spelling.sameLetters : spelling.edits <= TWIN_MERGE.edits) &&
     meaning >= TWIN_MERGE.meaning
   ) {
     return 'merge'

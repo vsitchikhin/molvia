@@ -26,12 +26,12 @@ describe('nameParts', () => {
   })
 
   it('keeps a number with no unit as a size, and the word after it as a word', () => {
-    expect(nameParts('Яйца С0 10 шт')).toEqual({
+    expect(nameParts('Яйца С0 10 шт')).toMatchObject({
       sizes: ['0', '10 piece'],
       words: ['iaiцa', 's'],
       scripts: ['cyrillic'],
     })
-    expect(nameParts('Сыр 2 вида')).toEqual({
+    expect(nameParts('Сыр 2 вида')).toMatchObject({
       sizes: ['2'],
       words: ['sir', 'vida'],
       scripts: ['cyrillic'],
@@ -64,7 +64,7 @@ describe('sameSizes', () => {
 
 describe('twinSpelling', () => {
   it('is no distance at all for a fat written with a comma and a point', () => {
-    expect(spelling('Молоко 3.2%', 'Молоко 3,2%')).toEqual({
+    expect(spelling('Молоко 3.2%', 'Молоко 3,2%')).toMatchObject({
       edits: 0,
       worst: 0,
       sameScripts: true,
@@ -72,7 +72,7 @@ describe('twinSpelling', () => {
   })
 
   it('counts a typo in a word', () => {
-    expect(spelling('Малоко 3,2%', 'Молоко 3,2 %')).toEqual({
+    expect(spelling('Малоко 3,2%', 'Молоко 3,2 %')).toMatchObject({
       edits: 1,
       worst: 1,
       sameScripts: true,
@@ -80,11 +80,16 @@ describe('twinSpelling', () => {
   })
 
   it('matches words in any order', () => {
-    expect(spelling('Сыр чанах', 'Чанах сыр')).toEqual({ edits: 0, worst: 0, sameScripts: true })
+    expect(spelling('Сыр чанах', 'Чанах сыр')).toMatchObject({
+      edits: 0,
+      worst: 0,
+      sameScripts: true,
+      sameLetters: false,
+    })
   })
 
   it('counts every word of a transliteration', () => {
-    expect(spelling('Ереван Сити', 'Yerevan City')).toEqual({
+    expect(spelling('Ереван Сити', 'Yerevan City')).toMatchObject({
       edits: 2,
       worst: 1,
       sameScripts: false,
@@ -108,7 +113,12 @@ describe('twinSpelling', () => {
 
   it('is no distance for one key in two scripts: the spelling cannot tell «Milo» from «Мыло»', () => {
     // The spelling sees one key, and says the scripts differ: never a merge, at most a candidate.
-    expect(spelling('Milo', 'Мыло')).toEqual({ edits: 0, worst: 0, sameScripts: false })
+    expect(spelling('Milo', 'Мыло')).toMatchObject({
+      edits: 0,
+      worst: 0,
+      sameScripts: false,
+      sameLetters: false,
+    })
   })
 
   it('is no pair for names of sizes alone', () => {
@@ -242,6 +252,31 @@ describe("a proper name, a place's (adversarial Ж1)", () => {
   it("leaves the items' rule as it was", () => {
     expect(
       twinVerdict({ spelling: spelling('Малоко', 'Молоко'), sameUnit: true, meaning: 0.95 }),
+    ).toBe('merge')
+  })
+})
+
+describe('a proper name by its letters, not its key (adversarial З1)', () => {
+  const place = (a: string, b: string, meaning: number) =>
+    twinVerdict({ spelling: spelling(a, b), sameUnit: true, meaning, properName: true })
+
+  it.each([
+    ['Аптека Римма', 'Аптека Рима', 0.944],
+    ['Салон Лилия', 'Салон Лиля', 0.967],
+    ['Кафе Майя', 'Кафе Мая', 0.922],
+    ['Магазин Милла', 'Магазин Мила', 0.967],
+  ])('never merges «%s» and «%s», one key and two shops (%s)', (a, b, meaning) => {
+    expect(spelling(a, b)?.edits).toBe(0)
+    expect(place(a, b, meaning)).toBe('candidate')
+  })
+
+  it('reads case, spacing, punctuation and «ё» aside, nothing else', () => {
+    expect(nameParts('Гранд-Кенди, ЁЛКИ').letters).toBe('гранд кенди елки')
+  })
+
+  it("leaves the items' rule to the key: «Майя» and «Мая» of a product may merge", () => {
+    expect(
+      twinVerdict({ spelling: spelling('Сок Майя', 'Сок Мая'), sameUnit: true, meaning: 0.95 }),
     ).toBe('merge')
   })
 })

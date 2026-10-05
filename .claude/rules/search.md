@@ -570,7 +570,10 @@ report.
   at all** (`properName`, adversarial Ж1): one letter apart is another shop, and the model reads a
   proper name by its letters — «Маркет Ширак» and «Маркет Шираз» at 0.942, «Магнит» and «Магнат» at
   0.919, both in Gyumri. Every place the measure merged by itself was no edit apart, so nothing is lost;
-  a typo of a shop's name is a candidate. `merge-corpus.integration.test.ts` pins both on the model.
+  a typo of a shop's name is a candidate. **As written, never by the search key** (`letters`, adversarial
+  З1): case, spacing, punctuation and «ё» aside and nothing else — the key folds a double letter, «й» and a
+  soft sign, and «Аптека Римма» and «Аптека Рима» are one key and two shops. `merge-corpus.integration.test.ts`
+  pins both on the model.
 - **A candidate** (named to the owner, never merged): the same sizes and words, two edits a word at
   most, and the meaning at 0.80 or one key; a pair that would merge but for its unit or for more than
   twenty codes together. **Named once, and only once printed** (`catalogue_merge_candidates`): a morning

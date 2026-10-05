@@ -60,6 +60,9 @@ const LETTER_APART: readonly (readonly [string, string])[] = [
   ['Маркет Ширак', 'Маркет Шираз'],
   ['Магнит', 'Магнат'],
   ['Аптека Альфа', 'Аптека Альта'],
+  // one search key, two shops: a proper name is compared as written (adversarial З1)
+  ['Аптека Римма', 'Аптека Рима'],
+  ['Салон Лилия', 'Салон Лиля'],
 ]
 
 let report: CatalogueMergedNotice
