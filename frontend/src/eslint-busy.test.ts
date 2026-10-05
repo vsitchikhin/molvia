@@ -71,6 +71,13 @@ describe('eslint.config.js: a busy button says what it does (MOL-225)', () => {
     // Р4-А2: a word that says nothing.
     ['with an empty word', button(':busy="sending" busy-label=""')],
     ['with a word of an ellipsis', button(':busy="sending" busy-label="…"')],
+    // Р5-А1: signs the rule of i18n lets through say nothing either.
+    ['with a word of three dots', button(':busy="sending" busy-label="..."')],
+    ['with a word of a dash', button(':busy="sending" busy-label="—"')],
+    ['with a word of hyphens', button(':busy="sending" busy-label="- -"')],
+    ['with a word of a middle dot', button(':busy="sending" busy-label="·"')],
+    // Р5-А2: `v-model:busy` gives the button the same prop.
+    ['by v-model:', button('v-model:busy="sending"')],
     // A word of an element in its slot is not the button's (self-review, round 4).
     [
       'with a word in its slot only',

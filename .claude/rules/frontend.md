@@ -288,13 +288,14 @@ The detail behind the frontend lines of `CLAUDE.md`.
   of `App.vue` is inert behind a modal sheet, where most of these buttons stand. While a photo is
   made ready, «Выбрать фото», «Снять» and «Отправить чек» are not now and the line «Готовим фото…»
   says it — the work is the photo's; three buttons with one word would be noise. The linter refuses
-  `busy` without its word (`vue/no-restricted-syntax`) — the button's own attribute, bound or alone,
-  never one of an element in its slot, or a key of what its `v-bind` gives: the object, a spread, a
+  `busy` without its word (`vue/no-restricted-syntax`) — the button's own attribute, bound, alone or
+  by `v-model:busy` (Р5-А2), never one of an element in its slot, or a key of what its `v-bind` gives: the object, a spread, a
   choice, a cast (a name, a string, a computed string or a template with nothing in it), never a key
   of an object that is a value or an argument inside it (`t('…', { busy })` is no prop), on
   `AppButton` or `app-button`, the word as `busy-label` or `busyLabel` (Р1-А5, Р2-А1, Р3-А2,
-  Р4-А1). A word written as a string is the word here when it says something — `""` and `"…"` say
-  nothing (Р4-А2) — and untranslated for `vue/no-bare-strings-in-template`, whose list of
+  Р4-А1). A word written as a string is the word here when it has a letter or a digit — `""`, `"…"`,
+  `"..."`, `"—"` say nothing (Р4-А2, Р5-А1): the rule of i18n cuts its whole list of signs out and
+  is silent on what is left — and untranslated for `vue/no-bare-strings-in-template`, whose list of
   attributes holds `busy-label` (Р3-А1); that list replaces the plugin's own, so a new attribute of
   text joins it by hand.
   `src/eslint-busy.test.ts` holds every way through the real config. It cannot see a
