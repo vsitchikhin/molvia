@@ -131,7 +131,13 @@ rule: a pair with the lari — the NBG, any other — the CBA.
   walked from the month's first day, the stretch between was no longer than a holiday and never asked
   for — after a stop of the API a little over a month with the bank silent in its first hour. **And
   a month the bank speaks in again is walked first**, however long the history's hole before it: after
-  a stop of four months the last month no longer came with the last portion of the history. After a restart the walk starts from the first hole
+  a stop of four months the last month no longer came with the last portion of the history. **Days
+  the archive answered with an earlier day are known, until the next day's look** (review 7,
+  adversarial round 5): a weekend, a holiday, the days a bank hung on one date. A bank that hung for
+  weeks and spoke again leaves a stretch no walk can fill, and counted a hole it was walked every hour
+  for ever; known for good, a bank that froze and thawed would never give back days it does have. So
+  the stretch is asked once a day, as in the first version of the walk. Kept in memory with
+  `archiveNext`, and only for a walk whose days were written. After a restart the walk starts from the first hole
   longer than `ARCHIVE_GAP_DAYS` (`archiveWalkFrom`): the longest stretch without
   a rate in the archive of 2022–2026 is six days, Easter 2026 — measured on 05.10.2026, every day
   asked. Only the days the cache lacks are written; a day the bank answers with tomorrow's rate, set
