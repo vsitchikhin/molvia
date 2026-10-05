@@ -274,6 +274,29 @@ whole; without it, until now. A day is Yerevan's; a moment needs its offset.
 
 In a working copy the same thing is `make gates FROM=2026-10-05 [TO=2026-10-31]`.
 
+## The merge of twins (MOL-106)
+
+Every night from 04:30 Yerevan, half an hour after the copy of the database, the API merges what is
+one thing written twice — «Молоко 3.2%» beside «Молоко 3,2%» — and at 09:00 the bot tells the owner
+what it merged and which new pairs it only names. `CATALOGUE_MERGE` in `.env.prod` says how: `report`
+(the default, owner's decision В-3) says what it would merge and changes nothing, `on` merges, `off`
+does not look.
+
+A candidate the report names is merged by hand with the two ids the message prints, and a merge is
+taken back by its number — both a dry run without `--yes`:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod \
+  exec backend node dist/merge.js merge <from-id> <into-id> --yes
+docker compose -f docker-compose.prod.yml --env-file .env.prod \
+  exec backend node dist/merge.js unmerge 17 --yes
+```
+
+An undone pair is never merged or named by the night again; the owner's hand still may. What the undo
+cannot bring back: the text of a review withdrawn because the same person had rated the twin too.
+
+In a working copy the same thing is `make merge FROM=<id> INTO=<id> [YES=1]` and `make unmerge ID=<n> [YES=1]`.
+
 ## Signals (MOL-142, MOL-221)
 
 Four checks at healthchecks.io tell the owner in Telegram that something in production is down.
