@@ -97,7 +97,8 @@ test('the search field is one pill, and the active option keeps its weight and r
       }
     }),
   )
-  expect(wells).toHaveLength(3)
+  // Three of the search section and the one the skeleton's field stands under (MOL-178).
+  expect(wells).toHaveLength(4)
   // A target of 44 inside an edge of 1 — 46, as every field of the kit (owner's choice on review Р1-3).
   // To a hundredth: a box at a fractional offset measures 45.9998 (MOL-225 put a section above it).
   for (const well of wells) {
@@ -301,4 +302,42 @@ for (const width of [390, 320])
     expect(bars.height).toBeCloseTo(real.height, 0)
     expect(bars.right).toBeCloseTo(real.right, 0)
     expect(Math.abs(bars.middle - real.middle)).toBeLessThan(1)
+  })
+
+// The skeleton is the answer's shape (MOL-178, Ф-13): each part of the kit as tall as the answer it stands
+// for — the well of a search, a caption, a row of `ListRow`, a row of `OperationRow` with a line under its
+// amount (owner's В-3 «б») — and that row's amount where the answer's ends, at both widths: on a card
+// narrower than 22rem the amount and the line under it stand under the words, in the bars too.
+for (const width of [390, 320])
+  test(`at ${String(width)} each part of the skeleton is as tall as the answer it stands for`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 720 })
+    await open(page, '/_kit')
+    const section = page.locator('section', {
+      has: page.getByRole('heading', { name: 'Skeleton' }),
+    })
+    await expect(section.locator('[data-part="under"]')).toBeVisible()
+    const parts = await section.evaluate((root) => {
+      const box = (selector: string) => {
+        const one = root.querySelector(selector)
+        if (!one) throw new Error(`no ${selector}`)
+        return one.getBoundingClientRect()
+      }
+      const pair = (part: string, answer: string, bars: string) => ({
+        answer: box(`[data-part="${part}"] ${answer}`).height,
+        bars: box(`[data-part="${part}"] ${bars}`).height,
+      })
+      return {
+        field: pair('field', '.well', '.field'),
+        caption: pair('caption', '.section-caption', '.caption'),
+        rows: pair('rows', '.list-row', '.row'),
+        under: pair('under', '.list-row', '.row'),
+        amount: {
+          answer: box('[data-part="under"] .list-row .amount').right,
+          bars: box('[data-part="under"] .row .amount').right,
+        },
+      }
+    })
+    for (const { answer, bars } of Object.values(parts)) expect(bars).toBeCloseTo(answer, 0)
   })

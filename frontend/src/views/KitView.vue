@@ -368,6 +368,45 @@
       <SkeletonPart kind="rows" :count="3" lead="circle" tail next />
     </section>
 
+    <!-- The skeleton (MOL-178, Ф-13): each part of the kit under the answer it stands for, so e2e holds
+         their heights at 390 and 320; then the parts that have no one component of an answer. -->
+    <section class="group">
+      <SectionCaption class="caption">{{ t('dev.kit.skeleton') }}</SectionCaption>
+      <div class="pair" data-part="field">
+        <SearchField
+          :model-value="t('dev.kit.search_sample')"
+          :label="t('dev.kit.skeleton')"
+          readonly
+        />
+        <SkeletonPart kind="field" />
+      </div>
+      <div class="pair" data-part="caption">
+        <SectionCaption as="p">{{ t('dev.kit.caption_month') }}</SectionCaption>
+        <SkeletonPart kind="caption" :width="30" />
+      </div>
+      <div class="pair" data-part="rows">
+        <AppCard as="ul" list>
+          <li>
+            <ListRow
+              :icon="IconWallet"
+              :title="t('dev.kit.row_cash')"
+              :meta="t('accounts.for_spending')"
+              next
+            />
+          </li>
+        </AppCard>
+        <SkeletonPart kind="rows" :count="1" lead="icon" next />
+      </div>
+      <div v-if="withUnder" class="pair" data-part="under">
+        <AppCard as="ul" list>
+          <OperationRow v-bind="withUnder" />
+        </AppCard>
+        <SkeletonPart kind="rows" :count="1" lead="circle" tail under next />
+      </div>
+      <SkeletonPart kind="figure" plate />
+      <SkeletonPart kind="lines" :widths="[64, 78]" />
+    </section>
+
     <section class="group">
       <SectionCaption class="caption">{{ t('dev.kit.cards') }}</SectionCaption>
       <AppCard as="section" tone="take">
@@ -738,6 +777,15 @@ export default defineComponent({
       categories,
       categoryName,
       operations,
+      // The typical row with a line under its amount (owner's В-3 «б»): a title and a meta of a line
+      // each — of the kit's rows with both, the shortest title, since a title that wraps is taller
+      // than any bars (the price MOL-176 named).
+      withUnder: computed(
+        () =>
+          operations.value
+            .filter((row) => row.sub && row.meta)
+            .sort((one, other) => one.title.length - other.title.length)[0],
+      ),
       category: ref<string | null>('00000000-0000-4000-8000-000000000101'),
       sheetOpen: ref(false),
       scannerOpen: ref(false),
@@ -779,6 +827,11 @@ export default defineComponent({
   gap: var(--space-2);
   min-height: var(--touch-target);
   font-size: var(--text-callout);
+}
+
+.pair {
+  display: grid;
+  gap: var(--space-2);
 }
 
 .row {
