@@ -40,22 +40,15 @@
             />
           </span>
         </div>
-        <!-- Not an error, a wait (round 3, №7): quiet, and its words through the app's one live
-             region. It takes the focus of the switch that went, and gives it back (Р3-А2). -->
-        <div
+        <TapUnsureLine
           v-if="analytics.unsure.value"
           ref="unsureLine"
-          class="quiet"
-          tabindex="-1"
+          class="under"
+          :pending="analytics.pending.value"
+          :online="analytics.online.value"
           :aria-describedby="`${id}-analytics`"
-        >
-          <span class="said"
-            ><IconCloud aria-hidden="true" /><span>{{ t('settings.tap.unsure') }}</span></span
-          >
-          <AppButton v-if="analytics.online.value" variant="ghost" @click="analytics.retry">{{
-            t('state.retry')
-          }}</AppButton>
-        </div>
+          @retry="analytics.retry"
+        />
         <!-- The icon and the words are one box: beside each other, the button under them once
              the line is full (Р2-А3, Р3-А4). -->
         <p
@@ -167,7 +160,9 @@ import AppReveal from '@/components/AppReveal.vue'
 import AppSwitch from '@/components/AppSwitch.vue'
 import EraseSheet from '@/components/EraseSheet.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import TapUnsureLine from '@/components/TapUnsureLine.vue'
 import { useAnalytics } from '@/composables/useAnalytics'
+import { useUnsureFocus } from '@/composables/useUnsureFocus'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExport } from '@/composables/useExport'
 import { useSignOutStore } from '@/stores/signOut'
@@ -193,6 +188,7 @@ export default defineComponent({
     IconStatistics,
     IconTerms,
     SectionCaption,
+    TapUnsureLine,
   },
   setup() {
     const { t } = useI18n()
@@ -227,45 +223,13 @@ export default defineComponent({
     })
     const analytics = useAnalytics()
     const switchSlot = ref<HTMLElement | null>(null)
-    const unsureLine = ref<HTMLElement | null>(null)
-    // The switch goes while a change is unsure, and the focus a tap left on it would fall to the
-    // page (round 3, Р3-А2): it waits on the line that says why, and goes back to the switch.
-    let heldFocus = false
-    let withdrawUnsure: (() => void) | undefined
-    // Read at the turn itself, while the switch is still on the page: a check that answers at once
-    // turns it back before any render, and a watcher run at the render would see neither turn.
-    watch(
-      () => analytics.unsure.value,
-      (unsure) => {
-        withdrawUnsure?.()
-        withdrawUnsure = undefined
-        if (!unsure) return
-        heldFocus = !!switchSlot.value?.contains(document.activeElement)
-        // A focus moved onto the line reads it; said in the live region too, it was heard twice
-        // (round 4, №10).
-        if (!heldFocus) withdrawUnsure = announce?.(t('settings.tap.unsure'))
-      },
-      { flush: 'sync' },
+    const unsureLine = ref<{ $el: HTMLElement } | null>(null)
+    useUnsureFocus(
+      analytics.unsure,
+      analytics.pending,
+      () => switchSlot.value,
+      () => unsureLine.value?.$el,
     )
-    // Acted on once the page is drawn: the line is there to take the focus, the switch to get it back.
-    watch(
-      () => analytics.unsure.value,
-      (unsure) => {
-        if (!heldFocus) return
-        if (unsure) {
-          unsureLine.value?.focus({ preventScroll: true })
-          return
-        }
-        heldFocus = false
-        // Only a focus left with nowhere to be — on the page, or on what has just left it; one the
-        // person moved meanwhile stays where it is.
-        const active = document.activeElement
-        if (active === null || active === document.body || !active.isConnected)
-          switchSlot.value?.querySelector('input')?.focus({ preventScroll: true })
-      },
-      { flush: 'post' },
-    )
-    onUnmounted(() => withdrawUnsure?.())
     return {
       t,
       id: useId(),
@@ -387,6 +351,11 @@ export default defineComponent({
   color: var(--bad-ink);
 }
 
+// The unsure line stands where the row's other lines do.
+.under {
+  margin: 0 var(--space-4) var(--space-3);
+}
+
 // An icon and its words as one item of the line: the words wrap beside the icon, and a button after
 // them goes under once the line is full — by the words' own width, not a basis of nothing (Р3-А4).
 .said {
@@ -395,10 +364,6 @@ export default defineComponent({
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
-}
-
-.quiet:focus-visible {
-  @include focus-ring;
 }
 
 .quiet {

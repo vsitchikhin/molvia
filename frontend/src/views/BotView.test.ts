@@ -159,7 +159,10 @@ describe('«Telegram bot» (MOL-129, В-2)', () => {
 describe('a change gone wrong is the row’s, never the page’s (MOL-96, round 2)', () => {
   it('a refused tap and a refused check after it leave both switches and say «not saved» (Р2-А2)', async () => {
     const view = await render()
-    chooseNotices.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    // A refusal in the API's own words, as the transport builds it: «not saved» is known.
+    chooseNotices.mockRejectedValue(
+      new ApiError(ERROR.INTERNAL, '', true, undefined, { fromApi: true }),
+    )
     readNotices.mockRejectedValue(new ApiError(ERROR.INTERNAL))
     await receipts(view).setValue(false)
     await flushPromises()
@@ -167,6 +170,27 @@ describe('a change gone wrong is the row’s, never the page’s (MOL-96, round 
     expect(view.text()).not.toContain(en.bot.load_error.title)
     expect(receipts(view).element.checked).toBe(true)
     expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
+  })
+})
+
+describe('a change still unsure draws no switch, as «Your data» (MOL-96, Р3-А3)', () => {
+  it('its answer and the check after it lost: the quiet line in its place, the other switch untouched', async () => {
+    const view = await render()
+    chooseNotices.mockRejectedValue(new TypeError('connection reset'))
+    readNotices.mockRejectedValue(new TypeError('connection reset'))
+    await receipts(view).setValue(false)
+    await flushPromises()
+    expect(view.findAll('input[role="switch"]')).toHaveLength(1)
+    expect(reminders(view).element.checked).toBe(true)
+    expect(view.text()).toContain(en.settings.tap.unsure)
+    expect(view.find('[role="alert"]').exists()).toBe(false)
+
+    readNotices.mockResolvedValue({ off: true, blocked: false })
+    const retry = view.findAll('button').find((button) => button.text() === en.state.retry)
+    await retry?.trigger('click')
+    await flushPromises()
+    expect(receipts(view).element.checked).toBe(false)
+    expect(view.text()).not.toContain(en.settings.tap.unsure)
   })
 })
 

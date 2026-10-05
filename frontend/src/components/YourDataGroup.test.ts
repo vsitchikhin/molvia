@@ -490,7 +490,7 @@ describe('«Count me in the statistics» (MOL-96)', () => {
       await flushPromises()
       expect(view.find('input[role="switch"]').exists()).toBe(false)
       // A wait, not an error: quiet, never an alert (round 3, №7).
-      expect(view.get('.quiet').text()).toContain(en.settings.tap.unsure)
+      expect(view.get('.unsure').text()).toContain(en.settings.tap.unsure)
       expect(view.find('[role="alert"]').exists()).toBe(false)
       expect(view.text()).not.toContain(en.settings.tap.save_failed)
       expect(view.text()).not.toContain(en.settings.tap.load_error)
@@ -536,7 +536,7 @@ describe('«Count me in the statistics» (MOL-96)', () => {
     await counted(view).setValue(false)
     await flushPromises()
     expect(view.find('input[role="switch"]').exists()).toBe(false)
-    expect(document.activeElement).toBe(view.get('.quiet').element)
+    expect(document.activeElement).toBe(view.get('.unsure').element)
     // The focus reads the line: the live region does not say it a second time (round 4, №10).
     await new Promise((resolve) => setTimeout(resolve, 150))
     expect(said).not.toContain(en.settings.tap.unsure)
@@ -617,12 +617,14 @@ describe('«Count me in the statistics» (MOL-96)', () => {
 
     const back = await render()
     expect(back.find('input[role="switch"]').exists()).toBe(false)
-    expect(back.text()).toContain(en.settings.tap.unsure)
+    // No answer is lost yet: it is still to come (round 12).
+    expect(back.text()).toContain(en.settings.tap.waiting)
+    expect(back.text()).not.toContain(en.settings.tap.unsure)
 
     land()
     await flushPromises()
     expect(counted(back).element.checked).toBe(true)
-    expect(back.text()).not.toContain(en.settings.tap.unsure)
+    expect(back.text()).not.toContain(en.settings.tap.waiting)
     expect(back.find('[role="alert"]').exists()).toBe(false)
   })
 

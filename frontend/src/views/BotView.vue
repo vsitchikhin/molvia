@@ -31,8 +31,12 @@
           :checked="reminders.off.value !== 'chosen'"
           :inactive="blocked || reminders.saving.value || !online"
           :save-failed="reminders.saveFailed.value"
+          :unsure="reminders.unsure.value"
+          :pending="reminders.pending.value"
+          :online="online"
           :noted-by="notes"
           @toggle="chooseReminders"
+          @retry="reminders.retry"
         />
         <BotSwitchRow
           :label="t('bot.receipts.label')"
@@ -40,8 +44,12 @@
           :checked="notices.off.value === false"
           :inactive="blocked || notices.saving.value || !online"
           :save-failed="notices.saveFailed.value"
+          :unsure="notices.unsure.value"
+          :pending="notices.pending.value"
+          :online="online"
           :noted-by="notes"
           @toggle="chooseNotices"
+          @retry="notices.retry"
         />
       </AppCard>
       <!-- Said once for every switch, as the block is (review №5), and under them: a note goes under

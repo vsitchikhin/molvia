@@ -59,6 +59,11 @@ export interface TapSettingState<T> {
    * answers.
    */
   readonly unsure: Ref<boolean>
+  /**
+   * Unsure because a write — another screen's, left on its way — has not ended yet: no answer has
+   * been lost, it is still to come (round 12: «ответ не пришёл» was said of it too).
+   */
+  readonly pending: Ref<boolean>
   retry(): Promise<void>
   choose(next: T): Promise<void>
 }
@@ -88,6 +93,7 @@ export function useTapSetting<T>(
   // server is read again (adversarial MOL-96 А2): a privacy switch put back to «on» over a server
   // that already turned it off.
   const unsure = ref(false)
+  const pending = ref(false)
   // The last choice that got no «yes»: its «not saved» stays the truth whatever a check finds of an
   // earlier change — unless the server holds that very choice (round 5, Р5-А1; round 6, №11,
   // Р6-А1). An earlier tap may have put it there; with three values or more, «differs from before»
@@ -122,6 +128,7 @@ export function useTapSetting<T>(
 
   function settle(): void {
     unsure.value = false
+    pending.value = false
     clearTimeout(check)
     checkIn = TAP_CHECK_FIRST_MS
   }
@@ -142,6 +149,7 @@ export function useTapSetting<T>(
     if (left && left.state !== 'refused') {
       lastChoice = { choice: left.choice as T }
       unsure.value = true
+      pending.value = left.state === 'writing'
     }
     const mine = ++latest
     try {
@@ -158,6 +166,7 @@ export function useTapSetting<T>(
         else {
           lastChoice = { choice: now.choice as T }
           unsure.value = true
+          pending.value = true
           checkLater()
         }
         return
@@ -167,6 +176,7 @@ export function useTapSetting<T>(
         lastChoice = { choice: now.choice as T }
         unsure.value = true
       }
+      pending.value = false
       const notSaved =
         now?.state === 'refused'
           ? true
@@ -223,6 +233,7 @@ export function useTapSetting<T>(
       // `2xx` of any shape, whole and off the contract or cut off on its way (Р4-А1), may well have
       // landed. One unsure change is not made sure by a refusal of the next: it is still checked.
       unsure.value = unsure.value || !refusedInWords(error)
+      pending.value = false
       if (unsure.value) leave({ state: 'unsure', choice: next, by: me })
       // A refusal said to a screen gone is told by the next one; said here, it is told here.
       else leave(alive ? undefined : { state: 'refused', by: me })
@@ -277,5 +288,5 @@ export function useTapSetting<T>(
     if (online.value && (value.value === undefined || failure.value || unsure.value)) void load()
   })
 
-  return { value, failure, online, saving, saveFailed, unsure, retry: load, choose }
+  return { value, failure, online, saving, saveFailed, unsure, pending, retry: load, choose }
 }

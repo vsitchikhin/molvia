@@ -1389,6 +1389,7 @@
       "offline": "Cannot save without a connection — the switch comes back with it.",
       "save_failed": "Not saved. Check the connection and try again.",
       "unsure": "No answer came — we do not know whether it was saved. Checking again.",
+      "waiting": "Saving — no answer yet. We will show it when it comes.",
       "load_error": "The setting could not be loaded."
     },
     "salary_shift": {
