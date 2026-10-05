@@ -169,13 +169,16 @@ function unitKnownOrNull(column: AnyPgColumn) {
 }
 
 /**
- * `homeBankOf` of a pair in SQL, written from the model's `HOME_BANK` so the check of a trip's
- * source can never name another bank than the domain does (MOL-110).
+ * `homeBankOf` of a pair in SQL, written from the model's `HOME_BANK` in the model's order — the
+ * base's bank, then the quote's (adversarial review) — so the check of a trip's source can never
+ * name another bank than the domain does (MOL-110).
  */
 function homeBankSql(base: AnyPgColumn, quote: AnyPgColumn) {
-  const banks = Object.entries(HOME_BANK).map(
-    ([currency, bank]) =>
-      sql`when ${base} = ${sql.raw(`'${currency}'`)} or ${quote} = ${sql.raw(`'${currency}'`)} then ${sql.raw(`'${bank}'`)}`,
+  const banks = [base, quote].flatMap((side) =>
+    Object.entries(HOME_BANK).map(
+      ([currency, bank]) =>
+        sql`when ${side} = ${sql.raw(`'${currency}'`)} then ${sql.raw(`'${bank}'`)}`,
+    ),
   )
   return sql`(case ${sql.join(banks, sql` `)} else 'cba' end)`
 }

@@ -57,6 +57,6 @@ ALTER TABLE "trips" ADD CONSTRAINT "trips_rate_base_known" CHECK ("trips"."rate_
 ALTER TABLE "trips" ADD CONSTRAINT "trips_rate_quote_known" CHECK ("trips"."rate_quote" is null or "trips"."rate_quote" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL'));--> statement-breakpoint
 ALTER TABLE "trips" ADD CONSTRAINT "trips_rate_provider_known" CHECK ("trips"."rate_provider" is null or "trips"."rate_provider" in ('cba', 'cbr', 'erapi', 'nbg'));--> statement-breakpoint
 ALTER TABLE "trips" ADD CONSTRAINT "trips_rate_provider_matches_source" CHECK (("trips"."rate_source" is null or "trips"."rate_source" = 'personal') = ("trips"."rate_provider" is null)
-        and (("trips"."rate_source" = 'official') = ("trips"."rate_provider" = (case when "trips"."rate_base" = 'GEL' or "trips"."rate_quote" = 'GEL' then 'nbg' else 'cba' end))) is not false);--> statement-breakpoint
+        and (("trips"."rate_source" = 'official') = ("trips"."rate_provider" = (case when "trips"."rate_base" = 'GEL' then 'nbg' when "trips"."rate_quote" = 'GEL' then 'nbg' else 'cba' end))) is not false);--> statement-breakpoint
 ALTER TABLE "trips" ADD CONSTRAINT "trips_receipt_currency_known" CHECK ("trips"."receipt_currency" is null or "trips"."receipt_currency" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL'));--> statement-breakpoint
 ALTER TABLE "trips" ADD CONSTRAINT "trips_debited_currency_known" CHECK ("trips"."debited_currency" is null or "trips"."debited_currency" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL'));

@@ -414,15 +414,18 @@ describe('pickOfficialRate', () => {
       expect(pickedRate?.rate.source).toBe('official')
     })
 
-    it('ЦБ РА молчит — НБ Грузии для драма стоит за ЦБ РФ и перед агрегатором', () => {
+    it('ЦБ РА молчит — НБ Грузии пару драма не берёт: ЦБ РФ, потом агрегатор (ревью 3)', () => {
       const rows = [
         amd('RUB', '4.3123', '2026-09-01'),
         amd('RUB', '4.35', '2026-09-19', 'nbg'),
         amd('RUB', '4.36', '2026-09-19', 'erapi'),
       ]
-      expect(pickOfficialRate('RUB', 'AMD', rows, sunday)?.provider).toBe('nbg')
+      expect(pickOfficialRate('RUB', 'AMD', rows, sunday)?.provider).toBe('erapi')
       const cbr = amd('RUB', '4.34', '2026-09-19', 'cbr')
       expect(pickOfficialRate('RUB', 'AMD', [...rows, cbr], sunday)?.provider).toBe('cbr')
+      // Только НБ Грузии свежий — пара драма остаётся у устаревшего ЦБ РА.
+      const only = [amd('RUB', '4.3123', '2026-09-01'), amd('RUB', '4.35', '2026-09-19', 'nbg')]
+      expect(pickOfficialRate('RUB', 'AMD', only, sunday)?.provider).toBe('cba')
     })
   })
 })

@@ -1,5 +1,5 @@
 {
-  "id": "6dc86b74-4fed-476f-91f0-63195fa39a76",
+  "id": "557fe937-44ef-4857-a916-130035079ebd",
   "prevId": "107eb535-8ef6-4f1a-9722-3471b1ca1c06",
   "version": "7",
   "dialect": "postgresql",
@@ -5058,7 +5058,7 @@
         },
         "trips_rate_provider_matches_source": {
           "name": "trips_rate_provider_matches_source",
-          "value": "(\"trips\".\"rate_source\" is null or \"trips\".\"rate_source\" = 'personal') = (\"trips\".\"rate_provider\" is null)\n        and ((\"trips\".\"rate_source\" = 'official') = (\"trips\".\"rate_provider\" = (case when \"trips\".\"rate_base\" = 'GEL' or \"trips\".\"rate_quote\" = 'GEL' then 'nbg' else 'cba' end))) is not false"
+          "value": "(\"trips\".\"rate_source\" is null or \"trips\".\"rate_source\" = 'personal') = (\"trips\".\"rate_provider\" is null)\n        and ((\"trips\".\"rate_source\" = 'official') = (\"trips\".\"rate_provider\" = (case when \"trips\".\"rate_base\" = 'GEL' then 'nbg' when \"trips\".\"rate_quote\" = 'GEL' then 'nbg' else 'cba' end))) is not false"
         },
         "trips_rate_source_known": {
           "name": "trips_rate_source_known",

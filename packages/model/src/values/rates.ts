@@ -413,6 +413,13 @@ export function isRateFresh(date: string, today: string): boolean {
 const PROVIDER_ORDER: readonly RateProvider[] = ['cba', 'cbr', 'nbg', 'erapi']
 
 /**
+ * The country banks of `HOME_BANK` stand only for their own pairs (MOL-110, plan Р-1: «for the rest,
+ * as it was»): the National Bank of Georgia prints the dram per 1000 with four digits, five
+ * significant ones, so a dollar in drams by it is coarser than the Bank of Russia's (review 3).
+ */
+const COUNTRY_BANKS: ReadonlySet<RateProvider> = new Set(Object.values(HOME_BANK))
+
+/**
  * The rate of `base` in `quote` built from rates against the dram: quote per one base, as the
  * snapshot stores it. Against the dram it is the published number itself; the inverse and the
  * cross are a division rounded half-up to the snapshot's six digits — the one rounding outside
@@ -493,7 +500,10 @@ export function pickOfficialRate(
 ): OfficialRate | null {
   const needed = new Set<Currency>([base, quote])
   const home = homeBankOf(base, quote)
-  const order = [home, ...PROVIDER_ORDER.filter((provider) => provider !== home)]
+  const order = [
+    home,
+    ...PROVIDER_ORDER.filter((provider) => provider !== home && !COUNTRY_BANKS.has(provider)),
+  ]
   const candidates = order.flatMap((provider) => {
     const own = rows.filter((row) => row.provider === provider && row.date <= today)
     const source = provider === home ? 'official' : 'fallback'
