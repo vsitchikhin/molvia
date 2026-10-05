@@ -241,7 +241,9 @@ export default defineComponent({
         withdrawUnsure = undefined
         if (!unsure) return
         heldFocus = !!switchSlot.value?.contains(document.activeElement)
-        withdrawUnsure = announce?.(t('settings.tap.unsure'))
+        // A focus moved onto the line reads it; said in the live region too, it was heard twice
+        // (round 4, №10).
+        if (!heldFocus) withdrawUnsure = announce?.(t('settings.tap.unsure'))
       },
       { flush: 'sync' },
     )

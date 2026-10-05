@@ -14,6 +14,15 @@ import { reportFailure } from '@/failures'
 export const TAP_CHECK_FIRST_MS = 5_000
 export const TAP_CHECK_LAST_MS = 60_000
 
+/**
+ * A refusal the API said itself: its error body, under its build's header. A `2xx` is never one —
+ * the change behind it went through, whatever became of the body on its way (Р4-А1).
+ */
+function refusedInWords(error: unknown): boolean {
+  if (!(error instanceof ApiError) || !error.answered || !error.fromApi) return false
+  return error.status === undefined || error.status < 200 || error.status >= 300
+}
+
 export interface TapSettingState<T> {
   /** The server's answer; undefined while it is not known yet. */
   readonly value: Ref<T | undefined>
@@ -111,16 +120,13 @@ export function useTapSetting<T>(
       settle()
     } catch (error) {
       value.value = shown
-      before = shown
-      // Unsure only where the API said nothing (round 3, №6, Р3-А1): a refusal in its own words — a
-      // 409, a 500 its handler wrote — rolled the change back, and «not saved» is the truth. A reply
-      // the contract could not read is a `2xx` that may well have landed.
-      unsure.value = !(
-        error instanceof ApiError &&
-        error.answered &&
-        error.fromApi &&
-        !error.offContract
-      )
+      // What the first unsure change was made over: a check tells by it whether that one landed.
+      if (!unsure.value) before = shown
+      // Unsure unless the API refused in its own words (round 3, №6; round 4, №9). Its refusal — a
+      // 409, a 500 its handler wrote — rolled the change back, and «not saved» is the truth; a
+      // `2xx` of any shape, whole and off the contract or cut off on its way (Р4-А1), may well have
+      // landed. One unsure change is not made sure by a refusal of the next: it is still checked.
+      unsure.value = unsure.value || !refusedInWords(error)
       // Offline or failed is decided after the failure (MOL-19, A1): a connection that dropped while
       // the answer was on its way is the grey «без связи», never the red «не сохранилось» (self-review 7).
       online.value = navigator.onLine

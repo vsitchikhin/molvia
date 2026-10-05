@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { defineComponent, h, watch } from 'vue'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -10,6 +11,7 @@ import YourDataGroup from './YourDataGroup.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { TAP_CHECK_FIRST_MS } from '@/composables/useTapSetting'
 import { useActorStore } from '@/stores/actor'
 
@@ -33,6 +35,19 @@ const share = vi.fn<(data: ShareData) => Promise<void>>()
 const canShare = vi.fn<(data: ShareData) => boolean>()
 const views: VueWrapper[] = []
 
+/** What the app's live region was handed, in order (round 4, №10). */
+const said: string[] = []
+const WithRegion = defineComponent({
+  setup() {
+    const announcements = provideAnnouncer()
+    watch(announcements, (now, before) => {
+      for (const added of now.filter((a) => !before.some((b) => b.id === a.id)))
+        said.push(added.text)
+    })
+    return () => h(YourDataGroup)
+  },
+})
+
 async function render() {
   // «Удалить мои данные» shares the store of «Выйти» (MOL-94).
   const pinia = createPinia()
@@ -40,7 +55,8 @@ async function render() {
   useActorStore().id = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/settings')
-  const view = mount(YourDataGroup, {
+  said.length = 0
+  const view = mount(WithRegion, {
     global: { plugins: [pinia, router, createAppI18n('en')] },
     attachTo: document.body,
   })
@@ -520,11 +536,26 @@ describe('«Count me in the statistics» (MOL-96)', () => {
     await flushPromises()
     expect(view.find('input[role="switch"]').exists()).toBe(false)
     expect(document.activeElement).toBe(view.get('.quiet').element)
+    // The focus reads the line: the live region does not say it a second time (round 4, №10).
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect(said).not.toContain(en.settings.tap.unsure)
 
     check({ off: true })
     await flushPromises()
     expect(document.activeElement).toBe(counted(view).element)
     expect(counted(view).element.checked).toBe(false)
+  })
+
+  it('«we do not know» with the focus elsewhere is said once, in the live region (№7, №10)', async () => {
+    const view = await render()
+    chooseAnalytics.mockImplementation(() => {
+      readAnalytics.mockReturnValue(new Promise(() => undefined))
+      return Promise.reject(new TypeError('connection reset'))
+    })
+    await counted(view).setValue(false)
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect(said.filter((text) => text === en.settings.tap.unsure)).toHaveLength(1)
   })
 
   it('«Try again» beside «we do not know» checks at once, and a change that did not land says so', async () => {

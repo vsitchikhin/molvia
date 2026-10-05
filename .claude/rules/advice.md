@@ -91,12 +91,14 @@ personal data.
 данные», 5.1), so they are on for everyone and the person may object — «Учитывать меня в
 статистике», the first row of «Ваши данные», saved on the tap at `PUT /actors/me/analytics` with no
 sheet (В-3), as the bot's switches are. **The switch is drawn only as the server's answer**
-(adversarial А1, Р2-А1): not before the read, and not after a change the API gave no word on — no
-answer, a proxy's page, an answer the contract could not read: the change may have landed, so a
-quiet «не знаем, сохранилось ли» stands in its place and takes its focus until a read says, checked
-at once and then by `useTapSetting` every 5 s doubling to a minute, the consent's rhythm (MOL-95); a
-failed check is never the screen's error. A refusal in the API's own words is «не сохранилось» at
-once (round 3, №6). **Off erases every row of the person's log at once** (В-1), every type, in the
+(adversarial А1, Р2-А1): not before the read, and not after a change the API did not refuse in its
+own words — no answer, a proxy's page, a `2xx` whole and off the contract or cut off on its way
+(Р4-А1): the change may have landed, so a quiet «не знаем, сохранилось ли» stands in its place and
+takes its focus until a read says, checked at once and then by `useTapSetting` every 5 s doubling to
+a minute, the consent's rhythm (MOL-95); a failed check is never the screen's error. A refusal in
+the API's own words is «не сохранилось» at once (round 3, №6), and never makes an earlier unsure
+change sure (round 4, №9); the line is said in the live region only when it does not take the focus,
+which reads it (№10). **Off erases every row of the person's log at once** (В-1), every type, in the
 transaction that marks the objection (`actors.analytics_off_at`) — the second written exception to
 append-only: the gates stop counting them, so the rows have no reader left, and an objection to a
 legitimate interest takes what it gathered (GDPR, the bar of section 2, art. 17(1)(c)). **The writer

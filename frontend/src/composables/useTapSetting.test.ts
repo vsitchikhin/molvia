@@ -2,7 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { ApiError } from '@molvia/client'
-import { ERROR } from '@molvia/model'
+import { ERROR, ISSUE } from '@molvia/model'
 import { defineComponent, h } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TAP_CHECK_FIRST_MS, TAP_CHECK_LAST_MS, useTapSetting } from './useTapSetting'
@@ -148,6 +148,11 @@ describe('useTapSetting: a change whose answer was lost', () => {
       'an answer of the API the contract could not read',
       new ApiError(ERROR.INTERNAL, '', true, 200, { fromApi: true, offContract: true }),
     ],
+    // The transport's form of a `200` of the API whose body was cut off on its way (round 4, Р4-А1).
+    [
+      'a 2xx of the API cut off on its way',
+      new ApiError(ISSUE.RESPONSE_INVALID, 'off', true, 200, { fromApi: true }),
+    ],
   ])('%s is unsure: the change may have landed', async (_, failure) => {
     read.mockRejectedValue(new TypeError('connection reset'))
     read.mockResolvedValueOnce(server)
@@ -155,6 +160,34 @@ describe('useTapSetting: a change whose answer was lost', () => {
     write.mockRejectedValue(failure)
     await tap.choose({ off: true })
     expect(tap.unsure.value).toBe(true)
+  })
+
+  it('a refusal in the transport’s own form — the error body, no status — is «not saved» at once', async () => {
+    const tap = await mounted()
+    write.mockRejectedValue(new ApiError(ERROR.INTERNAL, '', true, undefined, { fromApi: true }))
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.saveFailed.value).toBe(true)
+  })
+
+  it('an unsure change is not made sure by a refusal of the next one: still checked (round 4, №9)', async () => {
+    const tap = await mounted()
+    landsWithoutAnswer()
+    read.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(true)
+    // The same tap again before the clock: the API refuses it in its own words.
+    write.mockRejectedValue(new ApiError(ERROR.INTERNAL, '', true, undefined, { fromApi: true }))
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(true)
+    expect(tap.saveFailed.value).toBe(true)
+
+    // The first change had landed: the check by the clock finds it, and «not saved» goes.
+    read.mockImplementation(() => Promise.resolve(server))
+    await vi.advanceTimersByTimeAsync(TAP_CHECK_LAST_MS)
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.value.value).toEqual({ off: true })
+    expect(tap.saveFailed.value).toBe(false)
   })
 
   it('a change that did not land stays «not saved» once a check says so', async () => {
