@@ -22,11 +22,11 @@
             >
           </span>
           <!-- Only an answer is drawn (adversarial А1): «not known yet» drawn off read as an
-               objection nobody made. The place is held, so the words do not move when it comes;
+               objection nobody made — nor a change whose answer was lost (round 2, Р2-А1). The place is held, so the words do not move when it comes;
                it is not faded in — an answer read is not played (MOL-151). -->
           <span class="switch-slot">
             <AppSwitch
-              v-if="analytics.off.value !== undefined"
+              v-if="analytics.off.value !== undefined && !analytics.unsure.value"
               :id="`${id}-analytics-switch`"
               :checked="!analytics.off.value"
               :inactive="analytics.saving.value || !analytics.online.value"
@@ -39,8 +39,18 @@
             />
           </span>
         </div>
-        <p v-if="analytics.online.value && analytics.saveFailed.value" class="failed" role="alert">
-          <IconAlert aria-hidden="true" />{{ t('settings.tap.save_failed') }}
+        <div v-if="analytics.online.value && analytics.unsure.value" class="failed" role="alert">
+          <IconAlert aria-hidden="true" />
+          <span>{{ t('settings.tap.unsure') }}</span>
+          <AppButton variant="ghost" @click="analytics.retry">{{ t('state.retry') }}</AppButton>
+        </div>
+        <!-- The words in a box of their own, or wrapped as a whole under the icon (Р2-А3). -->
+        <p
+          v-else-if="analytics.online.value && analytics.saveFailed.value"
+          class="failed"
+          role="alert"
+        >
+          <IconAlert aria-hidden="true" /><span>{{ t('settings.tap.save_failed') }}</span>
         </p>
         <div
           v-else-if="analytics.online.value && analytics.failure.value === 'error'"
@@ -317,6 +327,12 @@ export default defineComponent({
 
 .failed {
   color: var(--bad-ink);
+
+  // Beside the icon, wrapping in its own box; the button goes under it when the line is full.
+  > span {
+    flex: 1 1 0;
+    min-width: 0;
+  }
 }
 
 .quiet {

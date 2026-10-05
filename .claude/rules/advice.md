@@ -90,11 +90,15 @@ personal data.
 04.10.2026). The log and the gates rest on a legitimate interest, not on consent («Персональные
 данные», 5.1), so they are on for everyone and the person may object — «Учитывать меня в
 статистике», the first row of «Ваши данные», saved on the tap at `PUT /actors/me/analytics` with no
-sheet (В-3), as the bot's switches are. **Off erases every row of the person's log at once** (В-1),
-every type, in the transaction that marks the objection (`actors.analytics_off_at`) — the second
-written exception to append-only: the gates stop counting them, so the rows have no reader left, and
-an objection to a legitimate interest takes what it gathered (GDPR, the bar of section 2, art.
-17(1)(c)). **The writer reads the objection after the lock**: the switch takes the log's own
+sheet (В-3), as the bot's switches are. **The switch is drawn only as the server's answer**
+(adversarial А1, Р2-А1): not before the read, and not after a change whose answer was lost — the
+change may have landed, so «не знаем, сохранилось ли» stands in its place until a read says, checked
+at once and then by `useTapSetting` every 5 s doubling to a minute, the consent's rhythm (MOL-95); a
+failed check is never the screen's error. **Off erases every row of the person's log at once**
+(В-1), every type, in the transaction that marks the objection (`actors.analytics_off_at`) — the
+second written exception to append-only: the gates stop counting them, so the rows have no reader
+left, and an objection to a legitimate interest takes what it gathered (GDPR, the bar of section 2,
+art. 17(1)(c)). **The writer reads the objection after the lock**: the switch takes the log's own
 advisory lock, so a visit being written either lands first and goes with the erasure, or waits and
 finds the objection; a person who is not there still fails on the foreign key, as before. **Out of
 both halves, never the numerator alone**: ten people, three back, two object — one of them back —

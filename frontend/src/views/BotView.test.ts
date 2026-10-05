@@ -154,6 +154,20 @@ describe('«Telegram bot» (MOL-129, В-2)', () => {
   })
 })
 
+describe('a change gone wrong is the row’s, never the page’s (MOL-96, round 2)', () => {
+  it('a refused tap and a refused check after it leave both switches and say «not saved» (Р2-А2)', async () => {
+    const view = await render()
+    chooseNotices.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    readNotices.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    await receipts(view).setValue(false)
+    await flushPromises()
+    expect(view.findAll('input[role="switch"]')).toHaveLength(2)
+    expect(view.text()).not.toContain(en.bot.load_error.title)
+    expect(receipts(view).element.checked).toBe(true)
+    expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
+  })
+})
+
 describe('the four states (MOL-19)', () => {
   it('draws the skeleton until both answers are in', async () => {
     readNotices.mockReturnValue(new Promise(() => undefined))

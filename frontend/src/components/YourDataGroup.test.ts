@@ -10,6 +10,7 @@ import YourDataGroup from './YourDataGroup.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
+import { TAP_CHECK_FIRST_MS } from '@/composables/useTapSetting'
 import { useActorStore } from '@/stores/actor'
 
 const exportMine =
@@ -434,7 +435,8 @@ describe('«Count me in the statistics» (MOL-96)', () => {
     })
     await counted(view).setValue(true)
     await flushPromises()
-    expect(counted(view).element.checked).toBe(false)
+    // Whether it landed is not known: no switch drawn as an answer (round 2, Р2-А1).
+    expect(view.find('input[role="switch"]').exists()).toBe(false)
     expect(view.text()).toContain(en.settings.tap.offline)
 
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
@@ -455,5 +457,52 @@ describe('«Count me in the statistics» (MOL-96)', () => {
     expect(readAnalytics).toHaveBeenCalledTimes(2)
     expect(counted(view).element.checked).toBe(false)
     expect(view.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('a change that got no answer, nor the read after it: no switch, «we do not know», checked again by itself (Р2-А1)', async () => {
+    vi.useFakeTimers()
+    try {
+      readAnalytics.mockResolvedValue({ off: true })
+      const view = await render()
+      // Back on lands; its answer and the read after it are torn, the phone still says «online».
+      chooseAnalytics.mockImplementation(() => {
+        readAnalytics.mockRejectedValue(new TypeError('connection reset'))
+        return Promise.reject(new TypeError('connection reset'))
+      })
+      await counted(view).setValue(true)
+      await flushPromises()
+      expect(view.find('input[role="switch"]').exists()).toBe(false)
+      expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.unsure)
+      expect(view.text()).not.toContain(en.settings.tap.save_failed)
+      expect(view.text()).not.toContain(en.settings.tap.load_error)
+      expect(readAnalytics).toHaveBeenCalledTimes(2)
+
+      // The connection mends with no `online` event: the check comes by the clock.
+      readAnalytics.mockResolvedValue({ off: false })
+      await vi.advanceTimersByTimeAsync(TAP_CHECK_FIRST_MS)
+      await flushPromises()
+      expect(readAnalytics).toHaveBeenCalledTimes(3)
+      expect(counted(view).element.checked).toBe(true)
+      expect(view.find('[role="alert"]').exists()).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('«Try again» beside «we do not know» checks at once, and a change that did not land says so', async () => {
+    const view = await render()
+    chooseAnalytics.mockImplementation(() => {
+      readAnalytics.mockRejectedValueOnce(new TypeError('connection reset'))
+      return Promise.reject(new TypeError('connection reset'))
+    })
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(view.text()).toContain(en.settings.tap.unsure)
+    const retry = view.findAll('button').find((button) => button.text() === en.state.retry)
+    await retry?.trigger('click')
+    await flushPromises()
+    // The server still holds «on»: the change did not land, and now that is known.
+    expect(counted(view).element.checked).toBe(true)
+    expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
   })
 })

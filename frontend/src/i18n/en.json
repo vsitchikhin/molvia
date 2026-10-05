@@ -1375,6 +1375,7 @@
     "tap": {
       "offline": "Cannot save without a connection — the switch comes back with it.",
       "save_failed": "Not saved. Check the connection and try again.",
+      "unsure": "No answer came — we do not know whether it was saved. Checking again.",
       "load_error": "The setting could not be loaded."
     },
     "salary_shift": {

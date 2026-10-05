@@ -40,7 +40,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/composables/useLocalDay.ts` — Composable: the phone's today as a screen holds it, asked again when the app comes back into view or online (MOL-121).
 - `frontend/src/composables/useReconnect.ts` — Composable: calls a screen's retry when the connection may be back — `online` or the app coming into view.
 - `frontend/src/composables/useSheetDrag.ts` — Composable: a sheet pulled down from the top of its content follows the finger and closes past a quarter or on a flick.
-- `frontend/src/composables/useTapSetting.ts` — Composable: a setting of one's own saved on the tap beside the settings form — read, shown at once and taken back on a failure, offline decided after it, and read again after a change whose answer was lost — at once, or when the connection is back (MOL-96, А2); nothing kept on the phone.
+- `frontend/src/composables/useTapSetting.ts` — Composable: a setting of one's own saved on the tap beside the settings form — read, shown at once and taken back on a failure, offline decided after it, and a change whose answer was lost `unsure` until a read says whether it landed — checked at once, then every 5 s doubling to a minute, or when the connection is back, a failed check never the screen's failure (MOL-96, А2, Р2-А1, Р2-А2); nothing kept on the phone.
 - `frontend/src/composables/useSheetHistory.ts` — Composable: the history entry an open sheet holds, closing on pop, putting the page back and focus on its opener; the stale-entry guard.
 
 ## frontend · stores
