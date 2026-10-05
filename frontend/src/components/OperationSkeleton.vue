@@ -1,10 +1,17 @@
 <template>
   <AppCard v-if="form === 'rows'" as="ul" list>
-    <li v-for="n in count" :key="n" class="row">
-      <span class="circle"></span>
-      <span class="words"><span class="title"></span><span class="meta"></span></span>
-      <span class="amount"></span>
-      <span class="chevron"></span>
+    <li v-for="n in count" :key="n" class="item">
+      <span class="row">
+        <span class="circle"></span>
+        <span class="words">
+          <span class="line"><span class="bar title"></span></span>
+          <span class="line small"><span class="bar meta"></span></span>
+        </span>
+        <span class="tail"
+          ><span class="line"><span class="bar amount"></span></span
+        ></span>
+        <span class="chevron"></span>
+      </span>
     </li>
   </AppCard>
   <div v-else class="cards">
@@ -26,8 +33,11 @@ import AppCard from '@/components/AppCard.vue'
  *
  *   cards — the cards of exchanges or incomes: the day, the amounts, the plate (MOL-81, handoff 02);
  *   rows  — the rows of `OperationRow` (MOL-176): its height, its circle of `--row-circle`, its words
- *           and its amount where they will stand, in a list card. Bars of `border` on `surface`
- *           (Ф-13): `surface-2` is not seen on the page's ground. Screens take it with MOL-178.
+ *           and its amount where they will stand, in a list card — each bar in a line of the size and
+ *           leading of the words it stands for, so a row is as tall as the answer's. Narrower than
+ *           `$row-narrow` the amount goes under the words, as the row's does (adversarial round 3, В1).
+ *           Bars of `border` on `surface` (Ф-13): `surface-2` is not seen on the page's ground.
+ *           Screens take it with MOL-178.
  */
 export default defineComponent({
   name: 'OperationSkeleton',
@@ -87,7 +97,12 @@ export default defineComponent({
   border-radius: var(--radius);
 }
 
-/* The geometry of `ListRow` with a tint and a chevron: 64, 12 / 16, the gaps of 12. */
+/* The geometry of `ListRow` with a tint and a chevron: 64, 12 / 16, the gaps of 12 — and its container
+   `row`, which `OperationRow` sets on its `li`. */
+.item {
+  container: row / inline-size;
+}
+
 .row {
   display: flex;
   align-items: center;
@@ -97,13 +112,26 @@ export default defineComponent({
   padding: var(--space-3) var(--space-4);
 }
 
-.circle,
-.title,
-.meta,
-.amount {
+/* A bar stands in a line of the words it stands for: the title's and the amount's 17, the meta's 13. */
+.line {
   display: block;
+  font-size: var(--text-body);
+  line-height: var(--leading-snug);
+}
+
+.small {
+  font-size: var(--text-footnote);
+}
+
+.circle,
+.bar {
+  display: inline-block;
   border-radius: var(--radius-pill);
   background: var(--border);
+}
+
+.bar {
+  vertical-align: middle;
 }
 
 .circle {
@@ -113,9 +141,8 @@ export default defineComponent({
 }
 
 .words {
-  display: grid;
   flex: 1;
-  gap: var(--space-2);
+  min-width: 0;
 }
 
 .title {
@@ -128,8 +155,13 @@ export default defineComponent({
   height: var(--skeleton-sub);
 }
 
-.amount {
+.tail {
+  flex: none;
   width: 22%;
+}
+
+.amount {
+  width: 100%;
   height: var(--skeleton-line);
 }
 
@@ -137,5 +169,36 @@ export default defineComponent({
 .chevron {
   flex: none;
   width: var(--icon);
+}
+
+/* Narrow, as `ListRow` in its container: the amount on a line of its own under the words, at the right. */
+@container row (width < #{$row-narrow}) {
+  .row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0 var(--space-3);
+  }
+
+  .circle {
+    grid-row: 1 / span 2;
+  }
+
+  .words {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .tail {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    width: 40%;
+    margin-top: var(--space-1);
+  }
+
+  .chevron {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
 }
 </style>

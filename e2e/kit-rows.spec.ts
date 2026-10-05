@@ -186,3 +186,35 @@ for (const width of [390, 320])
     // Two lines are the meta's on a phone of 390; on 320 the other half of an exchange may end in «…».
     if (width === 390) expect(look.metasCut).toBe(0)
   })
+
+// The skeleton is the answer's shape (MOL-176, R-14): a row of bars as tall as a row of the answer, its
+// amount where the answer's stands — beside the words on a wide card, under them on a narrow one. It kept
+// the wide shape alone, and a day of twelve rows would have grown by 300 px as the answer came
+// (adversarial round 3, В1).
+for (const width of [390, 320])
+  test(`at ${String(width)} a row of the skeleton is the shape of a row of the answer`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 720 })
+    await open(page, '/_kit')
+    const section = page.locator('section', {
+      has: page.getByRole('heading', { name: 'Operation row' }),
+    })
+    // A title, a meta and an amount with no line under it — what a bar stands for.
+    const answer = section.locator('.list-row', { hasText: '+₽99,615' })
+    await expect(answer).toBeVisible()
+    // The row's height, where its amount ends, and how far down the row its amount's middle stands.
+    const measure = (row: Element) => {
+      const amount = row.querySelector('.amount')
+      if (!amount) throw new Error('no amount')
+      const box = row.getBoundingClientRect()
+      const sum = amount.getBoundingClientRect()
+      return { height: box.height, right: sum.right, middle: (sum.top + sum.bottom) / 2 - box.top }
+    }
+    const real = await answer.evaluate(measure)
+    const bars = await section.locator('.item .row').first().evaluate(measure)
+    expect(bars.height).toBeCloseTo(real.height, 0)
+    expect(bars.right).toBeCloseTo(real.right, 0)
+    // The text's box is its face's, the bar's its line's middle: WebKit's metrics part them by a pixel.
+    expect(Math.abs(bars.middle - real.middle)).toBeLessThanOrEqual(2)
+  })

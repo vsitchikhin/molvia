@@ -354,9 +354,13 @@ The detail behind the frontend lines of `CLAUDE.md`.
   zero is «плохо», on the balance's card (116 v2 2d). `e2e/kit-rows` holds the column, the chevrons in
   one place inside the card, the skeleton's bars in it and nothing cut or over another at 390 and 320,
   in both engines; `accounts.spec` the account's journal at 320 and 430, `money.spec` the day's sum at
-  412 and 320. **Its skeleton is
-  `OperationSkeleton form="rows"`**, the same geometry in bars of `--border` on `--surface` (Ф-13);
-  the screens take it with MOL-178.
+  412 and 320. **Its skeleton is `OperationSkeleton form="rows"`**, the same geometry in bars of
+  `--border` on `--surface` (Ф-13), each bar in a line of the size and leading of the words it stands
+  for, so a row of bars is as tall as a row of the answer — **narrow too**: its `li` is the container
+  `row`, and both read the one `$row-narrow` (`_mixins.scss`), so the bars cannot part from the answer
+  (adversarial round 3, В1: kept wide, a day of twelve rows would have grown by 300 px as the answer
+  came); `e2e/kit-rows` holds the height and the amount's place at 390 and 320. The screens take it with
+  MOL-178.
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
   `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a

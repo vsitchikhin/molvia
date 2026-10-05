@@ -283,7 +283,7 @@ export default defineComponent({
    and 348 in their gutter of 32. The handoff's card of 390 (358) keeps the amount beside. The container
    is the caller's — `OperationRow` sets it — so every row of a card is laid out alike. No row gap: a row
    with no tail is not a line taller. */
-@container row (width < 22rem) {
+@container row (width < #{$row-narrow}) {
   .list-row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
