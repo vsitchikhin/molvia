@@ -2,14 +2,22 @@
   <component
     :is="tag"
     class="list-row"
-    :class="{ live: tag !== 'div', wrap, danger, inactive, selected, active }"
+    :class="{
+      live: tag === 'button' || tag === 'a',
+      option: tag === 'li',
+      wrap,
+      danger,
+      inactive,
+      selected,
+      active,
+    }"
     :type="tag === 'button' ? 'button' : undefined"
     :href="inactive ? undefined : link?.href.value"
     :role="link && inactive ? 'link' : undefined"
     :tabindex="link && inactive ? 0 : undefined"
     :aria-disabled="inactive && tag !== 'div' ? 'true' : undefined"
     :aria-checked="state === 'checked' ? String(selected) : undefined"
-    :aria-selected="state === 'selected' ? String(selected) : undefined"
+    :aria-selected="state === 'selected' ? String(selected || active) : undefined"
     @click="click"
   >
     <span
@@ -44,7 +52,7 @@ import type { RouteLocationRaw } from 'vue-router'
 import IconCheck from '~icons/mdi/check'
 import IconChevronRight from '~icons/mdi/chevron-right'
 
-const TAGS = ['button', 'router-link', 'div'] as const
+const TAGS = ['button', 'router-link', 'div', 'li'] as const
 export type RowTag = (typeof TAGS)[number]
 
 /** Roles whose choice is read out as checked, and those read out as selected. */
@@ -63,8 +71,10 @@ const SELECTED = new Set([
  * A row of a list (Ф-12, MOL-175): an icon of 24, a title 17/600, a meta of 13 in up to two lines, a
  * tail and a 20 chevron — 64 high, the hairline between rows drawn by the `AppCard list` around it.
  *
- *   as       — `button`, `router-link` (with `to`) or `div`. Only a `div` may hold a button in its
- *              tail: a button inside a button is no HTML, and a screen reader hears one of them;
+ *   as       — `button`, `router-link` (with `to`), `div` or `li`. Only a `div` may hold a button in its
+ *              tail: a button inside a button is no HTML, and a screen reader hears one of them. An
+ *              `li` is an option of a list a field owns (MOL-177): no stop of Tab, the focus stays in the
+ *              field, and no hover — on a desktop it fought the arrows for which row is active (MOL-23);
  *   icon     — a component, drawn here at its step, so no screen can draw it at another;
  *   tint     — the icon stands in a circle of 40 (MOL-176): a colour — a category's, on its
  *              `cat-tint-share` — or `muted`, `surface-2` under `text-muted`, for what has no colour;
@@ -80,7 +90,8 @@ const SELECTED = new Set([
  *   selected — the fill, the ring and a ✓ (Ф-5), the weight unchanged; read out by the role the row
  *              was given — `aria-checked` for a radio, `aria-selected` for an option — never only seen;
  *   active   — the row the keyboard stands on in a list a field owns (`aria-activedescendant`, К-4):
- *              the fill without the ring, since the focus is in the field.
+ *              the fill without the ring, since the focus is in the field, and read out as selected, as
+ *              the ARIA combobox has its active option.
  *
  * The slot `below` stands under the meta, in the column of the words — a tag, «Отправляем…»: in the
  * meta it would be cut with it at two lines.
@@ -185,6 +196,10 @@ export default defineComponent({
 .live {
   cursor: pointer;
   transition: background-color var(--dur-fast) var(--ease-out);
+}
+
+.option {
+  cursor: pointer;
 }
 
 @media (hover: hover) {
@@ -373,6 +388,15 @@ export default defineComponent({
 
   &::before {
     @include focus-ring(-6px);
+  }
+}
+
+/* The meta stays muted on the three grounds only: on the tint under a chosen or an active row it stood at
+   4.17:1 in the light scheme and 3.83:1 in the dark (MOL-172, MOL-177). */
+.selected,
+.active {
+  .meta {
+    color: var(--text);
   }
 }
 

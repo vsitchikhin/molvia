@@ -137,5 +137,29 @@ export default defineConfigWithVueTs(
       ],
     },
   },
+  // One search field (MOL-177, Ф-12): «Что взяли?», «Что брать» and «Выбрать товар» had grown three
+  // looks, and a fourth screen would draw a fourth. A field of search outside `SearchField` — by its
+  // type or by the key it asks the keyboard for — is refused, as caps outside `SectionCaption` are.
+  // A bound `:type` passes: it closes carelessness, not intent.
+  {
+    files: ['src/**/*.vue'],
+    ignores: ['src/components/SearchField.vue'],
+    rules: {
+      'vue/no-restricted-static-attribute': [
+        'error',
+        {
+          key: 'type',
+          value: 'search',
+          element: 'input',
+          message: 'A search field is SearchField (MOL-177).',
+        },
+        {
+          key: 'enterkeyhint',
+          value: 'search',
+          message: 'A search field is SearchField (MOL-177).',
+        },
+      ],
+    },
+  },
   prettier,
 )

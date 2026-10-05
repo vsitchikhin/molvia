@@ -1,30 +1,12 @@
 <template>
-  <div class="field">
-    <label class="hidden" :for="id">{{ t('advice.search.label') }}</label>
-    <IconMagnify class="magnify" aria-hidden="true" />
-    <input
-      :id="id"
-      ref="input"
-      class="input"
-      type="search"
-      enterkeyhint="search"
-      autocomplete="off"
-      autocapitalize="none"
-      spellcheck="false"
-      :placeholder="t('advice.search.placeholder')"
-      :value="modelValue"
-      @input="type"
-    />
-    <button
-      v-if="modelValue"
-      class="clear"
-      type="button"
-      :aria-label="t('advice.search.clear')"
-      @click="clear"
-    >
-      <IconCloseCircle aria-hidden="true" />
-    </button>
-  </div>
+  <SearchField
+    class="field"
+    :model-value="modelValue"
+    :label="t('advice.search.label')"
+    :placeholder="t('advice.search.placeholder')"
+    clearable
+    @update:model-value="$emit('update:modelValue', $event)"
+  />
 
   <template v-if="phase !== 'idle'">
     <p v-if="phase === 'memory' && fetchedAt" class="note">
@@ -117,11 +99,9 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onUnmounted, ref, toRef, useId, watch } from 'vue'
+import { computed, defineComponent, onUnmounted, toRef, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import IconCloseCircle from '~icons/mdi/close-circle'
-import IconMagnify from '~icons/mdi/magnify'
 import type { AdviceFound, AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
 import AdviceCheapRow from '@/components/AdviceCheapRow.vue'
 import AdviceGroup from '@/components/AdviceGroup.vue'
@@ -130,6 +110,7 @@ import AdviceTakeCard from '@/components/AdviceTakeCard.vue'
 import AppCard from '@/components/AppCard.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import SearchField from '@/components/SearchField.vue'
 import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
 import { useAdviceSearch } from '@/composables/useAdviceSearch'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -173,10 +154,9 @@ export default defineComponent({
     AdviceNeverRow,
     AdviceTakeCard,
     AppCard,
-    IconCloseCircle,
-    IconMagnify,
     ScreenSkeleton,
     ScreenState,
+    SearchField,
   },
   props: {
     modelValue: { type: String, required: true },
@@ -192,9 +172,8 @@ export default defineComponent({
     edit: (row: AdviceRow, scope: AdviceScope) => typeof row === 'object' && !!scope,
     rate: (item: AdviceFound, scope: AdviceScope) => typeof item === 'object' && !!scope,
   },
-  setup(props, { emit }) {
+  setup(props) {
     const { t, locale } = useI18n()
-    const id = useId()
     const search = useAdviceSearch(toRef(props, 'modelValue'), () => props.remembered)
     const { phase, found, stale, answered } = search
     const announce = useAnnouncer()
@@ -225,11 +204,8 @@ export default defineComponent({
       withdraw?.()
     })
 
-    const input = ref<HTMLInputElement | null>(null)
-
     return {
       t,
-      id,
       phase,
       found,
       stale,
@@ -237,16 +213,6 @@ export default defineComponent({
       scope: search.scope,
       groups: computed(() => laidOut(found.value)),
       retry: search.retry,
-      type: (event: Event) => {
-        emit('update:modelValue', (event.target as HTMLInputElement).value)
-      },
-      input,
-      // Back into the field: the button goes with what it cleared, and the focus would be left on
-      // nothing — the keyboard folded, a screen reader thrown to the top (review Р-12).
-      clear: () => {
-        emit('update:modelValue', '')
-        input.value?.focus()
-      },
       day: (when: Date) => purchaseDay(when, locale.value),
       time: (when: Date) => timeOfDay(when, locale.value),
     }
@@ -256,71 +222,7 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .field {
-  position: relative;
-  display: flex;
-  align-items: center;
-  min-height: var(--touch-target);
   margin-bottom: var(--space-4);
-  padding-left: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: inset 0 0 0 var(--hairline) var(--border-strong);
-
-  &:focus-within {
-    @include focus-ring;
-  }
-}
-
-.magnify {
-  @include icon;
-
-  font-size: var(--icon);
-  color: var(--text-muted);
-}
-
-.input {
-  flex: 1;
-  min-width: 0;
-  min-height: var(--touch-target);
-  padding: 0 var(--space-2);
-  border: 0;
-  outline: none;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: var(--text-body);
-
-  &::-webkit-search-cancel-button {
-    appearance: none;
-  }
-
-  &::placeholder {
-    color: var(--text-muted);
-  }
-}
-
-.clear {
-  @include touch-target;
-
-  flex: none;
-  border: 0;
-  background: none;
-  color: var(--text-muted);
-  cursor: pointer;
-
-  svg {
-    @include icon;
-
-    font-size: var(--icon);
-  }
-
-  &:focus-visible {
-    @include focus-ring;
-  }
-}
-
-.hidden {
-  @include visually-hidden;
 }
 
 .note,

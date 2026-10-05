@@ -258,8 +258,7 @@ export default defineComponent({
     outline-color var(--dur-fast) var(--ease-out);
 
   &:focus-within {
-    border-color: var(--accent);
-    outline: 2px solid var(--accent-tint);
+    @include field-focus;
   }
 }
 
