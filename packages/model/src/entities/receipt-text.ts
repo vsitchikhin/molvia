@@ -1266,14 +1266,18 @@ function classReceipt(rows: readonly TextRow[]): ReceiptText {
 // «Բաժին 1», as OCR reads it: «Ււսժին 1]», «Բայժին 11» — the section and its number.
 const DEPARTMENT = /(?:Բա|Բայ|Ււս)ժին\s*\d/u
 // What only an item prints: the class code, a customs heading «(3824)», a till's article «0401/1163909»,
-// a table's heading «Անուն Քան Գին Գումար». Dog City and KFC print «Բաժին» too, over their items.
+// a table's heading «Անուն Քան Գին Գումար». Dog City and KFC print «Բաժին» too, over their items — so it
+// is looked for under the section only: a phone in the head, «(0312) 5-12-34», «0312/51234», is the
+// trader's own line and no item (adversarial А2).
 const ITEM_MARK = new RegExp(
   `${CLASS_MARK.source}|\\(\\d{4}\\)|\\d{4}\\s*/\\s*\\d{5,}|Անուն.{0,20}Քան`,
   'u',
 )
-// The tax number: after its word, or before the till's registration number however OCR read the word,
-// «CUCC: 57311783 9/С: 31028805» — never the receipt's own number, «ԿՀ: 00000049».
-const DEPARTMENT_TIN = /ՀՎՀՀ\S{0,2}\s*(\d{8})(?!\d)|(?<!\d)(\d{8})\s+\S{1,3}\/\S{1,3}:?\s*\d{6,}/u
+// The tax number: after its word first, anywhere; else before the till's registration number on the same
+// row, however OCR read the word, «CUCC: 57311783 9/С: 31028805» — never the receipt's own number
+// «ԿՀ: 00000049» on the row above it (review 1, № 1).
+const DEPARTMENT_TIN_WORD = /ՀՎՀՀ\S{0,2}\s*(\d{8})(?!\d)/u
+const DEPARTMENT_TIN_TILL = /(?<!\d)(\d{8})\s+\S{1,3}\/\S{1,3}:?\s*\d{6,}/u
 const DEPARTMENT_DATE = /(?<!\d)(\d{2})[-.]\s?(\d{2})[-.]\s?(\d{2})\s+(\d{2}):(\d{2})/g
 // «ՖԻՍԿԱԼ ՀԱՄԱՐ 04143299», in capitals as often as not.
 const DEPARTMENT_FISCAL = /Ֆիսկալ\S*\s+\S*\s*(\d{8})(?!\d)/iu
@@ -1315,6 +1319,18 @@ function departmentAmounts(rows: readonly TextRow[]): Map<string, Set<number>> {
   return found
 }
 
+/** A day of the calendar and a time a clock shows, or null: «64-10-26» or «76:36» is no reading at all. */
+function calendarDayOf(year: string, month: string, day: string): string | null {
+  const iso = `20${year}-${month}-${day}`
+  const date = new Date(`${iso}T00:00:00Z`)
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== iso ? null : iso
+}
+const clockOf = (hour: string, minute: string): string | null =>
+  Number(hour) < 24 && Number(minute) < 60 ? `${hour}:${minute}` : null
+
+/** The rows of a reading, one per line of text — a part's rows are lines already. */
+const rowTexts = (rows: readonly TextRow[]): string[] => rows.map((row) => row.text)
+
 /** What both readings say, or what the one that read it says; two answers are none. */
 function agreed<T>(values: readonly (T | null)[]): T | null {
   const read = [...new Set(values.filter((v): v is T => v !== null))]
@@ -1330,8 +1346,12 @@ function agreed<T>(values: readonly (T | null)[]): T | null {
  */
 export function departmentReceipt(readings: readonly (readonly TextRow[])[]): ReceiptText | null {
   if (!readings.some((rows) => rows.some((row) => DEPARTMENT.test(row.text)))) return null
-  if (readings.some((rows) => rows.some((row) => ITEM_MARK.test(row.text)))) return null
-  const texts = readings.map((rows) => rows.map((row) => row.text).join('\n'))
+  const marked = (rows: readonly TextRow[]): boolean => {
+    const section = rows.findIndex((row) => DEPARTMENT.test(row.text))
+    return rows.slice(section + 1).some((row) => ITEM_MARK.test(row.text))
+  }
+  if (readings.some(marked)) return null
+  const texts = readings.map(rowTexts)
   const votes = new Map<number, Set<string>>()
   for (const rows of readings) {
     for (const [source, amounts] of departmentAmounts(rows)) {
@@ -1341,31 +1361,42 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
   const backed = [...votes].filter(([, sources]) => sources.size >= 2)
   const most = Math.max(0, ...backed.map(([, sources]) => sources.size))
   const totals = backed.filter(([, sources]) => sources.size === most)
-  const moments = texts.map((text) => [
-    ...new Set(
-      [...text.matchAll(DEPARTMENT_DATE)].map(([, day, month, year, hour, minute]) =>
-        [`20${year ?? ''}-${month ?? ''}-${day ?? ''}`, `${hour ?? ''}:${minute ?? ''}`].join(' '),
-      ),
-    ),
+  const moments = texts.map((rows) => [
+    ...new Map(
+      rows
+        .flatMap((text) => [...text.matchAll(DEPARTMENT_DATE)])
+        .map(([found, day = '', month = '', year = '', hour = '', minute = '']) => [
+          found,
+          { date: calendarDayOf(year, month, day), time: clockOf(hour, minute) },
+        ]),
+    ).values(),
   ])
-  // two receipts on one photo print two moments: whose total, time and number it is, nobody can tell —
-  // the person sees the photo and types the total (am-21 of the bench)
-  const several = moments.some((m) => m.length > 1)
-  const date = agreed(moments.flatMap((m) => m.map((moment) => moment.slice(0, 10))))
-  const time = several ? null : agreed(moments.map((m) => m[0]?.slice(11) ?? null))
+  // A receipt prints its moment, its total and its fiscal number once: two of any of them is two
+  // receipts on one photo, whose total, time and number nobody can tell — the person holds the
+  // receipts and types the total (am-21 of the bench). The moments alone missed a pair whose upper head
+  // was out of the frame: its total and time came from the lower receipt, its number from the upper
+  // one, and the upper receipt shot on its own was then refused as recorded (adversarial А1).
+  const once = (rows: readonly string[], test: (text: string) => boolean): boolean =>
+    rows.filter(test).length > 1
+  const several = texts.some(
+    (rows, i) =>
+      (moments[i]?.length ?? 0) > 1 ||
+      once(rows, (text) => /Ֆիսկալ/iu.test(text)) ||
+      once(rows, (text) => text.includes(DEPARTMENT_TOTAL) && !text.includes('զեղչ')),
+  )
+  // a day or a time no calendar or clock has is no reading of it, and outvotes nothing (adversarial А3)
+  const date = agreed(moments.flatMap((m) => m.map((moment) => moment.date)))
+  const time = several ? null : agreed(moments.map((m) => m[0]?.time ?? null))
+  const firstOf = (rows: readonly string[], pattern: RegExp): string | null =>
+    rows.map((text) => pattern.exec(text)?.[1]).find((found) => found !== undefined) ?? null
   return {
     layout: 'department',
     tin: agreed(
-      texts.map((text) => {
-        const found = DEPARTMENT_TIN.exec(text)
-        return found?.[1] ?? found?.[2] ?? null
-      }),
+      texts.map((rows) => firstOf(rows, DEPARTMENT_TIN_WORD) ?? firstOf(rows, DEPARTMENT_TIN_TILL)),
     ),
     date,
     time,
-    receiptNo: several
-      ? null
-      : agreed(texts.map((text) => DEPARTMENT_FISCAL.exec(text)?.[1] ?? null)),
+    receiptNo: several ? null : agreed(texts.map((rows) => firstOf(rows, DEPARTMENT_FISCAL))),
     totalHundredths: !several && totals.length === 1 ? (totals[0]?.[0] ?? null) : null,
     balanced: false,
     lines: [],
@@ -1414,7 +1445,9 @@ function readingOf(rows: readonly TextRow[]): ReceiptText {
   const card = cardReceipt(rows)
   const text = rows.map((r) => r.text).join('\n')
   let read = card
-  if (/\(\d{4}\)/.test(text)) {
+  // a customs heading names its item after it, «(3824) ՏՈՖՈՒՀՈՂ»; «(0312) 5-12-34» is a phone in the head,
+  // and read as Dog City's table it made one «line» of the whole head (MOL-227, adversarial А2)
+  if (/\(\d{4}\)\s*\p{L}/u.test(text)) {
     const table = tableLines(rows)
     if (table.lines.length > card.lines.length) read = tableReceipt(rows, table)
   }

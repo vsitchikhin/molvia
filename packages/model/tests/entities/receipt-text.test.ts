@@ -1671,6 +1671,76 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
     expect(needsReshoot(got)).toBe(true)
   })
 
+  it('reads the tax number after its word first, the receipt’s number on the row above never (review 1, № 1)', () => {
+    const rows = (word: string) =>
+      reading(
+        'ԽԱՆՈՒԹ ԱՁ',
+        'ԿՀ: 00000049',
+        'Գ/Հ: 87654321',
+        `${word} 12345678`,
+        'Բաժին 1',
+        'Ընդամենը 1700.00',
+        'Առձեռն 1700.00',
+      )
+    expect(bestReading([rows('ՀՎՀՀ:')]).tin).toBe('12345678')
+    // the word not read: eight digits that end a row are not the tax number of the till's row under it
+    expect(bestReading([rows('')]).tin).toBeNull()
+  })
+
+  it('reads no total, time or number where the upper receipt’s head is out of the frame (adversarial А1)', () => {
+    // one moment in view, but two totals and two fiscal numbers: two receipts all the same
+    const got = bestReading([
+      reading(
+        'Բաժին 1 - Բաժին 1',
+        '/ Շրջանառության հարկ/ 3660.00',
+        'Ընդամենը՝ 3660.00',
+        'ՖԻՍԿԱԼ ՀԱՄԱՐ 11223344',
+        'ԽԱՆՈՒԹ ԱՁ',
+        'ՀՎՀՀ: 12345678 Գ/Հ: 87654321',
+        '04-10-26 14:27:34',
+        'Բաժին 1 - Բաժին 1',
+        '/ Շրջանառության հարկ/ 1200.00',
+        'Ընդամենը՝ 1200.00',
+        'Առձեռն 1200.00',
+        'ՖԻՍԿԱԼ ՀԱՄԱՐ 55667788',
+      ),
+    ])
+    expect(got.layout).toBe('department')
+    expect([got.totalHundredths, got.time, got.receiptNo]).toEqual([null, null, null])
+    expect([got.tin, got.date]).toEqual(['12345678', '2026-10-04'])
+  })
+
+  it('takes a phone in the head for no item’s mark (adversarial А2)', () => {
+    for (const phone of ['Հեռ. (0312) 5-12-34', 'Հեռ. 0312/51234']) {
+      const got = bestReading([
+        reading(
+          'ԽԱՆՈՒԹ ԱՁ',
+          'ԳՅՈՒՄՐԻ Աբովյան 10',
+          phone,
+          'СУСС: 12345678 Գ/Ը: 87654321',
+          'ԿԸ: 00000050',
+          'Բաժին 1 - Բաժին 1',
+          '/ Շրջանառության Ըարկ/ 700.00',
+          'Ընդամենը՝ 700.00',
+        ),
+      ])
+      expect([got.layout, got.lines.length, got.tin, got.totalHundredths]).toEqual([
+        'department',
+        0,
+        '12345678',
+        70_000,
+      ])
+    }
+  })
+
+  it('takes a day or a time no calendar or clock has for no reading of it (adversarial А3)', () => {
+    const at = (moment: string) => reading(moment, 'Բաժին 1', 'Ընդամենը 1700.00', 'Առձեռն 1700.00')
+    const day = bestReading([at('04-10-26 16:36:48'), at('64-10-26 16:36:48')])
+    const hour = bestReading([at('04-10-26 16:36:48'), at('04-10-26 76:36:48')])
+    expect([day.date, day.time]).toEqual(['2026-10-04', '16:36'])
+    expect([hour.date, hour.time]).toEqual(['2026-10-04', '16:36'])
+  })
+
   it('leaves a receipt that found a line to its layout, a section printed or not', () => {
     expect(read(am14t as Fixture).layout).toBe('class')
     expect(read(am04 as Fixture).layout).toBe('table')
