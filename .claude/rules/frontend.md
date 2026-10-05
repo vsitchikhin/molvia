@@ -438,16 +438,19 @@ The detail behind the frontend lines of `CLAUDE.md`.
   zero is «плохо», on the balance's card (116 v2 2d). `e2e/kit-rows` holds the column, the chevrons in
   one place inside the card, the skeleton's bars in it and nothing cut or over another at 390 and 320,
   in both engines; `accounts.spec` the account's journal at 320 and 430, `money.spec` the day's sum at
-  412 and 320. **Its skeleton is `OperationSkeleton form="rows"`**, the same geometry in bars of
+  412 and 320. **Its skeleton is `SkeletonPart kind="rows"`** (`lead="circle" tail next`, MOL-178; it
+  was `OperationSkeleton form="rows"`), the same geometry in bars of
   `--border` on `--surface` (Ф-13), each bar in a line of the size and leading of the words it stands
-  for, so a row of bars is as tall as a typical row of the answer — a title and a meta of a line each,
-  no line under the amount — **narrow too**: its `li` is the container
+  for, so a row of bars is as tall as a typical row of the answer — **narrow too**: its `li` is the container
   `row`, and both read the one `$row-narrow` (`_mixins.scss`), so the bars cannot part from the answer
   (adversarial round 3, В1: kept wide, a day of twelve rows would have grown by 300 px as the answer
-  came); `e2e/kit-rows` holds the height and the amount's place at 390 and 320. **The price, named**
-  (adversarial round 4): a row whose words wrap or that has a line under its amount is taller than its bars
-  — on a card of 256 by 17 to 34 px — since the bars know no text; which row is typical is MOL-178's, when
-  the screens take it.
+  came); `e2e/kit-rows` holds the height and the amount's place at 390 and 320. **The typical row is the
+  short one** — a title and a meta of a line each, no line under the amount — **and the line under it is
+  the screen's to ask for** (`under`, owner's В-3 «б», MOL-178): an account in another currency has one
+  under nearly every amount, and twelve rows of bars a line short would grow by some 200 px as the answer
+  came; always drawn, a journal in its own currency would come shorter than its bars — the page under the
+  month's switcher, which MOL-138 holds. **The price, named** (adversarial round 4 of MOL-176): a row whose
+  words wrap is taller than its bars — on a card of 256 by 17 to 34 px — since the bars know no text.
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
   `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a
@@ -486,7 +489,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
   of the server.
 - **Every screen has four states:** loading, empty, error, offline. The empty state is not
   "no data" but an offer to act. They are drawn by two blocks and nothing else (MOL-19):
-  `ScreenSkeleton` for loading, the screen giving the widths of its bars, and `ScreenState`
+  `ScreenSkeleton` for loading, in the shape of the answer (the next rule), and `ScreenState`
   for the rest. The tone of the circle carries the meaning and is fixed by the kind — an error
   is always red and always offers «Try again»; offline is green or yellow and **never red**,
   which `vue-tsc` holds rather than memory: `bad` is not a tone a screen can ask for. The
@@ -503,6 +506,30 @@ The detail behind the frontend lines of `CLAUDE.md`.
   or «attention» on the screen interrupts; anything inline is polite. **A full-screen error also
   offers «Сообщить о проблеме»** (MOL-147), drawn by `ScreenState` and by nothing else, last and
   quietest: not `inline`, not for nobody known, not inside a `<dialog>` — `feedback.md` says why.
+- **The skeleton is the answer's shape, drawn in the kit's parts** (MOL-178, Ф-13, Н-5). Its bars were
+  `surface-2` on the page's ground — 1.06:1 in the light scheme, next to nothing — with no card, no
+  rows and no search field, so the screen jumped as the answer came. **`ScreenSkeleton` is the frame**:
+  «Loading…» in the live region, the bars hidden from a screen reader, one breath for all of them,
+  8 between its parts; **the shape is the screen's**, put in its slot in the order the answer will stand
+  (owner's В-2 «а»): the kit's `SkeletonPart`s — a caption on the ground (24 above it when it is not the
+  first), the well of a search, a list card of rows (`lead` an icon of 24 or a circle of 40, `tail`,
+  `under`, `next`), the card of a sum (`plate`), paragraphs — and between them what is the screen's own,
+  the ring of «Графики», the scale of «Оценки». A prop of one array was the other way, and the screen's
+  own would have stood only after every part. **A bar is `@include skeleton-bar` and nothing else** —
+  `border` on a card's `surface`, 1.42:1 and 1.38:1 — in the parts and in what a screen draws in the
+  slot (the fields of «Настройки», the keys of «Оценки», the cards of exchanges), never `surface-2`,
+  1.1:1 even on a card. **The widths of a row's bars are the part's**, the handoff's uneven cycle, never
+  the screen's; a caption's and the paragraphs' are the screen's, since there the width is the content.
+  **`groups` is the shape from before the parts**, drawn as paragraphs in one card, so every screen's
+  skeleton is seen at once (owner's В-1 «а»); each screen trades it for its answer's shape in its own
+  task of the epic, and its `groups` goes with the last of them. Where a card is not the answer's shape
+  the paragraphs stand bare (`card: false`): the scanner's bar at the top of the viewfinder. `/_kit`
+  «Скелетон» puts each part under the answer it stands for, and `e2e/kit-rows` holds their heights — the
+  well, a caption, a row of `ListRow`, a row of `OperationRow` with a line under its amount and the
+  amount's place — at 390 and 320 in both engines; the breath and its stillness under «reduce motion» are
+  held on the frame, where they are set (`advice.spec`, `item-search.spec`). **The price:** a card adds
+  its padding and edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter,
+  which the hold of MOL-138 needs.
 - **An installed app takes a new version only when nobody can lose anything to it: hidden, and
   holding no typing** (`pwaUpdate.ts`, MOL-46). The client reads every answer strictly, so an old page
   against a new API breaks — and nothing reloaded it: an iOS app frozen in the background came back
