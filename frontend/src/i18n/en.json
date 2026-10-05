@@ -225,7 +225,7 @@
       "other": "the server didn’t take the receipt"
     },
     "recorded_receipt": "{count} · {day} · from a receipt",
-    "receipt_sum": "receipt total",
+    "recorded_sum": "receipt total · {day}",
     "queued": {
       "waiting": "The photos are on your phone. We’ll send them once you are online — nothing to do.",
       "parsing": "Reading is under way — you can close the app. The ready receipt goes to “Check and save”.",
@@ -2056,6 +2056,7 @@
       "diff": "{amount} off — probably in the “{line}” line. You can save it anyway",
       "diff_unknown": "{amount} off — we couldn’t find the line. You can save it anyway",
       "photo_note": "We delete the photo after saving — the lines stay",
+      "photo_note_sum": "We delete the photo after saving",
       "partly_total": "Not all of it was read: the lines make {lines} of {total}. If the print is faint, a retake will not help — correct the lines",
       "no_items": "This receipt lists no items — we will save its total. You can add the purchases later, in the record",
       "partly_lines": "Not all of it was read: {n} of {total} lines add up. If the print is faint, a retake will not help — correct the lines",
@@ -2118,7 +2119,6 @@
     "recorded": {
       "title": "Saved {n} purchase | Saved {n} purchases",
       "sum_title": "Saved the receipt total",
-      "sum_body": "You can add its purchases below — «Add an item»",
       "body": "Rate them at home, in Ratings. Any line can be fixed right now too",
       "to_verdicts": "To ratings",
       "from_receipt": "from a receipt",

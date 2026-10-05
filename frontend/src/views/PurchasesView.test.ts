@@ -482,6 +482,28 @@ describe('PurchasesView (MOL-128)', () => {
   })
 
   describe('«Записаны»', () => {
+    it('запись с суммой и без покупок — «сумма по чеку», откуда бы ни была (MOL-227, Р-6, А7)', async () => {
+      const sum = [parseMoney('1700', 'AMD')]
+      const byHand = { ...trip(1), itemCount: 0, total: sum }
+      const fromReceipt = { ...trip(2, 'Гая 5'), itemCount: 0, total: sum, fromReceipt: true }
+      tripHistory.mockResolvedValue({ trips: [byHand, fromReceipt], nextCursor: null })
+      const { view } = await render()
+      for (const row of rows(view)) {
+        expect(row.text()).toContain('сумма по чеку · ')
+        expect(row.text()).not.toMatch(/0 позиций|из чека/)
+        expect(row.find('.sum').exists()).toBe(true)
+      }
+    })
+
+    it('«не должно сработать»: без суммы и без покупок — не «сумма по чеку» (А4b)', async () => {
+      const empty = { ...trip(1), itemCount: 0, total: [], fromReceipt: true }
+      tripHistory.mockResolvedValue({ trips: [empty], nextCursor: null })
+      const { view } = await render()
+      const [row] = rows(view)
+      expect(row?.text()).toContain('0 позиций · вчера · из чека')
+      expect(row?.text()).not.toContain('сумма по чеку')
+    })
+
     it('место, число позиций, день и сумма — от сервера; тап открывает записанные покупки', async () => {
       const first = {
         ...trip(1),

@@ -179,7 +179,7 @@ import IconCloudUpload from '~icons/mdi/cloud-upload-outline'
 import IconFileAlert from '~icons/mdi/file-alert-outline'
 import IconReceipt from '~icons/mdi/receipt-text-outline'
 import IconSync from '~icons/mdi/sync'
-import { formatMoney } from '@molvia/model'
+import { formatMoney, withoutItems } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
@@ -343,7 +343,8 @@ export default defineComponent({
         case 'parsed': {
           const count = row.summary?.lineCount ?? 0
           // a sole trader's section with no items: a sum to record (MOL-227)
-          if (count === 0) return t('purchases.no_items_meta', { day: readDay(row) })
+          if (withoutItems({ status: 'parsed', lineCount: count }))
+            return t('purchases.no_items_meta', { day: readDay(row) })
           return t('purchases.recorded', { count: positions(count), day: readDay(row) })
         }
       }
@@ -425,11 +426,11 @@ export default defineComponent({
       recordedMeta: (row: HistoryRow): string => {
         const day = dayOfAnyYear(row.at, locale.value)
         if (row.itemCount === null) return day
-        // a receipt with no items is recorded as its sum (MOL-227, Р-6)
-        const count =
-          row.fromReceipt && row.itemCount === 0
-            ? t('purchases.receipt_sum')
-            : positions(row.itemCount)
+        // a trip with its sum and no purchase — from a receipt with no items or typed by hand (MOL-78) —
+        // is the sum, never «0 позиций»; «по чеку» says «из чека» already (MOL-227, Р-6, review 1 № 2)
+        if (row.itemCount === 0 && (row.total?.length ?? 0) > 0)
+          return t('purchases.recorded_sum', { day })
+        const count = positions(row.itemCount)
         return t(row.fromReceipt ? 'purchases.recorded_receipt' : 'purchases.recorded', {
           count,
           day,

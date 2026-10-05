@@ -536,7 +536,7 @@ describe('ReceiptView (MOL-127)', () => {
     it('says there is no list of items, shows the total alone and records the sum', async () => {
       receipt.mockResolvedValue(noItems('1700'))
       const { view, router } = await render()
-      expect(view.get('.no-items').text()).toBe(ru.receipt.review.no_items)
+      expect(view.get('.no-items').text()).toContain(ru.receipt.review.no_items)
       expect(view.find('.receipt-line').exists()).toBe(false)
       expect(view.text()).not.toContain(ru.receipt.review.lines)
       expect(view.text()).not.toMatch(/Разница|0 позиций/)
@@ -549,6 +549,13 @@ describe('ReceiptView (MOL-127)', () => {
       expect(body?.lines).toEqual([])
       expect(body?.place).toEqual({ id: PLACE })
       expect(router.currentRoute.value.name).toBe('purchase')
+    })
+
+    it('offers a retake, and says the photo goes — no line is left to stay (А5, А6)', async () => {
+      receipt.mockResolvedValue(noItems('1700'))
+      const { view } = await render()
+      expect(view.get('.no-items').text()).toContain(ru.receipt.capture.retake)
+      expect(view.get('p.note').text()).toBe(ru.receipt.review.photo_note_sum)
     })
 
     it('with no total read, waits for one typed: nothing is sent', async () => {

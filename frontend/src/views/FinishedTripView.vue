@@ -25,7 +25,7 @@
             ? t('receipt.recorded.sum_title')
             : t('receipt.recorded.title', { n: recorded }, recorded)
         "
-        :body="recorded === 0 ? t('receipt.recorded.sum_body') : t('receipt.recorded.body')"
+        v-bind="recorded === 0 ? {} : { body: t('receipt.recorded.body') }"
       >
         <!-- A sum with no purchase has nothing to rate yet (MOL-227). -->
         <template v-if="recorded !== 0" #action>
@@ -97,6 +97,7 @@
       :trip-id="id"
       :trip-currency="receiptCurrency"
       :current="receiptCurrent"
+      :removable="rows.length > 0"
     />
     <TripRemoveSheet
       v-model:open="removing"

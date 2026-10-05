@@ -124,7 +124,15 @@
         <p v-if="refused" class="refused" role="alert">{{ refused }}</p>
         <!-- A sole trader's section with no items (MOL-227): the sum is what there is to record;
              the purchases, if wanted, are added later in the trip (В-1). -->
-        <AppNote v-if="noItems" class="no-items">{{ t('receipt.review.no_items') }}</AppNote>
+        <AppNote v-if="noItems" class="no-items">
+          {{ t('receipt.review.no_items') }}
+          <!-- A receipt with items whose every mark OCR lost is read so too (Р-7): a new shot is a tap
+               away, as on «Прочитали не всё» (adversarial А6). -->
+          <AppButton v-if="country && !locked" variant="ghost" @click="retake">
+            <template #icon><IconCamera /></template>
+            {{ t('receipt.capture.retake') }}
+          </AppButton>
+        </AppNote>
         <p v-else class="caption-plain">
           {{ t('receipt.review.count_hint', { count: positions(lines.length) }) }}
           <template v-if="checks > 0">
@@ -160,7 +168,7 @@
         />
         <p class="note">
           <IconImageOff class="note-icon" aria-hidden="true" />
-          {{ t('receipt.review.photo_note') }}
+          {{ t(noItems ? 'receipt.review.photo_note_sum' : 'receipt.review.photo_note') }}
         </p>
         <AppButton v-if="shelved.length > 0" variant="ghost" block @click="toDeveloper">
           <template #icon><IconMessage /></template>
