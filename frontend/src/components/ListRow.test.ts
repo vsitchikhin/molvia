@@ -50,6 +50,22 @@ describe('ListRow', () => {
     expect(view.get('.tail .end').text()).toBe('Завершить')
   })
 
+  // An option of the list under «Что взяли?»: the focus stays in the field (MOL-177).
+  it('as an li, is an option: no type, no stop of Tab, no hover, and its press is heard', async () => {
+    const view = mount(ListRow, {
+      props: { as: 'li', title: 'Сыр Лори', next: true },
+      attrs: { role: 'option' },
+    })
+    expect(view.element.tagName).toBe('LI')
+    expect(view.attributes('type')).toBeUndefined()
+    expect(view.attributes('tabindex')).toBeUndefined()
+    expect(view.classes()).toContain('option')
+    expect(view.classes()).not.toContain('live')
+    expect(view.attributes('aria-selected')).toBe('false')
+    await view.trigger('click')
+    expect(view.emitted('click')).toHaveLength(1)
+  })
+
   it('as a link, is an anchor that the router follows', async () => {
     const router = await routed()
     const view = mount(ListRow, {
@@ -162,6 +178,17 @@ describe('ListRow', () => {
       })
       expect(view.attributes('aria-selected')).toBe('true')
       expect(view.attributes('aria-checked')).toBeUndefined()
+    })
+
+    // The ARIA combobox marks its active option selected: the arrows choose what Enter takes (К-4).
+    it('reads out the active option as selected, the fill without the ring', () => {
+      const view = mount(ListRow, {
+        props: { as: 'li', title: 'Сыр Чанах', active: true },
+        attrs: { role: 'option' },
+      })
+      expect(view.attributes('aria-selected')).toBe('true')
+      expect(view.classes()).toContain('active')
+      expect(view.find('.check').exists()).toBe(false)
     })
 
     it('names no state on a row with no role to carry it, and says so while developing', () => {
