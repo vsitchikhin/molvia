@@ -439,11 +439,11 @@ export default defineComponent({
 
     // The strip goes with its ✕, which held the focus: the field takes it back — what the person
     // does next is type (adversarial О).
-    const combobox = ref<{ $el?: HTMLElement } | null>(null)
+    const combobox = ref<{ focus: () => void } | null>(null)
     async function dropPending(): Promise<void> {
       pendingCode.value = null
       await nextTick()
-      combobox.value?.$el?.querySelector<HTMLInputElement>('input')?.focus()
+      combobox.value?.focus()
     }
 
     /**

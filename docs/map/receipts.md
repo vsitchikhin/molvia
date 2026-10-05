@@ -86,7 +86,7 @@ memory: erasure leaves its words without an author, the copy carries the person'
 - `frontend/src/components/ReceiptLineRow.vue` — A line on the review: item, as printed in the system's face, «кол-во × цена», «≠ напечатанное», the marks, what it is recorded at.
 - `frontend/src/components/ReceiptTotal.vue` — The foot of the review: «Строки», the total as a button (Р-8), «≈» by the rate of the receipt's day, the difference and its line.
 - `frontend/src/components/ReceiptLineSheet.vue` — «Строка чека»: as printed, the item or a new one's name, how much, «цена за всё», «За единицу» with «Тут дешевле», «Не записывать»; into the draft, never the network.
-- `frontend/src/components/ItemPickSheet.vue` — «Выбрать товар» over the line's sheet: the catalogue's search from the gloss, «Оставить новым товаром».
+- `frontend/src/components/ItemPickSheet.vue` — «Выбрать товар» over the line's sheet: the catalogue's search from the gloss in the kit's `SearchField`, «Оставить новым товаром».
 - `frontend/src/components/ReceiptPlaceSheet.vue` — «Где купили?»: the place read, the shops of this phone or a new one, and the day; «Записать» with no place opens it.
 - `frontend/src/components/ReceiptTotalSheet.vue` — «Итог чека» put right, in the receipt's currency, into the draft.
 - `frontend/src/views/ReceiptView.vue` — `/purchases/receipts/:id`: the review, «не разобран» with its photos, «уже записан», gone; «Записать N» through the queue, then `router.replace` to the purchases.

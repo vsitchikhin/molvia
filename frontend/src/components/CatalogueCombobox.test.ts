@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { CATALOGUE_QUERY_MAX } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
+import { createAppI18n } from '@/i18n'
 import CatalogueCombobox from '@/components/CatalogueCombobox.vue'
 
 function entry(n: number, name: string, note: string | null = null): CatalogueEntry {
@@ -35,6 +36,7 @@ function combobox(props: { items?: CatalogueEntry[]; stale?: boolean; modelValue
       stale: props.stale ?? false,
     },
     slots: { before: '<p class="before">до</p>', after: '<p class="after">после</p>' },
+    global: { plugins: [createAppI18n('ru')] },
   })
   mounted.push(wrapper)
   return wrapper
@@ -53,7 +55,7 @@ function activeName(wrapper: VueWrapper): string | undefined {
   if (id === undefined) return undefined
   return wrapper
     .get(`#${CSS.escape(id)}`)
-    .get('.name')
+    .get('.title')
     .text()
 }
 
@@ -148,7 +150,7 @@ describe('the catalogue combobox', () => {
 
   it('keeps the rows in the order they came', () => {
     const names = combobox({ items: [condensed, milk, marianna] })
-      .findAll('.name')
+      .findAll('.title')
       .map((name) => name.text())
 
     expect(names).toEqual([condensed.name, milk.name, marianna.name])
