@@ -417,6 +417,16 @@ export function needsReshoot(text: ReceiptText): boolean {
   return text.lines.length === 0
 }
 
+/**
+ * A receipt of food service (MOL-226, owner's В-2): every line of class 56 of the services' classes —
+ * «Դաս. 56.10», a restaurant's or a café's. Recorded, it makes a new place a venue and its new items
+ * dishes, so that a meal at KFC falls on the venues' side of gate 0.3, measured apart from products. A
+ * receipt with one line of goods in it stays a shop's: a supermarket sells a coffee as well.
+ */
+export function isFoodServiceReceipt(lines: readonly { readonly hs: string | null }[]): boolean {
+  return lines.length > 0 && lines.every((line) => line.hs !== null && /^56\.\d{2}$/.test(line.hs))
+}
+
 /** A line of a parsed receipt, in the domain's own values. */
 export interface ReceiptLine {
   readonly printed: string

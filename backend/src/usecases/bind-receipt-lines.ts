@@ -1,4 +1,4 @@
-import { RECEIPT_NAME_LANGUAGE, createLineMatcher } from '@molvia/model'
+import { RECEIPT_NAME_LANGUAGE, createLineMatcher, isServiceClass } from '@molvia/model'
 import type { AppLocale, ReceiptCountry, ReceiptLine } from '@molvia/model'
 import type { ItemRepository } from '@/db/items-repository'
 import type { LineBinding } from '@/db/receipts-repository'
@@ -19,7 +19,8 @@ const SEARCH_ROWS = 5
  * The lines of a parsed receipt to items, once, in the queue (MOL-126, Р-1): the catalogue's names in
  * the till's language with the line's customs heading (`createLineMatcher`), then the catalogue search
  * by the line's gloss — near is found, far is «проверьте» (MOL-124 В-4) — and nothing is a new item,
- * named by the gloss. The shop's memory comes before all of it, but it is laid over on every reading
+ * named by the gloss. A line of a class of services, «56.10» of food service, is a dish: whatever the
+ * catalogue's goods give it is «проверьте» (MOL-226). The shop's memory comes before all of it, but it is laid over on every reading
  * of the receipt rather than here: it changes with every receipt recorded.
  *
  * The gloss is Russian, the catalogue's language, and is shown only to a receipt read out in Russian;
@@ -54,7 +55,8 @@ export async function bindReceiptLines(
       )
       const [first] = answer.items
       if (first !== undefined) {
-        const near = answer.nearIds.includes(first.id)
+        // a dish of a class of services is never sure among the catalogue's goods (MOL-226)
+        const near = answer.nearIds.includes(first.id) && !isServiceClass(line.hs)
         bound.push({ itemId: first.id, match: near ? 'search' : 'weak', translation })
         continue
       }

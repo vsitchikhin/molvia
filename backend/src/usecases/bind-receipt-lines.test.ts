@@ -87,6 +87,22 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
     expect(weak).toEqual({ itemId: SOUR_CREAM, match: 'weak', translation: 'сметана' })
   })
 
+  it('binds a dish of a class of services only as «проверьте», by its names or the search (MOL-226)', async () => {
+    const { items } = fakeItems({
+      items: [item(SOUR_CREAM, 'Сметана')],
+      near: true,
+      nearIds: [SOUR_CREAM],
+    })
+    const bound = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [
+      line('Կաթ', '56.10'),
+      line('ԹԹՎԱՍԵՐ 20%', '56.10'),
+    ])
+    expect(bound).toEqual([
+      { itemId: MILK, match: 'weak', translation: 'молоко' },
+      { itemId: SOUR_CREAM, match: 'weak', translation: 'сметана' },
+    ])
+  })
+
   it('leaves a line new when nothing is found, named by its gloss', async () => {
     const { items } = fakeItems()
     const bound = await bindReceiptLines({ items, embedder: NO_EMBEDDER }, ACTOR, 'AM', 'ru', [

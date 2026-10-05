@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   tellsQuietly,
+  isFoodServiceReceipt,
   moneyOfHundredths,
   needsReshoot,
   receiptDateOf,
@@ -511,5 +512,23 @@ describe('«чек разобран» without a sound at night (MOL-129)', () =>
     expect(tellsQuietly(new Date('2026-07-01T19:30:00Z'), 'Europe/Belgrade')).toBe(false)
     expect(tellsQuietly(new Date('2026-07-01T20:30:00Z'), 'Europe/Belgrade')).toBe(true)
     expect(tellsQuietly(new Date('2026-12-01T20:30:00Z'), 'Europe/Belgrade')).toBe(false)
+  })
+})
+
+describe('a receipt of food service (MOL-226)', () => {
+  const lines = (...hs: (string | null)[]) => hs.map((code) => ({ hs: code }))
+
+  it('is one whose every line is of class 56', () => {
+    expect(isFoodServiceReceipt(lines('56.10', '56.10'))).toBe(true)
+    expect(isFoodServiceReceipt(lines('56.30'))).toBe(true)
+  })
+
+  it('is not one with a line of goods, a line with no code, another service, or no line', () => {
+    expect(isFoodServiceReceipt(lines('56.10', '0401'))).toBe(false)
+    expect(isFoodServiceReceipt(lines('56.10', null))).toBe(false)
+    expect(isFoodServiceReceipt(lines('53.20'))).toBe(false)
+    // «5610» without its point is a customs heading as read
+    expect(isFoodServiceReceipt(lines('5610'))).toBe(false)
+    expect(isFoodServiceReceipt([])).toBe(false)
   })
 })

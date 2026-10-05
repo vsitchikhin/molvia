@@ -4,6 +4,7 @@ import {
   ERROR,
   addMoney,
   geographyAllowed,
+  isFoodServiceReceipt,
   latestDay,
   nameIdentity,
   receiptDigits,
@@ -193,12 +194,14 @@ export async function recordReceipt(
     }
     if (body.purchasedOn > latestDay(now)) throw new DomainError(ERROR.RECEIPT_IN_FUTURE)
 
+    // a meal at a restaurant is a venue's and its dishes (MOL-226); a place picked by its id keeps its kind
+    const served = isFoodServiceReceipt(held.lines)
     const place =
       'id' in body.place
         ? await places.byId(body.place.id)
         : geographyAllowed({ country: held.country, city: body.place.city }, actor)
           ? await places.ensure({
-              kind: 'store',
+              kind: served ? 'venue' : 'store',
               name: body.place.name,
               country: held.country,
               city: body.place.city,
@@ -273,7 +276,12 @@ export async function recordReceipt(
     })
     for (const [identity, { name, line }] of toCreate) {
       const proposal = await items.createUnlessNamed(
-        { kind: 'product', name, barcodes: [], defaultUnit: line.quantity?.unit ?? 'piece' },
+        {
+          kind: served ? 'dish' : 'product',
+          name,
+          barcodes: [],
+          defaultUnit: line.quantity?.unit ?? 'piece',
+        },
         actor.id,
       )
       // the item is made with no codes, so none of them can be another item's

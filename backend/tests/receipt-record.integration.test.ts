@@ -46,6 +46,8 @@ afterAll(async () => {
 
 interface Line {
   readonly printed: string
+  /** The class code printed on the line: a customs heading, or «56.10» of food service (MOL-226). */
+  readonly hs?: string
   readonly sku?: string
   readonly qty?: number
   readonly price: number
@@ -93,6 +95,7 @@ async function parsedReceipt(
         receiptId: id,
         position,
         printed: line.printed,
+        hs: line.hs ?? null,
         sku: line.sku ?? null,
         qtyMilli: BigInt((line.qty ?? 1) * 1000),
         qtyUnit: 'piece' as const,
@@ -802,5 +805,111 @@ describe('«Записать»', () => {
     expect(await db.select().from(receiptDays)).toMatchObject([
       { lines: 2, linesEdited: 2, linesSkipped: 1, linesItem: 1, linesFigures: 1 },
     ])
+  })
+
+  it('records a receipt of food service as a venue with dishes, a shop’s as before (MOL-226)', async () => {
+    const me = await insertActor(db)
+    const ketchup = await insertItem(db, { name: 'Кетчуп', searchKey: 'ketchup' })
+    const kfc: Line[] = [
+      { printed: 'Կետչուպ', hs: '56.10', sku: '740000', price: 115, sum: 115 },
+      { printed: '16 Թև', hs: '56.10', sku: '771300', price: 3_930, sum: 3_930 },
+    ]
+    const served = await parsedReceipt(me, kfc, { layout: 'class' })
+    const tripId = randomUUID()
+    const response = await record(me, served, {
+      tripId,
+      place: { name: 'KFC', city: 'Гюмри' },
+      purchasedOn: '2026-09-26',
+      lines: [
+        {
+          position: 0,
+          skip: false,
+          item: { id: ketchup },
+          quantity: pieces(1),
+          amount: amount(115),
+        },
+        {
+          position: 1,
+          skip: false,
+          item: { name: '16 крыльев' },
+          quantity: pieces(1),
+          amount: amount(3_930),
+        },
+      ],
+    })
+    expect(response.statusCode).toBe(200)
+    const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+    const [place] = await db
+      .select()
+      .from(places)
+      .where(eq(places.id, trip?.placeId ?? ''))
+    expect(place).toMatchObject({ name: 'KFC', kind: 'venue' })
+    const kinds = await db
+      .select({ name: items.name, kind: items.kind })
+      .from(items)
+      .orderBy(asc(items.name))
+    // an item chosen from the catalogue keeps its kind; one made by the receipt is a dish
+    expect(kinds).toEqual([
+      { name: '16 крыльев', kind: 'dish' },
+      { name: 'Кетчуп', kind: 'product' },
+    ])
+
+    // one line of goods makes it a shop's, with products
+    const mixed = await parsedReceipt(me, [kfc[0]!, { ...kfc[1]!, hs: '0207' }], {
+      receiptNo: '21410812',
+    })
+    const shopTrip = randomUUID()
+    expect(
+      (
+        await record(me, mixed, {
+          tripId: shopTrip,
+          place: { name: 'KFC', city: 'Гюмри' },
+          purchasedOn: '2026-09-26',
+          lines: [
+            {
+              position: 0,
+              skip: false,
+              item: { name: 'Соус' },
+              quantity: pieces(1),
+              amount: amount(115),
+            },
+            { position: 1, skip: true },
+          ],
+        })
+      ).statusCode,
+    ).toBe(200)
+    const [shop] = await db
+      .select({ kind: places.kind })
+      .from(places)
+      .innerJoin(trips, eq(trips.placeId, places.id))
+      .where(eq(trips.id, shopTrip))
+    expect(shop?.kind).toBe('store')
+    expect((await db.select().from(items).where(eq(items.name, 'Соус')))[0]?.kind).toBe('product')
+
+    // a place picked by its id keeps its own kind
+    const store = await insertPlace(db, { name: 'Фудкорт' })
+    const picked = await parsedReceipt(me, kfc, { layout: 'class', receiptNo: '21410813' })
+    const pickedTrip = randomUUID()
+    expect(
+      (
+        await record(me, picked, {
+          tripId: pickedTrip,
+          place: { id: store },
+          purchasedOn: '2026-09-26',
+          lines: [
+            {
+              position: 0,
+              skip: false,
+              item: { id: ketchup },
+              quantity: pieces(1),
+              amount: amount(115),
+            },
+            { position: 1, skip: true },
+          ],
+        })
+      ).statusCode,
+    ).toBe(200)
+    const [kept] = await db.select().from(places).where(eq(places.id, store))
+    expect(kept?.kind).toBe('store')
   })
 })
