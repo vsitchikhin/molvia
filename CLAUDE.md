@@ -534,6 +534,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   the review, never a refusal — the person's corrections are the measure of 0.2.
 - **The reader away leaves a receipt queued; a photo it drops goes to the end with its attempt
   counted; a photo it cannot read fails** — never lost, never read forever; people read in turn.
+- **The class code is a boundary, not a layout** (MOL-226): «Դաս. 56.10» opens an item on any fiscal till,
+  read beside the two layouts and chosen only where it finds more; a dish found among the catalogue's
+  goods is «проверьте», and until 0.3 a café's receipt is recorded as a shop's, with products (В-2 «а»).
 - **Every search of the parse has a ceiling, measured in time** — a line's, a reading's, the
   total's (`*_COMBINATIONS_*`, `RECONCILE_*`): it runs in the API's process; half a second at worst.
 - **A photo lives until the receipt is recorded, a receipt not recorded 28 days, a cut-out item line
