@@ -31,6 +31,11 @@
   height: 1em;
 }
 
+/// Narrower than this, a row of an operation stands its amount under its words (MOL-176): the row
+/// (`ListRow` in the container `row`) and its skeleton (`OperationSkeleton`) read the one number, so the
+/// bars cannot part from the answer. A container query takes no custom property, hence Sass.
+$row-narrow: 22rem;
+
 /// The target device is a phone; anything wider is the exception, so it is opt-in.
 @mixin wider-than-phone {
   @media (width >= 40rem) {

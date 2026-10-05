@@ -43,7 +43,6 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 - `frontend/src/components/HeldFromAccounts.vue` — «По счетам на …: … · Подставить» hint under «сколько было до» of an exchange or income, filled only on tap.
 - `frontend/src/components/OperationExchangeSheet.vue` — An exchange opened from an account's journal, «не попали» or a check, read from «Обмен денег» and amended in its sheet.
 - `frontend/src/components/OperationIncomeSheet.vue` — An income opened from an account's journal, «не попали» or a check, read from «Доходы» and amended in its sheet.
-- `frontend/src/components/OperationRow.vue` — One operation row in an account's journal, «не попали» or a check: a spending, trip, income or exchange side, signed.
 - `frontend/src/components/OperationSheet.vue` — Dispatcher that opens a journal row's operation in its own sheet — spending, trip summary, income or exchange — with «‹» back.
 - `frontend/src/components/ReconcileSheet.vue` — «Сверка» sheet: the fact first, then the server's difference and its reasons, each fixed in its sheet, and «Записать разницу».
 - `frontend/src/components/UnassignedSheet.vue` — «Не попали в остатки» sheet: the server's list of operations with no account; a row opens its sheet to choose one.

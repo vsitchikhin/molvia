@@ -1,6 +1,7 @@
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
-import { signedIn } from './session'
+import { asBrowser, open, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -274,4 +275,78 @@ test.describe('320 px, English', () => {
     await expect(check).toContainText(/Difference/)
     expect(await noSideScroll()).toBe(true)
   })
+})
+
+/**
+ * A ruble card and the rent paid from it in drams, «списано» typed: its row in the account's journal, on
+ * a phone of `width` (MOL-176). Beside the words, its amount and the line under it left «Аренда» under
+ * 40 px on a phone of 320, where the cards of «Деньги» stand in a gutter of 32 (adversarial round 2, Б1).
+ */
+async function rentRow(page: Page, width: number) {
+  await page.setViewportSize({ width, height: 740 })
+  await signedIn(page)
+  const headers = await asBrowser(page)
+  const post = async (url: string, data: Record<string, unknown>) => {
+    const response = await page.request.post(url, { headers, data })
+    expect(response.status(), await response.text()).toBe(201)
+  }
+  const account = randomUUID()
+  await post('/api/money/accounts', {
+    id: account,
+    name: 'Т-Банк',
+    currency: 'RUB',
+    savings: false,
+    start: { amount: '100000', currency: 'RUB' },
+    startOn: yesterday(),
+  })
+  const { categories } = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string }[] }
+  await post('/api/spendings', {
+    id: randomUUID(),
+    spentOn: yesterday(),
+    amount: { amount: '120000', currency: 'AMD' },
+    categoryId: categories[0]?.id,
+    note: 'Аренда',
+    accountId: account,
+    debited: { amount: '24123', currency: 'RUB' },
+  })
+  await open(page, `/money/accounts/${account}`)
+  const row = page.getByRole('button', { name: /^Открыть операцию: Аренда/ })
+  await expect(row).toContainText('120 000 ֏ · списано')
+  return row.evaluate((one) => {
+    const box = (selector: string) => {
+      const found = one.querySelector(selector)
+      if (!found) throw new Error(`no ${selector}`)
+      return found.getBoundingClientRect()
+    }
+    const title = one.querySelector('.title')
+    return {
+      words: box('.words').width,
+      under: box('.tail').top >= box('.words').bottom - 1,
+      lines: title
+        ? Math.round(
+            title.getBoundingClientRect().height / parseFloat(getComputedStyle(title).lineHeight),
+          )
+        : 0,
+      inside: box('.chevron').right <= (one.closest('ul')?.getBoundingClientRect().right ?? 0),
+    }
+  })
+}
+
+// The owner's choice (MOL-176, Б1, Б2): a row narrower than 22rem stands its amount under the words, and
+// the words take the whole width; a wider one keeps it beside them. The account's card stands in the
+// gutter of «Деньги»: 256 on a phone of 320, 366 on one of 430.
+test('a phone of 320: the rent’s amount under its words, «Аренда» on one line', async ({
+  page,
+}) => {
+  const look = await rentRow(page, 320)
+  expect(look).toMatchObject({ under: true, lines: 1, inside: true })
+  expect(look.words).toBeGreaterThan(120)
+})
+
+test('a phone of 430: the rent’s amount beside its words, as the handoff draws it', async ({
+  page,
+}) => {
+  expect(await rentRow(page, 430)).toMatchObject({ under: false, lines: 1, inside: true })
 })

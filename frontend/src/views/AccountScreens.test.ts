@@ -381,8 +381,7 @@ describe('a check and the operations of its reasons', () => {
         { kind: 'unassigned', operation: spendingRow(TAXI, '-1200', null) },
       ]),
     )
-    const row = view.findAllComponents(OperationRow).at(0)
-    row?.vm.$emit('open', row.props('operation'))
+    view.findAllComponents(OperationRow).at(0)?.vm.$emit('open')
     await settle()
     view.findComponent(OperationSheet).vm.$emit('removed', {
       undo: { id: TAXI, kind: 'restore' },
