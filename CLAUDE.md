@@ -486,7 +486,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   categories 0.07 apart, one hue in both schemes** (MOL-218): a ring puts any two side by side.
 - **Not now is one look: `text-muted` at 600, in focus (`inactive` = `aria-disabled`), never opacity**
   (MOL-174); a button keeps its variant's fill or none (В-1). **Chosen is a fill or a form, never a
-  weight.** `--opacity-stale` is only a previous answer while the next is on its way.
+  weight.** `--opacity-stale` is only a previous answer while the next is on its way. **At work is
+  a word, never not now** (MOL-225): `busy` with its `busy-label` («Удаляем…») in the action's look,
+  `disabled` or not, as wide as the wider word; no spinner, and the linter refuses `busy` without it.
 - **A row is `ListRow` or `NavRow`, a caps caption `SectionCaption` — caps nowhere else, the linter
   holds it** (MOL-175): the chevron is «opens something to go on with» — a screen or a sheet with
   fields (В-14) — never on a row that acts or asks to confirm, never mixed in one card; a caption's

@@ -712,8 +712,31 @@ describe('sending', () => {
     expect(sendFeedback).toHaveBeenCalledOnce()
     expect(button(sheet).text()).toBe(en.feedback.sending)
     expect(button(sheet).attributes('aria-busy')).toBe('true')
+    // The glyph of «Send» stays under «Sending…» (MOL-225): the form of the action, not «not now».
+    expect(button(sheet).find('.glyph').exists()).toBe(true)
     expect(textarea(sheet).attributes('readonly')).toBeDefined()
     expect(sheet.get('fieldset').attributes('disabled')).toBeDefined()
+  })
+
+  // MOL-225: the glyph of the action stays under the word of the work — ✈ under «Sending…» of a first
+  // send, ↻ under it when the send is a retry (adversarial round 1, «не проверено»).
+  it('keeps the glyph of the action it does: ✈ of a send, ↻ of a retry', async () => {
+    sendFeedback.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const { wrapper } = await render()
+    const sheet = await open(wrapper)
+    await choose(sheet, en.feedback.kinds.idea)
+    await type(sheet, 'Twice')
+    const send = button(sheet).get('.glyph').html()
+    await press(sheet)
+    expect(button(sheet).text()).toBe(en.state.retry)
+    const retry = button(sheet).get('.glyph').html()
+    expect(retry).not.toBe(send)
+
+    sendFeedback.mockReturnValue(new Promise(() => undefined))
+    await button(sheet).trigger('click')
+    await flushPromises()
+    expect(button(sheet).text()).toBe(en.feedback.sending)
+    expect(button(sheet).get('.glyph').html()).toBe(retry)
   })
 
   it('offline waits with the text kept: no queue, and the strip says so, not in red', async () => {

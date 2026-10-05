@@ -551,6 +551,27 @@ describe('ExchangeView: the rate and the list', () => {
     expect(view.text()).not.toContain('Exchange deleted')
   })
 
+  // MOL-225, adversarial Р1-А2 — the same «Bring back» as an income's, by its own composable.
+  it('«Bring back» on a slow line says «Bringing back…», at work, with the focus on it', async () => {
+    exchanges.mockResolvedValue(overview())
+    removeExchange.mockResolvedValue(overview({ exchanges: [], wallet: null }))
+    restoreExchange.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    await askToRemove(view)
+    confirmButton().click()
+    await flushPromises()
+
+    const restore = view.findAll('button').find((button) => button.text() === en.exchange.restore)
+    if (!restore) throw new Error('no «Bring back»')
+    await restore.trigger('click')
+    await flushPromises()
+    expect(restore.find('.words > :not([aria-hidden])').text()).toBe(en.exchange.restoring)
+    expect(restore.attributes('aria-busy')).toBe('true')
+    expect(document.activeElement).toBe(restore.element)
+    await restore.trigger('click')
+    expect(restoreExchange).toHaveBeenCalledOnce()
+  })
+
   it('«Bring back» after the removal became final says so, and reads the list again (Д1)', async () => {
     exchanges.mockResolvedValue(overview())
     removeExchange.mockResolvedValue(overview({ exchanges: [], wallet: null }))

@@ -380,6 +380,29 @@ describe('IncomesView: recording, amending and removing', () => {
     expect(document.activeElement?.getAttribute('aria-label')).toBe(en.income.record)
   })
 
+  // MOL-225, adversarial Р1-А2: «Bring back» at work said nothing and was drawn not now.
+  it('«Bring back» on a slow line says «Bringing back…», at work, with the focus on it', async () => {
+    incomes.mockResolvedValue(overview())
+    removeIncome.mockResolvedValue(overview({ months: [] }))
+    restoreIncome.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    await view.get('button.remove').trigger('click')
+    await risen()
+    sheetButton(en.income.remove_sheet.confirm).click()
+    await flushPromises()
+
+    const restore = view.findAll('button').find((button) => button.text() === en.income.restore)
+    if (!restore) throw new Error('no «Bring back»')
+    expect(document.activeElement).toBe(restore.element)
+    await restore.trigger('click')
+    await flushPromises()
+    expect(restore.find('.words > :not([aria-hidden])').text()).toBe(en.income.restoring)
+    expect(restore.attributes('aria-busy')).toBe('true')
+    expect(document.activeElement).toBe(restore.element)
+    await restore.trigger('click')
+    expect(restoreIncome).toHaveBeenCalledOnce()
+  })
+
   // Whether an income is still part of the rate only the whole walk knows: roubles never are, euros
   // are not until exchanged, an exchange with no remainder starts the rate afresh. So every income
   // is removed with a condition, never a promise (self-review Ч-2, adversarial round 2, Е1).

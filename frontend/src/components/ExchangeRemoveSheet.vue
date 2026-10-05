@@ -6,7 +6,13 @@
     <p class="words">{{ t('exchange.remove_sheet.body') }}</p>
 
     <template #footer>
-      <AppButton variant="danger-ghost" block :disabled="busy" @click="$emit('confirm')">
+      <AppButton
+        variant="danger-ghost"
+        block
+        :busy="busy"
+        :busy-label="t('exchange.remove_sheet.confirm_busy')"
+        @click="$emit('confirm')"
+      >
         {{ t('exchange.remove_sheet.confirm') }}
       </AppButton>
     </template>

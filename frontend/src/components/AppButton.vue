@@ -4,7 +4,7 @@
     :class="[variant, { large: size === 'large', block }]"
     :type="type"
     :disabled="disabled"
-    :aria-label="label"
+    :aria-label="label !== undefined && busy && busyLabel !== undefined ? busyLabel : label"
     :aria-disabled="inactive || busy ? true : undefined"
     :aria-busy="busy || undefined"
     @click="click"
@@ -13,7 +13,17 @@
     <span v-if="variant === 'icon'" class="glyph" aria-hidden="true"><slot /></span>
     <template v-else>
       <span v-if="$slots.icon" class="glyph" aria-hidden="true"><slot name="icon" /></span>
-      <slot />
+      <!-- A block button is as wide as its place, so its word is swapped. Any other holds both words
+           in one cell, the one not shown kept by its width: as wide as the wider word, it does not
+           jump under the thumb when the work starts or ends. At rest the word of the work is drawn by
+           CSS alone, so the button's text is its action's word — what a test or a copy reads. -->
+      <span v-if="busyLabel !== undefined && !block" class="words">
+        <span :class="{ unseen: busy }" :aria-hidden="busy || undefined"><slot /></span>
+        <span v-if="busy">{{ busyLabel }}</span>
+        <span v-else class="unseen" aria-hidden="true" :data-word="busyLabel" />
+      </span>
+      <template v-else-if="busy && busyLabel !== undefined">{{ busyLabel }}</template>
+      <slot v-else />
     </template>
   </button>
 </template>
@@ -36,6 +46,13 @@ export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost' | 'dang
  *
  * Network-backed actions can be busy; inactive keeps the action focusable and described.
  *
+ * **Busy is the button's own word** (MOL-225): `busyLabel` («Удаляем…») stands in place of the action's
+ * for as long as it works, in the action's look — fill, ink and glyph stay, with `disabled` too, since
+ * this is the one at work and not one that cannot be pressed. The word is the sign and the
+ * explanation at once: no spinner (DESIGN.md), nothing that moves, and the name a screen reader reads
+ * on the focused button along with `aria-busy`. The linter refuses a `busy` without it. A button named
+ * by `label` — an icon-only one has no word to swap — takes the word of the work as its name.
+ *
  * **Inactive is one look** (Ф-6, MOL-174): `text-muted` at 600 with no opacity, on `surface-2` where
  * the live button has a fill and on nothing where it has none — the form of the variant stays, so a
  * ghost under an inactive primary is not a second grey pill (the owner's В-1). `disabled` draws the
@@ -50,6 +67,7 @@ export default defineComponent({
     block: { type: Boolean, default: false },
     type: { type: String as PropType<'button' | 'submit' | 'reset'>, default: 'button' },
     busy: { type: Boolean, default: false },
+    busyLabel: { type: String, default: undefined },
     inactive: { type: Boolean, default: false },
     disabled: { type: Boolean, default: false },
     label: { type: String, default: undefined },
@@ -156,13 +174,9 @@ export default defineComponent({
   }
 }
 
-/* After every variant, so it wins over each of them. `busy` alone keeps the look of the action, as
-   on master: it is the one at work, and saying so is the screen's — its words («Сохраняем…») or a
-   status line; where the screen says nothing, only `aria-busy` does — among others «Удалить
-   навсегда», «Не тот товар», the login (round 3, Р3-А1; round 4 counted nine). `busy` with `disabled` is drawn as not now, as master drew it dimmed: a
-   sheet that keeps its «Сохранить» while it sends has nothing else to show it (round 2, Р2-А1). A
-   look of its own for `busy` is MOL-225's. */
-.button:disabled,
+/* After every variant, so it wins over each of them. Busy is never not now, `disabled` or not
+   (MOL-225): the button at work keeps its look and says so in its own word. */
+.button:disabled:not([aria-busy='true']),
 .button[aria-disabled='true']:not([aria-busy='true']) {
   background: var(--surface-2);
   color: var(--text-muted);
@@ -170,22 +184,47 @@ export default defineComponent({
   cursor: not-allowed;
 }
 
+.button[aria-busy='true'] {
+  cursor: progress;
+}
+
 /* The rest shadow is a live primary's. Light in weight (`:where`), so a place that lifts what it
    holds over the cards — the floating dock — keeps its lift on an inactive one (review 1). */
-.primary:where(:disabled, [aria-disabled='true']:not([aria-busy='true'])) {
+.primary:where(:disabled, [aria-disabled='true']):where(:not([aria-busy='true'])) {
   box-shadow: none;
 }
 
-.ghost:disabled,
-.danger-ghost:disabled,
+.ghost:disabled:not([aria-busy='true']),
+.danger-ghost:disabled:not([aria-busy='true']),
 .ghost[aria-disabled='true']:not([aria-busy='true']),
 .danger-ghost[aria-disabled='true']:not([aria-busy='true']) {
   background: transparent;
 }
 
-.secondary:disabled,
+.secondary:disabled:not([aria-busy='true']),
 .secondary[aria-disabled='true']:not([aria-busy='true']) {
   border-color: transparent;
+}
+
+/* In the middle both ways: the word not shown may wrap where a grid holds the button's width — «Готовим
+   фото…» in a pair at 360 — and the cell grows two lines high; the word shown stays in the middle of
+   it, not at its top (adversarial Р1-А4). */
+.words {
+  display: inline-grid;
+  place-items: center;
+  text-align: center;
+
+  & > * {
+    grid-area: 1 / 1;
+  }
+}
+
+.unseen {
+  visibility: hidden;
+}
+
+[data-word]::before {
+  content: attr(data-word);
 }
 
 .large {

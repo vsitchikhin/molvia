@@ -495,7 +495,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       await expect.poll(async () => (await focused(page)).field).toBe(true)
     })
 
-    test('an error and «Try again»: the focus on the error’s button, then on «Link and record» until it lands', async ({
+    test('an error and «Try again»: the focus on the error’s button, then on the bind button, «Linking…», until it lands', async ({
       page,
     }) => {
       const code = freshCode()
@@ -519,7 +519,8 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       await expect.poll(async () => (await focused(page)).text).toBe('Try again')
 
       await page.keyboard.press('Enter')
-      await expect.poll(async () => (await focused(page)).text).toBe('Link and record')
+      // The button at work says so in its own word (MOL-225), the focus still on it until it lands.
+      await expect.poll(async () => (await focused(page)).text).toBe('Linking…')
       await expect(page.getByRole('dialog', { name })).toBeVisible()
     })
 

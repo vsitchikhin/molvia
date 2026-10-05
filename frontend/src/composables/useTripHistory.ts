@@ -27,6 +27,8 @@ interface TripHistoryScreen {
   history: ReturnType<typeof useTripHistoryStore>
   rows: ComputedRef<HistoryRow[]>
   loading: ComputedRef<boolean>
+  /** The load «Показать ещё» asked for — the one that button says it is at work on (MOL-225). */
+  loadingMore: Ref<boolean>
   trouble: Ref<'error' | 'offline' | null>
   load(): void
   more(): void
@@ -51,6 +53,7 @@ export function useTripHistory(): TripHistoryScreen {
    * rather than a flag the early return leaves set — that return goes past no `finally` (В-4).
    */
   const loading = computed(() => busy.value || !actor.id)
+  const loadingMore = ref(false)
   const trouble = ref<'error' | 'offline' | null>(null)
   let run = 0
   const rows = computed(() => {
@@ -107,6 +110,7 @@ export function useTripHistory(): TripHistoryScreen {
     if (!actor.id) return
     const token = ++run
     busy.value = true
+    loadingMore.value = more
     history.stale = true
     try {
       // An answer the list moved under is asked for again (adversarial А), after a pause that
@@ -123,7 +127,10 @@ export function useTripHistory(): TripHistoryScreen {
       reportFailure(error, 'screen')
       if (token === run) trouble.value = navigator.onLine ? 'error' : 'offline'
     } finally {
-      if (token === run) busy.value = false
+      if (token === run) {
+        busy.value = false
+        loadingMore.value = false
+      }
     }
   }
   watch(
@@ -162,6 +169,7 @@ export function useTripHistory(): TripHistoryScreen {
     history,
     rows,
     loading,
+    loadingMore,
     trouble,
     load: () => void load(),
     more: () => void load(true),

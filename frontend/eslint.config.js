@@ -53,6 +53,38 @@ const BARE_STRING_DEFAULTS = {
   directives: ['v-text'],
 }
 
+/**
+ * The selector of a busy button with no word of the work (MOL-225). A prop is the button's own
+ * attribute, static or bound — of its start tag, never of an element in its slot — or a key of
+ * what its `v-bind` gives it: the object itself, one spread into it, either side of a choice, a
+ * cast (adversarial Р4-А1) — never a key of an object that is a value or an argument inside it
+ * (`t('…', { busy })`, `meta: { busyLabel }`, Р3-А2). A word written as a string counts only
+ * when it has a letter or a digit: `""`, `"…"`, `"..."`, `"—"` say nothing (Р4-А2, Р5-А1).
+ */
+function busyWithoutWord() {
+  const object = 'VAttribute[directive=true][key.name.name="bind"][key.argument=null]'
+  const own = `${object} Property:not(Property Property, CallExpression Property)`
+  const template = '[key.type="TemplateLiteral"][key.expressions.length=0]'
+  const key = (name) => [
+    `${own}[computed=false][key.name=${name}]`,
+    `${own}[key.value=${name}]`,
+    `${own}${template}[key.quasis.0.value.cooked=${name}]`,
+  ]
+  const tag = (name, says = '') => [
+    `VAttribute[directive=false][key.name=${name}]${says}`,
+    // `v-model:busy` gives the button the same prop (Р5-А2); `v-on` gives an event, no prop.
+    `VAttribute[directive=true][key.name.name=/^(bind|model)$/][key.argument.name=${name}]`,
+  ]
+  const has = (selectors) => selectors.map((one) => `:has(${one})`).join(', ')
+  const busy = [...tag('"busy"'), ...key('"busy"')]
+  // A letter or a digit of any script: what is left of the rest says nothing (Р4-А2, Р5-А1).
+  const says = '[value.value=/[\\p{L}\\p{N}]/u]'
+  const word = [...tag('/^busy-?label$/i', says), ...key('/^busy-?label$/i')]
+  // The start tag, not the element: its `:has()` reaches the button's own attributes alone.
+  const button = 'VElement[rawName=/^(AppButton|app-button)$/] > VStartTag'
+  return `${button}:matches(${has(busy)}):not(:matches(${has(word)}))`
+}
+
 // The Vue preset puts .vue files through the same type checker as .ts, so an SFC is no
 // weaker than a plain module and `any` has nowhere to hide.
 export default defineConfigWithVueTs(
@@ -104,7 +136,14 @@ export default defineConfigWithVueTs(
           allowlist: [...BARE_STRING_DEFAULTS.allowlist, '≈', '×', '֏', '₽', '…'],
           attributes: {
             ...BARE_STRING_DEFAULTS.attributes,
-            '/.+/': [...BARE_STRING_DEFAULTS.attributes['/.+/'], 'placeholder', 'alt', 'label'],
+            '/.+/': [
+              ...BARE_STRING_DEFAULTS.attributes['/.+/'],
+              'placeholder',
+              'alt',
+              'label',
+              // The word of a button at work (MOL-225, adversarial Р3-А1).
+              'busy-label',
+            ],
           },
           directives: [...BARE_STRING_DEFAULTS.directives, 'v-html'],
         },
@@ -157,6 +196,30 @@ export default defineConfigWithVueTs(
           key: 'enterkeyhint',
           value: 'search',
           message: 'A search field is SearchField (MOL-177).',
+        },
+      ],
+    },
+  },
+  // A busy button says what it does (MOL-225): at work it reads «Удаляем…» in place of its action's
+  // word, in the action's look. Without its word it looked live — or, beside `disabled`, not now —
+  // and the second tap was swallowed with nothing said. `busy` — alone, bound, by `v-model:busy`,
+  // or a key of what the `v-bind` gives (the object, a spread, a choice, a cast), written as a
+  // name, a string or a template with nothing in it — on `AppButton` or `app-button`, with no word
+  // of the work beside it, is refused (adversarial Р1-А5, Р2-А1, Р3-А2, Р4-А1, Р5-А2). A word
+  // written as a string counts when it has a letter or a digit — `""`, `"…"`, `"..."`, `"—"` say
+  // nothing (Р4-А2, Р5-А1) — and that it is no key of the dictionary is
+  // `vue/no-bare-strings-in-template`'s to say, which reads `busy-label` too (Р3-А1). What it
+  // cannot see: a button at work through `disabled` or `inactive` alone, which reads the same as a
+  // neighbour put out while another works; a key computed from a name; an object from the script
+  // or a call; a word bound and empty. It closes carelessness, not intent.
+  {
+    files: ['src/**/*.vue'],
+    rules: {
+      'vue/no-restricted-syntax': [
+        'error',
+        {
+          selector: busyWithoutWord(),
+          message: 'A busy button says what it does: give it a busy-label (MOL-225).',
         },
       ],
     },

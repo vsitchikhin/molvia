@@ -133,8 +133,15 @@
         @expire="removedReason = null"
       />
       <template v-if="!result">
-        <AppButton size="large" block :busy="sending" :disabled="sending || !online" @click="check">
-          <template #icon><IconScale v-if="online" /><IconCloudOff v-else /></template>
+        <AppButton
+          size="large"
+          block
+          :busy="sending"
+          :busy-label="t('accounts.reconcile.checking')"
+          :disabled="!online && !sending"
+          @click="check"
+        >
+          <template #icon><IconScale v-if="online || sending" /><IconCloudOff v-else /></template>
           {{ online ? t('accounts.reconcile.check') : t('accounts.reconcile.wait_online') }}
         </AppButton>
       </template>
@@ -143,7 +150,9 @@
           <AppButton
             variant="secondary"
             block
-            :disabled="writing || !online || recountPending || tripsHeld"
+            :busy="writing"
+            :busy-label="t('accounts.reconcile.writing')"
+            :disabled="!writing && (!online || recountPending || tripsHeld)"
             @click="writeDifference"
           >
             {{ t('accounts.reconcile.write_difference') }}

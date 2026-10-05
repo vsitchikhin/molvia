@@ -142,6 +142,23 @@ describe('экран входа', () => {
     expect(pollLogin).toHaveBeenCalledTimes(1)
   })
 
+  // MOL-225: while the request is made, «Открыть Telegram» says so — no `inactive` beside it any more:
+  // `busy` holds the tap alone, and the screen is not a dead grey button with no word.
+  it('пока запрос заводится, «Открыть Telegram» говорит «Opening Telegram…» и тапа не берёт', async () => {
+    const { view } = await render()
+    startLogin.mockReturnValue(new Promise(() => undefined))
+    await button(view, 'Sign in with Telegram').trigger('click')
+    await flushPromises()
+
+    const open = button(view, en.login.starting)
+    expect(open.attributes('aria-busy')).toBe('true')
+    expect(open.attributes('aria-disabled')).toBe('true')
+    await open.trigger('click')
+    await flushPromises()
+    expect(startLogin).toHaveBeenCalledOnce()
+    expect(opened).not.toHaveBeenCalled()
+  })
+
   it('повтор ссылки не заводит второго запроса, «Начать заново» — заводит', async () => {
     const { view } = await render()
     pollLogin.mockResolvedValue({ status: 'pending', expiresAt: REQUEST.expiresAt })
