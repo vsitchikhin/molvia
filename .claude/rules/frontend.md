@@ -337,14 +337,24 @@ The detail behind the frontend lines of `CLAUDE.md`.
   never the accent, which is «press here» (Ф-4): purchases take the circle of «Продукты»; and `#below`,
   the tag under the meta, since in the meta it would be cut with it. **The chevron is on every row** —
   every one opens a sheet to go on with — so the amounts end in one column; a sum over the rows stands
-  in it by `--space-tail` (the row's inset, the chevron and the gap: the day's sum of «Траты»). **The
-  title wraps, the meta has two lines and breaks a word longer than the column** rather than cutting
-  it at the side, **the amount and the line under it never wrap or cut** (Е-11), and a tag on a narrow
-  row breaks inside its pill rather than standing over the amount. **The amount is never coloured**:
-  only a balance below zero is «плохо», on the balance's card (116 v2 2d). **The price, named**: on a
-  phone of 320 with a long amount the title has some seventy pixels and breaks inside words, and the
-  other half of an exchange in the meta may end in «…»; at 390 nothing does. `e2e/kit-rows` holds the
-  column, the skeleton's bars in it and nothing cut at 390 and 320, in both engines. **Its skeleton is
+  in it by `--space-tail` (the card's hairline, the row's inset, the chevron and the gap: the day's sum
+  of «Траты», whose own words wrap and never its figure). **The title wraps, the meta has two lines and
+  breaks a word longer than the column** rather than cutting it at the side, and a tag on a narrow row
+  breaks inside its pill rather than standing over the amount. **The amount never wraps or cuts; the
+  line under it wraps only between its parts** — after «·», between two amounts (`unbroken`), never
+  inside «без «списано»» (adversarial round 2, Б3). **Beside the words the tail takes at most 45 % of the
+  row**, unless the amount itself is wider (`ListRow`): taken whole, a long line under the amount left
+  the title 0 px and pushed the chevron past the card, which cut it (adversarial А1, А2). **A row
+  narrower than 22rem stands its tail under the words**, at the right, where the column ends (owner's
+  choice of 05.10.2026 on Б1, Б2, Р3-2): on the cards of «Деньги» — 256 on a phone of 320 in their gutter
+  of 32 — an amount of six figures left the words forty pixels, and a salary with its kopecks none; no
+  share of the tail helps, since an amount is never cut. `OperationRow` makes its `li` the container
+  `row`, so every row of a card is laid out alike. The price: below 22rem such a row is a line taller,
+  and the handoff, drawn at 390, has none of it. **The amount is never coloured**: only a balance below
+  zero is «плохо», on the balance's card (116 v2 2d). `e2e/kit-rows` holds the column, the chevrons in
+  one place inside the card, the skeleton's bars in it and nothing cut or over another at 390 and 320,
+  in both engines; `accounts.spec` the account's journal at 320 and 430, `money.spec` the day's sum at
+  412 and 320. **Its skeleton is
   `OperationSkeleton form="rows"`**, the same geometry in bars of `--border` on `--surface` (Ф-13);
   the screens take it with MOL-178.
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
