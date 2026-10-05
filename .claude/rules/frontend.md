@@ -336,7 +336,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   not `none` (round 3, В1: a dialog beside the page or one to be stepped through keeps its Esc; round 4,
   Г1: one beside the page marked `closerequest` or `any` is closed, and the attribute is the platform's
   to read, not ours); an engine without the property knows no `closedby` and closes a modal dialog
-  alone. Unless its owner took the key first. Outside a dialog Esc is the platform's,
+  alone. **Not while a popover is open** (round 5, Д1): the platform's Esc closes the topmost of what
+  closes, a popover stands above the dialog, and taken by the field Esc closed the dialog under it; which
+  one is on top no script can ask, so with any popover open the key is the platform's — the price, while
+  none exists in the app, is that Chromium may clear the field there rather than close the popover.
+  Unless its owner took the key first. Outside a dialog Esc is the platform's,
   the combobox's «let go of the row» before it. **The focus of a field is one mixin, `field-focus`**, which `AppField` takes too. **The field
   is only a field**: a combobox gives it its role, its `aria-*` and its keys, and every attribute but
   `class` and `style` lands on the `<input>` — so the two simple searches carry no listbox they have

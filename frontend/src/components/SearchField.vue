@@ -57,6 +57,20 @@ function closedBy(dialog: HTMLDialogElement): string {
 }
 
 /**
+ * Whether a popover is open. The platform's Esc closes the topmost of what closes, and an open popover
+ * stands above the dialog: taken by the field, Esc closed the dialog under it (round 5, Д1). Which one is
+ * on top no script can ask, so with any popover open the key stays the platform's. An engine that knows
+ * no `:popover-open` has none open.
+ */
+function popoverOpen(): boolean {
+  try {
+    return [...document.querySelectorAll('[popover]')].some((one) => one.matches(':popover-open'))
+  } catch {
+    return false
+  }
+}
+
+/**
  * The one search field of the app (Ф-12, MOL-177): a pill on `surface-2` with the edge of a field,
  * a magnifier at the left, the screen's action or «Очистить» at the right, a hint under it.
  *
@@ -129,7 +143,7 @@ export default defineComponent({
       escape: (event: KeyboardEvent) => {
         if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented) return
         const dialog = input.value?.closest('dialog')
-        if (!dialog?.open || closedBy(dialog) === 'none') return
+        if (!dialog?.open || closedBy(dialog) === 'none' || popoverOpen()) return
         event.preventDefault()
         if (dialog.dispatchEvent(new Event('cancel', { cancelable: true }))) dialog.close()
       },
