@@ -860,13 +860,17 @@ const CLASS_TAIL = [
   // a price's decimals, «5610.00x» — an article glued with its comma, «56.10,745030», is no price (review 3)
   '|[.,]\\d{1,2}(?!\\d)',
   '|\\s*[xх×*]',
-  // an amount — two digits or more, or a fraction — not a count before its unit, «56.10 1 հատ» (review 3)
-  '|\\s+(?:\\d{2,4}(?:[.,]\\d+)?|\\d[.,]\\d+)(?![\\d.,])(?!\\s*(?:հ\\S?տ|կգ))(?:\\s*[xх×*]|(?![\\d\\p{L}]))',
+  // the same figure again — a price and its sum, «1 հաս 1300 1300», «Բաքեթ 5610 5610» — or a figure
+  // before «x»: the «class» was the line's price. Anything else after it is the code's own junk, «19»,
+  // «20-», or a count before its unit, «56.10 1 հատ» (reviews 3, 4)
+  '|\\s+\\1\\s?[.,]?\\s?\\2(?:[.,]\\d{1,2})?(?![\\d.,])(?!\\s*(?:հ\\S?տ|կգ))',
+  '|\\s+\\d{1,4}(?:[.,]\\d+)?\\s*[xх×*]',
   '|\\s*(?:մլ|լ|գ|կգ)(?!\\p{L}))',
 ].join('')
-// «Դաս», «հաս», «աս» — a letter glued before the word stays, «րԴաս» (review 3); «Կվաս» is a name
+// «Դաս», «հաս», «աս», and «Դ» misread as its look-alikes «Գ», «Ղ» (review 4) — a letter glued before
+// the word stays, «րԴաս» (review 3); «Կվաս» is a name
 export const CLASS_MARK = new RegExp(
-  `(?:(?<=[Դդհ])|(?<!\\p{L}))(?<!\\d\\s?հ)աս[^\\p{L}\\d]{0,4}(\\d{2})\\s?[.,]?\\s?(\\d{2})${CLASS_TAIL}`,
+  `(?:(?<=[ԴդհԳգՂղ])|(?<!\\p{L}))(?<!\\d\\s?հ)աս[^\\p{L}\\d]{0,4}(\\d{2})\\s?[.,]?\\s?(\\d{2})${CLASS_TAIL}`,
   'u',
 )
 // The till's article after the class: «Ն/Կ 745030», read «ՆԿ», «ԽԿ».
@@ -1004,6 +1008,8 @@ function classCandidates(budget: Budget, f: ClassFigures, guessed: Set<Candidate
 
 // How far above the first code the figures of an item whose code row OCR lost are looked for.
 const CLASS_LOOKBACK = 3
+// A row whose first letter is a small one: a name run on from the row above, «նալ», «դե լյուքս».
+const startsSmall = (row: string): boolean => /^[^\p{L}]*[ա-ֆ]/u.test(row)
 // Words of a fiscal head that are no dish: the cashier, the section, the fiscal mark, the address.
 const CLASS_HEAD_WORDS = /Գանձապահ|Բաժին|Ֆիսկալ|Հասցե|ՀՎՀՀ|ՀԴՄ/u
 
@@ -1054,6 +1060,18 @@ function classList(rows: readonly TextRow[]): {
   // The list begins at the first code — or at the item above it whose code row OCR lost whole (review
   // А2): its figures, with a unit or the terminal's sum, within three rows of names over the code.
   let start = mapped.findIndex((row) => anchorOf(row) !== null)
+  // a till that prints its names in capitals, «ԹՎԻՍՏԵՐ»: a word of capitals over a dish is then its name,
+  // not the head's (review 4, Г2)
+  const capitals = mapped
+    .slice(Math.max(start, 0))
+    .some(
+      (row) =>
+        /[Ա-Ֆ]{3}/u.test(row) &&
+        !/[ա-ֆ]/u.test(row) &&
+        !/\d/.test(row) &&
+        !CLASS_END.test(row) &&
+        !CLASS_HEAD_WORDS.test(row),
+    )
   for (let i = start - 1, seen = 0; start > 0 && i >= 0 && seen < CLASS_LOOKBACK; i--) {
     const row = mapped[i] ?? ''
     if (row.trim() === '') continue
@@ -1064,20 +1082,26 @@ function classList(rows: readonly TextRow[]): {
       // the terminal prints the name over its figures: the name rows right above them are the item's,
       // or the dish is left nameless and its name is read as the head (review 2, Б1) — up to three rows
       // with no digit but a count before the name, and none of the head (review 3, В4): a word of
-      // capitals «ԳՅՈՒՄՐԻ», «ՖԻՍԿԱԼ», or the cashier's «Գանձապահ» — a name of nobody's goes nowhere
+      // capitals «ԳՅՈՒՄՐԻ», «ՖԻՍԿԱԼ» on a till that names in small letters, or the cashier's «Գանձապահ»
+      // — a name of nobody's goes nowhere. A row over the first is the name's only where the name runs
+      // on across the rows, one of the two starting small: «դե լյուքս», «նալ» — never «Շնորհակալություն»
+      // over «Պանրային սոուս» (review 4, № 14)
+      let below: string | null = null
       for (let j = i - 1, names = 0; j >= 0 && names < CLASS_LOOKBACK; j--) {
         const above = mapped[j] ?? ''
         if (above.trim() === '') continue
         if (
           wordsOf(above) === '' ||
           /\d/.test(above.replace(/^\s*\d{1,3}\s+(?=\p{L})/u, '')) ||
-          /[Ա-Ֆ]{3}/u.test(above) ||
-          CLASS_HEAD_WORDS.test(above)
+          (!capitals && /[Ա-Ֆ]{3}/u.test(above)) ||
+          CLASS_HEAD_WORDS.test(above) ||
+          (below !== null && !startsSmall(above) && !startsSmall(below))
         ) {
           break
         }
         start = j
         names += 1
+        below = above
       }
       break
     }

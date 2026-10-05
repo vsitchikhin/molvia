@@ -155,6 +155,12 @@ describe('the city of the address (MOL-126, Р-6)', () => {
     expect(receiptCityOf(rows('«ՖԱՍՏՖՈՒԴ»', 'ԳՅՈՒՄՐԻ Սայաթ-Նովա 7/9', ...list))).toBe('Гюмри')
   })
 
+  it('ends the head above a first dish in capitals on a till that names in capitals (review 4, Г2)', () => {
+    const head = ['«ՖԱՍՏՖՈՒԴ»', 'ԳՅՈՒՄՐԻ Սայաթ Նովա 1', '/շրջ հարկ/ = 851000']
+    const list = ['ԵՐԵՎԱՆ ՍԵՆԴՎԻՉ', '688.09x1.0 հատ=688.09դրամ', 'Դաս՝ 56.10', 'ԹՎԻՍՏԵՐ']
+    expect(receiptCityOf(rows(...head, ...list))).toBe('Гюмри')
+  })
+
   it('reads the city that opens a row of the head', () => {
     expect(receiptCityOf(rows(': ԵՐԵՎԱՆ-ՍԻԹԻ', 'ԳՅՈՒՄՐԻ Գորկու 62 2.'))).toBe('Гюмри')
     expect(receiptCityOf(rows('DOG CITY', 'Gyumri Sayat-Nova Street, 42'))).toBe('Гюмри')

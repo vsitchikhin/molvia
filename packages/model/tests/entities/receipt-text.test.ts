@@ -1370,3 +1370,72 @@ describe('a fiscal till read by its class code: counts, articles, the head (MOL-
     expect(line?.printed).toBe('Ֆրի ստանդարտ')
   })
 })
+
+// MOL-226, review round 4: junk after a code is junk, «Դ» has look-alikes, a name runs on, capitals.
+describe('a fiscal till read by its class code: junk, look-alikes, the first name (MOL-226, review 4)', () => {
+  const receipt = (...texts: string[]) => parseReceiptText(rowsOf(texts.join('\n'), 0))
+
+  it('makes no line of digits of junk after the terminal’s code, one or two (Г1)', () => {
+    for (const code of ['Դաս՝ 56.10 1', 'Դաս՝ 56.10 19', 'Դաս՝ 56.10 20-']) {
+      const got = receipt(
+        'Դաս՝ 56.10',
+        'Ֆրի',
+        '688.09x1.0 հատ=688.09դրամ',
+        code,
+        'Թվիստեր',
+        '1250.0x1.0 հատ=1250.00դրամ',
+        'Ընդամենը 1938.09',
+      )
+      expect(got.lines.map((l) => [l.printed, l.sumHundredths, l.settled])).toEqual([
+        ['Ֆրի', 68_809, true],
+        ['Թվիստեր', 125_000, true],
+      ])
+    }
+  })
+
+  it('reads «Դ» misread as «Գ» or «Ղ» on every code (№ 13)', () => {
+    const got = receipt(
+      'Գաս. 56.10, Ն/Կ 745030 1հատ 688.09 688.09',
+      'Ֆրի',
+      'Ղաս. 56.10, Ն/Կ 745031 1հատ 120 120',
+      'Սոուս',
+      'Ընդամենը 808.09',
+    )
+    expect([got.lines.map((l) => [l.hs, l.sku]), got.balanced]).toEqual([
+      [
+        ['56.10', '745030'],
+        ['56.10', '745031'],
+      ],
+      true,
+    ])
+  })
+
+  const first = (...above: string[]) =>
+    receipt(
+      '«ՖԱՍՏՖՈՒԴ»',
+      '/շրջ հարկ/ = 851000',
+      ...above,
+      '1300.0x1.0 հատ=1300.00դրամ',
+      'Դաս՝ 56.10',
+      'Թվիստեր',
+      '1250.0x1.0 հատ=1250.00դրամ',
+    ).lines[0]?.printed
+
+  it('takes a row over the first dish’s name only where the name runs on (№ 14)', () => {
+    expect(first('Շնորհակալություն', 'Պանրային սոուս')).toBe('Պանրային սոուս')
+    expect(first('Չիզբուրգեր դե լյուքս Օրիգի', 'նալ')).toBe('Չիզբուրգեր դե լյուքս Օրիգի նալ')
+  })
+
+  it('names the first dish in capitals on a till that names in capitals (Г2)', () => {
+    const got = receipt(
+      '«ՖԱՍՏՖՈՒԴ»',
+      '/շրջ հարկ/ = 851000',
+      'ԵՐԵՎԱՆ ՍԵՆԴՎԻՉ',
+      '688.09x1.0 հատ=688.09դրամ',
+      'Դաս՝ 56.10',
+      'ԹՎԻՍՏԵՐ',
+      '1250.0x1.0 հատ=1250.00դրամ',
+    )
+    expect(got.lines.map((l) => l.printed)).toEqual(['ԵՐԵՎԱՆ ՍԵՆԴՎԻՉ', 'ԹՎԻՍՏԵՐ'])
+  })
+})
