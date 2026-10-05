@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   tellsQuietly,
-  isFoodServiceReceipt,
   moneyOfHundredths,
   needsReshoot,
   receiptDateOf,
@@ -137,6 +136,12 @@ describe('the city of the address (MOL-126, Р-6)', () => {
     const list = ['Դաս. 56.10, Ն/Կ 745030 1հատ 688.09 688.09', 'Երևան սենդվիչ']
     expect(receiptCityOf(rows(...head, ...list))).toBe('Гюмри')
     expect(receiptCityOf(rows(...list))).toBeNull()
+  })
+
+  it('ends the head where the class reading begins, «Դաս. 5б.10» as OCR reads it (review А6)', () => {
+    const head = ['«ՖԱՍՏՖՈՒԴ»', 'ԳՅՈՒՄՐԻ Սայաթ-Նովա 7/9']
+    const list = ['Դաս. 5б.10, Ն/Կ 745030 1հատ 688.09 688.09', 'Երևան սենդվիչ']
+    expect(receiptCityOf(rows(...head, ...list))).toBe('Гюмри')
   })
 
   it('reads the city that opens a row of the head', () => {
@@ -512,23 +517,5 @@ describe('«чек разобран» without a sound at night (MOL-129)', () =>
     expect(tellsQuietly(new Date('2026-07-01T19:30:00Z'), 'Europe/Belgrade')).toBe(false)
     expect(tellsQuietly(new Date('2026-07-01T20:30:00Z'), 'Europe/Belgrade')).toBe(true)
     expect(tellsQuietly(new Date('2026-12-01T20:30:00Z'), 'Europe/Belgrade')).toBe(false)
-  })
-})
-
-describe('a receipt of food service (MOL-226)', () => {
-  const lines = (...hs: (string | null)[]) => hs.map((code) => ({ hs: code }))
-
-  it('is one whose every line is of class 56', () => {
-    expect(isFoodServiceReceipt(lines('56.10', '56.10'))).toBe(true)
-    expect(isFoodServiceReceipt(lines('56.30'))).toBe(true)
-  })
-
-  it('is not one with a line of goods, a line with no code, another service, or no line', () => {
-    expect(isFoodServiceReceipt(lines('56.10', '0401'))).toBe(false)
-    expect(isFoodServiceReceipt(lines('56.10', null))).toBe(false)
-    expect(isFoodServiceReceipt(lines('53.20'))).toBe(false)
-    // «5610» without its point is a customs heading as read
-    expect(isFoodServiceReceipt(lines('5610'))).toBe(false)
-    expect(isFoodServiceReceipt([])).toBe(false)
   })
 })

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { EXCHANGE_UNDO_MINUTES } from '#model/entities/exchange'
-import { CLASS_MARK } from '#model/entities/receipt-text'
+import { classListStart } from '#model/entities/receipt-text'
 import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
 import { COUNTRY_CITIES } from '#model/contracts/settings'
 import { localClock } from '#model/entities/reminder'
@@ -247,7 +247,8 @@ function headEnd(rows: readonly TextRow[]): number {
     ends.push(numbered < 0 ? above : above + numbered)
   }
   // a fiscal till's class code «Դաս. 56.10» opens its first item where neither layout reads (MOL-226)
-  const coded = ends.length === 0 ? rows.findIndex((row) => CLASS_MARK.test(row.text)) : -1
+  // read as the class reading reads it, so the head and the list never disagree (review А6)
+  const coded = ends.length === 0 ? classListStart(rows) : -1
   if (coded >= 0) ends.push(coded)
   return ends.length === 0 ? Math.min(rows.length, HEAD_ROWS) : Math.min(...ends)
 }
@@ -415,16 +416,6 @@ export const RECEIPT_PAGE_MODES = [4, 6] as const
  */
 export function needsReshoot(text: ReceiptText): boolean {
   return text.lines.length === 0
-}
-
-/**
- * A receipt of food service (MOL-226, owner's В-2): every line of class 56 of the services' classes —
- * «Դաս. 56.10», a restaurant's or a café's. Recorded, it makes a new place a venue and its new items
- * dishes, so that a meal at KFC falls on the venues' side of gate 0.3, measured apart from products. A
- * receipt with one line of goods in it stays a shop's: a supermarket sells a coffee as well.
- */
-export function isFoodServiceReceipt(lines: readonly { readonly hs: string | null }[]): boolean {
-  return lines.length > 0 && lines.every((line) => line.hs !== null && /^56\.\d{2}$/.test(line.hs))
 }
 
 /** A line of a parsed receipt, in the domain's own values. */

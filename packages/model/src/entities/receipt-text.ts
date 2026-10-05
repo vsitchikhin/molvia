@@ -851,7 +851,13 @@ function tableReceipt(rows: readonly TextRow[], table: ReturnType<typeof tableLi
 // the last one above it, and its name on the side the receipt's coded items put it.
 
 // What OCR keeps of «Դաս» — «Դաս.», «աս,», «հաս ‘» — and the class after it: «56.10», «56 10», «5610».
-export const CLASS_MARK = /աս[^\p{L}\d]{0,4}(\d{2})\s?[.,]?\s?(\d{2})(?![\d])/u
+// Not «հատ» read «հաս» after a count («1 հաս 1300 1300»), and not a figure that goes on: a price
+// «5610.00x1.0», a volume «Կվաս 1000մլ» (review А3–А5).
+const CLASS_TAIL = '(?![\\d\\p{L}]|[.,]\\d|\\s*[xх×*])'
+export const CLASS_MARK = new RegExp(
+  `(?<!\\d\\s?հ)աս[^\\p{L}\\d]{0,4}(\\d{2})\\s?[.,]?\\s?(\\d{2})${CLASS_TAIL}`,
+  'u',
+)
 // The till's article after the class: «Ն/Կ 745030», read «ՆԿ», «ԽԿ».
 const CLASS_ARTICLE = /^[^\d]{0,8}?(\d{5,7})(?!\d)/
 const CLASS_END = /Հսկիչ|Ընդամենը/
@@ -980,8 +986,21 @@ function classCandidates(budget: Budget, f: ClassFigures, guessed: Set<Candidate
   return out
 }
 
-function classReceipt(rows: readonly TextRow[]): ReceiptText {
-  const text = rows.map((r) => r.text).join('\n')
+// How far above the first code the figures of an item whose code row OCR lost are looked for.
+const CLASS_LOOKBACK = 3
+
+interface ClassAnchor {
+  readonly hs: string
+  readonly sku: string | null
+  readonly rest: string
+}
+
+/** The rows as the class reading reads them, how it finds a code, and where its list begins. */
+function classList(rows: readonly TextRow[]): {
+  mapped: string[]
+  anchorOf: (row: string) => ClassAnchor | null
+  start: number
+} {
   const mapped = rows.map((r) => r.text.replace(/[ՅЗбОOo](?=[\d,.])/g, (c) => DIGIT_LIKE[c] ?? c))
   // a class of services read with its point anywhere on the receipt is the receipt's: «5610» and
   // «56 10» on the other rows are it, and so is a row whose «Դաս» OCR lost
@@ -993,12 +1012,12 @@ function classReceipt(rows: readonly TextRow[]): ReceiptText {
         : []
     }),
   )
-  const anchorOf = (row: string): { hs: string; sku: string | null; rest: string } | null => {
+  const anchorOf = (row: string): ClassAnchor | null => {
     let mark: RegExpExecArray | null = CLASS_MARK.exec(row)
     if (mark === null) {
       for (const service of services) {
         const loose = new RegExp(
-          `^[^\\d]{0,12}?(${service.slice(0, 2)})\\s?[.,]?\\s?(${service.slice(2)})(?![\\d])`,
+          `^[^\\d]{0,12}?(${service.slice(0, 2)})\\s?[.,]?\\s?(${service.slice(2)})${CLASS_TAIL}`,
           'u',
         ).exec(row)
         if (loose !== null) mark = loose
@@ -1014,8 +1033,30 @@ function classReceipt(rows: readonly TextRow[]): ReceiptText {
       rest: article === null ? after : after.slice(article.index + article[0].length),
     }
   }
+  // The list begins at the first code — or at the item above it whose code row OCR lost whole (review
+  // А2): its figures, with a unit or the terminal's sum, within three rows of names over the code.
+  let start = mapped.findIndex((row) => anchorOf(row) !== null)
+  for (let i = start - 1, seen = 0; start > 0 && i >= 0 && seen < CLASS_LOOKBACK; i--) {
+    const row = mapped[i] ?? ''
+    if (row.trim() === '') continue
+    seen += 1
+    const figures = classFigures(row)
+    if (figures !== null && (figures.terminal || CLASS_UNIT.test(row))) {
+      start = i
+      break
+    }
+  }
+  return { mapped, anchorOf, start }
+}
 
-  const first = mapped.findIndex((row) => CLASS_MARK.test(row))
+/** Where a fiscal till's list of items begins: its first class code, or -1 (MOL-226). */
+export function classListStart(rows: readonly TextRow[]): number {
+  return classList(rows).start
+}
+
+function classReceipt(rows: readonly TextRow[]): ReceiptText {
+  const text = rows.map((r) => r.text).join('\n')
+  const { mapped, anchorOf, start: first } = classList(rows)
   const end = first < 0 ? -1 : mapped.findIndex((row, i) => i > first && CLASS_END.test(row))
   const list = first < 0 ? [] : mapped.slice(first, end < 0 ? undefined : end)
   type Kind =
@@ -1055,6 +1096,11 @@ function classReceipt(rows: readonly TextRow[]): ReceiptText {
     })
     anchor = null
   }
+  // a line whose code OCR lost is of the receipt's class where every code read is one class of
+  // services: a dish of KFC is no product for the matcher because one row of it was smudged (А1b)
+  const classes = new Set(items.flatMap((item) => (item.hs === null ? [] : [item.hs])))
+  const [sole] = classes
+  const lostHs = classes.size === 1 && sole?.includes('.') ? sole : null
   const namesBetween = (from: number, to: number): string[] =>
     kinds.slice(from, to).flatMap((k) => (k.kind === 'name' ? [k.words] : []))
   // the side the names stand on: the terminal's between the code and the figures, the till's under
@@ -1095,7 +1141,7 @@ function classReceipt(rows: readonly TextRow[]): ReceiptText {
     const sumAsRead = f.terminal ? (unpointed(f.sumS, 2)[0] ?? f.sumS) : f.sumS
     return {
       printed: nameOf(names[i] ?? []),
-      hs: item.hs,
+      hs: item.hs ?? lostHs,
       sku: item.sku,
       quantityMilli: finite(pick?.qty ?? (f.qtyS === null ? 1000 : milliOf(f.qtyS))),
       unit: f.weighed ? 'kg' : 'piece',

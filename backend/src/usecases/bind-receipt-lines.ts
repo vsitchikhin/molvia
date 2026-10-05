@@ -20,8 +20,8 @@ const SEARCH_ROWS = 5
  * the till's language with the line's customs heading (`createLineMatcher`), then the catalogue search
  * by the line's gloss — near is found, far is «проверьте» (MOL-124 В-4) — and nothing is a new item,
  * named by the gloss. A line of a class of services, «56.10» of food service, is a dish: whatever the
- * catalogue's goods give it is «проверьте» (MOL-226). The shop's memory comes before all of it, but it is laid over on every reading
- * of the receipt rather than here: it changes with every receipt recorded.
+ * catalogue's goods give it is «проверьте» (MOL-226). The shop's memory comes before all of it, but it
+ * is laid over on every reading of the receipt rather than here: it changes with every receipt recorded.
  *
  * The gloss is Russian, the catalogue's language, and is shown only to a receipt read out in Russian;
  * the search asks it whatever the receipt's language.

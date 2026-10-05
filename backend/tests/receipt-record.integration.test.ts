@@ -807,16 +807,16 @@ describe('«Записать»', () => {
     ])
   })
 
-  it('records a receipt of food service as a venue with dishes, a shop’s as before (MOL-226)', async () => {
+  it('records a receipt of food service as a shop’s, its dishes in «Оценки» (MOL-226, В-2 «а»)', async () => {
     const me = await insertActor(db)
     const ketchup = await insertItem(db, { name: 'Кетчуп', searchKey: 'ketchup' })
     const kfc: Line[] = [
       { printed: 'Կետչուպ', hs: '56.10', sku: '740000', price: 115, sum: 115 },
       { printed: '16 Թև', hs: '56.10', sku: '771300', price: 3_930, sum: 3_930 },
     ]
-    const served = await parsedReceipt(me, kfc, { layout: 'class' })
+    const id = await parsedReceipt(me, kfc, { layout: 'class' })
     const tripId = randomUUID()
-    const response = await record(me, served, {
+    const response = await record(me, id, {
       tripId,
       place: { name: 'KFC', city: 'Гюмри' },
       purchasedOn: '2026-09-26',
@@ -843,73 +843,24 @@ describe('«Записать»', () => {
       .select()
       .from(places)
       .where(eq(places.id, trip?.placeId ?? ''))
-    expect(place).toMatchObject({ name: 'KFC', kind: 'venue' })
+    // a venue and its dishes have no screen before 0.3: «Оценки», the reminder and «Что брать» read
+    // products only, so a meal is recorded as a shop's purchases and stays there to be rated
+    expect(place).toMatchObject({ name: 'KFC', kind: 'store' })
     const kinds = await db
       .select({ name: items.name, kind: items.kind })
       .from(items)
       .orderBy(asc(items.name))
-    // an item chosen from the catalogue keeps its kind; one made by the receipt is a dish
     expect(kinds).toEqual([
-      { name: '16 крыльев', kind: 'dish' },
+      { name: '16 крыльев', kind: 'product' },
       { name: 'Кетчуп', kind: 'product' },
     ])
-
-    // one line of goods makes it a shop's, with products
-    const mixed = await parsedReceipt(me, [kfc[0]!, { ...kfc[1]!, hs: '0207' }], {
-      receiptNo: '21410812',
-    })
-    const shopTrip = randomUUID()
-    expect(
-      (
-        await record(me, mixed, {
-          tripId: shopTrip,
-          place: { name: 'KFC', city: 'Гюмри' },
-          purchasedOn: '2026-09-26',
-          lines: [
-            {
-              position: 0,
-              skip: false,
-              item: { name: 'Соус' },
-              quantity: pieces(1),
-              amount: amount(115),
-            },
-            { position: 1, skip: true },
-          ],
-        })
-      ).statusCode,
-    ).toBe(200)
-    const [shop] = await db
-      .select({ kind: places.kind })
-      .from(places)
-      .innerJoin(trips, eq(trips.placeId, places.id))
-      .where(eq(trips.id, shopTrip))
-    expect(shop?.kind).toBe('store')
-    expect((await db.select().from(items).where(eq(items.name, 'Соус')))[0]?.kind).toBe('product')
-
-    // a place picked by its id keeps its own kind
-    const store = await insertPlace(db, { name: 'Фудкорт' })
-    const picked = await parsedReceipt(me, kfc, { layout: 'class', receiptNo: '21410813' })
-    const pickedTrip = randomUUID()
-    expect(
-      (
-        await record(me, picked, {
-          tripId: pickedTrip,
-          place: { id: store },
-          purchasedOn: '2026-09-26',
-          lines: [
-            {
-              position: 0,
-              skip: false,
-              item: { id: ketchup },
-              quantity: pieces(1),
-              amount: amount(115),
-            },
-            { position: 1, skip: true },
-          ],
-        })
-      ).statusCode,
-    ).toBe(200)
-    const [kept] = await db.select().from(places).where(eq(places.id, store))
-    expect(kept?.kind).toBe('store')
+    const pending = await createExpenseRepository(db).pendingVerdictsFor(me, 10)
+    expect(pending.total).toBe(2)
+    // the class stays on the receipt's lines, for the venues of 0.3
+    const lines = await db
+      .select({ hs: receiptLines.hs })
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+    expect(lines.map((line) => line.hs)).toEqual(['56.10', '56.10'])
   })
 })
