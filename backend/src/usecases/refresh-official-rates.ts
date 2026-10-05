@@ -44,8 +44,8 @@ export const ARCHIVE_DAYS_PER_RUN = 120
 
 /**
  * A stretch of the archive longer than this with no day of the bank's is a hole to walk again: no
- * holiday of a central bank is so long — the National Bank of Georgia's longest, the first week of
- * January, is six days.
+ * holiday of a central bank is so long — the longest stretch without a rate in the National Bank of
+ * Georgia's archive of 2022–2026 is six days, Easter 2026 (every day asked, 05.10.2026).
  */
 export const ARCHIVE_GAP_DAYS = 10
 
@@ -62,29 +62,51 @@ function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS)
 }
 
-/**
- * The first day the archive of a country bank is walked from (MOL-110, Р-5), given the days of it
- * the cache holds: the start of the history while the cache's first day is far from it, the day
- * after the first hole — so a walk cut short by `ARCHIVE_DAYS_PER_RUN` or by a failure goes on
- * where it stopped — and with no hole, the last month.
- */
-export function archiveWalkFrom(kept: readonly string[], from: string, today: string): string {
-  const days = [...new Set(kept)].filter((day) => day >= from && day <= today).sort()
+/** Where a walk of a country bank's archive starts, and whether it is only the daily look back. */
+export interface ArchiveWalk {
+  readonly from: string
+  /** No hole was found: walked through to today, the archive is whole until tomorrow's look. */
+  readonly whole: boolean
+}
+
+/** The day after the first hole of `days` — sorted, from `start` — longer than `ARCHIVE_GAP_DAYS`. */
+function firstHole(days: readonly string[], start: string, end: string): string | null {
   const [first] = days
-  if (first === undefined || daysBetween(from, first) > ARCHIVE_GAP_DAYS) return from
+  if (first === undefined || daysBetween(start, first) > ARCHIVE_GAP_DAYS) return start
   for (const [index, day] of days.entries()) {
-    const next = days[index + 1] ?? today
+    const next = days[index + 1] ?? end
     if (daysBetween(day, next) > ARCHIVE_GAP_DAYS) return dayAfter(day)
   }
-  const recent = dayAfter(today, -ARCHIVE_RECENT_DAYS)
-  return recent > from ? recent : from
+  return null
 }
 
 /**
- * The central banks whose own rate is a pair's official one: the Central Bank of Armenia and the
- * country banks of `HOME_BANK` (MOL-110). Each is measured for a jump by its own rates alone.
+ * Where the archive of a country bank is walked from (MOL-110, Р-5), given the days of it the cache
+ * holds. **The last month first** (review 2, adversarial А): a spending of yesterday keeps the rate
+ * it is written with for good, and the bank's own five are what a new rate is judged by — walked
+ * from 2022, both were a year and a half old for the hours of the walk. Then the day after the first
+ * hole of the history — so a walk cut short by `ARCHIVE_DAYS_PER_RUN` or by a failure goes on where
+ * it stopped. With no hole, the last month again: the daily look back.
  */
-const HOME_BANKS: ReadonlySet<RateProvider> = new Set(['cba', ...Object.values(HOME_BANK)])
+export function archiveWalkFrom(kept: readonly string[], from: string, today: string): ArchiveWalk {
+  const days = [...new Set(kept)].filter((day) => day >= from && day <= today).sort()
+  const recent = dayAfter(today, -ARCHIVE_RECENT_DAYS)
+  const start = recent > from ? recent : from
+  const lastMonth = firstHole(
+    days.filter((day) => day >= start),
+    start,
+    today,
+  )
+  if (lastMonth !== null) return { from: start, whole: false }
+  const history = firstHole(days, from, today)
+  return history === null ? { from: start, whole: true } : { from: history, whole: false }
+}
+
+/**
+ * The country banks of `HOME_BANK` (MOL-110): a pair's official source beside the Central Bank of
+ * Armenia, its archive walked a day a request, its jump judged by its own week.
+ */
+const COUNTRY_BANKS: ReadonlySet<RateProvider> = new Set(Object.values(HOME_BANK))
 
 export interface RefreshLog {
   warn(details: object, message: string): void
@@ -244,13 +266,15 @@ export function officialRatesRefresh({
     if (at !== undefined && now().getTime() - at < HISTORY_EVERY_MS) return
     try {
       const kept = await history.rates.between(bank.provider, OFFICIAL_HISTORY_FROM, today)
-      const start =
-        archiveNext.get(bank.provider) ??
-        archiveWalkFrom(
-          kept.map((row) => row.date),
-          OFFICIAL_HISTORY_FROM,
-          today,
-        )
+      const next = archiveNext.get(bank.provider)
+      const walk: ArchiveWalk = next
+        ? { from: next, whole: false }
+        : archiveWalkFrom(
+            kept.map((row) => row.date),
+            OFFICIAL_HISTORY_FROM,
+            today,
+          )
+      const start = walk.from
       const days: string[] = []
       for (
         let day = start;
@@ -284,13 +308,15 @@ export function officialRatesRefresh({
       }
       await history.rates.insertMissing(missing)
       const last = days.at(-1)
-      if (last === undefined || last >= today) {
-        archiveNext.delete(bank.provider)
-        archiveAt.set(bank.provider, now().getTime())
-      } else {
+      if (last !== undefined && last < today) {
         archiveNext.set(bank.provider, dayAfter(last))
-        archiveAt.delete(bank.provider)
+      } else {
+        archiveNext.delete(bank.provider)
       }
+      // Rested until tomorrow only once a look found nothing to fill; the last month walked first
+      // goes on into the history at the next run (review 2).
+      if (walk.whole) archiveAt.set(bank.provider, now().getTime())
+      else archiveAt.delete(bank.provider)
     } catch (error) {
       archiveNext.delete(bank.provider)
       archiveAt.set(bank.provider, now().getTime() - HISTORY_EVERY_MS + HISTORY_RETRY_MS)
@@ -340,24 +366,28 @@ export function officialRatesRefresh({
   }
 
   /**
-   * What a new rate is measured against for a jump (Р-19, Р-22). A central bank whose rate is a
-   * pair's official one — the Central Bank of Armenia, a country bank of `HOME_BANK` — by its own
-   * latest rates. An open source is asked only while the central bank is silent, so its own
-   * history is an earlier episode, often months old — or nothing, exactly when a trip is about to
-   * take it: without three of its own from the last week, it is measured against the central
-   * bank's latest, in the same unit.
+   * What a new rate is measured against for a jump (Р-19, Р-22). The Central Bank of Armenia by its
+   * own latest rates: its archive comes whole in one answer. A country bank of `HOME_BANK` by its own
+   * of the last week, and with fewer than three of them by nothing (MOL-110, adversarial А): its
+   * archive comes a day a request, and right after a deploy «its own latest» were days of 2022 —
+   * a rouble a third dearer, today's true rate marked a jump. An open source is asked only while
+   * the central bank is silent, so its own history is an earlier episode, often months old — or
+   * nothing, exactly when a trip is about to take it: without three of its own from the last week,
+   * it is measured against the central bank's latest, in the same unit.
    */
   async function referenceFor(answer: Published): Promise<ReadonlyMap<string, readonly bigint[]>> {
     const currencies = answer.rates.map((rate) => rate.currency)
     const own = await rates.history(answer.provider, currencies, answer.date)
-    const home = HOME_BANKS.has(answer.provider)
-    const central = home ? own : await rates.history('cba', currencies, answer.date)
+    const country = COUNTRY_BANKS.has(answer.provider)
+    const central =
+      answer.provider === 'cba' ? own : await rates.history('cba', currencies, answer.date)
     const values = (past: readonly PastRate[] | undefined) => (past ?? []).map((row) => row.scaled)
 
     return new Map(
       currencies.map((currency) => {
-        if (home) return [currency, values(own.get(currency))]
+        if (answer.provider === 'cba') return [currency, values(own.get(currency))]
         const recent = (own.get(currency) ?? []).filter((row) => isRateFresh(row.date, answer.date))
+        if (country) return [currency, values(recent)]
         return [
           currency,
           recent.length >= RATE_JUMP_MIN_HISTORY ? values(recent) : values(central.get(currency)),
