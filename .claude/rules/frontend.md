@@ -356,11 +356,14 @@ The detail behind the frontend lines of `CLAUDE.md`.
   in both engines; `accounts.spec` the account's journal at 320 and 430, `money.spec` the day's sum at
   412 and 320. **Its skeleton is `OperationSkeleton form="rows"`**, the same geometry in bars of
   `--border` on `--surface` (Ф-13), each bar in a line of the size and leading of the words it stands
-  for, so a row of bars is as tall as a row of the answer — **narrow too**: its `li` is the container
+  for, so a row of bars is as tall as a typical row of the answer — a title and a meta of a line each,
+  no line under the amount — **narrow too**: its `li` is the container
   `row`, and both read the one `$row-narrow` (`_mixins.scss`), so the bars cannot part from the answer
   (adversarial round 3, В1: kept wide, a day of twelve rows would have grown by 300 px as the answer
-  came); `e2e/kit-rows` holds the height and the amount's place at 390 and 320. The screens take it with
-  MOL-178.
+  came); `e2e/kit-rows` holds the height and the amount's place at 390 and 320. **The price, named**
+  (adversarial round 4): a row whose words wrap or that has a line under its amount is taller than its bars
+  — on a card of 256 by 17 to 34 px — since the bars know no text; which row is typical is MOL-178's, when
+  the screens take it.
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
   `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a
