@@ -174,6 +174,20 @@ export const receiptRecordBodySchema = z.strictObject({
    */
   total: moneyCodec.refine((value) => value.minor > 0n, { error: ERROR.INVALID_AMOUNT }).optional(),
   lines: z.array(receiptRecordLineSchema).max(500),
+  /**
+   * What the person put right on the review (MOL-222, the measure of 0.2): the positions of the lines
+   * whose item they changed from the one the review showed, and of those whose quantity or sum they
+   * typed anew. Only the phone knows what it showed — the shops' memory may have learnt meanwhile from
+   * another record (adversarial А6) — and a total put right moves no line (review 2). Counted, never
+   * recorded: a figure of the measure, not of money. Absent from a phone of an earlier build — the
+   * server then compares with the review as it would show it now.
+   */
+  edited: z
+    .strictObject({
+      item: z.array(z.int().min(0)).max(500),
+      figures: z.array(z.int().min(0)).max(500),
+    })
+    .optional(),
 })
 export type ReceiptRecordBody = z.output<typeof receiptRecordBodySchema>
 

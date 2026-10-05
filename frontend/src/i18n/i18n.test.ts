@@ -108,9 +108,15 @@ describe('словарь: повторяющиеся тексты', () => {
     // решение, за которое заплачено. Поэтому цена закреплена снимком: новый незаявленный
     // дубль уронит тест, а заявленные видно списком.
     expect(duplicates(RU)).toEqual({
-      // Один глагол у трёх шторок: закончить с балансом счёта, с цифрами штрихкода (MOL-98) и с
-      // отправленным сообщением разработчику (MOL-147).
-      Готово: ['accounts.done', 'feedback.done', 'receipt.place.done', 'scanner.done'],
+      // Один глагол у шторок, где закончено дело: баланс счёта, цифры штрихкода (MOL-98),
+      // отправленное сообщение разработчику (MOL-147), место чека и края чека (MOL-222).
+      Готово: [
+        'accounts.done',
+        'feedback.done',
+        'receipt.edges.done',
+        'receipt.place.done',
+        'scanner.done',
+      ],
       // Строка входа и заголовок шторки, которую она открывает, — одни слова (MOL-147): человек
       // видит, что попал туда, куда нажал. И у ссылки экрана ошибки так же.
       'Написать разработчику': ['feedback.title', 'settings.feedback.label'],
@@ -253,7 +259,13 @@ describe('словарь: повторяющиеся тексты', () => {
     // проверка по обоим.
     expect(duplicates(EN)).toEqual({
       // One verb for two sheets, as in Russian: an account's balance, a barcode's digits (MOL-98).
-      Done: ['accounts.done', 'feedback.done', 'receipt.place.done', 'scanner.done'],
+      Done: [
+        'accounts.done',
+        'feedback.done',
+        'receipt.edges.done',
+        'receipt.place.done',
+        'scanner.done',
+      ],
       'Write to the developer': ['feedback.title', 'settings.feedback.label'],
       'Report a problem': ['feedback.title_error', 'state.report'],
       'Sending…': ['feedback.sending', 'spending.pending'],

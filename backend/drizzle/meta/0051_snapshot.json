@@ -1,6 +1,6 @@
 {
-  "id": "2f7d830b-7c13-413a-9817-ca1cc3604c0e",
-  "prevId": "107eb535-8ef6-4f1a-9722-3471b1ca1c06",
+  "id": "194426b9-2128-4b95-9e5a-59027f478b55",
+  "prevId": "757d0632-78a5-4586-9249-b75ffa295804",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -141,11 +141,11 @@
         },
         "actors_spend_currency_known": {
           "name": "actors_spend_currency_known",
-          "value": "\"actors\".\"spend_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"actors\".\"spend_currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "actors_income_currency_known": {
           "name": "actors_income_currency_known",
-          "value": "\"actors\".\"income_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"actors\".\"income_currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "actors_rate_preference_known": {
           "name": "actors_rate_preference_known",
@@ -263,7 +263,7 @@
         },
         "budget_plans_currency_known": {
           "name": "budget_plans_currency_known",
-          "value": "\"budget_plans\".\"currency\" is null or \"budget_plans\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"budget_plans\".\"currency\" is null or \"budget_plans\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "budget_plans_percent_range": {
           "name": "budget_plans_percent_range",
@@ -535,11 +535,11 @@
         },
         "exchange_revisions_given_currency_known": {
           "name": "exchange_revisions_given_currency_known",
-          "value": "\"exchange_revisions\".\"given_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"exchange_revisions\".\"given_currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "exchange_revisions_received_currency_known": {
           "name": "exchange_revisions_received_currency_known",
-          "value": "\"exchange_revisions\".\"received_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"exchange_revisions\".\"received_currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "exchange_revisions_channel_known": {
           "name": "exchange_revisions_channel_known",
@@ -733,11 +733,11 @@
         },
         "exchanges_given_currency_known": {
           "name": "exchanges_given_currency_known",
-          "value": "\"exchanges\".\"given_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"exchanges\".\"given_currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "exchanges_received_currency_known": {
           "name": "exchanges_received_currency_known",
-          "value": "\"exchanges\".\"received_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"exchanges\".\"received_currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "exchanges_currencies_differ": {
           "name": "exchanges_currencies_differ",
@@ -890,7 +890,7 @@
         },
         "expenses_amount_currency_known": {
           "name": "expenses_amount_currency_known",
-          "value": "\"expenses\".\"amount_currency\" is null or \"expenses\".\"amount_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"expenses\".\"amount_currency\" is null or \"expenses\".\"amount_currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         }
       },
       "isRLSEnabled": false
@@ -1670,7 +1670,7 @@
         },
         "income_revisions_currency_known": {
           "name": "income_revisions_currency_known",
-          "value": "\"income_revisions\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"income_revisions\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "income_revisions_source_known": {
           "name": "income_revisions_source_known",
@@ -1833,7 +1833,7 @@
         },
         "incomes_currency_known": {
           "name": "incomes_currency_known",
-          "value": "\"incomes\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"incomes\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "incomes_source_known": {
           "name": "incomes_source_known",
@@ -2483,7 +2483,7 @@
         },
         "market_rates_currency_foreign": {
           "name": "market_rates_currency_foreign",
-          "value": "\"market_rates\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR') and \"market_rates\".\"currency\" <> 'AMD'"
+          "value": "\"market_rates\".\"currency\" in ('RUB', 'USD', 'EUR')"
         },
         "market_rates_positive": {
           "name": "market_rates_positive",
@@ -2714,7 +2714,7 @@
       "checkConstraints": {
         "money_accounts_currency_known": {
           "name": "money_accounts_currency_known",
-          "value": "\"money_accounts\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"money_accounts\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "money_accounts_revision_positive": {
           "name": "money_accounts_revision_positive",
@@ -2797,11 +2797,11 @@
         },
         "money_month_rates_base_known": {
           "name": "money_month_rates_base_known",
-          "value": "\"money_month_rates\".\"base\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"money_month_rates\".\"base\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "money_month_rates_quote_known": {
           "name": "money_month_rates_quote_known",
-          "value": "\"money_month_rates\".\"quote\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"money_month_rates\".\"quote\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "money_month_rates_source_known": {
           "name": "money_month_rates_source_known",
@@ -2870,11 +2870,11 @@
       "checkConstraints": {
         "official_rates_provider_known": {
           "name": "official_rates_provider_known",
-          "value": "\"official_rates\".\"provider\" in ('cba', 'cbr', 'erapi')"
+          "value": "\"official_rates\".\"provider\" in ('cba', 'cbr', 'erapi', 'nbg')"
         },
         "official_rates_currency_foreign": {
           "name": "official_rates_currency_foreign",
-          "value": "\"official_rates\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR') and \"official_rates\".\"currency\" <> 'AMD'"
+          "value": "\"official_rates\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL') and \"official_rates\".\"currency\" <> 'AMD'"
         },
         "official_rates_positive": {
           "name": "official_rates_positive",
@@ -3331,6 +3331,13 @@
           "notNull": true,
           "default": 0
         },
+        "totals_corrected": {
+          "name": "totals_corrected",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "within_5m": {
           "name": "within_5m",
           "type": "integer",
@@ -3375,7 +3382,7 @@
       "checkConstraints": {
         "receipt_days_counts_non_negative": {
           "name": "receipt_days_counts_non_negative",
-          "value": "least(\"receipt_days\".\"read\", \"receipt_days\".\"read_partly\", \"receipt_days\".\"reshoot\", \"receipt_days\".\"unreadable\", \"receipt_days\".\"recorded\", \"receipt_days\".\"lines\", \"receipt_days\".\"lines_edited\", \"receipt_days\".\"lines_skipped\", \"receipt_days\".\"lines_item\", \"receipt_days\".\"lines_figures\", \"receipt_days\".\"within_5m\", \"receipt_days\".\"within_15m\", \"receipt_days\".\"within_1h\", \"receipt_days\".\"within_1d\", \"receipt_days\".\"later\") >= 0"
+          "value": "least(\"receipt_days\".\"read\", \"receipt_days\".\"read_partly\", \"receipt_days\".\"reshoot\", \"receipt_days\".\"unreadable\", \"receipt_days\".\"recorded\", \"receipt_days\".\"lines\", \"receipt_days\".\"lines_edited\", \"receipt_days\".\"lines_skipped\", \"receipt_days\".\"lines_item\", \"receipt_days\".\"lines_figures\", \"receipt_days\".\"totals_corrected\", \"receipt_days\".\"within_5m\", \"receipt_days\".\"within_15m\", \"receipt_days\".\"within_1h\", \"receipt_days\".\"within_1d\", \"receipt_days\".\"later\") >= 0"
         },
         "receipt_days_edited_within_lines": {
           "name": "receipt_days_edited_within_lines",
@@ -4054,7 +4061,7 @@
         },
         "receipts_currency_known": {
           "name": "receipts_currency_known",
-          "value": "\"receipts\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"receipts\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "receipts_whole_when_queued": {
           "name": "receipts_whole_when_queued",
@@ -4668,7 +4675,7 @@
         },
         "spendings_currency_known": {
           "name": "spendings_currency_known",
-          "value": "\"spendings\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"spendings\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "spendings_revision_positive": {
           "name": "spendings_revision_positive",
@@ -4700,11 +4707,11 @@
         },
         "spendings_debited_currency_known": {
           "name": "spendings_debited_currency_known",
-          "value": "\"spendings\".\"debited_currency\" is null or \"spendings\".\"debited_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"spendings\".\"debited_currency\" is null or \"spendings\".\"debited_currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "spendings_rate_quote_known": {
           "name": "spendings_rate_quote_known",
-          "value": "\"spendings\".\"rate_quote\" is null or \"spendings\".\"rate_quote\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"spendings\".\"rate_quote\" is null or \"spendings\".\"rate_quote\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "spendings_rate_source_known": {
           "name": "spendings_rate_source_known",
@@ -4861,7 +4868,7 @@
         },
         "store_memory_currency_known": {
           "name": "store_memory_currency_known",
-          "value": "\"store_memory\".\"price_currency\" is null or \"store_memory\".\"price_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"store_memory\".\"price_currency\" is null or \"store_memory\".\"price_currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         }
       },
       "isRLSEnabled": false
@@ -5163,7 +5170,7 @@
       "checkConstraints": {
         "trips_currency_known": {
           "name": "trips_currency_known",
-          "value": "\"trips\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"trips\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "trips_rate_all_or_none": {
           "name": "trips_rate_all_or_none",
@@ -5179,19 +5186,19 @@
         },
         "trips_rate_base_known": {
           "name": "trips_rate_base_known",
-          "value": "\"trips\".\"rate_base\" is null or \"trips\".\"rate_base\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"trips\".\"rate_base\" is null or \"trips\".\"rate_base\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "trips_rate_quote_known": {
           "name": "trips_rate_quote_known",
-          "value": "\"trips\".\"rate_quote\" is null or \"trips\".\"rate_quote\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"trips\".\"rate_quote\" is null or \"trips\".\"rate_quote\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "trips_rate_provider_known": {
           "name": "trips_rate_provider_known",
-          "value": "\"trips\".\"rate_provider\" is null or \"trips\".\"rate_provider\" in ('cba', 'cbr', 'erapi')"
+          "value": "\"trips\".\"rate_provider\" is null or \"trips\".\"rate_provider\" in ('cba', 'cbr', 'erapi', 'nbg')"
         },
         "trips_rate_provider_matches_source": {
           "name": "trips_rate_provider_matches_source",
-          "value": "(\"trips\".\"rate_source\" is null or \"trips\".\"rate_source\" = 'personal') = (\"trips\".\"rate_provider\" is null)\n        and ((\"trips\".\"rate_source\" = 'official') = (\"trips\".\"rate_provider\" = 'cba')) is not false"
+          "value": "(\"trips\".\"rate_source\" is null or \"trips\".\"rate_source\" = 'personal') = (\"trips\".\"rate_provider\" is null)\n        and ((\"trips\".\"rate_source\" = 'official') = (\"trips\".\"rate_provider\" = (case when \"trips\".\"rate_base\" = 'GEL' then 'nbg' when \"trips\".\"rate_quote\" = 'GEL' then 'nbg' else 'cba' end))) is not false"
         },
         "trips_rate_source_known": {
           "name": "trips_rate_source_known",
@@ -5239,7 +5246,7 @@
         },
         "trips_receipt_currency_known": {
           "name": "trips_receipt_currency_known",
-          "value": "\"trips\".\"receipt_currency\" is null or \"trips\".\"receipt_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"trips\".\"receipt_currency\" is null or \"trips\".\"receipt_currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         },
         "trips_receipt_first_with_sum": {
           "name": "trips_receipt_first_with_sum",
@@ -5255,7 +5262,7 @@
         },
         "trips_debited_currency_known": {
           "name": "trips_debited_currency_known",
-          "value": "\"trips\".\"debited_currency\" is null or \"trips\".\"debited_currency\" in ('AMD', 'RUB', 'USD', 'EUR')"
+          "value": "\"trips\".\"debited_currency\" is null or \"trips\".\"debited_currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL')"
         }
       },
       "isRLSEnabled": false

@@ -244,3 +244,122 @@ describe('what «Записать» sends', () => {
     )
   })
 })
+
+// MOL-222: the measure of 0.2 — what the person put right against what this review showed
+describe('what «Записать» says was put right', () => {
+  const OTHER = 'eeeeeeee-0000-4000-8000-000000000001'
+
+  it('nothing touched — nothing put right', () => {
+    const detail = receiptA()
+    const body = recordBody(detail, null, reviewLines(detail, null), TRIP, '2026-09-27')
+    expect(body?.edited).toEqual({ item: [], figures: [] })
+  })
+
+  it('a total put right moves the lines it confirms, and none of them is put right (review 2)', () => {
+    const detail = receiptA(null)
+    const draft: ReceiptDraft = { lines: {}, total: amd('3663') }
+    const body = recordBody(detail, draft, reviewLines(detail, draft), TRIP, '2026-09-27')
+    expect(body?.lines[3]).toMatchObject({ amount: amd('980') })
+    expect(body?.edited).toEqual({ item: [], figures: [] })
+  })
+
+  it('another item, and figures other than the shown ones; the same figures saved again are none', () => {
+    const detail = receiptA()
+    const draft: ReceiptDraft = {
+      lines: {
+        0: { item: { id: OTHER, name: 'Кефир' }, skip: false },
+        1: {
+          item: { id: MILK, name: 'Помидоры' },
+          figures: { quantity: parseQuantity('0.8', 'kg'), amount: amd('1032') },
+          skip: false,
+        },
+        3: {
+          item: { id: MILK, name: 'Шоколад «Гранд»' },
+          figures: { quantity: parseQuantity('1', 'piece'), amount: amd('980') },
+          skip: false,
+        },
+      },
+    }
+    const body = recordBody(detail, draft, reviewLines(detail, draft), TRIP, '2026-09-27')
+    expect(body?.edited).toEqual({ item: [0], figures: [3] })
+  })
+
+  it('a new item kept new under another name is no edit; one chosen from the catalogue is', () => {
+    const detail = receiptA()
+    const renamed: ReceiptDraft = {
+      lines: { 2: { item: { name: 'Сыр копчёный' }, skip: false } },
+    }
+    expect(
+      recordBody(detail, renamed, reviewLines(detail, renamed), TRIP, '2026-09-27')?.edited,
+    ).toEqual({ item: [], figures: [] })
+    const chosen: ReceiptDraft = {
+      lines: { 2: { item: { id: OTHER, name: 'Сыр Лори' }, skip: false } },
+    }
+    expect(
+      recordBody(detail, chosen, reviewLines(detail, chosen), TRIP, '2026-09-27')?.edited,
+    ).toEqual({ item: [2], figures: [] })
+  })
+
+  it('a line left out says nothing more: «не записывать» is its edit', () => {
+    const detail = receiptA()
+    const draft: ReceiptDraft = {
+      lines: { 0: { item: { id: OTHER, name: 'Кефир' }, skip: true } },
+    }
+    expect(
+      recordBody(detail, draft, reviewLines(detail, draft), TRIP, '2026-09-27')?.edited,
+    ).toEqual({
+      item: [],
+      figures: [],
+    })
+  })
+
+  // adversarial Б3: the review showed 890; the person typed 980, then the total from the paper — the
+  // total now confirms 980, and the line typed before it is still put right
+  it('a line put right stays put right when a total typed after it confirms the same sum', () => {
+    const detail = receiptA(null)
+    const draft: ReceiptDraft = {
+      lines: {
+        3: {
+          item: { id: MILK, name: 'Шоколад «Гранд»' },
+          figures: { quantity: parseQuantity('1', 'piece'), amount: amd('980') },
+          skip: false,
+        },
+      },
+      total: amd('3663'),
+    }
+    expect(
+      recordBody(detail, draft, reviewLines(detail, draft), TRIP, '2026-09-27')?.edited,
+    ).toEqual({
+      item: [],
+      figures: [3],
+    })
+  })
+
+  // adversarial В1: the line put right milk → cheese while the review showed milk; read again after
+  // another record taught the memory cheese, the review shows cheese — and the edit is still an edit
+  it('an item put right stays put right when the review read again shows the same item', () => {
+    const detail = receiptA()
+    const reread: ReceiptDetail = {
+      ...detail,
+      lines: detail.lines.map((one, position) =>
+        position === 0
+          ? { ...one, itemId: OTHER, itemName: 'Кефир', match: 'memory' as const }
+          : one,
+      ),
+    }
+    const draft: ReceiptDraft = {
+      lines: { 0: { item: { id: OTHER, name: 'Кефир' }, skip: false } },
+    }
+    const shown = { 0: MILK }
+    expect(
+      recordBody(reread, draft, reviewLines(reread, draft, shown), TRIP, '2026-09-27')?.edited,
+    ).toEqual({ item: [0], figures: [] })
+    // with nothing kept of the first edit — a draft of the build before — the review as it is now
+    expect(
+      recordBody(reread, draft, reviewLines(reread, draft), TRIP, '2026-09-27')?.edited,
+    ).toEqual({
+      item: [],
+      figures: [],
+    })
+  })
+})

@@ -3,7 +3,8 @@ import am01 from './receipt-text.am-01.json'
 import am03 from './receipt-text.am-03.json'
 import am04 from './receipt-text.am-04.json'
 import am05 from './receipt-text.am-05.json'
-import { needsReshoot } from '#model/entities/receipt'
+import { moneyOfHundredths, needsReshoot, receiptLineOf } from '#model/entities/receipt'
+import { readPartly } from '#model/entities/receipt-sum'
 import {
   bestReading,
   likeness,
@@ -360,8 +361,11 @@ describe('a receipt barely read (review Р6)', () => {
     expect(got.lines[1]!.sumHundredths).not.toBe(990_090)
   })
 
-  it('is «переснимите»', () => {
-    expect(needsReshoot(parse(crumpled))).toBe(true)
+  it('is read in part, not «переснимите»: its lines go to the review (MOL-222, В-1)', () => {
+    const got = parse(crumpled)
+    expect(needsReshoot(got)).toBe(false)
+    const lines = got.lines.map((line) => receiptLineOf(line, 'AMD'))
+    expect(readPartly(lines, moneyOfHundredths(got.totalHundredths, 'AMD'))).toBe(true)
   })
 })
 

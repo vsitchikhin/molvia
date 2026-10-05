@@ -940,6 +940,35 @@ describe('a screenshot with the message (MOL-167)', () => {
     expect(sendFeedback.mock.calls[0]?.[0].pictures).toEqual([base64('b')])
   })
 
+  // MOL-222, В-2: a receipt's photos come with the opening, drawn anew and seen like a picture chosen
+  it('takes a receipt’s photos as pictures: drawn anew, shown, removable, sent with the words', async () => {
+    const { wrapper } = await render('/purchases')
+    const photos = ['one', 'two', 'three', 'four'].map(
+      (bytes) => new Blob([bytes], { type: 'image/jpeg' }),
+    )
+    useFeedbackSheetStore().open({ from: 'receipt' }, photos)
+    await flushPromises()
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 120))
+    const sheet = wrapper
+    // three at most: what a message carries (В-2 of MOL-167) — and the fourth is said (MOL-222, review 6)
+    expect(tiles(sheet)).toHaveLength(3)
+    expect(note(sheet).text()).toBe(
+      '3 of 4 fit — a message takes three pictures at most. Remove one to attach another',
+    )
+    expect(drawPicture).toHaveBeenCalledTimes(3)
+    // handed over once: the next opening brings none
+    expect(useFeedbackSheetStore().takePhotos()).toEqual([])
+    await sheet.get('.picture-remove').trigger('click')
+    await flushPromises()
+    expect(tiles(sheet)).toHaveLength(2)
+    await choose(sheet, en.feedback.kinds.other)
+    await press(sheet)
+    expect(sendFeedback.mock.calls[0]?.[0]).toMatchObject({
+      pictures: [base64('two'), base64('three')],
+    })
+  })
+
   it('says why a picture did not go in, and keeps the others', async () => {
     const { PictureRefused } = await import('@/feedbackPicture')
     const { wrapper } = await render()

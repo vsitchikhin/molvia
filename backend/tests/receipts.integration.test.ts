@@ -17,6 +17,7 @@ import { NO_EMBEDDER } from '@/embeddings/embedder'
 import {
   itemHeadings,
   itemNames,
+  receiptDays,
   receiptLineImages,
   receiptLines,
   receiptParts,
@@ -119,6 +120,9 @@ function get(me: Owner, url: string) {
 let photos = 0
 
 /** The owner's receipt, sent whole: one part, in the queue. */
+/** The rows of `receipt_days` (MOL-222), in order of the day. */
+const days = () => db.select().from(receiptDays).orderBy(receiptDays.day)
+
 async function queued(me: Owner, over: Record<string, unknown> = {}): Promise<string> {
   const receipt = body(over)
   expect((await send(me, receipt)).statusCode).toBe(201)
@@ -395,14 +399,59 @@ describe('the queue', () => {
     expect(lines.every((line) => line.match !== null)).toBe(true)
   })
 
-  it('asks for a new shot when nothing worth checking was read (В-4)', async () => {
+  it('asks for a new shot only when not one item line was found (MOL-222, В-1)', async () => {
     const me = await owner()
     const id = await queued(me)
     const blank = { text: 'ԵՐԵՎԱՆ-ՍԻԹԻ\nՇնորհակալություն', rows: [], version: 'v' }
-    await readAll(benchReader({ read: () => Promise.resolve(blank) }))
+    const [report] = await readAll(benchReader({ read: () => Promise.resolve(blank) }))
     const summary = receiptDetailCodec.parse((await get(me, `/receipts/${id}`)).json()).receipt
     expect([summary.status, summary.failure, summary.lineCount]).toEqual(['failed', 'reshoot', 0])
     expect(await db.select().from(receiptLineImages)).toEqual([])
+    expect(report).toMatchObject({ kind: 'read', lines: 0, settled: 0, partly: false })
+    expect(await days()).toMatchObject([{ reshoot: 1, read: 0, readPartly: 0, unreadable: 0 }])
+  })
+
+  // MOL-222, В-1: «читать надо все кассы» — what was «переснимите» (В-4 of MOL-125) goes to the review
+  it('reads a receipt read in part, its lines and all, and counts it apart', async () => {
+    const me = await owner()
+    const id = await queued(me)
+    // two lines of a receipt of 10 000: what a crumpled one, or a till Tesseract misreads, gives
+    const text = [
+      '1. Կաթ',
+      '0401/1163909 1Հտ 370/370',
+      '2. Հաց',
+      '1905/1078044 1Հտ 99,1/0,9 100',
+      'Ընդամենը 10000.00',
+    ].join('\n')
+    const partial: ReaderReading = {
+      text,
+      rows: text.split('\n').map((row, i) => ({ text: row, box: [0, i * 40, 600, 30] })),
+      version: 'v',
+    }
+    const [report] = await readAll(benchReader({ read: () => Promise.resolve(partial) }))
+    const detail = receiptDetailCodec.parse((await get(me, `/receipts/${id}`)).json())
+    expect([detail.receipt.status, detail.receipt.failure]).toEqual(['parsed', null])
+    expect(detail.lines.length).toBeGreaterThan(0)
+    expect(report).toMatchObject({ kind: 'read', status: 'parsed', partly: true })
+    expect(report?.kind === 'read' && report.lines).toBe(detail.lines.length)
+    expect(await days()).toMatchObject([{ readPartly: 1, read: 0, reshoot: 0 }])
+  })
+
+  it('counts a receipt read whole as read, by the day in Yerevan, with no id of anyone', async () => {
+    const me = await owner()
+    await queued(me)
+    await queued(me)
+    const reports = await readAll(benchReader())
+    expect(reports.map((r) => r.kind === 'read' && r.partly)).toEqual([false, false])
+    const rows = await days()
+    expect(rows).toMatchObject([{ read: 2, readPartly: 0 }])
+    const [{ today } = { today: '' }] = await db.execute<{ today: string }>(
+      sql`select to_char(((now() at time zone 'UTC') + interval '4 hours')::date, 'YYYY-MM-DD') as today`,
+    )
+    expect(rows[0]?.day).toBe(today)
+    const columns = await db.execute<{ column_name: string; data_type: string }>(sql`
+      select column_name, data_type from information_schema.columns where table_name = 'receipt_days'`)
+    expect(columns.every((c) => c.data_type === 'integer' || c.column_name === 'day')).toBe(true)
   })
 
   it('fails a photo the reader cannot read, and reads the next one', async () => {
@@ -468,6 +517,8 @@ describe('the queue', () => {
       failure: 'unreadable',
       attempts: 2,
     })
+    // the first drop sent it back to the queue and counted nothing; the second failed it (MOL-222)
+    expect(await days()).toMatchObject([{ read: 1, unreadable: 1 }])
   })
 
   it('reads each person’s oldest receipt in turn: fifty of one do not hold another’s (review А10)', async () => {
@@ -548,6 +599,7 @@ describe('the queue', () => {
       status: 'failed',
       failure: 'unreadable',
     })
+    expect(await days()).toMatchObject([{ unreadable: 1 }])
   })
 
   it('must not read a receipt removed in the meantime into the list', async () => {
