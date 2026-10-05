@@ -22,21 +22,21 @@
             >
           </span>
           <!-- Only an answer is drawn (adversarial А1): «not known yet» drawn off read as an
-               objection nobody made. The place is held, so the words do not move when it comes. -->
+               objection nobody made. The place is held, so the words do not move when it comes;
+               it is not faded in — an answer read is not played (MOL-151). -->
           <span class="switch-slot">
-            <span v-if="analytics.off.value !== undefined" class="switch-in">
-              <AppSwitch
-                :id="`${id}-analytics-switch`"
-                :checked="!analytics.off.value"
-                :inactive="analytics.saving.value || !analytics.online.value"
-                :aria-describedby="
-                  analytics.online.value
-                    ? `${id}-analytics`
-                    : `${id}-analytics ${id}-analytics-offline`
-                "
-                @toggle="(on: boolean) => analytics.choose(!on)"
-              />
-            </span>
+            <AppSwitch
+              v-if="analytics.off.value !== undefined"
+              :id="`${id}-analytics-switch`"
+              :checked="!analytics.off.value"
+              :inactive="analytics.saving.value || !analytics.online.value"
+              :aria-describedby="
+                analytics.online.value
+                  ? `${id}-analytics`
+                  : `${id}-analytics ${id}-analytics-offline`
+              "
+              @toggle="(on: boolean) => analytics.choose(!on)"
+            />
           </span>
         </div>
         <p v-if="analytics.online.value && analytics.saveFailed.value" class="failed" role="alert">
@@ -289,12 +289,6 @@ export default defineComponent({
   flex: none;
   justify-content: flex-end;
   min-width: var(--switch-width);
-}
-
-.switch-in {
-  display: flex;
-
-  @include appear;
 }
 
 // The colour of an action that ends something, as «Выйти» beside it (MOL-57).

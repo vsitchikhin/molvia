@@ -65,7 +65,7 @@ export const TERMS_PARTS = [
   'contact',
 ] as const
 
-/** «Редакция от 4 октября 2026 г.» — the subtitle of both pages. */
+/** «Редакция от 5 октября 2026 г.» — the subtitle of both pages. */
 export function revisedOn(
   t: (key: string, values: Record<string, string>) => string,
   locale: string,
