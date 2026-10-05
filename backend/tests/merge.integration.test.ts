@@ -799,3 +799,52 @@ describe('every pair of a night (adversarial В2) and «apart» through a third 
     expect(would).toHaveLength(1)
   })
 })
+
+describe('a fan where the later merge only withdrew (review №12, adversarial Д1, Д2)', () => {
+  it('waits for the later merge when it withdrew against a verdict the earlier one brought', async () => {
+    const b = await made('Молоко 3,2%', 'moloko 3 2', '2026-09-01')
+    const a = await made('Малоко 3,2%', 'maloko 3 2', '2026-09-02')
+    const d = await made('Молако 3,2%', 'molako 3 2', '2026-09-03')
+    for (const [itemId, score, day] of [
+      [d, 2, '2026-09-02'],
+      [a, 5, '2026-09-03'],
+    ] as const) {
+      await db.execute(sql`
+        insert into verdicts (id, actor_id, item_id, item_kind, score, rated_at, updated_at)
+        values (${randomUUID()}, ${owner}, ${itemId}, 'product', ${score},
+                ${`${day}T10:00:00Z`}::timestamptz, ${`${day}T10:00:00Z`}::timestamptz)`)
+    }
+    const first = numbered(await merges.mergeItems(a, b, NIGHT))
+    // A's later five moved onto B wins without a swap; D's two is withdrawn against it.
+    const second = numbered(await merges.mergeItems(d, b, NIGHT))
+    expect(await merges.unmerge(first)).toEqual({ refused: 'chained', later: second })
+  })
+
+  it('leaves the survivor a name its other twin knew too', async () => {
+    const b = await made('Молоко', 'moloko', '2026-09-01')
+    const a = await made('Малоко', 'maloko', '2026-09-02')
+    const d = await made('Молако', 'molako', '2026-09-03')
+    await db.execute(sql`
+      insert into item_names (item_id, language, name) values (${a}, 'hy', 'կաթ'), (${d}, 'hy', 'կաթ')`)
+    await db.execute(sql`insert into item_hs (item_id, hs) values (${a}, '0401'), (${d}, '0401')`)
+    const first = numbered(await merges.mergeItems(a, b, NIGHT))
+    numbered(await merges.mergeItems(d, b, NIGHT))
+    await merges.unmerge(first)
+    const names = await db.execute<{ item_id: string }>(
+      sql`select item_id from item_names order by item_id`,
+    )
+    expect(names.map((row) => row.item_id).sort()).toEqual([a, b, d].sort())
+    const headings = await db.execute<{ item_id: string }>(sql`select item_id from item_hs`)
+    expect(headings.map((row) => row.item_id).sort()).toEqual([a, b, d].sort())
+  })
+
+  it('still takes a name back whole when no other twin knew it', async () => {
+    const b = await made('Молоко', 'moloko', '2026-09-01')
+    const a = await made('Малоко', 'maloko', '2026-09-02')
+    await db.execute(
+      sql`insert into item_names (item_id, language, name) values (${a}, 'hy', 'կաթ')`,
+    )
+    await merges.unmerge(numbered(await merges.mergeItems(a, b, NIGHT)))
+    expect(await db.execute(sql`select item_id from item_names`)).toEqual([{ item_id: a }])
+  })
+})

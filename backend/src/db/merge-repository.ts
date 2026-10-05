@@ -330,7 +330,11 @@ export function createMergeRepository(db: Conn): MergeRepository {
         update verdicts set deleted_at = greatest(clock_timestamp(), rated_at), review = null
         where id = ${row.trace} and deleted_at is null
         returning id`)
-      if (withdrawn.length > 0) moved.push({ what: 'verdict_withdrawn', key: { id: row.trace } })
+      // The row it lost to is written too: a later merge's withdrawal against a row an earlier merge
+      // brought is what makes that earlier one wait to be undone (review №12, adversarial Д1).
+      if (withdrawn.length > 0) {
+        moved.push({ what: 'verdict_withdrawn', key: { id: row.trace, kept: row.kept } })
+      }
     }
     return moved
   }
@@ -716,16 +720,36 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 update item_barcodes set item_id = ${from}
                 where code = ${key.code} and item_id = ${now}`)
               break
-            case 'item_name':
+            // A name or a heading another trace of the survivor knows too stays with the survivor, and the
+            // trace undone gets a copy: moved away, the survivor lost what that other twin had brought
+            // (adversarial Д2).
+            case 'item_name': {
+              const shared = sql`exists (
+                select 1 from item_names n join items t on t.id = n.item_id
+                where t.merged_into = ${now} and t.id <> ${from}
+                  and n.language = ${key.language} and n.name = ${key.name})`
+              await tx.execute(sql`
+                insert into item_names (item_id, language, name)
+                select ${from}, ${key.language}, ${key.name} where ${shared}
+                on conflict do nothing`)
               await tx.execute(sql`
                 update item_names set item_id = ${from}
-                where item_id = ${now} and language = ${key.language} and name = ${key.name}`)
+                where item_id = ${now} and language = ${key.language} and name = ${key.name}
+                  and not ${shared}`)
               break
-            case 'item_hs':
-              await tx.execute(
-                sql`update item_hs set item_id = ${from} where item_id = ${now} and hs = ${key.hs}`,
-              )
+            }
+            case 'item_hs': {
+              const shared = sql`exists (
+                select 1 from item_hs h join items t on t.id = h.item_id
+                where t.merged_into = ${now} and t.id <> ${from} and h.hs = ${key.hs})`
+              await tx.execute(sql`
+                insert into item_hs (item_id, hs) select ${from}, ${key.hs} where ${shared}
+                on conflict do nothing`)
+              await tx.execute(sql`
+                update item_hs set item_id = ${from}
+                where item_id = ${now} and hs = ${key.hs} and not ${shared}`)
               break
+            }
             case 'store_memory':
               await tx.execute(sql`
                 update store_memory set item_id = ${from} where id = ${key.id} and item_id = ${now}`)
