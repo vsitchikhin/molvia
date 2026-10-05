@@ -103,10 +103,14 @@ rule: a pair with the lari — the NBG, any other — the CBA.
   day the rate is in force — set the evening before, a Saturday's holding to Monday's evening.
 - **Asked every hour, whatever the CBA did** (`homeBanks`): it is the official source of its pairs,
   and nothing stands in for it but the others' rows already in the cache — the CBA writes the lari
-  every hour itself. **Its jump is judged by its own rows of the last week, by none with fewer than
-  three** (adversarial А): its archive comes a day a request, and right after a deploy «its own latest
-  five» were days of 2022 — the rouble a third dearer, today's true rate marked a jump, and a day last
-  written in that window kept the mark for good. It is never measured against another bank.
+  every hour itself. **Its jump is judged by its own rows of the last fortnight
+  (`COUNTRY_JUMP_DAYS`), by none with fewer than three** (adversarial А, Г): its archive comes a day a
+  request, and right after a deploy «its own latest five» were days of 2022 — the rouble a third
+  dearer, today's true rate marked a jump, and a day last written in that window kept the mark for
+  good. A week was the first bound and left the first working days after a holiday unjudged — the
+  15th of April 2026, after Easter, had two of its own within a week — and a country bank has no
+  stand-in to be measured by, as the open sources have the central bank. It is never measured against
+  another bank.
 - **Its archive is walked a day a request** (В-3): the API answers any day with the rate in force on
   it and has no range — measured. **The last `ARCHIVE_RECENT_DAYS` first** (review 2): a spending of
   yesterday keeps the rate it is written with for good, and walked from 2022 the lari of last week
@@ -115,8 +119,12 @@ rule: a pair with the lari — the NBG, any other — the CBA.
   fifteen hourly runs for the two years, not twelve minutes in one, since the market waits behind the
   official refresh — on from where the last run stopped (`archiveNext`, in memory: a Sunday asked is
   written as its Saturday, and the cache would ask it again); then once a day the last month again,
-  and only a look that found no hole rests the walk until tomorrow. After a restart the walk starts
-  from the first hole longer than `ARCHIVE_GAP_DAYS` (`archiveWalkFrom`): the longest stretch without
+  and only a look that found no hole rests the walk until tomorrow. **A hole is between two days the
+  bank has, or before the first of them — never after the last** (review 5): a bank stuck on an old
+  date answers every day with it, and a tail to today counted as a hole was walked every hour for
+  nothing, the history never reached while it hung; the hourly answer writes today the moment it
+  speaks, and the hole is then between two days. After a restart the walk starts from the first hole
+  longer than `ARCHIVE_GAP_DAYS` (`archiveWalkFrom`): the longest stretch without
   a rate in the archive of 2022–2026 is six days, Easter 2026 — measured on 05.10.2026, every day
   asked. Only the days the cache lacks are written; a day the bank answers with tomorrow's rate, set
   the evening before, is passed over; a failure is a line in the log and asked again in six hours, as
@@ -136,7 +144,13 @@ rule: a pair with the lari — the NBG, any other — the CBA.
   курсу 0,0309 на сегодня — не от НБ Грузии: он молчит больше недели», and the accounts say «по курсу
   дня» (review 1). Naming the fallback itself there would need the provider beside every rate
   snapshot — a spending's, a month's — a column and a migration; a trip and an exchange's card carry
-  it and name it.
+  it and name it. «Часть — по курсу {bank}» on «Обмен денег» keeps the pair's bank: it is the official
+  rate of every day the wallet valued by, the pair's bank unless it was silent that week, and which
+  days were not is not in the wallet's answer.
+- **The price of the first hours, named** (adversarial round 2): the walk brings the last month in its
+  first run and the history over some fifteen; a spending dated earlier than a month back and written
+  in those hours takes the CBA's rate as a fallback and keeps it, though the NBG's of that day is on
+  its way.
 - **The price, named** (adversarial): a page of a build before MOL-110 reads an answer with `GEL` or
   `nbg` by the strict schemas of its time and refuses it whole, as one before MOL-168 refused
   `rateCharts` — until it takes the new version (`pwaUpdate.ts`). Only for someone who already wrote
