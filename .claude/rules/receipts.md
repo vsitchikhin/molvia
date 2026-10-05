@@ -410,10 +410,14 @@ in the record if the person wants them — «Добавить позицию» i
 line (MOL-222 Р-14 stays where it was).
 
 **Told by what is printed, only where no reading found a line** (`departmentReceipt`, from `bestReading`): a
-section «Բաժին» (and OCR's «Ււսժին», «Բայժին») and nothing an item prints under it — the class code, a
-heading «(3824)», an article «0401/1163909», a table's heading. Dog City and KFC print «Բաժին» too, over
-their items; **above it is the trader's own head**, and a phone there — «(0312) 5-12-34», «0312/51234» —
-is no item (adversarial А2). **Nor is it Dog City's table**: a customs heading names its item after it,
+section «Բաժին» (and OCR's «Ււսժին», «Բայժին») and nothing an item prints anywhere — the class code, a
+customs heading **with its item's name after it** «(3824) ՏՈՖՈՒ», a till's article **of six digits and
+more** «0401/1163909» (the bench's 386 of 394; the eight of five digits are articles OCR cut), a table's
+heading. Dog City and KFC print «Բաժին» too, over their items. **A phone in the trader's head is no item**,
+«(0312) 5-12-34», «0312/51234» (adversarial А2): first looked for under the section only, it came back in a
+reading that lost the section — psm 6 of am-20 read «СЕТЕ 1-1» (round 2, Б2) — and that rule would have
+taken a till printing its sections in the footer for one with no items (review 2, № 10); the marks are
+read anywhere and made narrower instead. **Nor is it Dog City's table**: a customs heading names its item after it,
 «(3824) ՏՈՖՈՒՀՈՂ», and only that starts the table — read on any «(dddd)», a phone made one «line» of the
 whole head; the bench of every reading did not move. On the bench: 10 of 10 of the trader's receipts, 0 of 25 readings with items — the seven of
 them where the parse found no line among them, which stay «переснимите». **The price, named** (Р-7): a
@@ -433,7 +437,9 @@ is the amount two of three agree on** — the section's sum, «Ընդամենը�
 read once is outvoted by «550 00» twice, and one source alone is no total, since a wrong sum on a trip is
 worse than none the person sees and types. **Two receipts on one photo** print two moments (am-21) — or,
 the upper one's head out of the frame, two totals or two fiscal numbers, since a receipt prints each
-once: whose total, time and number it is nobody can tell, so none is read. Read by the moments alone, such
+once — **or a head under a fiscal number**, the last row of a receipt: the middle of a tape of two, one of
+each in view, gave the lower receipt's time under the upper one's number (round 2, Б1). Whose total, time
+and number it is nobody can tell, so none is read. Read by the moments alone, such
 a photo took the lower receipt's total under the upper one's fiscal number, and the upper receipt shot on
 its own was then refused as recorded (adversarial А1). **The price, named** (review 1, № 5): a moment
 printed twice and misread once is read as two receipts too — on the safe side, the person types the
@@ -450,7 +456,9 @@ and with no difference, and «Записать сумму» waits for a total �
 refused by the server** (`error.receipt_total_required`, 409 as the receipt's state refuses it, review 1,
 № 8; Р-4), the phone only keeps the button from a tap; the same holds for a receipt whose every line is
 left out and whose total nobody knows, **and for «Убрать сумму» on a finished trip with no purchase**
-(adversarial А4, `trips.md`): one tap after the record it made the very trip «Записать» refuses. The
+(adversarial А4, `trips.md`): one tap after the record it made the very trip «Записать» refuses. **No more is
+promised** (round 2, Б3): a purchase added, the sum taken off and the purchase removed leave such a trip,
+as removing the last purchase of any finished trip did before MOL-227. The
 review's note says «Фото удалим после записи» — no line stays (А5). After the record «Записали сумму по
 чеку», with no second sentence over «Здесь пока нет покупок» and no «К оценкам»: there is nothing to rate
 (review 1, № 7). «Покупки» say «без товаров · {day}», the bot «товаров в нём нет — можно записать сумму»,

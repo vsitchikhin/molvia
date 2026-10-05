@@ -1265,12 +1265,13 @@ function classReceipt(rows: readonly TextRow[]): ReceiptText {
 
 // «Բաժին 1», as OCR reads it: «Ււսժին 1]», «Բայժին 11» — the section and its number.
 const DEPARTMENT = /(?:Բա|Բայ|Ււս)ժին\s*\d/u
-// What only an item prints: the class code, a customs heading «(3824)», a till's article «0401/1163909»,
-// a table's heading «Անուն Քան Գին Գումար». Dog City and KFC print «Բաժին» too, over their items — so it
-// is looked for under the section only: a phone in the head, «(0312) 5-12-34», «0312/51234», is the
-// trader's own line and no item (adversarial А2).
+// What only an item prints: the class code, a customs heading with its item's name «(3824) ՏՈՖՈՒ», a
+// till's article «0401/1163909» — six digits and more, the bench's 386 of 394 — a table's heading «Անուն Քան
+// Գին Գումար». Dog City and KFC print «Բաժին» too, over their items. A phone in the trader's head is none of
+// them, «(0312) 5-12-34», «0312/51234», wherever it stands and whichever reading lost the section
+// (adversarial А2, round 2 Б2, review 2 № 10).
 const ITEM_MARK = new RegExp(
-  `${CLASS_MARK.source}|\\(\\d{4}\\)|\\d{4}\\s*/\\s*\\d{5,}|Անուն.{0,20}Քան`,
+  `${CLASS_MARK.source}|\\(\\d{4}\\)\\s*\\p{L}|(?<!\\d)\\d{4}\\s*/\\s*\\d{6,}|Անուն.{0,20}Քան`,
   'u',
 )
 // The tax number: after its word first, anywhere; else before the till's registration number on the same
@@ -1346,11 +1347,7 @@ function agreed<T>(values: readonly (T | null)[]): T | null {
  */
 export function departmentReceipt(readings: readonly (readonly TextRow[])[]): ReceiptText | null {
   if (!readings.some((rows) => rows.some((row) => DEPARTMENT.test(row.text)))) return null
-  const marked = (rows: readonly TextRow[]): boolean => {
-    const section = rows.findIndex((row) => DEPARTMENT.test(row.text))
-    return rows.slice(section + 1).some((row) => ITEM_MARK.test(row.text))
-  }
-  if (readings.some(marked)) return null
+  if (readings.some((rows) => rows.some((row) => ITEM_MARK.test(row.text)))) return null
   const texts = readings.map(rowTexts)
   const votes = new Map<number, Set<string>>()
   for (const rows of readings) {
@@ -1375,14 +1372,33 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
   // receipts on one photo, whose total, time and number nobody can tell — the person holds the
   // receipts and types the total (am-21 of the bench). The moments alone missed a pair whose upper head
   // was out of the frame: its total and time came from the lower receipt, its number from the upper
-  // one, and the upper receipt shot on its own was then refused as recorded (adversarial А1).
-  const once = (rows: readonly string[], test: (text: string) => boolean): boolean =>
+  // one, and the upper receipt shot on its own was then refused as recorded (adversarial А1). And the
+  // fiscal number is a receipt's last row: a moment or a tax number under it is the next receipt's head —
+  // the middle of a tape of two, one of each in view, the time of the lower under the number of the
+  // upper (round 2, Б1).
+  const repeated = (rows: readonly string[], test: (text: string) => boolean): boolean =>
     rows.filter(test).length > 1
+  const fiscal = (text: string): boolean => /Ֆիսկալ/iu.test(text)
+  const headUnder = (rows: readonly string[]): boolean => {
+    const end = rows.findIndex(fiscal)
+    return (
+      end >= 0 &&
+      rows
+        .slice(end + 1)
+        .some(
+          (text) =>
+            new RegExp(DEPARTMENT_DATE.source).test(text) ||
+            DEPARTMENT_TIN_WORD.test(text) ||
+            DEPARTMENT_TIN_TILL.test(text),
+        )
+    )
+  }
   const several = texts.some(
     (rows, i) =>
       (moments[i]?.length ?? 0) > 1 ||
-      once(rows, (text) => /Ֆիսկալ/iu.test(text)) ||
-      once(rows, (text) => text.includes(DEPARTMENT_TOTAL) && !text.includes('զեղչ')),
+      repeated(rows, fiscal) ||
+      repeated(rows, (text) => text.includes(DEPARTMENT_TOTAL) && !text.includes('զեղչ')) ||
+      headUnder(rows),
   )
   // a day or a time no calendar or clock has is no reading of it, and outvotes nothing (adversarial А3)
   const date = agreed(moments.flatMap((m) => m.map((moment) => moment.date)))

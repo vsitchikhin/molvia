@@ -1710,8 +1710,39 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
     expect([got.tin, got.date]).toEqual(['12345678', '2026-10-04'])
   })
 
-  it('takes a phone in the head for no item’s mark (adversarial А2)', () => {
+  it('reads no time or number from the middle of a tape of two receipts (round 2, Б1)', () => {
+    // the upper receipt from its section down, the lower one's head under its fiscal number: one moment,
+    // one total and one number in view — but a head under the last row of a receipt is the next one's
+    const got = bestReading([
+      reading(
+        'Բաժին 1 - Բաժին 1',
+        '/ Շրջանառության հարկ/ 3660.00',
+        'Ընդամենը՝ 3660.00',
+        'Առձեռն 3660.00',
+        'ՖԻՍԿԱԼ ՀԱՄԱՐ 11223344',
+        'ԽԱՆՈՒԹ ԱՁ',
+        'ՀՎՀՀ: 12345678 Գ/Հ: 87654321',
+        'ԿՀ: 00000023',
+        '04-10-26 14:27:34',
+      ),
+    ])
+    expect(got.layout).toBe('department')
+    expect([got.totalHundredths, got.time, got.receiptNo]).toEqual([null, null, null])
+  })
+
+  it('takes a phone in the head for no item’s mark, the section read or not (А2, round 2 Б2)', () => {
     for (const phone of ['Հեռ. (0312) 5-12-34', 'Հեռ. 0312/51234']) {
+      const head = ['ԽԱՆՈՒԹ ԱՁ', 'ԳՅՈՒՄՐԻ Աբովյան 10', phone, 'ՀՎՀՀ 12345678 9/2 87654321']
+      // one reading lost the section, as psm 6 of am-20 did — the phone is no mark there either (Б2)
+      const lost = bestReading([
+        reading(...head, 'Բաժին 1', 'Ընդամենը 700.00', 'Առձեռն 700 00'),
+        reading(...head, 'СЕТЕ 1-1', 'Ընդամենը 700.00', 'Առձեռն 700 00'),
+      ])
+      expect([lost.layout, lost.tin, lost.totalHundredths]).toEqual([
+        'department',
+        '12345678',
+        70_000,
+      ])
       const got = bestReading([
         reading(
           'ԽԱՆՈՒԹ ԱՁ',

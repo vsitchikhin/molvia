@@ -158,7 +158,8 @@ export async function removeExpense(
  * and a trip whose purchases were all removed after it keeps its money. **Nor does it take the sum off
  * such a trip once it is finished** (MOL-227, adversarial А4): a receipt with no items is recorded as its
  * sum alone, and a finished trip with no money and no purchase is the empty row «Записать» refuses
- * (Р-4) — «Удалить запись» is the way to be rid of it. An open one is a record still being typed.
+ * (Р-4) — «Удалить запись» is the way to be rid of it. An open one is a record still being typed. A rule
+ * of the sum only: removing the last purchase of a finished trip leaves it empty, as before (round 2, Б3).
  */
 export async function setReceipt(
   transact: Transact,
