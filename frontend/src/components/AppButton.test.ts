@@ -123,3 +123,71 @@ it.each(['busy', 'inactive'] as const)(
     expect(clicked).toHaveBeenCalledOnce()
   },
 )
+
+// MOL-225: busy is the button's own word. Both words stand in one cell, so the button keeps the
+// width of the wider one; the one not shown is hidden from the eye and from a screen reader.
+describe('AppButton at work', () => {
+  const words = (view: ReturnType<typeof mount>) =>
+    view.findAll('.words > span').map((word) => ({
+      text: word.text(),
+      shown: !word.classes('unseen') && word.attributes('aria-hidden') === undefined,
+    }))
+
+  it('says the action while idle and keeps the word of the work by its width', () => {
+    const view = mount(AppButton, {
+      props: { busyLabel: 'Deleting…' },
+      slots: { default: 'Delete for good' },
+    })
+    expect(words(view)).toEqual([
+      { text: 'Delete for good', shown: true },
+      { text: 'Deleting…', shown: false },
+    ])
+    expect(view.attributes('aria-busy')).toBeUndefined()
+  })
+
+  it('says the work while busy, in place of the action, and stays focusable', async () => {
+    const view = mount(AppButton, {
+      attachTo: document.body,
+      props: { busyLabel: 'Deleting…' },
+      slots: { icon: '<svg></svg>', default: 'Delete for good' },
+    })
+    view.element.focus()
+    await view.setProps({ busy: true })
+    expect(words(view)).toEqual([
+      { text: 'Delete for good', shown: false },
+      { text: 'Deleting…', shown: true },
+    ])
+    expect(view.attributes('aria-busy')).toBe('true')
+    // The glyph stays: the form of the action is kept, it is not «not now».
+    expect(view.find('.glyph').exists()).toBe(true)
+    expect(document.activeElement).toBe(view.element)
+    await view.setProps({ busy: false })
+    expect(words(view).map((word) => word.shown)).toEqual([true, false])
+    view.unmount()
+  })
+
+  it('keeps aria-busy with disabled, so the kit draws the work and not «not now»', () => {
+    const view = mount(AppButton, {
+      props: { busy: true, disabled: true, busyLabel: 'Saving…' },
+      slots: { default: 'Save' },
+    })
+    expect(view.attributes('aria-busy')).toBe('true')
+    expect(words(view)[1]).toEqual({ text: 'Saving…', shown: true })
+  })
+
+  it('names an icon-only button by the word of the work while busy', async () => {
+    const view = mount(AppButton, {
+      props: { variant: 'icon', label: 'Refresh', busyLabel: 'Refreshing…' },
+      slots: { default: '<svg></svg>' },
+    })
+    expect(view.attributes('aria-label')).toBe('Refresh')
+    await view.setProps({ busy: true })
+    expect(view.attributes('aria-label')).toBe('Refreshing…')
+  })
+
+  it('must not fire: a button with no word of work has no second cell', () => {
+    const view = mount(AppButton, { slots: { default: 'Save' } })
+    expect(view.find('.words').exists()).toBe(false)
+    expect(view.text()).toBe('Save')
+  })
+})

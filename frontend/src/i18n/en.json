@@ -1209,6 +1209,8 @@
       "badges": "Badges",
       "icons": "Icons",
       "selection": "Chosen and inactive",
+      "busy": "At work",
+      "busy_switch": "Working",
       "segment_fit": "Unit · by the width of words",
       "segment_inactive": "Unit · not now",
       "switch_off": "Off",
