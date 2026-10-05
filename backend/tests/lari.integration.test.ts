@@ -164,7 +164,7 @@ describe('база держит лари тем же правилом, что д
     }
   }
   const write = (values: Record<string, unknown>) =>
-    db.insert(trips).values({ id: randomUUID(), ...(values as typeof trips.$inferInsert) })
+    db.insert(trips).values({ ...(values as typeof trips.$inferInsert), id: randomUUID() })
 
   it('у пары с лари official — только НБ Грузии, ЦБ РА — только запасной', async () => {
     const lari = await snapshot('GEL')
