@@ -363,7 +363,7 @@ export const actors = pgTable(
  * `name`, carries the index — «moloko» scores 0.000 against «молоко».
  *
  * There is deliberately no unique index on `search_key`: the fork fold of MOL-5 merges
- * genuinely different names on purpose, and merging duplicate entries is a 0.2 question.
+ * genuinely different names on purpose; twins are merged by the night (MOL-106), into `merged_into`.
  */
 export const items = pgTable(
   'items',

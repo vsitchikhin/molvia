@@ -182,6 +182,13 @@ that are easiest to break; the file holds every rule of the area and the reason 
   four letters — measured, and a vector of another model is never read.
 - **The catalogue grows by «Предложить товар» and the seed** (MOL-112): the seed only adds, is
   not a migration, never stays in `_test` or `_e2e`, and holds no brands.
+- **Twins are merged by the night, and a false merge is worse than a missed one** (MOL-106): every
+  size with its unit, one edit a word, two a name, the meaning at 0.90 — measured on the seed; one key
+  in two scripts and a brand's extra word never merge. Places by the same rule, one city each.
+- **A merged item or place stays a trace** (`merged_into`): its name is the survivor's second name,
+  every write by an id goes through `liveItemId` / `livePlaceId`, the search answers the survivor once;
+  one person's two verdicts stay two rows, so the gate does not move. **Production runs
+  `CATALOGUE_MERGE=report` until the owner says `on`** (В-3); `make unmerge ID=` takes a merge back.
 
 ### «Что брать» and verdicts — `.claude/rules/advice.md`
 

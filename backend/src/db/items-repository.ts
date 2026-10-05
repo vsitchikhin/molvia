@@ -44,8 +44,8 @@ export interface ItemRepository {
    *
    * By the name, not by the search key: the key folds on purpose, and a false merge that costs
    * the search a candidate would cost this path the item itself — «Milo» would be answered
-   * with the «Мыло» already there, and could never be added. Merging what is merely similar
-   * is 0.2's.
+   * with the «Мыло» already there, and could never be added. What is merely similar is merged by
+   * the night (MOL-106); a trace's name, typed again, is its survivor.
    *
    * `createdBy` is null for the seed (MOL-112), which goes through here so that running it again
    * doubles nothing and a name someone already proposed stays theirs.

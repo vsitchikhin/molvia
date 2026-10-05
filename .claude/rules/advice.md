@@ -421,7 +421,10 @@ decisions of 02.10.2026 are В-1…В-10 of `requirements/MOL-92.md`.
   reader filters `deleted_at IS NULL`**: the verdict itself, «Что брать», the queue of
   unrated purchases and every aggregate of 0.3. A reader that forgets the filter puts a
   withdrawn opinion back on screen, silently. Rating again brings the same row back and keeps
-  `rated_at`, so withdrawing and re-rating cannot move anyone in the gate.
+  `rated_at`, so withdrawing and re-rating cannot move anyone in the gate. **The merge of twins keeps
+  it so** (MOL-106): one person's two verdicts on twins stay two rows — the one that wins on the
+  survivor, the other withdrawn on the trace — so the gate gains and loses nothing; the rules are in
+  `search.md`, «The merge of twins».
 - **The rating reminder asks about a withdrawn item only for a purchase after the withdrawal**
   (MOL-101, В-3 — the answer MOL-29 left for the bot). The queue of «Оценки» shows every purchase
   without a live verdict, as it did; the bot, which writes to the person unasked, skips a purchase

@@ -57,7 +57,9 @@ The detail behind the privacy lines of `CLAUDE.md`.
   **a dry run is the real run, rolled back**, so its count cannot disagree with what erasure does.
   **A new table that points at `actors` must join erasure** — a test compares every foreign key
   on `actors` with `ACTOR_REFERENCES`, and another scans every table for the erased person's uuid
-  and Telegram id. **Its first lock is the account's, then the person's login requests, and only
+  and Telegram id. The journal of the merge of twins (MOL-106) joined this way: a pick moved names
+  its person, so `catalogue_merge_moves.actor_id` goes with the person by the cascade and the copy
+  leaves the journal out, the pick itself being in it. **Its first lock is the account's, then the person's login requests, and only
   then the owner** (adversarial О-3, П-2): `for update` on an owner who does not exist yet locks
   nothing, and a login collected meanwhile created an owner the transaction had already decided
   was not there — «nobody to erase» over a live account. Collection locks its request row before
