@@ -19,7 +19,7 @@
       v-if="modelValue"
       class="clear"
       type="button"
-      :aria-label="t('advice.search.clear')"
+      :aria-label="t('field.clear')"
       @click="clear"
     >
       <IconCloseCircle aria-hidden="true" />

@@ -411,7 +411,6 @@
     "search": {
       "label": "Search the catalogue",
       "placeholder": "Milk, lavash, cheese…",
-      "clear": "Clear",
       "group_unrated": "Not rated yet",
       "rate": "Rate",
       "empty": {
@@ -1464,6 +1463,7 @@
     }
   },
   "field": {
+    "clear": "Clear",
     "left": "{n} character left | {n} characters left",
     "full": "That's the limit: {max} characters"
   },
