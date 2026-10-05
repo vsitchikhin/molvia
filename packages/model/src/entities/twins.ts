@@ -9,19 +9,24 @@ import { yerevanDate } from '#model/values/rates'
 
 /**
  * Units as a label writes them after a number, each to one name: «1л», «1 л» and «1 l» are one size,
- * «500 г» and «500 гр» too. Keyed by `toSearchKey`, so the scripts fold by themselves. A unit missing
- * here is read as a word after a number — two names that spell the same size two ways then differ by
- * a word and are a candidate, never a merge: the list errs towards the owner's eyes.
+ * «500 г» and «500 гр» too. **By the spelling itself, in lower case — never by `toSearchKey`**: the key
+ * folds on purpose what a size must tell apart — a double letter is one, so «мм» was «м»; a Latin «c»
+ * before «m» is hard, so «км» was «см»; «pc» was `pk`, a pack (adversarial А2: «Лента 50 мм» merged into
+ * «Лента 50 м»). A unit missing here is read as a word after a number — two names that spell the same
+ * size two ways then differ by a word and are a candidate, never a merge: the list errs towards the
+ * owner's eyes. A test holds that no spelling stands for two units.
  */
-const UNITS: Readonly<Record<string, readonly string[]>> = {
+export const TWIN_UNITS: Readonly<Record<string, readonly string[]>> = {
   l: ['л', 'литр', 'литра', 'литров', 'l', 'lt', 'լ'],
   ml: ['мл', 'ml', 'մլ'],
   kg: ['кг', 'kg', 'կգ'],
   g: ['г', 'гр', 'грамм', 'g', 'gr', 'գ', 'գր'],
   mg: ['мг', 'mg'],
   piece: ['шт', 'штук', 'штуки', 'штука', 'pcs', 'pc', 'հատ'],
+  mm: ['мм', 'mm', 'մմ'],
   cm: ['см', 'cm', 'սմ'],
-  m: ['м', 'm'],
+  m: ['м', 'm', 'մ'],
+  km: ['км', 'km', 'կմ'],
   pack: ['уп', 'упак', 'пак', 'pack', 'pk', 'տուփ'],
   roll: ['рулон', 'рулона', 'рулонов'],
   bag: ['пакетик', 'пакетика', 'пакетиков'],
@@ -31,8 +36,8 @@ const UNITS: Readonly<Record<string, readonly string[]>> = {
 }
 
 const UNIT_OF: ReadonlyMap<string, string> = new Map(
-  Object.entries(UNITS).flatMap(([unit, spellings]) =>
-    spellings.map((spelling) => [toSearchKey(spelling), unit] as const),
+  Object.entries(TWIN_UNITS).flatMap(([unit, spellings]) =>
+    spellings.map((spelling) => [spelling, unit] as const),
   ),
 )
 
@@ -59,6 +64,19 @@ export interface NameParts {
   readonly sizes: readonly string[]
   /** The words with every size taken out, as `toSearchKey` spells them. */
   readonly words: readonly string[]
+  /** The scripts the name's letters are written in, sorted: `cyrillic`, `latin latin`… once each. */
+  readonly scripts: readonly string[]
+}
+
+const SCRIPTS: readonly (readonly [string, RegExp])[] = [
+  ['armenian', /\p{Script=Armenian}/u],
+  ['cyrillic', /\p{Script=Cyrillic}/u],
+  ['georgian', /\p{Script=Georgian}/u],
+  ['latin', /\p{Script=Latin}/u],
+]
+
+function scriptsOf(name: string): string[] {
+  return SCRIPTS.filter(([, letter]) => letter.test(name)).map(([script]) => script)
 }
 
 export function nameParts(name: string): NameParts {
@@ -71,7 +89,7 @@ export function nameParts(name: string): NameParts {
         sizes.push(`${number} %`)
         return ' '
       }
-      const unit = after === undefined ? undefined : UNIT_OF.get(toSearchKey(after))
+      const unit = after === undefined ? undefined : UNIT_OF.get(after.toLowerCase())
       if (unit !== undefined) {
         sizes.push(`${number} ${unit}`)
         return ' '
@@ -84,6 +102,8 @@ export function nameParts(name: string): NameParts {
   return {
     sizes: sizes.sort(),
     words: key === '' ? [] : key.split(' ').filter((word) => !/^\d+$/u.test(word)),
+    // Of the words: a unit after a number, «1 l», is no script of the name.
+    scripts: scriptsOf(rest),
   }
 }
 
@@ -98,6 +118,12 @@ export interface Spelling {
   readonly edits: number
   /** Edits in the word that needs the most. */
   readonly worst: number
+  /**
+   * Whether the two are written in the same scripts. One key in two scripts is never merged, whatever
+   * the model says: it reads a transliteration by its letters, and «Bulochki dlya burgerov» stood at
+   * 0.902 to «Булочки для бургеров» where «Milo» stands at 0.48 to «Мыло» (review №6).
+   */
+  readonly sameScripts: boolean
 }
 
 /**
@@ -121,7 +147,7 @@ export function twinSpelling(a: NameParts, b: NameParts): Spelling | null {
 
   // The cheapest one-to-one matching: for the first i words of `a`, which words of `b` they took.
   const full = (1 << n) - 1
-  const best = new Map<number, Spelling>([[0, { edits: 0, worst: 0 }]])
+  const best = new Map<number, { edits: number; worst: number }>([[0, { edits: 0, worst: 0 }]])
   for (let mask = 0; mask < full; mask++) {
     const here = best.get(mask)
     if (here === undefined) continue
@@ -141,7 +167,11 @@ export function twinSpelling(a: NameParts, b: NameParts): Spelling | null {
       }
     }
   }
-  return best.get(full) ?? null
+  const found = best.get(full)
+  if (found === undefined) return null
+  const sameScripts =
+    a.scripts.length === b.scripts.length && a.scripts.every((script, i) => script === b.scripts[i])
+  return { ...found, sameScripts }
 }
 
 function bitCount(mask: number): number {
@@ -179,6 +209,7 @@ export function twinVerdict({ spelling, sameUnit, meaning }: TwinPair): TwinVerd
   if (spelling === null || spelling.worst > TWIN_CANDIDATE.worst) return 'apart'
   if (
     sameUnit &&
+    spelling.sameScripts &&
     meaning !== null &&
     spelling.worst <= TWIN_MERGE.worst &&
     spelling.edits <= TWIN_MERGE.edits &&

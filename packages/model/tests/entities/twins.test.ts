@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   TWIN_MERGE,
+  TWIN_UNITS,
   mergeClock,
   nameParts,
   sameSizes,
@@ -25,8 +26,16 @@ describe('nameParts', () => {
   })
 
   it('keeps a number with no unit as a size, and the word after it as a word', () => {
-    expect(nameParts('Яйца С0 10 шт')).toEqual({ sizes: ['0', '10 piece'], words: ['iaiцa', 's'] })
-    expect(nameParts('Сыр 2 вида')).toEqual({ sizes: ['2'], words: ['sir', 'vida'] })
+    expect(nameParts('Яйца С0 10 шт')).toEqual({
+      sizes: ['0', '10 piece'],
+      words: ['iaiцa', 's'],
+      scripts: ['cyrillic'],
+    })
+    expect(nameParts('Сыр 2 вида')).toEqual({
+      sizes: ['2'],
+      words: ['sir', 'vida'],
+      scripts: ['cyrillic'],
+    })
   })
 
   it('sorts the sizes, so the order of a label does not matter', () => {
@@ -55,19 +64,31 @@ describe('sameSizes', () => {
 
 describe('twinSpelling', () => {
   it('is no distance at all for a fat written with a comma and a point', () => {
-    expect(spelling('Молоко 3.2%', 'Молоко 3,2%')).toEqual({ edits: 0, worst: 0 })
+    expect(spelling('Молоко 3.2%', 'Молоко 3,2%')).toEqual({
+      edits: 0,
+      worst: 0,
+      sameScripts: true,
+    })
   })
 
   it('counts a typo in a word', () => {
-    expect(spelling('Малоко 3,2%', 'Молоко 3,2 %')).toEqual({ edits: 1, worst: 1 })
+    expect(spelling('Малоко 3,2%', 'Молоко 3,2 %')).toEqual({
+      edits: 1,
+      worst: 1,
+      sameScripts: true,
+    })
   })
 
   it('matches words in any order', () => {
-    expect(spelling('Сыр чанах', 'Чанах сыр')).toEqual({ edits: 0, worst: 0 })
+    expect(spelling('Сыр чанах', 'Чанах сыр')).toEqual({ edits: 0, worst: 0, sameScripts: true })
   })
 
   it('counts every word of a transliteration', () => {
-    expect(spelling('Ереван Сити', 'Yerevan City')).toEqual({ edits: 2, worst: 1 })
+    expect(spelling('Ереван Сити', 'Yerevan City')).toEqual({
+      edits: 2,
+      worst: 1,
+      sameScripts: false,
+    })
   })
 
   it('is no pair with another size', () => {
@@ -86,8 +107,8 @@ describe('twinSpelling', () => {
   })
 
   it('is no distance for one key in two scripts: the spelling cannot tell «Milo» from «Мыло»', () => {
-    // The meaning tells them apart; the spelling is half of the rule, never the whole.
-    expect(spelling('Milo', 'Мыло')).toEqual({ edits: 0, worst: 0 })
+    // The spelling sees one key, and says the scripts differ: never a merge, at most a candidate.
+    expect(spelling('Milo', 'Мыло')).toEqual({ edits: 0, worst: 0, sameScripts: false })
   })
 
   it('is no pair for names of sizes alone', () => {
@@ -143,5 +164,57 @@ describe('mergeClock', () => {
     ['2026-10-06T20:00:00Z', '2026-10-07', false, false],
   ])('at %s it is the night of %s: merge %s, report %s', (at, day, merge, report) => {
     expect(mergeClock(new Date(at))).toEqual({ day, merge, report })
+  })
+})
+
+describe('the units of a size (adversarial А2)', () => {
+  it('reads no spelling as two units', () => {
+    const spellings = Object.values(TWIN_UNITS).flat()
+    expect(new Set(spellings).size).toBe(spellings.length)
+  })
+
+  it.each([
+    ['Лента 50 мм', 'Лента 50 м'],
+    ['Труба 20 mm', 'Труба 20 m'],
+    ['Кабель 5 км', 'Кабель 5 см'],
+    ['Кабель 5 km', 'Кабель 5 cm'],
+    ['Батарейки AA 4 pc', 'Батарейки AA 4 уп'],
+    ['Салфетки 100 pc', 'Салфетки 100 pk'],
+  ])('tells «%s» from «%s», which the search key folds into one', (a, b) => {
+    expect(sameSizes(nameParts(a), nameParts(b))).toBe(false)
+    expect(twinVerdict({ spelling: spelling(a, b), sameUnit: true, meaning: 0.99 })).toBe('apart')
+  })
+
+  it('reads a unit in any case, and its spellings as one', () => {
+    expect(nameParts('Лента 50 ММ').sizes).toEqual(nameParts('Лента 50 mm').sizes)
+    expect(nameParts('Яйца 10 pc').sizes).toEqual(nameParts('Яйца 10 шт').sizes)
+  })
+})
+
+describe('one key in two scripts (review №6)', () => {
+  it.each([
+    ['Булочки для бургеров', 'Bulochki dlya burgerov', 0.902],
+    ['Ткемали', 'Tkemali', 0.891],
+    ['Зовк', 'Զովք', 0.99],
+    ['Сметана', 'Сметанa', 0.99],
+  ])('never merges «%s» and «%s», whatever the model says (%s)', (a, b, meaning) => {
+    expect(twinVerdict({ spelling: spelling(a, b), sameUnit: true, meaning })).toBe('candidate')
+  })
+
+  it('reads a unit after a number as no script of the name', () => {
+    expect(nameParts('Молоко 1 l').scripts).toEqual(['cyrillic'])
+    expect(
+      twinVerdict({
+        spelling: spelling('Молоко 1 l', 'Молоко 1 л'),
+        sameUnit: true,
+        meaning: 0.99,
+      }),
+    ).toBe('merge')
+  })
+
+  it('still merges «ё» and a comma, one script on both sides', () => {
+    expect(twinVerdict({ spelling: spelling('Мёд', 'Мед'), sameUnit: true, meaning: 0.95 })).toBe(
+      'merge',
+    )
   })
 })
