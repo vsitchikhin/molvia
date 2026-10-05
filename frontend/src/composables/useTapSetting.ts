@@ -23,6 +23,19 @@ function refusedInWords(error: unknown): boolean {
   return error.status === undefined || error.status < 200 || error.status >= 300
 }
 
+/**
+ * Changes still unsure, by owner and setting, for the page's life (round 8, Р8-А1): the screen that
+ * said «проверяем» may be left — a tab tapped — and the one drawn on the way back takes the last
+ * choice from here, so its first read is that check and says how it ended. In memory only: nothing
+ * of it is kept on the phone, and a reload reads the server afresh — a named price.
+ */
+const unsureChoices = new Map<string, { readonly choice: unknown }>()
+
+/** A fresh page, as a reload makes one: for the tests, which share one module between them. */
+export function forgetUnsureChanges(): void {
+  unsureChoices.clear()
+}
+
 export interface TapSettingState<T> {
   /** The server's answer; undefined while it is not known yet. */
   readonly value: Ref<T | undefined>
@@ -46,13 +59,15 @@ export interface TapSettingState<T> {
  * A setting of the person's own saved on the tap, beside the settings form and never under its
  * «Сохранить» (MOL-134, В-5; MOL-103, Р-1). Nothing is kept on the phone: without a connection the
  * control waits, and what it shows is always what the server answered. `read` and `write` are the
- * two calls of its own address.
+ * two calls of its own address; `name` tells its unsure change from another setting's.
  */
 export function useTapSetting<T>(
+  name: string,
   read: () => Promise<T>,
   write: (next: T) => Promise<T>,
 ): TapSettingState<T> {
   const actor = useActorStore()
+  const memory = (): string | undefined => (actor.id ? `${actor.id}:${name}` : undefined)
   const value = ref<T | undefined>(undefined) as Ref<T | undefined>
   const failure = ref<'offline' | 'error' | null>(null)
   const online = ref(navigator.onLine)
@@ -74,6 +89,8 @@ export function useTapSetting<T>(
   let checkIn = TAP_CHECK_FIRST_MS
 
   function settle(): void {
+    const key = memory()
+    if (key) unsureChoices.delete(key)
     unsure.value = false
     clearTimeout(check)
     checkIn = TAP_CHECK_FIRST_MS
@@ -89,6 +106,12 @@ export function useTapSetting<T>(
 
   async function load(): Promise<void> {
     if (!actor.id || saving.value) return
+    // A change left unsure on a screen since gone: this read is its check.
+    const kept = unsure.value ? undefined : unsureChoices.get(memory() ?? '')
+    if (kept) {
+      lastChoice = kept as { readonly choice: T }
+      unsure.value = true
+    }
     const mine = ++latest
     try {
       const answer = await read()
@@ -108,8 +131,9 @@ export function useTapSetting<T>(
       online.value = navigator.onLine
       // A read after a change is a check, not the screen's loading (round 2, №5 and Р2-А2): the
       // setting was read, only whether the change landed is not known, and a screen whose state is
-      // its read — «Бот» — must not go to its error for it.
-      if (unsure.value) checkLater()
+      // its read — «Бот» — must not go to its error for it. A screen drawn anew has read nothing
+      // yet: its first read failing is its own failure, and the change stays unsure for the next.
+      if (unsure.value && value.value !== undefined) checkLater()
       else failure.value = online.value ? 'error' : 'offline'
     }
   }
@@ -135,6 +159,8 @@ export function useTapSetting<T>(
       // `2xx` of any shape, whole and off the contract or cut off on its way (Р4-А1), may well have
       // landed. One unsure change is not made sure by a refusal of the next: it is still checked.
       unsure.value = unsure.value || !refusedInWords(error)
+      const key = memory()
+      if (key && unsure.value) unsureChoices.set(key, { choice: next })
       // Offline or failed is decided after the failure (MOL-19, A1): a connection that dropped while
       // the answer was on its way is the grey «без связи», never the red «не сохранилось» (self-review 7).
       online.value = navigator.onLine

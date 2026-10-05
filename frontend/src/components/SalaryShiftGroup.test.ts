@@ -9,6 +9,7 @@ import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { useActorStore } from '@/stores/actor'
 import SalaryShiftGroup from './SalaryShiftGroup.vue'
+import { forgetUnsureChanges } from '@/composables/useTapSetting'
 
 const read = vi.fn<() => Promise<SalaryShift>>()
 const choose = vi.fn<(day: number | null) => Promise<SalaryShift>>()
@@ -35,6 +36,7 @@ function switchOf(view: VueWrapper) {
 }
 
 beforeEach(() => {
+  forgetUnsureChanges()
   vi.restoreAllMocks()
   read.mockReset()
   choose.mockReset()

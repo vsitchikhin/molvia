@@ -12,7 +12,7 @@ import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
-import { TAP_CHECK_FIRST_MS } from '@/composables/useTapSetting'
+import { TAP_CHECK_FIRST_MS, forgetUnsureChanges } from '@/composables/useTapSetting'
 import { useActorStore } from '@/stores/actor'
 
 const exportMine =
@@ -87,6 +87,7 @@ function pointer(coarse: boolean): void {
 }
 
 beforeEach(() => {
+  forgetUnsureChanges()
   vi.restoreAllMocks()
   exportMine.mockReset().mockResolvedValue(ANSWER)
   readAnalytics.mockReset().mockResolvedValue({ off: false })
@@ -556,6 +557,25 @@ describe('«Count me in the statistics» (MOL-96)', () => {
     await flushPromises()
     await new Promise((resolve) => setTimeout(resolve, 150))
     expect(said.filter((text) => text === en.settings.tap.unsure)).toHaveLength(1)
+  })
+
+  it('«we do not know», then a tab and back: the screen says how the check ended (round 8, Р8-А1)', async () => {
+    const view = await render()
+    chooseAnalytics.mockImplementation(() => {
+      readAnalytics.mockRejectedValue(new TypeError('connection reset'))
+      return Promise.reject(new TypeError('connection reset'))
+    })
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(view.text()).toContain(en.settings.tap.unsure)
+    views.splice(views.indexOf(view), 1)
+    view.unmount()
+
+    // The objection never landed: the server still counts the person.
+    readAnalytics.mockResolvedValue({ off: false })
+    const back = await render()
+    expect(counted(back).element.checked).toBe(true)
+    expect(back.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
   })
 
   it('«Try again» beside «we do not know» checks at once, and a change that did not land says so', async () => {

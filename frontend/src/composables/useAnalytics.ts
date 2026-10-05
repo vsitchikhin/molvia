@@ -20,6 +20,7 @@ export interface AnalyticsState extends Omit<
  */
 export function useAnalytics(): AnalyticsState {
   const tap = useTapSetting<AnalyticsSetting>(
+    'analytics',
     async () => api.analyticsSetting(),
     async (next) => api.chooseAnalytics(!next.off),
   )

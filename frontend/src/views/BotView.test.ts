@@ -12,6 +12,7 @@ import en from '@/i18n/en.json'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import BotView from './BotView.vue'
+import { forgetUnsureChanges } from '@/composables/useTapSetting'
 
 const readReminders = vi.fn<() => Promise<RemindersSetting>>()
 const chooseReminders = vi.fn<(on: boolean) => Promise<RemindersSetting>>()
@@ -58,6 +59,7 @@ function describedBy(view: VueWrapper, control: ReturnType<typeof switchOf>): st
 }
 
 beforeEach(() => {
+  forgetUnsureChanges()
   vi.restoreAllMocks()
   for (const fake of [readReminders, chooseReminders, readNotices, chooseNotices]) fake.mockReset()
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)

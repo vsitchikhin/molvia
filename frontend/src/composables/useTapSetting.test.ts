@@ -5,7 +5,12 @@ import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import { defineComponent, h } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { TAP_CHECK_FIRST_MS, TAP_CHECK_LAST_MS, useTapSetting } from './useTapSetting'
+import {
+  TAP_CHECK_FIRST_MS,
+  TAP_CHECK_LAST_MS,
+  forgetUnsureChanges,
+  useTapSetting,
+} from './useTapSetting'
 import type { TapSettingState } from './useTapSetting'
 import { useActorStore } from '@/stores/actor'
 
@@ -32,7 +37,7 @@ async function mounted(): Promise<TapSettingState<Setting>> {
     mount(
       defineComponent({
         setup() {
-          state = useTapSetting(read, write)
+          state = useTapSetting('setting', read, write)
           return () => h('div')
         },
       }),
@@ -52,6 +57,7 @@ function landsWithoutAnswer(): void {
 }
 
 beforeEach(() => {
+  forgetUnsureChanges()
   vi.useFakeTimers()
   server = { off: false }
   online = true
@@ -148,6 +154,40 @@ describe('useTapSetting: a change whose answer was lost', () => {
     expect(tap.unsure.value).toBe(false)
     expect(tap.value.value).toEqual({ off: false })
     expect(tap.saveFailed.value).toBe(true)
+  })
+
+  it('a screen left while unsure: the one drawn on the way back checks with its first read (round 8, Р8-А1)', async () => {
+    const tap = await mounted()
+    write.mockRejectedValue(new TypeError('connection reset'))
+    read.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(true)
+    // A tab tapped: the screen goes, and its clock with it.
+    for (const view of views.splice(0)) view.unmount()
+
+    read.mockImplementation(() => Promise.resolve(server))
+    const back = await mounted()
+    expect(back.value.value).toEqual({ off: false })
+    expect(back.unsure.value).toBe(false)
+    expect(back.saveFailed.value).toBe(true)
+
+    // Answered, it is forgotten: the screen drawn after that reads as any other.
+    for (const view of views.splice(0)) view.unmount()
+    const again = await mounted()
+    expect(again.saveFailed.value).toBe(false)
+  })
+
+  it('a screen drawn anew whose first read fails: its own failure, and the change stays unsure', async () => {
+    const tap = await mounted()
+    write.mockRejectedValue(new TypeError('connection reset'))
+    read.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true })
+    for (const view of views.splice(0)) view.unmount()
+
+    const back = await mounted()
+    expect(back.value.value).toBeUndefined()
+    expect(back.failure.value).toBe('error')
+    expect(back.unsure.value).toBe(true)
   })
 
   it('a refusal in the API’s own words is «not saved» at once: no check, no clock (round 3, №6)', async () => {
