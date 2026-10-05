@@ -51,6 +51,7 @@ function chocolate(): ReviewLine {
     skip: false,
     edited: false,
     ownFigures: false,
+    changed: { item: false, figures: false },
   }
 }
 
