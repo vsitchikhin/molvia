@@ -1,6 +1,8 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { ApiError } from '@molvia/client'
+import { ERROR } from '@molvia/model'
 import { defineComponent, h } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TAP_CHECK_FIRST_MS, TAP_CHECK_LAST_MS, useTapSetting } from './useTapSetting'
@@ -124,6 +126,35 @@ describe('useTapSetting: a change whose answer was lost', () => {
     await flushPromises()
     expect(tap.unsure.value).toBe(false)
     expect(tap.value.value).toEqual({ off: true })
+  })
+
+  it('a refusal in the API’s own words is «not saved» at once: no check, no clock (round 3, №6)', async () => {
+    const tap = await mounted()
+    const reads = read.mock.calls.length
+    write.mockRejectedValue(new ApiError(ERROR.CONFLICT, '', true, 409, { fromApi: true }))
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.saveFailed.value).toBe(true)
+    expect(read.mock.calls.length).toBe(reads)
+    await vi.advanceTimersByTimeAsync(3 * TAP_CHECK_LAST_MS)
+    expect(read.mock.calls.length).toBe(reads)
+  })
+
+  it.each([
+    ['no answer at all', new TypeError('Failed to fetch')],
+    ['a status with no word of the API', new ApiError(ERROR.INTERNAL, '', false, 502)],
+    ['a proxy’s page, not the API', new ApiError(ERROR.INTERNAL, '', true, 502)],
+    [
+      'an answer of the API the contract could not read',
+      new ApiError(ERROR.INTERNAL, '', true, 200, { fromApi: true, offContract: true }),
+    ],
+  ])('%s is unsure: the change may have landed', async (_, failure) => {
+    read.mockRejectedValue(new TypeError('connection reset'))
+    read.mockResolvedValueOnce(server)
+    const tap = await mounted()
+    write.mockRejectedValue(failure)
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(true)
   })
 
   it('a change that did not land stays «not saved» once a check says so', async () => {

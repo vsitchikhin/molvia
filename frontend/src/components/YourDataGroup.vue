@@ -22,9 +22,10 @@
             >
           </span>
           <!-- Only an answer is drawn (adversarial А1): «not known yet» drawn off read as an
-               objection nobody made — nor a change whose answer was lost (round 2, Р2-А1). The place is held, so the words do not move when it comes;
-               it is not faded in — an answer read is not played (MOL-151). -->
-          <span class="switch-slot">
+               objection nobody made — nor a change whose answer was lost (round 2, Р2-А1). The
+               place is held, so the words do not move when it comes; it is not faded in — an
+               answer read is not played (MOL-151). -->
+          <span ref="switchSlot" class="switch-slot">
             <AppSwitch
               v-if="analytics.off.value !== undefined && !analytics.unsure.value"
               :id="`${id}-analytics-switch`"
@@ -39,25 +40,40 @@
             />
           </span>
         </div>
-        <div v-if="analytics.online.value && analytics.unsure.value" class="failed" role="alert">
-          <IconAlert aria-hidden="true" />
-          <span>{{ t('settings.tap.unsure') }}</span>
-          <AppButton variant="ghost" @click="analytics.retry">{{ t('state.retry') }}</AppButton>
+        <!-- Not an error, a wait (round 3, №7): quiet, and its words through the app's one live
+             region. It takes the focus of the switch that went, and gives it back (Р3-А2). -->
+        <div
+          v-if="analytics.unsure.value"
+          ref="unsureLine"
+          class="quiet"
+          tabindex="-1"
+          :aria-describedby="`${id}-analytics`"
+        >
+          <span class="said"
+            ><IconCloud aria-hidden="true" /><span>{{ t('settings.tap.unsure') }}</span></span
+          >
+          <AppButton v-if="analytics.online.value" variant="ghost" @click="analytics.retry">{{
+            t('state.retry')
+          }}</AppButton>
         </div>
-        <!-- The words in a box of their own, or wrapped as a whole under the icon (Р2-А3). -->
+        <!-- The icon and the words are one box: beside each other, the button under them once
+             the line is full (Р2-А3, Р3-А4). -->
         <p
           v-else-if="analytics.online.value && analytics.saveFailed.value"
           class="failed"
           role="alert"
         >
-          <IconAlert aria-hidden="true" /><span>{{ t('settings.tap.save_failed') }}</span>
+          <span class="said"
+            ><IconAlert aria-hidden="true" /><span>{{ t('settings.tap.save_failed') }}</span></span
+          >
         </p>
         <div
           v-else-if="analytics.online.value && analytics.failure.value === 'error'"
           class="failed"
         >
-          <IconAlert aria-hidden="true" />
-          <span>{{ t('settings.tap.load_error') }}</span>
+          <span class="said"
+            ><IconAlert aria-hidden="true" /><span>{{ t('settings.tap.load_error') }}</span></span
+          >
           <AppButton variant="ghost" @click="analytics.retry">{{ t('state.retry') }}</AppButton>
         </div>
       </li>
@@ -210,6 +226,44 @@ export default defineComponent({
       if (!open) signOut.stay()
     })
     const analytics = useAnalytics()
+    const switchSlot = ref<HTMLElement | null>(null)
+    const unsureLine = ref<HTMLElement | null>(null)
+    // The switch goes while a change is unsure, and the focus a tap left on it would fall to the
+    // page (round 3, Р3-А2): it waits on the line that says why, and goes back to the switch.
+    let heldFocus = false
+    let withdrawUnsure: (() => void) | undefined
+    // Read at the turn itself, while the switch is still on the page: a check that answers at once
+    // turns it back before any render, and a watcher run at the render would see neither turn.
+    watch(
+      () => analytics.unsure.value,
+      (unsure) => {
+        withdrawUnsure?.()
+        withdrawUnsure = undefined
+        if (!unsure) return
+        heldFocus = !!switchSlot.value?.contains(document.activeElement)
+        withdrawUnsure = announce?.(t('settings.tap.unsure'))
+      },
+      { flush: 'sync' },
+    )
+    // Acted on once the page is drawn: the line is there to take the focus, the switch to get it back.
+    watch(
+      () => analytics.unsure.value,
+      (unsure) => {
+        if (!heldFocus) return
+        if (unsure) {
+          unsureLine.value?.focus({ preventScroll: true })
+          return
+        }
+        heldFocus = false
+        // Only a focus left with nowhere to be — on the page, or on what has just left it; one the
+        // person moved meanwhile stays where it is.
+        const active = document.activeElement
+        if (active === null || active === document.body || !active.isConnected)
+          switchSlot.value?.querySelector('input')?.focus({ preventScroll: true })
+      },
+      { flush: 'post' },
+    )
+    onUnmounted(() => withdrawUnsure?.())
     return {
       t,
       id: useId(),
@@ -220,6 +274,8 @@ export default defineComponent({
       signOut,
       eraseOpen,
       analytics,
+      switchSlot,
+      unsureLine,
     }
   },
 })
@@ -327,12 +383,20 @@ export default defineComponent({
 
 .failed {
   color: var(--bad-ink);
+}
 
-  // Beside the icon, wrapping in its own box; the button goes under it when the line is full.
-  > span {
-    flex: 1 1 0;
-    min-width: 0;
-  }
+// An icon and its words as one item of the line: the words wrap beside the icon, and a button after
+// them goes under once the line is full — by the words' own width, not a basis of nothing (Р3-А4).
+.said {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.quiet:focus-visible {
+  @include focus-ring;
 }
 
 .quiet {

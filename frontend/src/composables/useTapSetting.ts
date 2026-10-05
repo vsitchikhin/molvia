@@ -1,5 +1,6 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Ref } from 'vue'
+import { ApiError } from '@molvia/client'
 import { useReconnect } from '@/composables/useReconnect'
 import { useActorStore } from '@/stores/actor'
 import { reportFailure } from '@/failures'
@@ -108,10 +109,18 @@ export function useTapSetting<T>(
     try {
       value.value = await write(next)
       settle()
-    } catch {
+    } catch (error) {
       value.value = shown
       before = shown
-      unsure.value = true
+      // Unsure only where the API said nothing (round 3, №6, Р3-А1): a refusal in its own words — a
+      // 409, a 500 its handler wrote — rolled the change back, and «not saved» is the truth. A reply
+      // the contract could not read is a `2xx` that may well have landed.
+      unsure.value = !(
+        error instanceof ApiError &&
+        error.answered &&
+        error.fromApi &&
+        !error.offContract
+      )
       // Offline or failed is decided after the failure (MOL-19, A1): a connection that dropped while
       // the answer was on its way is the grey «без связи», never the red «не сохранилось» (self-review 7).
       online.value = navigator.onLine
@@ -121,6 +130,7 @@ export function useTapSetting<T>(
     }
     // Asked at once while there is a connection; without one, when it comes back (below).
     if (unsure.value && online.value) await load()
+    else if (!unsure.value) settle()
   }
 
   const offline = (): void => {

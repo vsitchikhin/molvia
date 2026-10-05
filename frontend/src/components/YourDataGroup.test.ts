@@ -472,7 +472,9 @@ describe('«Count me in the statistics» (MOL-96)', () => {
       await counted(view).setValue(true)
       await flushPromises()
       expect(view.find('input[role="switch"]').exists()).toBe(false)
-      expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.unsure)
+      // A wait, not an error: quiet, never an alert (round 3, №7).
+      expect(view.get('.quiet').text()).toContain(en.settings.tap.unsure)
+      expect(view.find('[role="alert"]').exists()).toBe(false)
       expect(view.text()).not.toContain(en.settings.tap.save_failed)
       expect(view.text()).not.toContain(en.settings.tap.load_error)
       expect(readAnalytics).toHaveBeenCalledTimes(2)
@@ -487,6 +489,42 @@ describe('«Count me in the statistics» (MOL-96)', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('a refusal in the API’s own words is «not saved» at once, no «we do not know» (round 3, №6)', async () => {
+    const view = await render()
+    chooseAnalytics.mockRejectedValue(
+      new ApiError(ERROR.INTERNAL, '', true, 500, { fromApi: true }),
+    )
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(readAnalytics).toHaveBeenCalledTimes(1)
+    expect(counted(view).element.checked).toBe(true)
+    expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
+    expect(view.text()).not.toContain(en.settings.tap.unsure)
+  })
+
+  it('the focus a tap left on the switch waits on «we do not know» and goes back to it (Р3-А2)', async () => {
+    const view = await render()
+    let check: (answer: AnalyticsSetting) => void = () => undefined
+    chooseAnalytics.mockImplementation(() => {
+      readAnalytics.mockReturnValue(
+        new Promise((resolve) => {
+          check = resolve
+        }),
+      )
+      return Promise.reject(new TypeError('connection reset'))
+    })
+    counted(view).element.focus()
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(view.find('input[role="switch"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(view.get('.quiet').element)
+
+    check({ off: true })
+    await flushPromises()
+    expect(document.activeElement).toBe(counted(view).element)
+    expect(counted(view).element.checked).toBe(false)
   })
 
   it('«Try again» beside «we do not know» checks at once, and a change that did not land says so', async () => {

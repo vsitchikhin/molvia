@@ -91,34 +91,36 @@ personal data.
 данные», 5.1), so they are on for everyone and the person may object — «Учитывать меня в
 статистике», the first row of «Ваши данные», saved on the tap at `PUT /actors/me/analytics` with no
 sheet (В-3), as the bot's switches are. **The switch is drawn only as the server's answer**
-(adversarial А1, Р2-А1): not before the read, and not after a change whose answer was lost — the
-change may have landed, so «не знаем, сохранилось ли» stands in its place until a read says, checked
+(adversarial А1, Р2-А1): not before the read, and not after a change the API gave no word on — no
+answer, a proxy's page, an answer the contract could not read: the change may have landed, so a
+quiet «не знаем, сохранилось ли» stands in its place and takes its focus until a read says, checked
 at once and then by `useTapSetting` every 5 s doubling to a minute, the consent's rhythm (MOL-95); a
-failed check is never the screen's error. **Off erases every row of the person's log at once**
-(В-1), every type, in the transaction that marks the objection (`actors.analytics_off_at`) — the
-second written exception to append-only: the gates stop counting them, so the rows have no reader
-left, and an objection to a legitimate interest takes what it gathered (GDPR, the bar of section 2,
-art. 17(1)(c)). **The writer reads the objection after the lock**: the switch takes the log's own
-advisory lock, so a visit being written either lands first and goes with the erasure, or waits and
-finds the objection; a person who is not there still fails on the foreign key, as before. **Out of
-both halves, never the numerator alone**: ten people, three back, two object — one of them back —
-reads 2 of 10 if only the rows go, a gate pulled towards «stop» by objections rather than the
-hypothesis; 2 of 8 with «opted out 2» is the truth. **Gate 0.2 too** (В-2): «счётчики ворот» are the
-same legitimate interest, so a count over verdicts is analytics as much as the log; there the
-objection is read as it stands now — the verdicts are not erased, so back on, the person counts
-again. **Gate 0.3 counts someone back on only if they were back before their fourth week began**
-(`actors.analytics_on_at` at or before `created_at + 504 h`, Р-3): off later, that week's rows were
-erased; back later, part of it was never written — counted, they would read as not having come back.
-Two moments are kept: since when the person objects now — gone once they are back on — and when they
-last came back; a repeat moves neither. No history of objections is kept (review 1, adversarial А3):
-nothing reads it, and Р-3 needs only the last return. **The order of the lines is time, access, the
-objection**: waiting stays waiting — they may still be back before week four — and without access
-stays without access, so «opted out» says exactly how many the cohort lost to objections; `appeared
-= waiting + without access + opted out + cohort`. **What has no person behind it is not touched**
-(Р-4): `login_days`, `reminder_days`, `erasures`, `failures` keep no id, and there is nobody to
-leave out. The bot has no command for it (Р-6). The copy of one's data carries both moments (version
-14), erasure takes them with the row, and `/privacy` says it under «Отметки о визитах» — a new
-revision, not a new edition (Р-5): a right was added, not data, a recipient or a purpose.
+failed check is never the screen's error. A refusal in the API's own words is «не сохранилось» at
+once (round 3, №6). **Off erases every row of the person's log at once** (В-1), every type, in the
+transaction that marks the objection (`actors.analytics_off_at`) — the second written exception to
+append-only: the gates stop counting them, so the rows have no reader left, and an objection to a
+legitimate interest takes what it gathered (GDPR, the bar of section 2, art. 17(1)(c)). **The writer
+reads the objection after the lock**: the switch takes the log's own advisory lock, so a visit being
+written either lands first and goes with the erasure, or waits and finds the objection; a person who
+is not there still fails on the foreign key, as before. **Out of both halves, never the numerator
+alone**: ten people, three back, two object — one of them back — reads 2 of 10 if only the rows go,
+a gate pulled towards «stop» by objections rather than the hypothesis; 2 of 8 with «opted out 2» is
+the truth. **Gate 0.2 too** (В-2): «счётчики ворот» are the same legitimate interest, so a count
+over verdicts is analytics as much as the log; there the objection is read as it stands now — the
+verdicts are not erased, so back on, the person counts again. **Gate 0.3 counts someone back on only
+if they were back before their fourth week began** (`actors.analytics_on_at` at or before
+`created_at + 504 h`, Р-3): off later, that week's rows were erased; back later, part of it was
+never written — counted, they would read as not having come back. Two moments are kept: since when
+the person objects now — gone once they are back on — and when they last came back; a repeat moves
+neither. No history of objections is kept (review 1, adversarial А3): nothing reads it, and Р-3
+needs only the last return. **The order of the lines is time, access, the objection**: waiting stays
+waiting — they may still be back before week four — and without access stays without access, so
+«opted out» says exactly how many the cohort lost to objections; `appeared = waiting + without
+access + opted out + cohort`. **What has no person behind it is not touched** (Р-4): `login_days`,
+`reminder_days`, `erasures`, `failures` keep no id, and there is nobody to leave out. The bot has no
+command for it (Р-6). The copy of one's data carries both moments (version 14), erasure takes them
+with the row, and `/privacy` says it under «Отметки о визитах» — a new revision, not a new edition
+(Р-5): a right was added, not data, a recipient or a purpose.
 
 **The 0.2 gate is `VerdictRepository.reachedRatings` (MOL-49):** of those who appeared in a
 window, how many have `GATE_RATINGS` rows in `verdicts` within `GATE_RATINGS_WINDOW_HOURS` of
