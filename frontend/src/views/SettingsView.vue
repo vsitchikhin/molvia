@@ -466,14 +466,19 @@ export default defineComponent({
   background: var(--surface);
 }
 
-.skeleton-field,
-.skeleton-label {
+/* A field of the form, empty: its well and its edge, which `surface-2` alone on a card is not seen by
+   (1.1:1, Ф-13). */
+.skeleton-field {
+  box-sizing: border-box;
   height: var(--touch-target);
+  border: var(--hairline) solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--surface-2);
 }
 
 .skeleton-label {
+  @include skeleton-bar;
+
   width: 38%;
   height: var(--skeleton-line);
 }

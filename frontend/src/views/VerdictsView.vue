@@ -234,10 +234,11 @@ export default defineComponent({
 }
 
 .key {
+  @include skeleton-bar;
+
   flex: 1;
   height: var(--rating-key);
   border-radius: var(--radius);
-  background: var(--surface-2);
 }
 
 .notice {

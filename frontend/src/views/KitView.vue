@@ -365,7 +365,7 @@
       <AppCard as="ul" list>
         <OperationRow v-for="(row, index) in operations" :key="index" v-bind="row" />
       </AppCard>
-      <OperationSkeleton form="rows" :count="3" />
+      <SkeletonPart kind="rows" :count="3" lead="circle" tail next />
     </section>
 
     <section class="group">
@@ -443,10 +443,10 @@ import ListRow from '@/components/ListRow.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NavRow from '@/components/NavRow.vue'
 import OperationRow from '@/components/OperationRow.vue'
-import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import SearchField from '@/components/SearchField.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import { operationRowProps, shortDay } from '@/components/accounts'
 import { journalRowProps } from '@/components/spending'
 import type { JournalRow } from '@/components/spending'
@@ -483,10 +483,10 @@ export default defineComponent({
     MonthSwitcher,
     NavRow,
     OperationRow,
-    OperationSkeleton,
     SearchField,
     SectionCaption,
     SegmentedControl,
+    SkeletonPart,
     VerdictBadge,
     VerdictCard,
   },

@@ -354,8 +354,9 @@ test.describe('without the server', () => {
 
     await field(page).fill('квирта')
 
-    const bar = page.locator('.loading .line').first()
-    await expect(bar).toBeVisible()
-    expect(await bar.evaluate((node) => getComputedStyle(node).animationName)).toBe('none')
+    // The breath is the frame's, not a bar's (MOL-178): read where it is set, or the check passes anyway.
+    const bars = page.locator('.loading .bars')
+    await expect(bars).toBeVisible()
+    expect(await bars.evaluate((node) => getComputedStyle(node).animationName)).toBe('none')
   })
 })

@@ -1045,14 +1045,10 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-/* Not `.skeleton`: a scoped class reaches the root of a child too, and that is ScreenSkeleton's. */
+/* Not `.skeleton`: a scoped class reaches the root of a child too, and that is ScreenSkeleton's. The card
+   is the skeleton's own (MOL-178). */
 .loading {
   margin-top: var(--space-6);
-  padding: var(--space-4);
-  overflow: hidden;
-  border: var(--hairline) solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
 }
 
 .not-found {

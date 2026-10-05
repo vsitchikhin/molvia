@@ -3,10 +3,7 @@
     <p v-if="!announce" class="hidden" role="status">{{ t('state.loading') }}</p>
 
     <div class="bars" aria-hidden="true">
-      <div v-for="(width, index) in groups" :key="index" class="group">
-        <span class="line" :style="{ width: `${width}%` }"></span>
-        <span class="sub"></span>
-      </div>
+      <SkeletonPart v-if="groups" kind="lines" :widths="groups" />
       <slot />
     </div>
   </div>
@@ -15,24 +12,20 @@
 <script lang="ts">
 import { defineComponent, onBeforeUnmount, onMounted, type PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
+import SkeletonPart, { isWidths } from '@/components/SkeletonPart.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
-
-function isWidths(value: unknown): boolean {
-  return (
-    Array.isArray(value) &&
-    value.length > 0 &&
-    value.every((width) => typeof width === 'number' && width > 0 && width <= 100)
-  )
-}
 
 /**
  * Loading drawn as the content that is coming, not as a spinner: the screen must not jump
- * when the data arrives. The screen gives the geometry — one width per group, in percent,
- * deliberately uneven, since an even skeleton reads as a broken layout — and the block gives
- * the bars: a line and the shorter one under it.
+ * when the data arrives. The frame says «Loading…», hides its bars from a screen reader, breathes
+ * and keeps the screen's rhythm — 8 between its parts, 24 above a caption (Ф-13, MOL-178); the
+ * shape is the screen's, put in the slot in the order the answer will stand: the kit's parts
+ * (`SkeletonPart`) and between them what is the screen's own — the five squares of the rating
+ * scale — in bars of `skeleton-bar`.
  *
- * What is not a pair of bars — the five squares of the rating scale — goes into the slot and
- * breathes with the rest.
+ * `groups` is the shape from before the parts: one width per group, in percent, drawn as pairs of
+ * bars in a card (`SkeletonPart kind="lines"`), and the slot after it. The screens trade it for the
+ * shape of their answer in their own tasks (owner's В-1 «а»).
  *
  * No `aria-busy`: a screen reader holds back what changes inside a busy region until it is
  * no longer busy, and nothing ever clears it here — the skeleton is simply removed — so the
@@ -40,10 +33,11 @@ function isWidths(value: unknown): boolean {
  */
 export default defineComponent({
   name: 'ScreenSkeleton',
+  components: { SkeletonPart },
   props: {
     groups: {
       type: Array as PropType<number[]>,
-      required: true,
+      default: undefined,
       validator: isWidths,
     },
   },
@@ -70,31 +64,8 @@ export default defineComponent({
 .bars {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  animation: pulse var(--dur-pulse) ease-in-out infinite;
-}
-
-.group {
-  display: flex;
-  flex-direction: column;
   gap: var(--space-2);
-}
-
-.line,
-.sub {
-  display: block;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-}
-
-.line {
-  height: var(--skeleton-line);
-}
-
-.sub {
-  width: 38%;
-  height: var(--skeleton-sub);
-  opacity: 0.6;
+  animation: pulse var(--dur-pulse) ease-in-out infinite;
 }
 
 @keyframes pulse {

@@ -41,7 +41,11 @@
       </div>
       <!-- Only while open: the camera stopped by the close would bring it up as the sheet slides
            down, and say «Loading…» for nothing. -->
-      <ScreenSkeleton v-if="open && kind !== 'live'" class="loading" :groups="[40]" />
+      <!-- A bar at the top of the viewfinder, with no card: a card over the camera is no answer's shape
+           (MOL-178). -->
+      <ScreenSkeleton v-if="open && kind !== 'live'" class="loading">
+        <SkeletonPart kind="lines" :widths="[40]" :card="false" />
+      </ScreenSkeleton>
       <p class="hint">{{ t('scanner.hint') }}</p>
       <AppButton
         v-if="torch !== null"
@@ -120,6 +124,7 @@ import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import CameraHintSheet from '@/components/CameraHintSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { useBarcodeScan } from '@/composables/useBarcodeScan'
 import { useCamera } from '@/composables/useCamera'
@@ -162,6 +167,7 @@ export default defineComponent({
     IconTorch,
     IconTorchOff,
     ScreenSkeleton,
+    SkeletonPart,
     ScreenState,
   },
   props: {
