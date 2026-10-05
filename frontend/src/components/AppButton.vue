@@ -4,7 +4,7 @@
     :class="[variant, { large: size === 'large', block }]"
     :type="type"
     :disabled="disabled"
-    :aria-label="variant === 'icon' && busy && busyLabel ? busyLabel : label"
+    :aria-label="label !== undefined && busy && busyLabel !== undefined ? busyLabel : label"
     :aria-disabled="inactive || busy ? true : undefined"
     :aria-busy="busy || undefined"
     @click="click"
@@ -15,10 +15,12 @@
       <span v-if="$slots.icon" class="glyph" aria-hidden="true"><slot name="icon" /></span>
       <!-- A block button is as wide as its place, so its word is swapped. Any other holds both words
            in one cell, the one not shown kept by its width: as wide as the wider word, it does not
-           jump under the thumb when the work starts or ends. -->
+           jump under the thumb when the work starts or ends. At rest the word of the work is drawn by
+           CSS alone, so the button's text is its action's word — what a test or a copy reads. -->
       <span v-if="busyLabel !== undefined && !block" class="words">
         <span :class="{ unseen: busy }" :aria-hidden="busy || undefined"><slot /></span>
-        <span :class="{ unseen: !busy }" :aria-hidden="!busy || undefined">{{ busyLabel }}</span>
+        <span v-if="busy">{{ busyLabel }}</span>
+        <span v-else class="unseen" aria-hidden="true" :data-word="busyLabel" />
       </span>
       <template v-else-if="busy && busyLabel !== undefined">{{ busyLabel }}</template>
       <slot v-else />
@@ -48,8 +50,8 @@ export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost' | 'dang
  * for as long as it works, in the action's look — fill, ink and glyph stay, with `disabled` too, since
  * this is the one at work and not one that cannot be pressed. The word is the sign and the
  * explanation at once: no spinner (DESIGN.md), nothing that moves, and the name a screen reader reads
- * on the focused button along with `aria-busy`. The linter refuses a `busy` without it. An icon-only
- * button has no word to swap, so the label is what changes.
+ * on the focused button along with `aria-busy`. The linter refuses a `busy` without it. A button named
+ * by `label` — an icon-only one has no word to swap — takes the word of the work as its name.
  *
  * **Inactive is one look** (Ф-6, MOL-174): `text-muted` at 600 with no opacity, on `surface-2` where
  * the live button has a fill and on nothing where it has none — the form of the variant stays, so a
@@ -204,9 +206,13 @@ export default defineComponent({
   border-color: transparent;
 }
 
+/* In the middle both ways: the word not shown may wrap where a grid holds the button's width — «Готовим
+   фото…» in a pair at 360 — and the cell grows two lines high; the word shown stays in the middle of
+   it, not at its top (adversarial Р1-А4). */
 .words {
   display: inline-grid;
-  justify-items: center;
+  place-items: center;
+  text-align: center;
 
   & > * {
     grid-area: 1 / 1;
@@ -215,6 +221,10 @@ export default defineComponent({
 
 .unseen {
   visibility: hidden;
+}
+
+[data-word]::before {
+  content: attr(data-word);
 }
 
 .large {

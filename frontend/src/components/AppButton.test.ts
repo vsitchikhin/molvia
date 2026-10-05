@@ -127,9 +127,10 @@ it.each(['busy', 'inactive'] as const)(
 // MOL-225: busy is the button's own word. Both words stand in one cell, so the button keeps the
 // width of the wider one; the one not shown is hidden from the eye and from a screen reader.
 describe('AppButton at work', () => {
+  // The word not shown at rest is drawn by CSS from `data-word`, so the text is the action's alone.
   const words = (view: ReturnType<typeof mount>) =>
     view.findAll('.words > span').map((word) => ({
-      text: word.text(),
+      text: word.text() || (word.attributes('data-word') ?? ''),
       shown: !word.classes('unseen') && word.attributes('aria-hidden') === undefined,
     }))
 
@@ -143,6 +144,7 @@ describe('AppButton at work', () => {
       { text: 'Deleting…', shown: false },
     ])
     expect(view.attributes('aria-busy')).toBeUndefined()
+    expect(view.text()).toBe('Delete for good')
   })
 
   it('says the work while busy, in place of the action, and stays focusable', async () => {
@@ -196,6 +198,18 @@ describe('AppButton at work', () => {
     expect(view.text()).toBe('Deleting…')
     await view.setProps({ busy: false })
     expect(view.text()).toBe('Delete for good')
+  })
+
+  // Not only an icon: a label overrides the text for a screen reader, so it is the label that says
+  // the work (adversarial round 1, «не проверено»).
+  it('names a labelled button with text by the word of the work while busy', async () => {
+    const view = mount(AppButton, {
+      props: { label: 'Record an exchange', busyLabel: 'Saving…' },
+      slots: { default: 'Record' },
+    })
+    expect(view.attributes('aria-label')).toBe('Record an exchange')
+    await view.setProps({ busy: true })
+    expect(view.attributes('aria-label')).toBe('Saving…')
   })
 
   it('must not fire: a button with no word of work has no second cell', () => {
