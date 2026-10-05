@@ -32,9 +32,19 @@
 }
 
 /// Narrower than this, a row of an operation stands its amount under its words (MOL-176): the row
-/// (`ListRow` in the container `row`) and its skeleton (`OperationSkeleton`) read the one number, so the
-/// bars cannot part from the answer. A container query takes no custom property, hence Sass.
+/// (`ListRow` in the container `row`) and its skeleton (`SkeletonPart` of rows) read the one number, so
+/// the bars cannot part from the answer. A container query takes no custom property, hence Sass.
 $row-narrow: 22rem;
+
+/// A bar of a skeleton (Ф-13, MOL-178): `border` on the `surface` of a card, 1.42:1 in the light scheme
+/// and 1.38:1 in the dark. `surface-2` was the bar's colour and is not seen — 1.06:1 on the page's
+/// ground, 1.1:1 on a card. One colour for the kit's parts and for what a screen draws in their slot:
+/// the scale of «Оценки», the fields of «Настройки». A pill; a key or a plate sets its own radius after.
+@mixin skeleton-bar {
+  display: block;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+}
 
 /// The target device is a phone; anything wider is the exception, so it is opt-in.
 @mixin wider-than-phone {

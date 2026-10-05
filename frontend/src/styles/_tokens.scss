@@ -136,9 +136,12 @@
   /* The scanner's viewfinder: most of the sheet, and never so tall that its buttons leave it. */
   --viewfinder-height: min(52dvh, 26rem);
 
-  /* Loading bars: the height of the line they stand in for and of the one under it. */
+  /* Loading bars: the height of the line they stand in for and of the one under it, a caption's and
+     a figure's (MOL-178, handoff 77 v2 2a). */
   --skeleton-line: 0.8125rem; /* 13 */
   --skeleton-sub: 0.5625rem; /* 9 */
+  --skeleton-caption: 0.6875rem; /* 11 */
+  --skeleton-figure: 1.75rem; /* 28 */
 
   /* The circle under the icon of an operation's row (MOL-176): its skeleton takes the same. */
   --row-circle: 2.5rem; /* 40 */
