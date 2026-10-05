@@ -210,6 +210,23 @@ describe('useTapSetting: a change whose answer was lost', () => {
     expect(tap.saveFailed.value).toBe(true)
   })
 
+  it('two answers lost in a row: the check keeps «not saved» when only the earlier choice landed (round 6, №11, Р6-А1)', async () => {
+    const tap = await mounted()
+    landsWithoutAnswer()
+    read.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true, day: 10 })
+    // The next one never reaches the server, and its answer is lost too.
+    write.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true, day: 15 })
+    expect(tap.unsure.value).toBe(true)
+
+    read.mockImplementation(() => Promise.resolve(server))
+    await vi.advanceTimersByTimeAsync(TAP_CHECK_LAST_MS)
+    expect(tap.value.value).toEqual({ off: true, day: 10 })
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.saveFailed.value).toBe(true)
+  })
+
   it('a change that did not land stays «not saved» once a check says so', async () => {
     const tap = await mounted()
     write.mockRejectedValue(new TypeError('connection reset'))

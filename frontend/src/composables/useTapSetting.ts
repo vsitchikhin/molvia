@@ -64,11 +64,10 @@ export function useTapSetting<T>(
   // server is read again (adversarial MOL-96 А2): a privacy switch put back to «on» over a server
   // that already turned it off.
   const unsure = ref(false)
-  let before: T | undefined
-  // The last choice, when the API refused it in its own words: its «not saved» stays the truth
-  // whatever a check finds of an earlier change — unless the server holds that very choice, an
-  // earlier tap having put it there (round 5, Р5-А1).
-  let refused: { readonly choice: T } | undefined
+  // The last choice that got no «yes»: its «not saved» stays the truth whatever a check finds of an
+  // earlier change — unless the server holds that very choice (round 5, Р5-А1; round 6, №11, Р6-А1).
+  // An earlier tap may have put it there; with three values or more, «differs from before» is not it.
+  let lastChoice: { readonly choice: T } | undefined
   let check: ReturnType<typeof setTimeout> | undefined
   let checkIn = TAP_CHECK_FIRST_MS
 
@@ -95,8 +94,7 @@ export function useTapSetting<T>(
       // What the person chose last is on the server after all: «не сохранилось» is no longer true.
       const same = (one: unknown, other: unknown): boolean =>
         JSON.stringify(one) === JSON.stringify(other)
-      const landed = refused ? same(answer, refused.choice) : !same(answer, before)
-      if (unsure.value && landed) saveFailed.value = false
+      if (unsure.value && lastChoice && same(answer, lastChoice.choice)) saveFailed.value = false
       settle()
       value.value = answer
       failure.value = null
@@ -123,18 +121,16 @@ export function useTapSetting<T>(
     saveFailed.value = false
     try {
       value.value = await write(next)
-      refused = undefined
+      lastChoice = undefined
       settle()
     } catch (error) {
       value.value = shown
-      // What the first unsure change was made over: a check tells by it whether that one landed.
-      if (!unsure.value) before = shown
+      lastChoice = { choice: next }
       // Unsure unless the API refused in its own words (round 3, №6; round 4, №9). Its refusal — a
       // 409, a 500 its handler wrote — rolled the change back, and «not saved» is the truth; a
       // `2xx` of any shape, whole and off the contract or cut off on its way (Р4-А1), may well have
       // landed. One unsure change is not made sure by a refusal of the next: it is still checked.
-      refused = refusedInWords(error) ? { choice: next } : undefined
-      unsure.value = unsure.value || !refused
+      unsure.value = unsure.value || !refusedInWords(error)
       // Offline or failed is decided after the failure (MOL-19, A1): a connection that dropped while
       // the answer was on its way is the grey «без связи», never the red «не сохранилось» (self-review 7).
       online.value = navigator.onLine
