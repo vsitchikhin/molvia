@@ -1049,17 +1049,12 @@ function classList(rows: readonly TextRow[]): {
           `^[^\\d]{0,12}?(${service.slice(0, 2)})\\s?[.,]?\\s?(${service.slice(2)})${CLASS_TAIL}`,
           'u',
         ).exec(row)
-        // with no «Դաս» the class is the code only where no figure of a line follows it: nothing,
-        // or an article after its comma or mark, «ամ. 56.10, Li 740000». A price that begins with
-        // the class is a price whatever OCR made of the rest — «5610 5640», «5610:1.0», «5610 11220»
-        // (review 5: the family of А4, Б2, Г1, Д1, Д2 closed at its cause)
-        const rest = loose === null ? '' : row.slice(loose.index + loose[0].length)
-        if (
-          loose !== null &&
-          (!/\d/.test(rest) || /^[^\d]*[,\p{L}][^\d]*\d{5,7}(?!\d)/u.test(rest))
-        ) {
-          mark = loose
-        }
+        // with no «Դաս» the class is the code only where what follows is a code's (review 5, 6): nothing,
+        // a digit or two of junk «ши‘ 56 10 19», an article after its comma or mark — junk before the
+        // mark too, «ամ. 56.10 19 Ն/Կ 745030» — or a line's figures whose own arithmetic holds as read,
+        // «ամ. 56.10 1հատ 688.09 688.09». A price that begins with the class is none of them, whatever
+        // OCR made of the rest — «5610 5640», «5610:1.0», «5610 00:1.0», «5610 11220»
+        if (loose !== null && looseCode(row.slice(loose.index + loose[0].length))) mark = loose
       }
     }
     if (mark === null) return null
@@ -1122,6 +1117,20 @@ function classList(rows: readonly TextRow[]): {
     }
   }
   return { mapped, anchorOf, start }
+}
+
+// What may follow a class read with no «Դաս» for it to be the code (see `classList`).
+function looseCode(rest: string): boolean {
+  if (!/\d/.test(rest) || /^[^\d]*\d{1,2}(?!\d)[^\d]*$/.test(rest)) return true
+  const article = CLASS_ARTICLE.exec(rest)
+  if (article?.[1] !== undefined && /[,\p{L}]/u.test(rest.slice(0, rest.indexOf(article[1]))))
+    return true
+  const figures = classFigures(rest)
+  if (figures?.priceS == null || !(figures.terminal || CLASS_UNIT.test(rest))) {
+    return false
+  }
+  const budget: Budget = { left: LINE_COMBINATIONS_FLOOR, floors: 0 }
+  return classCandidates(budget, figures, new Set()).some((x) => x.swaps === 0)
 }
 
 /** Where a fiscal till's list of items begins: its first class code, or -1 (MOL-226). */

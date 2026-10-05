@@ -1499,3 +1499,45 @@ describe('a fiscal till read by its class code: a price that begins with the cla
     ])
   })
 })
+
+// MOL-226, review round 6: a code read with no «Դաս» is followed by what follows a code with it.
+describe('a fiscal till read by its class code: a code with no «Դաս» (MOL-226, review 6)', () => {
+  const receipt = (...texts: string[]) => parseReceiptText(rowsOf(texts.join('\n'), 0))
+
+  it('takes junk after the terminal’s code with no «Դաս» for the code’s own (Е1)', () => {
+    const got = receipt(
+      'Դաս՝ 56.10',
+      'Ֆրի',
+      '688.09x1.0 հատ=688.09դրամ',
+      'ши‘ 56 10 19',
+      'Թվիստեր',
+      '1250.0x1.0 հատ=1250.00դրամ',
+      'Ընդամենը 1938.09',
+    )
+    expect(got.lines.map((l) => [l.printed, l.sumHundredths, l.settled])).toEqual([
+      ['Ֆրի', 68_809, true],
+      ['Թվիստեր', 125_000, true],
+    ])
+  })
+
+  it('reads the till’s «ամ.» code with junk before its article, or with no article (Е2)', () => {
+    for (const [code, sku] of [
+      ['ամ. 56.10 19 Ն/Կ 745030', '745030'],
+      ['ամ. 56.10', null],
+    ] as const) {
+      const line = receipt(
+        'Դաս. 56.10, Ն/Կ 745031 1հատ 120.00 120.00',
+        'Սոուս',
+        `${code} 1հատ 688.09 688.09`,
+        'Ֆրի ստանդարտ',
+        'Ընդամենը 808.09',
+      ).lines[1]
+      expect(line).toMatchObject({
+        hs: '56.10',
+        sku,
+        printed: 'Ֆրի ստանդարտ',
+        sumHundredths: 68_809,
+      })
+    }
+  })
+})
