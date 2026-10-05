@@ -919,6 +919,45 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
     expect(home.askedOn.length - rested).toBe(ARCHIVE_RECENT_DAYS + 1)
   })
 
+  it('банк висел три недели и заговорил: дыру нечем заполнить — проход отдыхает (ревью 7)', async () => {
+    const home = homeHarness()
+    // С 20.08 по 13.09 на каждый день банк отвечал курсом 19.08; с 14.09 заговорил.
+    home.override((day) =>
+      day >= '2026-08-20' && day <= '2026-09-13' ? '2026-08-19' : inForce(day),
+    )
+    for (let run = 0; run < 25; run += 1) {
+      await home.run()
+      home.pass(60_000)
+    }
+    expect(home.warnings).toEqual([])
+    const settled = home.askedOn.length
+    for (let hour = 0; hour < 6; hour += 1) {
+      home.pass(HOUR)
+      await home.run()
+    }
+    expect(home.askedOn).toHaveLength(settled)
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-14')).toBe(true)
+  })
+
+  it('банк застыл и оттаял: его настоящие дни приходят на следующий день (адверсариальный, раунд 5, П3)', async () => {
+    const home = homeHarness()
+    const frozen = (day: string) =>
+      day >= '2026-08-20' && day <= '2026-09-13' ? '2026-08-19' : inForce(day)
+    home.override(frozen)
+    for (let run = 0; run < 25; run += 1) {
+      await home.run()
+      home.pass(60_000)
+    }
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-01')).toBe(
+      false,
+    )
+    // Архив оттаял: эти дни у банка есть. Взгляд назавтра их приносит.
+    home.override(inForce)
+    home.pass(HISTORY_EVERY_MS)
+    await home.run()
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-01')).toBe(true)
+  })
+
   it('архив отдал завтрашний курс на сегодня — день пропущен, проход не отвергнут; позже завтра — отвергнут', async () => {
     const tomorrow = '2026-09-20'
     const home = homeHarness({ cached: [], failOn: null })

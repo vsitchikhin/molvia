@@ -236,6 +236,15 @@ export function officialRatesRefresh({
    * would ask the Sunday again.
    */
   const archiveNext = new Map<RateProvider, string>()
+  /**
+   * The days a country bank has no rate of its own, as its archive said: asked, it answered with an
+   * earlier day — a weekend, a holiday, the days it hung on one date (review 7). Known, they are no
+   * hole: a bank that hung for weeks and spoke again left a stretch no walk can fill, and counted a
+   * hole it was walked every hour for ever. Until the next day's look, never longer: a bank frozen
+   * for a while answers so for days it does have, and they come back once it thaws. In memory, as
+   * `archiveNext`: after a restart one walk asks the stretch again and knows it again.
+   */
+  const archiveEmpty = new Map<RateProvider, Set<string>>()
 
   /**
    * The history, once a day (MOL-137, Р-4): the whole archive since 2022 in one answer — a fifth
@@ -291,16 +300,17 @@ export function officialRatesRefresh({
     if (!history) return
     const at = archiveAt.get(bank.provider)
     if (at !== undefined && now().getTime() - at < HISTORY_EVERY_MS) return
+    // Known until the next day's look only (adversarial round 5, П3): a bank frozen for a while
+    // answers its stuck day for days it does have, and those come back once it thaws.
+    if (at !== undefined) archiveEmpty.get(bank.provider)?.clear()
     try {
       const kept = await history.rates.between(bank.provider, OFFICIAL_HISTORY_FROM, today)
       const next = archiveNext.get(bank.provider)
+      const empty = archiveEmpty.get(bank.provider) ?? new Set<string>()
+      archiveEmpty.set(bank.provider, empty)
       const walk: ArchiveWalk = next
         ? { from: next, whole: false }
-        : archiveWalkFrom(
-            kept.map((row) => row.date),
-            OFFICIAL_HISTORY_FROM,
-            today,
-          )
+        : archiveWalkFrom([...kept.map((row) => row.date), ...empty], OFFICIAL_HISTORY_FROM, today)
       const start = walk.from
       const days: string[] = []
       for (
@@ -311,6 +321,7 @@ export function officialRatesRefresh({
         days.push(day)
       }
       const answers = new Map<string, readonly AmdRate[]>()
+      const none: string[] = []
       for (const day of days) {
         const answer = await bank.fetchOn(day)
         // Tomorrow is a bank setting its rate the evening before — the hourly answer writes it; past
@@ -320,6 +331,8 @@ export function officialRatesRefresh({
           throw new FeedError(bank.provider, `archive: ${answer.date} is in the future`)
         }
         answers.set(answer.date, answer.rates)
+        // Today is left out: the hourly answer may still bring a rate the archive does not have yet.
+        if (answer.date < day && day < today) none.push(day)
       }
       const missing = missingDays([...answers.values()].flat(), kept)
       for (const rate of missing.filter((row) => row.jump)) {
@@ -334,6 +347,9 @@ export function officialRatesRefresh({
         )
       }
       await history.rates.insertMissing(missing)
+      // Known only with the days around them written: a walk that failed halfway left an earlier
+      // day unwritten beside them, and that day would read as no hole.
+      for (const day of none) empty.add(day)
       const last = days.at(-1)
       if (last !== undefined && last < today) {
         archiveNext.set(bank.provider, dayAfter(last))
