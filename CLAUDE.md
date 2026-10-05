@@ -488,7 +488,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   place is in `:where()`, the screen's class sets the space above it. **An operation is
   `OperationRow`** (MOL-176): its words come from `journalRowProps` and `operationRowProps`, never
   from the row; the chevron on every one, the amounts in one column, never coloured, never cut — a row
-  narrower than 22rem stands its amount under the words.
+  narrower than 22rem stands its amount under the words. **A search is `SearchField`** (MOL-177): a
+  combobox gives it its role and keys, its rows are `ListRow as="li"` with no hover; a second search
+  field fails ESLint.
 - **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
   `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the
   failure; polite states speak through the one live region in `App.vue`.

@@ -1,64 +1,55 @@
 <template>
   <div class="combobox">
-    <div class="well" :class="{ trailed: $slots.trailing }">
-      <IconMagnify class="glyph" aria-hidden="true" />
-      <input
-        ref="input"
-        class="control"
-        type="search"
-        role="combobox"
-        autocomplete="off"
-        autocapitalize="off"
-        spellcheck="false"
-        enterkeyhint="search"
-        aria-autocomplete="list"
-        :aria-label="label"
-        :aria-describedby="`${id}-hint`"
-        :aria-expanded="expanded ? 'true' : 'false'"
-        :aria-controls="expanded ? `${id}-list` : undefined"
-        :aria-activedescendant="active < 0 ? undefined : optionId(active)"
-        :maxlength="maxLength"
-        :placeholder="placeholder"
-        :readonly="readonly"
-        :value="modelValue"
-        @input="update"
-        @keydown="onKeydown"
-      />
-      <!-- An action beside the text — the scanner (MOL-99) — inside the well, outside the input. -->
-      <slot name="trailing" />
-    </div>
-    <p :id="`${id}-hint`" class="hint">{{ hint }}</p>
+    <SearchField
+      ref="field"
+      :model-value="modelValue"
+      :label="label"
+      :placeholder="placeholder"
+      :hint="hint"
+      :maxlength="maxLength"
+      :readonly="readonly"
+      role="combobox"
+      aria-autocomplete="list"
+      :aria-expanded="expanded ? 'true' : 'false'"
+      :aria-controls="expanded ? `${id}-list` : undefined"
+      :aria-activedescendant="active < 0 ? undefined : optionId(active)"
+      @update:model-value="$emit('update:modelValue', $event)"
+      @keydown="onKeydown"
+    >
+      <!-- An action beside the text — the scanner (MOL-99) — inside the field, outside the input. -->
+      <template v-if="$slots.trailing" #trailing><slot name="trailing" /></template>
+    </SearchField>
 
     <slot name="before" />
 
     <template v-if="expanded">
       <SectionCaption :id="`${id}-heading`" as="p" class="heading">{{ heading }}</SectionCaption>
-      <ul
+      <AppCard
         :id="`${id}-list`"
         ref="list"
-        class="list"
+        as="ul"
+        list
+        class="options"
         :class="{ stale }"
         role="listbox"
         :aria-labelledby="`${id}-heading`"
         :aria-busy="stale ? 'true' : undefined"
       >
-        <li
+        <ListRow
           v-for="(item, index) in items"
           :id="optionId(index)"
           :key="item.id"
+          as="li"
           class="row"
-          :class="{ active: index === active }"
           role="option"
-          :aria-selected="index === active ? 'true' : 'false'"
+          :title="item.name"
+          :meta="item.note ?? ''"
+          :active="index === active"
+          wrap
+          next
           @click="choose(item)"
-        >
-          <span class="text">
-            <span class="name">{{ item.name }}</span>
-            <span v-if="item.note" class="meta">{{ item.note }}</span>
-          </span>
-          <IconChevronRight class="glyph chevron" aria-hidden="true" />
-        </li>
-      </ul>
+        />
+      </AppCard>
     </template>
 
     <slot name="after" />
@@ -68,10 +59,11 @@
 <script lang="ts">
 import { computed, defineComponent, nextTick, onMounted, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
-import IconChevronRight from '~icons/mdi/chevron-right'
-import IconMagnify from '~icons/mdi/magnify'
 import { CATALOGUE_QUERY_MAX } from '@molvia/model'
 import type { CatalogueEntry } from '@molvia/model'
+import AppCard from '@/components/AppCard.vue'
+import ListRow from '@/components/ListRow.vue'
+import SearchField from '@/components/SearchField.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 
 /**
@@ -90,10 +82,13 @@ import SectionCaption from '@/components/SectionCaption.vue'
  * the active row is brought into view by the page, to the nearest edge rather than the centre.
  *
  * Only what the server sent, in its order: nothing is filtered or sorted here.
+ *
+ * The field is the kit's `SearchField`, given the combobox's role, `aria-*` and keys; a row is a
+ * `ListRow` option, the one the arrows stand on filled and its weight unchanged (MOL-177, К-4).
  */
 export default defineComponent({
   name: 'CatalogueCombobox',
-  components: { IconChevronRight, IconMagnify, SectionCaption },
+  components: { AppCard, ListRow, SearchField, SectionCaption },
   props: {
     modelValue: { type: String, required: true },
     items: { type: Array as PropType<CatalogueEntry[]>, required: true },
@@ -112,10 +107,10 @@ export default defineComponent({
     'update:modelValue': (value: string) => typeof value === 'string',
     pick: (entry: CatalogueEntry) => typeof entry.id === 'string',
   },
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
     const id = useId()
-    const input = ref<HTMLInputElement | null>(null)
-    const list = ref<HTMLUListElement | null>(null)
+    const field = ref<{ focus: (options?: FocusOptions) => void; blur: () => void } | null>(null)
+    const list = ref<{ $el: HTMLElement } | null>(null)
     const active = ref(-1)
 
     const expanded = computed(() => props.items.length > 0)
@@ -135,12 +130,8 @@ export default defineComponent({
     watch(active, async (index) => {
       if (index < 0) return
       await nextTick()
-      list.value?.children[index]?.scrollIntoView({ block: 'nearest' })
+      list.value?.$el.children[index]?.scrollIntoView({ block: 'nearest' })
     })
-
-    function update(event: Event): void {
-      emit('update:modelValue', (event.target as HTMLInputElement).value)
-    }
 
     function choose(entry: CatalogueEntry): void {
       emit('pick', entry)
@@ -174,7 +165,7 @@ export default defineComponent({
           event.preventDefault()
           const entry = props.items[active.value]
           if (entry) choose(entry)
-          else input.value?.blur()
+          else field.value?.blur()
           return
         }
       }
@@ -184,17 +175,23 @@ export default defineComponent({
     // is for the phone to show (MOL-38); a hidden field on the previous screen to cheat it would
     // break with the next Safari.
     onMounted(() => {
-      input.value?.focus({ preventScroll: true })
+      field.value?.focus({ preventScroll: true })
     })
 
+    function focus(options?: FocusOptions): void {
+      field.value?.focus(options)
+    }
+
+    expose({ focus })
+
     return {
+      focus,
       id,
-      input,
+      field,
       list,
       active,
       expanded,
       optionId,
-      update,
       choose,
       onKeydown,
       maxLength: CATALOGUE_QUERY_MAX,
@@ -204,82 +201,11 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.well {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--touch-target);
-  padding: 0 var(--space-4);
-  border: var(--hairline) solid var(--border-strong);
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  transition:
-    border-color var(--dur-fast) var(--ease-out),
-    outline-color var(--dur-fast) var(--ease-out);
-
-  &:focus-within {
-    border-color: var(--accent);
-    outline: 2px solid var(--accent-tint);
-  }
-
-  /* The trailing button is a touch target of its own: it sits at the pill's end, not inset. */
-  &.trailed {
-    padding-right: 0;
-  }
-}
-
-.glyph {
-  @include icon;
-
-  font-size: var(--icon);
-  color: var(--text-muted);
-}
-
-.control {
-  flex: 1;
-  min-width: 0;
-  min-height: var(--touch-target);
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: var(--text-body);
-  appearance: none;
-
-  /* The ring is drawn on the well. */
-  outline: none;
-
-  &::placeholder {
-    color: var(--text-muted);
-    opacity: 1;
-  }
-
-  /* Chrome draws its clear button in the system blue, past the tokens. */
-  &::-webkit-search-cancel-button {
-    appearance: none;
-  }
-}
-
-.hint {
-  margin: 0;
-  padding: var(--space-2) var(--space-4) 0;
-  color: var(--text-muted);
-  font-size: var(--text-caption);
-}
-
 .heading {
   margin-top: var(--space-6);
 }
 
-.list {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  list-style: none;
-  border: var(--hairline) solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
+.options {
   transition: opacity var(--dur-fast) var(--ease-out);
 
   &.stale {
@@ -287,59 +213,14 @@ export default defineComponent({
   }
 }
 
+/* The page scrolls the active row into view, and the pinned bar of a nested screen covers the top of
+   it: moving up, the row would stop right under the bar (Р-8). */
 .row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--touch-target);
-  padding: var(--space-3) var(--space-4);
-  cursor: pointer;
-
-  /* The page scrolls the active row into view, and the pinned bar of a nested screen covers the
-     top of it: moving up, the row would stop right under the bar (Р-8). */
   scroll-margin-top: calc(var(--bar-height) + var(--safe-top) + var(--space-2));
-
-  & + & {
-    border-top: var(--hairline) solid var(--border);
-  }
-
-  /* The keyboard's row, never :hover — a phone has none, and on a desktop it would fight the
-     arrows for which row is active. */
-  &.active {
-    background: var(--accent-tint);
-
-    .name {
-      font-weight: var(--weight-bold);
-    }
-
-    /* Muted text is under 4.5:1 on a tint (MOL-172). */
-    .meta {
-      color: var(--text);
-    }
-  }
-}
-
-.text {
-  flex: 1;
-  min-width: 0;
-}
-
-.name {
-  display: block;
-  font-size: var(--text-headline);
-  font-weight: var(--weight-medium);
-  line-height: var(--leading-snug);
-}
-
-.meta {
-  display: block;
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .well,
-  .list {
+  .options {
     transition: none;
   }
 }

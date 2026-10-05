@@ -412,7 +412,6 @@
     "search": {
       "label": "Search the catalogue",
       "placeholder": "Milk, lavash, cheese…",
-      "clear": "Clear",
       "group_unrated": "Not rated yet",
       "rate": "Rate",
       "empty": {
@@ -1240,7 +1239,13 @@
       "caption_goes_on": "Goes on",
       "caption_acts": "Acts at once or asks",
       "row_link_inactive": "A link while offline",
-      "row_link_offline": "Opens once there is a connection"
+      "row_link_offline": "Opens once there is a connection",
+      "search": "Search field",
+      "search_clear": "«What to buy» · «Clear»",
+      "search_scan": "«What did you pick up?» · scanner",
+      "search_readonly": "Read-only",
+      "search_sample": "cheese",
+      "search_scanner": "The scanner in the field"
     },
     "login_seam": "Sign in for development",
     "login_insecure": "Signing in needs https: run make certs"
@@ -1472,6 +1477,7 @@
     }
   },
   "field": {
+    "clear": "Clear",
     "left": "{n} character left | {n} characters left",
     "full": "That's the limit: {max} characters"
   },

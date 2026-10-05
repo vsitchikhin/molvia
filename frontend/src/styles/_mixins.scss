@@ -69,6 +69,13 @@ $row-narrow: 22rem;
   outline-offset: $offset;
 }
 
+/// The focus of a field of the kit, drawn on its well around the text and whatever stands beside it:
+/// the edge in the accent and a halo of its tint. One rule for `AppField` and `SearchField` (MOL-177).
+@mixin field-focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-tint);
+}
+
 /// Comes in rather than pops up (MOL-151): faded in with a short rise the moment it is put in the
 /// page, by `@keyframes appear` in main.scss — which also stills it under «reduce motion» and
 /// while a screen moves. An animation, not a transition: the element's own transitions are untouched.
