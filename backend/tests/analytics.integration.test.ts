@@ -217,7 +217,9 @@ describe('снятые оценки (MOL-97, В1)', () => {
     await withdraw(me, milk)
 
     await choose(me, false)
-    expect(await verdictsOf(me.id)).toEqual(
+    const rows = await verdictsOf(me.id)
+    expect(rows).toHaveLength(2)
+    expect(rows).toEqual(
       expect.arrayContaining([
         { itemId: milk, withdrawn: true },
         { itemId: bread, withdrawn: false },

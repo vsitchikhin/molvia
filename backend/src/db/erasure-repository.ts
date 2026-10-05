@@ -180,7 +180,7 @@ export function createErasureRepository(db: Db): ErasureRepository {
             erased.rating_reminders = await count(
               sql`delete from rating_reminders where actor_id = ${actorId} returning 1`,
             )
-            // Withdrawn verdicts too: a row kept for the 0.2 gate is still this person's opinion.
+            // Withdrawn verdicts too: a row kept for the gate and the reminder is still this person's.
             erased.verdicts = await count(
               sql`delete from verdicts where actor_id = ${actorId} returning 1`,
             )
