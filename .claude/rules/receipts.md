@@ -439,7 +439,13 @@ worse than none the person sees and types. **Two receipts on one photo** print t
 the upper one's head out of the frame, two totals or two fiscal numbers, since a receipt prints each
 once — **or a head under a fiscal number**, the last row of a receipt: the middle of a tape of two, one of
 each in view, gave the lower receipt's time under the upper one's number (round 2, Б1). Whose total, time
-and number it is nobody can tell, so none is read. Read by the moments alone, such
+and number it is nobody can tell, so none is read. **And the fiscal number — the receipt's key against a second record — is read
+only from a reading that holds the receipt whole**, its moment above its number (round 3, В1): each sign of
+two receipts is seen within one reading, and two readings each holding half a tape — one the lower head and
+no number, the other the upper number and no head — made the key of two receipts again. **The price,
+named:** such a photo keeps the time it read, the lower receipt's, beside the upper one's total — the time
+orders a trip among the day's purchases and keys nothing — and with no number its receipt shot again is a
+second record (Р-8). Read by the moments alone, such
 a photo took the lower receipt's total under the upper one's fiscal number, and the upper receipt shot on
 its own was then refused as recorded (adversarial А1). **The price, named** (review 1, № 5): a moment
 printed twice and misread once is read as two receipts too — on the safe side, the person types the

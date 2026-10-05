@@ -1730,6 +1730,19 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
     expect([got.totalHundredths, got.time, got.receiptNo]).toEqual([null, null, null])
   })
 
+  it('reads the fiscal number only where one reading holds the receipt whole (round 3, В1)', () => {
+    // the middle of a tape of two: one reading lost the number and kept the lower head, the other stopped
+    // at the number — no reading has the moment above the number, so no key is made of two receipts
+    const upper = ['Բաժին 1 - Բաժին 1', '/ Շրջանառության հարկ/ 3660.00', 'Ընդամենը՝ 3660.00']
+    const got = bestReading([
+      reading(...upper, 'ԽԱՆՈՒԹ ԱՁ', 'ՀՎՀՀ: 12345678 Գ/Հ: 87654321', '04-10-26 14:27:34'),
+      reading(...upper, 'Առձեռն 3660.00', 'ՖԻՍԿԱԼ ՀԱՄԱՐ 11223344'),
+    ])
+    expect(got.layout).toBe('department')
+    expect(got.receiptNo).toBeNull()
+    expect(got.time).toBe('14:27')
+  })
+
   it('takes a phone in the head for no item’s mark, the section read or not (А2, round 2 Б2)', () => {
     for (const phone of ['Հեռ. (0312) 5-12-34', 'Հեռ. 0312/51234']) {
       const head = ['ԽԱՆՈՒԹ ԱՁ', 'ԳՅՈՒՄՐԻ Աբովյան 10', phone, 'ՀՎՀՀ 12345678 9/2 87654321']

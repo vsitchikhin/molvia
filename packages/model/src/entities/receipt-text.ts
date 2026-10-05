@@ -1280,6 +1280,8 @@ const ITEM_MARK = new RegExp(
 const DEPARTMENT_TIN_WORD = /ՀՎՀՀ\S{0,2}\s*(\d{8})(?!\d)/u
 const DEPARTMENT_TIN_TILL = /(?<!\d)(\d{8})\s+\S{1,3}\/\S{1,3}:?\s*\d{6,}/u
 const DEPARTMENT_DATE = /(?<!\d)(\d{2})[-.]\s?(\d{2})[-.]\s?(\d{2})\s+(\d{2}):(\d{2})/g
+// the same, to ask of one row (`test` of a global pattern carries its place from row to row)
+const DEPARTMENT_MOMENT = new RegExp(DEPARTMENT_DATE.source)
 // «ՖԻՍԿԱԼ ՀԱՄԱՐ 04143299», in capitals as often as not.
 const DEPARTMENT_FISCAL = /Ֆիսկալ\S*\s+\S*\s*(\d{8})(?!\d)/iu
 const SECTION_TAX = /Շրջ|հար[կլ]/u
@@ -1387,7 +1389,7 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
         .slice(end + 1)
         .some(
           (text) =>
-            new RegExp(DEPARTMENT_DATE.source).test(text) ||
+            DEPARTMENT_MOMENT.test(text) ||
             DEPARTMENT_TIN_WORD.test(text) ||
             DEPARTMENT_TIN_TILL.test(text),
         )
@@ -1412,7 +1414,19 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
     ),
     date,
     time,
-    receiptNo: several ? null : agreed(texts.map((rows) => firstOf(rows, DEPARTMENT_FISCAL))),
+    // the number is the receipt's key against a second record (Т-11): read only where one reading holds
+    // the receipt whole, its moment above its number — two readings each holding half a tape of two gave
+    // the lower receipt's time under the upper one's number, and the upper one shot alone was refused as
+    // recorded (round 3, В1). A number nobody vouches for so is the price of Р-8: two records, never none
+    receiptNo: several
+      ? null
+      : agreed(
+          texts.map((rows) => {
+            const end = rows.findIndex(fiscal)
+            const moment = rows.findIndex((text) => DEPARTMENT_MOMENT.test(text))
+            return moment >= 0 && moment < end ? firstOf(rows, DEPARTMENT_FISCAL) : null
+          }),
+        ),
     totalHundredths: !several && totals.length === 1 ? (totals[0]?.[0] ?? null) : null,
     balanced: false,
     lines: [],
