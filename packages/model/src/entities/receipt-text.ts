@@ -851,14 +851,22 @@ function tableReceipt(rows: readonly TextRow[], table: ReturnType<typeof tableLi
 // the last one above it, and its name on the side the receipt's coded items put it.
 
 // What OCR keeps of «Դաս» — «Դաս.», «աս,», «հաս ‘» — and the class after it: «56.10», «56 10», «5610».
-// «աս» is the word «Դաս», at most one letter before it: never inside a name, «Կվաս», «Անանաս». And the
+// «աս» is the word «Դաս»: «Դ», «դ» or «հ» before it, or no letter — never inside a name, «Կվաս». And the
 // class is no figure that goes on (reviews 1, 2): not an amount after it — «1 հաս 1300 1300», «Բաքեթ
 // 5610 5610», «5610 00х10», «5610.00x1.0» — nor a unit of volume or weight, glued or apart, «1000 մլ».
 // Letters right after it are the article's, «56.10Ն/Կ 745030»: OCR eats the comma and the space.
-const CLASS_TAIL =
-  '(?!\\d|[.,]\\d|\\s*[xх×*]|\\s+\\d{1,4}(?:[.,]\\d+)?(?:\\s*[xх×*]|(?![\\d\\p{L}]))|\\s*(?:մլ|լ|գ|կգ)(?!\\p{L}))'
+const CLASS_TAIL = [
+  '(?!\\d',
+  // a price's decimals, «5610.00x» — an article glued with its comma, «56.10,745030», is no price (review 3)
+  '|[.,]\\d{1,2}(?!\\d)',
+  '|\\s*[xх×*]',
+  // an amount — two digits or more, or a fraction — not a count before its unit, «56.10 1 հատ» (review 3)
+  '|\\s+(?:\\d{2,4}(?:[.,]\\d+)?|\\d[.,]\\d+)(?![\\d.,])(?!\\s*(?:հ\\S?տ|կգ))(?:\\s*[xх×*]|(?![\\d\\p{L}]))',
+  '|\\s*(?:մլ|լ|գ|կգ)(?!\\p{L}))',
+].join('')
+// «Դաս», «հաս», «աս» — a letter glued before the word stays, «րԴաս» (review 3); «Կվաս» is a name
 export const CLASS_MARK = new RegExp(
-  `(?<!\\p{L}\\p{L})(?<!\\d\\s?հ)աս[^\\p{L}\\d]{0,4}(\\d{2})\\s?[.,]?\\s?(\\d{2})${CLASS_TAIL}`,
+  `(?:(?<=[Դդհ])|(?<!\\p{L}))(?<!\\d\\s?հ)աս[^\\p{L}\\d]{0,4}(\\d{2})\\s?[.,]?\\s?(\\d{2})${CLASS_TAIL}`,
   'u',
 )
 // The till's article after the class: «Ն/Կ 745030», read «ՆԿ», «ԽԿ».
@@ -904,7 +912,10 @@ function wordsOf(text: string): string {
   const kept = tokens.filter(
     (w, i) =>
       (w.match(/\p{L}/gu) ?? []).length >= 2 ||
-      (/^\d{1,4}(?:[.,]\d+)?$/.test(w) && /\p{L}/u.test(tokens[i + 1] ?? '')) ||
+      // a number before a word of two letters, or before «լ», «գ»: not before a smudge, «2 Ա» (review 3)
+      (/^\d{1,4}(?:[.,]\d+)?$/.test(w) &&
+        ((tokens[i + 1]?.match(/\p{L}/gu) ?? []).length >= 2 ||
+          /^[լգ]$/u.test(tokens[i + 1] ?? ''))) ||
       (/^[լգ]$/u.test(w) && /^\d/.test(tokens[i - 1] ?? '')),
   )
   return kept.join(' ')
@@ -993,6 +1004,8 @@ function classCandidates(budget: Budget, f: ClassFigures, guessed: Set<Candidate
 
 // How far above the first code the figures of an item whose code row OCR lost are looked for.
 const CLASS_LOOKBACK = 3
+// Words of a fiscal head that are no dish: the cashier, the section, the fiscal mark, the address.
+const CLASS_HEAD_WORDS = /Գանձապահ|Բաժին|Ֆիսկալ|Հասցե|ՀՎՀՀ|ՀԴՄ/u
 
 interface ClassAnchor {
   readonly hs: string
@@ -1049,12 +1062,20 @@ function classList(rows: readonly TextRow[]): {
     if (figures !== null && (figures.terminal || CLASS_UNIT.test(row))) {
       start = i
       // the terminal prints the name over its figures: the name rows right above them are the item's,
-      // or the dish is left nameless and its name is read as the head (review 2, Б1) — rows with no
-      // digit but a count before the name, at most two
-      for (let j = i - 1, names = 0; j >= 0 && names < 2; j--) {
+      // or the dish is left nameless and its name is read as the head (review 2, Б1) — up to three rows
+      // with no digit but a count before the name, and none of the head (review 3, В4): a word of
+      // capitals «ԳՅՈՒՄՐԻ», «ՖԻՍԿԱԼ», or the cashier's «Գանձապահ» — a name of nobody's goes nowhere
+      for (let j = i - 1, names = 0; j >= 0 && names < CLASS_LOOKBACK; j--) {
         const above = mapped[j] ?? ''
         if (above.trim() === '') continue
-        if (wordsOf(above) === '' || /\d/.test(above.replace(/^\s*\d{1,3}\s+(?=\p{L})/u, ''))) break
+        if (
+          wordsOf(above) === '' ||
+          /\d/.test(above.replace(/^\s*\d{1,3}\s+(?=\p{L})/u, '')) ||
+          /[Ա-Ֆ]{3}/u.test(above) ||
+          CLASS_HEAD_WORDS.test(above)
+        ) {
+          break
+        }
         start = j
         names += 1
       }

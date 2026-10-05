@@ -1280,3 +1280,93 @@ describe('a fiscal till read by its class code: the code’s mark (MOL-226, revi
     ])
   })
 })
+
+// MOL-226, review round 3: an amount is not a count, a price is not an article, the head is not a name.
+describe('a fiscal till read by its class code: counts, articles, the head (MOL-226, review 3)', () => {
+  const receipt = (...texts: string[]) => parseReceiptText(rowsOf(texts.join('\n'), 0))
+
+  it('reads a till with no article whose count stands apart from «հատ» (В1)', () => {
+    const dishes = receipt(
+      'Դաս. 56.10 1 հատ 1250 1250',
+      'Թվիստեր',
+      'Դաս. 56.10 1 հատ 1300 1300',
+      'Չիզբուրգեր',
+      'Ընդամենը 2550',
+    )
+    expect([dishes.lines.map((l) => [l.hs, l.sumHundredths]), dishes.balanced]).toEqual([
+      [
+        ['56.10', 125_000],
+        ['56.10', 130_000],
+      ],
+      true,
+    ])
+    const goods = receipt(
+      'Դաս. 0401 2 հատ 370 740',
+      'Կաթ',
+      'Դաս. 1905 1 հատ 250 250',
+      'Թխվածքաբլիթ',
+      'Ընդամենը 990',
+    )
+    expect(goods.lines.map((l) => [l.hs, l.quantityMilli, l.sumHundredths])).toEqual([
+      ['0401', 2_000, 74_000],
+      ['1905', 1_000, 25_000],
+    ])
+  })
+
+  it('makes no line of a stray digit after the terminal’s code (В2)', () => {
+    const got = receipt(
+      'Դաս՝ 56.10',
+      'Ֆրի',
+      '688.09x1.0 հատ=688.09դրամ',
+      'Դաս՝ 56.10 1',
+      'Թվիստեր',
+      '1250.0x1.0 հատ=1250.00դրամ',
+      'Ընդամենը 1938.09',
+    )
+    expect(got.lines.map((l) => [l.printed, l.sumHundredths, l.settled])).toEqual([
+      ['Ֆրի', 68_809, true],
+      ['Թվիստեր', 125_000, true],
+    ])
+  })
+
+  it('reads an article glued to the code with its comma: «56.10,745030» (№ 9)', () => {
+    const line = receipt('Դաս. 56.10,745030 1հատ 688.09 688.09', 'Ֆրի').lines[0]
+    expect(line).toMatchObject({ hs: '56.10', sku: '745030', printed: 'Ֆրի' })
+  })
+
+  it('reads «Դաս» with a letter OCR glued before it: «րԴաս. 0401» (В3)', () => {
+    const line = receipt(
+      'րԴաս. 0401, Ն/Կ 1163909 1հատ 370 370',
+      'Կաթ',
+      'Դաս. 1905, Ն/Կ 1163910 1հատ 250 250',
+      'Հաց',
+    ).lines[0]
+    expect(line).toMatchObject({ hs: '0401', sku: '1163909', printed: 'Կաթ' })
+  })
+
+  const first = (...above: string[]) =>
+    receipt(
+      '«ՖԱՍՏՖՈՒԴ»',
+      ...above,
+      '1300.0x1.0 հատ=1300.00դրամ',
+      'Դաս՝ 56.10',
+      'Թվիստեր',
+      '1250.0x1.0 հատ=1250.00դրամ',
+      'Ընդամենը 2550.00',
+    ).lines[0]?.printed
+
+  it('names the terminal’s first dish whose code OCR lost by its rows, never the head’s (В4, № 11)', () => {
+    expect(first('/շրջ հարկ/ = 851000', 'Չիզբուրգեր', 'դե լյուքս', 'Օրիգինալ')).toBe(
+      'Չիզբուրգեր դե լյուքս Օրիգինալ',
+    )
+    expect(first('/շրջ հարկ/ = 851000', 'ՖԻՍԿԱԼ ԿՏՐՈՆ', 'Ֆրի')).toBe('Ֆրի')
+    expect(first('ԳՅՈՒՄՐԻ', 'Պանրային սոուս')).toBe('Պանրային սոուս')
+    // the cashier's name is nobody's dish: it would go into the shared catalogue
+    expect(first('Գանձապահ Արամ', 'Պանրային սոուս')).toBe('Պանրային սոուս')
+  })
+
+  it('keeps no number before a one-letter smudge in a name: «Ֆրի ստանդարտ 2 Ա» (№ 12)', () => {
+    const line = receipt('Դաս. 56.10, Ն/Կ 745030 1հատ 688.09 688.09', 'Ֆրի ստանդարտ 2 Ա').lines[0]
+    expect(line?.printed).toBe('Ֆրի ստանդարտ')
+  })
+})
