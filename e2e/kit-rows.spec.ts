@@ -90,7 +90,7 @@ test('the search field is one pill, and the active option keeps its weight and r
   await open(page, '/_kit')
   const wells = await page.getByRole('searchbox').evaluateAll((inputs) =>
     inputs.map((input) => {
-      const well = input.parentElement as HTMLElement
+      const well = input.parentElement!
       return {
         height: well.getBoundingClientRect().height,
         radius: parseFloat(getComputedStyle(well).borderTopLeftRadius),
@@ -106,8 +106,8 @@ test('the search field is one pill, and the active option keeps its weight and r
   const active = page.getByRole('listbox', { name: 'Found' }).getByRole('option').first()
   await expect(active).toHaveAttribute('aria-selected', 'true')
   const look = await active.evaluate((row) => {
-    const title = getComputedStyle(row.querySelector('.title') as Element)
-    const meta = getComputedStyle(row.querySelector('.meta') as Element)
+    const title = getComputedStyle(row.querySelector('.title')!)
+    const meta = getComputedStyle(row.querySelector('.meta')!)
     return {
       tag: row.tagName,
       weight: title.fontWeight,
