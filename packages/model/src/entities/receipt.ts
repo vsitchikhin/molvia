@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { EXCHANGE_UNDO_MINUTES } from '#model/entities/exchange'
+import { classListStart } from '#model/entities/receipt-text'
 import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
 import { COUNTRY_CITIES } from '#model/contracts/settings'
 import { localClock } from '#model/entities/reminder'
@@ -245,6 +246,10 @@ function headEnd(rows: readonly TextRow[]): number {
     const numbered = rows.slice(above, article).findIndex((row) => CARD_NUMBER_ROW.test(row.text))
     ends.push(numbered < 0 ? above : above + numbered)
   }
+  // a fiscal till's class code «Դաս. 56.10» opens its first item where neither layout reads (MOL-226)
+  // read as the class reading reads it, so the head and the list never disagree (review А6)
+  const coded = ends.length === 0 ? classListStart(rows) : -1
+  if (coded >= 0) ends.push(coded)
   return ends.length === 0 ? Math.min(rows.length, HEAD_ROWS) : Math.min(...ends)
 }
 

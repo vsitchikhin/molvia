@@ -130,6 +130,37 @@ describe('the time a receipt prints (review Р12)', () => {
 describe('the city of the address (MOL-126, Р-6)', () => {
   const rows = (...texts: string[]) => texts.map((text, line) => ({ text, part: 0, line }))
 
+  it('ends the head of a fiscal till at its first class code (MOL-226)', () => {
+    // a dish named after a city is a line, not a second city of the head
+    const head = ['«ՖԱՍՏՖՈՒԴ»', 'ԳՅՈՒՄՐԻ Սայաթ-Նովա 7/9']
+    const list = ['Դաս. 56.10, Ն/Կ 745030 1հատ 688.09 688.09', 'Երևան սենդվիչ']
+    expect(receiptCityOf(rows(...head, ...list))).toBe('Гюмри')
+    expect(receiptCityOf(rows(...list))).toBeNull()
+  })
+
+  it('ends the head where the class reading begins, «Դաս. 5б.10» as OCR reads it (review А6)', () => {
+    const head = ['«ՖԱՍՏՖՈՒԴ»', 'ԳՅՈՒՄՐԻ Սայաթ-Նովա 7/9']
+    const list = ['Դաս. 5б.10, Ն/Կ 745030 1հատ 688.09 688.09', 'Երևան սենդվիչ']
+    expect(receiptCityOf(rows(...head, ...list))).toBe('Гюмри')
+  })
+
+  it('ends the head above the name of a terminal’s first dish whose code OCR lost (review 2, Б1b)', () => {
+    const head = ['«ՖԱՍՏՖՈՒԴ»', 'ԳՅՈՒՄՐԻ Սայաթ Նովա 1']
+    const list = ['Երևան սենդվիչ', '688.09x1.0 հատ=688.09դրամ', 'Դաս՝ 56.10', 'Թվիստեր']
+    expect(receiptCityOf(rows(...head, ...list))).toBe('Гюмри')
+  })
+
+  it('keeps the head’s city out of a terminal’s first dish whose code OCR lost (review 3, № 11)', () => {
+    const list = ['Պանրային սոուս', '120.0x1.0 հատ=120.00դրամ', 'Դաս՝ 56.10', 'Ֆրի']
+    expect(receiptCityOf(rows('«ՖԱՍՏՖՈՒԴ»', 'ԳՅՈՒՄՐԻ Սայաթ-Նովա 7/9', ...list))).toBe('Гюмри')
+  })
+
+  it('ends the head above a first dish in capitals on a till that names in capitals (review 4, Г2)', () => {
+    const head = ['«ՖԱՍՏՖՈՒԴ»', 'ԳՅՈՒՄՐԻ Սայաթ Նովա 1', '/շրջ հարկ/ = 851000']
+    const list = ['ԵՐԵՎԱՆ ՍԵՆԴՎԻՉ', '688.09x1.0 հատ=688.09դրամ', 'Դաս՝ 56.10', 'ԹՎԻՍՏԵՐ']
+    expect(receiptCityOf(rows(...head, ...list))).toBe('Гюмри')
+  })
+
   it('reads the city that opens a row of the head', () => {
     expect(receiptCityOf(rows(': ԵՐԵՎԱՆ-ՍԻԹԻ', 'ԳՅՈՒՄՐԻ Գորկու 62 2.'))).toBe('Гюмри')
     expect(receiptCityOf(rows('DOG CITY', 'Gyumri Sayat-Nova Street, 42'))).toBe('Гюмри')

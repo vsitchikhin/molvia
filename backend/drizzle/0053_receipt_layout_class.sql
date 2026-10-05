@@ -1,0 +1,2 @@
+ALTER TABLE "receipts" DROP CONSTRAINT "receipts_layout_known";--> statement-breakpoint
+ALTER TABLE "receipts" ADD CONSTRAINT "receipts_layout_known" CHECK ("receipts"."layout" is null or "receipts"."layout" in ('card', 'table', 'class'));
