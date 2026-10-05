@@ -121,7 +121,7 @@ export async function mergeNight(
   { merges, embedder, failed }: Pick<MergeTwinsDeps, 'merges' | 'embedder' | 'failed'>,
   mode: 'on' | 'report',
   day: string,
-): Promise<CatalogueMergedNotice> {
+): Promise<{ report: CatalogueMergedNotice; pairs: MergedPair[] }> {
   const on = mode === 'on'
   // In both modes: a merge by the owner's hand has a trace to sweep in the week of `report` too.
   await merges.sweep()
@@ -130,9 +130,19 @@ export async function mergeNight(
     judge('item', row.a, row.b, row.a.unit === row.b.unit, row.meaning),
   )
   const places = await placePairs(await merges.placeGroups(), embedder)
+  // Kept as the night goes: a side merged — or, in `report`, merged as if — passes what it may not be
+  // merged with to its survivor, so «apart» of A and B holds against C once A went into C (adversarial
+  // Г1). In `on` the merge reads it again in its own transaction; in `report` this is all there is.
   const undone = {
-    item: await merges.undonePairs('item'),
-    place: await merges.undonePairs('place'),
+    item: new Set(await merges.undonePairs('item')),
+    place: new Set(await merges.undonePairs('place')),
+  }
+  const pass = (subject: MergeSubject, from: string, into: string): void => {
+    for (const key of [...undone[subject]]) {
+      const [a = '', b = ''] = key.split(' ')
+      if (a === from) undone[subject].add(pairKey(into, b))
+      if (b === from) undone[subject].add(pairKey(a, into))
+    }
   }
 
   const wouldMerge: MergedPair[] = []
@@ -151,6 +161,7 @@ export async function mergeNight(
     if (gone.has(pair.from.id) || gone.has(pair.into.id)) continue
     if (!on) {
       gone.add(pair.from.id)
+      pass(pair.subject, pair.from.id, pair.into.id)
       wouldMerge.push({
         subject: pair.subject,
         from: pair.from.name,
@@ -172,7 +183,10 @@ export async function mergeNight(
         pair.subject === 'item'
           ? await merges.mergeItems(pair.from.id, pair.into.id, how)
           : await merges.mergePlaces(pair.from.id, pair.into.id, how)
-      if ('id' in outcome) gone.add(pair.from.id)
+      if ('id' in outcome) {
+        gone.add(pair.from.id)
+        pass(pair.subject, pair.from.id, pair.into.id)
+      }
       // Too many codes for one item: the owner decides.
       else if (outcome.refused === 'barcodes') candidates.push(pair)
     } catch (error) {
@@ -219,13 +233,16 @@ export async function mergeNight(
 
   const merged = on ? await merges.nightMerges(day) : wouldMerge
   return {
-    kind: 'catalogue_merged',
-    day,
-    mode,
-    merged: merged.length,
-    candidates: fresh.length,
-    mergedPairs: merged.slice(0, MERGE_NOTICE_PAIRS),
-    candidatePairs: printed,
+    report: {
+      kind: 'catalogue_merged',
+      day,
+      mode,
+      merged: merged.length,
+      candidates: fresh.length,
+      mergedPairs: merged.slice(0, MERGE_NOTICE_PAIRS),
+      candidatePairs: printed,
+    },
+    pairs: merged,
   }
 }
 
@@ -244,8 +261,8 @@ export async function mergeTick(
   // A night that throws before its end — the pairs not read — stays claimed and unfinished, and is
   // claimed again within the hour; a pair that fails does not stop it.
   if (clock.merge && (await deps.merges.claimRun(clock.day, mode, now))) {
-    const report = await mergeNight(deps, mode, clock.day)
-    await deps.merges.finishRun(clock.day, report, new Date())
+    const { report, pairs } = await mergeNight(deps, mode, clock.day)
+    await deps.merges.finishRun(clock.day, report, pairs, new Date())
   }
   if (clock.report) {
     const report = await deps.merges.takeReport(clock.day, now)

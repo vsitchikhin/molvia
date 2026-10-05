@@ -1182,6 +1182,11 @@ export const catalogueMergeRuns = pgTable(
     startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
     report: jsonb('report'),
+    /**
+     * Every pair the night merged or, in `report`, would merge — the message names ten (adversarial В2):
+     * `make merge-night DAY=` prints them all, with a number to undo or a command to say apart.
+     */
+    pairs: jsonb('pairs'),
     reportedAt: timestamp('reported_at', { withTimezone: true }),
   },
   (table) => [check('catalogue_merge_runs_mode_known', oneOf(table.mode, ['on', 'report']))],

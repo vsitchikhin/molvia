@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { ITEM_BARCODES_MAX } from '@molvia/model'
-import { catalogueMergedNoticeSchema } from '@molvia/model'
+import { catalogueMergedNoticeSchema, mergedPairSchema } from '@molvia/model'
 import type { CatalogueMergedNotice, MergedPair, MergeSubject } from '@molvia/model'
 import type { Conn } from './index'
 import { idOrNull } from './rows'
@@ -31,9 +31,11 @@ export type UnmergeOutcome =
   | { readonly subject: MergeSubject; readonly from: string; readonly into: string }
   | { readonly refused: 'missing' | 'undone' }
   /**
-   * The survivor was merged on since: a chain is undone from its end. Undone out of order, the swap of
-   * one person's verdicts on the first step met its rows moved on by the second, and the person's
-   * opinions came back crossed (adversarial Б1). `later` is the merge to undo first.
+   * A later merge still standing touched what this one did: the survivor was merged on (a chain,
+   * adversarial Б1), or another merge into the same survivor swapped the same person's verdict or added
+   * to the same pick (a fan, review №11, adversarial В1, В3). Undone out of order, a swap undone met
+   * contents another merge had put there, and the person's scores came back crossed. Undone from the
+   * last, every swap meets its own. `later` is the merge to undo first.
    */
   | { readonly refused: 'chained'; readonly later: number }
 
@@ -99,7 +101,17 @@ export interface MergeRepository {
    * claimed over an hour ago and never finished is claimed again: its instance died with it (А6).
    */
   claimRun(day: string, mode: 'on' | 'report', at: Date): Promise<boolean>
-  finishRun(day: string, report: CatalogueMergedNotice, at: Date): Promise<void>
+  finishRun(
+    day: string,
+    report: CatalogueMergedNotice,
+    pairs: readonly MergedPair[],
+    at: Date,
+  ): Promise<void>
+  /**
+   * Every pair of a night: in `on` its merges still standing, by number, from the journal; in `report`
+   * the pairs it would have merged, with their ids. `null` for a night that never finished.
+   */
+  nightList(day: string): Promise<{ mode: 'on' | 'report'; pairs: MergedPair[] } | null>
   /** The report of a night finished and not yet handed to the owner, marked handed in one statement. */
   takeReport(day: string, at: Date): Promise<CatalogueMergedNotice | null>
 }
@@ -225,6 +237,34 @@ export function createMergeRepository(db: Conn): MergeRepository {
               where p.subject = 'place'`,
     )
     return new Set(rows.map((row) => pairKey(row.a, row.b)))
+  }
+
+  async function nightMergesOf(day: string): Promise<MergedPair[]> {
+    const rows = await db.execute<{
+      id: string
+      subject: MergeSubject
+      from_name: string
+      into_name: string
+      city: string | null
+    }>(sql`
+      select m.id, m.subject,
+             coalesce(fi.name, fp.name) as from_name,
+             coalesce(ti.name, tp.name) as into_name,
+             tp.city
+      from catalogue_merges m
+      left join items fi on fi.id = m.from_item
+      left join items ti on ti.id = m.into_item
+      left join places fp on fp.id = m.from_place
+      left join places tp on tp.id = m.into_place
+      where m.night = ${day}::date and m.undone_at is null
+      order by m.id`)
+    return rows.map((row) => ({
+      subject: row.subject,
+      from: row.from_name,
+      into: row.into_name,
+      ...(row.city === null ? {} : { city: row.city }),
+      id: Number(row.id),
+    }))
   }
 
   async function opened(
@@ -548,11 +588,29 @@ export function createMergeRepository(db: Conn): MergeRepository {
         const item = merge.subject === 'item'
         const from = (item ? merge.from_item : merge.from_place) ?? ''
         const into = (item ? merge.into_item : merge.into_place) ?? ''
-        const [later] = await tx.execute<{ id: string }>(
-          item
-            ? sql`select id from catalogue_merges where from_item = ${into} and undone_at is null`
-            : sql`select id from catalogue_merges where from_place = ${into} and undone_at is null`,
-        )
+        const [later] = await tx.execute<{ id: string }>(sql`
+          select id from (
+            -- the survivor merged on since: a chain
+            select m.id from catalogue_merges m
+            where m.undone_at is null
+              and ${item ? sql`m.from_item = ${into}::uuid` : sql`m.from_place = ${into}::uuid`}
+            union
+            -- a later merge that swapped or withdrew a verdict row this one did, or added to a pick
+            -- this one moved: a fan into one survivor
+            select l.id from catalogue_merges l
+            join catalogue_merge_moves lm on lm.merge_id = l.id
+            join catalogue_merge_moves mm on mm.merge_id = ${id}
+            where l.id > ${id} and l.undone_at is null
+              and (
+                (lm.what in ('verdict_swapped', 'verdict_withdrawn')
+                 and mm.what in ('verdict_swapped', 'verdict_withdrawn', 'verdict')
+                 and array[lm.key->>'kept', lm.key->>'trace', lm.key->>'id']
+                     && array[mm.key->>'kept', mm.key->>'trace', mm.key->>'id'])
+                or (lm.what = 'pick_added' and mm.what in ('pick', 'pick_added')
+                    and lm.actor_id = mm.actor_id and lm.key->>'queryKey' = mm.key->>'queryKey'))
+          ) touched
+          order by id desc
+          limit 1`)
         if (later) return { refused: 'chained', later: Number(later.id) }
         // Where the moved rows stand now: the survivor, or whatever it was merged into since.
         const now = item ? liveItemId(into) : livePlaceId(into)
@@ -845,33 +903,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
         on conflict do nothing`)
     },
 
-    async nightMerges(day) {
-      const rows = await db.execute<{
-        id: string
-        subject: MergeSubject
-        from_name: string
-        into_name: string
-        city: string | null
-      }>(sql`
-        select m.id, m.subject,
-               coalesce(fi.name, fp.name) as from_name,
-               coalesce(ti.name, tp.name) as into_name,
-               tp.city
-        from catalogue_merges m
-        left join items fi on fi.id = m.from_item
-        left join items ti on ti.id = m.into_item
-        left join places fp on fp.id = m.from_place
-        left join places tp on tp.id = m.into_place
-        where m.night = ${day}::date and m.undone_at is null
-        order by m.id`)
-      return rows.map((row) => ({
-        subject: row.subject,
-        from: row.from_name,
-        into: row.into_name,
-        ...(row.city === null ? {} : { city: row.city }),
-        id: Number(row.id),
-      }))
-    },
+    nightMerges: (day) => nightMergesOf(day),
 
     async claimRun(day, mode, at) {
       // A moment goes to the driver as a string: drizzle turns a `Date` only in its builder, and a raw
@@ -888,11 +920,21 @@ export function createMergeRepository(db: Conn): MergeRepository {
       return rows.length > 0
     },
 
-    async finishRun(day, report, at) {
+    async finishRun(day, report, pairs, at) {
       await db.execute(sql`
         update catalogue_merge_runs
-        set finished_at = ${at.toISOString()}::timestamptz, report = ${JSON.stringify(report)}::jsonb
+        set finished_at = ${at.toISOString()}::timestamptz, report = ${JSON.stringify(report)}::jsonb,
+            pairs = ${JSON.stringify(pairs)}::jsonb
         where day = ${day}::date`)
+    },
+
+    async nightList(day) {
+      const [run] = await db.execute<{ mode: 'on' | 'report'; pairs: unknown }>(sql`
+        select mode, pairs from catalogue_merge_runs
+        where day = ${day}::date and finished_at is not null`)
+      if (!run) return null
+      if (run.mode === 'on') return { mode: 'on', pairs: await nightMergesOf(day) }
+      return { mode: 'report', pairs: mergedPairSchema.array().parse(run.pairs ?? []) }
     },
 
     async takeReport(day, at) {

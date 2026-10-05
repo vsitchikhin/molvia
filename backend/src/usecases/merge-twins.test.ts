@@ -76,6 +76,7 @@ function world({
     },
     nightMerges: () => Promise.resolve([...journal]),
     openCandidates: () => Promise.resolve([]),
+    nightList: () => Promise.resolve(null),
     apart: () => Promise.reject(new Error('not here')),
     claimRun: (day) => {
       if (claimed || runs.has(day)) return Promise.resolve(false)
@@ -99,7 +100,7 @@ function world({
       return Promise.resolve()
     },
   }
-  const night = (mode: 'on' | 'report', day = '2026-10-06') =>
+  const nightAll = (mode: 'on' | 'report', day = '2026-10-06') =>
     mergeNight(
       {
         merges,
@@ -111,7 +112,9 @@ function world({
       mode,
       day,
     )
-  return { merges, notices, merged, queued, runs, failures, night, sweeps: () => sweeps }
+  const night = async (mode: 'on' | 'report', day = '2026-10-06') =>
+    (await nightAll(mode, day)).report
+  return { merges, notices, merged, queued, runs, failures, night, nightAll, sweeps: () => sweeps }
 }
 
 describe('mergeNight', () => {

@@ -17,7 +17,7 @@ NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json i
 # The heavy checks of every copy on this machine take turns, the push's among them (MOL-139).
 ONE_AT_A_TIME = ./bin/one-at-a-time.sh "make $@"
 
-.PHONY: help setup hooks up down reup ps logs psql migrate forget seed gates failures merge unmerge apart merge-candidates db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
+.PHONY: help setup hooks up down reup ps logs psql migrate forget seed gates failures merge unmerge apart merge-night merge-candidates db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -117,6 +117,10 @@ unmerge: ## Undo a merge by its number in the report: make unmerge ID=<n> [YES=1
 apart: ## Two things never merged or named by the night: make apart FROM=<id> INTO=<id> [YES=1] (MOL-106)
 	$(NEED_SCAFFOLD)
 	$(if $(filter command line,$(origin FROM)),,unset FROM;) $(if $(filter command line,$(origin INTO)),,unset INTO;) ./bin/merge.sh apart "$${FROM:-}" "$${INTO:-}" $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
+
+merge-night: ## Every pair a night merged, or would have: make merge-night DAY=<YYYY-MM-DD> (MOL-106)
+	$(NEED_SCAFFOLD)
+	$(if $(filter command line,$(origin DAY)),,unset DAY;) ./bin/merge.sh night "$${DAY:-}"
 
 merge-candidates: ## Every candidate of the reports named and still apart, with its command (MOL-106)
 	$(NEED_SCAFFOLD)

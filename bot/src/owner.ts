@@ -130,7 +130,9 @@ function mergedText(notice: CatalogueMergedNotice): string {
       printed += 1
     }
     const rest = notice.merged - printed
-    if (rest > 0) lines.push(t(undefined, 'owner.merge.more', { count: rest }))
+    // Every one of them has a number or a command, and the message has ten (adversarial В2).
+    if (rest > 0)
+      lines.push(t(undefined, 'owner.merge.moreNight', { count: rest, day: notice.day }))
   }
   if (notice.candidatePairs.length > 0) {
     fits(['', t(undefined, 'owner.merge.candidates')])

@@ -1,5 +1,5 @@
 {
-  "id": "71a11991-343e-4a49-8fe6-e5e04c39fd38",
+  "id": "f7813b78-e472-4074-9be5-5a2aeab6dc24",
   "prevId": "685fabd4-6eca-4b38-ad14-95f37971ba52",
   "version": "7",
   "dialect": "postgresql",
@@ -523,6 +523,12 @@
         },
         "report": {
           "name": "report",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pairs": {
+          "name": "pairs",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false

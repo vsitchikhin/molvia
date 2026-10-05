@@ -6,6 +6,7 @@ export const MERGE_USAGE = [
   '       merge unmerge <merge-number> [--yes]       a merge undone, by its number in the report',
   '       merge apart <id> <id> [--yes]              the two never merged or named by the night',
   '       merge candidates                           every candidate named and still apart',
+  '       merge night <YYYY-MM-DD>                   every pair a night merged, or would have',
 ].join('\n')
 
 /** 0 — done or nothing to do, 1 — refused or the database failed, 2 — the command was wrong. */
@@ -102,6 +103,26 @@ export async function mergeCommand(
           : 'apart already',
       )
       write(done)
+      return 0
+    }
+    if (action === 'night' && values.length === 1 && /^\d{4}-\d{2}-\d{2}$/.test(values[0] ?? '')) {
+      const day = values[0] ?? ''
+      const night = await inTransaction(true, (merges) => merges.nightList(day))
+      if (night === null) {
+        write(`no finished night on ${day}`)
+        return 1
+      }
+      for (const pair of night.pairs) {
+        const place = pair.city === undefined ? '' : `place · ${pair.city} · `
+        const what = `${place}«${pair.from}» → «${pair.into}»`
+        if (pair.id !== undefined) write(`#${String(pair.id)} ${what}`)
+        else write(`${what}\n  make apart FROM=${pair.fromId ?? ''} INTO=${pair.intoId ?? ''}`)
+      }
+      write(
+        night.mode === 'on'
+          ? `${String(night.pairs.length)} merged and standing — make unmerge ID= takes one back`
+          : `${String(night.pairs.length)} would be merged — make apart says one is two things`,
+      )
       return 0
     }
     if (action === 'candidates' && values.length === 0 && flags.length === 0) {

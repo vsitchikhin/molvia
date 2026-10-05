@@ -119,4 +119,18 @@ describe('dist/merge.js', () => {
     ])
     expect(merge('apart', older, younger, '--yes').stdout).toContain('apart already')
   })
+
+  it('prints every pair of a night, with its command (adversarial В2)', async () => {
+    expect(merge('night', '2026-10-06').status).toBe(1)
+    const pairs = [
+      { subject: 'item', from: 'Молоко 3.2%', into: 'Молоко 3,2%', fromId: younger, intoId: older },
+    ]
+    await db.execute(sql`
+      insert into catalogue_merge_runs (day, mode, started_at, finished_at, pairs)
+      values ('2026-10-06', 'report', now(), now(), ${JSON.stringify(pairs)}::jsonb)`)
+    const listed = merge('night', '2026-10-06')
+    expect(listed.status).toBe(0)
+    expect(listed.stdout).toContain(`make apart FROM=${younger} INTO=${older}`)
+    expect(listed.stdout).toContain('1 would be merged')
+  })
 })

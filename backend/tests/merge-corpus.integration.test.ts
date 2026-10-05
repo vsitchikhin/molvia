@@ -66,17 +66,19 @@ beforeAll(async () => {
   }
   await embedder.loaded
   await embedMissing({ embeddings: createItemEmbeddingRepository(db), embedder })
-  report = await mergeNight(
-    {
-      merges: createMergeRepository(db),
-      embedder,
-      failed: (error) => {
-        throw error
+  report = (
+    await mergeNight(
+      {
+        merges: createMergeRepository(db),
+        embedder,
+        failed: (error) => {
+          throw error
+        },
       },
-    },
-    'on',
-    '2026-10-06',
-  )
+      'on',
+      '2026-10-06',
+    )
+  ).report
 }, 600_000)
 
 afterAll(async () => {
@@ -103,7 +105,8 @@ describe('the night on the seed', () => {
     const merges = createMergeRepository(db)
     const named = [...report.candidatePairs]
     for (const day of ['2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10']) {
-      const next = await mergeNight({ merges, embedder, failed: () => undefined }, 'on', day)
+      const next = (await mergeNight({ merges, embedder, failed: () => undefined }, 'on', day))
+        .report
       expect(next.merged).toBe(0)
       named.push(...next.candidatePairs)
     }

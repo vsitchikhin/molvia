@@ -34,6 +34,7 @@ CREATE TABLE "catalogue_merge_runs" (
 	"started_at" timestamp with time zone NOT NULL,
 	"finished_at" timestamp with time zone,
 	"report" jsonb,
+	"pairs" jsonb,
 	"reported_at" timestamp with time zone,
 	CONSTRAINT "catalogue_merge_runs_mode_known" CHECK ("catalogue_merge_runs"."mode" in ('on', 'report'))
 );

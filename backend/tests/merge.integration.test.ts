@@ -552,11 +552,13 @@ describe('a pair undone is never joined again by the survivor’s survivor (adve
     await merges.unmerge(second)
     await merges.unmerge(first)
     numbered(await merges.mergeItems(b, c, { by: 'hand' }))
-    const report = await mergeNight(
-      { merges, embedder: NO_EMBEDDER, failed: () => undefined },
-      'on',
-      '2026-10-07',
-    )
+    const report = (
+      await mergeNight(
+        { merges, embedder: NO_EMBEDDER, failed: () => undefined },
+        'on',
+        '2026-10-07',
+      )
+    ).report
     expect([report.merged, await tracedTo(a)]).toEqual([0, null])
     // Not even named: the owner said once that they are two things.
     const named = report.candidatePairs.map((pair) => [pair.fromId, pair.intoId].sort().join(' '))
@@ -639,11 +641,13 @@ describe('two things the owner says are apart (make apart)', () => {
     expect(await merges.apart(a, b)).toEqual({ subject: 'item', said: true })
     expect(await merges.apart(b, a)).toEqual({ subject: 'item', said: false })
     numbered(await merges.mergeItems(b, c, { by: 'hand' }))
-    const report = await mergeNight(
-      { merges, embedder: NO_EMBEDDER, failed: () => undefined },
-      'on',
-      '2026-10-07',
-    )
+    const report = (
+      await mergeNight(
+        { merges, embedder: NO_EMBEDDER, failed: () => undefined },
+        'on',
+        '2026-10-07',
+      )
+    ).report
     expect(await tracedTo(a)).toBeNull()
     const named = report.candidatePairs.map((pair) => [pair.fromId, pair.intoId].sort().join(' '))
     expect(named).not.toContain([a, c].sort().join(' '))
@@ -660,5 +664,138 @@ describe('two things the owner says are apart (make apart)', () => {
     const gyumri = await insertPlace(db, { name: 'Ереван Сити', city: 'Гюмри' })
     const yerevan = await insertPlace(db, { name: 'Ереван Сити', city: 'Ереван' })
     expect(await merges.apart(gyumri, yerevan)).toEqual({ refused: 'city' })
+  })
+})
+
+describe('the undo of a fan into one survivor (review №11, adversarial В1, В3)', () => {
+  let a: string
+  let b: string
+  let d: string
+  let first: number
+  let second: number
+
+  const scores = async () => {
+    const read = async (itemId: string) =>
+      (
+        await db.execute<{ score: number }>(sql`
+          select score from verdicts
+          where actor_id = ${owner} and item_id = ${itemId} and deleted_at is null`)
+      )[0]?.score ?? null
+    return [await read(a), await read(b), await read(d)]
+  }
+
+  beforeEach(async () => {
+    b = await made('Молоко 3,2%', 'moloko 3 2', '2026-09-01')
+    a = await made('Малоко 3,2%', 'maloko 3 2', '2026-09-02')
+    d = await made('Молако 3,2%', 'molako 3 2', '2026-09-03')
+    for (const [itemId, score, day] of [
+      // both merges swap: A is later than B, and D later than what A left on B
+      [b, 1, '2026-09-01'],
+      [a, 5, '2026-09-02'],
+      [d, 3, '2026-09-03'],
+    ] as const) {
+      await db.execute(sql`
+        insert into verdicts (id, actor_id, item_id, item_kind, score, rated_at, updated_at)
+        values (${randomUUID()}, ${owner}, ${itemId}, 'product', ${score},
+                ${`${day}T10:00:00Z`}::timestamptz, ${`${day}T10:00:00Z`}::timestamptz)`)
+    }
+    first = numbered(await merges.mergeItems(a, b, NIGHT))
+    second = numbered(await merges.mergeItems(d, b, NIGHT))
+  })
+
+  it('refuses the first while the second swapped the same verdict, and changes nothing', async () => {
+    const before = await snapshot()
+    expect(await merges.unmerge(first)).toEqual({ refused: 'chained', later: second })
+    expect(await snapshot()).toEqual(before)
+  })
+
+  it('puts every score home undone from the last', async () => {
+    await merges.unmerge(second)
+    await merges.unmerge(first)
+    expect(await scores()).toEqual([5, 1, 3])
+  })
+
+  it('refuses it too while the second added to the same pick, keeping the «own word»', async () => {
+    const c = await made('Кефир 1%', 'kefir 1', '2026-09-01')
+    const x = await made('Кифир 1%', 'kifir 1', '2026-09-02')
+    const y = await made('Кефир 1 %', 'kefir 1', '2026-09-03')
+    await db.execute(sql`
+      insert into search_picks (actor_id, query_key, item_id, picks, admits)
+      values (${owner}, 'kefir', ${c}, 1, false), (${owner}, 'kefir', ${x}, 1, true),
+             (${owner}, 'kefir', ${y}, 1, true)`)
+    const one = numbered(await merges.mergeItems(x, c, NIGHT))
+    const two = numbered(await merges.mergeItems(y, c, NIGHT))
+    expect(await merges.unmerge(one)).toEqual({ refused: 'chained', later: two })
+  })
+
+  it('lets a merge go that no later one touched', async () => {
+    const c = await made('Кефир 1%', 'kefir 1', '2026-09-01')
+    const x = await made('Кифир 1%', 'kifir 1', '2026-09-02')
+    const y = await made('Кефир 1 %', 'kefir 1', '2026-09-03')
+    const one = numbered(await merges.mergeItems(x, c, NIGHT))
+    numbered(await merges.mergeItems(y, c, NIGHT))
+    expect(await merges.unmerge(one)).toEqual({ subject: 'item', from: x, into: c })
+  })
+})
+
+describe('every pair of a night (adversarial В2) and «apart» through a third (Г1)', () => {
+  async function twelvePairs(): Promise<void> {
+    for (let i = 0; i < 12; i++) {
+      const kept = await made(`Товар ${String(i)}`, `tovar ${String(i)}`, '2026-09-01')
+      const twin = await made(`Товар  ${String(i)}`, `tovar ${String(i)}`, '2026-09-02')
+      const axis = Array.from({ length: 768 }, (_, j) => (j === i ? 1 : 0))
+      for (const id of [kept, twin]) {
+        await db.execute(sql`
+          insert into item_embeddings (item_id, model, embedding)
+          values (${id}, ${EMBEDDING_MODEL}, ${`[${axis.join(',')}]`}::halfvec)`)
+      }
+    }
+  }
+
+  const tick = (mode: 'on' | 'report') =>
+    mergeTick(
+      {
+        merges,
+        embedder: NO_EMBEDDER,
+        notices: { queue: () => Promise.resolve() },
+        owner: true,
+        failed: () => undefined,
+      },
+      mode,
+      new Date('2026-10-06T05:00:00Z'),
+    )
+
+  it('keeps every merge of an `on` night past the ten the message names, by number', async () => {
+    await twelvePairs()
+    await tick('on')
+    const night = await merges.nightList('2026-10-06')
+    expect(night?.mode).toBe('on')
+    expect(night?.pairs.map((pair) => typeof pair.id)).toEqual(Array(12).fill('number'))
+  })
+
+  it('keeps every pair a `report` night would merge, with both ids', async () => {
+    await twelvePairs()
+    await tick('report')
+    const night = await merges.nightList('2026-10-06')
+    expect(night?.mode).toBe('report')
+    expect(night?.pairs).toHaveLength(12)
+    expect(
+      night?.pairs.every((pair) => pair.fromId !== undefined && pair.intoId !== undefined),
+    ).toBe(true)
+  })
+
+  it('does not promise in report to merge two things apart into one third', async () => {
+    const c = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
+    const b = await made('Молоко 3,2%', 'moloko 3 2', '2026-09-02')
+    const a = await made('Малоко 3,2%', 'maloko 3 2', '2026-09-03')
+    for (const id of [a, b, c]) await vector(id, 1, 0)
+    await merges.apart(a, b)
+    const { report } = await mergeNight(
+      { merges, embedder: NO_EMBEDDER, failed: () => undefined },
+      'report',
+      '2026-10-07',
+    )
+    const would = report.mergedPairs.filter((pair) => pair.intoId === c).map((pair) => pair.fromId)
+    expect(would).toHaveLength(1)
   })
 })
