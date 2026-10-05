@@ -101,16 +101,23 @@ export function useTapSetting<T>(
   const same = (one: unknown, other: unknown): boolean =>
     JSON.stringify(one) === JSON.stringify(other)
 
-  function leave(entry: LeftBehind | undefined): void {
+  /**
+   * Writes the setting's entry, or lets it go — only where it is this screen's own, or the very
+   * one named (`over`), or `'any'` for a new choice, always the last. A later screen's change owns
+   * the key, and the end of an earlier one is not its to overwrite (round 11, Р11-А1).
+   */
+  function leave(entry: LeftBehind | undefined, over?: LeftBehind | 'any'): void {
     const key = memory()
     if (!key) return
+    const current = leftBehind.get(key)
+    if (current && over !== 'any' && current.by !== me && current !== over) return
     if (entry) leftBehind.set(key, entry)
     else leftBehind.delete(key)
   }
 
   /** The person has been told — by this screen — what became of the change: nothing is left. */
-  function told(): void {
-    leave(undefined)
+  function told(over?: LeftBehind): void {
+    leave(undefined, over)
   }
 
   function settle(): void {
@@ -155,6 +162,11 @@ export function useTapSetting<T>(
         }
         return
       }
+      // Another screen's change left unsure while this read was out: this read is its check too.
+      if (now?.state === 'unsure' && now.by !== me) {
+        lastChoice = { choice: now.choice as T }
+        unsure.value = true
+      }
       const notSaved =
         now?.state === 'refused'
           ? true
@@ -170,7 +182,7 @@ export function useTapSetting<T>(
       // it said only «без связи», and a check that finds the choice did not land says «не
       // сохранилось».
       if (notSaved !== undefined) saveFailed.value = notSaved
-      told()
+      told(now)
       settle()
       value.value = answer
       failure.value = null
@@ -197,7 +209,7 @@ export function useTapSetting<T>(
     saving.value = true
     saveFailed.value = false
     // On its way, for any screen of the setting drawn before it ends (round 10, Р10-А1).
-    leave({ state: 'writing', choice: next, by: me })
+    leave({ state: 'writing', choice: next, by: me }, 'any')
     try {
       value.value = await write(next)
       lastChoice = undefined

@@ -309,6 +309,38 @@ describe('useTapSetting: a change whose answer was lost', () => {
     })
   })
 
+  it('the answer of a gone screen’s write does not wipe a later screen’s unsure choice (round 11, Р11-А1)', async () => {
+    server = { off: true, day: 25 }
+    const first = await mounted()
+    let landTen: () => void = () => undefined
+    write.mockImplementationOnce(
+      (next) =>
+        new Promise((resolve) => {
+          landTen = () => {
+            server = next
+            resolve(next)
+          }
+        }),
+    )
+    void first.choose({ off: true, day: 10 })
+    for (const view of views.splice(0)) view.unmount()
+
+    // The second screen: 10 still on its way; 15 chosen, lost, and its check torn too.
+    const second = await mounted()
+    write.mockRejectedValueOnce(new TypeError('connection reset'))
+    read.mockRejectedValueOnce(new TypeError('connection reset'))
+    await second.choose({ off: true, day: 15 })
+    expect(second.unsure.value).toBe(true)
+    for (const view of views.splice(0)) view.unmount()
+
+    landTen()
+    await flushPromises()
+    // The third screen: the server holds 10, and the last choice — 15 — was not saved.
+    const third = await mounted()
+    expect(third.value.value).toEqual({ off: true, day: 10 })
+    expect(third.saveFailed.value).toBe(true)
+  })
+
   it('a screen drawn anew whose first read fails: its own failure, and the change stays unsure', async () => {
     const tap = await mounted()
     write.mockRejectedValue(new TypeError('connection reset'))
