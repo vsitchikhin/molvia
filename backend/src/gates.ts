@@ -181,6 +181,8 @@ function receiptLines(receipts: ReceiptsInWindow): string[] {
     row('  left out', [String(receipts.linesSkipped), '']),
     row('  another item', [String(receipts.linesItem), '']),
     row('  quantity or sum', [String(receipts.linesFigures), '']),
+    // the receipt's own edit, not its lines': a total put right moves no line (MOL-222, review 2)
+    row('total put right', [String(receipts.totalsCorrected), 'receipts']),
     row('sent to recorded, within 5 min', [String(receipts.within5m), 'receipts']),
     row('  15 min', [String(receipts.within15m), '']),
     row('  1 hour', [String(receipts.within1h), '']),

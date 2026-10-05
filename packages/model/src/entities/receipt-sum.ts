@@ -155,25 +155,34 @@ export interface ReadFigures {
 }
 
 /**
+ * What the lines read make up of the printed total (MOL-222): each line's sum in the total's currency
+ * and not past the total itself — a sum past it or in another currency covers nothing (review Р11):
+ * junk OCR would otherwise vouch for a receipt barely read. `null` without a total. The one count the
+ * hint «строки дают X из Y» and `readPartly` both read.
+ */
+export function readCovered(lines: readonly ReadFigures[], total: Money | null): Money | null {
+  if (total === null || total.minor <= 0n) return null
+  let read = 0n
+  for (const { sum } of lines) {
+    if (sum !== null && sum.currency === total.currency && sum.minor <= total.minor)
+      read += sum.minor
+  }
+  return { minor: read, currency: total.currency }
+}
+
+/**
  * Read only in part (MOL-222, В-1 — the «переснимите» of before, now a hint on the review that never
  * keeps the receipt from being recorded): no lines; or the total was read and the lines make up less
- * than `READ_PARTLY_TOTAL_SHARE` of it; or the total was not read and fewer than half of the lines add
- * up by their own arithmetic. A total that was not read decides nothing alone — OCR missed it on 9 of
- * the bench's 16 readings, most of them good ones. Of what was read, never of the person's edits: the
- * server counts it at the reading, the phone shows it on the review.
+ * than `READ_PARTLY_TOTAL_SHARE` of it (`readCovered`); or the total was not read and fewer than half
+ * of the lines add up by their own arithmetic. A total that was not read decides nothing alone — OCR
+ * missed it on 9 of the bench's 16 readings, most of them good ones. Of what was read, never of the
+ * person's edits: the server counts it at the reading, the phone shows it on the review.
  */
 export function readPartly(lines: readonly ReadFigures[], total: Money | null): boolean {
   if (lines.length === 0) return true
-  if (total !== null && total.minor > 0n) {
-    // a sum past the total itself or in another currency covers nothing (review Р11): junk OCR would
-    // otherwise vouch for a receipt barely read
-    let read = 0n
-    for (const { sum } of lines) {
-      if (sum !== null && sum.currency === total.currency && sum.minor <= total.minor) {
-        read += sum.minor
-      }
-    }
-    return read * 100n < total.minor * BigInt(Math.round(READ_PARTLY_TOTAL_SHARE * 100))
+  const covered = readCovered(lines, total)
+  if (covered !== null && total !== null) {
+    return covered.minor * 100n < total.minor * BigInt(Math.round(READ_PARTLY_TOTAL_SHARE * 100))
   }
   const settled = lines.filter((line) => line.settled).length
   return settled * 2 < lines.length

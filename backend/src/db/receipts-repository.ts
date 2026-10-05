@@ -180,6 +180,8 @@ export interface RecordedReceipt {
   readonly confirmed: readonly number[]
   /** What the person put right before recording, counted in `receipt_days` (MOL-222). */
   readonly edits: ReceiptEdits
+  /** Counted in `receipt_days`: the first record of the receipt, never one after its trip went. */
+  readonly counted: boolean
 }
 
 /**
@@ -192,6 +194,8 @@ export interface ReceiptEdits {
   readonly skipped: number
   readonly item: number
   readonly figures: number
+  /** The total was put right: one edit of the receipt (review 2). */
+  readonly totalCorrected: boolean
 }
 
 /** What a reading or a record adds to its day of `receipt_days`, by column. */
@@ -690,6 +694,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           ? sql`(${took} <= interval '${sql.raw(bound)}')::int`
           : sql`(${took} > interval '${sql.raw(below)}' and ${took} <= interval '${sql.raw(bound)}')::int`
       const { edits } = recorded
+      if (!recorded.counted) return
       await tally(
         db,
         {
@@ -699,6 +704,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           linesSkipped: sql`${edits.skipped}::int`,
           linesItem: sql`${edits.item}::int`,
           linesFigures: sql`${edits.figures}::int`,
+          totalsCorrected: sql`${edits.totalCorrected ? 1 : 0}::int`,
           within5m: within('5 minutes', null),
           within15m: within('15 minutes', '5 minutes'),
           within1h: within('1 hour', '15 minutes'),

@@ -1798,6 +1798,8 @@ export const receiptDays = pgTable(
     linesItem: integer('lines_item').notNull().default(0),
     /** The quantity or the sum changed. */
     linesFigures: integer('lines_figures').notNull().default(0),
+    /** Receipts whose total the person put right — one edit of the receipt, never of its lines. */
+    totalsCorrected: integer('totals_corrected').notNull().default(0),
     /** From the server taking the receipt to its record — never the phone's clock. */
     within5m: integer('within_5m').notNull().default(0),
     within15m: integer('within_15m').notNull().default(0),
@@ -1808,7 +1810,7 @@ export const receiptDays = pgTable(
   (table) => [
     check(
       'receipt_days_counts_non_negative',
-      sql`least(${table.read}, ${table.readPartly}, ${table.reshoot}, ${table.unreadable}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
+      sql`least(${table.read}, ${table.readPartly}, ${table.reshoot}, ${table.unreadable}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
     ),
     check('receipt_days_edited_within_lines', sql`${table.linesEdited} <= ${table.lines}`),
   ],

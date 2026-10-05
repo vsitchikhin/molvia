@@ -4,6 +4,7 @@ import {
   lineProduct,
   priceInDoubt,
   READ_PARTLY_TOTAL_SHARE,
+  readCovered,
   readPartly,
   receiptBalance,
   receiptDigits,
@@ -236,5 +237,13 @@ describe('read only in part — the «переснимите» of before, a hint
 
   it('takes a total of zero for no total', () => {
     expect(readPartly([read(amd(1))], amd(0))).toBe(false)
+  })
+
+  it('covers by the lines in the total’s currency and not past it — the hint’s figure', () => {
+    expect(
+      readCovered([read(amd(300)), read(amd(5_000)), read(rub(100)), read(null)], amd(1_000)),
+    ).toEqual(amd(300))
+    expect(readCovered([read(amd(300))], null)).toBeNull()
+    expect(readCovered([read(amd(300))], amd(0))).toBeNull()
   })
 })

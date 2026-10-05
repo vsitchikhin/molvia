@@ -103,6 +103,7 @@ export interface ReceiptsInWindow {
   readonly linesSkipped: number
   readonly linesItem: number
   readonly linesFigures: number
+  readonly totalsCorrected: number
   readonly within5m: number
   readonly within15m: number
   readonly within1h: number
@@ -244,6 +245,7 @@ async function receiptsIn(tx: Conn, from: Date, to: Date): Promise<ReceiptsInWin
       linesSkipped: sum(receiptDays.linesSkipped),
       linesItem: sum(receiptDays.linesItem),
       linesFigures: sum(receiptDays.linesFigures),
+      totalsCorrected: sum(receiptDays.totalsCorrected),
       within5m: sum(receiptDays.within5m),
       within15m: sum(receiptDays.within15m),
       within1h: sum(receiptDays.within1h),
@@ -263,6 +265,7 @@ async function receiptsIn(tx: Conn, from: Date, to: Date): Promise<ReceiptsInWin
     linesSkipped: 0,
     linesItem: 0,
     linesFigures: 0,
+    totalsCorrected: 0,
     within5m: 0,
     within15m: 0,
     within1h: 0,

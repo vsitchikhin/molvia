@@ -50,35 +50,57 @@ function asRead(stored: StoredReceiptLine, line: RecordedLine): boolean {
 }
 
 /**
- * What the person put right against what the review showed (MOL-222, Р-6): «не записывать», another item
- * — a new one named where an item was shown, or a catalogue's where none or another was — and the
- * quantity or the sum changed. A new item kept new under another name is not an edit: the reading gave
- * no name to correct, only a gloss.
+ * What the person put right (MOL-222, Р-6): «не записывать», another item, the quantity or the sum, a
+ * line counted once however many of them; and the total, an edit of the receipt and never of its lines
+ * (review 2). The items and the figures are the phone's word (`body.edited`): only the phone knows what
+ * its review showed — the shops' memory may have learnt meanwhile from another record (adversarial А6)
+ * — and a number of the measure is no money the server must work out itself. A phone of an earlier
+ * build sends none: then each line is compared with the review as it would show it now, under the total
+ * the phone sends — a total put right moves the sums of the lines it confirms (В-5), and those moved no
+ * line. A new item kept new under another name is no edit there: the reading gave no name to correct.
  */
 function editsOf(
   body: ReceiptRecordBody,
   stored: readonly StoredReceiptLine[],
   shown: ShownLines,
 ): ReceiptEdits {
-  let [edited, skipped, item, figures] = [0, 0, 0, 0]
-  for (const line of body.lines) {
-    const read = stored[line.position]
-    if (read === undefined) continue
-    if (line.skip) {
-      edited += 1
-      skipped += 1
-      continue
+  const recorded = new Set(
+    body.lines
+      .filter((line) => !line.skip && stored[line.position] !== undefined)
+      .map((l) => l.position),
+  )
+  const skipped = body.lines.filter((line) => line.skip).length
+  let item: Set<number>
+  let figures: Set<number>
+  if (body.edited !== undefined) {
+    // positions of lines recorded only: a skipped line is put right as «не записывать» already
+    item = new Set(body.edited.item.filter((position) => recorded.has(position)))
+    figures = new Set(body.edited.figures.filter((position) => recorded.has(position)))
+  } else {
+    item = new Set()
+    figures = new Set()
+    for (const line of body.lines) {
+      const read = stored[line.position]
+      if (line.skip || read === undefined) continue
+      const was = shown.itemIds[line.position] ?? null
+      if ('id' in line.item ? line.item.id !== was : was !== null) item.add(line.position)
+      if (
+        !sameQuantity(line.quantity, read.quantity) ||
+        !sameMoney(line.amount, shown.amounts[line.position] ?? null)
+      ) {
+        figures.add(line.position)
+      }
     }
-    const was = shown.itemIds[line.position] ?? null
-    const otherItem = 'id' in line.item ? line.item.id !== was : was !== null
-    const otherFigures =
-      !sameQuantity(line.quantity, read.quantity) ||
-      !sameMoney(line.amount, shown.amounts[line.position] ?? null)
-    if (otherItem) item += 1
-    if (otherFigures) figures += 1
-    if (otherItem || otherFigures) edited += 1
   }
-  return { lines: body.lines.length, edited, skipped, item, figures }
+  const edited = new Set([...item, ...figures]).size + skipped
+  return {
+    lines: body.lines.length,
+    edited,
+    skipped,
+    item: item.size,
+    figures: figures.size,
+    totalCorrected: body.total !== undefined,
+  }
 }
 
 /**
@@ -192,13 +214,14 @@ export async function recordReceipt(
       throw new DomainError(ERROR.CONFLICT)
     }
 
-    // read before the memory is taught by this very record: the edits are against what was shown
+    // read before the memory is taught by this very record, and under the total the phone sends: the
+    // review it showed — the earlier build's measure, when the phone does not say what it put right
     const shown = await shownLines(
       repositories,
       actor.id,
       held.tin,
       held.lines,
-      held.total,
+      body.total ?? held.total,
       held.currency,
     )
 
@@ -284,6 +307,8 @@ export async function recordReceipt(
       expenses: written,
       confirmed,
       edits: editsOf(body, held.lines, shown),
+      // recorded again once its trip was removed for good: counted the first time only (review 7)
+      counted: held.status !== 'recorded',
     })
     return answer(trip.id)
   })
