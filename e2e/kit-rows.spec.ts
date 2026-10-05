@@ -98,8 +98,9 @@ test('the search field is one pill, and the active option keeps its weight and r
     }),
   )
   expect(wells).toHaveLength(3)
+  // A target of 44 inside an edge of 1 — 46, as every field of the kit (owner's choice on review Р1-3).
   for (const well of wells) {
-    expect(well.height).toBe(wells[0]?.height)
+    expect(well.height).toBe(46)
     expect(well.radius).toBeGreaterThanOrEqual(well.height / 2)
   }
 

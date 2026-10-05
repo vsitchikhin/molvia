@@ -322,10 +322,16 @@ The detail behind the frontend lines of `CLAUDE.md`.
   — rows had drawn them at 11/700, 11/600 and 13/600. Screens move onto them in their own tasks.
 - **A search is one field, `SearchField`** (MOL-177, Ф-12). «Что взяли?» drew a pill in a well with
   a hint of 11, «Что брать» a rounded box on `surface` edged by an inner shadow with a ring of its own,
-  «Выбрать товар» a field of the form with a label repeating the sheet's title. Now one: a pill of 44
-  on `surface-2` with a `border-strong` edge, a magnifier of 20, at the right the screen's action —
-  the scanner — **or** «Очистить» while there is text, never both, the focus of a kit field and a hint
-  of 13. **The focus of a field is one mixin, `field-focus`**, which `AppField` takes too. **The field
+  «Выбрать товар» a field of the form with a label repeating the sheet's title. Now one: a pill on
+  `surface-2` with a `border-strong` edge — 44 inside it, 46 outside, as `AppField` (owner's choice on
+  review Р1-3: a scanner of 44 in a pill of 44 would lie over the edge), a magnifier of 20, at the right the screen's action —
+  the scanner — **or** «Очистить» while there is text and the field is not read-only, never both, the
+  focus of a kit field and a hint of 13 (adversarial А2: read-only kept the keys out and let the button
+  empty the field). **In an open sheet the field gives Esc to the sheet**: Chromium takes a search
+  field's Esc for itself — it clears the text, and the dialog never hears `cancel` — so «Выбрать товар»
+  lost the receipt's words and stayed open (adversarial А3); the field prevents that Esc and hands the
+  sheet the `cancel` it closes on, unless its owner took the key first. Outside a sheet Esc is the
+  platform's, the combobox's «let go of the row» before it. **The focus of a field is one mixin, `field-focus`**, which `AppField` takes too. **The field
   is only a field**: a combobox gives it its role, its `aria-*` and its keys, and every attribute but
   `class` and `style` lands on the `<input>` — so the two simple searches carry no listbox they have
   not got, and the combobox keeps its list, its arrows and its Escape (MOL-23). **No width of its
@@ -335,12 +341,14 @@ The detail behind the frontend lines of `CLAUDE.md`.
   (`vue/no-restricted-static-attribute`), as caps outside `SectionCaption` are; a bound `:type` passes —
   it closes carelessness, not intent. **The rows of the combobox are `ListRow as="li"`** options: no
   `type`, no stop of Tab — the focus stays in the field — and **no hover**, which on a desktop fought
-  the arrows for which row is active (MOL-23); the active one is read out selected, as the ARIA
+  the arrows for which row is active (MOL-23); **the name wraps** (`wrap`), never «…» — its end, the fat
+  or the size, is what tells two items apart, and cut they read as one (adversarial А1: «Молоко
+  «Марианна» ультрапаст…» twice at 390); the active one is read out selected, as the ARIA
   combobox has it, filled at the weight of every row (К-4 — the handoff of 0.1 drew 700). **On the fill
   of an active or a selected row the meta is `text`**: muted stands 4.17:1 and 3.83:1 on `accent-tint`;
   the combobox had kept that itself, and `ListRow` had lost it for a chosen row with a meta (MOL-175).
-  `e2e/kit-rows` holds the pill, its one height with or without the scanner, and the active option's
-  weight and meta in both engines.
+  `e2e/kit-rows` holds the pill, its one height of 46 with or without the scanner, the active option's weight
+  and meta, a chosen row's meta, and an option's whole name at 390 and 320, in both engines.
 - **An operation is one row, `OperationRow`, and it knows no operation** (MOL-176, Ф-12). «Траты» drew
   `SpendingRow`, an account's journal, «не попали» and a check drew an `OperationRow` bound to
   `AccountOperationView`, and the two parted on everything seen: the chevron on purchases alone or on
