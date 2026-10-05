@@ -246,6 +246,69 @@ describe('useTapSetting: a change whose answer was lost', () => {
     expect(back.unsure.value).toBe(false)
   })
 
+  describe('back while the gone screen’s write is still on its way (round 10, Р10-А1)', () => {
+    async function leftWriting(): Promise<{
+      readonly back: TapSettingState<Setting>
+      readonly land: () => void
+      readonly lose: (error: Error) => void
+    }> {
+      server = { off: true }
+      const tap = await mounted()
+      let resolve: (setting: Setting) => void = () => undefined
+      let reject: (error: Error) => void = () => undefined
+      write.mockImplementation(
+        (next) =>
+          new Promise((ok, fail) => {
+            resolve = (setting) => {
+              server = next
+              ok(setting)
+            }
+            reject = fail
+          }),
+      )
+      void tap.choose({ off: false })
+      for (const view of views.splice(0)) view.unmount()
+      const back = await mounted()
+      return {
+        back,
+        land: () => {
+          resolve({ off: false })
+        },
+        lose: reject,
+      }
+    }
+
+    it('says «we do not know» while it is on its way, then shows what landed — with its answer', async () => {
+      const { back, land } = await leftWriting()
+      expect(back.unsure.value).toBe(true)
+      expect(back.saveFailed.value).toBe(false)
+      land()
+      await flushPromises()
+      expect(back.unsure.value).toBe(false)
+      expect(back.value.value).toEqual({ off: false })
+      expect(back.saveFailed.value).toBe(false)
+    })
+
+    it('lands with its answer lost: the screen that waited checks and shows it', async () => {
+      const { back, lose } = await leftWriting()
+      server = { off: false }
+      lose(new TypeError('connection reset'))
+      await flushPromises()
+      expect(back.unsure.value).toBe(false)
+      expect(back.value.value).toEqual({ off: false })
+      expect(back.saveFailed.value).toBe(false)
+    })
+
+    it('refused in the API’s own words: the screen that waited says «not saved»', async () => {
+      const { back, lose } = await leftWriting()
+      lose(new ApiError(ERROR.INTERNAL, '', true, undefined, { fromApi: true }))
+      await flushPromises()
+      expect(back.unsure.value).toBe(false)
+      expect(back.value.value).toEqual({ off: true })
+      expect(back.saveFailed.value).toBe(true)
+    })
+  })
+
   it('a screen drawn anew whose first read fails: its own failure, and the change stays unsure', async () => {
     const tap = await mounted()
     write.mockRejectedValue(new TypeError('connection reset'))

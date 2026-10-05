@@ -598,6 +598,34 @@ describe('«Count me in the statistics» (MOL-96)', () => {
     expect(back.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
   })
 
+  it('back on «Settings» while «count me» is still on its way: «we do not know», then the switch as it landed (Р10-А1)', async () => {
+    readAnalytics.mockResolvedValue({ off: true })
+    const view = await render()
+    let land: () => void = () => undefined
+    chooseAnalytics.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          land = () => {
+            readAnalytics.mockResolvedValue({ off: false })
+            resolve({ off: false })
+          }
+        }),
+    )
+    await counted(view).setValue(true)
+    views.splice(views.indexOf(view), 1)
+    view.unmount()
+
+    const back = await render()
+    expect(back.find('input[role="switch"]').exists()).toBe(false)
+    expect(back.text()).toContain(en.settings.tap.unsure)
+
+    land()
+    await flushPromises()
+    expect(counted(back).element.checked).toBe(true)
+    expect(back.text()).not.toContain(en.settings.tap.unsure)
+    expect(back.find('[role="alert"]').exists()).toBe(false)
+  })
+
   it('«Try again» beside «we do not know» checks at once, and a change that did not land says so', async () => {
     const view = await render()
     chooseAnalytics.mockImplementation(() => {

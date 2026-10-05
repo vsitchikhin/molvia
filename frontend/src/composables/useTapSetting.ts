@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { ApiError } from '@molvia/client'
 import { useReconnect } from '@/composables/useReconnect'
@@ -24,16 +24,20 @@ function refusedInWords(error: unknown): boolean {
 }
 
 /**
- * What a screen since gone left untold, by owner and setting, for the page's life (round 8, Р8-А1;
- * round 9, Р9-А1): a change still unsure — its last choice — or one it learnt was not saved. The
- * screen that said «проверяем», or was left the moment its switch was tapped, may be gone before
- * the answer comes; it tells nobody and leaves what it learnt here, and the screen drawn on the way
- * back takes it — its first read is the check, or it says «не сохранилось» — and only a screen that
- * said so lets it go. In memory only: nothing of it is kept on the phone, and a reload reads the
- * server afresh — a named price.
+ * A change of the page's life, by owner and setting, as long as some screen still has to say how it
+ * ended (rounds 8–10, Р8-А1…Р10-А1): on its way (`writing`) — a write a screen may have left the
+ * moment its switch was tapped; `unsure` — its answer lost, so its last choice waits for a check;
+ * or `refused` — known not saved. Every screen of the setting sees it: one drawn while a write is
+ * on its way says «не знаем» and draws no conclusion until the write ends, and hears the end the
+ * moment it comes, since the map is reactive. Only a screen alive lets an entry go, once it has
+ * said how the change ended. `by` names the screen that wrote it, so a screen does not answer
+ * itself. In memory only: nothing of it is kept on the phone, and a reload reads the server afresh
+ * — a named price.
  */
-type LeftBehind = { readonly unsure: true; readonly choice: unknown } | { readonly unsure: false }
-const leftBehind = new Map<string, LeftBehind>()
+type LeftBehind =
+  | { readonly state: 'writing' | 'unsure'; readonly choice: unknown; readonly by: symbol }
+  | { readonly state: 'refused'; readonly by: symbol }
+const leftBehind = reactive(new Map<string, LeftBehind>())
 
 /** A fresh page, as a reload makes one: for the tests, which share one module between them. */
 export function forgetUnsureChanges(): void {
@@ -93,11 +97,20 @@ export function useTapSetting<T>(
   let checkIn = TAP_CHECK_FIRST_MS
   // Gone with its screen, it still hears what it asked: what it learns is left for the next one.
   let alive = true
+  const me = Symbol(name)
+  const same = (one: unknown, other: unknown): boolean =>
+    JSON.stringify(one) === JSON.stringify(other)
+
+  function leave(entry: LeftBehind | undefined): void {
+    const key = memory()
+    if (!key) return
+    if (entry) leftBehind.set(key, entry)
+    else leftBehind.delete(key)
+  }
 
   /** The person has been told — by this screen — what became of the change: nothing is left. */
   function told(): void {
-    const key = memory()
-    if (key) leftBehind.delete(key)
+    leave(undefined)
   }
 
   function settle(): void {
@@ -116,10 +129,10 @@ export function useTapSetting<T>(
 
   async function load(): Promise<void> {
     if (!actor.id || saving.value) return
-    // What a screen since gone left: an unsure change, which this read checks, or one not saved.
     const key = memory()
+    // What another screen left: a change on its way or unsure, which this read checks.
     const left = unsure.value || !key ? undefined : leftBehind.get(key)
-    if (left?.unsure) {
+    if (left && left.state !== 'refused') {
       lastChoice = { choice: left.choice as T }
       unsure.value = true
     }
@@ -127,21 +140,36 @@ export function useTapSetting<T>(
     try {
       const answer = await read()
       if (mine !== latest) return
-      const same = (one: unknown, other: unknown): boolean =>
-        JSON.stringify(one) === JSON.stringify(other)
-      const notSaved = unsure.value && lastChoice ? !same(answer, lastChoice.choice) : undefined
+      // As it stands now: a write on its way may have ended while this read was out.
+      const now = key ? leftBehind.get(key) : undefined
+      if (now?.state === 'writing') {
+        // On its way: no conclusion until it ends — unless the server already holds its choice.
+        if (!alive) return
+        value.value = answer
+        failure.value = null
+        if (same(answer, now.choice)) settle()
+        else {
+          lastChoice = { choice: now.choice as T }
+          unsure.value = true
+          checkLater()
+        }
+        return
+      }
+      const notSaved =
+        now?.state === 'refused'
+          ? true
+          : unsure.value && lastChoice
+            ? !same(answer, lastChoice.choice)
+            : undefined
       if (!alive) {
         // Heard by a screen gone (Р9-А1): left for the next one, never let go here.
-        if (key && notSaved !== undefined)
-          if (notSaved) leftBehind.set(key, { unsure: false })
-          else leftBehind.delete(key)
+        if (notSaved !== undefined) leave(notSaved ? { state: 'refused', by: me } : undefined)
         return
       }
       // The check is the answer the change never got, either way (round 7, Р7-А1): lost offline,
       // it said only «без связи», and a check that finds the choice did not land says «не
       // сохранилось».
       if (notSaved !== undefined) saveFailed.value = notSaved
-      else if (left && !left.unsure) saveFailed.value = true
       told()
       settle()
       value.value = answer
@@ -168,6 +196,8 @@ export function useTapSetting<T>(
     value.value = next
     saving.value = true
     saveFailed.value = false
+    // On its way, for any screen of the setting drawn before it ends (round 10, Р10-А1).
+    leave({ state: 'writing', choice: next, by: me })
     try {
       value.value = await write(next)
       lastChoice = undefined
@@ -181,10 +211,9 @@ export function useTapSetting<T>(
       // `2xx` of any shape, whole and off the contract or cut off on its way (Р4-А1), may well have
       // landed. One unsure change is not made sure by a refusal of the next: it is still checked.
       unsure.value = unsure.value || !refusedInWords(error)
-      const key = memory()
-      if (key && unsure.value) leftBehind.set(key, { unsure: true, choice: next })
-      // A refusal said to a screen gone is told by the next one.
-      else if (key && !alive) leftBehind.set(key, { unsure: false })
+      if (unsure.value) leave({ state: 'unsure', choice: next, by: me })
+      // A refusal said to a screen gone is told by the next one; said here, it is told here.
+      else leave(alive ? undefined : { state: 'refused', by: me })
       // Offline or failed is decided after the failure (MOL-19, A1): a connection that dropped while
       // the answer was on its way is the grey «без связи», never the red «не сохранилось» (self-review 7).
       online.value = navigator.onLine
@@ -196,11 +225,21 @@ export function useTapSetting<T>(
     if (!alive) return
     // Asked at once while there is a connection; without one, when it comes back (below).
     if (unsure.value && online.value) await load()
-    else if (!unsure.value) {
-      told()
-      settle()
-    }
+    else if (!unsure.value) settle()
   }
+
+  // Another screen's change ended — or another screen let it go — while this one waits on it.
+  watch(
+    () => {
+      const key = memory()
+      return key ? leftBehind.get(key) : undefined
+    },
+    (entry, before) => {
+      if (!alive || saving.value || entry?.by === me || before?.by === me) return
+      if (entry?.state === 'writing') return
+      if (before?.state === 'writing' || entry) void load()
+    },
+  )
 
   const offline = (): void => {
     online.value = false

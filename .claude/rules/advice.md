@@ -105,9 +105,11 @@ the screen that said «проверяем» — kept in the page's memory by own
 drawn on the way back from another tab checks with its first read and says how it ended (round 8,
 Р8-А1) — and a screen left the moment its switch was tapped, or while its check was on its way,
 tells nobody and lets nothing go: what it hears is left for the next one, an unsure choice or «не
-сохранилось» (round 9, Р9-А1), while a reload reads the server afresh, a named price; the line is
-said in the live region only when it does not take the focus, which reads it (№10). **Off erases
-every row of the person's log at once** (В-1), every type, in the transaction that marks the
+сохранилось» (round 9, Р9-А1) — and a write still on its way is in that memory too: a screen drawn
+before it ends says «не знаем», draws no conclusion, and hears the end the moment it comes, the
+memory being reactive (round 10, Р10-А1), while a reload reads the server afresh, a named price; the
+line is said in the live region only when it does not take the focus, which reads it (№10). **Off
+erases every row of the person's log at once** (В-1), every type, in the transaction that marks the
 objection (`actors.analytics_off_at`) — the second written exception to append-only: the gates stop
 counting them, so the rows have no reader left, and an objection to a legitimate interest takes what
 it gathered (GDPR, the bar of section 2, art. 17(1)(c)). **The writer reads the objection after the
