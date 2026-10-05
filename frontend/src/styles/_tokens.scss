@@ -83,6 +83,11 @@
   --space-6: 1.5rem;
   --space-8: 2rem;
 
+  /* From a list card's right edge to the end of a row's amount — the card's hairline, the row's inset,
+     its chevron and the gap before it: a sum over the rows stands in their column (MOL-176; without the
+     hairline it stood a pixel past it, adversarial А4). */
+  --space-tail: calc(var(--hairline) + var(--space-4) + var(--icon) + var(--space-3));
+
   /* ── Shape ────────────────────────────────────────────────────────────── */
   --radius-sm: 0.5rem;
   --radius: 0.875rem;
@@ -134,6 +139,9 @@
   /* Loading bars: the height of the line they stand in for and of the one under it. */
   --skeleton-line: 0.8125rem; /* 13 */
   --skeleton-sub: 0.5625rem; /* 9 */
+
+  /* The circle under the icon of an operation's row (MOL-176): its skeleton takes the same. */
+  --row-circle: 2.5rem; /* 40 */
 
   /* The circle of a screen state and the icon in it. */
   --state-circle: 2.375rem; /* 38 */

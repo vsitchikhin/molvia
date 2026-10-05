@@ -54,7 +54,24 @@ function resolveVar(value) {
   return value.replace(/var\(--([a-z0-9-]+)\)/g, (_, name) => resolveVar(token(name)))
 }
 
-const rem = (v) => (/^[\d.]+rem$/.test(v) ? `${Math.round(parseFloat(v) * 16 * 100) / 100}px` : v)
+const px = (v) =>
+  /^[\d.]+rem$/.test(v) ? parseFloat(v) * 16 : /^[\d.]+px$/.test(v) ? parseFloat(v) : null
+// A sum of tokens (`--space-tail`, MOL-176) is printed as what it comes to: Claude Design reads this file
+// without `_tokens.scss`, and `calc(var(…))` is nothing to it. Anything else it cannot add up stays as written.
+const sum = (v) => {
+  const terms = /^calc\((.*)\)$/.exec(v)?.[1].split(' + ') ?? []
+  const values = terms.map((term) => {
+    const name = /^var\(--([\w-]+)\)$/.exec(term)?.[1]
+    return px(name ? (light.get(name) ?? '') : term)
+  })
+  return values.length > 0 && values.every((one) => one !== null)
+    ? values.reduce((a, b) => a + b, 0)
+    : null
+}
+const rem = (v) => {
+  const value = px(v) ?? sum(v)
+  return value === null ? v : `${Math.round(value * 100) / 100}px`
+}
 const isColour = (v) => /^(#|rgb|hsl)/.test(v)
 
 const colors = {}

@@ -285,7 +285,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
   it('removes without a question and offers «Undo», which brings the same spending back', async () => {
     moneyMonth.mockResolvedValue(month())
     const view = await render()
-    await view.find('.body').trigger('click')
+    await view.find('.list-row').trigger('click')
     await risen()
     // Sent first: an «Undo» before the removal left takes it out of the queue instead, which
     // the queue's own tests pin.
@@ -328,7 +328,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
     )
     const view = await render()
     expect(view.text()).toContain(en.spending.refused)
-    await view.find('.body').trigger('click')
+    await view.find('.list-row').trigger('click')
     await risen()
     const sheet = document.querySelector('dialog[open]')
     expect(sheet?.textContent).toContain(en.spending.sheet.refused_conflict)
@@ -345,7 +345,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
     moneyMonth.mockResolvedValueOnce(month({ previousSpent: null, income: rub('0') }))
     moneyMonth.mockResolvedValue(empty())
     const view = await render()
-    await view.find('.body').trigger('click')
+    await view.find('.list-row').trigger('click')
     await risen()
     await pressUntil(en.spending.sheet.remove, () => {
       expect(removeSpending).toHaveBeenCalledWith(BARBER)
@@ -386,7 +386,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
     )
     window.dispatchEvent(new StorageEvent('storage', { key: `molvia.spending-rejected.${ACTOR}` }))
     await flushPromises()
-    await view.findAll('.body').at(0)?.trigger('click')
+    await view.findAll('.list-row').at(0)?.trigger('click')
     await risen()
     await pressUntil(en.spending.sheet.save, () => {
       expect(document.querySelector('dialog[open]')?.textContent).toContain(
@@ -410,7 +410,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
       note: 'Taxi',
     })
     await flushPromises()
-    await view.findAll('.body').at(0)?.trigger('click')
+    await view.findAll('.list-row').at(0)?.trigger('click')
     await risen()
     const amount = document.querySelector<HTMLInputElement>('dialog[open] input[inputmode=decimal]')
     if (!amount) throw new Error('no amount')
@@ -421,7 +421,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
     })
     const waiting = queue.pending.filter((write) => write.kind === 'record')
     expect(waiting).toHaveLength(1)
-    expect(plain(view.findAll('.body').at(0)?.text() ?? '')).toContain('֏500')
+    expect(plain(view.findAll('.list-row').at(0)?.text() ?? '')).toContain('֏500')
   })
 })
 
@@ -604,7 +604,7 @@ describe('MoneySpendingsView: what round 2 of the review of MOL-159 found', () =
       expect(queue.rejected).toHaveLength(1)
     })
     await flushPromises()
-    await view.find(`[data-row="${RENT}"] .body`).trigger('click')
+    await view.find(`[data-row="${RENT}"] .list-row`).trigger('click')
     await risen()
     expect(document.querySelector('dialog[open]')?.textContent).toContain(en.error.not_found)
     await pressUntil(en.spending.sheet.dismiss, () => {
@@ -641,7 +641,7 @@ describe('MoneySpendingsView: what round 2 of the review of MOL-159 found', () =
       ]),
     )
     const view = await render()
-    await view.find(`[data-row="${SHAVE}"] .body`).trigger('click')
+    await view.find(`[data-row="${SHAVE}"] .list-row`).trigger('click')
     await risen()
     await pressUntil(en.spending.sheet.save, () => {
       expect(amendSpending).toHaveBeenCalled()
@@ -673,7 +673,7 @@ describe('MoneySpendingsView: what round 2 of the review of MOL-159 found', () =
     expect(rows[0]?.text()).toContain(en.spending.refused)
     // «Не приняты» only names it, and leads to it (round 7, Р): no row of its own there.
     expect(button(view, '1 marked in the journal below — show').exists()).toBe(true)
-    await rows[0]?.find('.body').trigger('click')
+    await rows[0]?.find('.list-row').trigger('click')
     await risen()
     await pressUntil(en.spending.sheet.save, () => {
       expect(amendSpending).toHaveBeenCalledTimes(2)
@@ -725,7 +725,7 @@ describe('MoneySpendingsView: what round 2 of the review of MOL-159 found', () =
   it('Ж: «Undo» is the queue’s, not the screen’s — it outlives «Траты» for the step back', async () => {
     moneyMonth.mockResolvedValue(month())
     const view = await render()
-    await view.find('.body').trigger('click')
+    await view.find('.list-row').trigger('click')
     await risen()
     await pressUntil(en.spending.sheet.remove, () => {
       expect(removeSpending).toHaveBeenCalledWith(BARBER)
