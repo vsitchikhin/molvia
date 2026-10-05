@@ -138,6 +138,7 @@
       "mine": "My own",
       "own": "enter",
       "save": "Count by it",
+      "saving": "Saving…",
       "failed": "The choice could not be saved. Try again",
       "source_nbg": "the National Bank of Georgia"
     },
@@ -167,6 +168,7 @@
       "cached": "Showing data saved on this device.",
       "local_finish": "Finished on this device — not sent yet",
       "more": "Show more",
+      "loading": "Loading…",
       "finished_at": "Finished · {when}",
       "missing_title": "Purchases unavailable",
       "missing_body": "These purchases could not be found in your account. Return to Purchases.",
@@ -384,6 +386,7 @@
       "save_new": "Rate it",
       "keeps_score": "The rating stays as it was. To take it back, withdraw it",
       "withdraw": "Withdraw the rating",
+      "withdrawing": "Withdrawing the rating…",
       "withdraw_hint": "The item leaves this screen, and the purchase goes back to «Ratings»",
       "withdraw_hint_shared": "Your rating leaves the average, and the purchase goes back to «Ratings»",
       "not_mine": "You have no rating here — refresh the list",
@@ -858,6 +861,7 @@
     },
     "removed": "Exchange deleted: {amounts}",
     "restore": "Bring back",
+    "restoring": "Bringing back…",
     "restored": "The exchange is back",
     "restore_gone": "The exchange can no longer be brought back — the removal is final. If it was needed, record it again",
     "conflict": "This exchange is already recorded — the list shows it as it stands now. If the amounts are wrong, tap it in the list and amend it",
@@ -1020,6 +1024,7 @@
     },
     "removed": "Income removed: {amount}",
     "restore": "Bring back",
+    "restoring": "Bringing back…",
     "restored": "Income restored",
     "restore_gone": "This income can no longer be restored — the removal is final. If you needed it, record it again",
     "conflict": "This income is already recorded — here it is as it stands. If something is wrong, tap it in the list and amend it",
@@ -1785,8 +1790,10 @@
       "name_taken": "“{name}” already exists — pick another name",
       "bad_start": "Enter a balance — 0 is fine",
       "delete": "Delete account",
+      "deleting": "Deleting…",
       "delete_note": "No entries yet — it will be deleted for good. You can undo for 10 seconds",
       "archive": "Put away",
+      "archiving": "Putting away…",
       "archive_note": "History and balance stay; the account moves to “Put away” and can be restored"
     },
     "reconcile": {
@@ -1816,6 +1823,7 @@
       "no_causes_title": "Looks like some spending wasn't recorded",
       "no_causes_body": "Since {date} every entry {currency} has an account, amounts and “charged” are in place. Think of what you might have paid outside the app",
       "write_difference": "Record the difference as “Other · check”",
+      "writing": "Recording the difference…",
       "write_out_note": "We'll record spending of {amount} on “{name}”",
       "write_in_note": "We'll record income of {amount} “Other” on “{name}”",
       "recounting": "We will count again once the corrections reach the server",
@@ -1979,6 +1987,7 @@
       "saving": "Saving…",
       "wait_online": "Waiting for connection",
       "remove": "Remove the plan",
+      "removing": "Removing the plan…",
       "other_currency": "The plan was {amount}, before the spending currency changed. Enter a sum in {sign}",
       "too_big": "Too large a sum for a month's plan"
     }

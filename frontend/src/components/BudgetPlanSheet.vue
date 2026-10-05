@@ -55,19 +55,23 @@
       <AppButton
         size="large"
         block
-        :busy="sending"
+        :busy="sending && !removing"
         :busy-label="t('budget.sheet.saving')"
-        :disabled="!online"
+        :inactive="removing"
+        :disabled="!online && !sending"
         @click="submit"
       >
-        <template #icon><IconCheck v-if="online" /><IconCloudOff v-else /></template>
+        <template #icon><IconCheck v-if="online || sending" /><IconCloudOff v-else /></template>
         {{ online ? t('budget.sheet.save') : t('budget.sheet.wait_online') }}
       </AppButton>
       <AppButton
         v-if="plan"
         variant="danger-ghost"
         block
-        :disabled="sending || !online"
+        :busy="removing"
+        :busy-label="t('budget.sheet.removing')"
+        :inactive="sending && !removing"
+        :disabled="!online && !sending"
         @click="send(null)"
       >
         <template #icon><IconClose /></template>
@@ -170,6 +174,8 @@ export default defineComponent({
     const problem = ref<string | null>(null)
     const failed = ref<string | null>(null)
     const sending = ref(false)
+    // Which of the two is at work: «Убрать план» and «Сохранить» share `sending` (adversarial Р1-А1).
+    const removing = ref(false)
     const valueField = ref<ComponentPublicInstance | null>(null)
     let outcome: BudgetOutcome | null = null
 
@@ -285,6 +291,7 @@ export default defineComponent({
         return
       }
       sending.value = true
+      removing.value = plan === null
       try {
         await props.save({ categoryId: id, from: props.month, plan })
         finished({
@@ -297,6 +304,7 @@ export default defineComponent({
           code === ERROR.NOT_FOUND ? t('budget.sheet.category_gone') : t('budget.sheet.failed')
       } finally {
         sending.value = false
+        removing.value = false
       }
     }
 
@@ -320,6 +328,7 @@ export default defineComponent({
       problem,
       failed,
       sending,
+      removing,
       valueField,
       title,
       sign,

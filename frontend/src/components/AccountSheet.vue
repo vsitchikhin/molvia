@@ -78,16 +78,27 @@
       <AppButton
         size="large"
         block
-        :busy="sending"
+        :busy="sending && !removing"
         :busy-label="t('accounts.sheet.saving')"
-        :disabled="!online"
+        :inactive="removing"
+        :disabled="!online && !sending"
         @click="submit"
       >
-        <template #icon><IconCheck v-if="online" /><IconCloudOff v-else /></template>
+        <template #icon><IconCheck v-if="online || sending" /><IconCloudOff v-else /></template>
         {{ online ? t('accounts.sheet.save') : t('accounts.sheet.wait_online') }}
       </AppButton>
       <template v-if="account && !account.archivedAt">
-        <AppButton variant="danger-ghost" block :disabled="sending || !online" @click="remove">
+        <AppButton
+          variant="danger-ghost"
+          block
+          :busy="removing"
+          :busy-label="
+            t(account.hasOperations ? 'accounts.sheet.archiving' : 'accounts.sheet.deleting')
+          "
+          :inactive="sending && !removing"
+          :disabled="!online && !sending"
+          @click="remove"
+        >
           <template #icon>
             <IconArchive v-if="account.hasOperations" /><IconDelete v-else />
           </template>
@@ -190,6 +201,9 @@ export default defineComponent({
     const startBad = ref(false)
     const dayProblem = ref<string | null>(null)
     const sending = ref(false)
+    // Which of the two is at work: «Удалить» and «Сохранить» share `sending`, and only the one pressed
+    // says so (adversarial Р1-А1).
+    const removing = ref(false)
     const failed = ref(false)
     const conflict = ref(false)
     let accountId = newId()
@@ -421,6 +435,7 @@ export default defineComponent({
       if (!account || sending.value || !props.online) return
       failed.value = false
       sending.value = true
+      removing.value = true
       try {
         const answer = await api.removeMoneyAccount(account.id)
         store.accept(answer)
@@ -431,6 +446,7 @@ export default defineComponent({
         failed.value = true
       } finally {
         sending.value = false
+        removing.value = false
       }
     }
 
@@ -449,6 +465,7 @@ export default defineComponent({
       startBad,
       dayProblem,
       sending,
+      removing,
       failed,
       conflict,
       locked,
