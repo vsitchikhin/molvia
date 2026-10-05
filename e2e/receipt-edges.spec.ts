@@ -177,3 +177,56 @@ test('the system’s «back» gives the shot up and leaves the capture sheet', a
   await expect(capturing(page)).toContainText('Smooth the receipt out')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Purchases')
 })
+
+/** A photo with nothing to find on it: one grey all over — the corners are the photo's own (Р-4). */
+async function plain(page: Page): Promise<Buffer> {
+  const encoded = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 2400
+    canvas.height = 3200
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('no canvas')
+    context.fillStyle = '#9a9a9a'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.9)
+    })
+    if (!blob) throw new Error('no jpeg')
+    const bytes = new Uint8Array(await blob.arrayBuffer())
+    let binary = ''
+    for (const byte of bytes) binary += String.fromCharCode(byte)
+    return btoa(binary)
+  })
+  return Buffer.from(encoded, 'base64')
+}
+
+// adversarial Б1: a handle at the photo's edge is drawn inside, away from its corner — touched to
+// look, the corner stays where it is and moves only as far as the finger
+test('a touch on a handle drawn inside at the edge leaves its corner where it is', async ({
+  page,
+}) => {
+  await signedIn(page, '/purchases')
+  await page.getByRole('button', { name: 'Photograph a receipt' }).click()
+  await capturing(page)
+    .locator('input[type="file"]:not([capture])')
+    .first()
+    .setInputFiles({ name: 'receipt.jpg', mimeType: 'image/jpeg', buffer: await plain(page) })
+  await expect(edges(page)).toContainText('Couldn')
+  await page.waitForTimeout(400)
+  const handle = edges(page).locator('.handle').first()
+  const where = () =>
+    handle.evaluate((node) => [
+      parseFloat((node as HTMLElement).style.left),
+      parseFloat((node as HTMLElement).style.top),
+    ])
+  expect(await where()).toEqual([0, 0])
+  const box = await handle.boundingBox()
+  if (!box) throw new Error('no handle')
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width / 2 + 2, box.y + box.height / 2 + 2, { steps: 2 })
+  await page.mouse.up()
+  const [left = 100, top = 100] = await where()
+  expect(left).toBeLessThan(1)
+  expect(top).toBeLessThan(1)
+})

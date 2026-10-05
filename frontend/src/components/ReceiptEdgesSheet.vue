@@ -323,18 +323,32 @@ export default defineComponent({
       context.drawImage(from, at.x - span / 2, at.y - span / 2, span, span, 0, 0, side, side)
     }
 
+    /**
+     * Where the finger took the handle, from its corner: a handle at the photo's edge is drawn inside,
+     * away from its corner, and a corner put under the finger jumped to it — a strip of the photo cut
+     * off by a touch meant to look (adversarial Б1). The corner moves as far as the finger, no more.
+     */
+    let grip: Point = { x: 0, y: 0 }
+
     function grab(index: number, event: PointerEvent): void {
       if (busy.value) return
       held.value = index
       ;(event.currentTarget as Element).setPointerCapture(event.pointerId)
       const corner = quad.value[index]
+      const at = photoPoint(event)
+      grip = corner && at ? { x: corner.x - at.x, y: corner.y - at.y } : { x: 0, y: 0 }
       if (corner) drawLoupe(corner)
     }
 
     function drag(index: number, event: PointerEvent): void {
       if (held.value !== index) return
-      const to = photoPoint(event)
-      if (!to) return
+      const at = photoPoint(event)
+      const from = photo.value
+      if (!at || !from) return
+      const to = {
+        x: Math.min(from.width, Math.max(0, at.x + grip.x)),
+        y: Math.min(from.height, Math.max(0, at.y + grip.y)),
+      }
       move(index, to)
       drawLoupe(to)
     }

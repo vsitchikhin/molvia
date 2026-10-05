@@ -777,6 +777,10 @@ describe('«Записать»', () => {
       ])
       await db.delete(receiptDays)
     }
+    // the total read, opened and saved as it was: a check, never «total put right» (review 10, Б2)
+    const checked = await parsedReceipt(me, lines, { receiptNo: '3', totalMinor: 148_000n })
+    expect((await record(me, checked, phoneBody(true))).statusCode).toBe(200)
+    expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 1, totalsCorrected: 0 }])
   })
 
   it('takes the phone’s positions only of lines recorded: a skipped or unknown one is no item edit', async () => {

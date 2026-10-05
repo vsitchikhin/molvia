@@ -36,7 +36,8 @@ export interface ReviewLine {
   /**
    * What the person put right against what this review showed (MOL-222, the measure of 0.2): another
    * item than the one shown — a new one kept new under another name is no edit, the reading gave no
-   * name to correct — and figures that differ from the shown ones. A total put right moves no line.
+   * name to correct — and figures that differ from the ones the server showed before any edit. A total
+   * put right moves no line.
    */
   readonly changed: { readonly item: boolean; readonly figures: boolean }
 }
@@ -99,9 +100,13 @@ export function reviewLines(detail: ReceiptDetail, draft: ReceiptDraft | null): 
         ownFigures: figures !== undefined,
         changed: {
           item: itemId !== null ? itemId !== line.itemId : line.itemId !== null,
+          // against the figures the review showed before any edit — the server's — never the ones a
+          // total typed since would show: a line put right stays put right whatever came after it
+          // (adversarial Б3)
           figures:
             figures !== undefined &&
-            (!sameQuantity(figures.quantity, line.quantity) || !sameMoney(figures.amount, amount)),
+            (!sameQuantity(figures.quantity, line.quantity) ||
+              !sameMoney(figures.amount, line.amount)),
         },
       }
     }

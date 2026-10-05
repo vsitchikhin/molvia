@@ -63,6 +63,7 @@ function editsOf(
   body: ReceiptRecordBody,
   stored: readonly StoredReceiptLine[],
   shown: ShownLines,
+  total: Money | null,
 ): ReceiptEdits {
   const recorded = new Set(
     body.lines
@@ -99,7 +100,8 @@ function editsOf(
     skipped,
     item: item.size,
     figures: figures.size,
-    totalCorrected: body.total !== undefined,
+    // the total the review showed, opened and saved as it was, is a check, not an edit (review 10)
+    totalCorrected: body.total !== undefined && !sameMoney(body.total, total),
   }
 }
 
@@ -306,7 +308,7 @@ export async function recordReceipt(
       tripId: trip.id,
       expenses: written,
       confirmed,
-      edits: editsOf(body, held.lines, shown),
+      edits: editsOf(body, held.lines, shown, held.total),
       // recorded again once its trip was removed for good: counted the first time only (review 7)
       counted: held.status !== 'recorded',
     })

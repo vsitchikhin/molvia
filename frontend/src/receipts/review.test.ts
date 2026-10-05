@@ -312,4 +312,26 @@ describe('what «Записать» says was put right', () => {
       figures: [],
     })
   })
+
+  // adversarial Б3: the review showed 890; the person typed 980, then the total from the paper — the
+  // total now confirms 980, and the line typed before it is still put right
+  it('a line put right stays put right when a total typed after it confirms the same sum', () => {
+    const detail = receiptA(null)
+    const draft: ReceiptDraft = {
+      lines: {
+        3: {
+          item: { id: MILK, name: 'Шоколад «Гранд»' },
+          figures: { quantity: parseQuantity('1', 'piece'), amount: amd('980') },
+          skip: false,
+        },
+      },
+      total: amd('3663'),
+    }
+    expect(
+      recordBody(detail, draft, reviewLines(detail, draft), TRIP, '2026-09-27')?.edited,
+    ).toEqual({
+      item: [],
+      figures: [3],
+    })
+  })
 })
