@@ -1286,6 +1286,7 @@
     "receipt_not_ready": "Чек ещё не разобран — записать его пока нельзя",
     "receipt_recorded_before": "Этот чек уже записан",
     "receipt_in_future": "Дата чека ещё не наступила",
+    "receipt_total_required": "Укажите итог чека — без него записывать нечего",
     "feedback_rate_limited": "Сегодня сообщений уже много. Текст сохранён — отправьте завтра",
     "feedback_picture_invalid": "Снимок не подошёл — выберите другой",
     "feedback_picture_too_large": "Снимок слишком большой — выберите другой",

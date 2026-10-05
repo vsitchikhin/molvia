@@ -1,0 +1,5 @@
+ALTER TABLE "receipt_days" DROP CONSTRAINT "receipt_days_counts_non_negative";--> statement-breakpoint
+ALTER TABLE "receipts" DROP CONSTRAINT "receipts_layout_known";--> statement-breakpoint
+ALTER TABLE "receipt_days" ADD COLUMN "no_items" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "receipt_days" ADD CONSTRAINT "receipt_days_counts_non_negative" CHECK (least("receipt_days"."read", "receipt_days"."read_partly", "receipt_days"."reshoot", "receipt_days"."no_items", "receipt_days"."unreadable", "receipt_days"."recorded", "receipt_days"."lines", "receipt_days"."lines_edited", "receipt_days"."lines_skipped", "receipt_days"."lines_item", "receipt_days"."lines_figures", "receipt_days"."totals_corrected", "receipt_days"."within_5m", "receipt_days"."within_15m", "receipt_days"."within_1h", "receipt_days"."within_1d", "receipt_days"."later") >= 0);--> statement-breakpoint
+ALTER TABLE "receipts" ADD CONSTRAINT "receipts_layout_known" CHECK ("receipts"."layout" is null or "receipts"."layout" in ('card', 'table', 'class', 'department'));

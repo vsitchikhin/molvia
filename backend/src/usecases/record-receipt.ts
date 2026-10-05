@@ -230,6 +230,12 @@ export async function recordReceipt(
     const recorded = body.lines
       .filter((line): line is RecordedLine => !line.skip)
       .sort((a, b) => a.position - b.position)
+    const money = receiptMoney(held.total, held.lines, body, held.currency)
+    // a trip with no money and no purchase is an empty row of «Деньги»: a receipt with no items needs
+    // its total, read or typed (MOL-227, Р-4)
+    if (money === null && recorded.length === 0) {
+      throw new DomainError(ERROR.RECEIPT_TOTAL_REQUIRED)
+    }
     const chosen = [
       ...new Set(recorded.flatMap((line) => ('id' in line.item ? [line.item.id] : []))),
     ]
@@ -254,7 +260,7 @@ export async function recordReceipt(
       },
       held.currency,
       snapshot,
-      receiptMoney(held.total, held.lines, body, held.currency),
+      money,
     )
 
     // new items before the purchases, in the order of their names: each name is locked to the end of

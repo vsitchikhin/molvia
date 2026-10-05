@@ -138,7 +138,7 @@ describe('the gates reader', () => {
     await db.insert(receiptDays).values([
       { day: '2026-10-06', ...counts }, // the day before
       { day: '2026-10-07', ...counts },
-      { day: '2026-10-18', ...counts, reshoot: 1, later: 1 },
+      { day: '2026-10-18', ...counts, reshoot: 1, noItems: 1, later: 1 },
       { day: '2026-10-19', ...counts }, // the day after
     ])
     const report = await reader.read({
@@ -151,6 +151,7 @@ describe('the gates reader', () => {
       read: 4,
       readPartly: 2,
       reshoot: 1,
+      noItems: 1,
       unreadable: 0,
       recorded: 2,
       lines: 20,

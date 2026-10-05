@@ -92,9 +92,10 @@ function headOf(
 
 /**
  * Reads one receipt: every part in both page modes, the parts of each mode joined at the till's
- * articles, the mode whose lines add up kept (MOL-114). A receipt with no item line fails as `reshoot`;
- * one with any is read, however little of it (MOL-222, В-1), and has its item lines cut out for the
- * reader's training (MOL-169).
+ * articles, the mode whose lines add up kept (MOL-114). A receipt with no item line fails as `reshoot`,
+ * unless it is a section printed with no items, read whole with its sum (MOL-227); one with any is
+ * read, however little of it (MOL-222, В-1), and has its item lines cut out for the reader's training
+ * (MOL-169).
  */
 async function readOne(
   { reader, report, bind }: ReadReceiptsDeps,
@@ -163,7 +164,8 @@ async function readOne(
     readerVersion: version ?? '',
     head,
     lines,
-    partly: readPartly(lines, total),
+    // a section with no items is read whole (MOL-227)
+    partly: lines.length > 0 && readPartly(lines, total),
     bindings,
     images,
   }

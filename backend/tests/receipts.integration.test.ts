@@ -411,6 +411,48 @@ describe('the queue', () => {
     expect(await days()).toMatchObject([{ reshoot: 1, read: 0, readPartly: 0, unreadable: 0 }])
   })
 
+  // MOL-227: a sole trader's section with no items is read whole — a sum to record, not a new shot
+  it('reads a receipt with no items, its head and its total, and counts it apart', async () => {
+    const me = await owner()
+    const id = await queued(me)
+    const text = [
+      'ԽԱՆՈՒԹ ԱՁ',
+      'ԳՅՈՒՄՐԻ Աբովյան 10',
+      'ՀՎՀՀ: 12345678 Գ/Հ: 87654321',
+      'ԿՀ: 00000049',
+      '04-10-26 16:30:59 ԳԱՆՁԱՊԱՀ: 3',
+      'Բաժին 1 - Բաժին 1',
+      '/ Շրջանառության հարկ/ 1700.00',
+      'Ընդամենը՝ 1700.00',
+      'Առձեռն 1700.00',
+      'ՖԻՍԿԱԼ ՀԱՄԱՐ 11223344',
+    ].join('\n')
+    const section: ReaderReading = {
+      text,
+      rows: text.split('\n').map((row, i) => ({ text: row, box: [0, i * 40, 600, 30] })),
+      version: 'v',
+    }
+    const [report] = await readAll(benchReader({ read: () => Promise.resolve(section) }))
+    const detail = receiptDetailCodec.parse((await get(me, `/receipts/${id}`)).json())
+    expect([detail.receipt.status, detail.receipt.failure, detail.lines]).toEqual([
+      'parsed',
+      null,
+      [],
+    ])
+    expect(detail.receipt.header).toMatchObject({
+      tin: '12345678',
+      date: '2026-10-04',
+      time: '16:30',
+      receiptNo: '11223344',
+    })
+    expect(detail.receipt.total).toEqual({ minor: 170_000n, currency: 'AMD' })
+    expect(await db.select().from(receiptLineImages)).toEqual([])
+    expect(report).toMatchObject({ kind: 'read', status: 'parsed', lines: 0, partly: false })
+    expect(await days()).toMatchObject([
+      { noItems: 1, read: 0, readPartly: 0, reshoot: 0, unreadable: 0 },
+    ])
+  })
+
   // MOL-222, В-1: «читать надо все кассы» — what was «переснимите» (В-4 of MOL-125) goes to the review
   it('reads a receipt read in part, its lines and all, and counts it apart', async () => {
     const me = await owner()

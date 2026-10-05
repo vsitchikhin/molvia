@@ -78,6 +78,9 @@ export const en: Dictionary = {
   'receipt.parsed': 'Your {place} receipt is ready: {count}. Take a look and save them.',
   'receipt.parsed_no_place':
     'Your receipt from {date} is ready: {count}. Take a look and save them.',
+  'receipt.no_items': 'Your {place} receipt is ready: it lists no items — you can save its total.',
+  'receipt.no_items_no_place':
+    'Your receipt from {date} is ready: it lists no items — you can save its total.',
   'receipt.failed':
     'We couldn’t read your receipt from {date}. You can retake it or add the purchases by hand.',
   'receipt.duplicate':

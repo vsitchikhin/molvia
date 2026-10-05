@@ -45,6 +45,12 @@ export function receiptText(notice: ReceiptNotice): string {
       ? t(language, 'receipt.duplicate_no_place', { date: dateOf(language, day) })
       : t(language, 'receipt.duplicate', { place })
   }
+  // a sole trader's section with no items: a sum to record, not «0 позиций» (MOL-227)
+  if (lineCount === 0) {
+    return place === null
+      ? t(language, 'receipt.no_items_no_place', { date: dateOf(language, day) })
+      : t(language, 'receipt.no_items', { place })
+  }
   const count = lines(language, lineCount)
   return place === null
     ? t(language, 'receipt.parsed_no_place', { date: dateOf(language, day), count })

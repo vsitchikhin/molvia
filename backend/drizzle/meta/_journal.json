@@ -379,6 +379,13 @@
       "when": 1791208350490,
       "tag": "0053_receipt_layout_class",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1791218700296,
+      "tag": "0054_receipt_no_items",
+      "breakpoints": true
     }
   ]
 }

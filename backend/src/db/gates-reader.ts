@@ -96,6 +96,7 @@ export interface ReceiptsInWindow {
   readonly read: number
   readonly readPartly: number
   readonly reshoot: number
+  readonly noItems: number
   readonly unreadable: number
   readonly recorded: number
   readonly lines: number
@@ -238,6 +239,7 @@ async function receiptsIn(tx: Conn, from: Date, to: Date): Promise<ReceiptsInWin
       read: sum(receiptDays.read),
       readPartly: sum(receiptDays.readPartly),
       reshoot: sum(receiptDays.reshoot),
+      noItems: sum(receiptDays.noItems),
       unreadable: sum(receiptDays.unreadable),
       recorded: sum(receiptDays.recorded),
       lines: sum(receiptDays.lines),
@@ -258,6 +260,7 @@ async function receiptsIn(tx: Conn, from: Date, to: Date): Promise<ReceiptsInWin
     read: 0,
     readPartly: 0,
     reshoot: 0,
+    noItems: 0,
     unreadable: 0,
     recorded: 0,
     lines: 0,
