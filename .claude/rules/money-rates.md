@@ -140,7 +140,11 @@ rule: a pair with the lari — the NBG, any other — the CBA.
   again then — a bank frozen that long gives its days back the day after it thaws, for at most a
   portion a day; an older one until a restart of the API (review 8): forgotten daily, a hole of 2024
   sent the walk from it to today every day, a portion an hour, some nine hundred requests a day and
-  growing. A month was the first bound and lost the days of a bank frozen for five weeks (adversarial
+  growing. **A restart is every deploy — every merge to `master` (MOL-90)**: with such a hole each
+  merge costs one walk from it to today, a portion an hour, a year after it some 365 requests. Only
+  a day asked when already older than the quarter is known so — a bank that thawed after a longer
+  freeze gives its days back at once, since the walk did not ask them while it stood (adversarial
+  round 7, П7). A month was the first bound and lost the days of a bank frozen for five weeks (adversarial
   round 6, П3). Kept in memory
   with `archiveNext`, and only for a walk whose days were written. After a restart the walk starts from the first hole
   longer than `ARCHIVE_GAP_DAYS` (`archiveWalkFrom`): the longest stretch without
