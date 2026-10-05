@@ -238,12 +238,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
   Ctrl or Meta is the browser's, as in a live group (Р2-А3). `e2e/kit-inactive`
   holds it in Chromium and WebKit, since the component tests send their own events. A native
   `disabled` is drawn the same and stays for a moment, until a screen trades it for `inactive`
-  with the words saying why. **`busy` alone keeps the look of the action**, as on master — it is the one
-  at work, and saying so is the screen's: its words («Сохраняем…») or a status line («Готовим
-  фото…»); where the screen says nothing — among others «Удалить навсегда», «Не тот товар», «Выйти»,
-  the login; round 4 counted nine — only `aria-busy` does (round 3, Р3-А1), a limit, not a promise; **`busy` with `disabled` is drawn as not now**, as master
-  drew it dimmed: «Сохранить» of a sheet that keeps its words while it sends had nothing else to
-  show it (round 2, Р2-А1 — round 1 had drawn it live). A look of its own for `busy` is MOL-225's. **The form of the variant stays** (owner's В-1 «а»): a button with
+  with the words saying why. **At work is never not now** — see the next rule. **The form of the variant stays** (owner's В-1 «а»): a button with
   a fill goes to `surface-2`, a ghost or danger-ghost keeps no fill — two grey pills in a sheet's
   footer read as two buttons of equal weight. The price, accepted (А4): the `surface-2` pill stands
   1.10:1 on a sheet, so in a footer that sends, primary and ghost read as two muted words; an edge
@@ -262,6 +257,30 @@ The detail behind the frontend lines of `CLAUDE.md`.
   every chip and every segment is at 600, so nothing reflows under the thumb. **`--opacity-stale`
   means one thing: a previous answer left while the next is on its way** (К-11) — the searches;
   the difference of a reconciliation waits in words («Пересчитаем, когда…»), not dimmed (116 v2).
+- **At work, a button says what it does** (MOL-225, owner's В-1…В-5 «а»). `busy` had no look of its
+  own: alone it was drawn live, with `disabled` as not now, and only four places of twenty-seven
+  changed their word — so «Удалить навсегда», «Отвязать», «Выйти и стереть», the login and the
+  receipt stayed silent on a slow line while the kit swallowed the second tap. **`busy-label` is the
+  word of the work** («Удаляем…»), standing in place of the action's in the action's look — variant,
+  fill, ink, shadow and glyph — with `disabled` too, since this is the one at work and not one that
+  cannot be pressed. **No spinner** (DESIGN.md, «no spinners on buttons»), nothing that breathes: the
+  word is the sign and the explanation at once, and still under reduced motion by its nature.
+  **The width is the wider word**: a button not `block` holds both words in one cell, the one not
+  shown `visibility: hidden` and `aria-hidden`, so it does not jump under the thumb when the work
+  starts or ends; a `block` one is as wide as its place and swaps the word, so its text is one word
+  (a cell there broke every test that finds a button by its text). The price, accepted: a live
+  «Обновить» stands a little wider than its word. **The focus stays**: a screen does not bind
+  `disabled` to its sending — the native attribute drops the focus to the page, `busy` is
+  `aria-disabled` and the kit cancels the tap; a neighbour that is not at work («Удалить» beside
+  «Сохранить» of an account) stays not now. **Nothing is announced apart**: the word is the name of
+  the focused button, beside `aria-busy`, and the outcome is announced as before — the live region
+  of `App.vue` is inert behind a modal sheet, where most of these buttons stand. While a photo is
+  made ready, «Выбрать фото», «Снять» and «Отправить чек» are not now and the line «Готовим фото…»
+  says it — the work is the photo's; three buttons with one word would be noise. The linter refuses
+  `busy` without `busy-label` (`vue/no-restricted-syntax`); it closes carelessness, not intent. An
+  icon-only button has no word to swap, so its label is what changes. `/_kit` «Идёт работа» and
+  `e2e/kit-inactive` hold the look and the width in Chromium and WebKit, `e2e/erase` the word, the
+  focus and the second tap on the most final button of the app.
 - **A row is `ListRow` or `NavRow`, a caps caption is `SectionCaption`** (MOL-175, Ф-12). A row of a
   list had been drawn anew on every screen — five heights (44, 52, 60, 64), a title at 400 or at 600,
   a hover here and none there — and a caps caption had grown 52 copies with three spacings to the
