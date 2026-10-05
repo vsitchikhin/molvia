@@ -608,7 +608,11 @@ report.
   or added to the same pick (a fan, review №11, adversarial В1, В3). Undone out of order, a swap met
   contents another merge had put there and the person's scores came back crossed — «Малоко» with the
   score given to «Молоко 3,2%» — and an «own word» another merge brought was taken off. A later merge
-  that touched nothing of it does not stand in the way. **The price:** to part a false merge the owner
+  that touched nothing of it does not stand in the way. A withdrawal writes the row it lost to as well
+  (`kept`): a later merge that only withdrew its own against a verdict the earlier one brought is a
+  touch too — undone first, the earlier one took the winner home and left the survivor with nothing of
+  the person (review №12, adversarial Д1). **A name or a heading the survivor's other twin knew too
+  stays with the survivor** on an undo, and the trace undone gets a copy (Д2). **The price:** to part a false merge the owner
   undoes the later true one too, and merges it again by hand — the texts of the reviews withdrawn on the
   way do not come back, and the night leaves that pair to the hand from then on. The
   survivor's own pick gets back its «own word» and its last
