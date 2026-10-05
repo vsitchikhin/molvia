@@ -163,9 +163,9 @@ export default defineConfigWithVueTs(
   },
   // A busy button says what it does (MOL-225): at work it reads «Удаляем…» in place of its action's
   // word, in the action's look. Without its word it looked live — or, beside `disabled`, not now — and
-  // the second tap was swallowed with nothing said. `busy` — alone, bound or in a `v-bind` object, on
-  // `AppButton` or `app-button` — with no word of the work, `busy-label` or `busyLabel`, is refused
-  // (adversarial Р1-А5). What it cannot see: a button at work through `disabled` or `inactive` alone,
+  // the second tap was swallowed with nothing said. `busy` — alone, bound or in a `v-bind` object (its
+  // key a name, a string or a computed string), on `AppButton` or `app-button` — with no word of the
+  // work, `busy-label` or `busyLabel`, is refused (adversarial Р1-А5, Р2-А1). What it cannot see: a button at work through `disabled` or `inactive` alone,
   // which reads the same as a neighbour put out while another works; a name computed passes. It
   // closes carelessness, not intent.
   {
@@ -179,12 +179,13 @@ export default defineConfigWithVueTs(
             ':matches(',
             ":has(VStartTag > VAttribute[directive=false][key.name='busy']),",
             ":has(VStartTag > VAttribute[directive=true][key.argument.name='busy']),",
-            ":has(VStartTag > VAttribute[directive=true][key.argument=null] Property[key.name='busy'])",
+            ":has(VStartTag > VAttribute[directive=true][key.argument=null] Property[key.name='busy']),",
+            ":has(VStartTag > VAttribute[directive=true][key.argument=null] Property[key.value='busy'])",
             ')',
             ':not(:matches(',
             ':has(VStartTag > VAttribute[directive=true][key.argument.name=/^busy-?label$/i]),',
             ':has(VStartTag > VAttribute[directive=true][key.argument=null] Property[key.name=/^busy-?label$/i]),',
-            ":has(VStartTag > VAttribute[directive=true][key.argument=null] Property[key.value='busy-label'])",
+            ':has(VStartTag > VAttribute[directive=true][key.argument=null] Property[key.value=/^busy-?label$/i])',
             '))',
           ].join(''),
           message: 'A busy button says what it does: give it a busy-label (MOL-225).',

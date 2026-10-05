@@ -10,6 +10,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 ## frontend · components
 
 - `frontend/src/components/AppButton.vue` — Kit button in six variants (primary, secondary, tinted, ghost, danger-ghost, icon), with busy and its word (`busyLabel`), one inactive look and an icon slot.
+- `frontend/src/eslint-busy.test.ts` — Test of `frontend/eslint.config.js`: `busy` on `AppButton` with no word of the work is refused however written — bound, alone, kebab tag, a `v-bind` object with a key named, quoted or computed — and passes with its word.
 - `frontend/src/components/AppCard.vue` — Kit card: the surface of lists and blocks, with a chosen tag, the green «take» tone and an edge-to-edge list mode.
 - `frontend/src/components/AppField.vue` — Kit field: a native input, textarea, select or date with its label (or one only read out), error code, a mark before and a suffix after, the right phone keyboard, and the count of the last characters left when asked.
 - `frontend/src/components/AppNote.vue` — Kit note: an icon of 18 and words of 13 on `surface-2`, or `warn` on its tint; the strip's shape, no live region.
