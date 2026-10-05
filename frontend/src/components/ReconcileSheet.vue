@@ -133,7 +133,14 @@
         @expire="removedReason = null"
       />
       <template v-if="!result">
-        <AppButton size="large" block :busy="sending" :disabled="sending || !online" @click="check">
+        <AppButton
+          size="large"
+          block
+          :busy="sending"
+          :busy-label="t('accounts.reconcile.checking')"
+          :disabled="!online"
+          @click="check"
+        >
           <template #icon><IconScale v-if="online" /><IconCloudOff v-else /></template>
           {{ online ? t('accounts.reconcile.check') : t('accounts.reconcile.wait_online') }}
         </AppButton>

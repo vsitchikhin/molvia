@@ -52,7 +52,14 @@
 
     <template #footer>
       <p v-if="failed" class="failed" role="alert">{{ failed }}</p>
-      <AppButton size="large" block :busy="sending" :disabled="sending || !online" @click="submit">
+      <AppButton
+        size="large"
+        block
+        :busy="sending"
+        :busy-label="t('budget.sheet.saving')"
+        :disabled="!online"
+        @click="submit"
+      >
         <template #icon><IconCheck v-if="online" /><IconCloudOff v-else /></template>
         {{ online ? t('budget.sheet.save') : t('budget.sheet.wait_online') }}
       </AppButton>

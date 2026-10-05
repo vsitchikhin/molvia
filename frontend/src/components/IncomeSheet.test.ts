@@ -137,6 +137,28 @@ describe('IncomeSheet', () => {
     expect(view.emitted('update:open')?.at(-1)).toEqual([false])
   })
 
+  // MOL-225, В-3: while it saves, the button is the one at work — its own word, the action's look and
+  // the focus kept (a `disabled` one dropped the focus to the page), and a second tap sends nothing.
+  it('says «Saving income…» while it saves, keeps the focus and takes no second tap', async () => {
+    let settle: (value: unknown) => void = () => undefined
+    record.mockImplementation(() => new Promise((resolve) => (settle = resolve)))
+    const view = await render()
+    await fill(view, '99615')
+    const button = view.findAll('button').find((one) => one.text() === en.income.sheet.save)
+    if (!button) throw new Error('no «Save income»')
+    ;(button.element as HTMLButtonElement).focus()
+    await button.trigger('click')
+    await flushPromises()
+    expect(button.text()).toBe(en.income.sheet.saving)
+    expect(button.attributes('aria-busy')).toBe('true')
+    expect(button.attributes('disabled')).toBeUndefined()
+    expect(document.activeElement).toBe(button.element)
+    await button.trigger('click')
+    expect(record).toHaveBeenCalledOnce()
+    settle(undefined)
+    await flushPromises()
+  })
+
   it('refuses without a source or an amount, under their fields (В-3)', async () => {
     const view = await render()
     await fill(view, '0', 'RUB', '')

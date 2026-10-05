@@ -78,6 +78,7 @@
         block
         :inactive="waiting !== null"
         :busy="phase === 'sending'"
+        :busy-label="t('feedback.sending')"
         @click="press"
       >
         <template v-if="action.icon" #icon><component :is="action.icon" /></template>
@@ -494,7 +495,6 @@ export default defineComponent({
 
     const action = computed<{ words: string; icon: Component | null }>(() => {
       if (phase.value === 'sent') return { words: t('feedback.done'), icon: IconCheck }
-      if (phase.value === 'sending') return { words: t('feedback.sending'), icon: null }
       if (waiting.value !== null) return { words: waiting.value, icon: null }
       if (phase.value === 'failed') return { words: t('state.retry'), icon: IconRefresh }
       return { words: t('feedback.send'), icon: IconSend }

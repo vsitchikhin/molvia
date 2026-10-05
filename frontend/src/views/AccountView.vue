@@ -115,8 +115,9 @@
       <AppButton
         v-else-if="account?.archivedAt"
         size="large"
-        :disabled="restoring || !online"
+        :disabled="!online"
         :busy="restoring"
+        :busy-label="t('accounts.screen.restoring')"
         @click="bringBack"
       >
         <template #icon><IconUndo /></template>

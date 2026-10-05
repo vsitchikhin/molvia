@@ -138,8 +138,9 @@
                     </RouterLink>
                     <AppButton
                       variant="secondary"
-                      :disabled="!online || restoring === account.id"
+                      :disabled="!online"
                       :busy="restoring === account.id"
+                      :busy-label="t('accounts.screen.restoring')"
                       @click="bringBack(account)"
                     >
                       <template #icon><IconUndo /></template>

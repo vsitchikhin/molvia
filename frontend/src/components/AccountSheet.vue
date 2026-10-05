@@ -75,7 +75,14 @@
         <p class="conflict">{{ t('accounts.sheet.conflict') }}</p>
         <p class="conflict current">{{ currentOf(account) }}</p>
       </div>
-      <AppButton size="large" block :busy="sending" :disabled="sending || !online" @click="submit">
+      <AppButton
+        size="large"
+        block
+        :busy="sending"
+        :busy-label="t('accounts.sheet.saving')"
+        :disabled="!online"
+        @click="submit"
+      >
         <template #icon><IconCheck v-if="online" /><IconCloudOff v-else /></template>
         {{ online ? t('accounts.sheet.save') : t('accounts.sheet.wait_online') }}
       </AppButton>
