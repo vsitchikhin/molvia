@@ -21,6 +21,7 @@ vi.mock('@/api', () => ({
     me: () => me(),
     saveSettings: (input: SettingsUpdate) => save(input),
     salaryShift: () => Promise.resolve({ day: null }),
+    analyticsSetting: () => Promise.resolve({ off: false }),
   },
 }))
 const initial = actorCodec.parse({

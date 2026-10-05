@@ -33,6 +33,7 @@ vi.mock('@/api', () => ({
   api: {
     me: () => me(),
     salaryShift: () => Promise.resolve({ day: null }),
+    analyticsSetting: () => Promise.resolve({ off: false }),
     logout: () => logout(),
     rateItem: (itemId: string, rating: Rating) => rateItem(itemId, rating),
   },

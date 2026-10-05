@@ -115,6 +115,8 @@ async function aFullLife(actorId: string, telegramUserId: number) {
       botBlockedAt: at(3),
       consentVersion: 1,
       consentedAt: at(2),
+      analyticsOffAt: at(4),
+      analyticsOnAt: at(5),
       sharedUntil: at(1),
     })
     .where(eq(actors.id, actorId))
