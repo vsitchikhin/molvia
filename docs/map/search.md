@@ -28,6 +28,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 
 - `backend/src/usecases/embed-items.ts` — The one writer of item vectors (MOL-105): every item without a vector of the current model, in batches; a minute timer nudged by a proposal and by the model's load. Tests: `embed-items.test.ts`.
 - `backend/src/usecases/embed-items.test.ts` — Use-case test: the writer fills every missing vector batch by batch, rewrites another model's, waits for no model; a nudge during a run repeats it once.
+- `backend/src/usecases/merge-twins.ts` — The night of the merge of twins (MOL-106): from half past four in Yerevan, once a day by the instance that claims it, the pairs judged by `twinVerdict` merged — or only named in `report` mode — new candidates named once, the report handed at nine. Tests: `merge-twins.test.ts`.
 - `backend/src/usecases/propose-item.ts` — Use case «Предложить товар»: the item of the same name already there, or a new one in the asker's name.
 - `backend/src/usecases/query-meaning.ts` — The vector of a query for the search by meaning (MOL-105), from four letters and only if it came in time; else the letters alone.
 - `backend/src/usecases/search-catalogue.ts` — Use case: the catalogue lookup behind «Что взяли?», at most `SEARCH_LIMIT` rows, writing nothing to the event log.
@@ -55,6 +56,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 ## backend · tests
 
 - `backend/tests/catalogue.integration.test.ts` — Integration test: both catalogue routes through the server — the door, the query bound, the wire answer, no event, proposal dedup.
+- `backend/tests/merge-corpus.integration.test.ts` — Integration test: the night on the seed with the real model — the twins typed beside a seed line merge into it, no seed pair merges, one key in two scripts and a doubtful typo are only named.
 - `backend/tests/merge.integration.test.ts` — Integration test: a merge moves every row and writes it down, two verdicts of one person settle, the 0.2 gate at five stays put, the undo restores a snapshot, the sweep, places by city.
 - `backend/tests/merge-trace.integration.test.ts` — Integration test: an id or a name of a merged item or place, on every path that writes by it — read, rated, bought, picked, coded, remembered, proposed, typed — lands on the survivor; the search finds the survivor by the trace's name, once.
 - `backend/tests/rekey.integration.test.ts` — Integration test: a key drifted from today's tables is rewritten, a current one left, a second start writes nothing (MOL-109).

@@ -60,6 +60,9 @@ services:
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:?set TELEGRAM_BOT_USERNAME}
       BOT_API_SECRET: ${BOT_API_SECRET:?set BOT_API_SECRET}
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # The nightly merge of twins (MOL-106): `report` says each morning what it would merge, `on`
+      # merges — the owner's word, one line in .env.prod (В-3).
+      CATALOGUE_MERGE: ${CATALOGUE_MERGE:-report}
       # Optional: empty leaves the Open Food Facts hint off (MOL-162).
       OPEN_FOOD_FACTS_CONTACT: ${OPEN_FOOD_FACTS_CONTACT:-}
       # The receipt reader below (MOL-125); while it is down, receipts wait in the queue.

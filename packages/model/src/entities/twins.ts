@@ -5,6 +5,7 @@
 
 import { levenshtein } from '#model/support/edits'
 import { toSearchKey } from '#model/support/search-key'
+import { yerevanDate } from '#model/values/rates'
 
 /**
  * Units as a label writes them after a number, each to one name: «1л», «1 л» and «1 l» are one size,
@@ -187,4 +188,25 @@ export function twinVerdict({ spelling, sameUnit, meaning }: TwinPair): TwinVerd
   }
   if (spelling.edits === 0 || (meaning ?? 0) >= TWIN_CANDIDATE.meaning) return 'candidate'
   return 'apart'
+}
+
+/**
+ * When the night merges (MOL-106, Р-7): from half past four in Yerevan — after the nightly copy of the
+ * database at four, so a copy taken before every merge is always there — and the morning's report from
+ * nine. Yerevan, not the owner's zone, which is kept nowhere; the copy is timed the same way. A night
+ * the API slept through runs when it wakes the same day.
+ */
+export const MERGE_FROM_MINUTE = 4 * 60 + 30
+export const MERGE_REPORT_FROM_MINUTE = 9 * 60
+
+const YEREVAN_OFFSET_MINUTES = 4 * 60
+
+/** The night's day in Yerevan, and whether its merge and its report are due at `now`. */
+export function mergeClock(now: Date): { day: string; merge: boolean; report: boolean } {
+  const minute = (now.getUTCHours() * 60 + now.getUTCMinutes() + YEREVAN_OFFSET_MINUTES) % (24 * 60)
+  return {
+    day: yerevanDate(now),
+    merge: minute >= MERGE_FROM_MINUTE,
+    report: minute >= MERGE_REPORT_FROM_MINUTE,
+  }
 }

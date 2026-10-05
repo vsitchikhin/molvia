@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { TWIN_MERGE, nameParts, sameSizes, twinSpelling, twinVerdict } from '#model/entities/twins'
+import {
+  TWIN_MERGE,
+  mergeClock,
+  nameParts,
+  sameSizes,
+  twinSpelling,
+  twinVerdict,
+} from '#model/entities/twins'
 
 const spelling = (a: string, b: string) => twinSpelling(nameParts(a), nameParts(b))
 
@@ -122,5 +129,19 @@ describe('twinVerdict', () => {
     expect(pair('Курица', 'Корица', 0.79)).toBe('apart')
     expect(pair('Молоко 1 л', 'Молоко 2 л', 0.99)).toBe('apart')
     expect(pair('SAS', 'SOS', 0.99)).toBe('apart')
+  })
+})
+
+describe('mergeClock', () => {
+  it.each([
+    ['2026-10-06T00:29:00Z', '2026-10-06', false, false],
+    ['2026-10-06T00:30:00Z', '2026-10-06', true, false],
+    ['2026-10-06T04:59:00Z', '2026-10-06', true, false],
+    ['2026-10-06T05:00:00Z', '2026-10-06', true, true],
+    ['2026-10-06T19:59:00Z', '2026-10-06', true, true],
+    // midnight in Yerevan is a new day, and its night not yet due
+    ['2026-10-06T20:00:00Z', '2026-10-07', false, false],
+  ])('at %s it is the night of %s: merge %s, report %s', (at, day, merge, report) => {
+    expect(mergeClock(new Date(at))).toEqual({ day, merge, report })
   })
 })

@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { ITEM_BARCODES_MAX } from '@molvia/model'
-import type { MergeSubject } from '@molvia/model'
+import { catalogueMergedNoticeSchema } from '@molvia/model'
+import type { CatalogueMergedNotice, MergeSubject } from '@molvia/model'
 import type { Conn } from './index'
 import { idOrNull } from './rows'
 import type { MergeBy, MergeMove } from './schema'
@@ -44,7 +45,61 @@ export interface MergeRepository {
    * it — moved to the survivor under the merge's own number. How many rows.
    */
   sweep(): Promise<number>
+  /**
+   * The pairs of live items the night looks at: each item's nearest names by meaning, as close as
+   * `minMeaning` or closer, of one kind — and every pair of one search key, however far by meaning,
+   * since one key in two scripts is the one pair the model cannot judge. Each pair once.
+   */
+  itemPairs(model: string, minMeaning: number): Promise<TwinRow[]>
+  /** The live places of one kind, country and city where there are two or more, by group. */
+  placeGroups(): Promise<PlaceRow[][]>
+  /** Whether a pair was merged once and undone: the night never merges it or names it again. */
+  undonePairs(subject: MergeSubject): Promise<ReadonlySet<string>>
+  /**
+   * The candidates of these never named before, now marked named on `day` — the morning names only
+   * new ones (Р-11). A pair by its ids in order.
+   */
+  firstNamed(
+    subject: MergeSubject,
+    pairs: readonly (readonly [string, string])[],
+    day: string,
+  ): Promise<ReadonlySet<string>>
+  /** The night of `day` claimed by this instance, or false when another has it — or had it. */
+  claimRun(day: string, mode: 'on' | 'report', at: Date): Promise<boolean>
+  finishRun(day: string, report: CatalogueMergedNotice, at: Date): Promise<void>
+  /** The report of a night finished and not yet handed to the owner, marked handed in one statement. */
+  takeReport(day: string, at: Date): Promise<CatalogueMergedNotice | null>
 }
+
+/** One side of a pair the night looks at. */
+export interface TwinSide {
+  readonly id: string
+  readonly name: string
+  readonly unit: string
+  readonly createdAt: Date
+}
+
+export interface TwinRow {
+  readonly a: TwinSide
+  readonly b: TwinSide
+  /** The cosine of the two names; null when either has no vector of the model. */
+  readonly meaning: number | null
+}
+
+export interface PlaceRow {
+  readonly id: string
+  readonly name: string
+  readonly city: string
+  readonly createdAt: Date
+}
+
+/** A pair by its two ids in order — how the journal and the named candidates key it. */
+export function pairKey(a: string, b: string): string {
+  return a < b ? `${a} ${b}` : `${b} ${a}`
+}
+
+/** How many nearest names by meaning the night asks the index for, each item. */
+const NEIGHBOURS = 10
 
 interface Moved {
   readonly what: MergeMove
@@ -545,6 +600,133 @@ export function createMergeRepository(db: Conn): MergeRepository {
         }
         return count
       })
+    },
+
+    async itemPairs(model, minMeaning) {
+      return db.transaction(async (tx) => {
+        await tx.execute(sql`select set_config('hnsw.ef_search', ${String(NEIGHBOURS * 4)}, true)`)
+        const rows = await tx.execute<{
+          a: string
+          b: string
+          meaning: number | null
+          a_name: string
+          a_unit: string
+          a_created: Date
+          b_name: string
+          b_unit: string
+          b_created: Date
+        }>(sql`
+          with pairs as (
+            select least(a.id, n.item_id) as a, greatest(a.id, n.item_id) as b
+            from items a
+            join item_embeddings ae on ae.item_id = a.id and ae.model = ${model}
+            cross join lateral (
+              select e.item_id, 1 - (e.embedding <=> ae.embedding) as meaning
+              from item_embeddings e
+              where e.model = ${model}
+              order by e.embedding <=> ae.embedding
+              limit ${NEIGHBOURS + 1}
+            ) n
+            where a.merged_into is null and n.item_id <> a.id and n.meaning >= ${minMeaning}
+            union
+            select a.id, b.id
+            from items a
+            join items b on b.search_key = a.search_key and b.kind = a.kind and a.id < b.id
+            where a.merged_into is null and b.merged_into is null
+          )
+          select p.a, p.b,
+                 1 - (ae.embedding <=> be.embedding) as meaning,
+                 a.name as a_name, a.default_unit as a_unit, a.created_at as a_created,
+                 b.name as b_name, b.default_unit as b_unit, b.created_at as b_created
+          from pairs p
+          join items a on a.id = p.a
+          join items b on b.id = p.b
+          left join item_embeddings ae on ae.item_id = a.id and ae.model = ${model}
+          left join item_embeddings be on be.item_id = b.id and be.model = ${model}
+          where a.kind = b.kind and a.merged_into is null and b.merged_into is null
+          order by meaning desc nulls last, p.a, p.b`)
+        return rows.map((row) => ({
+          a: { id: row.a, name: row.a_name, unit: row.a_unit, createdAt: new Date(row.a_created) },
+          b: { id: row.b, name: row.b_name, unit: row.b_unit, createdAt: new Date(row.b_created) },
+          meaning: row.meaning,
+        }))
+      })
+    },
+
+    async placeGroups() {
+      const rows = await db.execute<{
+        id: string
+        name: string
+        city: string
+        created_at: Date
+        grp: string
+      }>(sql`
+        select id, name, city, created_at,
+               kind || ' ' || country || ' ' || city as grp
+        from places p
+        where merged_into is null
+          and exists (select 1 from places o
+                      where o.merged_into is null and o.id <> p.id and o.kind = p.kind
+                        and o.country = p.country and o.city = p.city)
+        order by grp, created_at, id`)
+      const groups = new Map<string, PlaceRow[]>()
+      for (const row of rows) {
+        const place = {
+          id: row.id,
+          name: row.name,
+          city: row.city,
+          createdAt: new Date(row.created_at),
+        }
+        groups.set(row.grp, [...(groups.get(row.grp) ?? []), place])
+      }
+      return [...groups.values()]
+    },
+
+    async undonePairs(subject) {
+      const rows = await db.execute<{ a: string; b: string }>(
+        subject === 'item'
+          ? sql`select from_item as a, into_item as b from catalogue_merges
+                where subject = 'item' and undone_at is not null`
+          : sql`select from_place as a, into_place as b from catalogue_merges
+                where subject = 'place' and undone_at is not null`,
+      )
+      return new Set(rows.map((row) => pairKey(row.a, row.b)))
+    },
+
+    async firstNamed(subject, pairs, day) {
+      if (pairs.length === 0) return new Set()
+      const ordered = pairs.map(([a, b]) => (a < b ? [a, b] : [b, a]))
+      const rows = await db.execute<{ a: string; b: string }>(sql`
+        insert into catalogue_merge_candidates (subject, a, b, named_on)
+        select ${subject}, p.a, p.b, ${day}::date
+        from jsonb_to_recordset(${JSON.stringify(ordered.map(([a, b]) => ({ a, b })))}::jsonb)
+             as p(a uuid, b uuid)
+        on conflict do nothing
+        returning a, b`)
+      return new Set(rows.map((row) => pairKey(row.a, row.b)))
+    },
+
+    async claimRun(day, mode, at) {
+      const rows = await db.execute(sql`
+        insert into catalogue_merge_runs (day, mode, started_at)
+        values (${day}::date, ${mode}, ${at})
+        on conflict do nothing
+        returning day`)
+      return rows.length > 0
+    },
+
+    async finishRun(day, report, at) {
+      await db.execute(sql`
+        update catalogue_merge_runs set finished_at = ${at}, report = ${JSON.stringify(report)}::jsonb
+        where day = ${day}::date`)
+    },
+
+    async takeReport(day, at) {
+      const [row] = await db.execute<{ report: unknown }>(sql`
+        update catalogue_merge_runs set reported_at = ${at}
+        where day = ${day}::date and finished_at is not null and reported_at is null
+        returning report`)
+      return row ? catalogueMergedNoticeSchema.parse(row.report) : null
     },
   }
 }
