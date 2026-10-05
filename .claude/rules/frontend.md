@@ -288,10 +288,13 @@ The detail behind the frontend lines of `CLAUDE.md`.
   of `App.vue` is inert behind a modal sheet, where most of these buttons stand. While a photo is
   made ready, «Выбрать фото», «Снять» and «Отправить чек» are not now and the line «Готовим фото…»
   says it — the work is the photo's; three buttons with one word would be noise. The linter refuses
-  `busy` without its word (`vue/no-restricted-syntax`) — bound, alone or in a `v-bind` object whose
-  key is a name, a string or a computed string, on `AppButton` or `app-button`, the word as
-  `busy-label` or `busyLabel` (Р1-А5, Р2-А1); `src/eslint-busy.test.ts` holds every way through the
-  real config. It cannot see a
+  `busy` without its word (`vue/no-restricted-syntax`) — bound, alone, or a key of the `v-bind`
+  object itself (a name, a string, a computed string or a template with nothing in it, never a key
+  nested deeper: `t('…', { busy })` is no prop), on `AppButton` or `app-button`, the word as
+  `busy-label` or `busyLabel` (Р1-А5, Р2-А1, Р3-А2). A word written as a string is the word here and
+  untranslated for `vue/no-bare-strings-in-template`, whose list of attributes holds `busy-label`
+  (Р3-А1) — that list replaces the plugin's own, so a new attribute of text joins it by hand.
+  `src/eslint-busy.test.ts` holds every way through the real config. It cannot see a
   button at work through `disabled` or `inactive` alone, which reads the same as a neighbour put out
   while another works: that is review's. A button named by `label` — an icon-only one has no word to
   swap — takes the word of the work as its name. A retry keeps its ↻ under «Отправляем…». `/_kit` «Идёт работа» and

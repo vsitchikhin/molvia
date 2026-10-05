@@ -10,7 +10,6 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 ## frontend · components
 
 - `frontend/src/components/AppButton.vue` — Kit button in six variants (primary, secondary, tinted, ghost, danger-ghost, icon), with busy and its word (`busyLabel`), one inactive look and an icon slot.
-- `frontend/src/eslint-busy.test.ts` — Test of `frontend/eslint.config.js`: `busy` on `AppButton` with no word of the work is refused however written — bound, alone, kebab tag, a `v-bind` object with a key named, quoted or computed — and passes with its word.
 - `frontend/src/components/AppCard.vue` — Kit card: the surface of lists and blocks, with a chosen tag, the green «take» tone and an edge-to-edge list mode.
 - `frontend/src/components/AppField.vue` — Kit field: a native input, textarea, select or date with its label (or one only read out), error code, a mark before and a suffix after, the right phone keyboard, and the count of the last characters left when asked.
 - `frontend/src/components/AppNote.vue` — Kit note: an icon of 18 and words of 13 on `surface-2`, or `warn` on its tint; the strip's shape, no live region.
@@ -58,6 +57,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/DESIGN.md` — The style for Claude Design and for us: the token block generated from `_tokens.scss` by `bin/design-md.mjs`, then the named rules of colour, type, layout, shape and the kit.
 - `frontend/PRODUCT.md` — The product in one page for Claude Design: what it answers, who, where, tone, trust, anti-references.
 - `frontend/stylelint/known-properties.mjs` — Stylelint rule `molvia/known-custom-property`: a `var(--x)` must be declared in the tokens, `main.scss`, the mixins, its own file, or the list of properties set by script.
+- `frontend/src/eslint-busy.test.ts` — Test of the house config itself, through the real `eslint.config.js`: `busy` on `AppButton` with no word of the work is refused however written — bound, alone, kebab tag, a key of the `v-bind` object itself named, quoted, computed or a bare template — never for a key nested deeper; a word written as a string is refused as untranslated.
 - `frontend/stylelint/config.test.ts` — Test of the house config itself, through the real `.stylelintrc.json`: the kit passes; the `font` shorthand, a colour as a size, a number in a radius's `calc`, Nunito's axis and a literal in a mixin are refused; an icon takes a step of `--icon-*` or `--state-glyph`, never a literal or a step of spacing.
 - `frontend/stylelint/display-type.mjs` — Stylelint rule `molvia/display-type-whole`: in the rule with `@include display-type` or a mixin that wraps it (a wrapper only in `_mixins.scss`, by its whole path; no `@forward … as`), down its media queries, no `all`, `font`, `font-family`, `font-weight` or `font-variation-settings`; a nested rule only with the text face; never in a placeholder.
 - `frontend/stylelint/display-type.d.mts` — Types of the rule's exports (`roleMixins`) for its test.

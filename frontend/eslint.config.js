@@ -55,6 +55,31 @@ const BARE_STRING_DEFAULTS = {
 
 // The Vue preset puts .vue files through the same type checker as .ts, so an SFC is no
 // weaker than a plain module and `any` has nowhere to hide.
+/**
+ * The selector of a busy button with no word of the work (MOL-225): a prop is matched as the
+ * attribute itself — static or bound — or as a key of the `v-bind` object itself, never of an
+ * object nested in it (adversarial Р3-А2: `t('…', { busy })` is no prop of the button).
+ */
+function busyWithoutWord() {
+  const object = 'VStartTag > VAttribute[directive=true][key.argument=null] > VExpressionContainer'
+  const own = `${object} > ObjectExpression > Property`
+  const template = "[key.type='TemplateLiteral'][key.expressions.length=0]"
+  const key = (name) => [
+    `${own}[computed=false][key.name=${name}]`,
+    `${own}[key.value=${name}]`,
+    `${own}${template}[key.quasis.0.value.cooked=${name}]`,
+  ]
+  const attribute = (name) => [
+    `VStartTag > VAttribute[directive=false][key.name=${name}]`,
+    `VStartTag > VAttribute[directive=true][key.argument.name=${name}]`,
+  ]
+  const has = (selectors) => selectors.map((one) => `:has(${one})`).join(', ')
+  const busy = [...attribute("'busy'"), ...key("'busy'")]
+  const word = [...attribute('/^busy-?label$/i'), ...key('/^busy-?label$/i')]
+  const button = 'VElement[rawName=/^(AppButton|app-button)$/]'
+  return `${button}:matches(${has(busy)}):not(:matches(${has(word)}))`
+}
+
 export default defineConfigWithVueTs(
   ...base({ tsconfigRootDir, browser: true }),
   vue.configs['flat/recommended'],
@@ -104,7 +129,14 @@ export default defineConfigWithVueTs(
           allowlist: [...BARE_STRING_DEFAULTS.allowlist, '≈', '×', '֏', '₽', '…'],
           attributes: {
             ...BARE_STRING_DEFAULTS.attributes,
-            '/.+/': [...BARE_STRING_DEFAULTS.attributes['/.+/'], 'placeholder', 'alt', 'label'],
+            '/.+/': [
+              ...BARE_STRING_DEFAULTS.attributes['/.+/'],
+              'placeholder',
+              'alt',
+              'label',
+              // The word of a button at work (MOL-225, adversarial Р3-А1).
+              'busy-label',
+            ],
           },
           directives: [...BARE_STRING_DEFAULTS.directives, 'v-html'],
         },
@@ -162,32 +194,22 @@ export default defineConfigWithVueTs(
     },
   },
   // A busy button says what it does (MOL-225): at work it reads «Удаляем…» in place of its action's
-  // word, in the action's look. Without its word it looked live — or, beside `disabled`, not now — and
-  // the second tap was swallowed with nothing said. `busy` — alone, bound or in a `v-bind` object (its
-  // key a name, a string or a computed string), on `AppButton` or `app-button` — with no word of the
-  // work, `busy-label` or `busyLabel`, is refused (adversarial Р1-А5, Р2-А1). What it cannot see: a button at work through `disabled` or `inactive` alone,
-  // which reads the same as a neighbour put out while another works; a name computed passes. It
-  // closes carelessness, not intent.
+  // word, in the action's look. Without its word it looked live — or, beside `disabled`, not now —
+  // and the second tap was swallowed with nothing said. `busy` — alone, bound, or a key of the
+  // `v-bind` object itself written as a name, a string or a template with nothing in it — on
+  // `AppButton` or `app-button`, with no word of the work beside it, is refused (adversarial Р1-А5,
+  // Р2-А1, Р3-А2). A word written as a string counts here: that it is no key of the dictionary
+  // is `vue/no-bare-strings-in-template`'s to say, which reads `busy-label` too (Р3-А1). What it
+  // cannot see: a button at work through `disabled` or `inactive` alone, which reads the same as a
+  // neighbour put out while another works; a key computed from a name, an object from the script.
+  // It closes carelessness, not intent.
   {
     files: ['src/**/*.vue'],
     rules: {
       'vue/no-restricted-syntax': [
         'error',
         {
-          selector: [
-            'VElement[rawName=/^(AppButton|app-button)$/]',
-            ':matches(',
-            ":has(VStartTag > VAttribute[directive=false][key.name='busy']),",
-            ":has(VStartTag > VAttribute[directive=true][key.argument.name='busy']),",
-            ":has(VStartTag > VAttribute[directive=true][key.argument=null] Property[key.name='busy']),",
-            ":has(VStartTag > VAttribute[directive=true][key.argument=null] Property[key.value='busy'])",
-            ')',
-            ':not(:matches(',
-            ':has(VStartTag > VAttribute[directive=true][key.argument.name=/^busy-?label$/i]),',
-            ':has(VStartTag > VAttribute[directive=true][key.argument=null] Property[key.name=/^busy-?label$/i]),',
-            ':has(VStartTag > VAttribute[directive=true][key.argument=null] Property[key.value=/^busy-?label$/i])',
-            '))',
-          ].join(''),
+          selector: busyWithoutWord(),
           message: 'A busy button says what it does: give it a busy-label (MOL-225).',
         },
       ],

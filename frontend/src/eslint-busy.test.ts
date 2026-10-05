@@ -17,7 +17,8 @@ const WORD = "t('settings.saving')"
 const button = (attributes: string, tag = 'AppButton'): string =>
   `<${tag} ${attributes}>{{ t('item.save') }}</${tag}>`
 
-async function refused(template: string): Promise<boolean> {
+/** What the config says of the template, by rule: `[ruleId, message]`. */
+async function said(template: string): Promise<[string | null, string][]> {
   const code = `<template>
   ${template}
 </template>
@@ -43,7 +44,11 @@ export default defineComponent({
   const messages = result?.messages ?? []
   const fatal = messages.find((message) => message.fatal)
   if (fatal) throw new Error(fatal.message)
-  return messages.some((message) => message.message === MESSAGE)
+  return messages.map((message) => [message.ruleId, message.message])
+}
+
+async function refused(template: string): Promise<boolean> {
+  return (await said(template)).some(([, message]) => message === MESSAGE)
 }
 
 describe('eslint.config.js: a busy button says what it does (MOL-225)', () => {
@@ -56,6 +61,13 @@ describe('eslint.config.js: a busy button says what it does (MOL-225)', () => {
     // Adversarial Р2-А1: the key of an object in quotes, or computed.
     ['in an object, quoted', button(`v-bind="{ 'busy': sending }"`)],
     ['in an object, computed', button(`v-bind="{ ['busy']: sending }"`)],
+    // Р3-А2: a template with nothing in it is a computed string too.
+    ['in an object, a template', button('v-bind="{ [`busy`]: sending }"')],
+    // Р3-А2: a word deep in the object is no prop of the button.
+    [
+      'with a word nested deeper',
+      button(`v-bind="{ busy: sending, meta: { busyLabel: ${WORD} } }"`),
+    ],
   ])(
     'refuses `busy` %s with no word',
     async (_, template) => {
@@ -82,4 +94,26 @@ describe('eslint.config.js: a busy button says what it does (MOL-225)', () => {
   it('must not fire: a button that is not busy needs no word', async () => {
     expect(await refused(button(':inactive="sending"'))).toBe(false)
   }, 60_000)
+
+  // Р3-А2: a `busy` deep in the object — an argument of `t` — is nothing at work.
+  it('must not fire: a `busy` nested deeper in the object is no prop of the button', async () => {
+    expect(await refused(button(`v-bind="{ label: t('settings.saving', { busy: 1 }) }"`))).toBe(
+      false,
+    )
+  }, 60_000)
+
+  // Р3-А1: a word written into the markup is untranslated, and that is what is said — the word is
+  // there, so the rule of the busy button says nothing.
+  it.each([
+    ['alone', button('busy-label="Сохраняем…"')],
+    ['beside :busy', button(':busy="sending" busy-label="Сохраняем…"')],
+  ])(
+    'a word of the work written as a string %s is refused as untranslated',
+    async (_, template) => {
+      const rules = (await said(template)).map(([rule]) => rule)
+      expect(rules).toContain('vue/no-bare-strings-in-template')
+      expect(await refused(template)).toBe(false)
+    },
+    60_000,
+  )
 })
