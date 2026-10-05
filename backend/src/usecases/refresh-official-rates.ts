@@ -79,6 +79,11 @@ export interface ArchiveWalk {
 function firstHole(days: readonly string[], start: string): string | null {
   const [first] = days
   if (first === undefined || daysBetween(start, first) > ARCHIVE_GAP_DAYS) return start
+  return holeBetween(days)
+}
+
+/** The day after the first stretch longer than `ARCHIVE_GAP_DAYS` between two of `days`, sorted. */
+function holeBetween(days: readonly string[]): string | null {
   for (const [index, day] of days.entries()) {
     const next = days[index + 1]
     if (next !== undefined && daysBetween(day, next) > ARCHIVE_GAP_DAYS) return dayAfter(day)
@@ -98,10 +103,11 @@ export function archiveWalkFrom(kept: readonly string[], from: string, today: st
   const days = [...new Set(kept)].filter((day) => day >= from && day <= today).sort()
   const recent = dayAfter(today, -ARCHIVE_RECENT_DAYS)
   const start = recent > from ? recent : from
-  const lastMonth = firstHole(
-    days.filter((day) => day >= start),
-    start,
-  )
+  const inMonth = days.filter((day) => day >= start)
+  // With a day of the bank's before the month, the month's empty start is the history's hole, or the
+  // tail of a bank silent for over a month — never the month's (adversarial round 3, Д): counted so,
+  // a bank stuck on a day of the month before was walked every hour, and the history never came.
+  const lastMonth = days.length > inMonth.length ? holeBetween(inMonth) : firstHole(inMonth, start)
   if (lastMonth !== null) return { from: start, whole: false }
   const history = firstHole(days, from)
   return history === null ? { from: start, whole: true } : { from: history, whole: false }
