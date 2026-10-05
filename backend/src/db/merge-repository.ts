@@ -52,6 +52,11 @@ export interface MergeRepository {
    */
   unmerge(id: number): Promise<UnmergeOutcome>
   /**
+   * Two things the owner says are not one (`make apart`): the night never merges them and never names
+   * them, nor what they are merged into since. Whether it was said before is no refusal.
+   */
+  apart(a: string, b: string): Promise<ApartOutcome>
+  /**
    * Every candidate named to the owner and still apart — both live, never merged into each other, not
    * undone: what `make merge-candidates` lists, so a morning lost or cut for length loses nothing
    * (review №9). The older first in each pair is `into`.
@@ -98,6 +103,10 @@ export interface MergeRepository {
   /** The report of a night finished and not yet handed to the owner, marked handed in one statement. */
   takeReport(day: string, at: Date): Promise<CatalogueMergedNotice | null>
 }
+
+export type ApartOutcome =
+  | { readonly subject: MergeSubject; readonly said: boolean }
+  | { readonly refused: 'missing' | 'same' | 'kind' | 'city' }
 
 export interface OpenCandidate {
   readonly subject: MergeSubject
@@ -196,12 +205,24 @@ export function createMergeRepository(db: Conn): MergeRepository {
               from catalogue_merges m
               join items f on f.id = m.from_item
               join items t on t.id = m.into_item
-              where m.subject = 'item' and m.undone_at is not null`
+              where m.subject = 'item' and m.undone_at is not null
+              union
+              select coalesce(f.merged_into, f.id), coalesce(t.merged_into, t.id)
+              from catalogue_apart p
+              join items f on f.id = p.a
+              join items t on t.id = p.b
+              where p.subject = 'item'`
         : sql`select coalesce(f.merged_into, f.id) as a, coalesce(t.merged_into, t.id) as b
               from catalogue_merges m
               join places f on f.id = m.from_place
               join places t on t.id = m.into_place
-              where m.subject = 'place' and m.undone_at is not null`,
+              where m.subject = 'place' and m.undone_at is not null
+              union
+              select coalesce(f.merged_into, f.id), coalesce(t.merged_into, t.id)
+              from catalogue_apart p
+              join places f on f.id = p.a
+              join places t on t.id = p.b
+              where p.subject = 'place'`,
     )
     return new Set(rows.map((row) => pairKey(row.a, row.b)))
   }
@@ -934,6 +955,30 @@ export function createMergeRepository(db: Conn): MergeRepository {
             namedOn: row.named_on,
           }
         })
+    },
+    async apart(a, b) {
+      if (idOrNull(a) === null || idOrNull(b) === null) return { refused: 'missing' }
+      if (a.toLowerCase() === b.toLowerCase()) return { refused: 'same' }
+      const [x, y] = a.toLowerCase() < b.toLowerCase() ? [a, b] : [b, a]
+      const items = await db.execute<{ kind: string }>(
+        sql`select kind from items where id in (${x}::uuid, ${y}::uuid)`,
+      )
+      const places = await db.execute<{ kind: string; country: string; city: string }>(
+        sql`select kind, country, city from places where id in (${x}::uuid, ${y}::uuid)`,
+      )
+      const subject: MergeSubject | null =
+        items.length === 2 ? 'item' : places.length === 2 ? 'place' : null
+      if (subject === null) return { refused: 'missing' }
+      const [p, q] = subject === 'item' ? items : places
+      if (p?.kind !== q?.kind) return { refused: 'kind' }
+      if (subject === 'place') {
+        const [m, n] = places
+        if (m?.country !== n?.country || m?.city !== n?.city) return { refused: 'city' }
+      }
+      const said = await db.execute(sql`
+        insert into catalogue_apart (subject, a, b) values (${subject}, ${x}, ${y})
+        on conflict do nothing returning 1`)
+      return { subject, said: said.length > 0 }
     },
   }
 }

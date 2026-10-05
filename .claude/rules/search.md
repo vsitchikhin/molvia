@@ -633,8 +633,10 @@ report.
 - **`CATALOGUE_MERGE`**: `on` merges, `report` says what it would and merges nothing — it only sweeps
   what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production runs `report` until
   the owner says `on`** (В-3): the thresholds stand on a corpus, not yet on strangers' twins. A pair
-  only reported comes with its two ids (review №7): the owner can look at it, or forbid it for good by
-  `make merge` then `make unmerge`.
+  only reported comes with its command **`make apart FROM= INTO=`** (review №7, owner's decision
+  05.10.2026): the owner says two things are apart before `on` merges them. `catalogue_apart` holds the
+  pair by its ids; the night reads it as a pair undone — by the live things its ends stand in now —
+  never merging or naming it, nor what they are merged into since. The owner's `make merge` still may.
 - **The morning's message holds within Telegram's 4096** (`MERGE_TEXT_MAX`, review №9, adversarial Б2):
   pairs are printed while it holds them, the rest counted — a message refused is lost, being handed
   once. A candidate cut for length is named already; **`make merge-candidates`** lists every candidate

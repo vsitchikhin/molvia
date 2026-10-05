@@ -299,12 +299,12 @@ long message cut, or a morning that never arrived. A chain is undone from its en
 whose survivor was merged on since says which number to undo first.
 
 An undone pair is never merged or named by the night again; the owner's hand still may. In `report`
-mode a pair the night would merge comes with its two ids: to forbid it before `on`, merge it by hand and
-undo it. What the undo cannot bring back: the text of a review withdrawn because the same person had
+mode a pair the night would merge comes with `make apart FROM=… INTO=…` — two things, never merged or
+named by the night (`dist/merge.js apart <id> <id> --yes` here). What the undo cannot bring back: the text of a review withdrawn because the same person had
 rated the twin too.
 
-In a working copy the same thing is `make merge FROM=<id> INTO=<id> [YES=1]`, `make unmerge ID=<n> [YES=1]`
-and `make merge-candidates`.
+In a working copy the same thing is `make merge FROM=<id> INTO=<id> [YES=1]`, `make unmerge ID=<n> [YES=1]`,
+`make apart FROM=<id> INTO=<id> [YES=1]` and `make merge-candidates`.
 
 ## Signals (MOL-142, MOL-221)
 

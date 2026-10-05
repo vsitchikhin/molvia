@@ -1,3 +1,13 @@
+CREATE TABLE "catalogue_apart" (
+	"subject" text NOT NULL,
+	"a" uuid NOT NULL,
+	"b" uuid NOT NULL,
+	"said_at" timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+	CONSTRAINT "catalogue_apart_subject_a_b_pk" PRIMARY KEY("subject","a","b"),
+	CONSTRAINT "catalogue_apart_subject_known" CHECK ("catalogue_apart"."subject" in ('item', 'place')),
+	CONSTRAINT "catalogue_apart_ordered" CHECK ("catalogue_apart"."a" < "catalogue_apart"."b")
+);
+--> statement-breakpoint
 CREATE TABLE "catalogue_merge_candidates" (
 	"subject" text NOT NULL,
 	"a" uuid NOT NULL,

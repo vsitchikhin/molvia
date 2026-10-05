@@ -108,4 +108,15 @@ describe('dist/merge.js', () => {
     merge('merge', younger, older, '--yes')
     expect(merge('candidates').stdout).toContain('0 candidates named and still apart')
   })
+
+  it('says two things apart, a dry run without --yes', async () => {
+    expect(merge('apart', younger, older).stdout).toContain('dry run: nothing changed')
+    expect(await db.execute(sql`select 1 from catalogue_apart`)).toEqual([])
+    const said = merge('apart', younger, older, '--yes')
+    expect([said.status, said.stdout]).toEqual([
+      0,
+      expect.stringContaining('never merges or names'),
+    ])
+    expect(merge('apart', older, younger, '--yes').stdout).toContain('apart already')
+  })
 })

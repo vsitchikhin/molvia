@@ -4,6 +4,7 @@ import type { MergeOutcome, MergeRepository, UnmergeOutcome } from '@/db/merge-r
 export const MERGE_USAGE = [
   'usage: merge merge <from-id> <into-id> [--yes]   the item or place <from> into <into>',
   '       merge unmerge <merge-number> [--yes]       a merge undone, by its number in the report',
+  '       merge apart <id> <id> [--yes]              the two never merged or named by the night',
   '       merge candidates                           every candidate named and still apart',
 ].join('\n')
 
@@ -84,6 +85,21 @@ export async function mergeCommand(
       }
       write(
         `#${String(id)} undone: the ${outcome.subject} is apart again, and the night leaves the pair`,
+      )
+      write(done)
+      return 0
+    }
+    if (action === 'apart' && values.length === 2 && values.every((id) => UUID.test(id))) {
+      const [a = '', b = ''] = values
+      const outcome = await inTransaction(dryRun, (merges) => merges.apart(a, b))
+      if ('refused' in outcome) {
+        write(`not said: ${REFUSED[outcome.refused] ?? outcome.refused}`)
+        return 1
+      }
+      write(
+        outcome.said
+          ? `apart: the night never merges or names this ${outcome.subject} pair`
+          : 'apart already',
       )
       write(done)
       return 0

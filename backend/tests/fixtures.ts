@@ -12,6 +12,7 @@ import type { Db } from '@/db/index'
 import type { PriceQuery } from '@/db/expenses-repository'
 import {
   actors,
+  catalogueApart,
   catalogueMergeCandidates,
   catalogueMergeMoves,
   catalogueMergeRuns,
@@ -195,6 +196,7 @@ export async function clearAll(db: Db): Promise<void> {
   await db.delete(catalogueMerges)
   await db.delete(catalogueMergeRuns)
   await db.delete(catalogueMergeCandidates)
+  await db.delete(catalogueApart)
   await db.delete(searchPicks)
   await db.delete(verdicts)
   await db.delete(expenses)

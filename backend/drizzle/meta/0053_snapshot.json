@@ -1,5 +1,5 @@
 {
-  "id": "8d2061b2-31b5-42b7-a6bb-0340049a1f72",
+  "id": "71a11991-343e-4a49-8fe6-e5e04c39fd38",
   "prevId": "685fabd4-6eca-4b38-ad14-95f37971ba52",
   "version": "7",
   "dialect": "postgresql",
@@ -284,6 +284,58 @@
         "budget_plans_savings_is_share": {
           "name": "budget_plans_savings_is_share",
           "value": "\"budget_plans\".\"category_id\" is not null or \"budget_plans\".\"amount_minor\" is null"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.catalogue_apart": {
+      "name": "catalogue_apart",
+      "schema": "",
+      "columns": {
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "a": {
+          "name": "a",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "b": {
+          "name": "b",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "said_at": {
+          "name": "said_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "catalogue_apart_subject_a_b_pk": {
+          "name": "catalogue_apart_subject_a_b_pk",
+          "columns": ["subject", "a", "b"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "catalogue_apart_subject_known": {
+          "name": "catalogue_apart_subject_known",
+          "value": "\"catalogue_apart\".\"subject\" in ('item', 'place')"
+        },
+        "catalogue_apart_ordered": {
+          "name": "catalogue_apart_ordered",
+          "value": "\"catalogue_apart\".\"a\" < \"catalogue_apart\".\"b\""
         }
       },
       "isRLSEnabled": false

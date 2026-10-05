@@ -1188,6 +1188,28 @@ export const catalogueMergeRuns = pgTable(
 )
 
 /**
+ * A pair the owner said is two things (`make apart`, MOL-106): the night never merges it and never names
+ * it — as a pair undone, read by the live things its ends stand in now. The owner's hand still may merge
+ * it. By the two ids in order; no foreign key, since neither an item nor a place is ever deleted.
+ */
+export const catalogueApart = pgTable(
+  'catalogue_apart',
+  {
+    subject: text('subject').$type<(typeof MERGE_SUBJECTS)[number]>().notNull(),
+    a: uuid('a').notNull(),
+    b: uuid('b').notNull(),
+    saidAt: timestamp('said_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subject, table.a, table.b] }),
+    check('catalogue_apart_subject_known', oneOf(table.subject, MERGE_SUBJECTS)),
+    check('catalogue_apart_ordered', sql`${table.a} < ${table.b}`),
+  ],
+)
+
+/**
  * A candidate named to the owner once, so the next morning names only new ones. A pair by its two ids
  * in order; no foreign key, since neither an item nor a place is ever deleted.
  */

@@ -670,7 +670,7 @@ describe('ownerText — утренний отчёт склейки (MOL-106)', (
       '',
       'Склеил бы',
       '«Малоко» → «Молоко»',
-      `FROM=${FROM} INTO=${INTO}`,
+      `make apart FROM=${FROM} INTO=${INTO}`,
     ])
   })
 

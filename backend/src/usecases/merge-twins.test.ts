@@ -76,6 +76,7 @@ function world({
     },
     nightMerges: () => Promise.resolve([...journal]),
     openCandidates: () => Promise.resolve([]),
+    apart: () => Promise.reject(new Error('not here')),
     claimRun: (day) => {
       if (claimed || runs.has(day)) return Promise.resolve(false)
       runs.set(day, null)

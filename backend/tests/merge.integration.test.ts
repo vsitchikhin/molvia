@@ -629,3 +629,36 @@ describe('the night on the real database (adversarial А1, А6)', () => {
     expect(report.mergedPairs.map((pair) => pair.from).sort()).toEqual(['Кефир 1 %', 'Молоко 3.2%'])
   })
 })
+
+describe('two things the owner says are apart (make apart)', () => {
+  it('are never merged or named by the night, nor what they are merged into since', async () => {
+    const c = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
+    const b = await made('Молоко 3,2%', 'moloko 3 2', '2026-09-02')
+    const a = await made('Малоко 3,2%', 'maloko 3 2', '2026-09-03')
+    for (const id of [a, b, c]) await vector(id, 1, 0)
+    expect(await merges.apart(a, b)).toEqual({ subject: 'item', said: true })
+    expect(await merges.apart(b, a)).toEqual({ subject: 'item', said: false })
+    numbered(await merges.mergeItems(b, c, { by: 'hand' }))
+    const report = await mergeNight(
+      { merges, embedder: NO_EMBEDDER, failed: () => undefined },
+      'on',
+      '2026-10-07',
+    )
+    expect(await tracedTo(a)).toBeNull()
+    const named = report.candidatePairs.map((pair) => [pair.fromId, pair.intoId].sort().join(' '))
+    expect(named).not.toContain([a, c].sort().join(' '))
+    // The owner's hand still may.
+    expect('id' in (await merges.mergeItems(a, c, { by: 'hand' }))).toBe(true)
+  })
+
+  it('refuses what is no pair', async () => {
+    const dish = await made('Хаш', 'hash', '2026-09-01')
+    await db.update(items).set({ kind: 'dish' }).where(eq(items.id, dish))
+    expect(await merges.apart(older, older)).toEqual({ refused: 'same' })
+    expect(await merges.apart(older, randomUUID())).toEqual({ refused: 'missing' })
+    expect(await merges.apart(older, dish)).toEqual({ refused: 'kind' })
+    const gyumri = await insertPlace(db, { name: 'Ереван Сити', city: 'Гюмри' })
+    const yerevan = await insertPlace(db, { name: 'Ереван Сити', city: 'Ереван' })
+    expect(await merges.apart(gyumri, yerevan)).toEqual({ refused: 'city' })
+  })
+})

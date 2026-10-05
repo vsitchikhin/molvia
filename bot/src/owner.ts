@@ -121,10 +121,10 @@ function mergedText(notice: CatalogueMergedNotice): string {
     let printed = 0
     for (const pair of notice.mergedPairs) {
       const text = pairText(pair.subject, pair.from, pair.into, pair.city)
-      // Only reported: its ids, so a false pair can be looked at, or merged and undone for good.
+      // Only reported: the command that says it is two things, before `on` merges it.
       const ids =
         pair.id === undefined && pair.fromId !== undefined && pair.intoId !== undefined
-          ? [`FROM=${pair.fromId} INTO=${pair.intoId}`]
+          ? [`make apart FROM=${pair.fromId} INTO=${pair.intoId}`]
           : []
       if (!fits([pair.id === undefined ? text : `#${String(pair.id)} ${text}`, ...ids])) break
       printed += 1
