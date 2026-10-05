@@ -59,6 +59,7 @@ import {
   ratePreferenceSchema,
   SALARY_SHIFT_DAY_MAX,
   RECEIPT_CITIES,
+  RECEIPT_LAYOUTS,
   rateSourceSchema,
   RECEIPT_PARTS_MAX,
   RECEIPT_PART_BYTES_MAX,
@@ -72,6 +73,7 @@ import {
   spendingPresetSchema,
 } from '@molvia/model'
 import type {
+  ReceiptLayout,
   BaseUnit,
   Currency,
   ItemNameLanguage,
@@ -2188,7 +2190,7 @@ export const receipts = pgTable(
     attempts: smallint('attempts').notNull().default(0),
     // Tesseract and its language files, as the reader names them — which model read (MOL-169).
     readerVersion: text('reader_version'),
-    layout: text('layout').$type<'card' | 'table'>(),
+    layout: text('layout').$type<ReceiptLayout>(),
     tin: text('tin'),
     printedOn: date('printed_on'),
     printedTime: text('printed_time'),
@@ -2256,7 +2258,7 @@ export const receipts = pgTable(
     ),
     check(
       'receipts_layout_known',
-      sql`${table.layout} is null or ${table.layout} in ('card', 'table')`,
+      sql`${table.layout} is null or ${oneOf(table.layout, RECEIPT_LAYOUTS)}`,
     ),
     check(
       'receipts_heard_known',
