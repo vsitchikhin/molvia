@@ -209,7 +209,11 @@ function metaOf(
   switch (operation.kind) {
     case 'trip': {
       const items = operation.items ?? 0
-      const line = t('spending.trip_row_meta', { category: categoryName, n: items }, items)
+      // a trip on the account has money: with no purchase it is a receipt's sum (MOL-78, MOL-227)
+      const line =
+        items === 0
+          ? t('spending.trip_row_sum', { category: categoryName })
+          : t('spending.trip_row_meta', { category: categoryName, n: items }, items)
       return operation.unpriced > 0
         ? `${line}, ${String(operation.unpriced)} ${t('accounts.trip_unpriced', {})}`
         : line

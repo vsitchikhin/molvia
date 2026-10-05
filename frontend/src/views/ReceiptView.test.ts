@@ -501,13 +501,88 @@ describe('ReceiptView (MOL-127)', () => {
     expect(view.find('.partly').exists()).toBe(false)
   })
 
-  it('not one line found: says only that, and names no cause it does not know (MOL-222)', async () => {
+  // MOL-222 named no cause it did not know; MOL-227, В-2: the possible ones, none of them asserted,
+  // and faint print, which no retake fixes
+  it('not one line found: the causes it may be, faint print among them, none asserted', async () => {
     const failed = detail({ status: 'failed' })
     receipt.mockResolvedValue({ ...failed, receipt: { ...failed.receipt, failure: 'reshoot' } })
     const { view } = await render()
     expect(view.text()).toContain(ru.receipt.failed.reshoot_title)
-    expect(view.text()).toContain(ru.receipt.failed.reshoot_body)
-    expect(view.text()).not.toMatch(/смят|в тени/)
+    expect(view.text()).toContain('Так бывает, когда чек смят, в тени или напечатан бледно')
+    expect(view.text()).toContain(
+      'Бледную печать переснимок не исправит — запишите покупки вручную',
+    )
+  })
+
+  it('read in part: faint print needs the lines put right, not a retake (MOL-227, В-2)', async () => {
+    const partial = detail()
+    receipt.mockResolvedValue({ ...partial, receipt: { ...partial.receipt, total: amd('10000') } })
+    const { view } = await render()
+    expect(view.get('.partly').text()).toContain(
+      'Если печать бледная, переснимать не нужно — поправьте строки',
+    )
+  })
+
+  describe('a receipt with no items: the sum by the receipt (MOL-227)', () => {
+    const noItems = (total: string | null): ReceiptDetail => {
+      const one = detail()
+      return {
+        ...one,
+        receipt: { ...one.receipt, lineCount: 0, total: total === null ? null : amd(total) },
+        lines: [],
+      }
+    }
+
+    it('says there is no list of items, shows the total alone and records the sum', async () => {
+      receipt.mockResolvedValue(noItems('1700'))
+      const { view, router } = await render()
+      expect(view.get('.no-items').text()).toBe(ru.receipt.review.no_items)
+      expect(view.find('.receipt-line').exists()).toBe(false)
+      expect(view.text()).not.toContain(ru.receipt.review.lines)
+      expect(view.text()).not.toMatch(/Разница|0 позиций/)
+      const record = button(view, ru.receipt.review.record_sum)
+      expect(record.attributes('aria-disabled')).not.toBe('true')
+      await record.trigger('click')
+      await flushPromises()
+      expect(recordReceipt).toHaveBeenCalledTimes(1)
+      const body = recordReceipt.mock.calls[0]?.[1]
+      expect(body?.lines).toEqual([])
+      expect(body?.place).toEqual({ id: PLACE })
+      expect(router.currentRoute.value.name).toBe('purchase')
+    })
+
+    it('with no total read, waits for one typed: nothing is sent', async () => {
+      receipt.mockResolvedValue(noItems(null))
+      const { view } = await render()
+      expect(view.text()).toContain(ru.receipt.review.total_missing)
+      const record = button(view, ru.receipt.review.record_sum)
+      expect(record.attributes('aria-disabled')).toBe('true')
+      await record.trigger('click')
+      await flushPromises()
+      expect(recordReceipt).not.toHaveBeenCalled()
+    })
+
+    it('with the total typed, records it as the receipt’s total', async () => {
+      receipt.mockResolvedValue(noItems(null))
+      const { view } = await render()
+      useReceiptDraftsStore().setTotal(ID, amd('1800'))
+      await flushPromises()
+      const record = button(view, ru.receipt.review.record_sum)
+      expect(record.attributes('aria-disabled')).not.toBe('true')
+      await record.trigger('click')
+      await flushPromises()
+      expect(recordReceipt.mock.calls[0]?.[1].total).toEqual(amd('1800'))
+    })
+
+    it('with no place read, asks for it and names the sum on the sheet’s action', async () => {
+      const one = noItems('1700')
+      receipt.mockResolvedValue({ ...one, receipt: { ...one.receipt, place: null } })
+      const { view } = await render()
+      await button(view, ru.receipt.review.record_sum).trigger('click')
+      await flushPromises()
+      expect(recordReceipt).not.toHaveBeenCalled()
+      expect(sheet()?.textContent).toContain(ru.receipt.review.record_sum)
+    })
   })
 
   it('«Отправить чек разработчику» hands the photos of this phone to the sheet, seen there (В-2)', async () => {

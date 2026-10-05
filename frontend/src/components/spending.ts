@@ -520,7 +520,10 @@ export function journalRowProps(
   const money = trip ? row.amount : row.spending.amount
 
   let line: string
-  if (trip) line = t('spending.trip_row_meta', { category: categoryName, n: row.items }, row.items)
+  // a trip in the month has money: with no purchase it is a receipt's sum (MOL-78, MOL-227)
+  if (trip && row.items === 0) line = t('spending.trip_row_sum', { category: categoryName })
+  else if (trip)
+    line = t('spending.trip_row_meta', { category: categoryName, n: row.items }, row.items)
   else {
     const { note, place } = row.spending
     // Without «что это» the title is already the category: the line under it is the place alone.

@@ -342,6 +342,8 @@ export default defineComponent({
           return t('purchases.recording_meta')
         case 'parsed': {
           const count = row.summary?.lineCount ?? 0
+          // a sole trader's section with no items: a sum to record (MOL-227)
+          if (count === 0) return t('purchases.no_items_meta', { day: readDay(row) })
           return t('purchases.recorded', { count: positions(count), day: readDay(row) })
         }
       }
@@ -423,7 +425,11 @@ export default defineComponent({
       recordedMeta: (row: HistoryRow): string => {
         const day = dayOfAnyYear(row.at, locale.value)
         if (row.itemCount === null) return day
-        const count = positions(row.itemCount)
+        // a receipt with no items is recorded as its sum (MOL-227, Р-6)
+        const count =
+          row.fromReceipt && row.itemCount === 0
+            ? t('purchases.receipt_sum')
+            : positions(row.itemCount)
         return t(row.fromReceipt ? 'purchases.recorded_receipt' : 'purchases.recorded', {
           count,
           day,

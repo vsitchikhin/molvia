@@ -286,6 +286,33 @@ describe('PurchasesView (MOL-128)', () => {
   })
 
   describe('чеки (MOL-127)', () => {
+    it('чек без товаров — «без товаров», а не «0 позиций» (MOL-227)', async () => {
+      receipts.mockResolvedValue({
+        receipts: [
+          {
+            id: 'cccccccc-0000-4000-8000-000000000001',
+            status: 'parsed',
+            failure: null,
+            parts: 1,
+            received: 1,
+            capturedAt: new Date('2026-09-26T16:00:00.000Z'),
+            country: 'AM',
+            language: 'ru',
+            header: { tin: '12345678', date: '2026-09-26', time: '16:30', receiptNo: null },
+            total: { minor: 170_000n, currency: 'AMD' },
+            balanced: false,
+            lineCount: 0,
+            unsettled: 0,
+            place: null,
+            tripId: null,
+          },
+        ],
+      })
+      const { view } = await render()
+      expect(view.text()).toContain('без товаров · 26 сент.')
+      expect(view.text()).not.toContain('0 позиций')
+    })
+
     it('пока список чеков не ответил, «пусто» не говорится (ревью 7)', async () => {
       receipts.mockReturnValue(new Promise(() => undefined))
       const { view } = await render()
