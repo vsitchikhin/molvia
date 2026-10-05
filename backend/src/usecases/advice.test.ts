@@ -128,6 +128,8 @@ function deps(world: World = {}) {
       return Promise.resolve(true)
     },
     weekFourReturn: () => Promise.reject(new Error('weekFourReturn was not expected')),
+    analyticsOf: () => Promise.reject(new Error('analyticsOf was not expected')),
+    chooseAnalytics: () => Promise.reject(new Error('chooseAnalytics was not expected')),
   }
 
   return { actors, verdicts, expenses, events }

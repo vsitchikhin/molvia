@@ -1,6 +1,6 @@
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { EVENT } from '@molvia/model'
-import type { CatalogueSubject, EventInput } from '@molvia/model'
+import type { AnalyticsSetting, CatalogueSubject, EventInput } from '@molvia/model'
 import type { Conn } from './index'
 import { actors, events } from './schema'
 
@@ -25,6 +25,13 @@ export interface CohortReturn {
    * forecast — decided only for those whose window has closed (adversarial А).
    */
   readonly withoutAccess: number
+  /**
+   * Their fourth week is over and access reached it, but they objected to being counted (MOL-96):
+   * off now, or back on only after that week began — its rows erased or never written. Out of both
+   * halves, or the rate fell with every objection and read «stop» for a reason unrelated to the
+   * hypothesis; named, so how many the cohort lost to objections is seen.
+   */
+  readonly optedOut: number
 }
 
 export interface EventRepository {
@@ -42,8 +49,24 @@ export interface EventRepository {
    *
    * Serialised per actor by a transaction-scoped advisory lock: the screen searches on every
    * keystroke, and two overlapping requests would otherwise both see no row and both write.
+   *
+   * Nothing is written for someone who has turned «Учитывать меня в статистике» off (MOL-96).
    */
   recordOncePerDay(event: RecordedEvent): Promise<boolean>
+  /** «Учитывать меня в статистике» (MOL-96): whether the person has objected to being counted. */
+  analyticsOf(actorId: string): Promise<AnalyticsSetting>
+  /**
+   * Turns «Учитывать меня в статистике» off or back on (MOL-96). Off erases every row of the
+   * person's log at once (В-1) — the second written exception to append-only, after erasure
+   * (MOL-58): the gates stop counting them, so the rows have no reader left, and an objection to a
+   * legitimate interest takes what it gathered with it. Back on, the log starts afresh from that
+   * moment, and gate 0.3 counts the person only if their fourth week began after it (Р-3).
+   *
+   * Under the lock of `recordOncePerDay`: a visit being written as the switch goes off either
+   * lands before the erasure and goes with it, or waits and finds the objection.
+   * The same choice again moves no moment.
+   */
+  chooseAnalytics(actorId: string, off: boolean): Promise<AnalyticsSetting>
   /**
    * Gate 0.3: of those who appeared in a window, how many came back in their fourth week —
    * and came back *to read other people's data*, which is what the threshold actually asks.
@@ -71,8 +94,16 @@ export interface EventRepository {
    * Counted before, a person who came last week read as one who did not come back — and the more
    * people arrive, the harder that pulls the gate towards «stop». The ones still waiting are
    * named beside the cohort, not in it; so are those without access.
+   *
+   * **And not those who objected to being counted** (MOL-96): out of both halves, named beside
+   * them — or every objection lowered the rate and nothing said why.
    */
   weekFourReturn(subject: CatalogueSubject, from: Date, to: Date): Promise<CohortReturn>
+}
+
+/** One person's log, held by its writer and by the switch that stops it (MOL-96). */
+function lockLog(actorId: string) {
+  return sql`select pg_advisory_xact_lock(hashtext('events'), hashtext(${actorId}))`
 }
 
 // A repository is a function over a connection, not a module-level singleton: the
@@ -92,9 +123,7 @@ export function createEventRepository(db: Conn): EventRepository {
     async recordOncePerDay(event) {
       const payload = JSON.stringify('payload' in event ? event.payload : {})
       return db.transaction(async (tx) => {
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtext('events'), hashtext(${event.actorId}))`,
-        )
+        await tx.execute(lockLog(event.actorId))
         const rows = await tx.execute<{ id: string }>(sql`
           -- From when the person appeared, not from their first event (MOL-31, Р-20). While
           -- the log had a writer on the first visit the two were the same day; now the only
@@ -105,7 +134,13 @@ export function createEventRepository(db: Conn): EventRepository {
           )
           insert into ${events} (actor_id, type, payload)
           select ${event.actorId}::uuid, ${event.type}, ${payload}::jsonb
+          -- An objection stops the log (MOL-96). Read after the lock, so a switch turned off
+          -- meanwhile is seen; a person who is not there still fails on the foreign key.
           where not exists (
+            select 1 from ${actors}
+            where ${actors.id} = ${event.actorId}::uuid and ${actors.analyticsOffAt} is not null
+          )
+          and not exists (
             select 1 from ${events} e, first_seen f
             where e.actor_id = ${event.actorId}::uuid
               and e.type = ${event.type}
@@ -116,6 +151,34 @@ export function createEventRepository(db: Conn): EventRepository {
           returning id
         `)
         return rows.length > 0
+      })
+    },
+
+    async analyticsOf(actorId) {
+      const [row] = await db
+        .select({ offAt: actors.analyticsOffAt })
+        .from(actors)
+        .where(eq(actors.id, actorId))
+      return { off: (row?.offAt ?? null) !== null }
+    },
+
+    async chooseAnalytics(actorId, off) {
+      return db.transaction(async (tx) => {
+        await tx.execute(lockLog(actorId))
+        // The right-hand sides read the row as it was: «back on» is a moment only for someone
+        // who was off, and «off» keeps the moment of the first objection.
+        const [row] = await tx.execute<{ off: boolean }>(sql`
+          update ${actors} set
+            analytics_off_at = case when ${off}::boolean then coalesce(analytics_off_at, now()) end,
+            analytics_on_at = case
+              when not ${off}::boolean and analytics_off_at is not null then now()
+              else analytics_on_at
+            end
+          where ${actors.id} = ${actorId}::uuid
+          returning analytics_off_at is not null as off
+        `)
+        if (off) await tx.delete(events).where(eq(events.actorId, actorId))
+        return { off: row?.off ?? off }
       })
     },
 
@@ -131,15 +194,17 @@ export function createEventRepository(db: Conn): EventRepository {
         returned: number
         pending: number
         without_access: number
+        opted_out: number
       }>(sql`
         with appeared as (
-          select ${actors.id} as actor_id, ${actors.createdAt} as started, ${actors.sharedUntil} as shared_until
+          select ${actors.id} as actor_id, ${actors.createdAt} as started, ${actors.sharedUntil} as shared_until,
+            ${actors.analyticsOffAt} as off_at, ${actors.analyticsOnAt} as on_at
           from ${actors}
           where ${actors.createdAt} >= ${from.toISOString()}::timestamptz
             and ${actors.createdAt} <  ${to.toISOString()}::timestamptz
         ),
         closed as (
-          select actor_id, started, shared_until
+          select actor_id, started, shared_until, off_at, on_at
           from appeared
           -- Time first, access after (MOL-91, adversarial А). A fourth week still going is no
           -- answer yet, as gate 0.2 keeps its open windows out: counted now, a person who came
@@ -148,8 +213,8 @@ export function createEventRepository(db: Conn): EventRepository {
           -- 4» eighteen days early, and moved to «waiting» the day access was granted.
           where started + interval '672 hours' <= now()
         ),
-        cohort as (
-          select actor_id, started
+        with_access as (
+          select actor_id, started, off_at, on_at
           from closed
           -- Only those who could have answered the question (Р-24). The numerator is behind
           -- a paid door — advice_viewed is written in the shared mode alone — so counting
@@ -165,6 +230,15 @@ export function createEventRepository(db: Conn): EventRepository {
           -- that is a task, not a line.
           where shared_until >= started + interval '504 hours'
         ),
+        cohort as (
+          select actor_id, started
+          from with_access
+          -- Not those who objected to being counted (MOL-96), out of both halves. Back on counts
+          -- again only from before the fourth week began: switched off later, that week's rows were
+          -- erased, and switched on later, part of it was never written (Р-3).
+          where off_at is null
+            and (on_at is null or on_at <= started + interval '504 hours')
+        ),
         came_back as (
           select distinct c.actor_id
           from cohort c
@@ -178,7 +252,8 @@ export function createEventRepository(db: Conn): EventRepository {
           (select count(*) from cohort)::int as cohort_size,
           (select count(*) from came_back)::int as returned,
           (select count(*) from appeared)::int - (select count(*) from closed)::int as pending,
-          (select count(*) from closed)::int - (select count(*) from cohort)::int as without_access
+          (select count(*) from closed)::int - (select count(*) from with_access)::int as without_access,
+          (select count(*) from with_access)::int - (select count(*) from cohort)::int as opted_out
       `)
 
       const row = rows[0]
@@ -187,6 +262,7 @@ export function createEventRepository(db: Conn): EventRepository {
         returned: row?.returned ?? 0,
         pending: row?.pending ?? 0,
         withoutAccess: row?.without_access ?? 0,
+        optedOut: row?.opted_out ?? 0,
       }
     },
   }

@@ -1,6 +1,6 @@
 {
-  "id": "685fabd4-6eca-4b38-ad14-95f37971ba52",
-  "prevId": "194426b9-2128-4b95-9e5a-59027f478b55",
+  "id": "f1d67863-fc71-44a0-976f-62db5f620985",
+  "prevId": "685fabd4-6eca-4b38-ad14-95f37971ba52",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4089,7 +4089,7 @@
         },
         "receipts_layout_known": {
           "name": "receipts_layout_known",
-          "value": "\"receipts\".\"layout\" is null or \"receipts\".\"layout\" in ('card', 'table')"
+          "value": "\"receipts\".\"layout\" is null or \"receipts\".\"layout\" in ('card', 'table', 'class')"
         },
         "receipts_heard_known": {
           "name": "receipts_heard_known",

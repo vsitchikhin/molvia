@@ -369,8 +369,15 @@
     {
       "idx": 52,
       "version": "7",
-      "when": 1791199779238,
-      "tag": "0052_receipt_layout_class",
+      "when": 1791197152366,
+      "tag": "0052_analytics_opt_out",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1791208350490,
+      "tag": "0053_receipt_layout_class",
       "breakpoints": true
     }
   ]

@@ -18,6 +18,7 @@ export interface SalaryShiftState extends Omit<TapSettingState<number | null>, '
  */
 export function useSalaryShift(): SalaryShiftState {
   const { value, ...setting } = useTapSetting<number | null>(
+    'salary-shift',
     async () => (await api.salaryShift()).day,
     async (day) => (await api.chooseSalaryShift(day)).day,
   )

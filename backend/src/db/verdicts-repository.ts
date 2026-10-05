@@ -100,6 +100,12 @@ export interface CohortReached {
    * named beside it, or the first two weeks of a release read «0 of 0» over ten people (MOL-91).
    */
   readonly pending: number
+  /**
+   * Their window is over, and they objected to being counted (MOL-96, В-2): out of both halves and
+   * named beside them. Only whether they object now — the verdicts are not erased, so back on they
+   * count again.
+   */
+  readonly optedOut: number
 }
 
 /**
@@ -572,19 +578,30 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
 
       // Counted from `actors.created_at`, in hours, as gate 0.3 counts its weeks: both halves
       // of the gates stand on one axis, and hours mean the same in every time zone.
-      const rows = await db.execute<{ cohort_size: number; reached: number; pending: number }>(sql`
+      const rows = await db.execute<{
+        cohort_size: number
+        reached: number
+        pending: number
+        opted_out: number
+      }>(sql`
         with appeared as (
-          select ${actors.id} as actor_id, ${actors.createdAt} as started
+          select ${actors.id} as actor_id, ${actors.createdAt} as started, ${actors.analyticsOffAt} as off_at
           from ${actors}
           where ${actors.createdAt} >= ${from.toISOString()}::timestamptz
             and ${actors.createdAt} <  ${to.toISOString()}::timestamptz
         ),
-        cohort as (
-          select actor_id, started
+        closed as (
+          select actor_id, started, off_at
           from appeared
           -- A window still open is no answer yet: counted now, a person who came last week
           -- reads as one who failed, and the gate errs towards «stop» for no reason.
           where started + make_interval(hours => ${windowHours}::int) <= now()
+        ),
+        cohort as (
+          select actor_id, started
+          from closed
+          -- An objection to being counted takes them out of both halves (MOL-96, В-2).
+          where off_at is null
         ),
         reached as (
           select c.actor_id
@@ -599,7 +616,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         select
           (select count(*) from cohort)::int as cohort_size,
           (select count(*) from reached)::int as reached,
-          (select count(*) from appeared)::int - (select count(*) from cohort)::int as pending
+          (select count(*) from appeared)::int - (select count(*) from closed)::int as pending,
+          (select count(*) from closed)::int - (select count(*) from cohort)::int as opted_out
       `)
 
       const row = rows[0]
@@ -607,6 +625,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         cohortSize: row?.cohort_size ?? 0,
         reached: row?.reached ?? 0,
         pending: row?.pending ?? 0,
+        optedOut: row?.opted_out ?? 0,
       }
     },
   }

@@ -1,19 +1,30 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { defineComponent, h, watch } from 'vue'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
+import type { AnalyticsSetting } from '@molvia/model'
 import YourDataGroup from './YourDataGroup.vue'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
+import { TAP_CHECK_FIRST_MS, forgetUnsureChanges } from '@/composables/useTapSetting'
+import { useActorStore } from '@/stores/actor'
 
 const exportMine =
   vi.fn<(options?: { signal?: AbortSignal }) => Promise<{ text: string; exportedAt: Date }>>()
+const readAnalytics = vi.fn<() => Promise<AnalyticsSetting>>()
+const chooseAnalytics = vi.fn<(on: boolean) => Promise<AnalyticsSetting>>()
 vi.mock('@/api', () => ({
-  api: { exportMine: (options?: { signal?: AbortSignal }) => exportMine(options) },
+  api: {
+    exportMine: (options?: { signal?: AbortSignal }) => exportMine(options),
+    analyticsSetting: () => readAnalytics(),
+    chooseAnalytics: (on: boolean) => chooseAnalytics(on),
+  },
 }))
 
 const FILE_TEXT = '{\n  "format": "molvia-export",\n  "version": 1\n}'
@@ -24,13 +35,28 @@ const share = vi.fn<(data: ShareData) => Promise<void>>()
 const canShare = vi.fn<(data: ShareData) => boolean>()
 const views: VueWrapper[] = []
 
+/** What the app's live region was handed, in order (round 4, №10). */
+const said: string[] = []
+const WithRegion = defineComponent({
+  setup() {
+    const announcements = provideAnnouncer()
+    watch(announcements, (now, before) => {
+      for (const added of now.filter((a) => !before.some((b) => b.id === a.id)))
+        said.push(added.text)
+    })
+    return () => h(YourDataGroup)
+  },
+})
+
 async function render() {
   // «Удалить мои данные» shares the store of «Выйти» (MOL-94).
   const pinia = createPinia()
   setActivePinia(pinia)
+  useActorStore().id = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/settings')
-  const view = mount(YourDataGroup, {
+  said.length = 0
+  const view = mount(WithRegion, {
     global: { plugins: [pinia, router, createAppI18n('en')] },
     attachTo: document.body,
   })
@@ -61,8 +87,11 @@ function pointer(coarse: boolean): void {
 }
 
 beforeEach(() => {
+  forgetUnsureChanges()
   vi.restoreAllMocks()
   exportMine.mockReset().mockResolvedValue(ANSWER)
+  readAnalytics.mockReset().mockResolvedValue({ off: false })
+  chooseAnalytics.mockReset().mockImplementation((on) => Promise.resolve({ off: !on }))
   share.mockReset().mockResolvedValue(undefined)
   canShare.mockReset()
   shareable(true)
@@ -321,5 +350,298 @@ describe('«Скачать мои данные» (MOL-93)', () => {
     expect(labels.indexOf(en.terms.title)).toBe(labels.indexOf(en.privacy.title) + 1)
     const link = view.findAll('a').find((one) => one.text() === en.terms.title)
     expect(link?.attributes('href')).toBe('/terms')
+  })
+})
+
+describe('«Count me in the statistics» (MOL-96)', () => {
+  const counted = (view: VueWrapper) => view.get<HTMLInputElement>('input[role="switch"]')
+
+  function describedBy(view: VueWrapper): string[] {
+    const ids = (counted(view).attributes('aria-describedby') ?? '').split(' ')
+    return ids.map((id) => view.find(`[id="${id}"]`).text())
+  }
+
+  it('is on until the person objects, first in the group, and says that the past marks go', async () => {
+    const view = await render()
+    const first = view.get('li')
+    expect(first.text()).toContain(en.settings.analytics.label)
+    expect(counted(view).element.checked).toBe(true)
+    expect(counted(view).attributes('aria-disabled')).toBeUndefined()
+    expect(describedBy(view)).toEqual([en.settings.analytics.hint])
+  })
+
+  it('draws no switch until the server has answered: «not known» is no objection (adversarial А1)', async () => {
+    readAnalytics.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(view.find('input[role="switch"]').exists()).toBe(false)
+    expect(view.get('li').text()).toContain(en.settings.analytics.label)
+  })
+
+  it('opened without a connection: no switch, and says why — never red (А1)', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    readAnalytics.mockRejectedValue(new TypeError('Failed to fetch'))
+    const view = await render()
+    expect(view.find('input[role="switch"]').exists()).toBe(false)
+    expect(view.get('li').text()).toContain(en.settings.tap.offline)
+    expect(view.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('turns off on the tap with no sheet, and back on (В-3)', async () => {
+    const view = await render()
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(chooseAnalytics).toHaveBeenLastCalledWith(false)
+    expect(counted(view).element.checked).toBe(false)
+    expect(document.querySelector('dialog[open]')).toBeNull()
+
+    await counted(view).setValue(true)
+    await flushPromises()
+    expect(chooseAnalytics).toHaveBeenLastCalledWith(true)
+    expect(counted(view).element.checked).toBe(true)
+  })
+
+  it('shows the objection the server holds', async () => {
+    readAnalytics.mockResolvedValue({ off: true })
+    const view = await render()
+    expect(counted(view).element.checked).toBe(false)
+  })
+
+  it('puts the switch back where the server holds it when the answer does not come', async () => {
+    chooseAnalytics.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(counted(view).element.checked).toBe(true)
+    expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
+  })
+
+  it('offline: waits, and says why — never red', async () => {
+    const view = await render()
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+    expect(counted(view).attributes('aria-disabled')).toBe('true')
+    expect(describedBy(view)).toEqual([en.settings.analytics.hint, en.settings.tap.offline])
+    expect(view.find('[role="alert"]').exists()).toBe(false)
+    await counted(view).trigger('click')
+    await flushPromises()
+    expect(chooseAnalytics).not.toHaveBeenCalled()
+  })
+
+  it('a failed read offers «Try again» and no switch, which comes with the answer (А1)', async () => {
+    readAnalytics.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
+    const view = await render()
+    expect(view.text()).toContain(en.settings.tap.load_error)
+    expect(view.find('input[role="switch"]').exists()).toBe(false)
+    const retry = view.findAll('button').find((button) => button.text() === en.state.retry)
+    await retry?.trigger('click')
+    await flushPromises()
+    expect(readAnalytics).toHaveBeenCalledTimes(2)
+    expect(counted(view).element.checked).toBe(true)
+    expect(view.text()).not.toContain(en.settings.tap.load_error)
+  })
+
+  it('an answer lost offline is asked for again when the connection comes back (adversarial А2)', async () => {
+    readAnalytics.mockResolvedValue({ off: true })
+    const view = await render()
+    // Back on reaches the server and lands; the answer does not come back.
+    chooseAnalytics.mockImplementation(() => {
+      readAnalytics.mockResolvedValue({ off: false })
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      return Promise.reject(new TypeError('Failed to fetch'))
+    })
+    await counted(view).setValue(true)
+    await flushPromises()
+    // Whether it landed is not known: no switch drawn as an answer (round 2, Р2-А1).
+    expect(view.find('input[role="switch"]').exists()).toBe(false)
+    expect(view.text()).toContain(en.settings.tap.offline)
+
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(counted(view).element.checked).toBe(true)
+    expect(view.text()).not.toContain(en.settings.tap.offline)
+  })
+
+  it('an answer lost online is asked for at once, and a change that landed is not «not saved» (А2)', async () => {
+    const view = await render()
+    chooseAnalytics.mockImplementation(() => {
+      readAnalytics.mockResolvedValue({ off: true })
+      return Promise.reject(new TypeError('connection reset'))
+    })
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(readAnalytics).toHaveBeenCalledTimes(2)
+    expect(counted(view).element.checked).toBe(false)
+    expect(view.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('a change that got no answer, nor the read after it: no switch, «we do not know», checked again by itself (Р2-А1)', async () => {
+    vi.useFakeTimers()
+    try {
+      readAnalytics.mockResolvedValue({ off: true })
+      const view = await render()
+      // Back on lands; its answer and the read after it are torn, the phone still says «online».
+      chooseAnalytics.mockImplementation(() => {
+        readAnalytics.mockRejectedValue(new TypeError('connection reset'))
+        return Promise.reject(new TypeError('connection reset'))
+      })
+      await counted(view).setValue(true)
+      await flushPromises()
+      expect(view.find('input[role="switch"]').exists()).toBe(false)
+      // A wait, not an error: quiet, never an alert (round 3, №7).
+      expect(view.get('.unsure').text()).toContain(en.settings.tap.unsure)
+      expect(view.find('[role="alert"]').exists()).toBe(false)
+      expect(view.text()).not.toContain(en.settings.tap.save_failed)
+      expect(view.text()).not.toContain(en.settings.tap.load_error)
+      expect(readAnalytics).toHaveBeenCalledTimes(2)
+
+      // The connection mends with no `online` event: the check comes by the clock.
+      readAnalytics.mockResolvedValue({ off: false })
+      await vi.advanceTimersByTimeAsync(TAP_CHECK_FIRST_MS)
+      await flushPromises()
+      expect(readAnalytics).toHaveBeenCalledTimes(3)
+      expect(counted(view).element.checked).toBe(true)
+      expect(view.find('[role="alert"]').exists()).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a refusal in the API’s own words is «not saved» at once, no «we do not know» (round 3, №6)', async () => {
+    const view = await render()
+    chooseAnalytics.mockRejectedValue(
+      new ApiError(ERROR.INTERNAL, '', true, 500, { fromApi: true }),
+    )
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(readAnalytics).toHaveBeenCalledTimes(1)
+    expect(counted(view).element.checked).toBe(true)
+    expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
+    expect(view.text()).not.toContain(en.settings.tap.unsure)
+  })
+
+  it('the focus a tap left on the switch waits on «we do not know» and goes back to it (Р3-А2)', async () => {
+    const view = await render()
+    let check: (answer: AnalyticsSetting) => void = () => undefined
+    chooseAnalytics.mockImplementation(() => {
+      readAnalytics.mockReturnValue(
+        new Promise((resolve) => {
+          check = resolve
+        }),
+      )
+      return Promise.reject(new TypeError('connection reset'))
+    })
+    counted(view).element.focus()
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(view.find('input[role="switch"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(view.get('.unsure').element)
+    // The focus reads the line: the live region does not say it a second time (round 4, №10).
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect(said).not.toContain(en.settings.tap.unsure)
+
+    check({ off: true })
+    await flushPromises()
+    expect(document.activeElement).toBe(counted(view).element)
+    expect(counted(view).element.checked).toBe(false)
+  })
+
+  it('«we do not know» with the focus elsewhere is said once, in the live region (№7, №10)', async () => {
+    const view = await render()
+    chooseAnalytics.mockImplementation(() => {
+      readAnalytics.mockReturnValue(new Promise(() => undefined))
+      return Promise.reject(new TypeError('connection reset'))
+    })
+    await counted(view).setValue(false)
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect(said.filter((text) => text === en.settings.tap.unsure)).toHaveLength(1)
+  })
+
+  it('«we do not know», then a tab and back: the screen says how the check ended (round 8, Р8-А1)', async () => {
+    const view = await render()
+    chooseAnalytics.mockImplementation(() => {
+      readAnalytics.mockRejectedValue(new TypeError('connection reset'))
+      return Promise.reject(new TypeError('connection reset'))
+    })
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(view.text()).toContain(en.settings.tap.unsure)
+    views.splice(views.indexOf(view), 1)
+    view.unmount()
+
+    // The objection never landed: the server still counts the person.
+    readAnalytics.mockResolvedValue({ off: false })
+    const back = await render()
+    expect(counted(back).element.checked).toBe(true)
+    expect(back.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
+  })
+
+  it('switched off and a tab tapped at once: back, the screen says the objection was not saved (Р9-А1)', async () => {
+    const view = await render()
+    let fail: (error: Error) => void = () => undefined
+    chooseAnalytics.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject
+        }),
+    )
+    await counted(view).setValue(false)
+    views.splice(views.indexOf(view), 1)
+    view.unmount()
+    fail(new TypeError('connection reset'))
+    await flushPromises()
+
+    const back = await render()
+    expect(counted(back).element.checked).toBe(true)
+    expect(back.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
+  })
+
+  it('back on «Settings» while «count me» is still on its way: «we do not know», then the switch as it landed (Р10-А1)', async () => {
+    readAnalytics.mockResolvedValue({ off: true })
+    const view = await render()
+    let land: () => void = () => undefined
+    chooseAnalytics.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          land = () => {
+            readAnalytics.mockResolvedValue({ off: false })
+            resolve({ off: false })
+          }
+        }),
+    )
+    await counted(view).setValue(true)
+    views.splice(views.indexOf(view), 1)
+    view.unmount()
+
+    const back = await render()
+    expect(back.find('input[role="switch"]').exists()).toBe(false)
+    // No answer is lost yet: it is still to come (round 12).
+    expect(back.text()).toContain(en.settings.tap.waiting)
+    expect(back.text()).not.toContain(en.settings.tap.unsure)
+
+    land()
+    await flushPromises()
+    expect(counted(back).element.checked).toBe(true)
+    expect(back.text()).not.toContain(en.settings.tap.waiting)
+    expect(back.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('«Try again» beside «we do not know» checks at once, and a change that did not land says so', async () => {
+    const view = await render()
+    chooseAnalytics.mockImplementation(() => {
+      readAnalytics.mockRejectedValueOnce(new TypeError('connection reset'))
+      return Promise.reject(new TypeError('connection reset'))
+    })
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(view.text()).toContain(en.settings.tap.unsure)
+    const retry = view.findAll('button').find((button) => button.text() === en.state.retry)
+    await retry?.trigger('click')
+    await flushPromises()
+    // The server still holds «on»: the change did not land, and now that is known.
+    expect(counted(view).element.checked).toBe(true)
+    expect(view.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
   })
 })

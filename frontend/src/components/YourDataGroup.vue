@@ -2,6 +2,74 @@
   <section class="group">
     <SectionCaption>{{ t('settings.group_data') }}</SectionCaption>
     <AppCard as="ul" list>
+      <!-- First in the group (MOL-96): what is counted about the person, before what is done with it. -->
+      <li>
+        <!-- Drawn as the rows below it, its words beside the icon (adversarial А4). -->
+        <div class="entry setting">
+          <IconStatistics class="entry-icon" aria-hidden="true" />
+          <span class="entry-text">
+            <label class="entry-label" :for="`${id}-analytics-switch`">{{
+              t('settings.analytics.label')
+            }}</label>
+            <span :id="`${id}-analytics`" class="entry-hint">{{
+              t('settings.analytics.hint')
+            }}</span>
+            <span
+              v-if="!analytics.online.value"
+              :id="`${id}-analytics-offline`"
+              class="entry-hint"
+              >{{ t('settings.tap.offline') }}</span
+            >
+          </span>
+          <!-- Only an answer is drawn (adversarial А1): «not known yet» drawn off read as an
+               objection nobody made — nor a change whose answer was lost (round 2, Р2-А1). The
+               place is held, so the words do not move when it comes; it is not faded in — an
+               answer read is not played (MOL-151). -->
+          <span ref="switchSlot" class="switch-slot">
+            <AppSwitch
+              v-if="analytics.off.value !== undefined && !analytics.unsure.value"
+              :id="`${id}-analytics-switch`"
+              :checked="!analytics.off.value"
+              :inactive="analytics.saving.value || !analytics.online.value"
+              :aria-describedby="
+                analytics.online.value
+                  ? `${id}-analytics`
+                  : `${id}-analytics ${id}-analytics-offline`
+              "
+              @toggle="(on: boolean) => analytics.choose(!on)"
+            />
+          </span>
+        </div>
+        <TapUnsureLine
+          v-if="analytics.unsure.value"
+          ref="unsureLine"
+          class="under"
+          :pending="analytics.pending.value"
+          :online="analytics.online.value"
+          :aria-describedby="`${id}-analytics`"
+          @retry="analytics.retry"
+        />
+        <!-- The icon and the words are one box: beside each other, the button under them once
+             the line is full (Р2-А3, Р3-А4). -->
+        <p
+          v-else-if="analytics.online.value && analytics.saveFailed.value"
+          class="failed"
+          role="alert"
+        >
+          <span class="said"
+            ><IconAlert aria-hidden="true" /><span>{{ t('settings.tap.save_failed') }}</span></span
+          >
+        </p>
+        <div
+          v-else-if="analytics.online.value && analytics.failure.value === 'error'"
+          class="failed"
+        >
+          <span class="said"
+            ><IconAlert aria-hidden="true" /><span>{{ t('settings.tap.load_error') }}</span></span
+          >
+          <AppButton variant="ghost" @click="analytics.retry">{{ t('state.retry') }}</AppButton>
+        </div>
+      </li>
       <li>
         <!-- Inactive rather than disabled, as «Сохранить» is: it keeps its focus and its hint. -->
         <button
@@ -84,19 +152,24 @@ import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconDownload from '~icons/mdi/tray-arrow-down'
 import IconShield from '~icons/mdi/shield-account-outline'
+import IconStatistics from '~icons/mdi/chart-box-outline'
 import IconTerms from '~icons/mdi/file-document-outline'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
+import AppSwitch from '@/components/AppSwitch.vue'
 import EraseSheet from '@/components/EraseSheet.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import TapUnsureLine from '@/components/TapUnsureLine.vue'
+import { useAnalytics } from '@/composables/useAnalytics'
+import { useUnsureFocus } from '@/composables/useUnsureFocus'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExport } from '@/composables/useExport'
 import { useSignOutStore } from '@/stores/signOut'
 
 /**
- * «Ваши данные» (MOL-93, В-2): the copy of everything kept, erasing all of it (MOL-94), the page
- * that says what is kept and the terms beside it (MOL-95). Turning off the log (MOL-96) joins them here.
+ * «Ваши данные» (MOL-93, В-2): whether the person is counted (MOL-96), the copy of everything kept,
+ * erasing all of it (MOL-94), the page that says what is kept and the terms beside it (MOL-95).
  */
 export default defineComponent({
   name: 'YourDataGroup',
@@ -104,6 +177,7 @@ export default defineComponent({
     AppButton,
     AppCard,
     AppReveal,
+    AppSwitch,
     EraseSheet,
     IconAlert,
     IconChevron,
@@ -111,8 +185,10 @@ export default defineComponent({
     IconDelete,
     IconDownload,
     IconShield,
+    IconStatistics,
     IconTerms,
     SectionCaption,
+    TapUnsureLine,
   },
   setup() {
     const { t } = useI18n()
@@ -145,7 +221,28 @@ export default defineComponent({
     watch(eraseOpen, (open) => {
       if (!open) signOut.stay()
     })
-    return { t, id: useId(), row, ...exporting, retry, handOverFromCard, signOut, eraseOpen }
+    const analytics = useAnalytics()
+    const switchSlot = ref<HTMLElement | null>(null)
+    const unsureLine = ref<{ $el: HTMLElement } | null>(null)
+    useUnsureFocus(
+      analytics.unsure,
+      analytics.pending,
+      () => switchSlot.value,
+      () => unsureLine.value?.$el,
+    )
+    return {
+      t,
+      id: useId(),
+      row,
+      ...exporting,
+      retry,
+      handOverFromCard,
+      signOut,
+      eraseOpen,
+      analytics,
+      switchSlot,
+      unsureLine,
+    }
   },
 })
 </script>
@@ -209,6 +306,23 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
+// The row itself does nothing: its words and its switch do.
+.setting {
+  cursor: default;
+
+  label {
+    cursor: pointer;
+  }
+}
+
+// A switch's place, held while its answer is on the way (adversarial А1).
+.switch-slot {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  min-width: var(--switch-width);
+}
+
 // The colour of an action that ends something, as «Выйти» beside it (MOL-57).
 .erase {
   &,
@@ -235,6 +349,21 @@ export default defineComponent({
 
 .failed {
   color: var(--bad-ink);
+}
+
+// The unsure line stands where the row's other lines do.
+.under {
+  margin: 0 var(--space-4) var(--space-3);
+}
+
+// An icon and its words as one item of the line: the words wrap beside the icon, and a button after
+// them goes under once the line is full — by the words' own width, not a basis of nothing (Р3-А4).
+.said {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .quiet {

@@ -50,6 +50,6 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 ## frontend
 
 - `frontend/src/views/BotView.vue` — `/settings/bot`, «Бот в Telegram» (MOL-129, В-2): a switch a kind of the bot's messages — the rating reminders and «чек разобран» — each saved on the tap at its own address; one line about a block above both, both inactive under it showing the person's choice; the four states.
-- `frontend/src/components/BotSwitchRow.vue` — One kind of the bot's messages on the page «Бот»: its switch, what it does, «без связи» and «не сохранилось» under it, the block named to a screen reader.
+- `frontend/src/components/BotSwitchRow.vue` — One kind of the bot's messages on the page «Бот»: its switch — none while its change is unsure, the quiet line in its place (MOL-96) — what it does, «без связи» and «не сохранилось» under it, the block named to a screen reader.
 - `frontend/src/composables/useReceiptNotices.ts` — Composable: «Сообщать, что чек разобран» through `useTapSetting` — off or on (MOL-129).
 - `frontend/src/composables/useReminders.ts` — Composable: the reminders' switch through `useTapSetting` — off `chosen`, `blocked` or on.
