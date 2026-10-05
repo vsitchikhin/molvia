@@ -612,12 +612,12 @@ export default defineComponent({
         amount: formatEstimate(into, locale.value),
         rate: rateWords(rate, locale.value, t),
       }
-      return rate.source === 'personal'
-        ? t('spending.sheet.conversion_mine', words)
-        : t('spending.sheet.conversion_official', {
-            ...words,
-            bank: bankWords(rate.base, rate.quote, t),
-          })
+      if (rate.source === 'personal') return t('spending.sheet.conversion_mine', words)
+      const bank = bankWords(rate.base, rate.quote, t)
+      // As on «Деньги»: a fallback names the pair's bank as silent, not as its source (review 1).
+      return rate.source === 'fallback'
+        ? t('spending.sheet.conversion_fallback', { ...words, bank })
+        : t('spending.sheet.conversion_official', { ...words, bank })
     })
 
     /** «≈ 2 140,91 ₽» — what the server would count, where the account's rate joins the two. */
