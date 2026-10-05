@@ -161,5 +161,22 @@ export default defineConfigWithVueTs(
       ],
     },
   },
+  // A busy button says what it does (MOL-225): at work it reads «Удаляем…» in place of its action's
+  // word, in the action's look. Without its word it looked live — or, beside `disabled`, not now — and
+  // the second tap was swallowed with nothing said. `busy` alone or bound, with no `busy-label`, is
+  // refused. A label left empty passes: it closes carelessness, not intent.
+  {
+    files: ['src/**/*.vue'],
+    rules: {
+      'vue/no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "VElement[rawName='AppButton']:matches(:has(VStartTag > VAttribute[directive=false][key.name='busy']), :has(VStartTag > VAttribute[directive=true][key.argument.name='busy'])):not(:has(VStartTag > VAttribute[directive=true][key.argument.name='busy-label']))",
+          message: 'A busy button says what it does: give it a busy-label (MOL-225).',
+        },
+      ],
+    },
+  },
   prettier,
 )
