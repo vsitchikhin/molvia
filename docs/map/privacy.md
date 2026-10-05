@@ -52,7 +52,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 
 - `frontend/src/components/EraseSheet.vue` — Sheet «Удалить все ваши данные?» (MOL-94): the bot's words for what goes and what stays, what happens to the copies on the devices, one press «Удалить навсегда»; inactive offline.
 - `frontend/src/components/ConsentStep.vue` — «Условия и приватность», the door's step after the claim (MOL-95): both documents, «Мне 16 лет или больше» before «Принимаю», «Условия обновились» for an older edition; «Не принимаю» leads to «Выйти» or «Удалить мои данные», each with its own sheet.
-- `frontend/src/components/YourDataGroup.vue` — «Ваши данные» on the settings (MOL-93, В-2): «Учитывать меня в статистике» first, a switch saved on the tap with no sheet (MOL-96), «Скачать мои данные» with its states and «Сохранить или отправить» for a second tap, «Удалить мои данные» under it (MOL-94), and the link to «Данные и приватность».
+- `frontend/src/components/YourDataGroup.vue` — «Ваши данные» on the settings (MOL-93, В-2): «Учитывать меня в статистике» first, a switch saved on the tap with no sheet and drawn only once the server has answered (MOL-96), «Скачать мои данные» with its states and «Сохранить или отправить» for a second tap, «Удалить мои данные» under it (MOL-94), and the link to «Данные и приватность».
 
 ## frontend · composables
 

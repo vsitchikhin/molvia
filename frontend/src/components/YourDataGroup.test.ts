@@ -352,13 +352,20 @@ describe('«Count me in the statistics» (MOL-96)', () => {
     expect(describedBy(view)).toEqual([en.settings.analytics.hint])
   })
 
-  it('waits for the server before it can be moved', async () => {
+  it('draws no switch until the server has answered: «not known» is no objection (adversarial А1)', async () => {
     readAnalytics.mockReturnValue(new Promise(() => undefined))
     const view = await render()
-    expect(counted(view).attributes('aria-disabled')).toBe('true')
-    await counted(view).trigger('click')
-    await flushPromises()
-    expect(chooseAnalytics).not.toHaveBeenCalled()
+    expect(view.find('input[role="switch"]').exists()).toBe(false)
+    expect(view.get('li').text()).toContain(en.settings.analytics.label)
+  })
+
+  it('opened without a connection: no switch, and says why — never red (А1)', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    readAnalytics.mockRejectedValue(new TypeError('Failed to fetch'))
+    const view = await render()
+    expect(view.find('input[role="switch"]').exists()).toBe(false)
+    expect(view.get('li').text()).toContain(en.settings.tap.offline)
+    expect(view.find('[role="alert"]').exists()).toBe(false)
   })
 
   it('turns off on the tap with no sheet, and back on (В-3)', async () => {
@@ -403,16 +410,50 @@ describe('«Count me in the statistics» (MOL-96)', () => {
     expect(chooseAnalytics).not.toHaveBeenCalled()
   })
 
-  it('a failed read offers «Try again», which asks again', async () => {
+  it('a failed read offers «Try again» and no switch, which comes with the answer (А1)', async () => {
     readAnalytics.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL))
     const view = await render()
     expect(view.text()).toContain(en.settings.tap.load_error)
-    expect(counted(view).attributes('aria-disabled')).toBe('true')
+    expect(view.find('input[role="switch"]').exists()).toBe(false)
     const retry = view.findAll('button').find((button) => button.text() === en.state.retry)
     await retry?.trigger('click')
     await flushPromises()
     expect(readAnalytics).toHaveBeenCalledTimes(2)
     expect(counted(view).element.checked).toBe(true)
     expect(view.text()).not.toContain(en.settings.tap.load_error)
+  })
+
+  it('an answer lost offline is asked for again when the connection comes back (adversarial А2)', async () => {
+    readAnalytics.mockResolvedValue({ off: true })
+    const view = await render()
+    // Back on reaches the server and lands; the answer does not come back.
+    chooseAnalytics.mockImplementation(() => {
+      readAnalytics.mockResolvedValue({ off: false })
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      return Promise.reject(new TypeError('Failed to fetch'))
+    })
+    await counted(view).setValue(true)
+    await flushPromises()
+    expect(counted(view).element.checked).toBe(false)
+    expect(view.text()).toContain(en.settings.tap.offline)
+
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(counted(view).element.checked).toBe(true)
+    expect(view.text()).not.toContain(en.settings.tap.offline)
+  })
+
+  it('an answer lost online is asked for at once, and a change that landed is not «not saved» (А2)', async () => {
+    const view = await render()
+    chooseAnalytics.mockImplementation(() => {
+      readAnalytics.mockResolvedValue({ off: true })
+      return Promise.reject(new TypeError('connection reset'))
+    })
+    await counted(view).setValue(false)
+    await flushPromises()
+    expect(readAnalytics).toHaveBeenCalledTimes(2)
+    expect(counted(view).element.checked).toBe(false)
+    expect(view.find('[role="alert"]').exists()).toBe(false)
   })
 })

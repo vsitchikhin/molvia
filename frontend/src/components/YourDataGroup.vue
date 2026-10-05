@@ -3,29 +3,49 @@
     <SectionCaption>{{ t('settings.group_data') }}</SectionCaption>
     <AppCard as="ul" list>
       <!-- First in the group (MOL-96): what is counted about the person, before what is done with it. -->
-      <li class="switch-item">
-        <label class="switch-row">
+      <li>
+        <!-- Drawn as the rows below it, its words beside the icon (adversarial А4). -->
+        <div class="entry setting">
           <IconStatistics class="entry-icon" aria-hidden="true" />
-          <span class="entry-label">{{ t('settings.analytics.label') }}</span>
-          <AppSwitch
-            :checked="analytics.off.value === false"
-            :inactive="
-              analytics.off.value === undefined || analytics.saving.value || !analytics.online.value
-            "
-            :aria-describedby="
-              analytics.online.value ? `${id}-analytics` : `${id}-analytics ${id}-analytics-offline`
-            "
-            @toggle="(on: boolean) => analytics.choose(!on)"
-          />
-        </label>
-        <p :id="`${id}-analytics`" class="switch-hint">{{ t('settings.analytics.hint') }}</p>
-        <p v-if="!analytics.online.value" :id="`${id}-analytics-offline`" class="switch-hint">
-          {{ t('settings.tap.offline') }}
-        </p>
-        <p v-else-if="analytics.saveFailed.value" class="failed" role="alert">
+          <span class="entry-text">
+            <label class="entry-label" :for="`${id}-analytics-switch`">{{
+              t('settings.analytics.label')
+            }}</label>
+            <span :id="`${id}-analytics`" class="entry-hint">{{
+              t('settings.analytics.hint')
+            }}</span>
+            <span
+              v-if="!analytics.online.value"
+              :id="`${id}-analytics-offline`"
+              class="entry-hint"
+              >{{ t('settings.tap.offline') }}</span
+            >
+          </span>
+          <!-- Only an answer is drawn (adversarial А1): «not known yet» drawn off read as an
+               objection nobody made. The place is held, so the words do not move when it comes. -->
+          <span class="switch-slot">
+            <span v-if="analytics.off.value !== undefined" class="switch-in">
+              <AppSwitch
+                :id="`${id}-analytics-switch`"
+                :checked="!analytics.off.value"
+                :inactive="analytics.saving.value || !analytics.online.value"
+                :aria-describedby="
+                  analytics.online.value
+                    ? `${id}-analytics`
+                    : `${id}-analytics ${id}-analytics-offline`
+                "
+                @toggle="(on: boolean) => analytics.choose(!on)"
+              />
+            </span>
+          </span>
+        </div>
+        <p v-if="analytics.online.value && analytics.saveFailed.value" class="failed" role="alert">
           <IconAlert aria-hidden="true" />{{ t('settings.tap.save_failed') }}
         </p>
-        <div v-else-if="analytics.failure.value === 'error'" class="failed">
+        <div
+          v-else-if="analytics.online.value && analytics.failure.value === 'error'"
+          class="failed"
+        >
           <IconAlert aria-hidden="true" />
           <span>{{ t('settings.tap.load_error') }}</span>
           <AppButton variant="ghost" @click="analytics.retry">{{ t('state.retry') }}</AppButton>
@@ -254,29 +274,27 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
-// The switch's own row: the label is a `<label>`, so a tap on the words moves it too.
-.switch-item {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4) var(--space-3);
+// The row itself does nothing: its words and its switch do.
+.setting {
+  cursor: default;
+
+  label {
+    cursor: pointer;
+  }
 }
 
-.switch-row {
+// A switch's place, held while its answer is on the way (adversarial А1).
+.switch-slot {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--touch-target-lg);
-  cursor: pointer;
+  flex: none;
+  justify-content: flex-end;
+  min-width: var(--switch-width);
 }
 
-.switch-hint {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
+.switch-in {
+  display: flex;
 
-.switch-item .failed {
-  margin: 0;
+  @include appear;
 }
 
 // The colour of an action that ends something, as «Выйти» beside it (MOL-57).

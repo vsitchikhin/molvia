@@ -35,6 +35,11 @@ export function useTapSetting<T>(
   const saveFailed = ref(false)
   // A read that left before a change is older than it: its answer must not put the control back.
   let latest = 0
+  // A change whose answer never came may have landed all the same — the answer, not the request,
+  // is what a dropped connection loses — so what the control shows is only a guess until the
+  // server is read again (adversarial MOL-96 А2): a privacy switch put back to «on» over a server
+  // that already turned it off.
+  let unsure: { readonly shown: T } | null = null
 
   async function load(): Promise<void> {
     if (!actor.id || saving.value) return
@@ -42,6 +47,10 @@ export function useTapSetting<T>(
     try {
       const answer = await read()
       if (mine !== latest) return
+      // The change did land after all: «не сохранилось» is no longer true.
+      if (unsure && JSON.stringify(answer) !== JSON.stringify(unsure.shown))
+        saveFailed.value = false
+      unsure = null
       value.value = answer
       failure.value = null
     } catch (error) {
@@ -62,8 +71,10 @@ export function useTapSetting<T>(
     saveFailed.value = false
     try {
       value.value = await write(next)
+      unsure = null
     } catch {
       value.value = shown
+      unsure = { shown }
       // Offline or failed is decided after the failure (MOL-19, A1): a connection that dropped while
       // the answer was on its way is the grey «без связи», never the red «не сохранилось» (self-review 7).
       online.value = navigator.onLine
@@ -71,6 +82,8 @@ export function useTapSetting<T>(
     } finally {
       saving.value = false
     }
+    // Asked at once while there is a connection; without one, when it comes back (below).
+    if (unsure && online.value) await load()
   }
 
   const offline = (): void => {
@@ -92,7 +105,7 @@ export function useTapSetting<T>(
   )
   useReconnect(() => {
     online.value = navigator.onLine
-    if (online.value && (value.value === undefined || failure.value)) void load()
+    if (online.value && (value.value === undefined || failure.value || unsure)) void load()
   })
 
   return { value, failure, online, saving, saveFailed, retry: load, choose }
