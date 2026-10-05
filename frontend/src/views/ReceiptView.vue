@@ -129,13 +129,13 @@
           >
         </p>
         <!-- Read in part (MOL-222, В-1): what was «переснимите» — said, and recorded all the same. -->
-        <div v-if="partly" class="partly">
-          <p class="partly-text">{{ partly }}</p>
+        <AppNote v-if="partly" tone="warn" class="partly">
+          {{ partly }}
           <AppButton v-if="country && !locked" variant="ghost" @click="retake">
             <template #icon><IconCamera /></template>
             {{ t('receipt.capture.retake') }}
           </AppButton>
-        </div>
+        </AppNote>
         <AppCard class="block" list>
           <ReceiptLineRow
             v-for="one in lines"
@@ -301,6 +301,7 @@ import {
   ERROR,
   RECEIPT_CURRENCY,
   formatMoney,
+  readCovered,
   readPartly,
   receiptDigits,
   yerevanDate,
@@ -308,6 +309,7 @@ import {
 import type { Money } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
+import AppNote from '@/components/AppNote.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CaptureSheet from '@/components/CaptureSheet.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
@@ -353,6 +355,7 @@ export default defineComponent({
   components: {
     AppButton,
     AppCard,
+    AppNote,
     AppScreen,
     CaptureSheet,
     IconCamera,
@@ -572,14 +575,10 @@ export default defineComponent({
       const one = detail.value
       if (!one || one.lines.length === 0 || !readPartly(one.lines, one.receipt.total)) return null
       const total = one.receipt.total
-      if (total !== null && total.minor > 0n) {
-        let read = 0n
-        for (const line of one.lines) {
-          if (line.sum?.currency === total.currency && line.sum.minor <= total.minor)
-            read += line.sum.minor
-        }
+      const covered = readCovered(one.lines, total)
+      if (covered !== null && total !== null) {
         return t('receipt.review.partly_total', {
-          lines: formatMoney({ minor: read, currency: total.currency }, locale.value),
+          lines: formatMoney(covered, locale.value),
           total: formatMoney(total, locale.value),
         })
       }
@@ -825,23 +824,7 @@ export default defineComponent({
 }
 
 .partly {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-2);
-  align-items: center;
-  justify-content: space-between;
   margin: 0 0 var(--space-3);
-  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
-  border-radius: var(--radius);
-  color: var(--warn-ink);
-  background: var(--warn-tint);
-}
-
-.partly-text {
-  flex: 1 1 12rem;
-  margin: 0;
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
 }
 
 .refused {

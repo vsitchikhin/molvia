@@ -115,3 +115,65 @@ test('«‹» gives the shot up: no part, the capture sheet as it was', async ({
   await expect(capturing(page)).toContainText('Smooth the receipt out')
   await expect(capturing(page).getByRole('button', { name: 'Send receipt' })).toHaveCount(0)
 })
+
+/** One finger through Chromium's own touch input: down at `from`, slowly to `to`, up. */
+async function pull(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
+  const cdp = await page.context().newCDPSession(page)
+  const point = (x: number, y: number) => [{ x, y, id: 1 }]
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: point(from.x, from.y),
+  })
+  for (let i = 1; i <= 12; i++) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: point(from.x + ((to.x - from.x) * i) / 12, from.y + ((to.y - from.y) * i) / 12),
+    })
+    await page.waitForTimeout(16)
+  }
+  await page.waitForTimeout(300)
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+}
+
+// adversarial А3: the photo is the step's to drag on — a pull down from the outline, between two
+// corners, never takes the sheet and the shot with it
+test('a pull down from the photo between the corners keeps the step and its shot', async ({
+  page,
+}) => {
+  await shoot(page)
+  const right = await edges(page).locator('.handle').nth(2).boundingBox()
+  const left = await edges(page).locator('.handle').nth(3).boundingBox()
+  if (!right || !left) throw new Error('no corners')
+  const from = {
+    x: (left.x + right.x) / 2 + left.width / 2,
+    y: (left.y + right.y) / 2 + left.height / 2,
+  }
+  await pull(page, from, { x: from.x, y: from.y + 260 })
+  await expect(edges(page)).toBeVisible()
+  await edges(page).getByRole('button', { name: 'Done' }).click()
+  await expect(capturing(page)).toContainText('Part 1')
+})
+
+// adversarial А2: under the 200 px the server takes, «Keep it» is still a part — paper added to its
+// sides, never «didn't open as a photo»
+test('«Keep it» on a receipt narrower than the server takes still makes a part', async ({
+  page,
+}) => {
+  await shoot(page, 150)
+  await edges(page).getByRole('button', { name: 'Done' }).click()
+  await expect(edges(page)).toContainText('The receipt is small')
+  await edges(page).getByRole('button', { name: 'Keep it' }).click()
+  await expect(edges(page)).toHaveCount(0)
+  await expect(capturing(page)).toContainText('Part 1')
+  await expect(capturing(page)).not.toContainText('didn’t open as a photo')
+})
+
+// Р-10: the step is opened by the file's `change`, not by a tap — the system's «back» still takes
+// the step alone, never the capture sheet under it
+test('the system’s «back» gives the shot up and leaves the capture sheet', async ({ page }) => {
+  await shoot(page)
+  await page.goBack()
+  await expect(edges(page)).toHaveCount(0)
+  await expect(capturing(page)).toContainText('Smooth the receipt out')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Purchases')
+})

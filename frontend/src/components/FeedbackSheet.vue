@@ -367,6 +367,13 @@ export default defineComponent({
     async function attach(files: readonly Blob[]): Promise<void> {
       pictureNote.value = null
       drawing.value = true
+      // more than a message takes — a receipt of four parts (MOL-222, review 6): said, never dropped
+      // in silence
+      const room = FEEDBACK_PICTURES_MAX - pictures.value.length
+      const overflow =
+        files.length > room
+          ? t('feedback.picture.too_many', { n: Math.max(room, 0), total: files.length })
+          : null
       try {
         // Each file on its own: one the browser cannot open does not keep the next from being tried
         // (adversarial А6), and the first refusal is what is said.
@@ -388,6 +395,7 @@ export default defineComponent({
             pictureNote.value ??= t(PICTURE_NOTES[reason])
           }
         }
+        pictureNote.value ??= overflow
       } finally {
         drawing.value = false
       }

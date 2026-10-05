@@ -951,8 +951,11 @@ describe('a screenshot with the message (MOL-167)', () => {
     clock += 1000
     await new Promise((resolve) => setTimeout(resolve, 120))
     const sheet = wrapper
-    // three at most: what a message carries (В-2 of MOL-167)
+    // three at most: what a message carries (В-2 of MOL-167) — and the fourth is said (MOL-222, review 6)
     expect(tiles(sheet)).toHaveLength(3)
+    expect(note(sheet).text()).toBe(
+      '3 of 4 fit — a message takes three pictures at most. Remove one to attach another',
+    )
     expect(drawPicture).toHaveBeenCalledTimes(3)
     // handed over once: the next opening brings none
     expect(useFeedbackSheetStore().takePhotos()).toEqual([])

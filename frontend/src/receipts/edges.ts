@@ -441,7 +441,19 @@ export function proposedCorners(
 ): { quad: Quad; found: boolean } {
   const gray = grayOf(photo)
   const found = find(gray)
-  if (found !== null) return { quad: scaledTo(found, gray, photo), found: true }
+  if (found !== null) {
+    // the least rectangle of a receipt running off the frame stands past its edge (review 3): kept
+    // in the photo, its corners make a trapezoid, and the warp straightens it rather than paint white
+    const inside = (p: Point) => ({
+      x: Math.min(photo.width, Math.max(0, p.x)),
+      y: Math.min(photo.height, Math.max(0, p.y)),
+    })
+    const quad = scaledTo(found, gray, photo)
+    return {
+      quad: [inside(quad[0]), inside(quad[1]), inside(quad[2]), inside(quad[3])],
+      found: true,
+    }
+  }
   const { width, height } = photo
   return {
     quad: [

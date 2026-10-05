@@ -1,3 +1,4 @@
+import { RECEIPT_SIDE_MIN } from '@molvia/model'
 import { RECEIPT_PHOTO_SIDE } from '@/receipts/photo'
 import { EDGES_LONG_SIDE, proposedCorners } from '@/receipts/edges'
 import { boundsOf, orderCorners, rectOf, shifted, snapped, warp, within } from '@/receipts/warp'
@@ -146,9 +147,23 @@ export async function straighten(
       return null
     }
   }
-  const canvas = canvasOf(out)
+  // a side under what the server takes is paper added, white, to its sides — «Оставить так» on a
+  // receipt of 180 px is a receipt, never «файл не открылся» (adversarial А2)
+  const side = {
+    width: Math.max(out.width, RECEIPT_SIDE_MIN),
+    height: Math.max(out.height, RECEIPT_SIDE_MIN),
+  }
+  const canvas = canvasOf(side)
   const drawn = canvas.getContext('2d')
   if (!drawn) return null
-  drawn.putImageData(new ImageData(new Uint8ClampedArray(out.pixels), out.width, out.height), 0, 0)
+  if (side.width !== out.width || side.height !== out.height) {
+    drawn.fillStyle = '#fff'
+    drawn.fillRect(0, 0, side.width, side.height)
+  }
+  drawn.putImageData(
+    new ImageData(new Uint8ClampedArray(out.pixels), out.width, out.height),
+    Math.floor((side.width - out.width) / 2),
+    Math.floor((side.height - out.height) / 2),
+  )
   return canvas
 }

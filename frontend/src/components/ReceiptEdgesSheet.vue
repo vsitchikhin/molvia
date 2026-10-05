@@ -5,7 +5,9 @@
     <template #title>{{ t('receipt.edges.title') }}</template>
     <template #meta>{{ t('receipt.capture.part', { n: part }) }}</template>
 
-    <div v-if="photo" ref="stage" class="stage" :style="stageStyle">
+    <!-- The whole photo is the step's to drag on: a pull down from it would close the sheet and lose
+         the shot (adversarial А3), so the sheet's own pull starts only outside it. -->
+    <div v-if="photo" ref="stage" class="stage" data-drags :style="stageStyle">
       <canvas ref="view" class="view" aria-hidden="true" />
       <svg
         class="frame"
@@ -22,11 +24,8 @@
         type="button"
         class="handle"
         data-drags
-        :class="{ held: held === index }"
-        :style="{
-          left: `${(corner.x / photo.width) * 100}%`,
-          top: `${(corner.y / photo.height) * 100}%`,
-        }"
+        :class="[{ held: held === index }, handleEdges(corner)]"
+        :style="handleStyle(corner)"
         :aria-label="t('receipt.edges.corner', { corner: t(CORNERS[index] ?? CORNERS[0]) })"
         :disabled="busy"
         @pointerdown="grab(index, $event)"
@@ -47,13 +46,13 @@
       />
     </div>
 
-    <p class="hint">{{ t(found ? 'receipt.edges.hint' : 'receipt.edges.not_found') }}</p>
-    <p v-if="narrow" class="narrow" role="status">{{ t('receipt.edges.narrow') }}</p>
+    <p class="hint">{{ t(hint) }}</p>
+    <AppNote v-if="narrow" tone="warn" class="narrow">{{ t('receipt.edges.narrow') }}</AppNote>
 
     <template #footer>
       <div class="pair">
         <template v-if="narrow">
-          <AppButton variant="secondary" size="large" @click="$emit('closer')">
+          <AppButton variant="secondary" size="large" @click="closer">
             {{ t('receipt.edges.closer') }}
           </AppButton>
           <AppButton size="large" @click="keep">{{ t('receipt.edges.keep') }}</AppButton>
@@ -63,7 +62,7 @@
             <template #icon><IconRotate /></template>
             {{ t('receipt.edges.turn') }}
           </AppButton>
-          <AppButton size="large" :busy="busy" @click="done">{{
+          <AppButton size="large" :busy="busy" :inactive="flat" @click="done">{{
             t('receipt.edges.done')
           }}</AppButton>
         </template>
@@ -78,7 +77,9 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconRotate from '~icons/mdi/rotate-right'
 import AppButton from '@/components/AppButton.vue'
+import AppNote from '@/components/AppNote.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import { useAnnouncer } from '@/composables/useAnnouncer'
 import {
   RECEIPT_PHOTO_NARROW,
   proposeCorners,
@@ -102,6 +103,24 @@ const VIEW_SIDE = 1280
 const LOUPE_ZOOM = 3
 /** A key press moves a corner by this share of the photo's side; with Shift, five times. */
 const NUDGE = 0.005
+/**
+ * Below this share of the photo the corners make no receipt — three on a line, two on one point
+ * (review 9): «Готово» waits, and the step says so, rather than give up the shot as a file that did
+ * not open.
+ */
+const AREA_MIN = 0.005
+/** A corner this near an edge of the photo has its handle drawn inside it (review 3). */
+const EDGE = 0.04
+
+/** The area of four corners in reading order (the shoelace). */
+function areaOf(quad: Quad): number {
+  let twice = 0
+  quad.forEach((p, i) => {
+    const q = quad[(i + 1) % 4] ?? p
+    twice += p.x * q.y - q.x * p.y
+  })
+  return Math.abs(twice) / 2
+}
 
 /**
  * «Края чека» (MOL-222, Т-1…Т-4): the photo with four corners the phone proposed (Т-2), each moved by
@@ -112,7 +131,7 @@ const NUDGE = 0.005
  */
 export default defineComponent({
   name: 'ReceiptEdgesSheet',
-  components: { AppButton, BottomSheet, IconRotate },
+  components: { AppButton, AppNote, BottomSheet, IconRotate },
   props: {
     open: { type: Boolean, required: true },
     /** The decoded photo, upright by its EXIF; the sheet never changes the one it is given. */
@@ -149,6 +168,28 @@ export default defineComponent({
     /** The receipt straightened, waiting on «Оставить так» for being narrow. */
     const narrowed = shallowRef<HTMLCanvasElement | null>(null)
     const narrow = computed(() => narrowed.value !== null)
+    const announce = useAnnouncer()
+    let hush: (() => void) | undefined
+
+    /** «Чек мелкий» put away: its canvas let go at once — Safari frees one lazily (review 8, А5). */
+    function unnarrow(): void {
+      release(narrowed.value)
+      narrowed.value = null
+      hush?.()
+      hush = undefined
+    }
+
+    const flat = computed(() => {
+      const from = photo.value
+      return !!from && areaOf(orderCorners(quad.value)) < from.width * from.height * AREA_MIN
+    })
+    const hint = computed(() =>
+      flat.value
+        ? 'receipt.edges.flat'
+        : found.value
+          ? 'receipt.edges.hint'
+          : 'receipt.edges.not_found',
+    )
 
     /** A canvas this sheet made — a turn — is let go here; the source is the opener's. */
     function release(canvas: HTMLCanvasElement | null): void {
@@ -182,8 +223,7 @@ export default defineComponent({
       () => [props.open, props.source] as const,
       ([open, source]) => {
         if (!open || !source) return
-        release(narrowed.value)
-        narrowed.value = null
+        unnarrow()
         busy.value = false
         void show(source)
       },
@@ -201,6 +241,33 @@ export default defineComponent({
         width: `min(100%, calc(var(--viewfinder-height) * ${String(ratio)}))`,
       }
     })
+
+    /**
+     * A handle on its corner, but never past the photo's edge (review 3, Р-4): within a few per cent
+     * of an edge it is drawn inside — from the corner inwards, not around it — so nothing of it goes
+     * under the hint or off the sheet.
+     */
+    function handleStyle(corner: Point): Record<string, string> {
+      const from = photo.value
+      if (!from) return {}
+      return {
+        left: `${String((corner.x / from.width) * 100)}%`,
+        top: `${String((corner.y / from.height) * 100)}%`,
+      }
+    }
+
+    function handleEdges(corner: Point): Record<string, boolean> {
+      const from = photo.value
+      if (!from) return {}
+      const x = corner.x / from.width
+      const y = corner.y / from.height
+      return {
+        'at-left': x < EDGE,
+        'at-right': x > 1 - EDGE,
+        'at-top': y < EDGE,
+        'at-bottom': y > 1 - EDGE,
+      }
+    }
 
     const points = computed(() => quad.value.map((p) => `${String(p.x)},${String(p.y)}`).join(' '))
     const dimPath = computed(() => {
@@ -222,7 +289,7 @@ export default defineComponent({
     }
 
     function move(index: number, to: Point): void {
-      narrowed.value = null
+      unnarrow()
       quad.value = quad.value.map((p, i) => (i === index ? to : p)) as unknown as Quad
     }
 
@@ -308,29 +375,35 @@ export default defineComponent({
       release(from)
       photo.value = next
       quad.value = corners
-      narrowed.value = null
+      unnarrow()
       await nextTick()
       draw()
     }
 
     async function done(): Promise<void> {
       const from = photo.value
-      if (!from || busy.value) return
+      if (!from || busy.value || flat.value) return
       busy.value = true
       try {
         const straight = await straighten(from, orderCorners(quad.value))
-        if (!props.open) return
+        // the step may have been left meanwhile — «‹», and maybe another shot opened on it: the
+        // receipt cut from the photo given up is nobody's part now (review 8, adversarial А4)
+        if (!props.open || photo.value !== from) {
+          release(straight)
+          return
+        }
         if (!straight) {
           emit('failed')
           return
         }
         if (straight.width < RECEIPT_PHOTO_NARROW) {
           narrowed.value = straight
+          hush = announce?.(t('receipt.edges.narrow'))
           return
         }
         emit('done', straight)
       } finally {
-        busy.value = false
+        if (photo.value === from) busy.value = false
       }
     }
 
@@ -338,12 +411,18 @@ export default defineComponent({
       const straight = narrowed.value
       if (!straight) return
       narrowed.value = null
+      hush?.()
       emit('done', straight)
+    }
+
+    function closer(): void {
+      unnarrow()
+      emit('closer')
     }
 
     onBeforeUnmount(() => {
       release(photo.value)
-      release(narrowed.value)
+      unnarrow()
     })
 
     return {
@@ -358,6 +437,10 @@ export default defineComponent({
       held,
       busy,
       narrow,
+      flat,
+      hint,
+      handleStyle,
+      handleEdges,
       points,
       dimPath,
       stageStyle,
@@ -370,6 +453,7 @@ export default defineComponent({
       turn: () => void turn(),
       done: () => void done(),
       keep,
+      closer,
     }
   },
 })
@@ -413,8 +497,28 @@ export default defineComponent({
   border: 0;
   border-radius: 50%;
   background: none;
-  transform: translate(-50%, -50%);
+  --shift-x: -50%;
+  --shift-y: -50%;
+
+  transform: translate(var(--shift-x), var(--shift-y));
   cursor: grab;
+
+  &.at-left {
+    --shift-x: 0%;
+  }
+
+  &.at-right {
+    --shift-x: -100%;
+  }
+
+  &.at-top {
+    --shift-y: 0%;
+  }
+
+  &.at-bottom {
+    --shift-y: -100%;
+  }
+
   touch-action: none;
 
   &:focus-visible {
@@ -458,13 +562,9 @@ export default defineComponent({
 }
 
 .narrow {
-  margin: var(--space-3) 0 0;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  color: var(--warn-ink);
-  background: var(--warn-tint);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
+  @include appear;
+
+  margin-top: var(--space-3);
 }
 
 .pair {

@@ -1421,7 +1421,8 @@
       "hint": "Take a screenshot with the phone’s buttons and attach it from the gallery. Only what you attach is sent.",
       "unreadable": "The picture could not be opened — choose another one",
       "shape": "The picture is too narrow or too long — choose another one",
-      "lost": "The pictures were not kept — attach them again"
+      "lost": "The pictures were not kept — attach them again",
+      "too_many": "{n} of {total} fit — a message takes three pictures at most. Remove one to attach another"
     },
     "languages": {
       "ru": "Russian",
@@ -1963,6 +1964,7 @@
       "title": "Receipt edges",
       "hint": "Drag the corners to the receipt's edges. For a part of a long receipt — to the overlap line",
       "not_found": "Couldn't find the edges — drag the corners to the receipt's edges yourself",
+      "flat": "The corners don’t make a receipt — spread them to its edges",
       "corner": "Corner: {corner}. Move it with the arrow keys",
       "corners": {
         "top_left": "top left",
