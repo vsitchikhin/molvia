@@ -332,6 +332,7 @@
       "bind_question": "Link code {code} to «{name}»?",
       "bind_hint": "Everyone who scans this code will see this item",
       "bind": "Link and record",
+      "bind_busy": "Linking…",
       "without_code": "Record without the code",
       "propose_other": "It's a different item — suggest it",
       "taken": "Code {code} already belongs to «{name}»",
@@ -1170,6 +1171,7 @@
       "body": "Your purchases and ratings then survive a change of phone. We store neither your name nor your phone number."
     },
     "start": "Sign in with Telegram",
+    "starting": "Opening Telegram…",
     "waiting": {
       "title": "Open Telegram and tap «Sign in»",
       "body": "The link lives five minutes. Come back here — the app will recognise you by itself."
@@ -1863,6 +1865,7 @@
   "update": {
     "ready": "A new version is out",
     "apply": "Update",
+    "applying": "Updating…",
     "failed": {
       "title": "The update did not take",
       "body": "Close Molvia completely and open it again. iPhone: swipe it up in the app switcher. Android: Recents — swipe Molvia away."
@@ -2060,9 +2063,11 @@
       "partly_lines": "Not all of it was read: {n} of {total} lines add up",
       "to_developer": "Send the receipt to the developer",
       "record": "Save {n} purchase | Save {n} purchases",
+      "record_busy": "Saving…",
       "record_offline": "We’ll save it once you are online",
       "recording": "We’ll save it once you are online — the lines are kept on this phone",
       "cancel_record": "Cancel saving",
+      "cancel_record_busy": "Checking…",
       "cancel_record_offline": "You can cancel once online: the record may already have reached the server",
       "cancel_record_failed": "The server did not answer — try cancelling again",
       "refused": "Not saved: {reason}. Fix it and save again",
