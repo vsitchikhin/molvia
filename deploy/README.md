@@ -292,8 +292,10 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod \
   exec backend node dist/merge.js unmerge 17 --yes
 ```
 
-An undone pair is never merged or named by the night again; the owner's hand still may. What the undo
-cannot bring back: the text of a review withdrawn because the same person had rated the twin too.
+An undone pair is never merged or named by the night again; the owner's hand still may. In `report`
+mode a pair the night would merge comes with its two ids: to forbid it before `on`, merge it by hand and
+undo it. What the undo cannot bring back: the text of a review withdrawn because the same person had
+rated the twin too.
 
 In a working copy the same thing is `make merge FROM=<id> INTO=<id> [YES=1]` and `make unmerge ID=<n> [YES=1]`.
 
