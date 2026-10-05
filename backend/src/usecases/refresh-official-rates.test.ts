@@ -5,13 +5,19 @@ import type { PastRate } from '@/db/rates-repository'
 import { FeedError } from '@/rates/feed'
 import type { Published, RateFeed } from '@/rates/feed'
 import {
+  ARCHIVE_DAYS_PER_RUN,
+  ARCHIVE_GAP_DAYS,
+  ARCHIVE_RECENT_DAYS,
+  COUNTRY_JUMP_DAYS,
   FALLBACK_AFTER_FAILURES,
   HISTORY_EVERY_MS,
   HISTORY_RETRY_MS,
   OFFICIAL_HISTORY_FROM,
+  archiveWalkFrom,
   missingDays,
   officialRatesRefresh,
 } from './refresh-official-rates'
+import type { HomeBankFeed } from './refresh-official-rates'
 
 // Saturday 19.09.2026, noon in Yerevan; the central bank's latest is Friday's.
 const NOW = new Date('2026-09-19T08:00:00.000Z')
@@ -600,5 +606,414 @@ describe('the history of the central bank (MOL-137)', () => {
     history.pass(1)
     await history.run()
     expect(history.inserted).toHaveLength(1)
+  })
+})
+
+describe('банк страны: НБ Грузии (MOL-110)', () => {
+  const HOUR = 60 * 60 * 1000
+  const SATURDAY = '2026-09-19'
+
+  const lari = (date: string, rub = 4_348_959n): Published => ({
+    provider: 'nbg',
+    date,
+    rates: [
+      { provider: 'nbg', currency: 'RUB', date, scaled: rub },
+      { provider: 'nbg', currency: 'GEL', date, scaled: 139_349_516n },
+    ],
+  })
+
+  /** The day before `day` when `day` is a Sunday: the bank answers a day off with Saturday's rate. */
+  const inForce = (day: string): string => {
+    const at = new Date(`${day}T00:00:00.000Z`)
+    return at.getUTCDay() === 0
+      ? new Date(at.getTime() - 86_400_000).toISOString().slice(0, 10)
+      : day
+  }
+
+  function homeHarness({ cached = [] as CachedRate[], failOn = null as string | null } = {}) {
+    let clock = NOW.getTime()
+    const cache: CachedRate[] = [...cached]
+    const askedOn: string[] = []
+    const warnings: { details: Record<string, unknown>; message: string }[] = []
+    const state = { latest: 0, rub: 4_348_959n }
+    let dated = inForce
+    const nbg: HomeBankFeed = {
+      provider: 'nbg',
+      fetchLatest: () => {
+        state.latest += 1
+        return Promise.resolve(lari(SATURDAY, state.rub))
+      },
+      fetchOn: (day) => {
+        askedOn.push(day)
+        return day === failOn ? Promise.reject(cutOff()) : Promise.resolve(lari(dated(day)))
+      },
+    }
+    const cba = feed('cba')
+    const cbr = feed('cbr')
+    const run = officialRatesRefresh({
+      primary: cba.feed,
+      fallbacks: [cbr.feed],
+      homeBanks: [nbg],
+      rates: {
+        upsert: (rates) => {
+          cache.push(...rates)
+          return Promise.resolve()
+        },
+        latestOnOrBefore: () => Promise.resolve(cache),
+        history: (provider, currencies, date) =>
+          Promise.resolve(
+            new Map(
+              currencies.map((currency) => [
+                currency,
+                cache
+                  .filter(
+                    (row) =>
+                      row.provider === provider && row.currency === currency && row.date < date,
+                  )
+                  .sort((a, b) => (a.date < b.date ? 1 : -1))
+                  .map((row) => ({ date: row.date, scaled: row.scaled })),
+              ]),
+            ),
+          ),
+      },
+      log: {
+        warn: (details, message) =>
+          warnings.push({ details: details as Record<string, unknown>, message }),
+      },
+      now: () => new Date(clock),
+      history: {
+        feed: { fetchRange: () => Promise.resolve([]) },
+        rates: {
+          between: (provider, from, to) =>
+            Promise.resolve(
+              cache
+                .filter((row) => row.provider === provider && row.date >= from && row.date <= to)
+                .sort((a, b) => (a.date < b.date ? -1 : 1)),
+            ),
+          insertMissing: (rates) => {
+            cache.push(...rates)
+            return Promise.resolve(rates.length)
+          },
+        },
+      },
+    })
+    return {
+      run,
+      cache,
+      askedOn,
+      warnings,
+      state,
+      cbr: cbr.state,
+      pass: (ms: number) => {
+        clock += ms
+      },
+      /** Which day the archive answers a day with. */
+      override: (answer: (day: string) => string) => {
+        dated = answer
+      },
+    }
+  }
+
+  describe('archiveWalkFrom', () => {
+    const today = '2026-09-19'
+    const month = '2026-08-19'
+    const lastMonth = ['2026-08-20', '2026-08-28', '2026-09-05', '2026-09-14', today]
+
+    it('пустой кеш или одна строка часового ответа — сначала последний месяц (ревью 2)', () => {
+      expect(ARCHIVE_RECENT_DAYS).toBe(31)
+      expect(archiveWalkFrom([], OFFICIAL_HISTORY_FROM, today)).toEqual({
+        from: month,
+        whole: false,
+      })
+      expect(archiveWalkFrom([today], OFFICIAL_HISTORY_FROM, today)).toEqual({
+        from: month,
+        whole: false,
+      })
+    })
+
+    it('месяц на месте — история с начала, потом со дня после первой дыры', () => {
+      expect(archiveWalkFrom(lastMonth, OFFICIAL_HISTORY_FROM, today)).toEqual({
+        from: OFFICIAL_HISTORY_FROM,
+        whole: false,
+      })
+      expect(ARCHIVE_GAP_DAYS).toBe(10)
+      // Шесть дней без курса — праздник, не дыра (Пасха 2026, самая длинная в архиве).
+      const kept = ['2022-01-01', '2022-01-07', '2022-01-08', '2022-03-01', ...lastMonth]
+      expect(archiveWalkFrom(kept, OFFICIAL_HISTORY_FROM, today)).toEqual({
+        from: '2022-01-09',
+        whole: false,
+      })
+    })
+
+    it('банк завис на старой дате: хвост до сегодня — не дыра, проход отдыхает (ревью 5)', () => {
+      // Последний свой день — 1 сентября, дальше банк отвечает им же; история целая.
+      const hung = ['2026-08-10', '2026-08-15', '2026-08-25', '2026-09-01']
+      // Месяц начинается со дня после 15.08 — последнего дня банка перед ним (адверсариальный Е).
+      expect(archiveWalkFrom(hung, '2026-08-10', today)).toEqual({
+        from: '2026-08-16',
+        whole: true,
+      })
+      // А заговорил сегодня — дыра между двумя его днями, её и проходим.
+      expect(archiveWalkFrom([...hung, today], '2026-08-10', today)).toEqual({
+        from: '2026-08-16',
+        whole: false,
+      })
+    })
+
+    it('банк молчит дольше месяца: пустой месяц — хвост, не дыра (адверсариальный Д)', () => {
+      // История целая, последний день банка — 5 августа, в месяце с 19.08 его дней нет.
+      const silent = ['2026-07-01', '2026-07-10', '2026-07-20', '2026-07-28', '2026-08-05']
+      expect(archiveWalkFrom(silent, '2026-07-01', today)).toEqual({ from: month, whole: true })
+      // Дыра в истории перед пустым месяцем — дело истории, а не месяца.
+      expect(archiveWalkFrom(['2026-06-01', '2026-08-01'], '2026-06-01', today)).toEqual({
+        from: '2026-06-02',
+        whole: false,
+      })
+    })
+
+    it('простой чуть дольше месяца и молчащий банк: дни перед месяцем спрошены (адверсариальный Е)', () => {
+      // Последний день перед простоем — 12.08, до начала месяца 7 дней: не праздник, а не спрошенное.
+      const kept = ['2026-07-25', '2026-08-03', '2026-08-12']
+      expect(archiveWalkFrom(kept, '2026-07-25', today)).toEqual({
+        from: '2026-08-13',
+        whole: true,
+      })
+    })
+
+    it('простой дольше истории порции: заговоривший банк — сначала месяц, потом дыра истории', () => {
+      const kept = ['2026-01-01', '2026-01-10', '2026-01-20', today]
+      expect(archiveWalkFrom(kept, '2026-01-01', today)).toEqual({ from: month, whole: false })
+      const walked = [...kept, '2026-08-19', '2026-08-28', '2026-09-07', '2026-09-16']
+      expect(archiveWalkFrom(walked, '2026-01-01', today)).toEqual({
+        from: '2026-01-21',
+        whole: false,
+      })
+    })
+
+    it('без дыр — только последний месяц, и архив цел до завтра', () => {
+      const kept = ['2026-08-10', '2026-08-15', '2026-08-25', '2026-09-04', '2026-09-14', today]
+      expect(archiveWalkFrom(kept, '2026-08-10', today)).toEqual({
+        from: '2026-08-16',
+        whole: true,
+      })
+      expect(archiveWalkFrom(['2026-09-10', today], '2026-09-10', today)).toEqual({
+        from: '2026-09-10',
+        whole: true,
+      })
+    })
+  })
+
+  it('спрашивается каждый час, когда ЦБ РА в порядке, и пишется; запасные не спрошены', async () => {
+    const home = homeHarness()
+    await home.run()
+    home.pass(HOUR)
+    await home.run()
+    expect(home.state.latest).toBe(2)
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === SATURDAY)).toBe(true)
+    expect(home.cbr.asked).toBe(0)
+  })
+
+  it('скачок меряется по его же курсам, а не по ЦБ РА', async () => {
+    const own = ['2026-09-15', '2026-09-16', '2026-09-17'].map((date): CachedRate => ({
+      provider: 'nbg',
+      currency: 'RUB',
+      date,
+      scaled: 4_348_000n,
+      jump: false,
+    }))
+    const home = homeHarness({ cached: own })
+    home.state.rub = 6_000_000n
+    await home.run()
+    const written = home.cache.find(
+      (row) => row.provider === 'nbg' && row.currency === 'RUB' && row.date === SATURDAY,
+    )
+    expect(written?.jump).toBe(true)
+  })
+
+  it('после выкатки скачок не меряется по 2022 году: в своих пяти — только неделя (адверсариальный А)', async () => {
+    // Рубль весной 2022 по НБГ — 6,29 ֏, сегодня — 4,35: треть разницы, но это не скачок.
+    const old = ['2022-04-28', '2022-04-29', '2022-04-30'].map((date): CachedRate => ({
+      provider: 'nbg',
+      currency: 'RUB',
+      date,
+      scaled: 6_286_000n,
+      jump: false,
+    }))
+    const home = homeHarness({ cached: old })
+    await home.run()
+    const written = home.cache.find(
+      (row) => row.provider === 'nbg' && row.currency === 'RUB' && row.date === SATURDAY,
+    )
+    expect(written?.jump).toBe(false)
+  })
+
+  it('после праздника скачок меряется: своих за две недели хватает (адверсариальный Г)', async () => {
+    // Как 15.04.2026 после Пасхи: за неделю своих два, за две — пять. Рубль с запятой не там.
+    const own = ['2026-09-07', '2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11'].map(
+      (date): CachedRate => ({
+        provider: 'nbg',
+        currency: 'RUB',
+        date,
+        scaled: 4_348_000n,
+        jump: false,
+      }),
+    )
+    expect(COUNTRY_JUMP_DAYS).toBe(14)
+    const home = homeHarness({ cached: own })
+    home.state.rub = 43_480_000n
+    await home.run()
+    const written = home.cache.find(
+      (row) => row.provider === 'nbg' && row.currency === 'RUB' && row.date === SATURDAY,
+    )
+    expect(written?.jump).toBe(true)
+  })
+
+  it('архив: сначала последний месяц, потом история с начала, каждая порция — с места прошлой', async () => {
+    const home = homeHarness()
+    await home.run()
+    expect(home.askedOn[0]).toBe('2026-08-19')
+    expect(home.askedOn).toHaveLength(ARCHIVE_RECENT_DAYS + 1)
+    // Вчерашний курс НБГ есть сразу после первого прохода: трата вчерашнего дня возьмёт его.
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-18')).toBe(true)
+    home.pass(HOUR)
+    await home.run()
+    expect(home.askedOn[ARCHIVE_RECENT_DAYS + 1]).toBe(OFFICIAL_HISTORY_FROM)
+    expect(home.askedOn).toHaveLength(ARCHIVE_RECENT_DAYS + 1 + ARCHIVE_DAYS_PER_RUN)
+    const last = home.askedOn.at(-1) ?? ''
+    home.pass(HOUR)
+    await home.run()
+    expect(home.askedOn[ARCHIVE_RECENT_DAYS + 1 + ARCHIVE_DAYS_PER_RUN]).toBe(
+      new Date(Date.parse(`${last}T00:00:00.000Z`) + 86_400_000).toISOString().slice(0, 10),
+    )
+  })
+
+  it('дошёл до сегодня — следующий раз через сутки и только последний месяц', async () => {
+    const home = homeHarness()
+    // A walk cut short goes on at the next run, whenever it comes: a minute apart keeps the day.
+    for (let run = 0; run < 25; run += 1) {
+      await home.run()
+      home.pass(60_000)
+    }
+    expect(home.warnings).toEqual([])
+    // Каждый день от начала истории спрошен; повторно — только дни последнего месяца.
+    const asked = new Set(home.askedOn)
+    for (
+      let day = OFFICIAL_HISTORY_FROM;
+      day <= SATURDAY;
+      day = new Date(Date.parse(`${day}T00:00:00.000Z`) + 86_400_000).toISOString().slice(0, 10)
+    ) {
+      expect(asked.has(day), day).toBe(true)
+    }
+    const repeated = home.askedOn.filter((day, index) => home.askedOn.indexOf(day) !== index)
+    expect(repeated.every((day) => day >= '2026-08-19')).toBe(true)
+    // Воскресенье спрошено, но его ответ — суббота: строки воскресенья нет.
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-13')).toBe(
+      false,
+    )
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-12')).toBe(true)
+    const rested = home.askedOn.length
+    await home.run()
+    expect(home.askedOn).toHaveLength(rested)
+    home.pass(HISTORY_EVERY_MS)
+    await home.run()
+    expect(home.askedOn.length - rested).toBe(ARCHIVE_RECENT_DAYS + 1)
+  })
+
+  it('банк висел три недели и заговорил: дыру нечем заполнить — проход отдыхает (ревью 7)', async () => {
+    const home = homeHarness()
+    // С 20.08 по 13.09 на каждый день банк отвечал курсом 19.08; с 14.09 заговорил.
+    home.override((day) =>
+      day >= '2026-08-20' && day <= '2026-09-13' ? '2026-08-19' : inForce(day),
+    )
+    for (let run = 0; run < 25; run += 1) {
+      await home.run()
+      home.pass(60_000)
+    }
+    expect(home.warnings).toEqual([])
+    const settled = home.askedOn.length
+    for (let hour = 0; hour < 6; hour += 1) {
+      home.pass(HOUR)
+      await home.run()
+    }
+    expect(home.askedOn).toHaveLength(settled)
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-14')).toBe(true)
+  })
+
+  it('банк застыл и оттаял: его настоящие дни приходят на следующий день (адверсариальный, раунд 5, П3)', async () => {
+    const home = homeHarness()
+    const frozen = (day: string) =>
+      day >= '2026-08-20' && day <= '2026-09-13' ? '2026-08-19' : inForce(day)
+    home.override(frozen)
+    for (let run = 0; run < 25; run += 1) {
+      await home.run()
+      home.pass(60_000)
+    }
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-01')).toBe(
+      false,
+    )
+    // Архив оттаял: эти дни у банка есть. Взгляд назавтра их приносит.
+    home.override(inForce)
+    home.pass(HISTORY_EVERY_MS)
+    await home.run()
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-01')).toBe(true)
+  })
+
+  it('давняя дыра банка не гонит проход от неё до сегодня каждые сутки (ревью 8)', async () => {
+    const home = homeHarness()
+    // В марте 2024 банк висел три недели: на каждый день отвечал курсом 29.02.2024.
+    home.override((day) =>
+      day >= '2024-03-01' && day <= '2024-03-21' ? '2024-02-29' : inForce(day),
+    )
+    for (let run = 0; run < 25; run += 1) {
+      await home.run()
+      home.pass(60_000)
+    }
+    const perDay: number[] = []
+    for (let dayOf = 0; dayOf < 3; dayOf += 1) {
+      const before = home.askedOn.length
+      for (let hour = 0; hour < 24; hour += 1) {
+        home.pass(HOUR)
+        await home.run()
+      }
+      perDay.push(home.askedOn.length - before)
+    }
+    // Только суточный взгляд на месяц (с днями перед ним), а не проход от марта 2024.
+    expect(perDay.every((asked) => asked <= ARCHIVE_RECENT_DAYS + 1 + ARCHIVE_GAP_DAYS)).toBe(true)
+    expect(home.warnings).toEqual([])
+  })
+
+  it('архив отдал завтрашний курс на сегодня — день пропущен, проход не отвергнут; позже завтра — отвергнут', async () => {
+    const tomorrow = '2026-09-20'
+    const home = homeHarness({ cached: [], failOn: null })
+    const answers = new Map<string, string>([[SATURDAY, tomorrow]])
+    home.override((day) => answers.get(day) ?? inForce(day))
+    for (let run = 0; run < 20; run += 1) {
+      await home.run()
+      home.pass(60_000)
+    }
+    expect(home.warnings.map((warning) => warning.message)).not.toContain('official history failed')
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date === '2026-09-18')).toBe(true)
+
+    const broken = homeHarness()
+    broken.override(() => '2026-09-25')
+    await broken.run()
+    expect(broken.warnings.map((warning) => warning.message)).toContain('official history failed')
+  })
+
+  it('сбой посреди порции — строка в логе, порция не пишется, повтор через шесть часов с того же места', async () => {
+    const home = homeHarness({ failOn: '2022-01-05' })
+    await home.run()
+    expect(home.warnings).toEqual([])
+    home.pass(60_000)
+    await home.run()
+    expect(home.warnings.map((warning) => warning.message)).toContain('official history failed')
+    expect(home.cache.some((row) => row.provider === 'nbg' && row.date < '2026-01-01')).toBe(false)
+    const asked = home.askedOn.length
+    home.pass(HISTORY_RETRY_MS - 1)
+    await home.run()
+    expect(home.askedOn).toHaveLength(asked)
+    home.pass(1)
+    await home.run()
+    expect(home.askedOn[asked]).toBe(OFFICIAL_HISTORY_FROM)
   })
 })

@@ -119,6 +119,17 @@ describe('formatMoney', () => {
     expect(formatMoney(money(540312n, 'AMD'))).not.toContain('AMD')
   })
 
+  it('печатает лари знаком ₾ в обоих языках, а не «ლ» русского CLDR (MOL-110)', () => {
+    for (const locale of ['ru-RU', 'en-US']) {
+      expect(formatMoney(money(345n, 'GEL'), locale)).toContain('₾')
+      expect(formatMoney(money(345n, 'GEL'), locale)).not.toContain('ლ')
+      expect(formatEstimate(money(34_550n, 'GEL'), locale)).toContain('₾')
+      expect(currencySign('GEL', locale)).toBe('₾')
+    }
+    expect(digits(formatMoney(money(345n, 'GEL')))).toBe('3,45₾')
+    expect(currencySign('AMD')).toBe('֏')
+  })
+
   it('stays exact past 2^53 instead of drifting or printing infinity', () => {
     // The only bridge from bigint to float used to be here, and it failed quietly.
     const huge = money(9_007_199_254_740_993n, 'USD')

@@ -93,9 +93,9 @@ describe('actorCodec', () => {
     delete withoutCity.city
 
     expect(actorWireSchema.safeParse(withoutCity).success).toBe(false)
-    // GEL is in the Google Sheet the project grew out of and deliberately not in the schema:
-    // a fifth currency is a migration plus four CHECK constraints, not a wire concern.
-    expect(actorCodec.safeParse({ ...wire, spendCurrency: 'GEL' }).success).toBe(false)
+    // A currency is a migration plus its CHECK constraints, not a wire concern: the lari came so
+    // (MOL-110), and the pound, which nobody asked for, is refused.
+    expect(actorCodec.safeParse({ ...wire, spendCurrency: 'GBP' }).success).toBe(false)
   })
 
   it('keeps the granted access on the server — the allowlist never named it', () => {

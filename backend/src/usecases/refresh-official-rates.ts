@@ -1,4 +1,5 @@
 import {
+  COUNTRY_BANKS,
   RATE_JUMP_HISTORY,
   RATE_JUMP_MIN_HISTORY,
   isRateFresh,
@@ -6,7 +7,7 @@ import {
   yerevanDate,
   describeFailure,
 } from '@molvia/model'
-import type { AmdRate, CachedRate } from '@molvia/model'
+import type { AmdRate, CachedRate, RateProvider } from '@molvia/model'
 import type { PastRate, RateRepository } from '@/db/rates-repository'
 import { FOREIGN, FeedError } from '@/rates/feed'
 import type { Published, RateFeed } from '@/rates/feed'
@@ -34,6 +35,114 @@ export const HISTORY_EVERY_MS = 24 * 60 * 60 * 1000
  */
 export const HISTORY_RETRY_MS = 6 * 60 * 60 * 1000
 
+/**
+ * How many days of a country bank's archive one run asks for (MOL-110, Р-5): the archive answers one
+ * day a request, some 0,4 s each, and the market waits behind the official refresh in the same run —
+ * so the two years since 2022 come in over some fifteen hourly runs, not in one of twelve minutes.
+ */
+export const ARCHIVE_DAYS_PER_RUN = 120
+
+/**
+ * A stretch of the archive longer than this with no day of the bank's is a hole to walk again: no
+ * holiday of a central bank is so long — the longest stretch without a rate in the National Bank of
+ * Georgia's archive of 2022–2026 is six days, Easter 2026 (every day asked, 05.10.2026).
+ */
+export const ARCHIVE_GAP_DAYS = 10
+
+/** With no hole, how far back the daily walk still looks: a failed week closes itself. */
+export const ARCHIVE_RECENT_DAYS = 31
+
+/**
+ * How long a day the archive answered with an earlier one is asked again every day (review 7, 8,
+ * adversarial round 5, П3): a quarter. A bank frozen up to that long gives its days back the day
+ * after it thaws, for at most a portion a day; a stretch older stays known until a restart of the
+ * API — forgotten daily, a hole of 2024 cost some nine hundred requests a day, and growing.
+ */
+export const ARCHIVE_THAW_DAYS = 90
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function dayAfter(day: string, days = 1): string {
+  return new Date(Date.parse(`${day}T00:00:00.000Z`) + days * DAY_MS).toISOString().slice(0, 10)
+}
+
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(to) - Date.parse(from)) / DAY_MS)
+}
+
+/** Where a walk of a country bank's archive starts, and whether it is only the daily look back. */
+export interface ArchiveWalk {
+  readonly from: string
+  /** No hole was found: walked through to today, the archive is whole until tomorrow's look. */
+  readonly whole: boolean
+}
+
+/**
+ * The day after the first hole of `days` — sorted, from `start` — longer than `ARCHIVE_GAP_DAYS`:
+ * before the first of them, or between two of them. Never after the last (review 5): a bank stuck on
+ * an old date answers every day with it, and a tail to today counted as a hole was walked every hour,
+ * thirty-two requests that wrote nothing, and the history never reached while it hung. The hourly
+ * answer writes today's day the moment the bank speaks, and that makes the hole between two days.
+ */
+function firstHole(days: readonly string[], start: string): string | null {
+  const [first] = days
+  if (first === undefined || daysBetween(start, first) > ARCHIVE_GAP_DAYS) return start
+  return holeBetween(days)
+}
+
+/** The day after the first stretch longer than `ARCHIVE_GAP_DAYS` between two of `days`, sorted. */
+function holeBetween(days: readonly string[]): string | null {
+  for (const [index, day] of days.entries()) {
+    const next = days[index + 1]
+    if (next !== undefined && daysBetween(day, next) > ARCHIVE_GAP_DAYS) return dayAfter(day)
+  }
+  return null
+}
+
+/**
+ * Where the archive of a country bank is walked from (MOL-110, Р-5), given the days of it the cache
+ * holds. **The last month first** (review 2, adversarial А): a spending of yesterday keeps the rate
+ * it is written with for good, and the bank's own five are what a new rate is judged by — walked
+ * from 2022, both were a year and a half old for the hours of the walk. Then the day after the first
+ * hole of the history — so a walk cut short by `ARCHIVE_DAYS_PER_RUN` or by a failure goes on where
+ * it stopped. With no hole, the last month again: the daily look back.
+ */
+export function archiveWalkFrom(kept: readonly string[], from: string, today: string): ArchiveWalk {
+  const days = [...new Set(kept)].filter((day) => day >= from && day <= today).sort()
+  const recent = dayAfter(today, -ARCHIVE_RECENT_DAYS)
+  const start = recent > from ? recent : from
+  const inMonth = days.filter((day) => day >= start)
+  const before = days.filter((day) => day < start).at(-1)
+  // A bank's last day close before the month starts the month's walk at the day after it
+  // (adversarial round 4, Е): walked from the month's first day, the stretch between was no longer
+  // than a holiday, and never asked for.
+  const near =
+    before !== undefined && daysBetween(before, start) <= ARCHIVE_GAP_DAYS ? before : null
+  const monthFrom = near === null ? start : dayAfter(near)
+  // A month with no day of the bank's, after one before it, is the tail of a bank silent for over a
+  // month — never the month's hole (adversarial round 3, Д): counted so, a bank stuck on a day of
+  // the month before was walked every hour, and the history never came. A month the bank speaks in
+  // again is walked first, however long the history's hole before it (round 4).
+  const lastMonth =
+    inMonth.length === 0 && before !== undefined
+      ? null
+      : near === null
+        ? firstHole(inMonth, start)
+        : firstHole([near, ...inMonth], near)
+  if (lastMonth !== null) return { from: monthFrom, whole: false }
+  const history = firstHole(days, from)
+  return history === null ? { from: monthFrom, whole: true } : { from: history, whole: false }
+}
+
+/**
+ * How far back a country bank's own rates count for its jump (MOL-110, adversarial А and Г): a
+ * fortnight. A week left the first working days after a holiday unjudged — Easter 2026 has six days
+ * with no rate, and the 15th of April had two of its own within a week — and with no stand-in, as
+ * the open sources have the central bank, «fewer than three» meant a comma in the wrong place went
+ * unmarked. Longer than any stretch of the archive without a rate, and nowhere near 2022.
+ */
+export const COUNTRY_JUMP_DAYS = 14
+
 export interface RefreshLog {
   warn(details: object, message: string): void
 }
@@ -43,11 +152,22 @@ export interface RateHistoryFeed {
   fetchRange(from: string, to: string): Promise<readonly AmdRate[]>
 }
 
+/**
+ * A country's own central bank (MOL-110): asked every hour beside the Central Bank of Armenia, its
+ * archive walked a day a request — the National Bank of Georgia answers any day with the rate in
+ * force on it, and no range.
+ */
+export interface HomeBankFeed extends RateFeed {
+  fetchOn(date: string): Promise<Published>
+}
+
 export interface RefreshDeps {
   /** The Central Bank of Armenia — asked first on every refresh, whatever happened before. */
   readonly primary: RateFeed
   /** Open sources in order of trust: the Bank of Russia, then the aggregator. */
   readonly fallbacks: readonly RateFeed[]
+  /** The country banks of `HOME_BANK`, asked every hour, whatever the others did (MOL-110). */
+  readonly homeBanks?: readonly HomeBankFeed[]
   readonly rates: Pick<RateRepository, 'upsert' | 'latestOnOrBefore' | 'history'>
   readonly log: RefreshLog
   readonly now?: () => Date
@@ -108,6 +228,7 @@ export function missingDays(
 export function officialRatesRefresh({
   primary,
   fallbacks,
+  homeBanks = [],
   rates,
   log,
   now = () => new Date(),
@@ -115,6 +236,24 @@ export function officialRatesRefresh({
 }: RefreshDeps): () => Promise<void> {
   let failures = 0
   let historyAt: number | null = null
+  /** When each country bank's archive was last walked through to today, or last failed. */
+  const archiveAt = new Map<RateProvider, number>()
+  /**
+   * Where a walk cut short by `ARCHIVE_DAYS_PER_RUN` goes on: the day after the last one asked. The
+   * cache cannot say it — a Sunday asked is written as the Saturday it answers with, and the walk
+   * would ask the Sunday again.
+   */
+  const archiveNext = new Map<RateProvider, string>()
+  /**
+   * The days a country bank has no rate of its own, as its archive said: asked, it answered with an
+   * earlier day — a weekend, a holiday, the days it hung on one date (review 7). Known, they are no
+   * hole: a bank that hung for weeks and spoke again left a stretch no walk can fill, and counted a
+   * hole it was walked every hour for ever. A day of the last `ARCHIVE_THAW_DAYS` until the next
+   * day's look: a bank frozen for a while answers so for days it does have, and they come back once it
+   * thaws; an older one until a restart. In memory, as `archiveNext`: after a restart one walk asks the stretch
+   * again and knows it again.
+   */
+  const archiveEmpty = new Map<RateProvider, Set<string>>()
 
   /**
    * The history, once a day (MOL-137, Р-4): the whole archive since 2022 in one answer — a fifth
@@ -160,6 +299,96 @@ export function officialRatesRefresh({
   }
 
   /**
+   * A country bank's archive (MOL-110, Р-5), a day a request from `archiveWalkFrom`, at most
+   * `ARCHIVE_DAYS_PER_RUN` of them: only the days the cache lacks are written, each judged for a
+   * jump among the bank's own as `missingDays` judges the central bank's. Walked through to today,
+   * it is walked again a day later, the last month only; cut short, the next run goes on; a failure
+   * is a line in the log and is asked again in six hours, as the central bank's archive is.
+   */
+  async function walkArchive(bank: HomeBankFeed, today: string): Promise<void> {
+    if (!history) return
+    const at = archiveAt.get(bank.provider)
+    if (at !== undefined && now().getTime() - at < HISTORY_EVERY_MS) return
+    // A quarter's are known until the next day's look only (adversarial round 5, П3): a bank frozen
+    // for a while answers its stuck day for days it does have, and those come back once it thaws.
+    // Older ones until a restart (review 8): forgotten daily, a hole of 2024 sent the walk from it to
+    // today every day, a portion an hour — some nine hundred requests a day, and growing.
+    if (at !== undefined) {
+      const recent = dayAfter(today, -ARCHIVE_THAW_DAYS)
+      const empty = archiveEmpty.get(bank.provider)
+      for (const day of empty ?? []) if (day >= recent) empty?.delete(day)
+    }
+    try {
+      const kept = await history.rates.between(bank.provider, OFFICIAL_HISTORY_FROM, today)
+      const next = archiveNext.get(bank.provider)
+      const empty = archiveEmpty.get(bank.provider) ?? new Set<string>()
+      archiveEmpty.set(bank.provider, empty)
+      const walk: ArchiveWalk = next
+        ? { from: next, whole: false }
+        : archiveWalkFrom([...kept.map((row) => row.date), ...empty], OFFICIAL_HISTORY_FROM, today)
+      const start = walk.from
+      const days: string[] = []
+      for (
+        let day = start;
+        day <= today && days.length < ARCHIVE_DAYS_PER_RUN;
+        day = dayAfter(day)
+      ) {
+        days.push(day)
+      }
+      const answers = new Map<string, readonly AmdRate[]>()
+      const none: string[] = []
+      for (const day of days) {
+        const answer = await bank.fetchOn(day)
+        // Tomorrow is a bank setting its rate the evening before — the hourly answer writes it; past
+        // tomorrow is the archive being wrong (Р-25), and refuses the walk.
+        if (answer.date > today) {
+          if (isRateFresh(answer.date, today)) continue
+          throw new FeedError(bank.provider, `archive: ${answer.date} is in the future`)
+        }
+        answers.set(answer.date, answer.rates)
+        // Today is left out: the hourly answer may still bring a rate the archive does not have yet.
+        if (answer.date < day && day < today) none.push(day)
+      }
+      const missing = missingDays([...answers.values()].flat(), kept)
+      for (const rate of missing.filter((row) => row.jump)) {
+        log.warn(
+          {
+            provider: rate.provider,
+            currency: rate.currency,
+            date: rate.date,
+            scaled: String(rate.scaled),
+          },
+          'official rate jumped',
+        )
+      }
+      await history.rates.insertMissing(missing)
+      // Known only with the days around them written: a walk that failed halfway left an earlier
+      // day unwritten beside them, and that day would read as no hole.
+      for (const day of none) empty.add(day)
+      const last = days.at(-1)
+      if (last !== undefined && last < today) {
+        archiveNext.set(bank.provider, dayAfter(last))
+      } else {
+        archiveNext.delete(bank.provider)
+      }
+      // Rested until tomorrow only once a look found nothing to fill; the last month walked first
+      // goes on into the history at the next run (review 2).
+      if (walk.whole) archiveAt.set(bank.provider, now().getTime())
+      else archiveAt.delete(bank.provider)
+    } catch (error) {
+      archiveNext.delete(bank.provider)
+      archiveAt.set(bank.provider, now().getTime() - HISTORY_EVERY_MS + HISTORY_RETRY_MS)
+      log.warn(
+        {
+          provider: bank.provider,
+          ...(error instanceof FeedError ? { reason: error.message } : describeFailure(error)),
+        },
+        'official history failed',
+      )
+    }
+  }
+
+  /**
    * The provider's answer, or null — its failure logged, with how old the cache already is. An
    * answer dated past tomorrow is a failure too (Р-25): `9999-12-31` is a .NET service's «no
    * date», it would look fresh for ever, and no trip could take it.
@@ -195,15 +424,20 @@ export function officialRatesRefresh({
   }
 
   /**
-   * What a new rate is measured against for a jump (Р-19, Р-22). The central bank, by its own
-   * latest rates. An open source is asked only while the central bank is silent, so its own
-   * history is an earlier episode, often months old — or nothing, exactly when a trip is about to
-   * take it: without three of its own from the last week, it is measured against the central
-   * bank's latest, in the same unit.
+   * What a new rate is measured against for a jump (Р-19, Р-22). The Central Bank of Armenia by its
+   * own latest rates: its archive comes whole in one answer. A country bank of `HOME_BANK` by its own
+   * of the last `COUNTRY_JUMP_DAYS`, and with fewer than three of them by nothing (MOL-110,
+   * adversarial А, Г): its
+   * archive comes a day a request, and right after a deploy «its own latest» were days of 2022 —
+   * a rouble a third dearer, today's true rate marked a jump. An open source is asked only while
+   * the central bank is silent, so its own history is an earlier episode, often months old — or
+   * nothing, exactly when a trip is about to take it: without three of its own from the last week,
+   * it is measured against the central bank's latest, in the same unit.
    */
   async function referenceFor(answer: Published): Promise<ReadonlyMap<string, readonly bigint[]>> {
     const currencies = answer.rates.map((rate) => rate.currency)
     const own = await rates.history(answer.provider, currencies, answer.date)
+    const country = COUNTRY_BANKS.has(answer.provider)
     const central =
       answer.provider === 'cba' ? own : await rates.history('cba', currencies, answer.date)
     const values = (past: readonly PastRate[] | undefined) => (past ?? []).map((row) => row.scaled)
@@ -211,6 +445,12 @@ export function officialRatesRefresh({
     return new Map(
       currencies.map((currency) => {
         if (answer.provider === 'cba') return [currency, values(own.get(currency))]
+        if (country) {
+          const fortnight = (own.get(currency) ?? []).filter(
+            (row) => daysBetween(row.date, answer.date) <= COUNTRY_JUMP_DAYS,
+          )
+          return [currency, values(fortnight)]
+        }
         const recent = (own.get(currency) ?? []).filter((row) => isRateFresh(row.date, answer.date))
         return [
           currency,
@@ -273,6 +513,14 @@ export function officialRatesRefresh({
       failures += 1
     }
     await fillHistory(today)
+
+    // A country bank is asked whatever the central bank did: it is the official source of its own
+    // pairs, and nothing stands in for it but the others' rows already in the cache (MOL-110, Р-4).
+    for (const bank of homeBanks) {
+      const answer = await fetchFrom(bank, today, null)
+      if (answer) await store(answer)
+      await walkArchive(bank, today)
+    }
 
     const centralDate = central?.date ?? lastKnown
     const stale = centralDate !== null && !isRateFresh(centralDate, today)

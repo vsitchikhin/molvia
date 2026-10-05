@@ -24,8 +24,10 @@ const TRIP = 'bbbbbbbb-0000-4000-8000-000000000001'
 
 interface Over {
   readonly source?: 'official' | 'fallback' | 'personal'
-  readonly provider?: 'cba' | 'cbr' | 'erapi' | null
+  readonly provider?: 'cba' | 'cbr' | 'erapi' | 'nbg' | null
   readonly stale?: boolean
+  /** A trip in Tbilisi: lari against roubles, the National Bank of Georgia's pair (MOL-110). */
+  readonly lari?: boolean
   readonly jump?: {
     previous?: string | null
     choice?: 'jumped' | 'previous' | 'manual' | null
@@ -33,9 +35,9 @@ interface Over {
   }
 }
 
-const rate = (value: string, source = 'official') => ({
+const rate = (value: string, source = 'official', quote = 'AMD') => ({
   base: 'RUB',
-  quote: 'AMD',
+  quote,
   rate: value,
   source,
   asOf: '2026-01-15T12:00:00.000Z',
@@ -47,8 +49,8 @@ function trip(over: Over = {}): TripView {
     id: TRIP,
     startedAt: '2026-01-16T08:00:00.000Z',
     finishedAt: null,
-    currency: 'AMD',
-    rate: rate('4.82', source),
+    currency: over.lari ? 'GEL' : 'AMD',
+    rate: over.lari ? rate('0.0312', source, 'GEL') : rate('4.82', source),
     rateProvider: over.provider === undefined ? 'cba' : over.provider,
     rateJump: over.jump
       ? {
@@ -144,6 +146,26 @@ describe('TripRateNotes', () => {
     const fallback = await render({ stale: true, source: 'fallback', provider: 'cbr' })
     expect(fallback.text()).not.toContain('ЦБ РА ничего не публиковал')
     expect(fallback.text()).toContain('свежее никто ничего не опубликовал')
+  })
+
+  describe('лари — банк пары НБ Грузии (MOL-110)', () => {
+    it('курс НБ Грузии у похода в лари — без слова, как ЦБ РА у драма', async () => {
+      const view = await render({ lari: true, provider: 'nbg' })
+      expect(view.findAll('.note')).toHaveLength(0)
+    })
+
+    it('ЦБ РА у похода в лари — запасной: молчит НБ Грузии, источник — ЦБ РА', async () => {
+      const view = await render({ lari: true, source: 'fallback', provider: 'cba' })
+      expect(plain(view)).toContain(
+        'Курс не от НБ Грузии — он молчит больше недели. Источник: ЦБ РА',
+      )
+    })
+
+    it('«устарел» у курса НБ Грузии называет НБ Грузии', async () => {
+      const view = await render({ lari: true, provider: 'nbg', stale: true })
+      expect(view.text()).toContain('с тех пор НБ Грузии ничего не публиковал')
+      expect(view.text()).not.toContain('ЦБ РА')
+    })
   })
 
   describe('скачок', () => {

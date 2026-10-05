@@ -6,7 +6,7 @@ import {
   scaledFromDecimal,
 } from '#model/support/decimal'
 import { DomainError, ERROR, ISSUE } from '#model/support/errors'
-import { MINOR_EXPONENT, currencySchema } from './money'
+import { MINOR_EXPONENT, currencySchema, formatInCurrency } from './money'
 import type { Currency, Money } from './money'
 
 export const baseUnitSchema = z.enum(['kg', 'l', 'piece'])
@@ -144,13 +144,10 @@ export function formatUnitPrice(price: UnitPrice, locale = 'ru-RU'): string {
     price.scaledMinor,
     UNIT_PRICE_DIGITS + MINOR_EXPONENT[price.currency],
   )
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency: price.currency,
-    currencyDisplay: 'narrowSymbol',
+  return formatInCurrency(major, price.currency, locale, {
     minimumFractionDigits: exponent,
     maximumFractionDigits: exponent,
-  }).format(major)
+  })
 }
 
 /**

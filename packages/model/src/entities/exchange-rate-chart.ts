@@ -2,7 +2,8 @@ import { CHART_LEVEL, hundredthsOf } from '#model/entities/money-charts'
 import { divideRounded } from '#model/support/decimal'
 import { currencySchema } from '#model/values/money'
 import type { Currency } from '#model/values/money'
-import { marketSideOf } from '#model/values/market-rates'
+import { MARKET_CURRENCIES, marketSideOf } from '#model/values/market-rates'
+import type { MarketCurrency } from '#model/values/market-rates'
 import type {
   ForeignCurrency,
   MarketChannel,
@@ -190,11 +191,17 @@ export function stepRate(rows: readonly MarketRate[], end: string): MarketRate |
   return latest
 }
 
+function isMarketCurrency(currency: Currency): currency is MarketCurrency {
+  return MARKET_CURRENCIES.some((known) => known === currency)
+}
+
 /**
  * Which pairs the chart offers (Р-5), the currency of conversion first, and the side of each (В-2):
  * every currency changed against the dram in the window, on the side of its latest exchange — the
  * list comes newest first, so the first met of a day is the latest. With none, the currency of
  * conversion on the side of selling it, when it is not the dram: a newcomer sees the line alone.
+ * Only a currency of the market's files has a line (`MARKET_CURRENCIES`, MOL-110): an exchange of
+ * lari for drams is left out, or it would take the rouble's line away and draw nothing (adversarial В).
  */
 export function rateChartPairs(
   exchanges: readonly Pick<RateChartExchangeInput, 'exchangedOn' | 'given' | 'received'>[],
@@ -206,13 +213,15 @@ export function rateChartPairs(
   for (const exchange of exchanges) {
     if (exchange.exchangedOn < from || exchange.exchangedOn > today) continue
     const pair = marketSideOf(exchange.given.currency, exchange.received.currency)
-    if (!pair) continue
+    if (!pair || !isMarketCurrency(pair.currency)) continue
     const held = sides.get(pair.currency)
     if (!held || exchange.exchangedOn > held.day) {
       sides.set(pair.currency, { side: pair.side, day: exchange.exchangedOn })
     }
   }
-  if (sides.size === 0) return income === 'AMD' ? [] : [{ currency: income, side: 'bankBuys' }]
+  if (sides.size === 0) {
+    return isMarketCurrency(income) ? [{ currency: income, side: 'bankBuys' }] : []
+  }
   const order = (currency: Currency) =>
     currency === income ? -1 : currencySchema.options.indexOf(currency)
   return [...sides.entries()]

@@ -245,7 +245,7 @@ import SpendingSheet from '@/components/SpendingSheet.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
 import { pageOrder } from '@/components/accounts'
-import { budgetAmount, rateWords } from '@/components/spending'
+import { bankWords, budgetAmount, rateWords } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
 import { useReconnect } from '@/composables/useReconnect'
 import { calendarDay } from '@/days'
@@ -424,9 +424,13 @@ export default defineComponent({
         const date = calendarDay(lastDayOf(value.month), locale.value)
         return t('spending.rate_frozen', { date, rate })
       }
-      return value.rate.source === 'personal'
-        ? t('spending.rate_live_mine', { rate })
-        : t('spending.rate_live_official', { rate })
+      if (value.rate.source === 'personal') return t('spending.rate_live_mine', { rate })
+      // A fallback is not the pair's bank, and the month does not say whose it is (MOL-110, review 1):
+      // the bank is named as the one that is silent, never as the source.
+      const bank = bankWords(value.rate.base, value.rate.quote, t)
+      return value.rate.source === 'fallback'
+        ? t('spending.rate_live_fallback', { rate, bank })
+        : t('spending.rate_live_official', { rate, bank })
     })
 
     /**

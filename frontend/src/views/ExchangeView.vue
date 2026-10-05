@@ -53,7 +53,7 @@
         tone="accent"
         :icon="IconSwap"
         :title="t('exchange.empty.title')"
-        :body="t('exchange.empty.body')"
+        :body="t('exchange.empty.body', { bank })"
       >
         <template #action>
           <AppButton block :inactive="!online" @click="compose">
@@ -85,7 +85,9 @@
             <p class="meta">
               {{ t(basisKey(overview.wallet.basis), { date: dayOf(overview.wallet.rate.asOf) }) }}
             </p>
-            <p v-if="overview.wallet.estimated" class="meta">{{ t('exchange.estimated') }}</p>
+            <p v-if="overview.wallet.estimated" class="meta">
+              {{ t('exchange.estimated', { bank }) }}
+            </p>
           </template>
           <!-- Exchanges of the spending currency are there, its cost is not: the words say why, not
                «no exchanges yet» above a list of them (review С-4). -->
@@ -132,7 +134,7 @@
             :disabled="!online || busy"
             @update:model-value="choose"
           />
-          <p v-if="overview.pair" class="meta">{{ t('exchange.preference_hint') }}</p>
+          <p v-if="overview.pair" class="meta">{{ t('exchange.preference_hint', { bank }) }}</p>
         </AppCard>
 
         <p class="frozen"><IconCheck aria-hidden="true" />{{ t('money.rate_frozen') }}</p>
@@ -235,6 +237,7 @@ import { useExchanges } from '@/composables/useExchanges'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
+import { bankWords } from '@/components/spending'
 
 /**
  * «Обмен денег» (MOL-40), under «Деньги» since MOL-81: the person's own rate, which rate new trips take, and
@@ -352,16 +355,25 @@ export default defineComponent({
       window.removeEventListener('offline', follow)
     })
 
-    const preferenceOptions = [
+    /**
+     * The bank new trips take when no own rate is known: the one of the pair «Обмен денег» speaks of
+     * — the spending currency in the currency of conversion (MOL-110) — and the dram's otherwise.
+     */
+    const bank = computed(() => {
+      const pair = exchanges.overview.value?.pair
+      return pair ? bankWords(pair.base, pair.quote, t) : t('exchange.card_source_cba')
+    })
+    const preferenceOptions = computed(() => [
       { value: 'personal', label: t('exchange.preference_personal') },
-      { value: 'official', label: t('exchange.preference_official') },
-    ]
+      { value: 'official', label: t('exchange.preference_official', { bank: bank.value }) },
+    ])
 
     // The day a rate is dated by, as a calendar day of Yerevan (adversarial Ж).
     const dayOf = (when: Date): string => day(yerevanDate(when))
     const pairSigns = (pair: { base: Currency; quote: Currency }) => ({
       base: currencySign(pair.base, locale.value),
       quote: currencySign(pair.quote, locale.value),
+      bank: bankWords(pair.base, pair.quote, t),
     })
 
     /** Which money the rate was last taken from — an exchange or an income (MOL-66, Р-9). */
@@ -386,6 +398,8 @@ export default defineComponent({
       return t(old ? 'exchange.wallet_old_reckoning' : 'exchange.wallet_unknown', {
         ...words,
         given: currencySign(unknown.given, locale.value),
+        // The rate missing is the given currency's in the currency of conversion (MOL-110).
+        dayBank: bankWords(unknown.given, pair.base, t),
       })
     }
 
@@ -399,6 +413,7 @@ export default defineComponent({
       const words = {
         rate: rateOf(cost.rate),
         basis: t(basisKey(cost.basis), { date: dayOf(cost.rate.asOf) }),
+        bank: bankWords(cost.rate.base, cost.rate.quote, t),
       }
       return t(cost.estimated ? 'exchange.cost_line_estimated' : 'exchange.cost_line', words)
     }
@@ -450,6 +465,7 @@ export default defineComponent({
       confirmRemove,
       online,
       preferenceOptions,
+      bank,
       rateOf,
       dayOf,
       day,

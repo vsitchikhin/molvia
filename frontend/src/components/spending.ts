@@ -23,6 +23,7 @@ import {
   formatEstimate,
   formatMoney,
   formatRate,
+  homeBankOf,
   nextCategoryColour,
   TRIP_CATEGORY,
 } from '@molvia/model'
@@ -86,6 +87,15 @@ export function rateWords(
     amount: `${number} ${currencySign(rate.quote, locale)}`,
     sign: currencySign(rate.base, locale),
   })
+}
+
+/**
+ * The bank a pair's official rate is named by — «ЦБ РА», «НБ Грузии» (MOL-110, owner's decision
+ * В-2: the source is called by its bank): the domain's `homeBankOf`, by the name an exchange's card
+ * gives it, the one that stands at the head of a line and after «the» alike.
+ */
+export function bankWords(base: Currency, quote: Currency, t: (key: string) => string): string {
+  return t(`exchange.card_source_${homeBankOf(base, quote)}`)
 }
 
 /**

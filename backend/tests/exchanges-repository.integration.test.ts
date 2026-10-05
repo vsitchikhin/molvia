@@ -106,7 +106,7 @@ describe('exchanges: запись', () => {
     await expect(db.insert(exchanges).values({ ...row, givenMinor: 0n })).rejects.toThrow()
     await expect(db.insert(exchanges).values({ ...row, heldBeforeMinor: -1n })).rejects.toThrow()
     await expect(
-      db.insert(exchanges).values({ ...row, givenCurrency: 'GEL' as 'RUB' }),
+      db.insert(exchanges).values({ ...row, givenCurrency: 'GBP' as 'RUB' }),
     ).rejects.toThrow()
   })
 })

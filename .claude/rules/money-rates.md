@@ -81,6 +81,108 @@ snapshot, and an inverse or a cross is rounded there to the snapshot's six digit
   the same way (review П-4); a hole a failed week leaves closes
   itself within a day.
 
+## The lari and its own bank (MOL-110)
+
+**A currency's official rate is its own country's central bank's** (owner's decision В-1, 04.10.2026:
+«the first source of truth for a country's currency is that country's central bank»). The lari is
+the National Bank of Georgia's (`nbg`); the dram, the rouble, the dollar and the euro stay the Central
+Bank of Armenia's. `HOME_BANK` in the model is the one list, and `homeBankOf(base, quote)` the one
+rule: a pair with the lari — the NBG, any other — the CBA.
+
+- **`official` is the pair's own bank, `fallback` every other publisher** — the CBA too, for the lari.
+  `pickOfficialRate` takes the pair's bank while it is fresh (the week of MOL-39), else the freshest of
+  the rest that has both halves, the CBA, the Bank of Russia, er-api in that order on a tie. **A
+  country bank stands only for its own pairs** (plan Р-1, review 3): the NBG prints the dram per 1000
+  with four digits, five significant ones, so a pair of drams by it would be coarser than by the Bank
+  of Russia — it never takes one, the CBA silent or not. The trip's CHECK says the same in SQL, written
+  from `HOME_BANK` in the model's order, the base's bank before the quote's (`homeBankSql`), and
+  `tripSchema` in the domain.
+- **The NBG quotes everything in lari, the dram per 1000**, so every currency comes into drams inside
+  its one answer, as the Bank of Russia's does, and the cache stays «one currency against the dram».
+  The number is `rateFormated`, the decimal as the bank prints it; the day is the answer's `date`, the
+  day the rate is in force — set the evening before, a Saturday's holding to Monday's evening.
+- **Asked every hour, whatever the CBA did** (`homeBanks`): it is the official source of its pairs,
+  and nothing stands in for it but the others' rows already in the cache — the CBA writes the lari
+  every hour itself. **Its jump is judged by its own rows of the last fortnight
+  (`COUNTRY_JUMP_DAYS`), by none with fewer than three** (adversarial А, Г): its archive comes a day a
+  request, and right after a deploy «its own latest five» were days of 2022 — the rouble a third
+  dearer, today's true rate marked a jump, and a day last written in that window kept the mark for
+  good. A week was the first bound and left the first working days after a holiday unjudged — the
+  15th of April 2026, after Easter, had two of its own within a week — and a country bank has no
+  stand-in to be measured by, as the open sources have the central bank. It is never measured against
+  another bank.
+- **Its archive is walked a day a request** (В-3): the API answers any day with the rate in force on
+  it and has no range — measured. **The last `ARCHIVE_RECENT_DAYS` first** (review 2): a spending of
+  yesterday keeps the rate it is written with for good, and walked from 2022 the lari of last week
+  came some fifteen hours after the deploy — a spending written in those hours took the CBA's for
+  ever. Then the history since `OFFICIAL_HISTORY_FROM`, `ARCHIVE_DAYS_PER_RUN` (120) days a run — some
+  fifteen hourly runs for the two years, not twelve minutes in one, since the market waits behind the
+  official refresh — on from where the last run stopped (`archiveNext`, in memory: a Sunday asked is
+  written as its Saturday, and the cache would ask it again); then once a day the last month again,
+  and only a look that found no hole rests the walk until tomorrow. **A hole is between two days the
+  bank has, or before the first of them — never after the last** (review 5): a bank stuck on an old
+  date answers every day with it, and a tail to today counted as a hole was walked every hour for
+  nothing, the history never reached while it hung; the hourly answer writes today the moment it
+  speaks, and the hole is then between two days. **A month with no day of the bank's, after one
+  before it, is that same tail** (adversarial round 3, Д): a bank silent for over a month was walked
+  every hour again, thirty-two empty requests, and a history not walked yet never came; the stretch
+  from the bank's last day to the month is the history's to walk. **The month is walked from the day
+  after the bank's last day when that day is closer before it than `ARCHIVE_GAP_DAYS`** (round 4, Е):
+  walked from the month's first day, the stretch between was no longer than a holiday and never asked
+  for — after a stop of the API a little over a month with the bank silent in its first hour. **And
+  a month the bank speaks in again is walked first**, however long the history's hole before it: after
+  a stop of four months the last month no longer came with the last portion of the history. **Days
+  the archive answered with an earlier day are known, until the next day's look** (review 7,
+  adversarial round 5): a weekend, a holiday, the days a bank hung on one date. A bank that hung for
+  weeks and spoke again leaves a stretch no walk can fill, and counted a hole it was walked every hour
+  for ever; known for good, a bank that froze and thawed would never give back days it does have. So
+  a day of the last `ARCHIVE_THAW_DAYS` (a quarter) is known until the next day's look, and asked
+  again then — a bank frozen that long gives its days back the day after it thaws, for at most a
+  portion a day; an older one until a restart of the API (review 8): forgotten daily, a hole of 2024
+  sent the walk from it to today every day, a portion an hour, some nine hundred requests a day and
+  growing. **A restart is every deploy — every merge to `master` (MOL-90)**: with such a hole each
+  merge costs one walk from it to today, a portion an hour, a year after it some 365 requests. Only
+  a day asked when already older than the quarter is known so — a bank that thawed after a longer
+  freeze gives its days back at once, since the walk did not ask them while it stood (adversarial
+  round 7, П7). A month was the first bound and lost the days of a bank frozen for five weeks (adversarial
+  round 6, П3). Kept in memory
+  with `archiveNext`, and only for a walk whose days were written. After a restart the walk starts from the first hole
+  longer than `ARCHIVE_GAP_DAYS` (`archiveWalkFrom`): the longest stretch without
+  a rate in the archive of 2022–2026 is six days, Easter 2026 — measured on 05.10.2026, every day
+  asked. Only the days the cache lacks are written; a day the bank answers with tomorrow's rate, set
+  the evening before, is passed over; a failure is a line in the log and asked again in six hours, as
+  the CBA's archive.
+- **The CBA's archive carries the lari too**: every working day since 2022, the same days as the
+  dollar — measured on 04.10.2026 (1199 of 1199).
+- **The market is the three currencies of its files** (`MARKET_CURRENCIES`: RUB, USD, EUR), never every
+  currency of the product: none of the three files carries the lari, a reader asking for it would
+  refuse them all, and `market_rates` refuses it too. Lari against drams is «Без сравнения»; the block
+  «Курсы по данным ЦБ РА» keeps the three, and «Курс рубля за 12 месяцев» offers only them
+  (`rateChartPairs`, adversarial В): an exchange of lari took the rouble's line away and drew nothing.
+- **The words name the bank of the pair** (В-2): «ЦБ РА», «НБ Грузии», and a fallback by its own name —
+  `bankWords` on the phone, the domain's `homeBankOf` by the name of an exchange's card. The strings of
+  the market stay «ЦБ РА»: the market is Armenian only. The accounts' line names each bank once.
+  **Where a rate does not carry its publisher** — the month of «Деньги», the spending sheet, the
+  accounts — a fallback names the pair's bank as the one that is silent, never as its source: «По
+  курсу 0,0309 на сегодня — не от НБ Грузии: он молчит больше недели», and the accounts say «по курсу
+  дня» (review 1). Naming the fallback itself there would need the provider beside every rate
+  snapshot — a spending's, a month's — a column and a migration; a trip and an exchange's card carry
+  it and name it. «Часть — по курсу {bank}» on «Обмен денег» keeps the pair's bank: it is the official
+  rate of every day the wallet valued by, the pair's bank unless it was silent that week, and which
+  days were not is not in the wallet's answer.
+- **The price of the first hours, named** (adversarial round 2): the walk brings the last month in its
+  first run and the history over some fifteen; a spending dated earlier than a month back and written
+  in those hours takes the CBA's rate as a fallback and keeps it, though the NBG's of that day is on
+  its way.
+- **The price, named** (adversarial): a page of a build before MOL-110 reads an answer with `GEL` or
+  `nbg` by the strict schemas of its time and refuses it whole, as one before MOL-168 refused
+  `rateCharts` — until it takes the new version (`pwaUpdate.ts`). Only for someone who already wrote
+  the lari on another device.
+- **The sign is «₾» in every language** (`SIGN` in `money.ts`): Russian CLDR prints «ლ», an old letter.
+  No face of its own — it comes from the system font, as «₽» does.
+- **The dinar is MOL-230**: the National Bank of Serbia has neither the dram nor the lari, and gives a
+  program its rates only by a login on application; its open sources are that task's first step.
+
 ## The person's own rate, from exchanges
 
 **The person's own rate comes from exchanges, never from a number typed in (MOL-40).** The plan's

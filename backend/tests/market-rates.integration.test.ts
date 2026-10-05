@@ -105,6 +105,7 @@ describe('курсы рынка в базе (MOL-137)', () => {
     await expect(insert({ channel: 'interbank' })).rejects.toThrow()
     await expect(insert({ side: 'buy' })).rejects.toThrow()
     await expect(insert({ currency: 'AMD' })).rejects.toThrow()
+    // The lari is a currency of the product, never of the market's files (MOL-110).
     await expect(insert({ currency: 'GEL' })).rejects.toThrow()
     await expect(insert({ scaled: 0n })).rejects.toThrow()
   })

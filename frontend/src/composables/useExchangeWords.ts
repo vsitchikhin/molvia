@@ -1,7 +1,7 @@
 import { useI18n } from 'vue-i18n'
 import { formatRate, formatRateBeside, yerevanDate } from '@molvia/model'
 import type { ExchangeRate, ExchangeView } from '@molvia/model'
-import { asTyped } from '@/components/spending'
+import { asTyped, bankWords } from '@/components/spending'
 import { calendarDay } from '@/days'
 
 /** What the card of an exchange says of the central bank of its day, each part on its own line. */
@@ -38,6 +38,8 @@ export interface ExchangeWords {
   readonly rateLineOf: (exchange: ExchangeView) => string
   readonly officialOf: (exchange: ExchangeView) => OfficialWords | null
   readonly noOfficialOf: (exchange: ExchangeView) => string
+  /** The bank an exchange's pair is measured by, named — «ЦБ РА», «НБ Грузии» (MOL-110). */
+  readonly bankOf: (exchange: ExchangeView) => string
   readonly marketOf: (exchange: ExchangeView) => MarketWords | null
 }
 
@@ -97,7 +99,14 @@ export function useExchangeWords(): ExchangeWords {
 
   /** Why there is nothing to compare with — no rate of that day, or one in doubt (MOL-40, С-5). */
   function noOfficialOf(exchange: ExchangeView): string {
-    return t(exchange.officialDoubtful ? 'exchange.card_doubtful' : 'exchange.card_no_official')
+    return t(exchange.officialDoubtful ? 'exchange.card_doubtful' : 'exchange.card_no_official', {
+      bank: bankOf(exchange),
+    })
+  }
+
+  /** The bank the pair of an exchange is measured by, named (MOL-110). */
+  function bankOf(exchange: ExchangeView): string {
+    return bankWords(exchange.given.currency, exchange.received.currency, t)
   }
 
   /**
@@ -145,6 +154,7 @@ export function useExchangeWords(): ExchangeWords {
     rateLineOf,
     officialOf,
     noOfficialOf,
+    bankOf,
     marketOf,
   }
 }
