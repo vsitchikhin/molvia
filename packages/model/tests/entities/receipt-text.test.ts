@@ -1541,3 +1541,138 @@ describe('a fiscal till read by its class code: a code with no «Դաս» (MOL-2
     }
   })
 })
+
+describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
+  // the forms are the bench's ten receipts of one sole trader (am-15…am-24), every name and number made up
+  const reading = (...rows: string[]): TextRow[] =>
+    rows.map((text, line) => ({ text, part: 0, line }))
+  const bold = (tinWord: string, total: string, paid: string) =>
+    reading(
+      'ԽԱՆՈՒԹ ԱՁ',
+      'ԳՅՈՒՄՐԻ Աբովյան 10',
+      `${tinWord}: 12345678 Գ/Ը: 87654321`,
+      'ՍԸ: NCC100000001',
+      'ԿԸ: 00000049',
+      '04-10-26 16:30:59 ԳԱՆՋԱՊԱԸ: 3',
+      'Բաժին 1 - Բաժին 1',
+      '/ Շրջանառության Ըարկ/ 1700.00',
+      'Որից ԱԱԸ՝ 0.00',
+      '(Ֆ)',
+      `Ընդամենը' ${total}`,
+      `Առձեռն ${paid}`,
+      'ՖԻՍԿԱԼ ԸԱՄԱՐ 11223344',
+    )
+
+  it('reads the section whole: no line, the head of the terminal, the total all three print', () => {
+    const got = bestReading([
+      bold('СУСС', '1700.00', '1700.00'),
+      bold('CUCC', '1700.00', '1700.00'),
+    ])
+    expect(got).toEqual({
+      layout: 'department',
+      tin: '12345678',
+      date: '2026-10-04',
+      time: '16:30',
+      receiptNo: '11223344',
+      totalHundredths: 170_000,
+      balanced: false,
+      lines: [],
+    })
+    expect(needsReshoot(got)).toBe(false)
+  })
+
+  it('never takes the receipt’s own number «ԿՀ: 00000049» for the tax number', () => {
+    const got = bestReading([
+      reading('ԿԸ: 00000049', 'Բաժին 1 - Բաժին 1', 'Ընդամենը 120.00', 'Առձեռն 120.00'),
+    ])
+    expect(got.layout).toBe('department')
+    expect(got.tin).toBeNull()
+  })
+
+  it('takes the tax number after its word, a till number of as many digits never', () => {
+    const got = bestReading([
+      reading('ՀՎՀՀ 12345678 4/2 87654321', 'Բաժին 1', 'Ընդամենը 550.00', 'Առձեռն 550 00'),
+    ])
+    expect(got.tin).toBe('12345678')
+    expect(got.totalHundredths).toBe(55_000)
+  })
+
+  it('outvotes a total OCR misread by the section and the payment (550.09 for 550.00)', () => {
+    const got = bestReading([
+      reading('Բաժին 1 1', 'py հարկ/ = 550 00', 'Ընդամենը 550.09', 'լոձեռն 550 00'),
+    ])
+    expect(got.totalHundredths).toBe(55_000)
+  })
+
+  it('reads no total one source alone gives: the thin print lost the point of the other two', () => {
+    // am-20: «Կղդամեկը 18000», the section not read — the person types the total (Р-3)
+    const got = bestReading([
+      reading('ՀՎՀՀ 12345678 9/2 87654321', 'Ււսժին 1]', 'Կղդամեկը 18000', 'Бибби 1800 00'),
+    ])
+    expect(got.layout).toBe('department')
+    expect(got.totalHundredths).toBeNull()
+    expect(got.date).toBeNull()
+  })
+
+  it('reads no field the two readings read apart', () => {
+    const got = bestReading([
+      reading('CUCC: 87345678 9/С: 87654321', '04-10-26 16:30:59', 'Բաժին 1', 'Ընդամենը 1700.00'),
+      reading('СУСС: 12345678 Գ/Ը: 87654321', '04-10-26 16:31:59', 'Բաժին 1', 'Առձեռն 1700.00'),
+    ])
+    expect(got.tin).toBeNull()
+    expect(got.date).toBe('2026-10-04')
+    expect(got.time).toBeNull()
+    expect(got.totalHundredths).toBe(170_000)
+  })
+
+  it('reads no total, time or number of two receipts on one photo (am-21)', () => {
+    const got = bestReading([
+      reading(
+        '57311783 Գ/1',
+        '04-10-26 14:23:15 ԳԱՆՔԱՊԱԼ: 3',
+        'Բաժին 1 - Բաժին 1 :',
+        'Շրջանառության Լարկ/ 3660.00',
+        '3660.00',
+        'СУСС: 12345678 Գ/Ը: 87654321',
+        '04-10-26 14:27:34 ԳԱՆՋԱՊԱԸ: 3',
+        'Բաժին 1 - Բաժին 1',
+        '/ Շրջանառության Ըարկ/ 1200.00',
+        'Ընդամենը՝ 1200.00',
+        'Առձեռն 1200.00',
+        'ՖԻՍԿԱԼ ԸԱՄԱՐ 11223344',
+      ),
+    ])
+    expect(got.layout).toBe('department')
+    expect([got.totalHundredths, got.time, got.receiptNo]).toEqual([null, null, null])
+    expect(got.date).toBe('2026-10-04')
+  })
+
+  it('must not fire where an item’s mark is read: Dog City and KFC print «Բաժին» over their items', () => {
+    const dogCity = bestReading([
+      reading(
+        'Բաժին 1',
+        '| (3824) ՏՈՖՈՒ',
+        '| 1|ԴԵՂՉ ваши) 1 2 200',
+        'Ընդամենը: 9450.00',
+        'Կանխիկ 9450.00',
+      ),
+    ])
+    const kfc = bestReading([
+      reading('Բաժին 1-1', '/շրջ հարկ/ = 8510 00', 'Դաս՝ 56.10', 'Ֆրի', 'Ընդամենը 8510.00'),
+    ])
+    for (const got of [dogCity, kfc]) {
+      expect(got.layout).not.toBe('department')
+    }
+  })
+
+  it('must not fire on a receipt with items whose lines OCR lost and no section is printed', () => {
+    const got = bestReading([reading('ԵՐԵՎԱՆ ՍԻԹԻ', 'ՀՎՀՀ 12345678', 'Ընդամենը 5460.00')])
+    expect(got.layout).toBe('card')
+    expect(needsReshoot(got)).toBe(true)
+  })
+
+  it('leaves a receipt that found a line to its layout, a section printed or not', () => {
+    expect(read(am14t as Fixture).layout).toBe('class')
+    expect(read(am04 as Fixture).layout).toBe('table')
+  })
+})

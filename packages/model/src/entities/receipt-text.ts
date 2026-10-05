@@ -43,8 +43,11 @@ export interface ReceiptTextLine {
   readonly rows: readonly TextRow[]
 }
 
-/** How the lines were found: «Ереван Сити»'s card, Dog City's table, or the class code (MOL-226). */
-export const RECEIPT_LAYOUTS = ['card', 'table', 'class'] as const
+/**
+ * How the lines were found: «Ереван Сити»'s card, Dog City's table, the class code (MOL-226) — or a
+ * till's section with no items printed at all, the sole trader's receipt (MOL-227).
+ */
+export const RECEIPT_LAYOUTS = ['card', 'table', 'class', 'department'] as const
 export type ReceiptLayout = (typeof RECEIPT_LAYOUTS)[number]
 
 export interface ReceiptText {
@@ -1247,6 +1250,128 @@ function classReceipt(rows: readonly TextRow[]): ReceiptText {
   }
 }
 
+// MOL-227 — a sole trader's terminal prints no items at all: its section «Բաժին 1», the turnover tax,
+// the total, the payment, the tax number, the day. Read in full, it is no receipt to shoot again but a
+// sum to record (MOL-78). Its head is the terminal's own, read here only: the three layouts keep theirs.
+//
+//   ՀՎՀՀ 57311783 Գ/Հ 31028805      ← the tax number before the till's registration number
+//   ԿՀ: 00000049                     ← the receipt's number, never a tax number
+//   04-10-26 16:30:59                ← DD-MM-YY
+//   Բաժին 1 - Բաժին 1
+//   / Շրջանառության հարկ/ 1700.00    ← the section's sum
+//   Ընդամենը՝ 1700.00                ← the total
+//   Առձեռն 1700.00                   ← paid in cash
+//   ՖԻՍԿԱԼ ՀԱՄԱՐ 16013344
+
+// «Բաժին 1», as OCR reads it: «Ււսժին 1]», «Բայժին 11» — the section and its number.
+const DEPARTMENT = /(?:Բա|Բայ|Ււս)ժին\s*\d/u
+// What only an item prints: the class code, a customs heading «(3824)», a till's article «0401/1163909»,
+// a table's heading «Անուն Քան Գին Գումար». Dog City and KFC print «Բաժին» too, over their items.
+const ITEM_MARK = new RegExp(
+  `${CLASS_MARK.source}|\\(\\d{4}\\)|\\d{4}\\s*/\\s*\\d{5,}|Անուն.{0,20}Քան`,
+  'u',
+)
+// The tax number: after its word, or before the till's registration number however OCR read the word,
+// «CUCC: 57311783 9/С: 31028805» — never the receipt's own number, «ԿՀ: 00000049».
+const DEPARTMENT_TIN = /ՀՎՀՀ\S{0,2}\s*(\d{8})(?!\d)|(?<!\d)(\d{8})\s+\S{1,3}\/\S{1,3}:?\s*\d{6,}/u
+const DEPARTMENT_DATE = /(?<!\d)(\d{2})[-.]\s?(\d{2})[-.]\s?(\d{2})\s+(\d{2}):(\d{2})/g
+// «ՖԻՍԿԱԼ ՀԱՄԱՐ 04143299», in capitals as often as not.
+const DEPARTMENT_FISCAL = /Ֆիսկալ\S*\s+\S*\s*(\d{8})(?!\d)/iu
+const SECTION_TAX = /Շրջ|հար[կլ]/u
+// «Ընդամենը», «/չդամենը», «Կղդամեկը» — and not its discount, «Ընդամենը զեղչ»
+const DEPARTMENT_TOTAL = 'դամե'
+const DEPARTMENT_PAID = /ձեռն|ձեոն|ձեդն|Կանխիկ|Անկանխ|Վճար/u
+// An amount with its hundredths: «1700.00», «1800 00» — a figure that lost its point is no vote.
+const AMOUNT = /(?<![\d.,])(\d{1,7})[., ](\d{2})(?![\d.,])/g
+
+const amountsOf = (text: string): number[] =>
+  [...text.matchAll(AMOUNT)].map((m) => Number(m[1]) * 100 + Number(m[2])).filter((a) => a > 0)
+
+/**
+ * The amounts of a reading by where they stand: the section's sum, the total, the payment — each printed
+ * once on such a receipt, and each read on its own by OCR.
+ */
+function departmentAmounts(rows: readonly TextRow[]): Map<string, Set<number>> {
+  const texts = rows.map((r) => r.text).filter((t) => t.trim() !== '')
+  const found = new Map<string, Set<number>>([
+    ['section', new Set()],
+    ['total', new Set()],
+    ['paid', new Set()],
+  ])
+  const add = (source: string, amounts: number[]): void => {
+    for (const amount of amounts) found.get(source)?.add(amount)
+  }
+  texts.forEach((text, i) => {
+    if (DEPARTMENT.test(text)) {
+      add('section', amountsOf(text))
+      // the turnover tax under it carries the section's sum
+      for (const next of texts.slice(i + 1, i + 3)) {
+        if (SECTION_TAX.test(next)) add('section', amountsOf(next))
+      }
+    }
+    if (text.includes(DEPARTMENT_TOTAL) && !text.includes('զեղչ')) add('total', amountsOf(text))
+    if (DEPARTMENT_PAID.test(text)) add('paid', amountsOf(text))
+  })
+  return found
+}
+
+/** What both readings say, or what the one that read it says; two answers are none. */
+function agreed<T>(values: readonly (T | null)[]): T | null {
+  const read = [...new Set(values.filter((v): v is T => v !== null))]
+  return read.length === 1 ? (read[0] ?? null) : null
+}
+
+/**
+ * A receipt of a till's section with no items (MOL-227): no reading found a line, a section «Բաժին» is
+ * printed, and nothing an item prints is anywhere — or null. Its total is the amount at least two of
+ * the section's sum, the total and the payment were read as, across the readings: a wrong sum on a trip
+ * is worse than none, which the person sees and types (Р-3). A field the two readings read apart is
+ * not read.
+ */
+export function departmentReceipt(readings: readonly (readonly TextRow[])[]): ReceiptText | null {
+  if (!readings.some((rows) => rows.some((row) => DEPARTMENT.test(row.text)))) return null
+  if (readings.some((rows) => rows.some((row) => ITEM_MARK.test(row.text)))) return null
+  const texts = readings.map((rows) => rows.map((row) => row.text).join('\n'))
+  const votes = new Map<number, Set<string>>()
+  for (const rows of readings) {
+    for (const [source, amounts] of departmentAmounts(rows)) {
+      for (const amount of amounts) votes.set(amount, (votes.get(amount) ?? new Set()).add(source))
+    }
+  }
+  const backed = [...votes].filter(([, sources]) => sources.size >= 2)
+  const most = Math.max(0, ...backed.map(([, sources]) => sources.size))
+  const totals = backed.filter(([, sources]) => sources.size === most)
+  const moments = texts.map((text) => [
+    ...new Set(
+      [...text.matchAll(DEPARTMENT_DATE)].map(([, day, month, year, hour, minute]) =>
+        [`20${year ?? ''}-${month ?? ''}-${day ?? ''}`, `${hour ?? ''}:${minute ?? ''}`].join(' '),
+      ),
+    ),
+  ])
+  // two receipts on one photo print two moments: whose total, time and number it is, nobody can tell —
+  // the person sees the photo and types the total (am-21 of the bench)
+  const several = moments.some((m) => m.length > 1)
+  const date = agreed(moments.flatMap((m) => m.map((moment) => moment.slice(0, 10))))
+  const time = several ? null : agreed(moments.map((m) => m[0]?.slice(11) ?? null))
+  return {
+    layout: 'department',
+    tin: agreed(
+      texts.map((text) => {
+        const found = DEPARTMENT_TIN.exec(text)
+        return found?.[1] ?? found?.[2] ?? null
+      }),
+    ),
+    date,
+    time,
+    receiptNo: several
+      ? null
+      : agreed(texts.map((text) => DEPARTMENT_FISCAL.exec(text)?.[1] ?? null)),
+    totalHundredths: !several && totals.length === 1 ? (totals[0]?.[0] ?? null) : null,
+    balanced: false,
+    lines: [],
+  }
+}
+
 /** One reading of a receipt — the rows of its parts, joined — into lines with figures. */
 export function parseReceiptText(rows: readonly TextRow[]): ReceiptText {
   return withTwins(readingOf(rows))
@@ -1560,5 +1685,7 @@ export function bestReading(readings: readonly (readonly TextRow[])[]): ReceiptT
   )
   const best = sorted[0]
   if (best === undefined) throw new RangeError('a receipt needs at least one reading')
+  // no reading found a line: a section with no items is read whole, not one to shoot again (MOL-227)
+  if (best.lines.length === 0) return departmentReceipt(readings) ?? best
   return withTwins(best)
 }
