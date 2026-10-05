@@ -851,11 +851,14 @@ function tableReceipt(rows: readonly TextRow[], table: ReturnType<typeof tableLi
 // the last one above it, and its name on the side the receipt's coded items put it.
 
 // What OCR keeps of «Դաս» — «Դաս.», «աս,», «հաս ‘» — and the class after it: «56.10», «56 10», «5610».
-// Not «հատ» read «հաս» after a count («1 հաս 1300 1300»), and not a figure that goes on: a price
-// «5610.00x1.0», a volume «Կվաս 1000մլ» (review А3–А5).
-const CLASS_TAIL = '(?![\\d\\p{L}]|[.,]\\d|\\s*[xх×*])'
+// «աս» is the word «Դաս», at most one letter before it: never inside a name, «Կվաս», «Անանաս». And the
+// class is no figure that goes on (reviews 1, 2): not an amount after it — «1 հաս 1300 1300», «Բաքեթ
+// 5610 5610», «5610 00х10», «5610.00x1.0» — nor a unit of volume or weight, glued or apart, «1000 մլ».
+// Letters right after it are the article's, «56.10Ն/Կ 745030»: OCR eats the comma and the space.
+const CLASS_TAIL =
+  '(?!\\d|[.,]\\d|\\s*[xх×*]|\\s+\\d{1,4}(?:[.,]\\d+)?(?:\\s*[xх×*]|(?![\\d\\p{L}]))|\\s*(?:մլ|լ|գ|կգ)(?!\\p{L}))'
 export const CLASS_MARK = new RegExp(
-  `(?<!\\d\\s?հ)աս[^\\p{L}\\d]{0,4}(\\d{2})\\s?[.,]?\\s?(\\d{2})${CLASS_TAIL}`,
+  `(?<!\\p{L}\\p{L})(?<!\\d\\s?հ)աս[^\\p{L}\\d]{0,4}(\\d{2})\\s?[.,]?\\s?(\\d{2})${CLASS_TAIL}`,
   'u',
 )
 // The till's article after the class: «Ն/Կ 745030», read «ՆԿ», «ԽԿ».
@@ -891,7 +894,8 @@ function unpointed(text: string, places: number): string[] {
     : []
 }
 
-// The words of a name on a row: a count before them stays («16 Թև», «2 Ստրիպս»), figures and units go.
+// The words of a name on a row: a number before a word stays — a count «16 Թև», a volume «1000 մլ» —
+// figures and units of the till go.
 function wordsOf(text: string): string {
   const tokens = text
     .replace(/(?:հ\S?տ|կգ|դրամ|դրա)(?=\s|$)/gu, ' ')
@@ -900,7 +904,8 @@ function wordsOf(text: string): string {
   const kept = tokens.filter(
     (w, i) =>
       (w.match(/\p{L}/gu) ?? []).length >= 2 ||
-      (/^\d{1,3}$/.test(w) && (tokens[i + 1]?.match(/\p{L}/gu) ?? []).length >= 2),
+      (/^\d{1,4}(?:[.,]\d+)?$/.test(w) && /\p{L}/u.test(tokens[i + 1] ?? '')) ||
+      (/^[լգ]$/u.test(w) && /^\d/.test(tokens[i - 1] ?? '')),
   )
   return kept.join(' ')
 }
@@ -1043,6 +1048,16 @@ function classList(rows: readonly TextRow[]): {
     const figures = classFigures(row)
     if (figures !== null && (figures.terminal || CLASS_UNIT.test(row))) {
       start = i
+      // the terminal prints the name over its figures: the name rows right above them are the item's,
+      // or the dish is left nameless and its name is read as the head (review 2, Б1) — rows with no
+      // digit but a count before the name, at most two
+      for (let j = i - 1, names = 0; j >= 0 && names < 2; j--) {
+        const above = mapped[j] ?? ''
+        if (above.trim() === '') continue
+        if (wordsOf(above) === '' || /\d/.test(above.replace(/^\s*\d{1,3}\s+(?=\p{L})/u, ''))) break
+        start = j
+        names += 1
+      }
       break
     }
   }
