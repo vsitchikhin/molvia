@@ -18,11 +18,12 @@
         :value="modelValue"
         v-bind="inputAttrs()"
         @input="type"
+        @keydown="escape"
       />
       <!-- The screen's action — the scanner (MOL-99) — or the field's own «Очистить»: never both. -->
       <slot name="trailing">
         <button
-          v-if="clearable && modelValue"
+          v-if="clearable && modelValue && !readonly"
           class="clear"
           type="button"
           :aria-label="t('field.clear')"
@@ -64,7 +65,8 @@ export default defineComponent({
     label: { type: String, required: true },
     placeholder: { type: String, default: '' },
     hint: { type: String, default: '' },
-    /** «Очистить» while there is text — unless the slot `trailing` holds the screen's own action. */
+    /** «Очистить» while there is text — unless the slot `trailing` holds the screen's own action, or
+     *  nothing may be changed now (`readonly`). */
     clearable: { type: Boolean, default: false },
     maxlength: { type: Number, default: undefined },
     readonly: { type: Boolean, default: false },
@@ -77,7 +79,9 @@ export default defineComponent({
     const hintId = `${useId()}-hint`
     const input = ref<HTMLInputElement | null>(null)
 
-    const trailed = computed(() => !!slots.trailing || (props.clearable && props.modelValue !== ''))
+    const trailed = computed(
+      () => !!slots.trailing || (props.clearable && props.modelValue !== '' && !props.readonly),
+    )
 
     function focus(options?: FocusOptions): void {
       input.value?.focus(options)
@@ -102,6 +106,17 @@ export default defineComponent({
         Object.fromEntries(
           Object.entries(attrs).filter(([key]) => key !== 'class' && key !== 'style'),
         ),
+      // In a sheet Esc is «back», as everywhere in a sheet (MOL-80). Chromium gives a search field's Esc
+      // to the field instead — it clears the text and the dialog never hears `cancel` — so «Выбрать
+      // товар» lost the receipt's words and stayed open (adversarial А3). Taken here, the text stays and
+      // the sheet hears the `cancel` it closes on; its owner's own Esc — a combobox's — comes first.
+      escape: (event: KeyboardEvent) => {
+        if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented) return
+        const sheet = input.value?.closest('dialog')
+        if (!sheet?.open) return
+        event.preventDefault()
+        sheet.dispatchEvent(new Event('cancel', { cancelable: true }))
+      },
       type: (event: Event) => {
         emit('update:modelValue', (event.target as HTMLInputElement).value)
       },
