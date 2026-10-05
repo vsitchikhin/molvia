@@ -222,6 +222,22 @@ describe('rateChartPairs', () => {
     expect(rateChartPairs([], FROM, TODAY, 'RUB')).toEqual([{ currency: 'RUB', side: 'bankBuys' }])
     expect(rateChartPairs([], FROM, TODAY, 'AMD')).toEqual([])
   })
+
+  it('лари на драмы рубль не вытесняет: у лари нет линии рынка (MOL-110, адверсариальный В)', () => {
+    const lari = exchange('2026-09-20', { given: 'GEL', rate: '139' })
+    expect(rateChartPairs([lari], FROM, TODAY, 'RUB')).toEqual([
+      { currency: 'RUB', side: 'bankBuys' },
+    ])
+    const rows = [row('2026-09-27', '4.35')]
+    const chart = rateChart(
+      rateChartPairs([lari], FROM, TODAY, 'RUB').map((pair) => ({ ...pair, rows })),
+      [lari],
+      TODAY,
+    )
+    expect(chart?.pairs.map(({ currency }) => currency)).toEqual(['RUB'])
+    // Доход в лари — линии предложить нечего.
+    expect(rateChartPairs([], FROM, TODAY, 'GEL')).toEqual([])
+  })
 })
 
 describe('rateChart', () => {
