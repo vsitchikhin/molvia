@@ -3,11 +3,11 @@
     <template #title>{{ t('receipt.pick.title') }}</template>
     <template #meta>{{ meta }}</template>
 
-    <AppField
+    <SearchField
       v-model="query"
       :label="t('receipt.pick.title')"
       :placeholder="t('item.search_placeholder')"
-      enterkeyhint="search"
+      clearable
     />
 
     <p v-if="phase === 'loading' && results.length === 0" class="note" role="status">
@@ -48,8 +48,8 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { drawsNothing, newItemSchema, pastedLine } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
-import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import SearchField from '@/components/SearchField.vue'
 import { useCatalogueSearch } from '@/composables/useCatalogueSearch'
 
 /**
@@ -59,7 +59,7 @@ import { useCatalogueSearch } from '@/composables/useCatalogueSearch'
  */
 export default defineComponent({
   name: 'ItemPickSheet',
-  components: { AppCard, AppField, BottomSheet },
+  components: { AppCard, BottomSheet, SearchField },
   props: {
     open: { type: Boolean, required: true },
     printed: { type: String, required: true },

@@ -1,17 +1,24 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import { h } from 'vue'
+import type { VNode } from 'vue'
 import { createAppI18n } from '@/i18n'
 import SearchField from '@/components/SearchField.vue'
 
 type Props = InstanceType<typeof SearchField>['$props']
 
-function render(props: Partial<Props> = {}, options: Parameters<typeof mount>[1] = {}) {
+interface Options {
+  slots?: Record<string, () => VNode>
+  attrs?: Record<string, unknown>
+}
+
+function render(props: Partial<Props> = {}, { slots = {}, attrs = {} }: Options = {}) {
   return mount(SearchField, {
     props: { modelValue: '', label: 'Search the catalogue', ...props },
+    slots,
+    attrs,
     attachTo: document.body,
     global: { plugins: [createAppI18n('en')] },
-    ...options,
   })
 }
 

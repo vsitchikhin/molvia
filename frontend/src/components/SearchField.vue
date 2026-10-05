@@ -79,8 +79,8 @@ export default defineComponent({
 
     const trailed = computed(() => !!slots.trailing || (props.clearable && props.modelValue !== ''))
 
-    function focus(): void {
-      input.value?.focus({ preventScroll: true })
+    function focus(options?: FocusOptions): void {
+      input.value?.focus(options)
     }
 
     function blur(): void {
@@ -90,6 +90,8 @@ export default defineComponent({
     expose({ focus, blur })
 
     return {
+      focus,
+      blur,
       t,
       hintId,
       input,
