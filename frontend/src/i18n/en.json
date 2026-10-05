@@ -1371,6 +1371,10 @@
     "group_account": "Account",
     "sign_out": "Sign out",
     "group_data": "Your data",
+    "analytics": {
+      "label": "Count me in the statistics",
+      "hint": "Marks that you opened “What to buy”, and the count of ratings — this is how we learn whether Molvia is needed. Turn it off and past marks are deleted."
+    },
     "export": {
       "label": "Download my data",
       "hint": "Your records, ratings and settings, in one file",
@@ -1393,6 +1397,8 @@
     "tap": {
       "offline": "Cannot save without a connection — the switch comes back with it.",
       "save_failed": "Not saved. Check the connection and try again.",
+      "unsure": "No answer came — we do not know whether it was saved. Checking again.",
+      "waiting": "Saving — no answer yet. We will show it when it comes.",
       "load_error": "The setting could not be loaded."
     },
     "salary_shift": {
@@ -1549,7 +1555,7 @@
       },
       "visits": {
         "term": "Visit marks",
-        "text": "Whether you opened “What to buy” — at most once a day. This is how we learn whether people come back."
+        "text": "Whether you opened “What to buy” — at most once a day. This is how we learn whether people come back. You can turn them off in the settings, “Count me in the statistics”: past marks are deleted at once, no new ones are written, and you are no longer counted in whether people use Molvia — by marks or by ratings."
       },
       "devices": {
         "term": "Sign-in devices",
@@ -1557,7 +1563,7 @@
       },
       "settings": {
         "term": "Your settings",
-        "text": "Country, city, currencies, and the day you changed the currency of conversion."
+        "text": "Country, city, currencies, and the day you changed the currency of conversion — and for “Count me in the statistics”: since when it is off, and when you last turned it back on."
       },
       "consent": {
         "term": "Consent to the terms",

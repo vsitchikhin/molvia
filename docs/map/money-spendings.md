@@ -71,7 +71,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/components/MoneyEntries.vue` — The ways out of «Деньги»: «Траты» and «Бюджет» of the month, «Счета», «Обмен денег», «Доходы», «Категории», each with one figure or none until known.
 - `frontend/src/components/MonthSwitcher.vue` — «‹ Сентябрь 2026 ›» month switcher of «Деньги», or «‹ 2026 ›» of «Графики → Год»: no future, no swipe; the month with no lower bound, the year back to the first with data (MOL-160).
 - `frontend/src/components/NewCategorySheet.vue` — «Новая категория» sheet over the spending sheet: a name, made through the queue, a preset's name refused.
-- `frontend/src/components/SalaryShiftGroup.vue` — Settings group «Зарплата с … числа — в следующий месяц»: a switch and a day select, saved on the tap.
+- `frontend/src/components/SalaryShiftGroup.vue` — Settings group «Зарплата с … числа — в следующий месяц»: a switch and a day select, saved on the tap; neither while a change is unsure, the quiet line in their place (MOL-96).
 - `frontend/src/components/SpendingSheet.vue` — Spending sheet: «Новая трата», amending one's own, or reading a trip's line; writes go to the queue and it closes at once.
 - `frontend/src/components/charts.ts` — Words of «Графики»: the month long, in three letters and by name, «после октября», a span of months, the closed ones named, a signed percent, «−8 % к августу».
 - `frontend/src/components/spending.ts` — Helpers of «Деньги» drawing: category icon and colour, rate words, journal rows from the month and the queue, page merge, a figure of «Бюджет» (`budgetAmount`).

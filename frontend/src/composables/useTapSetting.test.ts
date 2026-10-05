@@ -1,0 +1,471 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import type { VueWrapper } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { ApiError } from '@molvia/client'
+import { ERROR, ISSUE } from '@molvia/model'
+import { defineComponent, h } from 'vue'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  TAP_CHECK_FIRST_MS,
+  TAP_CHECK_LAST_MS,
+  forgetUnsureChanges,
+  useTapSetting,
+} from './useTapSetting'
+import type { TapSettingState } from './useTapSetting'
+import { useActorStore } from '@/stores/actor'
+
+// A setting saved on the tap whose answer was lost (MOL-96, adversarial А2, round 2 Р2-А1, №5): the
+// change may have landed, so a read must say — and a read that fails is a check, not the screen's.
+
+interface Setting {
+  readonly off: boolean
+  /** A third value, as the salary's day has: a later choice can be refused over an earlier one. */
+  readonly day?: number
+}
+
+let server: Setting = { off: false }
+let online = true
+const read = vi.fn<() => Promise<Setting>>()
+const write = vi.fn<(next: Setting) => Promise<Setting>>()
+const views: VueWrapper[] = []
+
+async function mounted(): Promise<TapSettingState<Setting>> {
+  let state: TapSettingState<Setting> | undefined
+  setActivePinia(createPinia())
+  useActorStore().id = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+  views.push(
+    mount(
+      defineComponent({
+        setup() {
+          state = useTapSetting('setting', read, write)
+          return () => h('div')
+        },
+      }),
+    ),
+  )
+  await flushPromises()
+  if (!state) throw new Error('not mounted')
+  return state
+}
+
+/** The write lands on the server, and its answer is lost. */
+function landsWithoutAnswer(): void {
+  write.mockImplementation((next) => {
+    server = next
+    return Promise.reject(new TypeError('connection reset'))
+  })
+}
+
+beforeEach(() => {
+  forgetUnsureChanges()
+  vi.useFakeTimers()
+  server = { off: false }
+  online = true
+  vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => online)
+  read.mockReset().mockImplementation(() => Promise.resolve(server))
+  write.mockReset().mockImplementation((next) => {
+    server = next
+    return Promise.resolve(server)
+  })
+})
+afterEach(() => {
+  for (const view of views.splice(0)) view.unmount()
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
+
+describe('useTapSetting: a change whose answer was lost', () => {
+  it('is checked at once, and a change that landed is shown, not «not saved»', async () => {
+    const tap = await mounted()
+    landsWithoutAnswer()
+    await tap.choose({ off: true })
+    expect(read).toHaveBeenCalledTimes(2)
+    expect(tap.value.value).toEqual({ off: true })
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.saveFailed.value).toBe(false)
+  })
+
+  it('a check that fails keeps it unsure, never the screen’s failure, and tries again 5 s, 10 s … up to a minute', async () => {
+    const tap = await mounted()
+    landsWithoutAnswer()
+    read.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(true)
+    expect(tap.failure.value).toBeNull()
+    expect(tap.value.value).toEqual({ off: false })
+
+    const reads = (): number => read.mock.calls.length
+    const at = reads()
+    await vi.advanceTimersByTimeAsync(TAP_CHECK_FIRST_MS - 1)
+    expect(reads()).toBe(at)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(reads()).toBe(at + 1)
+    await vi.advanceTimersByTimeAsync(2 * TAP_CHECK_FIRST_MS)
+    expect(reads()).toBe(at + 2)
+    // Never longer than a minute between two checks.
+    await vi.advanceTimersByTimeAsync(10 * TAP_CHECK_LAST_MS)
+    expect(reads() - at).toBeGreaterThanOrEqual(2 + 9)
+    expect(tap.failure.value).toBeNull()
+
+    read.mockImplementation(() => Promise.resolve(server))
+    await vi.advanceTimersByTimeAsync(TAP_CHECK_LAST_MS)
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.value.value).toEqual({ off: true })
+    const settled = reads()
+    await vi.advanceTimersByTimeAsync(5 * TAP_CHECK_LAST_MS)
+    expect(reads()).toBe(settled)
+  })
+
+  it('without a connection waits for it rather than the clock', async () => {
+    const tap = await mounted()
+    write.mockImplementation((next) => {
+      server = next
+      online = false
+      return Promise.reject(new TypeError('Failed to fetch'))
+    })
+    await tap.choose({ off: true })
+    const at = read.mock.calls.length
+    await vi.advanceTimersByTimeAsync(3 * TAP_CHECK_LAST_MS)
+    expect(read.mock.calls.length).toBe(at)
+    expect(tap.unsure.value).toBe(true)
+
+    online = true
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.value.value).toEqual({ off: true })
+    expect(tap.saveFailed.value).toBe(false)
+  })
+
+  it('lost without a connection and never landed: the check back online says «not saved» (round 7, Р7-А1)', async () => {
+    const tap = await mounted()
+    write.mockImplementation(() => {
+      online = false
+      return Promise.reject(new TypeError('Failed to fetch'))
+    })
+    await tap.choose({ off: true })
+    // Offline is grey «без связи», never «not saved» — until a check knows (MOL-19).
+    expect(tap.saveFailed.value).toBe(false)
+    expect(tap.unsure.value).toBe(true)
+
+    online = true
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.value.value).toEqual({ off: false })
+    expect(tap.saveFailed.value).toBe(true)
+  })
+
+  it('a screen left while unsure: the one drawn on the way back checks with its first read (round 8, Р8-А1)', async () => {
+    const tap = await mounted()
+    write.mockRejectedValue(new TypeError('connection reset'))
+    read.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(true)
+    // A tab tapped: the screen goes, and its clock with it.
+    for (const view of views.splice(0)) view.unmount()
+
+    read.mockImplementation(() => Promise.resolve(server))
+    const back = await mounted()
+    expect(back.value.value).toEqual({ off: false })
+    expect(back.unsure.value).toBe(false)
+    expect(back.saveFailed.value).toBe(true)
+
+    // Answered, it is forgotten: the screen drawn after that reads as any other.
+    for (const view of views.splice(0)) view.unmount()
+    const again = await mounted()
+    expect(again.saveFailed.value).toBe(false)
+  })
+
+  it('tapped and left at once: the gone screen checks nothing and tells nobody; the next one says it (round 9, Р9-А1 а)', async () => {
+    const tap = await mounted()
+    let fail: (error: Error) => void = () => undefined
+    write.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject
+        }),
+    )
+    const tapped = tap.choose({ off: true })
+    for (const view of views.splice(0)) view.unmount()
+    const reads = read.mock.calls.length
+    fail(new TypeError('connection reset'))
+    await tapped
+    // The gone screen asks nothing: the one drawn on the way back does.
+    expect(read.mock.calls.length).toBe(reads)
+
+    const back = await mounted()
+    expect(back.value.value).toEqual({ off: false })
+    expect(back.saveFailed.value).toBe(true)
+  })
+
+  it('left while the check was on its way: what it learnt waits for the next screen (round 9, Р9-А1 б)', async () => {
+    const tap = await mounted()
+    let answer: (setting: Setting) => void = () => undefined
+    write.mockRejectedValue(new TypeError('connection reset'))
+    read.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve
+        }),
+    )
+    const tapped = tap.choose({ off: true })
+    await flushPromises()
+    for (const view of views.splice(0)) view.unmount()
+    answer({ off: false })
+    await tapped
+
+    read.mockImplementation(() => Promise.resolve(server))
+    const back = await mounted()
+    expect(back.value.value).toEqual({ off: false })
+    expect(back.saveFailed.value).toBe(true)
+    // Said once: the screen after that one has nothing left to say.
+    for (const view of views.splice(0)) view.unmount()
+    expect((await mounted()).saveFailed.value).toBe(false)
+  })
+
+  it('tapped and left, and the change landed: nothing is left, the next screen just reads', async () => {
+    const tap = await mounted()
+    let land: (setting: Setting) => void = () => undefined
+    write.mockImplementation(
+      (next) =>
+        new Promise((resolve) => {
+          land = (setting) => {
+            server = next
+            resolve(setting)
+          }
+        }),
+    )
+    const tapped = tap.choose({ off: true })
+    for (const view of views.splice(0)) view.unmount()
+    land({ off: true })
+    await tapped
+    const back = await mounted()
+    expect(back.value.value).toEqual({ off: true })
+    expect(back.saveFailed.value).toBe(false)
+    expect(back.unsure.value).toBe(false)
+  })
+
+  describe('back while the gone screen’s write is still on its way (round 10, Р10-А1)', () => {
+    async function leftWriting(): Promise<{
+      readonly back: TapSettingState<Setting>
+      readonly land: () => void
+      readonly lose: (error: Error) => void
+    }> {
+      server = { off: true }
+      const tap = await mounted()
+      let resolve: (setting: Setting) => void = () => undefined
+      let reject: (error: Error) => void = () => undefined
+      write.mockImplementation(
+        (next) =>
+          new Promise((ok, fail) => {
+            resolve = (setting) => {
+              server = next
+              ok(setting)
+            }
+            reject = fail
+          }),
+      )
+      void tap.choose({ off: false })
+      for (const view of views.splice(0)) view.unmount()
+      const back = await mounted()
+      return {
+        back,
+        land: () => {
+          resolve({ off: false })
+        },
+        lose: reject,
+      }
+    }
+
+    it('says «we do not know» while it is on its way, then shows what landed — with its answer', async () => {
+      const { back, land } = await leftWriting()
+      expect(back.unsure.value).toBe(true)
+      expect(back.saveFailed.value).toBe(false)
+      land()
+      await flushPromises()
+      expect(back.unsure.value).toBe(false)
+      expect(back.value.value).toEqual({ off: false })
+      expect(back.saveFailed.value).toBe(false)
+    })
+
+    it('lands with its answer lost: the screen that waited checks and shows it', async () => {
+      const { back, lose } = await leftWriting()
+      server = { off: false }
+      lose(new TypeError('connection reset'))
+      await flushPromises()
+      expect(back.unsure.value).toBe(false)
+      expect(back.value.value).toEqual({ off: false })
+      expect(back.saveFailed.value).toBe(false)
+    })
+
+    it('refused in the API’s own words: the screen that waited says «not saved»', async () => {
+      const { back, lose } = await leftWriting()
+      lose(new ApiError(ERROR.INTERNAL, '', true, undefined, { fromApi: true }))
+      await flushPromises()
+      expect(back.unsure.value).toBe(false)
+      expect(back.value.value).toEqual({ off: true })
+      expect(back.saveFailed.value).toBe(true)
+    })
+  })
+
+  it('the answer of a gone screen’s write does not wipe a later screen’s unsure choice (round 11, Р11-А1)', async () => {
+    server = { off: true, day: 25 }
+    const first = await mounted()
+    let landTen: () => void = () => undefined
+    write.mockImplementationOnce(
+      (next) =>
+        new Promise((resolve) => {
+          landTen = () => {
+            server = next
+            resolve(next)
+          }
+        }),
+    )
+    void first.choose({ off: true, day: 10 })
+    for (const view of views.splice(0)) view.unmount()
+
+    // The second screen: 10 still on its way; 15 chosen, lost, and its check torn too.
+    const second = await mounted()
+    write.mockRejectedValueOnce(new TypeError('connection reset'))
+    read.mockRejectedValueOnce(new TypeError('connection reset'))
+    await second.choose({ off: true, day: 15 })
+    expect(second.unsure.value).toBe(true)
+    for (const view of views.splice(0)) view.unmount()
+
+    landTen()
+    await flushPromises()
+    // The third screen: the server holds 10, and the last choice — 15 — was not saved.
+    const third = await mounted()
+    expect(third.value.value).toEqual({ off: true, day: 10 })
+    expect(third.saveFailed.value).toBe(true)
+  })
+
+  it('a screen drawn anew whose first read fails: its own failure, and the change stays unsure', async () => {
+    const tap = await mounted()
+    write.mockRejectedValue(new TypeError('connection reset'))
+    read.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true })
+    for (const view of views.splice(0)) view.unmount()
+
+    const back = await mounted()
+    expect(back.value.value).toBeUndefined()
+    expect(back.failure.value).toBe('error')
+    expect(back.unsure.value).toBe(true)
+  })
+
+  it('a refusal in the API’s own words is «not saved» at once: no check, no clock (round 3, №6)', async () => {
+    const tap = await mounted()
+    const reads = read.mock.calls.length
+    write.mockRejectedValue(new ApiError(ERROR.CONFLICT, '', true, 409, { fromApi: true }))
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.saveFailed.value).toBe(true)
+    expect(read.mock.calls.length).toBe(reads)
+    await vi.advanceTimersByTimeAsync(3 * TAP_CHECK_LAST_MS)
+    expect(read.mock.calls.length).toBe(reads)
+  })
+
+  it.each([
+    ['no answer at all', new TypeError('Failed to fetch')],
+    ['a status with no word of the API', new ApiError(ERROR.INTERNAL, '', false, 502)],
+    ['a proxy’s page, not the API', new ApiError(ERROR.INTERNAL, '', true, 502)],
+    [
+      'an answer of the API the contract could not read',
+      new ApiError(ERROR.INTERNAL, '', true, 200, { fromApi: true, offContract: true }),
+    ],
+    // The transport's form of a `200` of the API whose body was cut off on its way (round 4, Р4-А1).
+    [
+      'a 2xx of the API cut off on its way',
+      new ApiError(ISSUE.RESPONSE_INVALID, 'off', true, 200, { fromApi: true }),
+    ],
+  ])('%s is unsure: the change may have landed', async (_, failure) => {
+    read.mockRejectedValue(new TypeError('connection reset'))
+    read.mockResolvedValueOnce(server)
+    const tap = await mounted()
+    write.mockRejectedValue(failure)
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(true)
+  })
+
+  it('a refusal in the transport’s own form — the error body, no status — is «not saved» at once', async () => {
+    const tap = await mounted()
+    write.mockRejectedValue(new ApiError(ERROR.INTERNAL, '', true, undefined, { fromApi: true }))
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.saveFailed.value).toBe(true)
+  })
+
+  it('an unsure change is not made sure by a refusal of the next one: still checked (round 4, №9)', async () => {
+    const tap = await mounted()
+    landsWithoutAnswer()
+    read.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(true)
+    // The same tap again before the clock: the API refuses it in its own words.
+    write.mockRejectedValue(new ApiError(ERROR.INTERNAL, '', true, undefined, { fromApi: true }))
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(true)
+    expect(tap.saveFailed.value).toBe(true)
+
+    // The first change had landed: the check by the clock finds it, and «not saved» goes.
+    read.mockImplementation(() => Promise.resolve(server))
+    await vi.advanceTimersByTimeAsync(TAP_CHECK_LAST_MS)
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.value.value).toEqual({ off: true })
+    expect(tap.saveFailed.value).toBe(false)
+  })
+
+  it('a refusal of a later change keeps its «not saved» when the check finds the earlier one landed (round 5, Р5-А1)', async () => {
+    const tap = await mounted()
+    landsWithoutAnswer()
+    read.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true, day: 10 })
+    expect(tap.unsure.value).toBe(true)
+    write.mockRejectedValue(new ApiError(ERROR.INTERNAL, '', true, undefined, { fromApi: true }))
+    await tap.choose({ off: true, day: 15 })
+    expect(tap.saveFailed.value).toBe(true)
+
+    read.mockImplementation(() => Promise.resolve(server))
+    await vi.advanceTimersByTimeAsync(TAP_CHECK_LAST_MS)
+    // The screen shows what the server holds, and still says the last choice was not saved.
+    expect(tap.value.value).toEqual({ off: true, day: 10 })
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.saveFailed.value).toBe(true)
+  })
+
+  it('two answers lost in a row: the check keeps «not saved» when only the earlier choice landed (round 6, №11, Р6-А1)', async () => {
+    const tap = await mounted()
+    landsWithoutAnswer()
+    read.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true, day: 10 })
+    // The next one never reaches the server, and its answer is lost too.
+    write.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true, day: 15 })
+    expect(tap.unsure.value).toBe(true)
+
+    read.mockImplementation(() => Promise.resolve(server))
+    await vi.advanceTimersByTimeAsync(TAP_CHECK_LAST_MS)
+    expect(tap.value.value).toEqual({ off: true, day: 10 })
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.saveFailed.value).toBe(true)
+  })
+
+  it('a change that did not land stays «not saved» once a check says so', async () => {
+    const tap = await mounted()
+    write.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true })
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.saveFailed.value).toBe(true)
+    expect(tap.value.value).toEqual({ off: false })
+  })
+
+  it('an answer that came settles it: no check is left behind', async () => {
+    const tap = await mounted()
+    await tap.choose({ off: true })
+    const at = read.mock.calls.length
+    await vi.advanceTimersByTimeAsync(3 * TAP_CHECK_LAST_MS)
+    expect(read.mock.calls.length).toBe(at)
+    expect(tap.unsure.value).toBe(false)
+  })
+})

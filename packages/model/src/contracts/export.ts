@@ -36,8 +36,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // `consentedAt`, which edition of the terms and the privacy page the person accepted, and when (MOL-95).
 // 13: a receipt's `heard` and `heardAt`, how the person learned it was read — on the phone or from the
 // bot — and the account's `receiptNoticesOff` and `botBlockedAt`, whether the bot is to say so and
-// since when it is blocked (MOL-129).
-export const EXPORT_VERSION = 13
+// since when it is blocked (MOL-129). 14: the account's `analyticsOffAt` and `analyticsOnAt`, since when
+// the person objects to being counted and when they last stopped objecting (MOL-96).
+export const EXPORT_VERSION = 14
 
 const day = z.iso.date()
 
@@ -117,6 +118,8 @@ const accountSchema = z.strictObject({
   botBlockedAt: isoDate.nullable(),
   consentVersion: z.int().nullable(),
   consentedAt: isoDate.nullable(),
+  analyticsOffAt: isoDate.nullable(),
+  analyticsOnAt: isoDate.nullable(),
   sharedUntil: isoDate.nullable(),
   createdAt: isoDate,
   updatedAt: isoDate,
