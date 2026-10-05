@@ -130,13 +130,13 @@ back, two object — one of them back — reads 2 of 10 if only the rows go, a g
 «stop» by objections rather than the hypothesis; 2 of 8 with «opted out 2» is the truth. **Gate 0.2
 too** (В-2): «счётчики ворот» rest on the same basis as the log, so a count over verdicts is
 analytics as much as the log; there the objection is read as it stands now — the live verdicts are
-not erased, they are the contract's, so back on, the person counts again. **The withdrawn ones are
-kept for the gate alone, so off erases them too** (MOL-97, owner's decision on the review, Б1), in
-the same transaction and under the same lock as the log, and a withdrawal while off takes the row
-whole — `withdraw` takes the log's lock, so the two at once leave nothing (`lockLog`). Out of the
-gate, the rows have no reader; once the switch is a withdrawn consent (edition 2), Armenia's art. 21
-§6 leaves them no basis either. The price is the log's: back on, the person counts in 0.2 without
-the withdrawn ones erased, an error towards «stop». **Gate 0.3 counts someone back on only if they were
+not erased, they are the contract's, so back on, the person counts again. **Nor are the withdrawn
+ones** (MOL-97, В1, after a round that erased them): the reminder reads a withdrawal's moment to
+skip a purchase made before it (MOL-101), a reader on the contract, not on the statistics. Off stops
+the gate's counting — the gate reads the objection as it stands — and that is all a withdrawn
+consent stops (Armenia art. 21 §6: the processing on its basis); the row stays for its other
+purpose. Erased, the bot asked «Как молоко?» of someone who had rated the milk and taken it back —
+on the day they asked to be counted less. A test in `reminders.integration.test.ts` holds it. **Gate 0.3 counts someone back on only if they were
 back before their fourth week began** (`actors.analytics_on_at` at or before `created_at + 504 h`,
 Р-3): off later, that week's rows were erased; back later, part of it was never written — counted,
 they would read as not having come back. Two moments are kept: since when the person objects now —

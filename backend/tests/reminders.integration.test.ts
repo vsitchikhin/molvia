@@ -12,8 +12,10 @@ import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ERROR, ISSUE, REMINDERS_PER_CLAIM, dueRemindersSchema } from '@molvia/model'
 import type { DueReminders } from '@molvia/model'
+import { createEventRepository } from '@/db/events-repository'
 import { createReminderRepository } from '@/db/reminders-repository'
 import type { ReminderRepository } from '@/db/reminders-repository'
+import { createVerdictRepository } from '@/db/verdicts-repository'
 import { expenses, ratingReminders, reminderDays, trips, verdicts } from '@/db/schema'
 import { buildServer } from '@/server'
 import { remindRatings } from '@/usecases/remind-ratings'
@@ -384,6 +386,28 @@ describe('MOL-29: позиция со снятой оценкой (В-3)', () =>
     await verdict(anna, lori, yerevan('2026-07-12', '20:00'), yerevan('2026-07-13', '09:00'))
 
     expect(asked(await evening('2026-07-13'))).toEqual({})
+  })
+
+  it('выключенная статистика снятое не забывает: до снятия — не спрашиваем (MOL-97, В1)', async () => {
+    // The switch takes a person out of the gates; the reminder is the contract's, and the
+    // withdrawn row is what tells it the person had their say — in either order.
+    const log = createEventRepository(db)
+    const ratings = createVerdictRepository(db)
+    const anna = await person()
+    const lori = await item('Сыр Лори')
+    const tan = await item('Тан')
+    await bought(anna, lori, yerevan('2026-07-12', '12:00'))
+    await bought(anna, tan, yerevan('2026-07-12', '12:30'))
+    await verdict(anna, lori, yerevan('2026-07-12', '20:00'))
+    await verdict(anna, tan, yerevan('2026-07-12', '20:30'))
+
+    expect(await ratings.withdraw(anna.id, lori)).toBe(true)
+    await log.chooseAnalytics(anna.id, true)
+    expect(await ratings.withdraw(anna.id, tan)).toBe(true)
+
+    expect(asked(await evening('2026-07-13'))).toEqual({})
+    await log.chooseAnalytics(anna.id, false)
+    expect(asked(await evening('2026-07-13', '19:01'))).toEqual({})
   })
 })
 

@@ -204,50 +204,34 @@ describe('выключение', () => {
   })
 })
 
-describe('снятые оценки (MOL-97, Б1)', () => {
-  it('выключение стирает снятые оценки человека, живые и чужие остаются', async () => {
+describe('снятые оценки (MOL-97, В1)', () => {
+  // A withdrawn verdict has a second reader besides gate 0.2: the reminder skips a purchase made
+  // before the withdrawal (MOL-101). Off stops the gate's counting, which reads the objection as it
+  // stands; the row stays for the reminder, on the contract.
+  it('выключение снятые оценки не стирает — их читает напоминание', async () => {
     const me = await owner()
-    const other = await owner()
     const milk = await insertItem(db)
     const bread = await insertItem(db, { name: 'Хлеб', searchKey: 'hleb', defaultUnit: 'piece' })
     await rate(me, milk)
     await rate(me, bread)
     await withdraw(me, milk)
-    await rate(other, milk)
-    await withdraw(other, milk)
-    expect(await verdictsOf(me.id)).toHaveLength(2)
 
     await choose(me, false)
-    expect(await verdictsOf(me.id)).toEqual([{ itemId: bread, withdrawn: false }])
-    expect(await verdictsOf(other.id)).toEqual([{ itemId: milk, withdrawn: true }])
+    expect(await verdictsOf(me.id)).toEqual(
+      expect.arrayContaining([
+        { itemId: milk, withdrawn: true },
+        { itemId: bread, withdrawn: false },
+      ]),
+    )
   })
 
-  it('снятие у выключенного убирает строку целиком, у включённого — оставляет её воротам', async () => {
+  it('снятие у выключенного оставляет строку, как у включённого', async () => {
     const me = await owner()
     const milk = await insertItem(db)
     await choose(me, false)
     await rate(me, milk)
-    await withdraw(me, milk)
-    expect(await verdictsOf(me.id)).toEqual([])
-
-    await choose(me, true)
-    await rate(me, milk)
-    await withdraw(me, milk)
+    expect(await verdictRepository.withdraw(me.id, milk)).toBe(true)
     expect(await verdictsOf(me.id)).toEqual([{ itemId: milk, withdrawn: true }])
-  })
-
-  it('снятие и выключение разом не оставляют снятой строки, в каком бы порядке ни пришли', async () => {
-    for (let round = 0; round < 10; round += 1) {
-      const me = await owner()
-      const milk = await insertItem(db)
-      await rate(me, milk)
-      const [withdrawn] = await Promise.all([
-        verdictRepository.withdraw(me.id, milk),
-        log.chooseAnalytics(me.id, true),
-      ])
-      expect(withdrawn).toBe(true)
-      expect(await verdictsOf(me.id)).toEqual([])
-    }
   })
 })
 

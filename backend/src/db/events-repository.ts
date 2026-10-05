@@ -1,9 +1,8 @@
-import { and, eq, isNotNull, sql } from 'drizzle-orm'
-import type { SQL } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { EVENT } from '@molvia/model'
 import type { AnalyticsSetting, CatalogueSubject, EventInput } from '@molvia/model'
 import type { Conn } from './index'
-import { actors, events, verdicts } from './schema'
+import { actors, events } from './schema'
 
 // The type and its payload travel together, so a catalogue view cannot be recorded
 // without the axis the 0.3 gate splits on.
@@ -102,11 +101,8 @@ export interface EventRepository {
   weekFourReturn(subject: CatalogueSubject, from: Date, to: Date): Promise<CohortReturn>
 }
 
-/**
- * One person's log, held by its writer, by the switch that stops it (MOL-96) and by a withdrawal of
- * a verdict, which the switch erases too (MOL-97).
- */
-export function lockLog(actorId: string): SQL {
+/** One person's log, held by its writer and by the switch that stops it (MOL-96). */
+function lockLog(actorId: string) {
   return sql`select pg_advisory_xact_lock(hashtext('events'), hashtext(${actorId}))`
 }
 
@@ -181,15 +177,7 @@ export function createEventRepository(db: Conn): EventRepository {
           where ${actors.id} = ${actorId}::uuid
           returning analytics_off_at is not null as off
         `)
-        if (off) {
-          await tx.delete(events).where(eq(events.actorId, actorId))
-          // A withdrawn verdict is kept for gate 0.2 alone, and the switch takes the person out of
-          // it: the row has no reader left and no basis (MOL-97, Б1). The live ones are the
-          // contract's and stay.
-          await tx
-            .delete(verdicts)
-            .where(and(eq(verdicts.actorId, actorId), isNotNull(verdicts.deletedAt)))
-        }
+        if (off) await tx.delete(events).where(eq(events.actorId, actorId))
         return { off: row?.off ?? off }
       })
     },

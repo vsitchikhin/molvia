@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { DomainError, ERROR, verdictSchema } from '@molvia/model'
 import type { AdviceScope, NewVerdict, Verdict, VerdictPatch } from '@molvia/model'
-import { lockLog } from './events-repository'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
@@ -34,9 +33,7 @@ export interface VerdictRepository {
   amend(actorId: string, itemId: string, patch: VerdictPatch): Promise<Verdict | null>
   /**
    * Takes the person's verdict on a product back. The row stays, for the 0.2 gate only
-   * (schema, `deleted_at`); the text goes. For someone out of the statistics the row goes whole:
-   * the gate does not count them, and the switch erases what it would have kept (MOL-97). `false`
-   * when there was nothing of theirs to take.
+   * (schema, `deleted_at`); the text goes. `false` when there was nothing of theirs to take.
    */
   withdraw(actorId: string, itemId: string): Promise<boolean>
   forItem(actorId: string, itemId: string, placeId: string | null): Promise<Verdict | null>
@@ -65,7 +62,8 @@ export interface VerdictRepository {
    * `windowHours` of appearing (MOL-49). A query over this table, never an event: the log
    * must not repeat what a domain table already knows.
    *
-   * **The one reader that counts withdrawn verdicts.** The gate asks whether someone *gave*
+   * **A reader that counts withdrawn verdicts** — with the reminder, which skips a purchase made
+   * before the withdrawal (MOL-101), the only two (MOL-97, В1). The gate asks whether someone *gave*
    * five, and «rated five, took one back» is five (MOL-27, the owner's decision). Rating again
    * brings back the same row with its `rated_at`, so withdrawing and re-rating cannot move
    * anyone here, and one row per «actor + item + place» makes a re-rating one verdict.
@@ -348,33 +346,22 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
     async withdraw(actorId, itemId) {
       if (idOrNull(actorId) === null || idOrNull(itemId) === null) return false
 
-      return db.transaction(async (tx) => {
-        // The switch's lock: a withdrawal and «off» at once would otherwise leave the row behind.
-        await tx.execute(lockLog(actorId))
-        const mine = and(
-          eq(verdicts.actorId, actorId),
-          eq(verdicts.itemId, itemId),
-          isNull(verdicts.placeId),
-          // A second withdrawal finds nothing: the first one's time is the one that stands.
-          isNull(verdicts.deletedAt),
+      const withdrawn = await db
+        .update(verdicts)
+        // The text is erased with the withdrawal: whoever deletes a review expects it gone,
+        // and the gate needs only that the row existed and when. A CHECK holds the pair.
+        .set({ deletedAt: sql`clock_timestamp()`, review: null })
+        .where(
+          and(
+            eq(verdicts.actorId, actorId),
+            eq(verdicts.itemId, itemId),
+            isNull(verdicts.placeId),
+            // A second withdrawal finds nothing: the first one's time is the one that stands.
+            isNull(verdicts.deletedAt),
+          ),
         )
-        const [actor] = await tx
-          .select({ offAt: actors.analyticsOffAt })
-          .from(actors)
-          .where(eq(actors.id, actorId))
-        if (actor?.offAt) {
-          const gone = await tx.delete(verdicts).where(mine).returning({ id: verdicts.id })
-          return gone.length > 0
-        }
-        const withdrawn = await tx
-          .update(verdicts)
-          // The text is erased with the withdrawal: whoever deletes a review expects it gone,
-          // and the gate needs only that the row existed and when. A CHECK holds the pair.
-          .set({ deletedAt: sql`clock_timestamp()`, review: null })
-          .where(mine)
-          .returning({ id: verdicts.id })
-        return withdrawn.length > 0
-      })
+        .returning({ id: verdicts.id })
+      return withdrawn.length > 0
     },
 
     async forItem(actorId, itemId, placeId) {
@@ -622,8 +609,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
           from cohort c
           join ${verdicts} v on v.actor_id = c.actor_id
           where v.rated_at < c.started + make_interval(hours => ${windowHours}::int)
-            -- No deleted_at filter: the gate is the one reader that counts withdrawn
-            -- verdicts (MOL-27). Every other reader of this table must have it.
+            -- No deleted_at filter: the gate counts withdrawn verdicts (MOL-27), and so does the
+            -- reminder by their moment (MOL-101). Every other reader of this table must have it.
           group by c.actor_id
           having count(*) >= ${ratings}::int
         )

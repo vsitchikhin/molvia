@@ -74,7 +74,7 @@ The log's writer, the cohort and both gate queries are pinned in `.claude/rules/
 - **The log does not outlive the person, nor their objection** (MOL-58, MOL-96): erasure and
   «Учитывать меня в статистике» turned off are the two written exceptions to append-only.
 - **An objection takes a person out of both gates** (MOL-96): `actors.analytics_off_at`; off erases
-  their log and their withdrawn verdicts under its lock (MOL-97) and «Что брать» writes nothing more; each gate names them in a line of its
+  their log under its lock and «Что брать» writes nothing more; each gate names them in a line of its
   own, after time and access; back on counts in 0.3 only from before week four (`analytics_on_at`).
 - **The 0.2 gate is `VerdictRepository.reachedRatings`** (MOL-49): the one reader of `verdicts`
   without `deleted_at IS NULL`; its `from` is the release of 0.2, passed by the caller; a window
@@ -208,8 +208,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The limit never cuts one's own rows or the warnings** (Р-23, Р-25:
   `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
 - **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, **every other reader
-  filters `deleted_at IS NULL`** — unless its author is out of the statistics: then off erased it, and
-  a withdrawal takes the row whole (MOL-97); the reminder skips a purchase made before the withdrawal (MOL-101).
+  filters `deleted_at IS NULL`** — but the reminder, which reads the withdrawal's moment, so the row
+  outlives «Учитывать меня в статистике» off (MOL-97, В1); the reminder skips a purchase made before the withdrawal (MOL-101).
 - **A place is named with its city only where its name stands in two cities of one set** (MOL-120):
   the queue of «Оценки», a row of «Что брать», one reminder — one rule, `cityWhereNameRepeats` in
   the domain; the city is optional on the wire, and a place without one leaves its set named as
