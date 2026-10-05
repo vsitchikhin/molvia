@@ -36,3 +36,11 @@ export const GATE_RETURN_STOP_PERCENT = 15
  * beside its `n` and with no verdict.
  */
 export const LOGIN_SECOND_WAY_PERCENT = 25
+
+/**
+ * The receipt scanner's line (MOL-222, owner's decision 04.10.2026, epic MOL-113): when after four weeks
+ * people put right more than this share of the lines read, the question of the reader comes back — a
+ * cloud or a video card, each a decision of its own. A third, printed in percent like the others,
+ * beside its `n` and with no verdict.
+ */
+export const RECEIPT_EDITS_STOP_PERCENT = 33.3

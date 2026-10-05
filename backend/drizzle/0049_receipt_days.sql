@@ -1,0 +1,20 @@
+CREATE TABLE "receipt_days" (
+	"day" date PRIMARY KEY NOT NULL,
+	"read" integer DEFAULT 0 NOT NULL,
+	"read_partly" integer DEFAULT 0 NOT NULL,
+	"reshoot" integer DEFAULT 0 NOT NULL,
+	"unreadable" integer DEFAULT 0 NOT NULL,
+	"recorded" integer DEFAULT 0 NOT NULL,
+	"lines" integer DEFAULT 0 NOT NULL,
+	"lines_edited" integer DEFAULT 0 NOT NULL,
+	"lines_skipped" integer DEFAULT 0 NOT NULL,
+	"lines_item" integer DEFAULT 0 NOT NULL,
+	"lines_figures" integer DEFAULT 0 NOT NULL,
+	"within_5m" integer DEFAULT 0 NOT NULL,
+	"within_15m" integer DEFAULT 0 NOT NULL,
+	"within_1h" integer DEFAULT 0 NOT NULL,
+	"within_1d" integer DEFAULT 0 NOT NULL,
+	"later" integer DEFAULT 0 NOT NULL,
+	CONSTRAINT "receipt_days_counts_non_negative" CHECK (least("receipt_days"."read", "receipt_days"."read_partly", "receipt_days"."reshoot", "receipt_days"."unreadable", "receipt_days"."recorded", "receipt_days"."lines", "receipt_days"."lines_edited", "receipt_days"."lines_skipped", "receipt_days"."lines_item", "receipt_days"."lines_figures", "receipt_days"."within_5m", "receipt_days"."within_15m", "receipt_days"."within_1h", "receipt_days"."within_1d", "receipt_days"."later") >= 0),
+	CONSTRAINT "receipt_days_edited_within_lines" CHECK ("receipt_days"."lines_edited" <= "receipt_days"."lines")
+);

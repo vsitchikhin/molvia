@@ -1768,6 +1768,55 @@ export const reminderDays = pgTable(
 )
 
 /**
+ * The receipt scanner's measure (MOL-222, owner's decision 04.10.2026): how readings ended, and how
+ * much of what was read people put right before recording. The hypothesis of 0.2 stops when after
+ * four weeks more than a third of the lines are corrected. The same shape as `login_days` and for the
+ * same reason — no id of anyone and nothing of a receipt, so erasure has nothing to reach and an
+ * erased person's corrections still count.
+ *
+ * A reading counts on the day it ended, a record on the day it was written, both in Yerevan. A line
+ * is edited once however many things changed in it; the kinds beside it may add up past it.
+ */
+export const receiptDays = pgTable(
+  'receipt_days',
+  {
+    day: date('day').primaryKey(),
+    /** Read with its lines, and the lines cover the receipt (`readPartly` is false). */
+    read: integer('read').notNull().default(0),
+    /** Read with its lines, but they make up too little of it — the «переснимите» of before (В-1). */
+    readPartly: integer('read_partly').notNull().default(0),
+    /** Not one item line found. */
+    reshoot: integer('reshoot').notNull().default(0),
+    unreadable: integer('unreadable').notNull().default(0),
+    recorded: integer('recorded').notNull().default(0),
+    /** Every line of the receipts recorded, the ones left out included. */
+    lines: integer('lines').notNull().default(0),
+    linesEdited: integer('lines_edited').notNull().default(0),
+    /** «Не записывать». */
+    linesSkipped: integer('lines_skipped').notNull().default(0),
+    /** Another item than the review showed. */
+    linesItem: integer('lines_item').notNull().default(0),
+    /** The quantity or the sum changed. */
+    linesFigures: integer('lines_figures').notNull().default(0),
+    /** Receipts whose total the person put right — one edit of the receipt, never of its lines. */
+    totalsCorrected: integer('totals_corrected').notNull().default(0),
+    /** From the server taking the receipt to its record — never the phone's clock. */
+    within5m: integer('within_5m').notNull().default(0),
+    within15m: integer('within_15m').notNull().default(0),
+    within1h: integer('within_1h').notNull().default(0),
+    within1d: integer('within_1d').notNull().default(0),
+    later: integer('later').notNull().default(0),
+  },
+  (table) => [
+    check(
+      'receipt_days_counts_non_negative',
+      sql`least(${table.read}, ${table.readPartly}, ${table.reshoot}, ${table.unreadable}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
+    ),
+    check('receipt_days_edited_within_lines', sql`${table.linesEdited} <= ${table.lines}`),
+  ],
+)
+
+/**
  * «Написать разработчику» (MOL-147): what a person wrote to the one who builds the app. Not a
  * review — `verdicts.review` is that — so nothing reads it but the owner. The `id` is the number the
  * owner sees, `#fb42`, so it is the server's and counts up.

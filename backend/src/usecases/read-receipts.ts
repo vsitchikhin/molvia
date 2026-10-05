@@ -6,6 +6,7 @@ import {
   mergeParts,
   moneyOfHundredths,
   needsReshoot,
+  readPartly,
   receiptCityOf,
   receiptDateOf,
   receiptTimeOf,
@@ -58,7 +59,11 @@ export type ReadReport =
       readonly status: 'parsed' | 'failed'
       readonly failure: string | null
       readonly parts: number
+      /** Item lines found, and how many of them add up by their own arithmetic (MOL-222, Р-8). */
       readonly lines: number
+      readonly settled: number
+      /** Read only in part: the review says so (В-1). */
+      readonly partly: boolean
       readonly ms: number
     }
   | { readonly kind: 'reader_unavailable'; readonly reason: string }
@@ -87,8 +92,9 @@ function headOf(
 
 /**
  * Reads one receipt: every part in both page modes, the parts of each mode joined at the till's
- * articles, the mode whose lines add up kept (MOL-114). A receipt with too little in it fails as
- * `reshoot` (В-4); one laid out has its item lines cut out for the reader's training (MOL-169).
+ * articles, the mode whose lines add up kept (MOL-114). A receipt with no item line fails as `reshoot`;
+ * one with any is read, however little of it (MOL-222, В-1), and has its item lines cut out for the
+ * reader's training (MOL-169).
  */
 async function readOne(
   { reader, report, bind }: ReadReceiptsDeps,
@@ -151,7 +157,16 @@ async function readOne(
   if (bindings.length !== lines.length) {
     bindings = lines.map(() => ({ itemId: null, match: 'new', translation: null }))
   }
-  return { kind: 'parsed', readerVersion: version ?? '', head, lines, bindings, images }
+  const total = head.totalMinor === null ? null : { minor: head.totalMinor, currency }
+  return {
+    kind: 'parsed',
+    readerVersion: version ?? '',
+    head,
+    lines,
+    partly: readPartly(lines, total),
+    bindings,
+    images,
+  }
 }
 
 /** The item lines, row by row — never the head with the customer's name, never the total. */
@@ -237,6 +252,8 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
       failure: outcome.kind === 'failed' ? outcome.failure : null,
       parts: claimed.parts.length,
       lines: outcome.kind === 'parsed' ? outcome.lines.length : 0,
+      settled: outcome.kind === 'parsed' ? outcome.lines.filter((line) => line.settled).length : 0,
+      partly: outcome.kind === 'parsed' && outcome.partly,
       ms: Math.round(performance.now() - started),
     })
   }

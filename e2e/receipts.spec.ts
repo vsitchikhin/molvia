@@ -9,6 +9,16 @@ import { signedIn } from './session'
 // receipt is being read, so the waits below are generous.
 
 const sheet = (page: Page) => page.locator('dialog[open]')
+/** «Края чека» (MOL-222), over the capture sheet. */
+const edges = (page: Page) => page.locator('dialog[open]').filter({ hasText: 'Receipt edges' })
+
+/** Every shot passes «Края чека»: «Done» once its sheet has come up. */
+async function edged(page: Page): Promise<void> {
+  await expect(edges(page)).toBeVisible()
+  await page.waitForTimeout(400)
+  await edges(page).getByRole('button', { name: 'Done' }).click()
+  await expect(edges(page)).toHaveCount(0)
+}
 const READ = { timeout: 30_000 }
 
 /** A photo the browser itself draws and encodes: a sheet of paper with rows on it, as a JPEG. */
@@ -52,6 +62,7 @@ async function capture(page: Page, parts = 1): Promise<void> {
         mimeType: 'image/jpeg',
         buffer: await photo(page),
       })
+    await edged(page)
     await expect(sheet(page)).toContainText(`Part ${String(part)}`)
   }
   await page.waitForTimeout(400)
@@ -168,6 +179,7 @@ test('four parts and no fifth: the tile for the next part goes', async ({ page }
       mimeType: 'image/jpeg',
       buffer: await photo(page),
     })
+    await edged(page)
     await expect(sheet(page)).toContainText(`Part ${String(part)}`)
   }
   await expect(sheet(page)).toContainText('Four parts is the limit')

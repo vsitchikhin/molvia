@@ -33,7 +33,19 @@ export interface ReviewLine {
   readonly edited: boolean
   /** The quantity and the sum are the person's, not the reading's (review 28). */
   readonly ownFigures: boolean
+  /**
+   * What the person put right against what this review showed (MOL-222, the measure of 0.2): another
+   * item than the one shown — a new one kept new under another name is no edit, the reading gave no
+   * name to correct — and figures that differ from the ones the server showed before any edit. A total
+   * put right moves no line.
+   */
+  readonly changed: { readonly item: boolean; readonly figures: boolean }
 }
+
+const sameMoney = (a: Money | null, b: Money | null) =>
+  a === null || b === null ? a === b : a.minor === b.minor && a.currency === b.currency
+const sameQuantity = (a: Quantity | null, b: Quantity | null) =>
+  a === null || b === null ? a === b : a.milli === b.milli && a.unit === b.unit
 
 /** The name a new item is written under: the person's, else the gloss, else the line as printed. */
 function newName(line: ReceiptReviewLine): string {
@@ -62,7 +74,12 @@ function amountsOf(detail: ReceiptDetail, draft: ReceiptDraft | null) {
   return recordedSums(figures, total, digits)
 }
 
-export function reviewLines(detail: ReceiptDetail, draft: ReceiptDraft | null): ReviewLine[] {
+export function reviewLines(
+  detail: ReceiptDetail,
+  draft: ReceiptDraft | null,
+  /** The item each line showed at its first edit (`receiptDrafts.shownOf`, adversarial В1). */
+  shown: Readonly<Record<number, string | null>> = {},
+): ReviewLine[] {
   const amounts = amountsOf(detail, draft)
   return detail.lines.map((line, position) => {
     const edit = draft?.lines[position]
@@ -86,6 +103,20 @@ export function reviewLines(detail: ReceiptDetail, draft: ReceiptDraft | null): 
         skip: edit.skip,
         edited: true,
         ownFigures: figures !== undefined,
+        changed: {
+          // against what the review showed when the person put it right: read again after the memory
+          // learnt the same correction elsewhere, it shows their own word as the reading's (В1)
+          item: ((was) => (itemId !== null ? itemId !== was : was !== null))(
+            position in shown ? (shown[position] ?? null) : line.itemId,
+          ),
+          // against the figures the review showed before any edit — the server's — never the ones a
+          // total typed since would show: a line put right stays put right whatever came after it
+          // (adversarial Б3)
+          figures:
+            figures !== undefined &&
+            (!sameQuantity(figures.quantity, line.quantity) ||
+              !sameMoney(figures.amount, line.amount)),
+        },
       }
     }
     const isNew = line.itemId === null
@@ -102,6 +133,7 @@ export function reviewLines(detail: ReceiptDetail, draft: ReceiptDraft | null): 
       skip: false,
       edited: false,
       ownFigures: false,
+      changed: { item: false, figures: false },
     }
   })
 }
@@ -154,6 +186,11 @@ export function recordBody(
     place: id ? { id } : { name: place.name, city: place.city },
     purchasedOn: reviewDay(detail, draft, taken),
     ...(draft?.total ? { total: draft.total } : {}),
+    // what was put right, which only the phone knows (MOL-222): counted by the server, never recorded
+    edited: {
+      item: lines.filter((one) => !one.skip && one.changed.item).map((one) => one.position),
+      figures: lines.filter((one) => !one.skip && one.changed.figures).map((one) => one.position),
+    },
     lines: lines.map((one) =>
       one.skip
         ? { position: one.position, skip: true as const }

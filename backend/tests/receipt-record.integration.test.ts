@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { ERROR, receiptRecordedCodec, tripHistoryCodec, tripViewCodec } from '@molvia/model'
@@ -10,6 +10,7 @@ import {
   expenses,
   items,
   places,
+  receiptDays,
   receiptLineImages,
   receiptLines,
   receiptParts,
@@ -49,6 +50,8 @@ interface Line {
   readonly qty?: number
   readonly price: number
   readonly sum: number
+  /** The item the queue bound the line to (MOL-126). */
+  readonly itemId?: string
 }
 
 /** A receipt the queue laid out: one part still held, a row cut out of each line. */
@@ -97,7 +100,8 @@ async function parsedReceipt(
         sumMinor: BigInt(line.sum * 100),
         discountMinor: 0n,
         settled: line.price * (line.qty ?? 1) === line.sum,
-        match: 'new' as const,
+        itemId: line.itemId ?? null,
+        match: line.itemId === undefined ? ('new' as const) : ('search' as const),
       })),
     )
     await db.insert(receiptLineImages).values(
@@ -270,6 +274,8 @@ describe('«Записать»', () => {
 
     const other = await record(me, id, body(randomUUID()))
     expect([other.statusCode, codeOf(other)]).toEqual([409, ERROR.CONFLICT])
+    // the repeat is the same record: counted once (MOL-222)
+    expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 1, lines: 1 }])
   })
 
   it('answers «recorded?» only once a record still running has ended (MOL-169, Г1)', async () => {
@@ -575,5 +581,226 @@ describe('«Записать»', () => {
     expect((await record(me, id, again)).statusCode).toBe(200)
     const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
     expect([row?.status, row?.tripId]).toEqual(['recorded', again.tripId])
+    // the measure counts the receipt's first record only (MOL-222, review 7)
+    expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 1, lines: 1 }])
+  })
+
+  // MOL-222: the measure of 0.2 — what the person put right against what the review showed
+  it('counts the lines put right against what the review showed, each line once', async () => {
+    const me = await insertActor(db)
+    const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+    const cheese = await insertItem(db, { name: 'Сыр Лори', searchKey: 'syr lori' })
+    const place = await insertPlace(db, { name: 'Ереван Сити' })
+    const line = (
+      position: number,
+      item: Record<string, string>,
+      qty = 1,
+      drams = 100,
+    ): Record<string, unknown> => ({
+      position,
+      skip: false,
+      item,
+      quantity: pieces(qty),
+      amount: amount(drams),
+    })
+    // the first receipt teaches the shop's memory: article «7000005» is the cheese
+    const first = await parsedReceipt(
+      me,
+      [{ printed: 'ՊԱՆԻՐ', sku: '7000005', price: 100, sum: 100 }],
+      { receiptNo: '1' },
+    )
+    expect(
+      (
+        await record(me, first, {
+          tripId: randomUUID(),
+          place: { id: place },
+          purchasedOn: '2026-09-26',
+          lines: [line(0, { id: cheese })],
+        })
+      ).statusCode,
+    ).toBe(200)
+    // shown nothing, the cheese chosen: an item put right
+    expect(await db.select().from(receiptDays)).toMatchObject([
+      { recorded: 1, lines: 1, linesEdited: 1, linesItem: 1, linesFigures: 0, linesSkipped: 0 },
+    ])
+    await db.delete(receiptDays)
+
+    const second = await parsedReceipt(
+      me,
+      [
+        { printed: 'Կաթ', sku: '7000000', price: 100, sum: 100, itemId: milk },
+        { printed: 'Հաց', sku: '7000001', price: 100, sum: 100 },
+        { printed: 'Կաթ 2', sku: '7000002', price: 100, sum: 100, itemId: milk },
+        { printed: 'Ձու', sku: '7000003', price: 100, sum: 100 },
+        { printed: 'Տոպրակ', sku: '7000004', price: 100, sum: 100 },
+        { printed: 'ՊԱՆԻՐ', sku: '7000005', price: 100, sum: 100 },
+      ],
+      { receiptNo: '2' },
+    )
+    const response = await record(me, second, {
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        // as shown: the parse's milk
+        line(0, { id: milk }),
+        // as shown: new, named by the person — the reading gave no name to correct
+        line(1, { name: 'Хлеб' }),
+        // another item and another sum: one line edited, counted in both kinds
+        line(2, { id: cheese }, 1, 90),
+        // the quantity put right
+        line(3, { name: 'Яйца' }, 2, 100),
+        { position: 4, skip: true },
+        // the cheese the memory showed, left as it is
+        line(5, { id: cheese }),
+      ],
+    })
+    expect(response.statusCode).toBe(200)
+    expect(await db.select().from(receiptDays)).toMatchObject([
+      { recorded: 1, lines: 6, linesEdited: 3, linesSkipped: 1, linesItem: 1, linesFigures: 2 },
+    ])
+  })
+
+  it('counts the time from the server taking the receipt to its record, by the bucket', async () => {
+    const me = await insertActor(db)
+    const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+    const place = await insertPlace(db, { name: 'Ереван Сити' })
+    const ago = async (receiptNo: string, interval: string) => {
+      const id = await parsedReceipt(me, LINES.slice(0, 1), { receiptNo })
+      await db.execute(
+        sql`update receipts set created_at = now() - ${interval}::interval where id = ${id}`,
+      )
+      const response = await record(me, id, {
+        tripId: randomUUID(),
+        place: { id: place },
+        purchasedOn: '2026-09-26',
+        lines: [
+          {
+            position: 0,
+            skip: false,
+            item: { id: milk },
+            quantity: pieces(2),
+            amount: amount(740),
+          },
+        ],
+      })
+      expect(response.statusCode).toBe(200)
+    }
+    await ago('1', '4 minutes 50 seconds')
+    await ago('2', '5 minutes 10 seconds')
+    await ago('3', '59 minutes')
+    await ago('4', '23 hours')
+    await ago('5', '2 days')
+    expect(await db.select().from(receiptDays)).toMatchObject([
+      { recorded: 5, within5m: 1, within15m: 1, within1h: 1, within1d: 1, later: 1 },
+    ])
+  })
+
+  // MOL-222, adversarial А6: the memory learns from another record between the review and «Записать»;
+  // only the phone knows what it showed, and it says which lines it put right
+  it('counts what the phone says it put right, whatever the memory learnt meanwhile', async () => {
+    const me = await insertActor(db)
+    const milk = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3,2%' })
+    const cheese = await insertItem(db, { name: 'Сыр Лори', searchKey: 'syr lori' })
+    const place = await insertPlace(db, { name: 'Ереван Сити' })
+    const bound: Line = { printed: 'ՊԱՆԻՐ', sku: '7000005', price: 100, sum: 100, itemId: milk }
+    const a = await parsedReceipt(me, [bound], { receiptNo: '1' })
+    const b = await parsedReceipt(me, [bound], { receiptNo: '2' })
+    const c = await parsedReceipt(me, [bound], { receiptNo: '3' })
+    const body = (itemId: string, edited: number[]) => ({
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        {
+          position: 0,
+          skip: false,
+          item: { id: itemId },
+          quantity: pieces(1),
+          amount: amount(100),
+        },
+      ],
+      edited: { item: edited, figures: [] },
+    })
+    // A: the article put right — milk to cheese — and the memory learns it
+    expect((await record(me, a, body(cheese, [0]))).statusCode).toBe(200)
+    expect(await db.select().from(receiptDays)).toMatchObject([{ linesEdited: 1, linesItem: 1 }])
+    await db.delete(receiptDays)
+    // B: recorded as its review showed it before A — milk, nothing put right
+    expect((await record(me, b, body(milk, []))).statusCode).toBe(200)
+    expect(await db.select().from(receiptDays)).toMatchObject([{ linesEdited: 0, linesItem: 0 }])
+    await db.delete(receiptDays)
+    // C: put right the same way as A, though the memory would now show cheese
+    expect((await record(me, c, body(cheese, [0]))).statusCode).toBe(200)
+    expect(await db.select().from(receiptDays)).toMatchObject([{ linesEdited: 1, linesItem: 1 }])
+  })
+
+  // MOL-222, review 2 and adversarial А7: a total put right confirms the printed sums of the lines that
+  // do not add up (В-5) — one edit of the receipt, never of the lines nobody opened
+  it('counts a total put right as the receipt’s own edit, none of its lines', async () => {
+    const me = await insertActor(db)
+    const chocolate = await insertItem(db, { name: 'Шоколад', searchKey: 'shokolad' })
+    const milk = await insertItem(db, { name: 'Молоко', searchKey: 'moloko' })
+    const place = await insertPlace(db, { name: 'Ереван Сити' })
+    const lines: Line[] = [
+      { printed: 'Շոկոլադ', sku: '1110002', price: 890, sum: 980, itemId: chocolate },
+      { printed: 'Կաթ', sku: '1163909', price: 500, sum: 500, itemId: milk },
+    ]
+    // OCR read 1 408 for the printed 1 480: the review shows the chocolate at 890
+    const phoneBody = (edited: boolean) => ({
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      total: amount(1_480),
+      // what the phone sends once the total confirms the printed 980 (`amountsOf`, review 4)
+      lines: [
+        {
+          position: 0,
+          skip: false,
+          item: { id: chocolate },
+          quantity: pieces(1),
+          amount: amount(980),
+        },
+        { position: 1, skip: false, item: { id: milk }, quantity: pieces(1), amount: amount(500) },
+      ],
+      ...(edited ? { edited: { item: [], figures: [] } } : {}),
+    })
+    for (const [receiptNo, edited] of [
+      ['1', true],
+      ['2', false],
+    ] as const) {
+      const id = await parsedReceipt(me, lines, { receiptNo, totalMinor: 140_800n })
+      expect((await record(me, id, phoneBody(edited))).statusCode).toBe(200)
+      // the phone's word, and an earlier build's comparison under the phone's total, alike
+      expect(await db.select().from(receiptDays), receiptNo).toMatchObject([
+        { recorded: 1, lines: 2, linesEdited: 0, linesFigures: 0, totalsCorrected: 1 },
+      ])
+      await db.delete(receiptDays)
+    }
+    // the total read, opened and saved as it was: a check, never «total put right» (review 10, Б2)
+    const checked = await parsedReceipt(me, lines, { receiptNo: '3', totalMinor: 148_000n })
+    expect((await record(me, checked, phoneBody(true))).statusCode).toBe(200)
+    expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 1, totalsCorrected: 0 }])
+  })
+
+  it('takes the phone’s positions only of lines recorded: a skipped or unknown one is no item edit', async () => {
+    const me = await insertActor(db)
+    const milk = await insertItem(db, { name: 'Молоко', searchKey: 'moloko' })
+    const place = await insertPlace(db, { name: 'Ереван Сити' })
+    const id = await parsedReceipt(me, LINES.slice(0, 2))
+    const response = await record(me, id, {
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: amount(740) },
+        { position: 1, skip: true },
+      ],
+      edited: { item: [0, 1, 7], figures: [0] },
+    })
+    expect(response.statusCode).toBe(200)
+    expect(await db.select().from(receiptDays)).toMatchObject([
+      { lines: 2, linesEdited: 2, linesSkipped: 1, linesItem: 1, linesFigures: 1 },
+    ])
   })
 })
