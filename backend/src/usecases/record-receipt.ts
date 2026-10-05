@@ -20,9 +20,11 @@ import type {
   ReceiptRecorded,
   ReceiptSettled,
 } from '@molvia/model'
-import type { StoredReceiptLine } from '@/db/receipts-repository'
+import type { ReceiptEdits, StoredReceiptLine } from '@/db/receipts-repository'
 import type { MemoryWord } from '@/db/store-memory-repository'
 import type { Transact } from '@/db/unit-of-work'
+import { shownLines } from './receipts'
+import type { ShownLines } from './receipts'
 import { tripRateOn } from './start-trip'
 import type { Today } from './today'
 
@@ -31,18 +33,76 @@ type RecordedLine = Extract<ReceiptRecordBody['lines'][number], { skip: false }>
 const sameMoney = (a: Money | null, b: Money | null) =>
   a === null || b === null ? a === b : a.minor === b.minor && a.currency === b.currency
 
+const sameQuantity = (a: StoredReceiptLine['quantity'], b: StoredReceiptLine['quantity']) =>
+  a === null || b === null ? a === b : a.milli === b.milli && a.unit === b.unit
+
 /**
  * A line recorded as it was read (В-4): it added up, and the person changed neither its quantity nor
  * what was paid. Its cut-out rows keep the text read as their confirmed text; its shelf price is what
  * the memory keeps.
  */
 function asRead(stored: StoredReceiptLine, line: RecordedLine): boolean {
-  const quantity = stored.quantity
-  const same =
-    line.quantity === null || quantity === null
-      ? line.quantity === quantity
-      : line.quantity.milli === quantity.milli && line.quantity.unit === quantity.unit
-  return stored.settled && same && sameMoney(line.amount, stored.sum)
+  return (
+    stored.settled &&
+    sameQuantity(line.quantity, stored.quantity) &&
+    sameMoney(line.amount, stored.sum)
+  )
+}
+
+/**
+ * What the person put right (MOL-222, Р-6): «не записывать», another item, the quantity or the sum, a
+ * line counted once however many of them; and the total, an edit of the receipt and never of its lines
+ * (review 2). The items and the figures are the phone's word (`body.edited`): only the phone knows what
+ * its review showed — the shops' memory may have learnt meanwhile from another record (adversarial А6)
+ * — and a number of the measure is no money the server must work out itself. A phone of an earlier
+ * build sends none: then each line is compared with the review as it would show it now, under the total
+ * the phone sends — a total put right moves the sums of the lines it confirms (В-5), and those moved no
+ * line. A new item kept new under another name is no edit there: the reading gave no name to correct.
+ */
+function editsOf(
+  body: ReceiptRecordBody,
+  stored: readonly StoredReceiptLine[],
+  shown: ShownLines,
+  total: Money | null,
+): ReceiptEdits {
+  const recorded = new Set(
+    body.lines
+      .filter((line) => !line.skip && stored[line.position] !== undefined)
+      .map((l) => l.position),
+  )
+  const skipped = body.lines.filter((line) => line.skip).length
+  let item: Set<number>
+  let figures: Set<number>
+  if (body.edited !== undefined) {
+    // positions of lines recorded only: a skipped line is put right as «не записывать» already
+    item = new Set(body.edited.item.filter((position) => recorded.has(position)))
+    figures = new Set(body.edited.figures.filter((position) => recorded.has(position)))
+  } else {
+    item = new Set()
+    figures = new Set()
+    for (const line of body.lines) {
+      const read = stored[line.position]
+      if (line.skip || read === undefined) continue
+      const was = shown.itemIds[line.position] ?? null
+      if ('id' in line.item ? line.item.id !== was : was !== null) item.add(line.position)
+      if (
+        !sameQuantity(line.quantity, read.quantity) ||
+        !sameMoney(line.amount, shown.amounts[line.position] ?? null)
+      ) {
+        figures.add(line.position)
+      }
+    }
+  }
+  const edited = new Set([...item, ...figures]).size + skipped
+  return {
+    lines: body.lines.length,
+    edited,
+    skipped,
+    item: item.size,
+    figures: figures.size,
+    // the total the review showed, opened and saved as it was, is a check, not an edit (review 10)
+    totalCorrected: body.total !== undefined && !sameMoney(body.total, total),
+  }
 }
 
 /**
@@ -156,6 +216,17 @@ export async function recordReceipt(
       throw new DomainError(ERROR.CONFLICT)
     }
 
+    // read before the memory is taught by this very record, and under the total the phone sends: the
+    // review it showed — the earlier build's measure, when the phone does not say what it put right
+    const shown = await shownLines(
+      repositories,
+      actor.id,
+      held.tin,
+      held.lines,
+      body.total ?? held.total,
+      held.currency,
+    )
+
     const recorded = body.lines
       .filter((line): line is RecordedLine => !line.skip)
       .sort((a, b) => a.position - b.position)
@@ -233,7 +304,14 @@ export async function recordReceipt(
       }
     }
     if (held.tin !== null) await storeMemory.remember(actor.id, held.tin, words)
-    await receipts.markRecorded(held.id, { tripId: trip.id, expenses: written, confirmed })
+    await receipts.markRecorded(held.id, {
+      tripId: trip.id,
+      expenses: written,
+      confirmed,
+      edits: editsOf(body, held.lines, shown, held.total),
+      // recorded again once its trip was removed for good: counted the first time only (review 7)
+      counted: held.status !== 'recorded',
+    })
     return answer(trip.id)
   })
 }

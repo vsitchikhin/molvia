@@ -107,6 +107,18 @@
     </template>
   </BottomSheet>
 
+  <!-- «Края чека» (MOL-222): every shot, taken or picked, passes it before it is a part. -->
+  <ReceiptEdgesSheet
+    :open="edgesOpen"
+    :source="edgesSource"
+    :part="edgesPart"
+    :on-closed="edgesClosed"
+    @update:open="edgesOpen = $event"
+    @done="edged"
+    @closer="closer"
+    @failed="edgesFailed"
+  />
+
   <!-- «Часть 2 из 3» (4d): a sheet over the sheet — «‹», no × (Д-1). -->
   <BottomSheet :open="chosen !== null" back @update:open="(open) => !open && (chosen = null)">
     <template #title>{{
@@ -127,7 +139,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeUnmount, ref } from 'vue'
+import { computed, defineComponent, onBeforeUnmount, ref, shallowRef } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCamera from '~icons/mdi/camera-outline'
@@ -144,7 +156,8 @@ import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { useOnline } from '@/composables/useOnline'
 import { newId } from '@/ids'
-import { preparePhoto } from '@/receipts/photo'
+import ReceiptEdgesSheet from '@/components/ReceiptEdgesSheet.vue'
+import { decodePhoto, encodePhoto } from '@/receipts/photo'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
 
 const HINTS = [
@@ -172,6 +185,7 @@ export default defineComponent({
   components: {
     AppButton,
     BottomSheet,
+    ReceiptEdgesSheet,
     IconCamera,
     IconCameraPlus,
     IconCloudOff,
@@ -203,6 +217,11 @@ export default defineComponent({
     const problem = ref<'bad_file' | 'not_kept' | null>(null)
     const preparing = ref(false)
     const sending = ref(false)
+    /** The shot decoded and waiting on «Края чека»; `edgesFor` — which part it is for. */
+    const edgesOpen = ref(false)
+    const edgesSource = shallowRef<HTMLCanvasElement | null>(null)
+    let edgesFor: number | null = null
+    const edgesPart = ref(1)
     /** Which part a file being taken is for: `null` — a new one at the end. */
     let target: number | null = null
     /** Whether the sheet was closed by «Отправить чек», and offline then. */
@@ -226,13 +245,40 @@ export default defineComponent({
       if (!file) return
       preparing.value = true
       try {
-        const prepared = await preparePhoto(file)
+        const canvas = await decodePhoto(file)
+        if (!canvas) {
+          problem.value = 'bad_file'
+          return
+        }
+        // the shot goes to «Края чека» (MOL-222): a part is the receipt cut out, never the frame
+        releaseCanvas(edgesSource.value)
+        edgesSource.value = canvas
+        edgesFor = target
+        edgesPart.value = (target ?? parts.value.length) + 1
+        edgesOpen.value = true
+      } finally {
+        preparing.value = false
+      }
+    }
+
+    function releaseCanvas(canvas: HTMLCanvasElement | null): void {
+      if (!canvas) return
+      canvas.width = 0
+      canvas.height = 0
+    }
+
+    /** The receipt cut out and straight: encoded as it is sent, and a part — new, or in place. */
+    async function edged(straight: HTMLCanvasElement): Promise<void> {
+      const at = edgesFor
+      edgesOpen.value = false
+      preparing.value = true
+      try {
+        const prepared = await encodePhoto(straight)
         if (!prepared.ok) {
           problem.value = 'bad_file'
           return
         }
         const part: Part = { photo: prepared.photo, url: URL.createObjectURL(prepared.photo) }
-        const at = target
         if (at !== null && parts.value[at]) {
           URL.revokeObjectURL(parts.value[at].url)
           parts.value = parts.value.map((one, index) => (index === at ? part : one))
@@ -241,8 +287,27 @@ export default defineComponent({
           parts.value = [...parts.value, part]
         }
       } finally {
+        releaseCanvas(straight)
         preparing.value = false
       }
+    }
+
+    /** «Подойти ближе»: this shot is dropped and the camera asked again for the same part. */
+    function closer(): void {
+      edgesOpen.value = false
+      ask(take.value, edgesFor)
+    }
+
+    /** The shot could not be cut out: given up, and said as a file that did not open (4g). */
+    function edgesFailed(): void {
+      edgesOpen.value = false
+      problem.value = 'bad_file'
+    }
+
+    /** «Края чека» is away: its photo goes with it — taken, cut out or given up. */
+    function edgesClosed(): void {
+      releaseCanvas(edgesSource.value)
+      edgesSource.value = null
     }
 
     function removePart(): void {
@@ -299,7 +364,10 @@ export default defineComponent({
       props.onClosed?.()
     }
 
-    onBeforeUnmount(forgetParts)
+    onBeforeUnmount(() => {
+      forgetParts()
+      releaseCanvas(edgesSource.value)
+    })
 
     return {
       t,
@@ -317,6 +385,13 @@ export default defineComponent({
       sending,
       ask,
       taken,
+      edgesOpen,
+      edgesSource,
+      edgesPart,
+      edged: (straight: HTMLCanvasElement) => void edged(straight),
+      closer,
+      edgesFailed,
+      edgesClosed,
       removePart,
       send,
       closed,

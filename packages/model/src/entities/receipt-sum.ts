@@ -143,6 +143,52 @@ export function receiptBalance(
 }
 
 /**
+ * Below this share of the printed total a receipt is read only in part (В-4 of MOL-125): a crumpled one
+ * loses its rows. Above it one or two lost lines are the review's to live with.
+ */
+export const READ_PARTLY_TOTAL_SHARE = 0.7
+
+/** A line as read: whether its own arithmetic held, and what was paid for it. */
+export interface ReadFigures {
+  readonly settled: boolean
+  readonly sum: Money | null
+}
+
+/**
+ * What the lines read make up of the printed total (MOL-222): each line's sum in the total's currency
+ * and not past the total itself — a sum past it or in another currency covers nothing (review Р11):
+ * junk OCR would otherwise vouch for a receipt barely read. `null` without a total. The one count the
+ * hint «строки дают X из Y» and `readPartly` both read.
+ */
+export function readCovered(lines: readonly ReadFigures[], total: Money | null): Money | null {
+  if (total === null || total.minor <= 0n) return null
+  let read = 0n
+  for (const { sum } of lines) {
+    if (sum !== null && sum.currency === total.currency && sum.minor <= total.minor)
+      read += sum.minor
+  }
+  return { minor: read, currency: total.currency }
+}
+
+/**
+ * Read only in part (MOL-222, В-1 — the «переснимите» of before, now a hint on the review that never
+ * keeps the receipt from being recorded): no lines; or the total was read and the lines make up less
+ * than `READ_PARTLY_TOTAL_SHARE` of it (`readCovered`); or the total was not read and fewer than half
+ * of the lines add up by their own arithmetic. A total that was not read decides nothing alone — OCR
+ * missed it on 9 of the bench's 16 readings, most of them good ones. Of what was read, never of the
+ * person's edits: the server counts it at the reading, the phone shows it on the review.
+ */
+export function readPartly(lines: readonly ReadFigures[], total: Money | null): boolean {
+  if (lines.length === 0) return true
+  const covered = readCovered(lines, total)
+  if (covered !== null && total !== null) {
+    return covered.minor * 100n < total.minor * BigInt(Math.round(READ_PARTLY_TOTAL_SHARE * 100))
+  }
+  const settled = lines.filter((line) => line.settled).length
+  return settled * 2 < lines.length
+}
+
+/**
  * The price read differs from the one the shop's memory holds for this article by one digit OCR confuses
  * (5↔6, 1↔4, 3↔8, 0↔9) — «60 60» read for «50 50» adds up either way, and only the memory can tell
  * (owner, В-1, 03.10.2026). A hint for the person, never a correction: the figures stay as read.

@@ -7,7 +7,7 @@ import { sql } from 'drizzle-orm'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor } from './fixtures'
 import { createGatesReader } from '@/db/gates-reader'
-import { erasures, loginDays, reminderDays } from '@/db/schema'
+import { erasures, loginDays, receiptDays, reminderDays } from '@/db/schema'
 
 const { db, close } = connectDrizzle()
 const reader = createGatesReader(db)
@@ -130,6 +130,42 @@ describe('the gates reader', () => {
       offSettings: 0,
       offBlocked: 2,
     })
+  })
+
+  // MOL-222: the scanner's measure, summed over the Yerevan days the window touches, edges and all
+  it('sums the receipts of the days the window touches, and only those', async () => {
+    const counts = { read: 2, readPartly: 1, recorded: 1, lines: 10, linesEdited: 4, within5m: 1 }
+    await db.insert(receiptDays).values([
+      { day: '2026-10-06', ...counts }, // the day before
+      { day: '2026-10-07', ...counts },
+      { day: '2026-10-18', ...counts, reshoot: 1, later: 1 },
+      { day: '2026-10-19', ...counts }, // the day after
+    ])
+    const report = await reader.read({
+      from: new Date('2026-10-07T12:00:00+04:00'),
+      to: new Date('2026-10-19T00:00:00+04:00'),
+    })
+    expect(report.receipts).toMatchObject({
+      firstDay: '2026-10-07',
+      lastDay: '2026-10-18',
+      read: 4,
+      readPartly: 2,
+      reshoot: 1,
+      unreadable: 0,
+      recorded: 2,
+      lines: 20,
+      linesEdited: 8,
+      within5m: 2,
+      later: 1,
+    })
+  })
+
+  it('reads zeros for days without a receipt', async () => {
+    const report = await reader.read({
+      from: new Date('2026-10-07T00:00:00+04:00'),
+      to: new Date('2026-10-08T00:00:00+04:00'),
+    })
+    expect(report.receipts).toMatchObject({ read: 0, recorded: 0, lines: 0, linesEdited: 0 })
   })
 
   it('reads zeros for days without a reminder', async () => {

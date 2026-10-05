@@ -669,6 +669,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 failure: event.failure,
                 parts: event.parts,
                 lines: event.lines,
+                settled: event.settled,
+                partly: event.partly,
                 ms: event.ms,
               },
               'receipt read',

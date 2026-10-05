@@ -14,6 +14,7 @@ import ReceiptPlaceSheet from '@/components/ReceiptPlaceSheet.vue'
 import { stepBack } from '@/navigation'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
+import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
 
@@ -22,6 +23,7 @@ const recordReceipt = vi.fn<(id: string, body: ReceiptRecordBody) => Promise<{ t
 const receipts = vi.fn<() => Promise<{ receipts: ReceiptDetail['receipt'][] }>>()
 const receiptSettled = vi.fn<(id: string) => Promise<{ tripId: string | null }>>()
 const keepOnly = vi.fn<(named: ReadonlySet<string>) => Promise<void>>()
+const shelfParts = vi.fn<(id: string) => Promise<Blob[]>>()
 // Every other call of the API hangs: the screens behind this one load and never answer.
 vi.mock('@/api', () => ({
   api: new Proxy(
@@ -43,7 +45,7 @@ vi.mock('@/receipts/photoShelf', () => ({
   photoShelf: () => ({
     put: () => Promise.resolve(true),
     get: () => Promise.resolve(null),
-    parts: () => Promise.resolve([]),
+    parts: (id: string) => shelfParts(id),
     drop: () => Promise.resolve(),
     keepOnly: (named: ReadonlySet<string>) => keepOnly(named),
   }),
@@ -153,6 +155,8 @@ describe('ReceiptView (MOL-127)', () => {
     )
     keepOnly.mockReset()
     keepOnly.mockResolvedValue(undefined)
+    shelfParts.mockReset()
+    shelfParts.mockResolvedValue([])
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
     clock = 0
     vi.spyOn(performance, 'now').mockImplementation(() => clock)
@@ -173,6 +177,34 @@ describe('ReceiptView (MOL-127)', () => {
     expect(recordReceipt.mock.calls[0]?.[1].place).toEqual({ id: PLACE })
     expect(router.currentRoute.value.name).toBe('purchase')
     expect(router.currentRoute.value.params.tripId).toBe(TRIP)
+  })
+
+  // MOL-222, adversarial В1: the line was put right while the review showed the parse's item; read
+  // again after another record taught the memory that same correction, it shows the person's word —
+  // and «Записать» still says the line was put right
+  it('sends a line put right as put right though the review read again shows the same item', async () => {
+    const shownThen = 'aaaaaaaa-0000-4000-8000-000000000001'
+    const cheese = 'aaaaaaaa-0000-4000-8000-000000000009'
+    const reread = detail()
+    receipt.mockResolvedValue({
+      ...reread,
+      lines: reread.lines.map((one, position) =>
+        position === 0
+          ? { ...one, itemId: cheese, itemName: 'Сыр', match: 'memory' as const }
+          : one,
+      ),
+    })
+    const { view } = await render()
+    useReceiptDraftsStore().setLine(
+      ID,
+      0,
+      { item: { id: cheese, name: 'Сыр' }, skip: false },
+      shownThen,
+    )
+    await flushPromises()
+    await button(view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    expect(recordReceipt.mock.calls[0]?.[1].edited).toEqual({ item: [0], figures: [] })
   })
 
   it('with no place read, «Записать» asks for it first and sends nothing', async () => {
@@ -429,6 +461,70 @@ describe('ReceiptView (MOL-127)', () => {
     expect(useReceiptQueueStore().rejected).toEqual([])
     expect(keepOnly.mock.calls.at(-1)?.[0].has(ID)).toBe(false)
     expect(useReceiptDraftsStore().draftOf(ID)).toBeNull()
+  })
+
+  // MOL-222, В-1: what was «переснимите» is the review's hint, and the receipt is recorded all the same
+  it('read in part: the lines against the total, «Переснять» beside, «Записать» as ever', async () => {
+    const partial = detail()
+    receipt.mockResolvedValue({ ...partial, receipt: { ...partial.receipt, total: amd('10000') } })
+    const { view } = await render()
+    const strip = view.get('.partly')
+    expect(strip.text()).toContain('Прочитали не всё: строки дают')
+    expect(strip.text()).toContain(ru.receipt.capture.retake)
+    const record = button(view, 'Записать 2')
+    expect(record.attributes('aria-disabled')).not.toBe('true')
+  })
+
+  it('read in part with no total: how many lines added up; half of them is enough', async () => {
+    const one = detail()
+    const first = line('ԿԱԹ', '500')
+    const unsettled = { ...line('ՀԱՑ', '400'), settled: false }
+    receipt.mockResolvedValue({
+      ...one,
+      receipt: { ...one.receipt, total: null },
+      lines: [first, unsettled, unsettled],
+    })
+    const { view } = await render()
+    expect(view.get('.partly').text()).toContain('сошлось строк — 1 из 3')
+    while (mounted.length) mounted.pop()?.unmount()
+    receipt.mockResolvedValue({
+      ...one,
+      receipt: { ...one.receipt, total: null },
+      lines: [first, unsettled],
+    })
+    const half = await render()
+    expect(half.view.find('.partly').exists()).toBe(false)
+  })
+
+  it('must not hint when the lines make up the total (am-03 and its like)', async () => {
+    const { view } = await render()
+    expect(view.find('.partly').exists()).toBe(false)
+  })
+
+  it('not one line found: says only that, and names no cause it does not know (MOL-222)', async () => {
+    const failed = detail({ status: 'failed' })
+    receipt.mockResolvedValue({ ...failed, receipt: { ...failed.receipt, failure: 'reshoot' } })
+    const { view } = await render()
+    expect(view.text()).toContain(ru.receipt.failed.reshoot_title)
+    expect(view.text()).toContain(ru.receipt.failed.reshoot_body)
+    expect(view.text()).not.toMatch(/смят|в тени/)
+  })
+
+  it('«Отправить чек разработчику» hands the photos of this phone to the sheet, seen there (В-2)', async () => {
+    const photo = new Blob([new Uint8Array([0xff, 0xd8])], { type: 'image/jpeg' })
+    shelfParts.mockResolvedValue([photo])
+    const { view } = await render()
+    await button(view, ru.receipt.review.to_developer).trigger('click')
+    const sheet = useFeedbackSheetStore()
+    expect(sheet.shown).toBe(true)
+    expect(sheet.entry).toEqual({ from: 'receipt' })
+    expect(sheet.takePhotos()).toEqual([photo])
+  })
+
+  it('with no photo on this phone there is nothing to send: no button (В-2)', async () => {
+    receipt.mockResolvedValue(detail({ status: 'failed' }))
+    const { view } = await render()
+    expect(view.text()).not.toContain(ru.receipt.review.to_developer)
   })
 
   it('not read, after a move to Georgia: a record by hand, no retake, and the words say so (MOL-109, Б3)', async () => {

@@ -263,6 +263,8 @@ describe('какие ключи приложение пишет на устро�
       // Очередь чеков и её отказы (MOL-127).
       'molvia.receipt-queue',
       'molvia.receipt-rejected',
+      // Какой товар показал просмотр при первой правке строки — мера 0.2 (MOL-222, В1).
+      'molvia.receipt-shown',
       'molvia.receipts',
       // Набранный поиск и промах — пережить перезагрузку этого окна (MOL-46).
       'molvia.search-draft',

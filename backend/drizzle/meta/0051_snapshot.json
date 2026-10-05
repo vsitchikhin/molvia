@@ -1,6 +1,6 @@
 {
-  "id": "2f7d830b-7c13-413a-9817-ca1cc3604c0e",
-  "prevId": "107eb535-8ef6-4f1a-9722-3471b1ca1c06",
+  "id": "6704d2ea-210c-4d35-80a8-def2ae2bfef1",
+  "prevId": "757d0632-78a5-4586-9249-b75ffa295804",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -96,6 +96,18 @@
         },
         "consented_at": {
           "name": "consented_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "analytics_off_at": {
+          "name": "analytics_off_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "analytics_on_at": {
+          "name": "analytics_on_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -3331,6 +3343,13 @@
           "notNull": true,
           "default": 0
         },
+        "totals_corrected": {
+          "name": "totals_corrected",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "within_5m": {
           "name": "within_5m",
           "type": "integer",
@@ -3375,7 +3394,7 @@
       "checkConstraints": {
         "receipt_days_counts_non_negative": {
           "name": "receipt_days_counts_non_negative",
-          "value": "least(\"receipt_days\".\"read\", \"receipt_days\".\"read_partly\", \"receipt_days\".\"reshoot\", \"receipt_days\".\"unreadable\", \"receipt_days\".\"recorded\", \"receipt_days\".\"lines\", \"receipt_days\".\"lines_edited\", \"receipt_days\".\"lines_skipped\", \"receipt_days\".\"lines_item\", \"receipt_days\".\"lines_figures\", \"receipt_days\".\"within_5m\", \"receipt_days\".\"within_15m\", \"receipt_days\".\"within_1h\", \"receipt_days\".\"within_1d\", \"receipt_days\".\"later\") >= 0"
+          "value": "least(\"receipt_days\".\"read\", \"receipt_days\".\"read_partly\", \"receipt_days\".\"reshoot\", \"receipt_days\".\"unreadable\", \"receipt_days\".\"recorded\", \"receipt_days\".\"lines\", \"receipt_days\".\"lines_edited\", \"receipt_days\".\"lines_skipped\", \"receipt_days\".\"lines_item\", \"receipt_days\".\"lines_figures\", \"receipt_days\".\"totals_corrected\", \"receipt_days\".\"within_5m\", \"receipt_days\".\"within_15m\", \"receipt_days\".\"within_1h\", \"receipt_days\".\"within_1d\", \"receipt_days\".\"later\") >= 0"
         },
         "receipt_days_edited_within_lines": {
           "name": "receipt_days_edited_within_lines",
