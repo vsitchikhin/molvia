@@ -29,10 +29,12 @@ import { kindAt } from './kind-word'
 import { idOrNull, rowLimit, theRow } from './rows'
 import { vectorLiteral } from './item-embeddings-repository'
 import { itemBarcodes, itemEmbeddings, items, searchPicks } from './schema'
+import { liveItemId } from './trace'
 
 export interface ItemRepository {
   /** `createdBy` is null for a seeded item — it belongs to nobody. */
   create(input: NewItem, createdBy: string | null): Promise<Item>
+  /** The item an id stands for: through the trace of a merge to its survivor (MOL-106). */
   byId(id: string): Promise<Item | null>
   byIds(ids: readonly string[]): Promise<Item[]>
   /**
@@ -967,13 +969,18 @@ export function createItemRepository(db: Conn): ItemRepository {
     async byId(id) {
       if (idOrNull(id) === null) return null
 
-      const [row] = await db.select().from(items).where(eq(items.id, id)).limit(1)
+      // Through a trace to its survivor (MOL-106): every write that names an item reads it here first.
+      const [row] = await db
+        .select()
+        .from(items)
+        .where(sql`${items.id} = ${liveItemId(id)}`)
+        .limit(1)
       if (!row) return null
 
       const codes = await db
         .select()
         .from(itemBarcodes)
-        .where(eq(itemBarcodes.itemId, id))
+        .where(eq(itemBarcodes.itemId, row.id))
         .orderBy(asc(itemBarcodes.code))
 
       return toItem(
@@ -1012,6 +1019,8 @@ export function createItemRepository(db: Conn): ItemRepository {
           array(select h.hs from item_hs h where h.item_id = i.id order by h.hs) as headings
         from items i
         where exists (select 1 from item_names n where n.item_id = i.id and n.language = ${language})
+          -- a trace is no item of its own: its names went to the survivor (MOL-106)
+          and i.merged_into is null
         order by i.name collate "C", i.id`)
       return rows.map((row) => ({
         itemId: row.id,
@@ -1032,12 +1041,15 @@ export function createItemRepository(db: Conn): ItemRepository {
           // all meet at this lock, and the lookup below is an equality the GIN index serves.
           await lockItemKey(tx, input.kind, key)
           const rows = await tx
-            .select({ id: items.id, name: items.name })
+            .select({ id: items.id, name: items.name, mergedInto: items.mergedInto })
             .from(items)
             .where(and(eq(items.kind, input.kind), eq(items.searchKey, key)))
             .orderBy(asc(items.createdAt), asc(items.id))
 
-          const same = rows.find((row) => nameIdentity(row.name) === wanted)
+          // A trace's name is its survivor's second name (MOL-106): proposed again, or written by the
+          // seed that only adds, it gets the survivor — a merged twin never comes back by its name.
+          const named = rows.find((row) => nameIdentity(row.name) === wanted)
+          const same = named && { id: named.mergedInto ?? named.id }
           if (same) {
             // Beside a name the catalogue already holds, the codes are not written (MOL-100, owner's
             // decision В-5): the screen asks whether the code is this item's, as it asks of any item
@@ -1063,13 +1075,13 @@ export function createItemRepository(db: Conn): ItemRepository {
           const [row] = await tx
             .select({ id: items.id })
             .from(items)
-            .where(eq(items.id, itemId))
+            .where(sql`${items.id} = ${liveItemId(itemId)}`)
             .for('update')
           if (!row) return null
-          const claimed = await claim(tx, [code], itemId)
+          const claimed = await claim(tx, [code], row.id)
           if ('taken' in claimed) return holder(tx, claimed.taken)
-          await bind(tx, itemId, claimed.free, actorId)
-          const [item] = await load([itemId], tx)
+          await bind(tx, row.id, claimed.free, actorId)
+          const [item] = await load([row.id], tx)
           return item ? { item, added: claimed.free.length > 0 } : null
         }),
       )
@@ -1082,13 +1094,13 @@ export function createItemRepository(db: Conn): ItemRepository {
         const [row] = await tx
           .select({ id: items.id })
           .from(items)
-          .where(eq(items.id, itemId))
+          .where(sql`${items.id} = ${liveItemId(itemId)}`)
           .for('update')
         if (!row) return false
         await lockBarcodes(tx, [...new Set(forms)])
         await tx
           .delete(itemBarcodes)
-          .where(and(eq(itemBarcodes.itemId, itemId), inArray(itemBarcodes.code, forms)))
+          .where(and(eq(itemBarcodes.itemId, row.id), inArray(itemBarcodes.code, forms)))
         return true
       })
     },

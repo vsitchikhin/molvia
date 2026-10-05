@@ -3,6 +3,7 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { searchQueryKey } from './items-repository'
 import { QUERY_KEY_MAX_OCTETS, searchPicks } from './schema'
+import { liveItemId } from './trace'
 
 export interface SearchPickRepository {
   /**
@@ -38,7 +39,8 @@ export function createSearchPickRepository(db: Conn): SearchPickRepository {
     await translateFailures(() =>
       db
         .insert(searchPicks)
-        .values({ actorId, queryKey: key, itemId, admits })
+        // A pick of an id from before a merge is the survivor's (MOL-106).
+        .values({ actorId, queryKey: key, itemId: liveItemId(itemId), admits })
         .onConflictDoUpdate({
           target: [searchPicks.actorId, searchPicks.queryKey, searchPicks.itemId],
           set: {
