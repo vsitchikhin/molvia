@@ -511,7 +511,7 @@ describe('страж схемы', () => {
       order by 1`)
 
     // Red here is a person's new data: it also adds its row to the record of processing
-    // (Confluence 12091393, MOL-97) in the same PR — nothing but this line reminds of it.
+    // (Confluence 12091393, MOL-97) in the same PR — no test holds it, only this line and `CLAUDE.md`.
     expect(references.map((row) => row.reference)).toEqual([...ACTOR_REFERENCES].sort())
   })
 })

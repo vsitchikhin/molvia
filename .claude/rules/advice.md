@@ -129,8 +129,14 @@ on the foreign key, as before. **Out of both halves, never the numerator alone**
 back, two object — one of them back — reads 2 of 10 if only the rows go, a gate pulled towards
 «stop» by objections rather than the hypothesis; 2 of 8 with «opted out 2» is the truth. **Gate 0.2
 too** (В-2): «счётчики ворот» rest on the same basis as the log, so a count over verdicts is
-analytics as much as the log; there the objection is read as it stands now — the verdicts are not
-erased, so back on, the person counts again. **Gate 0.3 counts someone back on only if they were
+analytics as much as the log; there the objection is read as it stands now — the live verdicts are
+not erased, they are the contract's, so back on, the person counts again. **The withdrawn ones are
+kept for the gate alone, so off erases them too** (MOL-97, owner's decision on the review, Б1), in
+the same transaction and under the same lock as the log, and a withdrawal while off takes the row
+whole — `withdraw` takes the log's lock, so the two at once leave nothing (`lockLog`). Out of the
+gate, the rows have no reader; once the switch is a withdrawn consent (edition 2), Armenia's art. 21
+§6 leaves them no basis either. The price is the log's: back on, the person counts in 0.2 without
+the withdrawn ones erased, an error towards «stop». **Gate 0.3 counts someone back on only if they were
 back before their fourth week began** (`actors.analytics_on_at` at or before `created_at + 504 h`,
 Р-3): off later, that week's rows were erased; back later, part of it was never written — counted,
 they would read as not having come back. Two moments are kept: since when the person objects now —

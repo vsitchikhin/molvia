@@ -426,7 +426,7 @@ describe('состав экспорта — один источник правд
       select table_name, column_name from information_schema.columns
       where table_schema = 'public'`)
     // Red here is a person's new data: it also adds its row to the record of processing
-    // (Confluence 12091393, MOL-97) in the same PR — nothing but this line reminds of it.
+    // (Confluence 12091393, MOL-97) in the same PR — no test holds it, only this line and `CLAUDE.md`.
     for (const [table, { exported, omitted = {} }] of Object.entries(EXPORT_COLUMNS)) {
       const actual = rows
         .filter((row) => row.table_name === table)

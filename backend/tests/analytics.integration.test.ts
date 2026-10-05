@@ -7,13 +7,15 @@ import { eq, sql } from 'drizzle-orm'
 import { EVENT, analyticsSettingSchema } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createEventRepository } from '@/db/events-repository'
-import { actors, events } from '@/db/schema'
+import { createVerdictRepository } from '@/db/verdicts-repository'
+import { actors, events, verdicts } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, signIn } from './fixtures'
+import { clearAll, insertActor, insertItem, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const log = createEventRepository(db)
+const verdictRepository = createVerdictRepository(db)
 let app: FastifyInstance
 
 beforeAll(async () => {
@@ -73,6 +75,33 @@ async function moments(id: string) {
 
 async function rowsOf(id: string) {
   return db.select().from(events).where(eq(events.actorId, id))
+}
+
+async function rate(me: Owner, itemId: string) {
+  const reply = await app.inject({
+    method: 'PUT',
+    url: `/verdicts/${itemId}`,
+    headers: { cookie: me.cookie },
+    payload: { score: 2, review: 'Пахнет крахмалом' },
+  })
+  expect([200, 201]).toContain(reply.statusCode)
+}
+
+async function withdraw(me: Owner, itemId: string) {
+  const reply = await app.inject({
+    method: 'DELETE',
+    url: `/verdicts/${itemId}`,
+    headers: { cookie: me.cookie },
+  })
+  expect(reply.statusCode).toBe(204)
+}
+
+async function verdictsOf(id: string) {
+  const rows = await db
+    .select({ itemId: verdicts.itemId, deletedAt: verdicts.deletedAt })
+    .from(verdicts)
+    .where(eq(verdicts.actorId, id))
+  return rows.map((row) => ({ itemId: row.itemId, withdrawn: row.deletedAt !== null }))
 }
 
 async function openAdvice(me: Owner) {
@@ -171,6 +200,53 @@ describe('выключение', () => {
         log.chooseAnalytics(me.id, true),
       ])
       expect(await rowsOf(me.id)).toHaveLength(0)
+    }
+  })
+})
+
+describe('снятые оценки (MOL-97, Б1)', () => {
+  it('выключение стирает снятые оценки человека, живые и чужие остаются', async () => {
+    const me = await owner()
+    const other = await owner()
+    const milk = await insertItem(db)
+    const bread = await insertItem(db, { name: 'Хлеб', searchKey: 'hleb', defaultUnit: 'piece' })
+    await rate(me, milk)
+    await rate(me, bread)
+    await withdraw(me, milk)
+    await rate(other, milk)
+    await withdraw(other, milk)
+    expect(await verdictsOf(me.id)).toHaveLength(2)
+
+    await choose(me, false)
+    expect(await verdictsOf(me.id)).toEqual([{ itemId: bread, withdrawn: false }])
+    expect(await verdictsOf(other.id)).toEqual([{ itemId: milk, withdrawn: true }])
+  })
+
+  it('снятие у выключенного убирает строку целиком, у включённого — оставляет её воротам', async () => {
+    const me = await owner()
+    const milk = await insertItem(db)
+    await choose(me, false)
+    await rate(me, milk)
+    await withdraw(me, milk)
+    expect(await verdictsOf(me.id)).toEqual([])
+
+    await choose(me, true)
+    await rate(me, milk)
+    await withdraw(me, milk)
+    expect(await verdictsOf(me.id)).toEqual([{ itemId: milk, withdrawn: true }])
+  })
+
+  it('снятие и выключение разом не оставляют снятой строки, в каком бы порядке ни пришли', async () => {
+    for (let round = 0; round < 10; round += 1) {
+      const me = await owner()
+      const milk = await insertItem(db)
+      await rate(me, milk)
+      const [withdrawn] = await Promise.all([
+        verdictRepository.withdraw(me.id, milk),
+        log.chooseAnalytics(me.id, true),
+      ])
+      expect(withdrawn).toBe(true)
+      expect(await verdictsOf(me.id)).toEqual([])
     }
   })
 })

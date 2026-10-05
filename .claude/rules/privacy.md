@@ -151,7 +151,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   `/privacy` says what the copy holds — the removed and the withdrawn included — under «Копия ваших
   данных», and names the row by its words.
 - **A person can object to being counted** (MOL-96): «Учитывать меня в статистике» in «Ваши
-  данные» erases their event log at once, stops it, and takes them out of both gates — the reasons
+  данные» erases their event log at once — and the verdicts they withdrew, kept for gate 0.2 alone
+  (MOL-97) — stops it, and takes them out of both gates — the reasons
   and the rules are in `advice.md`. The two moments it keeps are on `actors`, so erasure takes them
   and the copy carries them (version 14).
 - **The terms and the privacy page are accepted, an edition at a time** (MOL-95, owner's decisions
