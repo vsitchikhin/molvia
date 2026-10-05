@@ -81,14 +81,8 @@
                 <OperationRow
                   v-for="reason in reasons"
                   :key="`${reason.kind}-${reason.operation.id}-${reason.operation.side ?? ''}`"
-                  :operation="reason.operation"
-                  :categories="categories"
-                  :name-of="nameOf"
-                  :account-name="accountName"
-                  :title="reasonTitle(reason)"
-                  :meta="reasonMeta(reason)"
-                  plain
-                  @open="openReason"
+                  v-bind="reasonRow(reason)"
+                  @open="openReason(reason.operation)"
                 />
               </AppReveal>
             </AppCard>
@@ -208,7 +202,12 @@ import OperationIncomeSheet from '@/components/OperationIncomeSheet.vue'
 import OperationSheet from '@/components/OperationSheet.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { parseSigned, shortDay as dayOf, signedAmount } from '@/components/accounts'
+import {
+  operationRowProps,
+  parseSigned,
+  shortDay as dayOf,
+  signedAmount,
+} from '@/components/accounts'
 import { asTyped } from '@/components/spending'
 import type { Removed } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -516,6 +515,25 @@ export default defineComponent({
       else recountOnLanding = true
     }
 
+    /**
+     * A reason in its own words (handoff 05): the row's circle is the operation's, its title and its
+     * meta the check's — the title says the sum already, so the row has no tail.
+     */
+    function reasonRow(reason: Reason) {
+      return {
+        ...operationRowProps(reason.operation, {
+          t,
+          locale: locale.value,
+          categories: props.categories,
+          nameOf: props.nameOf,
+          accountName: props.accountName,
+        }),
+        title: reasonTitle(reason),
+        meta: reasonMeta(reason),
+        amount: null,
+        sub: null,
+      }
+    }
     function reasonTitle({ kind, operation }: Reason): string {
       const [own] = operation.amounts
       const amount = own
@@ -715,8 +733,7 @@ export default defineComponent({
       reasonOperation,
       openReason,
       reasonSaved,
-      reasonTitle,
-      reasonMeta,
+      reasonRow,
       writeNote,
       writeDifference,
       finish,

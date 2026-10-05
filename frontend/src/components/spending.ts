@@ -14,6 +14,7 @@ import IconSofa from '~icons/mdi/sofa-outline'
 import IconTag from '~icons/mdi/tag-outline'
 import IconWifi from '~icons/mdi/wifi'
 import IconCafe from '~icons/mdi/silverware-fork-knife'
+import IconCart from '~icons/mdi/cart-outline'
 import {
   MINOR_EXPONENT,
   RATE_SCALE,
@@ -444,6 +445,117 @@ export function groceriesOf(categories: readonly SpendingCategoryView[]): string
     categories.find((category) => category.preset === TRIP_CATEGORY && !category.archived)?.id ??
     null
   )
+}
+
+/**
+ * One operation as `OperationRow` draws it (Ф-12, MOL-176): the row knows no operation, only these
+ * words and signs — put together here for «Траты» and in `accounts.ts` for an account, so every rule
+ * of what a row says is a function a test reads. `amount` null — the row has no tail: its title says
+ * the sum already (a check's reason).
+ */
+export interface OperationRowProps {
+  readonly icon: Component
+  /** A category's colour, or `muted` for what has none (Ф-4: the accent only where one presses). */
+  readonly tint: string
+  /** Read first, before everything the row says: «Открыть трату:». */
+  readonly verb: string
+  readonly title: string
+  readonly meta: string
+  readonly amount: string | null
+  /** Under the amount: what it was counted as, or the operation's own money in another currency. */
+  readonly sub: string | null
+  readonly tag: { readonly tone: 'warn' | 'bad'; readonly text: string } | null
+}
+
+/** `t` of vue-i18n, as the functions of this module take it: a key, its values, a count. */
+export type Translate = (key: string, named: Record<string, unknown>, plural?: number) => string
+
+/**
+ * A line under an amount breaks only between its parts — after «·» or between two amounts — never inside
+ * the words of its last part: «25 000 ₽ · без» over ««списано»» (MOL-176, adversarial round 2, Б3). The
+ * figures are whole already: `Intl` joins their groups and sign with no-break spaces.
+ */
+export function unbroken(text: string): string {
+  const cut = text.lastIndexOf(' · ')
+  const head = cut < 0 ? '' : text.slice(0, cut + ' · '.length)
+  return head + text.slice(head.length).replaceAll(' ', '\u00a0')
+}
+
+/** Purchases are drawn in the colour of «Продукты», where they land (Ф-4) — never the accent. */
+export function tripTint(groceries: SpendingCategoryView | null): string {
+  return groceries ? categoryColour(groceries) : `var(--cat-${TRIP_CATEGORY})`
+}
+
+/** A spending's circle: its category's colour and icon, or no colour for one the phone does not know. */
+export function spendingLook(category: SpendingCategoryView | null): {
+  readonly icon: Component
+  readonly tint: string
+} {
+  return category
+    ? { icon: categoryIcon(category), tint: categoryColour(category) }
+    : { icon: markRaw(IconTag), tint: 'muted' }
+}
+
+export const tripIcon = markRaw(IconCart)
+
+/**
+ * A line of the month's journal (MOL-82, handoff 01): a spending of one's own, or a finished trip's
+ * purchases in one currency. The amount is as it was spent; under it, for another currency, what the
+ * server counted it as — or that it could not. `when` is the day, where rows of different days stand
+ * together — «Не приняты» (MOL-159).
+ */
+export function journalRowProps(
+  row: JournalRow,
+  context: {
+    readonly t: Translate
+    readonly locale: string
+    readonly category: SpendingCategoryView | null
+    readonly categoryName: string
+    readonly spendCurrency: Currency
+    readonly when?: string
+  },
+): OperationRowProps {
+  const { t, locale, category, categoryName } = context
+  const trip = row.kind === 'trip'
+  const money = trip ? row.amount : row.spending.amount
+
+  let line: string
+  if (trip) line = t('spending.trip_row_meta', { category: categoryName, n: row.items }, row.items)
+  else {
+    const { note, place } = row.spending
+    // Without «что это» the title is already the category: the line under it is the place alone.
+    line = note === null ? (place ?? '') : place ? `${categoryName} · ${place}` : categoryName
+  }
+
+  let sub: string | null = null
+  // Not counted yet is not «не посчитано» — that says no rate of the day was known; a row still on
+  // the phone says «Отправляем…» already (review Т-8).
+  if (money.currency !== context.spendCurrency && !(row.kind === 'manual' && row.local))
+    sub = row.counted
+      ? `≈\u00a0${formatEstimate(row.counted, locale)}`
+      : unbroken(t('spending.uncounted_row', {}))
+
+  const mark = row.kind === 'manual' ? row.mark : null
+  const look = trip ? { icon: tripIcon, tint: tripTint(category) } : spendingLook(category)
+  return {
+    ...look,
+    verb: t(trip ? 'spending.row_open_trip' : 'spending.row_open', {}),
+    title: trip
+      ? t('spending.trip_row_title', { place: row.placeName })
+      : (row.spending.note ?? categoryName),
+    meta: [context.when, line].filter(Boolean).join(' · '),
+    amount: asTyped(money, locale),
+    sub,
+    tag:
+      mark === null
+        ? null
+        : mark === 'refused'
+          ? { tone: 'bad', text: t('spending.refused', {}) }
+          : {
+              tone: 'warn',
+              text: t(mark === 'editing' ? 'spending.editing' : 'spending.pending', {}),
+            },
+  }
 }
 
 /** What the sheet of a spending is opened on: a new one, one of one's own, or a trip's line. */

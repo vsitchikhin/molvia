@@ -5,11 +5,15 @@ import {
   asTyped,
   categoriesWith,
   journalOf,
+  journalRowProps,
   mergePages,
   rateWords,
   refusedRows,
+  unbroken,
   unsentIn,
 } from '@/components/spending'
+import type { JournalRow } from '@/components/spending'
+import { createAppI18n } from '@/i18n'
 import type { RejectedSpendingWrite, SpendingWrite } from '@/stores/spendingQueue'
 
 const BEAUTY = 'ffffffff-0000-4000-8000-000000000001'
@@ -334,5 +338,127 @@ describe('refused spendings, apart from the journal', () => {
         [],
       ),
     ).toEqual([])
+  })
+})
+
+/** A line of «Траты» as its row says it (MOL-176): what the journal's own row drew by itself, read here. */
+describe('a line of the journal as its row says it', () => {
+  const { t } = createAppI18n('ru').global
+  const groceries: SpendingCategoryView = {
+    id: 'ffffffff-0000-4000-8000-000000000009',
+    preset: 'groceries',
+    name: null,
+    colour: null,
+    archived: false,
+  }
+
+  function manual(patch: Partial<Extract<JournalRow, { kind: 'manual' }>> = {}): JournalRow {
+    return {
+      kind: 'manual',
+      key: TAXI,
+      spending: { ...spending(TAXI, '2026-09-27', '1800'), place: 'Кофеман' },
+      counted: null,
+      mark: null,
+      refusal: null,
+      local: false,
+      ...patch,
+    }
+  }
+  const trip: JournalRow = {
+    kind: 'trip',
+    key: TRIP,
+    tripId: TRIP,
+    placeName: 'Ереван Сити',
+    items: 9,
+    amount: amd('11280'),
+    counted: null,
+  }
+  function row(value: JournalRow, category: SpendingCategoryView | null = beauty, when = '') {
+    return journalRowProps(value, {
+      t,
+      locale: 'ru-RU',
+      category,
+      categoryName: category?.preset === 'groceries' ? 'Продукты' : 'Красота',
+      spendCurrency: 'AMD',
+      when,
+    })
+  }
+  const euro = (patch: Partial<Extract<JournalRow, { kind: 'manual' }>> = {}) =>
+    manual({
+      spending: { ...spending(TAXI, '2026-09-27', '1'), amount: parseMoney('24.99', 'EUR') },
+      ...patch,
+    })
+
+  it('a spending: the amount as typed, with no sign, and nothing under it in the spending currency', () => {
+    const value = row(manual())
+    expect(plain(value.amount ?? '')).toBe('1 800 ֏')
+    expect(value.sub).toBeNull()
+  })
+
+  it('in another currency: «≈» of what the server counted it as, or that it could not', () => {
+    expect(plain(row(euro({ counted: amd('10560.40') })).sub ?? '')).toBe('≈ 10 560 ֏')
+    expect(row(euro()).sub).toBe('не\u00a0посчитано')
+  })
+
+  it('must not fire: a row only the phone holds says no «не посчитано» — «Отправляем…» says it', () => {
+    expect(row(euro({ local: true, mark: 'waiting' })).sub).toBeNull()
+  })
+
+  it('without a note is titled by its category, the place under it; with one, the category and the place', () => {
+    expect([row(manual()).title, row(manual()).meta]).toEqual(['Красота', 'Кофеман'])
+    const noted = row(
+      manual({ spending: { ...spending(TAXI, '2026-09-27', '1800', 'Стрижка'), place: 'Барбер' } }),
+    )
+    expect([noted.title, noted.meta]).toEqual(['Стрижка', 'Красота · Барбер'])
+  })
+
+  it('puts the day first where rows of different days stand together', () => {
+    expect(row(manual(), beauty, 'Вчера').meta).toBe('Вчера · Кофеман')
+  })
+
+  it('a spending stands in its category’s circle; one the phone does not know, in no colour', () => {
+    expect(row(manual()).tint).toBe('var(--cat-beauty)')
+    expect(row(manual(), null).tint).toBe('muted')
+  })
+
+  it('a trip: its shop, its purchases counted, the circle of «Продукты» — never the accent (Ф-4)', () => {
+    const value = row(trip, groceries)
+    expect([value.title, value.meta, value.tint, value.verb]).toEqual([
+      'Покупки в «Ереван Сити»',
+      'Продукты · 9 позиций',
+      'var(--cat-groceries)',
+      'Открыть покупки:',
+    ])
+    expect(row(trip, null).tint).toBe('var(--cat-groceries)')
+  })
+
+  it('marks what the queue says as a tag: on its way and amended wait, a refusal is bad', () => {
+    expect(row(manual({ mark: 'waiting' })).tag).toEqual({ tone: 'warn', text: 'Отправляем…' })
+    expect(row(manual({ mark: 'editing' })).tag).toEqual({
+      tone: 'warn',
+      text: 'Правка отправляется',
+    })
+    expect(row(manual({ mark: 'refused' })).tag).toEqual({ tone: 'bad', text: 'Не принята' })
+    expect(row(manual()).tag).toBeNull()
+    expect(row(manual()).verb).toBe('Открыть трату:')
+  })
+})
+
+describe('a line under an amount breaks only between its parts (MOL-176, adversarial round 2, Б3)', () => {
+  it('glues the words of its last part, never the figures before it', () => {
+    expect(unbroken('25\u00a0000\u00a0₽ · без «списано»')).toBe(
+      '25\u00a0000\u00a0₽ · без\u00a0«списано»',
+    )
+    expect(unbroken('25,000 ₽ · no “charged”')).toBe('25,000 ₽ · no\u00a0“charged”')
+  })
+
+  it('leaves a break between two amounts and after «·»', () => {
+    expect(unbroken('2\u00a0331,85\u00a0₽, 24,99\u00a0€ · без «списано»')).toBe(
+      '2\u00a0331,85\u00a0₽, 24,99\u00a0€ · без\u00a0«списано»',
+    )
+  })
+
+  it('a line of one part is glued whole', () => {
+    expect(unbroken('не посчитано')).toBe('не\u00a0посчитано')
   })
 })

@@ -479,7 +479,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A row is `ListRow` or `NavRow`, a caps caption `SectionCaption` — caps nowhere else, the linter
   holds it** (MOL-175): the chevron is «opens something to go on with» — a screen or a sheet with
   fields (В-14) — never on a row that acts or asks to confirm, never mixed in one card; a caption's
-  place is in `:where()`, the screen's class sets the space above it.
+  place is in `:where()`, the screen's class sets the space above it. **An operation is
+  `OperationRow`** (MOL-176): its words come from `journalRowProps` and `operationRowProps`, never
+  from the row; the chevron on every one, the amounts in one column, never coloured, never cut — a row
+  narrower than 22rem stands its amount under the words.
 - **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
   `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the
   failure; polite states speak through the one live region in `App.vue`.

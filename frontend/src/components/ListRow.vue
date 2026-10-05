@@ -12,7 +12,15 @@
     :aria-selected="state === 'selected' ? String(selected) : undefined"
     @click="click"
   >
-    <component :is="icon" v-if="icon" class="icon" aria-hidden="true" />
+    <span
+      v-if="icon && tint"
+      class="circle"
+      :class="{ muted }"
+      :style="circleStyle"
+      aria-hidden="true"
+      ><component :is="icon" class="icon"
+    /></span>
+    <component :is="icon" v-else-if="icon" class="icon" aria-hidden="true" />
     <span class="words">
       <span class="title"
         ><slot name="title">{{ title }}</slot></span
@@ -20,6 +28,7 @@
       <span v-if="meta || $slots.meta" class="meta"
         ><slot name="meta">{{ meta }}</slot></span
       >
+      <span v-if="$slots.below" class="below"><slot name="below" /></span>
     </span>
     <span v-if="$slots.tail" class="tail"><slot name="tail" /></span>
     <IconCheck v-if="selected" class="check" aria-hidden="true" />
@@ -57,6 +66,8 @@ const SELECTED = new Set([
  *   as       — `button`, `router-link` (with `to`) or `div`. Only a `div` may hold a button in its
  *              tail: a button inside a button is no HTML, and a screen reader hears one of them;
  *   icon     — a component, drawn here at its step, so no screen can draw it at another;
+ *   tint     — the icon stands in a circle of 40 (MOL-176): a colour — a category's, on its
+ *              `cat-tint-share` — or `muted`, `surface-2` under `text-muted`, for what has no colour;
  *   wrap     — the title breaks onto lines instead of ending in «…»;
  *   next     — the chevron (the owner's В-14 «а»): the row opens something to go on with — a screen, a
  *              sheet with fields. A row that acts at once or asks to confirm has none, and one card
@@ -70,6 +81,9 @@ const SELECTED = new Set([
  *              was given — `aria-checked` for a radio, `aria-selected` for an option — never only seen;
  *   active   — the row the keyboard stands on in a list a field owns (`aria-activedescendant`, К-4):
  *              the fill without the ring, since the focus is in the field.
+ *
+ * The slot `below` stands under the meta, in the column of the words — a tag, «Отправляем…»: in the
+ * meta it would be cut with it at two lines.
  */
 export default defineComponent({
   name: 'ListRow',
@@ -84,6 +98,7 @@ export default defineComponent({
     title: { type: String, default: '' },
     meta: { type: String, default: '' },
     icon: { type: [Object, Function] as PropType<Component>, default: undefined },
+    tint: { type: String, default: '' },
     wrap: { type: Boolean, default: false },
     next: { type: Boolean, default: false },
     danger: { type: Boolean, default: false },
@@ -113,6 +128,15 @@ export default defineComponent({
         }
       })
     }
+    const muted = computed(() => props.tint === 'muted')
+    const circleStyle = computed(() =>
+      props.tint === '' || muted.value
+        ? undefined
+        : {
+            color: props.tint,
+            background: `color-mix(in oklch, ${props.tint} var(--cat-tint-share), var(--surface))`,
+          },
+    )
     function click(event: MouseEvent): void {
       if (props.inactive) {
         // Stopped as well as prevented, as the kit's button: nothing above hears a row that is not now.
@@ -123,7 +147,7 @@ export default defineComponent({
       emit('click', event)
       if (link && !event.defaultPrevented) void link.navigate(event)
     }
-    return { link, tag, state, click }
+    return { link, tag, state, muted, circleStyle, click }
   },
 })
 </script>
@@ -167,6 +191,12 @@ export default defineComponent({
   .live:not(.inactive, .selected, .active):hover {
     background: var(--surface-2);
   }
+
+  /* The muted circle is the hover's own fill: under the pointer it turns the other way, or it is gone
+     (adversarial А3). */
+  .live:not(.inactive, .selected, .active):hover .circle.muted {
+    background: var(--surface);
+  }
 }
 
 .icon {
@@ -174,6 +204,24 @@ export default defineComponent({
 
   font-size: var(--icon-md);
   color: var(--text-muted);
+}
+
+.circle {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--row-circle);
+  height: var(--row-circle);
+  border-radius: var(--radius-pill);
+
+  .icon {
+    color: inherit;
+  }
+
+  &.muted {
+    background: var(--surface-2);
+    color: var(--text-muted);
+  }
 }
 
 .words {
@@ -194,9 +242,12 @@ export default defineComponent({
   white-space: normal;
 }
 
+/* A word longer than the column breaks rather than being cut at the side: the two lines end in «…», the
+   middle of a word never in nothing (MOL-176, Е-11). */
 .meta {
   display: -webkit-box;
   overflow: hidden;
+  overflow-wrap: anywhere;
   color: var(--text-muted);
   font-size: var(--text-footnote);
   -webkit-box-orient: vertical;
@@ -204,12 +255,64 @@ export default defineComponent({
   line-clamp: 2;
 }
 
+.below {
+  justify-self: start;
+  margin-top: var(--space-1);
+}
+
+/* The tail takes at most 45 % of the row, unless what it holds cannot be narrower — an amount never
+   wraps — and gives way down to that: a line under an amount wraps between its parts, and the words keep
+   the rest. Taken whole, a long line under the amount left the title no width at all and pushed the
+   chevron past the card (MOL-176, adversarial А1, А2); at two fifths it broke a line the words had room
+   to give (round 2, Б3). */
 .tail {
   display: inline-flex;
-  flex: none;
+  flex: 0 1 auto;
   align-items: center;
+  min-width: min-content;
+  max-width: 45%;
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
+}
+
+/* In a narrow container named `row` the tail goes under the words, on a line of its own at the right —
+   where the amounts end, so the column holds — and the words take the whole width: beside them an amount
+   of a phone of 320 left the words forty pixels, and a salary with kopecks none (MOL-176, owner's choice
+   on adversarial Б1, Б2). 22rem (352): from there beside the tail's 45 % the words keep some 80 px, a
+   «Продукты» on its line; below it the word broke — the cards of «Деньги» on a phone of 390 and 412, 326
+   and 348 in their gutter of 32. The handoff's card of 390 (358) keeps the amount beside. The container
+   is the caller's — `OperationRow` sets it — so every row of a card is laid out alike. No row gap: a row
+   with no tail is not a line taller. */
+@container row (width < #{$row-narrow}) {
+  .list-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0 var(--space-3);
+  }
+
+  .circle,
+  .list-row > .icon {
+    grid-row: 1 / span 2;
+  }
+
+  .words {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .tail {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    max-width: none;
+    margin-top: var(--space-1);
+  }
+
+  .chevron,
+  .check {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
 }
 
 .chevron {

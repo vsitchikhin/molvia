@@ -169,7 +169,9 @@ balance, total and difference is the server's.
   amended from the journal, from «не попали» and from a check — offline too, through its queue.
   Exchanges and incomes open from their own lists: they need the connection they are written with.
   One component opens a row in its own sheet everywhere (`OperationSheet`), where the account is also
-  changed; the rows are `OperationRow`, not an extended `SpendingRow` — another shape of data. A trip
+  changed. The row is the kit's `OperationRow` (MOL-176), the words of an account's operation
+  `operationRowProps` in `accounts.ts`, `journalRowProps` those of «Траты» — two shapes of data, one
+  row. A trip
   whose removal waits in the queue is shown in no journal, «не попали» or check (MOL-76).
 - **The default is the screen's** (`defaultAccount`, `useAccountChoice`): the first live account of
   the operation's currency in the order of «Счета», following the currency until chosen by hand;
