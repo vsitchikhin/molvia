@@ -130,6 +130,14 @@ describe('the time a receipt prints (review Р12)', () => {
 describe('the city of the address (MOL-126, Р-6)', () => {
   const rows = (...texts: string[]) => texts.map((text, line) => ({ text, part: 0, line }))
 
+  it('ends the head of a fiscal till at its first class code (MOL-226)', () => {
+    // a dish named after a city is a line, not a second city of the head
+    const head = ['«ՖԱՍՏՖՈՒԴ»', 'ԳՅՈՒՄՐԻ Սայաթ-Նովա 7/9']
+    const list = ['Դաս. 56.10, Ն/Կ 745030 1հատ 688.09 688.09', 'Երևան սենդվիչ']
+    expect(receiptCityOf(rows(...head, ...list))).toBe('Гюмри')
+    expect(receiptCityOf(rows(...list))).toBeNull()
+  })
+
   it('reads the city that opens a row of the head', () => {
     expect(receiptCityOf(rows(': ԵՐԵՎԱՆ-ՍԻԹԻ', 'ԳՅՈՒՄՐԻ Գորկու 62 2.'))).toBe('Гюмри')
     expect(receiptCityOf(rows('DOG CITY', 'Gyumri Sayat-Nova Street, 42'))).toBe('Гюмри')

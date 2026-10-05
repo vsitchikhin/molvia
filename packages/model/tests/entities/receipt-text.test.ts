@@ -3,6 +3,8 @@ import am01 from './receipt-text.am-01.json'
 import am03 from './receipt-text.am-03.json'
 import am04 from './receipt-text.am-04.json'
 import am05 from './receipt-text.am-05.json'
+import am14 from './receipt-text.am-14.json'
+import am14t from './receipt-text.am-14t.json'
 import { moneyOfHundredths, needsReshoot, receiptLineOf } from '#model/entities/receipt'
 import { readPartly } from '#model/entities/receipt-sum'
 import {
@@ -839,5 +841,235 @@ describe('two flavours at one price numbered …5 and …6 in one photo (review 
       [29_000, true],
       [29_000, true],
     ])
+  })
+})
+
+// MOL-226: KFC's receipt in its two prints — the till's table and the fiscal terminal's — as Tesseract
+// read them, under a made-up head (`.scratch/tasks/status/MOL-226/fixtures.mts`). Eight dishes of
+// class 56.10; the total 8 510.
+describe('a fiscal till read by its class code (MOL-226)', () => {
+  const kfc = (fixture: { readings: string[] }) =>
+    bestReading(fixture.readings.map((text) => rowsOf(text, 0)))
+  const SUMS = [68_809, 393_191, 12_000, 48_032, 62_441, 11_527, 130_000, 125_000]
+
+  it('reads the till’s table: code, article and figures on a row, the name under it', () => {
+    const got = kfc(am14)
+    expect([got.layout, got.balanced, got.totalHundredths]).toEqual(['class', true, 851_000])
+    expect(got.lines.map((l) => l.sumHundredths)).toEqual(SUMS)
+    expect(got.lines.every((l) => l.quantityMilli === 1_000 && l.unit === 'piece')).toBe(true)
+    // the fourth line's code OCR lost: no class, no article
+    expect(got.lines.map((l) => l.hs)).toEqual([
+      ...Array<string>(3).fill('56.10'),
+      null,
+      ...Array<string>(4).fill('56.10'),
+    ])
+    expect(got.lines.map((l) => l.sku)).toEqual([
+      '745030',
+      '771300',
+      '740080',
+      null,
+      '770550',
+      '740000',
+      '750080',
+      '755009',
+    ])
+    expect(got.lines.map((l) => l.printed)).toEqual([
+      'Ֆրի ստանդարտ',
+      '16 Թն',
+      'Պանրային սոուս',
+      'Տա Ֆրի ստանդարտ',
+      '2 Ստրիպս',
+      'Կետչուպ',
+      'Չիզբուրգեր դե լյուքս Օրիգինալ',
+      // the name OCR lost: the line stays, its name is the person’s to give
+      '',
+    ])
+    expect([got.tin, got.date, got.time, got.receiptNo]).toEqual([
+      '01234567',
+      '2026-10-01',
+      '12:00',
+      '12345678',
+    ])
+  })
+
+  it('reads the terminal’s print: the code, the name, then price × count = sum, no article', () => {
+    const got = kfc(am14t)
+    expect([got.layout, got.balanced, got.totalHundredths]).toEqual(['class', true, 851_000])
+    expect(got.lines.map((l) => l.sumHundredths)).toEqual(SUMS)
+    expect(got.lines.every((l) => l.hs === '56.10' && l.sku === null)).toBe(true)
+    expect(got.lines.map((l) => l.printed)).toContain('Թթվիսթեր')
+    // the terminal's head as OCR lost it: nothing is made up of it
+    expect([got.tin, got.date, got.time, got.receiptNo]).toEqual([null, null, null, null])
+  })
+
+  it('cuts out the row of figures only', () => {
+    const got = kfc(am14)
+    expect(got.lines.every((l) => l.rows.length === 1 && /\d/.test(l.rows[0]!.text))).toBe(true)
+  })
+
+  const receipt = (...texts: string[]) => parseReceiptText(rowsOf(texts.join('\n'), 0))
+
+  it('puts back the point OCR lost in a terminal’s sum: «393191դրամ» is 3 931.91', () => {
+    const got = receipt('Դաս՝ 56.10', '16 Թև', '3931.91x1.0 հատ=393191դրամ', 'Ընդամենը 3931.91')
+    expect(
+      got.lines.map((l) => [l.quantityMilli, l.priceHundredths, l.sumHundredths, l.settled]),
+    ).toEqual([[1_000, 393_191, 393_191, true]])
+    expect(got.balanced).toBe(true)
+  })
+
+  it('reads «=» as OCR prints it, «-», and a count with its point lost, «x10» for 1.0', () => {
+    const line = receipt('Դաս՝ 56.10', 'Ֆրի', '688 09х10 հստ-688.09դրամ').lines[0]!
+    expect([line.quantityMilli, line.priceHundredths, line.sumHundredths, line.settled]).toEqual([
+      1_000,
+      68_809,
+      68_809,
+      true,
+    ])
+  })
+
+  it('undoes a count OCR misread by the arithmetic: «4 հատ 688.09 688.09» is one', () => {
+    const line = receipt('Դաս. 56.10, Ն/Կ 745030 4 հատ 688.09 688.09', 'Ֆրի').lines[0]!
+    expect([line.quantityMilli, line.sumHundredths, line.sku, line.settled]).toEqual([
+      1_000,
+      68_809,
+      '745030',
+      true,
+    ])
+  })
+
+  it('puts back the point of a till’s price by its sum: «11527 115.27»', () => {
+    const line = receipt('Դաս. 56.10, Ն/Կ 740000 1հատ 11527 115.27', 'Կետչուպ').lines[0]!
+    expect([line.priceHundredths, line.sumHundredths, line.printed]).toEqual([
+      11_527,
+      11_527,
+      'Կետչուպ',
+    ])
+  })
+
+  it('takes a name on the figures’ row and the row under it', () => {
+    const got = receipt(
+      'Դաս. 56.10, Ն/Կ 750080',
+      'Չիզբուրգեր դե լյուքս 1 հատ 1300 1300',
+      'Օրիգինալ',
+      'Դաս. 56.10, Ն/Կ 755000 1 հատ 1250 1250',
+      'Թվիստեր',
+    )
+    expect(got.lines.map((l) => [l.printed, l.sumHundredths])).toEqual([
+      ['Չիզբուրգեր դե լյուքս Օրիգինալ', 130_000],
+      ['Թվիստեր', 125_000],
+    ])
+  })
+
+  it('takes the name above the figures where the terminal prints it, in two rows', () => {
+    const got = receipt(
+      'Դաս՝ 56.10',
+      'Չիզբուրգեր դե լյուքս Օրիգի',
+      'նալ',
+      '1300.0x1.0 հատ=1300.00դրամ',
+      'Դաս՝ 56.10',
+      'Թվիստեր',
+      '1250.0x1.0 հատ=1250.00դրամ',
+    )
+    expect(got.lines.map((l) => l.printed)).toEqual(['Չիզբուրգեր դե լյուքս Օրիգի նալ', 'Թվիստեր'])
+  })
+
+  it('keeps a row of figures whose code OCR lost, with no code', () => {
+    const got = receipt(
+      'Դաս. 56.10, Ն/Կ 745030 1հատ 688.09 688.09',
+      'Ֆրի ստանդարտ',
+      'Ан Ц 56. յ wit 70211',
+      'lee pt Me TAAL 1հատ 480.32 480.32',
+      'Ֆրի ստանդարտ',
+      'Ընդամենը 1168.41',
+    )
+    expect(got.lines.map((l) => [l.hs, l.sumHundredths, l.printed])).toEqual([
+      ['56.10', 68_809, 'Ֆրի ստանդարտ'],
+      // a smudge of Latin on the figures' row is no name beside the Armenian under it
+      [null, 48_032, 'Ֆրի ստանդարտ'],
+    ])
+    expect(got.balanced).toBe(true)
+  })
+
+  it('knows the receipt’s class read without its point: «Դաս. 5610», «нии‘ 5610»', () => {
+    const got = receipt(
+      'Դաս՝ 56.10',
+      'Ֆրի',
+      '120.0x1.0 հատ=120.00դրամ',
+      'Դաս. 5610',
+      '2 Ստրիպս',
+      '624.41x1.0 հատ=624.41դրամ',
+      'нии‘ 5610',
+      'Կետչուպ',
+      '115.27x1.0 հատ=115.27դրամ',
+    )
+    expect(got.lines.map((l) => [l.hs, l.printed])).toEqual([
+      ['56.10', 'Ֆրի'],
+      ['56.10', '2 Ստրիպս'],
+      ['56.10', 'Կետչուպ'],
+    ])
+  })
+
+  it('keeps a customs heading of goods as it is: «Դաս. 0401»', () => {
+    const line = receipt('Դաս. 0401, Ն/Կ 1163909 1հատ 370 370', 'Կաթ').lines[0]!
+    expect([line.hs, line.sku, line.sumHundredths]).toEqual(['0401', '1163909', 37_000])
+  })
+
+  it('weighs a line in kilograms', () => {
+    const line = receipt('Դաս՝ 0406', 'Պանիր', '1290.00x0.742 կգ=957.18դրամ').lines[0]!
+    expect([line.unit, line.quantityMilli, line.priceHundredths, line.sumHundredths]).toEqual([
+      'kg',
+      742,
+      129_000,
+      95_718,
+    ])
+  })
+
+  it('keeps a line whose price OCR lost at its sum, unsettled', () => {
+    const line = receipt('Դաս. 56.10. Ն/Կ 740080', 'Պանրային սոուս 1 հատ Ա 120').lines[0]!
+    expect([line.sumHundredths, line.settled]).toEqual([12_000, false])
+  })
+
+  it('finds no item in the head above the first code or after the total', () => {
+    const got = receipt(
+      'ՀՎՀՀ: 01234567',
+      'ՍՀ: 00012345678',
+      'ԿՀ: 12345',
+      'Բաժին 1.2',
+      '/ Շրջ.հարկ /:8510 2 8510',
+      'Դաս. 56.10, Ն/Կ 745030 1հատ 688.09 688.09',
+      'Ֆրի',
+      'Հսկիչ նշանի քանակ 0',
+      'Ընդամենը 688.09',
+      'Վճարված Անկանխիկ 688.09 688.09',
+    )
+    expect(got.lines.map((l) => l.sumHundredths)).toEqual([68_809])
+    expect(got.balanced).toBe(true)
+  })
+
+  it('finds no line on a receipt of a section with no items and no class code', () => {
+    // a sole trader's terminal (am-15…am-24 of the bench): «Բաժին 1» and a turnover tax, no item
+    const got = receipt(
+      'ՀՎՀՀ 01234567',
+      'Բաժին 1',
+      'Շրջանառության հարկ 1700 1700',
+      'Ընդամենը 1700.00',
+      'Անկանխիկ 1700.00 1700.00',
+    )
+    expect(got.lines).toEqual([])
+  })
+
+  it('leaves a receipt both layouts read to them: a card with no class code', () => {
+    expect(read(am01 as Fixture).layout).toBe('card')
+    expect(read(am04 as Fixture).layout).toBe('table')
+  })
+
+  it('reads four hundred coded rows of junk within the ceilings', () => {
+    const rows = Array.from({ length: 400 }, (_, i) =>
+      i % 2 === 0 ? `Դաս. 56.10, Ն/Կ 7${String(i).padStart(5, '0')} 4 հատ 1388.89 1883.44` : 'Ֆրի',
+    )
+    const started = performance.now()
+    const got = receipt(...rows, 'Ընդամենը 99999.99')
+    expect(got.lines).toHaveLength(200)
+    expect(performance.now() - started).toBeLessThan(5_000)
   })
 })
