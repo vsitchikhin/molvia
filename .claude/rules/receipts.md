@@ -306,7 +306,8 @@ and at the foot of the review, while its photos are on this phone — they go in
 how readings ended (`read`, `read_partly`, `reshoot`, `unreadable` — the attempts' cap included), and
 at «Записать» the lines of the receipt, those put right, and each kind — left out, another item than
 the review showed, the quantity or the sum changed — a line counted once however many; receipts whose
-**total** was put right (`totals_corrected`) — one edit of the receipt, never of the lines it
+**total** was put right (`totals_corrected`) — one that differs from the total read: opened, checked and
+saved as it was is a check, not an edit (review 10) — one edit of the receipt, never of the lines it
 confirmed: a total put right moves the sums of the lines that do not add up (В-5), and counted as
 theirs it made one field N edits (review 2, adversarial А7); and how long from the server taking the
 receipt (`created_at`) to its record, in buckets: never the phone's clock, and `captured_at` is the
@@ -314,7 +315,9 @@ moment of «Отправить».
 
 **What was put right is the phone's word** (`edited` in the body of «Записать», `review.ts`): the
 positions of the lines whose item differs from the one the review showed and whose figures differ
-from the shown ones. Only the phone knows what it showed — the shops' memory is shared and learns
+from the ones the server showed before any edit — never the ones a total typed since would show: the
+draft keeps no order of edits, and a line typed before a total that confirms it was lost from the
+measure (adversarial Б3). Only the phone knows what it showed — the shops' memory is shared and learns
 from every record, so between a review and its «Записать» another record (the person's own, queued
 before it, or anyone's in the chain) changes what the server would show now (adversarial А6). A number
 of the measure, never money: the server takes positions of recorded lines only. **A phone of an
@@ -467,8 +470,10 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   **The whole photo is the step's to drag on** (`data-drags` on it): a pull down from the outline
   between two corners closed the sheet and took the shot with it (adversarial А3) — the sheet's own
   pull starts outside the photo. **A handle near an edge of the photo is drawn inside it** (Р-4,
-  review 3), and a corner the detector put past the frame is kept in it, so its trapezoid is
-  straightened rather than painted white. **«Готово» answers for the photo it was pressed on**: a warp
+  review 3) — and **a corner moves as far as the finger, never to it**: put under the finger, a touch
+  meant to look cut a strip of the photo off (adversarial Б1) — and a corner the detector put past the frame is kept in it, so its trapezoid is
+  straightened rather than painted white — measured, not worse (22 lines of 53 against 19 on the five
+  bench frames it touches). **«Готово» answers for the photo it was pressed on**: a warp
   of a shot given up — «‹» while it ran, another shot opened — is let go and nobody's part (review 8,
   adversarial А4). **Corners that make no receipt** — under half a per cent of the photo, three on a
   line — keep «Готово» waiting and say so, never «файл не открылся» (review 9). **A side under what the
