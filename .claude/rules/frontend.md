@@ -320,6 +320,27 @@ The detail behind the frontend lines of `CLAUDE.md`.
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
   — rows had drawn them at 11/700, 11/600 and 13/600. Screens move onto them in their own tasks.
+- **A search is one field, `SearchField`** (MOL-177, Ф-12). «Что взяли?» drew a pill in a well with
+  a hint of 11, «Что брать» a rounded box on `surface` edged by an inner shadow with a ring of its own,
+  «Выбрать товар» a field of the form with a label repeating the sheet's title. Now one: a pill of 44
+  on `surface-2` with a `border-strong` edge, a magnifier of 20, at the right the screen's action —
+  the scanner — **or** «Очистить» while there is text, never both, the focus of a kit field and a hint
+  of 13. **The focus of a field is one mixin, `field-focus`**, which `AppField` takes too. **The field
+  is only a field**: a combobox gives it its role, its `aria-*` and its keys, and every attribute but
+  `class` and `style` lands on the `<input>` — so the two simple searches carry no listbox they have
+  not got, and the combobox keeps its list, its arrows and its Escape (MOL-23). **No width of its
+  own** (`width: 0` beside `flex: 1`): an input brings some twenty characters as its least width, and
+  in the kit's grid that pushed a phone of 320 to 357 in WebKit. **A second one is refused by ESLint**:
+  `<input type="search">` and `enterkeyhint="search"` outside `SearchField.vue`
+  (`vue/no-restricted-static-attribute`), as caps outside `SectionCaption` are; a bound `:type` passes —
+  it closes carelessness, not intent. **The rows of the combobox are `ListRow as="li"`** options: no
+  `type`, no stop of Tab — the focus stays in the field — and **no hover**, which on a desktop fought
+  the arrows for which row is active (MOL-23); the active one is read out selected, as the ARIA
+  combobox has it, filled at the weight of every row (К-4 — the handoff of 0.1 drew 700). **On the fill
+  of an active or a selected row the meta is `text`**: muted stands 4.17:1 and 3.83:1 on `accent-tint`;
+  the combobox had kept that itself, and `ListRow` had lost it for a chosen row with a meta (MOL-175).
+  `e2e/kit-rows` holds the pill, its one height with or without the scanner, and the active option's
+  weight and meta in both engines.
 - **An operation is one row, `OperationRow`, and it knows no operation** (MOL-176, Ф-12). «Траты» drew
   `SpendingRow`, an account's journal, «не попали» and a check drew an `OperationRow` bound to
   `AccountOperationView`, and the two parted on everything seen: the chevron on purchases alone or on
