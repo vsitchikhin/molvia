@@ -46,6 +46,8 @@ afterAll(async () => {
 
 interface Line {
   readonly printed: string
+  /** The class code printed on the line: a customs heading, or «56.10» of food service (MOL-226). */
+  readonly hs?: string
   readonly sku?: string
   readonly qty?: number
   readonly price: number
@@ -93,6 +95,7 @@ async function parsedReceipt(
         receiptId: id,
         position,
         printed: line.printed,
+        hs: line.hs ?? null,
         sku: line.sku ?? null,
         qtyMilli: BigInt((line.qty ?? 1) * 1000),
         qtyUnit: 'piece' as const,
@@ -802,5 +805,62 @@ describe('«Записать»', () => {
     expect(await db.select().from(receiptDays)).toMatchObject([
       { lines: 2, linesEdited: 2, linesSkipped: 1, linesItem: 1, linesFigures: 1 },
     ])
+  })
+
+  it('records a receipt of food service as a shop’s, its dishes in «Оценки» (MOL-226, В-2 «а»)', async () => {
+    const me = await insertActor(db)
+    const ketchup = await insertItem(db, { name: 'Кетчуп', searchKey: 'ketchup' })
+    const kfc: Line[] = [
+      { printed: 'Կետչուպ', hs: '56.10', sku: '740000', price: 115, sum: 115 },
+      { printed: '16 Թև', hs: '56.10', sku: '771300', price: 3_930, sum: 3_930 },
+    ]
+    const id = await parsedReceipt(me, kfc, { layout: 'class' })
+    const tripId = randomUUID()
+    const response = await record(me, id, {
+      tripId,
+      place: { name: 'KFC', city: 'Гюмри' },
+      purchasedOn: '2026-09-26',
+      lines: [
+        {
+          position: 0,
+          skip: false,
+          item: { id: ketchup },
+          quantity: pieces(1),
+          amount: amount(115),
+        },
+        {
+          position: 1,
+          skip: false,
+          item: { name: '16 крыльев' },
+          quantity: pieces(1),
+          amount: amount(3_930),
+        },
+      ],
+    })
+    expect(response.statusCode).toBe(200)
+    const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+    const [place] = await db
+      .select()
+      .from(places)
+      .where(eq(places.id, trip?.placeId ?? ''))
+    // a venue and its dishes have no screen before 0.3: «Оценки», the reminder and «Что брать» read
+    // products only, so a meal is recorded as a shop's purchases and stays there to be rated
+    expect(place).toMatchObject({ name: 'KFC', kind: 'store' })
+    const kinds = await db
+      .select({ name: items.name, kind: items.kind })
+      .from(items)
+      .orderBy(asc(items.name))
+    expect(kinds).toEqual([
+      { name: '16 крыльев', kind: 'product' },
+      { name: 'Кетчуп', kind: 'product' },
+    ])
+    const pending = await createExpenseRepository(db).pendingVerdictsFor(me, 10)
+    expect(pending.total).toBe(2)
+    // the class stays on the receipt's lines, for the venues of 0.3
+    const lines = await db
+      .select({ hs: receiptLines.hs })
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+    expect(lines.map((line) => line.hs)).toEqual(['56.10', '56.10'])
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createLineMatcher, receiptWords } from '#model/entities/receipt-match'
+import { createLineMatcher, isServiceClass, receiptWords } from '#model/entities/receipt-match'
 import type { CatalogueNode } from '#model/entities/receipt-match'
 
 const node = (name: string, names: string[], headings: string[]): CatalogueNode => ({
@@ -68,6 +68,29 @@ describe('a line to an item by its names (MOL-126)', () => {
 
   it('finds nothing in a line with no Armenian word and no heading', () => {
     expect(matcher.match('Coca-Cola 1.5L', null)).toBeNull()
+  })
+})
+
+describe('a dish of a class of services (MOL-226)', () => {
+  it('rules nothing out by a class of services: it is no customs heading', () => {
+    // with the filter, «56.10» left no item at all of the seven names of KFC's receipt
+    expect(matcher.match('Կաթ', '56.10')?.itemId).toBe('Молоко')
+    expect(matcher.match('ՏՈՖՈՒ ՀՈՂ', '56.10')).toBeNull()
+  })
+
+  it('finds a dish among the goods only as «проверьте»', () => {
+    expect(matcher.match('Շոկոլադ', '56.10')).toEqual({ itemId: 'Шоколад', far: true })
+    expect(matcher.match('Շոկոլադ', null)).toEqual({ itemId: 'Шоколад', far: false })
+  })
+
+  it('tells a class of services from a heading by its point', () => {
+    expect([isServiceClass('56.10'), isServiceClass('5610'), isServiceClass(null)]).toEqual([
+      true,
+      false,
+      false,
+    ])
+    // «5610» read without its point is a heading: it rules out what it is not
+    expect(matcher.match('Կաթ', '5610')).toBeNull()
   })
 })
 

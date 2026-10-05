@@ -36,7 +36,7 @@ made the names up (MOL-114). What reads is a chain of cheap parts:
 | ------------- | ---------------------------------------------------------------------------------------- | ------------------------- |
 | Photo         | the phone crops to the receipt's edges, full resolution of the crop, up to four parts    | MOL-127, MOL-222          |
 | Reading       | Tesseract 5, Debian's `tessdata_fast`, page modes 4 and 6                                | `services/receipt-reader` |
-| Figures       | the till's layout, the line's arithmetic, the receipt's discount rate, the printed total | `receipt-text.ts`         |
+| Figures       | the till's layout or its class code, the line's arithmetic, the discount rate, the total | `receipt-text.ts`         |
 | «Переснимите» | not one item line found; read in part is the review's hint                               | `needsReshoot`            |
 
 **The parse is a port, measured on the bench.** `receipt-text.ts` began as MOL-114's `hybrid.mjs` in
@@ -120,6 +120,41 @@ seventy milliseconds, not two seconds of CI.
 the calendar from 2000 to the server's tomorrow, a time `HH:MM` — OCR makes up «01.01.0000», which
 Postgres refuses, «2099» and «99:99».
 
+## The class code (MOL-226)
+
+**An Armenian fiscal till marks every item with its class code**, after «Դաս.»: a customs heading of four
+digits for goods, a class of services «dd.dd» for food service — «56.10» at KFC — often with the till's
+article, «Ն/Կ 745030». The two layouts are that code in other forms («0401/1163909», «(3824)») and stay as
+measured; **the third reading, `classReceipt`, takes the code as a boundary, not a layout**: a row of
+figures is an item, its code the last one above it since the item before, and its name on the side the
+receipt's coded items put it — under the figures on the till's table, above them on the terminal's (ՀԴՄ)
+print, which carries no article. Without the code the side cannot be told: the till's name stands under
+its own figures, the terminal's over them. It reads only from the first code to «Հսկիչ» or «Ընդամենը», so
+nothing of the head or the payment is an item, and it is chosen only where it finds more lines than the
+two layouts — a receipt with no «Դաս» is read as before.
+
+| What OCR does                                                                                                  | What the reading does                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| «աս, 56.10», «Դաս՝ 56 10», «Դաս. 5610», «нии‘ 5610»                                                            | a class read with its point anywhere on the receipt is the receipt's class; with no «Դաս» it is a code only where a code's follows it — nothing, a digit or two of junk, an article after its comma or mark, or a line's figures whose own arithmetic holds as read — so a price that begins with the class is a price in every form, «5610 5640», «5610:1.0» (reviews 5, 6)                                                                                                                     |
+| the code row lost whole («Ан Ц 56. յ wit 70211»)                                                               | the row of figures is still an item, of the receipt's class where every code read is one class of services; the first item too: its figures within three rows above the first code begin the list, and on the terminal the name rows over them — no digit but a count, never the cashier, a word of capitals only on a till that names in capitals, and a second row only where the name runs on across the rows, one of the two starting small («Օրիգի» / «նալ») (reviews А2, Б1, В4, Г2, № 14) |
+| «1 հաս 1300 1300», «Բաքեթ 5610 5610», «Կվաս 1000 մլ», «րԴաս», «Գաս», «56.10,745030», «56.10 1 հատ», «56.10 19» | a mark is the word «Դաս» — «Դ» or a look-alike «Գ», «Ղ», «հ», or no letter before «աս» — and its class no figure of the line: not the same figure again (a price and its sum), no figure before «x», no price's decimals «5610.00x», no unit of volume or weight; junk after it is the code's own, and the article's letters or digits glued to it are the article's (reviews А3–А5, Б2–Б5, В1–В3, Г1, № 13)                                                                                     |
+| «393191դրա» for 3 931.91, «x10» for ×1.0, «-» for «=»                                                          | the terminal's sum has two decimals always, its count one; a till's figure without its point costs one swap                                                                                                                                                                                                                                                                                                                                                                                      |
+| «4 հատ 688.09 688.09»                                                                                          | the line's arithmetic, as the card's (`candidates`)                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| the price lost («1 հատ Ա 120»)                                                                                 | the sum alone, unsettled: it says nothing of the line's arithmetic                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Latin or Cyrillic smudges in a name («Ստրիպս Thuin ‘Al»)                                                       | a word with no Armenian letter is dropped from a name that has Armenian words                                                                                                                                                                                                                                                                                                                                                                                                                    |
+
+**The rules were picked on one receipt, KFC's two prints** (am-14, am-14t: 8 of 8 each, balanced; the bench
+80 → 96 of 228, not one line of the readings before lost, no line on the ten sole traders' receipts with no
+items). The honest figure is on receipts it never saw — the owner brings two or three of a café or a
+terminal (В-4). **The general parse of MOL-229 was not taken as the base** (В-1): on the same bench it made
+up 24 lines on the ten receipts with no items and read two or three times the lines there are. The head
+ends where the list begins — `classListStart`, the reading's own rows and marks, «5б.10» as «56.10» — wherever
+neither layout reads (`receiptCityOf`, review А6): a dish named after a city is a line.
+
+**The price, named:** the terminal's print loses its tax number and fiscal number to OCR, so its two prints
+of one purchase are recorded as two receipts if both are shot (В-3); with no article the shop's memory
+there is by the line's text only.
+
 **Amounts are counted in hundredths, not in minor units.** A till prints hundredths whatever the
 currency; `moneyOfHundredths` turns them into the currency's minor units by its exponent. Quantities
 are thousandths. A float is a ratio that ranks candidates, never money.
@@ -151,6 +186,10 @@ lines it gives the prototype's item and gloss line for line, in the seed's order
 (`.scratch/tasks/status/MOL-126/parity.mjs`) — so the figure measured on receipts its rules never saw,
 54 of 70, still holds. The nodes come by name bytewise, so a tie is decided the same on every database.
 A change of a rule is measured as the parse's are.
+
+**A class of services is no heading** (MOL-226, В-2): «56.10» rules nothing out, and a dish found by its name
+among the catalogue's goods — by the names or by the search — is `weak`: «16 Թև», sixteen wings, is no
+«Крылья куриные». The matcher is otherwise the port as measured: a four-digit heading rules out as before.
 
 **An item is a node** (owner, 30.09.2026): barcodes (MOL-99), the shops' articles (the memory), customs
 headings (`item_hs`) and names in the countries' languages (`item_names`) all lead to it. **The names
@@ -202,6 +241,13 @@ owner's lock of trips comes first**, then the receipt's row (review 7, В3): two
 recorded at once meet there. New items are made before the purchases, in the order of their names'
 keys — each name is locked to the end of the transaction (review 6). The server works every figure out itself, the phone's are not
 trusted: the unit price is the purchase's own, and the lines are every line of the receipt once.
+
+**A receipt of food service is recorded as a shop's, with products, until 0.3** (MOL-226, owner's В-2 «а»
+after review 1): a venue and its dishes have no screen yet — «Оценки», the 19:00 reminder, «Что брать» and
+«Тут дешевле» read products only, and a rating goes with no place — so eight dishes of KFC recorded as `dish`
+in a `venue` could not be rated at all. Gate 0.3 counts views of «Что брать» (`advice_viewed`), not the
+kinds recorded, so recording as a venue bought it nothing. The class stays on the receipt's lines
+(`receipt_lines.hs`): the venues of 0.3 take it from there with nothing read again.
 
 **The trip's money is what was paid** (В-3; В-5 of the review, owner, 03.10.2026): the total the phone
 sends — the printed one, or the person's correction of a total OCR misread, in the receipt's currency
