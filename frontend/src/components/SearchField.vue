@@ -149,6 +149,10 @@ export default defineComponent({
 
 .control {
   flex: 1;
+
+  /* No width of its own: an input brings some twenty characters as its least width, and in a grid
+     or under a flex item with no `min-width: 0` that pushed the page wider than a phone of 320. */
+  width: 0;
   min-width: 0;
   min-height: var(--touch-target);
   padding: 0;
