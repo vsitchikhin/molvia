@@ -220,24 +220,37 @@ describe('SearchField', () => {
     })
 
     // An open popover stands above the dialog, and the platform's Esc closes it, not the dialog under it
-    // (round 5, Д1). happy-dom matches no `:popover-open`, so one says it is open here.
-    it('leaves Esc to the platform while a popover is open', () => {
-      const popover = document.createElement('div')
-      popover.setAttribute('popover', 'auto')
-      const matches = popover.matches.bind(popover)
-      vi.spyOn(popover, 'matches').mockImplementation((selector) =>
-        selector === ':popover-open' ? true : matches(selector),
-      )
-      document.body.append(popover)
-      const { sheet, heard, view } = inSheet(true)
-      const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
-      view.get('input').element.dispatchEvent(event)
-      expect(event.defaultPrevented).toBe(false)
-      expect(heard).toEqual([])
-      expect(sheet.open).toBe(true)
-      popover.remove()
-      view.unmount()
-      sheet.remove()
+    // (round 5, Д1).
+    it('leaves Esc to the platform while a popover Esc closes is open, never for a manual one', () => {
+      // happy-dom reflects no `popover` and matches no `:popover-open`: a popover says both here, as an
+      // engine would — an invalid value reads `manual` there, and so does `manual` itself (round 6, Е1).
+      for (const [kind, taken] of [
+        ['auto', false],
+        ['hint', false],
+        ['manual', true],
+      ] as const) {
+        const popover = document.createElement('div')
+        popover.setAttribute('popover', kind)
+        Object.defineProperty(popover, 'popover', { value: kind })
+        const matches = popover.matches.bind(popover)
+        vi.spyOn(popover, 'matches').mockImplementation((selector) =>
+          selector === ':popover-open' ? true : matches(selector),
+        )
+        document.body.append(popover)
+        const { sheet, heard, view } = inSheet(true)
+        const event = new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        })
+        view.get('input').element.dispatchEvent(event)
+        expect(event.defaultPrevented, kind).toBe(taken)
+        expect(heard).toEqual(taken ? ['cancel'] : [])
+        expect(sheet.open).toBe(!taken)
+        popover.remove()
+        view.unmount()
+        sheet.remove()
+      }
     })
 
     it('must not take Esc outside an open sheet — clearing is the platform’s way there', () => {

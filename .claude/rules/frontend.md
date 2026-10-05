@@ -338,8 +338,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   to read, not ours); an engine without the property knows no `closedby` and closes a modal dialog
   alone. **Not while a popover is open** (round 5, Д1): the platform's Esc closes the topmost of what
   closes, a popover stands above the dialog, and taken by the field Esc closed the dialog under it; which
-  one is on top no script can ask, so with any popover open the key is the platform's — the price, while
-  none exists in the app, is that Chromium may clear the field there rather than close the popover.
+  one is on top no script can ask, so with a popover Esc closes open (`auto`, `hint`) the key is the
+  platform's; a `manual` one is a strip that stays until taken away, closes on no Esc and does not count
+  (round 6, Е1: counted, every such strip gave «Выбрать товар» back to Chromium's clearing). The price,
+  while none exists in the app, measured in round 6 (Е2): with such a popover in the dialog Chromium
+  clears the field and the popover stays; WebKit closes the popover.
   Unless its owner took the key first. Outside a dialog Esc is the platform's,
   the combobox's «let go of the row» before it. **The focus of a field is one mixin, `field-focus`**, which `AppField` takes too. **The field
   is only a field**: a combobox gives it its role, its `aria-*` and its keys, and every attribute but

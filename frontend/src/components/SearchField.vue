@@ -59,12 +59,15 @@ function closedBy(dialog: HTMLDialogElement): string {
 /**
  * Whether a popover is open. The platform's Esc closes the topmost of what closes, and an open popover
  * stands above the dialog: taken by the field, Esc closed the dialog under it (round 5, Д1). Which one is
- * on top no script can ask, so with any popover open the key stays the platform's. An engine that knows
- * no `:popover-open` has none open.
+ * on top no script can ask, so with any popover open the key stays the platform's. Only one Esc closes:
+ * `manual` is a strip that stays until taken away, and counted it gave Esc back to Chromium's clearing
+ * under every such strip (round 6, Е1). An engine that knows no `:popover-open` has none open.
  */
 function popoverOpen(): boolean {
   try {
-    return [...document.querySelectorAll('[popover]')].some((one) => one.matches(':popover-open'))
+    return [...document.querySelectorAll<HTMLElement>('[popover]')].some(
+      (one) => one.popover !== 'manual' && one.matches(':popover-open'),
+    )
   } catch {
     return false
   }
