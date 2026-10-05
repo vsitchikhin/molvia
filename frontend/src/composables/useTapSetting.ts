@@ -33,8 +33,9 @@ export interface TapSettingState<T> {
   /** The last change did not reach an answer: the control is back where the server holds it. */
   readonly saveFailed: Ref<boolean>
   /**
-   * The last change got no answer, and no read has said since whether it landed (MOL-96, А2): `value`
-   * is the server's word from before it — a guess. Checked again by itself until a read answers.
+   * The last change got no answer, and no read has said since whether it landed (MOL-96, А2):
+   * `value` is the server's word from before it — a guess. Checked again by itself until a read
+   * answers.
    */
   readonly unsure: Ref<boolean>
   retry(): Promise<void>
@@ -65,8 +66,9 @@ export function useTapSetting<T>(
   // that already turned it off.
   const unsure = ref(false)
   // The last choice that got no «yes»: its «not saved» stays the truth whatever a check finds of an
-  // earlier change — unless the server holds that very choice (round 5, Р5-А1; round 6, №11, Р6-А1).
-  // An earlier tap may have put it there; with three values or more, «differs from before» is not it.
+  // earlier change — unless the server holds that very choice (round 5, Р5-А1; round 6, №11,
+  // Р6-А1). An earlier tap may have put it there; with three values or more, «differs from before»
+  // is not it.
   let lastChoice: { readonly choice: T } | undefined
   let check: ReturnType<typeof setTimeout> | undefined
   let checkIn = TAP_CHECK_FIRST_MS
@@ -91,10 +93,12 @@ export function useTapSetting<T>(
     try {
       const answer = await read()
       if (mine !== latest) return
-      // What the person chose last is on the server after all: «не сохранилось» is no longer true.
       const same = (one: unknown, other: unknown): boolean =>
         JSON.stringify(one) === JSON.stringify(other)
-      if (unsure.value && lastChoice && same(answer, lastChoice.choice)) saveFailed.value = false
+      // The check is the answer the change never got, either way (round 7, Р7-А1): lost offline,
+      // it said only «без связи», and a check that finds the choice did not land says «не
+      // сохранилось».
+      if (unsure.value && lastChoice) saveFailed.value = !same(answer, lastChoice.choice)
       settle()
       value.value = answer
       failure.value = null

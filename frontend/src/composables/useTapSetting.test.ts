@@ -128,6 +128,26 @@ describe('useTapSetting: a change whose answer was lost', () => {
     await flushPromises()
     expect(tap.unsure.value).toBe(false)
     expect(tap.value.value).toEqual({ off: true })
+    expect(tap.saveFailed.value).toBe(false)
+  })
+
+  it('lost without a connection and never landed: the check back online says «not saved» (round 7, Р7-А1)', async () => {
+    const tap = await mounted()
+    write.mockImplementation(() => {
+      online = false
+      return Promise.reject(new TypeError('Failed to fetch'))
+    })
+    await tap.choose({ off: true })
+    // Offline is grey «без связи», never «not saved» — until a check knows (MOL-19).
+    expect(tap.saveFailed.value).toBe(false)
+    expect(tap.unsure.value).toBe(true)
+
+    online = true
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.value.value).toEqual({ off: false })
+    expect(tap.saveFailed.value).toBe(true)
   })
 
   it('a refusal in the API’s own words is «not saved» at once: no check, no clock (round 3, №6)', async () => {
