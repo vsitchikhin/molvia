@@ -579,6 +579,24 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
     expect(texts).toContain(en.income.title)
   })
 
+  it('запасной курс назван не банком пары, а молчащим банком пары (MOL-110, ревью 1)', async () => {
+    const rate = (source: 'official' | 'fallback') => ({
+      base: 'GEL' as const,
+      quote: 'RUB' as const,
+      scaled: 32_040_000n,
+      source,
+      asOf: new Date(),
+    })
+    moneyMonth.mockResolvedValue(month({ rate: rate('fallback') }))
+    const fallback = await render()
+    expect(fallback.text()).toContain('not a rate of the National Bank of Georgia')
+    expect(fallback.text()).not.toContain('At the National Bank of Georgia rate')
+
+    moneyMonth.mockResolvedValue(month({ rate: rate('official') }))
+    const official = await render()
+    expect(official.text()).toContain('At the National Bank of Georgia rate')
+  })
+
   it('a newcomer has no «Траты» — nothing to see there — and the rest are there', async () => {
     moneyMonth.mockResolvedValue(empty())
     const view = await render()

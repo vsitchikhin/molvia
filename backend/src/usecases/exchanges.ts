@@ -2,6 +2,7 @@ import {
   DomainError,
   ERROR,
   EXCHANGE_LOSS_MONTHS,
+  MARKET_CURRENCIES,
   OFFICIAL_RATE_FRESH_DAYS,
   RATE_SCALE,
   bestQuote,
@@ -156,9 +157,9 @@ export function marketComparisonOf(
 }
 
 /**
- * «Курсы по данным ЦБ РА» (MOL-137, В-1): for each currency, the central bank's own rate of today
- * — never an open source standing in for it, which the block's words would name the central bank
- * (review П-3) — and each channel's latest figures, each dated by its own day. The best for the
+ * «Курсы по данным ЦБ РА» (MOL-137, В-1): for each currency of the market's files — never the lari,
+ * which they do not carry (MOL-110) — the central bank's own rate of today, never an open source
+ * standing in for it, which the block's words would name the central bank (review П-3), and each channel's latest figures, each dated by its own day. The best for the
  * person is marked among the figures of the latest day still fresh today: an exchange office of last
  * week is shown with its date, but set beside today's banks it is not today's best — a card compares
  * with it only on its own day (review П-5).
@@ -168,7 +169,7 @@ export function marketTodayOf(
   official: readonly CachedRate[],
   today: string,
 ): MarketToday[] {
-  return FOREIGN.map((currency): MarketToday => {
+  return MARKET_CURRENCIES.map((currency): MarketToday => {
     const buys = marketQuotesToday(latest, currency, 'bankBuys', today)
     const sells = marketQuotesToday(latest, currency, 'bankSells', today)
     const fresh = (quotes: readonly MarketQuote[]) => {

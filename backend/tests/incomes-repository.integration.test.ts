@@ -119,7 +119,7 @@ describe('incomes: запись', () => {
         values (${randomUUID()}, ${owner}, ${patch.amount ?? row.amountMinor}, ${patch.currency ?? row.currency},
                 ${row.receivedOn}, ${patch.source ?? row.source}, ${patch.held ?? null})`)
     await expect(insert({ amount: 0n })).rejects.toThrow()
-    await expect(insert({ currency: 'GEL' })).rejects.toThrow()
+    await expect(insert({ currency: 'GBP' })).rejects.toThrow()
     await expect(insert({ source: 'lottery' })).rejects.toThrow()
     await expect(insert({ held: -1n })).rejects.toThrow()
     await db.insert(incomes).values({ id: randomUUID(), ...row })

@@ -61,7 +61,7 @@
             :aria-describedby="`${id}-held`"
           />
           <p :id="`${id}-held`" class="hint">
-            {{ t('income.sheet.held_hint') }}
+            {{ t('income.sheet.held_hint', { bank: bankWords(currency, overview.base, t) }) }}
             <template v-if="estimate"> <br />{{ estimate }} </template>
           </p>
           <HeldFromAccounts
@@ -153,6 +153,7 @@ import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import { bankWords } from '@/components/spending'
 import { useAccountChoice } from '@/composables/useAccountChoice'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { shown } from '@/composables/useItemDetails'
@@ -419,6 +420,7 @@ export default defineComponent({
     }
 
     return {
+      bankWords,
       accounts,
       accountId: choice.accountId,
       account: choice.account,

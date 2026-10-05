@@ -10,8 +10,8 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 - `packages/model/src/entities/exchange.ts` — Exchange entity and the wallet: currency costs along the chain, own rates, difference from the official rate, the «сколько было до» hint.
 - `packages/model/src/entities/exchange-rate-chart.ts` — «Курс рубля за месяц, 6 и 12 месяцев» (MOL-161, MOL-168): the periods and their first day, the days of the month and the weeks of half a year and the year, a step's figure of all bank clients, the pairs and the side of their line, each exchange with its percent and the market it was measured by, the round ticks of each period's axis.
 - `packages/model/src/entities/income.ts` — Income entity: the closed list of sources, the undo window, and the per-month sums per currency.
-- `packages/model/src/values/market-rates.ts` — Market-rate value (MOL-137): channels, the bank's side of an exchange, a day's figure per channel, the best for the person, «exchange offices still to come», the figures of today, the band of a factor of two.
-- `packages/model/src/values/rates.ts` — Exchange-rate value: six-digit scale, sources and providers, jump rule, Yerevan days, `latestDay` — the latest day on Earth, the bound of «not in the future» (MOL-121) —, freshness, picking the official rate, `formatRate`.
+- `packages/model/src/values/market-rates.ts` — Market-rate value (MOL-137): the currencies of the files (MOL-110), channels, the bank's side of an exchange, a day's figure per channel, the best for the person, «exchange offices still to come», the figures of today, the band of a factor of two.
+- `packages/model/src/values/rates.ts` — Exchange-rate value: six-digit scale, sources and providers, the pair's own bank (`homeBankOf`, MOL-110), jump rule, Yerevan days, `latestDay` — the latest day on Earth, the bound of «not in the future» (MOL-121) —, freshness, picking the official rate, `formatRate`.
 
 ## backend · routes
 
@@ -25,7 +25,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 - `backend/src/usecases/exchanges-market.test.ts` — Unit test: the block «Курсы по данным ЦБ РА» — the central bank's own rate only, the best starred among the latest day.
 - `backend/src/usecases/refresh-market-rates.ts` — Use case: the hourly refresh of the market (MOL-137) — each central-bank file on its own, downloaded when its version moved, refused whole outside a factor of two of the official rate or dated ahead. Tests beside it.
 - `backend/src/usecases/money-rates.ts` — Use case helper: the rates of one day between two currencies that «Деньги» counts spendings and incomes by.
-- `backend/src/usecases/refresh-official-rates.ts` — Use case: one hourly refresh of the official-rate cache — the CBA first, then the fallbacks — with jump marking.
+- `backend/src/usecases/refresh-official-rates.ts` — Use case: one hourly refresh of the official-rate cache — the CBA first, then the fallbacks, and the country banks every hour with their archive walked a day a request (MOL-110) — with jump marking.
 
 ## backend · db
 
@@ -41,6 +41,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 - `backend/src/rates/cba-market.ts` — Feeds of the market (MOL-137): three central-bank xlsx files — people in cash and not, all bank clients, exchange offices — strict readers of their sheets, a `HEAD` before each download and a ceiling held on the stream.
 - `backend/src/rates/cbr.ts` — Feed of the Bank of Russia, first fallback: parses the daily XML and turns rouble quotes into drams.
 - `backend/src/rates/erapi.ts` — Feed of open.er-api.com, second fallback: parses its JSON against the dram and inverts it to drams per unit.
+- `backend/src/rates/nbg.ts` — Feed of the National Bank of Georgia, the lari's own bank (MOL-110): parses its JSON of lari quotes into drams inside one answer; the latest and any day of the archive.
 - `backend/src/rates/feed.ts` — Shared feed plumbing: the `RateFeed` interface, the foreign-currency list, timeout, strict `published` check, HTTP request; `reach` turns a request with no answer into a `FeedError` worded by its `cause` (MOL-153).
 - `backend/src/rates/feeds.test.ts` — Unit test: each provider's recorded answer parses to the right rates, and malformed, zero, dated-wrong or slow answers are refused whole.
 - `backend/src/rates/market-feeds.test.ts` — Unit test: the three recorded xlsx files and the SOAP archive read to the right figures, and a file with one cell moved, zeroed or renamed refused whole.
@@ -51,9 +52,10 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 
 - `backend/tests/exchanges-repository.integration.test.ts` — Integration test: exchanges are written, repeated, refused on conflict, removed, restored within ten minutes and erased with the owner.
 - `backend/tests/exchanges.integration.test.ts` — Integration test: «Обмен денег» over HTTP — the wallet, the official comparison, the chain of costs and the rate a new trip takes.
-- `backend/tests/fixtures/rates/` — Provider answers recorded byte for byte that the feed parsers are tested on: 19.09.2026 (CBA, Bank of Russia, er-api, a SOAP fault) and 30.09.2026 (the CBA's archive and its three xlsx files of the market, MOL-137).
+- `backend/tests/fixtures/rates/` — Provider answers recorded byte for byte that the feed parsers are tested on: 19.09.2026 (CBA, Bank of Russia, er-api, a SOAP fault), 30.09.2026 (the CBA's archive — asked again with the lari on 04.10, MOL-110 — and its three xlsx files of the market, MOL-137) and 03.10.2026 (the National Bank of Georgia, MOL-110).
 - `backend/tests/fixtures/rates/cba-runtime-error.html` — Fixture: the CBA's «Runtime Error» page its GET form returns, which the parser must refuse.
 - `backend/tests/incomes-repository.integration.test.ts` — Integration test: incomes are written, amended with history, refused on conflict, removed, restored and erased with the owner.
+- `backend/tests/lari.integration.test.ts` — Integration test: the lari (MOL-110) — a trip takes the National Bank of Georgia as official and the CBA as its fallback, an exchange and an income of lari price the wallet, the database holds the pair's own bank as the domain does.
 - `backend/tests/incomes.integration.test.ts` — Integration test: «Доходы» over HTTP — months and sums, amend and undo, and how an income prices the wallet and a trip's rate.
 - `backend/tests/market-history.integration.test.ts` — Integration test: the central bank's archive since 2022 and its recorded file of banks in one hour — the file written whole, a non-cash exchange of 2024 beside all bank clients (review А).
 - `backend/tests/market-rates.integration.test.ts` — Integration test: the market table and its constraints, the official history filling holes only, and «Обмен денег» against the market over HTTP — sides, best and own channel, stand-ins, the block of today, the channel in repeats and amendments.

@@ -11,6 +11,7 @@ import {
   RATE_MIN,
   RATE_SCALE,
   exchangeRateSchema,
+  homeBankOf,
   isRateFresh,
   parseRate,
   rateProviderSchema,
@@ -87,13 +88,15 @@ const tripFields = z.object({
 export const tripSchema = tripFields
   // A provider belongs to a published rate and to nothing else: none without a snapshot, none for
   // a snapshot the person entered themselves, and one for every rate a bank or an aggregator gave.
-  // And the two agree: `official` is the central bank of Armenia, every other publisher is a
-  // `fallback`. They are one fact written twice, and a pair that disagrees would have the screen
-  // say «not the central bank» and then name it (MOL-22, В2-11).
+  // And the two agree: `official` is the pair's own bank — the National Bank of Georgia for the
+  // lari, the Central Bank of Armenia for the rest (`homeBankOf`, MOL-110) — every other publisher
+  // is a `fallback`. They are one fact written twice, and a pair that disagrees would have the
+  // screen say «not the central bank» and then name it (MOL-22, В2-11).
   .refine(
     ({ rate, rateProvider }) => {
       if (rate === null || rate.source === 'personal') return rateProvider === null
-      return rateProvider !== null && (rate.source === 'official') === (rateProvider === 'cba')
+      const home = homeBankOf(rate.base, rate.quote)
+      return rateProvider !== null && (rate.source === 'official') === (rateProvider === home)
     },
     { error: ISSUE.RATE_PROVIDER_UNMATCHED },
   )

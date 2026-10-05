@@ -1,5 +1,6 @@
-import type { MarketChannel, MarketRate, MarketSide } from '@molvia/model'
-import { FOREIGN, FeedError, reach } from './feed'
+import { MARKET_CURRENCIES } from '@molvia/model'
+import type { MarketChannel, MarketCurrency, MarketRate, MarketSide } from '@molvia/model'
+import { FeedError, reach } from './feed'
 import { readSheet, scaledFromCell } from './xlsx'
 import type { Sheet } from './xlsx'
 
@@ -81,7 +82,7 @@ export function readBybranch(sheet: Sheet): MarketRate[] {
     ['M', 'bankCash', 'bankSells'],
     ['P', 'bankNoncash', 'bankSells'],
   ]
-  return FOREIGN.flatMap((currency) => {
+  return MARKET_CURRENCIES.flatMap((currency) => {
     // The currency's cell is merged down its block, so every row of the block reads it: the row
     // wanted is the one of that block whose branch is people.
     const rows: number[] = []
@@ -113,7 +114,7 @@ const DAILY = 'FOREX ENG_Daily.xlsx'
  */
 const DAILY_COLUMNS: Readonly<
   Record<
-    MarketRate['currency'],
+    MarketCurrency,
     { title: string; buying: string; selling: string; buys: string; sells: string }
   >
 > = {
@@ -129,7 +130,7 @@ const DAILY_COLUMNS: Readonly<
  */
 export function readDaily(sheet: Sheet): MarketRate[] {
   const header: Record<string, string> = {}
-  for (const currency of FOREIGN) {
+  for (const currency of MARKET_CURRENCIES) {
     const { title, buying, selling, buys, sells } = DAILY_COLUMNS[currency]
     header[`${title}3`] = 'Intrabank operations'
     header[`${title}6`] = currency
@@ -146,7 +147,7 @@ export function readDaily(sheet: Sheet): MarketRate[] {
     if (sheet.value(`A${String(row)}`) === null) {
       // As for the exchange offices (round 3, Г; round 4, Д): an empty row is passed over, a row
       // with a rate and no day is the sheet rebuilt — passed over, its day would drop out in silence.
-      const rated = FOREIGN.some((currency) => {
+      const rated = MARKET_CURRENCIES.some((currency) => {
         const { buys, sells } = DAILY_COLUMNS[currency]
         return [buys, sells].some((column) => sheet.value(`${column}${String(row)}`) !== null)
       })
@@ -156,7 +157,7 @@ export function readDaily(sheet: Sheet): MarketRate[] {
     const date = sheet.day(`A${String(row)}`)
     if (date <= previous) throw refuse(DAILY, `A${String(row)} is not after the row above`)
     previous = date
-    for (const currency of FOREIGN) {
+    for (const currency of MARKET_CURRENCIES) {
       const { buys, sells } = DAILY_COLUMNS[currency]
       const at = { channel: 'banksAll' as const, currency, date }
       rates.push(rateOf(sheet, DAILY, `${buys}${String(row)}`, { ...at, side: 'bankBuys' }))
@@ -196,7 +197,7 @@ export function readExchangers(sheet: Sheet): MarketRate[] {
       )
       const currencyLike =
         typeof said[0] === 'string' &&
-        ['Other', ...FOREIGN].includes(said[0].replace(/\s+/g, ' ').trim())
+        ['Other', ...MARKET_CURRENCIES].includes(said[0].replace(/\s+/g, ' ').trim())
       if (currencyLike || said.slice(1).some((cell) => cell !== null)) {
         throw refuse(EXCHANGERS, `row ${String(row)} has no day`)
       }
@@ -205,7 +206,7 @@ export function readExchangers(sheet: Sheet): MarketRate[] {
     const date = sheet.day(`B${String(row)}`)
     const name = sheet.text(`C${String(row)}`)
     if (name === 'Other') continue
-    const currency = FOREIGN.find((known) => known === name)
+    const currency = MARKET_CURRENCIES.find((known) => known === name)
     if (currency === undefined) throw refuse(EXCHANGERS, `C${String(row)} is not a currency`)
     const seen = byDay.get(date) ?? new Set()
     if (seen.has(currency)) throw refuse(EXCHANGERS, `${currency} twice on ${date}`)
@@ -216,7 +217,7 @@ export function readExchangers(sheet: Sheet): MarketRate[] {
   }
   if (byDay.size === 0) throw refuse(EXCHANGERS, 'no rows')
   for (const [date, seen] of byDay) {
-    if (seen.size !== FOREIGN.length) throw refuse(EXCHANGERS, `${date} incomplete`)
+    if (seen.size !== MARKET_CURRENCIES.length) throw refuse(EXCHANGERS, `${date} incomplete`)
   }
   return rates
 }

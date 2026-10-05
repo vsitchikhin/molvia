@@ -59,7 +59,7 @@
           <!-- Under a market comparison «nothing to compare with» would be untrue (review). -->
           <span v-else class="missing">{{
             market && !exchange.officialDoubtful
-              ? t('exchange.card_no_official_short')
+              ? t('exchange.card_no_official_short', { bank: bankOf(exchange) })
               : noOfficialOf(exchange)
           }}</span>
         </span>
