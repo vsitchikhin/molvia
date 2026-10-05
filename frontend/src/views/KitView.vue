@@ -280,6 +280,7 @@
             :meta="t('dev.kit.sample_meta')"
             :active="index === 0"
             :selected="false"
+            wrap
             next
           />
         </AppCard>

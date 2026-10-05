@@ -45,6 +45,7 @@
           :title="item.name"
           :meta="item.note ?? ''"
           :active="index === active"
+          wrap
           next
           @click="choose(item)"
         />

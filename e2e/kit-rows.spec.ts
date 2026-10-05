@@ -122,6 +122,48 @@ test('the search field is one pill, and the active option keeps its weight and r
   expect(look.fill).not.toBe('rgba(0, 0, 0, 0)')
 })
 
+// A chosen row with a meta stands on the same tint: its meta is in the text's colour too (MOL-177, the
+// defect of MOL-175 — muted there is 3.83:1 in the dark).
+test('a chosen row reads its meta in text on its tint', async ({ page }) => {
+  await open(page, '/_kit')
+  const chosen = page
+    .getByRole('radiogroup', { name: 'Purchases account' })
+    .getByRole('radio', { checked: true })
+  const colours = await chosen.evaluate((row) => ({
+    title: getComputedStyle(row.querySelector('.title')!).color,
+    meta: getComputedStyle(row.querySelector('.meta')!).color,
+  }))
+  expect(colours.meta).toBe(colours.title)
+})
+
+// The end of a name tells items apart — the fat, the size (adversarial А1): an option of the list a field
+// owns breaks its name onto lines rather than ending it in «…», at 390 and at 320.
+for (const width of [390, 320])
+  test(`at ${String(width)} an option of the search list shows its whole name`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 720 })
+    await open(page, '/_kit')
+    const titles = await page
+      .getByRole('listbox', { name: 'Found' })
+      .getByRole('option')
+      .evaluateAll((rows) =>
+        rows.map((row) => {
+          const title = row.querySelector<HTMLElement>('.title')!
+          const style = getComputedStyle(title)
+          return {
+            cut: title.scrollWidth > title.clientWidth,
+            ellipsis: style.textOverflow === 'ellipsis' && style.whiteSpace === 'nowrap',
+            lines: Math.round(title.getBoundingClientRect().height / parseFloat(style.lineHeight)),
+          }
+        }),
+      )
+    expect(titles).toHaveLength(2)
+    for (const title of titles) expect(title).toMatchObject({ cut: false, ellipsis: false })
+    // The long name of the kit takes more than a line at either width.
+    expect(titles[1]?.lines).toBeGreaterThan(1)
+  })
+
 // One row of an operation (MOL-176, Ф-12): every row has its chevron, so the amounts end in one column
 // — and the bars of its skeleton end there too, or the list would jump as the answer comes.
 test('the amounts of operation rows stand in one column, where their skeleton’s stand', async ({
