@@ -99,8 +99,9 @@ test('the search field is one pill, and the active option keeps its weight and r
   )
   expect(wells).toHaveLength(3)
   // A target of 44 inside an edge of 1 — 46, as every field of the kit (owner's choice on review Р1-3).
+  // To a hundredth: a box at a fractional offset measures 45.9998 (MOL-225 put a section above it).
   for (const well of wells) {
-    expect(well.height).toBe(46)
+    expect(well.height).toBeCloseTo(46, 2)
     expect(well.radius).toBeGreaterThanOrEqual(well.height / 2)
   }
 
