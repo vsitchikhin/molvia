@@ -103,12 +103,14 @@ earlier tap may explain (round 5, Р5-А1; round 6, №11, Р6-А1); a change lo
 only «без связи», gets its answer from the check too (round 7, Р7-А1); and an unsure change outlives
 the screen that said «проверяем» — kept in the page's memory by owner and setting, so the screen
 drawn on the way back from another tab checks with its first read and says how it ended (round 8,
-Р8-А1), while a reload reads the server afresh, a named price; the line is said in the live region
-only when it does not take the focus, which reads it (№10). **Off erases every row of the person's
-log at once** (В-1), every type, in the transaction that marks the objection
-(`actors.analytics_off_at`) — the second written exception to append-only: the gates stop counting
-them, so the rows have no reader left, and an objection to a legitimate interest takes what it
-gathered (GDPR, the bar of section 2, art. 17(1)(c)). **The writer reads the objection after the
+Р8-А1) — and a screen left the moment its switch was tapped, or while its check was on its way,
+tells nobody and lets nothing go: what it hears is left for the next one, an unsure choice or «не
+сохранилось» (round 9, Р9-А1), while a reload reads the server afresh, a named price; the line is
+said in the live region only when it does not take the focus, which reads it (№10). **Off erases
+every row of the person's log at once** (В-1), every type, in the transaction that marks the
+objection (`actors.analytics_off_at`) — the second written exception to append-only: the gates stop
+counting them, so the rows have no reader left, and an objection to a legitimate interest takes what
+it gathered (GDPR, the bar of section 2, art. 17(1)(c)). **The writer reads the objection after the
 lock**: the switch takes the log's own advisory lock, so a visit being written either lands first
 and goes with the erasure, or waits and finds the objection; a person who is not there still fails
 on the foreign key, as before. **Out of both halves, never the numerator alone**: ten people, three

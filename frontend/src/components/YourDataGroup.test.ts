@@ -578,6 +578,26 @@ describe('«Count me in the statistics» (MOL-96)', () => {
     expect(back.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
   })
 
+  it('switched off and a tab tapped at once: back, the screen says the objection was not saved (Р9-А1)', async () => {
+    const view = await render()
+    let fail: (error: Error) => void = () => undefined
+    chooseAnalytics.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject
+        }),
+    )
+    await counted(view).setValue(false)
+    views.splice(views.indexOf(view), 1)
+    view.unmount()
+    fail(new TypeError('connection reset'))
+    await flushPromises()
+
+    const back = await render()
+    expect(counted(back).element.checked).toBe(true)
+    expect(back.get('[role="alert"]').text()).toContain(en.settings.tap.save_failed)
+  })
+
   it('«Try again» beside «we do not know» checks at once, and a change that did not land says so', async () => {
     const view = await render()
     chooseAnalytics.mockImplementation(() => {

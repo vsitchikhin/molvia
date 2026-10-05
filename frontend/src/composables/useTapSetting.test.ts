@@ -177,6 +177,75 @@ describe('useTapSetting: a change whose answer was lost', () => {
     expect(again.saveFailed.value).toBe(false)
   })
 
+  it('tapped and left at once: the gone screen checks nothing and tells nobody; the next one says it (round 9, Р9-А1 а)', async () => {
+    const tap = await mounted()
+    let fail: (error: Error) => void = () => undefined
+    write.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject
+        }),
+    )
+    const tapped = tap.choose({ off: true })
+    for (const view of views.splice(0)) view.unmount()
+    const reads = read.mock.calls.length
+    fail(new TypeError('connection reset'))
+    await tapped
+    // The gone screen asks nothing: the one drawn on the way back does.
+    expect(read.mock.calls.length).toBe(reads)
+
+    const back = await mounted()
+    expect(back.value.value).toEqual({ off: false })
+    expect(back.saveFailed.value).toBe(true)
+  })
+
+  it('left while the check was on its way: what it learnt waits for the next screen (round 9, Р9-А1 б)', async () => {
+    const tap = await mounted()
+    let answer: (setting: Setting) => void = () => undefined
+    write.mockRejectedValue(new TypeError('connection reset'))
+    read.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answer = resolve
+        }),
+    )
+    const tapped = tap.choose({ off: true })
+    await flushPromises()
+    for (const view of views.splice(0)) view.unmount()
+    answer({ off: false })
+    await tapped
+
+    read.mockImplementation(() => Promise.resolve(server))
+    const back = await mounted()
+    expect(back.value.value).toEqual({ off: false })
+    expect(back.saveFailed.value).toBe(true)
+    // Said once: the screen after that one has nothing left to say.
+    for (const view of views.splice(0)) view.unmount()
+    expect((await mounted()).saveFailed.value).toBe(false)
+  })
+
+  it('tapped and left, and the change landed: nothing is left, the next screen just reads', async () => {
+    const tap = await mounted()
+    let land: (setting: Setting) => void = () => undefined
+    write.mockImplementation(
+      (next) =>
+        new Promise((resolve) => {
+          land = (setting) => {
+            server = next
+            resolve(setting)
+          }
+        }),
+    )
+    const tapped = tap.choose({ off: true })
+    for (const view of views.splice(0)) view.unmount()
+    land({ off: true })
+    await tapped
+    const back = await mounted()
+    expect(back.value.value).toEqual({ off: true })
+    expect(back.saveFailed.value).toBe(false)
+    expect(back.unsure.value).toBe(false)
+  })
+
   it('a screen drawn anew whose first read fails: its own failure, and the change stays unsure', async () => {
     const tap = await mounted()
     write.mockRejectedValue(new TypeError('connection reset'))

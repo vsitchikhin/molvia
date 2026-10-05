@@ -24,16 +24,20 @@ function refusedInWords(error: unknown): boolean {
 }
 
 /**
- * Changes still unsure, by owner and setting, for the page's life (round 8, Р8-А1): the screen that
- * said «проверяем» may be left — a tab tapped — and the one drawn on the way back takes the last
- * choice from here, so its first read is that check and says how it ended. In memory only: nothing
- * of it is kept on the phone, and a reload reads the server afresh — a named price.
+ * What a screen since gone left untold, by owner and setting, for the page's life (round 8, Р8-А1;
+ * round 9, Р9-А1): a change still unsure — its last choice — or one it learnt was not saved. The
+ * screen that said «проверяем», or was left the moment its switch was tapped, may be gone before
+ * the answer comes; it tells nobody and leaves what it learnt here, and the screen drawn on the way
+ * back takes it — its first read is the check, or it says «не сохранилось» — and only a screen that
+ * said so lets it go. In memory only: nothing of it is kept on the phone, and a reload reads the
+ * server afresh — a named price.
  */
-const unsureChoices = new Map<string, { readonly choice: unknown }>()
+type LeftBehind = { readonly unsure: true; readonly choice: unknown } | { readonly unsure: false }
+const leftBehind = new Map<string, LeftBehind>()
 
 /** A fresh page, as a reload makes one: for the tests, which share one module between them. */
 export function forgetUnsureChanges(): void {
-  unsureChoices.clear()
+  leftBehind.clear()
 }
 
 export interface TapSettingState<T> {
@@ -87,10 +91,16 @@ export function useTapSetting<T>(
   let lastChoice: { readonly choice: T } | undefined
   let check: ReturnType<typeof setTimeout> | undefined
   let checkIn = TAP_CHECK_FIRST_MS
+  // Gone with its screen, it still hears what it asked: what it learns is left for the next one.
+  let alive = true
+
+  /** The person has been told — by this screen — what became of the change: nothing is left. */
+  function told(): void {
+    const key = memory()
+    if (key) leftBehind.delete(key)
+  }
 
   function settle(): void {
-    const key = memory()
-    if (key) unsureChoices.delete(key)
     unsure.value = false
     clearTimeout(check)
     checkIn = TAP_CHECK_FIRST_MS
@@ -106,10 +116,11 @@ export function useTapSetting<T>(
 
   async function load(): Promise<void> {
     if (!actor.id || saving.value) return
-    // A change left unsure on a screen since gone: this read is its check.
-    const kept = unsure.value ? undefined : unsureChoices.get(memory() ?? '')
-    if (kept) {
-      lastChoice = kept as { readonly choice: T }
+    // What a screen since gone left: an unsure change, which this read checks, or one not saved.
+    const key = memory()
+    const left = unsure.value || !key ? undefined : leftBehind.get(key)
+    if (left?.unsure) {
+      lastChoice = { choice: left.choice as T }
       unsure.value = true
     }
     const mine = ++latest
@@ -118,16 +129,26 @@ export function useTapSetting<T>(
       if (mine !== latest) return
       const same = (one: unknown, other: unknown): boolean =>
         JSON.stringify(one) === JSON.stringify(other)
+      const notSaved = unsure.value && lastChoice ? !same(answer, lastChoice.choice) : undefined
+      if (!alive) {
+        // Heard by a screen gone (Р9-А1): left for the next one, never let go here.
+        if (key && notSaved !== undefined)
+          if (notSaved) leftBehind.set(key, { unsure: false })
+          else leftBehind.delete(key)
+        return
+      }
       // The check is the answer the change never got, either way (round 7, Р7-А1): lost offline,
       // it said only «без связи», and a check that finds the choice did not land says «не
       // сохранилось».
-      if (unsure.value && lastChoice) saveFailed.value = !same(answer, lastChoice.choice)
+      if (notSaved !== undefined) saveFailed.value = notSaved
+      else if (left && !left.unsure) saveFailed.value = true
+      told()
       settle()
       value.value = answer
       failure.value = null
     } catch (error) {
       reportFailure(error, 'screen')
-      if (mine !== latest) return
+      if (mine !== latest || !alive) return
       online.value = navigator.onLine
       // A read after a change is a check, not the screen's loading (round 2, №5 and Р2-А2): the
       // setting was read, only whether the change landed is not known, and a screen whose state is
@@ -150,6 +171,7 @@ export function useTapSetting<T>(
     try {
       value.value = await write(next)
       lastChoice = undefined
+      told()
       settle()
     } catch (error) {
       value.value = shown
@@ -160,7 +182,9 @@ export function useTapSetting<T>(
       // landed. One unsure change is not made sure by a refusal of the next: it is still checked.
       unsure.value = unsure.value || !refusedInWords(error)
       const key = memory()
-      if (key && unsure.value) unsureChoices.set(key, { choice: next })
+      if (key && unsure.value) leftBehind.set(key, { unsure: true, choice: next })
+      // A refusal said to a screen gone is told by the next one.
+      else if (key && !alive) leftBehind.set(key, { unsure: false })
       // Offline or failed is decided after the failure (MOL-19, A1): a connection that dropped while
       // the answer was on its way is the grey «без связи», never the red «не сохранилось» (self-review 7).
       online.value = navigator.onLine
@@ -168,9 +192,14 @@ export function useTapSetting<T>(
     } finally {
       saving.value = false
     }
+    // A screen gone checks nothing: the one drawn on the way back does, with its first read.
+    if (!alive) return
     // Asked at once while there is a connection; without one, when it comes back (below).
     if (unsure.value && online.value) await load()
-    else if (!unsure.value) settle()
+    else if (!unsure.value) {
+      told()
+      settle()
+    }
   }
 
   const offline = (): void => {
@@ -181,6 +210,7 @@ export function useTapSetting<T>(
     void load()
   })
   onUnmounted(() => {
+    alive = false
     window.removeEventListener('offline', offline)
     clearTimeout(check)
   })
