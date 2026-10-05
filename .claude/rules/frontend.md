@@ -267,18 +267,32 @@ The detail behind the frontend lines of `CLAUDE.md`.
   word is the sign and the explanation at once, and still under reduced motion by its nature.
   **The width is the wider word**: a button not `block` holds both words in one cell, the one not
   shown `visibility: hidden` and `aria-hidden`, so it does not jump under the thumb when the work
-  starts or ends; a `block` one is as wide as its place and swaps the word, so its text is one word
-  (a cell there broke every test that finds a button by its text). The price, accepted: a live
-  «Обновить» stands a little wider than its word. **The focus stays**: a screen does not bind
-  `disabled` to its sending — the native attribute drops the focus to the page, `busy` is
-  `aria-disabled` and the kit cancels the tap; a neighbour that is not at work («Удалить» beside
-  «Сохранить» of an account) stays not now. **Nothing is announced apart**: the word is the name of
+  starts or ends; at rest the word of the work is drawn by CSS from `data-word`, so the button's
+  text is its action's word. A `block` one is as wide as its place and swaps the word (a cell there
+  broke every test that finds a button by its text). **The cell keeps the word shown in its middle**
+  (adversarial Р1-А4): where a grid holds the width — a pair of `1fr 1fr` — the word not shown wraps
+  and the cell grows two lines high; at its top, «Готово» of «Края чека» stood 12 px above its middle
+  on every phone. The prices, accepted: a live «Обновить» stands a little wider than its word, and
+  the word of the work in a pair may stand on two lines («Готовим / фото…»). **The focus stays**: a
+  screen does not bind `disabled` to its sending — the native attribute drops the focus to the page,
+  `busy` is `aria-disabled` and the kit cancels the tap — **nor to `!online` while it works**
+  (`!online && !sending`): a line that drops while the write hangs is the very case of the task, and
+  the glyph does not turn to «no network» beside «Сохраняем…» (Р1-А3). **Of two buttons that share
+  one write, the one pressed says it** (Р1-А1): «Удалить счёт», «Убрать план», «Снять оценку» have a
+  flag of their own beside `sending`; the other is `inactive` — before, «Сохранить» said «Сохраняем…»
+  of a save nobody asked for while the pressed one went grey. A neighbour that is not at work stays
+  not now. **Work is not only `busy`** (Р1-А2): a button whose own work was bound to `disabled` or
+  `inactive` — «Сохранить оценку», «Вернуть» of an income and an exchange (`restoring` of their
+  composables), «Считать по нему», «Записать разницу», «Показать ещё» (`loadingMore`) — is `busy` too. **Nothing is announced apart**: the word is the name of
   the focused button, beside `aria-busy`, and the outcome is announced as before — the live region
   of `App.vue` is inert behind a modal sheet, where most of these buttons stand. While a photo is
   made ready, «Выбрать фото», «Снять» and «Отправить чек» are not now and the line «Готовим фото…»
   says it — the work is the photo's; three buttons with one word would be noise. The linter refuses
-  `busy` without `busy-label` (`vue/no-restricted-syntax`); it closes carelessness, not intent. An
-  icon-only button has no word to swap, so its label is what changes. `/_kit` «Идёт работа» and
+  `busy` without its word (`vue/no-restricted-syntax`) — bound, alone or in a `v-bind` object, on
+  `AppButton` or `app-button`, the word as `busy-label` or `busyLabel` (Р1-А5). It cannot see a
+  button at work through `disabled` or `inactive` alone, which reads the same as a neighbour put out
+  while another works: that is review's. A button named by `label` — an icon-only one has no word to
+  swap — takes the word of the work as its name. A retry keeps its ↻ under «Отправляем…». `/_kit` «Идёт работа» and
   `e2e/kit-inactive` hold the look and the width in Chromium and WebKit, `e2e/erase` the word, the
   focus and the second tap on the most final button of the app.
 - **A row is `ListRow` or `NavRow`, a caps caption is `SectionCaption`** (MOL-175, Ф-12). A row of a
