@@ -132,3 +132,35 @@ test('an inactive row takes the focus, and neither Enter, a middle click nor a t
   await kit.getByRole('link', { name: /^A link that goes on/ }).tap()
   await expect.poll(followed).toBe('live')
 })
+
+// At work (MOL-225): the button says its own word in its own look — the variant's fill, ink and shadow,
+// not «not now» — and keeps its width, since both words stand in one cell. Each of the six variants,
+// in Chromium and WebKit.
+test('a busy button says what it does in the look of its action, and keeps its width', async ({
+  page,
+}) => {
+  const kit = await section(page, 'At work')
+  const buttons = kit.locator('.row button')
+  await expect(buttons).toHaveCount(6)
+  const looks = () =>
+    buttons.evaluateAll((all) =>
+      all.map((button) => {
+        const style = getComputedStyle(button)
+        return {
+          width: Math.round(button.getBoundingClientRect().width),
+          look: [style.backgroundColor, style.color, style.boxShadow, style.opacity].join(' · '),
+        }
+      }),
+    )
+  const live = await looks()
+
+  await kit.locator('label', { hasText: 'Working' }).click()
+  await expect(kit.getByRole('button', { name: 'Saving…', exact: true })).toHaveCount(6)
+  for (const button of await buttons.all())
+    await expect(button).toHaveAttribute('aria-busy', 'true')
+  expect(await looks()).toEqual(live)
+
+  await kit.locator('label', { hasText: 'Working' }).click()
+  await expect(kit.getByRole('button', { name: 'Saving…', exact: true })).toHaveCount(0)
+  expect(await looks()).toEqual(live)
+})
