@@ -29,7 +29,7 @@
       <SectionCaption class="caption">{{ t('dev.kit.busy') }}</SectionCaption>
       <label class="toggle">
         <AppSwitch :checked="working" @toggle="working = $event" />
-        {{ t('dev.kit.busy_switch') }}
+        {{ t('dev.kit.busy') }}
       </label>
       <div class="row">
         <AppButton :busy="working" :busy-label="t('settings.saving')">
