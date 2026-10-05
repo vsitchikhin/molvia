@@ -103,6 +103,10 @@ function mergedText(notice: CatalogueMergedNotice): string {
     for (const pair of notice.mergedPairs) {
       const text = pairText(pair.subject, pair.from, pair.into, pair.city)
       lines.push(pair.id === undefined ? text : `#${String(pair.id)} ${text}`)
+      // Only reported: its ids, so a false pair can be looked at, or merged and undone for good.
+      if (pair.id === undefined && pair.fromId !== undefined && pair.intoId !== undefined) {
+        lines.push(`FROM=${pair.fromId} INTO=${pair.intoId}`)
+      }
     }
     const rest = notice.merged - notice.mergedPairs.length
     if (rest > 0) lines.push(t(undefined, 'owner.merge.more', { count: rest }))
@@ -116,7 +120,7 @@ function mergedText(notice: CatalogueMergedNotice): string {
       )
     }
     const rest = notice.candidates - notice.candidatePairs.length
-    if (rest > 0) lines.push(t(undefined, 'owner.merge.more', { count: rest }))
+    if (rest > 0) lines.push(t(undefined, 'owner.merge.moreLater', { count: rest }))
   }
   if (on && notice.mergedPairs.length > 0) lines.push('', t(undefined, 'owner.merge.undo'))
   return lines.join('\n')

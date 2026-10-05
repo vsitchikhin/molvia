@@ -37,6 +37,15 @@ const NAMED: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
   ['Moloko', 'Молоко', 'l'],
   ['Кифир', 'Кефир', 'l'],
   ['Milo', 'Мыло', 'piece'],
+  // the closest by meaning of the seed's own transliterations, 0.902: past the threshold (review №6)
+  ['Bulochki dlya burgerov', 'Булочки для бургеров', 'piece'],
+]
+
+/** Two sizes the search key folds into one, and the model puts past 0.93 (adversarial А2). */
+const APART: readonly (readonly [string, string])[] = [
+  ['Лента 50 м', 'Лента 50 мм'],
+  ['Кабель 5 см', 'Кабель 5 км'],
+  ['Батарейки AA 4 уп', 'Батарейки AA 4 pc'],
 ]
 
 let report: CatalogueMergedNotice
@@ -52,9 +61,22 @@ beforeAll(async () => {
   for (const [name, , unit] of [...TWINS, ...NAMED]) {
     await items.create(newItemSchema.parse({ kind: 'product', name, defaultUnit: unit }), person)
   }
+  for (const name of APART.flat()) {
+    await items.create(newItemSchema.parse({ kind: 'product', name, defaultUnit: 'piece' }), person)
+  }
   await embedder.loaded
   await embedMissing({ embeddings: createItemEmbeddingRepository(db), embedder })
-  report = await mergeNight({ merges: createMergeRepository(db), embedder }, 'on', '2026-10-06')
+  report = await mergeNight(
+    {
+      merges: createMergeRepository(db),
+      embedder,
+      failed: (error) => {
+        throw error
+      },
+    },
+    'on',
+    '2026-10-06',
+  )
 }, 600_000)
 
 afterAll(async () => {
@@ -76,14 +98,25 @@ describe('the night on the seed', () => {
     expect(report.merged).toBe(TWINS.length)
   })
 
-  it('names what the model cannot judge, and merges none of it', async () => {
-    const named = await db.execute<{ a: string; b: string }>(sql`
-      select x.name as a, y.name as b
-      from catalogue_merge_candidates c
-      join items x on x.id = c.a
-      join items y on y.id = c.b`)
-    const pairs = named.map((row) => [row.a, row.b].sort().join(' ~ '))
+  it('names what the model cannot judge, ten a morning, and merges none of it', async () => {
+    // Ten a morning, the rest on the mornings after (review №2): read them all, as the owner would.
+    const merges = createMergeRepository(db)
+    const named = [...report.candidatePairs]
+    for (const day of ['2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10']) {
+      const next = await mergeNight({ merges, embedder, failed: () => undefined }, 'on', day)
+      expect(next.merged).toBe(0)
+      named.push(...next.candidatePairs)
+    }
+    expect(named).toHaveLength(report.candidates)
+    const pairs = named.map((pair) => [pair.from, pair.into].sort().join(' ~ '))
     for (const [from, into] of NAMED) expect(pairs).toContain([from, into].sort().join(' ~ '))
-    expect(report.candidates).toBe(named.length)
+  })
+
+  it('never merges two sizes the search key would fold into one', async () => {
+    const merged = await db.execute<{ name: string }>(sql`
+      select f.name from catalogue_merges m join items f on f.id = m.from_item`)
+    for (const pair of APART) {
+      for (const name of pair) expect(merged.map((row) => row.name)).not.toContain(name)
+    }
   })
 })

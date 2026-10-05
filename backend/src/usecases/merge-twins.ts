@@ -25,6 +25,8 @@ export interface MergeTwinsDeps {
   readonly notices: Pick<OwnerNoticeRepository, 'queue'>
   /** Whether there is an owner to tell: none in a copy, and then the report is only marked. */
   readonly owner: boolean
+  /** A pair that failed: told as the job's failure, and the night goes on. */
+  readonly failed: (error: unknown) => void
 }
 
 /** One pair the night judged, the older side first — the one a merge keeps (Р-2). */
@@ -111,15 +113,18 @@ async function placePairs(groups: readonly PlaceRow[][], embedder: Embedder): Pr
 /**
  * One night of the merge of twins (MOL-106): what reached a trace since is swept to its survivor, the
  * pairs near enough are merged — or only named, in `report` mode (В-3) — and the rest that are near are
- * new candidates for the owner. The report is kept with the night and handed in the morning.
+ * candidates for the owner. A pair that fails is told through `failed` and the night goes on: each
+ * merge is its own transaction, and what merged before is named all the same — the report reads the
+ * night's merges from the journal, a night broken off and run again included (adversarial А6).
  */
 export async function mergeNight(
-  { merges, embedder }: Pick<MergeTwinsDeps, 'merges' | 'embedder'>,
+  { merges, embedder, failed }: Pick<MergeTwinsDeps, 'merges' | 'embedder' | 'failed'>,
   mode: 'on' | 'report',
   day: string,
 ): Promise<CatalogueMergedNotice> {
   const on = mode === 'on'
-  if (on) await merges.sweep()
+  // In both modes: a merge by the owner's hand has a trace to sweep in the week of `report` too.
+  await merges.sweep()
 
   const items = (await merges.itemPairs(embedder.model, TWIN_CANDIDATE.meaning)).map((row) =>
     judge('item', row.a, row.b, row.a.unit === row.b.unit, row.meaning),
@@ -130,9 +135,10 @@ export async function mergeNight(
     place: await merges.undonePairs('place'),
   }
 
-  const merged: MergedPair[] = []
+  const wouldMerge: MergedPair[] = []
   const candidates: Judged[] = []
-  // A side merged tonight is a trace now: a later pair naming it waits for the next night.
+  // A side merged tonight is a trace now: a later pair naming it waits for the next night, where it
+  // meets the survivor instead.
   const gone = new Set<string>()
   for (const pair of [...items, ...places]) {
     if (pair.verdict === 'apart' || undone[pair.subject].has(pairKey(pair.from.id, pair.into.id))) {
@@ -143,45 +149,49 @@ export async function mergeNight(
       continue
     }
     if (gone.has(pair.from.id) || gone.has(pair.into.id)) continue
-    const named: MergedPair = {
-      subject: pair.subject,
-      from: pair.from.name,
-      into: pair.into.name,
-      ...(pair.city === undefined ? {} : { city: pair.city }),
-    }
     if (!on) {
       gone.add(pair.from.id)
-      merged.push(named)
+      wouldMerge.push({
+        subject: pair.subject,
+        from: pair.from.name,
+        into: pair.into.name,
+        ...(pair.city === undefined ? {} : { city: pair.city }),
+        fromId: pair.from.id,
+        intoId: pair.into.id,
+      })
       continue
     }
     const how = {
       by: 'night' as const,
+      night: day,
       ...(pair.spelling === null ? {} : { edits: pair.spelling.edits, worst: pair.spelling.worst }),
       ...(pair.meaning === null ? {} : { meaning: pair.meaning }),
     }
-    const outcome =
-      pair.subject === 'item'
-        ? await merges.mergeItems(pair.from.id, pair.into.id, how)
-        : await merges.mergePlaces(pair.from.id, pair.into.id, how)
-    if ('id' in outcome) {
-      gone.add(pair.from.id)
-      merged.push({ ...named, id: outcome.id })
-    } else if (outcome.refused === 'barcodes') {
+    try {
+      const outcome =
+        pair.subject === 'item'
+          ? await merges.mergeItems(pair.from.id, pair.into.id, how)
+          : await merges.mergePlaces(pair.from.id, pair.into.id, how)
+      if ('id' in outcome) gone.add(pair.from.id)
       // Too many codes for one item: the owner decides.
-      candidates.push(pair)
+      else if (outcome.refused === 'barcodes') candidates.push(pair)
+    } catch (error) {
+      failed(error)
     }
   }
 
+  // A candidate with a side merged tonight is asked again tomorrow, of the survivor: its command would
+  // be refused now, and named, it would never come back (adversarial А8).
+  const open = candidates.filter((pair) => !gone.has(pair.from.id) && !gone.has(pair.into.id))
   const fresh: CandidatePair[] = []
   for (const subject of ['item', 'place'] as const) {
-    const ofSubject = candidates.filter((pair) => pair.subject === subject)
-    const first = await merges.firstNamed(
+    const ofSubject = open.filter((pair) => pair.subject === subject)
+    const unnamed = await merges.unnamed(
       subject,
       ofSubject.map((pair) => [pair.from.id, pair.into.id] as const),
-      day,
     )
     for (const pair of ofSubject) {
-      if (!first.has(pairKey(pair.from.id, pair.into.id))) continue
+      if (!unnamed.has(pairKey(pair.from.id, pair.into.id))) continue
       fresh.push({
         subject,
         from: pair.from.name,
@@ -192,7 +202,19 @@ export async function mergeNight(
       })
     }
   }
+  // Only what the message prints is named: the rest come by name on the mornings after (review №2).
+  const printed = fresh.slice(0, MERGE_NOTICE_PAIRS)
+  for (const subject of ['item', 'place'] as const) {
+    await merges.markNamed(
+      subject,
+      printed
+        .filter((pair) => pair.subject === subject)
+        .map((pair) => [pair.fromId, pair.intoId] as const),
+      day,
+    )
+  }
 
+  const merged = on ? await merges.nightMerges(day) : wouldMerge
   return {
     kind: 'catalogue_merged',
     day,
@@ -200,7 +222,7 @@ export async function mergeNight(
     merged: merged.length,
     candidates: fresh.length,
     mergedPairs: merged.slice(0, MERGE_NOTICE_PAIRS),
-    candidatePairs: fresh.slice(0, MERGE_NOTICE_PAIRS),
+    candidatePairs: printed,
   }
 }
 
@@ -216,6 +238,8 @@ export async function mergeTick(
 ): Promise<void> {
   if (mode === 'off') return
   const clock = mergeClock(now)
+  // A night that throws before its end — the pairs not read — stays claimed and unfinished, and is
+  // claimed again within the hour; a pair that fails does not stop it.
   if (clock.merge && (await deps.merges.claimRun(clock.day, mode, now))) {
     const report = await mergeNight(deps, mode, clock.day)
     await deps.merges.finishRun(clock.day, report, new Date())

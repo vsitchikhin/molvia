@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MERGE_NOTICE_PAIRS } from '@molvia/model'
-import type { CatalogueMergedNotice, OwnerNotice } from '@molvia/model'
+import type { CatalogueMergedNotice, MergedPair, OwnerNotice } from '@molvia/model'
 import type {
   MergeHow,
   MergeOutcome,
@@ -30,23 +30,34 @@ function world({
   named = [] as string[],
   refuse = null as MergeOutcome | null,
   claimed = false,
+  breakOn = null as string | null,
 } = {}) {
   const merged: [string, string, MergeHow][] = []
+  const journal: MergedPair[] = []
   const runs = new Map<string, CatalogueMergedNotice | null>()
   const queued: OwnerNotice[] = []
   const reported = new Set<string>()
+  const failures: unknown[] = []
   let sweeps = 0
   const names = new Set(named)
+  const nameOf = new Map(
+    [...pairs.flatMap((pair) => [pair.a, pair.b]), ...groups.flat()].map((one) => [
+      one.id,
+      one.name,
+    ]),
+  )
   let next = 1
+  const merge = (subject: 'item' | 'place') => (from: string, into: string, how: MergeHow) => {
+    if (from === breakOn) return Promise.reject(new Error('connection terminated'))
+    merged.push([from, into, how])
+    if (refuse) return Promise.resolve(refuse)
+    const id = next++
+    journal.push({ subject, from: nameOf.get(from) ?? from, into: nameOf.get(into) ?? into, id })
+    return Promise.resolve({ id })
+  }
   const merges: MergeRepository = {
-    mergeItems: (from, into, how) => {
-      merged.push([from, into, how])
-      return Promise.resolve(refuse ?? { id: next++ })
-    },
-    mergePlaces: (from, into, how) => {
-      merged.push([from, into, how])
-      return Promise.resolve(refuse ?? { id: next++ })
-    },
+    mergeItems: merge('item'),
+    mergePlaces: merge('place'),
     unmerge: () => Promise.reject(new Error('not here')),
     sweep: () => {
       sweeps += 1
@@ -55,11 +66,15 @@ function world({
     itemPairs: () => Promise.resolve(pairs),
     placeGroups: () => Promise.resolve(groups),
     undonePairs: () => Promise.resolve(new Set(undone)),
-    firstNamed: (_subject, list) => {
-      const fresh = list.map(([a, b]) => pairKey(a, b)).filter((key) => !names.has(key))
-      for (const key of fresh) names.add(key)
-      return Promise.resolve(new Set(fresh))
+    unnamed: (_subject, list) =>
+      Promise.resolve(
+        new Set(list.map(([a, b]) => pairKey(a, b)).filter((key) => !names.has(key))),
+      ),
+    markNamed: (_subject, list) => {
+      for (const [a, b] of list) names.add(pairKey(a, b))
+      return Promise.resolve()
     },
+    nightMerges: () => Promise.resolve([...journal]),
     claimRun: (day) => {
       if (claimed || runs.has(day)) return Promise.resolve(false)
       runs.set(day, null)
@@ -82,21 +97,28 @@ function world({
       return Promise.resolve()
     },
   }
-  return {
-    merges,
-    notices,
-    merged,
-    queued,
-    runs,
-    sweeps: () => sweeps,
-  }
+  const night = (mode: 'on' | 'report', day = '2026-10-06') =>
+    mergeNight(
+      {
+        merges,
+        embedder: NO_EMBEDDER,
+        failed: (error) => {
+          failures.push(error)
+        },
+      },
+      mode,
+      day,
+    )
+  return { merges, notices, merged, queued, runs, failures, night, sweeps: () => sweeps }
 }
 
 describe('mergeNight', () => {
   it('merges the younger into the older, and names each merge by its number', async () => {
     const w = world({ pairs: [{ a: MILK_POINT, b: MILK, meaning: 0.97 }] })
-    const report = await mergeNight({ merges: w.merges, embedder: NO_EMBEDDER }, 'on', '2026-10-06')
-    expect(w.merged).toEqual([['a2', 'a1', { by: 'night', edits: 0, worst: 0, meaning: 0.97 }]])
+    const report = await w.night('on')
+    expect(w.merged).toEqual([
+      ['a2', 'a1', { by: 'night', night: '2026-10-06', edits: 0, worst: 0, meaning: 0.97 }],
+    ])
     expect(report).toEqual({
       kind: 'catalogue_merged',
       day: '2026-10-06',
@@ -109,17 +131,13 @@ describe('mergeNight', () => {
     expect(w.sweeps()).toBe(1)
   })
 
-  it('merges nothing in the report mode, and says what it would', async () => {
+  it('merges nothing in the report mode, says what it would by the two ids, and still sweeps', async () => {
     const w = world({ pairs: [{ a: MILK, b: MILK_POINT, meaning: 0.97 }] })
-    const report = await mergeNight(
-      { merges: w.merges, embedder: NO_EMBEDDER },
-      'report',
-      '2026-10-06',
-    )
+    const report = await w.night('report')
     expect(w.merged).toEqual([])
-    expect(w.sweeps()).toBe(0)
+    expect(w.sweeps()).toBe(1)
     expect(report.mergedPairs).toEqual([
-      { subject: 'item', from: 'Молоко 3.2%', into: 'Молоко 3,2%' },
+      { subject: 'item', from: 'Молоко 3.2%', into: 'Молоко 3,2%', fromId: 'a2', intoId: 'a1' },
     ])
   })
 
@@ -130,7 +148,7 @@ describe('mergeNight', () => {
         { a: MILK_POINT, b: MALOKO, meaning: 0.95 },
       ],
     })
-    await mergeNight({ merges: w.merges, embedder: NO_EMBEDDER }, 'on', '2026-10-06')
+    await w.night('on')
     expect(w.merged.map(([from, into]) => [from, into])).toEqual([['a2', 'a1']])
   })
 
@@ -139,7 +157,7 @@ describe('mergeNight', () => {
       pairs: [{ a: MILK, b: MILK_POINT, meaning: 0.97 }],
       undone: [pairKey('a1', 'a2')],
     })
-    const report = await mergeNight({ merges: w.merges, embedder: NO_EMBEDDER }, 'on', '2026-10-06')
+    const report = await w.night('on')
     expect([w.merged, report.merged, report.candidates]).toEqual([[], 0, 0])
   })
 
@@ -150,12 +168,44 @@ describe('mergeNight', () => {
       meaning: 0.48,
     }
     const w = world({ pairs: [pair] })
-    const first = await mergeNight({ merges: w.merges, embedder: NO_EMBEDDER }, 'on', '2026-10-06')
+    const first = await w.night('on')
     expect(first.candidatePairs).toEqual([
       { subject: 'item', from: 'Мыло', into: 'Milo', fromId: 'b2', intoId: 'b1' },
     ])
-    const second = await mergeNight({ merges: w.merges, embedder: NO_EMBEDDER }, 'on', '2026-10-07')
+    const second = await w.night('on', '2026-10-07')
     expect([second.candidates, w.merged]).toEqual([0, []])
+  })
+
+  it('names the candidates past ten on the mornings after, never losing one (review №2)', async () => {
+    const pairs = Array.from({ length: MERGE_NOTICE_PAIRS + 2 }, (_, i) => ({
+      a: side(`m${String(i)}a`, `Milo ${String(i)}`, '2026-09-01'),
+      b: side(`m${String(i)}b`, `Мыло ${String(i)}`, '2026-09-02'),
+      meaning: 0.5,
+    }))
+    const w = world({ pairs })
+    const first = await w.night('on')
+    expect([first.candidates, first.candidatePairs.length]).toEqual([
+      MERGE_NOTICE_PAIRS + 2,
+      MERGE_NOTICE_PAIRS,
+    ])
+    const second = await w.night('on', '2026-10-07')
+    expect([second.candidates, second.candidatePairs.length]).toEqual([2, 2])
+    const third = await w.night('on', '2026-10-08')
+    expect(third.candidates).toBe(0)
+  })
+
+  it('asks a candidate again tomorrow when a side of it merged tonight (adversarial А8)', async () => {
+    const chanah = side('c1', 'Сыр чанах', '2026-09-01')
+    const chunuh = side('c2', 'Сыр чунух', '2026-09-02')
+    const chanoh = side('c3', 'Сыр чанох', '2026-09-03')
+    const w = world({
+      pairs: [
+        { a: chanoh, b: chanah, meaning: 0.95 },
+        { a: chanoh, b: chunuh, meaning: 0.85 },
+      ],
+    })
+    const report = await w.night('on')
+    expect([report.merged, report.candidates]).toEqual([1, 0])
   })
 
   it('hands a pair whose codes would overflow one item to the owner', async () => {
@@ -163,8 +213,25 @@ describe('mergeNight', () => {
       pairs: [{ a: MILK, b: MILK_POINT, meaning: 0.97 }],
       refuse: { refused: 'barcodes' },
     })
-    const report = await mergeNight({ merges: w.merges, embedder: NO_EMBEDDER }, 'on', '2026-10-06')
+    const report = await w.night('on')
     expect([report.merged, report.candidates]).toEqual([0, 1])
+  })
+
+  it('tells a pair that failed and goes on with the night (adversarial А6)', async () => {
+    const w = world({
+      pairs: [
+        { a: MILK, b: MILK_POINT, meaning: 0.97 },
+        {
+          a: side('k1', 'Кефир 1%', '2026-09-01'),
+          b: side('k2', 'Кефир 1 %', '2026-09-02'),
+          meaning: 0.97,
+        },
+      ],
+      breakOn: 'a2',
+    })
+    const report = await w.night('on')
+    expect(w.failures).toHaveLength(1)
+    expect(report.mergedPairs.map((pair) => pair.from)).toEqual(['Кефир 1 %'])
   })
 
   it('names at most ten of each, and counts the rest', async () => {
@@ -173,11 +240,7 @@ describe('mergeNight', () => {
       b: side(`c${String(i)}b`, `Товар ${String(i)}`, '2026-09-02'),
       meaning: 0.99,
     }))
-    const report = await mergeNight(
-      { merges: world({ pairs }).merges, embedder: NO_EMBEDDER },
-      'on',
-      '2026-10-06',
-    )
+    const report = await world({ pairs }).night('on')
     expect([report.merged, report.mergedPairs.length]).toEqual([
       MERGE_NOTICE_PAIRS + 2,
       MERGE_NOTICE_PAIRS,
@@ -193,7 +256,7 @@ describe('mergeNight', () => {
       ],
     ]
     const w = world({ groups })
-    const report = await mergeNight({ merges: w.merges, embedder: NO_EMBEDDER }, 'on', '2026-10-06')
+    const report = await w.night('on')
     // No vector, no merge: one key, so a candidate.
     expect([w.merged, report.candidatePairs]).toEqual([
       [],
@@ -218,6 +281,7 @@ describe('mergeTick', () => {
     embedder: NO_EMBEDDER,
     notices: w.notices,
     owner,
+    failed: () => undefined,
   })
 
   it('runs the night from half past four in Yerevan, once, and reports from nine', async () => {

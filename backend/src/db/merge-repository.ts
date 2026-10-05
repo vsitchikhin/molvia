@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { ITEM_BARCODES_MAX } from '@molvia/model'
 import { catalogueMergedNoticeSchema } from '@molvia/model'
-import type { CatalogueMergedNotice, MergeSubject } from '@molvia/model'
+import type { CatalogueMergedNotice, MergedPair, MergeSubject } from '@molvia/model'
 import type { Conn } from './index'
 import { idOrNull } from './rows'
 import type { MergeBy, MergeMove } from './schema'
@@ -11,6 +11,8 @@ import { liveItemId, livePlaceId } from './trace'
 /** How a pair came to be merged, and the figures the night judged it by; none by hand. */
 export interface MergeHow {
   readonly by: MergeBy
+  /** The night's day in Yerevan, for a merge by the night: its report is read by it. */
+  readonly night?: string
   readonly edits?: number
   readonly worst?: number
   readonly meaning?: number
@@ -53,18 +55,29 @@ export interface MergeRepository {
   itemPairs(model: string, minMeaning: number): Promise<TwinRow[]>
   /** The live places of one kind, country and city where there are two or more, by group. */
   placeGroups(): Promise<PlaceRow[][]>
-  /** Whether a pair was merged once and undone: the night never merges it or names it again. */
-  undonePairs(subject: MergeSubject): Promise<ReadonlySet<string>>
   /**
-   * The candidates of these never named before, now marked named on `day` — the morning names only
-   * new ones (Р-11). A pair by its ids in order.
+   * The pairs merged once and undone, by the live things they stand in now: the night never merges or
+   * names them again — nor the survivor of the survivor, which holds what the undone one did
+   * (adversarial А5).
    */
-  firstNamed(
+  undonePairs(subject: MergeSubject): Promise<ReadonlySet<string>>
+  /** Of these candidates, the ones never named to the owner (Р-11). A pair by its ids in order. */
+  unnamed(
+    subject: MergeSubject,
+    pairs: readonly (readonly [string, string])[],
+  ): Promise<ReadonlySet<string>>
+  /** These candidates named on `day`: only the ones a morning's message printed by name. */
+  markNamed(
     subject: MergeSubject,
     pairs: readonly (readonly [string, string])[],
     day: string,
-  ): Promise<ReadonlySet<string>>
-  /** The night of `day` claimed by this instance, or false when another has it — or had it. */
+  ): Promise<void>
+  /** The merges a night made and nobody undid, oldest first: the report names them by number. */
+  nightMerges(day: string): Promise<MergedPair[]>
+  /**
+   * The night of `day` claimed by this instance, or false when another has it — or had it. A night
+   * claimed over an hour ago and never finished is claimed again: its instance died with it (А6).
+   */
   claimRun(day: string, mode: 'on' | 'report', at: Date): Promise<boolean>
   finishRun(day: string, report: CatalogueMergedNotice, at: Date): Promise<void>
   /** The report of a night finished and not yet handed to the owner, marked handed in one statement. */
@@ -101,6 +114,17 @@ export function pairKey(a: string, b: string): string {
 /** How many nearest names by meaning the night asks the index for, each item. */
 const NEIGHBOURS = 10
 
+/**
+ * A night claimed this long ago and not finished died with its instance — a restart, a lost connection
+ * — and is claimed again (adversarial А6). A night of the whole catalogue takes seconds.
+ */
+const STALE_RUN_MINUTES = 60
+
+/** Pairs as the candidates' table keys them: the two ids in order. */
+function ordered(pairs: readonly (readonly [string, string])[]): { a: string; b: string }[] {
+  return pairs.map(([x, y]) => (x < y ? { a: x, b: y } : { a: y, b: x }))
+}
+
 interface Moved {
   readonly what: MergeMove
   readonly key: Record<string, unknown>
@@ -127,21 +151,34 @@ export function createMergeRepository(db: Conn): MergeRepository {
       )}::jsonb) as m(what text, key jsonb, before jsonb, actor_id uuid)`)
   }
 
+  /**
+   * Whether the night may not merge these two live things: a merge undone between them — or between
+   * what has been merged into them since (adversarial А5).
+   */
   async function wasUndone(
     tx: Conn,
     subject: MergeSubject,
     a: string,
     b: string,
   ): Promise<boolean> {
-    const [from, into] =
-      subject === 'item' ? ['from_item', 'into_item'] : ['from_place', 'into_place']
-    const rows = await tx.execute(sql`
-      select 1 from catalogue_merges
-      where undone_at is not null
-        and ((${sql.raw(from)} = ${a} and ${sql.raw(into)} = ${b})
-          or (${sql.raw(from)} = ${b} and ${sql.raw(into)} = ${a}))
-      limit 1`)
-    return rows.length > 0
+    return (await undone(tx, subject)).has(pairKey(a, b))
+  }
+
+  async function undone(tx: Conn, subject: MergeSubject): Promise<ReadonlySet<string>> {
+    const rows = await tx.execute<{ a: string; b: string }>(
+      subject === 'item'
+        ? sql`select coalesce(f.merged_into, f.id) as a, coalesce(t.merged_into, t.id) as b
+              from catalogue_merges m
+              join items f on f.id = m.from_item
+              join items t on t.id = m.into_item
+              where m.subject = 'item' and m.undone_at is not null`
+        : sql`select coalesce(f.merged_into, f.id) as a, coalesce(t.merged_into, t.id) as b
+              from catalogue_merges m
+              join places f on f.id = m.from_place
+              join places t on t.id = m.into_place
+              where m.subject = 'place' and m.undone_at is not null`,
+    )
+    return new Set(rows.map((row) => pairKey(row.a, row.b)))
   }
 
   async function opened(
@@ -154,12 +191,13 @@ export function createMergeRepository(db: Conn): MergeRepository {
     // bigint comes over the wire as a string
     const [row] = await tx.execute<{ id: string }>(sql`
       insert into catalogue_merges
-        (subject, from_item, into_item, from_place, into_place, by, edits, worst, meaning)
+        (subject, from_item, into_item, from_place, into_place, by, night, edits, worst, meaning)
       values (
         ${subject},
         ${subject === 'item' ? from : null}::uuid, ${subject === 'item' ? into : null}::uuid,
         ${subject === 'place' ? from : null}::uuid, ${subject === 'place' ? into : null}::uuid,
-        ${how.by}, ${how.edits ?? null}::smallint, ${how.worst ?? null}::smallint,
+        ${how.by}, ${how.by === 'night' ? (how.night ?? null) : null}::date,
+        ${how.edits ?? null}::smallint, ${how.worst ?? null}::smallint,
         ${how.meaning ?? null}::real)
       returning id`)
     if (!row) throw new Error('a merge was not written')
@@ -247,13 +285,15 @@ export function createMergeRepository(db: Conn): MergeRepository {
     )
 
     // A pick of the same query on both: one row, the counts added and «own word» kept if either was;
-    // the trace's figures written down, so the undo can take them off again.
+    // the trace's figures and the survivor's own written down, so the undo puts both back (А7).
     const added = await tx.execute<{
       actor_id: string
       query_key: string
       picks: number
       last_picked_at: string
       admits: boolean
+      kept_last: string
+      kept_admits: boolean
     }>(sql`
       with gone as (
         delete from search_picks t
@@ -262,6 +302,12 @@ export function createMergeRepository(db: Conn): MergeRepository {
                       where k.actor_id = t.actor_id and k.query_key = t.query_key
                         and k.item_id = ${into})
         returning t.actor_id, t.query_key, t.picks, t.last_picked_at, t.admits
+      ),
+      prior as (
+        select k.actor_id, k.query_key, k.last_picked_at as kept_last, k.admits as kept_admits
+        from search_picks k
+        join gone g on k.actor_id = g.actor_id and k.query_key = g.query_key
+        where k.item_id = ${into}
       ),
       kept as (
         update search_picks k
@@ -272,12 +318,20 @@ export function createMergeRepository(db: Conn): MergeRepository {
         where k.actor_id = g.actor_id and k.query_key = g.query_key and k.item_id = ${into}
         returning 1
       )
-      select actor_id, query_key, picks, last_picked_at::text, admits from gone`)
+      select g.actor_id, g.query_key, g.picks, g.last_picked_at::text, g.admits,
+             p.kept_last::text, p.kept_admits
+      from gone g join prior p on p.actor_id = g.actor_id and p.query_key = g.query_key`)
     for (const row of added) {
       moved.push({
         what: 'pick_added',
         key: { queryKey: row.query_key },
-        before: { picks: row.picks, lastPickedAt: row.last_picked_at, admits: row.admits },
+        before: {
+          picks: row.picks,
+          lastPickedAt: row.last_picked_at,
+          admits: row.admits,
+          keptLastPickedAt: row.kept_last,
+          keptAdmits: row.kept_admits,
+        },
         actorId: row.actor_id,
       })
     }
@@ -451,10 +505,17 @@ export function createMergeRepository(db: Conn): MergeRepository {
         // Where the moved rows stand now: the survivor, or whatever it was merged into since.
         const now = item ? liveItemId(into) : livePlaceId(into)
 
+        const column = sql.raw(item ? 'item_id' : 'place_id')
         const moves = await tx.execute<{
           what: MergeMove
           key: Record<string, string | number>
-          before: { picks: number; lastPickedAt: string; admits: boolean } | null
+          before: {
+            picks: number
+            lastPickedAt: string
+            admits: boolean
+            keptLastPickedAt?: string
+            keptAdmits?: boolean
+          } | null
           actor_id: string | null
         }>(sql`
           select what, key, before, actor_id from catalogue_merge_moves
@@ -462,30 +523,36 @@ export function createMergeRepository(db: Conn): MergeRepository {
           -- withdrawn before swapped back: the withdrawal was made on the row's swapped contents
           order by case what when 'verdict_withdrawn' then 0 when 'verdict_swapped' then 1 else 2 end`)
 
+        // Every row goes back only from where this merge put it — the survivor, or what that was merged
+        // into since. A row moved on by somebody's own act after the merge is theirs and stays: a code
+        // given to another item, a new word of the shop's memory (adversarial А4); a row a later merge
+        // took on and whose undo came first is home already (А3).
         for (const move of moves) {
           const key = move.key
           switch (move.what) {
             case 'expense':
-              await tx.execute(sql`update expenses set item_id = ${from} where id = ${key.id}`)
+              await tx.execute(sql`
+                update expenses set item_id = ${from} where id = ${key.id} and item_id = ${now}`)
               break
             case 'trip':
-              await tx.execute(sql`update trips set place_id = ${from} where id = ${key.id}`)
+              await tx.execute(sql`
+                update trips set place_id = ${from} where id = ${key.id} and place_id = ${now}`)
               break
-            case 'verdict': {
-              const column = sql.raw(item ? 'item_id' : 'place_id')
+            case 'verdict':
               // Skipped when the trace has got a verdict of the same person since: never two.
               await tx.execute(sql`
                 update verdicts v set ${column} = ${from}
-                where v.id = ${key.id}
+                where v.id = ${key.id} and v.${column} = ${now}
                   and not exists (
                     select 1 from verdicts o
                     where o.actor_id = v.actor_id and o.id <> v.id
                       and o.item_id = ${item ? sql`${from}::uuid` : sql`v.item_id`}
                       and o.place_id is not distinct from ${item ? sql`v.place_id` : sql`${from}::uuid`})`)
               break
-            }
             case 'verdict_withdrawn':
-              await tx.execute(sql`update verdicts set deleted_at = null where id = ${key.id}`)
+              await tx.execute(sql`
+                update verdicts set deleted_at = null
+                where id = ${key.id} and ${column} = ${from} and deleted_at is not null`)
               break
             case 'verdict_swapped':
               await tx.execute(sql`
@@ -494,7 +561,9 @@ export function createMergeRepository(db: Conn): MergeRepository {
                     updated_at = o.updated_at, deleted_at = o.deleted_at
                 from verdicts o
                 where (v.id, o.id) in ((${key.kept}::uuid, ${key.trace}::uuid),
-                                       (${key.trace}::uuid, ${key.kept}::uuid))`)
+                                       (${key.trace}::uuid, ${key.kept}::uuid))
+                  and exists (select 1 from verdicts k where k.id = ${key.kept} and k.${column} = ${now})
+                  and exists (select 1 from verdicts t where t.id = ${key.trace} and t.${column} = ${from})`)
               break
             case 'pick':
               await tx.execute(sql`
@@ -508,9 +577,20 @@ export function createMergeRepository(db: Conn): MergeRepository {
             case 'pick_added': {
               const before = move.before
               if (before === null) break
+              // The survivor's own figures back: its «own word» unless it had one, its last pick unless
+              // the person picked it again since (А7).
+              const keptAdmits = before.keptAdmits ?? true
+              const keptLast = before.keptLastPickedAt ?? null
               await tx.execute(sql`
                 with taken as (
-                  update search_picks set picks = picks - ${before.picks}
+                  update search_picks
+                  set picks = picks - ${before.picks},
+                      admits = ${keptAdmits} or (admits and not ${before.admits}),
+                      last_picked_at = case
+                        when ${keptLast}::timestamptz is not null
+                         and last_picked_at = greatest(${keptLast}::timestamptz, ${before.lastPickedAt}::timestamptz)
+                        then ${keptLast}::timestamptz
+                        else last_picked_at end
                   where actor_id = ${move.actor_id} and query_key = ${key.queryKey}
                     and item_id = ${now} and picks > ${before.picks}
                   returning 1
@@ -522,9 +602,9 @@ export function createMergeRepository(db: Conn): MergeRepository {
               break
             }
             case 'barcode':
-              await tx.execute(
-                sql`update item_barcodes set item_id = ${from} where code = ${key.code}`,
-              )
+              await tx.execute(sql`
+                update item_barcodes set item_id = ${from}
+                where code = ${key.code} and item_id = ${now}`)
               break
             case 'item_name':
               await tx.execute(sql`
@@ -537,18 +617,20 @@ export function createMergeRepository(db: Conn): MergeRepository {
               )
               break
             case 'store_memory':
-              await tx.execute(sql`update store_memory set item_id = ${from} where id = ${key.id}`)
+              await tx.execute(sql`
+                update store_memory set item_id = ${from} where id = ${key.id} and item_id = ${now}`)
               break
             case 'receipt_line':
               await tx.execute(sql`
                 update receipt_lines set item_id = ${from}
-                where receipt_id = ${key.receiptId} and position = ${key.position}`)
+                where receipt_id = ${key.receiptId} and position = ${key.position}
+                  and item_id = ${now}`)
               break
             case 'trace':
               await tx.execute(
                 item
-                  ? sql`update items set merged_into = ${from} where id = ${key.id}`
-                  : sql`update places set merged_into = ${from} where id = ${key.id}`,
+                  ? sql`update items set merged_into = ${from} where id = ${key.id} and merged_into = ${now}`
+                  : sql`update places set merged_into = ${from} where id = ${key.id} and merged_into = ${now}`,
               )
               break
           }
@@ -586,6 +668,14 @@ export function createMergeRepository(db: Conn): MergeRepository {
               or exists (select 1 from search_picks where item_id = m.from_item)
               or exists (select 1 from item_barcodes where item_id = m.from_item)
               or exists (select 1 from store_memory where item_id = m.from_item)
+              or exists (select 1 from receipt_lines where item_id = m.from_item)
+              or exists (select 1 from item_names n where n.item_id = m.from_item
+                           and not exists (select 1 from item_names k
+                                           where k.item_id = i.merged_into
+                                             and k.language = n.language and k.name = n.name))
+              or exists (select 1 from item_hs h where h.item_id = m.from_item
+                           and not exists (select 1 from item_hs k
+                                           where k.item_id = i.merged_into and k.hs = h.hs))
               or exists (select 1 from trips where place_id = m.from_place)
               or exists (select 1 from verdicts where place_id = m.from_place and deleted_at is null))
           order by m.id`)
@@ -682,48 +772,80 @@ export function createMergeRepository(db: Conn): MergeRepository {
       return [...groups.values()]
     },
 
-    async undonePairs(subject) {
-      const rows = await db.execute<{ a: string; b: string }>(
-        subject === 'item'
-          ? sql`select from_item as a, into_item as b from catalogue_merges
-                where subject = 'item' and undone_at is not null`
-          : sql`select from_place as a, into_place as b from catalogue_merges
-                where subject = 'place' and undone_at is not null`,
-      )
+    undonePairs: (subject) => undone(db, subject),
+
+    async unnamed(subject, pairs) {
+      if (pairs.length === 0) return new Set()
+      const rows = await db.execute<{ a: string; b: string }>(sql`
+        select p.a, p.b
+        from jsonb_to_recordset(${JSON.stringify(ordered(pairs))}::jsonb) as p(a uuid, b uuid)
+        where not exists (select 1 from catalogue_merge_candidates c
+                          where c.subject = ${subject} and c.a = p.a and c.b = p.b)`)
       return new Set(rows.map((row) => pairKey(row.a, row.b)))
     },
 
-    async firstNamed(subject, pairs, day) {
-      if (pairs.length === 0) return new Set()
-      const ordered = pairs.map(([a, b]) => (a < b ? [a, b] : [b, a]))
-      const rows = await db.execute<{ a: string; b: string }>(sql`
+    async markNamed(subject, pairs, day) {
+      if (pairs.length === 0) return
+      await db.execute(sql`
         insert into catalogue_merge_candidates (subject, a, b, named_on)
         select ${subject}, p.a, p.b, ${day}::date
-        from jsonb_to_recordset(${JSON.stringify(ordered.map(([a, b]) => ({ a, b })))}::jsonb)
-             as p(a uuid, b uuid)
-        on conflict do nothing
-        returning a, b`)
-      return new Set(rows.map((row) => pairKey(row.a, row.b)))
+        from jsonb_to_recordset(${JSON.stringify(ordered(pairs))}::jsonb) as p(a uuid, b uuid)
+        on conflict do nothing`)
+    },
+
+    async nightMerges(day) {
+      const rows = await db.execute<{
+        id: string
+        subject: MergeSubject
+        from_name: string
+        into_name: string
+        city: string | null
+      }>(sql`
+        select m.id, m.subject,
+               coalesce(fi.name, fp.name) as from_name,
+               coalesce(ti.name, tp.name) as into_name,
+               tp.city
+        from catalogue_merges m
+        left join items fi on fi.id = m.from_item
+        left join items ti on ti.id = m.into_item
+        left join places fp on fp.id = m.from_place
+        left join places tp on tp.id = m.into_place
+        where m.night = ${day}::date and m.undone_at is null
+        order by m.id`)
+      return rows.map((row) => ({
+        subject: row.subject,
+        from: row.from_name,
+        into: row.into_name,
+        ...(row.city === null ? {} : { city: row.city }),
+        id: Number(row.id),
+      }))
     },
 
     async claimRun(day, mode, at) {
+      // A moment goes to the driver as a string: drizzle turns a `Date` only in its builder, and a raw
+      // template hands it to postgres-js as it is, which refuses it (adversarial А1).
       const rows = await db.execute(sql`
         insert into catalogue_merge_runs (day, mode, started_at)
-        values (${day}::date, ${mode}, ${at})
-        on conflict do nothing
+        values (${day}::date, ${mode}, ${at.toISOString()}::timestamptz)
+        on conflict (day) do update
+          set mode = excluded.mode, started_at = excluded.started_at
+          where catalogue_merge_runs.finished_at is null
+            and catalogue_merge_runs.started_at
+                < excluded.started_at - ${`${String(STALE_RUN_MINUTES)} minutes`}::interval
         returning day`)
       return rows.length > 0
     },
 
     async finishRun(day, report, at) {
       await db.execute(sql`
-        update catalogue_merge_runs set finished_at = ${at}, report = ${JSON.stringify(report)}::jsonb
+        update catalogue_merge_runs
+        set finished_at = ${at.toISOString()}::timestamptz, report = ${JSON.stringify(report)}::jsonb
         where day = ${day}::date`)
     },
 
     async takeReport(day, at) {
       const [row] = await db.execute<{ report: unknown }>(sql`
-        update catalogue_merge_runs set reported_at = ${at}
+        update catalogue_merge_runs set reported_at = ${at.toISOString()}::timestamptz
         where day = ${day}::date and finished_at is not null and reported_at is null
         returning report`)
       return row ? catalogueMergedNoticeSchema.parse(row.report) : null

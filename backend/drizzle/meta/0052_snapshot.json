@@ -1,5 +1,5 @@
 {
-  "id": "28a84bc9-daff-451b-a3f0-b83557a29b42",
+  "id": "be72c7c1-2fce-467f-8925-60637c7b565d",
   "prevId": "194426b9-2128-4b95-9e5a-59027f478b55",
   "version": "7",
   "dialect": "postgresql",
@@ -540,6 +540,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "night": {
+          "name": "night",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
         "edits": {
           "name": "edits",
           "type": "smallint",
@@ -573,6 +579,21 @@
         }
       },
       "indexes": {
+        "catalogue_merges_night_idx": {
+          "name": "catalogue_merges_night_idx",
+          "columns": [
+            {
+              "expression": "night",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "catalogue_merges_item_live": {
           "name": "catalogue_merges_item_live",
           "columns": [
@@ -685,6 +706,10 @@
         "catalogue_merges_by_known": {
           "name": "catalogue_merges_by_known",
           "value": "\"catalogue_merges\".\"by\" in ('night', 'hand')"
+        },
+        "catalogue_merges_night_by_night": {
+          "name": "catalogue_merges_night_by_night",
+          "value": "(\"catalogue_merges\".\"night\" is not null) = (\"catalogue_merges\".\"by\" = 'night')"
         },
         "catalogue_merges_subject_named": {
           "name": "catalogue_merges_subject_named",

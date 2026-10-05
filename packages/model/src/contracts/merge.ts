@@ -21,7 +21,11 @@ export const MERGE_NOTICE_PAIRS = 10
 
 const named = z.string().min(1).max(200)
 
-/** A pair merged, or one `report` would have merged. `id` is the journal's number, the one `make unmerge` takes. */
+/**
+ * A pair merged, or one `report` would have merged. `id` is the journal's number, the one `make unmerge`
+ * takes; a pair only reported carries its two ids instead, so the owner can look at it, or merge and
+ * undo it — then the night never merges it (review №7).
+ */
 export const mergedPairSchema = z.strictObject({
   subject: mergeSubjectSchema,
   from: named,
@@ -29,6 +33,8 @@ export const mergedPairSchema = z.strictObject({
   /** A place's city: two cities may hold one name (MOL-120). */
   city: z.string().min(1).max(120).optional(),
   id: z.int().positive().optional(),
+  fromId: z.uuid().optional(),
+  intoId: z.uuid().optional(),
 })
 export type MergedPair = z.infer<typeof mergedPairSchema>
 

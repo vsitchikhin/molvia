@@ -36,6 +36,7 @@ CREATE TABLE "catalogue_merges" (
 	"from_place" uuid,
 	"into_place" uuid,
 	"by" text NOT NULL,
+	"night" date,
 	"edits" smallint,
 	"worst" smallint,
 	"meaning" real,
@@ -43,6 +44,7 @@ CREATE TABLE "catalogue_merges" (
 	"undone_at" timestamp with time zone,
 	CONSTRAINT "catalogue_merges_subject_known" CHECK ("catalogue_merges"."subject" in ('item', 'place')),
 	CONSTRAINT "catalogue_merges_by_known" CHECK ("catalogue_merges"."by" in ('night', 'hand')),
+	CONSTRAINT "catalogue_merges_night_by_night" CHECK (("catalogue_merges"."night" is not null) = ("catalogue_merges"."by" = 'night')),
 	CONSTRAINT "catalogue_merges_subject_named" CHECK (case "catalogue_merges"."subject" when 'item'
         then "catalogue_merges"."from_item" is not null and "catalogue_merges"."into_item" is not null
           and "catalogue_merges"."from_place" is null and "catalogue_merges"."into_place" is null
@@ -62,6 +64,7 @@ ALTER TABLE "catalogue_merges" ADD CONSTRAINT "catalogue_merges_from_place_place
 ALTER TABLE "catalogue_merges" ADD CONSTRAINT "catalogue_merges_into_place_places_id_fk" FOREIGN KEY ("into_place") REFERENCES "public"."places"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "catalogue_merge_moves_merge_idx" ON "catalogue_merge_moves" USING btree ("merge_id");--> statement-breakpoint
 CREATE INDEX "catalogue_merge_moves_actor_idx" ON "catalogue_merge_moves" USING btree ("actor_id");--> statement-breakpoint
+CREATE INDEX "catalogue_merges_night_idx" ON "catalogue_merges" USING btree ("night");--> statement-breakpoint
 CREATE UNIQUE INDEX "catalogue_merges_item_live" ON "catalogue_merges" USING btree ("from_item") WHERE "catalogue_merges"."undone_at" is null and "catalogue_merges"."from_item" is not null;--> statement-breakpoint
 CREATE UNIQUE INDEX "catalogue_merges_place_live" ON "catalogue_merges" USING btree ("from_place") WHERE "catalogue_merges"."undone_at" is null and "catalogue_merges"."from_place" is not null;--> statement-breakpoint
 CREATE INDEX "catalogue_merges_into_item_idx" ON "catalogue_merges" USING btree ("into_item");--> statement-breakpoint

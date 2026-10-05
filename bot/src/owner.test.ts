@@ -652,7 +652,9 @@ describe('ownerText — утренний отчёт склейки (MOL-106)', (
       ...NIGHT,
       mode: 'report',
       merged: 1,
-      mergedPairs: [{ subject: 'item', from: 'Малоко', into: 'Молоко' }],
+      mergedPairs: [
+        { subject: 'item', from: 'Малоко', into: 'Молоко', fromId: FROM, intoId: INTO },
+      ],
       candidates: 0,
       candidatePairs: [],
     }).split('\n')
@@ -661,7 +663,13 @@ describe('ownerText — утренний отчёт склейки (MOL-106)', (
       '',
       'Склеил бы',
       '«Малоко» → «Молоко»',
+      `FROM=${FROM} INTO=${INTO}`,
     ])
+  })
+
+  it('says the candidates past the printed ones come on the mornings after', () => {
+    const text = ownerText({ ...NIGHT, merged: 0, mergedPairs: [], candidates: 3 })
+    expect(text).toContain('…и ещё 2 — назову в следующие утра')
   })
 
   it('still says the night ran when nothing merged', () => {

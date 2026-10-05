@@ -1057,6 +1057,11 @@ export const catalogueMerges = pgTable(
     fromPlace: uuid('from_place').references(() => places.id),
     intoPlace: uuid('into_place').references(() => places.id),
     by: text('by').$type<MergeBy>().notNull(),
+    /**
+     * The night that merged it, a day in Yerevan; none by hand. The morning's report is read from here,
+     * so a merge made before a night broke off is named all the same (adversarial А6).
+     */
+    night: date('night'),
     /** The spelling and the meaning the pair was judged by; none for a pair merged by hand. */
     edits: smallint('edits'),
     worst: smallint('worst'),
@@ -1069,6 +1074,11 @@ export const catalogueMerges = pgTable(
   (table) => [
     check('catalogue_merges_subject_known', oneOf(table.subject, MERGE_SUBJECTS)),
     check('catalogue_merges_by_known', oneOf(table.by, MERGE_BY)),
+    check(
+      'catalogue_merges_night_by_night',
+      sql`(${table.night} is not null) = (${table.by} = 'night')`,
+    ),
+    index('catalogue_merges_night_idx').on(table.night),
     check(
       'catalogue_merges_subject_named',
       sql`case ${table.subject} when 'item'

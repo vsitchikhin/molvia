@@ -7,8 +7,14 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import { GATE_RATINGS, GATE_RATINGS_WINDOW_HOURS } from '@molvia/model'
+import type { OwnerNotice } from '@molvia/model'
+import { EMBEDDING_MODEL, NO_EMBEDDER } from '@/embeddings/embedder'
+import { mergeNight, mergeTick } from '@/usecases/merge-twins'
 import { createErasureRepository } from '@/db/erasure-repository'
+import { createItemRepository } from '@/db/items-repository'
 import { createMergeRepository } from '@/db/merge-repository'
+import type { MergeRepository } from '@/db/merge-repository'
+import { createStoreMemoryRepository } from '@/db/store-memory-repository'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { actors, catalogueMergeMoves, catalogueMerges, items, places } from '@/db/schema'
 import { connectDrizzle } from './db'
@@ -16,7 +22,7 @@ import { clearAll, insertActor, insertItem, insertPlace, insertTrip } from './fi
 
 const { db, close } = connectDrizzle()
 const merges = createMergeRepository(db)
-const NIGHT = { by: 'night', edits: 1, worst: 1, meaning: 0.95 } as const
+const NIGHT = { by: 'night', night: '2026-10-06', edits: 1, worst: 1, meaning: 0.95 } as const
 
 let owner: string
 let older: string
@@ -401,5 +407,212 @@ describe('the journal and erasure', () => {
       from: younger,
       into: older,
     })
+  })
+})
+
+/** An item made at its own moment: the older survives. */
+const made = (name: string, key: string, day: string) =>
+  insertItem(db, { name, searchKey: key, createdAt: new Date(`${day}T10:00:00Z`) })
+
+/** A vector on the first two axes: the cosine of two of them is their dot product. */
+async function vector(itemId: string, x: number, y: number): Promise<void> {
+  const v = Array.from({ length: 768 }, (_, i) => (i === 0 ? x : i === 1 ? y : 0))
+  await db.execute(sql`
+    insert into item_embeddings (item_id, model, embedding)
+    values (${itemId}, ${EMBEDDING_MODEL}, ${`[${v.join(',')}]`}::halfvec)`)
+}
+
+async function bought(itemId: string): Promise<string> {
+  const trip = await insertTrip(db, { actorId: owner, placeId: await insertPlace(db) })
+  const id = randomUUID()
+  await db.execute(
+    sql`insert into expenses (id, trip_id, item_id) values (${id}, ${trip}, ${itemId})`,
+  )
+  return id
+}
+
+const itemOfExpense = async (id: string) =>
+  (await db.execute<{ item_id: string }>(sql`select item_id from expenses where id = ${id}`))[0]
+    ?.item_id
+const tracedTo = async (id: string) =>
+  (await db.select({ to: items.mergedInto }).from(items).where(eq(items.id, id)))[0]?.to
+
+function numbered(outcome: Awaited<ReturnType<MergeRepository['mergeItems']>>): number {
+  if (!('id' in outcome)) throw new Error(`not merged: ${outcome.refused}`)
+  return outcome.id
+}
+
+describe('the undo of a chain, in any order (adversarial А3)', () => {
+  let a: string
+  let b: string
+  let c: string
+  let purchase: string
+  let first: number
+  let second: number
+
+  beforeEach(async () => {
+    c = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
+    b = await made('Молоко 3,2%', 'moloko 3 2', '2026-09-02')
+    a = await made('Малоко 3,2%', 'maloko 3 2', '2026-09-03')
+    purchase = await bought(a)
+    first = numbered(await merges.mergeItems(a, b, NIGHT))
+    second = numbered(await merges.mergeItems(b, c, NIGHT))
+  })
+
+  it('puts the first back and leaves the second, undone first', async () => {
+    await merges.unmerge(first)
+    await merges.unmerge(second)
+    expect([await itemOfExpense(purchase), await tracedTo(a), await tracedTo(b)]).toEqual([
+      a,
+      null,
+      null,
+    ])
+  })
+
+  it('puts both back undone the other way round', async () => {
+    await merges.unmerge(second)
+    await merges.unmerge(first)
+    expect([await itemOfExpense(purchase), await tracedTo(a), await tracedTo(b)]).toEqual([
+      a,
+      null,
+      null,
+    ])
+  })
+})
+
+describe('the undo leaves what people did after the merge (adversarial А4)', () => {
+  it('leaves a code let go and written to another item', async () => {
+    const other = await made('Кефир 1%', 'kefir 1', '2026-09-05')
+    await db.execute(
+      sql`insert into item_barcodes (code, item_id) values ('4600000000003', ${younger})`,
+    )
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const catalogue = createItemRepository(db)
+    await catalogue.detachBarcode(older, '4600000000003')
+    await catalogue.attachBarcode(other, '4600000000003', owner)
+    await merges.unmerge(id)
+    expect(await db.execute(sql`select item_id from item_barcodes`)).toEqual([{ item_id: other }])
+  })
+
+  it('leaves a word of the shop’s memory said again after the merge', async () => {
+    const other = await made('Кефир 1%', 'kefir 1', '2026-09-05')
+    const memory = createStoreMemoryRepository(db)
+    const word = { kind: 'sku' as const, key: '1163909', price: null }
+    await memory.remember(owner, '01282006', [{ ...word, itemId: younger }])
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    await memory.remember(owner, '01282006', [{ ...word, itemId: other }])
+    await merges.unmerge(id)
+    expect(await db.execute(sql`select item_id from store_memory`)).toEqual([{ item_id: other }])
+  })
+})
+
+describe('the survivor’s own pick after the undo (adversarial А7)', () => {
+  it('gets back its «own word» and its last pick', async () => {
+    await db.execute(sql`
+      insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at, admits)
+      values (${owner}, 'moloko', ${older}, 2, '2026-09-01T10:00:00Z', false),
+             (${owner}, 'moloko', ${younger}, 1, '2026-09-20T10:00:00Z', true)`)
+    await merges.unmerge(numbered(await merges.mergeItems(younger, older, NIGHT)))
+    const rows = await db.execute<{
+      item_id: string
+      picks: number
+      admits: boolean
+      same: boolean
+    }>(sql`
+      select item_id, picks, admits,
+             last_picked_at = case when item_id = ${older} then '2026-09-01T10:00:00Z'::timestamptz
+                                   else '2026-09-20T10:00:00Z'::timestamptz end as same
+      from search_picks order by picks desc`)
+    expect(rows).toEqual([
+      { item_id: older, picks: 2, admits: false, same: true },
+      { item_id: younger, picks: 1, admits: true, same: true },
+    ])
+  })
+})
+
+describe('a pair undone is never joined again by the survivor’s survivor (adversarial А5)', () => {
+  it('leaves the younger alone after its survivor was merged on', async () => {
+    const c = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
+    const b = await made('Молоко 3,2%', 'moloko 3 2', '2026-09-02')
+    const a = await made('Малоко 3,2%', 'maloko 3 2', '2026-09-03')
+    for (const id of [a, b, c]) await vector(id, 1, 0)
+    const first = numbered(await merges.mergeItems(a, b, NIGHT))
+    numbered(await merges.mergeItems(b, c, NIGHT))
+    await merges.unmerge(first)
+    const report = await mergeNight(
+      { merges, embedder: NO_EMBEDDER, failed: () => undefined },
+      'on',
+      '2026-10-07',
+    )
+    expect([report.merged, await tracedTo(a)]).toEqual([0, null])
+    // Not even named: the owner said once that they are two things.
+    const named = report.candidatePairs.map((pair) => [pair.fromId, pair.intoId].sort().join(' '))
+    expect(named).not.toContain([a, c].sort().join(' '))
+  })
+})
+
+describe('the night on the real database (adversarial А1, А6)', () => {
+  const at = (day: string, hhmm: string) => new Date(`${day}T${hhmm}:00+04:00`)
+  const queued: OwnerNotice[] = []
+  const deps = (repository: MergeRepository = merges) => ({
+    merges: repository,
+    embedder: NO_EMBEDDER,
+    notices: {
+      queue: (notice: OwnerNotice) => {
+        queued.push(notice)
+        return Promise.resolve()
+      },
+    },
+    owner: true,
+    failed: () => undefined,
+  })
+
+  async function twoPairs(): Promise<void> {
+    const milk = await made('Молоко 3,2%', 'moloko 3 2', '2026-08-01')
+    const milkPoint = await made('Молоко 3.2%', 'moloko 3 2', '2026-08-02')
+    const kefir = await made('Кефир 1%', 'kefir 1', '2026-08-01')
+    const kefirSpaced = await made('Кефир 1 %', 'kefir 1', '2026-08-02')
+    for (const id of [milk, milkPoint]) await vector(id, 1, 0)
+    for (const id of [kefir, kefirSpaced]) await vector(id, 0, 1)
+  }
+
+  beforeEach(() => {
+    queued.length = 0
+  })
+
+  it('claims its day once, finishes it, and hands the report once from nine', async () => {
+    await twoPairs()
+    await mergeTick(deps(), 'on', at('2026-10-06', '04:30'))
+    await mergeTick(deps(), 'on', at('2026-10-06', '04:31'))
+    expect(await db.execute(sql`select count(*)::int as n from catalogue_merges`)).toEqual([
+      { n: 2 },
+    ])
+    await mergeTick(deps(), 'on', at('2026-10-06', '09:00'))
+    await mergeTick(deps(), 'on', at('2026-10-06', '09:01'))
+    expect(
+      queued.map((notice) => (notice.kind === 'catalogue_merged' ? notice.merged : -1)),
+    ).toEqual([2])
+  })
+
+  it('claims a night again an hour after it died, and names what it merged before', async () => {
+    await twoPairs()
+    // The first instance merged one pair and died: its day claimed, never finished.
+    await db.execute(sql`
+      insert into catalogue_merge_runs (day, mode, started_at) values ('2026-10-06', 'on', ${at('2026-10-06', '04:30').toISOString()}::timestamptz)`)
+    const [first] = await db.execute<{ a: string; b: string }>(sql`
+      select f.id as a, t.id as b from items f join items t on t.name = 'Молоко 3,2%'
+      where f.name = 'Молоко 3.2%'`)
+    if (!first) throw new Error('no pair')
+    numbered(await merges.mergeItems(first.a, first.b, NIGHT))
+
+    await mergeTick(deps(), 'on', at('2026-10-06', '05:00'))
+    expect(await db.execute(sql`select count(*)::int as n from catalogue_merges`)).toEqual([
+      { n: 1 },
+    ])
+    await mergeTick(deps(), 'on', at('2026-10-06', '05:31'))
+    await mergeTick(deps(), 'on', at('2026-10-06', '09:00'))
+    const report = queued[0]
+    if (report?.kind !== 'catalogue_merged') throw new Error('no report')
+    expect(report.mergedPairs.map((pair) => pair.from).sort()).toEqual(['Кефир 1 %', 'Молоко 3.2%'])
   })
 })

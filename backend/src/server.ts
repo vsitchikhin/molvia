@@ -654,6 +654,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 embedder,
                 notices: createOwnerNoticeRepository(db),
                 owner: owner !== null,
+                failed: (error) => {
+                  failures.report(error, job('catalogue-merge'), 'catalogue merge of a pair failed')
+                },
               },
               mergeMode,
               new Date(),

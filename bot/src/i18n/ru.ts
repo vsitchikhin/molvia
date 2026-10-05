@@ -210,6 +210,7 @@ export const ru = {
   'owner.merge.pair': '«{from}» → «{into}»',
   'owner.merge.place': 'место {pair} · {city}',
   'owner.merge.more': '…и ещё {count}',
+  'owner.merge.moreLater': '…и ещё {count} — назову в следующие утра',
   'owner.merge.undo': 'Отменить — make unmerge ID=номер',
   /**
    * «Написать разработчику» in the bot (MOL-148). The frame is what the person gets around the
