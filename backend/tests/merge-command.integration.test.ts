@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { items } from '@/db/schema'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertItem } from './fixtures'
@@ -83,5 +83,29 @@ describe('dist/merge.js', () => {
       const wrong = merge(...args)
       expect([wrong.status, wrong.stdout]).toEqual([2, expect.stringContaining('usage: merge')])
     }
+  })
+
+  it('refuses the first step of a chain, naming the one to undo first', async () => {
+    const third = await insertItem(db, { name: 'Молоко 3.20%', searchKey: 'moloko 3 20' })
+    const first = /#(\d+)/.exec(merge('merge', younger, older, '--yes').stdout)?.[1] ?? ''
+    const second = /#(\d+)/.exec(merge('merge', older, third, '--yes').stdout)?.[1] ?? ''
+    const refused = merge('unmerge', first, '--yes')
+    expect([refused.status, refused.stdout]).toEqual([
+      1,
+      expect.stringContaining(`undo #${second} first`),
+    ])
+  })
+
+  it('lists every candidate named and still apart, with its command (review №9)', async () => {
+    const [a, b] = [older, younger].sort()
+    await db.execute(sql`
+      insert into catalogue_merge_candidates (subject, a, b, named_on)
+      values ('item', ${a}, ${b}, '2026-10-06')`)
+    const listed = merge('candidates')
+    expect(listed.status).toBe(0)
+    expect(listed.stdout).toContain(`make merge FROM=${younger} INTO=${older}`)
+    expect(listed.stdout).toContain('1 candidates named and still apart')
+    merge('merge', younger, older, '--yes')
+    expect(merge('candidates').stdout).toContain('0 candidates named and still apart')
   })
 })

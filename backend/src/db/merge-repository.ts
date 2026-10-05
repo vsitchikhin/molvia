@@ -30,6 +30,12 @@ export type MergeOutcome = { readonly id: number } | { readonly refused: MergeRe
 export type UnmergeOutcome =
   | { readonly subject: MergeSubject; readonly from: string; readonly into: string }
   | { readonly refused: 'missing' | 'undone' }
+  /**
+   * The survivor was merged on since: a chain is undone from its end. Undone out of order, the swap of
+   * one person's verdicts on the first step met its rows moved on by the second, and the person's
+   * opinions came back crossed (adversarial Б1). `later` is the merge to undo first.
+   */
+  | { readonly refused: 'chained'; readonly later: number }
 
 export interface MergeRepository {
   /**
@@ -40,8 +46,17 @@ export interface MergeRepository {
   mergeItems(from: string, into: string, how: MergeHow): Promise<MergeOutcome>
   /** The same for two places of one kind, country and city (MOL-50). */
   mergePlaces(from: string, into: string, how: MergeHow): Promise<MergeOutcome>
-  /** Everything a merge moved, moved back, and its pair never merged by the night again. */
+  /**
+   * Everything a merge moved, moved back, and its pair never merged by the night again. A chain is undone
+   * from its end: a merge whose survivor was merged on since is refused, naming the later one.
+   */
   unmerge(id: number): Promise<UnmergeOutcome>
+  /**
+   * Every candidate named to the owner and still apart — both live, never merged into each other, not
+   * undone: what `make merge-candidates` lists, so a morning lost or cut for length loses nothing
+   * (review №9). The older first in each pair is `into`.
+   */
+  openCandidates(): Promise<OpenCandidate[]>
   /**
    * What reached a trace after its merge — a write that read the id a moment before the merge took
    * it — moved to the survivor under the merge's own number. How many rows.
@@ -82,6 +97,16 @@ export interface MergeRepository {
   finishRun(day: string, report: CatalogueMergedNotice, at: Date): Promise<void>
   /** The report of a night finished and not yet handed to the owner, marked handed in one statement. */
   takeReport(day: string, at: Date): Promise<CatalogueMergedNotice | null>
+}
+
+export interface OpenCandidate {
+  readonly subject: MergeSubject
+  readonly from: string
+  readonly into: string
+  readonly fromId: string
+  readonly intoId: string
+  readonly city: string | null
+  readonly namedOn: string
 }
 
 /** One side of a pair the night looks at. */
@@ -502,6 +527,12 @@ export function createMergeRepository(db: Conn): MergeRepository {
         const item = merge.subject === 'item'
         const from = (item ? merge.from_item : merge.from_place) ?? ''
         const into = (item ? merge.into_item : merge.into_place) ?? ''
+        const [later] = await tx.execute<{ id: string }>(
+          item
+            ? sql`select id from catalogue_merges where from_item = ${into} and undone_at is null`
+            : sql`select id from catalogue_merges where from_place = ${into} and undone_at is null`,
+        )
+        if (later) return { refused: 'chained', later: Number(later.id) }
         // Where the moved rows stand now: the survivor, or whatever it was merged into since.
         const now = item ? liveItemId(into) : livePlaceId(into)
 
@@ -849,6 +880,60 @@ export function createMergeRepository(db: Conn): MergeRepository {
         where day = ${day}::date and finished_at is not null and reported_at is null
         returning report`)
       return row ? catalogueMergedNoticeSchema.parse(row.report) : null
+    },
+    async openCandidates() {
+      const rows = await db.execute<{
+        subject: MergeSubject
+        a: string
+        b: string
+        a_name: string
+        b_name: string
+        a_created: Date
+        b_created: Date
+        city: string | null
+        named_on: string
+      }>(sql`
+        select c.subject, c.a, c.b, c.named_on::text,
+               coalesce(ia.name, pa.name) as a_name, coalesce(ib.name, pb.name) as b_name,
+               coalesce(ia.created_at, pa.created_at) as a_created,
+               coalesce(ib.created_at, pb.created_at) as b_created,
+               pa.city
+        from catalogue_merge_candidates c
+        left join items ia on c.subject = 'item' and ia.id = c.a
+        left join items ib on c.subject = 'item' and ib.id = c.b
+        left join places pa on c.subject = 'place' and pa.id = c.a
+        left join places pb on c.subject = 'place' and pb.id = c.b
+        where coalesce(ia.merged_into, pa.merged_into) is null
+          and coalesce(ib.merged_into, pb.merged_into) is null
+          and coalesce(ia.id, pa.id) is not null and coalesce(ib.id, pb.id) is not null
+        order by c.named_on, c.subject, a_name`)
+      const apart = { item: await undone(db, 'item'), place: await undone(db, 'place') }
+      return rows
+        .filter((row) => !apart[row.subject].has(pairKey(row.a, row.b)))
+        .map((row) => {
+          const aOlder =
+            new Date(row.a_created).getTime() !== new Date(row.b_created).getTime()
+              ? new Date(row.a_created) < new Date(row.b_created)
+              : row.a < row.b
+          const [from, into] = aOlder
+            ? [
+                { id: row.b, name: row.b_name },
+                { id: row.a, name: row.a_name },
+              ]
+            : [
+                { id: row.a, name: row.a_name },
+                { id: row.b, name: row.b_name },
+              ]
+          return {
+            subject: row.subject,
+            from: from.name,
+            into: into.name,
+            fromId: from.id,
+            intoId: into.id,
+            city: row.city,
+            namedOn: row.named_on,
+          }
+        })
     },
   }
 }

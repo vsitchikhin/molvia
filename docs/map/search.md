@@ -48,7 +48,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 
 - `backend/src/embeddings/embedder.ts` — The model of the search by meaning in the API (MOL-105): loaded in the background with onnxruntime's telemetry off, queries ahead of names, a wait of 150 ms, a cache of queries; without it no vector and the letters alone.
 - `backend/src/embeddings/model.json` — The pinned model: EmbeddingGemma-300m q4, its revision and the sha256 of every file — read by the API and by `bin/fetch-model.mjs`.
-- `backend/src/merge-command.ts` — The owner's hand on the merge of twins (MOL-106, В-2): a candidate merged by two ids, a merge undone by its number, a dry run unless `--yes`.
+- `backend/src/merge-command.ts` — The owner's hand on the merge of twins (MOL-106, В-2): a candidate merged by two ids, a merge undone by its number — a chain from its end — the open candidates listed; a dry run unless `--yes`.
 - `backend/src/merge-cli.ts` — Entry of `dist/merge.js` in the API image: runs the merge command against the database, a dry run rolled back. Tests: `backend/tests/merge-command.integration.test.ts`.
 - `backend/src/catalogue-seed.ts` — The seed list: some six hundred common names without brands, each with the unit its price is compared by.
 - `backend/src/catalogue-seed-nodes.ts` — The seed's items as a receipt reaches them (MOL-126): their Armenian names and customs headings, one entry per seed line, written by `make seed` to `item_names` and `item_hs`.
@@ -96,4 +96,4 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 
 ## bin
 
-- `bin/merge.sh` — Script behind `make merge` and `make unmerge` (MOL-106): the owner's merge of a candidate and the undo, in this copy's database, a dry run unless `--yes`; the production line in its header.
+- `bin/merge.sh` — Script behind `make merge`, `make unmerge` and `make merge-candidates` (MOL-106): the owner's merge of a candidate and the undo, in this copy's database, a dry run unless `--yes`; the production line in its header.

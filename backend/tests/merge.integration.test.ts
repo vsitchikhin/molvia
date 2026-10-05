@@ -312,21 +312,6 @@ describe('the undo', () => {
     expect(await merges.mergeItems(older, younger, NIGHT)).toEqual({ refused: 'undone' })
     expect('id' in (await merges.mergeItems(younger, older, { by: 'hand' }))).toBe(true)
   })
-
-  it('takes the rows back from wherever a later merge moved them', async () => {
-    await everything()
-    const third = await insertItem(db, { name: 'Молоко 3.2%', searchKey: 'moloko 3 2' })
-    const before = await snapshot()
-    const first = await merges.mergeItems(younger, older, NIGHT)
-    await merges.mergeItems(older, third, NIGHT)
-    if (!('id' in first)) throw new Error('not merged')
-    await merges.unmerge(first.id)
-    expect(await namedBy('expenses', younger)).toBe(1)
-    expect(await namedBy('search_picks', younger)).toBe(1)
-    const [row] = await db.select().from(items).where(eq(items.id, younger))
-    expect(row?.mergedInto).toBeNull()
-    expect(before).toBeDefined()
-  })
 })
 
 describe('the sweep', () => {
@@ -442,7 +427,7 @@ function numbered(outcome: Awaited<ReturnType<MergeRepository['mergeItems']>>): 
   return outcome.id
 }
 
-describe('the undo of a chain, in any order (adversarial А3)', () => {
+describe('the undo of a chain, from its end (adversarial А3, Б1)', () => {
   let a: string
   let b: string
   let c: string
@@ -450,33 +435,57 @@ describe('the undo of a chain, in any order (adversarial А3)', () => {
   let first: number
   let second: number
 
+  const rate = (itemId: string, score: number, ratedAt: string) =>
+    db.execute(sql`
+      insert into verdicts (id, actor_id, item_id, item_kind, score, review, rated_at, updated_at)
+      values (${randomUUID()}, ${owner}, ${itemId}, 'product', ${score}, ${`отзыв ${String(score)}`},
+              ${ratedAt}::timestamptz, ${ratedAt}::timestamptz)`)
+
+  /** The person's live score on each, as «Что брать» shows it. */
+  const scores = async () => {
+    const read = async (itemId: string) =>
+      (
+        await db.execute<{ score: number; review: string | null }>(sql`
+          select score, review from verdicts
+          where actor_id = ${owner} and item_id = ${itemId} and deleted_at is null`)
+      )[0] ?? null
+    return { A: await read(a), B: await read(b), C: await read(c) }
+  }
+
   beforeEach(async () => {
     c = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
     b = await made('Молоко 3,2%', 'moloko 3 2', '2026-09-02')
     a = await made('Малоко 3,2%', 'maloko 3 2', '2026-09-03')
     purchase = await bought(a)
+    // The person rated all three: both steps of the chain swap their verdicts.
+    await rate(b, 1, '2026-09-01T10:00:00Z')
+    await rate(c, 3, '2026-09-02T10:00:00Z')
+    await rate(a, 5, '2026-09-03T10:00:00Z')
     first = numbered(await merges.mergeItems(a, b, NIGHT))
     second = numbered(await merges.mergeItems(b, c, NIGHT))
   })
 
-  it('puts the first back and leaves the second, undone first', async () => {
-    await merges.unmerge(first)
+  it('puts every row and every opinion back, undone from the end', async () => {
     await merges.unmerge(second)
+    await merges.unmerge(first)
     expect([await itemOfExpense(purchase), await tracedTo(a), await tracedTo(b)]).toEqual([
       a,
       null,
       null,
     ])
+    // Every score home. The texts of the two that lost on the way are gone — a withdrawn row holds no
+    // text, the named price; the one that won keeps its own.
+    expect(await scores()).toEqual({
+      A: { score: 5, review: 'отзыв 5' },
+      B: { score: 1, review: null },
+      C: { score: 3, review: null },
+    })
   })
 
-  it('puts both back undone the other way round', async () => {
-    await merges.unmerge(second)
-    await merges.unmerge(first)
-    expect([await itemOfExpense(purchase), await tracedTo(a), await tracedTo(b)]).toEqual([
-      a,
-      null,
-      null,
-    ])
+  it('refuses the first step while the second stands, naming it, and changes nothing', async () => {
+    const before = await snapshot()
+    expect(await merges.unmerge(first)).toEqual({ refused: 'chained', later: second })
+    expect(await snapshot()).toEqual(before)
   })
 })
 
@@ -537,8 +546,12 @@ describe('a pair undone is never joined again by the survivor’s survivor (adve
     const a = await made('Малоко 3,2%', 'maloko 3 2', '2026-09-03')
     for (const id of [a, b, c]) await vector(id, 1, 0)
     const first = numbered(await merges.mergeItems(a, b, NIGHT))
-    numbered(await merges.mergeItems(b, c, NIGHT))
+    const second = numbered(await merges.mergeItems(b, c, NIGHT))
+    // The owner: «Малоко» is not «Молоко 3,2%». A chain is undone from its end, and the right step
+    // merged again by hand.
+    await merges.unmerge(second)
     await merges.unmerge(first)
+    numbered(await merges.mergeItems(b, c, { by: 'hand' }))
     const report = await mergeNight(
       { merges, embedder: NO_EMBEDDER, failed: () => undefined },
       'on',

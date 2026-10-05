@@ -4,6 +4,7 @@ import type { MergeOutcome, MergeRepository, UnmergeOutcome } from '@/db/merge-r
 export const MERGE_USAGE = [
   'usage: merge merge <from-id> <into-id> [--yes]   the item or place <from> into <into>',
   '       merge unmerge <merge-number> [--yes]       a merge undone, by its number in the report',
+  '       merge candidates                           every candidate named and still apart',
 ].join('\n')
 
 /** 0 — done or nothing to do, 1 — refused or the database failed, 2 — the command was wrong. */
@@ -71,6 +72,12 @@ export async function mergeCommand(
       const outcome = await inTransaction(dryRun, (merges): Promise<UnmergeOutcome> =>
         merges.unmerge(id),
       )
+      if ('refused' in outcome && outcome.refused === 'chained') {
+        write(
+          `not undone: the survivor was merged on since — a chain is undone from its end: undo #${String(outcome.later)} first`,
+        )
+        return 1
+      }
       if ('refused' in outcome) {
         write(`not undone: ${REFUSED[outcome.refused] ?? outcome.refused}`)
         return 1
@@ -79,6 +86,17 @@ export async function mergeCommand(
         `#${String(id)} undone: the ${outcome.subject} is apart again, and the night leaves the pair`,
       )
       write(done)
+      return 0
+    }
+    if (action === 'candidates' && values.length === 0 && flags.length === 0) {
+      // Only reads: the transaction is rolled back like a dry run.
+      const open = await inTransaction(true, (merges) => merges.openCandidates())
+      for (const pair of open) {
+        const place = pair.city === null ? '' : `place · ${pair.city} · `
+        write(`${pair.namedOn} ${place}«${pair.from}» → «${pair.into}»`)
+        write(`  make merge FROM=${pair.fromId} INTO=${pair.intoId}`)
+      }
+      write(`${String(open.length)} candidates named and still apart`)
       return 0
     }
   } catch (error) {

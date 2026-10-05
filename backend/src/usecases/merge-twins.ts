@@ -181,8 +181,11 @@ export async function mergeNight(
   }
 
   // A candidate with a side merged tonight is asked again tomorrow, of the survivor: its command would
-  // be refused now, and named, it would never come back (adversarial А8).
-  const open = candidates.filter((pair) => !gone.has(pair.from.id) && !gone.has(pair.into.id))
+  // be refused now, and named, it would never come back (adversarial А8). Not in `report`, where nothing
+  // merged: hidden there, it stayed hidden every morning of the week (round 2).
+  const open = on
+    ? candidates.filter((pair) => !gone.has(pair.from.id) && !gone.has(pair.into.id))
+    : candidates
   const fresh: CandidatePair[] = []
   for (const subject of ['item', 'place'] as const) {
     const ofSubject = open.filter((pair) => pair.subject === subject)

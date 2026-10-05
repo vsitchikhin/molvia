@@ -75,6 +75,7 @@ function world({
       return Promise.resolve()
     },
     nightMerges: () => Promise.resolve([...journal]),
+    openCandidates: () => Promise.resolve([]),
     claimRun: (day) => {
       if (claimed || runs.has(day)) return Promise.resolve(false)
       runs.set(day, null)
@@ -206,6 +207,20 @@ describe('mergeNight', () => {
     })
     const report = await w.night('on')
     expect([report.merged, report.candidates]).toEqual([1, 0])
+  })
+
+  it('names that candidate in the report mode, where nothing merged (round 2)', async () => {
+    const chanah = side('c1', 'Сыр чанах', '2026-09-01')
+    const chunuh = side('c2', 'Сыр чунух', '2026-09-02')
+    const chanoh = side('c3', 'Сыр чанох', '2026-09-03')
+    const w = world({
+      pairs: [
+        { a: chanoh, b: chanah, meaning: 0.95 },
+        { a: chanoh, b: chunuh, meaning: 0.85 },
+      ],
+    })
+    const report = await w.night('report')
+    expect([report.merged, report.candidates]).toEqual([1, 1])
   })
 
   it('hands a pair whose codes would overflow one item to the owner', async () => {
