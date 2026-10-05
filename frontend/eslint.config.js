@@ -163,16 +163,30 @@ export default defineConfigWithVueTs(
   },
   // A busy button says what it does (MOL-225): at work it reads «Удаляем…» in place of its action's
   // word, in the action's look. Without its word it looked live — or, beside `disabled`, not now — and
-  // the second tap was swallowed with nothing said. `busy` alone or bound, with no `busy-label`, is
-  // refused. A label left empty passes: it closes carelessness, not intent.
+  // the second tap was swallowed with nothing said. `busy` — alone, bound or in a `v-bind` object, on
+  // `AppButton` or `app-button` — with no word of the work, `busy-label` or `busyLabel`, is refused
+  // (adversarial Р1-А5). What it cannot see: a button at work through `disabled` or `inactive` alone,
+  // which reads the same as a neighbour put out while another works; a name computed passes. It
+  // closes carelessness, not intent.
   {
     files: ['src/**/*.vue'],
     rules: {
       'vue/no-restricted-syntax': [
         'error',
         {
-          selector:
-            "VElement[rawName='AppButton']:matches(:has(VStartTag > VAttribute[directive=false][key.name='busy']), :has(VStartTag > VAttribute[directive=true][key.argument.name='busy'])):not(:has(VStartTag > VAttribute[directive=true][key.argument.name='busy-label']))",
+          selector: [
+            'VElement[rawName=/^(AppButton|app-button)$/]',
+            ':matches(',
+            ":has(VStartTag > VAttribute[directive=false][key.name='busy']),",
+            ":has(VStartTag > VAttribute[directive=true][key.argument.name='busy']),",
+            ":has(VStartTag > VAttribute[directive=true][key.argument=null] Property[key.name='busy'])",
+            ')',
+            ':not(:matches(',
+            ':has(VStartTag > VAttribute[directive=true][key.argument.name=/^busy-?label$/i]),',
+            ':has(VStartTag > VAttribute[directive=true][key.argument=null] Property[key.name=/^busy-?label$/i]),',
+            ":has(VStartTag > VAttribute[directive=true][key.argument=null] Property[key.value='busy-label'])",
+            '))',
+          ].join(''),
           message: 'A busy button says what it does: give it a busy-label (MOL-225).',
         },
       ],
