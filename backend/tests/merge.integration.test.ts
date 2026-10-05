@@ -7,9 +7,10 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import { GATE_RATINGS, GATE_RATINGS_WINDOW_HOURS } from '@molvia/model'
+import { createErasureRepository } from '@/db/erasure-repository'
 import { createMergeRepository } from '@/db/merge-repository'
 import { createVerdictRepository } from '@/db/verdicts-repository'
-import { catalogueMergeMoves, catalogueMerges, items, places } from '@/db/schema'
+import { actors, catalogueMergeMoves, catalogueMerges, items, places } from '@/db/schema'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
 
@@ -377,5 +378,28 @@ describe('a merge of places', () => {
     const venue = await insertPlace(db, { kind: 'venue', name: 'Ереван Сити' })
     expect(await merges.mergePlaces(yerevan, gyumri, { by: 'hand' })).toEqual({ refused: 'city' })
     expect(await merges.mergePlaces(venue, gyumri, { by: 'hand' })).toEqual({ refused: 'kind' })
+  })
+})
+
+describe('the journal and erasure', () => {
+  it('keeps no pick of a person erased since, and the rest of the merge stands', async () => {
+    await db.execute(sql`
+      insert into search_picks (actor_id, query_key, item_id) values (${owner}, 'maloko', ${younger})`)
+    const outcome = await merges.mergeItems(younger, older, NIGHT)
+    if (!('id' in outcome)) throw new Error('not merged')
+    const [person] = await db
+      .select({ tg: actors.telegramUserId })
+      .from(actors)
+      .where(eq(actors.id, owner))
+    if (!person) throw new Error('no person')
+    await createErasureRepository(db).erase(person.tg, { dryRun: false })
+    const left = await db.execute(sql`
+      select 1 from catalogue_merge_moves where actor_id is not null or key::text like ${`%${owner}%`}`)
+    expect(left).toEqual([])
+    expect(await merges.unmerge(outcome.id)).toEqual({
+      subject: 'item',
+      from: younger,
+      into: older,
+    })
   })
 })
