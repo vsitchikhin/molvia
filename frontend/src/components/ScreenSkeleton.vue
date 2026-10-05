@@ -3,25 +3,25 @@
     <p v-if="!announce" class="hidden" role="status">{{ t('state.loading') }}</p>
 
     <div class="bars" aria-hidden="true">
-      <SkeletonPart v-if="groups" kind="lines" :widths="groups" />
+      <SkeletonPart v-if="groups?.length" kind="lines" :widths="groups" />
       <slot />
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, onBeforeUnmount, onMounted, type PropType } from 'vue'
+import { defineComponent, onBeforeUnmount, onMounted, warn, type PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import SkeletonPart, { isWidths } from '@/components/SkeletonPart.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 
 /**
  * Loading drawn as the content that is coming, not as a spinner: the screen must not jump
- * when the data arrives. The frame says «Loading…», hides its bars from a screen reader, breathes
- * and keeps the screen's rhythm — 8 between its parts, 24 above a caption (Ф-13, MOL-178); the
- * shape is the screen's, put in the slot in the order the answer will stand: the kit's parts
- * (`SkeletonPart`) and between them what is the screen's own — the five squares of the rating
- * scale — in bars of `skeleton-bar`.
+ * when the data arrives. The frame says «Loading…», hides its bars from a screen reader and keeps
+ * the screen's rhythm — 8 between its parts, 24 above a caption that is not the first (Ф-13,
+ * MOL-178); the shape is the screen's, put in the slot in the order the answer will stand: the kit's
+ * parts (`SkeletonPart`) and between them what is the screen's own — the five squares of the rating
+ * scale — in bars of `skeleton-bar`, which breathe by their colour.
  *
  * `groups` is the shape from before the parts: one width per group, in percent, drawn as pairs of
  * bars in a card (`SkeletonPart kind="lines"`), and the slot after it. The screens trade it for the
@@ -41,8 +41,11 @@ export default defineComponent({
       validator: isWidths,
     },
   },
-  setup() {
+  setup(props, { slots }) {
     const { t } = useI18n()
+    // A frame with no shape says «Loading…» over nothing — the invisible skeleton of Н-5, which no
+    // type and no test would see once `groups` stopped being required (adversarial А4).
+    if (!props.groups?.length && !slots.default) warn('ScreenSkeleton has nothing to draw')
     // Said in the app's live region when there is one, and taken back when loading is over —
     // «Loading…» left in the region would be read under the answer (MOL-19, П-2, C3).
     const announce = useAnnouncer()
@@ -65,23 +68,11 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  animation: pulse var(--dur-pulse) ease-in-out infinite;
 }
 
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-
-  50% {
-    opacity: 0.9;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bars {
-    animation: none;
-  }
+/* 24 above a caption that is not the first, as on a screen: the frame's rhythm, not the part's — the
+   part stands on its own in the kit, under the answer it stands for. */
+:slotted(.skeleton-caption:not(:first-child)) {
+  margin-top: var(--space-4);
 }
 </style>

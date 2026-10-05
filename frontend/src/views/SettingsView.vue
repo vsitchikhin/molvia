@@ -467,10 +467,10 @@ export default defineComponent({
 }
 
 /* A field of the form, empty: its well and its edge, which `surface-2` alone on a card is not seen by
-   (1.1:1, Ф-13). */
+   (1.1:1, Ф-13) — 44 inside the edge, 46 outside, as `AppField` (adversarial А6). */
 .skeleton-field {
   box-sizing: border-box;
-  height: var(--touch-target);
+  height: calc(var(--touch-target) + 2 * var(--hairline));
   border: var(--hairline) solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--surface-2);

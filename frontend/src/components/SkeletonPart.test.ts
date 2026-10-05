@@ -14,7 +14,7 @@ describe('SkeletonPart', () => {
   // A caption stands on the ground, as `SectionCaption` does: one bar as wide as the screen asked.
   it('draws a caption as one bar on the ground, as wide as asked', () => {
     const view = render({ kind: 'caption', width: 30 })
-    expect(view.classes()).toContain('caption')
+    expect(view.classes()).toContain('skeleton-caption')
     expect(view.find('.card').exists()).toBe(false)
     expect(view.findAll('.bar')).toHaveLength(1)
     expect(view.get('.bar').attributes('style')).toBe('width: 30%;')
@@ -22,7 +22,7 @@ describe('SkeletonPart', () => {
 
   it('draws a field as the empty well of a search, with no bar in it', () => {
     const view = render({ kind: 'field' })
-    expect(view.classes()).toContain('field')
+    expect(view.classes()).toContain('skeleton-field')
     expect(view.element.childElementCount).toBe(0)
   })
 
@@ -73,11 +73,24 @@ describe('SkeletonPart', () => {
       ).toEqual(['amount'])
     })
 
-    // An account in another currency has a line under nearly every amount: the screen asks for it.
-    it('draws the line under the amount only when asked, and only with an amount', () => {
-      const under = render({ kind: 'rows', count: 1, tail: true, under: true }).get('.tail')
-      expect(under.findAll('.bar').map((bar) => bar.classes()[1])).toEqual(['amount', 'under'])
-      expect(render({ kind: 'rows', count: 1, under: true }).find('.under').exists()).toBe(false)
+    // An account in another currency has a line under nearly every amount: the screen asks for it,
+    // and a line under an amount brings the amount — asked for alone, it was dropped without a word
+    // (adversarial А5).
+    it('draws the line under the amount when asked, with its amount', () => {
+      for (const props of [{ tail: true, under: true }, { under: true }]) {
+        const under = render({ kind: 'rows', count: 1, ...props }).get('.tail')
+        expect(under.findAll('.bar').map((bar) => bar.classes()[1])).toEqual(['amount', 'under'])
+      }
+      expect(render({ kind: 'rows', count: 1, tail: true }).find('.under').exists()).toBe(false)
+    })
+
+    // Narrow is the answer's: only `OperationRow` makes its `li` the container `row`, and a `ListRow`
+    // in a plain `li` stays wide — bars gone narrow under it stood 9 px taller (adversarial А1).
+    it('goes narrow only when the answer does', () => {
+      expect(render({ kind: 'rows', tail: true }).classes()).not.toContain('skeleton-narrow')
+      expect(render({ kind: 'rows', tail: true, narrow: true }).classes()).toContain(
+        'skeleton-narrow',
+      )
     })
 
     it('leaves the meta out when the answer has none', () => {
@@ -96,7 +109,7 @@ describe('SkeletonPart', () => {
   // Handoff 77 v2 2a: a caption, the figure, a line — and a plate under them when the answer has one.
   it('draws the card of a sum: a caption, the figure, a line, and the plate when asked', () => {
     const view = render({ kind: 'figure' })
-    expect(view.classes()).toEqual(expect.arrayContaining(['card', 'figure']))
+    expect(view.classes()).toEqual(expect.arrayContaining(['card', 'skeleton-figure']))
     expect(view.findAll('.bar').map((bar) => bar.classes()[1])).toEqual(['label', 'sum', 'note'])
     expect(view.find('.plate').exists()).toBe(false)
     expect(render({ kind: 'figure', plate: true }).find('.plate').exists()).toBe(true)
@@ -105,7 +118,7 @@ describe('SkeletonPart', () => {
   describe('lines', () => {
     it('draws a pair of bars per width, in a card', () => {
       const view = render({ kind: 'lines', widths: [72, 54] })
-      expect(view.classes()).toEqual(expect.arrayContaining(['card', 'lines']))
+      expect(view.classes()).toEqual(expect.arrayContaining(['card', 'skeleton-lines']))
       expect(view.findAll('.group')).toHaveLength(2)
       expect(view.findAll('.text').map((bar) => bar.attributes('style'))).toEqual([
         'width: 72%;',
@@ -118,9 +131,26 @@ describe('SkeletonPart', () => {
     it('stands bare where a card is not the answer’s shape', () => {
       const view = render({ kind: 'lines', widths: [40], card: false })
       expect(view.classes()).not.toContain('card')
-      expect(view.classes()).toContain('lines')
+      expect(view.classes()).toContain('skeleton-lines')
       expect(view.findAll('.group')).toHaveLength(1)
     })
+  })
+
+  // The part is rendered by the screen that puts it in the frame, so its root carries the screen's
+  // scope: a root named `caption` took the size of «Бюджет»'s own captions (adversarial А3).
+  it.each([
+    ['caption', {}],
+    ['field', {}],
+    ['rows', {}],
+    ['figure', {}],
+    ['lines', {}],
+    ['lines', { card: false }],
+  ])('names the root of %s apart from any class of a screen', (kind, props) => {
+    const root = render({ kind, ...props }).classes()
+    expect(root.some((name) => name.startsWith('skeleton-'))).toBe(true)
+    expect(root.filter((name) => !name.startsWith('skeleton-'))).toEqual(
+      expect.not.arrayContaining(['caption', 'field', 'figure', 'lines', 'rows', 'narrow']),
+    )
   })
 
   it.each([

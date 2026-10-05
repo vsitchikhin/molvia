@@ -77,6 +77,15 @@ const ACHROMATIC = 0.04
 const MARK_CONTRAST = 3
 const TEXT_CONTRAST = 4.5
 
+/**
+ * A skeleton's bar is `--border`, breathing up to `--border-strong` and back (MOL-178, Ф-13, Н-5): at
+ * rest it stands 1.42:1 on a card in the light scheme and 1.38:1 in the dark, a caption's bar on the
+ * page's ground 1.22:1 and 1.53:1. Its bars were `--surface-2` on the ground, 1.06:1 — next to nothing —
+ * and a token made lighter for finer hairlines would bring that back with no test going red.
+ */
+const BAR_ON_CARD = 1.35
+const BAR_ON_GROUND = 1.2
+
 function linear(hex: string): [number, number, number] {
   const channel = (at: number) => {
     const c = parseInt(hex.slice(at, at + 2), 16) / 255
@@ -182,6 +191,15 @@ describe.each(['light', 'dark'] as const)('the %s scheme', (scheme) => {
       .filter(([, ratio]) => ratio < MARK_CONTRAST)
       .map(([name, ratio]) => `--${name} ${ratio.toFixed(2)}:1`)
     expect(faint).toEqual([])
+  })
+
+  it(`draws a skeleton's bar at ${String(BAR_ON_CARD)}:1 on a card and ${String(BAR_ON_GROUND)}:1 on the ground, its breath only stronger`, () => {
+    expect(contrast(value('border'), value('surface'))).toBeGreaterThanOrEqual(BAR_ON_CARD)
+    expect(contrast(value('border'), value('sunken'))).toBeGreaterThanOrEqual(BAR_ON_GROUND)
+    for (const ground of ['surface', 'sunken'])
+      expect(contrast(value('border-strong'), value(ground))).toBeGreaterThan(
+        contrast(value('border'), value(ground)),
+      )
   })
 
   it(`sets text at ${String(TEXT_CONTRAST)}:1 on every ground it stands on`, () => {

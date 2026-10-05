@@ -1,11 +1,17 @@
 <template>
-  <span v-if="kind === 'caption'" class="caption">
+  <span v-if="kind === 'caption'" class="skeleton-caption">
     <span class="bar" :style="{ width: `${width}%` }"></span>
   </span>
 
-  <span v-else-if="kind === 'field'" class="field"></span>
+  <span v-else-if="kind === 'field'" class="skeleton-field"></span>
 
-  <AppCard v-else-if="kind === 'rows'" as="ul" list>
+  <AppCard
+    v-else-if="kind === 'rows'"
+    as="ul"
+    list
+    class="skeleton-rows"
+    :class="{ 'skeleton-narrow': narrow }"
+  >
     <li v-for="n in count" :key="n" class="item">
       <span class="row">
         <span v-if="lead === 'circle'" class="circle"></span>
@@ -14,7 +20,7 @@
           <span class="line"><span class="bar title"></span></span>
           <span v-if="meta" class="line small"><span class="bar meta"></span></span>
         </span>
-        <span v-if="tail" class="tail">
+        <span v-if="tail || under" class="tail">
           <span class="line"><span class="bar amount"></span></span>
           <span v-if="under" class="line small"><span class="bar under"></span></span>
         </span>
@@ -23,20 +29,20 @@
     </li>
   </AppCard>
 
-  <AppCard v-else-if="kind === 'figure'" class="figure">
+  <AppCard v-else-if="kind === 'figure'" class="skeleton-figure">
     <span class="line caption-line"><span class="bar label"></span></span>
     <span class="line figure-line"><span class="bar sum"></span></span>
     <span class="line small"><span class="bar note"></span></span>
     <span v-if="plate" class="plate"></span>
   </AppCard>
 
-  <AppCard v-else-if="card" class="lines">
+  <AppCard v-else-if="card" class="skeleton-lines">
     <span v-for="(share, index) in widths" :key="index" class="group">
       <span class="bar text" :style="{ width: `${share}%` }"></span>
       <span class="bar sub"></span>
     </span>
   </AppCard>
-  <span v-else class="lines">
+  <span v-else class="skeleton-lines">
     <span v-for="(share, index) in widths" :key="index" class="group">
       <span class="bar text" :style="{ width: `${share}%` }"></span>
       <span class="bar sub"></span>
@@ -72,18 +78,26 @@ export function isWidths(value: unknown): boolean {
  *   field   — the empty pill of a `SearchField`;
  *   rows    — a list card of `count` rows of 64, the geometry of `ListRow` and `OperationRow`: `lead`
  *             an icon of 24, a circle of 40 or nothing; `meta`, a line under the title; `tail`, an
- *             amount; `under`, a line under the amount; `next`, the place of the chevron. Each bar in
- *             a line of the size and leading of the words it stands for, so a row is as tall as the
- *             answer's — and narrow too, its `li` the container `row` of `$row-narrow`. The typical row
- *             is the short one (owner's В-3 «б»): a title and a meta of a line each; the line under the
- *             amount is the screen's to ask for, where it is the rule — an account in another currency;
+ *             amount; `under`, a line under the amount, which brings the amount with it; `next`, the
+ *             place of the chevron. Each bar in a line of the size and leading of the words it stands
+ *             for, so a row is as tall as the answer's. `narrow` is the answer's own: below
+ *             `$row-narrow` the tail goes under the words, as in a row of `OperationRow`, whose `li` is
+ *             the container `row` — a `ListRow` in a plain `li` stays wide at any width, and bars that
+ *             went narrow under it stood 9 px taller at 320 (adversarial А1). The typical row is the
+ *             short one (owner's В-3 «б»): a title and a meta of a line each; the line under the amount
+ *             is the screen's to ask for, where it is the rule — an account in another currency;
  *   figure  — the card of a sum (handoff 77 v2 2a): a caption, the figure, a line, and a `plate`;
  *   lines   — pairs of bars by `widths`, the line and the shorter one under it: what `groups` drew
  *             before there were parts — in a card, or bare (`card: false`) where a card is not the
  *             answer's shape, over the camera.
  *
  * The widths of the rows' bars are the part's, not the screen's: deliberately uneven, by the handoff's
- * cycle, since an even skeleton reads as a broken layout. The breath is the frame's.
+ * cycle, since an even skeleton reads as a broken layout. The bars breathe by their colour
+ * (`skeleton-bar`).
+ *
+ * The roots are named `skeleton-*`, never `caption`, `field` or `figure`: the part is rendered by the
+ * screen that puts it in the frame's slot, so its root carries the screen's scope too, and a scoped
+ * `.caption` of «Бюджет» set its size on the bar's line (adversarial А3, review № 1).
  */
 export default defineComponent({
   name: 'SkeletonPart',
@@ -109,6 +123,7 @@ export default defineComponent({
     tail: { type: Boolean, default: false },
     under: { type: Boolean, default: false },
     next: { type: Boolean, default: false },
+    narrow: { type: Boolean, default: false },
     plate: { type: Boolean, default: false },
     widths: {
       type: Array as PropType<number[]>,
@@ -141,19 +156,16 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
-/* A caption's place is the screen's (`SectionCaption`): 4 from the left, 8 to its card, 24 from what
-   is above it — here 16 on the frame's gap of 8. Its line is the caption's, 11 at the body's leading. */
-.caption {
+/* A caption's place is the screen's (`SectionCaption`): 4 from the left, 8 to its card — the frame's
+   gap — and 24 from what is above it, the frame's too. Its line is the caption's, 11 at the body's
+   leading. */
+.skeleton-caption {
   display: flex;
   align-items: center;
   height: calc(1em * var(--leading-body));
   margin: 0;
   padding: 0 var(--space-1);
   font-size: var(--text-caption);
-
-  &:not(:first-child) {
-    margin-top: var(--space-4);
-  }
 
   .bar {
     height: var(--skeleton-caption);
@@ -162,7 +174,7 @@ export default defineComponent({
 
 /* The well of `SearchField`, empty: 44 inside its edge, 46 outside, as every field of the kit — the
    field's 44 is its input's, inside the edge. */
-.field {
+.skeleton-field {
   display: block;
   min-height: calc(var(--touch-target) + 2 * var(--hairline));
   border: var(--hairline) solid var(--border-strong);
@@ -170,9 +182,9 @@ export default defineComponent({
   background: var(--surface-2);
 }
 
-/* The geometry of `ListRow`: 64, 12 / 16, the gaps of 12 — and its container `row`, which
+/* The geometry of `ListRow`: 64, 12 / 16, the gaps of 12 — and, `narrow`, its container `row`, which
    `OperationRow` sets on its `li`. */
-.item {
+.skeleton-narrow .item {
   container: row / inline-size;
 }
 
@@ -225,6 +237,10 @@ export default defineComponent({
   .amount {
     width: 74%;
   }
+
+  .under {
+    width: 90%;
+  }
 }
 
 .item:nth-child(3n) {
@@ -238,6 +254,10 @@ export default defineComponent({
 
   .amount {
     width: 86%;
+  }
+
+  .under {
+    width: 60%;
   }
 }
 
@@ -257,8 +277,9 @@ export default defineComponent({
   height: var(--skeleton-line);
 }
 
+/* Never the amount's own width: two equal bars one under the other read as one block (review № 4). */
 .under {
-  width: 100%;
+  width: 70%;
   height: var(--skeleton-sub);
 }
 
@@ -301,7 +322,7 @@ export default defineComponent({
   }
 }
 
-.figure {
+.skeleton-figure {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -341,7 +362,7 @@ export default defineComponent({
 }
 
 /* What `groups` drew: a line and the shorter one under it, 16 between the pairs. */
-.lines {
+.skeleton-lines {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);

@@ -310,9 +310,10 @@ for (const width of [390, 320])
   })
 
 // The skeleton is the answer's shape (MOL-178, Ф-13): each part of the kit as tall as the answer it stands
-// for — the well of a search, a caption, a row of `ListRow`, a row of `OperationRow` with a line under its
-// amount (owner's В-3 «б») — and that row's amount where the answer's ends, at both widths: on a card
-// narrower than 22rem the amount and the line under it stand under the words, in the bars too.
+// for — the well of a search, a caption, a row of `ListRow` with its amount, a row of `OperationRow` with a
+// line under its amount (owner's В-3 «б») — and each amount where the answer's ends, at both widths: on a
+// card narrower than 22rem an operation's amount and the line under it stand under the words, in the bars
+// too (`narrow`), and a `ListRow`'s stays beside them, in the bars too (adversarial А1).
 for (const width of [390, 320])
   test(`at ${String(width)} each part of the skeleton is as tall as the answer it stands for`, async ({
     page,
@@ -334,13 +335,19 @@ for (const width of [390, 320])
         bars: box(`[data-part="${part}"] ${bars}`).height,
       })
       return {
-        field: pair('field', '.well', '.field'),
-        caption: pair('caption', '.section-caption', '.caption'),
+        field: pair('field', '.well', '.skeleton-field'),
+        caption: pair('caption', '.section-caption', '.skeleton-caption'),
         rows: pair('rows', '.list-row', '.row'),
         under: pair('under', '.list-row', '.row'),
         amount: {
           answer: box('[data-part="under"] .list-row .amount').right,
           bars: box('[data-part="under"] .row .amount').right,
+        },
+        // A `ListRow` in a plain `li` keeps its amount beside the words at any width, and so do its
+        // bars (adversarial А1): where the answer's tail ends, theirs ends.
+        tail: {
+          answer: box('[data-part="rows"] .list-row .tail').right,
+          bars: box('[data-part="rows"] .row .amount').right,
         },
         // Seen at all: a bar of no width stands at the right edge too, and passed the line above.
         widths: [...root.querySelectorAll('[data-part="under"] .row .tail .bar')].map(

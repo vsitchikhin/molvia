@@ -365,7 +365,7 @@
       <AppCard as="ul" list>
         <OperationRow v-for="(row, index) in operations" :key="index" v-bind="row" />
       </AppCard>
-      <SkeletonPart kind="rows" :count="3" lead="circle" tail next />
+      <SkeletonPart kind="rows" :count="3" lead="circle" tail next narrow />
     </section>
 
     <!-- The skeleton (MOL-178, Ф-13): each part of the kit under the answer it stands for, so e2e holds
@@ -384,24 +384,28 @@
         <SectionCaption as="p">{{ t('dev.kit.caption_month') }}</SectionCaption>
         <SkeletonPart kind="caption" :width="30" />
       </div>
+      <!-- A `ListRow` in a plain `li` stays wide at any width, its amount beside the words; its bars too
+           (adversarial А1). Words short enough not to wrap at 320: a wrap is the answer's own price. -->
       <div class="pair" data-part="rows">
         <AppCard as="ul" list>
           <li>
             <ListRow
               :icon="IconWallet"
-              :title="t('dev.kit.row_cash')"
-              :meta="t('accounts.for_spending')"
+              :title="t('dev.kit.row_short')"
+              :meta="t('dev.kit.row_short_meta')"
               next
-            />
+            >
+              <template #tail>{{ figures.balance }}</template>
+            </ListRow>
           </li>
         </AppCard>
-        <SkeletonPart kind="rows" :count="1" lead="icon" next />
+        <SkeletonPart kind="rows" :count="1" lead="icon" tail next />
       </div>
       <div v-if="withUnder" class="pair" data-part="under">
         <AppCard as="ul" list>
           <OperationRow v-bind="withUnder" />
         </AppCard>
-        <SkeletonPart kind="rows" :count="1" lead="circle" tail under next />
+        <SkeletonPart kind="rows" :count="1" lead="circle" tail under next narrow />
       </div>
       <SkeletonPart kind="figure" plate />
       <SkeletonPart kind="lines" :widths="[64, 78]" />

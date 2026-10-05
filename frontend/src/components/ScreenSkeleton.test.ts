@@ -95,7 +95,7 @@ describe('ScreenSkeleton', () => {
   it('draws the groups of before in a card, as the kit’s paragraphs', () => {
     const view = render([72, 54])
     const card = view.get('.bars > .card')
-    expect(card.classes()).toContain('lines')
+    expect(card.classes()).toContain('skeleton-lines')
     expect(card.findAll('.group')).toHaveLength(2)
   })
 
@@ -113,8 +113,32 @@ describe('ScreenSkeleton', () => {
       'ring',
       expect.stringContaining('card'),
     ])
-    expect(view.find('.lines').exists()).toBe(false)
+    expect(view.find('.skeleton-lines').exists()).toBe(false)
     expect(view.get('[role="status"]').text()).toBe(en.state.loading)
+  })
+
+  // A frame with no shape says «Loading…» over nothing — the invisible skeleton of Н-5 — and once
+  // `groups` stopped being required nothing said so (adversarial А4).
+  it('warns when it has nothing to draw, and draws no empty card for no groups', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const view = render(undefined)
+    expect(warn.mock.calls.some(([message]) => String(message).includes('nothing to draw'))).toBe(
+      true,
+    )
+    expect(view.get('.bars').element.children).toHaveLength(0)
+    warn.mockClear()
+    const none = render([])
+    expect(none.find('.card').exists()).toBe(false)
+    expect(warn.mock.calls.some(([message]) => String(message).includes('nothing to draw'))).toBe(
+      true,
+    )
+  })
+
+  it('says nothing of a frame with a shape', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    render([40])
+    render(undefined, 'en', () => h(SkeletonPart, { kind: 'field' }))
+    expect(warn).not.toHaveBeenCalled()
   })
 
   it.each([

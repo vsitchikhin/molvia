@@ -37,13 +37,22 @@
 $row-narrow: 22rem;
 
 /// A bar of a skeleton (Ф-13, MOL-178): `border` on the `surface` of a card, 1.42:1 in the light scheme
-/// and 1.38:1 in the dark. `surface-2` was the bar's colour and is not seen — 1.06:1 on the page's
-/// ground, 1.1:1 on a card. One colour for the kit's parts and for what a screen draws in their slot:
-/// the scale of «Оценки», the fields of «Настройки». A pill; a key or a plate sets its own radius after.
+/// and 1.38:1 in the dark — `tokens.test.ts` holds it. `surface-2` was the bar's colour and is not seen:
+/// 1.06:1 on the page's ground, 1.1:1 on a card. **It breathes by its colour**, up to `border-strong`
+/// and back (`@keyframes skeleton-breath`, main.scss), never by opacity: the frame's opacity of 0.45 to
+/// 0.9 took the very contrast this is for — 1.17:1 in a card at the trough, 1.09 on the ground, where Н-5
+/// was 1.06 (adversarial А2). Still under «reduce motion». One look for the kit's parts and for what a
+/// screen draws in their slot: the scale of «Оценки», the fields of «Настройки». A pill; a key or a
+/// plate sets its own radius after.
 @mixin skeleton-bar {
   display: block;
   border-radius: var(--radius-pill);
   background: var(--border);
+  animation: skeleton-breath var(--dur-pulse) ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 }
 
 /// The target device is a phone; anything wider is the exception, so it is opt-in.
