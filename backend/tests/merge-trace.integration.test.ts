@@ -139,3 +139,25 @@ describe('a place by the id or the name of a trace', () => {
     expect(left).toHaveLength(2)
   })
 })
+
+describe('the search', () => {
+  const names = async (query: string) =>
+    (await itemRepo.search(query, 20, owner, null)).items.map((item) => item.id)
+
+  it('finds the survivor by the trace’s name, its second name', async () => {
+    expect(await names('малоко 3,2%')).toEqual([survivor])
+  })
+
+  it('answers the survivor once when both names are found', async () => {
+    expect(await names('молоко')).toEqual([survivor])
+  })
+
+  it('gives the twin’s row to the next item, never leaves it empty', async () => {
+    const other = await insertItem(db, { name: 'Молоко топлёное', searchKey: 'moloko toplenoe' })
+    expect(await names('молоко')).toEqual([survivor, other])
+    expect((await itemRepo.search('молоко', 2, owner, null)).items.map((item) => item.id)).toEqual([
+      survivor,
+      other,
+    ])
+  })
+})

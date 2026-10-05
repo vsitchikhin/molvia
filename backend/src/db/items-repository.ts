@@ -758,7 +758,7 @@ export function rankedCandidates(
                   where starts_with(w.word, k.q[cardinality(k.q)])
                 ))
       group by sp.item_id
-    )
+    ),
     -- Near: every word of the row within one edit, the size aside — or the person's own, taken
     -- before on this query or their own word for the item: their choice says more than a typo
     -- metric, the same reason it is lifted. Per row, and the answer is near by the rows it hands
@@ -768,46 +768,57 @@ export function rankedCandidates(
     --
     -- A name found by meaning is near (owner's decision В-3 of MOL-105): «овощи» that finds the
     -- potato is a find, not «не нашли» over it.
-    select r.id,
-           coalesce(r.words_worst <= ${NEAR_DISTANCE} or r.admitted or m.item_id is not null, false)
-             or ${byMeaning} as near
-    from ranked r
-    left join remembered m on m.item_id = r.id
-    left join meaning mg on mg.id = r.id
-    -- The filter stays on the distance: a pick lifts what the search found and never lets in
-    -- what it did not, or memory would become a second search with rules of its own. The one
-    -- exception is the person's own word (MOL-45), and it is let in, not lifted.
-    where r.distance <= ${ACCEPTED_DISTANCE} or r.admitted or ${byMeaning}
-    -- What only a learnt word let in stands below what the search found by its words or the
-    -- person took before, and above what it found by a typo (owner's decisions on review,
-    -- MOL-45 И, О and Т): «кефир» learnt as the milk taken in its place stops standing above the
-    -- kefir the day the catalogue has one — in any size, «кефир 1 л» against «0,5 л» — and the
-    -- potato learnt for «овощи» stays above the flour the absolute budget finds there (MOL-46).
-    -- Among what the search found, the words matched exactly now go before a typo in a word at
-    -- the same distance; nothing else moves. Then what the person took before,
-    -- above a closer spelling — their own choice says more than a typo metric does. Among
-    -- several, the latest wins: after switching brands the new one is on top from the first
-    -- trip. Then the distance of MOL-10, and at one distance: what the typed word found before
-    -- what a synonym found («маслины» over «Оливки»), then the shorter name (owner's decision
-    -- MOL-112, В-5) — the more of a name the query covers, the nearer: «Молоко» before «Молоко
-    -- 3,2%» on «молоко», before «Кофе … молотый» on «мол». The length before the similarity: a
-    -- size in the query otherwise handed the row to a variety that shares a digit or a letter
-    -- with it — «молоко 1 л» to «Молоко 1,5%», «рис 1 кг» to «Рис круглозёрный» (review А, Б).
-    -- The similarity then orders one length, and \`id\` keeps two loads of one screen in one order.
-    --
-    -- A name placed by its meaning stands at \`MEANING_DISTANCE\`, the nearer by meaning first;
-    -- every other key is null or equal there, so nothing found within one edit moves.
-    order by case when not coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) and r.admitted then 1
-                  when m.item_id is not null or r.words_distance = 0 then 0
-                  else 2
-             end,
-             m.item_id is null,
-             m.last_picked_at desc nulls last,
-             m.picks desc nulls last,
-             case when ${byMeaning} then ${sql.raw(String(MEANING_DISTANCE))} else r.distance end,
-             case when ${byMeaning} then mg.sim end desc nulls last,
-             r.by_synonym, r.by_prefix, r.fat_hits desc, r.key_length,
-             r.ws desc, r.id
+    ordered as (
+      select r.id,
+             coalesce(r.words_worst <= ${NEAR_DISTANCE} or r.admitted or m.item_id is not null, false)
+               or ${byMeaning} as near,
+      -- What only a learnt word let in stands below what the search found by its words or the
+      -- person took before, and above what it found by a typo (owner's decisions on review,
+      -- MOL-45 И, О and Т): «кефир» learnt as the milk taken in its place stops standing above the
+      -- kefir the day the catalogue has one — in any size, «кефир 1 л» against «0,5 л» — and the
+      -- potato learnt for «овощи» stays above the flour the absolute budget finds there (MOL-46).
+      -- Among what the search found, the words matched exactly now go before a typo in a word at
+      -- the same distance; nothing else moves. Then what the person took before,
+      -- above a closer spelling — their own choice says more than a typo metric does. Among
+      -- several, the latest wins: after switching brands the new one is on top from the first
+      -- trip. Then the distance of MOL-10, and at one distance: what the typed word found before
+      -- what a synonym found («маслины» over «Оливки»), then the shorter name (owner's decision
+      -- MOL-112, В-5) — the more of a name the query covers, the nearer: «Молоко» before «Молоко
+      -- 3,2%» on «молоко», before «Кофе … молотый» on «мол». The length before the similarity: a
+      -- size in the query otherwise handed the row to a variety that shares a digit or a letter
+      -- with it — «молоко 1 л» to «Молоко 1,5%», «рис 1 кг» to «Рис круглозёрный» (review А, Б).
+      -- The similarity then orders one length, and \`id\` keeps two loads of one screen in one order.
+      --
+      -- A name placed by its meaning stands at \`MEANING_DISTANCE\`, the nearer by meaning first;
+      -- every other key is null or equal there, so nothing found within one edit moves.
+             row_number() over (
+               order by case when not coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) and r.admitted then 1
+                             when m.item_id is not null or r.words_distance = 0 then 0
+                             else 2
+                        end,
+                        m.item_id is null,
+                        m.last_picked_at desc nulls last,
+                        m.picks desc nulls last,
+                        case when ${byMeaning} then ${sql.raw(String(MEANING_DISTANCE))} else r.distance end,
+                        case when ${byMeaning} then mg.sim end desc nulls last,
+                        r.by_synonym, r.by_prefix, r.fat_hits desc, r.key_length,
+                        r.ws desc, r.id
+             ) as place
+      from ranked r
+      left join remembered m on m.item_id = r.id
+      left join meaning mg on mg.id = r.id
+      -- The filter stays on the distance: a pick lifts what the search found and never lets in
+      -- what it did not, or memory would become a second search with rules of its own. The one
+      -- exception is the person's own word (MOL-45), and it is let in, not lifted.
+      where r.distance <= ${ACCEPTED_DISTANCE} or r.admitted or ${byMeaning}
+    )
+    -- A trace of a merge is found by its own name and vector — the survivor's second name (MOL-106)
+    -- — and answered as the survivor, once, at the better of the two places.
+    select coalesce(i.merged_into, o.id) as id, bool_or(o.near) as near
+    from ordered o
+    join ${items} i on i.id = o.id
+    group by coalesce(i.merged_into, o.id)
+    order by min(o.place)
     limit ${limit}
   `
 }

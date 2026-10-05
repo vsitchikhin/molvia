@@ -54,7 +54,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 ## backend · tests
 
 - `backend/tests/catalogue.integration.test.ts` — Integration test: both catalogue routes through the server — the door, the query bound, the wire answer, no event, proposal dedup.
-- `backend/tests/merge-trace.integration.test.ts` — Integration test: an id or a name of a merged item or place, on every path that writes by it — read, rated, bought, picked, coded, remembered, proposed, typed — lands on the survivor.
+- `backend/tests/merge-trace.integration.test.ts` — Integration test: an id or a name of a merged item or place, on every path that writes by it — read, rated, bought, picked, coded, remembered, proposed, typed — lands on the survivor; the search finds the survivor by the trace's name, once.
 - `backend/tests/rekey.integration.test.ts` — Integration test: a key drifted from today's tables is rewritten, a current one left, a second start writes nothing (MOL-109).
 - `backend/tests/search-corpus.integration.test.ts` — Integration test: the whole corpora and the owner's shelf through the real search, every answer pinned whole, near and far included.
 - `backend/tests/search-meaning.integration.test.ts` — Integration test: the search by meaning on the seed with the real model — shelf words, the owner's words unmoved, nothing near for things absent, other models unread, the HNSW plan, the server and the writer.
