@@ -9,6 +9,8 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 - `packages/model/src/entities/item.ts` — Entity: a catalogue item — kind, name, search key, barcodes, unit — and the schema of a new item.
 - `packages/model/src/support/search-key.ts` — `toSearchKey`, the frozen alphabet — Cyrillic with Serbian, Armenian, Georgian, Serbian Latin (MOL-109) — that folds any spelling of a name to one key, `unfinishedFoldSpellings` for a word typed halfway through a fold, and `nameIdentity` for duplicates.
 - `packages/model/src/support/synonyms.ts` — The synonym dictionary (`synonymKeys`) and the word-of-the-kind rules: adjective and noun patterns, `WORD_BREAK`, `kindKey`.
+- `packages/model/src/support/edits.ts` — `levenshtein`: edits between two strings by code point, shared by the receipt matcher and the merge of twins.
+- `packages/model/src/entities/twins.ts` — When two names are one thing written twice (MOL-106): the sizes with their units, the words left, and the spelling of a pair word against word in any order.
 - `packages/model/src/support/text.ts` — Visible-text rules shared by every name: `INVISIBLE`, `visibleLine`/`visibleText`, `pastedLine` for what a paste brings along.
 
 ## packages/model · tests
