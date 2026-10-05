@@ -1233,7 +1233,13 @@
       "caption_goes_on": "Открывает продолжение",
       "caption_acts": "Действует сразу или спрашивает",
       "row_link_inactive": "Ссылка, пока нет связи",
-      "row_link_offline": "Откроется, когда появится связь"
+      "row_link_offline": "Откроется, когда появится связь",
+      "search": "Поле поиска",
+      "search_clear": "«Что брать» · «Очистить»",
+      "search_scan": "«Что взяли?» · сканер",
+      "search_readonly": "Только чтение",
+      "search_sample": "сыр",
+      "search_scanner": "Сканер в поле"
     },
     "login_seam": "Войти для разработки",
     "login_insecure": "По http вход не работает: нужен make certs"

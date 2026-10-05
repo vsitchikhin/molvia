@@ -81,6 +81,47 @@ test('a chosen row the keyboard stands on takes its fill from its round layer al
   expect(fills.layer).toBe(fills.alone)
 })
 
+// One search field (MOL-177, Ф-12): a pill on the well's ground, the same height whatever stands at its
+// end. The option the arrows stand on is filled at the weight of every row (К-4), and its meta is in
+// the text's colour — muted stands under 4.5:1 on the tint (MOL-172).
+test('the search field is one pill, and the active option keeps its weight and reads its meta in text', async ({
+  page,
+}) => {
+  await open(page, '/_kit')
+  const wells = await page.getByRole('searchbox').evaluateAll((inputs) =>
+    inputs.map((input) => {
+      const well = input.parentElement as HTMLElement
+      return {
+        height: well.getBoundingClientRect().height,
+        radius: parseFloat(getComputedStyle(well).borderTopLeftRadius),
+      }
+    }),
+  )
+  expect(wells).toHaveLength(3)
+  for (const well of wells) {
+    expect(well.height).toBe(wells[0]?.height)
+    expect(well.radius).toBeGreaterThanOrEqual(well.height / 2)
+  }
+
+  const active = page.getByRole('listbox', { name: 'Found' }).getByRole('option').first()
+  await expect(active).toHaveAttribute('aria-selected', 'true')
+  const look = await active.evaluate((row) => {
+    const title = getComputedStyle(row.querySelector('.title') as Element)
+    const meta = getComputedStyle(row.querySelector('.meta') as Element)
+    return {
+      tag: row.tagName,
+      weight: title.fontWeight,
+      title: title.color,
+      meta: meta.color,
+      fill: getComputedStyle(row).backgroundColor,
+    }
+  })
+  expect(look.tag).toBe('LI')
+  expect(look.weight).toBe('600')
+  expect(look.meta).toBe(look.title)
+  expect(look.fill).not.toBe('rgba(0, 0, 0, 0)')
+})
+
 // One row of an operation (MOL-176, Ф-12): every row has its chevron, so the amounts end in one column
 // — and the bars of its skeleton end there too, or the list would jump as the answer comes.
 test('the amounts of operation rows stand in one column, where their skeleton’s stand', async ({

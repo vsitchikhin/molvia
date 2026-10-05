@@ -82,6 +82,43 @@
     </section>
 
     <section class="group">
+      <SectionCaption class="caption">{{ t('dev.kit.search') }}</SectionCaption>
+      <div>
+        <SectionCaption as="h3">{{ t('dev.kit.search_clear') }}</SectionCaption>
+        <SearchField
+          v-model="searchAdvice"
+          :label="t('advice.search.label')"
+          :placeholder="t('advice.search.placeholder')"
+          clearable
+        />
+      </div>
+      <div>
+        <SectionCaption as="h3">{{ t('dev.kit.search_scan') }}</SectionCaption>
+        <SearchField
+          v-model="searchItem"
+          :label="t('item.search_title')"
+          :placeholder="t('item.search_placeholder')"
+          :hint="t('item.search_hint')"
+        >
+          <template #trailing>
+            <!-- Named apart from the kit's own scanner below, which the scanner's e2e opens by name. -->
+            <AppButton variant="icon" :label="t('dev.kit.search_scanner')"
+              ><IconBarcode
+            /></AppButton>
+          </template>
+        </SearchField>
+      </div>
+      <div>
+        <SectionCaption as="h3">{{ t('dev.kit.search_readonly') }}</SectionCaption>
+        <SearchField
+          :model-value="t('dev.kit.search_sample')"
+          :label="t('dev.kit.search_readonly')"
+          readonly
+        />
+      </div>
+    </section>
+
+    <section class="group">
       <SectionCaption class="caption">{{ t('dev.kit.badges') }}</SectionCaption>
       <div class="row">
         <VerdictBadge v-for="level in levels" :key="level" :level="level" />
@@ -232,12 +269,12 @@
       </div>
       <div>
         <SectionCaption as="h3">{{ t('item.group_found') }}</SectionCaption>
-        <AppCard list role="listbox" :aria-label="t('item.group_found')">
+        <AppCard as="ul" list role="listbox" :aria-label="t('item.group_found')">
           <ListRow
             v-for="(found, index) in foundRows"
             :id="`kit-found-${String(index)}`"
             :key="found"
-            as="div"
+            as="li"
             role="option"
             :title="found"
             :meta="t('dev.kit.sample_meta')"
@@ -345,6 +382,7 @@ import {
 } from '@molvia/model'
 import type { AccountOperationView, SpendingCategoryView } from '@molvia/model'
 import IconAlert from '~icons/mdi/alert-outline'
+import IconBarcode from '~icons/mdi/barcode-scan'
 import IconCart from '~icons/mdi/cart-outline'
 import IconDevices from '~icons/mdi/cellphone-link'
 import IconPhone from '~icons/mdi/cellphone'
@@ -371,6 +409,7 @@ import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NavRow from '@/components/NavRow.vue'
 import OperationRow from '@/components/OperationRow.vue'
 import OperationSkeleton from '@/components/OperationSkeleton.vue'
+import SearchField from '@/components/SearchField.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { operationRowProps, shortDay } from '@/components/accounts'
@@ -400,6 +439,7 @@ export default defineComponent({
     BarcodeScannerSheet,
     BottomSheet,
     CategoryChips,
+    IconBarcode,
     IconClose,
     IconPlus,
     IconRefresh,
@@ -409,6 +449,7 @@ export default defineComponent({
     NavRow,
     OperationRow,
     OperationSkeleton,
+    SearchField,
     SectionCaption,
     SegmentedControl,
     VerdictBadge,
@@ -641,6 +682,8 @@ export default defineComponent({
       picked: ref('card'),
       foundRows: computed(() => [t('dev.kit.sample_milk'), t('dev.kit.row_long')]),
       sign: currencySign('AMD'),
+      searchAdvice: ref(''),
+      searchItem: ref(t('dev.kit.search_sample')),
       quantity: ref('1'),
       price: ref('57о'),
       review: ref(''),
