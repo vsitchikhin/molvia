@@ -189,7 +189,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A merged item or place stays a trace** (`merged_into`): its name is the survivor's second name,
   every write by an id goes through `liveItemId` / `livePlaceId`, the search answers the survivor once;
   one person's two verdicts stay two rows, so the gate does not move. **Production runs
-  `CATALOGUE_MERGE=report` until the owner says `on`** (В-3); `make unmerge ID=` takes a merge back.
+  `CATALOGUE_MERGE=report` until the owner says `on`** (В-3); `make unmerge ID=` takes a merge back,
+  a chain from its end.
 
 ### «Что брать» and verdicts — `.claude/rules/advice.md`
 

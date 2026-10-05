@@ -602,8 +602,11 @@ report.
 - **The journal** (`catalogue_merges`, `catalogue_merge_moves`) writes down every row moved by its own
   key; **`make unmerge ID=`** moves those back — **each only from where the merge put it**, the survivor
   or what that was merged into since: a code let go and written to another item, a word of the shop's
-  memory said again, stay with what people did (adversarial А4), and two merges of a chain undone in
-  either order leave both apart (А3). The survivor's own pick gets back its «own word» and its last
+  memory said again, stay with what people did (adversarial А4). **A chain is undone from its end**: a
+  merge whose survivor was merged on since is refused, naming the later one (`chained`) — the swap of one
+  person's verdicts on the first step met its rows moved on by the second, and undone out of order the
+  person's scores came back crossed, «Малоко» with the score given to «Молоко 3,2%» (А3, Б1). The
+  survivor's own pick gets back its «own word» and its last
   pick (А7). **An undone pair is never merged or named by the night again — nor the survivor of its
   survivor**: the pair is read by the live things its two ends stand in now, so «Малоко», undone from
   «Молоко 3,2%», does not merge into what that went into (А5). The owner's `make merge` still may (В-2). A
@@ -621,11 +624,20 @@ report.
   `sql` template is refused by postgres-js under drizzle, and the night never ran (№1, А1). **What
   reached a trace after its merge** (a write that read the id a moment before — `liveItemId` takes no
   lock) is swept to the survivor under the merge's number, **in both modes** and by every table a merge
-  moves (№8). Yerevan, not the owner's zone, which is kept nowhere.
-- **`CATALOGUE_MERGE`**: `on` merges, `report` says what it would and changes nothing, `off` does not
-  look — the default, so a copy, CI and the tests never merge by a timer. **Production runs `report` until
+  moves (№8). Yerevan, not the owner's zone, which is kept nowhere. **The prices, named:** a night that
+  first starts after 23:00 — the API down since 04:30 — and dies is claimed again only in the next day,
+  and its merges are named by no morning; they stand in the journal and in `make unmerge`. A candidate
+  whose side merged that night waits for the next only in `on`, and meets the survivor there only if the
+  survivor is near the other side too («Сыр чанох» merged into «Сыр чанах», whose pair with «Сыр чунух»
+  is 0.64: never asked) — in `report`, where nothing merged, it is named as it is.
+- **`CATALOGUE_MERGE`**: `on` merges, `report` says what it would and merges nothing — it only sweeps
+  what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production runs `report` until
   the owner says `on`** (В-3): the thresholds stand on a corpus, not yet on strangers' twins. A pair
   only reported comes with its two ids (review №7): the owner can look at it, or forbid it for good by
   `make merge` then `make unmerge`.
+- **The morning's message holds within Telegram's 4096** (`MERGE_TEXT_MAX`, review №9, adversarial Б2):
+  pairs are printed while it holds them, the rest counted — a message refused is lost, being handed
+  once. A candidate cut for length is named already; **`make merge-candidates`** lists every candidate
+  named and still apart, with its command, so neither a cut nor a lost morning loses one.
 - **Not here:** merging by codes (one package is one item already, MOL-100), renaming an item by hand,
   chains of shops across cities (two places, MOL-120).

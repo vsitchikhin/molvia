@@ -279,8 +279,8 @@ In a working copy the same thing is `make gates FROM=2026-10-05 [TO=2026-10-31]`
 Every night from 04:30 Yerevan, half an hour after the copy of the database, the API merges what is
 one thing written twice — «Молоко 3.2%» beside «Молоко 3,2%» — and at 09:00 the bot tells the owner
 what it merged and which new pairs it only names. `CATALOGUE_MERGE` in `.env.prod` says how: `report`
-(the default, owner's decision В-3) says what it would merge and changes nothing, `on` merges, `off`
-does not look.
+(the default, owner's decision В-3) says what it would merge and merges nothing — it only sweeps onto
+the survivor what reached the trace of a merge made by hand — `on` merges, `off` does not look.
 
 A candidate the report names is merged by hand with the two ids the message prints, and a merge is
 taken back by its number — both a dry run without `--yes`:
@@ -290,14 +290,21 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod \
   exec backend node dist/merge.js merge <from-id> <into-id> --yes
 docker compose -f docker-compose.prod.yml --env-file .env.prod \
   exec backend node dist/merge.js unmerge 17 --yes
+docker compose -f docker-compose.prod.yml --env-file .env.prod \
+  exec backend node dist/merge.js candidates
 ```
+
+`candidates` lists every candidate the mornings named and still apart, with its command — the ones a
+long message cut, or a morning that never arrived. A chain is undone from its end: `unmerge` of a merge
+whose survivor was merged on since says which number to undo first.
 
 An undone pair is never merged or named by the night again; the owner's hand still may. In `report`
 mode a pair the night would merge comes with its two ids: to forbid it before `on`, merge it by hand and
 undo it. What the undo cannot bring back: the text of a review withdrawn because the same person had
 rated the twin too.
 
-In a working copy the same thing is `make merge FROM=<id> INTO=<id> [YES=1]` and `make unmerge ID=<n> [YES=1]`.
+In a working copy the same thing is `make merge FROM=<id> INTO=<id> [YES=1]`, `make unmerge ID=<n> [YES=1]`
+and `make merge-candidates`.
 
 ## Signals (MOL-142, MOL-221)
 
