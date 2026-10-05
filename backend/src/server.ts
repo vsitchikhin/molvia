@@ -222,6 +222,8 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   // state refuses it — the phone shows «уже записан» by the code.
   [ERROR.RECEIPT_NOT_READY]: 409,
   [ERROR.RECEIPT_RECORDED_BEFORE]: 409,
+  // A receipt with no items whose total nobody knows (MOL-227, Р-4): well formed, its state refuses it.
+  [ERROR.RECEIPT_TOTAL_REQUIRED]: 409,
 }
 
 // The handler answers with the contract the client parses, so it checks its own reply

@@ -104,7 +104,8 @@ export const ERROR = {
   RECEIPT_IN_FUTURE: 'error.receipt_in_future',
   /**
    * «Записать» that would leave a trip with no money and no purchase (MOL-227, Р-4): a receipt with no
-   * items whose total was neither read nor typed, or one whose every line is left out with no total.
+   * items whose total was neither read nor typed, or one whose every line is left out with no total —
+   * and «Убрать сумму» on a trip with no purchase, which would leave the same (adversarial А4).
    */
   RECEIPT_TOTAL_REQUIRED: 'error.receipt_total_required',
   /**

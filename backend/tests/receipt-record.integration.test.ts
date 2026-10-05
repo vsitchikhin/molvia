@@ -917,12 +917,30 @@ describe('«Записать»', () => {
         purchasedOn: '2026-09-26',
         lines: [],
       })
-      expect(response.statusCode).toBe(400)
+      expect(response.statusCode).toBe(409)
       expect(codeOf(response)).toBe(ERROR.RECEIPT_TOTAL_REQUIRED)
       expect(await db.select().from(trips)).toEqual([])
       expect(await db.select().from(places)).toEqual([])
       const [held] = await db.select().from(receipts).where(eq(receipts.id, id))
       expect(held?.status).toBe('parsed')
+    })
+
+    it('keeps the sum on its trip: taken off, nothing would be left (adversarial А4)', async () => {
+      const me = await insertActor(db)
+      const id = await parsedReceipt(me, [], noItems)
+      const tripId = randomUUID()
+      const body = { tripId, place: { name: 'Гая 5', city: 'Гюмри' }, purchasedOn: '2026-09-26' }
+      expect((await record(me, id, { ...body, lines: [] })).statusCode).toBe(200)
+      const off = await app.inject({
+        method: 'PUT',
+        url: `/trips/${tripId}/receipt`,
+        headers: { cookie: await signIn(db, me) },
+        payload: { receipt: null },
+      })
+      expect(off.statusCode).toBe(409)
+      expect(codeOf(off)).toBe(ERROR.RECEIPT_TOTAL_REQUIRED)
+      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+      expect(trip?.receiptMinor).toBe(170_000n)
     })
 
     it('records the same receipt twice where its fiscal number was not read — the price, named (Р-8)', async () => {
