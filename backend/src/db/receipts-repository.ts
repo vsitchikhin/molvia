@@ -18,6 +18,7 @@ import type {
   ReceiptBody,
   ReceiptFailure,
   ReceiptHeard,
+  ReceiptLayout,
   ReceiptLine,
   ReceiptParsedMatch,
   ReceiptPlace,
@@ -64,7 +65,7 @@ export interface ReceiptHead {
   readonly receiptNo: string | null
   readonly totalMinor: bigint | null
   readonly balanced: boolean
-  readonly layout: 'card' | 'table'
+  readonly layout: ReceiptLayout
   /** The city of the settings its address prints (MOL-126, Р-6). */
   readonly city: ReceiptCity | null
 }

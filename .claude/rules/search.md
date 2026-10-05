@@ -596,7 +596,7 @@ report.
   row by row, so two rows cannot cross in one statement — and the loser, on the trace, is withdrawn. **The
   0.2 gate counts rows** (`reachedRatings`, MOL-27), so a merge gives nobody a rating and takes none
   (Т-6, the test at five). `updated_at`, the order of «Что брать», travels with the words: the trigger
-  `verdicts_touch_updated_at` keeps still under `molvia.merging` (0053). **The price:** a withdrawn row
+  `verdicts_touch_updated_at` keeps still under `molvia.merging` (0054). **The price:** a withdrawn row
   holds no text (CHECK), so the undo brings the loser back without its review — the journal keeps no
   one's words.
 - **The journal** (`catalogue_merges`, `catalogue_merge_moves`) writes down every row moved by its own

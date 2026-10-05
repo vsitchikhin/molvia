@@ -15,7 +15,10 @@ export interface CatalogueNode {
   readonly headings: readonly string[]
 }
 
-/** The item a line found; `far` — by its heading alone, with no word of a name: «проверьте». */
+/**
+ * The item a line found; `far` — «проверьте»: by its heading alone, with no word of a name, or a dish
+ * of a class of services found among the catalogue's goods by its name.
+ */
 export interface LineMatch {
   readonly itemId: string
   readonly far: boolean
@@ -26,6 +29,16 @@ export interface LineMatcher {
   /** The line word by word in Russian, by the dictionary of till words; '' when no word is known. */
   gloss(printed: string): string
 }
+
+/**
+ * A class of services, «56.10» of food service (MOL-226): no customs heading, so it rules nothing out,
+ * and the catalogue holds goods — «16 Թև», sixteen wings at KFC, is no «Крылья куриные». A dish
+ * found by its name is a guess for the person to check, and the shop's memory learns the answer.
+ */
+export const isServiceClass = (hs: string | null): boolean =>
+  hs !== null && /^\d{2}\.\d{2}$/.test(hs)
+
+const isHeading = (hs: string | null): hs is string => hs !== null && /^\d{4}$/.test(hs)
 
 /** Below this a line's best name is no match: the heading alone decides, or nothing does. */
 const MATCH_SCORE = 0.7
@@ -122,7 +135,7 @@ export function createLineMatcher(
   // No name matched: the heading alone, when it leaves one item, or the item whose own name shares a
   // stem with the line's gloss («кошка» → «Корм для кошек»). Bound far — «проверьте».
   function byHeading(printed: string, hs: string | null): LineMatch | null {
-    if (hs === null) return null
+    if (!isHeading(hs)) return null
     // the exact heading only: a swapped digit is fine for ruling out, not for choosing (3506 → 8506)
     const candidates = nodes.filter((node) => node.headings.includes(hs))
     if (candidates.length === 0) return null
@@ -150,7 +163,7 @@ export function createLineMatcher(
 
   function match(printed: string, hs: string | null): LineMatch | null {
     const tokens = receiptWords(printed)
-    const allowed = hs === null ? null : headingVariants(hs)
+    const allowed = isHeading(hs) ? headingVariants(hs) : null
     let best: { node: CatalogueNode; score: number } | null = null
     for (const entry of index) {
       const { headings } = entry.node
@@ -165,7 +178,7 @@ export function createLineMatcher(
       if (best === null || score > best.score) best = { node: entry.node, score }
     }
     if (best !== null && best.score >= MATCH_SCORE) {
-      return { itemId: refine(best.node, printed).itemId, far: false }
+      return { itemId: refine(best.node, printed).itemId, far: isServiceClass(hs) }
     }
     return byHeading(printed, hs)
   }
