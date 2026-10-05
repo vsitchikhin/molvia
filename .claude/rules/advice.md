@@ -27,12 +27,12 @@ The detail behind the gate and «Что брать» lines of `CLAUDE.md`.
 
 ## The gates: who writes the log, and what they count
 
-The `events` table is that groundwork, and it holds only what no domain table can answer:
-whether someone came back, and to look at what. The 0.2 threshold is a query over
-verdicts, not an event — anything a domain table already knows must never be duplicated
-into the log. Nothing updates or deletes from it — with two written exceptions, erasing a person
-(MOL-58) and their objection to being counted (MOL-96), both below — the gate queries are its only readers, and each is pinned by an integration
-test, boundary days included.
+The `events` table is that groundwork, and it holds only what no domain table can answer: whether
+someone came back, and to look at what. The 0.2 threshold is a query over verdicts, not an event —
+anything a domain table already knows must never be duplicated into the log. Nothing updates or
+deletes from it — with two written exceptions, erasing a person (MOL-58) and their objection to
+being counted (MOL-96), both below — the gate queries are its only readers, and each is pinned by an
+integration test, boundary days included.
 
 **The one writer is «Что брать», once a day per owner (MOL-31).** MOL-8 was going to record
 `session_started` on the first visit, and the promise was withdrawn when it was examined:
@@ -78,12 +78,13 @@ anything at all** — with the gate gone, `catalogue_viewed` had no reader, and 
 enters purchases is what `expenses` and `verdicts` answer. The rows already written stay where
 they are: the log is append-only, and they were true when they were made.
 
-**The question MOL-6 left open is answered: the log does not outlive the person** (MOL-58,
-owner's decision 20.09.2026). The log points at `actors` with a real foreign key, so an owner
-with events could not be deleted; erasing a person on request is a written exception to
-append-only, and their rows go with them — one of two, the other is an objection (MOL-96, below). The right to be erased outweighs a gate,
-and a lost row there is the lesser harm. Whether the log could instead be anonymised to keep the
-gates is 0.2's question, and an anonymisation that can be reversed is still personal data.
+**The question MOL-6 left open is answered: the log does not outlive the person** (MOL-58, owner's
+decision 20.09.2026). The log points at `actors` with a real foreign key, so an owner with events
+could not be deleted; erasing a person on request is a written exception to append-only, and their
+rows go with them — one of two, the other is an objection (MOL-96, below). The right to be erased
+outweighs a gate, and a lost row there is the lesser harm. Whether the log could instead be
+anonymised to keep the gates is 0.2's question, and an anonymisation that can be reversed is still
+personal data.
 
 **An objection to being counted takes a person out of both gates** (MOL-96, owner's decisions
 04.10.2026). The log and the gates rest on a legitimate interest, not on consent («Персональные
@@ -104,15 +105,16 @@ objection is read as it stands now — the verdicts are not erased, so back on, 
 again. **Gate 0.3 counts someone back on only if they were back before their fourth week began**
 (`actors.analytics_on_at` at or before `created_at + 504 h`, Р-3): off later, that week's rows were
 erased; back later, part of it was never written — counted, they would read as not having come back.
-Both moments are kept, the first objection's and the last return's, and a repeat moves neither.
-**The order of the lines is time, access, the objection**: waiting stays waiting — they may still be
-back before week four — and without access stays without access, so «opted out» says exactly how many
-the cohort lost to objections; `appeared = waiting + without access + opted out + cohort`. **What has
-no person behind it is not touched** (Р-4): `login_days`, `reminder_days`, `erasures`, `failures` keep
-no id, and there is nobody to leave out. The bot has no command for it (Р-6). The copy of one's data
-carries both moments (version 14), erasure takes them with the row, and `/privacy` says it under
-«Отметки о визитах» — a new revision, not a new edition (Р-5): a right was added, not data, a
-recipient or a purpose.
+Two moments are kept: since when the person objects now — gone once they are back on — and when they
+last came back; a repeat moves neither. No history of objections is kept (review 1, adversarial А3):
+nothing reads it, and Р-3 needs only the last return. **The order of the lines is time, access, the
+objection**: waiting stays waiting — they may still be back before week four — and without access
+stays without access, so «opted out» says exactly how many the cohort lost to objections; `appeared
+= waiting + without access + opted out + cohort`. **What has no person behind it is not touched**
+(Р-4): `login_days`, `reminder_days`, `erasures`, `failures` keep no id, and there is nobody to
+leave out. The bot has no command for it (Р-6). The copy of one's data carries both moments (version
+14), erasure takes them with the row, and `/privacy` says it under «Отметки о визитах» — a new
+revision, not a new edition (Р-5): a right was added, not data, a recipient or a purpose.
 
 **The 0.2 gate is `VerdictRepository.reachedRatings` (MOL-49):** of those who appeared in a
 window, how many have `GATE_RATINGS` rows in `verdicts` within `GATE_RATINGS_WINDOW_HOURS` of
