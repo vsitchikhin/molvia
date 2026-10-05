@@ -33,7 +33,7 @@ export default defineComponent({
   components: { AppButton },
   setup() {
     const { t } = useI18n()
-    return { t, sending: ref(false) }
+    return { t, sending: ref(false), cond: ref(true) }
   },
 })
 </script>
@@ -63,6 +63,19 @@ describe('eslint.config.js: a busy button says what it does (MOL-225)', () => {
     ['in an object, computed', button(`v-bind="{ ['busy']: sending }"`)],
     // Р3-А2: a template with nothing in it is a computed string too.
     ['in an object, a template', button('v-bind="{ [`busy`]: sending }"')],
+    // Р4-А1: what the `v-bind` gives the button another way — a spread, a choice, a cast.
+    ['spread into the object', button('v-bind="{ ...{ busy: sending } }"')],
+    ['on one side of a choice', button('v-bind="cond ? { busy: sending } : {}"')],
+    ['a choice spread into the object', button('v-bind="{ ...(cond ? { busy: sending } : {}) }"')],
+    ['in an object cast', button('v-bind="{ busy: sending } as Record<string, unknown>"')],
+    // Р4-А2: a word that says nothing.
+    ['with an empty word', button(':busy="sending" busy-label=""')],
+    ['with a word of an ellipsis', button(':busy="sending" busy-label="…"')],
+    // A word of an element in its slot is not the button's (self-review, round 4).
+    [
+      'with a word in its slot only',
+      `<AppButton :busy="sending"><span :busy-label="${WORD}" /></AppButton>`,
+    ],
     // Р3-А2: a word deep in the object is no prop of the button.
     [
       'with a word nested deeper',
@@ -93,6 +106,11 @@ describe('eslint.config.js: a busy button says what it does (MOL-225)', () => {
 
   it('must not fire: a button that is not busy needs no word', async () => {
     expect(await refused(button(':inactive="sending"'))).toBe(false)
+  }, 60_000)
+
+  // `v-on` with an object is no prop: its `busy` would be an event (self-review, round 4).
+  it('must not fire: `busy` as an event of `v-on` is no prop', async () => {
+    expect(await refused(button('v-on="{ busy: () => undefined }"'))).toBe(false)
   }, 60_000)
 
   // Р3-А2: a `busy` deep in the object — an argument of `t` — is nothing at work.
