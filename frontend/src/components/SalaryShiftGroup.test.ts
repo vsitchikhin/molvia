@@ -9,6 +9,7 @@ import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { useActorStore } from '@/stores/actor'
 import SalaryShiftGroup from './SalaryShiftGroup.vue'
+import { forgetUnsureChanges } from '@/composables/useTapSetting'
 
 const read = vi.fn<() => Promise<SalaryShift>>()
 const choose = vi.fn<(day: number | null) => Promise<SalaryShift>>()
@@ -35,6 +36,7 @@ function switchOf(view: VueWrapper) {
 }
 
 beforeEach(() => {
+  forgetUnsureChanges()
   vi.restoreAllMocks()
   read.mockReset()
   choose.mockReset()
@@ -112,7 +114,9 @@ it('a connection lost while saving is «without a connection», not a red failur
   })
   await switchOf(view).setValue(true)
   await flushPromises()
-  expect(switchOf(view).element.checked).toBe(false)
+  // Whether it landed is not known (MOL-96, Р3-А3): no switch drawn as an answer, and no red.
+  expect(view.find('input[role="switch"]').exists()).toBe(false)
+  expect(view.text()).toContain(en.settings.tap.unsure)
   expect(view.find('[role="alert"]').exists()).toBe(false)
   expect(view.text()).toContain(en.settings.tap.offline)
 })
@@ -124,4 +128,27 @@ it('tells a screen reader why the switch is inactive offline (self-review 8)', a
   const described = (switchOf(view).attributes('aria-describedby') ?? '').split(' ')
   const texts = described.map((id) => view.find(`[id="${id}"]`).text())
   expect(texts).toContain(en.settings.tap.offline)
+})
+
+it('a day chosen and its answer lost: no switch and no day until a check says, then the day that landed (MOL-96, Р3-А3)', async () => {
+  read.mockResolvedValue({ day: 25 })
+  const view = await render()
+  choose.mockImplementation(() => {
+    read.mockRejectedValue(new TypeError('connection reset'))
+    return Promise.reject(new TypeError('connection reset'))
+  })
+  await view.get('select').setValue('10')
+  await flushPromises()
+  expect(view.find('input[role="switch"]').exists()).toBe(false)
+  expect(view.find('select').exists()).toBe(false)
+  expect(view.text()).toContain(en.settings.tap.unsure)
+
+  read.mockResolvedValue({ day: 10 })
+  const retry = view.findAll('button').find((button) => button.text() === en.state.retry)
+  await retry?.trigger('click')
+  await flushPromises()
+  expect(switchOf(view).element.checked).toBe(true)
+  expect(view.get<HTMLSelectElement>('select').element.value).toBe('10')
+  expect(view.text()).not.toContain(en.settings.tap.unsure)
+  expect(view.find('[role="alert"]').exists()).toBe(false)
 })

@@ -369,8 +369,15 @@
     {
       "idx": 52,
       "version": "7",
-      "when": 1791205643481,
-      "tag": "0052_catalogue_merge",
+      "when": 1791197152366,
+      "tag": "0052_analytics_opt_out",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1791209636581,
+      "tag": "0053_catalogue_merge",
       "breakpoints": true
     }
   ]

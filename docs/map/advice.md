@@ -6,7 +6,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 ## packages/model
 
 - `packages/model/src/contracts/advice.ts` — Wire contract of «Что брать»: `scope`, the row as a union on `level`, places with unit prices, limits, the answer, the search's answer (an item found with its row or `null`, MOL-128), and «Тут дешевле» — the person's own last prices and alternatives, a union on `level` (MOL-92).
-- `packages/model/src/contracts/events.ts` — Contract of the event log: the event types, `advice_viewed` among them, each with the payload tied to its type.
+- `packages/model/src/contracts/events.ts` — Contract of the event log: the event types, `advice_viewed` among them, each with the payload tied to its type; and «Учитывать меня в статистике» (MOL-96), the setting and the body of its switch.
 - `packages/model/src/contracts/verdict.ts` — Wire contract of verdicts: the path by item, the rating and amendment bodies, the verdict card, the pending list and one's own «не брать нигде» (MOL-92).
 - `packages/model/src/entities/cheaper-hint.ts` — «Тут дешевле» (MOL-92): `cheaperHint` — what the sheet of a purchase says of the item's own last prices and of another item of its kind, against the price typed.
 - `packages/model/src/entities/catalogue.ts` — Frozen mapping of item kinds and place kinds onto the two halves of the 0.3 gate, product and venue.
@@ -16,11 +16,13 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 ## backend · routes
 
 - `backend/src/routes/advice.ts` — Routes `GET /advice` (the whole «Что брать» screen, no parameters), `GET /advice/search?q=` (MOL-128) and `GET /advice/prices` («Тут дешевле», MOL-92), never cached. Tests: `backend/tests/advice.integration.test.ts`, `backend/tests/advice-search.integration.test.ts`, `backend/tests/advice-prices-own.integration.test.ts`.
+- `backend/src/routes/analytics.ts` — Routes `GET`/`PUT /actors/me/analytics` (MOL-96): «Учитывать меня в статистике», saved on the tap beside the settings, `no-store`. Tests: `backend/tests/analytics.integration.test.ts`.
 - `backend/src/routes/verdicts.ts` — Routes of verdicts: `PUT`, `PATCH`, `DELETE /verdicts/:itemId`, `GET /verdicts/pending` and `GET /verdicts/never` (one's own «не брать нигде», MOL-92). Tests: `backend/tests/verdicts.integration.test.ts`, `backend/tests/advice-prices-own.integration.test.ts`.
 
 ## backend · usecases
 
 - `backend/src/usecases/advice.ts` — Use cases «Что брать»: rows by verdict with prices, own or shared scope, the once-a-day `advice_viewed` in shared mode; and its search — the catalogue's answer with each item's row by the same rules, rated ones past the limit kept, no visit written.
+- `backend/src/usecases/analytics.ts` — Use cases of «Учитывать меня в статистике» (MOL-96): read the objection, and turn it on or off on the tap.
 - `backend/src/usecases/own-never.ts` — Use case: the items the person themselves rated «не брать нигде», live verdicts only — what «Тут дешевле» remembered for no signal lets go of (MOL-92, Б′).
 - `backend/src/usecases/own-prices.ts` — Use case «Тут дешевле» (MOL-92): the person's own last prices of an item in the record's city, and the other products of its kind with the person's own rating — with access or without; «не брать нигде» never asked about; writes nothing.
 - `backend/src/usecases/amend-verdict.ts` — Use case «Изменить оценку»: changes the score or the review of one's own verdict; nothing to change is not found.
@@ -30,7 +32,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 
 ## backend · db
 
-- `backend/src/db/events-repository.ts` — Repository of the event log: record, record once per day of the person's life, and the 0.3 week-four return. Tests: `backend/tests/events-repository.integration.test.ts`.
+- `backend/src/db/events-repository.ts` — Repository of the event log: record, record once per day of the person's life unless they objected, the switch that erases the log and stops it (MOL-96), and the 0.3 week-four return. Tests: `backend/tests/events-repository.integration.test.ts`.
 - `backend/src/db/gates-reader.ts` — Reader of both gates over one window in a read-only snapshot, with the erased counted by week, the login funnel (`login_days`) by day and the reminder counters (`reminder_days`, MOL-101). Tests: `backend/tests/gates-reader.integration.test.ts`.
 - `backend/src/db/verdicts-repository.ts` — Repository of verdicts: put, amend, withdraw, the «Что брать» rows (optionally of given items, for the search) and `reachedRatings` for gate 0.2. Tests: `backend/tests/advice-verdicts.integration.test.ts`.
 
@@ -46,6 +48,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 - `backend/tests/advice-search-seed.integration.test.ts` — Integration test: the search on «Что брать» over the real seed — a rated item past the limit of twenty is found, its «не брать нигде» too.
 - `backend/tests/advice-search.integration.test.ts` — Integration test: `GET /advice/search` — transliteration and typos, a row past `ADVICE_LIMIT`, the threshold of three, no price on «не брать нигде», nothing written.
 - `backend/tests/advice-prices-own.integration.test.ts` — Integration test: `GET /advice/prices` — the last price of a place, the record's city, only one's own, `except`, «не брать нигде» with no prices, the alternatives of a kind, nothing written.
+- `backend/tests/analytics.integration.test.ts` — Integration test: «Учитывать меня в статистике» — off erases the person's log and no one else's and stops «Что брать» writing, a visit racing the switch leaves no row, nor does erasure racing it, back on starts afresh with its moment, repeats move no moment (MOL-96).
 - `backend/tests/advice.integration.test.ts` — Integration test: `GET /advice` through the server — the three groups, prices, nothing of others without access, the event log.
 - `backend/tests/events-repository.integration.test.ts` — Integration test: the 0.3 week-four return by cohort and access, pending windows, and recording at most once a day.
 - `backend/tests/gates-reader.integration.test.ts` — Integration test: the gates reader reads both gates over one window, counts the erased, inside a read-only transaction.

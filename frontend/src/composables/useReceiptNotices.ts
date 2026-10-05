@@ -23,6 +23,7 @@ export interface ReceiptNoticesState extends Omit<
  */
 export function useReceiptNotices(): ReceiptNoticesState {
   const tap = useTapSetting<ReceiptNoticesSetting>(
+    'receipt-notices',
     async () => api.receiptNoticesSetting(),
     async (next) => api.chooseReceiptNotices(!next.off),
   )

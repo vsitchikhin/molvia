@@ -52,6 +52,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 0,
+      optedOut: 0,
     })
   })
 
@@ -69,6 +70,7 @@ describe('week-four return', () => {
       returned: 1,
       pending: 0,
       withoutAccess: 0,
+      optedOut: 0,
     })
   })
 
@@ -86,12 +88,14 @@ describe('week-four return', () => {
       returned: 1,
       pending: 0,
       withoutAccess: 0,
+      optedOut: 0,
     })
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
       cohortSize: 1,
       returned: 0,
       pending: 0,
       withoutAccess: 0,
+      optedOut: 0,
     })
   })
 
@@ -117,6 +121,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 0,
+      optedOut: 0,
     })
   })
 
@@ -136,6 +141,7 @@ describe('week-four return', () => {
       returned: 1,
       pending: 0,
       withoutAccess: 0,
+      optedOut: 0,
     })
   })
 
@@ -156,6 +162,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 0,
+      optedOut: 0,
     })
   })
 
@@ -171,6 +178,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 0,
+      optedOut: 0,
     })
   })
 
@@ -185,6 +193,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 1,
+      optedOut: 0,
     })
   })
 
@@ -206,6 +215,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 1,
+      optedOut: 0,
     })
   })
 
@@ -223,6 +233,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 0,
+      optedOut: 0,
     })
   })
 })
@@ -249,6 +260,7 @@ describe('week-four return: a fourth week not over is no answer yet (MOL-91)', (
       returned: 0,
       pending: 1,
       withoutAccess: 0,
+      optedOut: 0,
     })
   })
 
@@ -260,6 +272,7 @@ describe('week-four return: a fourth week not over is no answer yet (MOL-91)', (
       returned: 0,
       pending: 1,
       withoutAccess: 0,
+      optedOut: 0,
     })
   })
 
@@ -278,6 +291,7 @@ describe('week-four return: a fourth week not over is no answer yet (MOL-91)', (
       returned: 1,
       pending: 1,
       withoutAccess: 0,
+      optedOut: 0,
     })
   })
 
@@ -292,6 +306,7 @@ describe('week-four return: a fourth week not over is no answer yet (MOL-91)', (
       returned: 0,
       pending: 2,
       withoutAccess: 0,
+      optedOut: 0,
     })
 
     // Granting access moves nobody: they were waiting either way.
@@ -302,6 +317,7 @@ describe('week-four return: a fourth week not over is no answer yet (MOL-91)', (
       returned: 0,
       pending: 2,
       withoutAccess: 0,
+      optedOut: 0,
     })
   })
 
@@ -316,6 +332,90 @@ describe('week-four return: a fourth week not over is no answer yet (MOL-91)', (
       returned: 0,
       pending: 1,
       withoutAccess: 2,
+      optedOut: 0,
+    })
+  })
+})
+
+describe('week-four return: an objection to being counted (MOL-96)', () => {
+  const hoursAgo = (hours: number) => new Date(Date.now() - hours * HOUR)
+  const gate = () => repository.weekFourReturn('product', daysAgo(60), new Date(Date.now() + DAY))
+
+  async function cameBack(actorId: string) {
+    await db.execute(sql`
+      insert into events (actor_id, type, payload, occurred_at)
+      select id, ${EVENT.ADVICE_VIEWED}, '{"subject":"product"}'::jsonb, created_at + interval '530 hours'
+      from actors where id = ${actorId}::uuid`)
+  }
+
+  /** Back on at `started` plus this interval, written in Postgres to keep the microseconds. */
+  async function backOnAt(actorId: string, after: string) {
+    await db.execute(sql`
+      update actors set analytics_off_at = null, analytics_on_at = created_at + ${after}::interval
+      where id = ${actorId}::uuid`)
+  }
+
+  it('leaves someone off out of both halves and names them, whatever rows are left', async () => {
+    const off = await actorSeenAt(hoursAgo(700))
+    await cameBack(off)
+    await db.execute(sql`update actors set analytics_off_at = now() where id = ${off}::uuid`)
+    await cameBack(await actorSeenAt(hoursAgo(700)))
+
+    await expect(gate()).resolves.toEqual({
+      cohortSize: 1,
+      returned: 1,
+      pending: 0,
+      withoutAccess: 0,
+      optedOut: 1,
+    })
+  })
+
+  it('through the switch: a return erased with the log is an objection, not a person who stayed away', async () => {
+    const actorId = await actorSeenAt(hoursAgo(700))
+    await cameBack(actorId)
+    await repository.chooseAnalytics(actorId, true)
+
+    await expect(gate()).resolves.toMatchObject({ cohortSize: 0, returned: 0, optedOut: 1 })
+  })
+
+  it('counts someone back on exactly as their fourth week began, and not a millisecond later (Р-3)', async () => {
+    const onTime = await actorSeenAt(hoursAgo(700))
+    await backOnAt(onTime, '504 hours')
+    await cameBack(onTime)
+    const late = await actorSeenAt(hoursAgo(700))
+    await backOnAt(late, '504 hours 1 millisecond')
+    await cameBack(late)
+
+    await expect(gate()).resolves.toEqual({
+      cohortSize: 1,
+      returned: 1,
+      pending: 0,
+      withoutAccess: 0,
+      optedOut: 1,
+    })
+  })
+
+  it('keeps out someone back on after their fourth week too: that week was erased', async () => {
+    const actorId = await actorSeenAt(hoursAgo(700))
+    await backOnAt(actorId, '690 hours')
+
+    await expect(gate()).resolves.toMatchObject({ cohortSize: 0, optedOut: 1 })
+  })
+
+  it('time first, access after, the objection last: each person on one line, the lines add up', async () => {
+    const offAt = new Date()
+    await insertActor(db, { createdAt: hoursAgo(600), analyticsOffAt: offAt }) // waiting
+    await insertActor(db, { createdAt: hoursAgo(700), analyticsOffAt: offAt }) // no access
+    const objected = await actorSeenAt(hoursAgo(700))
+    await db.execute(sql`update actors set analytics_off_at = now() where id = ${objected}::uuid`)
+    await actorSeenAt(hoursAgo(700)) // the cohort
+
+    await expect(gate()).resolves.toEqual({
+      cohortSize: 1,
+      returned: 0,
+      pending: 1,
+      withoutAccess: 1,
+      optedOut: 1,
     })
   })
 })
@@ -380,7 +480,7 @@ describe("recording at most once a day of the person's own life", () => {
     await lifeEarlier(db, actorId, 168)
     await expect(
       repository.weekFourReturn('product', ago(28 * DAY + 2 * HOUR), ago(28 * DAY)),
-    ).resolves.toEqual({ cohortSize: 1, returned: 1, pending: 0, withoutAccess: 0 })
+    ).resolves.toEqual({ cohortSize: 1, returned: 1, pending: 0, withoutAccess: 0, optedOut: 0 })
   })
 
   it('counts days and weeks the same in any time zone of the session', async () => {

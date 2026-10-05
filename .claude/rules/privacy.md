@@ -8,7 +8,7 @@ paths:
   - 'backend/drizzle/*.sql'
   - 'backend/tests/{erasure,erase-route,export,export-route,life,forget-bundle,request-log,login-log,compose-logging,consent}*.ts'
   - 'packages/model/src/contracts/export.ts'
-  - 'frontend/src/{components/YourDataGroup,components/EraseSheet,composables/useExport}*'
+  - 'frontend/src/{components/YourDataGroup,components/EraseSheet,composables/useExport,composables/useAnalytics}*'
   - 'bin/forget-actor.sh'
   - 'bot/src/erase*.ts'
   - 'frontend/src/views/{PrivacyView,TermsView,policy}*'
@@ -152,6 +152,10 @@ The detail behind the privacy lines of `CLAUDE.md`.
   (adversarial Б).
   `/privacy` says what the copy holds — the removed and the withdrawn included — under «Копия ваших
   данных», and names the row by its words.
+- **A person can object to being counted** (MOL-96): «Учитывать меня в статистике» in «Ваши
+  данные» erases their event log at once, stops it, and takes them out of both gates — the reasons
+  and the rules are in `advice.md`. The two moments it keeps are on `actors`, so erasure takes them
+  and the copy carries them (version 14).
 - **The terms and the privacy page are accepted, an edition at a time** (MOL-95, owner's decisions
   04.10.2026). Two pages under one edition: «Данные и приватность» and «Условия использования»
   (`/terms`, В-2), both open without a session, the age of 16 in the terms. **Two marks, not one**

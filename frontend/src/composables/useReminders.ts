@@ -16,6 +16,7 @@ export interface RemindersState extends Omit<TapSettingState<RemindersOff | null
  */
 export function useReminders(): RemindersState {
   const { value, ...setting } = useTapSetting<RemindersOff | null>(
+    'reminders',
     async () => (await api.remindersSetting()).off,
     async (off) => (await api.chooseReminders(off === null)).off,
   )

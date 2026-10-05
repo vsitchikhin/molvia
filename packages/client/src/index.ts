@@ -53,6 +53,8 @@ import {
   salaryShiftSchema,
   chooseReceiptNoticesSchema,
   chooseRemindersSchema,
+  analyticsSettingSchema,
+  chooseAnalyticsSchema,
   receiptNoticesSettingSchema,
   acceptConsentSchema,
   consentSchema,
@@ -132,6 +134,7 @@ import type {
   MoneyMonthView,
   ReceiptNoticesSetting,
   RemindersSetting,
+  AnalyticsSetting,
   Consent,
   SalaryShift,
   ReceiptBody,
@@ -403,6 +406,10 @@ export interface MolviaClient {
   receiptNoticesSetting(): Promise<ReceiptNoticesSetting>
   /** Saved on the tap. Safe to repeat. */
   chooseReceiptNotices(on: boolean): Promise<ReceiptNoticesSetting>
+  /** «Учитывать меня в статистике» (MOL-96): `off` — the person objected to being counted. */
+  analyticsSetting(): Promise<AnalyticsSetting>
+  /** Saved on the tap; off erases the person's log. Safe to repeat. */
+  chooseAnalytics(on: boolean): Promise<AnalyticsSetting>
   /** The edition of the terms and the privacy page accepted (MOL-95): `version` null is none. */
   consent(): Promise<Consent>
   /** The edition the screen showed, accepted now. Safe to repeat: the row only ever goes up. */
@@ -901,6 +908,14 @@ export function createClient(options: ClientOptions): MolviaClient {
       request('/actors/me/receipt-notices', receiptNoticesSettingSchema, {
         method: 'PUT',
         body: encode(chooseReceiptNoticesSchema, { on }),
+      }),
+
+    analyticsSetting: () => request('/actors/me/analytics', analyticsSettingSchema),
+
+    chooseAnalytics: async (on) =>
+      request('/actors/me/analytics', analyticsSettingSchema, {
+        method: 'PUT',
+        body: encode(chooseAnalyticsSchema, { on }),
       }),
 
     consent: () => request('/actors/me/consent', consentSchema),

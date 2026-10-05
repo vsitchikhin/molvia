@@ -157,7 +157,7 @@ interface Moved {
   readonly actorId?: string
 }
 
-/** The setting the verdicts' trigger reads: a merge is no new opinion, `updated_at` stays (0052). */
+/** The setting the verdicts' trigger reads: a merge is no new opinion, `updated_at` stays (0053). */
 const MERGING = sql`select set_config('molvia.merging', 'on', true)`
 
 export function createMergeRepository(db: Conn): MergeRepository {

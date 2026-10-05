@@ -1,6 +1,6 @@
 {
-  "id": "685fabd4-6eca-4b38-ad14-95f37971ba52",
-  "prevId": "194426b9-2128-4b95-9e5a-59027f478b55",
+  "id": "8d2061b2-31b5-42b7-a6bb-0340049a1f72",
+  "prevId": "685fabd4-6eca-4b38-ad14-95f37971ba52",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -284,6 +284,452 @@
         "budget_plans_savings_is_share": {
           "name": "budget_plans_savings_is_share",
           "value": "\"budget_plans\".\"category_id\" is not null or \"budget_plans\".\"amount_minor\" is null"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.catalogue_merge_candidates": {
+      "name": "catalogue_merge_candidates",
+      "schema": "",
+      "columns": {
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "a": {
+          "name": "a",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "b": {
+          "name": "b",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "named_on": {
+          "name": "named_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "catalogue_merge_candidates_subject_a_b_pk": {
+          "name": "catalogue_merge_candidates_subject_a_b_pk",
+          "columns": ["subject", "a", "b"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "catalogue_merge_candidates_subject_known": {
+          "name": "catalogue_merge_candidates_subject_known",
+          "value": "\"catalogue_merge_candidates\".\"subject\" in ('item', 'place')"
+        },
+        "catalogue_merge_candidates_ordered": {
+          "name": "catalogue_merge_candidates_ordered",
+          "value": "\"catalogue_merge_candidates\".\"a\" < \"catalogue_merge_candidates\".\"b\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.catalogue_merge_moves": {
+      "name": "catalogue_merge_moves",
+      "schema": "",
+      "columns": {
+        "merge_id": {
+          "name": "merge_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "what": {
+          "name": "what",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key": {
+          "name": "key",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "before": {
+          "name": "before",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "catalogue_merge_moves_merge_idx": {
+          "name": "catalogue_merge_moves_merge_idx",
+          "columns": [
+            {
+              "expression": "merge_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "catalogue_merge_moves_actor_idx": {
+          "name": "catalogue_merge_moves_actor_idx",
+          "columns": [
+            {
+              "expression": "actor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "catalogue_merge_moves_merge_id_catalogue_merges_id_fk": {
+          "name": "catalogue_merge_moves_merge_id_catalogue_merges_id_fk",
+          "tableFrom": "catalogue_merge_moves",
+          "tableTo": "catalogue_merges",
+          "columnsFrom": ["merge_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "catalogue_merge_moves_actor_id_actors_id_fk": {
+          "name": "catalogue_merge_moves_actor_id_actors_id_fk",
+          "tableFrom": "catalogue_merge_moves",
+          "tableTo": "actors",
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "catalogue_merge_moves_what_known": {
+          "name": "catalogue_merge_moves_what_known",
+          "value": "\"catalogue_merge_moves\".\"what\" in ('expense', 'verdict', 'verdict_swapped', 'verdict_withdrawn', 'trip', 'barcode', 'item_name', 'item_hs', 'store_memory', 'receipt_line', 'pick', 'pick_added', 'trace')"
+        },
+        "catalogue_merge_moves_pick_named": {
+          "name": "catalogue_merge_moves_pick_named",
+          "value": "(\"catalogue_merge_moves\".\"actor_id\" is not null) = (\"catalogue_merge_moves\".\"what\" in ('pick', 'pick_added'))"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.catalogue_merge_runs": {
+      "name": "catalogue_merge_runs",
+      "schema": "",
+      "columns": {
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "report": {
+          "name": "report",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reported_at": {
+          "name": "reported_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "catalogue_merge_runs_mode_known": {
+          "name": "catalogue_merge_runs_mode_known",
+          "value": "\"catalogue_merge_runs\".\"mode\" in ('on', 'report')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.catalogue_merges": {
+      "name": "catalogue_merges",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "catalogue_merges_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "from_item": {
+          "name": "from_item",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "into_item": {
+          "name": "into_item",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "from_place": {
+          "name": "from_place",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "into_place": {
+          "name": "into_place",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "by": {
+          "name": "by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "night": {
+          "name": "night",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "edits": {
+          "name": "edits",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "worst": {
+          "name": "worst",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "meaning": {
+          "name": "meaning",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "merged_at": {
+          "name": "merged_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        },
+        "undone_at": {
+          "name": "undone_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "catalogue_merges_night_idx": {
+          "name": "catalogue_merges_night_idx",
+          "columns": [
+            {
+              "expression": "night",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "catalogue_merges_item_live": {
+          "name": "catalogue_merges_item_live",
+          "columns": [
+            {
+              "expression": "from_item",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"catalogue_merges\".\"undone_at\" is null and \"catalogue_merges\".\"from_item\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "catalogue_merges_place_live": {
+          "name": "catalogue_merges_place_live",
+          "columns": [
+            {
+              "expression": "from_place",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"catalogue_merges\".\"undone_at\" is null and \"catalogue_merges\".\"from_place\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "catalogue_merges_into_item_idx": {
+          "name": "catalogue_merges_into_item_idx",
+          "columns": [
+            {
+              "expression": "into_item",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "catalogue_merges_into_place_idx": {
+          "name": "catalogue_merges_into_place_idx",
+          "columns": [
+            {
+              "expression": "into_place",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "catalogue_merges_from_item_items_id_fk": {
+          "name": "catalogue_merges_from_item_items_id_fk",
+          "tableFrom": "catalogue_merges",
+          "tableTo": "items",
+          "columnsFrom": ["from_item"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "catalogue_merges_into_item_items_id_fk": {
+          "name": "catalogue_merges_into_item_items_id_fk",
+          "tableFrom": "catalogue_merges",
+          "tableTo": "items",
+          "columnsFrom": ["into_item"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "catalogue_merges_from_place_places_id_fk": {
+          "name": "catalogue_merges_from_place_places_id_fk",
+          "tableFrom": "catalogue_merges",
+          "tableTo": "places",
+          "columnsFrom": ["from_place"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "catalogue_merges_into_place_places_id_fk": {
+          "name": "catalogue_merges_into_place_places_id_fk",
+          "tableFrom": "catalogue_merges",
+          "tableTo": "places",
+          "columnsFrom": ["into_place"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "catalogue_merges_subject_known": {
+          "name": "catalogue_merges_subject_known",
+          "value": "\"catalogue_merges\".\"subject\" in ('item', 'place')"
+        },
+        "catalogue_merges_by_known": {
+          "name": "catalogue_merges_by_known",
+          "value": "\"catalogue_merges\".\"by\" in ('night', 'hand')"
+        },
+        "catalogue_merges_night_by_night": {
+          "name": "catalogue_merges_night_by_night",
+          "value": "(\"catalogue_merges\".\"night\" is not null) = (\"catalogue_merges\".\"by\" = 'night')"
+        },
+        "catalogue_merges_subject_named": {
+          "name": "catalogue_merges_subject_named",
+          "value": "case \"catalogue_merges\".\"subject\" when 'item'\n        then \"catalogue_merges\".\"from_item\" is not null and \"catalogue_merges\".\"into_item\" is not null\n          and \"catalogue_merges\".\"from_place\" is null and \"catalogue_merges\".\"into_place\" is null\n        else \"catalogue_merges\".\"from_place\" is not null and \"catalogue_merges\".\"into_place\" is not null\n          and \"catalogue_merges\".\"from_item\" is null and \"catalogue_merges\".\"into_item\" is null end"
+        },
+        "catalogue_merges_not_self": {
+          "name": "catalogue_merges_not_self",
+          "value": "coalesce(\"catalogue_merges\".\"from_item\", \"catalogue_merges\".\"from_place\") <> coalesce(\"catalogue_merges\".\"into_item\", \"catalogue_merges\".\"into_place\")"
         }
       },
       "isRLSEnabled": false
@@ -2183,6 +2629,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "merged_into": {
+          "name": "merged_into",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -2201,6 +2653,22 @@
           "concurrently": false,
           "method": "gin",
           "with": {}
+        },
+        "items_merged_into_idx": {
+          "name": "items_merged_into_idx",
+          "columns": [
+            {
+              "expression": "merged_into",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"items\".\"merged_into\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -2211,6 +2679,15 @@
           "columnsFrom": ["created_by"],
           "columnsTo": ["id"],
           "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "items_merged_into_items_id_fk": {
+          "name": "items_merged_into_items_id_fk",
+          "tableFrom": "items",
+          "tableTo": "items",
+          "columnsFrom": ["merged_into"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -2224,6 +2701,10 @@
       },
       "policies": {},
       "checkConstraints": {
+        "items_merged_not_self": {
+          "name": "items_merged_not_self",
+          "value": "\"items\".\"merged_into\" <> \"items\".\"id\""
+        },
         "items_kind_known": {
           "name": "items_kind_known",
           "value": "\"items\".\"kind\" in ('product', 'dish')"
@@ -3091,7 +3572,7 @@
       "checkConstraints": {
         "owner_notices_kind_known": {
           "name": "owner_notices_kind_known",
-          "value": "\"owner_notices\".\"kind\" in ('failure', 'failure_count', 'failure_muted', 'feedback', 'feedback_continued')"
+          "value": "\"owner_notices\".\"kind\" in ('failure', 'failure_count', 'failure_muted', 'feedback', 'feedback_continued', 'catalogue_merged')"
         },
         "owner_notices_feedback_named": {
           "name": "owner_notices_feedback_named",
@@ -3148,9 +3629,31 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "merged_into": {
+          "name": "merged_into",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
+        "places_merged_into_idx": {
+          "name": "places_merged_into_idx",
+          "columns": [
+            {
+              "expression": "merged_into",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"places\".\"merged_into\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "places_identity_key": {
           "name": "places_identity_key",
           "columns": [
@@ -3185,11 +3688,25 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "places_merged_into_places_id_fk": {
+          "name": "places_merged_into_places_id_fk",
+          "tableFrom": "places",
+          "tableTo": "places",
+          "columnsFrom": ["merged_into"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
+        "places_merged_not_self": {
+          "name": "places_merged_not_self",
+          "value": "\"places\".\"merged_into\" <> \"places\".\"id\""
+        },
         "places_kind_known": {
           "name": "places_kind_known",
           "value": "\"places\".\"kind\" in ('store', 'venue')"
@@ -3601,6 +4118,21 @@
         }
       },
       "indexes": {
+        "receipt_lines_item_idx": {
+          "name": "receipt_lines_item_idx",
+          "columns": [
+            {
+              "expression": "item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "receipt_lines_expense_key": {
           "name": "receipt_lines_expense_key",
           "columns": [
@@ -4230,7 +4762,23 @@
           "default": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "search_picks_item_idx": {
+          "name": "search_picks_item_idx",
+          "columns": [
+            {
+              "expression": "item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "search_picks_actor_id_actors_id_fk": {
           "name": "search_picks_actor_id_actors_id_fk",
@@ -4822,6 +5370,21 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "store_memory_item_idx": {
+          "name": "store_memory_item_idx",
+          "columns": [
+            {
+              "expression": "item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}

@@ -323,6 +323,18 @@ export const actors = pgTable(
      */
     consentVersion: smallint('consent_version'),
     consentedAt: timestamp('consented_at', { withTimezone: true }),
+    /**
+     * «Учитывать меня в статистике» (MOL-96): since when the person has objected to being counted —
+     * the event log stops and its rows go, and neither gate counts them; empty is on, as every
+     * account starts, since the gates rest on a legitimate interest rather than on consent.
+     */
+    analyticsOffAt: timestamp('analytics_off_at', { withTimezone: true }),
+    /**
+     * When the person last turned it back on (MOL-96, Р-3). Gate 0.3 reads it: someone back on
+     * after their fourth week began had that week's rows erased or never written, and counted they
+     * would read as not having come back.
+     */
+    analyticsOnAt: timestamp('analytics_on_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.
