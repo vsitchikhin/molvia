@@ -111,11 +111,18 @@ export default defineComponent({
       // товар» lost the receipt's words and stayed open (adversarial А3). Taken here, the text stays and
       // the dialog gets the close request the platform would have made: a `cancel` it may prevent — a
       // sheet does, and closes through the history — else it is closed (round 2, Б1: a `cancel` from a
-      // script closes nothing by itself). Its owner's own Esc — a combobox's — comes first.
+      // script closes nothing by itself). Only where the platform makes one: a modal dialog that does not
+      // ask to be stepped through (`closedby="none"`) — a dialog beside the page keeps its Esc (round 3,
+      // В1). Its owner's own Esc — a combobox's — comes first.
       escape: (event: KeyboardEvent) => {
         if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented) return
         const dialog = input.value?.closest('dialog')
-        if (!dialog?.open) return
+        if (
+          !dialog?.matches(':modal') ||
+          dialog.getAttribute('closedby')?.toLowerCase() === 'none'
+        ) {
+          return
+        }
         event.preventDefault()
         if (dialog.dispatchEvent(new Event('cancel', { cancelable: true }))) dialog.close()
       },

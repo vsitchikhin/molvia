@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { h } from 'vue'
 import type { VNode } from 'vue'
 import { createAppI18n } from '@/i18n'
@@ -129,9 +129,15 @@ describe('SearchField', () => {
   describe('Esc in a sheet (adversarial А3)', () => {
     // Chromium clears a search field on Esc and the dialog never hears `cancel`: «Выбрать товар» lost
     // the receipt's words and stayed open. In a sheet Esc is «back» (MOL-80).
-    function inSheet(open: boolean, attrs: Record<string, unknown> = {}) {
+    // happy-dom matches no `:modal`: a dialog shown as modal is one here by its own word — the engines
+    // themselves are held by the adversarial probes of round 3 (Chromium and WebKit).
+    function inSheet(open: boolean, attrs: Record<string, unknown> = {}, modal = open) {
       const sheet = document.createElement('dialog')
       if (open) sheet.setAttribute('open', '')
+      const matches = sheet.matches.bind(sheet)
+      vi.spyOn(sheet, 'matches').mockImplementation((selector) =>
+        selector === ':modal' ? modal : matches(selector),
+      )
       document.body.append(sheet)
       const heard: string[] = []
       sheet.addEventListener('cancel', () => heard.push('cancel'))
@@ -173,6 +179,30 @@ describe('SearchField', () => {
           )
         expect(heard).toEqual(['cancel'])
         expect(sheet.open).toBe(prevents)
+        view.unmount()
+        sheet.remove()
+      }
+    })
+
+    // The platform closes neither on Esc: a dialog beside the page, and one to be stepped through, not
+    // waved away (round 3, В1).
+    it('must not take Esc in a dialog that is not modal, or that asks to be closed by nothing', () => {
+      for (const [modal, closedBy] of [
+        [false, null],
+        [true, 'none'],
+        [true, 'NONE'],
+      ] as const) {
+        const { sheet, heard, view } = inSheet(true, {}, modal)
+        if (closedBy) sheet.setAttribute('closedby', closedBy)
+        const event = new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        })
+        view.get('input').element.dispatchEvent(event)
+        expect(event.defaultPrevented).toBe(false)
+        expect(heard).toEqual([])
+        expect(sheet.open).toBe(true)
         view.unmount()
         sheet.remove()
       }
