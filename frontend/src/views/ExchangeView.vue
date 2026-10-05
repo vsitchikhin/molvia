@@ -15,7 +15,13 @@
         <span class="removed-text">{{
           t('exchange.removed', { amounts: amountsOf(removed) })
         }}</span>
-        <AppButton variant="ghost" :inactive="!online || busy" @click="restore">
+        <AppButton
+          variant="ghost"
+          :busy="restoring"
+          :busy-label="t('exchange.restoring')"
+          :inactive="!online || busy"
+          @click="restore"
+        >
           {{ t('exchange.restore') }}
         </AppButton>
       </div>
