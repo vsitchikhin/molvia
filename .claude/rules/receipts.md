@@ -153,7 +153,7 @@ neither layout reads (`receiptCityOf`, review А6): a dish named after a city is
 
 **The price, named:** the terminal's print loses its tax number and fiscal number to OCR, so its two prints
 of one purchase are recorded as two receipts if both are shot (В-3); with no article the shop's memory
-there is by the line's text only.
+there is by the line's text only; a name ending in «աս» before a bare number, «Կվաս 1000», still reads as a code «1000».
 
 **Amounts are counted in hundredths, not in minor units.** A till prints hundredths whatever the
 currency; `moneyOfHundredths` turns them into the currency's minor units by its exponent. Quantities
