@@ -65,6 +65,10 @@ export function useTapSetting<T>(
   // that already turned it off.
   const unsure = ref(false)
   let before: T | undefined
+  // The last choice, when the API refused it in its own words: its «not saved» stays the truth
+  // whatever a check finds of an earlier change — unless the server holds that very choice, an
+  // earlier tap having put it there (round 5, Р5-А1).
+  let refused: { readonly choice: T } | undefined
   let check: ReturnType<typeof setTimeout> | undefined
   let checkIn = TAP_CHECK_FIRST_MS
 
@@ -88,9 +92,11 @@ export function useTapSetting<T>(
     try {
       const answer = await read()
       if (mine !== latest) return
-      // The change did land after all: «не сохранилось» is no longer true.
-      if (unsure.value && JSON.stringify(answer) !== JSON.stringify(before))
-        saveFailed.value = false
+      // What the person chose last is on the server after all: «не сохранилось» is no longer true.
+      const same = (one: unknown, other: unknown): boolean =>
+        JSON.stringify(one) === JSON.stringify(other)
+      const landed = refused ? same(answer, refused.choice) : !same(answer, before)
+      if (unsure.value && landed) saveFailed.value = false
       settle()
       value.value = answer
       failure.value = null
@@ -117,6 +123,7 @@ export function useTapSetting<T>(
     saveFailed.value = false
     try {
       value.value = await write(next)
+      refused = undefined
       settle()
     } catch (error) {
       value.value = shown
@@ -126,7 +133,8 @@ export function useTapSetting<T>(
       // 409, a 500 its handler wrote — rolled the change back, and «not saved» is the truth; a
       // `2xx` of any shape, whole and off the contract or cut off on its way (Р4-А1), may well have
       // landed. One unsure change is not made sure by a refusal of the next: it is still checked.
-      unsure.value = unsure.value || !refusedInWords(error)
+      refused = refusedInWords(error) ? { choice: next } : undefined
+      unsure.value = unsure.value || !refused
       // Offline or failed is decided after the failure (MOL-19, A1): a connection that dropped while
       // the answer was on its way is the grey «без связи», never the red «не сохранилось» (self-review 7).
       online.value = navigator.onLine

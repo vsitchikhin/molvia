@@ -14,6 +14,8 @@ import { useActorStore } from '@/stores/actor'
 
 interface Setting {
   readonly off: boolean
+  /** A third value, as the salary's day has: a later choice can be refused over an earlier one. */
+  readonly day?: number
 }
 
 let server: Setting = { off: false }
@@ -188,6 +190,24 @@ describe('useTapSetting: a change whose answer was lost', () => {
     expect(tap.unsure.value).toBe(false)
     expect(tap.value.value).toEqual({ off: true })
     expect(tap.saveFailed.value).toBe(false)
+  })
+
+  it('a refusal of a later change keeps its «not saved» when the check finds the earlier one landed (round 5, Р5-А1)', async () => {
+    const tap = await mounted()
+    landsWithoutAnswer()
+    read.mockRejectedValue(new TypeError('connection reset'))
+    await tap.choose({ off: true, day: 10 })
+    expect(tap.unsure.value).toBe(true)
+    write.mockRejectedValue(new ApiError(ERROR.INTERNAL, '', true, undefined, { fromApi: true }))
+    await tap.choose({ off: true, day: 15 })
+    expect(tap.saveFailed.value).toBe(true)
+
+    read.mockImplementation(() => Promise.resolve(server))
+    await vi.advanceTimersByTimeAsync(TAP_CHECK_LAST_MS)
+    // The screen shows what the server holds, and still says the last choice was not saved.
+    expect(tap.value.value).toEqual({ off: true, day: 10 })
+    expect(tap.unsure.value).toBe(false)
+    expect(tap.saveFailed.value).toBe(true)
   })
 
   it('a change that did not land stays «not saved» once a check says so', async () => {
