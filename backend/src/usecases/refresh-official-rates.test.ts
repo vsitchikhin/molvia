@@ -748,10 +748,14 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
     it('банк завис на старой дате: хвост до сегодня — не дыра, проход отдыхает (ревью 5)', () => {
       // Последний свой день — 1 сентября, дальше банк отвечает им же; история целая.
       const hung = ['2026-08-10', '2026-08-15', '2026-08-25', '2026-09-01']
-      expect(archiveWalkFrom(hung, '2026-08-10', today)).toEqual({ from: month, whole: true })
+      // Месяц начинается со дня после 15.08 — последнего дня банка перед ним (адверсариальный Е).
+      expect(archiveWalkFrom(hung, '2026-08-10', today)).toEqual({
+        from: '2026-08-16',
+        whole: true,
+      })
       // А заговорил сегодня — дыра между двумя его днями, её и проходим.
       expect(archiveWalkFrom([...hung, today], '2026-08-10', today)).toEqual({
-        from: month,
+        from: '2026-08-16',
         whole: false,
       })
     })
@@ -767,9 +771,31 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
       })
     })
 
+    it('простой чуть дольше месяца и молчащий банк: дни перед месяцем спрошены (адверсариальный Е)', () => {
+      // Последний день перед простоем — 12.08, до начала месяца 7 дней: не праздник, а не спрошенное.
+      const kept = ['2026-07-25', '2026-08-03', '2026-08-12']
+      expect(archiveWalkFrom(kept, '2026-07-25', today)).toEqual({
+        from: '2026-08-13',
+        whole: true,
+      })
+    })
+
+    it('простой дольше истории порции: заговоривший банк — сначала месяц, потом дыра истории', () => {
+      const kept = ['2026-01-01', '2026-01-10', '2026-01-20', today]
+      expect(archiveWalkFrom(kept, '2026-01-01', today)).toEqual({ from: month, whole: false })
+      const walked = [...kept, '2026-08-19', '2026-08-28', '2026-09-07', '2026-09-16']
+      expect(archiveWalkFrom(walked, '2026-01-01', today)).toEqual({
+        from: '2026-01-21',
+        whole: false,
+      })
+    })
+
     it('без дыр — только последний месяц, и архив цел до завтра', () => {
       const kept = ['2026-08-10', '2026-08-15', '2026-08-25', '2026-09-04', '2026-09-14', today]
-      expect(archiveWalkFrom(kept, '2026-08-10', today)).toEqual({ from: month, whole: true })
+      expect(archiveWalkFrom(kept, '2026-08-10', today)).toEqual({
+        from: '2026-08-16',
+        whole: true,
+      })
       expect(archiveWalkFrom(['2026-09-10', today], '2026-09-10', today)).toEqual({
         from: '2026-09-10',
         whole: true,

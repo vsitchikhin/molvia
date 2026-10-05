@@ -126,7 +126,12 @@ rule: a pair with the lari — the NBG, any other — the CBA.
   speaks, and the hole is then between two days. **A month with no day of the bank's, after one
   before it, is that same tail** (adversarial round 3, Д): a bank silent for over a month was walked
   every hour again, thirty-two empty requests, and a history not walked yet never came; the stretch
-  from the bank's last day to the month is the history's to walk. After a restart the walk starts from the first hole
+  from the bank's last day to the month is the history's to walk. **The month is walked from the day
+  after the bank's last day when that day is closer before it than `ARCHIVE_GAP_DAYS`** (round 4, Е):
+  walked from the month's first day, the stretch between was no longer than a holiday and never asked
+  for — after a stop of the API a little over a month with the bank silent in its first hour. **And
+  a month the bank speaks in again is walked first**, however long the history's hole before it: after
+  a stop of four months the last month no longer came with the last portion of the history. After a restart the walk starts from the first hole
   longer than `ARCHIVE_GAP_DAYS` (`archiveWalkFrom`): the longest stretch without
   a rate in the archive of 2022–2026 is six days, Easter 2026 — measured on 05.10.2026, every day
   asked. Only the days the cache lacks are written; a day the bank answers with tomorrow's rate, set

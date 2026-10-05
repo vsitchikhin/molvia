@@ -104,13 +104,26 @@ export function archiveWalkFrom(kept: readonly string[], from: string, today: st
   const recent = dayAfter(today, -ARCHIVE_RECENT_DAYS)
   const start = recent > from ? recent : from
   const inMonth = days.filter((day) => day >= start)
-  // With a day of the bank's before the month, the month's empty start is the history's hole, or the
-  // tail of a bank silent for over a month — never the month's (adversarial round 3, Д): counted so,
-  // a bank stuck on a day of the month before was walked every hour, and the history never came.
-  const lastMonth = days.length > inMonth.length ? holeBetween(inMonth) : firstHole(inMonth, start)
-  if (lastMonth !== null) return { from: start, whole: false }
+  const before = days.filter((day) => day < start).at(-1)
+  // A bank's last day close before the month starts the month's walk at the day after it
+  // (adversarial round 4, Е): walked from the month's first day, the stretch between was no longer
+  // than a holiday, and never asked for.
+  const near =
+    before !== undefined && daysBetween(before, start) <= ARCHIVE_GAP_DAYS ? before : null
+  const monthFrom = near === null ? start : dayAfter(near)
+  // A month with no day of the bank's, after one before it, is the tail of a bank silent for over a
+  // month — never the month's hole (adversarial round 3, Д): counted so, a bank stuck on a day of
+  // the month before was walked every hour, and the history never came. A month the bank speaks in
+  // again is walked first, however long the history's hole before it (round 4).
+  const lastMonth =
+    inMonth.length === 0 && before !== undefined
+      ? null
+      : near === null
+        ? firstHole(inMonth, start)
+        : firstHole([near, ...inMonth], near)
+  if (lastMonth !== null) return { from: monthFrom, whole: false }
   const history = firstHole(days, from)
-  return history === null ? { from: start, whole: true } : { from: history, whole: false }
+  return history === null ? { from: monthFrom, whole: true } : { from: history, whole: false }
 }
 
 /**
