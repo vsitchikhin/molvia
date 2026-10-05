@@ -4,6 +4,7 @@ import {
   GATE_RATINGS_WINDOW_HOURS,
   GATE_RETURN_STOP_PERCENT,
   LOGIN_SECOND_WAY_PERCENT,
+  RECEIPT_EDITS_STOP_PERCENT,
   yerevanDate,
   yerevanMidnight,
   describeFailure,
@@ -13,6 +14,7 @@ import type {
   GatesReport,
   GatesWindow,
   LoginsInWindow,
+  ReceiptsInWindow,
   RemindersInWindow,
 } from '@/db/gates-reader'
 
@@ -152,6 +154,40 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
     ...loginLines(report.logins),
     '',
     ...reminderLines(report.reminders),
+    '',
+    ...receiptLines(report.receipts),
+  ]
+}
+
+/**
+ * The receipt scanner (MOL-222, owner's decision 04.10.2026): the share of lines people put right
+ * before recording — above a third after four weeks, the question of the reader comes back. Beside it
+ * the readings that never reached a record, since the share counts recorded receipts only and would
+ * read better than the scanner is. A line put right is counted once; its kinds may add up past it.
+ */
+function receiptLines(receipts: ReceiptsInWindow): string[] {
+  const { firstDay, lastDay } = receipts
+  const span = firstDay === lastDay ? `the day ${firstDay}` : `days ${firstDay} … ${lastDay}`
+  const readings = receipts.read + receipts.readPartly + receipts.reshoot + receipts.unreadable
+  return [
+    `0.2r ${'does the scanner spare typing?'.padEnd(47)}stop above ${String(RECEIPT_EDITS_STOP_PERCENT)} % after 4 weeks`,
+    row('receipts read', [String(readings), `${span} in Yerevan`]),
+    row('  with their lines', [String(receipts.read), '']),
+    row('  in part', [String(receipts.readPartly), 'to the review all the same']),
+    row('  not one line found', [String(receipts.reshoot), '«переснимите»']),
+    row('  unreadable', [String(receipts.unreadable), '']),
+    row('receipts recorded', [String(receipts.recorded), '']),
+    row('lines put right', share(receipts.linesEdited, receipts.lines, 'up')),
+    row('  left out', [String(receipts.linesSkipped), '']),
+    row('  another item', [String(receipts.linesItem), '']),
+    row('  quantity or sum', [String(receipts.linesFigures), '']),
+    // the receipt's own edit, not its lines': a total put right moves no line (MOL-222, review 2)
+    row('total put right', [String(receipts.totalsCorrected), 'receipts']),
+    row('sent to recorded, within 5 min', [String(receipts.within5m), 'receipts']),
+    row('  15 min', [String(receipts.within15m), '']),
+    row('  1 hour', [String(receipts.within1h), '']),
+    row('  1 day', [String(receipts.within1d), '']),
+    row('  later', [String(receipts.later), '']),
   ]
 }
 

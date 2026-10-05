@@ -248,7 +248,7 @@ import CategoryChips from '@/components/CategoryChips.vue'
 import ChargedField from '@/components/ChargedField.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { defaultAccount, pageOrder } from '@/components/accounts'
-import { asTyped, categoryColour, groceriesOf, rateWords } from '@/components/spending'
+import { asTyped, bankWords, categoryColour, groceriesOf, rateWords } from '@/components/spending'
 import type { JournalRow, Removed, SpendingTarget } from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDay, localDay, shiftDay } from '@/days'
@@ -612,9 +612,12 @@ export default defineComponent({
         amount: formatEstimate(into, locale.value),
         rate: rateWords(rate, locale.value, t),
       }
-      return rate.source === 'personal'
-        ? t('spending.sheet.conversion_mine', words)
-        : t('spending.sheet.conversion_official', words)
+      if (rate.source === 'personal') return t('spending.sheet.conversion_mine', words)
+      const bank = bankWords(rate.base, rate.quote, t)
+      // As on «Деньги»: a fallback names the pair's bank as silent, not as its source (review 1).
+      return rate.source === 'fallback'
+        ? t('spending.sheet.conversion_fallback', { ...words, bank })
+        : t('spending.sheet.conversion_official', { ...words, bank })
     })
 
     /** «≈ 2 140,91 ₽» — what the server would count, where the account's rate joins the two. */

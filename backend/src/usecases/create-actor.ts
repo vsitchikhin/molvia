@@ -1,19 +1,26 @@
 import { randomUUID } from 'node:crypto'
 import { firstGeography, newActorSchema, SETTINGS_COUNTRIES, timeZoneOf } from '@molvia/model'
-import type { Actor, NewActor, TelegramUserId } from '@molvia/model'
+import type { Actor, Currency, NewActor, TelegramUserId } from '@molvia/model'
 import type { ActorRepository } from '@/db/actors-repository'
+
+/**
+ * What a country's shops take, where it is not the dram (MOL-110): a person from Tbilisi starts
+ * spending lari. Serbia keeps the dram until the dinar comes (MOL-230).
+ */
+const SPEND_CURRENCY: Readonly<Partial<Record<string, Currency>>> = { GE: 'GEL' }
 
 /**
  * Four columns are NOT NULL, so the server names them before the person has seen the settings.
  * The country and its first city are `firstGeography`'s — the ones the phone's time zone lives in
  * (MOL-109, В-3): a person from Belgrade does not start in Gyumri, and every other zone does, as
- * every account began before. The currencies stay the dram and the author's ruble until the lari
- * and the dinar come (MOL-110); the settings change all four in a tap.
+ * every account began before. The spending currency is the country's (`SPEND_CURRENCY`), the
+ * income one the author's ruble; the settings change all four in a tap.
  */
 function firstVisit(zone: string | undefined): NewActor {
+  const geography = firstGeography(zone)
   return newActorSchema.parse({
-    ...firstGeography(zone),
-    spendCurrency: 'AMD',
+    ...geography,
+    spendCurrency: SPEND_CURRENCY[geography.country] ?? 'AMD',
     incomeCurrency: 'RUB',
   })
 }

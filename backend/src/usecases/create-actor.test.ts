@@ -76,10 +76,14 @@ describe('createActor', () => {
       ['AM', 'Гюмри'],
       ['AM', 'Гюмри'],
     ])
-    // the currencies wait for the lari and the dinar (MOL-110)
-    for (const input of written) {
-      expect([input.spendCurrency, input.incomeCurrency]).toEqual(['AMD', 'RUB'])
-    }
+    // Tbilisi spends lari (MOL-110); Belgrade keeps the dram until the dinar comes (MOL-230).
+    expect(written.map((input) => [input.spendCurrency, input.incomeCurrency])).toEqual([
+      ['GEL', 'RUB'],
+      ['AMD', 'RUB'],
+      ['AMD', 'RUB'],
+      ['AMD', 'RUB'],
+      ['AMD', 'RUB'],
+    ])
   })
 
   it('issues the identifier itself, and a different one every time', async () => {

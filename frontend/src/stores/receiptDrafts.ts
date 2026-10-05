@@ -75,6 +75,32 @@ const draftCodec = z.strictObject({
 
 const KEY = 'molvia.receipt-drafts'
 
+/**
+ * The item the review showed for a line when the person first put it right (MOL-222, adversarial В1):
+ * the shops' memory learns from every record, and a review read again after another record shows the
+ * person's own correction as though the reading had made it — the edit vanished from the measure.
+ * **Beside the drafts, never inside**: a draft line is read strictly by the build before, which would
+ * drop the whole receipt's draft for a field it does not know.
+ */
+const SHOWN_KEY = 'molvia.receipt-shown'
+
+/** Per receipt, per line: the item id shown at the first edit, `null` — a new item was shown. */
+type Shown = Record<string, Record<string, string | null>>
+
+const shownCodec = z.record(z.string(), z.record(z.string().regex(/^\d+$/), z.uuid().nullable()))
+
+function recallShown(owner: string | null): Shown {
+  if (!owner) return {}
+  const raw = read(`${SHOWN_KEY}.${owner}`)
+  if (!raw) return {}
+  try {
+    const parsed = shownCodec.safeParse(JSON.parse(raw))
+    return parsed.success ? parsed.data : {}
+  } catch {
+    return {}
+  }
+}
+
 function recall(owner: string | null): Record<string, ReceiptDraft> {
   if (!owner) return {}
   const raw = read(`${KEY}.${owner}`)
@@ -122,16 +148,26 @@ function recall(owner: string | null): Record<string, ReceiptDraft> {
 export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
   const actor = useActorStore()
   const drafts = ref<Record<string, ReceiptDraft>>(recall(actor.id))
+  const shown = ref<Shown>(recallShown(actor.id))
 
   watch(
     () => actor.id,
     (id) => {
       drafts.value = recall(id)
+      shown.value = recallShown(id)
     },
   )
   window.addEventListener('storage', (event) => {
     if (actor.id && event.key === `${KEY}.${actor.id}`) drafts.value = recall(actor.id)
+    if (actor.id && event.key === `${SHOWN_KEY}.${actor.id}`) shown.value = recallShown(actor.id)
   })
+
+  function keepShown(edit: (all: Shown) => Shown): void {
+    const owner = actor.id
+    if (!owner) return
+    shown.value = edit(recallShown(owner))
+    write(`${SHOWN_KEY}.${owner}`, JSON.stringify(shown.value))
+  }
 
   function persist(): void {
     const owner = actor.id
@@ -161,8 +197,23 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
   return {
     drafts,
     draftOf: (receiptId: string): ReceiptDraft | null => drafts.value[receiptId] ?? null,
-    setLine(receiptId: string, position: number, line: LineDraft): void {
+    /** The items the review showed at each line's first edit (adversarial В1). */
+    shownOf: (receiptId: string): Readonly<Record<number, string | null>> =>
+      Object.fromEntries(
+        Object.entries(shown.value[receiptId] ?? {}).map(([position, item]) => [
+          Number(position),
+          item,
+        ]),
+      ),
+    /** A line put right; `showing` — the item the review shows it with now, kept from the first edit. */
+    setLine(receiptId: string, position: number, line: LineDraft, showing?: string | null): void {
       change(receiptId, (draft) => ({ ...draft, lines: { ...draft.lines, [position]: line } }))
+      if (showing === undefined) return
+      keepShown((all) => {
+        const lines = all[receiptId] ?? {}
+        if (String(position) in lines) return all
+        return { ...all, [receiptId]: { ...lines, [String(position)]: showing } }
+      })
     },
     setPlace(receiptId: string, place: PlaceDraft, purchasedOn: string): void {
       change(receiptId, (draft) => ({ ...draft, place, purchasedOn }))
@@ -178,6 +229,7 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
       })
     },
     forget(receiptId: string): void {
+      keepShown((all) => Object.fromEntries(Object.entries(all).filter(([id]) => id !== receiptId)))
       drafts.value = recall(actor.id)
       if (!(receiptId in drafts.value)) return
       drafts.value = Object.fromEntries(
@@ -187,6 +239,11 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
     },
     /** Lets go of the drafts of every receipt not named — recorded, removed, gone (Т-4). */
     keepOnly(receiptIds: ReadonlySet<string>): void {
+      if (Object.keys(recallShown(actor.id)).some((id) => !receiptIds.has(id))) {
+        keepShown((all) =>
+          Object.fromEntries(Object.entries(all).filter(([id]) => receiptIds.has(id))),
+        )
+      }
       drafts.value = recall(actor.id)
       const kept = Object.fromEntries(
         Object.entries(drafts.value).filter(([id]) => receiptIds.has(id)),

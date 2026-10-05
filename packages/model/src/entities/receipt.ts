@@ -65,9 +65,10 @@ export const receiptStatusSchema = z.enum([
 export type ReceiptStatus = z.infer<typeof receiptStatusSchema>
 
 /**
- * Why a receipt failed: `reshoot` — too little was read to be worth correcting, a crumpled, shaded or
- * distant shot (В-4), so «разгладьте и переснимите»; `unreadable` — the photo could not be read at
- * all (the reader failed on it, or ran out of time, or its answer was not a reading).
+ * Why a receipt failed: `reshoot` — not one item line was found, so there is nothing to correct and only
+ * a new shot can help (MOL-222, В-1); `unreadable` — the photo could not be read at all (the reader
+ * failed on it, or ran out of time, or its answer was not a reading). A receipt read only in part is
+ * not a failure: it goes to the review with what was read (`readPartly`).
  */
 export const receiptFailureSchema = z.enum(['reshoot', 'unreadable'])
 export type ReceiptFailure = z.infer<typeof receiptFailureSchema>
@@ -403,31 +404,13 @@ function withinOneEdit(a: string, b: string): boolean {
 export const RECEIPT_PAGE_MODES = [4, 6] as const
 
 /**
- * Below this share of the printed total the lines read are not worth correcting (В-4): a crumpled
- * receipt loses its rows. Above it one or two lost lines are typed in by hand on the review screen.
- */
-export const RESHOOT_TOTAL_SHARE = 0.7
-
-/**
- * «Разгладьте и переснимите» (В-4, owner, 03.10.2026): no item lines at all; or the total was read and
- * the lines make up less than `RESHOOT_TOTAL_SHARE` of it; or the total was not read and fewer than
- * half of the lines add up by their own arithmetic. A total that was not read decides nothing alone —
- * OCR missed it on 9 of the bench's 16 readings, most of them good ones.
+ * «Переснимите» (MOL-222, owner, 04.10.2026): not one item line was found. Every receipt with a line in
+ * it is read and goes to the review — «читать надо все кассы, все чеки» — however little of it was
+ * read: the person's corrections are what the hypothesis of 0.2 counts, and a till read badly is one to
+ * learn. What was «переснимите» before (В-4 of MOL-125) is `readPartly`, a hint on the review.
  */
 export function needsReshoot(text: ReceiptText): boolean {
-  if (text.lines.length === 0) return true
-  const total = text.totalHundredths
-  if (total !== null && total > 0) {
-    // a sum the domain throws away — past a safe integer, or past the total itself — covers nothing
-    // (review Р11): junk OCR would otherwise vouch for a receipt barely read
-    const read = text.lines.reduce((sum, line) => {
-      const own = line.sumHundredths
-      return sum + (own !== null && Number.isSafeInteger(own) && own <= total ? own : 0)
-    }, 0)
-    return read < RESHOOT_TOTAL_SHARE * total
-  }
-  const settled = text.lines.filter((line) => line.settled).length
-  return settled * 2 < text.lines.length
+  return text.lines.length === 0
 }
 
 /** A line of a parsed receipt, in the domain's own values. */

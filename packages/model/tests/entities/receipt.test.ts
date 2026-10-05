@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   tellsQuietly,
-  RESHOOT_TOTAL_SHARE,
   moneyOfHundredths,
   needsReshoot,
   receiptDateOf,
@@ -39,48 +38,15 @@ const receipt = (lines: ReceiptTextLine[], totalHundredths: number | null = null
   lines,
 })
 
-describe('«разгладьте и переснимите» (В-4)', () => {
-  it('asks for a new shot when no item line was read', () => {
+describe('«переснимите» — not one line found (MOL-222, В-1)', () => {
+  it('asks for a new shot when no item line was read, the total read or not', () => {
     expect(needsReshoot(receipt([], 100_000))).toBe(true)
     expect(needsReshoot(receipt([]))).toBe(true)
   })
 
-  it(`with the total read, asks below ${String(RESHOOT_TOTAL_SHARE * 100)} % of it: exactly the share, a luma under`, () => {
-    expect(needsReshoot(receipt([line({ sumHundredths: 70_000 })], 100_000))).toBe(false)
-    expect(needsReshoot(receipt([line({ sumHundredths: 69_999 })], 100_000))).toBe(true)
-  })
-
-  it('with the total read, one lost line of many is the review screen’s, not a new shot (am-03: 0,97)', () => {
-    expect(needsReshoot(receipt([line({ sumHundredths: 97_000 })], 100_000))).toBe(false)
-  })
-
-  it('with the total read, counts a line whose sum was lost as nothing', () => {
-    expect(
-      needsReshoot(
-        receipt([line({ sumHundredths: null }), line({ sumHundredths: 50_000 })], 100_000),
-      ),
-    ).toBe(true)
-  })
-
-  it('with no total, asks when fewer than half the lines add up: half is enough', () => {
-    expect(needsReshoot(receipt([line(), line({ settled: false })]))).toBe(false)
-    expect(
-      needsReshoot(receipt([line(), line({ settled: false }), line({ settled: false })])),
-    ).toBe(true)
-  })
-
-  it('must not fire on a short receipt whose total was missed but whose lines add up (am-01)', () => {
-    expect(needsReshoot(receipt([line(), line(), line()]))).toBe(false)
-  })
-
-  it('counts no sum the domain throws away: past a safe integer, past the total (review Р11)', () => {
-    const junk = line({ sumHundredths: Number.MAX_SAFE_INTEGER + 2 })
-    expect(needsReshoot(receipt([junk], 1_000_000))).toBe(true)
-    expect(needsReshoot(receipt([line({ sumHundredths: 2_000_000 })], 1_000_000))).toBe(true)
-  })
-
-  it('takes a total of zero for no total', () => {
-    expect(needsReshoot(receipt([line()], 0))).toBe(false)
+  it('must not fire on one line, however little of the total it makes up (am-06: 14 lines, 2 add up)', () => {
+    expect(needsReshoot(receipt([line({ sumHundredths: 1_000 })], 1_000_000))).toBe(false)
+    expect(needsReshoot(receipt([line({ settled: false }), line({ settled: false })]))).toBe(false)
   })
 })
 

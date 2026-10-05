@@ -30,6 +30,15 @@ export type MarketSide = z.infer<typeof marketSideSchema>
 
 export type ForeignCurrency = Exclude<Currency, 'AMD'>
 
+/**
+ * The currencies the central bank's files of the market carry (MOL-137): the dollar, the euro and
+ * the rouble, and «Other» as a sum without a rate. Not every foreign currency — the lari is in none
+ * of the three files (MOL-110), so an exchange of lari for drams has no market and says so, and a
+ * reader that asked the files for every currency of the product would refuse them all.
+ */
+export const MARKET_CURRENCIES = ['RUB', 'USD', 'EUR'] as const satisfies readonly ForeignCurrency[]
+export type MarketCurrency = (typeof MARKET_CURRENCIES)[number]
+
 /** One published figure: drams per unit of `currency`, on `date`, on one side of one channel. */
 export interface MarketRate {
   readonly channel: MarketChannel

@@ -34,10 +34,10 @@ made the names up (MOL-114). What reads is a chain of cheap parts:
 
 | Step          | What                                                                                     | Where                     |
 | ------------- | ---------------------------------------------------------------------------------------- | ------------------------- |
-| Photo         | the phone crops to the receipt's edges, full resolution of the crop, up to four parts    | MOL-127                   |
+| Photo         | the phone crops to the receipt's edges, full resolution of the crop, up to four parts    | MOL-127, MOL-222          |
 | Reading       | Tesseract 5, Debian's `tessdata_fast`, page modes 4 and 6                                | `services/receipt-reader` |
 | Figures       | the till's layout, the line's arithmetic, the receipt's discount rate, the printed total | `receipt-text.ts`         |
-| «Переснимите» | too little read to be worth correcting                                                   | `needsReshoot`            |
+| «Переснимите» | not one item line found; read in part is the review's hint                               | `needsReshoot`            |
 
 **The parse is a port, measured on the bench.** `receipt-text.ts` began as MOL-114's `hybrid.mjs` in
 TypeScript, line for line on the bench's readings (`.scratch/tasks/status/MOL-125/parity.mjs`); the
@@ -280,13 +280,72 @@ it gave 70–72 and lost nothing, every line gained on the delivery till (am-06)
 Worth coming back to with a new receipt of that till and after the edges of MOL-222; the bench and its
 scripts are kept. The cut-out lines are still kept and confirmed (В-4), with no reader of them yet.
 
-## «Переснимите» (В-4)
+## «Переснимите» — only when not one line was found (MOL-222, В-1)
 
-A receipt fails as `reshoot` when no item line was read; or the total was read and the lines make up
-less than 70 % of it; or the total was not read and fewer than half the lines add up. **The total
-alone decides nothing**: OCR missed it on 9 of the bench's 16 readings, most of them good ones, and
-«any mismatch with the total» would have sent 12 of 16 to a new shot, am-03 with 17 lines of 18 among
-them. One or two lost lines are the review screen's to add, not a new shot's.
+**Every receipt with a line in it is read and goes to the review** (owner, 04.10.2026: «читать надо
+все кассы, все чеки, пытаться максимально собрать информацию»). A receipt fails as `reshoot` only when
+not one item line was found: there is nothing to correct, and only a new shot can help. What was
+«переснимите» before (В-4 of MOL-125) — the total read and the lines under 70 % of it, or no total and
+fewer than half the lines adding up — is **read in part** (`readPartly` in `receipt-sum.ts`, one
+function for the server and the phone): the review says «Прочитали не всё» under its count with
+«Переснять» beside it, and «Записать» stays. Before, it threw away everything read: am-06, a till whose
+print Tesseract misreads, found 14 lines of which 2 add up and showed none of them; a crumpled am-13L
+found 11 with 9 right. Now the person sees them and puts them right, and **those corrections are the
+measure of 0.2** (`receipt_days`, below) — a till read badly is one to learn (MOL-169), never one to
+refuse. **The total alone decides nothing**: OCR missed it on 9 of the bench's 16 readings, most of
+them good ones. **«Переснимите» names no cause it does not know** — «Не нашли ни одной строки» and the
+advice, not «смят или в тени»: the owner's three shots of 04.10 were none of those.
+
+**What a person can do with a receipt read badly** (В-2): «Отправить чек разработчику» on the failure
+and at the foot of the review, while its photos are on this phone — they go into «Написать
+разработчику» as pictures do (`feedback.md`).
+
+## The measure of 0.2: what people put right (MOL-222)
+
+**`receipt_days` counts, by day in Yerevan and with no id of anyone**, as `login_days` does (MOL-68):
+how readings ended (`read`, `read_partly`, `reshoot`, `unreadable` — the attempts' cap included), and
+at «Записать» the lines of the receipt, those put right, and each kind — left out, another item than
+the review showed, the quantity or the sum changed — a line counted once however many; receipts whose
+**total** was put right (`totals_corrected`) — one that differs from the total read: opened, checked and
+saved as it was is a check, not an edit (review 10) — one edit of the receipt, never of the lines it
+confirmed: a total put right moves the sums of the lines that do not add up (В-5), and counted as
+theirs it made one field N edits (review 2, adversarial А7); and how long from the server taking the
+receipt (`created_at`) to its record, in buckets: never the phone's clock, and `captured_at` is the
+moment of «Отправить».
+
+**What was put right is the phone's word** (`edited` in the body of «Записать», `review.ts`): the
+positions of the lines whose item differs from the one the review showed and whose figures differ
+from the ones the server showed before any edit — never the ones a total typed since would show: the
+draft keeps no order of edits, and a line typed before a total that confirms it was lost from the
+measure (adversarial Б3). **The prices, named, both of one choice:** a line where the person
+typed by hand, after a total put right, the very sum that total confirms is counted as figures put
+right — opened and saved as it was, it is not, the sheet keeps no figures it did not change; and a
+line where they typed, after a total put right, the server's own sum (the shelf's 890 where the total
+made it 980) is not counted, though it is recorded at 890 (adversarial В2). **The item is compared
+with what the review showed at the line's first edit**, kept beside the drafts (`molvia.receipt-shown`,
+never inside a draft line, which the build before reads strictly): read again after another record
+taught the memory the same correction, the review shows the person's own word as the reading's, and
+the edit vanished (adversarial В1). A draft of the build before has none, and its lines go by the
+review as it is now. Only the phone knows what it showed — the shops' memory is shared and learns
+from every record, so between a review and its «Записать» another record (the person's own, queued
+before it, or anyone's in the chain) changes what the server would show now (adversarial А6). A number
+of the measure, never money: the server takes positions of recorded lines only. **A phone of an
+earlier build sends none**, and then each line is compared with the review as the server would show
+it now (`shownLines`, the review's own function) under the total the phone sends — **the price,
+named:** for those builds a record made after another one taught the memory counts against the new
+memory. A new item kept new under another name is no edit either way: the reading gave no name to
+correct. Written in the transaction it counts, the last statement of it; a repeat of «Записать»
+counts nothing, and **a receipt recorded again once its trip was removed for good counts nothing
+either** (review 7). Erasure does not reach it, and an erased person's corrections still count.
+**`make gates` reads it as the block «0.2r»** with its stop line — more than a third of the lines put
+right after four weeks brings the question of the reader back (`RECEIPT_EDITS_STOP_PERCENT`, owner,
+04.10.2026) — beside the share the readings that never reached a record, since the share is of
+recorded receipts only, and the totals put right. The log of a reading carries the lines found, those
+that add up and «in part»: `lines: 0` of every «переснимите» sent the owner to a wrong cause on 04.10.
+
+**Receipts that failed as `reshoot` before MOL-222 say «Не нашли ни одной строки»**, though some had
+lines under the old rule (am-06: 14): the price, named — before 0.2 only the owner is on production,
+and those receipts are taken again (Т-10).
 
 ## The reader holds nothing
 
@@ -406,17 +465,51 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   quiet line for everyone. Its place («Где купили?») is of the receipt's country — that country's
   cities, the one read first, no recent shop of another; a receipt not read offers a record by hand
   and no retake, in words that promise only that.
-- **A photo is made ready before it is queued** (`preparePhoto`): upright by its EXIF, drawn under
-  `CANVAS_PIXELS_MAX` (16 Mp — iOS draws no larger canvas, and an iPhone 15 shoots 24 Mp, Р-11), brought
-  to `RECEIPT_PHOTO_SIDE` (3 200, П-7) and encoded as JPEG, which carries no EXIF and so no place. What
-  the server would refuse — not a picture, under 200 px, over 8 MB — is «файл не открылся» in the sheet,
-  never a queued part. **The edges of the receipt are the person's, on a step still to come** (В-2: four
-  corners and straightening, drawn by Claude Design — prompt 12 of MOL-118): until it lands the whole
-  frame goes, which the reader reads worse (MOL-114).
+- **A photo is made ready before it is queued**: upright by its EXIF, drawn under `CANVAS_PIXELS_MAX`
+  (16 Mp — iOS draws no larger canvas, and an iPhone 15 shoots 24 Mp, Р-11) (`decodePhoto`), cut out at
+  «Края чека», brought to `RECEIPT_PHOTO_SIDE` (3 200, П-7) and encoded as JPEG, which carries no EXIF and
+  so no place (`encodePhoto`). What the server would refuse — not a picture, under 200 px, over 8 MB — is
+  «файл не открылся» in the sheet, never a queued part.
+- **Every shot passes «Края чека»** (MOL-222, `ReceiptEdgesSheet`): a sheet over the capture sheet with
+  the four corners the phone proposed, each moved by a finger — a loupe over it, since the finger hides
+  the corner — or by the arrow keys; «Повернуть» turns the photo a quarter; «Готово» straightens the
+  receipt and adds the part; «‹» gives the shot up. **The whole frame lost a quarter of the lines** on
+  the bench (16 receipts: 50 lines of 132 against 64 cut by hand; on the four of 04.10, 16 against 34).
+  On the kit until prompt 12 of MOL-118 has a handoff (MOL-127 В-1); the brief is the step's.
+  **The whole photo is the step's to drag on** (`data-drags` on it): a pull down from the outline
+  between two corners closed the sheet and took the shot with it (adversarial А3) — the sheet's own
+  pull starts outside the photo. **A handle near an edge of the photo is drawn inside it** (Р-4,
+  review 3) — and **a corner moves as far as the finger, never to it**: put under the finger, a touch
+  meant to look cut a strip of the photo off (adversarial Б1) — and a corner the detector put past the frame is kept in it, so its trapezoid is
+  straightened rather than painted white — measured, not worse (22 lines of 53 against 19 on the five
+  bench frames it touches). **«Готово» answers for the photo it was pressed on**: a warp
+  of a shot given up — «‹» while it ran, another shot opened — is let go and nobody's part (review 8,
+  adversarial А4). **Corners that make no receipt** — under half a per cent of the photo, three on a
+  line — keep «Готово» waiting and say so, never «файл не открылся» (review 9). **A side under what the
+  server takes is paper added**: «Оставить так» on a receipt under 200 px gets white margins to 200,
+  never the refusal of a photo (adversarial А2). **Not on WebKit end-to-end** (Т-11, the price): the
+  engine keeps no `Secure` cookie on http://127.0.0.1 and «Покупки» need the API; the sheet's own
+  WebKit behaviour is `sheet.spec`'s, and the step's opening from the file's `change` is held by the
+  system «back» in Chromium (Р-10).
+- **The corners are proposed by the measured candidate** (`edges.ts`, Т-2): «paper» — on a copy at most
+  640 long, the light flattened against a wide blur so glare is as dull as the table, a pixel of colour
+  never paper (a hand, a wooden table), thin bridges cut, the least rectangle around the region. Of
+  34 bench frames it matched the hand's box best (mean IoU 0.87; brightness 0.78, flattened alone 0.82,
+  closed edges 0.72) — brightness alone took a hand on the receipt for paper (am-04). Not found — the
+  corners of the photo itself, so nothing is cut that the person did not move. The figures and the
+  readings are in `.scratch/tasks/research/MOL-222.md`; a change of the detector is measured there.
+- **A warp redraws every pixel, and the reader pays for it** (`warp.ts`): the bench read the same cut
+  fewer lines drawn anew from four neighbours, and still fewer than as the photo's own pixels. So the
+  corners go on whole pixels, a receipt standing square within 1.5 % of its side is cut as its box —
+  the photo's pixels copied, nothing blended — and only a real tilt is warped, from sixteen neighbours
+  (Keys' cubic). Off the page in a worker (`warpWorker.ts`); a worker that does not start — its script
+  not loaded offline in development, a WebView without module workers — leaves it to the page.
 - **No check of sharpness** (В-3, measured): the variance of the Laplacian put am-06 — the receipt the
   check was for — highest of all, and its width (695 px) is am-03's (719), which reads 17 of 18. A check
-  that cannot tell a bad photo from a good one teaches «Оставить так». The narrow-receipt warning is
-  left for the edges step, with a threshold from the till's grid (600 px), not from the bench.
+  that cannot tell a bad photo from a good one teaches «Оставить так». **«Чек мелкий» is the width of the
+  receipt cut out**, a note of the kit (`AppNote`) said through the app's one live region (`RECEIPT_PHOTO_NARROW`, 600 px — an 80 mm roll prints 42 characters, and Tesseract
+  loses a till's digits under about 14 px a character): «Подойти ближе» or «Оставить так», never a
+  refusal.
 - **The receipts' queue is MOL-24's** (`receiptQueue`): storage is the queue, one window sends under
   `navigator.locks`, a lost connection, a 5xx, a portal, a `401` hold it; `413`/`415` and a photo the
   phone lost are «не принят» and take the later parts of the receipt along. The receipt, its parts in

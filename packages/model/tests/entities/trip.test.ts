@@ -80,6 +80,21 @@ describe('tripSchema', () => {
     ).toBe(true)
   })
 
+  it('у пары с лари official — НБ Грузии, а ЦБ РА — только запасной (MOL-110)', () => {
+    const lari = {
+      ...trip,
+      currency: 'GEL',
+      rate: { ...rate('0.0312'), base: 'RUB', quote: 'GEL' },
+    }
+    expect(tripSchema.safeParse({ ...lari, rateProvider: 'nbg' }).success).toBe(true)
+    expect(tripSchema.safeParse({ ...lari, rateProvider: 'cba' }).success).toBe(false)
+    const fallback = { ...lari, rate: { ...lari.rate, source: 'fallback' } }
+    expect(tripSchema.safeParse({ ...fallback, rateProvider: 'cba' }).success).toBe(true)
+    expect(tripSchema.safeParse({ ...fallback, rateProvider: 'nbg' }).success).toBe(false)
+    // У пары драма НБ Грузии — запасной, как ЦБ РФ.
+    expect(tripSchema.safeParse({ ...trip, rateProvider: 'nbg' }).success).toBe(false)
+  })
+
   it('refuses a rate quoted in some other currency than the trip', () => {
     const foreign = { ...rate('90'), quote: 'USD' as const }
     expect(() => tripSchema.parse({ ...trip, rate: foreign })).toThrow()

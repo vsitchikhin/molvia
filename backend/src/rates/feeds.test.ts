@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cbaFeed, parseCba } from './cba'
 import { parseCbr } from './cbr'
 import { parseErapi } from './erapi'
+import { parseNbg } from './nbg'
 import { FEED_TIMEOUT_MS, FOREIGN, FeedError, request } from './feed'
 
 // Answers recorded from the providers on 19.09.2026 (a Saturday), byte for byte.
@@ -16,6 +17,8 @@ function fixture(name: string): string {
 const cba = fixture('cba-latest-2026-09-19.xml')
 const cbr = fixture('cbr-daily-2026-09-19.xml')
 const erapi = fixture('erapi-latest-2026-09-19.json')
+// Recorded on 04.10.2026: the rate in force on Saturday 03.10, set by the bank on Friday evening.
+const nbg = fixture('nbg-2026-10-03.json')
 
 describe('ЦБ РА', () => {
   it('читает субботний ответ как пятничный курс: в выходные банк не публикует', () => {
@@ -26,6 +29,7 @@ describe('ЦБ РА', () => {
         { provider: 'cba', currency: 'RUB', date: '2026-09-18', scaled: 4_312_300n },
         { provider: 'cba', currency: 'USD', date: '2026-09-18', scaled: 363_440_000n },
         { provider: 'cba', currency: 'EUR', date: '2026-09-18', scaled: 417_050_000n },
+        { provider: 'cba', currency: 'GEL', date: '2026-09-18', scaled: 139_530_000n },
       ],
     })
   })
@@ -38,8 +42,13 @@ describe('ЦБ РА', () => {
     expect(parseCba(per10).rates[0]?.scaled).toBe(4_312_300n)
   })
 
-  it('пропускает валюты, которых нет в продукте, — риал, иену, лари', () => {
-    expect(parseCba(cba).rates.map((rate) => rate.currency)).toEqual(['RUB', 'USD', 'EUR'])
+  it('пропускает валюты, которых нет в продукте, — риал, иену; лари теперь в продукте (MOL-110)', () => {
+    expect(parseCba(cba).rates.map((rate) => rate.currency)).toEqual(['RUB', 'USD', 'EUR', 'GEL'])
+  })
+
+  it('отвергает ответ целиком, если в нём нет лари (MOL-110)', () => {
+    const noLari = cba.replace(/<ExchangeRate><ISO>GEL<\/ISO>[\s\S]*?<\/ExchangeRate>/, '')
+    expect(() => parseCba(noLari)).toThrow('cba: no GEL')
   })
 
   it('отвергает ответ целиком на SOAP Fault и на страницу ошибки вместо XML', () => {
@@ -78,6 +87,8 @@ describe('ЦБ РФ', () => {
         { provider: 'cbr', currency: 'RUB', date: '2026-09-19', scaled: 4_316_522n },
         { provider: 'cbr', currency: 'USD', date: '2026-09-19', scaled: 363_440_354n },
         { provider: 'cbr', currency: 'EUR', date: '2026-09-19', scaled: 417_265_656n },
+        // 32.2893 × 100 / 23.1668 = 139.377471…
+        { provider: 'cbr', currency: 'GEL', date: '2026-09-19', scaled: 139_377_471n },
       ],
     })
   })
@@ -104,6 +115,8 @@ describe('ExchangeRate-API', () => {
         { provider: 'erapi', currency: 'RUB', date: '2026-09-19', scaled: 4_314_771n },
         { provider: 'erapi', currency: 'USD', date: '2026-09-19', scaled: 363_504_180n },
         { provider: 'erapi', currency: 'EUR', date: '2026-09-19', scaled: 417_188_152n },
+        // 1 / 0.007165 = 139.567341…
+        { provider: 'erapi', currency: 'GEL', date: '2026-09-19', scaled: 139_567_341n },
       ],
     })
   })
@@ -128,6 +141,56 @@ describe('ExchangeRate-API', () => {
     for (const bad of [1e-7, '0.231762', 0]) {
       const variant = { ...body, rates: { ...body.rates, RUB: bad } }
       expect(() => parseErapi(JSON.stringify(variant))).toThrow('erapi: implausible RUB')
+    }
+  })
+})
+
+describe('НБ Грузии (MOL-110)', () => {
+  it('переводит котировки в лари в драмы внутри одного ответа: драм за 1000', () => {
+    // Лари за драм — 7.1762 / 1000; рубль — 3.1209 / 100 / 0.0071762 = 4.348959…;
+    // лари — 1000 / 7.1762 = 139.349516…
+    expect(parseNbg(nbg)).toEqual({
+      provider: 'nbg',
+      date: '2026-10-03',
+      rates: [
+        { provider: 'nbg', currency: 'RUB', date: '2026-10-03', scaled: 4_348_959n },
+        { provider: 'nbg', currency: 'USD', date: '2026-10-03', scaled: 362_852_206n },
+        { provider: 'nbg', currency: 'EUR', date: '2026-10-03', scaled: 407_694_880n },
+        { provider: 'nbg', currency: 'GEL', date: '2026-10-03', scaled: 139_349_516n },
+      ],
+    })
+  })
+
+  it('читает число строкой банка, а не числом JSON', () => {
+    const body = JSON.parse(nbg) as [{ currencies: Record<string, unknown>[] }]
+    const usd = body[0].currencies.find((entry) => entry.code === 'USD')
+    if (usd) usd.rate = 99
+    expect(parseNbg(JSON.stringify(body)).rates[1]?.scaled).toBe(362_852_206n)
+  })
+
+  it('отвергает ответ без драма, без даты, не одним ответом и страницу вместо JSON', () => {
+    const body = JSON.parse(nbg) as [{ date: string; currencies: Record<string, unknown>[] }]
+    const noDram = [{ ...body[0], currencies: body[0].currencies.filter((c) => c.code !== 'AMD') }]
+    expect(() => parseNbg(JSON.stringify(noDram))).toThrow('nbg: no AMD')
+    expect(() => parseNbg(JSON.stringify([{ ...body[0], date: 'вчера' }]))).toThrow('nbg: no date')
+    expect(() => parseNbg(JSON.stringify([body[0], body[0]]))).toThrow('nbg: not one answer')
+    expect(() => parseNbg('<html>')).toThrow(new FeedError('nbg', 'not JSON'))
+  })
+
+  it('отвергает ответ целиком: у валюты нет котировки, она дважды, курс нулевой или без количества', () => {
+    const body = JSON.parse(nbg) as [{ currencies: Record<string, unknown>[] }]
+    const variants: Record<string, unknown>[][] = [
+      body[0].currencies.filter((entry) => entry.code !== 'USD'),
+      [...body[0].currencies, ...body[0].currencies.filter((entry) => entry.code === 'USD')],
+      body[0].currencies.map((entry) =>
+        entry.code === 'USD' ? { ...entry, rateFormated: '0' } : entry,
+      ),
+      body[0].currencies.map((entry) => (entry.code === 'USD' ? { ...entry, quantity: 0 } : entry)),
+    ]
+    for (const currencies of variants) {
+      expect(() => parseNbg(JSON.stringify([{ ...body[0], currencies }]))).toThrow(
+        'nbg: implausible USD',
+      )
     }
   })
 })
@@ -160,7 +223,7 @@ describe('дата ответа', () => {
 
 describe('список валют', () => {
   it('берётся из схемы: всё, кроме драма', () => {
-    expect(FOREIGN).toEqual(['RUB', 'USD', 'EUR'])
+    expect(FOREIGN).toEqual(['RUB', 'USD', 'EUR', 'GEL'])
   })
 })
 

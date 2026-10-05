@@ -1,10 +1,11 @@
 import { sql } from 'drizzle-orm'
+import type { SQLWrapper } from 'drizzle-orm'
 import { GATE_RATINGS, GATE_RATINGS_WINDOW_HOURS } from '@molvia/model'
 import type { CohortReturn } from './events-repository'
 import type { Conn, Db } from './index'
 import type { CohortReached } from './verdicts-repository'
 import { createEventRepository } from './events-repository'
-import { loginDays, reminderDays } from './schema'
+import { loginDays, receiptDays, reminderDays } from './schema'
 import { createVerdictRepository } from './verdicts-repository'
 import { yerevanDay, yerevanWeek } from './yerevan-week'
 
@@ -23,6 +24,7 @@ export interface GatesReport {
   readonly erased: ErasedInWindow
   readonly logins: LoginsInWindow
   readonly reminders: RemindersInWindow
+  readonly receipts: ReceiptsInWindow
 }
 
 /**
@@ -82,6 +84,33 @@ export interface RemindersInWindow {
   readonly offBlocked: number
 }
 
+/**
+ * The receipt scanner (MOL-222) over the days the window touches, in Yerevan, summed from
+ * `receipt_days`: how readings ended, and of the receipts recorded how many lines people put right —
+ * the measure of the hypothesis of 0.2 — and how long from the server taking a receipt to its record.
+ * Not the gate's cohort: every receipt of those days, whoever's.
+ */
+export interface ReceiptsInWindow {
+  readonly firstDay: string
+  readonly lastDay: string
+  readonly read: number
+  readonly readPartly: number
+  readonly reshoot: number
+  readonly unreadable: number
+  readonly recorded: number
+  readonly lines: number
+  readonly linesEdited: number
+  readonly linesSkipped: number
+  readonly linesItem: number
+  readonly linesFigures: number
+  readonly totalsCorrected: number
+  readonly within5m: number
+  readonly within15m: number
+  readonly within1h: number
+  readonly within1d: number
+  readonly later: number
+}
+
 export interface GatesReader {
   read(window: GatesWindow): Promise<GatesReport>
 }
@@ -115,6 +144,7 @@ export function createGatesReader(db: Db): GatesReader {
             erased: await erasedIn(tx, from, to),
             logins: await loginsIn(tx, from, to),
             reminders: await remindersIn(tx, from, to),
+            receipts: await receiptsIn(tx, from, to),
           }
         },
         { isolationLevel: 'repeatable read', accessMode: 'read only' },
@@ -198,4 +228,49 @@ async function remindersIn(tx: Conn, from: Date, to: Date): Promise<RemindersInW
     offSettings: sums?.offSettings ?? 0,
     offBlocked: sums?.offBlocked ?? 0,
   }
+}
+
+async function receiptsIn(tx: Conn, from: Date, to: Date): Promise<ReceiptsInWindow> {
+  const { firstDay, lastDay } = await daysOf(tx, from, to)
+  const sum = (column: SQLWrapper) => sql<number>`coalesce(sum(${column}), 0)::int`
+  const [sums] = await tx
+    .select({
+      read: sum(receiptDays.read),
+      readPartly: sum(receiptDays.readPartly),
+      reshoot: sum(receiptDays.reshoot),
+      unreadable: sum(receiptDays.unreadable),
+      recorded: sum(receiptDays.recorded),
+      lines: sum(receiptDays.lines),
+      linesEdited: sum(receiptDays.linesEdited),
+      linesSkipped: sum(receiptDays.linesSkipped),
+      linesItem: sum(receiptDays.linesItem),
+      linesFigures: sum(receiptDays.linesFigures),
+      totalsCorrected: sum(receiptDays.totalsCorrected),
+      within5m: sum(receiptDays.within5m),
+      within15m: sum(receiptDays.within15m),
+      within1h: sum(receiptDays.within1h),
+      within1d: sum(receiptDays.within1d),
+      later: sum(receiptDays.later),
+    })
+    .from(receiptDays)
+    .where(sql`${receiptDays.day} between ${firstDay}::date and ${lastDay}::date`)
+  const zero = {
+    read: 0,
+    readPartly: 0,
+    reshoot: 0,
+    unreadable: 0,
+    recorded: 0,
+    lines: 0,
+    linesEdited: 0,
+    linesSkipped: 0,
+    linesItem: 0,
+    linesFigures: 0,
+    totalsCorrected: 0,
+    within5m: 0,
+    within15m: 0,
+    within1h: 0,
+    within1d: 0,
+    later: 0,
+  }
+  return { firstDay, lastDay, ...zero, ...sums }
 }

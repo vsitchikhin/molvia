@@ -53,6 +53,8 @@ import {
   marketSideSchema,
   placeKindSchema,
   rateChoiceSchema,
+  HOME_BANK,
+  MARKET_CURRENCIES,
   rateProviderSchema,
   ratePreferenceSchema,
   SALARY_SHIFT_DAY_MAX,
@@ -164,6 +166,21 @@ function hexDigest(column: AnyPgColumn) {
 /** A quantity unit is nullable in several tables; the list is the same everywhere. */
 function unitKnownOrNull(column: AnyPgColumn) {
   return sql`${column} is null or ${oneOf(column, baseUnitSchema.options)}`
+}
+
+/**
+ * `homeBankOf` of a pair in SQL, written from the model's `HOME_BANK` in the model's order — the
+ * base's bank, then the quote's (adversarial review) — so the check of a trip's source can never
+ * name another bank than the domain does (MOL-110).
+ */
+function homeBankSql(base: AnyPgColumn, quote: AnyPgColumn) {
+  const banks = [base, quote].flatMap((side) =>
+    Object.entries(HOME_BANK).map(
+      ([currency, bank]) =>
+        sql`when ${side} = ${sql.raw(`'${currency}'`)} then ${sql.raw(`'${bank}'`)}`,
+    ),
+  )
+  return sql`(case ${sql.join(banks, sql` `)} else 'cba' end)`
 }
 
 /** Currency is nullable wherever the amount beside it is. */
@@ -787,14 +804,15 @@ export const trips = pgTable(
       sql`${table.rateProvider} is null or ${oneOf(table.rateProvider, rateProviderSchema.options)}`,
     ),
     // A publisher for every published rate, and none for a rate nobody published — and the two
-    // say the same thing: the source *is* the publisher («official» is the central bank of
-    // Armenia and nothing else), so «fallback by cba» or «official by erapi» is not a state but a
-    // contradiction (MOL-22, В2-11). On a personal rate and on no rate at all the second
+    // say the same thing: the source *is* the publisher («official» is the pair's own bank,
+    // `homeBankOf`: the National Bank of Georgia for the lari, the Central Bank of Armenia for the
+    // rest, MOL-110), so «fallback by cba» on a pair of drams or «official by erapi» is not a state
+    // but a contradiction (MOL-22, В2-11). On a personal rate and on no rate at all the second
     // expression is null and the check passes.
     check(
       'trips_rate_provider_matches_source',
       sql`(${table.rateSource} is null or ${table.rateSource} = 'personal') = (${table.rateProvider} is null)
-        and ((${table.rateSource} = 'official') = (${table.rateProvider} = 'cba')) is not false`,
+        and ((${table.rateSource} = 'official') = (${table.rateProvider} = ${homeBankSql(table.rateBase, table.rateQuote)})) is not false`,
     ),
     check(
       'trips_rate_source_known',
@@ -1102,10 +1120,9 @@ export const marketRates = pgTable(
     primaryKey({ columns: [table.channel, table.currency, table.side, table.rateDate] }),
     check('market_rates_channel_known', oneOf(table.channel, marketChannelSchema.options)),
     check('market_rates_side_known', oneOf(table.side, marketSideSchema.options)),
-    check(
-      'market_rates_currency_foreign',
-      sql`${oneOf(table.currency, currencySchema.options)} and ${table.currency} <> 'AMD'`,
-    ),
+    // The currencies of the files and no other (MOL-110): the lari is in none of them, and a mirror
+    // holds what it mirrors.
+    check('market_rates_currency_foreign', oneOf(table.currency, MARKET_CURRENCIES)),
     check('market_rates_positive', sql`${table.scaled} > 0`),
   ],
 )
@@ -1764,6 +1781,55 @@ export const reminderDays = pgTable(
       'reminder_days_counts_non_negative',
       sql`least(${table.firstSteps}, ${table.secondSteps}, ${table.thirdSteps}, ${table.items}, ${table.rated}, ${table.offButton}, ${table.offSettings}, ${table.offBlocked}) >= 0`,
     ),
+  ],
+)
+
+/**
+ * The receipt scanner's measure (MOL-222, owner's decision 04.10.2026): how readings ended, and how
+ * much of what was read people put right before recording. The hypothesis of 0.2 stops when after
+ * four weeks more than a third of the lines are corrected. The same shape as `login_days` and for the
+ * same reason — no id of anyone and nothing of a receipt, so erasure has nothing to reach and an
+ * erased person's corrections still count.
+ *
+ * A reading counts on the day it ended, a record on the day it was written, both in Yerevan. A line
+ * is edited once however many things changed in it; the kinds beside it may add up past it.
+ */
+export const receiptDays = pgTable(
+  'receipt_days',
+  {
+    day: date('day').primaryKey(),
+    /** Read with its lines, and the lines cover the receipt (`readPartly` is false). */
+    read: integer('read').notNull().default(0),
+    /** Read with its lines, but they make up too little of it — the «переснимите» of before (В-1). */
+    readPartly: integer('read_partly').notNull().default(0),
+    /** Not one item line found. */
+    reshoot: integer('reshoot').notNull().default(0),
+    unreadable: integer('unreadable').notNull().default(0),
+    recorded: integer('recorded').notNull().default(0),
+    /** Every line of the receipts recorded, the ones left out included. */
+    lines: integer('lines').notNull().default(0),
+    linesEdited: integer('lines_edited').notNull().default(0),
+    /** «Не записывать». */
+    linesSkipped: integer('lines_skipped').notNull().default(0),
+    /** Another item than the review showed. */
+    linesItem: integer('lines_item').notNull().default(0),
+    /** The quantity or the sum changed. */
+    linesFigures: integer('lines_figures').notNull().default(0),
+    /** Receipts whose total the person put right — one edit of the receipt, never of its lines. */
+    totalsCorrected: integer('totals_corrected').notNull().default(0),
+    /** From the server taking the receipt to its record — never the phone's clock. */
+    within5m: integer('within_5m').notNull().default(0),
+    within15m: integer('within_15m').notNull().default(0),
+    within1h: integer('within_1h').notNull().default(0),
+    within1d: integer('within_1d').notNull().default(0),
+    later: integer('later').notNull().default(0),
+  },
+  (table) => [
+    check(
+      'receipt_days_counts_non_negative',
+      sql`least(${table.read}, ${table.readPartly}, ${table.reshoot}, ${table.unreadable}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
+    ),
+    check('receipt_days_edited_within_lines', sql`${table.linesEdited} <= ${table.lines}`),
   ],
 )
 
