@@ -1217,6 +1217,7 @@
       "date": "Date",
       "scanned": "Read: {code}",
       "rows": "Rows and captions",
+      "operations": "Operation row",
       "caption_month": "September 2026",
       "row_cash": "Cash, drams",
       "row_card": "Ardshin card",

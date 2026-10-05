@@ -84,12 +84,8 @@
                     <OperationRow
                       v-for="row in day.rows"
                       :key="`${row.id}-${row.side ?? ''}`"
-                      :operation="row"
-                      :categories="categories"
-                      :name-of="nameOf"
-                      :account-name="accountName"
-                      in-account
-                      @open="openRow"
+                      v-bind="rowOf(row)"
+                      @open="openRow(row)"
                     />
                   </AppReveal>
                 </AppCard>
@@ -181,7 +177,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { countedWhen, shortDay, signedAmount } from '@/components/accounts'
+import { countedWhen, operationRowProps, shortDay, signedAmount } from '@/components/accounts'
 import type { Removed } from '@/components/spending'
 import { useAccountJournal } from '@/composables/useAccountJournal'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -266,6 +262,15 @@ export default defineComponent({
       return fromPage ?? fromJournal
     })
     const accountName = (id: string) => store.accounts.find((one) => one.id === id)?.name ?? null
+    const rowOf = (row: AccountOperationView) =>
+      operationRowProps(row, {
+        t,
+        locale: locale.value,
+        categories: categories.value,
+        nameOf,
+        accountName,
+        inAccount: true,
+      })
 
     const money = (value: Money) => signedAmount(value, locale.value)
     const estimate = (value: Money) => signedAmount(value, locale.value, { estimate: true })
@@ -423,6 +428,7 @@ export default defineComponent({
       operationOpen,
       operation,
       openRow,
+      rowOf,
       edited,
       restoring,
       bringBack,

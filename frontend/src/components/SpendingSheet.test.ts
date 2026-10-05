@@ -144,7 +144,7 @@ async function pressUntil(text: string, happened: () => void): Promise<void> {
 
 /** Opens the one row, types a new note — the smallest amendment there is. */
 async function amendNote(view: VueWrapper): Promise<HTMLDialogElement> {
-  await view.find('.body').trigger('click')
+  await view.find('.list-row').trigger('click')
   await risen()
   const dialog = document.querySelector<HTMLDialogElement>('dialog[open]')
   if (!dialog) throw new Error('no sheet')

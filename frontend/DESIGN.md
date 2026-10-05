@@ -156,6 +156,7 @@ spacing:
   4: '16px'
   6: '24px'
   8: '32px'
+  tail: '49px'
 components:
   button-primary:
     backgroundColor: '{colors.accent-solid}'
@@ -472,12 +473,12 @@ filled MDI icon and a 700 label; inactive tabs are outlined, 600.
 
 - **Card:** `surface`, radius 20, 16 padding, `border` hairline, rest shadow.
 - **List card:** the same with no padding; rows divided by a hairline; focus drawn inside the row.
-- **ListRow:** icon 24 · title 17/600 (an ellipsis, or wrapped) · meta 13 in two lines at most · tail (an amount, or a 44 button on a row that is no control) · a 20 chevron; 64 high. Destructive: title and icon `bad-ink`. Inactive: `text-muted`, still focusable, the meta says why. Selected: the `accent-tint` fill and a 2 `accent` ring on a layer rounded as the card — the row and the hairline above it stay square — and a ✓ in place of the chevron; its keyboard focus stands inside the ring, the fill between them. Active under the keyboard (a list a field owns): the fill without the ring. Hover `surface-2`.
+- **ListRow:** icon 24, or in a circle of 40 (`row-circle`) in a category's colour or `surface-2` · title 17/600 (an ellipsis, or wrapped) · meta 13 in two lines at most · tail (an amount, or a 44 button on a row that is no control) · a 20 chevron; 64 high. Destructive: title and icon `bad-ink`. Inactive: `text-muted`, still focusable, the meta says why. Selected: the `accent-tint` fill and a 2 `accent` ring on a layer rounded as the card — the row and the hairline above it stay square — and a ✓ in place of the chevron; its keyboard focus stands inside the ring, the fill between them. Active under the keyboard (a list a field owns): the fill without the ring. Hover `surface-2`.
 - **The Chevron Goes On Rule.** A chevron means the row opens something to go on with — a screen, or a sheet with fields. A row that acts at once or asks to confirm has none, and one card never mixes the two (the owner's В-14).
 - **SectionCaption:** caps 11/700, `text-muted`, 4 from the left, 8 above its card; a mark before the words (the verdict's dot, 24) and a tail on the right (a month's sum, 13/600). Inside a card, as the card's own title, it has no 4 and no 8. Caps are drawn nowhere else.
 - **NavRow:** "icon · label · value · ›", 52 — the entry into a nested screen, or a button opening a sheet. The chevron always.
 - **Note:** an 18 icon and 13 words on `surface-2`, radius 14, 8 / 12; `warn` on its tint. A tag in a row: a pill of 13/600, plain, `warn` or `bad`.
-- **OperationRow (target, one):** one row for spendings, an account's log and a reconciliation; a chevron on every pressable row or on none; amounts aligned in one column.
+- **OperationRow:** one row for spendings, an account's log, «not counted in balances» and a reconciliation. A circle of 40 under the 24 icon in the category's colour on its `cat-tint-share` — purchases in the colour of groceries, an income and an exchange on `surface-2` with a `text-muted` icon, never the accent · title 17/600 that wraps · meta 13 in two lines · a tag under it (`Отправляем…` warn, `Не принята` bad) · the amount 17/600 tabular, never wrapped or cut, and a 13 line under it that wraps only between its parts · a 20 chevron on every row, so the amounts stand in one column and a sum over them stands in it too (`space-tail`). Beside the words the tail takes at most 45 % of the row unless the amount is wider; a row narrower than 22rem stands the tail under the words, at the right, in the same column. The amount is always `text`: only a balance below zero is bad, on its card.
 
 ### Inputs / Fields
 
