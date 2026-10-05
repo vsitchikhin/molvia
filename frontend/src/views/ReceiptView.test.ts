@@ -179,6 +179,34 @@ describe('ReceiptView (MOL-127)', () => {
     expect(router.currentRoute.value.params.tripId).toBe(TRIP)
   })
 
+  // MOL-222, adversarial В1: the line was put right while the review showed the parse's item; read
+  // again after another record taught the memory that same correction, it shows the person's word —
+  // and «Записать» still says the line was put right
+  it('sends a line put right as put right though the review read again shows the same item', async () => {
+    const shownThen = 'aaaaaaaa-0000-4000-8000-000000000001'
+    const cheese = 'aaaaaaaa-0000-4000-8000-000000000009'
+    const reread = detail()
+    receipt.mockResolvedValue({
+      ...reread,
+      lines: reread.lines.map((one, position) =>
+        position === 0
+          ? { ...one, itemId: cheese, itemName: 'Сыр', match: 'memory' as const }
+          : one,
+      ),
+    })
+    const { view } = await render()
+    useReceiptDraftsStore().setLine(
+      ID,
+      0,
+      { item: { id: cheese, name: 'Сыр' }, skip: false },
+      shownThen,
+    )
+    await flushPromises()
+    await button(view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    expect(recordReceipt.mock.calls[0]?.[1].edited).toEqual({ item: [0], figures: [] })
+  })
+
   it('with no place read, «Записать» asks for it first and sends nothing', async () => {
     receipt.mockResolvedValue(detail({ place: false }))
     const { view } = await render()

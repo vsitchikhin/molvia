@@ -334,4 +334,32 @@ describe('what «Записать» says was put right', () => {
       figures: [3],
     })
   })
+
+  // adversarial В1: the line put right milk → cheese while the review showed milk; read again after
+  // another record taught the memory cheese, the review shows cheese — and the edit is still an edit
+  it('an item put right stays put right when the review read again shows the same item', () => {
+    const detail = receiptA()
+    const reread: ReceiptDetail = {
+      ...detail,
+      lines: detail.lines.map((one, position) =>
+        position === 0
+          ? { ...one, itemId: OTHER, itemName: 'Кефир', match: 'memory' as const }
+          : one,
+      ),
+    }
+    const draft: ReceiptDraft = {
+      lines: { 0: { item: { id: OTHER, name: 'Кефир' }, skip: false } },
+    }
+    const shown = { 0: MILK }
+    expect(
+      recordBody(reread, draft, reviewLines(reread, draft, shown), TRIP, '2026-09-27')?.edited,
+    ).toEqual({ item: [0], figures: [] })
+    // with nothing kept of the first edit — a draft of the build before — the review as it is now
+    expect(
+      recordBody(reread, draft, reviewLines(reread, draft), TRIP, '2026-09-27')?.edited,
+    ).toEqual({
+      item: [],
+      figures: [],
+    })
+  })
 })

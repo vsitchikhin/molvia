@@ -399,7 +399,9 @@ export default defineComponent({
     const currency = computed(() => RECEIPT_CURRENCY[detail.value?.receipt.country ?? 'AM'])
     const taken = computed(() => localDay(detail.value?.receipt.capturedAt ?? new Date()))
 
-    const lines = computed(() => (detail.value ? reviewLines(detail.value, draft.value) : []))
+    const lines = computed(() =>
+      detail.value ? reviewLines(detail.value, draft.value, drafts.shownOf(id.value)) : [],
+    )
     const balance = computed(() =>
       detail.value
         ? reviewBalance(detail.value, lines.value, draft.value)
@@ -750,7 +752,9 @@ export default defineComponent({
         opened.value = null
       },
       saveLine: (line: LineDraft) => {
-        if (opened.value !== null) drafts.setLine(id.value, opened.value, line)
+        // with the item the review shows it with now — kept from the line's first edit (MOL-222, В1)
+        if (opened.value !== null)
+          drafts.setLine(id.value, opened.value, line, openedLine.value?.line.itemId ?? null)
       },
       choosePlace: (chosen: PlaceDraft, purchasedOn: string) => {
         drafts.setPlace(id.value, chosen, purchasedOn)

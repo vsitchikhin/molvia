@@ -74,7 +74,12 @@ function amountsOf(detail: ReceiptDetail, draft: ReceiptDraft | null) {
   return recordedSums(figures, total, digits)
 }
 
-export function reviewLines(detail: ReceiptDetail, draft: ReceiptDraft | null): ReviewLine[] {
+export function reviewLines(
+  detail: ReceiptDetail,
+  draft: ReceiptDraft | null,
+  /** The item each line showed at its first edit (`receiptDrafts.shownOf`, adversarial В1). */
+  shown: Readonly<Record<number, string | null>> = {},
+): ReviewLine[] {
   const amounts = amountsOf(detail, draft)
   return detail.lines.map((line, position) => {
     const edit = draft?.lines[position]
@@ -99,7 +104,11 @@ export function reviewLines(detail: ReceiptDetail, draft: ReceiptDraft | null): 
         edited: true,
         ownFigures: figures !== undefined,
         changed: {
-          item: itemId !== null ? itemId !== line.itemId : line.itemId !== null,
+          // against what the review showed when the person put it right: read again after the memory
+          // learnt the same correction elsewhere, it shows their own word as the reading's (В1)
+          item: ((was) => (itemId !== null ? itemId !== was : was !== null))(
+            position in shown ? (shown[position] ?? null) : line.itemId,
+          ),
           // against the figures the review showed before any edit — the server's — never the ones a
           // total typed since would show: a line put right stays put right whatever came after it
           // (adversarial Б3)

@@ -317,7 +317,16 @@ moment of «Отправить».
 positions of the lines whose item differs from the one the review showed and whose figures differ
 from the ones the server showed before any edit — never the ones a total typed since would show: the
 draft keeps no order of edits, and a line typed before a total that confirms it was lost from the
-measure (adversarial Б3). **The price, named:** a line opened after a total put right and saved with the sum that total confirms is counted as figures put right. Only the phone knows what it showed — the shops' memory is shared and learns
+measure (adversarial Б3). **The prices, named, both of one choice:** a line where the person
+typed by hand, after a total put right, the very sum that total confirms is counted as figures put
+right — opened and saved as it was, it is not, the sheet keeps no figures it did not change; and a
+line where they typed, after a total put right, the server's own sum (the shelf's 890 where the total
+made it 980) is not counted, though it is recorded at 890 (adversarial В2). **The item is compared
+with what the review showed at the line's first edit**, kept beside the drafts (`molvia.receipt-shown`,
+never inside a draft line, which the build before reads strictly): read again after another record
+taught the memory the same correction, the review shows the person's own word as the reading's, and
+the edit vanished (adversarial В1). A draft of the build before has none, and its lines go by the
+review as it is now. Only the phone knows what it showed — the shops' memory is shared and learns
 from every record, so between a review and its «Записать» another record (the person's own, queued
 before it, or anyone's in the chain) changes what the server would show now (adversarial А6). A number
 of the measure, never money: the server takes positions of recorded lines only. **A phone of an
