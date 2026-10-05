@@ -249,6 +249,23 @@ describe('словарь: повторяющиеся тексты', () => {
       '12 месяцев': ['exchange.rate_chart.period_in.12', 'exchange.rate_chart.period_option.12'],
       Месяц: ['exchange.rate_chart.period_option.1', 'spending.charts.mode_month'],
       Период: ['exchange.rate_chart.period', 'spending.charts.mode'],
+      // Слово на время работы (MOL-225) — у каждой кнопки свой ключ рядом с её действием: слово
+      // действия и слово работы правятся вместе, а не через общий ключ чужой шторки.
+      'Удаляем…': [
+        'accounts.sheet.deleting',
+        'erase.confirm_busy',
+        'exchange.remove_sheet.confirm_busy',
+      ],
+      'Сохраняем…': [
+        'accounts.sheet.saving',
+        'budget.sheet.saving',
+        'consent.accept_busy',
+        'settings.saving',
+        'trip.rate.saving',
+      ],
+      'Возвращаем…': ['accounts.screen.restoring', 'exchange.restoring', 'income.restoring'],
+      // «Показать ещё» за работой и загрузка экрана — одно слово, ключи разные (MOL-225).
+      'Загружаем…': ['state.loading', 'trip.history.loading'],
     })
   })
 
@@ -284,6 +301,24 @@ describe('словарь: повторяющиеся тексты', () => {
       Item: ['receipt.line.product', 'trip.queued.unnamed'],
       // «проверьте» on a receipt line and «сверить» of a check: one verb in English.
       check: ['accounts.reconcile.note', 'receipt.review.tag_check'],
+      // The word of a button at work (MOL-225), each beside its action's key, as in Russian; «Записываем…»
+      // of a receipt and «Сверяем…» of a check meet «Saving…» and «Checking…» in English.
+      'Deleting…': [
+        'accounts.sheet.deleting',
+        'erase.confirm_busy',
+        'exchange.remove_sheet.confirm_busy',
+      ],
+      'Saving…': [
+        'accounts.sheet.saving',
+        'budget.sheet.saving',
+        'consent.accept_busy',
+        'receipt.review.record_busy',
+        'settings.saving',
+        'trip.rate.saving',
+      ],
+      'Bringing back…': ['exchange.restoring', 'income.restoring'],
+      'Loading…': ['state.loading', 'trip.history.loading'],
+      'Checking…': ['accounts.reconcile.checking', 'receipt.review.cancel_record_busy'],
       // The screen's title and the way to it from «Where it went» (MOL-156), as in Russian.
       Charts: ['spending.charts.title', 'spending.summary.charts'],
       // The city of the settings and of «Where was it?» for another country's receipt, as in Russian.

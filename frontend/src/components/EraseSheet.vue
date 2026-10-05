@@ -25,6 +25,7 @@
         variant="danger-ghost"
         block
         :busy="busy"
+        :busy-label="t('erase.confirm_busy')"
         :inactive="offline"
         @click="$emit('confirm')"
       >

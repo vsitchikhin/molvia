@@ -193,6 +193,7 @@
               variant="ghost"
               block
               :busy="checking"
+              :busy-label="t('receipt.review.cancel_record_busy')"
               @click="cancelRecord"
             >
               {{ t('receipt.review.cancel_record') }}
@@ -212,6 +213,7 @@
             size="large"
             block
             :busy="sending"
+            :busy-label="t('receipt.review.record_busy')"
             :inactive="noItems ? shownTotal === null : balance.recorded === 0"
             @click="record"
           >

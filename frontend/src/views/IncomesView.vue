@@ -13,7 +13,13 @@
       <p v-if="gone" class="strip" role="alert">{{ t('income.restore_gone') }}</p>
       <div v-if="removed" ref="removedStrip" class="strip removed">
         <span class="removed-text">{{ t('income.removed', { amount: amountOf(removed) }) }}</span>
-        <AppButton variant="ghost" :inactive="!online || busy" @click="restore">
+        <AppButton
+          variant="ghost"
+          :busy="restoring"
+          :busy-label="t('income.restoring')"
+          :inactive="!online || busy"
+          @click="restore"
+        >
           {{ t('income.restore') }}
         </AppButton>
       </div>

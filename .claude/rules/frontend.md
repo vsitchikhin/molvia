@@ -238,12 +238,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
   Ctrl or Meta is the browser's, as in a live group (Р2-А3). `e2e/kit-inactive`
   holds it in Chromium and WebKit, since the component tests send their own events. A native
   `disabled` is drawn the same and stays for a moment, until a screen trades it for `inactive`
-  with the words saying why. **`busy` alone keeps the look of the action**, as on master — it is the one
-  at work, and saying so is the screen's: its words («Сохраняем…») or a status line («Готовим
-  фото…»); where the screen says nothing — among others «Удалить навсегда», «Не тот товар», «Выйти»,
-  the login; round 4 counted nine — only `aria-busy` does (round 3, Р3-А1), a limit, not a promise; **`busy` with `disabled` is drawn as not now**, as master
-  drew it dimmed: «Сохранить» of a sheet that keeps its words while it sends had nothing else to
-  show it (round 2, Р2-А1 — round 1 had drawn it live). A look of its own for `busy` is MOL-225's. **The form of the variant stays** (owner's В-1 «а»): a button with
+  with the words saying why. **At work is never not now** — see the next rule. **The form of the variant stays** (owner's В-1 «а»): a button with
   a fill goes to `surface-2`, a ghost or danger-ghost keeps no fill — two grey pills in a sheet's
   footer read as two buttons of equal weight. The price, accepted (А4): the `surface-2` pill stands
   1.10:1 on a sheet, so in a footer that sends, primary and ghost read as two muted words; an edge
@@ -262,6 +257,53 @@ The detail behind the frontend lines of `CLAUDE.md`.
   every chip and every segment is at 600, so nothing reflows under the thumb. **`--opacity-stale`
   means one thing: a previous answer left while the next is on its way** (К-11) — the searches;
   the difference of a reconciliation waits in words («Пересчитаем, когда…»), not dimmed (116 v2).
+- **At work, a button says what it does** (MOL-225, owner's В-1…В-5 «а»). `busy` had no look of its
+  own: alone it was drawn live, with `disabled` as not now, and only four places of twenty-seven
+  changed their word — so «Удалить навсегда», «Отвязать», «Выйти и стереть», the login and the
+  receipt stayed silent on a slow line while the kit swallowed the second tap. **`busy-label` is the
+  word of the work** («Удаляем…»), standing in place of the action's in the action's look — variant,
+  fill, ink, shadow and glyph — with `disabled` too, since this is the one at work and not one that
+  cannot be pressed. **No spinner** (DESIGN.md, «no spinners on buttons»), nothing that breathes: the
+  word is the sign and the explanation at once, and still under reduced motion by its nature.
+  **The width is the wider word**: a button not `block` holds both words in one cell, the one not
+  shown `visibility: hidden` and `aria-hidden`, so it does not jump under the thumb when the work
+  starts or ends; at rest the word of the work is drawn by CSS from `data-word`, so the button's
+  text is its action's word. A `block` one is as wide as its place and swaps the word (a cell there
+  broke every test that finds a button by its text). **The cell keeps the word shown in its middle**
+  (adversarial Р1-А4): where a grid holds the width — a pair of `1fr 1fr` — the word not shown wraps
+  and the cell grows two lines high; at its top, «Готово» of «Края чека» stood 12 px above its middle
+  on every phone. The prices, accepted: a live «Обновить» stands a little wider than its word, and
+  the word of the work in a pair may stand on two lines («Готовим / фото…»). **The focus stays**: a
+  screen does not bind `disabled` to its sending — the native attribute drops the focus to the page,
+  `busy` is `aria-disabled` and the kit cancels the tap — **nor to `!online` while it works**
+  (`!online && !sending`): a line that drops while the write hangs is the very case of the task, and
+  the glyph does not turn to «no network» beside «Сохраняем…» (Р1-А3). **Of two buttons that share
+  one write, the one pressed says it** (Р1-А1): «Удалить счёт», «Убрать план», «Снять оценку» have a
+  flag of their own beside `sending`; the other is `inactive` — before, «Сохранить» said «Сохраняем…»
+  of a save nobody asked for while the pressed one went grey. A neighbour that is not at work stays
+  not now. **Work is not only `busy`** (Р1-А2): a button whose own work was bound to `disabled` or
+  `inactive` — «Сохранить оценку», «Вернуть» of an income and an exchange (`restoring` of their
+  composables), «Считать по нему», «Записать разницу», «Показать ещё» (`loadingMore`) — is `busy` too. **Nothing is announced apart**: the word is the name of
+  the focused button, beside `aria-busy`, and the outcome is announced as before — the live region
+  of `App.vue` is inert behind a modal sheet, where most of these buttons stand. While a photo is
+  made ready, «Выбрать фото», «Снять» and «Отправить чек» are not now and the line «Готовим фото…»
+  says it — the work is the photo's; three buttons with one word would be noise. The linter refuses
+  `busy` without its word (`vue/no-restricted-syntax`) — the button's own attribute, bound, alone or
+  by `v-model:busy` (Р5-А2), never one of an element in its slot, or a key of what its `v-bind` gives: the object, a spread, a
+  choice, a cast (a name, a string, a computed string or a template with nothing in it), never a key
+  of an object that is a value or an argument inside it (`t('…', { busy })` is no prop), on
+  `AppButton` or `app-button`, the word as `busy-label` or `busyLabel` (Р1-А5, Р2-А1, Р3-А2,
+  Р4-А1). A word written as a string is the word here when it has a letter or a digit — `""`, `"…"`,
+  `"..."`, `"—"` say nothing (Р4-А2, Р5-А1): the rule of i18n cuts its whole list of signs out and
+  is silent on what is left — and untranslated for `vue/no-bare-strings-in-template`, whose list of
+  attributes holds `busy-label` (Р3-А1); that list replaces the plugin's own, so a new attribute of
+  text joins it by hand.
+  `src/eslint-busy.test.ts` holds every way through the real config. It cannot see a
+  button at work through `disabled` or `inactive` alone, which reads the same as a neighbour put out
+  while another works: that is review's. A button named by `label` — an icon-only one has no word to
+  swap — takes the word of the work as its name. A retry keeps its ↻ under «Отправляем…». `/_kit` «Идёт работа» and
+  `e2e/kit-inactive` hold the look and the width in Chromium and WebKit, `e2e/erase` the word, the
+  focus and the second tap on the most final button of the app.
 - **A row is `ListRow` or `NavRow`, a caps caption is `SectionCaption`** (MOL-175, Ф-12). A row of a
   list had been drawn anew on every screen — five heights (44, 52, 60, 64), a title at 400 or at 600,
   a hover here and none there — and a caps caption had grown 52 copies with three spacings to the

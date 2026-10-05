@@ -404,9 +404,11 @@ describe('ScreenState', () => {
       expect(view.emitted('retry')).toHaveLength(1)
     })
 
-    it('holds «Обновить» busy while the version is let in', () => {
+    it('holds «Обновить» busy while the version is let in, saying so (MOL-225)', () => {
       const { view } = waiting('applying')
-      expect(view.findAll('.action button')[0]?.attributes('aria-busy')).toBe('true')
+      const button = view.findAll('.action button')[0]
+      expect(button?.attributes('aria-busy')).toBe('true')
+      expect(button?.text()).toBe('Обновляем…')
     })
 
     it.each(['none', 'failed'] as const)(

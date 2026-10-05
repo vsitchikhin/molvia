@@ -138,6 +138,7 @@
       "mine": "My own",
       "own": "enter",
       "save": "Count by it",
+      "saving": "Saving…",
       "failed": "The choice could not be saved. Try again",
       "source_nbg": "the National Bank of Georgia"
     },
@@ -167,6 +168,7 @@
       "cached": "Showing data saved on this device.",
       "local_finish": "Finished on this device — not sent yet",
       "more": "Show more",
+      "loading": "Loading…",
       "finished_at": "Finished · {when}",
       "missing_title": "Purchases unavailable",
       "missing_body": "These purchases could not be found in your account. Return to Purchases.",
@@ -334,6 +336,7 @@
       "bind_question": "Link code {code} to «{name}»?",
       "bind_hint": "Everyone who scans this code will see this item",
       "bind": "Link and record",
+      "bind_busy": "Linking…",
       "without_code": "Record without the code",
       "propose_other": "It's a different item — suggest it",
       "taken": "Code {code} already belongs to «{name}»",
@@ -347,6 +350,7 @@
       "detach_question": "Unlink code {code} from «{name}»?",
       "detach_hint": "Nobody will find it by this code any more",
       "detach": "Unlink",
+      "detach_busy": "Unlinking…",
       "bind_named": "«{name}» is already in the catalogue. Link code {code} to it?"
     }
   },
@@ -384,6 +388,7 @@
       "save_new": "Rate it",
       "keeps_score": "The rating stays as it was. To take it back, withdraw it",
       "withdraw": "Withdraw the rating",
+      "withdrawing": "Withdrawing the rating…",
       "withdraw_hint": "The item leaves this screen, and the purchase goes back to «Ratings»",
       "withdraw_hint_shared": "Your rating leaves the average, and the purchase goes back to «Ratings»",
       "not_mine": "You have no rating here — refresh the list",
@@ -854,10 +859,12 @@
     "remove_sheet": {
       "title": "Delete the exchange?",
       "body": "A deleted exchange no longer counts in the rate of new purchases. Past purchases do not change",
-      "confirm": "Delete"
+      "confirm": "Delete",
+      "confirm_busy": "Deleting…"
     },
     "removed": "Exchange deleted: {amounts}",
     "restore": "Bring back",
+    "restoring": "Bringing back…",
     "restored": "The exchange is back",
     "restore_gone": "The exchange can no longer be brought back — the removal is final. If it was needed, record it again",
     "conflict": "This exchange is already recorded — the list shows it as it stands now. If the amounts are wrong, tap it in the list and amend it",
@@ -1015,10 +1022,12 @@
     "remove_sheet": {
       "title": "Remove this income?",
       "body": "Past purchases do not change. If this income was part of your rate, new purchases will be counted without it",
-      "confirm": "Remove income"
+      "confirm": "Remove income",
+      "confirm_busy": "Removing income…"
     },
     "removed": "Income removed: {amount}",
     "restore": "Bring back",
+    "restoring": "Bringing back…",
     "restored": "Income restored",
     "restore_gone": "This income can no longer be restored — the removal is final. If you needed it, record it again",
     "conflict": "This income is already recorded — here it is as it stands. If something is wrong, tap it in the list and amend it",
@@ -1093,7 +1102,8 @@
       "title": "End the session on {device}?",
       "title_unknown": "End the session on an unknown device?",
       "body": "Molvia will ask to sign in with Telegram again on that device. This cannot be undone from here.",
-      "confirm": "End session"
+      "confirm": "End session",
+      "confirm_busy": "Ending…"
     },
     "end_failed": "Could not end that session. Check the connection and try again.",
     "ended": "The session on {device} has ended",
@@ -1135,6 +1145,7 @@
     "body": "Everything Molvia saved on this device will be erased. Nothing is lost on the server: sign in with Telegram and it all comes back.",
     "unsent": "{n} entry has not been sent or was not accepted and will be lost | {n} entries have not been sent or were not accepted and will be lost",
     "confirm": "Sign out and erase",
+    "confirm_busy": "Signing out…",
     "offline": "Signing out needs a connection: without one the session on the server cannot be ended.",
     "error": "Could not sign out: the server did not answer. Try again."
   },
@@ -1145,6 +1156,7 @@
     "devices": "What is saved on this device is erased. Copies on other devices stay until the app or the site data is deleted there.",
     "final": "This cannot be undone. You can download a copy first: «Download my data».",
     "confirm": "Delete for good",
+    "confirm_busy": "Deleting…",
     "offline": "Deleting needs a connection.",
     "error": "Could not delete: the server did not answer. Try again.",
     "signed_out": "This sign-in has already ended, and this tap deleted nothing. If you have already deleted your data — here, in the bot or on another device — it is gone; if not, sign in and delete it again.",
@@ -1167,6 +1179,7 @@
       "body": "Your purchases and ratings then survive a change of phone. We store neither your name nor your phone number."
     },
     "start": "Sign in with Telegram",
+    "starting": "Opening Telegram…",
     "waiting": {
       "title": "Open Telegram and tap «Sign in»",
       "body": "The link lives five minutes. Come back here — the app will recognise you by itself."
@@ -1212,6 +1225,7 @@
       "badges": "Badges",
       "icons": "Icons",
       "selection": "Chosen and inactive",
+      "busy": "At work",
       "segment_fit": "Unit · by the width of words",
       "segment_inactive": "Unit · not now",
       "switch_off": "Off",
@@ -1650,6 +1664,7 @@
     },
     "age": "I am 16 or older",
     "accept": "I accept",
+    "accept_busy": "Saving…",
     "decline": "I do not accept",
     "offline": "You cannot accept without the internet — connect, and the button will work.",
     "error": "Could not save your consent. Try again.",
@@ -1707,6 +1722,7 @@
       "archived_row": "{currency} · {amount} · put away {date}",
       "archived_note": "A put-away account isn’t offered for new spending, income or exchanges. Its history and balance are kept",
       "restore": "Restore",
+      "restoring": "Restoring…",
       "restored": "“{name}” is back in the list",
       "removed": "Deleted: {name}",
       "removed_announced": "Deleted: {name}. Undo within 10 seconds",
@@ -1767,6 +1783,7 @@
       "start_day": "As of",
       "start_hint": "From this day on the balance keeps itself. Anything earlier is history and doesn't change it",
       "save": "Save",
+      "saving": "Saving…",
       "wait_online": "Will save once online",
       "offline": "Offline. Accounts change only with a connection — what you typed stays here",
       "added": "Account “{name}” added",
@@ -1777,8 +1794,10 @@
       "name_taken": "“{name}” already exists — pick another name",
       "bad_start": "Enter a balance — 0 is fine",
       "delete": "Delete account",
+      "deleting": "Deleting…",
       "delete_note": "No entries yet — it will be deleted for good. You can undo for 10 seconds",
       "archive": "Put away",
+      "archiving": "Putting away…",
       "archive_note": "History and balance stay; the account moves to “Put away” and can be restored"
     },
     "reconcile": {
@@ -1788,6 +1807,7 @@
       "hint": "Count the cash or look in the bank. We'll show what the app counts afterwards — so you don't adjust to it",
       "no_fact": "Enter an amount — 0 is fine",
       "check": "Check",
+      "checking": "Checking…",
       "wait_online": "Will check once online",
       "offline": "Offline. The server does the check — come back to it online",
       "match_title": "Matches the app",
@@ -1807,6 +1827,7 @@
       "no_causes_title": "Looks like some spending wasn't recorded",
       "no_causes_body": "Since {date} every entry {currency} has an account, amounts and “charged” are in place. Think of what you might have paid outside the app",
       "write_difference": "Record the difference as “Other · check”",
+      "writing": "Recording the difference…",
       "write_out_note": "We'll record spending of {amount} on “{name}”",
       "write_in_note": "We'll record income of {amount} “Other” on “{name}”",
       "recounting": "We will count again once the corrections reach the server",
@@ -1864,6 +1885,7 @@
   "update": {
     "ready": "A new version is out",
     "apply": "Update",
+    "applying": "Updating…",
     "failed": {
       "title": "The update did not take",
       "body": "Close Molvia completely and open it again. iPhone: swipe it up in the app switcher. Android: Recents — swipe Molvia away."
@@ -1966,8 +1988,10 @@
       "failed": "Not saved. Try again",
       "offline": "No connection. A plan is saved only online",
       "save": "Save",
+      "saving": "Saving…",
       "wait_online": "Waiting for connection",
       "remove": "Remove the plan",
+      "removing": "Removing the plan…",
       "other_currency": "The plan was {amount}, before the spending currency changed. Enter a sum in {sign}",
       "too_big": "Too large a sum for a month's plan"
     }
@@ -2026,6 +2050,7 @@
       "not_kept": "The photo wasn’t kept on this phone. Free some space and try again",
       "preparing": "Preparing the photo…",
       "send": "Send receipt",
+      "send_busy": "Sending the receipt…",
       "send_offline": "We’ll send it once you are online",
       "sent": "Receipt sent",
       "sent_offline": "The receipt is waiting for a connection — we’ll send it"
@@ -2062,10 +2087,12 @@
       "partly_lines": "Not all of it was read: {n} of {total} lines add up. If the print is faint, a retake will not help — correct the lines",
       "to_developer": "Send the receipt to the developer",
       "record": "Save {n} purchase | Save {n} purchases",
+      "record_busy": "Saving…",
       "record_sum": "Save the total",
       "record_offline": "We’ll save it once you are online",
       "recording": "We’ll save it once you are online — the lines are kept on this phone",
       "cancel_record": "Cancel saving",
+      "cancel_record_busy": "Checking…",
       "cancel_record_offline": "You can cancel once online: the record may already have reached the server",
       "cancel_record_failed": "The server did not answer — try cancelling again",
       "refused": "Not saved: {reason}. Fix it and save again",

@@ -33,7 +33,13 @@
 
     <template #footer>
       <p v-if="failed" class="failed" role="alert">{{ t('trip.rate.failed') }}</p>
-      <AppButton size="large" block :disabled="sending" @click="submit">
+      <AppButton
+        size="large"
+        block
+        :busy="sending"
+        :busy-label="t('trip.rate.saving')"
+        @click="submit"
+      >
         {{ t('trip.rate.save') }}
       </AppButton>
     </template>
