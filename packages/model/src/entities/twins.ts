@@ -148,3 +148,43 @@ function bitCount(mask: number): number {
   for (let rest = mask; rest !== 0; rest &= rest - 1) count++
   return count
 }
+
+/**
+ * Merged by itself: one edit a word, two a name, and a meaning at least this close. Measured on the
+ * seed (MOL-106, `.scratch/tasks/status/MOL-106-measure.md`): of its 178 000 pairs not one merges, the
+ * nearest one edit apart being «Курица» and «Корица» at 0.856; two edits a word let in «Хлеб» and
+ * «Хлебцы» at 0.937. What it takes: a fat with a comma or a point, «ё», the order of words, half of
+ * the typos. **A name in another script is not taken**: the model reads a transliteration by its
+ * letters, «Moloko» against «Молоко» is 0.69 at the median — as far as «Milo» from «Мыло», 0.48 — so
+ * one key in two scripts is always a candidate, never a merge.
+ */
+export const TWIN_MERGE = Object.freeze({ worst: 1, edits: 2, meaning: 0.9 })
+
+/** Named to the owner: two edits a word, and a meaning this close or one key in two scripts. */
+export const TWIN_CANDIDATE = Object.freeze({ worst: 2, meaning: 0.8 })
+
+/** What the night does with a pair: merges it, names it to the owner, or leaves it. */
+export type TwinVerdict = 'merge' | 'candidate' | 'apart'
+
+export interface TwinPair {
+  readonly spelling: Spelling | null
+  /** The unit a price is compared by — a kilo of bread is not a loaf. Always true for places. */
+  readonly sameUnit: boolean
+  /** The cosine of the two names' vectors; null when either has none, and then nothing merges. */
+  readonly meaning: number | null
+}
+
+export function twinVerdict({ spelling, sameUnit, meaning }: TwinPair): TwinVerdict {
+  if (spelling === null || spelling.worst > TWIN_CANDIDATE.worst) return 'apart'
+  if (
+    sameUnit &&
+    meaning !== null &&
+    spelling.worst <= TWIN_MERGE.worst &&
+    spelling.edits <= TWIN_MERGE.edits &&
+    meaning >= TWIN_MERGE.meaning
+  ) {
+    return 'merge'
+  }
+  if (spelling.edits === 0 || (meaning ?? 0) >= TWIN_CANDIDATE.meaning) return 'candidate'
+  return 'apart'
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nameParts, sameSizes, twinSpelling } from '#model/entities/twins'
+import { TWIN_MERGE, nameParts, sameSizes, twinSpelling, twinVerdict } from '#model/entities/twins'
 
 const spelling = (a: string, b: string) => twinSpelling(nameParts(a), nameParts(b))
 
@@ -85,5 +85,42 @@ describe('twinSpelling', () => {
 
   it('is no pair for names of sizes alone', () => {
     expect(spelling('500 г', '500 г')).toBeNull()
+  })
+})
+
+describe('twinVerdict', () => {
+  const pair = (a: string, b: string, meaning: number | null, sameUnit = true) =>
+    twinVerdict({ spelling: spelling(a, b), sameUnit, meaning })
+
+  it('merges a fat with a comma and a point, close in meaning', () => {
+    expect(pair('Молоко 3.2%', 'Молоко 3,2%', 0.97)).toBe('merge')
+  })
+
+  it('merges at the threshold exactly and not below it', () => {
+    expect(pair('Малоко', 'Молоко', TWIN_MERGE.meaning)).toBe('merge')
+    expect(pair('Малоко', 'Молоко', TWIN_MERGE.meaning - 0.001)).toBe('candidate')
+  })
+
+  it('merges nothing without a vector', () => {
+    expect(pair('Молоко 3.2%', 'Молоко 3,2%', null)).toBe('candidate')
+  })
+
+  it('never merges two units of price, only names them', () => {
+    expect(pair('Хлеб', 'Хлеб', 0.99, false)).toBe('candidate')
+  })
+
+  it('never merges one key in two scripts: «Milo» is not «Мыло»', () => {
+    expect(pair('Milo', 'Мыло', 0.48)).toBe('candidate')
+  })
+
+  it('never merges two edits in a word, however close the meaning', () => {
+    expect(pair('Хлеб белый', 'Хлеб балай', 0.99)).toBe('candidate')
+    expect(pair('Лимоны', 'Лимонад', 0.91)).toBe('candidate')
+  })
+
+  it('leaves what is far by meaning, and what differs in size or a short word', () => {
+    expect(pair('Курица', 'Корица', 0.79)).toBe('apart')
+    expect(pair('Молоко 1 л', 'Молоко 2 л', 0.99)).toBe('apart')
+    expect(pair('SAS', 'SOS', 0.99)).toBe('apart')
   })
 })
