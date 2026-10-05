@@ -566,7 +566,11 @@ report.
   no identity, MOL-12). The price: «Сметанa» with a Latin «a» is named, not merged. A unit after a number
   is no script of the name: «Молоко 1 l» merges with «Молоко 1 л». For places this is the price the owner chose with В-1:
   «Yerevan City» is 0.818 from «Ереван Сити» and is named, not merged; a double space, a hyphen or «ё»
-  inside merge by themselves.
+  inside merge by themselves. **A place's name is a proper name, and merges by itself only with no edit
+  at all** (`properName`, adversarial Ж1): one letter apart is another shop, and the model reads a
+  proper name by its letters — «Маркет Ширак» and «Маркет Шираз» at 0.942, «Магнит» and «Магнат» at
+  0.919, both in Gyumri. Every place the measure merged by itself was no edit apart, so nothing is lost;
+  a typo of a shop's name is a candidate. `merge-corpus.integration.test.ts` pins both on the model.
 - **A candidate** (named to the owner, never merged): the same sizes and words, two edits a word at
   most, and the meaning at 0.80 or one key; a pair that would merge but for its unit or for more than
   twenty codes together. **Named once, and only once printed** (`catalogue_merge_candidates`): a morning

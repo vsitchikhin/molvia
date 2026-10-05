@@ -188,7 +188,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Twins are merged by the night, and a false merge is worse than a missed one** (MOL-106): every
   size with its unit (by its spelling, never the search key), one edit a word, two a name, the meaning
   at 0.90 — measured on the seed; two scripts and a brand's extra word never merge, by the code. Places
-  by the same rule, one city each.
+  by the same rule, one city each, and with no edit at all: a shop's name is a proper name.
 - **A merged item or place stays a trace** (`merged_into`): its name is the survivor's second name,
   every write by an id goes through `liveItemId` / `livePlaceId`, the search answers the survivor once;
   one person's two verdicts stay two rows, so the gate does not move. **Production runs

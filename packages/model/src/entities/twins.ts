@@ -203,16 +203,23 @@ export interface TwinPair {
   readonly sameUnit: boolean
   /** The cosine of the two names' vectors; null when either has none, and then nothing merges. */
   readonly meaning: number | null
+  /**
+   * A proper name — a place's. One letter apart is two shops there, and the model reads a proper name
+   * by its letters: «Маркет Ширак» and «Маркет Шираз» at 0.942, «Магнит» and «Магнат» at 0.919
+   * (adversarial Ж1). So a proper name merges by itself only with no edit at all — a double space, a
+   * hyphen, «ё» — and one letter apart is a candidate.
+   */
+  readonly properName?: boolean
 }
 
-export function twinVerdict({ spelling, sameUnit, meaning }: TwinPair): TwinVerdict {
+export function twinVerdict({ spelling, sameUnit, meaning, properName }: TwinPair): TwinVerdict {
   if (spelling === null || spelling.worst > TWIN_CANDIDATE.worst) return 'apart'
   if (
     sameUnit &&
     spelling.sameScripts &&
     meaning !== null &&
     spelling.worst <= TWIN_MERGE.worst &&
-    spelling.edits <= TWIN_MERGE.edits &&
+    spelling.edits <= (properName === true ? 0 : TWIN_MERGE.edits) &&
     meaning >= TWIN_MERGE.meaning
   ) {
     return 'merge'

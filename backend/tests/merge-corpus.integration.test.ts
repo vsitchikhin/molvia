@@ -18,7 +18,7 @@ import { env } from '@/env'
 import { embedMissing } from '@/usecases/embed-items'
 import { mergeNight } from '@/usecases/merge-twins'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor } from './fixtures'
+import { clearAll, insertActor, insertPlace } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const quiet = { info: () => undefined, warn: () => undefined }
@@ -48,6 +48,20 @@ const APART: readonly (readonly [string, string])[] = [
   ['Батарейки AA 4 уп', 'Батарейки AA 4 pc'],
 ]
 
+/** One shop written twice — older first, the survivor: merged by the night by itself. */
+const SAME_PLACE: readonly (readonly [string, string])[] = [
+  ['Ереван Сити', 'Ереван  Сити'],
+  ['Гранд Кенди', 'Гранд-Кенди'],
+  ['Перекрёсток', 'Перекресток'],
+]
+
+/** Two shops of one city a letter apart, which the model reads as one (adversarial Ж1). */
+const LETTER_APART: readonly (readonly [string, string])[] = [
+  ['Маркет Ширак', 'Маркет Шираз'],
+  ['Магнит', 'Магнат'],
+  ['Аптека Альфа', 'Аптека Альта'],
+]
+
 let report: CatalogueMergedNotice
 
 beforeAll(async () => {
@@ -60,6 +74,9 @@ beforeAll(async () => {
   const items = createItemRepository(db)
   for (const [name, , unit] of [...TWINS, ...NAMED]) {
     await items.create(newItemSchema.parse({ kind: 'product', name, defaultUnit: unit }), person)
+  }
+  for (const [i, name] of [...SAME_PLACE, ...LETTER_APART].flat().entries()) {
+    await insertPlace(db, { name, city: 'Гюмри', createdAt: new Date(Date.UTC(2026, 8, 1, 0, i)) })
   }
   for (const name of APART.flat()) {
     await items.create(newItemSchema.parse({ kind: 'product', name, defaultUnit: 'piece' }), person)
@@ -97,7 +114,7 @@ describe('the night on the seed', () => {
     expect(merged.map((row) => [row.from, row.into])).toEqual(
       TWINS.map(([from, into]) => [from, into]).sort(([a = ''], [b = '']) => (a < b ? -1 : 1)),
     )
-    expect(report.merged).toBe(TWINS.length)
+    expect(report.merged).toBe(TWINS.length + SAME_PLACE.length)
   })
 
   it('names what the model cannot judge, ten a morning, and merges none of it', async () => {
@@ -121,5 +138,15 @@ describe('the night on the seed', () => {
     for (const pair of APART) {
       for (const name of pair) expect(merged.map((row) => row.name)).not.toContain(name)
     }
+  })
+
+  it('merges one shop written twice, and never two shops a letter apart', async () => {
+    const merged = await db.execute<{ from: string; into: string }>(sql`
+      select f.name as "from", t.name as into
+      from catalogue_merges m
+      join places f on f.id = m.from_place
+      join places t on t.id = m.into_place`)
+    const pairs = merged.map((row) => `${row.from} → ${row.into}`).sort()
+    expect(pairs).toEqual(SAME_PLACE.map(([into, from]) => `${from} → ${into}`).sort())
   })
 })

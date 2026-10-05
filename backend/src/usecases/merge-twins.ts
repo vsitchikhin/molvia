@@ -62,7 +62,8 @@ function judge(
     from,
     into,
     ...(city === undefined ? {} : { city }),
-    verdict: twinVerdict({ spelling, sameUnit, meaning }),
+    // A place's name is a proper name: one letter apart is another shop (adversarial Ж1).
+    verdict: twinVerdict({ spelling, sameUnit, meaning, properName: subject === 'place' }),
     spelling,
     meaning,
   }

@@ -218,3 +218,30 @@ describe('one key in two scripts (review №6)', () => {
     )
   })
 })
+
+describe("a proper name, a place's (adversarial Ж1)", () => {
+  const place = (a: string, b: string, meaning: number) =>
+    twinVerdict({ spelling: spelling(a, b), sameUnit: true, meaning, properName: true })
+
+  it.each([
+    ['Маркет Ширак', 'Маркет Шираз', 0.942],
+    ['Магнит', 'Магнат', 0.919],
+    ['Аптека Альфа', 'Аптека Альта', 0.91],
+  ])('never merges «%s» and «%s», a letter apart (%s)', (a, b, meaning) => {
+    expect(place(a, b, meaning)).toBe('candidate')
+  })
+
+  it.each([
+    ['Ереван  Сити', 'Ереван Сити', 0.98],
+    ['Ереван-Сити', 'Ереван Сити', 0.981],
+    ['Перекрёсток', 'Перекресток', 0.954],
+  ])('merges «%s» and «%s», no edit apart (%s)', (a, b, meaning) => {
+    expect(place(a, b, meaning)).toBe('merge')
+  })
+
+  it("leaves the items' rule as it was", () => {
+    expect(
+      twinVerdict({ spelling: spelling('Малоко', 'Молоко'), sameUnit: true, meaning: 0.95 }),
+    ).toBe('merge')
+  })
+})
