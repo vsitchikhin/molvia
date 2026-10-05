@@ -161,7 +161,11 @@ describe('SearchField', () => {
     it('closes a dialog that is no sheet, and leaves one that prevents its cancel to close itself', () => {
       for (const prevents of [false, true]) {
         const { sheet, heard, view } = inSheet(true)
-        if (prevents) sheet.addEventListener('cancel', (event) => event.preventDefault())
+        if (prevents) {
+          sheet.addEventListener('cancel', (event) => {
+            event.preventDefault()
+          })
+        }
         view
           .get('input')
           .element.dispatchEvent(
