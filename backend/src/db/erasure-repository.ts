@@ -12,6 +12,7 @@ import { yerevanWeek } from './yerevan-week'
  */
 export const ACTOR_REFERENCES = [
   'budget_plans.actor_id',
+  'catalogue_merge_moves.actor_id',
   'events.actor_id',
   'exchanges.actor_id',
   'feedback.actor_id',

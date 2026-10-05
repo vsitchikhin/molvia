@@ -5,11 +5,16 @@ import type { Conn } from './index'
 import { rowLimit } from './rows'
 import { feedbackPictureFiles, feedbackPictures, ownerNotices } from './schema'
 
-/** A notice about a failure not handed within a day goes: `make failures` still has its count (Р-7). */
+/**
+ * A notice about a failure not handed within a day goes: `make failures` still has its count (Р-7).
+ * So does a morning's report of the merge (MOL-106): the next morning brings its own, and the journal
+ * keeps every merge.
+ */
 const FAILURE_NOTICE_KINDS = [
   'failure',
   'failure_count',
   'failure_muted',
+  'catalogue_merged',
 ] as const satisfies readonly OwnerNoticeKind[]
 const UNHANDED_FAILURE_NOTICE_MS = 24 * 60 * 60 * 1000
 

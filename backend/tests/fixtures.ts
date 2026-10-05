@@ -12,6 +12,10 @@ import type { Db } from '@/db/index'
 import type { PriceQuery } from '@/db/expenses-repository'
 import {
   actors,
+  catalogueMergeCandidates,
+  catalogueMergeMoves,
+  catalogueMergeRuns,
+  catalogueMerges,
   erasures,
   loginDays,
   receiptDays,
@@ -187,6 +191,10 @@ export async function clearAll(db: Db): Promise<void> {
   await db.delete(openFoodFacts)
   await db.delete(exchanges)
   await db.delete(incomes)
+  await db.delete(catalogueMergeMoves)
+  await db.delete(catalogueMerges)
+  await db.delete(catalogueMergeRuns)
+  await db.delete(catalogueMergeCandidates)
   await db.delete(searchPicks)
   await db.delete(verdicts)
   await db.delete(expenses)

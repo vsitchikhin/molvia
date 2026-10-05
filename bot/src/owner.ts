@@ -2,7 +2,12 @@ import { GrammyError, InputFile } from 'grammy'
 import type { Api } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
-import type { FeedbackContinuedNotice, FeedbackNotice, OwnerNotice } from '@molvia/model'
+import type {
+  CatalogueMergedNotice,
+  FeedbackContinuedNotice,
+  FeedbackNotice,
+  OwnerNotice,
+} from '@molvia/model'
 import { t } from './i18n'
 import { telegramFailure } from './assemble'
 import { sleep } from './deliver'
@@ -16,6 +21,7 @@ import { reportDefect } from './failure'
 export function ownerText(notice: OwnerNotice): string {
   if (notice.kind === 'feedback') return feedbackText(notice)
   if (notice.kind === 'feedback_continued') return continuedText(notice)
+  if (notice.kind === 'catalogue_merged') return mergedText(notice)
   if (notice.kind === 'failure_muted') {
     // Said only what is so (review №10, adversarial Г2): no «скрыто: 0», and `make failures` only for
     // the held ones — the unwritten are in no table.
@@ -58,6 +64,62 @@ export function ownerText(notice: OwnerNotice): string {
     }),
     t(undefined, 'owner.failure.more'),
   ].join('\n')
+}
+
+/** A name of the catalogue or a place as the report prints it: cut, so ten pairs fit one message. */
+const PRINTED_NAME = 60
+
+function printed(name: string): string {
+  const chars = Array.from(name)
+  return chars.length <= PRINTED_NAME ? name : `${chars.slice(0, PRINTED_NAME - 1).join('')}…`
+}
+
+function pairText(
+  subject: 'item' | 'place',
+  from: string,
+  into: string,
+  city: string | undefined,
+): string {
+  const pair = t(undefined, 'owner.merge.pair', { from: printed(from), into: printed(into) })
+  if (subject === 'item') return pair
+  return t(undefined, 'owner.merge.place', { pair, city: city ?? '' })
+}
+
+/**
+ * The morning's report of the night's merge (MOL-106): sent every morning, nothing merged included —
+ * it is also the word that the night ran. In `report` mode it says what would have merged (В-3).
+ */
+function mergedText(notice: CatalogueMergedNotice): string {
+  const on = notice.mode === 'on'
+  const lines = [
+    t(undefined, on ? 'owner.merge.head' : 'owner.merge.headReport', {
+      day: notice.day,
+      merged: notice.merged,
+      candidates: notice.candidates,
+    }),
+  ]
+  if (notice.mergedPairs.length > 0) {
+    lines.push('', t(undefined, on ? 'owner.merge.merged' : 'owner.merge.wouldMerge'))
+    for (const pair of notice.mergedPairs) {
+      const text = pairText(pair.subject, pair.from, pair.into, pair.city)
+      lines.push(pair.id === undefined ? text : `#${String(pair.id)} ${text}`)
+    }
+    const rest = notice.merged - notice.mergedPairs.length
+    if (rest > 0) lines.push(t(undefined, 'owner.merge.more', { count: rest }))
+  }
+  if (notice.candidatePairs.length > 0) {
+    lines.push('', t(undefined, 'owner.merge.candidates'))
+    for (const pair of notice.candidatePairs) {
+      lines.push(
+        pairText(pair.subject, pair.from, pair.into, pair.city),
+        `make merge FROM=${pair.fromId} INTO=${pair.intoId}`,
+      )
+    }
+    const rest = notice.candidates - notice.candidatePairs.length
+    if (rest > 0) lines.push(t(undefined, 'owner.merge.more', { count: rest }))
+  }
+  if (on && notice.mergedPairs.length > 0) lines.push('', t(undefined, 'owner.merge.undo'))
+  return lines.join('\n')
 }
 
 /**

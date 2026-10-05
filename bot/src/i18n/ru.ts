@@ -198,6 +198,20 @@ export const ru = {
   'owner.failure.buildPrint': 'Сборка {build} · {fingerprint}',
   'owner.failure.more': 'Подробности — make failures',
   /**
+   * The morning's report of the nightly merge of twins (MOL-106), every morning: how many merged,
+   * how many new candidates, the first ten of each, the command for a candidate and for an undo.
+   */
+  'owner.merge.head': '🧩 Склейка за {day}: склеено {merged}, новых кандидатов {candidates}',
+  'owner.merge.headReport':
+    '🔎 Склейка за {day}, только отчёт: склеил бы {merged}, новых кандидатов {candidates}',
+  'owner.merge.merged': 'Склеено',
+  'owner.merge.wouldMerge': 'Склеил бы',
+  'owner.merge.candidates': 'Кандидаты — склеить командой',
+  'owner.merge.pair': '«{from}» → «{into}»',
+  'owner.merge.place': 'место {pair} · {city}',
+  'owner.merge.more': '…и ещё {count}',
+  'owner.merge.undo': 'Отменить — make unmerge ID=номер',
+  /**
    * «Написать разработчику» in the bot (MOL-148). The frame is what the person gets around the
    * owner's reply, in the language of their message (Р-12 of MOL-150); the rest answers a text
    * written as a reply to the bot, in the writer's language, under their message.

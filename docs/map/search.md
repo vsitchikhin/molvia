@@ -6,6 +6,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 ## packages/model
 
 - `packages/model/src/contracts/catalogue.ts` — Wire contract of the catalogue: the search query and its bound, the entry allowlist, the answer with `near`, the «Предложить товар» body.
+- `packages/model/src/contracts/merge.ts` — Wire contract of the merge of twins (MOL-106): items and places, the modes `on`/`report`/`off`, the morning's report to the owner with the pairs merged and the candidates.
 - `packages/model/src/entities/item.ts` — Entity: a catalogue item — kind, name, search key, barcodes, unit — and the schema of a new item.
 - `packages/model/src/support/search-key.ts` — `toSearchKey`, the frozen alphabet — Cyrillic with Serbian, Armenian, Georgian, Serbian Latin (MOL-109) — that folds any spelling of a name to one key, `unfinishedFoldSpellings` for a word typed halfway through a fold, and `nameIdentity` for duplicates.
 - `packages/model/src/support/synonyms.ts` — The synonym dictionary (`synonymKeys`) and the word-of-the-kind rules: adjective and noun patterns, `WORD_BREAK`, `kindKey`.
