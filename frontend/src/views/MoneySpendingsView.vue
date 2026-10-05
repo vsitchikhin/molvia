@@ -110,7 +110,7 @@
               <h2 class="day-head">
                 <span>{{ dayTitle(day.day) }}</span>
                 <span v-if="day.total" class="day-total">
-                  {{ day.estimated ? `≈ ${whole(day.total)}` : whole(day.total) }}
+                  {{ day.estimated ? `≈\u00a0${whole(day.total)}` : whole(day.total) }}
                 </span>
               </h2>
               <AppCard as="ul" list>
@@ -492,9 +492,13 @@ export default defineComponent({
   justify-self: start;
 }
 
+/* The day's words give way on a narrow phone, never its sum: broken, «≈» stood over «125 403 ֏» and the
+   figure left the column (review Р3-1). */
 .day-total {
+  flex: none;
   font-weight: var(--weight-regular);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .more {

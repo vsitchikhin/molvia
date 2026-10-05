@@ -9,6 +9,7 @@ import {
   mergePages,
   rateWords,
   refusedRows,
+  unbroken,
   unsentIn,
 } from '@/components/spending'
 import type { JournalRow } from '@/components/spending'
@@ -396,7 +397,7 @@ describe('a line of the journal as its row says it', () => {
 
   it('in another currency: «≈» of what the server counted it as, or that it could not', () => {
     expect(plain(row(euro({ counted: amd('10560.40') })).sub ?? '')).toBe('≈ 10 560 ֏')
-    expect(row(euro()).sub).toBe('не посчитано')
+    expect(row(euro()).sub).toBe('не\u00a0посчитано')
   })
 
   it('must not fire: a row only the phone holds says no «не посчитано» — «Отправляем…» says it', () => {
@@ -440,5 +441,24 @@ describe('a line of the journal as its row says it', () => {
     expect(row(manual({ mark: 'refused' })).tag).toEqual({ tone: 'bad', text: 'Не принята' })
     expect(row(manual()).tag).toBeNull()
     expect(row(manual()).verb).toBe('Открыть трату:')
+  })
+})
+
+describe('a line under an amount breaks only between its parts (MOL-176, adversarial round 2, Б3)', () => {
+  it('glues the words of its last part, never the figures before it', () => {
+    expect(unbroken('25\u00a0000\u00a0₽ · без «списано»')).toBe(
+      '25\u00a0000\u00a0₽ · без\u00a0«списано»',
+    )
+    expect(unbroken('25,000 ₽ · no “charged”')).toBe('25,000 ₽ · no\u00a0“charged”')
+  })
+
+  it('leaves a break between two amounts and after «·»', () => {
+    expect(unbroken('2\u00a0331,85\u00a0₽, 24,99\u00a0€ · без «списано»')).toBe(
+      '2\u00a0331,85\u00a0₽, 24,99\u00a0€ · без\u00a0«списано»',
+    )
+  })
+
+  it('a line of one part is glued whole', () => {
+    expect(unbroken('не посчитано')).toBe('не\u00a0посчитано')
   })
 })

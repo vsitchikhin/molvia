@@ -190,20 +190,26 @@ async function twelveADay(page: Page, days: string[]): Promise<void> {
 // The day's sum stands over the rows' sums (MOL-176, В-1 «а»): `--space-tail` is the card's hairline,
 // the row's inset, its chevron and the gap. Without the hairline it ended a pixel past the column
 // (adversarial А4).
-test('the day’s sum on «Траты» ends where the amounts of its rows do (MOL-176)', async ({
-  page,
-}) => {
-  await twelveADay(page, [yerevanDay()])
-  const day = page.locator('section.day', { has: page.locator('.day-total') }).first()
-  const edges = await day.evaluate((root) => ({
-    total: root.querySelector('.day-total')?.getBoundingClientRect().right ?? Number.NaN,
-    amounts: [...root.querySelectorAll('.list-row .amount')].map(
-      (one) => one.getBoundingClientRect().right,
-    ),
-  }))
-  expect(edges.amounts.length).toBe(12)
-  for (const amount of edges.amounts) expect(amount).toBeCloseTo(edges.total, 1)
-})
+for (const width of [412, 320])
+  test(`at ${String(width)} the day’s sum on «Траты» ends where its rows’ amounts do (MOL-176)`, async ({
+    page,
+  }) => {
+    // On 320 the rows stand their amounts under the words, and the day's words wrap, never its sum:
+    // broken, «≈» stood over the figure and the figure left the column (review Р3-1).
+    await page.setViewportSize({ width, height: 840 })
+    await twelveADay(page, [yerevanDay()])
+    const day = page.locator('section.day', { has: page.locator('.day-total') }).first()
+    const edges = await day.evaluate((root) => ({
+      total: root.querySelector('.day-total')?.getBoundingClientRect().right ?? Number.NaN,
+      lines: root.querySelector('.day-total')?.getClientRects().length ?? 0,
+      amounts: [...root.querySelectorAll('.list-row .amount')].map(
+        (one) => one.getBoundingClientRect().right,
+      ),
+    }))
+    expect(edges.amounts.length).toBe(12)
+    for (const amount of edges.amounts) expect(amount).toBeCloseTo(edges.total, 1)
+    expect(edges.lines).toBe(1)
+  })
 
 test('changing the month keeps the switcher where it was on the screen, under the skeleton too', async ({
   page,

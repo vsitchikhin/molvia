@@ -460,6 +460,17 @@ export interface OperationRowProps {
 /** `t` of vue-i18n, as the functions of this module take it: a key, its values, a count. */
 export type Translate = (key: string, named: Record<string, unknown>, plural?: number) => string
 
+/**
+ * A line under an amount breaks only between its parts — after «·» or between two amounts — never inside
+ * the words of its last part: «25 000 ₽ · без» over ««списано»» (MOL-176, adversarial round 2, Б3). The
+ * figures are whole already: `Intl` joins their groups and sign with no-break spaces.
+ */
+export function unbroken(text: string): string {
+  const cut = text.lastIndexOf(' · ')
+  const head = cut < 0 ? '' : text.slice(0, cut + ' · '.length)
+  return head + text.slice(head.length).replaceAll(' ', '\u00a0')
+}
+
 /** Purchases are drawn in the colour of «Продукты», where they land (Ф-4) — never the accent. */
 export function tripTint(groceries: SpendingCategoryView | null): string {
   return groceries ? categoryColour(groceries) : `var(--cat-${TRIP_CATEGORY})`
@@ -512,7 +523,7 @@ export function journalRowProps(
   if (money.currency !== context.spendCurrency && !(row.kind === 'manual' && row.local))
     sub = row.counted
       ? `≈\u00a0${formatEstimate(row.counted, locale)}`
-      : t('spending.uncounted_row', {})
+      : unbroken(t('spending.uncounted_row', {}))
 
   const mark = row.kind === 'manual' ? row.mark : null
   const look = trip ? { icon: tripIcon, tint: tripTint(category) } : spendingLook(category)

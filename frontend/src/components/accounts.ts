@@ -11,7 +11,7 @@ import type {
 } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
-import { asTyped, spendingLook, tripIcon, tripTint } from '@/components/spending'
+import { asTyped, spendingLook, tripIcon, tripTint, unbroken } from '@/components/spending'
 import type { OperationRowProps, Translate } from '@/components/spending'
 import { calendarDay, timeOfDay } from '@/days'
 
@@ -264,8 +264,10 @@ function subOf(
   const other = operation.amounts.filter((one) => one.currency !== moved.currency)
   if (other.length === 0) return null
   const amount = other.map((one) => unsigned(one, context.locale)).join(', ')
-  return context.t(
-    operation.debited ? 'accounts.account.charged_sub' : 'accounts.account.no_charged_sub',
-    { amount },
+  return unbroken(
+    context.t(
+      operation.debited ? 'accounts.account.charged_sub' : 'accounts.account.no_charged_sub',
+      { amount },
+    ),
   )
 }

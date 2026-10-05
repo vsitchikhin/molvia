@@ -169,6 +169,8 @@ describe('an operation as its row says it', () => {
         '2 331,85 ₽ · списано',
       )
       expect(plain(row(operation(other)).sub)).toBe('2 331,85 ₽ · без «списано»')
+      // Broken only after «·»: never «без» over ««списано»» (adversarial round 2, Б3).
+      expect(row(operation(other)).sub).toContain(' · без\u00a0«списано»')
     })
 
     it('must not fire: no line under it in the account’s own currency, or with nothing counted', () => {
