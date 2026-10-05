@@ -80,8 +80,10 @@ The log's writer, the cohort and both gate queries are pinned in `.claude/rules/
   every share, the stop line printed and no verdict; gate 0.3 closes its window as 0.2 does; the
   erased leave one number, by week of arrival, in `erasures`.
 - **The scanner's measure is `receipt_days`** (MOL-222): how readings ended, and at «Записать» the lines
-  put right against what the review showed and the time from the server taking the receipt — by day,
-  no id; read as the block «0.2r» of `make gates`, stop above a third of the lines after four weeks.
+  put right — the phone's word (`edited`), since only it knows what its review showed — a total put
+  right as the receipt's own edit, the first record only, and the time from the server taking the
+  receipt — by day, no id; read as the block «0.2r» of `make gates`, stop above a third of the lines
+  after four weeks.
 - **The login's funnel is `login_days`** (MOL-68): counted in each step's own transaction, by the
   day the login began, with no id at all; a device's repeat says `again=1`, so «began» is people
   rather than taps; a second way in is filed above `LOGIN_SECOND_WAY_PERCENT` (25 %) lost, read as

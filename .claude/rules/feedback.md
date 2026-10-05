@@ -96,7 +96,9 @@ a screenshot with it MOL-167 (В-1…В-5, Р-1…Р-13 in `.scratch/tasks/requi
   them anew like a picture chosen and shows them before sending — the person's act still, and a photo
   the system camera took is in no gallery to choose from. Three at most, as any; removable, as any; the
   picture lives as any other until the owner's Telegram has it. A receipt may carry a buyer's name, and
-  that is why it is seen before it goes. A till read badly is one to learn (MOL-169).
+  that is why it is seen before it goes. A till read badly is one to learn (MOL-169). **What does not fit is said**: a
+  receipt of four parts into a message of three, or into a draft already holding a picture, leaves a
+  note «Поместилось N из M» under the pictures (review 6) — never a part dropped in silence.
 - **The phone draws every picture anew** (`pictureFromFile`, Р-1): the orientation applied while
   decoding, the longest side to `FEEDBACK_PICTURE_SIDE`, a JPEG at 0.85, then 0.7, then smaller, until it
   fits `FEEDBACK_PICTURE_BYTES_MAX`. **A canvas writes only its own** (review 3): WebKit an EXIF of

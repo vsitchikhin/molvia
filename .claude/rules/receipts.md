@@ -305,18 +305,35 @@ and at the foot of the review, while its photos are on this phone — they go in
 **`receipt_days` counts, by day in Yerevan and with no id of anyone**, as `login_days` does (MOL-68):
 how readings ended (`read`, `read_partly`, `reshoot`, `unreadable` — the attempts' cap included), and
 at «Записать» the lines of the receipt, those put right, and each kind — left out, another item than
-the review showed, the quantity or the sum changed — a line counted once however many; and how long
-from the server taking the receipt (`created_at`) to its record, in buckets: never the phone's clock,
-and `captured_at` is the moment of «Отправить». **An edit is against what the review showed** — the
-shop's memory laid over the parse (`shownLines`, the review's own function), so an item the memory put
-there and the person left is not an edit, and a new item kept new under another name is none either:
-the reading gave no name to correct. Written in the transaction it counts, the last statement of it; a
-repeat of «Записать» counts nothing. Erasure does not reach it, and an erased person's corrections
-still count. **`make gates` reads it as the block «0.2r»** with its stop line — more than a third of
-the lines put right after four weeks brings the question of the reader back (`RECEIPT_EDITS_STOP_PERCENT`,
-owner, 04.10.2026) — and beside the share the readings that never reached a record, since the share is
-of recorded receipts only. The log of a reading carries the lines found, those that add up and «in
-part»: `lines: 0` of every «переснимите» sent the owner to a wrong cause on 04.10.
+the review showed, the quantity or the sum changed — a line counted once however many; receipts whose
+**total** was put right (`totals_corrected`) — one edit of the receipt, never of the lines it
+confirmed: a total put right moves the sums of the lines that do not add up (В-5), and counted as
+theirs it made one field N edits (review 2, adversarial А7); and how long from the server taking the
+receipt (`created_at`) to its record, in buckets: never the phone's clock, and `captured_at` is the
+moment of «Отправить».
+
+**What was put right is the phone's word** (`edited` in the body of «Записать», `review.ts`): the
+positions of the lines whose item differs from the one the review showed and whose figures differ
+from the shown ones. Only the phone knows what it showed — the shops' memory is shared and learns
+from every record, so between a review and its «Записать» another record (the person's own, queued
+before it, or anyone's in the chain) changes what the server would show now (adversarial А6). A number
+of the measure, never money: the server takes positions of recorded lines only. **A phone of an
+earlier build sends none**, and then each line is compared with the review as the server would show
+it now (`shownLines`, the review's own function) under the total the phone sends — **the price,
+named:** for those builds a record made after another one taught the memory counts against the new
+memory. A new item kept new under another name is no edit either way: the reading gave no name to
+correct. Written in the transaction it counts, the last statement of it; a repeat of «Записать»
+counts nothing, and **a receipt recorded again once its trip was removed for good counts nothing
+either** (review 7). Erasure does not reach it, and an erased person's corrections still count.
+**`make gates` reads it as the block «0.2r»** with its stop line — more than a third of the lines put
+right after four weeks brings the question of the reader back (`RECEIPT_EDITS_STOP_PERCENT`, owner,
+04.10.2026) — beside the share the readings that never reached a record, since the share is of
+recorded receipts only, and the totals put right. The log of a reading carries the lines found, those
+that add up and «in part»: `lines: 0` of every «переснимите» sent the owner to a wrong cause on 04.10.
+
+**Receipts that failed as `reshoot` before MOL-222 say «Не нашли ни одной строки»**, though some had
+lines under the old rule (am-06: 14): the price, named — before 0.2 only the owner is on production,
+and those receipts are taken again (Т-10).
 
 ## The reader holds nothing
 
@@ -447,6 +464,19 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
   receipt and adds the part; «‹» gives the shot up. **The whole frame lost a quarter of the lines** on
   the bench (16 receipts: 50 lines of 132 against 64 cut by hand; on the four of 04.10, 16 against 34).
   On the kit until prompt 12 of MOL-118 has a handoff (MOL-127 В-1); the brief is the step's.
+  **The whole photo is the step's to drag on** (`data-drags` on it): a pull down from the outline
+  between two corners closed the sheet and took the shot with it (adversarial А3) — the sheet's own
+  pull starts outside the photo. **A handle near an edge of the photo is drawn inside it** (Р-4,
+  review 3), and a corner the detector put past the frame is kept in it, so its trapezoid is
+  straightened rather than painted white. **«Готово» answers for the photo it was pressed on**: a warp
+  of a shot given up — «‹» while it ran, another shot opened — is let go and nobody's part (review 8,
+  adversarial А4). **Corners that make no receipt** — under half a per cent of the photo, three on a
+  line — keep «Готово» waiting and say so, never «файл не открылся» (review 9). **A side under what the
+  server takes is paper added**: «Оставить так» on a receipt under 200 px gets white margins to 200,
+  never the refusal of a photo (adversarial А2). **Not on WebKit end-to-end** (Т-11, the price): the
+  engine keeps no `Secure` cookie on http://127.0.0.1 and «Покупки» need the API; the sheet's own
+  WebKit behaviour is `sheet.spec`'s, and the step's opening from the file's `change` is held by the
+  system «back» in Chromium (Р-10).
 - **The corners are proposed by the measured candidate** (`edges.ts`, Т-2): «paper» — on a copy at most
   640 long, the light flattened against a wide blur so glare is as dull as the table, a pixel of colour
   never paper (a hand, a wooden table), thin bridges cut, the least rectangle around the region. Of
@@ -463,7 +493,7 @@ Requirements, decisions and the measurement of the photo check: `.scratch/tasks/
 - **No check of sharpness** (В-3, measured): the variance of the Laplacian put am-06 — the receipt the
   check was for — highest of all, and its width (695 px) is am-03's (719), which reads 17 of 18. A check
   that cannot tell a bad photo from a good one teaches «Оставить так». **«Чек мелкий» is the width of the
-  receipt cut out** (`RECEIPT_PHOTO_NARROW`, 600 px — an 80 mm roll prints 42 characters, and Tesseract
+  receipt cut out**, a note of the kit (`AppNote`) said through the app's one live region (`RECEIPT_PHOTO_NARROW`, 600 px — an 80 mm roll prints 42 characters, and Tesseract
   loses a till's digits under about 14 px a character): «Подойти ближе» or «Оставить так», never a
   refusal.
 - **The receipts' queue is MOL-24's** (`receiptQueue`): storage is the queue, one window sends under
