@@ -873,8 +873,12 @@ export const CLASS_MARK = new RegExp(
   `(?:(?<=[ԴդհԳգՂղ])|(?<!\\p{L}))(?<!\\d\\s?հ)աս[^\\p{L}\\d]{0,4}(\\d{2})\\s?[.,]?\\s?(\\d{2})${CLASS_TAIL}`,
   'u',
 )
-// The till's article after the class: «Ն/Կ 745030», read «ՆԿ», «ԽԿ».
-const CLASS_ARTICLE = /^[^\d]{0,8}?(\d{5,7})(?!\d)/
+// The till's article after the class: «Ն/Կ 745030», read «ՆԿ», «ԽԿ» — after a digit or two of the code's
+// own junk too where its mark is read, «56.10 19 Ն/Կ 745030» (review 5, № 15).
+const CLASS_ARTICLE =
+  /^(?:[^\d]{0,8}?|[^\d]{0,3}\d{1,2}[^\d]{0,3}(?:Ն\/?Կ|ՆԿ|Խ\/?Կ{1,2})[^\d]{0,3})(\d{5,7})(?!\d)/u
+// The article's mark is no word of a name: «Դաս. 56.10, Ն/Կ 1հատ …» with its digits lost (№ 15).
+const ARTICLE_MARK = /^(?:Ն\/?Կ|ՆԿ|Խ\/?Կ{1,2})$/u
 const CLASS_END = /Հսկիչ|Ընդամենը/
 const CLASS_TOTAL = /Ընդամենը:?\s+(\d[\d ]*(?:[.,]\d{1,2})?)(?![\d.,])/
 // A count before its unit: «1հատ», «4 հատ», «0.742 կգ».
@@ -913,6 +917,7 @@ function wordsOf(text: string): string {
     .replace(/(?:հ\S?տ|կգ|դրամ|դրա)(?=\s|$)/gu, ' ')
     .split(/\s+/)
     .map((w) => w.replace(/^[^\p{L}\d]+|[^\p{L}\d]+$/gu, ''))
+    .filter((w) => !ARTICLE_MARK.test(w))
   const kept = tokens.filter(
     (w, i) =>
       (w.match(/\p{L}/gu) ?? []).length >= 2 ||
@@ -1044,7 +1049,17 @@ function classList(rows: readonly TextRow[]): {
           `^[^\\d]{0,12}?(${service.slice(0, 2)})\\s?[.,]?\\s?(${service.slice(2)})${CLASS_TAIL}`,
           'u',
         ).exec(row)
-        if (loose !== null) mark = loose
+        // with no «Դաս» the class is the code only where no figure of a line follows it: nothing,
+        // or an article after its comma or mark, «ամ. 56.10, Li 740000». A price that begins with
+        // the class is a price whatever OCR made of the rest — «5610 5640», «5610:1.0», «5610 11220»
+        // (review 5: the family of А4, Б2, Г1, Д1, Д2 closed at its cause)
+        const rest = loose === null ? '' : row.slice(loose.index + loose[0].length)
+        if (
+          loose !== null &&
+          (!/\d/.test(rest) || /^[^\d]*[,\p{L}][^\d]*\d{5,7}(?!\d)/u.test(rest))
+        ) {
+          mark = loose
+        }
       }
     }
     if (mark === null) return null

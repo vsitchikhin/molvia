@@ -1439,3 +1439,63 @@ describe('a fiscal till read by its class code: junk, look-alikes, the first nam
     expect(got.lines.map((l) => l.printed)).toEqual(['ԵՐԵՎԱՆ ՍԵՆԴՎԻՉ', 'ԹՎԻՍՏԵՐ'])
   })
 })
+
+// MOL-226, review round 5: with no «Դաս», a class followed by a line's figures is a price, whatever form.
+describe('a fiscal till read by its class code: a price that begins with the class (MOL-226, review 5)', () => {
+  const receipt = (...texts: string[]) => parseReceiptText(rowsOf(texts.join('\n'), 0))
+
+  it('reads the till’s price as a price, its sum misread or of two pieces (Д1, № 16)', () => {
+    for (const [figures, total, sum] of [
+      // the total puts back the sum OCR misread: 5 730 is 5 610 and 120
+      ['5610 5640', '5730', 561_000],
+      ['5610 11220', '11340', 1_122_000],
+    ] as const) {
+      const got = receipt(
+        'Դաս. 56.10, Ն/Կ 745031',
+        `Բաքեթ ${figures}`,
+        'Դաս. 56.10, Ն/Կ 745032 1հատ 120.00 120.00',
+        'Սոուս',
+        `Ընդամենը ${total}`,
+      )
+      expect(got.lines.map((l) => l.printed)).toEqual(['Բաքեթ', 'Սոուս'])
+      expect(got.lines[0]?.sumHundredths).toBe(sum)
+    }
+  })
+
+  it('reads the terminal’s price whose «x» OCR read «:» (Д2)', () => {
+    for (const figures of ['5610:1.0 հատ-5610.00դրամ', '5610 00:1.0 հատ-5610.00դրամ']) {
+      const line = receipt(
+        'Դաս՝ 56.10',
+        'Բաքեթ',
+        figures,
+        'Դաս՝ 56.10',
+        'Թվիստեր',
+        '1250.0x1.0 հատ=1250.00դրամ',
+      ).lines[0]
+      expect(line).toMatchObject({ printed: 'Բաքեթ', sumHundredths: 561_000, settled: true })
+    }
+  })
+
+  it('keeps the article’s mark and the code’s junk out of a name, the article read (№ 15)', () => {
+    const lost = receipt('Դաս. 56.10, Ն/Կ 1հատ 688.09 688.09', 'Ֆրի').lines[0]
+    expect(lost).toMatchObject({ printed: 'Ֆրի', sku: null })
+    const junk = receipt('Դաս. 56.10 19 Ն/Կ 745030 1հատ 688.09 688.09', 'Ֆրի').lines[0]
+    expect(junk).toMatchObject({ printed: 'Ֆրի', sku: '745030' })
+  })
+
+  it('still reads a code with no «Դաս» on its own row, or before its article', () => {
+    const got = receipt(
+      'Դաս. 56.10, Ն/Կ 745030 1հատ 688.09 688.09',
+      'Ֆրի',
+      'ամ. 56.10, Li 740000 1հատ 11527 115.27',
+      'Կետչուպ',
+      'Ջ ւս 56 10',
+      'Թվիստեր 1 հատ 1250 1250',
+    )
+    expect(got.lines.map((l) => [l.hs, l.sku, l.sumHundredths])).toEqual([
+      ['56.10', '745030', 68_809],
+      ['56.10', '740000', 11_527],
+      ['56.10', null, 125_000],
+    ])
+  })
+})
