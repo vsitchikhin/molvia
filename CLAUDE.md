@@ -534,9 +534,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   В-2); read in part (`readPartly`, the model's) is a hint on the review, never a refusal — the person's
   corrections are the measure of 0.2.
 - **A receipt with no items is its sum** (MOL-227): a section «Բաժին» and no item's mark, only where no
-  reading found a line (`departmentReceipt`); a `parsed` receipt with no lines (`withoutItems`), its head
-  the terminal's — never the receipt's own «ԿՀ» as a tax number — its total two sources of three, and a
-  trip with no money and no purchase refused.
+  reading found a line (`departmentReceipt`), marks looked for under the section; a `parsed` receipt with
+  no lines (`withoutItems`), its head the terminal's — the tax number after «ՀՎՀՀ» first, never the
+  receipt's own «ԿՀ» — its total two sources of three, none where two receipts show; a finished trip
+  with no money and no purchase refused, at «Записать» and at «Убрать сумму».
 - **The reader away leaves a receipt queued; a photo it drops goes to the end with its attempt
   counted; a photo it cannot read fails** — never lost, never read forever; people read in turn.
 - **The class code is a boundary, not a layout** (MOL-226): «Դաս. 56.10» opens an item on any fiscal till,

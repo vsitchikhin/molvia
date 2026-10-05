@@ -142,6 +142,10 @@ another currency than the receipt's is «списано со счёта», not a
   purchases without a price came to, or by how much the prices miss the receipt — more than it is a
   line of warning, never a refusal (the receipt's discount, or a price typed wrong). Two currencies do
   not subtract, and then nothing is said.
+- **The sum is not taken off a finished trip with no purchase** (MOL-227, adversarial А4): what would be
+  left is a trip with no money and nothing in it, the empty row «Записать» of a receipt refuses —
+  `error.receipt_total_required`, and the sheet offers no «Убрать сумму» there; «Удалить запись» is the
+  way to be rid of it. An open trip is a record still being typed, and takes its sum off as ever.
 - **A change of the sum is a change of the trip's money**: it takes «списано» off (Р-32 MOL-115) and
   moves `receipt_set_at`, taken off included — what a check's window is measured by; the same sum
   again is a repeat from the queue and moves neither. **Under a sum a price is not the trip's money**
