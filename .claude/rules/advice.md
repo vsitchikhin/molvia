@@ -92,8 +92,7 @@ personal data.
 данные», 5.1), so they are on for everyone and the person may object. **Armenia's law has no
 legitimate interest** (art. 8, MOL-97): from edition 2 of the terms (MOL-236, before `v0.2.0`) the log
 and the count over verdicts rest on the consent «Принимаю» names, and the switch is its withdrawal —
-the mechanics stay; until that edition the log has no Armenian basis, a price named in «Персональные
-данные», 2.1, and before 0.2 production holds the owner alone. The switch is «Учитывать меня в
+the mechanics stay; what stands until that edition is in «Персональные данные», 2.1. The switch is «Учитывать меня в
 статистике», the first row of «Ваши данные», saved on the tap at `PUT /actors/me/analytics` with no
 sheet (В-3), as the bot's switches are. **The switch is drawn only as the server's answer**
 (adversarial А1, Р2-А1) — on «Бот» and «Зарплата» too, whose rows take the same quiet line

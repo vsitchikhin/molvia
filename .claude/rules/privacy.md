@@ -194,9 +194,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   load this file at all. **Armenia's law knows
   two bases only — consent or a law** (art. 8): there is no legitimate interest, so whatever the
   service does not need to work — the visit log, the withdrawn verdicts gate 0.2 counts — rests on
-  «Принимаю» **from edition 2** (MOL-236, before `v0.2.0`), whose text names it (art. 10). Until then
-  the log has no Armenian basis: a price named in «Персональные данные», 2.1, with production the
-  owner's alone before 0.2. **There is
+  «Принимаю» **from edition 2** (MOL-236, before `v0.2.0`), whose text names it (art. 10); what stands
+  until then is in «Персональные данные», 2.1. **There is
   no lawyer** (owner's decision В-1, 05.10.2026): where the text reads two ways, the strict reading is
   taken and the risk named in 3244067, section 2.1; a lawyer is called on a complaint or a letter from
   an authority, a breach, money, a country beyond the three, or 1.0 (the brief is `.scratch/tasks/questions/MOL-97-lawyer.md`).
