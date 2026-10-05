@@ -270,6 +270,11 @@ describe('a proper name by its letters, not its key (adversarial З1)', () => {
     expect(place(a, b, meaning)).toBe('candidate')
   })
 
+  it('reads the Armenian «և», «եւ» and «եվ» as one spelling (MOL-12)', () => {
+    expect(nameParts('Երևան Սիթի').letters).toBe(nameParts('Երեւան Սիթի').letters)
+    expect(nameParts('Երևան Սիթի').letters).toBe(nameParts('Երեվան Սիթի').letters)
+  })
+
   it('reads case, spacing, punctuation and «ё» aside, nothing else', () => {
     expect(nameParts('Гранд-Кенди, ЁЛКИ').letters).toBe('гранд кенди елки')
   })

@@ -110,10 +110,13 @@ export function nameParts(name: string): NameParts {
     words: key === '' ? [] : key.split(' ').filter((word) => !/^\d+$/u.test(word)),
     // Of the words: a unit after a number, «1 l», is no script of the name.
     scripts: scriptsOf(rest),
+    // Armenian «և», «եւ» and «եվ» are one spelling (the owner, MOL-12), as `nameIdentity` holds.
     letters: name
       .normalize('NFC')
       .toLowerCase()
       .replaceAll('ё', 'е')
+      .replaceAll('և', 'եվ')
+      .replaceAll('եւ', 'եվ')
       .replace(/[^\p{L}\p{N}]+/gu, ' ')
       .trim(),
   }
