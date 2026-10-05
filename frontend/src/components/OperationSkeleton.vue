@@ -112,11 +112,13 @@ export default defineComponent({
   padding: var(--space-3) var(--space-4);
 }
 
-/* A bar stands in a line of the words it stands for: the title's and the amount's 17, the meta's 13. */
+/* A bar stands in the middle of a line of the words it stands for — the title's and the amount's 17, the
+   meta's 13 — as tall as their leading makes it: where the text's own box is centred. */
 .line {
-  display: block;
+  display: flex;
+  align-items: center;
+  height: calc(1em * var(--leading-snug));
   font-size: var(--text-body);
-  line-height: var(--leading-snug);
 }
 
 .small {
@@ -125,13 +127,9 @@ export default defineComponent({
 
 .circle,
 .bar {
-  display: inline-block;
+  display: block;
   border-radius: var(--radius-pill);
   background: var(--border);
-}
-
-.bar {
-  vertical-align: middle;
 }
 
 .circle {

@@ -215,6 +215,5 @@ for (const width of [390, 320])
     const bars = await section.locator('.item .row').first().evaluate(measure)
     expect(bars.height).toBeCloseTo(real.height, 0)
     expect(bars.right).toBeCloseTo(real.right, 0)
-    // The text's box is its face's, the bar's its line's middle: WebKit's metrics part them by a pixel.
-    expect(Math.abs(bars.middle - real.middle)).toBeLessThanOrEqual(2)
+    expect(Math.abs(bars.middle - real.middle)).toBeLessThan(1)
   })
