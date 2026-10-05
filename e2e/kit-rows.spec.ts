@@ -81,6 +81,90 @@ test('a chosen row the keyboard stands on takes its fill from its round layer al
   expect(fills.layer).toBe(fills.alone)
 })
 
+// One search field (MOL-177, Ф-12): a pill on the well's ground, the same height whatever stands at its
+// end. The option the arrows stand on is filled at the weight of every row (К-4), and its meta is in
+// the text's colour — muted stands under 4.5:1 on the tint (MOL-172).
+test('the search field is one pill, and the active option keeps its weight and reads its meta in text', async ({
+  page,
+}) => {
+  await open(page, '/_kit')
+  const wells = await page.getByRole('searchbox').evaluateAll((inputs) =>
+    inputs.map((input) => {
+      const well = input.parentElement!
+      return {
+        height: well.getBoundingClientRect().height,
+        radius: parseFloat(getComputedStyle(well).borderTopLeftRadius),
+      }
+    }),
+  )
+  expect(wells).toHaveLength(3)
+  // A target of 44 inside an edge of 1 — 46, as every field of the kit (owner's choice on review Р1-3).
+  for (const well of wells) {
+    expect(well.height).toBe(46)
+    expect(well.radius).toBeGreaterThanOrEqual(well.height / 2)
+  }
+
+  const active = page.getByRole('listbox', { name: 'Found' }).getByRole('option').first()
+  await expect(active).toHaveAttribute('aria-selected', 'true')
+  const look = await active.evaluate((row) => {
+    const title = getComputedStyle(row.querySelector('.title')!)
+    const meta = getComputedStyle(row.querySelector('.meta')!)
+    return {
+      tag: row.tagName,
+      weight: title.fontWeight,
+      title: title.color,
+      meta: meta.color,
+      fill: getComputedStyle(row).backgroundColor,
+    }
+  })
+  expect(look.tag).toBe('LI')
+  expect(look.weight).toBe('600')
+  expect(look.meta).toBe(look.title)
+  expect(look.fill).not.toBe('rgba(0, 0, 0, 0)')
+})
+
+// A chosen row with a meta stands on the same tint: its meta is in the text's colour too (MOL-177, the
+// defect of MOL-175 — muted there is 3.83:1 in the dark).
+test('a chosen row reads its meta in text on its tint', async ({ page }) => {
+  await open(page, '/_kit')
+  const chosen = page
+    .getByRole('radiogroup', { name: 'Purchases account' })
+    .getByRole('radio', { checked: true })
+  const colours = await chosen.evaluate((row) => ({
+    title: getComputedStyle(row.querySelector('.title')!).color,
+    meta: getComputedStyle(row.querySelector('.meta')!).color,
+  }))
+  expect(colours.meta).toBe(colours.title)
+})
+
+// The end of a name tells items apart — the fat, the size (adversarial А1): an option of the list a field
+// owns breaks its name onto lines rather than ending it in «…», at 390 and at 320.
+for (const width of [390, 320])
+  test(`at ${String(width)} an option of the search list shows its whole name`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 720 })
+    await open(page, '/_kit')
+    const titles = await page
+      .getByRole('listbox', { name: 'Found' })
+      .getByRole('option')
+      .evaluateAll((rows) =>
+        rows.map((row) => {
+          const title = row.querySelector<HTMLElement>('.title')!
+          const style = getComputedStyle(title)
+          return {
+            cut: title.scrollWidth > title.clientWidth,
+            ellipsis: style.textOverflow === 'ellipsis' && style.whiteSpace === 'nowrap',
+            lines: Math.round(title.getBoundingClientRect().height / parseFloat(style.lineHeight)),
+          }
+        }),
+      )
+    expect(titles).toHaveLength(2)
+    for (const title of titles) expect(title).toMatchObject({ cut: false, ellipsis: false })
+    // The long name of the kit takes more than a line at either width.
+    expect(titles[1]?.lines).toBeGreaterThan(1)
+  })
+
 // One row of an operation (MOL-176, Ф-12): every row has its chevron, so the amounts end in one column
 // — and the bars of its skeleton end there too, or the list would jump as the answer comes.
 test('the amounts of operation rows stand in one column, where their skeleton’s stand', async ({

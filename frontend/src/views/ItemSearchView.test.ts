@@ -138,7 +138,7 @@ function field(view: VueWrapper) {
 }
 
 function names(view: VueWrapper): string[] {
-  return view.findAll('[role="option"] .name').map((name) => name.text())
+  return view.findAll('[role="option"] .title').map((name) => name.text())
 }
 
 function button(view: VueWrapper, text: string): DOMWrapper<HTMLButtonElement> {

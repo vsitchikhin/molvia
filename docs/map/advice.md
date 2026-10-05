@@ -67,7 +67,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 - `frontend/src/components/AdviceGroup.vue` — Group heading of «Что брать»: the word and badge of «Брать», «Только если дёшево» or «Не брать нигде»; «Ещё не оценивали» for the search.
 - `frontend/src/components/AdviceHomeNew.vue` — «Что брать» of a newcomer (MOL-128): «Запишите первые покупки» or «Осталось оценить», the cycle of three steps, the line about trust.
 - `frontend/src/components/AdviceNeverRow.vue` — Row of «Не брать нигде»: struck-through name, rating and own review, with no price or place.
-- `frontend/src/components/AdviceSearch.vue` — The search on «Что брать»: the field, and what is found laid out by the list's groups and shapes, «Ещё не оценивали» last with «Оценить».
+- `frontend/src/components/AdviceSearch.vue` — The search on «Что брать»: the kit's `SearchField` with «Очистить», and what is found laid out by the list's groups and shapes, «Ещё не оценивали» last with «Оценить».
 - `frontend/src/components/AdviceRating.vue` — The «4,3 из 5 · 3 оценки» figure shared by all three row forms; the count is left out in own mode.
 - `frontend/src/components/AdviceTakeCard.vue` — Card of «Брать»: verdict, rating, name, and where it is cheapest at what price per unit.
 - `frontend/src/components/RatingScale.vue` — The 1–5 digit scale used wherever a verdict is given or changed; a second tap takes the choice back.

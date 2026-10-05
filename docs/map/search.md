@@ -65,7 +65,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 
 ## frontend · components
 
-- `frontend/src/components/CatalogueCombobox.vue` — The field and result list of «Что взяли?»: an ARIA combobox on a native input, rows only as the server sent them.
+- `frontend/src/components/CatalogueCombobox.vue` — The field and result list of «Что взяли?»: an ARIA combobox on the kit's `SearchField`, rows `ListRow` options only as the server sent them.
 - `frontend/src/components/ProposeItemSheet.vue` — «Предложить товар» sheet: name from the query, unit and note, waits for a connection, «already there» is a pick.
 
 ## frontend · composables

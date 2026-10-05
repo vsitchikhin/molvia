@@ -320,6 +320,48 @@ The detail behind the frontend lines of `CLAUDE.md`.
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
   — rows had drawn them at 11/700, 11/600 and 13/600. Screens move onto them in their own tasks.
+- **A search is one field, `SearchField`** (MOL-177, Ф-12). «Что взяли?» drew a pill in a well with
+  a hint of 11, «Что брать» a rounded box on `surface` edged by an inner shadow with a ring of its own,
+  «Выбрать товар» a field of the form with a label repeating the sheet's title. Now one: a pill on
+  `surface-2` with a `border-strong` edge — 44 inside it, 46 outside, as `AppField` (owner's choice on
+  review Р1-3: a scanner of 44 in a pill of 44 would lie over the edge), a magnifier of 20, at the right the screen's action —
+  the scanner — **or** «Очистить» while there is text and the field is not read-only, never both, the
+  focus of a kit field and a hint of 13 (adversarial А2: read-only kept the keys out and let the button
+  empty the field). **In an open dialog the field gives Esc to the dialog**: Chromium takes a search
+  field's Esc for itself — it clears the text, and the dialog never hears `cancel` — so «Выбрать товар»
+  lost the receipt's words and stayed open (adversarial А3); the field prevents that Esc and makes the
+  close request the platform would have: a `cancel` the dialog may prevent — a sheet does, and closes
+  through the history — else the dialog is closed, since a `cancel` from a script closes nothing by
+  itself (round 2, Б1) — and only where the platform makes one, by its own answer `dialog.closedBy`:
+  not `none` (round 3, В1: a dialog beside the page or one to be stepped through keeps its Esc; round 4,
+  Г1: one beside the page marked `closerequest` or `any` is closed, and the attribute is the platform's
+  to read, not ours); an engine without the property knows no `closedby` and closes a modal dialog
+  alone. **Not while a popover is open** (round 5, Д1): the platform's Esc closes the topmost of what
+  closes, a popover stands above the dialog, and taken by the field Esc closed the dialog under it; which
+  one is on top no script can ask, so with a popover Esc closes open (`auto`, `hint`) the key is the
+  platform's; a `manual` one is a strip that stays until taken away, closes on no Esc and does not count
+  (round 6, Е1: counted, every such strip gave «Выбрать товар» back to Chromium's clearing). The price,
+  while none exists in the app, measured in round 6 (Е2): with such a popover in the dialog Chromium
+  clears the field and the popover stays; WebKit closes the popover.
+  Unless its owner took the key first. Outside a dialog Esc is the platform's,
+  the combobox's «let go of the row» before it. **The focus of a field is one mixin, `field-focus`**, which `AppField` takes too. **The field
+  is only a field**: a combobox gives it its role, its `aria-*` and its keys, and every attribute but
+  `class` and `style` lands on the `<input>` — so the two simple searches carry no listbox they have
+  not got, and the combobox keeps its list, its arrows and its Escape (MOL-23). **No width of its
+  own** (`width: 0` beside `flex: 1`): an input brings some twenty characters as its least width, and
+  in the kit's grid that pushed a phone of 320 to 357 in WebKit. **A second one is refused by ESLint**:
+  `<input type="search">` and `enterkeyhint="search"` outside `SearchField.vue`
+  (`vue/no-restricted-static-attribute`), as caps outside `SectionCaption` are; a bound `:type` passes —
+  it closes carelessness, not intent. **The rows of the combobox are `ListRow as="li"`** options: no
+  `type`, no stop of Tab — the focus stays in the field — and **no hover**, which on a desktop fought
+  the arrows for which row is active (MOL-23); **the name wraps** (`wrap`), never «…» — its end, the fat
+  or the size, is what tells two items apart, and cut they read as one (adversarial А1: «Молоко
+  «Марианна» ультрапаст…» twice at 390); the active one is read out selected, as the ARIA
+  combobox has it, filled at the weight of every row (К-4 — the handoff of 0.1 drew 700). **On the fill
+  of an active or a selected row the meta is `text`**: muted stands 4.17:1 and 3.83:1 on `accent-tint`;
+  the combobox had kept that itself, and `ListRow` had lost it for a chosen row with a meta (MOL-175).
+  `e2e/kit-rows` holds the pill, its one height of 46 with or without the scanner, the active option's weight
+  and meta, a chosen row's meta, and an option's whole name at 390 and 320, in both engines.
 - **An operation is one row, `OperationRow`, and it knows no operation** (MOL-176, Ф-12). «Траты» drew
   `SpendingRow`, an account's journal, «не попали» and a check drew an `OperationRow` bound to
   `AccountOperationView`, and the two parted on everything seen: the chevron on purchases alone or on
