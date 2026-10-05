@@ -413,11 +413,12 @@ export function isRateFresh(date: string, today: string): boolean {
 const PROVIDER_ORDER: readonly RateProvider[] = ['cba', 'cbr', 'nbg', 'erapi']
 
 /**
- * The country banks of `HOME_BANK` stand only for their own pairs (MOL-110, plan Р-1: «for the rest,
- * as it was»): the National Bank of Georgia prints the dram per 1000 with four digits, five
- * significant ones, so a dollar in drams by it is coarser than the Bank of Russia's (review 3).
+ * The country banks of `HOME_BANK` (MOL-110), the one list of them. They stand only for their own
+ * pairs (plan Р-1: «for the rest, as it was»): the National Bank of Georgia prints the dram per 1000
+ * with four digits, five significant ones, so a dollar in drams by it is coarser than the Bank of
+ * Russia's (review 3). The refresh asks them every hour and judges their jumps by their own fortnight.
  */
-const COUNTRY_BANKS: ReadonlySet<RateProvider> = new Set(Object.values(HOME_BANK))
+export const COUNTRY_BANKS: ReadonlySet<RateProvider> = new Set(Object.values(HOME_BANK))
 
 /**
  * The rate of `base` in `quote` built from rates against the dram: quote per one base, as the

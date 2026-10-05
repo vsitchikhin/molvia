@@ -8,6 +8,7 @@ import {
   ARCHIVE_DAYS_PER_RUN,
   ARCHIVE_GAP_DAYS,
   ARCHIVE_RECENT_DAYS,
+  COUNTRY_JUMP_DAYS,
   FALLBACK_AFTER_FAILURES,
   HISTORY_EVERY_MS,
   HISTORY_RETRY_MS,
@@ -744,6 +745,17 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
       })
     })
 
+    it('банк завис на старой дате: хвост до сегодня — не дыра, проход отдыхает (ревью 5)', () => {
+      // Последний свой день — 1 сентября, дальше банк отвечает им же; история целая.
+      const hung = ['2026-08-10', '2026-08-15', '2026-08-25', '2026-09-01']
+      expect(archiveWalkFrom(hung, '2026-08-10', today)).toEqual({ from: month, whole: true })
+      // А заговорил сегодня — дыра между двумя его днями, её и проходим.
+      expect(archiveWalkFrom([...hung, today], '2026-08-10', today)).toEqual({
+        from: month,
+        whole: false,
+      })
+    })
+
     it('без дыр — только последний месяц, и архив цел до завтра', () => {
       const kept = ['2026-08-10', '2026-08-15', '2026-08-25', '2026-09-04', '2026-09-14', today]
       expect(archiveWalkFrom(kept, '2026-08-10', today)).toEqual({ from: month, whole: true })
@@ -796,6 +808,27 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
       (row) => row.provider === 'nbg' && row.currency === 'RUB' && row.date === SATURDAY,
     )
     expect(written?.jump).toBe(false)
+  })
+
+  it('после праздника скачок меряется: своих за две недели хватает (адверсариальный Г)', async () => {
+    // Как 15.04.2026 после Пасхи: за неделю своих два, за две — пять. Рубль с запятой не там.
+    const own = ['2026-09-07', '2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11'].map(
+      (date): CachedRate => ({
+        provider: 'nbg',
+        currency: 'RUB',
+        date,
+        scaled: 4_348_000n,
+        jump: false,
+      }),
+    )
+    expect(COUNTRY_JUMP_DAYS).toBe(14)
+    const home = homeHarness({ cached: own })
+    home.state.rub = 43_480_000n
+    await home.run()
+    const written = home.cache.find(
+      (row) => row.provider === 'nbg' && row.currency === 'RUB' && row.date === SATURDAY,
+    )
+    expect(written?.jump).toBe(true)
   })
 
   it('архив: сначала последний месяц, потом история с начала, каждая порция — с места прошлой', async () => {
