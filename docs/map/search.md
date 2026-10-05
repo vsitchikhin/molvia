@@ -37,6 +37,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 - `backend/src/db/kind-word.ts` — `kindAt`: where the word of the kind stands in a name, the one SQL spelling of `kindKey` (MOL-45) — read by the search's synonyms and by «Тут дешевле»'s items of a kind (MOL-92).
 - `backend/src/db/item-embeddings-repository.ts` — Repository of item vectors (MOL-105): the items without one of a model, and the vectors written — another model's replaced, an item gone skipped.
 - `backend/src/db/items-repository.ts` — Repository of items: the ranked search (candidates, distance, units, synonyms, picks, `near`) and `createUnlessNamed`. Tests: `backend/tests/search.integration.test.ts`.
+- `backend/src/db/merge-repository.ts` — The merge of twins (MOL-106): an item or a place into another in one transaction, every row moved and written down, one person's two verdicts settled; the undo by the journal, and the sweep of what reached a trace after its merge. Tests: `backend/tests/merge.integration.test.ts`.
 - `backend/src/db/trace.ts` — `liveItemId` and `livePlaceId` (MOL-106): the id an item or a place stands for now — the survivor of the merge it went into, else itself — for every write by an id.
 - `backend/src/db/rekey.ts` — `rekeyItems`: at the API's start, every stored search key brought to what `toSearchKey` gives its name today, under a lock against writes (MOL-109). Tests: `backend/tests/rekey.integration.test.ts`.
 - `backend/src/db/search-picks-repository.ts` — Repository of remembered picks: a query and the item taken after it, and the person's own word (`admits`). Tests: `backend/tests/search-picks.integration.test.ts`.
@@ -54,6 +55,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 ## backend · tests
 
 - `backend/tests/catalogue.integration.test.ts` — Integration test: both catalogue routes through the server — the door, the query bound, the wire answer, no event, proposal dedup.
+- `backend/tests/merge.integration.test.ts` — Integration test: a merge moves every row and writes it down, two verdicts of one person settle, the 0.2 gate at five stays put, the undo restores a snapshot, the sweep, places by city.
 - `backend/tests/merge-trace.integration.test.ts` — Integration test: an id or a name of a merged item or place, on every path that writes by it — read, rated, bought, picked, coded, remembered, proposed, typed — lands on the survivor; the search finds the survivor by the trace's name, once.
 - `backend/tests/rekey.integration.test.ts` — Integration test: a key drifted from today's tables is rewritten, a current one left, a second start writes nothing (MOL-109).
 - `backend/tests/search-corpus.integration.test.ts` — Integration test: the whole corpora and the owner's shelf through the real search, every answer pinned whole, near and far included.

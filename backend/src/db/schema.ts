@@ -1101,9 +1101,11 @@ export const catalogueMerges = pgTable(
 export const MERGE_MOVES = [
   'expense',
   'verdict',
-  // a verdict of the survivor that lost to the trace's own: it went to the trace
-  'verdict_displaced',
-  // a verdict that lost, withdrawn on the trace — `before` holds when, if ever, it was withdrawn
+  // one person's two verdicts, the trace's the later: the rows stay, their contents swap — the unique
+  // key holds row by row, so two rows cannot cross over in one statement
+  'verdict_swapped',
+  // the verdict that lost, withdrawn on the trace; the gate still counts it, the undo brings it back
+  // without its text, which a withdrawn row cannot hold
   'verdict_withdrawn',
   'trip',
   'barcode',
@@ -1215,6 +1217,8 @@ export const searchPicks = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.actorId, table.queryKey, table.itemId] }),
+    // The merge of twins and its nightly sweep look a pick up by its item alone (MOL-106).
+    index('search_picks_item_idx').on(table.itemId),
     check('search_picks_counted', sql`${table.picks} > 0`),
     // The key is a btree row, and a btree row stops at 2704 bytes: 800 four-byte code
     // points would overflow it with `54000`, an error about index internals rather than
@@ -2500,6 +2504,7 @@ export const receiptLines = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.receiptId, table.position] }),
+    index('receipt_lines_item_idx').on(table.itemId),
     check('receipt_lines_position_non_negative', sql`${table.position} >= 0`),
     check(
       'receipt_lines_quantity_whole',
@@ -2588,6 +2593,7 @@ export const storeMemory = pgTable(
   (table) => [
     // one word per person and key; the erased are many words of nobody
     uniqueIndex('store_memory_word_key').on(table.tin, table.kind, table.key, table.actorId),
+    index('store_memory_item_idx').on(table.itemId),
     index('store_memory_actor_idx').on(table.actorId),
     check('store_memory_kind_known', oneOf(table.kind, storeMemoryKindSchema.options)),
     check(

@@ -14,7 +14,7 @@ CREATE TABLE "catalogue_merge_moves" (
 	"key" jsonb NOT NULL,
 	"before" jsonb,
 	"actor_id" uuid,
-	CONSTRAINT "catalogue_merge_moves_what_known" CHECK ("catalogue_merge_moves"."what" in ('expense', 'verdict', 'verdict_displaced', 'verdict_withdrawn', 'trip', 'barcode', 'item_name', 'item_hs', 'store_memory', 'receipt_line', 'pick', 'pick_added', 'trace')),
+	CONSTRAINT "catalogue_merge_moves_what_known" CHECK ("catalogue_merge_moves"."what" in ('expense', 'verdict', 'verdict_swapped', 'verdict_withdrawn', 'trip', 'barcode', 'item_name', 'item_hs', 'store_memory', 'receipt_line', 'pick', 'pick_added', 'trace')),
 	CONSTRAINT "catalogue_merge_moves_pick_named" CHECK (("catalogue_merge_moves"."actor_id" is not null) = ("catalogue_merge_moves"."what" in ('pick', 'pick_added')))
 );
 --> statement-breakpoint
@@ -70,6 +70,9 @@ ALTER TABLE "items" ADD CONSTRAINT "items_merged_into_items_id_fk" FOREIGN KEY (
 ALTER TABLE "places" ADD CONSTRAINT "places_merged_into_places_id_fk" FOREIGN KEY ("merged_into") REFERENCES "public"."places"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "items_merged_into_idx" ON "items" USING btree ("merged_into") WHERE "items"."merged_into" is not null;--> statement-breakpoint
 CREATE INDEX "places_merged_into_idx" ON "places" USING btree ("merged_into") WHERE "places"."merged_into" is not null;--> statement-breakpoint
+CREATE INDEX "receipt_lines_item_idx" ON "receipt_lines" USING btree ("item_id");--> statement-breakpoint
+CREATE INDEX "search_picks_item_idx" ON "search_picks" USING btree ("item_id");--> statement-breakpoint
+CREATE INDEX "store_memory_item_idx" ON "store_memory" USING btree ("item_id");--> statement-breakpoint
 ALTER TABLE "items" ADD CONSTRAINT "items_merged_not_self" CHECK ("items"."merged_into" <> "items"."id");--> statement-breakpoint
 ALTER TABLE "owner_notices" ADD CONSTRAINT "owner_notices_kind_known" CHECK ("owner_notices"."kind" in ('failure', 'failure_count', 'failure_muted', 'feedback', 'feedback_continued', 'catalogue_merged'));--> statement-breakpoint
 ALTER TABLE "places" ADD CONSTRAINT "places_merged_not_self" CHECK ("places"."merged_into" <> "places"."id");--> statement-breakpoint
