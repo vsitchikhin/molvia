@@ -327,11 +327,13 @@ The detail behind the frontend lines of `CLAUDE.md`.
   review Р1-3: a scanner of 44 in a pill of 44 would lie over the edge), a magnifier of 20, at the right the screen's action —
   the scanner — **or** «Очистить» while there is text and the field is not read-only, never both, the
   focus of a kit field and a hint of 13 (adversarial А2: read-only kept the keys out and let the button
-  empty the field). **In an open sheet the field gives Esc to the sheet**: Chromium takes a search
+  empty the field). **In an open dialog the field gives Esc to the dialog**: Chromium takes a search
   field's Esc for itself — it clears the text, and the dialog never hears `cancel` — so «Выбрать товар»
-  lost the receipt's words and stayed open (adversarial А3); the field prevents that Esc and hands the
-  sheet the `cancel` it closes on, unless its owner took the key first. Outside a sheet Esc is the
-  platform's, the combobox's «let go of the row» before it. **The focus of a field is one mixin, `field-focus`**, which `AppField` takes too. **The field
+  lost the receipt's words and stayed open (adversarial А3); the field prevents that Esc and makes the
+  close request the platform would have: a `cancel` the dialog may prevent — a sheet does, and closes
+  through the history — else the dialog is closed, since a `cancel` from a script closes nothing by
+  itself (round 2, Б1); unless its owner took the key first. Outside a dialog Esc is the platform's,
+  the combobox's «let go of the row» before it. **The focus of a field is one mixin, `field-focus`**, which `AppField` takes too. **The field
   is only a field**: a combobox gives it its role, its `aria-*` and its keys, and every attribute but
   `class` and `style` lands on the `<input>` — so the two simple searches carry no listbox they have
   not got, and the combobox keeps its list, its arrows and its Escape (MOL-23). **No width of its

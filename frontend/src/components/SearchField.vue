@@ -106,16 +106,18 @@ export default defineComponent({
         Object.fromEntries(
           Object.entries(attrs).filter(([key]) => key !== 'class' && key !== 'style'),
         ),
-      // In a sheet Esc is «back», as everywhere in a sheet (MOL-80). Chromium gives a search field's Esc
-      // to the field instead — it clears the text and the dialog never hears `cancel` — so «Выбрать
+      // In a dialog Esc closes it — in a sheet that is «back» (MOL-80). Chromium gives a search field's
+      // Esc to the field instead — it clears the text and the dialog never hears `cancel` — so «Выбрать
       // товар» lost the receipt's words and stayed open (adversarial А3). Taken here, the text stays and
-      // the sheet hears the `cancel` it closes on; its owner's own Esc — a combobox's — comes first.
+      // the dialog gets the close request the platform would have made: a `cancel` it may prevent — a
+      // sheet does, and closes through the history — else it is closed (round 2, Б1: a `cancel` from a
+      // script closes nothing by itself). Its owner's own Esc — a combobox's — comes first.
       escape: (event: KeyboardEvent) => {
         if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented) return
-        const sheet = input.value?.closest('dialog')
-        if (!sheet?.open) return
+        const dialog = input.value?.closest('dialog')
+        if (!dialog?.open) return
         event.preventDefault()
-        sheet.dispatchEvent(new Event('cancel', { cancelable: true }))
+        if (dialog.dispatchEvent(new Event('cancel', { cancelable: true }))) dialog.close()
       },
       type: (event: Event) => {
         emit('update:modelValue', (event.target as HTMLInputElement).value)

@@ -156,6 +156,24 @@ describe('SearchField', () => {
       sheet.remove()
     })
 
+    // A dialog that is no sheet hears a `cancel` from a script and closes on nothing: the field closes it
+    // as the platform would, unless the dialog prevents the `cancel` — a sheet does (round 2, Б1).
+    it('closes a dialog that is no sheet, and leaves one that prevents its cancel to close itself', () => {
+      for (const prevents of [false, true]) {
+        const { sheet, heard, view } = inSheet(true)
+        if (prevents) sheet.addEventListener('cancel', (event) => event.preventDefault())
+        view
+          .get('input')
+          .element.dispatchEvent(
+            new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+          )
+        expect(heard).toEqual(['cancel'])
+        expect(sheet.open).toBe(prevents)
+        view.unmount()
+        sheet.remove()
+      }
+    })
+
     it('must not take Esc outside an open sheet — clearing is the platform’s way there', () => {
       const { sheet, heard, view } = inSheet(false)
       const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
