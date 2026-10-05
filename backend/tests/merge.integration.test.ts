@@ -76,8 +76,10 @@ async function snapshot(): Promise<unknown> {
       select actor_id, query_key, item_id, picks, last_picked_at, admits
       from search_picks order by actor_id, query_key, item_id`),
     codes: await read(sql`select code, item_id from item_barcodes order by code`),
-    names: await read(sql`select item_id, language, name from item_names order by language, name`),
-    headings: await read(sql`select item_id, hs from item_hs order by hs`),
+    names: await read(
+      sql`select item_id, language, name from item_names order by language, name, item_id`,
+    ),
+    headings: await read(sql`select item_id, hs from item_hs order by hs, item_id`),
     memory: await read(sql`select id, item_id from store_memory order by id`),
     lines: await read(
       sql`select receipt_id, position, item_id from receipt_lines order by position`,
@@ -836,6 +838,36 @@ describe('a fan where the later merge only withdrew (review №12, adversarial �
     expect(names.map((row) => row.item_id).sort()).toEqual([a, b, d].sort())
     const headings = await db.execute<{ item_id: string }>(sql`select item_id from item_hs`)
     expect(headings.map((row) => row.item_id).sort()).toEqual([a, b, d].sort())
+  })
+
+  it('leaves the survivor as it was, the fan undone from the earlier merge on (adversarial Е1)', async () => {
+    const b = await made('Молоко', 'moloko', '2026-09-01')
+    const a = await made('Малоко', 'maloko', '2026-09-02')
+    const d = await made('Молако', 'molako', '2026-09-03')
+    await db.execute(sql`
+      insert into item_names (item_id, language, name) values (${a}, 'hy', 'կաթ'), (${d}, 'hy', 'կաթ')`)
+    await db.execute(sql`insert into item_hs (item_id, hs) values (${a}, '0401'), (${d}, '0401')`)
+    const before = await snapshot()
+    const first = numbered(await merges.mergeItems(a, b, NIGHT))
+    const second = numbered(await merges.mergeItems(d, b, NIGHT))
+    await merges.unmerge(first)
+    await merges.unmerge(second)
+    expect(await snapshot()).toEqual(before)
+  })
+
+  it('keeps a name of the survivor its own, whatever the twins knew', async () => {
+    const b = await made('Молоко', 'moloko', '2026-09-01')
+    const a = await made('Малоко', 'maloko', '2026-09-02')
+    const d = await made('Молако', 'molako', '2026-09-03')
+    await db.execute(sql`
+      insert into item_names (item_id, language, name)
+      values (${a}, 'hy', 'կաթ'), (${d}, 'hy', 'կաթ'), (${b}, 'hy', 'կաթ')`)
+    const before = await snapshot()
+    const first = numbered(await merges.mergeItems(a, b, NIGHT))
+    const second = numbered(await merges.mergeItems(d, b, NIGHT))
+    await merges.unmerge(first)
+    await merges.unmerge(second)
+    expect(await snapshot()).toEqual(before)
   })
 
   it('still takes a name back whole when no other twin knew it', async () => {

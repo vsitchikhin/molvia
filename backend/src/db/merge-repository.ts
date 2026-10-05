@@ -769,6 +769,41 @@ export function createMergeRepository(db: Conn): MergeRepository {
               break
           }
         }
+        if (item) {
+          // A name or a heading the survivor kept only for this twin's sake — it came with a merge undone
+          // since, and stayed for this one (Д2) — goes with it: undone from the earlier merge on, the
+          // survivor kept what neither it nor any merge left standing gives it (adversarial Е1). Kept when
+          // the survivor had it of its own, a merge still standing brought it, or another twin knows it.
+          const brought = (what: 'item_name' | 'item_hs', match: SQL) => sql`
+            exists (select 1 from catalogue_merge_moves mv
+                    join catalogue_merges m on m.id = mv.merge_id
+                    where mv.what = ${what} and m.into_item = ${into} and ${match})`
+          const standing = (what: 'item_name' | 'item_hs', match: SQL) => sql`
+            exists (select 1 from catalogue_merge_moves mv
+                    join catalogue_merges m on m.id = mv.merge_id
+                    where mv.what = ${what} and m.into_item = ${into} and m.undone_at is null
+                      and m.id <> ${id} and ${match})`
+          const nameMatch = sql`mv.key->>'language' = s.language and mv.key->>'name' = s.name`
+          await tx.execute(sql`
+            delete from item_names s
+            where s.item_id = ${now}
+              and exists (select 1 from item_names d
+                          where d.item_id = ${from} and d.language = s.language and d.name = s.name)
+              and ${brought('item_name', nameMatch)}
+              and not ${standing('item_name', nameMatch)}
+              and not exists (select 1 from item_names o join items t on t.id = o.item_id
+                              where t.merged_into = ${now} and t.id <> ${from}
+                                and o.language = s.language and o.name = s.name)`)
+          const hsMatch = sql`mv.key->>'hs' = s.hs`
+          await tx.execute(sql`
+            delete from item_hs s
+            where s.item_id = ${now}
+              and exists (select 1 from item_hs d where d.item_id = ${from} and d.hs = s.hs)
+              and ${brought('item_hs', hsMatch)}
+              and not ${standing('item_hs', hsMatch)}
+              and not exists (select 1 from item_hs o join items t on t.id = o.item_id
+                              where t.merged_into = ${now} and t.id <> ${from} and o.hs = s.hs)`)
+        }
         await tx.execute(
           item
             ? sql`update items set merged_into = null where id = ${from}`

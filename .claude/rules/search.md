@@ -612,7 +612,9 @@ report.
   (`kept`): a later merge that only withdrew its own against a verdict the earlier one brought is a
   touch too — undone first, the earlier one took the winner home and left the survivor with nothing of
   the person (review №12, adversarial Д1). **A name or a heading the survivor's other twin knew too
-  stays with the survivor** on an undo, and the trace undone gets a copy (Д2). **The price:** to part a false merge the owner
+  stays with the survivor** on an undo, and the trace undone gets a copy (Д2); **undone in turn, the
+  twin takes it away** unless the survivor had it of its own, a merge still standing brought it, or
+  another twin knows it — so a fan undone from the earlier merge on leaves the survivor as it was (Е1). **The price:** to part a false merge the owner
   undoes the later true one too, and merges it again by hand — the texts of the reviews withdrawn on the
   way do not come back, and the night leaves that pair to the hand from then on. The
   survivor's own pick gets back its «own word» and its last
