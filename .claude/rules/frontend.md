@@ -509,27 +509,46 @@ The detail behind the frontend lines of `CLAUDE.md`.
 - **The skeleton is the answer's shape, drawn in the kit's parts** (MOL-178, Ф-13, Н-5). Its bars were
   `surface-2` on the page's ground — 1.06:1 in the light scheme, next to nothing — with no card, no
   rows and no search field, so the screen jumped as the answer came. **`ScreenSkeleton` is the frame**:
-  «Loading…» in the live region, the bars hidden from a screen reader, one breath for all of them,
-  8 between its parts; **the shape is the screen's**, put in its slot in the order the answer will stand
-  (owner's В-2 «а»): the kit's `SkeletonPart`s — a caption on the ground (24 above it when it is not the
-  first), the well of a search, a list card of rows (`lead` an icon of 24 or a circle of 40, `tail`,
-  `under`, `next`), the card of a sum (`plate`), paragraphs — and between them what is the screen's own,
-  the ring of «Графики», the scale of «Оценки». A prop of one array was the other way, and the screen's
-  own would have stood only after every part. **A bar is `@include skeleton-bar` and nothing else** —
-  `border` on a card's `surface`, 1.42:1 and 1.38:1 — in the parts and in what a screen draws in the
-  slot (the fields of «Настройки», the keys of «Оценки», the cards of exchanges), never `surface-2`,
-  1.1:1 even on a card. **The widths of a row's bars are the part's**, the handoff's uneven cycle, never
-  the screen's; a caption's and the paragraphs' are the screen's, since there the width is the content.
-  **`groups` is the shape from before the parts**, drawn as paragraphs in one card, so every screen's
-  skeleton is seen at once (owner's В-1 «а»); each screen trades it for its answer's shape in its own
-  task of the epic, and its `groups` goes with the last of them. Where a card is not the answer's shape
-  the paragraphs stand bare (`card: false`): the scanner's bar at the top of the viewfinder. `/_kit`
-  «Скелетон» puts each part under the answer it stands for, and `e2e/kit-rows` holds their heights — the
-  well, a caption, a row of `ListRow`, a row of `OperationRow` with a line under its amount and the
-  amount's place — at 390 and 320 in both engines; the breath and its stillness under «reduce motion» are
-  held on the frame, where they are set (`advice.spec`, `item-search.spec`). **The price:** a card adds
-  its padding and edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter,
-  which the hold of MOL-138 needs.
+  «Loading…» in the live region, the bars hidden from a screen reader, 8 between its parts and 24 above
+  a caption that is not the first (`:slotted`, the frame's rhythm, not the part's); **the shape is the
+  screen's**, put in its slot in the order the answer will stand (owner's В-2 «а»): the kit's
+  `SkeletonPart`s — a caption on the ground, the well of a search, a list card of rows (`lead` an icon of
+  24 or a circle of 40, `tail`, `under`, `next`, `narrow`), the card of a sum (`plate`), paragraphs — and
+  between them what is the screen's own, the ring of «Графики», the scale of «Оценки». A prop of one
+  array was the other way, and the screen's own would have stood only after every part. A frame with
+  nothing to draw warns while developing — once `groups` stopped being required, the invisible skeleton
+  of Н-5 was one no type or test would see (adversarial А4). **The roots of the parts are named
+  `skeleton-*`**: a part is rendered by the screen that puts it in the slot, so its root carries the
+  screen's scope too, and a scoped `.caption` of «Бюджет» set its size on the caption's bar
+  (adversarial А3) — a class of a root is never a word a screen uses for its own. **A bar is
+  `@include skeleton-bar`** — `border` on a card's `surface`, 1.42:1 and 1.38:1, and on the ground under
+  a caption 1.22:1 and 1.53:1, which `tokens.test.ts` holds — in the parts and in what a screen draws in
+  the slot (the fields of «Настройки», the keys of «Оценки», the cards of exchanges), never `surface-2`,
+  1.1:1 even on a card; a well (a field) is `surface-2` with its `border-strong` edge, as the field's own.
+  No linter holds it — a well is `surface-2` by right — review does, and a bar drawn past the mixin
+  stands still among the others. **It breathes by its colour**, up to `border-strong` and back
+  (`@keyframes skeleton-breath`, global), never by opacity: the frame's 0.45 to 0.9 took the very
+  contrast the bar is drawn for — 1.17:1 in a card at the trough, 1.09 on the ground, where Н-5 was 1.06
+  (adversarial А2); still under «reduce motion». **The widths of a row's bars are the part's**, the
+  handoff's uneven cycle, never the screen's — the line under an amount never the amount's own, or the
+  two read as one block; a caption's and the paragraphs' are the screen's, since there the width is the
+  content. **Narrow is the answer's**: `narrow` makes the rows' `li` the container `row`, as
+  `OperationRow` does — a `ListRow` in a plain `li` keeps its amount beside the words at any width, and
+  bars gone narrow under it stood 9 px taller at 320 (adversarial А1). `under` brings its amount with
+  it. **`groups` is the shape from before the parts**, drawn as paragraphs in one card, so every
+  screen's skeleton is seen at once (owner's В-1 «а»); each screen trades it for its answer's shape in
+  its own task of the epic, and its `groups` goes with the last of them. Where a card is not the
+  answer's shape the paragraphs stand bare (`card: false`): the scanner's bar at the top of the
+  viewfinder. `/_kit` «Скелетон» puts each part under the answer it stands for, and `e2e/kit-rows` holds
+  their heights — the well, a caption, a row of `ListRow` with its amount, a row of `OperationRow` with a
+  line under its amount — and where each amount ends, at 390 and 320 in both engines; the breath and its
+  stillness under «reduce motion» are held on a bar (`advice.spec`, `item-search.spec`). **The card of a
+  sum is held by nothing yet**: its shape is the total of 77 v2 2a (`TripTotal`, figure 28 at
+  `--leading-tight`), which is no card until MOL-206 makes it one; the sums of «Деньги», «Счета», an
+  account, «Обмен» and «Бюджет» stand at the body's leading, some 8 px taller than the part — their
+  tasks (MOL-183 first) set the part against their answer. **The price:** a card adds its padding and
+  edge, so a skeleton of `groups` is some 34 px taller than before — taller, not shorter, which the hold
+  of MOL-138 needs.
 - **An installed app takes a new version only when nobody can lose anything to it: hidden, and
   holding no typing** (`pwaUpdate.ts`, MOL-46). The client reads every answer strictly, so an old page
   against a new API breaks — and nothing reloaded it: an iOS app frozen in the background came back
