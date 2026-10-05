@@ -109,6 +109,45 @@ describe('VerdictEditSheet', () => {
     expect(amendVerdict).toHaveBeenCalledWith(ITEM, { score: 4 })
   })
 
+  // MOL-225, adversarial Р1-А2: the two buttons share one write. The pressed one says its work in
+  // its own look and keeps the focus; the other is not now, and says nothing it is not doing.
+  it('the button pressed says its work and keeps the focus; the other is not now and silent', async () => {
+    amendVerdict.mockReturnValue(new Promise(() => undefined))
+    const { view } = await render({ ownScore: 1 })
+    await key(view, 4).trigger('click')
+    const save = button(view, 'Save the rating')
+    ;(save.element as HTMLButtonElement).focus()
+    await save.trigger('click')
+    await flushPromises()
+
+    expect(save.text()).toBe('Sending the rating…')
+    expect(save.attributes('aria-busy')).toBe('true')
+    expect(save.attributes('disabled')).toBeUndefined()
+    expect(document.activeElement).toBe(save.element)
+    const withdraw = button(view, 'Withdraw the rating')
+    expect(withdraw.attributes('aria-busy')).toBeUndefined()
+    expect(withdraw.attributes('aria-disabled')).toBe('true')
+    await withdraw.trigger('click')
+    expect(withdrawVerdict).not.toHaveBeenCalled()
+  })
+
+  it('«Withdraw the rating» pressed says «Withdrawing the rating…»; «Save» beside it is not now', async () => {
+    withdrawVerdict.mockReturnValue(new Promise(() => undefined))
+    const { view } = await render({ ownScore: 1 })
+    await key(view, 4).trigger('click')
+    const withdraw = button(view, 'Withdraw the rating')
+    await withdraw.trigger('click')
+    await flushPromises()
+
+    expect(withdraw.text()).toBe('Withdrawing the rating…')
+    expect(withdraw.attributes('aria-busy')).toBe('true')
+    const save = button(view, 'Save the rating')
+    expect(save.attributes('aria-busy')).toBeUndefined()
+    expect(save.attributes('aria-disabled')).toBe('true')
+    await save.trigger('click')
+    expect(amendVerdict).not.toHaveBeenCalled()
+  })
+
   it('in the shared mode nothing is pre-chosen: the average is not this person`s opinion', async () => {
     amendVerdict.mockResolvedValue(card())
     const { view } = await render({ ownScore: null, ownReview: 'Мой отзыв' })

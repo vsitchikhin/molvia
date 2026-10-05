@@ -251,13 +251,21 @@ describe('словарь: повторяющиеся тексты', () => {
       Период: ['exchange.rate_chart.period', 'spending.charts.mode'],
       // Слово на время работы (MOL-225) — у каждой кнопки свой ключ рядом с её действием: слово
       // действия и слово работы правятся вместе, а не через общий ключ чужой шторки.
-      'Удаляем…': ['erase.confirm_busy', 'exchange.remove_sheet.confirm_busy'],
+      'Удаляем…': [
+        'accounts.sheet.deleting',
+        'erase.confirm_busy',
+        'exchange.remove_sheet.confirm_busy',
+      ],
       'Сохраняем…': [
         'accounts.sheet.saving',
         'budget.sheet.saving',
         'consent.accept_busy',
         'settings.saving',
+        'trip.rate.saving',
       ],
+      'Возвращаем…': ['accounts.screen.restoring', 'exchange.restoring', 'income.restoring'],
+      // «Показать ещё» за работой и загрузка экрана — одно слово, ключи разные (MOL-225).
+      'Загружаем…': ['state.loading', 'trip.history.loading'],
     })
   })
 
@@ -295,14 +303,21 @@ describe('словарь: повторяющиеся тексты', () => {
       check: ['accounts.reconcile.note', 'receipt.review.tag_check'],
       // The word of a button at work (MOL-225), each beside its action's key, as in Russian; «Записываем…»
       // of a receipt and «Сверяем…» of a check meet «Saving…» and «Checking…» in English.
-      'Deleting…': ['erase.confirm_busy', 'exchange.remove_sheet.confirm_busy'],
+      'Deleting…': [
+        'accounts.sheet.deleting',
+        'erase.confirm_busy',
+        'exchange.remove_sheet.confirm_busy',
+      ],
       'Saving…': [
         'accounts.sheet.saving',
         'budget.sheet.saving',
         'consent.accept_busy',
         'receipt.review.record_busy',
         'settings.saving',
+        'trip.rate.saving',
       ],
+      'Bringing back…': ['exchange.restoring', 'income.restoring'],
+      'Loading…': ['state.loading', 'trip.history.loading'],
       'Checking…': ['accounts.reconcile.checking', 'receipt.review.cancel_record_busy'],
       // The screen's title and the way to it from «Where it went» (MOL-156), as in Russian.
       Charts: ['spending.charts.title', 'spending.summary.charts'],
