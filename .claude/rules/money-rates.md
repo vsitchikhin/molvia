@@ -91,35 +91,56 @@ rule: a pair with the lari — the NBG, any other — the CBA.
 
 - **`official` is the pair's own bank, `fallback` every other publisher** — the CBA too, for the lari.
   `pickOfficialRate` takes the pair's bank while it is fresh (the week of MOL-39), else the freshest of
-  the rest that has both halves, the CBA, the Bank of Russia, the NBG, er-api in that order on a tie;
-  the NBG thus stands behind the Bank of Russia for a pair of drams when the CBA is silent. The trip's
-  CHECK says the same in SQL, written from `HOME_BANK` (`homeBankSql`), and `tripSchema` in the domain.
+  the rest that has both halves, the CBA, the Bank of Russia, er-api in that order on a tie. **A
+  country bank stands only for its own pairs** (plan Р-1, review 3): the NBG prints the dram per 1000
+  with four digits, five significant ones, so a pair of drams by it would be coarser than by the Bank
+  of Russia — it never takes one, the CBA silent or not. The trip's CHECK says the same in SQL, written
+  from `HOME_BANK` in the model's order, the base's bank before the quote's (`homeBankSql`), and
+  `tripSchema` in the domain.
 - **The NBG quotes everything in lari, the dram per 1000**, so every currency comes into drams inside
   its one answer, as the Bank of Russia's does, and the cache stays «one currency against the dram».
   The number is `rateFormated`, the decimal as the bank prints it; the day is the answer's `date`, the
   day the rate is in force — set the evening before, a Saturday's holding to Monday's evening.
 - **Asked every hour, whatever the CBA did** (`homeBanks`): it is the official source of its pairs,
   and nothing stands in for it but the others' rows already in the cache — the CBA writes the lari
-  every hour itself. Its jump is judged by its own five, as the CBA's: a home bank is never measured
-  against another.
+  every hour itself. **Its jump is judged by its own rows of the last week, by none with fewer than
+  three** (adversarial А): its archive comes a day a request, and right after a deploy «its own latest
+  five» were days of 2022 — the rouble a third dearer, today's true rate marked a jump, and a day last
+  written in that window kept the mark for good. It is never measured against another bank.
 - **Its archive is walked a day a request** (В-3): the API answers any day with the rate in force on
-  it and has no range — measured. Since `OFFICIAL_HISTORY_FROM`, `ARCHIVE_DAYS_PER_RUN` (120) days a
-  run — some fifteen hourly runs for the two years, not twelve minutes in one, since the market waits
-  behind the official refresh — on from where the last run stopped (`archiveNext`, in memory: a Sunday
-  asked is written as its Saturday, and the cache would ask it again); then once a day the last
-  `ARCHIVE_RECENT_DAYS`. After a restart the walk starts from the first hole longer than
-  `ARCHIVE_GAP_DAYS` (`archiveWalkFrom`): the NBG's longest holiday is the six days of early January.
-  Only the days the cache lacks are written; a failure is a line in the log and asked again in six
-  hours, as the CBA's archive.
+  it and has no range — measured. **The last `ARCHIVE_RECENT_DAYS` first** (review 2): a spending of
+  yesterday keeps the rate it is written with for good, and walked from 2022 the lari of last week
+  came some fifteen hours after the deploy — a spending written in those hours took the CBA's for
+  ever. Then the history since `OFFICIAL_HISTORY_FROM`, `ARCHIVE_DAYS_PER_RUN` (120) days a run — some
+  fifteen hourly runs for the two years, not twelve minutes in one, since the market waits behind the
+  official refresh — on from where the last run stopped (`archiveNext`, in memory: a Sunday asked is
+  written as its Saturday, and the cache would ask it again); then once a day the last month again,
+  and only a look that found no hole rests the walk until tomorrow. After a restart the walk starts
+  from the first hole longer than `ARCHIVE_GAP_DAYS` (`archiveWalkFrom`): the longest stretch without
+  a rate in the archive of 2022–2026 is six days, Easter 2026 — measured on 05.10.2026, every day
+  asked. Only the days the cache lacks are written; a day the bank answers with tomorrow's rate, set
+  the evening before, is passed over; a failure is a line in the log and asked again in six hours, as
+  the CBA's archive.
 - **The CBA's archive carries the lari too**: every working day since 2022, the same days as the
   dollar — measured on 04.10.2026 (1199 of 1199).
 - **The market is the three currencies of its files** (`MARKET_CURRENCIES`: RUB, USD, EUR), never every
   currency of the product: none of the three files carries the lari, a reader asking for it would
   refuse them all, and `market_rates` refuses it too. Lari against drams is «Без сравнения»; the block
-  «Курсы по данным ЦБ РА» keeps the three.
+  «Курсы по данным ЦБ РА» keeps the three, and «Курс рубля за 12 месяцев» offers only them
+  (`rateChartPairs`, adversarial В): an exchange of lari took the rouble's line away and drew nothing.
 - **The words name the bank of the pair** (В-2): «ЦБ РА», «НБ Грузии», and a fallback by its own name —
   `bankWords` on the phone, the domain's `homeBankOf` by the name of an exchange's card. The strings of
   the market stay «ЦБ РА»: the market is Armenian only. The accounts' line names each bank once.
+  **Where a rate does not carry its publisher** — the month of «Деньги», the spending sheet, the
+  accounts — a fallback names the pair's bank as the one that is silent, never as its source: «По
+  курсу 0,0309 на сегодня — не от НБ Грузии: он молчит больше недели», and the accounts say «по курсу
+  дня» (review 1). Naming the fallback itself there would need the provider beside every rate
+  snapshot — a spending's, a month's — a column and a migration; a trip and an exchange's card carry
+  it and name it.
+- **The price, named** (adversarial): a page of a build before MOL-110 reads an answer with `GEL` or
+  `nbg` by the strict schemas of its time and refuses it whole, as one before MOL-168 refused
+  `rateCharts` — until it takes the new version (`pwaUpdate.ts`). Only for someone who already wrote
+  the lari on another device.
 - **The sign is «₾» in every language** (`SIGN` in `money.ts`): Russian CLDR prints «ლ», an old letter.
   No face of its own — it comes from the system font, as «₽» does.
 - **The dinar is MOL-230**: the National Bank of Serbia has neither the dram nor the lari, and gives a
