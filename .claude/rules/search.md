@@ -602,10 +602,15 @@ report.
 - **The journal** (`catalogue_merges`, `catalogue_merge_moves`) writes down every row moved by its own
   key; **`make unmerge ID=`** moves those back — **each only from where the merge put it**, the survivor
   or what that was merged into since: a code let go and written to another item, a word of the shop's
-  memory said again, stay with what people did (adversarial А4). **A chain is undone from its end**: a
-  merge whose survivor was merged on since is refused, naming the later one (`chained`) — the swap of one
-  person's verdicts on the first step met its rows moved on by the second, and undone out of order the
-  person's scores came back crossed, «Малоко» with the score given to «Молоко 3,2%» (А3, Б1). The
+  memory said again, stay with what people did (adversarial А4). **Merges are undone from the last
+  that touched the same rows** (`chained`, naming it): a merge whose survivor was merged on since (a
+  chain, А3, Б1), or after which another merge into the same survivor swapped the same person's verdict
+  or added to the same pick (a fan, review №11, adversarial В1, В3). Undone out of order, a swap met
+  contents another merge had put there and the person's scores came back crossed — «Малоко» with the
+  score given to «Молоко 3,2%» — and an «own word» another merge brought was taken off. A later merge
+  that touched nothing of it does not stand in the way. **The price:** to part a false merge the owner
+  undoes the later true one too, and merges it again by hand — the texts of the reviews withdrawn on the
+  way do not come back, and the night leaves that pair to the hand from then on. The
   survivor's own pick gets back its «own word» and its last
   pick (А7). **An undone pair is never merged or named by the night again — nor the survivor of its
   survivor**: the pair is read by the live things its two ends stand in now, so «Малоко», undone from
@@ -636,7 +641,12 @@ report.
   only reported comes with its command **`make apart FROM= INTO=`** (review №7, owner's decision
   05.10.2026): the owner says two things are apart before `on` merges them. `catalogue_apart` holds the
   pair by its ids; the night reads it as a pair undone — by the live things its ends stand in now —
-  never merging or naming it, nor what they are merged into since. The owner's `make merge` still may.
+  never merging or naming it, nor what they are merged into since, **that very night too**: a side merged
+  — or, in `report`, merged as if — passes what it may not be merged with to its survivor, so `report`
+  never promises A→C and B→C for A and B apart (adversarial Г1). The owner's `make merge` still may.
+  **Every pair of a night is kept** (adversarial В2): the message names ten, and `make merge-night DAY=`
+  prints them all — in `on` the merges still standing by number, in `report` each pair with its
+  `make apart` (`catalogue_merge_runs.pairs`).
 - **The morning's message holds within Telegram's 4096** (`MERGE_TEXT_MAX`, review №9, adversarial Б2):
   pairs are printed while it holds them, the rest counted — a message refused is lost, being handed
   once. A candidate cut for length is named already; **`make merge-candidates`** lists every candidate

@@ -295,8 +295,12 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod \
 ```
 
 `candidates` lists every candidate the mornings named and still apart, with its command — the ones a
-long message cut, or a morning that never arrived. A chain is undone from its end: `unmerge` of a merge
-whose survivor was merged on since says which number to undo first.
+long message cut, or a morning that never arrived; `night 2026-10-06` every pair of that night, past the
+ten the message names, by number or with `make apart`. Merges are undone from the last that touched the
+same rows: `unmerge` of a merge whose survivor was merged on since, or after which another merge into the
+same survivor touched the same person's verdict or pick, says which number to undo first — to part a
+false merge that way, the true one undone on the way is merged again by hand, and the reviews withdrawn
+by it do not come back.
 
 An undone pair is never merged or named by the night again; the owner's hand still may. In `report`
 mode a pair the night would merge comes with `make apart FROM=… INTO=…` — two things, never merged or
@@ -304,7 +308,7 @@ named by the night (`dist/merge.js apart <id> <id> --yes` here). What the undo c
 rated the twin too.
 
 In a working copy the same thing is `make merge FROM=<id> INTO=<id> [YES=1]`, `make unmerge ID=<n> [YES=1]`,
-`make apart FROM=<id> INTO=<id> [YES=1]` and `make merge-candidates`.
+`make apart FROM=<id> INTO=<id> [YES=1]`, `make merge-candidates` and `make merge-night DAY=<day>`.
 
 ## Signals (MOL-142, MOL-221)
 
