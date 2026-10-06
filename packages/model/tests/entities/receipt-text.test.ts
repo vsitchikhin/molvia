@@ -1541,3 +1541,280 @@ describe('a fiscal till read by its class code: a code with no «Դաս» (MOL-2
     }
   })
 })
+
+describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
+  // the forms are the bench's ten receipts of one sole trader (am-15…am-24), every name and number made up
+  const reading = (...rows: string[]): TextRow[] =>
+    rows.map((text, line) => ({ text, part: 0, line }))
+  const bold = (tinWord: string, total: string, paid: string) =>
+    reading(
+      'ԽԱՆՈՒԹ ԱՁ',
+      'ԳՅՈՒՄՐԻ Աբովյան 10',
+      `${tinWord}: 12345678 Գ/Ը: 87654321`,
+      'ՍԸ: NCC100000001',
+      'ԿԸ: 00000049',
+      '04-10-26 16:30:59 ԳԱՆՋԱՊԱԸ: 3',
+      'Բաժին 1 - Բաժին 1',
+      '/ Շրջանառության Ըարկ/ 1700.00',
+      'Որից ԱԱԸ՝ 0.00',
+      '(Ֆ)',
+      `Ընդամենը' ${total}`,
+      `Առձեռն ${paid}`,
+      'ՖԻՍԿԱԼ ԸԱՄԱՐ 11223344',
+    )
+
+  it('reads the section whole: no line, the head of the terminal, the total all three print', () => {
+    const got = bestReading([
+      bold('СУСС', '1700.00', '1700.00'),
+      bold('CUCC', '1700.00', '1700.00'),
+    ])
+    expect(got).toEqual({
+      layout: 'department',
+      tin: '12345678',
+      date: '2026-10-04',
+      time: '16:30',
+      receiptNo: '11223344',
+      totalHundredths: 170_000,
+      balanced: false,
+      lines: [],
+    })
+    expect(needsReshoot(got)).toBe(false)
+  })
+
+  it('never takes the receipt’s own number «ԿՀ: 00000049» for the tax number', () => {
+    const got = bestReading([
+      reading('ԿԸ: 00000049', 'Բաժին 1 - Բաժին 1', 'Ընդամենը 120.00', 'Առձեռն 120.00'),
+    ])
+    expect(got.layout).toBe('department')
+    expect(got.tin).toBeNull()
+  })
+
+  it('takes the tax number after its word, a till number of as many digits never', () => {
+    const got = bestReading([
+      reading('ՀՎՀՀ 12345678 4/2 87654321', 'Բաժին 1', 'Ընդամենը 550.00', 'Առձեռն 550 00'),
+    ])
+    expect(got.tin).toBe('12345678')
+    expect(got.totalHundredths).toBe(55_000)
+  })
+
+  it('outvotes a total OCR misread by the section and the payment (550.09 for 550.00)', () => {
+    const got = bestReading([
+      reading('Բաժին 1 1', 'py հարկ/ = 550 00', 'Ընդամենը 550.09', 'լոձեռն 550 00'),
+    ])
+    expect(got.totalHundredths).toBe(55_000)
+  })
+
+  it('reads no total one source alone gives: the thin print lost the point of the other two', () => {
+    // am-20: «Կղդամեկը 18000», the section not read — the person types the total (Р-3)
+    const got = bestReading([
+      reading('ՀՎՀՀ 12345678 9/2 87654321', 'Ււսժին 1]', 'Կղդամեկը 18000', 'Бибби 1800 00'),
+    ])
+    expect(got.layout).toBe('department')
+    expect(got.totalHundredths).toBeNull()
+    expect(got.date).toBeNull()
+  })
+
+  it('reads no field the two readings read apart', () => {
+    const got = bestReading([
+      reading('CUCC: 87345678 9/С: 87654321', '04-10-26 16:30:59', 'Բաժին 1', 'Ընդամենը 1700.00'),
+      reading('СУСС: 12345678 Գ/Ը: 87654321', '04-10-26 16:31:59', 'Բաժին 1', 'Առձեռն 1700.00'),
+    ])
+    expect(got.tin).toBeNull()
+    expect(got.date).toBe('2026-10-04')
+    expect(got.time).toBeNull()
+    expect(got.totalHundredths).toBe(170_000)
+  })
+
+  it('reads no total, time or number of two receipts on one photo (am-21)', () => {
+    const got = bestReading([
+      reading(
+        '57311783 Գ/1',
+        '04-10-26 14:23:15 ԳԱՆՔԱՊԱԼ: 3',
+        'Բաժին 1 - Բաժին 1 :',
+        'Շրջանառության Լարկ/ 3660.00',
+        '3660.00',
+        'СУСС: 12345678 Գ/Ը: 87654321',
+        '04-10-26 14:27:34 ԳԱՆՋԱՊԱԸ: 3',
+        'Բաժին 1 - Բաժին 1',
+        '/ Շրջանառության Ըարկ/ 1200.00',
+        'Ընդամենը՝ 1200.00',
+        'Առձեռն 1200.00',
+        'ՖԻՍԿԱԼ ԸԱՄԱՐ 11223344',
+      ),
+    ])
+    expect(got.layout).toBe('department')
+    expect([got.totalHundredths, got.time, got.receiptNo]).toEqual([null, null, null])
+    expect(got.date).toBe('2026-10-04')
+  })
+
+  it('must not fire where an item’s mark is read: Dog City and KFC print «Բաժին» over their items', () => {
+    const dogCity = bestReading([
+      reading(
+        'Բաժին 1',
+        '| (3824) ՏՈՖՈՒ',
+        '| 1|ԴԵՂՉ ваши) 1 2 200',
+        'Ընդամենը: 9450.00',
+        'Կանխիկ 9450.00',
+      ),
+    ])
+    const kfc = bestReading([
+      reading('Բաժին 1-1', '/շրջ հարկ/ = 8510 00', 'Դաս՝ 56.10', 'Ֆրի', 'Ընդամենը 8510.00'),
+    ])
+    for (const got of [dogCity, kfc]) {
+      expect(got.layout).not.toBe('department')
+    }
+  })
+
+  it('must not fire on a receipt with items whose lines OCR lost and no section is printed', () => {
+    const got = bestReading([reading('ԵՐԵՎԱՆ ՍԻԹԻ', 'ՀՎՀՀ 12345678', 'Ընդամենը 5460.00')])
+    expect(got.layout).toBe('card')
+    expect(needsReshoot(got)).toBe(true)
+  })
+
+  it('reads the tax number after its word first, the receipt’s number on the row above never (review 1, № 1)', () => {
+    const rows = (word: string) =>
+      reading(
+        'ԽԱՆՈՒԹ ԱՁ',
+        'ԿՀ: 00000049',
+        'Գ/Հ: 87654321',
+        `${word} 12345678`,
+        'Բաժին 1',
+        'Ընդամենը 1700.00',
+        'Առձեռն 1700.00',
+      )
+    expect(bestReading([rows('ՀՎՀՀ:')]).tin).toBe('12345678')
+    // the word not read: eight digits that end a row are not the tax number of the till's row under it
+    expect(bestReading([rows('')]).tin).toBeNull()
+  })
+
+  it('reads no total, time or number where the upper receipt’s head is out of the frame (adversarial А1)', () => {
+    // one moment in view, but two totals and two fiscal numbers: two receipts all the same
+    const got = bestReading([
+      reading(
+        'Բաժին 1 - Բաժին 1',
+        '/ Շրջանառության հարկ/ 3660.00',
+        'Ընդամենը՝ 3660.00',
+        'ՖԻՍԿԱԼ ՀԱՄԱՐ 11223344',
+        'ԽԱՆՈՒԹ ԱՁ',
+        'ՀՎՀՀ: 12345678 Գ/Հ: 87654321',
+        '04-10-26 14:27:34',
+        'Բաժին 1 - Բաժին 1',
+        '/ Շրջանառության հարկ/ 1200.00',
+        'Ընդամենը՝ 1200.00',
+        'Առձեռն 1200.00',
+        'ՖԻՍԿԱԼ ՀԱՄԱՐ 55667788',
+      ),
+    ])
+    expect(got.layout).toBe('department')
+    expect([got.totalHundredths, got.time, got.receiptNo]).toEqual([null, null, null])
+    // one head in view of two receipts may be another trader's: no tax number (round 4, Г1)
+    expect([got.tin, got.date]).toEqual([null, '2026-10-04'])
+  })
+
+  it('reads the tax number of two receipts only where both heads print one (round 4, Г1)', () => {
+    const receipt = (tin: string, moment: string, total: string) => [
+      'ԽԱՆՈՒԹ ԱՁ',
+      `ՀՎՀՀ: ${tin} Գ/Հ: 87654321`,
+      moment,
+      'Բաժին 1 - Բաժին 1',
+      `Ընդամենը՝ ${total}`,
+      `Առձեռն ${total}`,
+      'ՖԻՍԿԱԼ ՀԱՄԱՐ 11223344',
+    ]
+    const one = bestReading([
+      reading(
+        ...receipt('12345678', '04-10-26 14:23:15', '3660.00'),
+        ...receipt('12345678', '04-10-26 14:27:34', '1200.00'),
+      ),
+    ])
+    const two = bestReading([
+      reading(
+        ...receipt('12345678', '04-10-26 14:23:15', '3660.00'),
+        ...receipt('76543210', '04-10-26 14:27:34', '1200.00'),
+      ),
+    ])
+    // two receipts of one trader, am-21: the place is still his
+    expect([one.tin, one.totalHundredths]).toEqual(['12345678', null])
+    expect(two.tin).toBeNull()
+  })
+
+  it('reads no time or number from the middle of a tape of two receipts (round 2, Б1)', () => {
+    // the upper receipt from its section down, the lower one's head under its fiscal number: one moment,
+    // one total and one number in view — but a head under the last row of a receipt is the next one's
+    const got = bestReading([
+      reading(
+        'Բաժին 1 - Բաժին 1',
+        '/ Շրջանառության հարկ/ 3660.00',
+        'Ընդամենը՝ 3660.00',
+        'Առձեռն 3660.00',
+        'ՖԻՍԿԱԼ ՀԱՄԱՐ 11223344',
+        'ԽԱՆՈՒԹ ԱՁ',
+        'ՀՎՀՀ: 12345678 Գ/Հ: 87654321',
+        'ԿՀ: 00000023',
+        '04-10-26 14:27:34',
+      ),
+    ])
+    expect(got.layout).toBe('department')
+    expect([got.totalHundredths, got.time, got.receiptNo]).toEqual([null, null, null])
+  })
+
+  it('reads the fiscal number only where one reading holds the receipt whole (round 3, В1)', () => {
+    // the middle of a tape of two: one reading lost the number and kept the lower head, the other stopped
+    // at the number — no reading has the moment above the number, so no key is made of two receipts
+    const upper = ['Բաժին 1 - Բաժին 1', '/ Շրջանառության հարկ/ 3660.00', 'Ընդամենը՝ 3660.00']
+    const got = bestReading([
+      reading(...upper, 'ԽԱՆՈՒԹ ԱՁ', 'ՀՎՀՀ: 12345678 Գ/Հ: 87654321', '04-10-26 14:27:34'),
+      reading(...upper, 'Առձեռն 3660.00', 'ՖԻՍԿԱԼ ՀԱՄԱՐ 11223344'),
+    ])
+    expect(got.layout).toBe('department')
+    expect(got.receiptNo).toBeNull()
+    expect(got.time).toBe('14:27')
+  })
+
+  it('takes a phone in the head for no item’s mark, the section read or not (А2, round 2 Б2)', () => {
+    for (const phone of ['Հեռ. (0312) 5-12-34', 'Հեռ. 0312/51234']) {
+      const head = ['ԽԱՆՈՒԹ ԱՁ', 'ԳՅՈՒՄՐԻ Աբովյան 10', phone, 'ՀՎՀՀ 12345678 9/2 87654321']
+      // one reading lost the section, as psm 6 of am-20 did — the phone is no mark there either (Б2)
+      const lost = bestReading([
+        reading(...head, 'Բաժին 1', 'Ընդամենը 700.00', 'Առձեռն 700 00'),
+        reading(...head, 'СЕТЕ 1-1', 'Ընդամենը 700.00', 'Առձեռն 700 00'),
+      ])
+      expect([lost.layout, lost.tin, lost.totalHundredths]).toEqual([
+        'department',
+        '12345678',
+        70_000,
+      ])
+      const got = bestReading([
+        reading(
+          'ԽԱՆՈՒԹ ԱՁ',
+          'ԳՅՈՒՄՐԻ Աբովյան 10',
+          phone,
+          'СУСС: 12345678 Գ/Ը: 87654321',
+          'ԿԸ: 00000050',
+          'Բաժին 1 - Բաժին 1',
+          '/ Շրջանառության Ըարկ/ 700.00',
+          'Ընդամենը՝ 700.00',
+        ),
+      ])
+      expect([got.layout, got.lines.length, got.tin, got.totalHundredths]).toEqual([
+        'department',
+        0,
+        '12345678',
+        70_000,
+      ])
+    }
+  })
+
+  it('takes a day or a time no calendar or clock has for no reading of it (adversarial А3)', () => {
+    const at = (moment: string) => reading(moment, 'Բաժին 1', 'Ընդամենը 1700.00', 'Առձեռն 1700.00')
+    const day = bestReading([at('04-10-26 16:36:48'), at('64-10-26 16:36:48')])
+    const hour = bestReading([at('04-10-26 16:36:48'), at('04-10-26 76:36:48')])
+    expect([day.date, day.time]).toEqual(['2026-10-04', '16:36'])
+    expect([hour.date, hour.time]).toEqual(['2026-10-04', '16:36'])
+  })
+
+  it('leaves a receipt that found a line to its layout, a section printed or not', () => {
+    expect(read(am14t as Fixture).layout).toBe('class')
+    expect(read(am04 as Fixture).layout).toBe('table')
+  })
+})

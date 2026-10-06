@@ -432,6 +432,10 @@ describe('a line of the journal as its row says it', () => {
     expect(row(trip, null).tint).toBe('var(--cat-groceries)')
   })
 
+  it('a trip with money and no purchase is the receipt’s sum, never «0 позиций» (MOL-227)', () => {
+    expect(row({ ...trip, items: 0 }, groceries).meta).toBe('Продукты · сумма по чеку')
+  })
+
   it('marks what the queue says as a tag: on its way and amended wait, a refusal is bad', () => {
     expect(row(manual({ mark: 'waiting' })).tag).toEqual({ tone: 'warn', text: 'Отправляем…' })
     expect(row(manual({ mark: 'editing' })).tag).toEqual({

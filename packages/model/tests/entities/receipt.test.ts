@@ -3,6 +3,7 @@ import {
   tellsQuietly,
   moneyOfHundredths,
   needsReshoot,
+  withoutItems,
   receiptDateOf,
   STORE_MEMORY_KEY_MAX_OCTETS,
   receiptCityOf,
@@ -47,6 +48,21 @@ describe('«переснимите» — not one line found (MOL-222, В-1)', ()
   it('must not fire on one line, however little of the total it makes up (am-06: 14 lines, 2 add up)', () => {
     expect(needsReshoot(receipt([line({ sumHundredths: 1_000 })], 1_000_000))).toBe(false)
     expect(needsReshoot(receipt([line({ settled: false }), line({ settled: false })]))).toBe(false)
+  })
+})
+
+describe('a receipt with no items (MOL-227)', () => {
+  it('asks for no new shot of a section read whole, its total read or not', () => {
+    expect(needsReshoot({ ...receipt([], 170_000), layout: 'department' })).toBe(false)
+    expect(needsReshoot({ ...receipt([]), layout: 'department' })).toBe(false)
+  })
+
+  it('is a receipt read with no line, and nothing else', () => {
+    expect(withoutItems({ status: 'parsed', lineCount: 0 })).toBe(true)
+    expect(withoutItems({ status: 'parsed', lineCount: 1 })).toBe(false)
+    expect(withoutItems({ status: 'failed', lineCount: 0 })).toBe(false)
+    expect(withoutItems({ status: 'reading', lineCount: 0 })).toBe(false)
+    expect(withoutItems({ status: 'recorded', lineCount: 0 })).toBe(false)
   })
 })
 

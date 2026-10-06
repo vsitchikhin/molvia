@@ -122,7 +122,18 @@
 
       <template v-else>
         <p v-if="refused" class="refused" role="alert">{{ refused }}</p>
-        <p class="caption-plain">
+        <!-- A sole trader's section with no items (MOL-227): the sum is what there is to record;
+             the purchases, if wanted, are added later in the trip (В-1). -->
+        <AppNote v-if="noItems" class="no-items">
+          {{ t('receipt.review.no_items') }}
+          <!-- A receipt with items whose every mark OCR lost is read so too (Р-7): a new shot is a tap
+               away, as on «Прочитали не всё» (adversarial А6). -->
+          <AppButton v-if="country && !locked" variant="ghost" @click="retake">
+            <template #icon><IconCamera /></template>
+            {{ t('receipt.capture.retake') }}
+          </AppButton>
+        </AppNote>
+        <p v-else class="caption-plain">
           {{ t('receipt.review.count_hint', { count: positions(lines.length) }) }}
           <template v-if="checks > 0">
             · {{ t('receipt.review.issues_check', { n: checks }) }}</template
@@ -136,7 +147,7 @@
             {{ t('receipt.capture.retake') }}
           </AppButton>
         </AppNote>
-        <AppCard class="block" list>
+        <AppCard v-if="!noItems" class="block" list>
           <ReceiptLineRow
             v-for="one in lines"
             :key="one.position"
@@ -152,11 +163,12 @@
           :rate="detail.rate"
           :day="rateDay"
           :suspect="suspect"
+          :no-items="noItems"
           @total="!locked && (totalOpen = true)"
         />
         <p class="note">
           <IconImageOff class="note-icon" aria-hidden="true" />
-          {{ t('receipt.review.photo_note') }}
+          {{ t(noItems ? 'receipt.review.photo_note_sum' : 'receipt.review.photo_note') }}
         </p>
         <AppButton v-if="shelved.length > 0" variant="ghost" block @click="toDeveloper">
           <template #icon><IconMessage /></template>
@@ -202,10 +214,10 @@
             block
             :busy="sending"
             :busy-label="t('receipt.review.record_busy')"
-            :inactive="balance.recorded === 0"
+            :inactive="noItems ? shownTotal === null : balance.recorded === 0"
             @click="record"
           >
-            {{ t('receipt.review.record', { n: balance.recorded }, balance.recorded) }}
+            {{ recordLabel }}
           </AppButton>
           <p v-if="!online && !recording" class="under">{{ t('receipt.review.record_offline') }}</p>
         </template>
@@ -258,11 +270,7 @@
       :current="place"
       :read="!!detail.receipt.place && !placeChosen"
       :day="day"
-      :action="
-        recordAfterPlace
-          ? t('receipt.review.record', { n: balance.recorded }, balance.recorded)
-          : null
-      "
+      :action="recordAfterPlace ? recordLabel : null"
       :on-closed="placeClosed"
       @chosen="choosePlace"
     />
@@ -306,6 +314,7 @@ import {
   readCovered,
   readPartly,
   receiptDigits,
+  withoutItems,
   yerevanDate,
 } from '@molvia/model'
 import type { Money } from '@molvia/model'
@@ -397,6 +406,14 @@ export default defineComponent({
       status.value === 'parsed' ? (detail.value?.duplicateOf ?? null) : null,
     )
     const reshoot = computed(() => detail.value?.receipt.failure === 'reshoot')
+    const noItems = computed(() =>
+      detail.value
+        ? withoutItems({
+            status: detail.value.receipt.status,
+            lineCount: detail.value.lines.length,
+          })
+        : false,
+    )
     const lang = computed(() => (detail.value ? PRINTED_LANG[detail.value.receipt.country] : 'hy'))
     const currency = computed(() => RECEIPT_CURRENCY[detail.value?.receipt.country ?? 'AM'])
     const taken = computed(() => localDay(detail.value?.receipt.capturedAt ?? new Date()))
@@ -422,6 +439,11 @@ export default defineComponent({
       return at === null ? null : (lines.value[at]?.name ?? null)
     })
     const checks = computed(() => lines.value.filter((one) => one.check && !one.skip).length)
+    const recordLabel = computed(() =>
+      noItems.value
+        ? t('receipt.review.record_sum')
+        : t('receipt.review.record', { n: balance.value.recorded }, balance.value.recorded),
+    )
     /** The digits the receipt prints its sums to (П-2): the line's «кол-во × цена» is rounded so. */
     const digits = computed(() => {
       const one = detail.value
@@ -695,6 +717,8 @@ export default defineComponent({
       status,
       duplicate,
       reshoot,
+      noItems,
+      recordLabel,
       lang,
       currency,
       lines,
@@ -829,7 +853,8 @@ export default defineComponent({
   font-size: var(--icon-sm);
 }
 
-.partly {
+.partly,
+.no-items {
   margin: 0 0 var(--space-3);
 }
 

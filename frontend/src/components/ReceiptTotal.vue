@@ -1,10 +1,13 @@
 <template>
   <AppCard class="total">
-    <div class="line">
-      <span>{{ t('receipt.review.lines') }}</span>
-      <span class="figure">{{ linesText ?? '—' }}</span>
-    </div>
-    <hr class="rule" />
+    <!-- A receipt with no items (MOL-227) has no lines to set against its total. -->
+    <template v-if="!noItems">
+      <div class="line">
+        <span>{{ t('receipt.review.lines') }}</span>
+        <span class="figure">{{ linesText ?? '—' }}</span>
+      </div>
+      <hr class="rule" />
+    </template>
     <!-- The total is a button (Р-8): OCR misses it on half the receipts, and the trip's money is the
          receipt's total (MOL-78) — the person types it in the sheet of «Сумма по чеку». -->
     <button class="line main" type="button" @click="$emit('total')">
@@ -49,6 +52,8 @@ export default defineComponent({
     day: { type: String, required: true },
     /** The name of the line the difference likely sits in. */
     suspect: { type: String as PropType<string | null>, default: null },
+    /** A receipt with no items (MOL-227): the total alone, no «Строки» and no difference. */
+    noItems: { type: Boolean, default: false },
   },
   emits: { total: () => true },
   setup(props) {
@@ -68,7 +73,7 @@ export default defineComponent({
     })
     const difference = computed(() => {
       const gap = props.balance.difference
-      if (!gap || gap.minor === 0n) return null
+      if (props.noItems || !gap || gap.minor === 0n) return null
       const amount = formatMoney(
         { ...gap, minor: gap.minor < 0n ? -gap.minor : gap.minor },
         locale.value,

@@ -155,7 +155,11 @@ export async function removeExpense(
  * money and takes its «списано» off (Р-32 MOL-115), as a price does; the same sum again is a repeat
  * from the queue and moves nothing — neither «списано» nor the moment a check dates it by. The
  * server does not refuse a sum on a trip with no purchases (В-1): the screen does not offer one,
- * and a trip whose purchases were all removed after it keeps its money.
+ * and a trip whose purchases were all removed after it keeps its money. **Nor does it take the sum off
+ * such a trip once it is finished** (MOL-227, adversarial А4): a receipt with no items is recorded as its
+ * sum alone, and a finished trip with no money and no purchase is the empty row «Записать» refuses
+ * (Р-4) — «Удалить запись» is the way to be rid of it. An open one is a record still being typed. A rule
+ * of the sum only: removing the last purchase of a finished trip leaves it empty, as before (round 2, Б3).
  */
 export async function setReceipt(
   transact: Transact,
@@ -166,6 +170,14 @@ export async function setReceipt(
   return transact(async (repositories) => {
     const trip = await lockedTrip(repositories.trips, tripId, actorId)
     if (sameMoney(trip.receipt, receipt)) return tripViewFor(repositories, trip)
+    // an open trip with nothing in it is a record being typed; a finished one is an empty row
+    if (
+      receipt === null &&
+      trip.finishedAt !== null &&
+      (await repositories.expenses.forTrip(trip.id, actorId)).length === 0
+    ) {
+      throw new DomainError(ERROR.RECEIPT_TOTAL_REQUIRED)
+    }
     const changed = await repositories.trips.setReceipt(trip.id, actorId, receipt)
     if (!changed) throw new DomainError(ERROR.NOT_FOUND)
     return tripViewFor(repositories, await moneyMoved(repositories, changed))

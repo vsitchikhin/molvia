@@ -546,8 +546,14 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The parse is MOL-114's prototype, measured on the bench** (`receipt-text.ts`, `score.mjs`): a rule
   changed is run on the bench's truth before and after; amounts in hundredths, never floats.
 - **Every receipt with a line in it is read** (MOL-222, В-1): «переснимите» only when not one line was
-  found, and it names no cause it does not know; read in part (`readPartly`, the model's) is a hint on
-  the review, never a refusal — the person's corrections are the measure of 0.2.
+  found, and it asserts no cause it does not know — faint print named among those it may be (MOL-227,
+  В-2); read in part (`readPartly`, the model's) is a hint on the review, never a refusal — the person's
+  corrections are the measure of 0.2.
+- **A receipt with no items is its sum** (MOL-227): a section «Բաժին» and no item's mark anywhere — a
+  phone in the head is none — only where no reading found a line (`departmentReceipt`); a `parsed`
+  receipt with no lines (`withoutItems`), its head the terminal's — the tax number after «ՀՎՀՀ» first,
+  never the receipt's own «ԿՀ» — its total two sources of three, none where two receipts show (a head
+  under a fiscal number among them); neither «Записать» nor «Убрать сумму» makes a finished trip empty.
 - **The reader away leaves a receipt queued; a photo it drops goes to the end with its attempt
   counted; a photo it cannot read fails** — never lost, never read forever; people read in turn.
 - **The class code is a boundary, not a layout** (MOL-226): «Դաս. 56.10» opens an item on any fiscal till,

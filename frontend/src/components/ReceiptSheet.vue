@@ -12,7 +12,7 @@
 
     <template #footer>
       <AppButton size="large" block @click="save">{{ t('trip.receipt.sheet.save') }}</AppButton>
-      <AppButton v-if="current" variant="danger-ghost" block @click="clear">{{
+      <AppButton v-if="current && removable" variant="danger-ghost" block @click="clear">{{
         t('trip.receipt.sheet.remove')
       }}</AppButton>
     </template>
@@ -50,6 +50,11 @@ export default defineComponent({
     tripCurrency: { type: String as PropType<Currency>, required: true },
     /** The sum the record holds, or the one still in the queue; null for none. */
     current: { type: Object as PropType<Money | null>, default: null },
+    /**
+     * Whether the sum may be taken off: not from a finished record with no purchase, which would be left
+     * with no money and nothing in it — the server refuses it (MOL-227, adversarial А4).
+     */
+    removable: { type: Boolean, default: true },
     onClosed: { type: Function as PropType<() => void>, default: undefined },
   },
   emits: {

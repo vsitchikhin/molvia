@@ -171,13 +171,15 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
 function receiptLines(receipts: ReceiptsInWindow): string[] {
   const { firstDay, lastDay } = receipts
   const span = firstDay === lastDay ? `the day ${firstDay}` : `days ${firstDay} … ${lastDay}`
-  const readings = receipts.read + receipts.readPartly + receipts.reshoot + receipts.unreadable
+  const readings =
+    receipts.read + receipts.readPartly + receipts.reshoot + receipts.noItems + receipts.unreadable
   return [
     `0.2r ${'does the scanner spare typing?'.padEnd(47)}stop above ${String(RECEIPT_EDITS_STOP_PERCENT)} % after 4 weeks`,
     row('receipts read', [String(readings), `${span} in Yerevan`]),
     row('  with their lines', [String(receipts.read), '']),
     row('  in part', [String(receipts.readPartly), 'to the review all the same']),
     row('  not one line found', [String(receipts.reshoot), '«переснимите»']),
+    row('  no items on it', [String(receipts.noItems), 'a sum to record (MOL-227)']),
     row('  unreadable', [String(receipts.unreadable), '']),
     row('receipts recorded', [String(receipts.recorded), '']),
     row('lines put right', share(receipts.linesEdited, receipts.lines, 'up')),

@@ -20,10 +20,15 @@
         tone="good"
         inline
         :icon="IconCheck"
-        :title="t('receipt.recorded.title', { n: recorded }, recorded)"
-        :body="t('receipt.recorded.body')"
+        :title="
+          recorded === 0
+            ? t('receipt.recorded.sum_title')
+            : t('receipt.recorded.title', { n: recorded }, recorded)
+        "
+        v-bind="recorded === 0 ? {} : { body: t('receipt.recorded.body') }"
       >
-        <template #action>
+        <!-- A sum with no purchase has nothing to rate yet (MOL-227). -->
+        <template v-if="recorded !== 0" #action>
           <AppButton variant="ghost" @click="toVerdicts">
             <template #icon><IconStar /></template>
             {{ t('receipt.recorded.to_verdicts') }}
@@ -92,6 +97,7 @@
       :trip-id="id"
       :trip-currency="receiptCurrency"
       :current="receiptCurrent"
+      :removable="rows.length > 0"
     />
     <TripRemoveSheet
       v-model:open="removing"

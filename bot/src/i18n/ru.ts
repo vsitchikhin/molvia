@@ -168,6 +168,8 @@ export const ru = {
    */
   'receipt.parsed': 'Чек из «{place}» разобран: {count}. Посмотрите и запишите.',
   'receipt.parsed_no_place': 'Чек от {date} разобран: {count}. Посмотрите и запишите.',
+  'receipt.no_items': 'Чек из «{place}» разобран: товаров в нём нет — можно записать сумму.',
+  'receipt.no_items_no_place': 'Чек от {date} разобран: товаров в нём нет — можно записать сумму.',
   'receipt.failed':
     'Чек от {date} не удалось прочитать. Можно переснять или записать покупки вручную.',
   'receipt.duplicate':

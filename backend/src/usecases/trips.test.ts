@@ -1015,6 +1015,29 @@ describe('setReceipt (MOL-78)', () => {
     expect(view.total).toEqual([milkBought.amount])
   })
 
+  it('«Убрать сумму» с законченной записи без покупок — отказ: пустая строка (MOL-227, А4)', async () => {
+    const { repositories, calls } = world({
+      ...paid,
+      receipt: RECEIPT,
+      finishedAt: new Date('2026-09-19T11:00:00.000Z'),
+    })
+    repositories.expenses.forTrip = () => Promise.resolve([])
+    await expect(setReceipt(transactWith(repositories), ACTOR, TRIP, null)).rejects.toMatchObject({
+      code: ERROR.RECEIPT_TOTAL_REQUIRED,
+    })
+    expect(calls).toEqual(['lock'])
+    // another sum on it is a change of money as ever
+    await setReceipt(transactWith(repositories), ACTOR, TRIP, { ...RECEIPT, minor: 1_500_000n })
+    expect(calls.at(-2)).toBe(`set ${TRIP} ${ACTOR} 1500000`)
+  })
+
+  it('«не должно сработать»: с открытой записи без покупок сумма снимается — запись ещё вносят', async () => {
+    const { repositories, calls } = world({ ...paid, receipt: RECEIPT })
+    repositories.expenses.forTrip = () => Promise.resolve([])
+    await setReceipt(transactWith(repositories), ACTOR, TRIP, null)
+    expect(calls).toEqual(['lock', `set ${TRIP} ${ACTOR} null`, `drop ${TRIP}`])
+  })
+
   it('та же сумма в другой валюте — другая сумма', async () => {
     const { repositories, calls } = world({ ...paid, receipt: RECEIPT })
     await setReceipt(transactWith(repositories), ACTOR, TRIP, {
