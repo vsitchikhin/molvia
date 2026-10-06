@@ -77,6 +77,27 @@ test('a receipt by its link: pasted, asked of the tax office, reviewed and recor
   ).toBeVisible()
 })
 
+// A finger's double tap on «Send receipt» (adversarial А3): the sheet stays at work for it, so the
+// second tap lands on the busy button — one receipt, and «Покупки» stay on the screen.
+test('a double tap on «Send receipt» sends one receipt and stays in «Purchases»', async ({
+  page,
+}) => {
+  test.setTimeout(90_000)
+  await signedIn(page, '/purchases')
+  await paste(page, link())
+  const box = await sheet(page).getByRole('button', { name: 'Send receipt' }).boundingBox()
+  if (box === null) throw new Error('no button')
+  const [x, y] = [box.x + box.width / 2, box.y + box.height / 2]
+  await page.touchscreen.tap(x, y)
+  await page.waitForTimeout(60)
+  await page.touchscreen.tap(x, y)
+  await expect(sheet(page)).toHaveCount(0)
+  await expect(page).toHaveURL(/\/purchases$/)
+  await expect(page.locator('.purchase-row').filter({ hasText: '2 items' })).toHaveCount(1, READ)
+  await page.waitForTimeout(3_000)
+  await expect(page.locator('.purchase-row').filter({ hasText: '2 items' })).toHaveCount(1)
+})
+
 test('a pasted text that is no receipt to record is refused under the field, and nothing is queued', async ({
   page,
 }) => {

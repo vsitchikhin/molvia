@@ -93,6 +93,9 @@ describe('«Чек по ссылке» (MOL-232)', () => {
     expect(sheet.text()).not.toContain(en.receipt.link.refusal.not_link)
     await send(sheet)?.trigger('click')
     await flushPromises()
+    // at work for a double tap, then away
+    expect(sheet.emitted('update:open')).toBeUndefined()
+    await new Promise((resolve) => setTimeout(resolve, 350))
 
     expect(sendLink).toHaveBeenCalledTimes(1)
     expect(sendLink.mock.calls[0]?.[0]).toMatchObject({
@@ -100,6 +103,18 @@ describe('«Чек по ссылке» (MOL-232)', () => {
       country: 'RS',
       language: 'en',
     })
+    expect(sheet.emitted('update:open')).toEqual([[false]])
+  })
+
+  it('queues one receipt for a double click, and says it is at work until the sheet goes (adversarial А3)', async () => {
+    const sheet = await render()
+    await field(sheet).setValue(LINK)
+    await send(sheet)?.trigger('click')
+    await send(sheet)?.trigger('click')
+    await flushPromises()
+    expect(sendLink).toHaveBeenCalledTimes(1)
+    expect(sheet.text()).toContain(en.receipt.capture.send_busy)
+    await new Promise((resolve) => setTimeout(resolve, 350))
     expect(sheet.emitted('update:open')).toEqual([[false]])
   })
 

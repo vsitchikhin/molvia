@@ -29,7 +29,15 @@
     </div>
 
     <template #footer>
-      <AppButton size="large" block @click="send">{{ t('receipt.capture.send') }}</AppButton>
+      <AppButton
+        size="large"
+        block
+        :busy="sending"
+        :busy-label="t('receipt.capture.send_busy')"
+        @click="send"
+      >
+        {{ t('receipt.capture.send') }}
+      </AppButton>
       <p v-if="!online" class="under">{{ t('receipt.capture.send_offline') }}</p>
     </template>
   </BottomSheet>
@@ -44,7 +52,7 @@ import { LOCALES, serbianReceiptLink } from '@molvia/model'
 import type { ReceiptLinkRefusal } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
-import BottomSheet from '@/components/BottomSheet.vue'
+import BottomSheet, { DOUBLE_TAP } from '@/components/BottomSheet.vue'
 import { useOnline } from '@/composables/useOnline'
 import { newId } from '@/ids'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
@@ -76,6 +84,7 @@ export default defineComponent({
     const text = ref('')
     const tried = ref(false)
     const notKept = ref(false)
+    const sending = ref(false)
     let sentOffline: boolean | null = null
 
     const read = computed(() => serbianReceiptLink(text.value))
@@ -85,7 +94,9 @@ export default defineComponent({
       return read.value.reason
     })
 
-    function send(): void {
+    async function send(): Promise<void> {
+      // a double click is one receipt, never two of one link (adversarial А3)
+      if (sending.value) return
       tried.value = true
       const link = read.value
       if (!link.ok) return
@@ -102,6 +113,11 @@ export default defineComponent({
         return
       }
       sentOffline = !navigator.onLine
+      // Queued at once, with no photo to keep: the sheet stays at work for a double tap, so the second
+      // tap lands on «Отправляем чек…» and never through a sheet going down onto the tab bar (А3) —
+      // as a photo's sheet stays while its photos are kept.
+      sending.value = true
+      await new Promise((resolve) => setTimeout(resolve, DOUBLE_TAP))
       emit('update:open', false)
     }
 
@@ -111,11 +127,12 @@ export default defineComponent({
       text.value = ''
       tried.value = false
       notKept.value = false
+      sending.value = false
       if (offline !== null) emit('sent', offline)
       props.onClosed?.()
     }
 
-    return { t, online, text, refusal, notKept, send, closed }
+    return { t, online, text, refusal, notKept, sending, send: () => void send(), closed }
   },
 })
 </script>
