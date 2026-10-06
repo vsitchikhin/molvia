@@ -10,7 +10,7 @@
     as="ul"
     list
     class="skeleton-rows"
-    :class="{ 'skeleton-narrow': narrow }"
+    :class="{ 'skeleton-narrow': narrow ?? lead === 'circle' }"
   >
     <li v-for="n in count" :key="n" class="item">
       <span class="row">
@@ -75,7 +75,8 @@ export function isWidths(value: unknown): boolean {
  * the ring of «Графики», the scale of «Оценки» — between them, in bars of `skeleton-bar`.
  *
  *   caption — the bar of a `SectionCaption`, on the ground: `width` in percent;
- *   field   — the empty pill of a `SearchField`;
+ *   field   — the empty pill of a `SearchField`: a well, not a bar, so it stands still while the bars
+ *             breathe — a field is not text that is coming;
  *   rows    — a list card of `count` rows of 64, the geometry of `ListRow` and `OperationRow`: `lead`
  *             an icon of 24, a circle of 40 or nothing; `meta`, a line under the title; `tail`, an
  *             amount; `under`, a line under the amount, which brings the amount with it; `next`, the
@@ -83,7 +84,9 @@ export function isWidths(value: unknown): boolean {
  *             for, so a row is as tall as the answer's. `narrow` is the answer's own: below
  *             `$row-narrow` the tail goes under the words, as in a row of `OperationRow`, whose `li` is
  *             the container `row` — a `ListRow` in a plain `li` stays wide at any width, and bars that
- *             went narrow under it stood 9 px taller at 320 (adversarial А1). The typical row is the
+ *             went narrow under it stood 9 px taller at 320 (adversarial А1). Left out, it is the
+ *             circle's: a circle of 40 is `OperationRow`'s, and forgotten there the bars of a row came
+ *             42 px short of the answer at 320 — the dear way (adversarial Б2). The typical row is the
  *             short one (owner's В-3 «б»): a title and a meta of a line each; the line under the amount
  *             is the screen's to ask for, where it is the rule — an account in another currency;
  *   figure  — the card of a sum (handoff 77 v2 2a): a caption, the figure, a line, and a `plate`;
@@ -123,7 +126,8 @@ export default defineComponent({
     tail: { type: Boolean, default: false },
     under: { type: Boolean, default: false },
     next: { type: Boolean, default: false },
-    narrow: { type: Boolean, default: false },
+    /** Left out, the circle's: `OperationRow` is the one row with a circle, and it always goes narrow. */
+    narrow: { type: Boolean as PropType<boolean | undefined>, default: undefined },
     plate: { type: Boolean, default: false },
     widths: {
       type: Array as PropType<number[]>,

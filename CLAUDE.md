@@ -499,8 +499,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
   `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the
   failure; polite states speak through the one live region in `App.vue`. **The skeleton is the
-  answer's shape** (MOL-178): the kit's `SkeletonPart`s in its slot, roots named `skeleton-*`, bars only
-  `skeleton-bar`, breathing by colour — never by opacity; review holds it, not a linter.
+  answer's shape** (MOL-178): the kit's `SkeletonPart`s in its slot, roots named `skeleton-*` and never a
+  class of a screen (a test holds it), bars only `skeleton-bar` — breathing by their own opacity from
+  `--skeleton-rest`, never the frame's; the bar is review's, not a linter's.
 - **The scheme is the device's** (MOL-111): `molvia.scheme`, set before the first paint by the script
   in `index.html` — the one reader of storage outside `storage.ts`; the person's choice wins both ways
   by selectors, and the status bar follows by `media`, the manifest never.

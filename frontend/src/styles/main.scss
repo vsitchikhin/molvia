@@ -157,11 +157,11 @@ html[data-nav] {
   }
 }
 
-// A skeleton's bar breathes by its colour, up to `--border-strong` and back, never by opacity, which
-// took the contrast the bar is drawn for (MOL-178, `skeleton-bar`). Global, so every bar of a screen
-// reads one name — a scoped `@keyframes` is renamed per component.
+// A skeleton's bar breathes from its rest up to the whole `--border-strong` and back, never fainter
+// than at rest, and on the compositor (MOL-178, `skeleton-bar`). Global, so every bar of a screen reads
+// one name — a scoped `@keyframes` is renamed per component.
 @keyframes skeleton-breath {
   50% {
-    background-color: var(--border-strong);
+    opacity: 1;
   }
 }

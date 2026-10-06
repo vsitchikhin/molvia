@@ -1,3 +1,4 @@
+import { readFileSync, readdirSync } from 'node:fs'
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import SkeletonPart from '@/components/SkeletonPart.vue'
@@ -86,11 +87,18 @@ describe('SkeletonPart', () => {
 
     // Narrow is the answer's: only `OperationRow` makes its `li` the container `row`, and a `ListRow`
     // in a plain `li` stays wide — bars gone narrow under it stood 9 px taller (adversarial А1).
-    it('goes narrow only when the answer does', () => {
-      expect(render({ kind: 'rows', tail: true }).classes()).not.toContain('skeleton-narrow')
-      expect(render({ kind: 'rows', tail: true, narrow: true }).classes()).toContain(
-        'skeleton-narrow',
-      )
+    // Left out, `narrow` is the circle's: a circle of 40 is `OperationRow`'s, which always goes
+    // narrow, and forgotten there the bars came 42 px short of the answer at 320 (adversarial Б2).
+    it('goes narrow only when the answer does, and with the circle by itself', () => {
+      const narrow = (props: Record<string, unknown>) =>
+        render({ kind: 'rows', tail: true, ...props })
+          .classes()
+          .includes('skeleton-narrow')
+      expect(narrow({})).toBe(false)
+      expect(narrow({ lead: 'icon' })).toBe(false)
+      expect(narrow({ narrow: true })).toBe(true)
+      expect(narrow({ lead: 'circle' })).toBe(true)
+      expect(narrow({ lead: 'circle', narrow: false })).toBe(false)
     })
 
     it('leaves the meta out when the answer has none', () => {
@@ -166,5 +174,30 @@ describe('SkeletonPart', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     render(props)
     expect(warn.mock.calls.some(([message]) => String(message).includes('Invalid prop'))).toBe(true)
+  })
+
+  // The part is rendered by the screen that puts it in the frame, so a scoped rule of any screen on a
+  // class of its root reaches it: «Настройки» drew their own fields as `.skeleton-field`, the search
+  // well's root, and its corners went 14 px (adversarial Б1). The roots are read from the part's
+  // template, the classes from every other component's styles — the rule held by this, not by memory.
+  it('names no root a class any other component styles', () => {
+    const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+    const part = source('./SkeletonPart.vue')
+    const template = part.slice(0, part.indexOf('<script'))
+    const roots = [...template.matchAll(/(?:class="|')(skeleton-[a-z-]+)/g)].map((m) => m[1] ?? '')
+    expect(roots).toEqual(expect.arrayContaining(['skeleton-caption', 'skeleton-narrow']))
+    const SOURCES = '../'
+    const clashes = readdirSync(new URL(SOURCES, import.meta.url), { recursive: true })
+      .map(String)
+      .filter((path) => path.endsWith('.vue') && !path.endsWith('SkeletonPart.vue'))
+      .flatMap((path) => {
+        const sfc = source(`${SOURCES}${path}`)
+        // The frame's `:slotted()` places the parts on purpose: that is no screen's own rule.
+        const styles = sfc.slice(sfc.indexOf('<style')).replace(/:slotted\([^)]*\)/g, '')
+        return roots
+          .filter((root) => new RegExp(`\\.${root}(?![\\w-])`).test(styles))
+          .map((root) => `${path} .${root}`)
+      })
+    expect(clashes).toEqual([])
   })
 })

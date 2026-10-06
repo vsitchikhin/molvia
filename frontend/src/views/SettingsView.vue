@@ -1,11 +1,11 @@
 <template>
   <AppScreen :title="t('settings.title')">
     <ScreenSkeleton v-if="form.loading && !form.draft" :groups="[32]">
-      <div class="skeleton-card">
-        <span class="skeleton-label"></span><span class="skeleton-field"></span>
+      <div class="ghost-card">
+        <span class="ghost-label"></span><span class="ghost-field"></span>
       </div>
-      <div class="skeleton-card">
-        <span class="skeleton-field"></span><span class="skeleton-field"></span>
+      <div class="ghost-card">
+        <span class="ghost-field"></span><span class="ghost-field"></span>
       </div>
     </ScreenSkeleton>
     <ScreenState
@@ -458,7 +458,7 @@ export default defineComponent({
   }
 }
 
-.skeleton-card {
+.ghost-card {
   display: grid;
   gap: var(--space-4);
   padding: var(--space-4);
@@ -467,8 +467,10 @@ export default defineComponent({
 }
 
 /* A field of the form, empty: its well and its edge, which `surface-2` alone on a card is not seen by
-   (1.1:1, Ф-13) — 44 inside the edge, 46 outside, as `AppField` (adversarial А6). */
-.skeleton-field {
+   (1.1:1, Ф-13) — 44 inside the edge, 46 outside, as `AppField` (adversarial А6). `ghost-*`, never
+   `skeleton-*`: those are the roots of the kit's parts, and a scoped class of this screen would reach
+   one put in the frame's slot (adversarial Б1). */
+.ghost-field {
   box-sizing: border-box;
   height: calc(var(--touch-target) + 2 * var(--hairline));
   border: var(--hairline) solid var(--border-strong);
@@ -476,7 +478,7 @@ export default defineComponent({
   background: var(--surface-2);
 }
 
-.skeleton-label {
+.ghost-label {
   @include skeleton-bar;
 
   width: 38%;

@@ -365,7 +365,7 @@
       <AppCard as="ul" list>
         <OperationRow v-for="(row, index) in operations" :key="index" v-bind="row" />
       </AppCard>
-      <SkeletonPart kind="rows" :count="3" lead="circle" tail next narrow />
+      <SkeletonPart kind="rows" :count="3" lead="circle" tail next />
     </section>
 
     <!-- The skeleton (MOL-178, Ф-13): each part of the kit under the answer it stands for, so e2e holds
@@ -405,7 +405,7 @@
         <AppCard as="ul" list>
           <OperationRow v-bind="withUnder" />
         </AppCard>
-        <SkeletonPart kind="rows" :count="1" lead="circle" tail under next narrow />
+        <SkeletonPart kind="rows" :count="1" lead="circle" tail under next />
       </div>
       <SkeletonPart kind="figure" plate />
       <SkeletonPart kind="lines" :widths="[64, 78]" />

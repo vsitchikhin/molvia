@@ -2,7 +2,7 @@
   <div class="skeleton">
     <p v-if="!announce" class="hidden" role="status">{{ t('state.loading') }}</p>
 
-    <div class="bars" aria-hidden="true">
+    <div ref="bars" class="bars" aria-hidden="true">
       <SkeletonPart v-if="groups?.length" kind="lines" :widths="groups" />
       <slot />
     </div>
@@ -10,7 +10,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onBeforeUnmount, onMounted, warn, type PropType } from 'vue'
+import { defineComponent, onBeforeUnmount, onMounted, ref, warn, type PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import SkeletonPart, { isWidths } from '@/components/SkeletonPart.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -41,20 +41,23 @@ export default defineComponent({
       validator: isWidths,
     },
   },
-  setup(props, { slots }) {
+  setup() {
     const { t } = useI18n()
     // A frame with no shape says «Loading…» over nothing — the invisible skeleton of Н-5, which no
-    // type and no test would see once `groups` stopped being required (adversarial А4).
-    if (!props.groups?.length && !slots.default) warn('ScreenSkeleton has nothing to draw')
+    // type and no test would see once `groups` stopped being required (adversarial А4). Read from what
+    // was drawn, not from what was passed: a slot of `<SkeletonPart v-if="known">` is passed and draws
+    // nothing (adversarial Б4).
+    const bars = ref<HTMLElement | null>(null)
     // Said in the app's live region when there is one, and taken back when loading is over —
     // «Loading…» left in the region would be read under the answer (MOL-19, П-2, C3).
     const announce = useAnnouncer()
     let withdraw: (() => void) | undefined
     onMounted(() => {
       withdraw = announce?.(t('state.loading'))
+      if (bars.value?.childElementCount === 0) warn('ScreenSkeleton has nothing to draw')
     })
     onBeforeUnmount(() => withdraw?.())
-    return { t, announce }
+    return { t, announce, bars }
   },
 })
 </script>

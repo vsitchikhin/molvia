@@ -36,18 +36,22 @@
 /// the bars cannot part from the answer. A container query takes no custom property, hence Sass.
 $row-narrow: 22rem;
 
-/// A bar of a skeleton (Ф-13, MOL-178): `border` on the `surface` of a card, 1.42:1 in the light scheme
-/// and 1.38:1 in the dark — `tokens.test.ts` holds it. `surface-2` was the bar's colour and is not seen:
-/// 1.06:1 on the page's ground, 1.1:1 on a card. **It breathes by its colour**, up to `border-strong`
-/// and back (`@keyframes skeleton-breath`, main.scss), never by opacity: the frame's opacity of 0.45 to
-/// 0.9 took the very contrast this is for — 1.17:1 in a card at the trough, 1.09 on the ground, where Н-5
-/// was 1.06 (adversarial А2). Still under «reduce motion». One look for the kit's parts and for what a
-/// screen draws in their slot: the scale of «Оценки», the fields of «Настройки». A pill; a key or a
-/// plate sets its own radius after.
+/// A bar of a skeleton (Ф-13, MOL-178): `border-strong` at `--skeleton-rest`, which on a card's `surface`
+/// is `border`'s 1.42:1 in the light scheme and 1.47:1 in the dark, on the page's ground 1.31 and 1.53 —
+/// `tokens.test.ts` holds it. `surface-2` was the bar's colour and is not seen: 1.06:1 on the ground,
+/// 1.1:1 on a card. **It breathes from its rest up to the whole `border-strong` and back**
+/// (`@keyframes skeleton-breath`, main.scss), so it is never fainter than at rest: the frame's opacity of
+/// 0.45 to 0.9 faded the cards with it and took the very contrast this is for — 1.17:1 at the trough, 1.09
+/// on the ground, where Н-5 was 1.06 (adversarial А2). By opacity, not by colour: a colour is repainted
+/// on the main thread every frame — 61 style recalculations a second on «Что брать» against 5.5, while
+/// the answer is being read (adversarial Б3) — and an opacity is the compositor's. Still under «reduce
+/// motion». One look for the kit's parts and for what a screen draws in their slot: the scale of
+/// «Оценки». A pill; a key or a plate sets its own radius after.
 @mixin skeleton-bar {
   display: block;
   border-radius: var(--radius-pill);
-  background: var(--border);
+  background: var(--border-strong);
+  opacity: var(--skeleton-rest);
   animation: skeleton-breath var(--dur-pulse) ease-in-out infinite;
 
   @media (prefers-reduced-motion: reduce) {

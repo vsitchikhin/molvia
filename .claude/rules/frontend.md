@@ -515,27 +515,35 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `SkeletonPart`s — a caption on the ground, the well of a search, a list card of rows (`lead` an icon of
   24 or a circle of 40, `tail`, `under`, `next`, `narrow`), the card of a sum (`plate`), paragraphs — and
   between them what is the screen's own, the ring of «Графики», the scale of «Оценки». A prop of one
-  array was the other way, and the screen's own would have stood only after every part. A frame with
-  nothing to draw warns while developing — once `groups` stopped being required, the invisible skeleton
-  of Н-5 was one no type or test would see (adversarial А4). **The roots of the parts are named
+  array was the other way, and the screen's own would have stood only after every part. A frame that drew
+  nothing warns while developing — read from what is under its bars once mounted, since a slot of
+  `<SkeletonPart v-if>` is passed and draws nothing; once `groups` stopped being required, the invisible
+  skeleton of Н-5 was one no type or test would see (adversarial А4, Б4). **The roots of the parts are named
   `skeleton-*`**: a part is rendered by the screen that puts it in the slot, so its root carries the
   screen's scope too, and a scoped `.caption` of «Бюджет» set its size on the caption's bar
-  (adversarial А3) — a class of a root is never a word a screen uses for its own. **A bar is
-  `@include skeleton-bar`** — `border` on a card's `surface`, 1.42:1 and 1.38:1, and on the ground under
-  a caption 1.22:1 and 1.53:1, which `tokens.test.ts` holds — in the parts and in what a screen draws in
-  the slot (the fields of «Настройки», the keys of «Оценки», the cards of exchanges), never `surface-2`,
-  1.1:1 even on a card; a well (a field) is `surface-2` with its `border-strong` edge, as the field's own.
-  No linter holds it — a well is `surface-2` by right — review does, and a bar drawn past the mixin
-  stands still among the others. **It breathes by its colour**, up to `border-strong` and back
-  (`@keyframes skeleton-breath`, global), never by opacity: the frame's 0.45 to 0.9 took the very
-  contrast the bar is drawn for — 1.17:1 in a card at the trough, 1.09 on the ground, where Н-5 was 1.06
-  (adversarial А2); still under «reduce motion». **The widths of a row's bars are the part's**, the
+  (adversarial А3) — a class of a root is never a word a screen uses for its own, and `SkeletonPart.test`
+  holds it against the styles of every component (adversarial Б1: «Настройки» drew their fields as
+  `.skeleton-field`, now `ghost-*`). **A bar is `@include skeleton-bar`** — `border-strong` at
+  `--skeleton-rest` (0.62), which is `border`'s 1.42:1 on a card in the light scheme and 1.47:1 in the
+  dark, 1.31 and 1.53 on the ground under a caption, as `tokens.test.ts` holds — in the parts and in what a
+  screen draws in the slot (the label of «Настройки», the keys of «Оценки», the cards of exchanges), never
+  `surface-2`, 1.1:1 even on a card. A well (a field) is `surface-2` with its `border-strong` edge, as the
+  field's own, **and stands still** — a field is not text that is coming. No linter holds the bar — a well
+  is `surface-2` by right — review does, and a bar drawn past the mixin stands still among the others.
+  **It breathes by its own opacity, from its rest up to 1 and back** (`@keyframes skeleton-breath`,
+  global), so it is never fainter than at rest: the frame's 0.45 to 0.9 faded the cards too and took the
+  very contrast the bar is drawn for — 1.17:1 in a card at the trough, 1.09 on the ground, where Н-5 was
+  1.06 (adversarial А2); and a colour that breathed instead was repainted on the main thread, 61 style
+  recalculations a second against 5.5, while the answer is read (adversarial Б3); an opacity is the
+  compositor's. Still under «reduce motion». **The widths of a row's bars are the part's**, the
   handoff's uneven cycle, never the screen's — the line under an amount never the amount's own, or the
   two read as one block; a caption's and the paragraphs' are the screen's, since there the width is the
   content. **Narrow is the answer's**: `narrow` makes the rows' `li` the container `row`, as
   `OperationRow` does — a `ListRow` in a plain `li` keeps its amount beside the words at any width, and
-  bars gone narrow under it stood 9 px taller at 320 (adversarial А1). `under` brings its amount with
-  it. **`groups` is the shape from before the parts**, drawn as paragraphs in one card, so every
+  bars gone narrow under it stood 9 px taller at 320 (adversarial А1). Left out, it is the circle's: a
+  circle of 40 is `OperationRow`'s alone, and a forgotten `narrow` there left the bars 42 px short of the
+  answer at 320 — the dear way, which MOL-138 holds the page against (adversarial Б2). `under` brings its
+  amount with it. **`groups` is the shape from before the parts**, drawn as paragraphs in one card, so every
   screen's skeleton is seen at once (owner's В-1 «а»); each screen trades it for its answer's shape in
   its own task of the epic, and its `groups` goes with the last of them. Where a card is not the
   answer's shape the paragraphs stand bare (`card: false`): the scanner's bar at the top of the

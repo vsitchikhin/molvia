@@ -134,6 +134,20 @@ describe('ScreenSkeleton', () => {
     )
   })
 
+  // Passed is not drawn: a slot of `<SkeletonPart v-if="known">`, or of a list that came empty, is a
+  // slot all the same, and the frame said «Loading…» over nothing with no word (adversarial Б4).
+  it('warns of a slot that draws nothing, as of no slot', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    for (const slot of [() => null, () => []]) {
+      warn.mockClear()
+      const view = render(undefined, 'en', slot)
+      expect(view.get('.bars').element.children).toHaveLength(0)
+      expect(warn.mock.calls.some(([message]) => String(message).includes('nothing to draw'))).toBe(
+        true,
+      )
+    }
+  })
+
   it('says nothing of a frame with a shape', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     render([40])

@@ -143,6 +143,10 @@
   --skeleton-caption: 0.6875rem; /* 11 */
   --skeleton-figure: 1.75rem; /* 28 */
 
+  /* A bar is `--border-strong` at this opacity at rest — `--border`'s contrast on a card, 1.42:1 —
+     and breathes up to 1 (MOL-178): an opacity is the compositor's, a colour the main thread's. */
+  --skeleton-rest: 0.62;
+
   /* The circle under the icon of an operation's row (MOL-176): its skeleton takes the same. */
   --row-circle: 2.5rem; /* 40 */
 
