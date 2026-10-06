@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import type { Currency, Money, StoreMemoryKind, StoreMemoryWord } from '@molvia/model'
 import type { Conn } from './index'
 import { storeMemory } from './schema'
+import { liveItemId } from './trace'
 
 /**
  * What the memory says a key is: the item, and whether it is the person's own word; the shelf price of
@@ -120,7 +121,8 @@ export function createStoreMemoryRepository(db: Conn): StoreMemoryRepository {
             kind: word.kind,
             key: word.key,
             actorId,
-            itemId: word.itemId,
+            // A word about an item from before a merge is about the survivor (MOL-106).
+            itemId: liveItemId(word.itemId),
             priceMinor: word.price?.minor ?? null,
             priceCurrency: word.price?.currency ?? null,
           })),

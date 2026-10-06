@@ -426,7 +426,7 @@ export const SEARCH_KEY_TABLES = Object.freeze({
  * seen aside, nothing else. Deliberately narrower than `toSearchKey`, which folds scripts,
  * forks and punctuation so that a search finds more — «Milo» and «Мыло» share a key, and a
  * false merge that costs the search a candidate would cost «Предложить товар» the item itself.
- * «3.2%» and «3,2%» stay two names here; merging what is merely similar is 0.2's.
+ * «3.2%» and «3,2%» stay two names here; what is merely similar is the nightly merge's (MOL-106).
  *
  * **Two names with the same identity always have the same key**, and `createUnlessNamed`
  * rests on it: it locks and looks up by key, then compares identities. So this is built from

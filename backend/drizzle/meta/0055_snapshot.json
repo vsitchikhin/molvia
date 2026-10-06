@@ -1,6 +1,6 @@
 {
-  "id": "3b71ecba-e28f-4d24-94e6-0bca1503c3b8",
-  "prevId": "f1d67863-fc71-44a0-976f-62db5f620985",
+  "id": "65309149-60d9-497f-869f-69e1279af485",
+  "prevId": "3b71ecba-e28f-4d24-94e6-0bca1503c3b8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3869,6 +3869,13 @@
           "notNull": true,
           "default": 0
         },
+        "no_items": {
+          "name": "no_items",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "unreadable": {
           "name": "unreadable",
           "type": "integer",
@@ -3969,7 +3976,7 @@
       "checkConstraints": {
         "receipt_days_counts_non_negative": {
           "name": "receipt_days_counts_non_negative",
-          "value": "least(\"receipt_days\".\"read\", \"receipt_days\".\"read_partly\", \"receipt_days\".\"reshoot\", \"receipt_days\".\"unreadable\", \"receipt_days\".\"recorded\", \"receipt_days\".\"lines\", \"receipt_days\".\"lines_edited\", \"receipt_days\".\"lines_skipped\", \"receipt_days\".\"lines_item\", \"receipt_days\".\"lines_figures\", \"receipt_days\".\"totals_corrected\", \"receipt_days\".\"within_5m\", \"receipt_days\".\"within_15m\", \"receipt_days\".\"within_1h\", \"receipt_days\".\"within_1d\", \"receipt_days\".\"later\") >= 0"
+          "value": "least(\"receipt_days\".\"read\", \"receipt_days\".\"read_partly\", \"receipt_days\".\"reshoot\", \"receipt_days\".\"no_items\", \"receipt_days\".\"unreadable\", \"receipt_days\".\"recorded\", \"receipt_days\".\"lines\", \"receipt_days\".\"lines_edited\", \"receipt_days\".\"lines_skipped\", \"receipt_days\".\"lines_item\", \"receipt_days\".\"lines_figures\", \"receipt_days\".\"totals_corrected\", \"receipt_days\".\"within_5m\", \"receipt_days\".\"within_15m\", \"receipt_days\".\"within_1h\", \"receipt_days\".\"within_1d\", \"receipt_days\".\"later\") >= 0"
         },
         "receipt_days_edited_within_lines": {
           "name": "receipt_days_edited_within_lines",
@@ -4679,7 +4686,7 @@
         },
         "receipts_layout_known": {
           "name": "receipts_layout_known",
-          "value": "\"receipts\".\"layout\" is null or \"receipts\".\"layout\" in ('card', 'table', 'class')"
+          "value": "\"receipts\".\"layout\" is null or \"receipts\".\"layout\" in ('card', 'table', 'class', 'department')"
         },
         "receipts_heard_known": {
           "name": "receipts_heard_known",

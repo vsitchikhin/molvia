@@ -5,6 +5,8 @@
 // for line (`.scratch/tasks/status/MOL-126/parity.mjs`), so the measured figure — 54 of 70 lines of
 // receipts its rules never saw — still holds.
 
+import { levenshtein } from '#model/support/edits'
+
 /** An item as a receipt reaches it: its own name, its names in the till's language, its headings. */
 export interface CatalogueNode {
   readonly itemId: string
@@ -51,24 +53,6 @@ export function receiptWords(text: string): string[] {
     .replace(/և/gu, 'եվ')
     .split(/[^ա-ևԱ-Ֆa-zа-яё0-9%]+/u)
     .filter((word) => word.length >= 2 && /[ա-և]/u.test(word))
-}
-
-function levenshtein(a: string, b: string): number {
-  const x = Array.from(a)
-  const y = Array.from(b)
-  let previous = Array.from({ length: y.length + 1 }, (_, j) => j)
-  for (let i = 1; i <= x.length; i++) {
-    const row = [i]
-    for (let j = 1; j <= y.length; j++) {
-      row[j] = Math.min(
-        (previous[j] ?? 0) + 1,
-        (row[j - 1] ?? 0) + 1,
-        (previous[j - 1] ?? 0) + (x[i - 1] === y[j - 1] ? 0 : 1),
-      )
-    }
-    previous = row
-  }
-  return previous[y.length] ?? 0
 }
 
 /**

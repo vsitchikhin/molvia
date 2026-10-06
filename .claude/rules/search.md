@@ -20,6 +20,13 @@ paths:
   - 'frontend/src/composables/useCatalogueSearch*'
   - 'frontend/src/stores/{searchDraft,itemEntry,recentItems}*'
   - 'e2e/item-search.spec.ts'
+  - 'packages/model/src/entities/twins.ts'
+  - 'packages/model/src/contracts/merge.ts'
+  - 'backend/src/db/{merge-repository,trace}.ts'
+  - 'backend/src/usecases/merge-twins*.ts'
+  - 'backend/src/merge-{command,cli}.ts'
+  - 'backend/tests/merge*.ts'
+  - 'bin/merge.sh'
 ---
 
 # Catalogue search, transliteration, the dictionary, the seed
@@ -121,7 +128,7 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   table and Cyrillic alone (review, remark 4). **A rollback past a rekeying build is a rename for
   the data** (adversarial А5): the image put back looks a name up by its own tables' key, misses the
   row rewritten, and `createUnlessNamed` may write a twin; the next start of the new build rekeys
-  again, and a twin made meanwhile is found by `nameIdentity` and merged by hand. Accepted: a
+  again, and a twin made meanwhile is the nightly merge's (MOL-106) — merged, or named to the owner. Accepted: a
   rollback is rare, a twin is seen, and holding the old key beside the new would be a second column
   for one deploy. MOL-11 and MOL-27 changed the alphabet before any
   key was stored; MOL-109 is the first change the recompute carried. Same standing as
@@ -523,3 +530,142 @@ shows what it moves.
   still no identity: another thing with the same key is left out too — «Мыло» beside somebody's
   «Milo» — and is proposed by hand, since «Предложить товар» compares names (review К, С-9). A line
   left out costs a proposal; a twin written would be there for good, since the seed only adds.
+
+## The merge of twins (MOL-106)
+
+The owner's decision of 26.09.2026: strangers proposing items make twins — «Молоко 3.2%» beside
+«Молоко 3,2%», «Малоко» beside «Молоко», «Yerevan City» beside «Ереван Сити» — and a twin splits the
+ratings and prices of one thing in two, so «Что брать» has under three people on each half and shows
+neither. The night merges them by itself; **a false merge is worse than a missed one**, since it pours
+the ratings of two things into one. Places joined from MOL-50 on 02.10.2026: one journal, one undo, one
+report.
+
+- **What merges by itself** (`twinVerdict`): one kind, one unit a price is compared by, **every size
+  the same with its unit** — «3.2%» and «3,2%» are one, «1 л» and «2 л», «С0» and «С1», «1 кг» and
+  «1000 г» are not (`nameParts`: the number by its value, the unit from `TWIN_UNITS` by its spelling in
+  lower case — **never by `toSearchKey`**, which folds «мм» into «м», «км» into «см» and «pc» into a
+  pack, and let «Лента 50 мм» merge into «Лента 50 м» at 0.957, adversarial А2; a test holds that no
+  spelling stands for two units, and a unit missing is a word, so the pair is a candidate, never a
+  merge) — **the same scripts** (review №6: held by the code, not by the model), **the same number of words,
+  each within one edit, two in the name** (`twinSpelling`: matched one to one in any order, «Чанах сыр» is
+  «Сыр чанах»; a word under four letters must be the same — «SAS» and «SOS» are two shops), **and the
+  names' vectors at least 0.90 apart by cosine**. A word more is a brand, never a twin: «Сыр чанах
+  Ашхар», «Молоко Марианна» (MOL-112, В-1) — not even a candidate, or every brand would stand in the list
+  beside its kind.
+- **Measured on the seed** (`.scratch/tasks/status/MOL-106-measure.md`, the bench beside it): of its
+  178 000 pairs none merges; the nearest one edit apart is «Курица» and «Корица» at 0.856; two edits in a
+  word let in «Хлеб» and «Хлебцы» at 0.937, so a word takes one. Taken: a fat with a comma or a point
+  (7 of 7), «ё» (32 of 33), the order of words (207 of 222), half of the typos. 0.88 also had no false
+  merge, but «Курица» stood 0.024 from it. `merge-corpus.integration.test.ts` pins it end to end on the
+  real model, with pairs well clear of the threshold — the model's last digits differ on x86 (MOL-105).
+- **The model does not read across scripts.** «Moloko» against «Молоко» is 0.69 at the median, «Mylo»
+  against «Мыло» 0.47 — as far as «Milo» from «Мыло», 0.48: a transliteration and a homograph look alike
+  to it — and its highest, «Bulochki dlya burgerov», stands at 0.902, past the threshold. So **a pair
+  in two sets of scripts is always a candidate, never a merge, by the code** (`sameScripts` of
+  `twinSpelling`), whatever a model or a re-measure says; the search key is no ground of the merge (it is
+  no identity, MOL-12). The price: «Сметанa» with a Latin «a» is named, not merged. A unit after a number
+  is no script of the name: «Молоко 1 l» merges with «Молоко 1 л». For places this is the price the owner chose with В-1:
+  «Yerevan City» is 0.818 from «Ереван Сити» and is named, not merged; a double space, a hyphen or «ё»
+  inside merge by themselves. **A place's name is a proper name, and merges by itself only with no edit
+  at all** (`properName`, adversarial Ж1): one letter apart is another shop, and the model reads a
+  proper name by its letters — «Маркет Ширак» and «Маркет Шираз» at 0.942, «Магнит» and «Магнат» at
+  0.919, both in Gyumri. Every place the measure merged by itself was no edit apart, so nothing is lost;
+  a typo of a shop's name is a candidate. **As written, never by the search key** (`letters`, adversarial
+  З1): case, spacing, punctuation and «ё» aside and nothing else — the key folds a double letter, «й» and a
+  soft sign, and «Аптека Римма» and «Аптека Рима» are one key and two shops. Armenian «և», «եւ» and
+  «եվ» are one spelling (MOL-12). **The price:** a sign that means something in a shop's name goes with
+  the punctuation — «Маркет Ани+» and «Маркет Ани» are one spelling, and merge at 0.92; rare in one
+  city, and `make apart` parts them (adversarial round 9). `merge-corpus.integration.test.ts`
+  pins both on the model.
+- **A candidate** (named to the owner, never merged): the same sizes and words, two edits a word at
+  most, and the meaning at 0.80 or one key; a pair that would merge but for its unit or for more than
+  twenty codes together. **Named once, and only once printed** (`catalogue_merge_candidates`): a morning
+  prints ten and marks those, the rest come by name on the mornings after — marked all at once, the
+  eleventh was never named at all (review №2). A candidate with a side merged that same night waits for
+  the next, where it meets the survivor: its command would be refused (adversarial А8). On the seed alone
+  the first nights name some twenty («Курица ~ Корица»), then none.
+- **The older survives** (`created_at`, the lower id on a tie), as places did in `0007` and `0010`: on
+  production the seed is older than anything a person types. The price: a typo proposed first is the
+  canon's name, and the undo does not rename.
+- **The merged item stays as a trace** (`items.merged_into`, `places.merged_into`), never deleted. The
+  one column does four things: the trace's name is the survivor's **second name** — the search finds it
+  by its key and its vector and answers the survivor once, at the better place, the limit after the
+  folding; **an id from before** — a purchase queued on a phone, a draft, a bot's button — lands on the
+  survivor by `liveItemId` / `livePlaceId` on every path that writes by an id, and `byId` reads through
+  it; **a trace's name typed again** — «Предложить товар», a receipt's new line, the seed that only adds,
+  a place at the door — is the survivor, so a twin never comes back; and the undo takes the mark off. A
+  trace always points at a live item: a merge into a trace is refused, and the traces of a merged item
+  follow it. A trace is no node of the receipt matcher. **The price on the phone:** «Часто берёте» offline
+  shows the old name until the server answers.
+- **What moves**: purchases, verdicts, picks and the person's own word (`admits`, added together when
+  both items had one query), codes (refused past `ITEM_BARCODES_MAX` — then a candidate), Armenian names
+  and headings (one both have stays on the trace), the shops' memory, receipts' lines; for a place, trips
+  and dishes' verdicts. The vector stays with the trace: the meaning finds the survivor by it.
+- **One person's two verdicts** (Т-5): a live one beats a withdrawn one, of two alike the later
+  `rated_at`, the survivor's on a tie. The rows stay and **trade what they say** — the unique key holds
+  row by row, so two rows cannot cross in one statement — and the loser, on the trace, is withdrawn. **The
+  0.2 gate counts rows** (`reachedRatings`, MOL-27), so a merge gives nobody a rating and takes none
+  (Т-6, the test at five). `updated_at`, the order of «Что брать», travels with the words: the trigger
+  `verdicts_touch_updated_at` keeps still under `molvia.merging` (0054). **The price:** a withdrawn row
+  holds no text (CHECK), so the undo brings the loser back without its review — the journal keeps no
+  one's words.
+- **The journal** (`catalogue_merges`, `catalogue_merge_moves`) writes down every row moved by its own
+  key; **`make unmerge ID=`** moves those back — **each only from where the merge put it**, the survivor
+  or what that was merged into since: a code let go and written to another item, a word of the shop's
+  memory said again, stay with what people did (adversarial А4). **Merges are undone from the last
+  that touched the same rows** (`chained`, naming it): a merge whose survivor was merged on since (a
+  chain, А3, Б1), or after which another merge into the same survivor swapped the same person's verdict
+  or added to the same pick (a fan, review №11, adversarial В1, В3). Undone out of order, a swap met
+  contents another merge had put there and the person's scores came back crossed — «Малоко» with the
+  score given to «Молоко 3,2%» — and an «own word» another merge brought was taken off. A later merge
+  that touched nothing of it does not stand in the way. A withdrawal writes the row it lost to as well
+  (`kept`): a later merge that only withdrew its own against a verdict the earlier one brought is a
+  touch too — undone first, the earlier one took the winner home and left the survivor with nothing of
+  the person (review №12, adversarial Д1). **A name or a heading the survivor's other twin knew too
+  stays with the survivor** on an undo, and the trace undone gets a copy (Д2); **undone in turn, the
+  twin takes it away** unless the survivor had it of its own, a merge still standing brought it, or
+  another twin knows it — so a fan undone from the earlier merge on leaves the survivor as it was (Е1). **The price:** to part a false merge the owner
+  undoes the later true one too, and merges it again by hand — the texts of the reviews withdrawn on the
+  way do not come back, and the night leaves that pair to the hand from then on. The
+  survivor's own pick gets back its «own word» and its last
+  pick (А7). **An undone pair is never merged or named by the night again — nor the survivor of its
+  survivor**: the pair is read by the live things its two ends stand in now, so «Малоко», undone from
+  «Молоко 3,2%», does not merge into what that went into (А5). The owner's `make merge` still may (В-2). A
+  pick has no id, so its move names its person and **goes with the person by the cascade**
+  (`ACTOR_REFERENCES`); the copy of a person's data leaves the journal out, the pick itself being in it.
+- **The night** (`mergeTick`): a minute timer in the API, from 04:30 Yerevan — after the copy of the
+  database at 04:00, so a copy before every merge exists — claimed by its day in
+  `catalogue_merge_runs`, so two instances never run one night and a night slept through runs on waking;
+  the report from 09:00, queued as `catalogue_merged` and sent every morning, nothing merged included —
+  it is also the word that the night ran. **A pair that fails is told as `job:catalogue-merge` and the
+  night goes on**; a night that dies whole — a restart, a lost connection — leaves its day claimed and
+  unfinished and **is claimed again an hour on** (`STALE_RUN_MINUTES`), and **the report reads the
+  night's merges from the journal** (`catalogue_merges.night`), so what merged before it died is named
+  all the same (review №3, adversarial А6). A moment goes to the driver as a string: a `Date` in a raw
+  `sql` template is refused by postgres-js under drizzle, and the night never ran (№1, А1). **What
+  reached a trace after its merge** (a write that read the id a moment before — `liveItemId` takes no
+  lock) is swept to the survivor under the merge's number, **in both modes** and by every table a merge
+  moves (№8). Yerevan, not the owner's zone, which is kept nowhere. **The prices, named:** a night that
+  first starts after 23:00 — the API down since 04:30 — and dies is claimed again only in the next day,
+  and its merges are named by no morning; they stand in the journal and in `make unmerge`. A candidate
+  whose side merged that night waits for the next only in `on`, and meets the survivor there only if the
+  survivor is near the other side too («Сыр чанох» merged into «Сыр чанах», whose pair with «Сыр чунух»
+  is 0.64: never asked) — in `report`, where nothing merged, it is named as it is.
+- **`CATALOGUE_MERGE`**: `on` merges, `report` says what it would and merges nothing — it only sweeps
+  what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production runs `report` until
+  the owner says `on`** (В-3): the thresholds stand on a corpus, not yet on strangers' twins. A pair
+  only reported comes with its command **`make apart FROM= INTO=`** (review №7, owner's decision
+  05.10.2026): the owner says two things are apart before `on` merges them. `catalogue_apart` holds the
+  pair by its ids; the night reads it as a pair undone — by the live things its ends stand in now —
+  never merging or naming it, nor what they are merged into since, **that very night too**: a side merged
+  — or, in `report`, merged as if — passes what it may not be merged with to its survivor, so `report`
+  never promises A→C and B→C for A and B apart (adversarial Г1). The owner's `make merge` still may.
+  **Every pair of a night is kept** (adversarial В2): the message names ten, and `make merge-night DAY=`
+  prints them all — in `on` the merges still standing by number, in `report` each pair with its
+  `make apart` (`catalogue_merge_runs.pairs`).
+- **The morning's message holds within Telegram's 4096** (`MERGE_TEXT_MAX`, review №9, adversarial Б2):
+  pairs are printed while it holds them, the rest counted — a message refused is lost, being handed
+  once. A candidate cut for length is named already; **`make merge-candidates`** lists every candidate
+  named and still apart, with its command, so neither a cut nor a lost morning loses one.
+- **Not here:** merging by codes (one package is one item already, MOL-100), renaming an item by hand,
+  chains of shops across cities (two places, MOL-120).

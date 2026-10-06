@@ -12,6 +12,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  real,
   smallint,
   text,
   timestamp,
@@ -34,6 +35,7 @@ import {
   FEEDBACK_PICTURE_BYTES_MAX,
   LOCALES,
   LOGIN_CODE_MAX,
+  MERGE_SUBJECTS,
   REMINDERS_OFF,
   baseUnitSchema,
   catalogueSubjectSchema,
@@ -375,7 +377,7 @@ export const actors = pgTable(
  * `name`, carries the index — «moloko» scores 0.000 against «молоко».
  *
  * There is deliberately no unique index on `search_key`: the fork fold of MOL-5 merges
- * genuinely different names on purpose, and merging duplicate entries is a 0.2 question.
+ * genuinely different names on purpose; twins are merged by the night (MOL-106), into `merged_into`.
  */
 export const items = pgTable(
   'items',
@@ -399,9 +401,21 @@ export const items = pgTable(
       onDelete: 'set null',
     }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * The item this one was merged into (MOL-106), or null. A merged item stays as a trace rather
+     * than going: its name is a second name the search finds the survivor by, an id a phone or a
+     * bot's button still holds lands on the survivor, a proposal or the seed that writes its name
+     * gets the survivor, and `make unmerge` takes the mark off. One step always: a merge into an
+     * item that is itself merged is refused, and the traces of an item merged on follow it.
+     */
+    mergedInto: uuid('merged_into').references((): AnyPgColumn => items.id),
   },
   (table) => [
     index('items_search_key_trgm_idx').using('gin', table.searchKey.op('gin_trgm_ops')),
+    index('items_merged_into_idx')
+      .on(table.mergedInto)
+      .where(sql`${table.mergedInto} is not null`),
+    check('items_merged_not_self', sql`${table.mergedInto} <> ${table.id}`),
     // Redundant as a key — `id` is already unique — and required as one: a verdict points
     // at the pair, so that «a product is rated without a place» is checkable by the
     // database rather than by whoever writes the next use case.
@@ -595,8 +609,14 @@ export const places = pgTable(
     country: char('country', { length: 2 }).notNull(),
     city: varchar('city', { length: 120 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    /** The place this one was merged into (MOL-106, from MOL-50), or null — a trace, as an item's. */
+    mergedInto: uuid('merged_into').references((): AnyPgColumn => places.id),
   },
   (table) => [
+    index('places_merged_into_idx')
+      .on(table.mergedInto)
+      .where(sql`${table.mergedInto} is not null`),
+    check('places_merged_not_self', sql`${table.mergedInto} <> ${table.id}`),
     /**
      * Identity, not spelling. Exact uniqueness let «SAS» and «sas» — and «Ёлки» written
      * with U+0401 against the same word with U+0415 U+0308 — become two places that look
@@ -982,7 +1002,8 @@ export const verdicts = pgTable(
     /**
      * A withdrawn verdict stays a row (MOL-27, the owner's decision): the 0.2 gate asks
      * whether someone reached five ratings in their first two weeks, and «rated five, took
-     * one back» has to stay five. So **the gate counts every row, and every other reader
+     * one back» has to stay five. So **the gate counts every row, the reminder reads the
+     * withdrawal's moment to skip a purchase made before it (MOL-101), and every other reader
      * counts only `deleted_at IS NULL`** — «Что брать», the verdict itself, and the
      * aggregates of 0.3. A reader that forgets the filter puts a withdrawn opinion back on
      * screen, silently. Rating again clears it on the same row, keeping `rated_at`.
@@ -1032,6 +1053,189 @@ export const verdicts = pgTable(
  */
 export const QUERY_KEY_MAX_OCTETS = 600
 
+/** Who merged a pair: the night by itself, or the owner by `make merge` (В-2). */
+export const MERGE_BY = ['night', 'hand'] as const
+export type MergeBy = (typeof MERGE_BY)[number]
+
+/**
+ * The journal of the merge of twins (MOL-106): a row a pair, what went into what, by the night or by
+ * the owner's hand, with the figures it was judged by. `undone_at` is `make unmerge`'s mark, and an
+ * undone pair is never merged or named again. The rows moved are `catalogue_merge_moves`.
+ */
+export const catalogueMerges = pgTable(
+  'catalogue_merges',
+  {
+    id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
+    subject: text('subject').$type<(typeof MERGE_SUBJECTS)[number]>().notNull(),
+    fromItem: uuid('from_item').references(() => items.id),
+    intoItem: uuid('into_item').references(() => items.id),
+    fromPlace: uuid('from_place').references(() => places.id),
+    intoPlace: uuid('into_place').references(() => places.id),
+    by: text('by').$type<MergeBy>().notNull(),
+    /**
+     * The night that merged it, a day in Yerevan; none by hand. The morning's report is read from here,
+     * so a merge made before a night broke off is named all the same (adversarial А6).
+     */
+    night: date('night'),
+    /** The spelling and the meaning the pair was judged by; none for a pair merged by hand. */
+    edits: smallint('edits'),
+    worst: smallint('worst'),
+    meaning: real('meaning'),
+    mergedAt: timestamp('merged_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    undoneAt: timestamp('undone_at', { withTimezone: true }),
+  },
+  (table) => [
+    check('catalogue_merges_subject_known', oneOf(table.subject, MERGE_SUBJECTS)),
+    check('catalogue_merges_by_known', oneOf(table.by, MERGE_BY)),
+    check(
+      'catalogue_merges_night_by_night',
+      sql`(${table.night} is not null) = (${table.by} = 'night')`,
+    ),
+    index('catalogue_merges_night_idx').on(table.night),
+    check(
+      'catalogue_merges_subject_named',
+      sql`case ${table.subject} when 'item'
+        then ${table.fromItem} is not null and ${table.intoItem} is not null
+          and ${table.fromPlace} is null and ${table.intoPlace} is null
+        else ${table.fromPlace} is not null and ${table.intoPlace} is not null
+          and ${table.fromItem} is null and ${table.intoItem} is null end`,
+    ),
+    check(
+      'catalogue_merges_not_self',
+      sql`coalesce(${table.fromItem}, ${table.fromPlace}) <> coalesce(${table.intoItem}, ${table.intoPlace})`,
+    ),
+    // One live merge of a thing: a trace is merged once, and an undone row leaves room for none other.
+    uniqueIndex('catalogue_merges_item_live')
+      .on(table.fromItem)
+      .where(sql`${table.undoneAt} is null and ${table.fromItem} is not null`),
+    uniqueIndex('catalogue_merges_place_live')
+      .on(table.fromPlace)
+      .where(sql`${table.undoneAt} is null and ${table.fromPlace} is not null`),
+    index('catalogue_merges_into_item_idx').on(table.intoItem),
+    index('catalogue_merges_into_place_idx').on(table.intoPlace),
+  ],
+)
+
+/**
+ * What a merge moved, a row a row, so that `make unmerge` moves exactly that back. Keyed by the
+ * moved row's own key; a remembered pick has no id of its own, so its row names its person, and goes
+ * with the person (`ACTOR_REFERENCES`) — nothing is left to undo for someone erased.
+ */
+export const MERGE_MOVES = [
+  'expense',
+  'verdict',
+  // one person's two verdicts, the trace's the later: the rows stay, their contents swap — the unique
+  // key holds row by row, so two rows cannot cross over in one statement
+  'verdict_swapped',
+  // the verdict that lost, withdrawn on the trace; the gate still counts it, the undo brings it back
+  // without its text, which a withdrawn row cannot hold
+  'verdict_withdrawn',
+  'trip',
+  'barcode',
+  'item_name',
+  'item_hs',
+  'store_memory',
+  'receipt_line',
+  'pick',
+  // a pick added to the survivor's own for the same query — `before` holds what the trace's held
+  'pick_added',
+  // a trace of the merged item, now a trace of the survivor
+  'trace',
+] as const
+export type MergeMove = (typeof MERGE_MOVES)[number]
+
+export const catalogueMergeMoves = pgTable(
+  'catalogue_merge_moves',
+  {
+    mergeId: bigint('merge_id', { mode: 'number' })
+      .notNull()
+      .references(() => catalogueMerges.id),
+    what: text('what').$type<MergeMove>().notNull(),
+    key: jsonb('key').notNull(),
+    before: jsonb('before'),
+    /**
+     * The person of a remembered pick, for picks only. Goes with the person by the cascade: once the
+     * pick is erased there is nothing to move back, and the journal keeps no one's trace.
+     */
+    actorId: uuid('actor_id').references(() => actors.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    index('catalogue_merge_moves_merge_idx').on(table.mergeId),
+    index('catalogue_merge_moves_actor_idx').on(table.actorId),
+    check('catalogue_merge_moves_what_known', oneOf(table.what, MERGE_MOVES)),
+    check(
+      'catalogue_merge_moves_pick_named',
+      sql`(${table.actorId} is not null) = (${oneOf(table.what, ['pick', 'pick_added'])})`,
+    ),
+  ],
+)
+
+/**
+ * One night of the merge (MOL-106): claimed by its day in Yerevan, so two instances of the API never run
+ * one night twice, and a night the API slept through runs when it wakes. `report` is the morning's
+ * notice, queued at nine and marked `reported_at`.
+ */
+export const catalogueMergeRuns = pgTable(
+  'catalogue_merge_runs',
+  {
+    day: date('day').primaryKey(),
+    mode: text('mode').$type<'on' | 'report'>().notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    report: jsonb('report'),
+    /**
+     * Every pair the night merged or, in `report`, would merge — the message names ten (adversarial В2):
+     * `make merge-night DAY=` prints them all, with a number to undo or a command to say apart.
+     */
+    pairs: jsonb('pairs'),
+    reportedAt: timestamp('reported_at', { withTimezone: true }),
+  },
+  (table) => [check('catalogue_merge_runs_mode_known', oneOf(table.mode, ['on', 'report']))],
+)
+
+/**
+ * A pair the owner said is two things (`make apart`, MOL-106): the night never merges it and never names
+ * it — as a pair undone, read by the live things its ends stand in now. The owner's hand still may merge
+ * it. By the two ids in order; no foreign key, since neither an item nor a place is ever deleted.
+ */
+export const catalogueApart = pgTable(
+  'catalogue_apart',
+  {
+    subject: text('subject').$type<(typeof MERGE_SUBJECTS)[number]>().notNull(),
+    a: uuid('a').notNull(),
+    b: uuid('b').notNull(),
+    saidAt: timestamp('said_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subject, table.a, table.b] }),
+    check('catalogue_apart_subject_known', oneOf(table.subject, MERGE_SUBJECTS)),
+    check('catalogue_apart_ordered', sql`${table.a} < ${table.b}`),
+  ],
+)
+
+/**
+ * A candidate named to the owner once, so the next morning names only new ones. A pair by its two ids
+ * in order; no foreign key, since neither an item nor a place is ever deleted.
+ */
+export const catalogueMergeCandidates = pgTable(
+  'catalogue_merge_candidates',
+  {
+    subject: text('subject').$type<(typeof MERGE_SUBJECTS)[number]>().notNull(),
+    a: uuid('a').notNull(),
+    b: uuid('b').notNull(),
+    namedOn: date('named_on').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subject, table.a, table.b] }),
+    check('catalogue_merge_candidates_subject_known', oneOf(table.subject, MERGE_SUBJECTS)),
+    check('catalogue_merge_candidates_ordered', sql`${table.a} < ${table.b}`),
+  ],
+)
+
 /**
  * A query and the item chosen after it, so the pair comes up first next time. No domain
  * type: it never crosses the wire and takes part in no rule — it is server-side ranking
@@ -1065,6 +1269,8 @@ export const searchPicks = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.actorId, table.queryKey, table.itemId] }),
+    // The merge of twins and its nightly sweep look a pick up by its item alone (MOL-106).
+    index('search_picks_item_idx').on(table.itemId),
     check('search_picks_counted', sql`${table.picks} > 0`),
     // The key is a btree row, and a btree row stops at 2704 bytes: 800 four-byte code
     // points would overflow it with `54000`, an error about index internals rather than
@@ -2352,6 +2558,7 @@ export const receiptLines = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.receiptId, table.position] }),
+    index('receipt_lines_item_idx').on(table.itemId),
     check('receipt_lines_position_non_negative', sql`${table.position} >= 0`),
     check(
       'receipt_lines_quantity_whole',
@@ -2440,6 +2647,7 @@ export const storeMemory = pgTable(
   (table) => [
     // one word per person and key; the erased are many words of nobody
     uniqueIndex('store_memory_word_key').on(table.tin, table.kind, table.key, table.actorId),
+    index('store_memory_item_idx').on(table.itemId),
     index('store_memory_actor_idx').on(table.actorId),
     check('store_memory_kind_known', oneOf(table.kind, storeMemoryKindSchema.options)),
     check(
