@@ -26,6 +26,16 @@ body {
   min-height: var(--page-hold);
 }
 
+// A browser below the floor of the build (MOL-231): the one line the script in `index.html` put in
+// place of the app, in the middle of the screen. `vh`, not `dvh`: the browsers that see it are old.
+html[data-outdated] #app {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: var(--space-6);
+  text-align: center;
+}
+
 // A modal <dialog> makes the page inert but not still — `:modal`, not `[open]`, so a dialog shown
 // in place does not freeze the page: on iOS it slides under a finger on the
 // scrim. The sheet scrolls on its own; the page under it waits.

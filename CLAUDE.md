@@ -522,6 +522,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The scheme is the device's** (MOL-111): `molvia.scheme`, set before the first paint by the script
   in `index.html` — the one reader of storage outside `storage.ts`; the person's choice wins both ways
   by selectors, and the status bar follows by `media`, the manifest never.
+- **The floor of the browsers is `build.target`, written out in `vite.config.ts`** (MOL-231): the
+  script after `#app` in `index.html` checks markers of exactly that floor (`browserFloor.test.ts`),
+  and below it draws the locales' line, and the app neither starts nor reports. An API above the floor
+  raises the floor, never a workaround; no legacy plugin, no polyfills.
 - **Native HTML first, then Reka UI, never a styled kit**; the catalogue combobox is our own.
   Interface icons come from MDI through `unplugin-icons`.
 - **An installed app takes a new version only when hidden and holding no typing** (`pwaUpdate.ts`),

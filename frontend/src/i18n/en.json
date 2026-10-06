@@ -2,6 +2,9 @@
   "app": {
     "name": "Molvia"
   },
+  "outdated": {
+    "line": "This browser is out of date — open Molvia in a recent Chrome, Safari, Firefox or Edge"
+  },
   "nav": {
     "label": "Sections",
     "advice": "What to buy",

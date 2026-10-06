@@ -487,6 +487,63 @@ The detail behind the frontend lines of `CLAUDE.md`.
   px) a pixel of its 92 (owner's В-1: «выбор шире»). Not in a card for the same reason. Taken on the
   tap, nothing said: the screen is the answer; in every state of the screen, since it asks nothing
   of the server.
+- **The floor of the browsers is `build.target`, one statement in `vite.config.ts`, and below it the
+  app does not start** (MOL-231). A phone sent `TypeError · vue:login` (`1415bf`, 05.10.2026):
+  `Object.hasOwn` in `ScreenState`, a browser of 2021. Vite lowers syntax to its target and touches
+  no API, and its default target — `baseline-widely-available`, Firefox 114 in Vite 8.3 — was not
+  even true: the bundle constructs `Intl.Segmenter` as it loads, which Firefox has from 125, so
+  Firefox 114–124 failed at the start and reported it. **The floor is the target, not a list of
+  what the code calls today**: `hasOwn`, `.at` and `findLast` are all in Safari 15.4, while a regex
+  literal with a lookbehind (`receipt.ts`) is a syntax error below 16.4 that keeps the whole bundle
+  from parsing — a check by those names would let iOS 15 through to a blank screen. So
+  `BROWSER_FLOOR` is written out (`chrome111, edge111, firefox125, safari16.4, ios16.4`, owner's
+  В-1 «а»), never Vite's default, which moves with Vite. **A classic ES5 script after `#app` in
+  `index.html` checks two markers** — `String.prototype.isWellFormed` (Chrome 111, Safari 16.4,
+  Firefox 119) and `Intl.Segmenter` (Firefox 125), the newest of which is the floor of each engine —
+  and below it puts `data-outdated` on the root, the language by `pickLocale`'s rule into `lang`, and
+  one line, «Браузер устарел — откройте Molvia в свежем Chrome, Safari, Firefox или Edge», in
+  `#app`. After `#app`, since a classic script runs as the page is parsed and every module waits for
+  the parse to end; a fresh browser pays one synchronous check and nothing else. **The line is
+  `outdated.line` of the locales**, put into the script by a plugin of `vite.config.ts` at build
+  and on the dev server — no Vue is running yet to translate it; the script names it by an
+  identifier, so its test runs the file as it is. Every occurrence is replaced, by a function — a
+  `$` of a line is no pattern — and a build with the name left behind, or none at all, fails: a bare
+  identifier is a `ReferenceError` before the mark, the bug back for the very browsers the script is
+  for (adversarial А2); the test holds the name to one place, the script. **The condition is held
+  whole**: a probe added to the script and not to the test's table would raise the floor unseen.
+  **Below the floor nothing listens and nothing starts**: `catchers.ts` installs no reports —
+  `failures` is a silent stub, so `reportFailure` from any module says nothing — sets no listener, and
+  `main.ts` no `start()`, so no `POST /client-errors`, no worker, and whatever the old engine trips
+  on as the bundle loads reaches its console alone. The bundle is still fetched: a module put in by
+  the script would be found late by the preload scanner, and a fresh browser would wait for it.
+  **What the check lets through is our defect, and the owner hears it**: a browser at the floor
+  failing on an API above it means the code outran the floor, and the floor is raised — nothing
+  filters it on the server, no column of `failures` carries a version. **The floor is held by
+  `browserFloor.test.ts` and by this rule, with no dependency** (owner's В-2 «а»): the test holds
+  the markers, with their versions copied from MDN's browser-compat-data, to exactly the target of
+  each engine, neither above nor below; **an API above the floor raises the floor here, and in the
+  markers, never a workaround in the code** — `eslint-plugin-compat` sees globals but not instance
+  methods, `eslint-plugin-es-x` measures ECMAScript years rather than browsers, and neither was
+  bought. Never `@vitejs/plugin-legacy` or polyfills: weight at the shelf for browsers the audience
+  has not got. **The price, named:** Firefox 114–124 and Safari below 16.4 get the line in place of
+  the app — before, a blank or a broken screen. **And Chrome and Edge 97–110 get it too, where the app
+  ran** (adversarial А1): their 111 is the target Vite's default gave, not a need of the bundle —
+  nothing in it calls an API past Chrome 97 unchecked (`findLast`), and a Chromium with the API
+  surface of 97 went through the login, five tabs, a sheet and a record without one failure. Kept,
+  since the task forbids lowering `build.target` and the floor is the target: below 111 the CSS is
+  not checked either (`:has` and `@container` 105, `dvh` 108), and a lower floor is a decision of its
+  own. Who meets it: Android 6, stuck at Chrome 106, and its WebView — Telegram's in-app browser
+  there — and the vendors' Chromium browsers that lag behind. **Nor does the check help a page an old
+  worker serves**: a browser below the floor that reached the app before this (`1415bf` did) gets the
+  old `index.html` from its precache until the new version is let in the quiet way, and reports as
+  before meanwhile — a passing price.
+- **The scrim is declared on `::backdrop` too** (MOL-231, adversarial А3): a backdrop inherits from
+  its dialog only since Chrome 122, Firefox 120 and Safari 17.4, and on the floor below that
+  `var(--scrim)` there was undefined — every sheet rose over a page not dimmed, every iPhone 8 and X
+  among them, and silently, since CSS reports nothing. The light value is the one copy beside `:root`,
+  the dark scheme gives the backdrop its mixin under both of its selectors, `tokens.test.ts` holds
+  both. Any other custom property a backdrop reads goes the same way; `--sheet-drag`, set on the
+  dialog, falls back to 0 there — the scrim does not fade under the finger on the floor, a price.
 - **Every screen has four states:** loading, empty, error, offline. The empty state is not
   "no data" but an offer to act. They are drawn by two blocks and nothing else (MOL-19):
   `ScreenSkeleton` for loading, in the shape of the answer (the next rule), and `ScreenState`
