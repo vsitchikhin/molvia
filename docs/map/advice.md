@@ -28,7 +28,7 @@ Rules: `.claude/rules/advice.md`. A test beside its source, or mirroring it unde
 - `backend/src/usecases/amend-verdict.ts` — Use case «Изменить оценку»: changes the score or the review of one's own verdict; nothing to change is not found.
 - `backend/src/usecases/pending-verdicts.ts` — Use case «Оценки»: the person's purchases not yet rated, one card per item.
 - `backend/src/usecases/rate-item.ts` — Use case «Поставить оценку»: a first or repeated verdict on any catalogue item, the body checked against the item's kind.
-- `backend/src/usecases/withdraw-verdict.ts` — Use case «Снять оценку»: hides one's verdict everywhere and erases its text, the row kept for the 0.2 gate.
+- `backend/src/usecases/withdraw-verdict.ts` — Use case «Снять оценку»: hides one's verdict everywhere and erases its text, the row kept for the 0.2 gate and the reminder.
 
 ## backend · db
 
