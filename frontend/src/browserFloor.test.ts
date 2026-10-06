@@ -44,7 +44,10 @@ const MARKERS: readonly {
 
 /** `build.target` as `vite.config.ts` writes it, by engine. */
 function floor(): Map<string, string> {
-  expect(config).toMatch(/build: \{ target: BROWSER_FLOOR,/)
+  // Whatever Prettier makes of the object, and wherever the key stands in it (self-review №4).
+  expect(config, 'build.target is BROWSER_FLOOR').toMatch(
+    /build:\s*\{[^}]*\btarget:\s*BROWSER_FLOOR\b/,
+  )
   const list = /const BROWSER_FLOOR = \[([^\]]*)\]/.exec(config)?.[1] ?? ''
   const entries = [...list.matchAll(/'([a-z]+)([\d.]+)'/g)].map(
     ([, engine, version]) => [engine ?? '', version ?? ''] as const,
@@ -110,8 +113,16 @@ describe('пол сборки (MOL-231)', () => {
     }
   })
 
-  it('каждый маркер проверяется скриптом', () => {
-    for (const marker of MARKERS) expect(floorScripts[0]).toContain(marker.probe)
+  it('условие скрипта — ровно маркеры таблицы, ни пробы сверх них', () => {
+    // A probe added to the script and not to the table would raise the floor above build.target
+    // unseen (self-review №1, adversarial А2, M1): the condition is read whole.
+    const condition = /if \((.+)\) return/.exec(floorScripts[0] ?? '')?.[1]
+    expect(condition).toBe(MARKERS.map((marker) => marker.probe).join(' && '))
+  })
+
+  it('заглушка строки названа в index.html один раз — в самом скрипте', () => {
+    expect(html.split(PLACEHOLDER)).toHaveLength(2)
+    expect(floorScripts[0]).toContain(`var lines = ${PLACEHOLDER}`)
   })
 
   it('браузер не ниже пола проходит незаметно: ни отметки, ни строки, язык прежний', () => {

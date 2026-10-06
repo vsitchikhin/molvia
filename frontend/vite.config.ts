@@ -38,7 +38,9 @@ const BROWSER_FLOOR = ['chrome111', 'edge111', 'firefox125', 'safari16.4', 'ios1
 
 // The line a browser below the floor sees, from the locales: no text lives in the markup, and before
 // the floor is known there is no Vue to translate it. The script names it by an identifier, so the
-// file stays a script its test can run; a placeholder gone is a build that fails, not a blank line.
+// file stays a script its test can run. Every occurrence is replaced, and the build fails on one left
+// behind or none at all: a bare identifier in the script is a `ReferenceError` before the mark, and the
+// very browsers the script is for would start the app and report (adversarial А2, M3).
 const OUTDATED_LINES = 'MOLVIA_OUTDATED_LINES'
 
 function outdatedLines(): Plugin {
@@ -52,9 +54,12 @@ function outdatedLines(): Plugin {
     name: 'molvia-outdated-lines',
     transformIndexHtml(html) {
       if (!html.includes(OUTDATED_LINES)) throw new Error(`index.html has no ${OUTDATED_LINES}`)
-      // `<` escaped, so no line can close the script it is put in.
+      // `<` escaped, so no line can close the script it is put in; put in by a function, so a `$` of a
+      // line is not read as a pattern of the replacement.
       const lines = JSON.stringify({ ru: line('ru'), en: line('en') }).replaceAll('<', '\\u003c')
-      return html.replace(OUTDATED_LINES, lines)
+      const built = html.replaceAll(OUTDATED_LINES, () => lines)
+      if (built.includes(OUTDATED_LINES)) throw new Error(`${OUTDATED_LINES} left in index.html`)
+      return built
     },
   }
 }
