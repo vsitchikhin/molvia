@@ -82,13 +82,22 @@
 
       <!-- «Не разобран» (06): the parts from this phone, top to bottom; «переснимите» says why. -->
       <template v-else-if="status === 'failed'">
+        <!-- A receipt by its link (MOL-232): the tax office's word, and no photo to show. -->
         <ScreenState
+          v-if="byLink"
+          kind="attention"
+          inline
+          :title="t(`receipt.failed.link.${linkFailure}_title`)"
+          :body="t(`receipt.failed.link.${linkFailure}_body`)"
+        />
+        <ScreenState
+          v-else
           kind="attention"
           inline
           :title="t(reshoot ? 'receipt.failed.reshoot_title' : 'receipt.failed.title')"
           :body="
             t(
-              country
+              canRetake
                 ? reshoot
                   ? 'receipt.failed.reshoot_body'
                   : 'receipt.failed.body'
@@ -96,14 +105,16 @@
             )
           "
         />
-        <SectionCaption as="p" class="caption">{{ t('receipt.failed.photos') }}</SectionCaption>
-        <p v-if="photos.length === 0" class="note">{{ t('receipt.failed.photos_elsewhere') }}</p>
-        <figure v-for="(url, index) in photos" :key="url" class="part">
-          <figcaption class="part-caption">
-            {{ t('receipt.capture.part_of', { n: index + 1, total: photos.length }) }}
-          </figcaption>
-          <img :src="url" alt="" class="part-photo" loading="lazy" decoding="async" />
-        </figure>
+        <template v-if="!byLink">
+          <SectionCaption as="p" class="caption">{{ t('receipt.failed.photos') }}</SectionCaption>
+          <p v-if="photos.length === 0" class="note">{{ t('receipt.failed.photos_elsewhere') }}</p>
+          <figure v-for="(url, index) in photos" :key="url" class="part">
+            <figcaption class="part-caption">
+              {{ t('receipt.capture.part_of', { n: index + 1, total: photos.length }) }}
+            </figcaption>
+            <img :src="url" alt="" class="part-photo" loading="lazy" decoding="async" />
+          </figure>
+        </template>
         <AppButton variant="danger-ghost" block class="delete" @click="remove">
           <template #icon><IconDelete /></template>
           {{ t('purchases.delete') }}
@@ -116,7 +127,7 @@
           kind="attention"
           inline
           :title="t('purchases.group_working')"
-          :body="t('purchases.queued.parsing')"
+          :body="t(byLink ? 'purchases.queued.link_parsing' : 'purchases.queued.parsing')"
         />
       </template>
 
@@ -128,7 +139,7 @@
           {{ t('receipt.review.no_items') }}
           <!-- A receipt with items whose every mark OCR lost is read so too (Р-7): a new shot is a tap
                away, as on «Прочитали не всё» (adversarial А6). -->
-          <AppButton v-if="country && !locked" variant="ghost" @click="retake">
+          <AppButton v-if="canRetake && !locked" variant="ghost" @click="retake">
             <template #icon><IconCamera /></template>
             {{ t('receipt.capture.retake') }}
           </AppButton>
@@ -139,10 +150,12 @@
             · {{ t('receipt.review.issues_check', { n: checks }) }}</template
           >
         </p>
+        <!-- Lines from the tax office (MOL-232): nothing of OCR to check against the paper. -->
+        <AppNote v-if="byLink" class="source">{{ t('receipt.review.from_tax_office') }}</AppNote>
         <!-- Read in part (MOL-222, В-1): what was «переснимите» — said, and recorded all the same. -->
-        <AppNote v-if="partly" tone="warn" class="partly">
+        <AppNote v-else-if="partly" tone="warn" class="partly">
           {{ partly }}
-          <AppButton v-if="country && !locked" variant="ghost" @click="retake">
+          <AppButton v-if="canRetake && !locked" variant="ghost" @click="retake">
             <template #icon><IconCamera /></template>
             {{ t('receipt.capture.retake') }}
           </AppButton>
@@ -166,7 +179,7 @@
           :no-items="noItems"
           @total="!locked && (totalOpen = true)"
         />
-        <p class="note">
+        <p v-if="!byLink" class="note">
           <IconImageOff class="note-icon" aria-hidden="true" />
           {{ t(noItems ? 'receipt.review.photo_note_sum' : 'receipt.review.photo_note') }}
         </p>
@@ -225,7 +238,7 @@
              receipts — a receipt taken before a move to Georgia or Serbia is retaken nowhere (MOL-109, Б3). -->
         <template v-else-if="docked === 'failed'">
           <ManualEntryButton />
-          <AppButton v-if="country" variant="ghost" block @click="retake">
+          <AppButton v-if="canRetake" variant="ghost" block @click="retake">
             <template #icon><IconCamera /></template>
             {{ t('receipt.capture.retake') }}
           </AppButton>
@@ -268,6 +281,7 @@
       v-model:open="placeOpen"
       :country="detail.receipt.country"
       :current="place"
+      :proposed="detail.receipt.header?.shop ?? null"
       :read="!!detail.receipt.place && !placeChosen"
       :day="day"
       :action="recordAfterPlace ? recordLabel : null"
@@ -285,7 +299,7 @@
     <!-- Mounted until it is put away, as from the strip: the sheet tells «sent» from its `onClosed`,
          and unmounted on `update:open` it told nobody (review 2). -->
     <CaptureSheet
-      v-if="country && detail && retakeMounted"
+      v-if="canRetake && country && detail && retakeMounted"
       v-model:open="retaking"
       :country="country"
       :replacing="detail.receipt.id"
@@ -314,6 +328,7 @@ import {
   readCovered,
   readPartly,
   receiptDigits,
+  receiptSourceOf,
   withoutItems,
   yerevanDate,
 } from '@molvia/model'
@@ -407,6 +422,16 @@ export default defineComponent({
       status.value === 'parsed' ? (detail.value?.duplicateOf ?? null) : null,
     )
     const reshoot = computed(() => detail.value?.receipt.failure === 'reshoot')
+    /** A Serbian receipt by its link (MOL-232): its lines are the tax office's, there is no photo. */
+    const byLink = computed(() =>
+      detail.value ? receiptSourceOf(detail.value.receipt.country) === 'tax' : false,
+    )
+    const linkFailure = computed(() => {
+      const failure = detail.value?.receipt.failure
+      return failure === 'missing' || failure === 'invalid' ? failure : 'unreadable'
+    })
+    // A retake is the camera's, of a photo: a receipt by its link is pasted again, not shot
+    const canRetake = computed(() => country.value !== null && !byLink.value)
     const noItems = computed(() =>
       detail.value
         ? withoutItems({
@@ -487,9 +512,11 @@ export default defineComponent({
         time: time ?? '',
       }
       if (!tin) return t('receipt.review.place_line_no_tin', words)
+      // a Serbian seller's tax number is its ПИБ (MOL-232)
+      const kind = byLink.value ? 'place_line_pib' : 'place_line'
       return time && !placeChosen.value
-        ? t('receipt.review.place_line_time', words)
-        : t('receipt.review.place_line', words)
+        ? t(`receipt.review.${kind}_time`, words)
+        : t(`receipt.review.${kind}`, words)
     })
 
     // The record waiting in the queue, and a refusal of one: the screen is the place to put it right.
@@ -747,6 +774,9 @@ export default defineComponent({
       toDeveloper,
       online,
       country,
+      byLink,
+      linkFailure,
+      canRetake,
       opened,
       openedLine,
       linePlace,
@@ -855,6 +885,7 @@ export default defineComponent({
 }
 
 .partly,
+.source,
 .no-items {
   margin: 0 0 var(--space-3);
 }

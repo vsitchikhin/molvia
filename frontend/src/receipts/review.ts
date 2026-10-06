@@ -1,8 +1,15 @@
-import { RECEIPT_CURRENCY, receiptBalance, receiptDigits, recordedSums } from '@molvia/model'
+import {
+  RECEIPT_CURRENCY,
+  receiptBalance,
+  receiptDigits,
+  receiptLineName,
+  recordedSums,
+} from '@molvia/model'
 import type {
   Money,
   Quantity,
   ReceiptBalance,
+  ReceiptCountry,
   ReceiptDetail,
   ReceiptRecordBody,
   ReceiptReviewLine,
@@ -47,9 +54,12 @@ const sameMoney = (a: Money | null, b: Money | null) =>
 const sameQuantity = (a: Quantity | null, b: Quantity | null) =>
   a === null || b === null ? a === b : a.milli === b.milli && a.unit === b.unit
 
-/** The name a new item is written under: the person's, else the gloss, else the line as printed. */
-function newName(line: ReceiptReviewLine): string {
-  return (line.itemName ?? line.translation ?? line.printed).trim()
+/**
+ * The name a new item is written under: the person's, else the gloss, else the line's own — a Serbian
+ * till's name less its unit word (MOL-232) — else as printed.
+ */
+function newName(line: ReceiptReviewLine, country: ReceiptCountry): string {
+  return (line.itemName ?? line.translation ?? receiptLineName(line.printed, country)).trim()
 }
 
 /**
@@ -81,6 +91,7 @@ export function reviewLines(
   shown: Readonly<Record<number, string | null>> = {},
 ): ReviewLine[] {
   const amounts = amountsOf(detail, draft)
+  const country = detail.receipt.country
   return detail.lines.map((line, position) => {
     const edit = draft?.lines[position]
     const amount = amounts[position] ?? line.amount
@@ -124,7 +135,7 @@ export function reviewLines(
       position,
       line,
       itemId: line.itemId,
-      name: isNew ? newName(line) : (line.itemName ?? newName(line)),
+      name: isNew ? newName(line, country) : (line.itemName ?? newName(line, country)),
       isNew,
       check: line.match === 'weak',
       mismatch: !line.settled && line.sum !== null,

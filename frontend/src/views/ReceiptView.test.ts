@@ -666,3 +666,104 @@ describe('ReceiptView (MOL-127)', () => {
     expect(view.text()).toContain(ru.receipt.gone.action)
   })
 })
+
+describe('ReceiptView of a receipt by its link (MOL-232)', () => {
+  const rsd = (value: string) => parseMoney(value, 'RSD')
+
+  function serbian(over: Partial<ReceiptDetail['receipt']> = {}): ReceiptDetail {
+    const base = detail({ place: false })
+    return {
+      ...base,
+      receipt: {
+        ...base.receipt,
+        parts: 0,
+        received: 0,
+        country: 'RS',
+        header: {
+          tin: '100000009',
+          date: '2025-07-18',
+          time: '08:56',
+          receiptNo: 'TESTAAAA-TESTBBBB-1',
+          shop: 'RODA MEGAMARKET 463',
+        },
+        total: rsd('486.37'),
+        ...over,
+      },
+      lines: [
+        {
+          ...line('SECER KRISTAL 1KG SUNOKO KOM', '189.98'),
+          price: rsd('94.99'),
+          sum: rsd('189.98'),
+          amount: rsd('189.98'),
+          quantity: parseQuantity('2', 'piece'),
+          itemId: null,
+          itemName: null,
+          match: 'new',
+        },
+      ],
+    }
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+    receipt.mockReset()
+    receipts.mockReset()
+    receipts.mockResolvedValue({ receipts: [] })
+    shelfParts.mockReset()
+    shelfParts.mockResolvedValue([])
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    clock = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => clock)
+  })
+  afterEach(() => {
+    while (mounted.length) mounted.pop()?.unmount()
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  it('says its lines are the tax office’s, and nothing of a photo or of a retake', async () => {
+    receipt.mockResolvedValue(serbian())
+    const { view } = await render({ country: 'RS', city: 'Белград' })
+    expect(view.text()).toContain(ru.receipt.review.from_tax_office)
+    expect(view.text()).not.toContain(ru.receipt.review.photo_note)
+    expect(view.text()).not.toContain(ru.receipt.capture.retake)
+    // the new item is named by the line less its unit word
+    expect(view.text()).toContain('Secer kristal 1kg sunoko')
+  })
+
+  it('names the seller’s ПИБ, and proposes the shop the tax office names as a new place', async () => {
+    receipt.mockResolvedValue(
+      serbian({
+        place: { id: PLACE, name: 'RODA MEGAMARKET 463', city: 'Белград', tin: '100000009' },
+      }),
+    )
+    const { view } = await render({ country: 'RS', city: 'Белград' })
+    expect(view.text()).toContain('ПИБ 100000009')
+    expect(view.text()).not.toContain('ИНН')
+    view.unmount()
+    mounted.pop()
+    document.body.innerHTML = ''
+
+    receipt.mockResolvedValue(serbian())
+    const second = await render({ country: 'RS', city: 'Белград' })
+    expect(second.view.findComponent(ReceiptPlaceSheet).props('proposed')).toBe(
+      'RODA MEGAMARKET 463',
+    )
+  })
+
+  it('says the tax office never showed it, with a record by hand and no retake', async () => {
+    receipt.mockResolvedValue(serbian({ status: 'failed', failure: 'missing' }))
+    const { view } = await render({ country: 'RS', city: 'Белград' })
+    expect(view.text()).toContain(ru.receipt.failed.link.missing_title)
+    expect(view.text()).not.toContain(ru.receipt.failed.photos)
+    expect(view.text()).not.toContain(ru.receipt.capture.retake)
+  })
+
+  it('takes no retake for a receipt by its link even where the camera is the person’s', async () => {
+    receipt.mockResolvedValue(serbian({ status: 'failed', failure: 'invalid' }))
+    const { view } = await render()
+    expect(view.text()).toContain(ru.receipt.failed.link.invalid_title)
+    expect(view.findComponent(CaptureSheet).exists()).toBe(false)
+    expect(view.text()).not.toContain(ru.receipt.capture.retake)
+  })
+})

@@ -8,7 +8,13 @@ import {
   receiptBodySchema,
   receiptRecordBodySchema,
 } from '@molvia/model'
-import type { ReceiptBody, ReceiptPhotoBody, ReceiptRecordBody, WireCode } from '@molvia/model'
+import type {
+  ReceiptBody,
+  ReceiptLinkBody,
+  ReceiptPhotoBody,
+  ReceiptRecordBody,
+  WireCode,
+} from '@molvia/model'
 import { api } from '@/api'
 import { photoShelf } from '@/receipts/photoShelf'
 import { useActorStore } from '@/stores/actor'
@@ -451,6 +457,9 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
           ...rejected.value,
           { key: newKey(), write, code: refusal, at: Date.now() },
         ]
+      } else if (write.kind === 'create' && 'link' in write.body) {
+        // a receipt by its link is whole as it lands: no part follows it (MOL-232)
+        keepDelivered(owner, { ...delivered.value, [write.body.id]: Date.now() })
       } else if (
         write.kind === 'part' &&
         !kept.some(
@@ -521,6 +530,19 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
           write: { kind: 'part', id: body.id, part: index + 1 } as const,
         })),
       ]
+    })
+    sentAt.value = Date.now()
+    return true
+  }
+
+  /**
+   * «Отправить чек» by its link (MOL-232): one write, no photo — the server asks the tax office. False
+   * with nobody signed in, as `capture`.
+   */
+  function sendLink(body: ReceiptLinkBody): boolean {
+    if (!actor.id) return false
+    change(() => {
+      kept = [...kept, { key: newKey(), write: { kind: 'create', body } }]
     })
     sentAt.value = Date.now()
     return true
@@ -713,6 +735,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
     settleDelivered,
     flush,
     capture,
+    sendLink,
     remove,
     restore,
     forgetRemoved,

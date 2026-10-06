@@ -226,7 +226,8 @@
       "not_photo": "no receipt in the photo",
       "too_large": "the photo is too large",
       "lost": "the photo wasn’t kept on this phone",
-      "other": "the server didn’t take the receipt"
+      "other": "the server didn’t take the receipt",
+      "link": "the link did not fit"
     },
     "recorded_receipt": "{count} · {day} · from a receipt",
     "recorded_sum": "receipt total · {day}",
@@ -235,7 +236,11 @@
       "parsing": "Reading is under way — you can close the app. The ready receipt goes to “Check and save”.",
       "sending": "The photos are going to the server. If you close the app, sending goes on the next time you open it.",
       "stuck": "The server got only some parts of this receipt, and this phone has none of them. Delete the receipt and take it again.",
-      "rejected": "The server didn’t take this receipt: {reason}. Remove it and take it again."
+      "rejected": "The server didn’t take this receipt: {reason}. Remove it and take it again.",
+      "link_waiting": "The link is on your phone. We will send it once there is a connection — nothing to do.",
+      "link_sending": "The link is going to the server. If you close the app, sending carries on next time you open it.",
+      "link_parsing": "Asking the Serbian tax office. A receipt just printed shows up there in a couple of minutes — you can close the app. Once ready, the receipt moves to «Check and save».",
+      "link_rejected": "The server did not accept this receipt: {reason}. Remove it and paste the link again."
     },
     "delete": "Delete receipt",
     "delete_note": "The photo goes with it",
@@ -247,7 +252,13 @@
     "stuck_meta": "{parts} · not all parts arrived",
     "record_refused": "not saved — open it and fix it",
     "receipts_error": "Receipts didn’t load — we’ll show them once the server answers",
-    "receipts_offline": "Offline · receipts from this phone"
+    "receipts_offline": "Offline · receipts from this phone",
+    "capture_link": "Receipt by link",
+    "by_link": "by link",
+    "asking_tax_office": "asking the tax office",
+    "missing_meta": "the tax office did not show it",
+    "invalid_meta": "the tax office does not accept it",
+    "delete_note_link": "The receipt goes together with its link"
   },
   "item": {
     "search_title": "What did you pick up?",
@@ -2112,7 +2123,10 @@
         "title": "The server didn’t answer",
         "body": "The receipt is safe. Any line edits are kept on this phone"
       },
-      "line_aria": "{name}, {qty}, {sum}"
+      "line_aria": "{name}, {qty}, {sum}",
+      "from_tax_office": "Lines from the Serbian tax office. No need to check them against the paper.",
+      "place_line_pib": "{city} · PIB {inn} · {day}",
+      "place_line_pib_time": "{city} · PIB {inn} · {day}, {time}"
     },
     "line": {
       "title": "Receipt line",
@@ -2170,7 +2184,15 @@
       "reshoot_body": "This happens when a receipt is crumpled, in shadow or faintly printed. Crumpled or in shadow — retake it: the receipt filling the frame, in parts if it is long; flattened with your palm; no shadow of your hand or phone. A retake will not fix faint print — add the purchases by hand.",
       "manual_body": "The lines in the photo can’t be made out. You can record the purchases by hand.",
       "photos": "Receipt photos · top to bottom",
-      "photos_elsewhere": "The photo was taken on another phone — it isn’t here"
+      "photos_elsewhere": "The photo was taken on another phone — it isn’t here",
+      "link": {
+        "missing_title": "The tax office did not show the receipt",
+        "missing_body": "We asked for two days. This happens when the till worked offline. You can record the purchases by hand.",
+        "invalid_title": "The tax office does not accept this receipt",
+        "invalid_body": "The tax office’s check says the receipt is not valid. You can record the purchases by hand.",
+        "unreadable_title": "Could not read the tax office’s answer",
+        "unreadable_body": "The tax office showed the receipt with no list of purchases. You can record the purchases by hand."
+      }
     },
     "duplicate": {
       "title": "This receipt was saved on {day}",
@@ -2180,6 +2202,20 @@
       "title": "This receipt is gone",
       "body": "It was deleted — perhaps on another phone.",
       "action": "To purchases"
+    },
+    "link": {
+      "title": "Receipt by link",
+      "step_qr": "Point your phone’s camera at the QR code at the bottom of the receipt",
+      "step_copy": "Open the link and copy the page’s address",
+      "step_paste": "Paste it here",
+      "field": "Link from the receipt",
+      "send": "Send receipt",
+      "refusal": {
+        "not_link": "This is not a link from a Serbian receipt",
+        "damaged": "The link is damaged — copy it again",
+        "not_sale": "This is not a purchase receipt — copies, advance and training receipts are not recorded",
+        "refund": "This is a refund receipt — it is not recorded"
+      }
     }
   }
 }

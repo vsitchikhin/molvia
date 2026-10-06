@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE, parseMoney, parseQuantity } from '@molvia/model'
-import type { ReceiptBody, ReceiptPhotoBody, ReceiptRecordBody } from '@molvia/model'
+import type {
+  ReceiptBody,
+  ReceiptLinkBody,
+  ReceiptPhotoBody,
+  ReceiptRecordBody,
+} from '@molvia/model'
 import type { PhotoShelf } from '@/receipts/photoShelf'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
@@ -57,6 +62,10 @@ vi.mock('@/receipts/photoShelf', () => ({
 }))
 
 const ME = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+// A Serbian receipt's link made up by the model's `madeUpSerbianLink` (MOL-232): a test of `src` may
+// not import the package's testing export.
+const SERBIAN_LINK =
+  'https://suf.purs.gov.rs/v/?vl=A1RFU1RBQUFBVEVTVEJCQkIBAAAAAQAAANQ2SgAAAAAAAAABmBxSTwgAAABUc5Kx0O8OLUxriqnI5wYlRGOCocDf%2Fh08W3qZuNf2FTRTcpGwz%2B4NLEtqiajH5gUkQ2KBoL%2Fe%2FRw7WnmYt9b1FDNScZCvzu0MK0ppiKfG5QQjQmGAn77d%2FBs6WXiXttX0EzJRcI%2BuzewLKkloh6bF5AMiQWB%2Fnr3c%2Bxo5WHeWtdTzEjFQb46tzOsKKUhnhqXE4wIhQF9%2Bnbzb%2Bhk4V3aVtNPyETBPbo2sy%2BoJKEdmhaTD4gEgP159nLva%2BRg3VnWUs9LxEC9ObYyryukIJ0ZlhKPC4QAfPl18m7rZ%2BBc2VXSTstHwDy5NbIuqyegHJkVkg6LB4P8ePVx7mrnY9xY1VHOSsdDvDi1Ma4qpyOcGJURjgqHA3%2F4dPFt6mbjX9hU0U3KRsM%2FuDSxLaomox%2BYFJENigaC%2F3v0cO1p5mLfW9RQzUnGQr87tDCtKaYinxuUEI0JhgJ%2B%2B3fwbOll4l7bV9BMyUXCPrs3sCypJaIemxeQDIkFgf5693PsaOVh3lrXU8xIxUG%2BOrczrCilIZ4alxOMCIUBffp282%2FoZOFd2lbTT8hEwT26NrMvqCShHZoWkw%2BIBID9efZy72vkYN1Z1lLPS8RAvTm2Mq8rpCCdGZYSjwuEAHz5dfJu62fgXNlV0k7LR8A8uTWyLqsnoByZFZIOiweD%2FHj1ce5q52PcWNQ87U0RqxUqXGlv0IC2EMdY%3D'
 const RECEIPT = 'cccccccc-0000-4000-8000-000000000001'
 const SECOND = 'cccccccc-0000-4000-8000-000000000002'
 const TRIP = 'dddddddd-0000-4000-8000-000000000001'
@@ -119,6 +128,36 @@ describe('receipt queue', () => {
     expect(queue.pending).toEqual([])
     // The photos stay: «не разобран» shows them from this phone (Т-4).
     expect(photos.size).toBe(2)
+  })
+
+  it('sends a receipt by its link as one write, no photo, and holds it delivered as it lands (MOL-232)', async () => {
+    const queue = fresh()
+    const link: ReceiptLinkBody = {
+      id: RECEIPT,
+      link: SERBIAN_LINK,
+      country: 'RS',
+      language: 'ru',
+      capturedAt: new Date('2026-10-03T15:00:00Z'),
+    }
+    expect(queue.sendLink(link)).toBe(true)
+    await queue.flush()
+    expect(calls).toEqual([`create ${RECEIPT}`])
+    expect(sendReceipt).toHaveBeenCalledWith(link)
+    expect(photos.size).toBe(0)
+    expect(RECEIPT in queue.delivered).toBe(true)
+    // kept across a restart as written, its link with it
+    expect(fresh().pending).toEqual([])
+  })
+
+  it('keeps a receipt by its link across a restart while it waits for a connection (MOL-232)', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    const queue = fresh()
+    const link = SERBIAN_LINK
+    queue.sendLink({ id: RECEIPT, link, country: 'RS', language: 'ru', capturedAt: new Date() })
+    await queue.flush()
+    expect(calls).toEqual([])
+    const again = fresh()
+    expect(again.pending).toMatchObject([{ kind: 'create', body: { id: RECEIPT, link } }])
   })
 
   it('remembers a receipt delivered whole, kept on the phone, until the list says where it is (Б1)', async () => {

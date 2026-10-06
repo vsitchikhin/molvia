@@ -37,8 +37,12 @@ export interface ReceiptRow {
 }
 
 /** Why a receipt was not accepted, in the words of «Не принят: …». */
-export function rejectedReason(code: WireCode): 'not_photo' | 'too_large' | 'lost' | 'other' {
+export function rejectedReason(
+  code: WireCode,
+): 'not_photo' | 'too_large' | 'lost' | 'link' | 'other' {
   if (code === ERROR.RECEIPT_NOT_PHOTO) return 'not_photo'
+  // a receipt's link the server did not take (MOL-232): the phone checks it first, so an old build
+  if (code === ERROR.RECEIPT_LINK_INVALID) return 'link'
   if (code === ERROR.RECEIPT_TOO_LARGE) return 'too_large'
   if (code === ERROR.NOT_FOUND) return 'lost'
   return 'other'

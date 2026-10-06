@@ -145,6 +145,7 @@ export const receiptCountrySchema = z.enum([
 ])
 export type ReceiptCountry = z.infer<typeof receiptCountrySchema>
 export type PhotoReceiptCountry = z.infer<typeof photoReceiptCountrySchema>
+export type LinkReceiptCountry = z.infer<typeof linkReceiptCountrySchema>
 
 /**
  * Where a receipt's lines come from (MOL-232): `photo` — the phone's photo read by our reader;

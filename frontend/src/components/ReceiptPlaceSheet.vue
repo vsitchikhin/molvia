@@ -108,6 +108,11 @@ export default defineComponent({
     current: { type: Object as PropType<PlaceDraft | null>, default: null },
     /** Whether the server read it off the receipt. */
     read: { type: Boolean, default: false },
+    /**
+     * The shop's own name the receipt carries — a Serbian receipt's premises as the tax office names
+     * them (MOL-232) — proposed as a new place's name while the receipt has no place.
+     */
+    proposed: { type: String as PropType<string | null>, default: null },
     day: { type: String, required: true },
     /** The word of the main button when it records as well: «Записать 7 покупок». */
     action: { type: String as PropType<string | null>, default: null },
@@ -165,7 +170,7 @@ export default defineComponent({
       (open) => {
         if (!open) return
         when.value = props.day
-        name.value = ''
+        name.value = props.current ? '' : (props.proposed ?? '')
         chosen.value = props.current ? 'current' : null
         const read = props.current ? settingsCityOf(props.current.city) : null
         away.value =
