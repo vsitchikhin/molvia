@@ -1,5 +1,9 @@
 import {
   COUNTRY_BANKS,
+  PUBLISHED,
+  RATE_BASE,
+  homeBankOf,
+  publishes,
   RATE_JUMP_HISTORY,
   RATE_JUMP_MIN_HISTORY,
   isRateFresh,
@@ -13,9 +17,10 @@ import { FOREIGN, FeedError } from '@/rates/feed'
 import type { Published, RateFeed } from '@/rates/feed'
 
 /**
- * How many times in a row the Central Bank of Armenia may fail before the open sources are asked
- * too (MOL-39, В-7): at an hourly refresh, about five hours of silence. The count is in memory, so
- * a restart starts it again — the trip waits a week before it takes a fallback anyway.
+ * How many times in a row the Central Bank of Armenia — or a country bank (MOL-230) — may fail before
+ * the open sources are asked too (MOL-39, В-7): at an hourly refresh, about five hours of silence.
+ * The count is in memory, so a restart starts it again — the trip waits a week before it takes a
+ * fallback anyway.
  */
 export const FALLBACK_AFTER_FAILURES = 5
 
@@ -135,6 +140,25 @@ export function archiveWalkFrom(kept: readonly string[], from: string, today: st
 }
 
 /**
+ * The days of `rows` that hold every currency `provider` publishes (MOL-230, plan Р-6): only those
+ * are written for a walk of its archive. A currency added to its set — the dinar to the National
+ * Bank of Georgia's, after MOL-110 had walked its history — makes every day before it a hole, and the
+ * same walk brings it, writing only the rows the cache lacks (`missingDays`); counted by any row, the
+ * history of the new currency would never come.
+ */
+export function wholeDays(rows: readonly AmdRate[], provider: RateProvider): string[] {
+  const currencies = new Map<string, Set<string>>()
+  for (const row of rows) {
+    const day = currencies.get(row.date) ?? new Set<string>()
+    day.add(row.currency)
+    currencies.set(row.date, day)
+  }
+  return [...currencies]
+    .filter(([, held]) => PUBLISHED[provider].every((currency) => held.has(currency)))
+    .map(([day]) => day)
+}
+
+/**
  * How far back a country bank's own rates count for its jump (MOL-110, adversarial А and Г): a
  * fortnight. A week left the first working days after a holiday unjudged — Easter 2026 has six days
  * with no rate, and the 15th of April had two of its own within a week — and with no stand-in, as
@@ -235,6 +259,8 @@ export function officialRatesRefresh({
   history,
 }: RefreshDeps): () => Promise<void> {
   let failures = 0
+  /** Each country bank's failures in a row, counted as the central bank's are (MOL-230). */
+  const homeFailures = new Map<RateProvider, number>()
   let historyAt: number | null = null
   /** When each country bank's archive was last walked through to today, or last failed. */
   const archiveAt = new Map<RateProvider, number>()
@@ -325,7 +351,11 @@ export function officialRatesRefresh({
       archiveEmpty.set(bank.provider, empty)
       const walk: ArchiveWalk = next
         ? { from: next, whole: false }
-        : archiveWalkFrom([...kept.map((row) => row.date), ...empty], OFFICIAL_HISTORY_FROM, today)
+        : archiveWalkFrom(
+            [...wholeDays(kept, bank.provider), ...empty],
+            OFFICIAL_HISTORY_FROM,
+            today,
+          )
       const start = walk.from
       const days: string[] = []
       for (
@@ -432,7 +462,11 @@ export function officialRatesRefresh({
    * a rouble a third dearer, today's true rate marked a jump. An open source is asked only while
    * the central bank is silent, so its own history is an earlier episode, often months old — or
    * nothing, exactly when a trip is about to take it: without three of its own from the last week,
-   * it is measured against the central bank's latest, in the same unit.
+   * it is measured against the central bank's latest, in the same unit. **A currency the central
+   * bank does not publish is measured against the bank of its pair with the dram** (MOL-230, review
+   * 2): the dinar by the National Bank of Georgia's, in drams as the open sources' are — the open
+   * sources stand in for the dinar exactly when a trip in dinars is about to take them, and a comma
+   * in the wrong place went into it unmarked.
    */
   async function referenceFor(answer: Published): Promise<ReadonlyMap<string, readonly bigint[]>> {
     const currencies = answer.rates.map((rate) => rate.currency)
@@ -441,6 +475,21 @@ export function officialRatesRefresh({
     const central =
       answer.provider === 'cba' ? own : await rates.history('cba', currencies, answer.date)
     const values = (past: readonly PastRate[] | undefined) => (past ?? []).map((row) => row.scaled)
+    // The bank an open source's currency is measured by, in the open source's own base.
+    const standIn = (currency: AmdRate['currency']): RateProvider | null => {
+      const bank = publishes('cba', currency) ? 'cba' : homeBankOf(currency, 'AMD')
+      return RATE_BASE[bank] === RATE_BASE[answer.provider] ? bank : null
+    }
+    const standIns = new Map<RateProvider, ReadonlyMap<string, readonly PastRate[]>>([
+      ['cba', central],
+    ])
+    if (!country && answer.provider !== 'cba') {
+      for (const currency of currencies) {
+        const bank = standIn(currency)
+        if (bank === null || standIns.has(bank)) continue
+        standIns.set(bank, await rates.history(bank, currencies, answer.date))
+      }
+    }
 
     return new Map(
       currencies.map((currency) => {
@@ -452,10 +501,9 @@ export function officialRatesRefresh({
           return [currency, values(fortnight)]
         }
         const recent = (own.get(currency) ?? []).filter((row) => isRateFresh(row.date, answer.date))
-        return [
-          currency,
-          recent.length >= RATE_JUMP_MIN_HISTORY ? values(recent) : values(central.get(currency)),
-        ]
+        const bank = standIn(currency)
+        const measure = bank === null ? undefined : standIns.get(bank)?.get(currency)
+        return [currency, recent.length >= RATE_JUMP_MIN_HISTORY ? values(recent) : values(measure)]
       }),
     )
   }
@@ -491,10 +539,10 @@ export function officialRatesRefresh({
     }
   }
 
-  async function lastCentralDate(today: string): Promise<string | null> {
+  async function lastDateOf(provider: RateProvider, today: string): Promise<string | null> {
     try {
       const rows = await rates.latestOnOrBefore(FOREIGN, today)
-      const dates = rows.filter((row) => row.provider === 'cba').map((row) => row.date)
+      const dates = rows.filter((row) => row.provider === provider).map((row) => row.date)
       return dates.length === 0 ? null : dates.reduce((a, b) => (a > b ? a : b))
     } catch {
       return null
@@ -503,7 +551,7 @@ export function officialRatesRefresh({
 
   return async () => {
     const today = yerevanDate(now())
-    const lastKnown = await lastCentralDate(today)
+    const lastKnown = await lastDateOf('cba', today)
 
     const central = await fetchFrom(primary, today, lastKnown)
     if (central) {
@@ -515,16 +563,34 @@ export function officialRatesRefresh({
     await fillHistory(today)
 
     // A country bank is asked whatever the central bank did: it is the official source of its own
-    // pairs, and nothing stands in for it but the others' rows already in the cache (MOL-110, Р-4).
+    // pairs (MOL-110, Р-4). **Silent, it sends the refresh on to the open sources as the central bank
+    // does** (MOL-230): the lari had the central bank's own rows to stand in, written every hour, but
+    // the dinar is in no answer of the central bank's — and the open sources, asked only for its
+    // silence, would leave a pair of the dinar with nothing fresher than the silent bank.
+    // **Every bank's latest before any archive** (adversarial round 2, П2): walked in turn, the
+    // National Bank of Serbia waited for the National Bank of Georgia's walk — right after the deploy a
+    // month of it, 32 requests, up to sixteen minutes of a slow bank — with the dinar of today in
+    // nobody's row.
+    const answers = new Map<RateProvider, Published | null>()
     for (const bank of homeBanks) {
       const answer = await fetchFrom(bank, today, null)
+      homeFailures.set(bank.provider, answer ? 0 : (homeFailures.get(bank.provider) ?? 0) + 1)
       if (answer) await store(answer)
-      await walkArchive(bank, today)
+      answers.set(bank.provider, answer)
+    }
+    for (const bank of homeBanks) await walkArchive(bank, today)
+    let homeSilent = false
+    for (const bank of homeBanks) {
+      const failed = homeFailures.get(bank.provider) ?? 0
+      const date = answers.get(bank.provider)?.date ?? (await lastDateOf(bank.provider, today))
+      if (failed > FALLBACK_AFTER_FAILURES || (date !== null && !isRateFresh(date, today))) {
+        homeSilent = true
+      }
     }
 
     const centralDate = central?.date ?? lastKnown
     const stale = centralDate !== null && !isRateFresh(centralDate, today)
-    if (failures <= FALLBACK_AFTER_FAILURES && !stale) return
+    if (failures <= FALLBACK_AFTER_FAILURES && !stale && !homeSilent) return
 
     for (const fallback of fallbacks) {
       const answer = await fetchFrom(fallback, today, lastKnown)

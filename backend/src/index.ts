@@ -13,6 +13,7 @@ import { marketFiles } from '@/rates/cba-market'
 import { cbrFeed } from '@/rates/cbr'
 import { erapiFeed } from '@/rates/erapi'
 import { nbgFeed } from '@/rates/nbg'
+import { nbsFeed } from '@/rates/nbs'
 import { refreshAtBoot, startSchedule } from '@/rates/schedule'
 import { apiFailureReporter } from '@/failure-reporter'
 import { marketRatesRefresh } from '@/usecases/refresh-market-rates'
@@ -66,10 +67,12 @@ try {
 if (env.RATES_REFRESH === 'on') {
   const rates = createRateRepository(getDb())
   const rateFailures = apiFailureReporter(getDb, env.OWNER_TELEGRAM_ID ?? null, app.log)
+  const primary = cbaFeed()
+  const homeBanks = [nbgFeed(), nbsFeed()]
   const official = officialRatesRefresh({
-    primary: cbaFeed(),
+    primary,
     fallbacks: [cbrFeed(), erapiFeed()],
-    homeBanks: [nbgFeed()],
+    homeBanks,
     rates,
     log: app.log,
     history: { feed: { fetchRange: (from, to) => fetchCbaRange(from, to) }, rates },
@@ -93,6 +96,10 @@ if (env.RATES_REFRESH === 'on') {
     {
       immediately: refreshAtBoot(await rates.lastFetchedAt().catch(() => null), new Date(), {
         development: env.NODE_ENV === 'development',
+        unwritten: await rates
+          .writtenBy()
+          .then((written) => [primary, ...homeBanks].some((feed) => !written.has(feed.provider)))
+          .catch(() => false),
       }),
     },
   )

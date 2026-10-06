@@ -1,5 +1,5 @@
-import { RATE_SCALE, divideRounded, scaledFromDecimal, yerevanDate } from '@molvia/model'
-import { FOREIGN, FeedError, published, request } from './feed'
+import { PUBLISHED, RATE_SCALE, divideRounded, scaledFromDecimal, yerevanDate } from '@molvia/model'
+import { FeedError, published, request } from './feed'
 import type { Published, RateFeed } from './feed'
 
 export const ERAPI_URL = 'https://open.er-api.com/v6/latest/AMD'
@@ -39,7 +39,7 @@ export function parseErapi(json: string): Published {
   const rates = isRecord(body.rates) ? body.rates : {}
 
   const scaled = new Map<string, bigint | null>()
-  for (const currency of FOREIGN) {
+  for (const currency of PUBLISHED.erapi) {
     const perDram = rates[currency]
     const units =
       typeof perDram === 'number' ? scaledFromDecimal(String(perDram), ERAPI_DIGITS) : null

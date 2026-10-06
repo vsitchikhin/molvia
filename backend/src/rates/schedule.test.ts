@@ -63,6 +63,16 @@ describe('обновление при старте', () => {
     expect(refreshAtBoot(ago(10 * REFRESH_EVERY_MS), now, { development: true })).toBe(false)
   })
 
+  it('источник, которого спрашивают каждый час, ещё не писал — выкатка обновляет сразу (MOL-230, А)', () => {
+    // Выкатка через 20 минут после часового прогона: без этого у динара час не было бы ни строки.
+    expect(refreshAtBoot(ago(20 * 60 * 1000), now, { unwritten: true })).toBe(true)
+    expect(refreshAtBoot(ago(20 * 60 * 1000), now, { unwritten: false })).toBe(false)
+    // В разработке — по-прежнему только пустой кеш.
+    expect(refreshAtBoot(ago(20 * 60 * 1000), now, { development: true, unwritten: true })).toBe(
+      false,
+    )
+  })
+
   it('кеш записан меньше часа назад — перезапуск `make dev` в ЦБ РА не идёт', () => {
     expect(refreshAtBoot(ago(REFRESH_EVERY_MS - 1), now)).toBe(false)
     expect(refreshAtBoot(ago(0), now)).toBe(false)

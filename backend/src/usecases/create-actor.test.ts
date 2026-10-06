@@ -76,10 +76,10 @@ describe('createActor', () => {
       ['AM', 'Гюмри'],
       ['AM', 'Гюмри'],
     ])
-    // Tbilisi spends lari (MOL-110); Belgrade keeps the dram until the dinar comes (MOL-230).
+    // Tbilisi spends lari (MOL-110), Belgrade dinars (MOL-230); the income stays the rouble.
     expect(written.map((input) => [input.spendCurrency, input.incomeCurrency])).toEqual([
       ['GEL', 'RUB'],
-      ['AMD', 'RUB'],
+      ['RSD', 'RUB'],
       ['AMD', 'RUB'],
       ['AMD', 'RUB'],
       ['AMD', 'RUB'],

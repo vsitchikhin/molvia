@@ -1,5 +1,5 @@
-import { RATE_DIGITS, RATE_SCALE, divideRounded, scaledFromDecimal } from '@molvia/model'
-import { FOREIGN, FeedError, published, request } from './feed'
+import { PUBLISHED, RATE_DIGITS, RATE_SCALE, divideRounded, scaledFromDecimal } from '@molvia/model'
+import { FeedError, published, request } from './feed'
 import type { Published, RateFeed } from './feed'
 
 export const NBG_URL = 'https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json/'
@@ -63,7 +63,7 @@ export function parseNbg(json: string): Published {
   if (dram === null) throw new FeedError('nbg', 'no AMD')
 
   const scaled = new Map<string, bigint | null>()
-  for (const currency of FOREIGN) {
+  for (const currency of PUBLISHED.nbg) {
     const quote =
       currency === 'GEL' ? { quantity: 1n, value: RATE_SCALE } : quoteOf(currencies, currency)
     // drams per unit = (lari per unit) / (lari per dram)

@@ -181,34 +181,90 @@ export function formatRateBeside(
  * Where an official rate was read. The cache keeps the provider so that one pair is never built
  * from two sources — a rouble from one bank against a dollar from another is nobody's rate.
  */
-export const rateProviderSchema = z.enum(['cba', 'cbr', 'erapi', 'nbg'])
+export const rateProviderSchema = z.enum(['cba', 'cbr', 'erapi', 'nbg', 'nbs'])
 export type RateProvider = z.infer<typeof rateProviderSchema>
 
 /**
  * The central bank of a currency's own country, where it is not the dram's (MOL-110, owner's
  * decision В-1: «the first source of truth for a country's currency is that country's central
- * bank»): the lari is the National Bank of Georgia's. Every other currency is the Central Bank of
- * Armenia's, as it always was.
+ * bank»): the lari is the National Bank of Georgia's, the dinar the National Bank of Serbia's
+ * (MOL-230). Every other currency is the Central Bank of Armenia's, as it always was.
  */
 export const HOME_BANK: Readonly<Partial<Record<Currency, RateProvider>>> = Object.freeze({
   GEL: 'nbg',
+  RSD: 'nbs',
 })
 
 /**
- * The bank whose rate is a pair's official one — the one a trip takes while it is fresh and calls
- * `official`, every other publisher being a `fallback`: the bank of the pair's currency that has one
- * of its own, and the Central Bank of Armenia otherwise. The National Bank of Georgia publishes the
- * dram, the rouble, the dollar and the euro beside the lari, so a pair with the lari is built from
- * its one answer.
+ * The currency each provider quotes the others in — the dram, but for the National Bank of Serbia,
+ * whose list has no dram to bring its answer into (MOL-230): its rows are dinars per unit.
  */
-export function homeBankOf(base: Currency, quote: Currency): RateProvider {
-  return HOME_BANK[base] ?? HOME_BANK[quote] ?? 'cba'
+export const RATE_BASE: Readonly<Record<RateProvider, Currency>> = Object.freeze({
+  cba: 'AMD',
+  cbr: 'AMD',
+  erapi: 'AMD',
+  nbg: 'AMD',
+  nbs: 'RSD',
+})
+
+type Quoted = Exclude<Currency, 'AMD'>
+
+const ALL_BUT_DRAM = currencySchema.options.filter(
+  (currency): currency is Quoted => currency !== 'AMD',
+)
+
+/**
+ * What each provider publishes against its base (MOL-230): an answer missing one of its own is
+ * refused whole, and another's currency is not asked of it. The Central Bank of Armenia has no
+ * dinar, and the National Bank of Serbia neither the dram nor the lari — measured on 06.10.2026.
+ */
+export const PUBLISHED: Readonly<Record<RateProvider, readonly Quoted[]>> = Object.freeze({
+  cba: ALL_BUT_DRAM.filter((currency) => currency !== 'RSD'),
+  cbr: ALL_BUT_DRAM,
+  erapi: ALL_BUT_DRAM,
+  nbg: ALL_BUT_DRAM,
+  nbs: ['RUB', 'USD', 'EUR'],
+})
+
+/** Whether `provider` publishes `currency` — its base, or one of the currencies it quotes. */
+export function publishes(provider: RateProvider, currency: Currency): boolean {
+  return RATE_BASE[provider] === currency || PUBLISHED[provider].some((one) => one === currency)
 }
 
-/** One published rate: how many drams one unit of `currency` was worth on `date` in Yerevan. */
+/**
+ * The country banks of `HOME_BANK`, the one list of them. They stand only for their own pairs
+ * (MOL-110, plan Р-1): the National Bank of Georgia prints the dram per 1000 with four digits, five
+ * significant ones, so a dollar in drams by it is coarser than the Bank of Russia's (review 3). The
+ * refresh asks them every hour and judges their jumps by their own fortnight.
+ */
+export const COUNTRY_BANKS: ReadonlySet<RateProvider> = new Set(Object.values(HOME_BANK))
+
+/**
+ * The bank whose rate is a pair's official one — the one a trip takes while it is fresh and calls
+ * `official`, every other publisher being a `fallback`. **The first that publishes both currencies**
+ * (MOL-230) of: the bank of each currency of the pair, the Central Bank of Armenia, then the other
+ * country banks. So the lari's pairs are the National Bank of Georgia's — it publishes everything;
+ * the dinar against the rouble, the dollar and the euro the National Bank of Serbia's; the dinar
+ * against the dram the National Bank of Georgia's (MOL-110, В-5 «а»): neither Serbia's bank has the
+ * dram nor Armenia's the dinar, and a pair is never built from two. The rest is the Central Bank of
+ * Armenia's, as it always was.
+ */
+export function homeBankOf(base: Currency, quote: Currency): RateProvider {
+  const order = [HOME_BANK[base], HOME_BANK[quote], 'cba' as const, ...COUNTRY_BANKS]
+  const home = order.find(
+    (provider) => provider !== undefined && publishes(provider, base) && publishes(provider, quote),
+  )
+  return home ?? 'cba'
+}
+
+/**
+ * One published rate: how many units of the provider's base (`RATE_BASE`) one unit of `currency`
+ * was worth on `date` — drams for every provider but the National Bank of Serbia, whose rows are
+ * dinars (MOL-230). Never read without its provider: a rouble of 1,2257 is dinars, not drams.
+ */
 export interface AmdRate {
   readonly provider: RateProvider
-  readonly currency: Exclude<Currency, 'AMD'>
+  readonly currency: Quoted
   /** `YYYY-MM-DD`, the day in Yerevan the provider dates the rate by. */
   readonly date: string
   readonly scaled: bigint
@@ -410,19 +466,12 @@ export function isRateFresh(date: string, today: string): boolean {
 }
 
 // Tie-breaking order after the pair's own bank: the central banks, then the aggregator.
-const PROVIDER_ORDER: readonly RateProvider[] = ['cba', 'cbr', 'nbg', 'erapi']
+const PROVIDER_ORDER: readonly RateProvider[] = ['cba', 'cbr', 'nbg', 'nbs', 'erapi']
 
 /**
- * The country banks of `HOME_BANK` (MOL-110), the one list of them. They stand only for their own
- * pairs (plan Р-1: «for the rest, as it was»): the National Bank of Georgia prints the dram per 1000
- * with four digits, five significant ones, so a dollar in drams by it is coarser than the Bank of
- * Russia's (review 3). The refresh asks them every hour and judges their jumps by their own fortnight.
- */
-export const COUNTRY_BANKS: ReadonlySet<RateProvider> = new Set(Object.values(HOME_BANK))
-
-/**
- * The rate of `base` in `quote` built from rates against the dram: quote per one base, as the
- * snapshot stores it. Against the dram it is the published number itself; the inverse and the
+ * The rate of `base` in `quote` built from one provider's rates against `unit`, its base
+ * (`RATE_BASE`): the dram, or the dinar for the National Bank of Serbia (MOL-230). Quote per one base,
+ * as the snapshot stores it. Against the unit it is the published number itself; the inverse and the
  * cross are a division rounded half-up to the snapshot's six digits — the one rounding outside
  * output, because the snapshot's scale is fixed (MOL-4) and the snapshot is this value's output.
  *
@@ -435,16 +484,17 @@ export function rateFromAmd(
   quote: Currency,
   rates: readonly AmdRate[],
   source: RateSource,
+  unit: Currency = 'AMD',
 ): ExchangeRate | null {
   if (base === quote) return null
 
   const halves = [base, quote].map((currency) =>
-    currency === 'AMD' ? null : rates.find((rate) => rate.currency === currency),
+    currency === unit ? null : rates.find((rate) => rate.currency === currency),
   )
   if (halves.includes(undefined)) return null
 
-  const amdPer = (index: number): bigint => halves[index]?.scaled ?? RATE_SCALE
-  const scaled = divideRounded(amdPer(0) * RATE_SCALE, amdPer(1))
+  const unitsPer = (index: number): bigint => halves[index]?.scaled ?? RATE_SCALE
+  const scaled = divideRounded(unitsPer(0) * RATE_SCALE, unitsPer(1))
 
   const dates = halves.flatMap((half) => (half ? [half.date] : [])).sort()
   const [oldest] = dates
@@ -509,14 +559,15 @@ export function pickOfficialRate(
     const own = rows.filter((row) => row.provider === provider && row.date <= today)
     const source = provider === home ? 'official' : 'fallback'
     const latest = latestOf(own)
-    const rate = rateFromAmd(base, quote, latest, source)
+    const unit = RATE_BASE[provider]
+    const rate = rateFromAmd(base, quote, latest, source, unit)
     if (!rate) return []
 
     const jumped = latest.some((row) => row.jump && needed.has(row.currency))
     // A previous rate over a week older than the jump is not an alternative but a stale number
     // (Р-24): not offered, and the person still has «count by the new one» and their own.
     const steady = jumped
-      ? rateFromAmd(base, quote, latestOf(own.filter((row) => !row.jump)), source)
+      ? rateFromAmd(base, quote, latestOf(own.filter((row) => !row.jump)), source, unit)
       : null
     const date = yerevanDate(rate.asOf)
     const previous = steady && isRateFresh(yerevanDate(steady.asOf), date) ? steady : null

@@ -236,10 +236,13 @@ that are easiest to break; the file holds every rule of the area and the reason 
 ### Money: rates, exchanges, incomes — `.claude/rules/money-rates.md`
 
 - **Starting a record never goes to the network** (the old «Начать поход»): a trip snapshots the official rate from the cache,
-  which the API refreshes hourly; the cache holds one currency against the dram per day.
-- **The CBA first, then the Bank of Russia, then open.er-api.com**; a pair with the lari is the
-  National Bank of Georgia's, `official` is the pair's own bank (`homeBankOf`, MOL-110); a pair is
-  never built from two providers; a jump is flagged, not refused; an answer that is not strict is not written; an empty
+  which the API refreshes hourly; the cache holds one currency against the provider's base per day —
+  the dram, the dinar for the National Bank of Serbia (`official_rates.base`, MOL-230).
+- **The CBA first, then the Bank of Russia, then open.er-api.com**; a pair's bank is the first that
+  publishes both its currencies — the lari's the National Bank of Georgia's, the dinar's against the
+  rouble, the dollar and the euro the National Bank of Serbia's, against the dram Georgia's — and
+  `official` is that bank (`homeBankOf`, MOL-110, MOL-230); a silent country bank asks the open
+  sources as the CBA's silence does; a pair is never built from two providers; a jump is flagged, not refused; an answer that is not strict is not written; an empty
   cache gives a trip no rate, for good.
 - **The person's own rate comes from exchanges, never from a typed number** (MOL-40): the wallet is
   the average cost of what is held, every currency has a cost in the currency of conversion, and

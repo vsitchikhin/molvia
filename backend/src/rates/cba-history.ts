@@ -1,4 +1,5 @@
 import {
+  PUBLISHED,
   RATE_DIGITS,
   RATE_MAX,
   RATE_MIN,
@@ -8,14 +9,14 @@ import {
 } from '@molvia/model'
 import type { AmdRate } from '@molvia/model'
 import { CBA_URL } from './cba'
-import { FOREIGN, FeedError, request } from './feed'
+import { FeedError, request } from './feed'
 
 function envelope(from: string, to: string): string {
   return (
     '<?xml version="1.0" encoding="utf-8"?>' +
     '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">' +
     '<soap:Body><ExchangeRatesByDateRangeByISO xmlns="http://www.cba.am/">' +
-    `<ISOCodes>${FOREIGN.join(',')}</ISOCodes><DateFrom>${from}</DateFrom><DateTo>${to}</DateTo>` +
+    `<ISOCodes>${PUBLISHED.cba.join(',')}</ISOCodes><DateFrom>${from}</DateFrom><DateTo>${to}</DateTo>` +
     '</ExchangeRatesByDateRangeByISO></soap:Body></soap:Envelope>'
   )
 }
@@ -39,7 +40,7 @@ export function parseCbaRange(xml: string): AmdRate[] {
   const byDay = new Map<string, AmdRate[]>()
   for (const [block] of xml.matchAll(/<ExchangeRatesByRange\b[\s\S]*?<\/ExchangeRatesByRange>/g)) {
     const iso = field(block, 'ISO')
-    const currency = FOREIGN.find((known) => known === iso)
+    const currency = PUBLISHED.cba.find((known) => known === iso)
     if (currency === undefined) continue
     const date = /^(\d{4}-\d{2}-\d{2})T/.exec(field(block, 'RateDate') ?? '')?.[1] ?? ''
     if (!isRateDay(date)) throw new FeedError('cba', `range: unreadable date of ${currency}`)
@@ -58,7 +59,8 @@ export function parseCbaRange(xml: string): AmdRate[] {
   }
   if (byDay.size === 0) throw new FeedError('cba', 'range: no rates')
   for (const [date, rates] of byDay) {
-    if (rates.length !== FOREIGN.length) throw new FeedError('cba', `range: ${date} incomplete`)
+    if (rates.length !== PUBLISHED.cba.length)
+      throw new FeedError('cba', `range: ${date} incomplete`)
   }
   return [...byDay.values()].flat().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
 }

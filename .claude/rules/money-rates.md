@@ -28,8 +28,9 @@ not wait for a central bank. The API refreshes the cache itself, hourly, and at 
 the cache was written less than an hour ago — in development, unless it holds anything at all:
 `make dev` restarts on every save
 (`RATES_REFRESH`, on by default, off in end-to-end runs). The cache holds what the banks
-publish — **one currency against the dram per day**, never a pair; the pair is built at the
-snapshot, and an inverse or a cross is rounded there to the snapshot's six digits.
+publish — **one currency against the provider's base per day** — the dram, or the dinar for the
+National Bank of Serbia (MOL-230) — never a pair; the pair is built at the snapshot, and an inverse
+or a cross is rounded there to the snapshot's six digits.
 
 - **The CBA speaks SOAP only** — the GET form answers «Runtime Error» — and dates its rate by
   the day in Yerevan, with nothing on weekends: a Sunday trip takes Friday's rate, with Friday's
@@ -180,8 +181,111 @@ rule: a pair with the lari — the NBG, any other — the CBA.
   the lari on another device.
 - **The sign is «₾» in every language** (`SIGN` in `money.ts`): Russian CLDR prints «ლ», an old letter.
   No face of its own — it comes from the system font, as «₽» does.
-- **The dinar is MOL-230**: the National Bank of Serbia has neither the dram nor the lari, and gives a
-  program its rates only by a login on application; its open sources are that task's first step.
+- **The dinar is the next section** (MOL-230).
+
+## The dinar and its own bank (MOL-230)
+
+**The dinar's bank is the National Bank of Serbia, and it is open** (owner's decision В-1 «а»,
+06.10.2026). MOL-110 had looked only at the old page `nbs.rs/kursnaListaModul`, which resets a
+program's connection, and at the web services, a login on application. The bank's own application
+«Курсна листа НБС» on `webappcenter.nbs.rs` answers anyone — curl, Node's `fetch`, from the
+production server — and offers each list for download as XML. Its `Copyright` lets its files be
+saved and reproduced unchanged, with the source named every time. **So a trip's rate line names it
+beside the number** — «курс 1,23 RSD/₽ · 6 окт. · НБ Сербии» (`NAMED_BESIDE` in `TripTotal`, review
+1): «Деньги», the accounts, the spending sheet and an exchange's card name the pair's bank already
+(В-2 of MOL-110), but a trip named a bank only when it was silent or stale. Decided by the
+aggregator's precedent, whose terms put its name beside its rate; the other banks stay unnamed there. A mirror, kurs.resenje.org, carries the same figures — checked — and
+was left out: a retelling of the bank is what rate.am was rejected for.
+
+- **Two requests a list** (`backend/src/rates/nbs.ts`): a page that names the list by an id in its
+  links — `CurrentMiddleRate`, or `IndexByDate?Date=dd.mm.yyyy` — then the list as XML. The page's
+  range search wants a form token, so the archive is a day a request, walked as the National Bank of
+  Georgia's is. A page with two ids is refused; one with none is a day with no list formed yet —
+  today before 8:00 in Belgrade, whose day starts two or three hours after Yerevan's — and that day
+  is asked as the day before, whose list is still in force. **The day is the list's `Date`**, the day
+  it was formed and in force from 8:00 in Belgrade: a weekend or a holiday is answered with the
+  working day's before it, as the National Bank of Georgia's archive is (31.12.2021 for the 1st and
+  the 3rd of January 2022).
+- **Its rows are dinars, not drams: `official_rates.base`.** The list has the rouble, the dollar and
+  the euro and no dram, so nothing in one answer brings it into drams. The model names each provider's
+  base (`RATE_BASE`) and the row carries it, a check holding it to the provider, so nobody reading the
+  table takes 1,2257 dinars for a rouble as drams. **The pair is built in the base of the rows of its
+  provider** (`rateFromAmd`'s `unit`), in `pickOfficialRate` — the one door through which a trip,
+  «Деньги», the wallet and an exchange read the cache; the market reads the CBA's rows alone. Its
+  rouble is never a fallback for a pair of the dram: a country bank stands only for its own pairs,
+  and it publishes no dram.
+- **Each provider publishes its own currencies** (`PUBLISHED`): the CBA all but the dinar — neither
+  its latest nor its archive has it, and an answer without it is whole; the National Bank of Serbia
+  the rouble, the dollar and the euro; the National Bank of Georgia, the Bank of Russia and er-api
+  everything. `published()` and the CBA's archive refuse an answer missing one of its own, as before.
+- **The pair's bank is the first that publishes both currencies** (`homeBankOf`): the bank of each
+  currency of the pair, the CBA, then the other country banks. So the dinar against the rouble, the
+  dollar and the euro is the National Bank of Serbia's; against the dram and the lari the National
+  Bank of Georgia's (В-5 «а» of MOL-110): neither Serbia's bank has the dram nor Armenia's the dinar,
+  and a pair is never built from two. The trip's check is written from this rule pair by pair
+  (`homeBankSql`) — a bank per currency no longer says it. A test holds that the pair's bank
+  publishes both its currencies, for every pair.
+- **A silent country bank sends the refresh on to the open sources too** (review of the plan, found
+  in the code): they were asked only when the CBA was silent, and the CBA writes the lari every hour,
+  so the lari always had a stand-in in the cache. The dinar is in no answer of the CBA's: with the
+  National Bank of Serbia silent and the CBA well, a trip in dinars would have nothing fresher than
+  the silent bank. So five failures of a country bank in a row, or its latest over a week old, ask
+  the Bank of Russia and then er-api, as the CBA's silence does. **An open source's dinar is measured
+  for a jump by the National Bank of Georgia's** (review 2): an open source without three of its own
+  is measured by the CBA, which has no dinar, and the open sources stand in for the dinar exactly when
+  a trip in dinars takes them — a comma in the wrong place went in unmarked. The bank of the currency's
+  pair with the dram, in drams as theirs are; none when that bank has fewer than three, as everywhere.
+- **A day of a country bank's archive counts as written only when it holds every currency the bank
+  publishes** (`wholeDays`, plan Р-6): the dinar joined the National Bank of Georgia's set after
+  MOL-110 had walked its history, and counted by any row those days were never asked again. Now the
+  same walk brings the dinar against the dram since 2022, writing only the rows the cache lacks, some
+  fifteen hours after the deploy; any currency added to a bank's set comes the same way.
+- **The rouble is printed with four digits** (1,2257 — five significant): a pair by the National Bank
+  of Serbia is coarser than one by the Bank of Russia, by at most four thousandths of a percent. The
+  owner's rule is the bank of the currency's country, and that difference is never seen in money.
+- **Dinars are typed whole, as roubles are** (review 3): a Serbian shelf prints paras — 53,99,
+  114,99 дин at Maxi, checked 06.10.2026 — exactly as a Russian one prints 99,99 ₽, and the owner's
+  rule of 02.10.2026 types roubles whole whatever kopecks the receipt printed. The step only sets what
+  «Тут дешевле» lets a price per unit wobble by — half a dinar on a sum, in the safe direction. ISO 4217
+  gives the dinar two digits. The sign
+  is «RSD», as the browser prints it (В-4 of MOL-110). A person whose phone is in Belgrade starts
+  spending dinars, the rouble the income.
+- **The deploy refreshes at once when a source asked every hour has never written** (`refreshAtBoot`'s
+  `unwritten`, adversarial А): a deploy is a restart, and the boot skipped the refresh when the CBA had
+  written within the hour — on production nearly always. The dinar has no stand-in in the cache — the
+  CBA has none, and the open sources are asked only for a silence — so for up to an hour no pair of it
+  had a rate, and a trip started then had none for good. In development only an empty cache, as before.
+- **Every country bank's latest comes before any archive** (adversarial round 2, П2): walked in turn,
+  the National Bank of Serbia waited for the National Bank of Georgia's walk — right after the deploy
+  the last month of it, 32 requests, some twenty seconds and up to sixteen minutes of a slow bank —
+  with today's dinar in nobody's row. The archives are walked after all the latest have answered.
+- **A rollback past `0056` is safe only until a row outside the official cache holds `RSD` or `nbs`** —
+  an actor, a trip, a spending, an exchange (adversarial round 2, review 7, 8; by the code, not held by a
+  test). The cache itself is safe: the image before it knows no `nbs` and
+  never builds a pair from its rows, every reader of another provider reads its own, and its writes
+  leave `base` to the default, the dram, which the check takes for every provider it knows. **But that
+  image reads the rest through the domain's schemas, where the dinar is not**: an actor spending or
+  counting in dinars — anyone who came in with Belgrade's zone or chose the dinar — fails `actorSchema`
+  on every request with a session, and is a 500 everywhere; a trip, a spending, an exchange in dinars
+  fails its own. So the automatic rollback of a failed deploy (MOL-90) is safe — no such row exists yet
+  — and a late rollback by hand locks such a person out until the deploy forward. The lari after MOL-110
+  is the same; `deploy.md` names the rule.
+- **The price of the first hours, named** (adversarial А, corrected): the archive comes in portions —
+  the National Bank of Serbia's from 2022 and the dinar in the National Bank of Georgia's, the last
+  month first, the history over some fifteen hours. **A day of the dinar older than the month has no
+  rate of anyone's until its portion comes** — unlike the lari, which the CBA's rows stood in for, it
+  is not a fallback but nothing: a spending in dinars dated then and written in those hours has no rate
+  and «Деньги» say «не всё посчитано» until it is amended. Only the owner is on production before 0.2,
+  and the window is hours. A page before MOL-230 refuses an answer with `RSD` or `nbs` until it takes
+  the new version.
+- **The dinar is in the strict set of the National Bank of Georgia and of the Bank of Russia**
+  (adversarial Б, named): an answer missing it is refused whole, as one missing any of its own — the
+  lari's official source with it at the NBG, the first fallback of every pair of the dram at the Bank
+  of Russia. Strict within its set was the task's requirement. The NBG had the dinar on all 1 740 days
+  since 2022 (measured 06.10.2026); the Bank of Russia's list is not fixed — it has the dinar only
+  since 2023 — and if it drops it, er-api is still behind it.
+- **The page is a step the feed depends on**: a change of its markup refuses the feed whole, and the
+  pair goes to the Bank of Russia with «не от НБ Сербии: он молчит» — never half written.
 
 ## The person's own rate, from exchanges
 

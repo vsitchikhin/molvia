@@ -393,6 +393,13 @@
       "when": 1791262193270,
       "tag": "0055_receipt_no_items",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1791271909527,
+      "tag": "0056_dinar",
+      "breakpoints": true
     }
   ]
 }

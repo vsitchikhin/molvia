@@ -222,7 +222,7 @@ import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 
 /** The order the rate line names the currencies in (handoff 02). */
-const RATE_ORDER: readonly Currency[] = ['RUB', 'USD', 'EUR', 'GEL', 'AMD']
+const RATE_ORDER: readonly Currency[] = ['RUB', 'USD', 'EUR', 'GEL', 'RSD', 'AMD']
 
 /**
  * «Счета» (MOL-123, handoff 02): where the money lies — the totals in the spending currency, the
