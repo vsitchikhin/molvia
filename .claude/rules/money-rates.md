@@ -259,10 +259,16 @@ was left out: a retelling of the bank is what rate.am was rejected for.
   the National Bank of Serbia waited for the National Bank of Georgia's walk — right after the deploy
   the last month of it, 32 requests, some twenty seconds and up to sixteen minutes of a slow bank —
   with today's dinar in nobody's row. The archives are walked after all the latest have answered.
-- **A rollback past `0056` is safe by the code** (adversarial round 2, not held by a test): the image
-  before it knows no `nbs` and never builds a pair from its rows, every reader of another provider
-  reads its own, and its writes leave `base` to the default, the dram, which the check takes for every
-  provider it knows.
+- **A rollback past `0056` is safe only until a row holds `RSD` or `nbs`** (adversarial round 2, review
+  7; by the code, not held by a test). The cache itself is safe: the image before it knows no `nbs` and
+  never builds a pair from its rows, every reader of another provider reads its own, and its writes
+  leave `base` to the default, the dram, which the check takes for every provider it knows. **But that
+  image reads the rest through the domain's schemas, where the dinar is not**: an actor spending or
+  counting in dinars — anyone who came in with Belgrade's zone or chose the dinar — fails `actorSchema`
+  on every request with a session, and is a 500 everywhere; a trip, a spending, an exchange in dinars
+  fails its own. So the automatic rollback of a failed deploy (MOL-90) is safe — no such row exists yet
+  — and a late rollback by hand locks such a person out until the deploy forward. The lari after MOL-110
+  is the same; `deploy.md` names the rule.
 - **The price of the first hours, named** (adversarial А, corrected): the archive comes in portions —
   the National Bank of Serbia's from 2022 and the dinar in the National Bank of Georgia's, the last
   month first, the history over some fifteen hours. **A day of the dinar older than the month has no
