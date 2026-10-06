@@ -5,10 +5,12 @@ import type { NewPlace, Place, SettingsGeography } from '@molvia/model'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
 import { identityOf, placeIdentity, places, trips } from './schema'
+import { livePlaceId } from './trace'
 
 export interface PlaceRepository {
   /** The place that is already there, or a new one — never a second card for one shop. */
   ensure(input: NewPlace): Promise<Place>
+  /** The place an id stands for: through the trace of a merge to its survivor (MOL-106). */
   byId(id: string): Promise<Place | null>
   byIds(ids: readonly string[]): Promise<Place[]>
   /** Places this person has already shopped in, the most recent first. */
@@ -68,14 +70,23 @@ export function createPlaceRepository(db: Conn): PlaceRepository {
           .limit(1)
 
         if (!row) throw new Error('ensure(place) neither wrote a place nor found one')
-        return toPlace(row)
+        // A trace's name is its survivor's (MOL-106): typed again, it is the shop it was merged into.
+        if (row.mergedInto === null) return toPlace(row)
+        const [survivor] = await tx.select().from(places).where(eq(places.id, row.mergedInto))
+        if (!survivor) throw new Error('a place merged into nothing')
+        return toPlace(survivor)
       })
     },
 
     async byId(id) {
       if (idOrNull(id) === null) return null
 
-      const [row] = await db.select().from(places).where(eq(places.id, id)).limit(1)
+      // Through a trace to its survivor (MOL-106): a receipt's draft may name a place merged since.
+      const [row] = await db
+        .select()
+        .from(places)
+        .where(sql`${places.id} = ${livePlaceId(id)}`)
+        .limit(1)
       return row ? toPlace(row) : null
     },
 

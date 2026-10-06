@@ -7,7 +7,14 @@ import type { MolviaBotClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { OwnerNotice, OwnerNotices } from '@molvia/model'
 import { FEEDBACK_KINDS } from '@molvia/model'
-import { OWNER_STOP_BUDGET_MS, ownerText, startOwnerNotices, tellOwner, threadTagOf } from './owner'
+import {
+  MERGE_TEXT_MAX,
+  OWNER_STOP_BUDGET_MS,
+  ownerText,
+  startOwnerNotices,
+  tellOwner,
+  threadTagOf,
+} from './owner'
 
 const OWNER = 4242
 const NEW: OwnerNotice = {
@@ -602,5 +609,125 @@ describe('tellOwner — 429 на снимке кончает прогон, ка�
 
     expect(made).toEqual(['sendMessage', 'sendPhoto'])
     expect(ownerNoticesSent).not.toHaveBeenCalled()
+  })
+})
+
+describe('ownerText — утренний отчёт склейки (MOL-106)', () => {
+  const FROM = '0a0b0c0d-0000-4000-8000-000000000001'
+  const INTO = '0a0b0c0d-0000-4000-8000-000000000002'
+  const NIGHT: OwnerNotice = {
+    kind: 'catalogue_merged',
+    day: '2026-10-06',
+    mode: 'on',
+    merged: 12,
+    candidates: 1,
+    mergedPairs: [
+      { subject: 'item', from: 'Малоко 3,2%', into: 'Молоко 3,2%', id: 17 },
+      { subject: 'place', from: 'Ереван  Сити', into: 'Ереван Сити', city: 'Гюмри', id: 18 },
+    ],
+    candidatePairs: [
+      {
+        subject: 'place',
+        from: 'Yerevan City',
+        into: 'Ереван Сити',
+        fromId: FROM,
+        intoId: INTO,
+        city: 'Гюмри',
+      },
+    ],
+  }
+
+  it('names what merged with its number, places with their city, the rest counted', () => {
+    expect(ownerText(NIGHT).split('\n')).toEqual([
+      '🧩 Склейка за 2026-10-06: склеено 12, новых кандидатов 1',
+      '',
+      'Склеено',
+      '#17 «Малоко 3,2%» → «Молоко 3,2%»',
+      '#18 место «Ереван  Сити» → «Ереван Сити» · Гюмри',
+      '…и ещё 10 — все: make merge-night DAY=2026-10-06',
+      '',
+      'Кандидаты — склеить командой',
+      'место «Yerevan City» → «Ереван Сити» · Гюмри',
+      `make merge FROM=${FROM} INTO=${INTO}`,
+      '',
+      'Отменить — make unmerge ID=номер',
+    ])
+  })
+
+  it('says only what would merge in the report mode, and offers no undo', () => {
+    const lines = ownerText({
+      ...NIGHT,
+      mode: 'report',
+      merged: 1,
+      mergedPairs: [
+        { subject: 'item', from: 'Малоко', into: 'Молоко', fromId: FROM, intoId: INTO },
+      ],
+      candidates: 0,
+      candidatePairs: [],
+    }).split('\n')
+    expect(lines).toEqual([
+      '🔎 Склейка за 2026-10-06, только отчёт: склеил бы 1, новых кандидатов 0',
+      '',
+      'Склеил бы',
+      '«Малоко» → «Молоко»',
+      `make apart FROM=${FROM} INTO=${INTO}`,
+    ])
+  })
+
+  it('says the candidates past the printed ones come on the mornings after', () => {
+    const text = ownerText({ ...NIGHT, merged: 0, mergedPairs: [], candidates: 3 })
+    expect(text).toContain('…и ещё 2 — назову в следующие утра')
+  })
+
+  it('holds within what Telegram takes, and sends the cut candidates to the list (review №9)', () => {
+    const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+    const long = (n: number) => `${'Молоко ультрапастеризованное '.repeat(3)}${String(n)}`
+    const city = 'Г'.repeat(120)
+    for (const subject of ['item', 'place'] as const) {
+      const text = ownerText({
+        kind: 'catalogue_merged',
+        day: '2026-10-06',
+        mode: 'report',
+        merged: 10,
+        candidates: 12,
+        mergedPairs: Array.from({ length: 10 }, (_, i) => ({
+          subject,
+          from: long(i),
+          into: long(i + 50),
+          ...(subject === 'place' ? { city } : {}),
+          fromId: id(i),
+          intoId: id(i + 50),
+        })),
+        candidatePairs: Array.from({ length: 10 }, (_, i) => ({
+          subject,
+          from: long(i + 100),
+          into: long(i + 150),
+          ...(subject === 'place' ? { city } : {}),
+          fromId: id(i + 100),
+          intoId: id(i + 150),
+        })),
+      })
+      expect(text.length).toBeLessThanOrEqual(MERGE_TEXT_MAX)
+      expect(text).toContain('не влезли в сообщение — все: make merge-candidates')
+      expect(text).toContain('…и ещё 2 — назову в следующие утра')
+    }
+  })
+
+  it('still says the night ran when nothing merged', () => {
+    expect(
+      ownerText({ ...NIGHT, merged: 0, candidates: 0, mergedPairs: [], candidatePairs: [] }),
+    ).toBe('🧩 Склейка за 2026-10-06: склеено 0, новых кандидатов 0')
+  })
+
+  it('cuts a long name so ten pairs fit one message', () => {
+    const long = 'Ж'.repeat(200)
+    const text = ownerText({
+      ...NIGHT,
+      merged: 1,
+      mergedPairs: [{ subject: 'item', from: long, into: 'Ж', id: 1 }],
+      candidates: 0,
+      candidatePairs: [],
+    })
+    expect(text).toContain(`«${'Ж'.repeat(59)}…»`)
   })
 })

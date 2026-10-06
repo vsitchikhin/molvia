@@ -33,6 +33,7 @@ const entries = {
     'seed-catalogue': 'src/seed-catalogue-cli.ts',
     gates: 'src/gates-cli.ts',
     failures: 'src/failures-cli.ts',
+    merge: 'src/merge-cli.ts',
   },
   bot: { index: 'src/index.ts' },
 }

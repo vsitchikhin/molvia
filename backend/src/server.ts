@@ -32,6 +32,7 @@ import {
 import type { FailurePlace } from '@/usecases/record-failure'
 import { analyticsOf, chooseAnalytics } from '@/usecases/analytics'
 import { createFailureRepository } from '@/db/failures-repository'
+import { createMergeRepository } from '@/db/merge-repository'
 import { createOwnerNoticeRepository } from '@/db/owner-notices-repository'
 import { healthRoutes } from '@/routes/health'
 import { internalAuthRoutes } from '@/routes/internal-auth'
@@ -61,6 +62,7 @@ import { completeLogin } from '@/usecases/complete-login'
 import { currentTrip, selectedTrip } from '@/usecases/current-trip'
 import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
+import { mergeTick } from '@/usecases/merge-twins'
 import { readQueuedReceipts } from '@/usecases/read-receipts'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
 import { receiptSettled, recordReceipt } from '@/usecases/record-receipt'
@@ -549,6 +551,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopSessionCleanup: (() => Promise<void>) | undefined
     let stopFeedbackCleanup: (() => Promise<void>) | undefined
     let stopFailureCleanup: (() => Promise<void>) | undefined
+    let stopMergeTwins: (() => Promise<void>) | undefined
     const embedder = options.embedder?.(instance.log) ?? NO_EMBEDDER
     let itemEmbedding: ReturnType<typeof startItemEmbedding> | undefined
     instance.addHook('onReady', (ready) => {
@@ -641,6 +644,30 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       void embedder.loaded.then(() => {
         writer.nudge()
       })
+      // The nightly merge of twins (MOL-106): a minute timer that runs its night once a day, from half
+      // past four in Yerevan, by whichever instance claims the day, and hands the report at nine.
+      const mergeMode = env.CATALOGUE_MERGE
+      if (mergeMode !== 'off') {
+        stopMergeTwins = startLoginCleanup(
+          () =>
+            mergeTick(
+              {
+                merges: createMergeRepository(db),
+                embedder,
+                notices: createOwnerNoticeRepository(db),
+                owner: owner !== null,
+                failed: (error) => {
+                  failures.report(error, job('catalogue-merge'), 'catalogue merge of a pair failed')
+                },
+              },
+              mergeMode,
+              new Date(),
+            ),
+          (error) => {
+            failures.report(error, job('catalogue-merge'), 'catalogue merge failed')
+          },
+        )
+      }
       // Receipts (MOL-125): a removal final after its ten minutes, a receipt not recorded after its
       // 28 days, a line cut out for training 28 days after it was confirmed.
       stopReceiptCleanup = startLoginCleanup(
@@ -722,6 +749,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopSessionCleanup?.()
       await stopFeedbackCleanup?.()
       await stopFailureCleanup?.()
+      await stopMergeTwins?.()
       await itemEmbedding?.stop()
       await stopReceiptCleanup?.()
       await receiptQueue?.stop()

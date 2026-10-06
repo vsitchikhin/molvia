@@ -29,10 +29,12 @@ import { kindAt } from './kind-word'
 import { idOrNull, rowLimit, theRow } from './rows'
 import { vectorLiteral } from './item-embeddings-repository'
 import { itemBarcodes, itemEmbeddings, items, searchPicks } from './schema'
+import { liveItemId } from './trace'
 
 export interface ItemRepository {
   /** `createdBy` is null for a seeded item — it belongs to nobody. */
   create(input: NewItem, createdBy: string | null): Promise<Item>
+  /** The item an id stands for: through the trace of a merge to its survivor (MOL-106). */
   byId(id: string): Promise<Item | null>
   byIds(ids: readonly string[]): Promise<Item[]>
   /**
@@ -42,8 +44,8 @@ export interface ItemRepository {
    *
    * By the name, not by the search key: the key folds on purpose, and a false merge that costs
    * the search a candidate would cost this path the item itself — «Milo» would be answered
-   * with the «Мыло» already there, and could never be added. Merging what is merely similar
-   * is 0.2's.
+   * with the «Мыло» already there, and could never be added. What is merely similar is merged by
+   * the night (MOL-106); a trace's name, typed again, is its survivor.
    *
    * `createdBy` is null for the seed (MOL-112), which goes through here so that running it again
    * doubles nothing and a name someone already proposed stays theirs.
@@ -756,7 +758,7 @@ export function rankedCandidates(
                   where starts_with(w.word, k.q[cardinality(k.q)])
                 ))
       group by sp.item_id
-    )
+    ),
     -- Near: every word of the row within one edit, the size aside — or the person's own, taken
     -- before on this query or their own word for the item: their choice says more than a typo
     -- metric, the same reason it is lifted. Per row, and the answer is near by the rows it hands
@@ -766,46 +768,57 @@ export function rankedCandidates(
     --
     -- A name found by meaning is near (owner's decision В-3 of MOL-105): «овощи» that finds the
     -- potato is a find, not «не нашли» over it.
-    select r.id,
-           coalesce(r.words_worst <= ${NEAR_DISTANCE} or r.admitted or m.item_id is not null, false)
-             or ${byMeaning} as near
-    from ranked r
-    left join remembered m on m.item_id = r.id
-    left join meaning mg on mg.id = r.id
-    -- The filter stays on the distance: a pick lifts what the search found and never lets in
-    -- what it did not, or memory would become a second search with rules of its own. The one
-    -- exception is the person's own word (MOL-45), and it is let in, not lifted.
-    where r.distance <= ${ACCEPTED_DISTANCE} or r.admitted or ${byMeaning}
-    -- What only a learnt word let in stands below what the search found by its words or the
-    -- person took before, and above what it found by a typo (owner's decisions on review,
-    -- MOL-45 И, О and Т): «кефир» learnt as the milk taken in its place stops standing above the
-    -- kefir the day the catalogue has one — in any size, «кефир 1 л» against «0,5 л» — and the
-    -- potato learnt for «овощи» stays above the flour the absolute budget finds there (MOL-46).
-    -- Among what the search found, the words matched exactly now go before a typo in a word at
-    -- the same distance; nothing else moves. Then what the person took before,
-    -- above a closer spelling — their own choice says more than a typo metric does. Among
-    -- several, the latest wins: after switching brands the new one is on top from the first
-    -- trip. Then the distance of MOL-10, and at one distance: what the typed word found before
-    -- what a synonym found («маслины» over «Оливки»), then the shorter name (owner's decision
-    -- MOL-112, В-5) — the more of a name the query covers, the nearer: «Молоко» before «Молоко
-    -- 3,2%» on «молоко», before «Кофе … молотый» on «мол». The length before the similarity: a
-    -- size in the query otherwise handed the row to a variety that shares a digit or a letter
-    -- with it — «молоко 1 л» to «Молоко 1,5%», «рис 1 кг» to «Рис круглозёрный» (review А, Б).
-    -- The similarity then orders one length, and \`id\` keeps two loads of one screen in one order.
-    --
-    -- A name placed by its meaning stands at \`MEANING_DISTANCE\`, the nearer by meaning first;
-    -- every other key is null or equal there, so nothing found within one edit moves.
-    order by case when not coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) and r.admitted then 1
-                  when m.item_id is not null or r.words_distance = 0 then 0
-                  else 2
-             end,
-             m.item_id is null,
-             m.last_picked_at desc nulls last,
-             m.picks desc nulls last,
-             case when ${byMeaning} then ${sql.raw(String(MEANING_DISTANCE))} else r.distance end,
-             case when ${byMeaning} then mg.sim end desc nulls last,
-             r.by_synonym, r.by_prefix, r.fat_hits desc, r.key_length,
-             r.ws desc, r.id
+    ordered as (
+      select r.id,
+             coalesce(r.words_worst <= ${NEAR_DISTANCE} or r.admitted or m.item_id is not null, false)
+               or ${byMeaning} as near,
+      -- What only a learnt word let in stands below what the search found by its words or the
+      -- person took before, and above what it found by a typo (owner's decisions on review,
+      -- MOL-45 И, О and Т): «кефир» learnt as the milk taken in its place stops standing above the
+      -- kefir the day the catalogue has one — in any size, «кефир 1 л» against «0,5 л» — and the
+      -- potato learnt for «овощи» stays above the flour the absolute budget finds there (MOL-46).
+      -- Among what the search found, the words matched exactly now go before a typo in a word at
+      -- the same distance; nothing else moves. Then what the person took before,
+      -- above a closer spelling — their own choice says more than a typo metric does. Among
+      -- several, the latest wins: after switching brands the new one is on top from the first
+      -- trip. Then the distance of MOL-10, and at one distance: what the typed word found before
+      -- what a synonym found («маслины» over «Оливки»), then the shorter name (owner's decision
+      -- MOL-112, В-5) — the more of a name the query covers, the nearer: «Молоко» before «Молоко
+      -- 3,2%» on «молоко», before «Кофе … молотый» on «мол». The length before the similarity: a
+      -- size in the query otherwise handed the row to a variety that shares a digit or a letter
+      -- with it — «молоко 1 л» to «Молоко 1,5%», «рис 1 кг» to «Рис круглозёрный» (review А, Б).
+      -- The similarity then orders one length, and \`id\` keeps two loads of one screen in one order.
+      --
+      -- A name placed by its meaning stands at \`MEANING_DISTANCE\`, the nearer by meaning first;
+      -- every other key is null or equal there, so nothing found within one edit moves.
+             row_number() over (
+               order by case when not coalesce(r.distance <= ${ACCEPTED_DISTANCE}, false) and r.admitted then 1
+                             when m.item_id is not null or r.words_distance = 0 then 0
+                             else 2
+                        end,
+                        m.item_id is null,
+                        m.last_picked_at desc nulls last,
+                        m.picks desc nulls last,
+                        case when ${byMeaning} then ${sql.raw(String(MEANING_DISTANCE))} else r.distance end,
+                        case when ${byMeaning} then mg.sim end desc nulls last,
+                        r.by_synonym, r.by_prefix, r.fat_hits desc, r.key_length,
+                        r.ws desc, r.id
+             ) as place
+      from ranked r
+      left join remembered m on m.item_id = r.id
+      left join meaning mg on mg.id = r.id
+      -- The filter stays on the distance: a pick lifts what the search found and never lets in
+      -- what it did not, or memory would become a second search with rules of its own. The one
+      -- exception is the person's own word (MOL-45), and it is let in, not lifted.
+      where r.distance <= ${ACCEPTED_DISTANCE} or r.admitted or ${byMeaning}
+    )
+    -- A trace of a merge is found by its own name and vector — the survivor's second name (MOL-106)
+    -- — and answered as the survivor, once, at the better of the two places.
+    select coalesce(i.merged_into, o.id) as id, bool_or(o.near) as near
+    from ordered o
+    join ${items} i on i.id = o.id
+    group by coalesce(i.merged_into, o.id)
+    order by min(o.place)
     limit ${limit}
   `
 }
@@ -967,13 +980,18 @@ export function createItemRepository(db: Conn): ItemRepository {
     async byId(id) {
       if (idOrNull(id) === null) return null
 
-      const [row] = await db.select().from(items).where(eq(items.id, id)).limit(1)
+      // Through a trace to its survivor (MOL-106): every write that names an item reads it here first.
+      const [row] = await db
+        .select()
+        .from(items)
+        .where(sql`${items.id} = ${liveItemId(id)}`)
+        .limit(1)
       if (!row) return null
 
       const codes = await db
         .select()
         .from(itemBarcodes)
-        .where(eq(itemBarcodes.itemId, id))
+        .where(eq(itemBarcodes.itemId, row.id))
         .orderBy(asc(itemBarcodes.code))
 
       return toItem(
@@ -1012,6 +1030,8 @@ export function createItemRepository(db: Conn): ItemRepository {
           array(select h.hs from item_hs h where h.item_id = i.id order by h.hs) as headings
         from items i
         where exists (select 1 from item_names n where n.item_id = i.id and n.language = ${language})
+          -- a trace is no item of its own: its names went to the survivor (MOL-106)
+          and i.merged_into is null
         order by i.name collate "C", i.id`)
       return rows.map((row) => ({
         itemId: row.id,
@@ -1032,12 +1052,15 @@ export function createItemRepository(db: Conn): ItemRepository {
           // all meet at this lock, and the lookup below is an equality the GIN index serves.
           await lockItemKey(tx, input.kind, key)
           const rows = await tx
-            .select({ id: items.id, name: items.name })
+            .select({ id: items.id, name: items.name, mergedInto: items.mergedInto })
             .from(items)
             .where(and(eq(items.kind, input.kind), eq(items.searchKey, key)))
             .orderBy(asc(items.createdAt), asc(items.id))
 
-          const same = rows.find((row) => nameIdentity(row.name) === wanted)
+          // A trace's name is its survivor's second name (MOL-106): proposed again, or written by the
+          // seed that only adds, it gets the survivor — a merged twin never comes back by its name.
+          const named = rows.find((row) => nameIdentity(row.name) === wanted)
+          const same = named && { id: named.mergedInto ?? named.id }
           if (same) {
             // Beside a name the catalogue already holds, the codes are not written (MOL-100, owner's
             // decision В-5): the screen asks whether the code is this item's, as it asks of any item
@@ -1063,13 +1086,13 @@ export function createItemRepository(db: Conn): ItemRepository {
           const [row] = await tx
             .select({ id: items.id })
             .from(items)
-            .where(eq(items.id, itemId))
+            .where(sql`${items.id} = ${liveItemId(itemId)}`)
             .for('update')
           if (!row) return null
-          const claimed = await claim(tx, [code], itemId)
+          const claimed = await claim(tx, [code], row.id)
           if ('taken' in claimed) return holder(tx, claimed.taken)
-          await bind(tx, itemId, claimed.free, actorId)
-          const [item] = await load([itemId], tx)
+          await bind(tx, row.id, claimed.free, actorId)
+          const [item] = await load([row.id], tx)
           return item ? { item, added: claimed.free.length > 0 } : null
         }),
       )
@@ -1082,13 +1105,13 @@ export function createItemRepository(db: Conn): ItemRepository {
         const [row] = await tx
           .select({ id: items.id })
           .from(items)
-          .where(eq(items.id, itemId))
+          .where(sql`${items.id} = ${liveItemId(itemId)}`)
           .for('update')
         if (!row) return false
         await lockBarcodes(tx, [...new Set(forms)])
         await tx
           .delete(itemBarcodes)
-          .where(and(eq(itemBarcodes.itemId, itemId), inArray(itemBarcodes.code, forms)))
+          .where(and(eq(itemBarcodes.itemId, row.id), inArray(itemBarcodes.code, forms)))
         return true
       })
     },

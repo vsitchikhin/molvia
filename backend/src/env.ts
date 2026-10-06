@@ -1,7 +1,7 @@
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
-import { UNNAMED_BUILD, telegramUserIdSchema } from '@molvia/model'
+import { UNNAMED_BUILD, catalogueMergeModeSchema, telegramUserIdSchema } from '@molvia/model'
 import model from '@/embeddings/model.json'
 import { loginConfiguration } from './login-config'
 
@@ -44,6 +44,12 @@ const envSchema = z.object({
    * depends on a foreign server answering is a test that fails for someone else's reasons.
    */
   RATES_REFRESH: z.enum(['on', 'off']).default('on'),
+  /**
+   * The nightly merge of twins in the catalogue (MOL-106): `on` merges, `report` only says what it
+   * would, `off` does not look. Off by default — a copy, CI and the tests never merge by a timer;
+   * production passes `report` until the owner says `on` (В-3).
+   */
+  CATALOGUE_MERGE: catalogueMergeModeSchema.default('off'),
   /**
    * The build `/health` names (MOL-90): `git describe` of the commit the image was built from —
    * `v0.1.1-3-g1a2b3c4`, or the tag alone on a tagged commit. The image carries it; outside one it

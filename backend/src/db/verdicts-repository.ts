@@ -6,6 +6,7 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
 import { actors, items, verdicts } from './schema'
+import { liveItemId } from './trace'
 
 export interface RatedVerdict {
   readonly verdict: Verdict
@@ -334,7 +335,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         .where(
           and(
             eq(verdicts.actorId, actorId),
-            eq(verdicts.itemId, itemId),
+            // An id from before a merge reaches the survivor's verdict (MOL-106).
+            sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
             // Products only until 0.3 — the path names an item, and a product has no place.
             isNull(verdicts.placeId),
             isNull(verdicts.deletedAt),
@@ -355,7 +357,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         .where(
           and(
             eq(verdicts.actorId, actorId),
-            eq(verdicts.itemId, itemId),
+            // An id from before a merge reaches the survivor's verdict (MOL-106).
+            sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
             isNull(verdicts.placeId),
             // A second withdrawal finds nothing: the first one's time is the one that stands.
             isNull(verdicts.deletedAt),
@@ -378,7 +381,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         .where(
           and(
             eq(verdicts.actorId, actorId),
-            eq(verdicts.itemId, itemId),
+            // An id from before a merge reaches the survivor's verdict (MOL-106).
+            sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
             // A product is rated as itself and carries no place, so the empty place is a
             // value here, not a missing filter.
             placeId === null ? isNull(verdicts.placeId) : eq(verdicts.placeId, placeId),

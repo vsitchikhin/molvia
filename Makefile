@@ -17,7 +17,7 @@ NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json i
 # The heavy checks of every copy on this machine take turns, the push's among them (MOL-139).
 ONE_AT_A_TIME = ./bin/one-at-a-time.sh "make $@"
 
-.PHONY: help setup hooks up down reup ps logs psql migrate forget seed gates failures db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
+.PHONY: help setup hooks up down reup ps logs psql migrate forget seed gates failures merge unmerge apart merge-night merge-candidates db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -103,6 +103,28 @@ gates: ## Read gates 0.2 and 0.3: make gates FROM=<day|moment> [TO=<day|moment>]
 failures: ## The latest failures of the API and the bot: make failures [LIMIT=20] (MOL-143)
 	$(NEED_SCAFFOLD)
 	$(if $(filter command line,$(origin LIMIT)),,unset LIMIT;) ./bin/failures.sh "$${LIMIT:-}"
+
+# The ids and the number reach the script through the environment, never pasted into the recipe, and
+# only a value typed on this command line counts — as for `forget` (MOL-58, П-3; adversarial Е).
+merge: ## Merge a candidate of the morning's report by hand: make merge FROM=<id> INTO=<id> [YES=1] (MOL-106)
+	$(NEED_SCAFFOLD)
+	$(if $(filter command line,$(origin FROM)),,unset FROM;) $(if $(filter command line,$(origin INTO)),,unset INTO;) ./bin/merge.sh merge "$${FROM:-}" "$${INTO:-}" $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
+
+unmerge: ## Undo a merge by its number in the report: make unmerge ID=<n> [YES=1] (MOL-106)
+	$(NEED_SCAFFOLD)
+	$(if $(filter command line,$(origin ID)),,unset ID;) ./bin/merge.sh unmerge "$${ID:-}" $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
+
+apart: ## Two things never merged or named by the night: make apart FROM=<id> INTO=<id> [YES=1] (MOL-106)
+	$(NEED_SCAFFOLD)
+	$(if $(filter command line,$(origin FROM)),,unset FROM;) $(if $(filter command line,$(origin INTO)),,unset INTO;) ./bin/merge.sh apart "$${FROM:-}" "$${INTO:-}" $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
+
+merge-night: ## Every pair a night merged, or would have: make merge-night DAY=<YYYY-MM-DD> (MOL-106)
+	$(NEED_SCAFFOLD)
+	$(if $(filter command line,$(origin DAY)),,unset DAY;) ./bin/merge.sh night "$${DAY:-}"
+
+merge-candidates: ## Every candidate of the reports named and still apart, with its command (MOL-106)
+	$(NEED_SCAFFOLD)
+	./bin/merge.sh candidates
 
 model: ## Fetch the embedding model of catalogue search into .models, checked by sha256 (MOL-105)
 	node bin/fetch-model.mjs
