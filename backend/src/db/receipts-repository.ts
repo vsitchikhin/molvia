@@ -22,6 +22,7 @@ import type {
   ReceiptBody,
   ReceiptFailure,
   ReceiptLinkBody,
+  ReceiptSource,
   ReceiptHeard,
   ReceiptLayout,
   ReceiptLine,
@@ -40,6 +41,7 @@ import {
   places,
   receiptLineImages,
   receiptLines,
+  receiptLinks,
   receiptDays,
   receiptParts,
   receipts,
@@ -183,6 +185,8 @@ export interface RecordedTwin {
 export interface ReceiptToRecord {
   readonly id: string
   readonly status: ReceiptSummary['status']
+  /** A photo read by our reader, or a Serbian receipt's link asked of the tax office (MOL-232). */
+  readonly source: ReceiptSource
   readonly country: ReceiptSummary['country']
   readonly currency: Currency
   readonly tin: string | null
@@ -468,11 +472,10 @@ function linkReceipt(body: ReceiptLinkBody) {
   const read = serbianReceiptLink(body.link)
   if (!read.ok) throw new Error(`a receipt's link passed the door and did not read: ${read.reason}`)
   const clock = receiptClockOf(read.at, body.country)
-  return {
+  const row = {
     status: 'queued' as const,
     source: 'tax' as const,
     parts: 0,
-    link: read.link,
     queuedAt: sql`clock_timestamp()`,
     nextAttemptAt: sql`clock_timestamp()`,
     printedOn: clock.day,
@@ -480,6 +483,7 @@ function linkReceipt(body: ReceiptLinkBody) {
     receiptNo: read.number,
     totalMinor: read.total.minor,
   }
+  return { link: read.link, row }
 }
 
 export function createReceiptRepository(db: Conn): ReceiptRepository {
@@ -516,11 +520,21 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               language: body.language,
               currency: RECEIPT_CURRENCY[body.country],
               capturedAt: body.capturedAt,
-              ...('link' in body ? linkReceipt(body) : { status: 'uploading', parts: body.parts }),
+              ...('link' in body
+                ? linkReceipt(body).row
+                : { status: 'uploading', parts: body.parts }),
             })
             .onConflictDoNothing({ target: receipts.id })
             .returning({ id: receipts.id })
-          if (inserted) return { receipt: await summaryOf(tx, body.id), created: true }
+          if (inserted) {
+            // the link in a table of its own, out of the nightly copy (adversarial А4)
+            if ('link' in body) {
+              await tx
+                .insert(receiptLinks)
+                .values({ receiptId: body.id, link: linkReceipt(body).link })
+            }
+            return { receipt: await summaryOf(tx, body.id), created: true }
+          }
 
           const [held] = await tx.select().from(receipts).where(eq(receipts.id, body.id)).limit(1)
           // every field the body names, the country too — there will be more than one (MOL-89); a link
@@ -531,7 +545,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             held.deletedAt === null &&
             fields.every((field) => held[field] === body[field]) &&
             ('link' in body
-              ? held.source === 'tax' && held.receiptNo === linkReceipt(body).receiptNo
+              ? held.source === 'tax' && held.receiptNo === linkReceipt(body).row.receiptNo
               : held.source === 'photo' && held.parts === body.parts) &&
             capturedSame(held.capturedAt, body.capturedAt)
           if (!same) throw new DomainError(ERROR.CONFLICT)
@@ -718,6 +732,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
       return {
         id: row.id,
         status: row.status,
+        source: row.source,
         country: row.country,
         currency: row.currency,
         tin: row.tin,
@@ -1059,23 +1074,29 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             failure: outcome.kind === 'failed' ? outcome.failure : null,
             readAt: sql`clock_timestamp()`,
             readerVersion: outcome.readerVersion,
-            layout: head?.layout ?? null,
-            tin: head?.tin ?? null,
-            printedOn: head?.printedOn ?? null,
-            printedTime: head?.printedTime ?? null,
-            receiptNo: head?.receiptNo ?? null,
-            totalMinor: head?.totalMinor ?? null,
-            balanced: head?.balanced ?? false,
-            city: head?.city ?? null,
-            shopUnit: head?.shopUnit ?? null,
-            shop: head?.shop ?? null,
-            // read or failed, the link of a receipt by its QR code is no longer kept (MOL-232, Р-4)
-            link: null,
+            // no head read leaves the head there is: a photo's has none before its reading, and a
+            // receipt by its link keeps what the link said — its day, number and total (review 2)
+            ...(head === null
+              ? {}
+              : {
+                  layout: head.layout,
+                  tin: head.tin,
+                  printedOn: head.printedOn,
+                  printedTime: head.printedTime,
+                  receiptNo: head.receiptNo,
+                  totalMinor: head.totalMinor,
+                  balanced: head.balanced,
+                  city: head.city,
+                  shopUnit: head.shopUnit ?? null,
+                  shop: head.shop ?? null,
+                }),
             nextAttemptAt: null,
           })
           .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
           .returning({ id: receipts.id, source: receipts.source })
         if (done === undefined) return
+        // read or failed, the link of a receipt by its QR code is no longer kept (MOL-232, Р-4)
+        await tx.delete(receiptLinks).where(eq(receiptLinks.receiptId, id))
         // the measure of 0.2 is the reader's (MOL-222): a receipt from the tax office has nothing in it
         // to put right, and until MOL-234 gives it a line of its own it counts nothing (Р-5)
         const counted = done.source === 'photo'
@@ -1123,14 +1144,29 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async requeueInterruptedLinks() {
-      await db
-        .update(receipts)
-        .set({
-          status: 'queued',
-          attempts: sql`greatest(${receipts.attempts} - 1, 0)`,
-          nextAttemptAt: sql`clock_timestamp()`,
-        })
-        .where(and(eq(receipts.status, 'reading'), eq(receipts.source, 'tax')))
+      await db.transaction(async (tx) => {
+        await tx
+          .update(receipts)
+          .set({
+            status: 'queued',
+            attempts: sql`greatest(${receipts.attempts} - 1, 0)`,
+            nextAttemptAt: sql`clock_timestamp()`,
+          })
+          .where(and(eq(receipts.status, 'reading'), eq(receipts.source, 'tax')))
+        // restored from a nightly copy, which holds no link (adversarial А4): nothing to ask with
+        await tx
+          .update(receipts)
+          .set({
+            status: 'failed',
+            failure: 'unreadable',
+            readAt: sql`clock_timestamp()`,
+            nextAttemptAt: null,
+          })
+          .where(
+            sql`${receipts.source} = 'tax' and ${receipts.status} = 'queued'
+              and not exists (select 1 from ${receiptLinks} where ${receiptLinks.receiptId} = ${receipts.id})`,
+          )
+      })
     },
 
     async claimLink() {
@@ -1160,12 +1196,15 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             actorId: receipts.actorId,
             country: receipts.country,
             language: receipts.language,
-            link: receipts.link,
             attempts: receipts.attempts,
           })
-        const link = claimed?.link
-        if (claimed === undefined || link === undefined || link === null) return null
-        return { ...claimed, link }
+        if (claimed === undefined) return null
+        const [held] = await tx
+          .select({ link: receiptLinks.link })
+          .from(receiptLinks)
+          .where(eq(receiptLinks.receiptId, claimed.id))
+        // a receipt that lost its link is failed before the next round asks (`requeueInterruptedLinks`)
+        return held === undefined ? null : { ...claimed, link: held.link }
       })
     },
 
@@ -1178,18 +1217,22 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
 
     async askLater(id, minutes) {
       const over = sql`${receipts.createdAt} <= clock_timestamp() - make_interval(hours => ${RECEIPT_LINK_WAIT_HOURS})`
-      const [moved] = await db
-        .update(receipts)
-        .set({
-          status: sql`case when ${over} then 'failed' else 'queued' end`,
-          failure: sql`case when ${over} then 'missing' end`,
-          readAt: sql`case when ${over} then clock_timestamp() end`,
-          link: sql`case when ${over} then null else ${receipts.link} end`,
-          nextAttemptAt: sql`case when ${over} then null else clock_timestamp() + make_interval(mins => ${minutes}) end`,
-        })
-        .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
-        .returning({ status: receipts.status })
-      return moved?.status === 'failed' ? 'failed' : 'queued'
+      return db.transaction(async (tx) => {
+        const [moved] = await tx
+          .update(receipts)
+          .set({
+            status: sql`case when ${over} then 'failed' else 'queued' end`,
+            failure: sql`case when ${over} then 'missing' end`,
+            readAt: sql`case when ${over} then clock_timestamp() end`,
+            nextAttemptAt: sql`case when ${over} then null else clock_timestamp() + make_interval(mins => ${minutes}) end`,
+          })
+          .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+          .returning({ status: receipts.status })
+        if (moved?.status !== 'failed') return 'queued'
+        // given up, the link is no longer kept (Р-4)
+        await tx.delete(receiptLinks).where(eq(receiptLinks.receiptId, id))
+        return 'failed'
+      })
     },
   }
 }

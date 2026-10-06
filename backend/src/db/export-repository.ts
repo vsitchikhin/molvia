@@ -80,6 +80,7 @@ export const EXPORT_COLUMNS: Readonly<
     | 'item_barcodes'
     | 'store_memory'
     | 'receipt_lines'
+    | 'receipt_links'
     | 'receipt_parts'
     | 'receipt_line_images',
     { readonly exported: readonly string[]; readonly omitted?: Readonly<Record<string, string>> }
@@ -318,10 +319,7 @@ export const EXPORT_COLUMNS: Readonly<
       'trip_id',
       'deleted_at',
     ],
-    omitted: {
-      actor_id: OWNER,
-      link: 'the key to the tax office’s copy of a Serbian receipt, held only until it is read (MOL-232): the receipt itself is exported',
-    },
+    omitted: { actor_id: OWNER },
   },
   // Read with their receipt, as an exchange's earlier versions are.
   receipt_lines: {
@@ -344,6 +342,13 @@ export const EXPORT_COLUMNS: Readonly<
     omitted: { receipt_id: 'the receipt it is nested in' },
   },
   // Taken by erasure with their receipt; never in the file — bytes of a picture, kept days (В-3).
+  receipt_links: {
+    exported: [],
+    omitted: {
+      receipt_id: 'the receipt by its link, exported itself',
+      link: 'the key to the tax office’s copy of a Serbian receipt, held only until it is answered (MOL-232): the receipt itself is exported',
+    },
+  },
   receipt_parts: {
     exported: [],
     omitted: {

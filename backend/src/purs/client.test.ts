@@ -125,6 +125,32 @@ describe('клиент проверки чеков налоговой Серби
     expect(failures.join()).not.toContain('vl=')
   })
 
+  it('ответ, который больше не читается, — владельцу, по виду и без ответа; погода — только в журнал (ревью 4)', async () => {
+    const broken: { code: string; message: string }[] = []
+    const c = (now: () => number) =>
+      purs({
+        url: 'https://purs.test',
+        userAgent: 'Molvia/test (owner@example.com)',
+        onBroken: (error) => broken.push({ code: error.code, message: error.message }),
+        now,
+      })
+    for (const [body, status] of [
+      ['<html>Сервис недоступан</html>', 200],
+      ['{"isValid":true}', 200],
+      ['', 503],
+      ['', 404],
+    ] as const) {
+      answering(body, status)
+      clock += PURS_PAUSE_MS
+      await c(now).receipt(LINK, ANNA)
+    }
+    expect(broken).toEqual([
+      { code: 'NOT_JSON', message: 'tax office: not json' },
+      { code: 'UNKNOWN_ANSWER', message: 'tax office: unknown answer' },
+    ])
+    expect(JSON.stringify(broken)).not.toContain('vl=')
+  })
+
   it('таймаут и обрыв пишут имя ошибки, а не её текст со ссылкой', async () => {
     fetch = vi.fn(() =>
       Promise.reject(new DOMException(`timed out asking ${LINK}`, 'TimeoutError')),

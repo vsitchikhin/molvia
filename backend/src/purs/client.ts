@@ -81,14 +81,25 @@ export interface PursOptions {
   readonly userAgent: string
   /** Why the service did not answer — never the link: it may carry the buyer's tax id. */
   readonly onFailure?: (reason: string) => void
+  /**
+   * The answer no longer reads — not JSON, or JSON of another shape (review 4): the tax office changed
+   * it, and every Serbian receipt would wait its two days and fail as `missing` for a reason that is
+   * not the till's. The owner's to hear of, as a contract no longer read (`observability.md`); a 5xx or
+   * a timeout is the weather and the log's alone. The error says its kind only, never the answer.
+   */
+  readonly onBroken?: (error: PursError) => void
   readonly perMinute?: number
   readonly now?: () => number
 }
 
-class PursError extends Error {
-  constructor(reason: string) {
+/** A failure of the tax office's check, by its kind: `code` is the fingerprint's, the message the log's. */
+export class PursError extends Error {
+  readonly code: 'NOT_JSON' | 'UNKNOWN_ANSWER' | 'HTTP'
+
+  constructor(reason: string, code: PursError['code']) {
     super(`tax office: ${reason}`)
     this.name = 'PursError'
+    this.code = code
   }
 }
 
@@ -138,15 +149,15 @@ export function purs(options: PursOptions): Purs {
       if (response.status === 400) return { kind: 'refused' }
       // a receipt it does not show yet: just printed — no failure of the service, no pause
       if (response.status === 404) return { kind: 'not_yet' }
-      if (response.status !== 200) throw new PursError(`HTTP ${String(response.status)}`)
+      if (response.status !== 200) throw new PursError(`HTTP ${String(response.status)}`, 'HTTP')
       let json: unknown
       try {
         json = JSON.parse(await response.text())
       } catch {
-        throw new PursError('not json')
+        throw new PursError('not json', 'NOT_JSON')
       }
       const parsed = answerSchema.safeParse(json)
-      if (!parsed.success) throw new PursError('unknown answer')
+      if (!parsed.success) throw new PursError('unknown answer', 'UNKNOWN_ANSWER')
       const { invoiceRequest: seller, invoiceResult: result, journal, isValid } = parsed.data
       if (!isValid) return { kind: 'refused' }
       return {
@@ -161,6 +172,7 @@ export function purs(options: PursOptions): Purs {
     } catch (error) {
       pausedUntil = now() + PURS_PAUSE_MS
       options.onFailure?.(reasonOf(error))
+      if (error instanceof PursError && error.code !== 'HTTP') options.onBroken?.(error)
       return { kind: 'not_yet' }
     }
   }

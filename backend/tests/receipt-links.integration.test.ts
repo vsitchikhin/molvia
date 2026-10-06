@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
@@ -8,12 +9,13 @@ import {
   toSearchKey,
   receiptRecordedCodec,
   receiptSummaryCodec,
+  serbianReceiptLink,
 } from '@molvia/model'
 import { madeUpJournal, madeUpSerbianLink } from '@molvia/model/testing/serbian-receipt'
 import type { FastifyInstance } from 'fastify'
 import { createItemRepository } from '@/db/items-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
-import { receiptDays, receiptLines, receipts, storeMemory, trips } from '@/db/schema'
+import { receiptDays, receiptLines, receiptLinks, receipts, storeMemory, trips } from '@/db/schema'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
 import type { Purs, PursAnswer } from '@/purs/client'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
@@ -96,7 +98,8 @@ const found = (over: Partial<Extract<PursAnswer, { kind: 'found' }>> = {}): Purs
   locationName: '1113343-RODA MEGAMARKET 463',
   city: 'БЕОГРАД (ЗЕМУН)',
   administrativeUnit: 'Београд-Земун',
-  number: 'TESTAAAA-TESTBBBB-1',
+  // the number of the receipt asked about, filled in by `office` from its link unless a test names one
+  number: '',
   journal: JOURNAL,
   ...over,
 })
@@ -107,7 +110,13 @@ function office(...answers: PursAnswer[]): Purs & { asked: string[] } {
     asked,
     receipt: vi.fn((url: string) => {
       asked.push(url)
-      return Promise.resolve(answers.shift() ?? found())
+      const answer = answers.shift() ?? found()
+      const signed = serbianReceiptLink(url)
+      return Promise.resolve(
+        answer.kind === 'found' && answer.number === '' && signed.ok
+          ? { ...answer, number: signed.number }
+          : answer,
+      )
     }),
   }
 }
@@ -130,7 +139,13 @@ function round(purs: Purs): Promise<number> {
   })
 }
 
-const row = async (id: string) => (await db.select().from(receipts).where(eq(receipts.id, id)))[0]
+/** The receipt's row with its link beside it — kept in a table of its own (adversarial А4). */
+const row = async (id: string) => {
+  const [found] = await db.select().from(receipts).where(eq(receipts.id, id))
+  if (found === undefined) return undefined
+  const [held] = await db.select().from(receiptLinks).where(eq(receiptLinks.receiptId, id))
+  return { ...found, link: held?.link ?? null }
+}
 const days = () => db.select().from(receiptDays)
 const due = (id: string) =>
   db
@@ -364,6 +379,53 @@ describe('the tax office’s queue', () => {
     expect(await row(empty)).toMatchObject({ status: 'failed', failure: 'unreadable', link: null })
   })
 
+  it('keeps what the link said when the tax office refuses it, and the same body again is the same answer (review 2, А1)', async () => {
+    const me = await serb()
+    const refused = body(link())
+    const empty = body(link())
+    expect((await send(me, refused)).statusCode).toBe(201)
+    expect((await send(me, empty)).statusCode).toBe(201)
+    await round(office({ kind: 'refused' }, found({ journal: '==== ФИСКАЛНИ РАЧУН ====' })))
+    for (const payload of [refused, empty]) {
+      expect(await row(payload.id)).toMatchObject({
+        status: 'failed',
+        printedOn: '2025-07-18',
+        printedTime: '08:56',
+        totalMinor: 48_637n,
+        link: null,
+      })
+      // the queue's own repeat of a send whose answer was lost: the receipt itself, never a 409
+      const again = await send(me, payload)
+      expect(again.statusCode).toBe(200)
+      expect(receiptSummaryCodec.parse(again.json()).header?.date).toBe('2025-07-18')
+    }
+  })
+
+  it('refuses an answer about another receipt than the one the link signs (review 8)', async () => {
+    const me = await serb()
+    const id = await taken(me)
+    await round(office(found({ number: 'OTHERAAA-OTHERBBB-7' })))
+    expect(await row(id)).toMatchObject({ status: 'failed', failure: 'invalid', link: null })
+  })
+
+  it('keeps the link apart, where the nightly copy does not reach (А4), and fails a receipt restored without it', async () => {
+    const script = readFileSync(new URL('../../deploy/backup/backup.sh', import.meta.url), 'utf8')
+    expect(script).toContain('--exclude-table-data=receipt_links')
+    const columns = await db.execute<{ column_name: string }>(
+      sql`select column_name from information_schema.columns where table_name = 'receipts'`,
+    )
+    expect(columns.map((one) => one.column_name)).not.toContain('link')
+
+    const me = await serb()
+    const id = await taken(me)
+    // what a restore brings back: the receipt, and no link to ask with
+    await db.delete(receiptLinks).where(eq(receiptLinks.receiptId, id))
+    const purs = office(found())
+    expect(await round(purs)).toBe(0)
+    expect(purs.asked).toEqual([])
+    expect(await row(id)).toMatchObject({ status: 'failed', failure: 'unreadable' })
+  })
+
   it('stops the round over the limit and leaves the receipt as it was, its ask not counted', async () => {
     const me = await serb()
     const id = await taken(me)
@@ -384,7 +446,7 @@ describe('the tax office’s queue', () => {
     await round(purs)
     const [askedAbout] = purs.asked
     const [borisReceipt] = await db.select().from(receipts).where(eq(receipts.actorId, boris.id))
-    expect(askedAbout).toBe(borisReceipt?.link)
+    expect(askedAbout).toBe((await row(borisReceipt?.id ?? ''))?.link)
   })
 
   it('begins again an ask the last process did not finish, the ask not counted', async () => {
@@ -491,11 +553,8 @@ describe('«Записать» a receipt by its link', () => {
         .statusCode,
     ).toBe(200)
 
-    const same = await parsedLink(me, found({ number: 'TESTAAAA-TESTBBBB-2' }))
-    const other = await parsedLink(
-      me,
-      found({ number: 'TESTAAAA-TESTBBBB-3', locationName: '1113400-IDEA 12' }),
-    )
+    const same = await parsedLink(me, found())
+    const other = await parsedLink(me, found({ locationName: '1113400-IDEA 12' }))
     const placeOf = async (id: string) =>
       receiptDetailCodec.parse((await get(me, `/receipts/${id}`)).json()).receipt.place
     expect(await placeOf(same)).toMatchObject({
@@ -513,7 +572,6 @@ describe('«Записать» a receipt by its link', () => {
     const nis = await parsedLink(
       me,
       found({
-        number: 'TESTAAAA-TESTBBBB-4',
         administrativeUnit: 'Ниш-Медијана',
         city: 'НИШ (МЕДИЈАНА)',
       }),

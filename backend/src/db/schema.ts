@@ -2420,9 +2420,6 @@ export const receipts = pgTable(
     source: text('source').$type<ReceiptSource>().notNull().default('photo'),
     parts: smallint('parts').notNull(),
     country: char('country', { length: 2 }).$type<ReceiptCountry>().notNull(),
-    // The link of a receipt by its QR code, kept only while the tax office is still to be asked: the
-    // buyer's tax id may be in it (MOL-232, Р-4) — read or failed, it is gone.
-    link: text('link'),
     // When the tax office is asked next about a receipt it did not show yet (MOL-232, Р-2).
     nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
     // The language the lines are to be read out in: the interface's, which nothing else keeps (П-4).
@@ -2508,14 +2505,10 @@ export const receipts = pgTable(
       sql`(${table.source} = 'photo' and ${table.parts} between 1 and ${sql.raw(String(RECEIPT_PARTS_MAX))})
           or (${table.source} = 'tax' and ${table.parts} = 0)`,
     ),
-    // The link lives only while the tax office is to be asked, and only on a receipt by its link.
+    // A receipt by its link waiting in the tax office's queue knows when it is asked next (MOL-232).
     check(
-      'receipts_link_while_asked',
-      sql`${table.link} is null or (${table.source} = 'tax' and ${table.status} in ('queued', 'reading'))`,
-    ),
-    check(
-      'receipts_link_asked_when',
-      sql`${table.source} = 'photo' or ${table.status} <> 'queued' or (${table.link} is not null and ${table.nextAttemptAt} is not null)`,
+      'receipts_asked_when_queued',
+      sql`${table.source} = 'photo' or ${table.status} <> 'queued' or ${table.nextAttemptAt} is not null`,
     ),
     check('receipts_country_known', oneOf(table.country, receiptCountrySchema.options)),
     check('receipts_language_known', oneOf(table.language, LOCALES)),
@@ -2544,6 +2537,20 @@ export const receipts = pgTable(
     ),
   ],
 )
+
+/**
+ * The link of a Serbian receipt by its QR code (MOL-232), kept only while the tax office is still to be
+ * asked: the buyer's tax id may be in it (Р-4) — read, refused or given up, the row is deleted in the
+ * same statement. **A table of its own so the nightly copy leaves it out** (`backup.sh`, adversarial А4),
+ * as a photo's: a receipt waits up to two days, and a copy kept fourteen would keep the link longer than
+ * `/privacy` says. A restore brings it back empty, and a receipt left without its link fails.
+ */
+export const receiptLinks = pgTable('receipt_links', {
+  receiptId: uuid('receipt_id')
+    .primaryKey()
+    .references(() => receipts.id, { onDelete: 'cascade' }),
+  link: text('link').notNull(),
+})
 
 /**
  * A receipt's photo, part by part, top to bottom (MOL-124 В-1): the JPEG the phone cropped to the

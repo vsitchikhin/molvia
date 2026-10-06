@@ -38,11 +38,13 @@ partial="$RCLONE_REMOTE/partial/$name"
 # back empty from a restore. A photo carries a customer's name and lives only until the receipt is
 # recorded; a copy kept fourteen days would keep it longer than the promise on /privacy. The pictures
 # of messages to the developer stay out for the same reason (MOL-167): kept only until the owner's
-# Telegram has them, at most a week.
+# Telegram has them, at most a week. The link of a Serbian receipt still being asked of the tax office
+# stays out too (MOL-232, adversarial А4): it may carry the buyer's tax id, and /privacy keeps it only
+# until the tax office answered — up to two days, never the copy's fourteen.
 docker compose -f docker-compose.prod.yml --env-file .env.prod exec -T postgres \
   sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom \
     --exclude-table-data=receipt_parts --exclude-table-data=receipt_line_images \
-    --exclude-table-data=feedback_picture_files' \
+    --exclude-table-data=feedback_picture_files --exclude-table-data=receipt_links' \
   | age --encrypt --recipient "$AGE_RECIPIENT" \
   | rclone rcat --streaming-upload-cutoff 1G "$partial"
 

@@ -121,6 +121,8 @@ async function outcomeOf(
   const link = serbianReceiptLink(claimed.link)
   const journal = serbianJournal(answer.journal)
   if (!link.ok) return failed('invalid')
+  // an answer about another receipt than the one the link signs is no answer about this one (review 8)
+  if (answer.number !== link.number) return failed('invalid')
   if (journal === null || journal.lines.length === 0) return failed('unreadable')
 
   const currency = RECEIPT_CURRENCY[claimed.country]

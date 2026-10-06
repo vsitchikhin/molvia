@@ -98,7 +98,7 @@ import { hintByBarcode } from '@/usecases/hint-by-barcode'
 import { offUserAgent, openFoodFacts } from '@/open-food-facts/client'
 import type { OpenFoodFacts } from '@/open-food-facts/client'
 import { purs, pursUserAgent } from '@/purs/client'
-import type { Purs } from '@/purs/client'
+import type { Purs, PursError } from '@/purs/client'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { signIn } from '@/usecases/sign-in'
 import { endSession, listSessions, logout } from '@/usecases/sessions'
@@ -381,10 +381,11 @@ const NAMED_BUILD = encodeURIComponent(VERSION)
  * set, as Open Food Facts'. A failure is logged by its reason — never the link, which may carry the
  * buyer's tax id.
  */
-function pursOf(log: FastifyBaseLogger): Purs | null {
+function pursOf(log: FastifyBaseLogger, broken: (error: PursError) => void): Purs | null {
   const contact = env.PURS_CONTACT
   if (contact === undefined) return null
   return purs({
+    onBroken: broken,
     ...(env.PURS_URL === undefined ? {} : { url: env.PURS_URL }),
     userAgent: pursUserAgent(VERSION, contact),
     ...(env.PURS_PER_MINUTE === undefined ? {} : { perMinute: env.PURS_PER_MINUTE }),
@@ -568,7 +569,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const removedAccounts = createMoneyAccountRepository(db)
     const receipts = createReceiptRepository(db)
     const reader = options.receiptReader ?? null
-    const taxOffice = options.purs === undefined ? pursOf(instance.log) : options.purs
+    const taxOffice =
+      options.purs === undefined
+        ? pursOf(instance.log, (error) => {
+            failures.report(error, job('receipt-link'), 'tax office answer no longer reads')
+          })
+        : options.purs
     let stopReceiptCleanup: (() => Promise<void>) | undefined
     let receiptQueue: ReturnType<typeof startItemEmbedding> | undefined
     let linkQueue: ReturnType<typeof startItemEmbedding> | undefined
