@@ -238,6 +238,7 @@ describe('словарь: повторяющиеся тексты', () => {
       'ЦБ РА': ['exchange.card_source_cba', 'trip.rate.source_cba'],
       'ЦБ РФ': ['exchange.card_source_cbr', 'trip.rate.source_cbr'],
       'НБ Грузии': ['exchange.card_source_nbg', 'trip.rate.source_nbg'],
+      'НБ Сербии': ['exchange.card_source_nbs', 'trip.rate.source_nbs'],
       'open.er-api.com': ['exchange.card_source_erapi', 'trip.rate.source_erapi'],
       // Счета (MOL-123): экран и пункт страницы приватности о том же; плавающая «Счёт», заголовок
       // её шторки в правке и строка выбора счёта в шторках операций.

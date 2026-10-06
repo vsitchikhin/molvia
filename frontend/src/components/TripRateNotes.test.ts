@@ -24,10 +24,15 @@ const TRIP = 'bbbbbbbb-0000-4000-8000-000000000001'
 
 interface Over {
   readonly source?: 'official' | 'fallback' | 'personal'
-  readonly provider?: 'cba' | 'cbr' | 'erapi' | 'nbg' | null
+  readonly provider?: 'cba' | 'cbr' | 'erapi' | 'nbg' | 'nbs' | null
   readonly stale?: boolean
   /** A trip in Tbilisi: lari against roubles, the National Bank of Georgia's pair (MOL-110). */
   readonly lari?: boolean
+  /**
+   * A trip in Belgrade (MOL-230): dinars against roubles — the National Bank of Serbia's pair — or,
+   * with `dram`, against drams, the National Bank of Georgia's.
+   */
+  readonly dinar?: 'rouble' | 'dram'
   readonly jump?: {
     previous?: string | null
     choice?: 'jumped' | 'previous' | 'manual' | null
@@ -35,8 +40,8 @@ interface Over {
   }
 }
 
-const rate = (value: string, source = 'official', quote = 'AMD') => ({
-  base: 'RUB',
+const rate = (value: string, source = 'official', quote = 'AMD', base = 'RUB') => ({
+  base,
   quote,
   rate: value,
   source,
@@ -49,8 +54,14 @@ function trip(over: Over = {}): TripView {
     id: TRIP,
     startedAt: '2026-01-16T08:00:00.000Z',
     finishedAt: null,
-    currency: over.lari ? 'GEL' : 'AMD',
-    rate: over.lari ? rate('0.0312', source, 'GEL') : rate('4.82', source),
+    currency: over.lari ? 'GEL' : over.dinar ? 'RSD' : 'AMD',
+    rate: over.lari
+      ? rate('0.0312', source, 'GEL')
+      : over.dinar === 'rouble'
+        ? rate('1.2257', source, 'RSD')
+        : over.dinar === 'dram'
+          ? rate('0.2891', source, 'RSD', 'AMD')
+          : rate('4.82', source),
     rateProvider: over.provider === undefined ? 'cba' : over.provider,
     rateJump: over.jump
       ? {
@@ -165,6 +176,31 @@ describe('TripRateNotes', () => {
       const view = await render({ lari: true, provider: 'nbg', stale: true })
       expect(view.text()).toContain('с тех пор НБ Грузии ничего не публиковал')
       expect(view.text()).not.toContain('ЦБ РА')
+    })
+  })
+
+  describe('динар — НБ Сербии или НБ Грузии, по второй валюте пары (MOL-230)', () => {
+    it('курс НБ Сербии у похода в динарах с доходом в рублях — без слова', async () => {
+      const view = await render({ dinar: 'rouble', provider: 'nbs' })
+      expect(view.findAll('.note')).toHaveLength(0)
+    })
+
+    it('ЦБ РФ у похода в динарах — запасной: молчит НБ Сербии', async () => {
+      const view = await render({ dinar: 'rouble', source: 'fallback', provider: 'cbr' })
+      expect(plain(view)).toContain(
+        'Курс не от НБ Сербии — он молчит больше недели. Источник: ЦБ РФ',
+      )
+    })
+
+    it('«устарел» у курса НБ Сербии называет НБ Сербии', async () => {
+      const view = await render({ dinar: 'rouble', provider: 'nbs', stale: true })
+      expect(view.text()).toContain('с тех пор НБ Сербии ничего не публиковал')
+    })
+
+    it('динар к драму — пара НБ Грузии: молчит он, а не НБ Сербии', async () => {
+      const view = await render({ dinar: 'dram', source: 'fallback', provider: 'cbr' })
+      expect(plain(view)).toContain('Курс не от НБ Грузии — он молчит больше недели')
+      expect(view.text()).not.toContain('НБ Сербии')
     })
   })
 
