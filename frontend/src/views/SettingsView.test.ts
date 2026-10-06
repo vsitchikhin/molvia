@@ -73,8 +73,8 @@ it('loads without invented fields, and keeps a focusable inactive save action', 
   const view = await render(false)
   expect(view.find('.skeleton').exists()).toBe(true)
   expect(view.find('select').exists()).toBe(false)
-  expect(view.get('.actions button').attributes('aria-disabled')).toBe('true')
-  expect(view.get('.actions button').attributes('disabled')).toBeUndefined()
+  expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
+  expect(view.get('.dock > button').attributes('disabled')).toBeUndefined()
 })
 it('a failed initial read shows retry, not a creation form', async () => {
   me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
@@ -96,7 +96,7 @@ it('offline with memory keeps fields editable and explains when save becomes pos
   const view = await render()
   await field(view, 'city')?.setValue('Ереван')
   expect(view.text()).toContain(en.settings.offline.strip)
-  expect(view.get('.actions button').attributes('aria-disabled')).toBe('true')
+  expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
   expect(view.find('[role="alert"]').exists()).toBe(false)
 })
 it('shows changed fields and matching currencies, then clears badges on success', async () => {
@@ -107,7 +107,7 @@ it('shows changed fields and matching currencies, then clears badges on success'
   expect(view.text()).toContain(en.settings.same_currencies)
   expect(view.find('.draft').exists()).toBe(false)
   save.mockResolvedValue({ ...initial, city: 'Ереван', incomeCurrency: 'AMD' })
-  await view.get('.actions button').trigger('click')
+  await view.get('.dock > button').trigger('click')
   await flushPromises()
   expect(view.text()).toContain(en.settings.saved)
   expect(view.find('.badge').exists()).toBe(false)
@@ -124,7 +124,7 @@ it('preserves an unsupported saved city while allowing currency changes', async 
   expect(kept.text()).toContain(en.settings.city_not_listed)
   expect(field(view, 'city')?.attributes('aria-describedby')).toContain(kept.attributes('id'))
   await field(view, 'income')?.setValue('EUR')
-  expect(view.get('.actions button').attributes('aria-disabled')).toBeUndefined()
+  expect(view.get('.dock > button').attributes('aria-disabled')).toBeUndefined()
 })
 
 it('Б1: an unsupported city can be returned to, and keeps its own country', async () => {
@@ -145,7 +145,7 @@ it('Б1: an unsupported city can be returned to, and keeps its own country', asy
   expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Москва')
   expect(view.find('.kept').exists()).toBe(true)
   save.mockResolvedValue(legacy)
-  expect(view.get('.actions button').attributes('aria-disabled')).toBe('true')
+  expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
   expect(view.find('.badge').exists()).toBe(false)
 })
 
@@ -165,7 +165,7 @@ it('moves to Georgia: the cities follow the country, the first one chosen (MOL-1
   expect(view.findAll('.badge')).toHaveLength(2)
   expect(view.find('.kept').exists()).toBe(false)
   save.mockResolvedValue({ ...initial, country: 'GE', city: 'Батуми' })
-  await view.get('.actions button').trigger('click')
+  await view.get('.dock > button').trigger('click')
   await flushPromises()
   expect(save).toHaveBeenCalledWith({
     previous: expect.objectContaining({ country: 'AM', city: 'Гюмри' }),
@@ -190,7 +190,7 @@ it('back to its own country, the form is back on its own city: nothing changed (
   await field(view, 'country')?.setValue('AM')
   expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Ереван')
   expect(view.find('.badge').exists()).toBe(false)
-  expect(view.get('.actions button').attributes('aria-disabled')).toBe('true')
+  expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
 })
 
 it('choosing the country it already has changes nothing (MOL-109)', async () => {
@@ -207,7 +207,7 @@ it('names the country and the currencies of a conflict in the words the form use
   await field(view, 'spend')?.setValue('EUR')
   save.mockRejectedValue(new ApiError(ERROR.CONFLICT))
   me.mockResolvedValue({ ...initial, spendCurrency: 'USD' })
-  await view.get('.actions button').trigger('click')
+  await view.get('.dock > button').trigger('click')
   await flushPromises()
   const said = en.settings.conflict.body
     .replace('{country}', en.settings.countries.AM)
@@ -221,15 +221,15 @@ it('replaces a previous write error with the offline notice when the connection 
   const view = await render()
   await field(view, 'city')?.setValue('Ереван')
   save.mockRejectedValue(new ApiError(ERROR.INTERNAL))
-  await view.get('.actions button').trigger('click')
+  await view.get('.dock > button').trigger('click')
   await flushPromises()
   expect(view.find('[role="alert"]').exists()).toBe(true)
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
   window.dispatchEvent(new Event('offline'))
   await flushPromises()
   expect(view.find('[role="alert"]').exists()).toBe(false)
-  expect(view.get('.actions button').text()).toBe(en.settings.save)
-  expect(view.get('.actions button').attributes('aria-disabled')).toBe('true')
+  expect(view.get('.dock > button').text()).toBe(en.settings.save)
+  expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
 })
 
 it.each([

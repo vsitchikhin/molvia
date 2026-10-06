@@ -16,9 +16,9 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/components/AppReveal.vue` — Grows from nothing and shrinks back what pushes its neighbours — rows of a list, an error under a field, a block of a sheet; still for an answer read, a screen move, reduced motion.
 - `frontend/src/components/AppSwitch.vue` — Kit switch: a native checkbox read out as a switch, showing what the server holds and saying which way it was moved — for a setting saved on the tap; a ✓ on the knob when on, `inactive` focusable.
 - `frontend/src/components/AppTag.vue` — Kit tag in a row: a pill of 13/600, plain, warn or bad, with an optional icon of 14.
-- `frontend/src/components/AppScreen.vue` — The frame every screen sits in: pinned row, collapsing large title, back chevron with its label, docked strip, identity notice.
+- `frontend/src/components/AppScreen.vue` — The frame every screen sits in: pinned row, collapsing large title, back chevron with its label, docked strip with its margins, the one place of «Вернуть» (`#undo`), identity notice.
 - `frontend/src/components/BottomSheet.vue` — The sheet: a native modal `<dialog>` rising from the bottom, closed through its history entry; stacks with «‹» instead of ×.
-- `frontend/src/components/FloatingDock.vue` — Floating spot for the main action of a «Деньги» screen («Трата», «Обмен», «Доход») or «Вернуть» after a removal.
+- `frontend/src/components/FloatingDock.vue` — Floating spot for the main action of a «Деньги» screen not yet in the docked strip («Счёт», «Сверить», «Обмен», «Доход»); on its way out.
 - `frontend/src/components/ListRow.vue` — Kit row of a list, 64: icon (or in a circle of 40, `tint`), title, meta in two lines, a tag under it, a tail and the chevron of «opens something to go on with» (В-14); a button, a router link, a div or an `li` option of a list a field owns (no hover); destructive, inactive with words why, selected read out by its role, active under the keyboard; on the fill the meta is `text`.
 - `frontend/src/components/SearchField.vue` — Kit search field (MOL-177), the one for every search: a pill on `surface-2` with a magnifier, the screen's action or «Очистить» at the right, a hint under it; a combobox's role, `aria-*` and keys land on its input; `focus()` and `blur()` for its owner.
 - `frontend/src/components/OperationRow.vue` — Kit row of one operation (MOL-176) on `ListRow`: a circle of 40 in a category's colour, the title wrapped, a tag under the meta, the amount and a line under it in one column, the chevron always; the words come from `journalRowProps` and `operationRowProps`.
@@ -30,8 +30,8 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/components/SectionCaption.vue` — Kit caps caption: a group's caption 4 from the left and 8 above its card, or `inset` as a card's own title; a mark before the words and a tail on the right, inside the heading; the one place caps are drawn.
 - `frontend/src/components/SegmentedControl.vue` — Kit segmented control: a radio fieldset drawn as segments, the chosen one filled, for one choice out of up to four (unit, rate); `fit` gives each segment the width of its word, `inactive` holds the choice in focus.
 - `frontend/src/components/TapUnsureLine.vue` — The quiet line where a switch saved on the tap stands while its change is unsure (MOL-96): «не знаем, сохранилось ли», or «Сохраняем» while another screen's write is on its way, with «Повторить» online; never an alert, focusable for the focus the switch left.
-- `frontend/src/components/TabBar.vue` — The tab bar of the five sections («Что брать», «Покупки», «Оценки», «Деньги», «Настройки»), moving through `useNavigation`.
-- `frontend/src/components/UndoStrip.vue` — «Удалено · Вернуть» strip: ten seconds to take back a removal, paused under a finger or focus.
+- `frontend/src/components/TabBar.vue` — The tab bar of the five sections («Что брать», «Покупки», «Оценки», «Деньги», «Настройки»), the current one filled, moving through `useNavigation`.
+- `frontend/src/components/UndoStrip.vue` — «Удалено · Вернуть» strip: words, a ten-second count, «Вернуть»; paused under a finger or focus, placed in `AppScreen`'s `#undo` or a sheet's footer.
 - `frontend/src/components/UpdateBand.vue` — «Вышла новая версия · Обновить»: the top row of the screen's pinned strip while a version waits, and the words when it did not take.
 
 ## frontend · composables

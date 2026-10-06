@@ -142,7 +142,7 @@
     </div>
 
     <!-- «Вернуть» stands whatever the screen became under it (adversarial Г), over the strip. -->
-    <FloatingDock v-if="removed || tripRemoved" class="float">
+    <template v-if="removed || tripRemoved" #undo>
       <UndoStrip
         v-if="removed"
         :key="removed.stamp"
@@ -158,16 +158,14 @@
         @expire="forgetRemoved"
       />
       <!-- A trip opened from here and removed comes back here, with its «Вернуть» (MOL-76). -->
-      <TripUndoStrip v-else class="undo" />
-    </FloatingDock>
+      <TripUndoStrip v-else />
+    </template>
 
     <template v-if="canWrite && phase !== 'idle'" #docked>
-      <div class="add">
-        <AppButton ref="addButton" size="large" block @click="add">
-          <template #icon><IconPlus /></template>
-          {{ t('spending.summary.add') }}
-        </AppButton>
-      </div>
+      <AppButton ref="addButton" size="large" block @click="add">
+        <template #icon><IconPlus /></template>
+        {{ t('spending.summary.add') }}
+      </AppButton>
     </template>
 
     <SpendingSheet
@@ -204,7 +202,6 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
-import FloatingDock from '@/components/FloatingDock.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NewCategorySheet from '@/components/NewCategorySheet.vue'
 import OperationRow from '@/components/OperationRow.vue'
@@ -230,7 +227,6 @@ export default defineComponent({
     AppCard,
     AppReveal,
     AppScreen,
-    FloatingDock,
     IconCloudOff,
     IconPlus,
     MonthSwitcher,
@@ -398,11 +394,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-/* The dock keeps no padding of its own above or below: the screen's row does (as «Покупки»). */
-.add {
-  padding: var(--space-3) 0;
-}
-
 .content {
   display: flex;
   flex-direction: column;
@@ -506,10 +497,6 @@ export default defineComponent({
   justify-items: center;
   gap: var(--space-2);
   padding: var(--space-2) 0;
-}
-
-.float > .undo {
-  flex: 1;
 }
 
 /* The answer comes in where the skeleton stood, faded only: the screen keeps it in one block of its

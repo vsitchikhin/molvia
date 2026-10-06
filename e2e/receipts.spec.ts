@@ -237,7 +237,7 @@ test('«Удалить чек» goes with «Вернуть» for ten seconds, an
 
   await expect(page).toHaveURL(/\/purchases$/)
   await expect(
-    page.locator('.undo').filter({ hasText: 'Receipt deleted with its photo' }),
+    page.locator('.undo-strip').filter({ hasText: 'Receipt deleted with its photo' }),
   ).toBeVisible()
   await expect(ready).toHaveCount(0)
   await page.getByRole('button', { name: 'Undo' }).click()

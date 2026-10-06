@@ -194,11 +194,15 @@ test.describe('the trip', () => {
     // No question for a trip with nothing in it — only «Undo» after.
     await page.getByRole('button', { name: 'Delete the entry' }).click()
     await expect(sheet(page)).toHaveCount(0)
-    await expect(page.locator('.undo').filter({ hasText: 'Entry deleted: SAS' })).toBeVisible()
+    await expect(
+      page.locator('.undo-strip').filter({ hasText: 'Entry deleted: SAS' }),
+    ).toBeVisible()
     await expect.poll(setting.current).toBeNull()
 
     await startTrip(page, 'Ереван Сити')
-    await expect(page.locator('.undo').filter({ hasText: 'Entry deleted: SAS' })).toHaveCount(0)
+    await expect(page.locator('.undo-strip').filter({ hasText: 'Entry deleted: SAS' })).toHaveCount(
+      0,
+    )
     await expect.poll(async () => (await setting.current())?.place.name).toBe('Ереван Сити')
   })
 

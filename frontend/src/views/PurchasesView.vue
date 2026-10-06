@@ -153,20 +153,22 @@
       :meta="workRow ? receiptMeta(workRow) : null"
     />
 
+    <!-- «Вернуть» of a record removed from its own screen (MOL-76), and of a receipt, in the one
+         place over the strip (Ф-29); each strip draws itself only while its removal can be taken back. -->
+    <template v-if="removing" #undo>
+      <TripUndoStrip />
+      <ReceiptUndoStrip v-if="country" />
+    </template>
+
     <!-- The action under the thumb in every state, loading and failure included: a record goes
-         through the queue and needs neither the list nor the network (MOL-77). «Вернуть» of a
-         record removed from its own screen stands above it (MOL-76). -->
+         through the queue and needs neither the list nor the network (MOL-77). -->
     <template #docked>
-      <div class="strip">
-        <TripUndoStrip class="undo" />
-        <template v-if="country">
-          <ReceiptUndoStrip class="undo" />
-          <ReceiptSentLine class="undo" />
-          <CaptureButton :country="country" />
-          <div class="by-hand"><ManualEntryButton by-hand /></div>
-        </template>
-        <ManualEntryButton v-else />
-      </div>
+      <template v-if="country">
+        <ReceiptSentLine />
+        <CaptureButton :country="country" />
+        <ManualEntryButton by-hand />
+      </template>
+      <ManualEntryButton v-else />
     </template>
   </AppScreen>
 </template>
@@ -210,7 +212,9 @@ import { useVerdictQueue } from '@/composables/useVerdictQueue'
 import { calendarDay, dayOfAnyYear, purchaseDay, timeOfDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
+import { useReceiptQueueStore } from '@/stores/receiptQueue'
 import { useTripStore } from '@/stores/trip'
+import { useTripQueueStore } from '@/stores/tripQueue'
 
 /**
  * «Покупки» (MOL-128) — what was bought, in one list by what asks to be done: the record still
@@ -270,6 +274,13 @@ export default defineComponent({
     // reads (Р-1); the receipts a person holds are shown whatever the country, since one taken before a
     // move to Georgia or Serbia is still to be recorded or removed (MOL-109, adversarial А2).
     const { country } = useReceiptCapture()
+    // The place of «Вернуть» only while a removal waits: each strip still decides whether its ten
+    // seconds are left (Р-7).
+    const tripQueue = useTripQueueStore()
+    const receiptQueue = useReceiptQueueStore()
+    const removing = computed(() =>
+      Boolean(tripQueue.lastRemoved ?? (country.value ? receiptQueue.lastRemoved : null)),
+    )
     const receipts = useReceipts()
     const receiptRows = computed(() => receipts.rows.value)
     const working = computed(() => receiptRows.value.filter((row) => WORKING.includes(row.state)))
@@ -412,6 +423,7 @@ export default defineComponent({
     const positions = (n: number): string => t('trip.items_count', { n }, n)
 
     return {
+      removing,
       t,
       asked,
       IconPencil,
@@ -494,20 +506,6 @@ export default defineComponent({
 
 .more {
   margin-top: var(--space-4);
-}
-
-.strip {
-  @include appear;
-
-  padding: var(--space-3) 0;
-}
-
-.undo {
-  margin-bottom: var(--space-3);
-}
-
-.by-hand {
-  margin-top: var(--space-1);
 }
 
 // A receipt being read «breathes» (handoff 03): no percent, no timer — work that takes a while.

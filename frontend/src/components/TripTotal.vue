@@ -290,10 +290,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.total {
-  padding: var(--space-3) 0;
-}
-
 .figures {
   display: flex;
   gap: var(--space-3);

@@ -65,6 +65,14 @@ describe('UndoStrip', () => {
     expect(strip.emitted('expire')).toBeUndefined()
   })
 
+  // 157 v2 2d, 72 v2 03: the words first, the count beside the button the finger goes to.
+  it('reads «words · count · Вернуть», the count kept from screen readers', () => {
+    const strip = render()
+    const parts = [...strip.element.children].map((part) => part.className.split(' ')[0])
+    expect(parts).toEqual(['text', 'count', 'button'])
+    expect(strip.get('.count').attributes('aria-hidden')).toBe('true')
+  })
+
   // Ф-12, MOL-174: «Вернуть» is the tinted button — the handoffs' «secondary» is the kit's outlined one.
   it('draws «Вернуть» as the tinted button', () => {
     expect(render().find('button').classes()).toContain('tinted')

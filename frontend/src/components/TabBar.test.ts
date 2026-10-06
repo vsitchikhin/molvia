@@ -1,6 +1,8 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import IconWallet from '~icons/mdi/wallet'
+import IconWalletOutline from '~icons/mdi/wallet-outline'
 import type { AppLocale } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
@@ -56,6 +58,16 @@ describe('TabBar', () => {
     const view = await render(path)
     const current = view.findAll('a').map((link) => link.attributes('aria-current'))
     expect(current).toEqual([0, 1, 2, 3, 4].map((i) => (i === index ? 'page' : undefined)))
+  })
+
+  it('fills the current tab’s icon and outlines the rest — form, not only a hue (Ф-5)', async () => {
+    // The shape is the path; the tab's own class and scope sit on the <svg> around it.
+    const drawn = (icon: object) => mount(icon).get('path').attributes('d')
+    const shape = async (path: string) =>
+      (await render(path)).findAll('a')[3]?.get('path').attributes('d')
+    expect(drawn(IconWallet)).not.toBe(drawn(IconWalletOutline))
+    expect(await shape('/money')).toBe(drawn(IconWallet))
+    expect(await shape('/settings')).toBe(drawn(IconWalletOutline))
   })
 
   // «Покупки» must not claim the record typed by hand as «the current page»: it is a step inside

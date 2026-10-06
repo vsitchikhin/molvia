@@ -237,6 +237,45 @@ describe('AppScreen', () => {
   // MOL-22, Н-1: полосу итога рисует фрейм, потому что место под ней — его забота. Высота
   // меряется в живом браузере (e2e), здесь — что полоса есть, пуста по умолчанию и что место
   // под неё контент просит переменной.
+  // Ф-29, К-10: one place for «Вернуть» on every screen, the frame's — 8 over the strip, which
+  // stays under it whole. Where it lands is measured end to end; here, that it is its own block.
+  describe('the place of «Вернуть»', () => {
+    it('is not there when a screen has nothing to take back', async () => {
+      const { view } = await render('/money')
+      expect(view.find('.undo-place').exists()).toBe(false)
+    })
+
+    it('stands apart from the strip and the scroll, the strip still whole under it', async () => {
+      const { view } = await render('/money', {
+        slots: {
+          docked: () => h('button', 'Добавить трату'),
+          undo: () => h('div', { class: 'undo-strip' }, 'Удалено: кофе'),
+        },
+      })
+      const place = view.get('.undo-place')
+      expect(place.text()).toBe('Удалено: кофе')
+      expect(view.get('.dock').element.contains(place.element)).toBe(false)
+      expect(view.get('.content').element.contains(place.element)).toBe(false)
+      expect(view.get('.dock').text()).toBe('Добавить трату')
+      // Over the strip by its measured height: the frame says it is holding one.
+      expect(view.classes()).toContain('held')
+    })
+
+    // Adversarial А1: the list ends over «Вернуть» too — with no strip under it as well.
+    it('keeps the room under the list for itself, with or without a strip', async () => {
+      const { view } = await render('/money', { slots: { undo: () => h('div', 'Удалено: кофе') } })
+      expect(view.get('.content').find('.dock-room').exists()).toBe(true)
+    })
+
+    it('rises over a waiting version, which is a strip too, and stands without one', async () => {
+      const undo = () => h('div', 'Удалено: кофе')
+      const waiting = await render('/money', { update: 'ready', slots: { undo } })
+      expect(waiting.view.classes()).toContain('held')
+      const bare = await render('/money', { slots: { undo } })
+      expect(bare.view.classes()).not.toContain('held')
+    })
+  })
+
   describe('the docked strip', () => {
     it('is not there at all when a screen has nothing to pin', async () => {
       const { view } = await render('/')

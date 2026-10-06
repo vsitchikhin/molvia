@@ -184,68 +184,66 @@
     </template>
 
     <template v-if="detail && docked" #docked>
-      <div class="dock">
-        <template v-if="docked === 'record'">
-          <template v-if="recording">
-            <p class="under">{{ t('receipt.review.recording') }}</p>
-            <AppButton
-              v-if="cancellable"
-              variant="ghost"
-              block
-              :busy="checking"
-              :busy-label="t('receipt.review.cancel_record_busy')"
-              @click="cancelRecord"
-            >
-              {{ t('receipt.review.cancel_record') }}
-            </AppButton>
-            <p v-if="cancelRefused" class="under">
-              {{
-                t(
-                  cancelRefused === 'offline'
-                    ? 'receipt.review.cancel_record_offline'
-                    : 'receipt.review.cancel_record_failed',
-                )
-              }}
-            </p>
-          </template>
+      <template v-if="docked === 'record'">
+        <template v-if="recording">
+          <p class="under">{{ t('receipt.review.recording') }}</p>
           <AppButton
-            v-else
-            size="large"
+            v-if="cancellable"
+            variant="ghost"
             block
-            :busy="sending"
-            :busy-label="t('receipt.review.record_busy')"
-            :inactive="noItems ? shownTotal === null : balance.recorded === 0"
-            @click="record"
+            :busy="checking"
+            :busy-label="t('receipt.review.cancel_record_busy')"
+            @click="cancelRecord"
           >
-            {{ recordLabel }}
+            {{ t('receipt.review.cancel_record') }}
           </AppButton>
-          <p v-if="!online && !recording" class="under">{{ t('receipt.review.record_offline') }}</p>
-        </template>
-        <!-- A record by hand is everyone's; a retake is the camera's, the country's that reads
-             receipts — a receipt taken before a move to Georgia or Serbia is retaken nowhere (MOL-109, Б3). -->
-        <template v-else-if="docked === 'failed'">
-          <ManualEntryButton />
-          <AppButton v-if="country" variant="ghost" block @click="retake">
-            <template #icon><IconCamera /></template>
-            {{ t('receipt.capture.retake') }}
-          </AppButton>
-          <!-- A till read badly is one to learn (MOL-222, В-2): its photos, seen before they go. -->
-          <AppButton v-if="shelved.length > 0" variant="ghost" block @click="toDeveloper">
-            <template #icon><IconMessage /></template>
-            {{ t('receipt.review.to_developer') }}
-          </AppButton>
+          <p v-if="cancelRefused" class="under">
+            {{
+              t(
+                cancelRefused === 'offline'
+                  ? 'receipt.review.cancel_record_offline'
+                  : 'receipt.review.cancel_record_failed',
+              )
+            }}
+          </p>
         </template>
         <AppButton
-          v-else-if="docked === 'duplicate'"
-          variant="secondary"
+          v-else
           size="large"
           block
-          @click="remove"
+          :busy="sending"
+          :busy-label="t('receipt.review.record_busy')"
+          :inactive="noItems ? shownTotal === null : balance.recorded === 0"
+          @click="record"
         >
-          <template #icon><IconDelete /></template>
-          {{ t('purchases.delete') }}
+          {{ recordLabel }}
         </AppButton>
-      </div>
+        <p v-if="!online && !recording" class="under">{{ t('receipt.review.record_offline') }}</p>
+      </template>
+      <!-- A record by hand is everyone's; a retake is the camera's, the country's that reads
+           receipts — a receipt taken before a move to Georgia or Serbia is retaken nowhere (MOL-109, Б3). -->
+      <template v-else-if="docked === 'failed'">
+        <ManualEntryButton />
+        <AppButton v-if="country" variant="ghost" block @click="retake">
+          <template #icon><IconCamera /></template>
+          {{ t('receipt.capture.retake') }}
+        </AppButton>
+        <!-- A till read badly is one to learn (MOL-222, В-2): its photos, seen before they go. -->
+        <AppButton v-if="shelved.length > 0" variant="ghost" block @click="toDeveloper">
+          <template #icon><IconMessage /></template>
+          {{ t('receipt.review.to_developer') }}
+        </AppButton>
+      </template>
+      <AppButton
+        v-else-if="docked === 'duplicate'"
+        variant="secondary"
+        size="large"
+        block
+        @click="remove"
+      >
+        <template #icon><IconDelete /></template>
+        {{ t('purchases.delete') }}
+      </AppButton>
     </template>
 
     <ReceiptLineSheet
@@ -912,14 +910,6 @@ export default defineComponent({
 
 .delete {
   margin-top: var(--space-2);
-}
-
-.dock {
-  @include appear;
-
-  display: grid;
-  gap: var(--space-1);
-  padding: var(--space-3) 0;
 }
 
 .under {

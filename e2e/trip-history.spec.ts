@@ -222,7 +222,7 @@ test('a finished record deleted from its own screen leaves «Записаны»,
   // Back where it was opened from — «Покупки» — with «Undo» there.
   await expect(page).toHaveURL(/\/purchases$/)
   await expect(
-    page.locator('.undo').filter({ hasText: 'Entry deleted: Deleted shop' }),
+    page.locator('.undo-strip').filter({ hasText: 'Entry deleted: Deleted shop' }),
   ).toBeVisible()
   await expect(recent).toHaveCount(0)
   await expect

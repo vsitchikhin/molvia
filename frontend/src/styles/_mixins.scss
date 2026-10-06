@@ -66,12 +66,11 @@ $row-narrow: 22rem;
   }
 }
 
-/// A bar that stays put while the page scrolls under it: the top row, the tab bar, the total.
-/// Translucency is the --chrome token; the blur only keeps the text under it from fighting
-/// the text on it.
+/// A bar that stays put while the page scrolls under it: the top row, the tab bar, the docked
+/// strip. Opaque (Ф-18): through a translucent one the list showed under the words on it, and the
+/// blur that was to keep them apart was a second picture to read past. Its hairline is the user's.
 @mixin pinned-bar {
-  background: var(--chrome);
-  backdrop-filter: blur(12px);
+  background: var(--surface);
 }
 
 /// Read by a screen reader, never drawn. For words the screen already says with a picture —
