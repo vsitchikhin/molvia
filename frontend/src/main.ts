@@ -1,5 +1,6 @@
 // First, before any other module of the app is evaluated: the phone's catchers (MOL-144, Б3).
 import { failures, placeFailures } from '@/catchers'
+import { belowFloor } from '@/browserFloor'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from '@/App.vue'
@@ -119,9 +120,13 @@ function start(): void {
     })
 }
 
-try {
-  start()
-} catch (error) {
-  failures.report(error, 'start')
-  throw error
+// Below the floor of the build the script in `index.html` has drawn its line in place of the app,
+// and the app is not started over it (MOL-231).
+if (!belowFloor()) {
+  try {
+    start()
+  } catch (error) {
+    failures.report(error, 'start')
+    throw error
+  }
 }

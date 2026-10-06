@@ -1,4 +1,5 @@
 import { api } from '@/api'
+import { belowFloor } from '@/browserFloor'
 import { installFailureReports, pageBuild } from '@/failures'
 import { platformLine } from '@/platform'
 
@@ -22,15 +23,19 @@ export const failures = installFailureReports({
   send: (body) => api.reportClientErrors(body),
 })
 
-window.addEventListener('error', (event) => {
-  failures.report(event.error, 'window')
-})
-window.addEventListener('unhandledrejection', (event) => {
-  failures.report(event.reason, 'rejection')
-})
-window.addEventListener('online', () => {
-  void failures.flush()
-})
+// Below the floor of the build nothing listens (MOL-231): such a browser fails on whatever it lacks
+// first — as the bundle loads, as a screen draws — and that is no defect of ours to report.
+if (!belowFloor()) {
+  window.addEventListener('error', (event) => {
+    failures.report(event.error, 'window')
+  })
+  window.addEventListener('unhandledrejection', (event) => {
+    failures.report(event.reason, 'rejection')
+  })
+  window.addEventListener('online', () => {
+    void failures.flush()
+  })
+}
 
 /** Where on the app a failure happened, from the moment the app is mounted. */
 export function placeFailures(where: () => string): void {
