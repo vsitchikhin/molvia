@@ -50,7 +50,9 @@ function account(name: string, start: string, startOn = '2026-09-16', savings = 
     start: amount,
     startOn,
     revision: 1,
+    // Midnight in Yerevan: made the day after its start, so its start is that day's evening.
     createdAt: new Date('2026-09-16T20:00:00Z'),
+    createdOn: '2026-09-17',
     archivedAt: null,
   })
 }
@@ -70,6 +72,7 @@ function operation(
     side: null,
     day,
     at,
+    writtenAt: at,
     // Unless a test says otherwise, the server learned of it when it was written.
     seenAt: at,
     currency: sums[0]?.currency ?? on?.currency ?? 'AMD',
@@ -466,5 +469,94 @@ describe('markOf', () => {
   it('is the evening of the start before any check', () => {
     const cash = account('Наличные', '1 AMD')
     expect(markOf(cash, null)).toEqual({ day: '2026-09-16', at: null })
+  })
+})
+
+describe('an account made on its own start day starts when it was made (MOL-250)', () => {
+  // 06.10 at noon in Gyumri: «Доллары», 0 $, «На день» — today.
+  const MADE = new Date('2026-10-06T08:00:00Z')
+  const madeToday = (start = '0 USD', startOn = '2026-10-06') => ({
+    ...account('Доллары', start, startOn),
+    createdAt: MADE,
+    createdOn: '2026-10-06',
+  })
+  const after = (minutes: number) => new Date(MADE.getTime() + minutes * 60_000)
+  const written = (at: Date) => ({ at, writtenAt: at, seenAt: at })
+
+  it('counts what was written on that day after it — the owner’s two exchanges', () => {
+    const dollars = madeToday()
+    const ops = [
+      operation('exchange', ['5.42 USD'], '2026-10-06', dollars, {
+        side: 'received',
+        ...written(after(5)),
+      }),
+      operation('exchange', ['5.42 USD'], '2026-10-06', dollars, {
+        side: 'received',
+        ...written(after(10)),
+      }),
+    ]
+    expect(accountBalance(dollars, ops, noRates).balance).toEqual(toMoney('10.84 USD'))
+  })
+
+  it('keeps out one of that day written before it, though given the account after', () => {
+    const cash = madeToday('18000 AMD')
+    const morning = operation('spending', ['-2000 AMD'], '2026-10-06', cash, {
+      ...written(after(-180)),
+      seenAt: after(60),
+    })
+    expect(accountBalance(cash, [morning], noRates).balance).toEqual(toMoney('18000 AMD'))
+  })
+
+  it('takes the moment itself as the start: the same instant is in it, the next one after', () => {
+    const cash = madeToday('100 AMD')
+    const same = operation('spending', ['-10 AMD'], '2026-10-06', cash, written(MADE))
+    const next = operation('spending', ['-10 AMD'], '2026-10-06', cash, {
+      ...written(new Date(MADE.getTime() + 1)),
+    })
+    expect(accountBalance(cash, [same], noRates).balance).toEqual(toMoney('100 AMD'))
+    expect(accountBalance(cash, [next], noRates).balance).toEqual(toMoney('90 AMD'))
+  })
+
+  it('leaves the day before as history and counts the day after whatever the moment', () => {
+    const cash = madeToday('100 AMD')
+    const yesterday = operation('spending', ['-10 AMD'], '2026-10-05', cash, written(after(30)))
+    const tomorrow = operation('spending', ['-1 AMD'], '2026-10-07', cash, written(after(-60)))
+    expect(accountBalance(cash, [yesterday, tomorrow], noRates).balance).toEqual(toMoney('99 AMD'))
+  })
+
+  it('is the evening of its day again once the start is moved to another day', () => {
+    const cash = madeToday('100 AMD', '2026-10-05')
+    const ofStart = operation('spending', ['-10 AMD'], '2026-10-05', cash, written(after(30)))
+    const ofMaking = operation('spending', ['-1 AMD'], '2026-10-06', cash, written(after(-60)))
+    expect(accountBalance(cash, [ofStart, ofMaking], noRates).balance).toEqual(toMoney('99 AMD'))
+    expect(markOf(cash, null)).toEqual({ day: '2026-10-05', at: null })
+  })
+
+  it('leaves out a trip begun before it, though finished after (Е2)', () => {
+    const cash = madeToday('100 AMD')
+    const trip = operation('trip', ['-30 AMD'], '2026-10-06', cash, {
+      at: after(30),
+      writtenAt: after(-30),
+      seenAt: after(30),
+    })
+    expect(accountBalance(cash, [trip], noRates).balance).toEqual(toMoney('100 AMD'))
+  })
+
+  it('looks for reasons from the moment it was made, never before it', () => {
+    const card = { ...madeToday('10000 RUB'), currency: 'RUB' as const }
+    const before = operation('spending', ['-500 AMD'], '2026-10-06', card, written(after(-30)))
+    const later = operation('spending', ['-700 AMD'], '2026-10-06', card, written(after(30)))
+    expect(markOf(card, null)).toEqual({ day: '2026-10-06', at: MADE })
+    const result = accountCheck(card, [before, later], null, toMoney('0 RUB'), rubAmd)
+    expect(result.reasons.map(({ kind, operation }) => [kind, operation.id])).toEqual([
+      ['noDebited', later.id],
+    ])
+  })
+
+  it('asks about one of that day with no account only when written after it', () => {
+    const cash = madeToday('100 AMD')
+    const before = operation('spending', ['-5 AMD'], '2026-10-06', null, written(after(-30)))
+    const later = operation('spending', ['-7 AMD'], '2026-10-06', null, written(after(30)))
+    expect(unassignedOperations([cash], new Map(), [before, later])).toEqual([later])
   })
 })

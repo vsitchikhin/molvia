@@ -243,6 +243,7 @@ const file: ExportFile = {
       start: money(24_153_000n, 'AMD'),
       startOn: '2026-09-16',
       revision: 1,
+      createdOn: '2026-09-27',
       createdAt: at,
       archivedAt: null,
       removedAt: null,

@@ -26,7 +26,10 @@ export const MONEY_ACCOUNT_UNDO_MINUTES = EXCHANGE_UNDO_MINUTES
  * The start is **what it held at the end of `startOn`** — «Старт — вечер 16.09» of the owner's
  * sheet — and may be below zero: a credit card is a name, not a kind. What the account holds now is
  * the start and every operation on it dated after that day (MOL-43, Р-3); what came before is
- * history and moves nothing. There is no rate on an account, ever: the price of money belongs to
+ * history and moves nothing. **An account made on its own start day starts at the moment it was
+ * made** (MOL-250): the start typed is what it holds now, so an operation of that day the server
+ * got after the account is in the balance, and one it got before is already in the start.
+ * `createdOn` is the phone's day it was made on. There is no rate on an account, ever: the price of money belongs to
  * its currency (MOL-42, MOL-43 Р-2).
  *
  * `archivedAt` is «убран из выбора»: an account with operations is never erased, since its history
@@ -43,6 +46,7 @@ export const moneyAccountSchema = z
     startOn: exchangeDaySchema,
     revision: z.int().min(1),
     createdAt: z.date(),
+    createdOn: exchangeDaySchema,
     archivedAt: z.date().nullable(),
   })
   .refine(({ start, currency }) => start.currency === currency, {
@@ -87,6 +91,12 @@ export interface AccountOperation {
   readonly day: string
   /** When it was written — a trip, when it was finished, or started while it is open. */
   readonly at: Date
+  /**
+   * When the server first had it — a trip, when it was started: what the start of an account made
+   * on its own day is measured by (MOL-250). Never `seenAt`: an account given to an old spending
+   * does not make the spending new.
+   */
+  readonly writtenAt: Date
   /**
    * The last moment the server learned something about it: written, amended, given or taken an
    * account — a trip, received as finished or given a purchase. What a check's window is measured
@@ -222,12 +232,28 @@ export function movementOf(
   return { amount: bounded(minor, currency), approximate }
 }
 
-/** Whether an operation stands after the start of an account: the start is the evening of its day. */
+/**
+ * Whether the start of an account is the moment it was made rather than the evening of its day: it
+ * was made on its own start day (MOL-250). A start moved to another day is that day's evening again.
+ */
+function startsWhenMade(account: MoneyAccount): boolean {
+  return account.startOn === account.createdOn
+}
+
+/**
+ * Whether an operation stands after the start of an account: dated after its day, or — for an
+ * account made on that day — of that day and written after the account.
+ */
 export function afterStart(
-  operation: Pick<AccountOperation, 'day'>,
+  operation: Pick<AccountOperation, 'day' | 'writtenAt'>,
   account: MoneyAccount,
 ): boolean {
-  return operation.day > account.startOn
+  if (operation.day > account.startOn) return true
+  return (
+    startsWhenMade(account) &&
+    operation.day === account.startOn &&
+    operation.writtenAt > account.createdAt
+  )
 }
 
 /** An account's own operations that make its balance — the ones dated after its start. */
@@ -297,7 +323,8 @@ export function balancesOn(
 }
 
 /**
- * Where a check starts looking: the moment of the last check, or the evening of the start day. An
+ * Where a check starts looking: the moment of the last check, or the start — the evening of its
+ * day, or the moment the account was made on it (MOL-250). An
  * operation is after it when it is dated after that day, or was written after the check — one dated
  * back, typed in only now, is exactly what a difference is made of.
  */
@@ -308,7 +335,7 @@ export interface CheckMark {
 
 export function markOf(account: MoneyAccount, last: MoneyAccountCheck | null): CheckMark {
   return last === null
-    ? { day: account.startOn, at: null }
+    ? { day: account.startOn, at: startsWhenMade(account) ? account.createdAt : null }
     : { day: last.checkedOn, at: last.createdAt }
 }
 

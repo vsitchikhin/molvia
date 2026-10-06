@@ -613,6 +613,7 @@ describe('what the accounts held at the end of a day (MOL-134)', () => {
     startOn: '2026-09-16',
     revision: 1,
     createdAt: new Date('2026-09-16T10:00:00Z'),
+    createdOn: '2026-09-16',
     archivedAt: null,
     ...patch,
   })
@@ -622,6 +623,7 @@ describe('what the accounts held at the end of a day (MOL-134)', () => {
     side: null,
     day,
     at: new Date(`${day}T10:00:00Z`),
+    writtenAt: new Date(`${day}T10:00:00Z`),
     seenAt: new Date(`${day}T10:00:00Z`),
     currency: toMoney(amount).currency,
     accountId: on.id,
