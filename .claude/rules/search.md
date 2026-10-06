@@ -577,13 +577,16 @@ report.
   the punctuation — «Маркет Ани+» and «Маркет Ани» are one spelling, and merge at 0.92; rare in one
   city, and `make apart` parts them (adversarial round 9). `merge-corpus.integration.test.ts`
   pins both on the model.
-- **A candidate** (named to the owner, never merged): the same sizes and words, two edits a word at
-  most, and the meaning at 0.80 or one key; a pair that would merge but for its unit or for more than
+- **A candidate** (named to the owner, never merged): the same sizes and words, **one edit a word at
+  most** (the owner, 06.10.2026: two named the seed against itself every first morning — «Хлеб ~
+  Хлебцы», «Курица ~ Курага», «Редис ~ Редька», twenty pairs nobody merges; a typo of the measure is one
+  edit, so none is lost), and the meaning at 0.80 or one key; a pair that would merge but for its unit or for more than
   twenty codes together. **Named once, and only once printed** (`catalogue_merge_candidates`): a morning
   prints ten and marks those, the rest come by name on the mornings after — marked all at once, the
   eleventh was never named at all (review №2). A candidate with a side merged that same night waits for
   the next, where it meets the survivor: its command would be refused (adversarial А8). On the seed alone
-  the first nights name some twenty («Курица ~ Корица»), then none.
+  the first night names four («Курица ~ Корица», «Сливки ~ Сливы»), then none. A seed line is not kept
+  out as such — what the seed may come to hold is named like anything else.
 - **The older survives** (`created_at`, the lower id on a tie), as places did in `0007` and `0010`: on
   production the seed is older than anything a person types. The price: a typo proposed first is the
   canon's name, and the undo does not rename.

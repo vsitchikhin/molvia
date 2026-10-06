@@ -208,8 +208,13 @@ function bitCount(mask: number): number {
  */
 export const TWIN_MERGE = Object.freeze({ worst: 1, edits: 2, meaning: 0.9 })
 
-/** Named to the owner: two edits a word, and a meaning this close or one key in two scripts. */
-export const TWIN_CANDIDATE = Object.freeze({ worst: 2, meaning: 0.8 })
+/**
+ * Named to the owner: one edit a word, and a meaning this close or one key in two scripts. Two edits a
+ * word named the seed against itself every first morning — «Хлеб ~ Хлебцы», «Курица ~ Курага», «Редис ~
+ * Редька», twenty pairs of things nobody merges (the owner, 06.10.2026); a typo of the measure is one
+ * edit a word, so none is lost.
+ */
+export const TWIN_CANDIDATE = Object.freeze({ worst: 1, meaning: 0.8 })
 
 /** What the night does with a pair: merges it, names it to the owner, or leaves it. */
 export type TwinVerdict = 'merge' | 'candidate' | 'apart'

@@ -151,9 +151,15 @@ describe('twinVerdict', () => {
     expect(pair('Milo', 'Мыло', 0.48)).toBe('candidate')
   })
 
-  it('never merges two edits in a word, however close the meaning', () => {
-    expect(pair('Хлеб белый', 'Хлеб балай', 0.99)).toBe('candidate')
-    expect(pair('Лимоны', 'Лимонад', 0.91)).toBe('candidate')
+  it('never merges or names two edits in a word, however close the meaning', () => {
+    expect(pair('Хлеб белый', 'Хлеб балай', 0.99)).toBe('apart')
+    expect(pair('Лимоны', 'Лимонад', 0.91)).toBe('apart')
+    expect(pair('Хлеб', 'Хлебцы', 0.937)).toBe('apart')
+  })
+
+  it('names one edit in a word the model doubts: a typo, or a neighbour on the shelf', () => {
+    expect(pair('Кифир', 'Кефир', 0.855)).toBe('candidate')
+    expect(pair('Курица', 'Корица', 0.856)).toBe('candidate')
   })
 
   it('leaves what is far by meaning, and what differs in size or a short word', () => {
