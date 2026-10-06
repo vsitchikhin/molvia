@@ -333,7 +333,7 @@ export async function addMoneyAccount(
   now: Date = new Date(),
 ): Promise<{ overview: MoneyAccountsResponse; created: boolean }> {
   if (body.startOn > latestDay(now)) throw new DomainError(ERROR.MONEY_ACCOUNT_IN_FUTURE)
-  const { created } = await repositories.moneyAccounts.add(owner.id, body)
+  const { created } = await repositories.moneyAccounts.add(owner.id, body, todayOf(owner, now))
   return { overview: await moneyAccountsOf(repositories, owner, now), created }
 }
 

@@ -1809,7 +1809,7 @@
       "kind": "What for",
       "kind_hint": "Savings aren't counted as spendable",
       "start_day": "As of",
-      "start_hint": "From this day on the balance keeps itself. Anything earlier is history and doesn't change it",
+      "start_hint": "Today — the balance when the account was made: everything recorded on it after changes it. A past day — the balance that evening",
       "save": "Save",
       "saving": "Saving…",
       "wait_online": "Will save once online",

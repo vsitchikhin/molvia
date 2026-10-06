@@ -236,6 +236,7 @@ export async function aLife(
     currency: 'AMD',
     startMinor: 24_153_000n,
     startOn: '2026-09-16',
+    createdOn: '2026-09-27',
   })
   await db.insert(moneyAccountChecks).values({
     id: randomUUID(),

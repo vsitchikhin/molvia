@@ -72,7 +72,7 @@ carries receipts and their lines, never a photo. MOL-126 (`0045_receipt_lines_bo
 its item and purchase and adds the item as a node — `item_names` (names in the tills' languages) and
 `item_hs` (customs headings), both the seed's — `receipts_trip_key` (one trip, one receipt), and `store_memory`, the shops' shared
 memory: erasure leaves its words without an author, the copy carries the person's own. MOL-232
-(`0057_receipt_links`) gives a receipt its `source` — a photo, or a Serbian receipt's link asked of the
+(`0058_receipt_links`) gives a receipt its `source` — a photo, or a Serbian receipt's link asked of the
 tax office, with no parts — the next ask and the premises' code and name; the link while it is asked
 is `receipt_links`, a table the nightly copy leaves out.
 

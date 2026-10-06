@@ -681,6 +681,8 @@ export const moneyAccounts = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .default(sql`clock_timestamp()`),
+    // The phone's day it was made on: made on its start day, it starts at `created_at` (MOL-250).
+    createdOn: date('created_on').notNull(),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },

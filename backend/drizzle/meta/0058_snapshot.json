@@ -1,6 +1,6 @@
 {
-  "id": "98ef8169-6bc5-48d5-986e-9542c146461f",
-  "prevId": "dedde690-9cdf-4346-bfe7-5009ebca0b9b",
+  "id": "21f09214-7d50-43d6-980d-bccfc8ebe36c",
+  "prevId": "98ef8169-6bc5-48d5-986e-9542c146461f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4296,6 +4296,41 @@
       },
       "isRLSEnabled": false
     },
+    "public.receipt_links": {
+      "name": "receipt_links",
+      "schema": "",
+      "columns": {
+        "receipt_id": {
+          "name": "receipt_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "link": {
+          "name": "link",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "receipt_links_receipt_id_receipts_id_fk": {
+          "name": "receipt_links_receipt_id_receipts_id_fk",
+          "tableFrom": "receipt_links",
+          "tableTo": "receipts",
+          "columnsFrom": ["receipt_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.receipt_parts": {
       "name": "receipt_parts",
       "schema": "",
@@ -4402,6 +4437,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'photo'"
+        },
         "parts": {
           "name": "parts",
           "type": "smallint",
@@ -4413,6 +4455,12 @@
           "type": "char(2)",
           "primaryKey": false,
           "notNull": true
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "language": {
           "name": "language",
@@ -4478,6 +4526,18 @@
         },
         "tin": {
           "name": "tin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shop_unit": {
+          "name": "shop_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shop": {
+          "name": "shop",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -4620,6 +4680,22 @@
           "method": "btree",
           "with": {}
         },
+        "receipts_link_queue_idx": {
+          "name": "receipts_link_queue_idx",
+          "columns": [
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"receipts\".\"source\" = 'tax' and \"receipts\".\"status\" = 'queued' and \"receipts\".\"deleted_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "receipts_untold_idx": {
           "name": "receipts_untold_idx",
           "columns": [
@@ -4667,19 +4743,27 @@
         },
         "receipts_failure_known": {
           "name": "receipts_failure_known",
-          "value": "\"receipts\".\"failure\" is null or \"receipts\".\"failure\" in ('reshoot', 'unreadable')"
+          "value": "\"receipts\".\"failure\" is null or \"receipts\".\"failure\" in ('reshoot', 'unreadable', 'missing', 'invalid')"
         },
         "receipts_failure_of_failed": {
           "name": "receipts_failure_of_failed",
           "value": "(\"receipts\".\"status\" = 'failed') = (\"receipts\".\"failure\" is not null)"
         },
+        "receipts_source_known": {
+          "name": "receipts_source_known",
+          "value": "\"receipts\".\"source\" in ('photo', 'tax')"
+        },
         "receipts_parts_range": {
           "name": "receipts_parts_range",
-          "value": "\"receipts\".\"parts\" between 1 and 4"
+          "value": "(\"receipts\".\"source\" = 'photo' and \"receipts\".\"parts\" between 1 and 4)\n          or (\"receipts\".\"source\" = 'tax' and \"receipts\".\"parts\" = 0)"
+        },
+        "receipts_asked_when_queued": {
+          "name": "receipts_asked_when_queued",
+          "value": "\"receipts\".\"source\" = 'photo' or \"receipts\".\"status\" <> 'queued' or \"receipts\".\"next_attempt_at\" is not null"
         },
         "receipts_country_known": {
           "name": "receipts_country_known",
-          "value": "\"receipts\".\"country\" in ('AM')"
+          "value": "\"receipts\".\"country\" in ('AM', 'RS')"
         },
         "receipts_language_known": {
           "name": "receipts_language_known",
@@ -4699,7 +4783,7 @@
         },
         "receipts_city_known": {
           "name": "receipts_city_known",
-          "value": "\"receipts\".\"city\" is null or \"receipts\".\"city\" in ('Гюмри', 'Ереван')"
+          "value": "\"receipts\".\"city\" is null or \"receipts\".\"city\" in ('Гюмри', 'Ереван', 'Белград', 'Нови-Сад')"
         },
         "receipts_layout_known": {
           "name": "receipts_layout_known",
