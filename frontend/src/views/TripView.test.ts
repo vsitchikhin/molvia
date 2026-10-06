@@ -1360,6 +1360,8 @@ describe('TripView', () => {
 
     it('полоска считает десять секунд от удаления, а не от экрана (Р-1)', async () => {
       const { view, queue } = await render()
+      // Без удаления места «Вернуть» на «Покупках» нет вовсе (MOL-179, Р-7).
+      expect(view.find('.undo-place').exists()).toBe(false)
       queue.lastRemoved = {
         tripId: LAST,
         name: 'SAS',
