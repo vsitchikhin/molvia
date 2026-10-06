@@ -77,6 +77,24 @@ test('a spending lands in the month, and a removal comes back with «Верну�
   // reads the strip before reaching for it (adversarial Г).
   await expect(page.getByRole('heading', { name: /трат нет/ })).toBeVisible()
   await page.waitForTimeout(1000)
+  // One place (Ф-29): 8 over the strip, and «Добавить трату» whole under it and the one tapped.
+  const add = page.getByRole('button', { name: 'Добавить трату' })
+  const [strip, dock, added] = await Promise.all([
+    page.locator('.undo-strip').boundingBox(),
+    page.locator('.dock').boundingBox(),
+    add.boundingBox(),
+  ])
+  expect(Math.round((dock?.y ?? 0) - ((strip?.y ?? 0) + (strip?.height ?? 0)))).toBe(8)
+  const centre = {
+    x: (added?.x ?? 0) + (added?.width ?? 0) / 2,
+    y: (added?.y ?? 0) + (added?.height ?? 0) / 2,
+  }
+  expect(
+    await page.evaluate(
+      ({ x, y }) => document.elementFromPoint(x, y)?.closest('button')?.textContent.trim(),
+      centre,
+    ),
+  ).toBe('Добавить трату')
   await page.getByRole('button', { name: 'Вернуть' }).click()
   await expect(row).toBeVisible()
   await expect(page.locator('.total .figure')).toHaveText(/5\s000\s֏/)

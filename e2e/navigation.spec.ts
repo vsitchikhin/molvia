@@ -343,6 +343,33 @@ test.describe('safe areas', () => {
     })
   }
 
+  // К-9: the docked strip keeps its own margins — 12 over and under its column, on top of the tab
+  // bar that holds the indicator — whatever the screen puts in it.
+  test('the docked strip stands on the tab bar, 12 around its column', async ({ page }) => {
+    await insets(page, portrait)
+    await open(page, '/settings')
+    const save = page.locator('.dock > button')
+    await expect(save).toBeVisible()
+    const [dock, button, tabs] = await Promise.all([
+      page.locator('.dock').boundingBox(),
+      save.boundingBox(),
+      page.locator('nav.tabbar').boundingBox(),
+    ])
+    expect(Math.round((dock?.y ?? 0) + (dock?.height ?? 0))).toBe(Math.round(tabs?.y ?? -1))
+    expect(Math.round((tabs?.y ?? 0) - ((button?.y ?? 0) + (button?.height ?? 0)))).toBe(12)
+    // Opaque (Ф-18): nothing of the page shows through the strip or the tab bar.
+    for (const bar of ['.dock', 'nav.tabbar', 'header.bar']) {
+      const style = await page
+        .locator(bar)
+        .evaluate((node) => [
+          getComputedStyle(node).backgroundColor,
+          getComputedStyle(node).backdropFilter,
+        ])
+      expect(style[0]).toMatch(/^rgb\(/)
+      expect(style[1]).toBe('none')
+    }
+  })
+
   test('held sideways, nothing starts under the notch', async ({ page }) => {
     await page.setViewportSize({ width: 915, height: 412 })
     await insets(page, landscape)
