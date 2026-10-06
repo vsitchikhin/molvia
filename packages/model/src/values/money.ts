@@ -29,8 +29,9 @@ const POW10 = [1n, 10n, 100n, 1000n] as const
  * (MOL-92, adversarial Г″, review №8). An Armenian receipt prints hundredths and the shop rounds them
  * away, so a sum is paid and typed in whole drams; roubles are typed whole too, whatever kopecks the
  * receipt printed (owner's decision, 02.10.2026); a till in dollars, euros or lari counts to the cent
- * or the tetri — a Georgian price is 3,45 ₾ (MOL-110); a Serbian till counts whole dinars, as the
- * Armenian one counts drams (MOL-230). What
+ * or the tetri — a Georgian price is 3,45 ₾ (MOL-110). Dinars are typed whole as roubles are: a
+ * Serbian shelf prints paras — 53,99, 114,99 дин, as a Russian one prints 99,99 ₽ — and the owner's
+ * rule for roubles is the person's typing, not the receipt's (MOL-230, review 3). What
  * «Тут дешевле» allows a price per unit to wobble by: half a step on a sum.
  */
 export const TILL_STEP_MINOR: Readonly<Record<Currency, bigint>> = Object.freeze({

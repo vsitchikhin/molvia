@@ -243,7 +243,11 @@ was left out: a retelling of the bank is what rate.am was rejected for.
 - **The rouble is printed with four digits** (1,2257 — five significant): a pair by the National Bank
   of Serbia is coarser than one by the Bank of Russia, by at most four thousandths of a percent. The
   owner's rule is the bank of the currency's country, and that difference is never seen in money.
-- **The till counts whole dinars**, as it counts drams; ISO 4217 gives the dinar two digits. The sign
+- **Dinars are typed whole, as roubles are** (review 3): a Serbian shelf prints paras — 53,99,
+  114,99 дин at Maxi, checked 06.10.2026 — exactly as a Russian one prints 99,99 ₽, and the owner's
+  rule of 02.10.2026 types roubles whole whatever kopecks the receipt printed. The step only sets what
+  «Тут дешевле» lets a price per unit wobble by — half a dinar on a sum, in the safe direction. ISO 4217
+  gives the dinar two digits. The sign
   is «RSD», as the browser prints it (В-4 of MOL-110). A person whose phone is in Belgrade starts
   spending dinars, the rouble the income.
 - **The deploy refreshes at once when a source asked every hour has never written** (`refreshAtBoot`'s
