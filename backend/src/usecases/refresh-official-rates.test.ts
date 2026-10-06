@@ -1,5 +1,6 @@
 import { DrizzleQueryError } from 'drizzle-orm/errors'
 import { describe, expect, it } from 'vitest'
+import { PUBLISHED } from '@molvia/model'
 import type { AmdRate, CachedRate, RateProvider } from '@molvia/model'
 import type { PastRate } from '@/db/rates-repository'
 import { FeedError } from '@/rates/feed'
@@ -16,6 +17,7 @@ import {
   archiveWalkFrom,
   missingDays,
   officialRatesRefresh,
+  wholeDays,
 } from './refresh-official-rates'
 import type { HomeBankFeed } from './refresh-official-rates'
 
@@ -613,13 +615,17 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
   const HOUR = 60 * 60 * 1000
   const SATURDAY = '2026-09-19'
 
+  // Every currency the bank publishes, as `published()` holds a real answer to (MOL-230): a day
+  // missing one of them is a hole its walk comes back for.
   const lari = (date: string, rub = 4_348_959n): Published => ({
     provider: 'nbg',
     date,
-    rates: [
-      { provider: 'nbg', currency: 'RUB', date, scaled: rub },
-      { provider: 'nbg', currency: 'GEL', date, scaled: 139_349_516n },
-    ],
+    rates: PUBLISHED.nbg.map((currency) => ({
+      provider: 'nbg',
+      currency,
+      date,
+      scaled: currency === 'RUB' ? rub : currency === 'GEL' ? 139_349_516n : 3_471_475n,
+    })),
   })
 
   /** The day before `day` when `day` is a Sunday: the bank answers a day off with Saturday's rate. */
@@ -1015,5 +1021,107 @@ describe('банк страны: НБ Грузии (MOL-110)', () => {
     home.pass(1)
     await home.run()
     expect(home.askedOn[asked]).toBe(OFFICIAL_HISTORY_FROM)
+  })
+  it('валюта, добавленная к набору банка, — дыра: обход дописывает её в записанные дни (MOL-230)', async () => {
+    // История MOL-110 — рубль и лари, без динара (и без доллара с евро в этой подделке).
+    const cached: CachedRate[] = []
+    for (let at = Date.parse('2026-07-01'); at <= Date.parse(SATURDAY); at += 86_400_000) {
+      const date = new Date(at).toISOString().slice(0, 10)
+      cached.push(
+        { provider: 'nbg', currency: 'RUB', date, scaled: 4_348_959n, jump: false },
+        { provider: 'nbg', currency: 'GEL', date, scaled: 139_349_516n, jump: false },
+      )
+    }
+    const home = homeHarness({ cached })
+    await home.run()
+    // Сначала последний месяц, как при любой дыре.
+    expect(home.askedOn[0]).toBe('2026-08-19')
+    const day = (date: string, currency: string) =>
+      home.cache.filter(
+        (row) => row.provider === 'nbg' && row.date === date && row.currency === currency,
+      )
+    expect(day('2026-09-01', 'RSD')).toHaveLength(1)
+    // Записанное не трогается и не дублируется: пишутся только недостающие строки.
+    expect(day('2026-09-01', 'RUB')).toHaveLength(1)
+  })
+
+  it('wholeDays — только дни со всеми валютами банка', () => {
+    const row = (date: string, currency: AmdRate['currency']): AmdRate => ({
+      provider: 'nbs',
+      currency,
+      date,
+      scaled: 1_225_700n,
+    })
+    const rows = [
+      ...PUBLISHED.nbs.map((currency) => row('2026-10-02', currency)),
+      row('2026-10-05', 'RUB'),
+      row('2026-10-05', 'USD'),
+    ]
+    expect(wholeDays(rows, 'nbs')).toEqual(['2026-10-02'])
+    expect(wholeDays([], 'nbg')).toEqual([])
+  })
+})
+
+describe('банк страны молчит — запасные (MOL-230)', () => {
+  // Динара нет ни в одном ответе ЦБ РА: пока молчит НБС, свежий курс пары динара есть только у
+  // запасных — а их спрашивали лишь за молчание ЦБ РА.
+  function silentHome(bank: { up: boolean; date: string }) {
+    const cba = feed('cba')
+    const cbr = feed('cbr', true, SATURDAY_NBS)
+    const cache: CachedRate[] = []
+    const nbs: HomeBankFeed = {
+      provider: 'nbs',
+      fetchLatest: () =>
+        bank.up
+          ? Promise.resolve({
+              provider: 'nbs',
+              date: bank.date,
+              rates: PUBLISHED.nbs.map((currency) => ({
+                provider: 'nbs',
+                currency,
+                date: bank.date,
+                scaled: 1_225_700n,
+              })),
+            })
+          : Promise.reject(cutOff()),
+      fetchOn: () => Promise.reject(cutOff()),
+    }
+    const run = officialRatesRefresh({
+      primary: cba.feed,
+      fallbacks: [cbr.feed],
+      homeBanks: [nbs],
+      rates: {
+        upsert: (rates) => {
+          cache.push(...rates)
+          return Promise.resolve()
+        },
+        latestOnOrBefore: () => Promise.resolve(cache),
+        history: () => Promise.resolve(new Map()),
+      },
+      log: { warn: () => undefined },
+      now: () => NOW,
+    })
+    return { run, cbr: cbr.state }
+  }
+  const SATURDAY_NBS = '2026-09-19'
+
+  it('НБС отвечает — запасные не спрашиваются', async () => {
+    const h = silentHome({ up: true, date: FRIDAY })
+    await times(h.run, FALLBACK_AFTER_FAILURES + 2)
+    expect(h.cbr.asked).toBe(0)
+  })
+
+  it(`${String(FALLBACK_AFTER_FAILURES + 1)} сбоев НБС подряд — ЦБ РФ спрошен, хотя ЦБ РА в порядке`, async () => {
+    const h = silentHome({ up: false, date: FRIDAY })
+    await times(h.run, FALLBACK_AFTER_FAILURES)
+    expect(h.cbr.asked).toBe(0)
+    await h.run()
+    expect(h.cbr.asked).toBe(1)
+  })
+
+  it('НБС отвечает листом старше недели — запасные сразу', async () => {
+    const h = silentHome({ up: true, date: '2026-09-01' })
+    await h.run()
+    expect(h.cbr.asked).toBe(1)
   })
 })
