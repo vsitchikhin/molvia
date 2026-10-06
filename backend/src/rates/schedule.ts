@@ -12,10 +12,14 @@ export const REFRESH_EVERY_MS = 60 * 60 * 1000
 export function refreshAtBoot(
   lastFetchedAt: Date | null,
   now: Date,
-  { development = false, everyMs = REFRESH_EVERY_MS } = {},
+  { development = false, everyMs = REFRESH_EVERY_MS, unwritten = false } = {},
 ): boolean {
   if (lastFetchedAt === null) return true
   if (development) return false
+  // A source asked every hour that has never written — a country bank the deploy just brought: the
+  // dinar has no row of anyone's until it speaks, and a trip started in that hour had no rate for
+  // good (MOL-230, adversarial А). The lari had the central bank's own rows to stand in.
+  if (unwritten) return true
   return now.getTime() - lastFetchedAt.getTime() >= everyMs
 }
 

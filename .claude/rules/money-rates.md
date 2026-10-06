@@ -243,10 +243,25 @@ was left out: a retelling of the bank is what rate.am was rejected for.
 - **The till counts whole dinars**, as it counts drams; ISO 4217 gives the dinar two digits. The sign
   is «RSD», as the browser prints it (В-4 of MOL-110). A person whose phone is in Belgrade starts
   spending dinars, the rouble the income.
-- **The price of the first hours, named**: as with the lari, the archive comes in portions — the
-  National Bank of Serbia's from 2022 and the dinar in the National Bank of Georgia's — and a spending
-  in dinars dated more than a month back, written in those hours, keeps the fallback it took. A page
-  before MOL-230 refuses an answer with `RSD` or `nbs` until it takes the new version.
+- **The deploy refreshes at once when a source asked every hour has never written** (`refreshAtBoot`'s
+  `unwritten`, adversarial А): a deploy is a restart, and the boot skipped the refresh when the CBA had
+  written within the hour — on production nearly always. The dinar has no stand-in in the cache — the
+  CBA has none, and the open sources are asked only for a silence — so for up to an hour no pair of it
+  had a rate, and a trip started then had none for good. In development only an empty cache, as before.
+- **The price of the first hours, named** (adversarial А, corrected): the archive comes in portions —
+  the National Bank of Serbia's from 2022 and the dinar in the National Bank of Georgia's, the last
+  month first, the history over some fifteen hours. **A day of the dinar older than the month has no
+  rate of anyone's until its portion comes** — unlike the lari, which the CBA's rows stood in for, it
+  is not a fallback but nothing: a spending in dinars dated then and written in those hours has no rate
+  and «Деньги» say «не всё посчитано» until it is amended. Only the owner is on production before 0.2,
+  and the window is hours. A page before MOL-230 refuses an answer with `RSD` or `nbs` until it takes
+  the new version.
+- **The dinar is in the strict set of the National Bank of Georgia and of the Bank of Russia**
+  (adversarial Б, named): an answer missing it is refused whole, as one missing any of its own — the
+  lari's official source with it at the NBG, the first fallback of every pair of the dram at the Bank
+  of Russia. Strict within its set was the task's requirement. The NBG had the dinar on all 1 740 days
+  since 2022 (measured 06.10.2026); the Bank of Russia's list is not fixed — it has the dinar only
+  since 2023 — and if it drops it, er-api is still behind it.
 - **The page is a step the feed depends on**: a change of its markup refuses the feed whole, and the
   pair goes to the Bank of Russia with «не от НБ Сербии: он молчит» — never half written.
 

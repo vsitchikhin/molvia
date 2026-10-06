@@ -41,6 +41,9 @@ export interface RateRepository {
   /** When any provider's answer was last written — whether the boot refresh can be skipped. */
   lastFetchedAt(): Promise<Date | null>
 
+  /** The providers with a row in the cache — whether a source asked every hour has ever written. */
+  writtenBy(): Promise<ReadonlySet<RateProvider>>
+
   /**
    * The history of the central bank (MOL-137, Р-4): only the days the cache does not have yet — a
    * day already there is left as it is, jump mark included. Returns how many were written.
@@ -189,6 +192,11 @@ export function createRateRepository(db: Conn): RateRepository {
     async lastFetchedAt() {
       const [row] = await db.select({ at: max(officialRates.fetchedAt) }).from(officialRates)
       return row?.at ?? null
+    },
+
+    async writtenBy() {
+      const rows = await db.selectDistinct({ provider: officialRates.provider }).from(officialRates)
+      return new Set(rows.map((row) => row.provider))
     },
   }
 }

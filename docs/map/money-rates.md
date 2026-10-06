@@ -32,7 +32,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 - `backend/src/db/exchanges-repository.ts` — Repository of exchanges: add with repeat/conflict, amend with revisions, mark-remove and restore, the held-before hint, rate preference. Tests: `backend/tests/exchanges-repository.integration.test.ts`.
 - `backend/src/db/incomes-repository.ts` — Repository of incomes: add with repeat/conflict, amend with revisions, mark-remove, restore and final erase. Tests: `backend/tests/incomes-repository.integration.test.ts`.
 - `backend/src/db/market-rates-repository.ts` — Repository of the market (MOL-137): a file written whole, each channel's latest within a week before a day, the latest of all, how far a channel reached. Tests: `backend/tests/market-rates.integration.test.ts`.
-- `backend/src/db/rates-repository.ts` — Repository of the official-rate cache: whole-answer upsert, latest on or before a day, jump history, last fetch time. Tests: `backend/tests/rates-repository.integration.test.ts`.
+- `backend/src/db/rates-repository.ts` — Repository of the official-rate cache: whole-answer upsert, latest on or before a day, jump history, last fetch time, which providers have written. Tests: `backend/tests/rates-repository.integration.test.ts`.
 
 ## backend · rates
 
@@ -46,7 +46,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 - `backend/src/rates/feed.ts` — Shared feed plumbing: the `RateFeed` interface, the foreign-currency list, timeout, strict `published` check of each provider's own currencies, HTTP request; `reach` turns a request with no answer into a `FeedError` worded by its `cause` (MOL-153).
 - `backend/src/rates/feeds.test.ts` — Unit test: each provider's recorded answer parses to the right rates, and malformed, zero, dated-wrong or slow answers are refused whole.
 - `backend/src/rates/market-feeds.test.ts` — Unit test: the three recorded xlsx files and the SOAP archive read to the right figures, and a file with one cell moved, zeroed or renamed refused whole.
-- `backend/src/rates/schedule.ts` — The hourly refresh timer and whether the API refreshes at boot, given when the cache was last written.
+- `backend/src/rates/schedule.ts` — The hourly refresh timer and whether the API refreshes at boot, given when the cache was last written and whether every source asked hourly has written (MOL-230).
 - `backend/src/rates/xlsx.ts` — One sheet of a workbook read through exceljs into its cells once, with accessors that refuse what they did not expect (MOL-137).
 
 ## backend · tests

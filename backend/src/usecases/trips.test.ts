@@ -179,6 +179,7 @@ function fakeRepositories(
       latestOnOrBefore: unexpected('rates.latestOnOrBefore'),
       history: unexpected('rates.history'),
       lastFetchedAt: unexpected('rates.lastFetchedAt'),
+      writtenBy: unexpected('rates.writtenBy'),
       insertMissing: unexpected('rates.insertMissing'),
       between: unexpected('rates.between'),
       ...overrides.rates,
