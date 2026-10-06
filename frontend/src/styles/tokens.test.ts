@@ -77,6 +77,25 @@ const ACHROMATIC = 0.04
 const MARK_CONTRAST = 3
 const TEXT_CONTRAST = 4.5
 
+/**
+ * A skeleton's bar is `--border-strong` at `--skeleton-rest`, breathing up to the whole colour and back
+ * (MOL-178, Ф-13, Н-5): at rest it stands 1.42:1 on a card in the light scheme and 1.47:1 in the dark, a
+ * caption's bar on the page's ground 1.31:1 and 1.53:1. Its bars were `--surface-2` on the ground,
+ * 1.06:1 — next to nothing — and a token made lighter for finer hairlines would bring that back with no
+ * test going red.
+ */
+const BAR_ON_CARD = 1.35
+const BAR_ON_GROUND = 1.2
+
+/** A colour laid over a ground at an opacity, as the browser composes it. */
+function over(colour: string, ground: string, opacity: number): string {
+  const channel = (hex: string, at: number) => parseInt(hex.slice(at, at + 2), 16)
+  const mixed = [1, 3, 5].map((at) =>
+    Math.round(channel(colour, at) * opacity + channel(ground, at) * (1 - opacity)),
+  )
+  return `#${mixed.map((c) => c.toString(16).padStart(2, '0')).join('')}`
+}
+
 function linear(hex: string): [number, number, number] {
   const channel = (at: number) => {
     const c = parseInt(hex.slice(at, at + 2), 16) / 255
@@ -182,6 +201,23 @@ describe.each(['light', 'dark'] as const)('the %s scheme', (scheme) => {
       .filter(([, ratio]) => ratio < MARK_CONTRAST)
       .map(([name, ratio]) => `--${name} ${ratio.toFixed(2)}:1`)
     expect(faint).toEqual([])
+  })
+
+  it(`draws a skeleton's bar at ${String(BAR_ON_CARD)}:1 on a card and ${String(BAR_ON_GROUND)}:1 on the ground, its breath only stronger`, () => {
+    // The scheme's own rest, as the dark block inherits `:root` where it says nothing: read from the
+    // light one alone, a rest set in the dark block would be checked by the light figure (review № 10).
+    const REST = Number(
+      declared[scheme].get('skeleton-rest') ?? declared.light.get('skeleton-rest'),
+    )
+    expect(REST).toBeGreaterThan(0)
+    expect(REST).toBeLessThan(1)
+    const rest = (ground: string) => over(value('border-strong'), value(ground), REST)
+    expect(contrast(rest('surface'), value('surface'))).toBeGreaterThanOrEqual(BAR_ON_CARD)
+    expect(contrast(rest('sunken'), value('sunken'))).toBeGreaterThanOrEqual(BAR_ON_GROUND)
+    for (const ground of ['surface', 'sunken'])
+      expect(contrast(value('border-strong'), value(ground))).toBeGreaterThan(
+        contrast(rest(ground), value(ground)),
+      )
   })
 
   it(`sets text at ${String(TEXT_CONTRAST)}:1 on every ground it stands on`, () => {

@@ -283,14 +283,15 @@ test('a mis-tapped verdict is amended where it is met, and withdrawn from there 
 test('the skeleton breathes, and stops for someone who asked for less motion', async ({ page }) => {
   await person(page)
   await page.route('**/api/advice', () => new Promise(() => undefined))
-  const bars = page.locator('.skeleton .bars')
+  // A bar breathes by its colour (MOL-178): the animation is the bar's own, not the frame's opacity.
+  const bars = page.locator('.skeleton .bar').first()
   const animation = () => bars.evaluate((element) => getComputedStyle(element).animationName)
 
   await page.goto('/')
   // Скелет именно этого экрана: пока личность не осела, свой скелет рисует и экран входа.
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('What to buy')
   await expect(bars).toBeVisible()
-  expect(await animation()).not.toBe('none')
+  expect(await animation()).toBe('skeleton-breath')
 
   await page.emulateMedia({ reducedMotion: 'reduce' })
   expect(await animation()).toBe('none')

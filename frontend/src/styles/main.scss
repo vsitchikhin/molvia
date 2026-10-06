@@ -156,3 +156,12 @@ html[data-nav] {
     --appear-duration: 0s;
   }
 }
+
+// A skeleton's bar breathes from its rest up to the whole `--border-strong` and back, never fainter
+// than at rest, and on the compositor (MOL-178, `skeleton-bar`). Global, so every bar of a screen reads
+// one name — a scoped `@keyframes` is renamed per component.
+@keyframes skeleton-breath {
+  50% {
+    opacity: 1;
+  }
+}

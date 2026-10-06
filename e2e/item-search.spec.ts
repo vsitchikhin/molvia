@@ -354,7 +354,8 @@ test.describe('without the server', () => {
 
     await field(page).fill('квирта')
 
-    const bar = page.locator('.loading .line').first()
+    // The breath is the bar's own colour (MOL-178): read where it is set, or the check passes anyway.
+    const bar = page.locator('.loading .bar').first()
     await expect(bar).toBeVisible()
     expect(await bar.evaluate((node) => getComputedStyle(node).animationName)).toBe('none')
   })

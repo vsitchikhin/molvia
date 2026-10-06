@@ -6,11 +6,12 @@ import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 
 function render(groups: unknown, locale: AppLocale = 'en', slot?: () => unknown) {
   return mount(ScreenSkeleton, {
-    props: { groups: groups as number[] },
+    props: groups === undefined ? {} : { groups: groups as number[] },
     slots: slot ? { default: slot } : {},
     global: { plugins: [createAppI18n(locale)] },
   })
@@ -24,7 +25,7 @@ describe('ScreenSkeleton', () => {
   it('draws one pair of bars per group, the line as wide as the screen asked', () => {
     const view = render([72, 54, 84, 46])
     expect(view.findAll('.group')).toHaveLength(4)
-    expect(view.findAll('.line').map((line) => line.attributes('style'))).toEqual([
+    expect(view.findAll('.text').map((line) => line.attributes('style'))).toEqual([
       'width: 72%;',
       'width: 54%;',
       'width: 84%;',
@@ -87,6 +88,70 @@ describe('ScreenSkeleton', () => {
     const view = render([58, 90], 'en', () => h('div', { class: 'scale' }))
     const bars = view.get('.bars')
     expect(bars.element.lastElementChild?.className).toBe('scale')
+  })
+
+  // Ф-13 (MOL-178): the groups of before stand in a card, where a bar of `border` is seen — on the
+  // page's ground, the bars of `surface-2` were 1.06:1. The screens that pass them change nothing.
+  it('draws the groups of before in a card, as the kit’s paragraphs', () => {
+    const view = render([72, 54])
+    const card = view.get('.bars > .skeleton-lines > .card')
+    expect(card.findAll('.group')).toHaveLength(2)
+  })
+
+  // The shape of the answer is the screen's, in the order it will stand: the kit's parts and what is
+  // the screen's own between them, all in the one frame that breathes and is hidden.
+  it('with no groups, draws only what the screen puts in it, in its order', () => {
+    const view = render(undefined, 'en', () => [
+      h(SkeletonPart, { kind: 'caption', width: 30 }),
+      h('div', { class: 'ring' }),
+      h(SkeletonPart, { kind: 'rows', count: 2 }),
+    ])
+    const parts = [...view.get('.bars').element.children].map((child) => child.className)
+    expect(parts).toEqual([
+      expect.stringContaining('caption'),
+      'ring',
+      expect.stringContaining('skeleton-rows'),
+    ])
+    expect(view.find('.skeleton-lines').exists()).toBe(false)
+    expect(view.get('[role="status"]').text()).toBe(en.state.loading)
+  })
+
+  // A frame with no shape says «Loading…» over nothing — the invisible skeleton of Н-5 — and once
+  // `groups` stopped being required nothing said so (adversarial А4).
+  it('warns when it has nothing to draw, and draws no empty card for no groups', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const view = render(undefined)
+    expect(warn.mock.calls.some(([message]) => String(message).includes('nothing to draw'))).toBe(
+      true,
+    )
+    expect(view.get('.bars').element.children).toHaveLength(0)
+    warn.mockClear()
+    const none = render([])
+    expect(none.find('.card').exists()).toBe(false)
+    expect(warn.mock.calls.some(([message]) => String(message).includes('nothing to draw'))).toBe(
+      true,
+    )
+  })
+
+  // Passed is not drawn: a slot of `<SkeletonPart v-if="known">`, or of a list that came empty, is a
+  // slot all the same, and the frame said «Loading…» over nothing with no word (adversarial Б4).
+  it('warns of a slot that draws nothing, as of no slot', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    for (const slot of [() => null, () => []]) {
+      warn.mockClear()
+      const view = render(undefined, 'en', slot)
+      expect(view.get('.bars').element.children).toHaveLength(0)
+      expect(warn.mock.calls.some(([message]) => String(message).includes('nothing to draw'))).toBe(
+        true,
+      )
+    }
+  })
+
+  it('says nothing of a frame with a shape', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    render([40])
+    render(undefined, 'en', () => h(SkeletonPart, { kind: 'field' }))
+    expect(warn).not.toHaveBeenCalled()
   })
 
   it.each([

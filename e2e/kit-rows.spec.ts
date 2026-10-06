@@ -97,7 +97,8 @@ test('the search field is one pill, and the active option keeps its weight and r
       }
     }),
   )
-  expect(wells).toHaveLength(3)
+  // Three of the search section and the one the skeleton's field stands under (MOL-178).
+  expect(wells).toHaveLength(4)
   // A target of 44 inside an edge of 1 — 46, as every field of the kit (owner's choice on review Р1-3).
   // To a hundredth: a box at a fractional offset measures 45.9998 (MOL-225 put a section above it).
   for (const well of wells) {
@@ -179,10 +180,15 @@ test('the amounts of operation rows stand in one column, where their skeleton’
   const edges = await section.evaluate((root) => {
     const right = (selector: string) =>
       [...root.querySelectorAll(selector)].map((one) => one.getBoundingClientRect().right)
-    return { rows: right('.list-row .amount'), bars: right('.row .amount') }
+    const widths = [...root.querySelectorAll('.row .amount')].map(
+      (one) => one.getBoundingClientRect().width,
+    )
+    return { rows: right('.list-row .amount'), bars: right('.row .amount'), widths }
   })
   expect(edges.rows.length).toBeGreaterThan(5)
   expect(edges.bars.length).toBe(3)
+  // A bar of no width ends there too (MOL-178): the bars must be seen.
+  for (const width of edges.widths) expect(width).toBeGreaterThan(20)
   for (const edge of [...edges.rows, ...edges.bars]) expect(edge).toBeCloseTo(edges.rows[0] ?? 0, 0)
 })
 
@@ -301,4 +307,56 @@ for (const width of [390, 320])
     expect(bars.height).toBeCloseTo(real.height, 0)
     expect(bars.right).toBeCloseTo(real.right, 0)
     expect(Math.abs(bars.middle - real.middle)).toBeLessThan(1)
+  })
+
+// The skeleton is the answer's shape (MOL-178, Ф-13): each part of the kit as tall as the answer it stands
+// for — the well of a search, a caption, a row of `ListRow` with its amount, a row of `OperationRow` with a
+// line under its amount (owner's В-3 «б») — and each amount where the answer's ends, at both widths: on a
+// card narrower than 22rem an operation's amount and the line under it stand under the words, in the bars
+// too (`narrow`), and a `ListRow`'s stays beside them, in the bars too (adversarial А1).
+for (const width of [390, 320])
+  test(`at ${String(width)} each part of the skeleton is as tall as the answer it stands for`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 720 })
+    await open(page, '/_kit')
+    const section = page.locator('section', {
+      has: page.getByRole('heading', { name: 'Skeleton' }),
+    })
+    await expect(section.locator('[data-part="under"]')).toBeVisible()
+    const parts = await section.evaluate((root) => {
+      const box = (selector: string) => {
+        const one = root.querySelector(selector)
+        if (!one) throw new Error(`no ${selector}`)
+        return one.getBoundingClientRect()
+      }
+      const pair = (part: string, answer: string, bars: string) => ({
+        answer: box(`[data-part="${part}"] ${answer}`).height,
+        bars: box(`[data-part="${part}"] ${bars}`).height,
+      })
+      return {
+        field: pair('field', '.well', '.skeleton-field'),
+        caption: pair('caption', '.section-caption', '.skeleton-caption'),
+        rows: pair('rows', '.list-row', '.row'),
+        under: pair('under', '.list-row', '.row'),
+        amount: {
+          answer: box('[data-part="under"] .list-row .amount').right,
+          bars: box('[data-part="under"] .row .amount').right,
+        },
+        // A `ListRow` in a plain `li` keeps its amount beside the words at any width, and so do its
+        // bars (adversarial А1): where the answer's tail ends, theirs ends.
+        tail: {
+          answer: box('[data-part="rows"] .list-row .tail').right,
+          bars: box('[data-part="rows"] .row .amount').right,
+        },
+        // Seen at all: a bar of no width stands at the right edge too, and passed the line above.
+        widths: [...root.querySelectorAll('[data-part="under"] .row .tail .bar')].map(
+          (bar) => bar.getBoundingClientRect().width,
+        ),
+      }
+    })
+    const { widths, ...pairs } = parts
+    for (const { answer, bars } of Object.values(pairs)) expect(bars).toBeCloseTo(answer, 0)
+    expect(widths).toHaveLength(2)
+    for (const one of widths) expect(one).toBeGreaterThan(20)
   })

@@ -365,7 +365,50 @@
       <AppCard as="ul" list>
         <OperationRow v-for="(row, index) in operations" :key="index" v-bind="row" />
       </AppCard>
-      <OperationSkeleton form="rows" :count="3" />
+      <SkeletonPart kind="rows" :count="3" lead="circle" tail next />
+    </section>
+
+    <!-- The skeleton (MOL-178, Ф-13): each part of the kit under the answer it stands for, so e2e holds
+         their heights at 390 and 320; then the parts that have no one component of an answer. -->
+    <section class="group">
+      <SectionCaption class="caption">{{ t('dev.kit.skeleton') }}</SectionCaption>
+      <div class="pair" data-part="field">
+        <SearchField
+          :model-value="t('dev.kit.search_sample')"
+          :label="t('dev.kit.skeleton')"
+          readonly
+        />
+        <SkeletonPart kind="field" />
+      </div>
+      <div class="pair" data-part="caption">
+        <SectionCaption as="p">{{ t('dev.kit.caption_month') }}</SectionCaption>
+        <SkeletonPart kind="caption" :width="30" />
+      </div>
+      <!-- A `ListRow` in a plain `li` stays wide at any width, its amount beside the words; its bars too
+           (adversarial А1). Words short enough not to wrap at 320: a wrap is the answer's own price. -->
+      <div class="pair" data-part="rows">
+        <AppCard as="ul" list>
+          <li>
+            <ListRow
+              :icon="IconWallet"
+              :title="t('dev.kit.row_short')"
+              :meta="t('dev.kit.row_short_meta')"
+              next
+            >
+              <template #tail>{{ figures.balance }}</template>
+            </ListRow>
+          </li>
+        </AppCard>
+        <SkeletonPart kind="rows" :count="1" lead="icon" tail next />
+      </div>
+      <div v-if="withUnder" class="pair" data-part="under">
+        <AppCard as="ul" list>
+          <OperationRow v-bind="withUnder" />
+        </AppCard>
+        <SkeletonPart kind="rows" :count="1" lead="circle" tail under next />
+      </div>
+      <SkeletonPart kind="figure" plate />
+      <SkeletonPart kind="lines" :widths="[64, 78]" />
     </section>
 
     <section class="group">
@@ -443,10 +486,10 @@ import ListRow from '@/components/ListRow.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NavRow from '@/components/NavRow.vue'
 import OperationRow from '@/components/OperationRow.vue'
-import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import SearchField from '@/components/SearchField.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
 import { operationRowProps, shortDay } from '@/components/accounts'
 import { journalRowProps } from '@/components/spending'
 import type { JournalRow } from '@/components/spending'
@@ -483,10 +526,10 @@ export default defineComponent({
     MonthSwitcher,
     NavRow,
     OperationRow,
-    OperationSkeleton,
     SearchField,
     SectionCaption,
     SegmentedControl,
+    SkeletonPart,
     VerdictBadge,
     VerdictCard,
   },
@@ -738,6 +781,15 @@ export default defineComponent({
       categories,
       categoryName,
       operations,
+      // The typical row with a line under its amount (owner's В-3 «б»): a title and a meta of a line
+      // each — of the kit's rows with both, the shortest title, since a title that wraps is taller
+      // than any bars (the price MOL-176 named).
+      withUnder: computed(
+        () =>
+          operations.value
+            .filter((row) => row.sub && row.meta)
+            .sort((one, other) => one.title.length - other.title.length)[0],
+      ),
       category: ref<string | null>('00000000-0000-4000-8000-000000000101'),
       sheetOpen: ref(false),
       scannerOpen: ref(false),
@@ -779,6 +831,11 @@ export default defineComponent({
   gap: var(--space-2);
   min-height: var(--touch-target);
   font-size: var(--text-callout);
+}
+
+.pair {
+  display: grid;
+  gap: var(--space-2);
 }
 
 .row {
