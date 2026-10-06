@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { receiptBodySchema } from '#model/contracts/receipt'
 import { serbianReceiptLink } from '#model/entities/receipt-link'
 import { madeUpSerbianLink } from './serbian-receipt'
 
@@ -100,5 +101,40 @@ describe('serbianReceiptLink', () => {
     expect(total(8_291_200n)).toBe(82_912n)
     expect(total(8_291_249n)).toBe(82_912n)
     expect(total(8_291_250n)).toBe(82_913n)
+  })
+})
+
+describe('«Отправить чек» by its link (MOL-232)', () => {
+  const link = madeUpSerbianLink({ totalHundredths: 19_190, at: new Date('2026-01-06T07:57:46Z') })
+  const byLink = {
+    id: '0b0d8f1e-5c1a-4e2b-9a64-3f0d9c4a1e77',
+    link,
+    country: 'RS',
+    language: 'ru',
+    capturedAt: '2026-10-03T08:15:00.000Z',
+  }
+  const body = {
+    id: byLink.id,
+    parts: 2,
+    country: 'AM',
+    language: 'ru',
+    capturedAt: byLink.capturedAt,
+  }
+
+  it('takes a Serbian receipt as its link, with no parts', () => {
+    expect(receiptBodySchema.safeParse(byLink).success).toBe(true)
+  })
+
+  it('refuses a link that is no receipt to record, by the code of the registry', () => {
+    const parsed = receiptBodySchema.safeParse({ ...byLink, link: link.slice(0, -10) })
+    expect(parsed.success).toBe(false)
+    expect(JSON.stringify(parsed.error?.issues)).toContain('error.receipt_link_invalid')
+    expect(receiptBodySchema.safeParse({ ...byLink, link: 'x'.repeat(2_049) }).success).toBe(false)
+  })
+
+  it('keeps each country to its own way: Armenia by photo, Serbia by link', () => {
+    expect(receiptBodySchema.safeParse({ ...byLink, country: 'AM' }).success).toBe(false)
+    expect(receiptBodySchema.safeParse({ ...body, country: 'RS' }).success).toBe(false)
+    expect(receiptBodySchema.safeParse({ ...byLink, parts: 1 }).success).toBe(false)
   })
 })

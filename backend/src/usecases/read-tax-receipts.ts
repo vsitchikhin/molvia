@@ -143,7 +143,7 @@ async function outcomeOf(
   const sums = lines.map((line) => line.sum?.minor ?? null)
   const balanced =
     sums.every((sum) => sum !== null) &&
-    sums.reduce<bigint>((all, sum) => all + (sum ?? 0n), 0n) === link.total.minor
+    sums.reduce<bigint>((all, sum) => all + sum, 0n) === link.total.minor
   return {
     kind: 'parsed',
     // who read it: the tax office, not a version of our reader

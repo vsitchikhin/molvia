@@ -1163,8 +1163,9 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             link: receipts.link,
             attempts: receipts.attempts,
           })
-        if (claimed === undefined || claimed.link === null) return null
-        return { ...claimed, link: claimed.link }
+        const link = claimed?.link
+        if (claimed === undefined || link === undefined || link === null) return null
+        return { ...claimed, link }
       })
     },
 

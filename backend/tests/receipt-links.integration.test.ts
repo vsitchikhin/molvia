@@ -175,8 +175,14 @@ describe('«Отправить чек» by its link', () => {
     expect((await send(me, payload)).statusCode).toBe(201)
     expect((await send(me, payload)).statusCode).toBe(200)
     expect((await send(me, { ...payload, link: link() })).statusCode).toBe(409)
-    const { link: _link, ...photo } = payload
-    expect((await send(me, { ...photo, parts: 1, country: 'AM' })).statusCode).toBe(409)
+    const photo = {
+      id: payload.id,
+      parts: 1,
+      country: 'AM',
+      language: payload.language,
+      capturedAt: payload.capturedAt,
+    }
+    expect((await send(me, photo)).statusCode).toBe(409)
   })
 
   it('is the same receipt sent again once read, its link gone', async () => {
