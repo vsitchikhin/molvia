@@ -169,7 +169,7 @@
     <!-- A spending is removed on «Траты», where its row is, and its «Вернуть» comes back here with
          the step back (adversarial round 2, Ж); a trip's is the app's, wherever the trip was removed
          from (MOL-76). Both over the strip. -->
-    <FloatingDock v-if="removed || tripRemoved" class="float">
+    <template v-if="removed || tripRemoved" #undo>
       <UndoStrip
         v-if="removed"
         :key="removed.stamp"
@@ -184,8 +184,8 @@
         @tick="keepLeft"
         @expire="forgetRemoved"
       />
-      <TripUndoStrip v-else class="undo" />
-    </FloatingDock>
+      <TripUndoStrip v-else />
+    </template>
 
     <!-- Wherever there is something to write it into, a slow answer and a broken server included
          (review Т-6), and offline on a month never read while another month names the categories. -->
@@ -231,7 +231,6 @@ import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import CategoryDonutCard from '@/components/CategoryDonutCard.vue'
-import FloatingDock from '@/components/FloatingDock.vue'
 import MoneyEntries from '@/components/MoneyEntries.vue'
 import type { EntryValues } from '@/components/MoneyEntries.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
@@ -265,7 +264,6 @@ export default defineComponent({
     AppReveal,
     AppScreen,
     CategoryDonutCard,
-    FloatingDock,
     IconCloudOff,
     IconPlus,
     MoneyEntries,
@@ -626,10 +624,6 @@ export default defineComponent({
   color: var(--accent-ink);
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
-}
-
-.float > .undo {
-  flex: 1;
 }
 
 /* The answer comes in where the skeleton stood, faded only: the screen keeps it in one block of its

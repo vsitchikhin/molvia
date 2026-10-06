@@ -156,9 +156,8 @@
       </template>
     </div>
 
-    <FloatingDock v-if="store.removed || showsAdd" class="float">
+    <template v-if="store.removed" #undo>
       <UndoStrip
-        v-if="store.removed"
         :key="store.removed.stamp"
         :text="t('accounts.screen.removed', { name: store.removed.name })"
         :announcement="t('accounts.screen.removed_announced', { name: store.removed.name })"
@@ -166,7 +165,11 @@
         @restore="undoRemoval"
         @expire="store.removed = null"
       />
-      <AppButton v-else ref="addButton" size="large" class="add" @click="compose">
+    </template>
+    <!-- Not under «Вернуть»: floating 16 over the tab bar, it would stand behind the strip 8 over it,
+         until «Добавить счёт» goes into the docked strip (MOL-193). -->
+    <FloatingDock v-if="!store.removed && showsAdd" class="float">
+      <AppButton ref="addButton" size="large" class="add" @click="compose">
         <template #icon><IconPlus /></template>
         {{ t('accounts.screen.add') }}
       </AppButton>

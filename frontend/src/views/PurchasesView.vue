@@ -153,13 +153,17 @@
       :meta="workRow ? receiptMeta(workRow) : null"
     />
 
-    <!-- The action under the thumb in every state, loading and failure included: a record goes
-         through the queue and needs neither the list nor the network (MOL-77). «Вернуть» of a
-         record removed from its own screen stands above it (MOL-76). -->
-    <template #docked>
+    <!-- «Вернуть» of a record removed from its own screen (MOL-76), and of a receipt, in the one
+         place over the strip (Ф-29); each strip draws itself only while its removal can be taken back. -->
+    <template #undo>
       <TripUndoStrip />
+      <ReceiptUndoStrip v-if="country" />
+    </template>
+
+    <!-- The action under the thumb in every state, loading and failure included: a record goes
+         through the queue and needs neither the list nor the network (MOL-77). -->
+    <template #docked>
       <template v-if="country">
-        <ReceiptUndoStrip />
         <ReceiptSentLine />
         <CaptureButton :country="country" />
         <ManualEntryButton by-hand />
