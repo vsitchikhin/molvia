@@ -1,7 +1,7 @@
-import { RATE_MAX, RATE_MIN, currencySchema, isRateDay } from '@molvia/model'
+import { PUBLISHED, RATE_MAX, RATE_MIN, currencySchema, isRateDay } from '@molvia/model'
 import type { AmdRate, RateProvider } from '@molvia/model'
 
-/** What one provider published in one answer: every currency the product holds, for one day. */
+/** What one provider published in one answer: every currency it publishes (`PUBLISHED`), for one day. */
 export interface Published {
   readonly provider: RateProvider
   readonly date: string
@@ -15,8 +15,9 @@ export interface RateFeed {
 }
 
 /**
- * Every currency but the dram — the rates are against it, so it has no row of its own. Taken
- * from the schema, as the table's CHECK is: a currency added there is asked for here too, rather
+ * Every currency but the dram — what the cache is read for, whatever provider quotes it. Taken from
+ * the schema, as the table's CHECK is. What each provider is asked for is its own set, `PUBLISHED`
+ * (MOL-230): a currency added to the schema and to a provider's set there is asked of it, rather
  * than accepted by the cache and silently never fetched.
  */
 export const FOREIGN: readonly AmdRate['currency'][] = currencySchema.options.filter(
@@ -38,9 +39,10 @@ export class FeedError extends Error {
 }
 
 /**
- * Checks a parsed answer the same way for every provider. Strict on purpose: a partial write is
- * worse than none — half the currencies «fresh» and half silently yesterday's — so one missing
- * or implausible currency refuses the whole answer.
+ * Checks a parsed answer the same way for every provider, against the currencies it publishes
+ * (`PUBLISHED`, MOL-230): the Central Bank of Armenia has no dinar, and that is not a gap. Strict on
+ * purpose: a partial write is worse than none — half the currencies «fresh» and half silently
+ * yesterday's — so one missing or implausible currency of its own refuses the whole answer.
  */
 export function published(
   provider: RateProvider,
@@ -48,7 +50,7 @@ export function published(
   scaled: ReadonlyMap<string, bigint | null>,
 ): Published {
   if (!isRateDay(date)) throw new FeedError(provider, `unreadable date ${JSON.stringify(date)}`)
-  const rates = FOREIGN.map((currency): AmdRate => {
+  const rates = PUBLISHED[provider].map((currency): AmdRate => {
     const value = scaled.get(currency)
     if (value === undefined) throw new FeedError(provider, `no ${currency}`)
     if (value === null || value < RATE_MIN || value > RATE_MAX) {

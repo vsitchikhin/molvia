@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { ERROR } from '#model/support/errors'
 import { convertMoney } from '#model/entities/trip'
-import { money } from '#model/values/money'
+import { currencySchema, money } from '#model/values/money'
 import {
   OFFICIAL_RATE_FRESH_DAYS,
+  PUBLISHED,
+  RATE_BASE,
   RATE_SCALE,
   dayIn,
   decimalFromRate,
@@ -21,6 +23,7 @@ import {
   midnightIn,
   parseRate,
   pickOfficialRate,
+  publishes,
   rateCodec,
   rateFromAmd,
   todayFrom,
@@ -428,14 +431,128 @@ describe('pickOfficialRate', () => {
       expect(pickOfficialRate('RUB', 'AMD', only, sunday)?.provider).toBe('cba')
     })
   })
+
+  describe('динар — НБ Сербии, его строки к динару (MOL-230)', () => {
+    // Лист НБС 06.10.2026: динаров за рубль, доллар, евро.
+    const nbs = [
+      amd('RUB', '1.2257', '2026-10-06', 'nbs'),
+      amd('USD', '104.7068', '2026-10-06', 'nbs'),
+      amd('EUR', '117.4601', '2026-10-06', 'nbs'),
+    ]
+    const cba = [amd('RUB', '4.3123', '2026-10-06'), amd('USD', '363.44', '2026-10-06')]
+    const cbr = [
+      amd('RSD', '3.4800', '2026-10-06', 'cbr'),
+      amd('RUB', '4.2600', '2026-10-06', 'cbr'),
+    ]
+    const nbg = [
+      amd('RSD', '3.4592', '2026-10-06', 'nbg'),
+      amd('RUB', '4.2700', '2026-10-06', 'nbg'),
+    ]
+    const day = '2026-10-06'
+
+    it('динар к рублю — число НБС как есть, official', () => {
+      const pickedRate = pickOfficialRate('RUB', 'RSD', [...cba, ...cbr, ...nbg, ...nbs], day)
+      expect(pickedRate?.provider).toBe('nbs')
+      expect(pickedRate?.rate).toMatchObject({ scaled: 1_225_700n, source: 'official' })
+      // Обратная пара — делением, на шестом знаке: 1 / 1,2257 = 0,815860…
+      expect(pick('RSD', 'RUB', [...cbr, ...nbs], day)?.scaled).toBe(815_860n)
+      // Кросс внутри одного листа: долларов за евро.
+      expect(pick('EUR', 'USD', nbs, day)).toBeNull()
+    })
+
+    it('рубль НБС — это динары, а не драмы: пара драма с рублём остаётся у ЦБ РА', () => {
+      const pickedRate = pickOfficialRate('RUB', 'AMD', [...nbs, ...cba], day)
+      expect(pickedRate?.provider).toBe('cba')
+      expect(pickedRate?.rate.scaled).toBe(4_312_300n)
+      // ЦБ РА молчит — НБС пару драма не собирает: у него нет драма.
+      const stale = [amd('RUB', '4.3123', '2026-09-01')]
+      expect(pickOfficialRate('RUB', 'AMD', [...stale, ...nbs], day)?.provider).toBe('cba')
+      expect(pickOfficialRate('USD', 'AMD', nbs, day)).toBeNull()
+    })
+
+    it('динар к драму — НБ Грузии official; ЦБ РФ — запасной, НБС не участвует', () => {
+      const pickedRate = pickOfficialRate('RSD', 'AMD', [...cba, ...cbr, ...nbg, ...nbs], day)
+      expect(pickedRate?.provider).toBe('nbg')
+      expect(pickedRate?.rate).toMatchObject({ scaled: 3_459_200n, source: 'official' })
+      const silent = [amd('RSD', '3.4000', '2026-09-20', 'nbg')]
+      const fallback = pickOfficialRate('RSD', 'AMD', [...silent, ...cbr, ...nbs], day)
+      expect(fallback?.provider).toBe('cbr')
+      expect(fallback?.rate.source).toBe('fallback')
+    })
+
+    it('НБС молчит больше недели — ЦБ РФ, fallback; ЦБ РА динара не даёт', () => {
+      const old = [amd('RUB', '1.2500', '2026-09-20', 'nbs')]
+      const pickedRate = pickOfficialRate('RSD', 'RUB', [...old, ...cba, ...cbr], day)
+      expect(pickedRate?.provider).toBe('cbr')
+      expect(pickedRate?.rate.source).toBe('fallback')
+      // 3,48 / 4,26 рубля за динар.
+      expect(pickedRate?.rate.scaled).toBe(816_901n)
+      // Ровно неделя — ещё НБС.
+      expect(pickOfficialRate('RSD', 'RUB', [...old, ...cbr], '2026-09-27')?.provider).toBe('nbs')
+    })
+
+    it('rateFromAmd считает в базе провайдера: без неё рубль НБС прочитан как драмы', () => {
+      expect(rateFromAmd('RUB', 'RSD', nbs, 'official', 'RSD')?.scaled).toBe(1_225_700n)
+      expect(rateFromAmd('RUB', 'AMD', nbs, 'official', 'RSD')).toBeNull()
+      expect(rateFromAmd('RSD', 'AMD', nbs, 'official', 'RSD')).toBeNull()
+    })
+  })
 })
 
-describe('homeBankOf (MOL-110)', () => {
+describe('homeBankOf (MOL-110, MOL-230)', () => {
   it('лари — НБ Грузии с любой стороны пары, остальное — ЦБ РА', () => {
     expect(homeBankOf('GEL', 'RUB')).toBe('nbg')
     expect(homeBankOf('AMD', 'GEL')).toBe('nbg')
     expect(homeBankOf('RUB', 'AMD')).toBe('cba')
     expect(homeBankOf('USD', 'EUR')).toBe('cba')
+  })
+
+  it('динар — НБ Сербии там, где он знает обе валюты, и НБ Грузии против драма и лари', () => {
+    for (const other of ['RUB', 'USD', 'EUR'] as const) {
+      expect(homeBankOf('RSD', other)).toBe('nbs')
+      expect(homeBankOf(other, 'RSD')).toBe('nbs')
+    }
+    // У НБС нет драма, у ЦБ РА — динара: пара из одного ответа есть только у НБ Грузии (В-5 «а»).
+    expect(homeBankOf('RSD', 'AMD')).toBe('nbg')
+    expect(homeBankOf('AMD', 'RSD')).toBe('nbg')
+    expect(homeBankOf('RSD', 'GEL')).toBe('nbg')
+    expect(homeBankOf('GEL', 'RSD')).toBe('nbg')
+  })
+
+  it('банк страны не берёт чужую пару, даже публикуя обе её валюты', () => {
+    // НБ Грузии знает драм и рубль, но пара драма с рублём — ЦБ РА (MOL-110, Р-1).
+    for (const [one, other] of [
+      ['AMD', 'RUB'],
+      ['USD', 'AMD'],
+      ['EUR', 'RUB'],
+    ] as const) {
+      expect(homeBankOf(one, other)).toBe('cba')
+    }
+  })
+
+  it('банк пары всегда публикует обе её валюты — кроме пары из одной валюты', () => {
+    for (const one of currencySchema.options) {
+      for (const other of currencySchema.options) {
+        if (one === other) continue
+        const bank = homeBankOf(one, other)
+        expect(publishes(bank, one) && publishes(bank, other), `${one}/${other}`).toBe(true)
+      }
+    }
+  })
+})
+
+describe('PUBLISHED и RATE_BASE (MOL-230)', () => {
+  it('у ЦБ РА нет динара, у НБС — драма и лари; строки НБС — к динару', () => {
+    expect(publishes('cba', 'RSD')).toBe(false)
+    expect(publishes('nbs', 'AMD')).toBe(false)
+    expect(publishes('nbs', 'GEL')).toBe(false)
+    expect(publishes('nbs', 'RSD')).toBe(true)
+    expect(RATE_BASE.nbs).toBe('RSD')
+    for (const provider of ['cba', 'cbr', 'erapi', 'nbg'] as const) {
+      expect(RATE_BASE[provider]).toBe('AMD')
+      expect(PUBLISHED[provider]).not.toContain('AMD')
+    }
+    expect(PUBLISHED.nbs).not.toContain('RSD')
   })
 })
 

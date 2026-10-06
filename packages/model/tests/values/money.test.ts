@@ -4,6 +4,7 @@ import { INT8_MAX } from '#model/support/decimal'
 import { DomainError, ERROR } from '#model/support/errors'
 import {
   MINOR_EXPONENT,
+  TILL_STEP_MINOR,
   addMoney,
   compareMoney,
   currencySign,
@@ -128,6 +129,15 @@ describe('formatMoney', () => {
     }
     expect(digits(formatMoney(money(345n, 'GEL')))).toBe('3,45₾')
     expect(currencySign('AMD')).toBe('֏')
+  })
+
+  it('печатает динар как браузер — «RSD», с двумя знаками ISO 4217 (MOL-230, В-4 MOL-110)', () => {
+    expect(formatMoney(money(123_450n, 'RSD'))).toContain('RSD')
+    expect(digits(formatMoney(money(123_450n, 'RSD')))).toBe('1234,50RSD')
+    expect(currencySign('RSD', 'en-US')).toBe('RSD')
+    expect(minorPerMajor('RSD')).toBe(100n)
+    // Касса — целые динары, как драмы (MOL-230).
+    expect(TILL_STEP_MINOR.RSD).toBe(TILL_STEP_MINOR.AMD)
   })
 
   it('stays exact past 2^53 instead of drifting or printing infinity', () => {

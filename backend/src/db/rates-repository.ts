@@ -1,5 +1,5 @@
 import { and, asc, eq, gte, inArray, lt, lte, max, sql } from 'drizzle-orm'
-import { RATE_JUMP_HISTORY } from '@molvia/model'
+import { RATE_BASE, RATE_JUMP_HISTORY } from '@molvia/model'
 import type { AmdRate, CachedRate, RateProvider } from '@molvia/model'
 import type { Conn } from './index'
 import { officialRates } from './schema'
@@ -40,6 +40,9 @@ export interface RateRepository {
 
   /** When any provider's answer was last written — whether the boot refresh can be skipped. */
   lastFetchedAt(): Promise<Date | null>
+
+  /** The providers with a row in the cache — whether a source asked every hour has ever written. */
+  writtenBy(): Promise<ReadonlySet<RateProvider>>
 
   /**
    * The history of the central bank (MOL-137, Р-4): only the days the cache does not have yet — a
@@ -89,6 +92,7 @@ export function createRateRepository(db: Conn): RateRepository {
           rates.map((rate) => ({
             provider: rate.provider,
             currency: rate.currency,
+            base: RATE_BASE[rate.provider],
             rateDate: rate.date,
             scaled: rate.scaled,
             jump: rate.jump,
@@ -150,6 +154,7 @@ export function createRateRepository(db: Conn): RateRepository {
               rates.slice(start, start + WRITE_CHUNK).map((rate) => ({
                 provider: rate.provider,
                 currency: rate.currency,
+                base: RATE_BASE[rate.provider],
                 rateDate: rate.date,
                 scaled: rate.scaled,
                 jump: rate.jump,
@@ -187,6 +192,11 @@ export function createRateRepository(db: Conn): RateRepository {
     async lastFetchedAt() {
       const [row] = await db.select({ at: max(officialRates.fetchedAt) }).from(officialRates)
       return row?.at ?? null
+    },
+
+    async writtenBy() {
+      const rows = await db.selectDistinct({ provider: officialRates.provider }).from(officialRates)
+      return new Set(rows.map((row) => row.provider))
     },
   }
 }

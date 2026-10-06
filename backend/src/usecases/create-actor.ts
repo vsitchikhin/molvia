@@ -4,10 +4,10 @@ import type { Actor, Currency, NewActor, TelegramUserId } from '@molvia/model'
 import type { ActorRepository } from '@/db/actors-repository'
 
 /**
- * What a country's shops take, where it is not the dram (MOL-110): a person from Tbilisi starts
- * spending lari. Serbia keeps the dram until the dinar comes (MOL-230).
+ * What a country's shops take, where it is not the dram: a person from Tbilisi starts spending lari
+ * (MOL-110), one from Belgrade dinars (MOL-230).
  */
-const SPEND_CURRENCY: Readonly<Partial<Record<string, Currency>>> = { GE: 'GEL' }
+const SPEND_CURRENCY: Readonly<Partial<Record<string, Currency>>> = { GE: 'GEL', RS: 'RSD' }
 
 /**
  * Four columns are NOT NULL, so the server names them before the person has seen the settings.

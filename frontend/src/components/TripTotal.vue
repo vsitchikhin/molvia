@@ -53,12 +53,19 @@ import {
   formatRateBeside,
   yerevanDate,
 } from '@molvia/model'
-import type { Money, TripView } from '@molvia/model'
+import type { Money, RateProvider, TripView } from '@molvia/model'
 import { calendarDay } from '@/days'
 import { read, writeEverywhere } from '@/stores/storage'
 import SectionCaption from '@/components/SectionCaption.vue'
 
 const FLIPPED = 'molvia.total-flipped'
+
+/**
+ * The publishers whose terms ask for their name beside every rate taken from them (MOL-230, review 1):
+ * the National Bank of Serbia lets its lists be reproduced «with the source visibly named every time».
+ * Every other bank is named where it is silent or stale, and the aggregator in the fallback's note.
+ */
+const NAMED_BESIDE: ReadonlySet<RateProvider> = new Set(['nbs'])
 
 /**
  * «ИТОГО 6 493,12 ֏ ≈ 1 347 ₽ · курс 4,82 ֏/₽ · 18 сент.» — the one permanent place in the app
@@ -179,7 +186,16 @@ export default defineComponent({
       // two ways a line apart (review Т-11, adversarial А‴).
       const jump = props.trip.rateJump
       const anchor = jump ? (jump.previous ?? jump.jumped) : null
-      return t(rate.source === 'personal' ? 'trip.rate_line_mine' : 'trip.rate_line', {
+      const provider = props.trip.rateProvider
+      const named = rate.source !== 'personal' && provider !== null && NAMED_BESIDE.has(provider)
+      const key =
+        rate.source === 'personal'
+          ? 'trip.rate_line_mine'
+          : named
+            ? 'trip.rate_line_source'
+            : 'trip.rate_line'
+      return t(key, {
+        source: named ? t(`exchange.card_source_${provider}`) : '',
         rate: anchor
           ? formatRateBeside(rate, anchor, locale.value)
           : formatRate(rate, locale.value),

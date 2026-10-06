@@ -235,6 +235,25 @@ test('moves to Georgia: the city list follows the country, the lari is a spendin
   await expect(spending).toHaveValue('GEL')
 })
 
+test('moves to Serbia: the dinar is a spending currency and stays chosen (MOL-230)', async ({
+  page,
+}) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  const country = page.getByLabel('Страна', { exact: true })
+  await country.selectOption({ label: 'Сербия' })
+  await expect(page.getByLabel('Город', { exact: true })).toHaveValue('Белград')
+  const spending = page.getByLabel('Валюта трат', { exact: true })
+  await spending.selectOption({ label: 'Сербский динар · RSD' })
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(
+    page.locator('.dock').getByText('Настройки сохранены', { exact: true }),
+  ).toBeVisible()
+  await page.reload()
+  await expect(country).toHaveValue('RS')
+  await expect(spending).toHaveValue('RSD')
+})
+
 test('lost save responses remain uncertain until a read confirms the result', async ({
   page,
 }, testInfo) => {

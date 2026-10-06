@@ -1,5 +1,5 @@
-import { RATE_DIGITS, RATE_SCALE, divideRounded, scaledFromDecimal } from '@molvia/model'
-import { FOREIGN, FeedError, published, request } from './feed'
+import { PUBLISHED, RATE_DIGITS, RATE_SCALE, divideRounded, scaledFromDecimal } from '@molvia/model'
+import { FeedError, published, request } from './feed'
 import type { Published, RateFeed } from './feed'
 
 export const CBR_URL = 'https://www.cbr.ru/scripts/XML_daily.asp'
@@ -41,7 +41,7 @@ export function parseCbr(xml: string): Published {
   if (dram === null) throw new FeedError('cbr', 'no AMD')
 
   const scaled = new Map<string, bigint | null>()
-  for (const currency of FOREIGN) {
+  for (const currency of PUBLISHED.cbr) {
     const quote = currency === 'RUB' ? { nominal: 1n, value: RATE_SCALE } : quoteOf(xml, currency)
     // drams per unit = (roubles per unit) / (roubles per dram)
     //                = (value / nominal) / (dram.value / dram.nominal)
