@@ -6,9 +6,12 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 ## packages/model
 
 - `packages/model/src/contracts/catalogue.ts` — Wire contract of the catalogue: the search query and its bound, the entry allowlist, the answer with `near`, the «Предложить товар» body.
+- `packages/model/src/contracts/merge.ts` — Wire contract of the merge of twins (MOL-106): items and places, the modes `on`/`report`/`off`, the morning's report to the owner with the pairs merged and the candidates.
 - `packages/model/src/entities/item.ts` — Entity: a catalogue item — kind, name, search key, barcodes, unit — and the schema of a new item.
 - `packages/model/src/support/search-key.ts` — `toSearchKey`, the frozen alphabet — Cyrillic with Serbian, Armenian, Georgian, Serbian Latin (MOL-109) — that folds any spelling of a name to one key, `unfinishedFoldSpellings` for a word typed halfway through a fold, and `nameIdentity` for duplicates.
 - `packages/model/src/support/synonyms.ts` — The synonym dictionary (`synonymKeys`) and the word-of-the-kind rules: adjective and noun patterns, `WORD_BREAK`, `kindKey`.
+- `packages/model/src/support/edits.ts` — `levenshtein`: edits between two strings by code point, shared by the receipt matcher and the merge of twins.
+- `packages/model/src/entities/twins.ts` — When two names are one thing written twice (MOL-106): the sizes with their units, the words left, and the spelling of a pair word against word in any order.
 - `packages/model/src/support/text.ts` — Visible-text rules shared by every name: `INVISIBLE`, `visibleLine`/`visibleText`, `pastedLine` for what a paste brings along.
 
 ## packages/model · tests
@@ -25,6 +28,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 
 - `backend/src/usecases/embed-items.ts` — The one writer of item vectors (MOL-105): every item without a vector of the current model, in batches; a minute timer nudged by a proposal and by the model's load. Tests: `embed-items.test.ts`.
 - `backend/src/usecases/embed-items.test.ts` — Use-case test: the writer fills every missing vector batch by batch, rewrites another model's, waits for no model; a nudge during a run repeats it once.
+- `backend/src/usecases/merge-twins.ts` — The night of the merge of twins (MOL-106): from half past four in Yerevan, once a day by the instance that claims it, the pairs judged by `twinVerdict` merged — or only named in `report` mode — new candidates named once, the report handed at nine. Tests: `merge-twins.test.ts`.
 - `backend/src/usecases/propose-item.ts` — Use case «Предложить товар»: the item of the same name already there, or a new one in the asker's name.
 - `backend/src/usecases/query-meaning.ts` — The vector of a query for the search by meaning (MOL-105), from four letters and only if it came in time; else the letters alone.
 - `backend/src/usecases/search-catalogue.ts` — Use case: the catalogue lookup behind «Что взяли?», at most `SEARCH_LIMIT` rows, writing nothing to the event log.
@@ -34,6 +38,8 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 - `backend/src/db/kind-word.ts` — `kindAt`: where the word of the kind stands in a name, the one SQL spelling of `kindKey` (MOL-45) — read by the search's synonyms and by «Тут дешевле»'s items of a kind (MOL-92).
 - `backend/src/db/item-embeddings-repository.ts` — Repository of item vectors (MOL-105): the items without one of a model, and the vectors written — another model's replaced, an item gone skipped.
 - `backend/src/db/items-repository.ts` — Repository of items: the ranked search (candidates, distance, units, synonyms, picks, `near`) and `createUnlessNamed`. Tests: `backend/tests/search.integration.test.ts`.
+- `backend/src/db/merge-repository.ts` — The merge of twins (MOL-106): an item or a place into another in one transaction, every row moved and written down, one person's two verdicts settled; the undo by the journal, and the sweep of what reached a trace after its merge. Tests: `backend/tests/merge.integration.test.ts`.
+- `backend/src/db/trace.ts` — `liveItemId` and `livePlaceId` (MOL-106): the id an item or a place stands for now — the survivor of the merge it went into, else itself — for every write by an id.
 - `backend/src/db/rekey.ts` — `rekeyItems`: at the API's start, every stored search key brought to what `toSearchKey` gives its name today, under a lock against writes (MOL-109). Tests: `backend/tests/rekey.integration.test.ts`.
 - `backend/src/db/search-picks-repository.ts` — Repository of remembered picks: a query and the item taken after it, and the person's own word (`admits`). Tests: `backend/tests/search-picks.integration.test.ts`.
 - `backend/src/db/seed-repository.ts` — Repository writing the seed in one transaction: adds new names, reports those kept and twins under another spelling. Tests: `backend/tests/seed-catalogue.integration.test.ts`.
@@ -42,6 +48,8 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 
 - `backend/src/embeddings/embedder.ts` — The model of the search by meaning in the API (MOL-105): loaded in the background with onnxruntime's telemetry off, queries ahead of names, a wait of 150 ms, a cache of queries; without it no vector and the letters alone.
 - `backend/src/embeddings/model.json` — The pinned model: EmbeddingGemma-300m q4, its revision and the sha256 of every file — read by the API and by `bin/fetch-model.mjs`.
+- `backend/src/merge-command.ts` — The owner's hand on the merge of twins (MOL-106, В-2): a candidate merged by two ids, a merge undone by its number — a chain from its end — two things said apart, the open candidates and a night's every pair listed; a dry run unless `--yes`.
+- `backend/src/merge-cli.ts` — Entry of `dist/merge.js` in the API image: runs the merge command against the database, a dry run rolled back. Tests: `backend/tests/merge-command.integration.test.ts`.
 - `backend/src/catalogue-seed.ts` — The seed list: some six hundred common names without brands, each with the unit its price is compared by.
 - `backend/src/catalogue-seed-nodes.ts` — The seed's items as a receipt reaches them (MOL-126): their Armenian names and customs headings, one entry per seed line, written by `make seed` to `item_names` and `item_hs`.
 - `backend/src/seed-catalogue-cli.ts` — Entry point of `dist/seed-catalogue.js`: connects to the database and runs the seed command.
@@ -50,6 +58,10 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 ## backend · tests
 
 - `backend/tests/catalogue.integration.test.ts` — Integration test: both catalogue routes through the server — the door, the query bound, the wire answer, no event, proposal dedup.
+- `backend/tests/merge-corpus.integration.test.ts` — Integration test: the night on the seed with the real model — the twins typed beside a seed line merge into it, no seed pair merges, one key in two scripts and a doubtful typo are only named.
+- `backend/tests/merge-command.integration.test.ts` — Integration test: `dist/merge.js` from the bundle — a dry run changes nothing, `--yes` merges, the undo by its number, the refusals and the usage.
+- `backend/tests/merge.integration.test.ts` — Integration test: a merge moves every row and writes it down, two verdicts of one person settle, the 0.2 gate at five stays put, the undo restores a snapshot, the sweep, places by city.
+- `backend/tests/merge-trace.integration.test.ts` — Integration test: an id or a name of a merged item or place, on every path that writes by it — read, rated, bought, picked, coded, remembered, proposed, typed — lands on the survivor; the search finds the survivor by the trace's name, once.
 - `backend/tests/rekey.integration.test.ts` — Integration test: a key drifted from today's tables is rewritten, a current one left, a second start writes nothing (MOL-109).
 - `backend/tests/search-corpus.integration.test.ts` — Integration test: the whole corpora and the owner's shelf through the real search, every answer pinned whole, near and far included.
 - `backend/tests/search-meaning.integration.test.ts` — Integration test: the search by meaning on the seed with the real model — shelf words, the owner's words unmoved, nothing near for things absent, other models unread, the HNSW plan, the server and the writer.
@@ -81,3 +93,7 @@ Rules: `.claude/rules/search.md`. A test beside its source, or mirroring it unde
 ## e2e
 
 - `e2e/item-search.spec.ts` — End-to-end: «Что взяли?» finds by typo and Latin, drives by keyboard, proposes on a miss, says far, works offline.
+
+## bin
+
+- `bin/merge.sh` — Script behind `make merge`, `make unmerge`, `make apart`, `make merge-night` and `make merge-candidates` (MOL-106): the owner's merge of a candidate and the undo, in this copy's database, a dry run unless `--yes`; the production line in its header.

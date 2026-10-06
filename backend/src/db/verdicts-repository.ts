@@ -6,6 +6,7 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
 import { actors, items, verdicts } from './schema'
+import { liveItemId } from './trace'
 
 export interface RatedVerdict {
   readonly verdict: Verdict
@@ -32,8 +33,9 @@ export interface VerdictRepository {
    */
   amend(actorId: string, itemId: string, patch: VerdictPatch): Promise<Verdict | null>
   /**
-   * Takes the person's verdict on a product back. The row stays, for the 0.2 gate only
-   * (schema, `deleted_at`); the text goes. `false` when there was nothing of theirs to take.
+   * Takes the person's verdict on a product back. The row stays, for the 0.2 gate and for the
+   * reminder, which skips a purchase made before it (schema, `deleted_at`); the text goes.
+   * `false` when there was nothing of theirs to take.
    */
   withdraw(actorId: string, itemId: string): Promise<boolean>
   forItem(actorId: string, itemId: string, placeId: string | null): Promise<Verdict | null>
@@ -62,7 +64,8 @@ export interface VerdictRepository {
    * `windowHours` of appearing (MOL-49). A query over this table, never an event: the log
    * must not repeat what a domain table already knows.
    *
-   * **The one reader that counts withdrawn verdicts.** The gate asks whether someone *gave*
+   * **A reader that counts withdrawn verdicts** — with the reminder, which skips a purchase made
+   * before the withdrawal (MOL-101), the only two (MOL-97, В1). The gate asks whether someone *gave*
    * five, and «rated five, took one back» is five (MOL-27, the owner's decision). Rating again
    * brings back the same row with its `rated_at`, so withdrawing and re-rating cannot move
    * anyone here, and one row per «actor + item + place» makes a re-rating one verdict.
@@ -332,7 +335,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         .where(
           and(
             eq(verdicts.actorId, actorId),
-            eq(verdicts.itemId, itemId),
+            // An id from before a merge reaches the survivor's verdict (MOL-106).
+            sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
             // Products only until 0.3 — the path names an item, and a product has no place.
             isNull(verdicts.placeId),
             isNull(verdicts.deletedAt),
@@ -353,7 +357,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         .where(
           and(
             eq(verdicts.actorId, actorId),
-            eq(verdicts.itemId, itemId),
+            // An id from before a merge reaches the survivor's verdict (MOL-106).
+            sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
             isNull(verdicts.placeId),
             // A second withdrawal finds nothing: the first one's time is the one that stands.
             isNull(verdicts.deletedAt),
@@ -376,7 +381,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         .where(
           and(
             eq(verdicts.actorId, actorId),
-            eq(verdicts.itemId, itemId),
+            // An id from before a merge reaches the survivor's verdict (MOL-106).
+            sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
             // A product is rated as itself and carries no place, so the empty place is a
             // value here, not a missing filter.
             placeId === null ? isNull(verdicts.placeId) : eq(verdicts.placeId, placeId),
@@ -392,7 +398,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
       const rows = await db
         .select()
         .from(verdicts)
-        // A withdrawn verdict is kept for the gate only (schema, `deleted_at`).
+        // A withdrawn verdict is kept for the gate and the reminder (schema, `deleted_at`).
         .where(and(eq(verdicts.actorId, actorId), isNull(verdicts.deletedAt)))
         .orderBy(desc(verdicts.updatedAt), desc(verdicts.id))
         .limit(rowLimit(limit))
@@ -446,8 +452,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             max(${verdicts.score}) filter (where ${mine}) as own_score,
             max(${verdicts.review}) filter (where ${mine}) as own_review
           from ${verdicts}
-          -- A withdrawn verdict is kept for the 0.2 gate alone: it is nobody's opinion, so
-          -- it is neither a score nor a contribution here.
+          -- A withdrawn verdict is kept for the 0.2 gate and the reminder: it is nobody's
+          -- opinion, so it is neither a score nor a contribution here.
           where ${verdicts.deletedAt} is null
             ${scope === 'own' ? sql`and ${mine}` : sql``}
             ${only ? sql`and ${inArray(verdicts.itemId, only)}` : sql``}
@@ -608,8 +614,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
           from cohort c
           join ${verdicts} v on v.actor_id = c.actor_id
           where v.rated_at < c.started + make_interval(hours => ${windowHours}::int)
-            -- No deleted_at filter: the gate is the one reader that counts withdrawn
-            -- verdicts (MOL-27). Every other reader of this table must have it.
+            -- No deleted_at filter: the gate counts withdrawn verdicts (MOL-27), and so does the
+            -- reminder by their moment (MOL-101). Every other reader of this table must have it.
           group by c.actor_id
           having count(*) >= ${ratings}::int
         )

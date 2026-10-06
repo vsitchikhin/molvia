@@ -76,9 +76,10 @@ The log's writer, the cohort and both gate queries are pinned in `.claude/rules/
 - **An objection takes a person out of both gates** (MOL-96): `actors.analytics_off_at`; off erases
   their log under its lock and «Что брать» writes nothing more; each gate names them in a line of its
   own, after time and access; back on counts in 0.3 only from before week four (`analytics_on_at`).
-- **The 0.2 gate is `VerdictRepository.reachedRatings`** (MOL-49): the one reader of `verdicts`
-  without `deleted_at IS NULL`; its `from` is the release of 0.2, passed by the caller; a window
-  still open is left out; a verdict counts from when the server received it.
+- **The 0.2 gate is `VerdictRepository.reachedRatings`** (MOL-49): one of two readers that act on a
+  withdrawn verdict, with the reminder (MOL-101) — the copy only shows it, `put` brings it back; its
+  `from` is the release of 0.2, passed by the caller; a window still open is left out; a verdict
+  counts from when the server received it.
 - **Both gates are read by `dist/gates.js`** (MOL-91), `make gates FROM=…` in a copy: `n` beside
   every share, the stop line printed and no verdict; gate 0.3 closes its window as 0.2 does; the
   erased leave one number, by week of arrival, in `erasures`.
@@ -185,6 +186,16 @@ that are easiest to break; the file holds every rule of the area and the reason 
   four letters — measured, and a vector of another model is never read.
 - **The catalogue grows by «Предложить товар» and the seed** (MOL-112): the seed only adds, is
   not a migration, never stays in `_test` or `_e2e`, and holds no brands.
+- **Twins are merged by the night, and a false merge is worse than a missed one** (MOL-106): every
+  size with its unit (by its spelling, never the search key), one edit a word, two a name, the meaning
+  at 0.90 — measured on the seed; two scripts and a brand's extra word never merge, by the code. Places
+  by the same rule, one city each, and only as one spelling — as written, not by the key: a shop's
+  name is a proper name.
+- **A merged item or place stays a trace** (`merged_into`): its name is the survivor's second name,
+  every write by an id goes through `liveItemId` / `livePlaceId`, the search answers the survivor once;
+  one person's two verdicts stay two rows, so the gate does not move. **Production runs
+  `CATALOGUE_MERGE=report` until the owner says `on`** (В-3); `make unmerge ID=` takes a merge back,
+  a chain from its end.
 
 ### «Что брать» and verdicts — `.claude/rules/advice.md`
 
@@ -207,8 +218,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   by rating down, then name.
 - **The limit never cuts one's own rows or the warnings** (Р-23, Р-25:
   `ADVICE_WARNINGS_RESERVED`); the server names no superlative; every row carries `isMine`.
-- **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, **every other reader
-  filters `deleted_at IS NULL`**; the reminder skips a purchase made before the withdrawal (MOL-101).
+- **A withdrawn verdict is still a row** (MOL-27): the gate counts every row, and so does the
+  reminder, which skips a purchase made before the withdrawal (MOL-101) — so the row outlives
+  «Учитывать меня в статистике» off (MOL-97, В1); **every other reader filters
+  `deleted_at IS NULL`** but the copy, which marks it, and `put`, which brings it back.
 - **A place is named with its city only where its name stands in two cities of one set** (MOL-120):
   the queue of «Оценки», a row of «Что брать», one reminder — one rule, `cityWhereNameRepeats` in
   the domain; the city is optional on the wire, and a place without one leaves its set named as
@@ -369,7 +382,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   and «Удалить мои данные» in the settings (`DELETE /actors/me`, MOL-94) — in one transaction; catalogue items stay
   with `created_by` nulled, every place stays, and one is added to `erasures` — a count by week of
   arrival, no id (MOL-91). **A new table that points at `actors` must join
-  erasure** — a test holds `ACTOR_REFERENCES` to every foreign key.
+  erasure** — a test holds `ACTOR_REFERENCES` to every foreign key — **and the record of processing**
+  (Confluence 12091393, MOL-97) in the same PR, as must a new recipient; nothing holds that one.
 - **The copy is what erasure takes** (`GET /actors/me/export`, MOL-93): a section per erased table,
   counted against a dry run, **and every column exported or left out with its reason**
   (`EXPORT_COLUMNS`); stored, never counted; the removed marked; no secret.

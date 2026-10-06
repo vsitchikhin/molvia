@@ -7,13 +7,15 @@ import { eq, sql } from 'drizzle-orm'
 import { EVENT, analyticsSettingSchema } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createEventRepository } from '@/db/events-repository'
-import { actors, events } from '@/db/schema'
+import { createVerdictRepository } from '@/db/verdicts-repository'
+import { actors, events, verdicts } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, signIn } from './fixtures'
+import { clearAll, insertActor, insertItem, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const log = createEventRepository(db)
+const verdictRepository = createVerdictRepository(db)
 let app: FastifyInstance
 
 beforeAll(async () => {
@@ -73,6 +75,33 @@ async function moments(id: string) {
 
 async function rowsOf(id: string) {
   return db.select().from(events).where(eq(events.actorId, id))
+}
+
+async function rate(me: Owner, itemId: string) {
+  const reply = await app.inject({
+    method: 'PUT',
+    url: `/verdicts/${itemId}`,
+    headers: { cookie: me.cookie },
+    payload: { score: 2, review: 'Пахнет крахмалом' },
+  })
+  expect([200, 201]).toContain(reply.statusCode)
+}
+
+async function withdraw(me: Owner, itemId: string) {
+  const reply = await app.inject({
+    method: 'DELETE',
+    url: `/verdicts/${itemId}`,
+    headers: { cookie: me.cookie },
+  })
+  expect(reply.statusCode).toBe(204)
+}
+
+async function verdictsOf(id: string) {
+  const rows = await db
+    .select({ itemId: verdicts.itemId, deletedAt: verdicts.deletedAt })
+    .from(verdicts)
+    .where(eq(verdicts.actorId, id))
+  return rows.map((row) => ({ itemId: row.itemId, withdrawn: row.deletedAt !== null }))
 }
 
 async function openAdvice(me: Owner) {
@@ -172,6 +201,39 @@ describe('выключение', () => {
       ])
       expect(await rowsOf(me.id)).toHaveLength(0)
     }
+  })
+})
+
+describe('снятые оценки (MOL-97, В1)', () => {
+  // A withdrawn verdict has a second reader besides gate 0.2: the reminder skips a purchase made
+  // before the withdrawal (MOL-101). Off stops the gate's counting, which reads the objection as it
+  // stands; the row stays for the reminder, on the contract.
+  it('выключение снятые оценки не стирает — их читает напоминание', async () => {
+    const me = await owner()
+    const milk = await insertItem(db)
+    const bread = await insertItem(db, { name: 'Хлеб', searchKey: 'hleb', defaultUnit: 'piece' })
+    await rate(me, milk)
+    await rate(me, bread)
+    await withdraw(me, milk)
+
+    await choose(me, false)
+    const rows = await verdictsOf(me.id)
+    expect(rows).toHaveLength(2)
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { itemId: milk, withdrawn: true },
+        { itemId: bread, withdrawn: false },
+      ]),
+    )
+  })
+
+  it('снятие у выключенного оставляет строку, как у включённого', async () => {
+    const me = await owner()
+    const milk = await insertItem(db)
+    await choose(me, false)
+    await rate(me, milk)
+    expect(await verdictRepository.withdraw(me.id, milk)).toBe(true)
+    expect(await verdictsOf(me.id)).toEqual([{ itemId: milk, withdrawn: true }])
   })
 })
 

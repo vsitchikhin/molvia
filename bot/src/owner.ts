@@ -2,7 +2,12 @@ import { GrammyError, InputFile } from 'grammy'
 import type { Api } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
-import type { FeedbackContinuedNotice, FeedbackNotice, OwnerNotice } from '@molvia/model'
+import type {
+  CatalogueMergedNotice,
+  FeedbackContinuedNotice,
+  FeedbackNotice,
+  OwnerNotice,
+} from '@molvia/model'
 import { t } from './i18n'
 import { telegramFailure } from './assemble'
 import { sleep } from './deliver'
@@ -16,6 +21,7 @@ import { reportDefect } from './failure'
 export function ownerText(notice: OwnerNotice): string {
   if (notice.kind === 'feedback') return feedbackText(notice)
   if (notice.kind === 'feedback_continued') return continuedText(notice)
+  if (notice.kind === 'catalogue_merged') return mergedText(notice)
   if (notice.kind === 'failure_muted') {
     // Said only what is so (review №10, adversarial Г2): no «скрыто: 0», and `make failures` only for
     // the held ones — the unwritten are in no table.
@@ -58,6 +64,94 @@ export function ownerText(notice: OwnerNotice): string {
     }),
     t(undefined, 'owner.failure.more'),
   ].join('\n')
+}
+
+/** A name of the catalogue or a place as the report prints it: cut, so ten pairs fit one message. */
+const PRINTED_NAME = 60
+
+function printed(name: string): string {
+  const chars = Array.from(name)
+  return chars.length <= PRINTED_NAME ? name : `${chars.slice(0, PRINTED_NAME - 1).join('')}…`
+}
+
+function pairText(
+  subject: 'item' | 'place',
+  from: string,
+  into: string,
+  city: string | undefined,
+): string {
+  const pair = t(undefined, 'owner.merge.pair', { from: printed(from), into: printed(into) })
+  if (subject === 'item') return pair
+  return t(undefined, 'owner.merge.place', { pair, city: city ?? '' })
+}
+
+/**
+ * The longest morning's report: Telegram takes 4096 characters and answers 400 past them, and a report
+ * refused is lost — it is handed once (review №9, adversarial Б2). Room is left for the closing lines.
+ */
+export const MERGE_TEXT_MAX = 4000
+const MERGE_TEXT_TAIL = 300
+
+/**
+ * The morning's report of the night's merge (MOL-106): sent every morning, nothing merged included —
+ * it is also the word that the night ran. In `report` mode it says what would have merged (В-3). Pairs
+ * are printed while the message holds them; the rest are counted, and a candidate cut for length is
+ * named by `make merge-candidates`, which lists every one named and still apart.
+ */
+function mergedText(notice: CatalogueMergedNotice): string {
+  const on = notice.mode === 'on'
+  const lines = [
+    t(undefined, on ? 'owner.merge.head' : 'owner.merge.headReport', {
+      day: notice.day,
+      merged: notice.merged,
+      candidates: notice.candidates,
+    }),
+  ]
+  let length = lines[0]?.length ?? 0
+  const fits = (block: readonly string[]): boolean => {
+    const more = block.reduce((sum, line) => sum + line.length + 1, 0)
+    if (length + more > MERGE_TEXT_MAX - MERGE_TEXT_TAIL) return false
+    lines.push(...block)
+    length += more
+    return true
+  }
+
+  if (notice.mergedPairs.length > 0) {
+    fits(['', t(undefined, on ? 'owner.merge.merged' : 'owner.merge.wouldMerge')])
+    let printed = 0
+    for (const pair of notice.mergedPairs) {
+      const text = pairText(pair.subject, pair.from, pair.into, pair.city)
+      // Only reported: the command that says it is two things, before `on` merges it.
+      const ids =
+        pair.id === undefined && pair.fromId !== undefined && pair.intoId !== undefined
+          ? [`make apart FROM=${pair.fromId} INTO=${pair.intoId}`]
+          : []
+      if (!fits([pair.id === undefined ? text : `#${String(pair.id)} ${text}`, ...ids])) break
+      printed += 1
+    }
+    const rest = notice.merged - printed
+    // Every one of them has a number or a command, and the message has ten (adversarial В2).
+    if (rest > 0)
+      lines.push(t(undefined, 'owner.merge.moreNight', { count: rest, day: notice.day }))
+  }
+  if (notice.candidatePairs.length > 0) {
+    fits(['', t(undefined, 'owner.merge.candidates')])
+    let printed = 0
+    for (const pair of notice.candidatePairs) {
+      const block = [
+        pairText(pair.subject, pair.from, pair.into, pair.city),
+        `make merge FROM=${pair.fromId} INTO=${pair.intoId}`,
+      ]
+      if (!fits(block)) break
+      printed += 1
+    }
+    const cut = notice.candidatePairs.length - printed
+    if (cut > 0) lines.push(t(undefined, 'owner.merge.cut', { count: cut }))
+    const later = notice.candidates - notice.candidatePairs.length
+    if (later > 0) lines.push(t(undefined, 'owner.merge.moreLater', { count: later }))
+  }
+  if (on && notice.mergedPairs.length > 0) lines.push('', t(undefined, 'owner.merge.undo'))
+  return lines.join('\n')
 }
 
 /**

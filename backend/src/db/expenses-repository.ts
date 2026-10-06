@@ -16,6 +16,7 @@ import type { Conn } from './index'
 import { kindAt } from './kind-word'
 import { idOrNull, rowLimit } from './rows'
 import { expenses, identityOf, items, placeIdentity, places, trips, verdicts } from './schema'
+import { liveItemId } from './trace'
 
 /** An expense to add, named by the device that adds it (MOL-21, В-2). */
 export type ExpenseToAdd = NewExpense & { readonly id: string }
@@ -590,7 +591,8 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
             .values({
               id: input.id,
               tripId: input.tripId,
-              itemId: input.itemId,
+              // An id queued before a merge lands on the survivor (MOL-106).
+              itemId: liveItemId(input.itemId),
               qtyMilli: quantity.milli,
               qtyUnit: quantity.unit,
               amountMinor: amount.minor,
@@ -610,7 +612,8 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
               and(
                 eq(expenses.id, input.id),
                 eq(expenses.tripId, input.tripId),
-                eq(expenses.itemId, input.itemId),
+                // A repeat sent after a merge moved the first one is still the same purchase.
+                sql`${expenses.itemId} = ${liveItemId(input.itemId)}`,
               ),
             )
             .limit(1)

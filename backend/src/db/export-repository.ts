@@ -70,6 +70,7 @@ export const EXPORT_COLUMNS: Readonly<
   Record<
     | ErasedTable
     | 'exchange_revisions'
+    | 'catalogue_merge_moves'
     | 'income_revisions'
     | 'feedback_replies'
     | 'feedback_pictures'
@@ -479,11 +480,24 @@ export const EXPORT_COLUMNS: Readonly<
       created_by: OWNER,
       search_key: 'made from the name, never typed',
       origin: "the catalogue's licence mark (MOL-162), not anything the person entered",
+      merged_into: 'the catalogue’s own merge of twins (MOL-106), not anything the person entered',
     },
   },
   // Read twice: the codes of the items the person added, whoever wrote them, and every code the
   // person wrote, to whichever item (MOL-100) — the second is theirs, as an item's author is.
   item_barcodes: { exported: ['code', 'item_id', 'added_at'], omitted: { added_by: OWNER } },
+  // The journal of the merge of twins (MOL-106): a remembered pick that moved, kept only so that
+  // `make unmerge` can move it back — the pick itself is in `searchPicks`.
+  catalogue_merge_moves: {
+    exported: [],
+    omitted: {
+      merge_id: 'a number of the catalogue’s journal, about an item, not the person',
+      what: 'the kind of row the merge moved — the moved pick is in searchPicks',
+      key: 'the query the moved pick was remembered under — the pick is in searchPicks',
+      before: 'what the pick held before the merge, for the undo alone',
+      actor_id: OWNER,
+    },
+  },
   store_memory: {
     exported: ['tin', 'kind', 'key', 'item_id', 'price_minor', 'price_currency', 'written_at'],
     omitted: { id: 'a key of the row, of no meaning to the person', actor_id: OWNER },
