@@ -165,7 +165,7 @@ import IconImageOff from '~icons/mdi/image-off-outline'
 import IconLayers from '~icons/mdi/layers-outline'
 import IconReceipt from '~icons/mdi/receipt-text-outline'
 import { LOCALES, RECEIPT_PARTS_MAX } from '@molvia/model'
-import type { ReceiptCountry } from '@molvia/model'
+import type { PhotoReceiptCountry } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { useOnline } from '@/composables/useOnline'
@@ -208,7 +208,7 @@ export default defineComponent({
   },
   props: {
     open: { type: Boolean, required: true },
-    country: { type: String as PropType<ReceiptCountry>, required: true },
+    country: { type: String as PropType<PhotoReceiptCountry>, required: true },
     /** The receipt this one is taken again for: removed, without a strip, once this one is queued. */
     replacing: { type: String as PropType<string | null>, default: null },
     /** The sheet is put away — the opener unmounts it then, as it does a purchase's (MOL-24). */

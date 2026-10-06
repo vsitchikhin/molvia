@@ -10,6 +10,8 @@ import {
   RECEIPT_TELL_AFTER_SECONDS,
   RECEIPT_TELL_WITHIN_HOURS,
   RECEIPT_UNDO_MINUTES,
+  receiptClockOf,
+  serbianReceiptLink,
   withoutItems,
 } from '@molvia/model'
 import type {
@@ -18,6 +20,7 @@ import type {
   Place,
   ReceiptBody,
   ReceiptFailure,
+  ReceiptLinkBody,
   ReceiptHeard,
   ReceiptLayout,
   ReceiptLine,
@@ -358,7 +361,9 @@ function toSummary({
   recorded: trip,
 }: SummaryRow): ReceiptSummary {
   // a head is what a reading found; a receipt failed before any reading has none (review А11)
-  const read = [row.tin, row.printedOn, row.printedTime, row.receiptNo].some((v) => v !== null)
+  const read = [row.tin, row.printedOn, row.printedTime, row.receiptNo, row.shop].some(
+    (v) => v !== null,
+  )
   return {
     id: row.id,
     status: row.status,
@@ -374,6 +379,7 @@ function toSummary({
           date: row.printedOn,
           time: row.printedTime,
           receiptNo: row.receiptNo,
+          shop: row.shop,
         }
       : null,
     total: row.totalMinor === null ? null : { minor: row.totalMinor, currency: row.currency },
@@ -416,6 +422,29 @@ function toLine(row: typeof receiptLines.$inferSelect, currency: Currency): Stor
 
 const capturedSame = (a: Date, b: Date) => a.getTime() === b.getTime()
 
+/**
+ * A receipt by its link as it is taken (MOL-232): straight into the tax office's queue, asked at once,
+ * with what the link itself says — its total, its moment on Belgrade's clock and its number — as its
+ * head. The body was checked at the door; a link that does not read here is a defect, not a refusal.
+ */
+function linkReceipt(body: ReceiptLinkBody) {
+  const read = serbianReceiptLink(body.link)
+  if (!read.ok) throw new Error(`a receipt's link passed the door and did not read: ${read.reason}`)
+  const clock = receiptClockOf(read.at, body.country)
+  return {
+    status: 'queued' as const,
+    source: 'tax' as const,
+    parts: 0,
+    link: read.link,
+    queuedAt: sql`clock_timestamp()`,
+    nextAttemptAt: sql`clock_timestamp()`,
+    printedOn: clock.day,
+    printedTime: clock.time,
+    receiptNo: read.number,
+    totalMinor: read.total.minor,
+  }
+}
+
 export function createReceiptRepository(db: Conn): ReceiptRepository {
   async function summaryOf(conn: Conn, id: string): Promise<ReceiptSummary> {
     const [found] = await conn
@@ -446,24 +475,27 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             .values({
               id: body.id,
               actorId,
-              status: 'uploading',
-              parts: body.parts,
               country: body.country,
               language: body.language,
               currency: RECEIPT_CURRENCY[body.country],
               capturedAt: body.capturedAt,
+              ...('link' in body ? linkReceipt(body) : { status: 'uploading', parts: body.parts }),
             })
             .onConflictDoNothing({ target: receipts.id })
             .returning({ id: receipts.id })
           if (inserted) return { receipt: await summaryOf(tx, body.id), created: true }
 
           const [held] = await tx.select().from(receipts).where(eq(receipts.id, body.id)).limit(1)
-          // every field the body names, the country too — there will be more than one (MOL-89)
-          const fields = ['parts', 'country', 'language'] as const
+          // every field the body names, the country too — there will be more than one (MOL-89); a link
+          // by the receipt it names, since the link itself is gone once the receipt is read (MOL-232)
+          const fields = ['country', 'language'] as const
           const same =
             held?.actorId === actorId &&
             held.deletedAt === null &&
             fields.every((field) => held[field] === body[field]) &&
+            ('link' in body
+              ? held.source === 'tax' && held.receiptNo === linkReceipt(body).receiptNo
+              : held.source === 'photo' && held.parts === body.parts) &&
             capturedSame(held.capturedAt, body.capturedAt)
           if (!same) throw new DomainError(ERROR.CONFLICT)
           return { receipt: await summaryOf(tx, body.id), created: false }
@@ -900,7 +932,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             failure: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then 'unreadable' end`,
             readAt: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then clock_timestamp() end`,
           })
-          .where(eq(receipts.status, 'reading'))
+          // the reader's own: a receipt by its link has no reading to begin again (MOL-232)
+          .where(and(eq(receipts.status, 'reading'), eq(receipts.source, 'photo')))
           .returning({ status: receipts.status })
         const failed = moved.filter((row) => row.status === 'failed').length
         if (failed > 0) await tally(tx, { unreadable: sql`${failed}::int` }, today())
@@ -913,7 +946,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         // a person's next receipt waits behind everyone else's first (review А10)
         const [next] = await tx.execute<{ id: string }>(sql`
           select waiting.id from ${receipts} waiting
-          where waiting.status = 'queued' and waiting.deleted_at is null
+          where waiting.status = 'queued' and waiting.source = 'photo' and waiting.deleted_at is null
           order by (
             select count(*) from ${receipts} served
             where served.actor_id = waiting.actor_id

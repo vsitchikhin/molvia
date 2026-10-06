@@ -16,7 +16,7 @@ function untold(patch: Partial<ReceiptSummary> = {}, telegramUserId = 4242): Unt
       capturedAt: new Date('2026-10-04T07:59:00Z'),
       country: 'AM',
       language: 'ru',
-      header: { tin: '01234567', date: '2026-10-03', time: '20:15', receiptNo: '7' },
+      header: { tin: '01234567', date: '2026-10-03', time: '20:15', receiptNo: '7', shop: null },
       total: null,
       balanced: true,
       lineCount: 7,
@@ -80,7 +80,7 @@ describe('claimReceiptNotices (MOL-129)', () => {
 
   it('says a second shot of a receipt recorded before is one (adversarial А4)', async () => {
     const receipt = untold({
-      header: { tin: '01234567', date: '2026-10-03', time: null, receiptNo: '417' },
+      header: { tin: '01234567', date: '2026-10-03', time: null, receiptNo: '417', shop: null },
     })
     const twin = repository([receipt], [], true)
     const { notices } = await claimReceiptNotices(twin, AT, vi.fn())
@@ -90,7 +90,11 @@ describe('claimReceiptNotices (MOL-129)', () => {
 
   it('asks nothing about a twin without a number to know it by', async () => {
     const twin = repository(
-      [untold({ header: { tin: '01234567', date: null, time: null, receiptNo: null } })],
+      [
+        untold({
+          header: { tin: '01234567', date: null, time: null, receiptNo: null, shop: null },
+        }),
+      ],
       [],
       true,
     )

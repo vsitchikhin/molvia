@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE, parseMoney, parseQuantity } from '@molvia/model'
-import type { ReceiptBody, ReceiptRecordBody } from '@molvia/model'
+import type { ReceiptBody, ReceiptPhotoBody, ReceiptRecordBody } from '@molvia/model'
 import type { PhotoShelf } from '@/receipts/photoShelf'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
@@ -62,7 +62,7 @@ const SECOND = 'cccccccc-0000-4000-8000-000000000002'
 const TRIP = 'dddddddd-0000-4000-8000-000000000001'
 const MILK = 'aaaaaaaa-0000-4000-8000-000000000001'
 
-function body(id = RECEIPT, parts = 2): ReceiptBody {
+function body(id = RECEIPT, parts = 2): ReceiptPhotoBody {
   return { id, parts, country: 'AM', language: 'ru', capturedAt: new Date('2026-10-03T15:00:00Z') }
 }
 

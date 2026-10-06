@@ -68,11 +68,32 @@ export type ReceiptStatus = z.infer<typeof receiptStatusSchema>
 /**
  * Why a receipt failed: `reshoot` — not one item line was found, so there is nothing to correct and only
  * a new shot can help (MOL-222, В-1); `unreadable` — the photo could not be read at all (the reader
- * failed on it, or ran out of time, or its answer was not a reading). A receipt read only in part is
- * not a failure: it goes to the review with what was read (`readPartly`).
+ * failed on it, or ran out of time, or its answer was not a reading), or the tax office's journal held
+ * no list. A receipt read only in part is not a failure: it goes to the review with what was read
+ * (`readPartly`). A receipt by its link (MOL-232): `missing` — the tax office never showed it in
+ * `RECEIPT_LINK_WAIT_HOURS`; `invalid` — the tax office does not hold it valid.
  */
-export const receiptFailureSchema = z.enum(['reshoot', 'unreadable'])
+export const receiptFailureSchema = z.enum(['reshoot', 'unreadable', 'missing', 'invalid'])
 export type ReceiptFailure = z.infer<typeof receiptFailureSchema>
+
+/**
+ * How long a receipt by its link is asked of the tax office before it fails as `missing` (MOL-232,
+ * Р-2): a receipt just printed shows in a minute or two (receipto, TAP), one of a till that was
+ * offline only once the till reaches the tax office — two days with room to spare.
+ */
+export const RECEIPT_LINK_WAIT_HOURS = 48
+
+/**
+ * The pauses between asks of a receipt the tax office does not show yet, in minutes: quick while it
+ * is likely just printed, then once an hour to the end of `RECEIPT_LINK_WAIT_HOURS`.
+ */
+export const RECEIPT_LINK_RETRY_MINUTES = [1, 2, 4, 8, 15, 30] as const
+const RECEIPT_LINK_RETRY_LAST_MINUTES = 60
+
+/** The pause before the ask after `asked` asks the tax office did not answer with the receipt. */
+export function receiptLinkRetryMinutes(asked: number): number {
+  return RECEIPT_LINK_RETRY_MINUTES[asked - 1] ?? RECEIPT_LINK_RETRY_LAST_MINUTES
+}
 
 /**
  * How the person learned their receipt was read (MOL-129): `app` — the phone was handed it read, by
@@ -115,8 +136,14 @@ export function tellsQuietly(now: Date, timeZone: string): boolean {
  * receipts are not read off a photo at all but by the link of their QR code — the tax office gives
  * their lines (MOL-232); Georgia (`kat+eng`) joins with its card (MOL-248).
  */
-export const receiptCountrySchema = z.enum(['AM', 'RS'])
+export const photoReceiptCountrySchema = z.enum(['AM'])
+export const linkReceiptCountrySchema = z.enum(['RS'])
+export const receiptCountrySchema = z.enum([
+  ...photoReceiptCountrySchema.options,
+  ...linkReceiptCountrySchema.options,
+])
 export type ReceiptCountry = z.infer<typeof receiptCountrySchema>
+export type PhotoReceiptCountry = z.infer<typeof photoReceiptCountrySchema>
 
 /**
  * Where a receipt's lines come from (MOL-232): `photo` — the phone's photo read by our reader;
@@ -125,9 +152,8 @@ export type ReceiptCountry = z.infer<typeof receiptCountrySchema>
  */
 export const receiptSourceSchema = z.enum(['photo', 'tax'])
 export type ReceiptSource = z.infer<typeof receiptSourceSchema>
-export const RECEIPT_SOURCE: Readonly<Record<ReceiptCountry, ReceiptSource>> = {
-  AM: 'photo',
-  RS: 'tax',
+export function receiptSourceOf(country: ReceiptCountry): ReceiptSource {
+  return linkReceiptCountrySchema.safeParse(country).success ? 'tax' : 'photo'
 }
 
 /**

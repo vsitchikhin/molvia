@@ -21,7 +21,7 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import IconCamera from '~icons/mdi/camera-outline'
-import type { ReceiptCountry } from '@molvia/model'
+import type { PhotoReceiptCountry } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import CaptureSheet from '@/components/CaptureSheet.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -37,7 +37,7 @@ export default defineComponent({
   name: 'CaptureButton',
   components: { AppButton, CaptureSheet, IconCamera },
   props: {
-    country: { type: String as PropType<ReceiptCountry>, required: true },
+    country: { type: String as PropType<PhotoReceiptCountry>, required: true },
   },
   emits: {
     /** Whether its sheet is up: the screen keeps the button mounted meanwhile (as «Записать»). */

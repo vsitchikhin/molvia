@@ -109,6 +109,12 @@ export const ERROR = {
    */
   RECEIPT_TOTAL_REQUIRED: 'error.receipt_total_required',
   /**
+   * A receipt's link that is no receipt to record (MOL-232): not the tax office's, damaged, or no sale.
+   * The phone checks it by the same function before it is queued and says which; the server answers
+   * only an old build or a body made by hand.
+   */
+  RECEIPT_LINK_INVALID: 'error.receipt_link_invalid',
+  /**
    * A message to the developer past `FEEDBACK_DAY_LIMIT` in a rolling day (MOL-147). The sheet keeps
    * the text and says to send it tomorrow.
    */

@@ -1312,6 +1312,7 @@
     "receipt_recorded_before": "This receipt has already been recorded",
     "receipt_in_future": "The receipt's date has not come yet",
     "receipt_total_required": "Enter the receipt's total — without it there is nothing to record",
+    "receipt_link_invalid": "This is not a link from a Serbian tax receipt, or it is damaged",
     "feedback_rate_limited": "That is a lot of messages for today. Your text is saved — send it tomorrow",
     "feedback_picture_invalid": "The picture would not do — choose another one",
     "feedback_picture_too_large": "The picture is too large — choose another one",

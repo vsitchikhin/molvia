@@ -8,7 +8,7 @@ import {
   receiptBodySchema,
   receiptRecordBodySchema,
 } from '@molvia/model'
-import type { ReceiptBody, ReceiptRecordBody, WireCode } from '@molvia/model'
+import type { ReceiptBody, ReceiptPhotoBody, ReceiptRecordBody, WireCode } from '@molvia/model'
 import { api } from '@/api'
 import { photoShelf } from '@/receipts/photoShelf'
 import { useActorStore } from '@/stores/actor'
@@ -502,7 +502,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
    * «Отправить чек»: the photos onto the shelf first, then the writes that name them. False — the
    * phone had nowhere to keep a photo, and nothing is queued: a receipt without its photos is not one.
    */
-  async function capture(body: ReceiptBody, photos: readonly Blob[]): Promise<boolean> {
+  async function capture(body: ReceiptPhotoBody, photos: readonly Blob[]): Promise<boolean> {
     const owner = actor.id
     if (!owner || photos.length !== body.parts) return false
     const shelf = photoShelf(owner)

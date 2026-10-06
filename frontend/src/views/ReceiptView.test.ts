@@ -88,7 +88,7 @@ function detail(over: { place?: boolean; status?: 'parsed' | 'failed' } = {}): R
       capturedAt: new Date('2026-10-01T10:00:00Z'),
       country: 'AM',
       language: 'ru',
-      header: { tin: '01234567', date: '2026-10-01', time: '12:00', receiptNo: '1' },
+      header: { tin: '01234567', date: '2026-10-01', time: '12:00', receiptNo: '1', shop: null },
       total: amd('900'),
       balanced: true,
       lineCount: 2,

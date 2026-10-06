@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 import type { ComputedRef } from 'vue'
-import { receiptCountrySchema } from '@molvia/model'
-import type { ReceiptCountry } from '@molvia/model'
+import { photoReceiptCountrySchema } from '@molvia/model'
+import type { PhotoReceiptCountry } from '@molvia/model'
 import { useActorStore } from '@/stores/actor'
 
 /**
@@ -10,11 +10,11 @@ import { useActorStore } from '@/stores/actor'
  * countries the server reads** (Р-1): a receipt of any other is refused by the schema, and a button
  * that always ends in «не принят» is worse than none. No flag: the rule is the model's list.
  */
-export function useReceiptCapture(): { readonly country: ComputedRef<ReceiptCountry | null> } {
+export function useReceiptCapture(): { readonly country: ComputedRef<PhotoReceiptCountry | null> } {
   const actor = useActorStore()
   return {
     country: computed(() => {
-      const parsed = receiptCountrySchema.safeParse(actor.settings?.country)
+      const parsed = photoReceiptCountrySchema.safeParse(actor.settings?.country)
       return parsed.success ? parsed.data : null
     }),
   }

@@ -342,7 +342,13 @@ describe('the queue', () => {
       failure: null,
       balanced: true,
       lineCount: 13,
-      header: { tin: '01234567', date: '2026-10-01', time: '12:00', receiptNo: '12345678' },
+      header: {
+        tin: '01234567',
+        date: '2026-10-01',
+        time: '12:00',
+        receiptNo: '12345678',
+        shop: null,
+      },
       total: { minor: 867_641n, currency: 'AMD' },
     })
     expect(detail.lines).toHaveLength(13)
