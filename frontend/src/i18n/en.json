@@ -2194,8 +2194,8 @@
         "missing_body": "We asked for two days. This happens when the till worked offline. You can record the purchases by hand.",
         "invalid_title": "The tax office does not accept this receipt",
         "invalid_body": "The tax office’s check says the receipt is not valid. You can record the purchases by hand.",
-        "unreadable_title": "Could not read the tax office’s answer",
-        "unreadable_body": "The tax office showed the receipt with no list of purchases. You can record the purchases by hand."
+        "unreadable_title": "The receipt was not read",
+        "unreadable_body": "You can record the purchases by hand or paste the receipt’s link again."
       }
     },
     "duplicate": {

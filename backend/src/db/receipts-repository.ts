@@ -143,6 +143,8 @@ export interface StoredReceipt {
   readonly city: ReceiptCity | null
   /** The premises of a Serbian seller, where its place is looked for first (MOL-232, Р-7). */
   readonly shopUnit: string | null
+  /** A photo read by our reader, or a Serbian receipt's link asked of the tax office (MOL-232). */
+  readonly source: ReceiptSource
   /** How the person learned it was read (MOL-129); `null` — not yet, or not read. */
   readonly heard: ReceiptHeard | null
 }
@@ -437,6 +439,7 @@ function toStored(found: SummaryRow): StoredReceipt {
     currency: found.row.currency,
     city: found.row.city,
     shopUnit: found.row.shopUnit,
+    source: found.row.source,
     heard: found.row.heard,
   }
 }

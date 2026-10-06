@@ -18,7 +18,7 @@ const LINK = 'https://suf.purs.gov.rs/v/?vl=A1RFU1RBQUFBVEVTVEJCQkIwMTAwMDAwMDE3
 const ANNA = 'anna'
 const BORIS = 'boris'
 
-describe('клиент проверки чеков налоговой Сербии', () => {
+describe('the client of the Serbian tax office’s check of a receipt', () => {
   let clock = 1_000_000
   const now = (): number => clock
   const failures: string[] = []
@@ -49,7 +49,7 @@ describe('клиент проверки чеков налоговой Серби
     vi.restoreAllMocks()
   })
 
-  it('спрашивает ссылку чека в JSON, своим UA и с таймаутом — по своему адресу, с путём и запросом ссылки', async () => {
+  it('asks the receipt’s link for JSON, with its own UA and a timeout — at its own address, with the link’s path and query', async () => {
     const timeout = vi.spyOn(AbortSignal, 'timeout')
     answering(fixture('found.json'))
 
@@ -73,7 +73,7 @@ describe('клиент проверки чеков налоговой Серби
     })
   })
 
-  it('не берёт из ответа ни кассира, ни покупателя, ни оплат', async () => {
+  it('takes neither the cashier, nor the buyer, nor the payments from the answer', async () => {
     answering(fixture('found.json'))
     const answer = await client().receipt(LINK, ANNA)
     const fields = Object.keys(answer)
@@ -82,13 +82,13 @@ describe('клиент проверки чеков налоговой Серби
     }
   })
 
-  it('чек, которого налоговая ещё не показывает (404), — «ещё нет», без паузы и без сбоя', async () => {
+  it('a receipt the tax office does not show yet (404) is «not yet», with no pause and no failure', async () => {
     answering('', 404)
     expect(await client().receipt(LINK, ANNA)).toEqual({ kind: 'not_yet' })
     expect(failures).toEqual([])
   })
 
-  it('400 и isValid: false — отказ налоговой, не сбой', async () => {
+  it('400 and isValid: false are the tax office’s refusal, not a failure', async () => {
     answering('', 400)
     expect(await client().receipt(LINK, ANNA)).toEqual({ kind: 'refused' })
     answering(fixture('not-valid.json'))
@@ -96,7 +96,7 @@ describe('клиент проверки чеков налоговой Серби
     expect(failures).toEqual([])
   })
 
-  it('сбой службы — «ещё нет», минута тишины для всех, в журнале причина без ссылки', async () => {
+  it('a failure of the service is «not yet», a minute of silence for everyone, and its reason logged without the link', async () => {
     for (const [body, status] of [
       ['<html>Сервис недоступан</html>', 503],
       ['<html>Сервис недоступан</html>', 200],
@@ -125,7 +125,7 @@ describe('клиент проверки чеков налоговой Серби
     expect(failures.join()).not.toContain('vl=')
   })
 
-  it('ответ, который больше не читается, — владельцу, по виду и без ответа; погода — только в журнал (ревью 4)', async () => {
+  it('an answer that no longer reads goes to the owner by its kind, without the answer; the weather only to the log (review 4)', async () => {
     const broken: { code: string; message: string }[] = []
     const c = (now: () => number) =>
       purs({
@@ -151,7 +151,7 @@ describe('клиент проверки чеков налоговой Серби
     expect(JSON.stringify(broken)).not.toContain('vl=')
   })
 
-  it('таймаут и обрыв пишут имя ошибки, а не её текст со ссылкой', async () => {
+  it('a timeout and a dropped connection log the error’s name, never its text with the link', async () => {
     fetch = vi.fn(() =>
       Promise.reject(new DOMException(`timed out asking ${LINK}`, 'TimeoutError')),
     )
@@ -160,7 +160,7 @@ describe('клиент проверки чеков налоговой Серби
     expect(failures).toEqual(['TimeoutError'])
   })
 
-  it('не больше PURS_PER_MINUTE запросов в минуту на всех и трети — на одного', async () => {
+  it('asks at most PURS_PER_MINUTE a minute for everyone, and a third of it for one person', async () => {
     answering('', 404)
     const c = client()
     const share = pursShare(PURS_PER_MINUTE)
@@ -181,7 +181,7 @@ describe('клиент проверки чеков налоговой Серби
     expect((await c.receipt(LINK, ANNA)).kind).toBe('not_yet')
   })
 
-  it('называет себя сборкой и контактом, сборку — как /health', () => {
+  it('names itself by the build and a contact, the build encoded as /health’s', () => {
     expect(pursUserAgent('v0.2.0-3-gabc', 'owner@example.com')).toBe(
       'Molvia/v0.2.0-3-gabc (owner@example.com)',
     )

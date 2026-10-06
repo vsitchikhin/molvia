@@ -28,6 +28,7 @@ function untold(patch: Partial<ReceiptSummary> = {}, telegramUserId = 4242): Unt
     currency: 'AMD',
     city: null,
     shopUnit: null,
+    source: 'photo',
     heard: 'bot',
     actor: { id: 'a1', telegramUserId, country: 'AM', city: 'Гюмри' },
   }
@@ -75,6 +76,7 @@ describe('claimReceiptNotices (MOL-129)', () => {
         day: '2026-10-03',
         lineCount: 7,
         duplicate: false,
+        taxOffice: null,
         silent: false,
       },
     ])

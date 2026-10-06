@@ -20,6 +20,7 @@ import { NO_EMBEDDER } from '@/embeddings/embedder'
 import type { Purs, PursAnswer } from '@/purs/client'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
 import { readTaxReceipts } from '@/usecases/read-tax-receipts'
+import { claimReceiptNotices } from '@/usecases/tell-receipts'
 import type { TaxReport } from '@/usecases/read-tax-receipts'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
@@ -424,6 +425,31 @@ describe('the tax office’s queue', () => {
     expect(await round(purs)).toBe(0)
     expect(purs.asked).toEqual([])
     expect(await row(id)).toMatchObject({ status: 'failed', failure: 'unreadable' })
+  })
+
+  it('tells the bot of a failed receipt by its link in the tax office’s word, never a photo’s (Р2-1, Р2-2)', async () => {
+    const me = await serb()
+    const refused = await taken(me)
+    const missing = await taken(me)
+    const lost = await taken(me)
+    await db
+      .update(receipts)
+      .set({
+        createdAt: sql`clock_timestamp() - make_interval(hours => ${RECEIPT_LINK_WAIT_HOURS}, secs => 1)`,
+      })
+      .where(eq(receipts.id, missing))
+    // what a restore brings back: the receipt with no link to ask with
+    await db.delete(receiptLinks).where(eq(receiptLinks.receiptId, lost))
+    await round(office({ kind: 'refused' }, { kind: 'not_yet' }))
+    await db.update(receipts).set({ readAt: sql`clock_timestamp() - interval '31 seconds'` })
+    const { notices } = await claimReceiptNotices(repository, new Date(), () => {
+      throw new Error('a notice the contract refused')
+    })
+    const told = new Map(notices.map((notice) => [notice.receiptId, notice]))
+    expect(told.get(refused)).toMatchObject({ outcome: 'failed', taxOffice: 'invalid' })
+    expect(told.get(missing)).toMatchObject({ outcome: 'failed', taxOffice: 'missing' })
+    // never asked: no cause of the tax office's asserted
+    expect(told.get(lost)).toMatchObject({ outcome: 'failed', taxOffice: 'unread' })
   })
 
   it('stops the round over the limit and leaves the receipt as it was, its ask not counted', async () => {
