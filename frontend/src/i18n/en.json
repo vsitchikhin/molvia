@@ -113,6 +113,7 @@
       "drop_trip": "Drop the entry and its purchases"
     },
     "rate_line": "rate {rate} · {date}",
+    "rate_line_source": "rate {rate} · {date} · {source}",
     "rate_line_mine": "my rate {rate} · {date}",
     "flip": "Show in the other currency",
     "caveat": {

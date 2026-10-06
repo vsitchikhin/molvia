@@ -190,8 +190,11 @@ rule: a pair with the lari — the NBG, any other — the CBA.
 program's connection, and at the web services, a login on application. The bank's own application
 «Курсна листа НБС» on `webappcenter.nbs.rs` answers anyone — curl, Node's `fetch`, from the
 production server — and offers each list for download as XML. Its `Copyright` lets its files be
-saved and reproduced unchanged, with the source named every time: the screen names the bank of the
-pair already (В-2 of MOL-110). A mirror, kurs.resenje.org, carries the same figures — checked — and
+saved and reproduced unchanged, with the source named every time. **So a trip's rate line names it
+beside the number** — «курс 1,23 RSD/₽ · 6 окт. · НБ Сербии» (`NAMED_BESIDE` in `TripTotal`, review
+1): «Деньги», the accounts, the spending sheet and an exchange's card name the pair's bank already
+(В-2 of MOL-110), but a trip named a bank only when it was silent or stale. Decided by the
+aggregator's precedent, whose terms put its name beside its rate; the other banks stay unnamed there. A mirror, kurs.resenje.org, carries the same figures — checked — and
 was left out: a retelling of the bank is what rate.am was rejected for.
 
 - **Two requests a list** (`backend/src/rates/nbs.ts`): a page that names the list by an id in its

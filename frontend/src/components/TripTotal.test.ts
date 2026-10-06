@@ -104,6 +104,21 @@ describe('TripTotal', () => {
     expect(plain(view)).not.toContain('ЦБ')
   })
 
+  it('курс НБ Сербии назван рядом с числом — так требуют условия НБС (MOL-230, ревью 1)', () => {
+    const own = trip()
+    const dinar = {
+      ...own,
+      currency: 'RSD' as const,
+      rate: own.rate && { ...own.rate, quote: 'RSD' as const, scaled: 1_225_700n },
+      rateProvider: 'nbs' as const,
+    }
+    expect(plain(render({ trip: dinar }))).toContain('курс 1,23 RSD/₽ · 15 янв. · НБ Сербии')
+    // ЦБ РА и запасной под строкой не называются: у них своё место — заметка курса.
+    expect(plain(render())).not.toContain('ЦБ РА')
+    const mine = { ...dinar, rate: dinar.rate && { ...dinar.rate, source: 'personal' as const } }
+    expect(plain(render({ trip: { ...mine, rateProvider: null } }))).not.toContain('НБ Сербии')
+  })
+
   // Прыжок запятой через единицу: строка под суммой — той же стороной, что заметка и шторка
   // (ревью Т-11, адв. А‴), и день курса — днём Еревана, в UTC тоже (адв. Ж″).
   it('после прыжка через единицу курс под суммой — стороной прежнего, день — днём Еревана', () => {

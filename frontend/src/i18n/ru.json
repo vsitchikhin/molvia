@@ -113,6 +113,7 @@
       "drop_trip": "Убрать запись с покупками"
     },
     "rate_line": "курс {rate} · {date}",
+    "rate_line_source": "курс {rate} · {date} · {source}",
     "rate_line_mine": "мой курс {rate} · {date}",
     "flip": "Показать в другой валюте",
     "caveat": {
