@@ -33,8 +33,9 @@ export async function bindReceiptLines(
   language: AppLocale,
   lines: readonly ReceiptLine[],
 ): Promise<LineBinding[]> {
+  const names = RECEIPT_NAME_LANGUAGE[country]
   const matcher = createLineMatcher(
-    await items.nodes(RECEIPT_NAME_LANGUAGE[country]),
+    names === undefined ? [] : await items.nodes(names),
     TILL_WORDS_RU,
   )
   const bound: LineBinding[] = []

@@ -111,31 +111,51 @@ export function tellsQuietly(now: Date, timeZone: string): boolean {
 
 /**
  * The countries a receipt is read in, with Tesseract's languages for each, as MOL-114 measured them:
- * one country's set, never every script at once, which is slower and confuses the alphabets.
- * Georgia (`kat+eng`) and Serbia (`srp+srp_latn+eng`) join with their currencies (MOL-89); the
- * reader already carries their languages.
+ * one country's set, never every script at once, which is slower and confuses the alphabets. Serbia's
+ * receipts are not read off a photo at all but by the link of their QR code — the tax office gives
+ * their lines (MOL-232); Georgia (`kat+eng`) joins with its card (MOL-248).
  */
-export const receiptCountrySchema = z.enum(['AM'])
+export const receiptCountrySchema = z.enum(['AM', 'RS'])
 export type ReceiptCountry = z.infer<typeof receiptCountrySchema>
 
 /**
- * The cities a receipt names, as a word of its head: Armenia's, since only Armenian receipts are read
- * (MOL-109, Р-5) — a person in Tbilisi records an Armenian receipt in Gyumri or Yerevan.
+ * Where a receipt's lines come from (MOL-232): `photo` — the phone's photo read by our reader;
+ * `tax` — the tax office, asked by the link of the receipt's QR code. A country's receipts come one
+ * way: a Serbian receipt off a photo is MOL-233's, and it is the link read off it that is sent.
  */
-export const RECEIPT_CITIES = COUNTRY_CITIES.AM
-export type ReceiptCity = (typeof RECEIPT_CITIES)[number]
+export const receiptSourceSchema = z.enum(['photo', 'tax'])
+export type ReceiptSource = z.infer<typeof receiptSourceSchema>
+export const RECEIPT_SOURCE: Readonly<Record<ReceiptCountry, ReceiptSource>> = {
+  AM: 'photo',
+  RS: 'tax',
+}
 
-export const RECEIPT_LANGUAGES: Readonly<Record<ReceiptCountry, string>> = { AM: 'hye+rus+eng' }
-export const RECEIPT_CURRENCY: Readonly<Record<ReceiptCountry, Currency>> = { AM: 'AMD' }
+/**
+ * The cities a receipt names, as a word of its head, of the countries read: a person in Tbilisi
+ * records an Armenian receipt in Gyumri or Yerevan (MOL-109, Р-5).
+ */
+export const RECEIPT_CITIES = [...COUNTRY_CITIES.AM, ...COUNTRY_CITIES.RS] as const
+export type ReceiptCity = (typeof RECEIPT_CITIES)[number]
+type ArmenianCity = (typeof COUNTRY_CITIES.AM)[number]
+
+/** Tesseract's languages of the countries read off a photo. */
+export const RECEIPT_LANGUAGES: Readonly<Partial<Record<ReceiptCountry, string>>> = {
+  AM: 'hye+rus+eng',
+}
+export const RECEIPT_CURRENCY: Readonly<Record<ReceiptCountry, Currency>> = {
+  AM: 'AMD',
+  RS: 'RSD',
+}
 
 /**
  * The language a country's tills print names in, and the language of the catalogue's names a line is
  * matched against (MOL-126): an item is a node, reached by its barcodes, the shops' articles, its
- * customs headings and its names in the countries' languages.
+ * customs headings and its names in the countries' languages. Serbia has no names of its own yet: its
+ * lines go by the shop's memory and the catalogue's search (MOL-232, В-3).
  */
 export const itemNameLanguageSchema = z.enum(['hy'])
 export type ItemNameLanguage = z.infer<typeof itemNameLanguageSchema>
-export const RECEIPT_NAME_LANGUAGE: Readonly<Record<ReceiptCountry, ItemNameLanguage>> = {
+export const RECEIPT_NAME_LANGUAGE: Readonly<Partial<Record<ReceiptCountry, ItemNameLanguage>>> = {
   AM: 'hy',
 }
 
@@ -190,19 +210,19 @@ export function storeMemoryWords(line: {
  * The cities of the settings as a receipt prints them, as a word (Р-6): a place is the shop in its city.
  * «ԵՐԵՎԱՆ-ՍԻԹԻ», «YEREVAN CITY» is the chain's name, not the city.
  */
-const CITY_WORDS: Readonly<Record<ReceiptCity, string>> = {
+const CITY_WORDS: Readonly<Record<ArmenianCity, string>> = {
   Гюмри: '(?:գյումրի|gyumri)(?![\\p{L}-])',
   Ереван: '(?:երևան|երե[վւ]ան|yerevan)(?![\\p{L}-])(?!\\s*[-–]?\\s*(?:սիթի|city|сити))',
 }
 
 /** A city named anywhere in a row of the head, a word of its own: an address, or an item's name. */
-const CITY_ANYWHERE: Readonly<Record<ReceiptCity, RegExp>> = {
+const CITY_ANYWHERE: Readonly<Record<ArmenianCity, RegExp>> = {
   Гюмри: new RegExp(`(?<!\\p{L})${CITY_WORDS.Гюмри}`, 'iu'),
   Ереван: new RegExp(`(?<!\\p{L})${CITY_WORDS.Ереван}`, 'iu'),
 }
 
 /** The city after «ք.», քաղաք — a mark an address has and an item's name never does. */
-const CITY_MARKED: Readonly<Record<ReceiptCity, RegExp>> = {
+const CITY_MARKED: Readonly<Record<ArmenianCity, RegExp>> = {
   Гюмри: new RegExp(`(?<!\\p{L})ք\\.\\s*${CITY_WORDS.Гюмри}`, 'iu'),
   Ереван: new RegExp(`(?<!\\p{L})ք\\.\\s*${CITY_WORDS.Ереван}`, 'iu'),
 }
@@ -264,12 +284,12 @@ function headEnd(rows: readonly TextRow[]): number {
 export function receiptCityOf(
   rows: readonly TextRow[],
   productWords: ReadonlySet<string> = NO_WORDS,
-): ReceiptCity | null {
+): ArmenianCity | null {
   const first = rows.filter((row) => row.part === 0)
   const head = first.slice(0, headEnd(first))
   // the chain's site, «www.yerevan-city.am», however OCR read it — «Ww Yerevan: СПу. ат» — names no city
   const lines = head.filter((row) => !isSiteRow(row.text))
-  const cities = Object.keys(CITY_ANYWHERE) as ReceiptCity[]
+  const cities = Object.keys(CITY_ANYWHERE) as ArmenianCity[]
   // the city an address names — the one city named in the head at all: an item named after another
   // city, or a chain's legal address beside its shop's, is two cities and no answer (rounds 3–10)
   const named = cities.filter((city) => lines.some((row) => CITY_ANYWHERE[city].test(row.text)))
@@ -491,8 +511,14 @@ export function receiptDateOf(text: ReceiptText, latest: string): string | null 
   return text.date >= '2000-01-01' && text.date <= latest ? text.date : null
 }
 
-/** Where a country's tills keep their clocks: Armenia is at +4 the year round. */
-export const RECEIPT_UTC_OFFSET: Readonly<Record<ReceiptCountry, string>> = { AM: '+04:00' }
+/**
+ * Where a country's tills keep their clocks: Armenia is at +4 the year round, Serbia moves its clock
+ * twice a year — a zone's name, never an offset (MOL-232).
+ */
+export const RECEIPT_TIME_ZONE: Readonly<Record<ReceiptCountry, string>> = {
+  AM: 'Asia/Yerevan',
+  RS: 'Europe/Belgrade',
+}
 
 /**
  * The moment a receipt prints, its day and time read on the till's clock (MOL-126): what a trip
@@ -504,8 +530,67 @@ export function receiptMomentOf(
   country: ReceiptCountry,
 ): Date | null {
   if (time === null || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return null
-  const moment = new Date(`${day}T${time}:00${RECEIPT_UTC_OFFSET[country]}`)
-  return Number.isNaN(moment.getTime()) ? null : moment
+  const asUtc = new Date(`${day}T${time}:00Z`)
+  if (Number.isNaN(asUtc.getTime())) return null
+  // the zone's offset at that moment, asked twice: once for the clock read as UTC, once for the answer
+  const zone = RECEIPT_TIME_ZONE[country]
+  const first = new Date(asUtc.getTime() - zoneOffsetMs(asUtc, zone))
+  return new Date(asUtc.getTime() - zoneOffsetMs(first, zone))
+}
+
+/** The day and time a till's clock showed at `at`: `YYYY-MM-DD`, `HH:MM`. */
+export function receiptClockOf(at: Date, country: ReceiptCountry): { day: string; time: string } {
+  const parts = clockParts(at, RECEIPT_TIME_ZONE[country])
+  return {
+    day: `${parts.year}-${parts.month}-${parts.day}`,
+    time: `${parts.hour}:${parts.minute}`,
+  }
+}
+
+interface Clock {
+  readonly year: string
+  readonly month: string
+  readonly day: string
+  readonly hour: string
+  readonly minute: string
+  readonly second: string
+}
+
+function clockParts(at: Date, timeZone: string): Clock {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(at)
+  const part = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((one) => one.type === type)?.value ?? ''
+  return {
+    year: part('year'),
+    month: part('month'),
+    day: part('day'),
+    hour: part('hour'),
+    minute: part('minute'),
+    second: part('second'),
+  }
+}
+
+/** How far a zone's clock is ahead of UTC at `at`, in milliseconds. */
+function zoneOffsetMs(at: Date, timeZone: string): number {
+  const p = clockParts(at, timeZone)
+  const shown = Date.UTC(
+    Number(p.year),
+    Number(p.month) - 1,
+    Number(p.day),
+    Number(p.hour),
+    Number(p.minute),
+    Number(p.second),
+  )
+  return shown - Math.floor(at.getTime() / 1000) * 1000
 }
 
 /** The time a receipt prints, if it is one a clock shows: `HH:MM` (review Р12). */

@@ -317,7 +317,7 @@ import {
   withoutItems,
   yerevanDate,
 } from '@molvia/model'
-import type { Money } from '@molvia/model'
+import type { Money, ReceiptCountry } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppNote from '@/components/AppNote.vue'
@@ -351,7 +351,8 @@ import type { LineDraft, PlaceDraft } from '@/stores/receiptDrafts'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
 
 /** The language a receipt of a country is printed in, for the system's face to pick its glyphs. */
-const PRINTED_LANG = { AM: 'hy' } as const
+// the language a till prints its lines in, for the browser's choice of glyphs and hyphens
+const PRINTED_LANG: Readonly<Record<ReceiptCountry, string>> = { AM: 'hy', RS: 'sr' }
 
 /**
  * A receipt before it is recorded (MOL-127, handoff 05, 06): its place and day, its lines as read
