@@ -519,7 +519,13 @@ receipt waits its two days and fails as `missing` for a reason that is not the t
 is the weather, the log's alone.
 
 **The link lives in a table of its own, out of the nightly copy** (`receipt_links`, adversarial А4); a
-receipt restored without it fails as `unreadable` before the next ask. **On the phone the sheet stays at
+receipt restored without it fails as `unreadable` before the next ask. **A failed receipt by its link is
+told in the tax office's word, never a photo's** (adversarial Р2-1, Р2-2): the bot's notice carries
+`taxOffice` — `missing`, `invalid`, or `unread` for any other failure — decided by the API from the row's
+`source`, and the bot never says «переснять» of a receipt with no photo. `unread` asserts no cause: it
+covers a journal with no list, a link lost in a restore and a failure of ours alike, so neither the review
+nor the bot says «the tax office showed it with no list» — only that it was not read, with a record by
+hand or the link pasted again. **On the phone the sheet stays at
 work for a double tap** (`DOUBLE_TAP`, adversarial А3): the link is queued at once, and a sheet that went
 down on the first tap let the second through onto the tab bar — «Оценки» opened over the receipt just
 sent; a double click queued it twice.
