@@ -1,6 +1,9 @@
 import {
   COUNTRY_BANKS,
   PUBLISHED,
+  RATE_BASE,
+  homeBankOf,
+  publishes,
   RATE_JUMP_HISTORY,
   RATE_JUMP_MIN_HISTORY,
   isRateFresh,
@@ -459,7 +462,11 @@ export function officialRatesRefresh({
    * a rouble a third dearer, today's true rate marked a jump. An open source is asked only while
    * the central bank is silent, so its own history is an earlier episode, often months old — or
    * nothing, exactly when a trip is about to take it: without three of its own from the last week,
-   * it is measured against the central bank's latest, in the same unit.
+   * it is measured against the central bank's latest, in the same unit. **A currency the central
+   * bank does not publish is measured against the bank of its pair with the dram** (MOL-230, review
+   * 2): the dinar by the National Bank of Georgia's, in drams as the open sources' are — the open
+   * sources stand in for the dinar exactly when a trip in dinars is about to take them, and a comma
+   * in the wrong place went into it unmarked.
    */
   async function referenceFor(answer: Published): Promise<ReadonlyMap<string, readonly bigint[]>> {
     const currencies = answer.rates.map((rate) => rate.currency)
@@ -468,6 +475,21 @@ export function officialRatesRefresh({
     const central =
       answer.provider === 'cba' ? own : await rates.history('cba', currencies, answer.date)
     const values = (past: readonly PastRate[] | undefined) => (past ?? []).map((row) => row.scaled)
+    // The bank an open source's currency is measured by, in the open source's own base.
+    const standIn = (currency: AmdRate['currency']): RateProvider | null => {
+      const bank = publishes('cba', currency) ? 'cba' : homeBankOf(currency, 'AMD')
+      return RATE_BASE[bank] === RATE_BASE[answer.provider] ? bank : null
+    }
+    const standIns = new Map<RateProvider, ReadonlyMap<string, readonly PastRate[]>>([
+      ['cba', central],
+    ])
+    if (!country && answer.provider !== 'cba') {
+      for (const currency of currencies) {
+        const bank = standIn(currency)
+        if (bank === null || standIns.has(bank)) continue
+        standIns.set(bank, await rates.history(bank, currencies, answer.date))
+      }
+    }
 
     return new Map(
       currencies.map((currency) => {
@@ -479,10 +501,9 @@ export function officialRatesRefresh({
           return [currency, values(fortnight)]
         }
         const recent = (own.get(currency) ?? []).filter((row) => isRateFresh(row.date, answer.date))
-        return [
-          currency,
-          recent.length >= RATE_JUMP_MIN_HISTORY ? values(recent) : values(central.get(currency)),
-        ]
+        const bank = standIn(currency)
+        const measure = bank === null ? undefined : standIns.get(bank)?.get(currency)
+        return [currency, recent.length >= RATE_JUMP_MIN_HISTORY ? values(recent) : values(measure)]
       }),
     )
   }

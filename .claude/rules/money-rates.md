@@ -227,8 +227,11 @@ was left out: a retelling of the bank is what rate.am was rejected for.
   so the lari always had a stand-in in the cache. The dinar is in no answer of the CBA's: with the
   National Bank of Serbia silent and the CBA well, a trip in dinars would have nothing fresher than
   the silent bank. So five failures of a country bank in a row, or its latest over a week old, ask
-  the Bank of Russia and then er-api, as the CBA's silence does. **The price, named:** a fallback's
-  dinar is never judged for a jump — the CBA, which an open source is measured by, has none.
+  the Bank of Russia and then er-api, as the CBA's silence does. **An open source's dinar is measured
+  for a jump by the National Bank of Georgia's** (review 2): an open source without three of its own
+  is measured by the CBA, which has no dinar, and the open sources stand in for the dinar exactly when
+  a trip in dinars takes them — a comma in the wrong place went in unmarked. The bank of the currency's
+  pair with the dram, in drams as theirs are; none when that bank has fewer than three, as everywhere.
 - **A day of a country bank's archive counts as written only when it holds every currency the bank
   publishes** (`wholeDays`, plan Р-6): the dinar joined the National Bank of Georgia's set after
   MOL-110 had walked its history, and counted by any row those days were never asked again. Now the

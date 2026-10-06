@@ -1119,6 +1119,65 @@ describe('банк страны молчит — запасные (MOL-230)', ()
     expect(h.cbr.asked).toBe(1)
   })
 
+  it('динар запасного мерится по НБ Грузии — запятая не на месте помечена скачком (ревью 2)', async () => {
+    async function run(nbgDays: number) {
+      const cache: CachedRate[] = []
+      for (let day = 1; day <= nbgDays; day += 1) {
+        const date = `2026-09-${String(10 + day)}`
+        cache.push({ provider: 'nbg', currency: 'RSD', date, scaled: 3_471_475n, jump: false })
+      }
+      const rsd = (scaled: bigint): RateFeed => ({
+        provider: 'cbr',
+        fetchLatest: () =>
+          Promise.resolve({
+            provider: 'cbr',
+            date: SATURDAY_NBS,
+            rates: [{ provider: 'cbr', currency: 'RSD', date: SATURDAY_NBS, scaled }],
+          }),
+      })
+      const silent: HomeBankFeed = {
+        provider: 'nbs',
+        fetchLatest: () => Promise.reject(cutOff()),
+        fetchOn: () => Promise.reject(cutOff()),
+      }
+      const refresh = officialRatesRefresh({
+        primary: feed('cba').feed,
+        fallbacks: [rsd(34_800_000n)],
+        homeBanks: [silent],
+        rates: {
+          upsert: (rates) => {
+            cache.push(...rates)
+            return Promise.resolve()
+          },
+          latestOnOrBefore: () => Promise.resolve(cache),
+          history: (provider, currencies, date) =>
+            Promise.resolve(
+              new Map(
+                currencies.map((currency) => [
+                  currency,
+                  cache
+                    .filter(
+                      (row) =>
+                        row.provider === provider && row.currency === currency && row.date < date,
+                    )
+                    .sort((a, b) => (a.date < b.date ? 1 : -1))
+                    .map((row) => ({ date: row.date, scaled: row.scaled })),
+                ]),
+              ),
+            ),
+        },
+        log: { warn: () => undefined },
+        now: () => NOW,
+      })
+      await times(refresh, FALLBACK_AFTER_FAILURES + 1)
+      return cache.find((row) => row.provider === 'cbr' && row.currency === 'RSD')
+    }
+    // 34,80 драма за динар против 3,47 у НБ Грузии — скачок; у ЦБ РА динара нет вовсе.
+    expect((await run(5))?.jump).toBe(true)
+    // Меньше трёх курсов НБ Грузии — без суждения, как везде.
+    expect((await run(2))?.jump).toBe(false)
+  })
+
   it('НБС отвечает листом старше недели — запасные сразу', async () => {
     const h = silentHome({ up: true, date: '2026-09-01' })
     await h.run()
