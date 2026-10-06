@@ -445,7 +445,10 @@ two receipts is seen within one reading, and two readings each holding half a ta
 no number, the other the upper number and no head — made the key of two receipts again. **The price,
 named:** such a photo keeps the time it read, the lower receipt's, beside the upper one's total — the time
 orders a trip among the day's purchases and keys nothing — and with no number its receipt shot again is a
-second record (Р-8). Read by the moments alone, such
+second record (Р-8). **Nor is the tax number of two receipts one head's** (round 4, Г1): it is read only where a
+reading holds both heads and they print one number — two receipts of one trader, am-21, keep their place;
+one head in view may be the other receipt's, another trader's, and the upper receipt recorded at its shop
+under the lower trader's number proposed that shop to everyone who shot his. Read by the moments alone, such
 a photo took the lower receipt's total under the upper one's fiscal number, and the upper receipt shot on
 its own was then refused as recorded (adversarial А1). **The price, named** (review 1, № 5): a moment
 printed twice and misread once is read as two receipts too — on the safe side, the person types the

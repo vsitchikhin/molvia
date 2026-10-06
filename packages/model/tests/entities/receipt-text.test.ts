@@ -1707,7 +1707,35 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
     ])
     expect(got.layout).toBe('department')
     expect([got.totalHundredths, got.time, got.receiptNo]).toEqual([null, null, null])
-    expect([got.tin, got.date]).toEqual(['12345678', '2026-10-04'])
+    // one head in view of two receipts may be another trader's: no tax number (round 4, Г1)
+    expect([got.tin, got.date]).toEqual([null, '2026-10-04'])
+  })
+
+  it('reads the tax number of two receipts only where both heads print one (round 4, Г1)', () => {
+    const receipt = (tin: string, moment: string, total: string) => [
+      'ԽԱՆՈՒԹ ԱՁ',
+      `ՀՎՀՀ: ${tin} Գ/Հ: 87654321`,
+      moment,
+      'Բաժին 1 - Բաժին 1',
+      `Ընդամենը՝ ${total}`,
+      `Առձեռն ${total}`,
+      'ՖԻՍԿԱԼ ՀԱՄԱՐ 11223344',
+    ]
+    const one = bestReading([
+      reading(
+        ...receipt('12345678', '04-10-26 14:23:15', '3660.00'),
+        ...receipt('12345678', '04-10-26 14:27:34', '1200.00'),
+      ),
+    ])
+    const two = bestReading([
+      reading(
+        ...receipt('12345678', '04-10-26 14:23:15', '3660.00'),
+        ...receipt('76543210', '04-10-26 14:27:34', '1200.00'),
+      ),
+    ])
+    // two receipts of one trader, am-21: the place is still his
+    expect([one.tin, one.totalHundredths]).toEqual(['12345678', null])
+    expect(two.tin).toBeNull()
   })
 
   it('reads no time or number from the middle of a tape of two receipts (round 2, Б1)', () => {

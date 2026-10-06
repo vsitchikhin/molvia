@@ -1407,11 +1407,29 @@ export function departmentReceipt(readings: readonly (readonly TextRow[])[]): Re
   const time = several ? null : agreed(moments.map((m) => m[0]?.time ?? null))
   const firstOf = (rows: readonly string[], pattern: RegExp): string | null =>
     rows.map((text) => pattern.exec(text)?.[1]).find((found) => found !== undefined) ?? null
+  // the tax number of every head a reading holds, row by row
+  const tins = texts.map((rows) =>
+    rows.flatMap((text) => {
+      const found = DEPARTMENT_TIN_WORD.exec(text)?.[1] ?? DEPARTMENT_TIN_TILL.exec(text)?.[1]
+      return found === undefined ? [] : [found]
+    }),
+  )
+  // Two receipts on one photo: the tax number is the key of a place for everyone (review 1, № 1), so it
+  // is read only where a reading holds both heads and they print one number — two receipts of one trader,
+  // am-21. One head in view may be the other receipt's, another trader's: the upper receipt recorded at
+  // its shop under the lower trader's number proposed that shop to everyone with his (round 4, Г1).
+  const tin = several
+    ? tins.some((found) => found.length > 1) && new Set(tins.flat()).size === 1
+      ? (tins.flat()[0] ?? null)
+      : null
+    : agreed(
+        texts.map(
+          (rows) => firstOf(rows, DEPARTMENT_TIN_WORD) ?? firstOf(rows, DEPARTMENT_TIN_TILL),
+        ),
+      )
   return {
     layout: 'department',
-    tin: agreed(
-      texts.map((rows) => firstOf(rows, DEPARTMENT_TIN_WORD) ?? firstOf(rows, DEPARTMENT_TIN_TILL)),
-    ),
+    tin,
     date,
     time,
     // the number is the receipt's key against a second record (Т-11): read only where one reading holds
