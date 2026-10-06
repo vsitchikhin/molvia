@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { signedIn } from './session'
 
 // «Края чека» (MOL-222): every shot passes it before it is a part — the corners the phone found on a
@@ -229,4 +229,63 @@ test('a touch on a handle drawn inside at the edge leaves its corner where it is
   const [left = 100, top = 100] = await where()
   expect(left).toBeLessThan(1)
   expect(top).toBeLessThan(1)
+})
+
+/**
+ * Where the word each button of a pair shows stands against the middle of its button (MOL-225): the
+ * cell of a button not full-width holds the word of the work by its width, and in a pair of equal
+ * columns «Preparing the photo…» wraps — the cell two lines high, the word shown must stay in the
+ * middle of it (adversarial Р1-А4: «Done» stood 12 px above its middle on every phone).
+ */
+async function offsets(pair: Locator) {
+  return pair.locator('button').evaluateAll((buttons) =>
+    buttons.map((button) => {
+      const box = button.getBoundingClientRect()
+      const range = document.createRange()
+      const cell = button.querySelector('.words > span:not(.unseen)') ?? button
+      range.selectNodeContents(cell)
+      const rects = [...range.getClientRects()].filter((rect) => rect.width > 0)
+      const top = Math.min(...rects.map((rect) => rect.top))
+      const bottom = Math.max(...rects.map((rect) => rect.bottom))
+      return {
+        text: cell.textContent.trim(),
+        width: Math.round(box.width),
+        offset: Math.round((top + bottom) / 2 - (box.top + box.bottom) / 2),
+      }
+    }),
+  )
+}
+
+for (const width of [360, 412]) {
+  test.describe(`a phone of ${String(width)}`, () => {
+    test.use({ viewport: { width, height: 800 } })
+    test(`«Done» at rest stands in the middle of its button, as «Rotate» beside it (${String(width)})`, async ({
+      page,
+    }) => {
+      await shoot(page)
+      const [turn, done] = await offsets(edges(page).locator('.pair'))
+      expect(done?.text).toBe('Done')
+      expect(Math.abs(done?.offset ?? 99)).toBeLessThanOrEqual(1)
+      expect(Math.abs(turn?.offset ?? 99)).toBeLessThanOrEqual(1)
+      expect(Math.abs((done?.width ?? 0) - (turn?.width ?? 99))).toBeLessThanOrEqual(1)
+    })
+  })
+}
+
+test.describe('the sheet of a part, at 360', () => {
+  test.use({ viewport: { width: 360, height: 800 } })
+  test('«Retake» at rest stands in the middle of its button, as «Remove part» beside it', async ({
+    page,
+  }) => {
+    await shoot(page)
+    await edges(page).getByRole('button', { name: 'Done', exact: true }).click()
+    await expect(edges(page)).toHaveCount(0)
+    await capturing(page).getByRole('button', { name: 'Part 1: retake or remove' }).click()
+    const part = page.locator('dialog[open]').filter({ hasText: 'Part 1 of 1' })
+    await expect(part).toBeVisible()
+    await page.waitForTimeout(400)
+    const words = await offsets(part.locator('.pair'))
+    expect(words.map((word) => word.text)).toEqual(['Remove part', 'Retake'])
+    for (const word of words) expect(Math.abs(word.offset)).toBeLessThanOrEqual(1)
+  })
 })

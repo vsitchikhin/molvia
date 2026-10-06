@@ -12,6 +12,7 @@
         variant="danger-ghost"
         block
         :busy="busy"
+        :busy-label="t('sign_out.confirm_busy')"
         :inactive="offline"
         @click="$emit('confirm')"
       >

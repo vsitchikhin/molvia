@@ -15,7 +15,13 @@
     <div v-if="kind === 'error' || $slots.action" class="action">
       <!-- A version waits: the error may well be the old code reading the new server's answer,
            and the reload loses nothing (MOL-132, В-2). -->
-      <AppButton v-if="kind === 'error' && updating" block :busy="applying" @click="update.apply()">
+      <AppButton
+        v-if="kind === 'error' && updating"
+        block
+        :busy="applying"
+        :busy-label="t('update.applying')"
+        @click="update.apply()"
+      >
         <template #icon><IconUpdate /></template>
         {{ t('update.apply') }}
       </AppButton>

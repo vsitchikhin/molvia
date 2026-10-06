@@ -92,7 +92,13 @@
           <p class="caption">{{ t('item.barcode.detach_hint') }}</p>
           <!-- Destructive for everyone and with no «Вернуть»: not the filled button, and the focus
                waits on «Отменить» (review Л). -->
-          <AppButton variant="danger-ghost" block :busy="detaching" @click="notThis">
+          <AppButton
+            variant="danger-ghost"
+            block
+            :busy="detaching"
+            :busy-label="t('item.barcode.detach_busy')"
+            @click="notThis"
+          >
             {{ t('item.barcode.detach') }}
           </AppButton>
           <AppButton

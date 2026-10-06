@@ -260,6 +260,27 @@ describe('«Завершить»', () => {
     expect(view.findAll('li')).toHaveLength(1)
   })
 
+  // MOL-225: «Завершить вход» was `disabled` while it ended — grey, silent, the focus on the page.
+  it('на время работы «Завершить вход» говорит «Ending…», держит фокус, второй тап не шлёт второго запроса', async () => {
+    sessions.mockResolvedValueOnce(both)
+    const view = await render()
+    await askToEnd(view)
+    endSession.mockReturnValue(new Promise(() => undefined))
+    const button = confirmButton()
+    button.focus()
+    button.click()
+    await flushPromises()
+
+    expect(button.textContent.trim()).toBe(en.devices.end_sheet.confirm_busy)
+    expect(button.getAttribute('aria-busy')).toBe('true')
+    expect(button.disabled).toBe(false)
+    expect(document.activeElement).toBe(button)
+    button.click()
+    await flushPromises()
+    expect(endSession).toHaveBeenCalledOnce()
+    view.unmount()
+  })
+
   it('«уже нет» от сервера — тоже успех: строка уходит, ошибки нет', async () => {
     sessions.mockResolvedValueOnce(both)
     const view = await render()

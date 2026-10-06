@@ -350,3 +350,41 @@ test('a phone of 430: the rent’s amount beside its words, as the handoff draws
 }) => {
   expect(await rentRow(page, 430)).toMatchObject({ under: false, lines: 1, inside: true })
 })
+
+// MOL-225, adversarial Р1-А3: the line drops while «Сохранить» works. A native `disabled` put on the
+// button at work took the focus out of the sheet to the page; the button keeps it, and its word.
+test('связь пропала, пока «Сохранить» работает: кнопка держит фокус и слово «Сохраняем…»', async ({
+  page,
+  context,
+}) => {
+  await openMoney(page)
+  await openAccounts(page)
+  await page.getByRole('button', { name: 'Добавить счёт' }).click()
+  await addAccount(page, 'Наличные', '1000')
+  await page.getByRole('link', { name: /Наличные/ }).click()
+  await page.getByRole('button', { name: 'Править' }).click()
+  const sheet = topSheet(page)
+  await expect(sheet).toContainText('Удалить счёт')
+  await page.waitForTimeout(400)
+  await sheet.getByLabel('Имя').fill('Наличные в кошельке')
+
+  let release: () => void = () => undefined
+  const held = new Promise<void>((done) => (release = done))
+  await page.route('**/api/money/accounts**', async (route) => {
+    if (route.request().method() !== 'PUT') return route.fallback()
+    await held
+    await route.continue().catch(() => undefined)
+  })
+  await sheet.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  const busy = sheet.getByRole('button', { name: 'Сохраняем…', exact: true })
+  await expect(busy).toBeFocused()
+  await context.setOffline(true)
+  // Long enough for the page to hear it went offline.
+  await page.waitForTimeout(300)
+  // Not `toBeEnabled`: Playwright counts the `aria-disabled` of `busy` as disabled too.
+  await expect(busy).not.toHaveAttribute('disabled')
+  await expect(busy).toBeFocused()
+  await expect(busy).toHaveAttribute('aria-busy', 'true')
+  await context.setOffline(false)
+  release()
+})

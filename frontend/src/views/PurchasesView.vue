@@ -138,7 +138,9 @@
         v-if="history.page.nextCursor && trouble !== 'offline'"
         class="more"
         variant="ghost"
-        :disabled="loading"
+        :busy="loadingMore"
+        :busy-label="t('trip.history.loading')"
+        :disabled="loading && !loadingMore"
         @click="more"
         >{{ t('trip.history.more') }}</AppButton
       >
@@ -245,7 +247,7 @@ export default defineComponent({
     const actor = useActorStore()
     const trips = useTripStore()
     const screen = useTripHistory()
-    const { history, rows, loading, trouble } = screen
+    const { history, rows, loading, loadingMore, trouble } = screen
     const verdicts = useVerdictQueue()
     const pending = computed(() => verdicts.count.value)
     const pendingFrom = usePendingFrom(verdicts)
@@ -414,6 +416,7 @@ export default defineComponent({
       history,
       rows,
       loading,
+      loadingMore,
       trouble,
       shown,
       open,

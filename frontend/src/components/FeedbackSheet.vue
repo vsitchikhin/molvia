@@ -78,6 +78,7 @@
         block
         :inactive="waiting !== null"
         :busy="phase === 'sending'"
+        :busy-label="t('feedback.sending')"
         @click="press"
       >
         <template v-if="action.icon" #icon><component :is="action.icon" /></template>
@@ -247,6 +248,9 @@ export default defineComponent({
     const text = ref('')
     const clientKey = ref(newId())
     const phase = ref<Phase>('idle')
+    // A send that answers «Повторить» keeps its ↻ under «Отправляем…»: the glyph of the action stays
+    // while it works (MOL-225).
+    const retrying = ref(false)
     const unsupported = ref(false)
     const connected = ref(navigator.onLine)
     /**
@@ -494,9 +498,9 @@ export default defineComponent({
 
     const action = computed<{ words: string; icon: Component | null }>(() => {
       if (phase.value === 'sent') return { words: t('feedback.done'), icon: IconCheck }
-      if (phase.value === 'sending') return { words: t('feedback.sending'), icon: null }
       if (waiting.value !== null) return { words: waiting.value, icon: null }
-      if (phase.value === 'failed') return { words: t('state.retry'), icon: IconRefresh }
+      if (phase.value === 'failed' || (phase.value === 'sending' && retrying.value))
+        return { words: t('state.retry'), icon: IconRefresh }
       return { words: t('feedback.send'), icon: IconSend }
     })
 
@@ -530,6 +534,7 @@ export default defineComponent({
       // From here the server may hold it: what went with it stays with the key (В1).
       frozen.value = attached.value
       keep()
+      retrying.value = phase.value === 'failed'
       phase.value = 'sending'
       try {
         try {

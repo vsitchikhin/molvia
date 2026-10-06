@@ -49,6 +49,8 @@ export interface Incomes {
   readonly gone: Ref<boolean>
   /** The last «Вернуть» brought the income back — said out loud, the button being gone. */
   readonly restored: Ref<boolean>
+  /** «Вернуть» in the air — the one write of `busy` that button says it is at work on (MOL-225). */
+  readonly restoring: Ref<boolean>
   retry(): Promise<void>
   /** Resolves `null` when the server holds another income under this name (В-6). */
   record(body: IncomeBody): Promise<IncomesResponse | null>
@@ -83,6 +85,7 @@ export function useIncomes(): Incomes {
   const vanished = ref(false)
   const gone = ref(false)
   const restored = ref(false)
+  const restoring = ref(false)
   let latest = 0
 
   function land(answer: IncomesResponse): void {
@@ -150,6 +153,7 @@ export function useIncomes(): Incomes {
     vanished,
     gone,
     restored,
+    restoring,
     retry: load,
     async record(body) {
       hush()
@@ -208,6 +212,7 @@ export function useIncomes(): Incomes {
       const income = removed.value
       if (!income || busy.value) return
       busy.value = true
+      restoring.value = true
       failed.value = false
       gone.value = false
       try {
@@ -224,6 +229,7 @@ export function useIncomes(): Incomes {
         }
       } finally {
         busy.value = false
+        restoring.value = false
       }
     },
   }

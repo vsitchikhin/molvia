@@ -97,3 +97,53 @@ test('сессию кончили, пока лист открыт: нажати�
   const again = await signedIn(page)
   expect(again).toBe(owner)
 })
+
+// MOL-225: the most final button of the app, at work on a slow line. It says «Удаляем…» in its own
+// look, keeps the focus, and a second tap sends nothing — before, it stayed «Удалить навсегда» and
+// the second tap was swallowed with nothing said.
+test('«Удалить навсегда» на время работы говорит «Удаляем…», держит фокус и вид, второй тап не шлёт ничего', async ({
+  page,
+}) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await page.getByRole('button', { name: /Удалить мои данные/ }).click()
+  await page
+    .locator('dialog[open]')
+    .evaluate((dialog) =>
+      Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished)),
+    )
+  await page.waitForTimeout(350)
+
+  let sent = 0
+  let release: () => void = () => undefined
+  const held = new Promise<void>((done) => (release = done))
+  await page.route('**/api/actors/me', async (route) => {
+    if (route.request().method() !== 'DELETE') return route.fallback()
+    sent += 1
+    await held
+    await route.continue()
+  })
+
+  const sheet = page.getByRole('dialog')
+  const live = sheet.getByRole('button', { name: 'Удалить навсегда', exact: true })
+  const look = (button: typeof live) =>
+    button.evaluate((one) => {
+      const style = getComputedStyle(one)
+      return [style.backgroundColor, style.color, style.opacity].join(' · ')
+    })
+  const rest = await look(live)
+  await live.click()
+
+  const busy = sheet.getByRole('button', { name: 'Удаляем…', exact: true })
+  await expect(busy).toHaveAttribute('aria-busy', 'true')
+  await expect(busy).toBeFocused()
+  expect(await look(busy)).toBe(rest)
+  // Playwright counts `aria-disabled` as not enabled: the tap is forced, as a finger would.
+  await busy.click({ force: true })
+  await expect.poll(() => sent).toBe(1)
+  await page.waitForTimeout(200)
+  expect(sent).toBe(1)
+
+  release()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Вход')
+})

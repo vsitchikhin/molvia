@@ -23,7 +23,9 @@
       >
         <p v-if="insecure" class="hint">{{ t('dev.login_insecure') }}</p>
         <template #action>
-          <AppButton block :busy="starting" @click="begin">{{ t('login.start') }}</AppButton>
+          <AppButton block :busy="starting" :busy-label="t('login.starting')" @click="begin">
+            {{ t('login.start') }}
+          </AppButton>
           <AppButton v-if="seam" block variant="ghost" @click="devSignIn">
             {{ t('dev.login_seam') }}
           </AppButton>
@@ -39,7 +41,7 @@
         :body="t('login.waiting.body')"
       >
         <template #action>
-          <AppButton block :busy="starting" :inactive="starting" @click="again">
+          <AppButton block :busy="starting" :busy-label="t('login.starting')" @click="again">
             {{ t('login.open') }}
           </AppButton>
           <AppButton block variant="ghost" @click="restart">{{ t('login.restart') }}</AppButton>
@@ -75,7 +77,9 @@
         :body="t('login.unavailable.body')"
       >
         <template #action>
-          <AppButton block :busy="starting" @click="begin">{{ t('login.start') }}</AppButton>
+          <AppButton block :busy="starting" :busy-label="t('login.starting')" @click="begin">
+            {{ t('login.start') }}
+          </AppButton>
         </template>
       </ScreenState>
 

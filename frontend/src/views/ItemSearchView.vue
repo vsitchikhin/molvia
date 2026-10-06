@@ -71,7 +71,13 @@
           </p>
           <p class="not-found-text">{{ t('item.barcode.bind_hint') }}</p>
           <div class="bind-actions">
-            <AppButton ref="bindFirst" block :busy="bind.phase === 'sending'" @click="attach">
+            <AppButton
+              ref="bindFirst"
+              block
+              :busy="bind.phase === 'sending'"
+              :busy-label="t('item.barcode.bind_busy')"
+              @click="attach"
+            >
               {{ t('item.barcode.bind') }}
             </AppButton>
             <!-- Inactive while the code is on its way: «без кода» then would be written with it,

@@ -62,9 +62,15 @@
             <template #icon><IconRotate /></template>
             {{ t('receipt.edges.turn') }}
           </AppButton>
-          <AppButton size="large" :busy="busy" :inactive="flat" @click="done">{{
-            t('receipt.edges.done')
-          }}</AppButton>
+          <AppButton
+            size="large"
+            :busy="busy"
+            :busy-label="t('receipt.capture.preparing')"
+            :inactive="flat"
+            @click="done"
+          >
+            {{ t('receipt.edges.done') }}
+          </AppButton>
         </template>
       </div>
     </template>

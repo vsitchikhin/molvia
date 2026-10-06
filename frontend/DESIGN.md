@@ -458,6 +458,7 @@ height on it.
 - **Tinted:** `accent-tint` fill, `accent-ink` text 600 — "Вернуть", "Записать разницу", "Добавить счёт". The old handoffs called this "secondary"; it is a variant of its own.
 - **Ghost / Danger ghost:** no fill, `accent-ink` / `bad-ink` text. "Убрать" a category is ghost, not danger: it erases nothing **(target)**.
 - **Icon:** a 44 circle on `surface-2`, its glyph 24 in `text`; inactive, in `text-muted`.
+- **At work:** the button says what it does — «Удаляем…», «Сохраняем…» in place of its word, in its own look (fill, ink, glyph); never the inactive look, never a spinner. A button not full-width keeps the width of the wider word, so nothing jumps under the thumb.
 - **Inactive:** one look everywhere — `text-muted` 600, still focusable (`aria-disabled`), and the words say why ("Выберите оценку"). No opacity. A variant with a fill turns `surface-2`; ghost and danger ghost keep no fill, so a sheet's footer never shows two grey pills.
 - **Focus:** a 2 px `accent` ring, 2 px out.
 

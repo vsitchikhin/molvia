@@ -171,6 +171,30 @@ describe('ExchangeSheet', () => {
     expect(view.emitted('update:open')?.at(-1)).toEqual([false])
   })
 
+  // MOL-225, В-3: the same as «Сохранить доход» — the other way to write money. `disabled` while it
+  // saved dropped the focus to the page; at work the button says so and keeps it.
+  it('says «Saving the exchange…» while it saves, keeps the focus and takes no second tap', async () => {
+    record.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    await fill(view, '20 000', '95000,50')
+    const held = view
+      .findAll('.field')
+      .find((candidate) => candidate.get('label').text().includes('held before the exchange'))
+    await held?.get('input').setValue('20000')
+    const button = view.findAll('button').find((one) => one.text() === en.exchange.sheet.save)
+    if (!button) throw new Error('no «Save the exchange»')
+    ;(button.element as HTMLButtonElement).focus()
+    await button.trigger('click')
+    await flushPromises()
+
+    expect(button.text()).toBe(en.exchange.sheet.saving)
+    expect(button.attributes('aria-busy')).toBe('true')
+    expect(button.attributes('disabled')).toBeUndefined()
+    expect(document.activeElement).toBe(button.element)
+    await button.trigger('click')
+    expect(record).toHaveBeenCalledOnce()
+  })
+
   it('asks by an income that gave the currency a price, as by an exchange (MOL-66)', async () => {
     const income = { id: '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c2d', currency: 'AMD' as const }
     const view = await render(
