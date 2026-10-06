@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta cha!importantmportantset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>&#x41A;&#x443;&#x440;&#x441;&#x43D;&#x430; &#x43B;&#x438;&#x441;&#x442;&#x430; &#x41D;&#x411;&#x421; - </title>
+<link rel="icon" type="image/svg+xml" href="_content/NBS.Common.WebApp/css/favicon.svg">
+
+    
+<link rel="stylesheet" href="https://appcdn.nbs.rs/webapp/lib/bootstrap/5.3.3/css/bootstrap.min.css" />
+<link rel="stylesheet" href="https://appcdn.nbs.rs/webapp/lib/bootstrap-icons/1.11.3/font/bootstrap-icons.css" />
+<link rel="stylesheet" href="https://appcdn.nbs.rs/webapp/lib/flatpickr/4.6.13/flatpickr.css" />
+
+
+<link rel="stylesheet" href="https://appcdn.nbs.rs/webapp/lib/c3/0.7.20/c3.css" />
+
+
+
+<link rel="stylesheet" href="/ExchangeRateWebApp/_content/NBS.Common.WebApp/css/Standard1/site.css?v=e_BqTk0M0YugdTl52WoK05JPRROEEL4Ke6Tt-ccw1rU" />
+<link rel="stylesheet" href="/ExchangeRateWebApp/_content/NBS.Common.WebApp/css/Standard1/siteComponents.css?v=guqtusLAxar1m045oRsclYmGMmnk8UwbtiE7t5VnLSs" />
+<link rel="stylesheet" href="/ExchangeRateWebApp/_content/NBS.Common.WebApp/css/Standard1/siteComponentsResponsiveTable.css?v=lid0yV0G-O7SisYAlMLJoQgiReIZWXR_8UGepvolvTg" />
+
+<link rel="stylesheet" href="/ExchangeRateWebApp/css/siteExtension.css?v=4O3I0nVZ4ZRZ8VDgkDx655UAD9Yy7EEbSZZWKfezW4c" />
+
+    
+</head>
+<body>
+    
+<!-- Gornji red: samo na velikim ekranima -->
+<div class="top-header fixed-top d-none d-lg-block">
+    <div class="container container-1440 d-flex align-items-center py-2">
+        <a class="app-logo" href="https://www.nbs.rs/sr_RS/indeks/"></a>
+        <h5 class="mb-0">
+            &#x41A;&#x443;&#x440;&#x441;&#x43D;&#x430; &#x43B;&#x438;&#x441;&#x442;&#x430; &#x41D;&#x411;&#x421;
+        </h5>
+    </div>
+</div>
+
+<!-- Navigacija -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top main-navbar">
+    <div class="container container-1440">
+        <a class="navbar-brand d-lg-none MyCaption" style="margin-right:0px;" href="https://www.nbs.rs/sr_RS/indeks/">
+            <span class="app-logo"></span>            
+            &#x41A;&#x443;&#x440;&#x441;&#x43D;&#x430; &#x43B;&#x438;&#x441;&#x442;&#x430; &#x41D;&#x411;&#x421;
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNavbar">
+            
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+    
+        <li class="nav-item">
+            <a class="nav-link" href="/ExchangeRateWebApp/ExchangeRate/CurrentMiddleRate?">&#x417;&#x432;&#x430;&#x43D;&#x438;&#x447;&#x43D;&#x438; &#x441;&#x440;&#x435;&#x434;&#x45A;&#x438; &#x43A;&#x443;&#x440;&#x441; &#x434;&#x438;&#x43D;&#x430;&#x440;&#x430;</a>
+        </li>
+
+    
+        <li class="nav-item">
+            <a class="nav-link" href="/ExchangeRateWebApp/ExchangeRate/CurrentForeignExchange?">&#x417;&#x430; &#x434;&#x435;&#x432;&#x438;&#x437;&#x435;</a>
+        </li>
+
+    
+        <li class="nav-item">
+            <a class="nav-link" href="/ExchangeRateWebApp/ExchangeRate/CurrentForeignCash?">&#x417;&#x430; &#x435;&#x444;&#x435;&#x43A;&#x442;&#x438;&#x432;&#x43D;&#x438; &#x441;&#x442;&#x440;&#x430;&#x43D;&#x438; &#x43D;&#x43E;&#x432;&#x430;&#x446; </a>
+        </li>
+
+
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+        &#x41D;&#x430; &#x436;&#x435;&#x459;&#x435;&#x43D;&#x438; &#x434;&#x430;&#x43D;
+    </a>
+    <ul class="dropdown-menu navbar-dark myNavigationDropdown" aria-labelledby="navbarDropdown">
+            
+        <li>
+            <a class="dropdown-item" href="/ExchangeRateWebApp/ExchangeRate/IndexByDate?isSearchExecuted=false">&#x41F;&#x440;&#x435;&#x442;&#x440;&#x430;&#x433;&#x430; &#x43F;&#x43E; &#x434;&#x430;&#x442;&#x443;&#x43C;&#x443;</a>
+        </li>
+
+
+            
+        <li>
+            <a class="dropdown-item" href="/ExchangeRateWebApp/ExchangeRate/IndexByNumber?isSearchExecuted=false">&#x41F;&#x440;&#x435;&#x442;&#x440;&#x430;&#x433;&#x430; &#x43F;&#x43E; &#x431;&#x440;&#x43E;&#x458;&#x443; &#x43A;&#x443;&#x440;&#x441;&#x43D;&#x435; &#x43B;&#x438;&#x441;&#x442;&#x435;</a>
+        </li>
+
+    </ul>
+</li>
+
+    
+        <li class="nav-item">
+            <a class="nav-link" href="/ExchangeRateWebApp/ExchangeRate/IndexPeriod?isSearchExecuted=false">&#x417;&#x430; &#x43F;&#x435;&#x440;&#x438;&#x43E;&#x434;</a>
+        </li>
+
+
+    
+        <li class="nav-item">
+            <a class="nav-link" href="/ExchangeRateWebApp/ExchangeRateAverage/Index?">&#x41F;&#x440;&#x43E;&#x441;&#x435;&#x447;&#x43D;&#x438; &#x43A;&#x443;&#x440;&#x441;&#x435;&#x432;&#x438;</a>
+        </li>
+
+
+
+
+    
+    <li class="nav-item">
+        <a class="nav-link" href="/ExchangeRateWebApp/Help/Index?">&#x41F;&#x43E;&#x43C;&#x43E;&#x45B;</a>
+    </li>
+
+            </ul>
+
+                <ul class="navbar-nav mb-2 mb-lg-0">
+
+
+        <div title="(&#x441;&#x440;&#x43F;&#x441;&#x43A;&#x438; (&#x45B;&#x438;&#x440;&#x438;&#x43B;&#x438;&#x446;&#x430;))">
+            <form method="post" role="form" action="/ExchangeRateWebApp/CultureInfo/SetLanguage?returnUrl=~%2FExchangeRate%2FIndexByDate%3FisSearchExecuted%3Dtrue%26Date%3D03.10.2026%26ExchangeRateListTypeID%3D3">
+                <select class="form-control" name="language" onchange="this.form.submit();" id="language">
+                <option selected="selected" value="sr-Cyrl">&#x441;&#x440;&#x43F;&#x441;&#x43A;&#x438; (&#x45B;&#x438;&#x440;&#x438;&#x43B;&#x438;&#x446;&#x430;)</option>
+<option value="sr-Latn">srpski (latinica)</option>
+<option value="en-US">English (United States)</option>
+</select>
+            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8AeYDVnk7phCmg0uIlcqnHqvPbvNaO0y7C0m_1-c05N_oQGhPicOzKm3ObiIZ2aAkabMKRoRIFj2IJAbSkoWSfArM4C5YldLpjJOfH4ow_HOVy0rfPtnJjswstGldzkxnLZ-JjUWU2Q1C45Y3sejZbTBT-JHyG6Q_wV8HPWVcEprwvJL_JibImHUj4ioKCTG-w" /></form>
+        </div>
+                </ul>
+
+        </div>
+    </div>
+</nav>
+
+    <main class="content">
+        <div class="container container-1440">
+            
+
+<h1>&#x41D;&#x430; &#x436;&#x435;&#x459;&#x435;&#x43D;&#x438; &#x434;&#x430;&#x43D;</h1>
+
+
+    <div>
+        <p style="text-align: right">
+            <a class="btn btn-primary" href="/ExchangeRateWebApp/ExchangeRate/Download?ExchangeRateListID=83c8d434-56ad-4bde-9f70-1d7d0c845c46&Format=csv" target="_blank">CSV</a>
+
+            <a class="btn btn-primary" href="/ExchangeRateWebApp/ExchangeRate/Download?ExchangeRateListID=83c8d434-56ad-4bde-9f70-1d7d0c845c46&ExchangeRateListTypeName=srednjiKurs&Format=xml" target="_blank">XML</a>
+
+            <a class="btn btn-primary" href="/ExchangeRateWebApp/ExchangeRate/IndexPrint?ExchangeRateListID=83c8d434-56ad-4bde-9f70-1d7d0c845c46" target="_blank">&#x428;&#x442;&#x430;&#x43C;&#x43F;&#x430;</a>
+        </p>
+    </div>
+
+
+<div id="searchCollapsible" class="row myColapsiblePanel " >
+    <div class="col-12 card" style="margin:0px;padding:0px;">
+        <div id="searchCollapsibleHeader" class="card-header p-1 myColapsiblePanelCaption">
+            <div class="text-left myColapsiblePanelCaptionContent" data-bs-toggle="collapse" data-bs-target="#searchCollapsibleContent" aria-expanded="true" aria-controls="searchCollapsibleContent">
+                <i class="bi bi-arrow-down-up m-1"></i>Параметри претраге
+            </div>
+        </div>
+    </div>
+    <div id="searchCollapsibleContent" class="col-12 collapse myColapsiblePanelContent " aria-labelledby="searchCollapsibleHeader">
+        
+
+    <form id="searchParamForm" name="searchParamForm" method="get" action="/ExchangeRateWebApp/ExchangeRate/IndexByDate">
+        <div class="row">
+    <div class="col-12 card myIndexInputPanel">
+        
+            
+            <input type="hidden" id="isSearchExecuted" name="isSearchExecuted" value="true" />
+
+<div class="row mySectionPlace" >
+    <div class="col-12 card pb-1 mySection">
+        
+    <div class="row" >
+
+        <div class="col-12 col-sm-12 col-md-6 col-lg-6">
+	<label class="control-label" for="Date">Датум(дд.мм.гггг)</label>
+	<input class="form-control" autocomplete="off" type="text" id="Date" name="Date" value="3.10.2026."  my-date-type="Date">
+	<span class="text-danger field-validation-valid" data-valmsg-for="Date" data-valmsg-replace="true"></span>
+</div>
+        <div class="col-12 col-sm-12 col-md-6 col-lg-6">
+	<label class="control-label myRequired" for="ExchangeRateListTypeID" title="Врста:">Врста:</label>
+	<select class="form-control" id="ExchangeRateListTypeID" name="ExchangeRateListTypeID">
+	<option  value="1">За девизе</option>
+<option  value="2">Ефектива</option>
+<option selected="selected" value="3">Средњи курс</option>
+
+	</select>
+	<span class="text-danger field-validation-valid" data-valmsg-for="ExchangeRateListTypeID" data-valmsg-replace="true"></span>
+</div>
+    
+</div>
+
+    </div>
+</div>
+
+
+        
+    </div>
+</div>
+    </form>
+
+        <div class="row">
+    <div class="col-12 card myActionPanel">
+        
+            <div class="row m-0">
+                <div class="col-12 m-0 p-0 mySearchButton">
+                    <div class="btn-group-sm mySearchButtonStyle">
+                        <button class="btn btn-primary" my-button-type="IndexSearch" my-paging-helper="myIndexOutput">&#x41F;&#x440;&#x438;&#x43A;&#x430;&#x436;&#x438;</button>
+                    </div>
+                </div>
+            </div>
+        
+    </div>
+</div>
+
+
+    </div>
+</div>
+
+
+        <div class="row">
+            <div class="col-12" style="padding:0px;">
+                <div>
+
+    <center><h6> &#x41A;&#x423;&#x420;&#x421;&#x41D;&#x410; &#x41B;&#x418;&#x421;&#x422;&#x410; &#x411;&#x420;. 188</h6></center>
+    <center><h6> &#x417;&#x410; &#x417;&#x412;&#x410;&#x41D;&#x418;&#x427;&#x41D;&#x418; &#x421;&#x420;&#x415;&#x414;&#x40A;&#x418; &#x41A;&#x423;&#x420;&#x421; &#x414;&#x418;&#x41D;&#x410;&#x420;&#x410;</h6></center>
+    <center><h6> &#x424;&#x41E;&#x420;&#x41C;&#x418;&#x420;&#x410;&#x41D;&#x410; &#x41D;&#x410; &#x414;&#x410;&#x41D; 2.10.2026. &#x413;&#x41E;&#x414;&#x418;&#x41D;&#x415;</h6></center>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>&#x41E;&#x417;&#x41D;&#x410;&#x41A;&#x410; &#x412;&#x410;&#x41B;&#x423;&#x422;&#x415;</th>
+                <th>&#x428;&#x418;&#x424;&#x420;&#x410; &#x412;&#x410;&#x41B;&#x423;&#x422;&#x415;</th>
+                <th>&#x41D;&#x410;&#x417;&#x418;&#x412; &#x417;&#x415;&#x41C;&#x409;&#x415;</th>
+                <th>&#x412;&#x410;&#x416;&#x418; &#x417;&#x410;</th>
+                    <th>&#x421;&#x420;&#x415;&#x414;&#x40A;&#x418; &#x41A;&#x423;&#x420;&#x421;</th>
+               
+            </tr>
+        </thead>
+        <tbody>
+                    <tr>
+                        <td>EUR</td>
+                        <td>978</td>
+                            <td>&#x415;&#x41C;&#x423;</td>
+                        <td>1</td>
+                                <td>117,4948</td>
+                    </tr>
+                    <tr>
+                        <td>AUD</td>
+                        <td>36</td>
+                            <td>&#x410;&#x443;&#x441;&#x442;&#x440;&#x430;&#x43B;&#x438;&#x458;&#x430;</td>
+                        <td>1</td>
+                                <td>72,4114</td>
+                    </tr>
+                    <tr>
+                        <td>CAD</td>
+                        <td>124</td>
+                            <td>&#x41A;&#x430;&#x43D;&#x430;&#x434;&#x430;</td>
+                        <td>1</td>
+                                <td>73,4526</td>
+                    </tr>
+                    <tr>
+                        <td>CNY</td>
+                        <td>156</td>
+                            <td>&#x41A;&#x438;&#x43D;&#x430;</td>
+                        <td>1</td>
+                                <td>15,5732</td>
+                    </tr>
+                    <tr>
+                        <td>CZK</td>
+                        <td>203</td>
+                            <td>&#x427;&#x435;&#x448;&#x43A;&#x430; &#x420;&#x435;&#x43F;&#x443;&#x431;&#x43B;&#x438;&#x43A;&#x430;</td>
+                        <td>1</td>
+                                <td>4,8012</td>
+                    </tr>
+                    <tr>
+                        <td>DKK</td>
+                        <td>208</td>
+                            <td>&#x414;&#x430;&#x43D;&#x441;&#x43A;&#x430;</td>
+                        <td>1</td>
+                                <td>15,7165</td>
+                    </tr>
+                    <tr>
+                        <td>HUF</td>
+                        <td>348</td>
+                            <td>&#x41C;&#x430;&#x452;&#x430;&#x440;&#x441;&#x43A;&#x430;</td>
+                        <td>100</td>
+                                <td>31,8578</td>
+                    </tr>
+                    <tr>
+                        <td>INR</td>
+                        <td>356</td>
+                            <td>&#x418;&#x43D;&#x434;&#x438;&#x458;&#x430;</td>
+                        <td>1</td>
+                                <td>1,0838</td>
+                    </tr>
+                    <tr>
+                        <td>JPY</td>
+                        <td>392</td>
+                            <td>&#x408;&#x430;&#x43F;&#x430;&#x43D;</td>
+                        <td>100</td>
+                                <td>66,1495</td>
+                    </tr>
+                    <tr>
+                        <td>KWD</td>
+                        <td>414</td>
+                            <td>&#x41A;&#x443;&#x432;&#x430;&#x458;&#x442;</td>
+                        <td>1</td>
+                                <td>338,9925</td>
+                    </tr>
+                    <tr>
+                        <td>NOK</td>
+                        <td>578</td>
+                            <td>&#x41D;&#x43E;&#x440;&#x432;&#x435;&#x448;&#x43A;&#x430;</td>
+                        <td>1</td>
+                                <td>10,8538</td>
+                    </tr>
+                    <tr>
+                        <td>RUB</td>
+                        <td>643</td>
+                            <td>&#x420;&#x443;&#x441;&#x43A;&#x430; &#x424;&#x435;&#x434;&#x435;&#x440;&#x430;&#x446;&#x438;&#x458;&#x430;</td>
+                        <td>1</td>
+                                <td>1,2501</td>
+                    </tr>
+                    <tr>
+                        <td>SEK</td>
+                        <td>752</td>
+                            <td>&#x428;&#x432;&#x435;&#x434;&#x441;&#x43A;&#x430;</td>
+                        <td>1</td>
+                                <td>10,4105</td>
+                    </tr>
+                    <tr>
+                        <td>CHF</td>
+                        <td>756</td>
+                            <td>&#x428;&#x432;&#x430;&#x458;&#x446;&#x430;&#x440;&#x441;&#x43A;&#x430;</td>
+                        <td>1</td>
+                                <td>125,8378</td>
+                    </tr>
+                    <tr>
+                        <td>AED</td>
+                        <td>784</td>
+                            <td>&#x423;&#x458;&#x435;&#x434;&#x438;&#x45A;&#x435;&#x43D;&#x438; &#x410;&#x440;&#x430;&#x43F;&#x441;&#x43A;&#x438; &#x415;&#x43C;&#x438;&#x440;&#x430;&#x442;&#x438;</td>
+                        <td>1</td>
+                                <td>28,4291</td>
+                    </tr>
+                    <tr>
+                        <td>MKD</td>
+                        <td>807</td>
+                            <td>&#x420;&#x435;&#x43F;&#x443;&#x431;&#x43B;&#x438;&#x43A;&#x430; &#x421;&#x435;&#x432;&#x435;&#x440;&#x43D;&#x430; &#x41C;&#x430;&#x43A;&#x435;&#x434;&#x43E;&#x43D;&#x438;&#x458;&#x430;</td>
+                        <td>1</td>
+                                <td>1,9065</td>
+                    </tr>
+                    <tr>
+                        <td>GBP</td>
+                        <td>826</td>
+                            <td>&#x412;&#x435;&#x43B;&#x438;&#x43A;&#x430; &#x411;&#x440;&#x438;&#x442;&#x430;&#x43D;&#x438;&#x458;&#x430;</td>
+                        <td>1</td>
+                                <td>137,9209</td>
+                    </tr>
+                    <tr>
+                        <td>USD</td>
+                        <td>840</td>
+                            <td>&#x421;&#x410;&#x414;</td>
+                        <td>1</td>
+                                <td>104,4027</td>
+                    </tr>
+                    <tr>
+                        <td>BYN</td>
+                        <td>933</td>
+                            <td>&#x411;&#x435;&#x43B;&#x43E;&#x440;&#x443;&#x441;&#x438;&#x458;&#x430;</td>
+                        <td>1</td>
+                                <td>34,5126</td>
+                    </tr>
+                    <tr>
+                        <td>RON</td>
+                        <td>946</td>
+                            <td>&#x420;&#x443;&#x43C;&#x443;&#x43D;&#x438;&#x458;&#x430;</td>
+                        <td>1</td>
+                                <td>21,9777</td>
+                    </tr>
+                    <tr>
+                        <td>TRY</td>
+                        <td>949</td>
+                            <td>&#x422;&#x443;&#x440;&#x441;&#x43A;&#x430;</td>
+                        <td>1</td>
+                                <td>2,1251</td>
+                    </tr>
+                    <tr>
+                        <td>BAM</td>
+                        <td>977</td>
+                            <td>&#x411;&#x43E;&#x441;&#x43D;&#x430; &#x438; &#x425;&#x435;&#x440;&#x446;&#x435;&#x433;&#x43E;&#x432;&#x438;&#x43D;&#x430;</td>
+                        <td>1</td>
+                                <td>60,0741</td>
+                    </tr>
+                    <tr>
+                        <td>PLN</td>
+                        <td>985</td>
+                            <td>&#x41F;&#x43E;&#x459;&#x441;&#x43A;&#x430;</td>
+                        <td>1</td>
+                                <td>26,8425</td>
+                    </tr>
+                    <tr>
+                        <td>ATS</td>
+                        <td>40</td>
+                            <td>&#x410;&#x443;&#x441;&#x442;&#x440;&#x438;&#x458;&#x430;</td>
+                        <td>1</td>
+                                <td>8,5387</td>
+                    </tr>
+                    <tr>
+                        <td>BEF</td>
+                        <td>56</td>
+                            <td>&#x411;&#x435;&#x43B;&#x433;&#x438;&#x458;&#x430;</td>
+                        <td>100</td>
+                                <td>291,2620</td>
+                    </tr>
+                    <tr>
+                        <td>FIM</td>
+                        <td>246</td>
+                            <td>&#x424;&#x438;&#x43D;&#x441;&#x43A;&#x430;</td>
+                        <td>1</td>
+                                <td>19,7612</td>
+                    </tr>
+                    <tr>
+                        <td>FRF</td>
+                        <td>250</td>
+                            <td>&#x424;&#x440;&#x430;&#x43D;&#x446;&#x443;&#x441;&#x43A;&#x430;</td>
+                        <td>1</td>
+                                <td>17,9120</td>
+                    </tr>
+                    <tr>
+                        <td>DEM</td>
+                        <td>280</td>
+                            <td>&#x41D;&#x435;&#x43C;&#x430;&#x447;&#x43A;&#x430;</td>
+                        <td>1</td>
+                                <td>60,0741</td>
+                    </tr>
+                    <tr>
+                        <td>GRD</td>
+                        <td>300</td>
+                            <td>&#x413;&#x440;&#x447;&#x43A;&#x430;</td>
+                        <td>100</td>
+                                <td>34,4812</td>
+                    </tr>
+                    <tr>
+                        <td>IEP</td>
+                        <td>372</td>
+                            <td>&#x418;&#x440;&#x441;&#x43A;&#x430;</td>
+                        <td>1</td>
+                                <td>149,1876</td>
+                    </tr>
+                    <tr>
+                        <td>ITL</td>
+                        <td>380</td>
+                            <td>&#x418;&#x442;&#x430;&#x43B;&#x438;&#x458;&#x430;</td>
+                        <td>100</td>
+                                <td>6,0681</td>
+                    </tr>
+                    <tr>
+                        <td>LUF</td>
+                        <td>442</td>
+                            <td>&#x41B;&#x443;&#x43A;&#x441;&#x435;&#x43C;&#x431;&#x443;&#x440;&#x433;</td>
+                        <td>100</td>
+                                <td>291,2620</td>
+                    </tr>
+                    <tr>
+                        <td>PTE</td>
+                        <td>620</td>
+                            <td>&#x41F;&#x43E;&#x440;&#x442;&#x443;&#x433;&#x430;&#x43B;&#x438;&#x458;&#x430;</td>
+                        <td>100</td>
+                                <td>58,6062</td>
+                    </tr>
+                    <tr>
+                        <td>ESP</td>
+                        <td>724</td>
+                            <td>&#x428;&#x43F;&#x430;&#x43D;&#x438;&#x458;&#x430;</td>
+                        <td>100</td>
+                                <td>70,6158</td>
+                    </tr>
+        </tbody>
+    </table>
+
+<p style="margin-top:20px" class="MyContentBottom">
+
+1. &#x41A;&#x443;&#x440;&#x441;&#x435;&#x432;&#x438; &#x438;&#x437; &#x43E;&#x432;&#x435; &#x43B;&#x438;&#x441;&#x442;&#x435; &#x43F;&#x440;&#x438;&#x43C;&#x435;&#x45A;&#x443;&#x458;&#x443; &#x441;&#x435; &#x43E;&#x434; 8 &#x447;&#x430;&#x441;&#x43E;&#x432;&#x430; 2.10.2026. &#x433;&#x43E;&#x434;&#x438;&#x43D;&#x435; &#x434;&#x43E; 8 &#x447;&#x430;&#x441;&#x43E;&#x432;&#x430; &#x43D;&#x430; &#x434;&#x430;&#x43D; &#x43A;&#x430;&#x434;&#x430; &#x45B;&#x435; &#x431;&#x438;&#x442;&#x438; &#x444;&#x43E;&#x440;&#x43C;&#x438;&#x440;&#x430;&#x43D;&#x430; &#x43D;&#x430;&#x440;&#x435;&#x434;&#x43D;&#x430; &#x43A;&#x443;&#x440;&#x441;&#x43D;&#x430; &#x43B;&#x438;&#x441;&#x442;&#x430;. <br />
+2. &#x41A;&#x443;&#x440;&#x441;&#x435;&#x432;&#x438; &#x438;&#x437; &#x43E;&#x432;&#x435; &#x43B;&#x438;&#x441;&#x442;&#x435; &#x43F;&#x440;&#x438;&#x43C;&#x435;&#x45A;&#x443;&#x458;&#x443; &#x441;&#x435; &#x437;&#x430; &#x43F;&#x43E;&#x442;&#x440;&#x435;&#x431;&#x435; &#x43A;&#x45A;&#x438;&#x433;&#x43E;&#x432;&#x43E;&#x434;&#x441;&#x442;&#x432;&#x430; &#x438; &#x441;&#x442;&#x430;&#x442;&#x438;&#x441;&#x442;&#x438;&#x43A;&#x435;, &#x43A;&#x430;&#x43E; &#x438; &#x437;&#x430; &#x43E;&#x431;&#x440;&#x430;&#x447;&#x443;&#x43D; &#x446;&#x430;&#x440;&#x438;&#x43D;&#x435; &#x438; &#x434;&#x440;&#x443;&#x433;&#x438;&#x445; &#x443;&#x432;&#x43E;&#x437;&#x43D;&#x438;&#x445; &#x434;&#x430;&#x436;&#x431;&#x438;&#x43D;&#x430;, &#x441;&#x430;&#x433;&#x43B;&#x430;&#x441;&#x43D;&#x43E; &#x447;&#x43B;&#x430;&#x43D;&#x443; 41. &#x417;&#x430;&#x43A;&#x43E;&#x43D;&#x430; &#x43E; &#x434;&#x435;&#x432;&#x438;&#x437;&#x43D;&#x43E;&#x43C; &#x43F;&#x43E;&#x441;&#x43B;&#x43E;&#x432;&#x430;&#x45A;&#x443; (&quot;&#x421;&#x43B;&#x443;&#x436;&#x431;&#x435;&#x43D;&#x438; &#x433;&#x43B;&#x430;&#x441;&#x43D;&#x438;&#x43A; &#x420;&#x421;&quot;, &#x431;&#x440;. 62/2006).  <br />
+3. &#x41A;&#x443;&#x440;&#x441; &#x437;&#x430; XDR 1,00 &#x438;&#x437;&#x43D;&#x43E;&#x441;&#x438;: USD 1,35595 , &#x442;&#x458;. RSD 141,5648.            <br />
+4.   &#x41A;&#x443;&#x440;&#x441; &#x437;&#x430; &#x43E;&#x431;&#x440;&#x430;&#x447;&#x443;&#x43D;&#x441;&#x43A;&#x438; &#x434;&#x43E;&#x43B;&#x430;&#x440; &#x458;&#x435;&#x434;&#x43D;&#x430;&#x43A; &#x458;&#x435; &#x441;&#x440;&#x435;&#x434;&#x45A;&#x435;&#x43C; &#x43A;&#x443;&#x440;&#x441;&#x443; &#x423;&#x421;&#x414;.             <br />
+5.   &#x421;&#x440;&#x435;&#x434;&#x45A;&#x438; &#x43A;&#x443;&#x440;&#x441;&#x435;&#x432;&#x438; &#x437;&#x430; &#x418;&#x41D; &#x432;&#x430;&#x43B;&#x443;&#x442;&#x435;, &#x437;&#x430; &#x432;&#x43E;&#x452;&#x435;&#x45A;&#x435; &#x43A;&#x45A;&#x438;&#x433;&#x430; &#x443; &#x431;&#x430;&#x43D;&#x43A;&#x430;&#x43C;&#x430;, &#x438;&#x437;&#x440;&#x430;&#x447;&#x443;&#x43D;&#x430;&#x432;&#x430;&#x458;&#x443; &#x441;&#x435; &#x43F;&#x440;&#x435;&#x43C;&#x430; &#x441;&#x440;&#x435;&#x434;&#x45A;&#x435;&#x43C; &#x43A;&#x443;&#x440;&#x441;&#x443; &#x437;&#x430; &#x415;&#x423;&#x420; &#x43F;&#x440;&#x438;&#x43C;&#x435;&#x43D;&#x43E;&#x43C; &#x444;&#x438;&#x43A;&#x441;&#x43D;&#x438;&#x445; &#x43A;&#x443;&#x440;&#x441;&#x435;&#x432;&#x430; &#x415;&#x432;&#x440;&#x43E;&#x43F;&#x441;&#x43A;&#x435; &#x446;&#x435;&#x43D;&#x442;&#x440;&#x430;&#x43B;&#x43D;&#x435; &#x431;&#x430;&#x43D;&#x43A;&#x435;.             <br />
+</p>
+
+                </div>
+            </div>
+        </div>
+
+
+
+
+
+
+        </div>
+    </main>
+    <footer>
+    <div class="container container-1440">
+        <p>&copy; 2026 - &#x41D;&#x430;&#x440;&#x43E;&#x434;&#x43D;&#x430; &#x431;&#x430;&#x43D;&#x43A;&#x430; &#x421;&#x440;&#x431;&#x438;&#x458;&#x435;</p>
+    </div>
+</footer>
+    
+    
+<script src="https://appcdn.nbs.rs/webapp/lib/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://appcdn.nbs.rs/webapp/lib/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="https://appcdn.nbs.rs/webapp/lib/bootstrap-icons/1.11.3/font/bootstrap-icons.json"></script>
+
+<script src="https://appcdn.nbs.rs/webapp/lib/flatpickr/4.6.13/flatpickr.js"></script>
+    <script src="https://appcdn.nbs.rs/webapp/lib/flatpickr/4.6.13/l10n/sr-cyr.js"></script>
+
+
+
+<script src="https://appcdn.nbs.rs/webapp/lib/c3/0.7.20/c3.min.js"></script>
+<script src="https://appcdn.nbs.rs/webapp/lib/c3/0.7.20/d3.v5.min.js"></script>
+
+<script src="/ExchangeRateWebApp/_content/NBS.Common.WebApp/lib/nbs/0.8/dist/namespace.js?v=IPy65JRuuXI7oPUOLMw_F-xF1QhzzbobmvTkWIr7UZI"></script>
+<script src="/ExchangeRateWebApp/_content/NBS.Common.WebApp/lib/nbs/0.8/dist/ButtonHelper.js?v=ActTJL6Kvfgn04akSRHzVJ31uC1A0aFotx803jh_piM"></script>
+<script src="/ExchangeRateWebApp/_content/NBS.Common.WebApp/lib/nbs/0.8/dist/ParentOperationHelper.js?v=l-cAStDoKDl1FwKHMCaFQ3umIZTMGCNH08_WvW7ptAc"></script>
+<script src="/ExchangeRateWebApp/_content/NBS.Common.WebApp/lib/nbs/0.8/dist/ChildrenOperationHelper.js?v=0h2Fxqhgm18d6OsZYxN7x1q_yl33XGaBP5AK3Tp-Jjo"></script>
+<script src="/ExchangeRateWebApp/_content/NBS.Common.WebApp/lib/nbs/0.8/dist/ModalDialogHelper.js?v=28lBTGwmn84hQnCUfVHqud79W7OQnIJ71lK4KLBPP3A"></script>
+<script src="/ExchangeRateWebApp/_content/NBS.Common.WebApp/lib/nbs/0.8/dist/BaseWebApp.js?v=WSxvnThbtojEjaMiMOzz2fq5jsd0MmWiwXKPhd_9-i0"></script>
+<script src="/ExchangeRateWebApp/_content/NBS.Common.WebApp/lib/nbs/0.8/dist/StandardApp.js?v=LyVfKBQvDHK-9cDBuI_LUhHSnaAeEb1S6nPy4kbFsD8"></script>
+
+<script src="/ExchangeRateWebApp/js/site.js?v=tH87tp_EDLFnME0FT-mYOCqAgg__2LTp8mL3gMHRRCE"></script>
+
+<script type="text/javascript">
+    var myAppContext = null;
+
+    $(function () {
+
+        var myAppContextSetting = {
+            "AppUrl": "/ExchangeRateWebApp"
+        };
+
+        myAppContext = new NBS.App.StandardApp(myAppContextSetting);
+        myAppContext.Init();
+
+        // myAppContext.Setting.AppUrl
+
+        var flatPickrSettingForDate = {
+            locale: "sr",
+
+            dateFormat: "d.m.Y.",
+            allowInput: true,
+
+            enableTime: false,
+            time_24hr: true
+        };
+
+        var flatPickrSettingForDateTime = {
+            locale: "sr",
+
+            dateFormat: "d.m.Y. H:i",
+            allowInput: true,
+
+            enableTime: true,
+            time_24hr: true
+        };
+
+        flatpickr("input[my-date-type=\"Date\"]", flatPickrSettingForDate);
+        flatpickr("input[my-date-type=\"DateTime\"]", flatPickrSettingForDateTime);
+    
+        // window.addEventListener('load', adjustMainPadding);
+        window.addEventListener('resize', adjustMainPadding);
+        adjustMainPadding();
+    });
+
+    function adjustMainPadding() 
+    {
+        const topHeader = document.querySelector('.top-header');
+        const mainNavbar = document.querySelector('.main-navbar');
+        const main = document.querySelector('main');
+
+        let offset = 0;
+
+        if (window.getComputedStyle(topHeader).display !== 'none') {
+            offset += topHeader.offsetHeight;
+        }
+
+        if (mainNavbar) {
+            offset += mainNavbar.offsetHeight;
+        }
+
+        main.style.paddingTop = offset + 'px';
+    }
+</script>
+
+
+    
+    
+
+</body>
+</html>

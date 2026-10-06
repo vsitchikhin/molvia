@@ -88,9 +88,10 @@ const tripFields = z.object({
 export const tripSchema = tripFields
   // A provider belongs to a published rate and to nothing else: none without a snapshot, none for
   // a snapshot the person entered themselves, and one for every rate a bank or an aggregator gave.
-  // And the two agree: `official` is the pair's own bank — the National Bank of Georgia for the
-  // lari, the Central Bank of Armenia for the rest (`homeBankOf`, MOL-110) — every other publisher
-  // is a `fallback`. They are one fact written twice, and a pair that disagrees would have the
+  // And the two agree: `official` is the pair's own bank — the first that publishes both currencies:
+  // the National Bank of Georgia for the lari and the dinar against the dram, the National Bank of
+  // Serbia for the dinar's other pairs, the Central Bank of Armenia for the rest (`homeBankOf`,
+  // MOL-110, MOL-230) — every other publisher is a `fallback`. They are one fact written twice, and a pair that disagrees would have the
   // screen say «not the central bank» and then name it (MOL-22, В2-11).
   .refine(
     ({ rate, rateProvider }) => {

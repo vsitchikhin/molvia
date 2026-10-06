@@ -113,6 +113,7 @@
       "drop_trip": "Drop the entry and its purchases"
     },
     "rate_line": "rate {rate} · {date}",
+    "rate_line_source": "rate {rate} · {date} · {source}",
     "rate_line_mine": "my rate {rate} · {date}",
     "flip": "Show in the other currency",
     "caveat": {
@@ -140,7 +141,8 @@
       "save": "Count by it",
       "saving": "Saving…",
       "failed": "The choice could not be saved. Try again",
-      "source_nbg": "the National Bank of Georgia"
+      "source_nbg": "the National Bank of Georgia",
+      "source_nbs": "the National Bank of Serbia"
     },
     "start": {
       "title": "Where are you?",
@@ -598,7 +600,8 @@
         "RUB": "roubles",
         "USD": "dollars",
         "EUR": "euros",
-        "GEL": "lari"
+        "GEL": "lari",
+        "RSD": "dinars"
       },
       "no_rate": "no rate for the month",
       "difference_uncounted": "not all counted",
@@ -728,7 +731,8 @@
       "RUB": "Roubles",
       "USD": "Dollars",
       "EUR": "Euros",
-      "GEL": "Lari"
+      "GEL": "Lari",
+      "RSD": "Dinars"
     },
     "sheet": {
       "title_add": "New spending",
@@ -925,6 +929,7 @@
     "card_source_cbr": "Bank of Russia",
     "card_source_erapi": "open.er-api.com",
     "card_source_nbg": "National Bank of Georgia",
+    "card_source_nbs": "National Bank of Serbia",
     "card_more": "{amount} more than the central bank",
     "card_less": "{amount} less than the central bank",
     "card_equal": "Exactly the central bank rate",
@@ -1328,7 +1333,8 @@
       "RUB": "Russian ruble · RUB",
       "USD": "US dollar · USD",
       "EUR": "Euro · EUR",
-      "GEL": "Georgian lari · GEL"
+      "GEL": "Georgian lari · GEL",
+      "RSD": "Serbian dinar · RSD"
     },
     "conversion_hint": "Shows what your purchases cost in this currency. This is not an income record.",
     "scope": "New settings apply to future entries. Entries already started keep their currency and rate.",
@@ -1876,7 +1882,8 @@
       "RUB": "in roubles",
       "USD": "in dollars",
       "EUR": "in euros",
-      "GEL": "in lari"
+      "GEL": "in lari",
+      "RSD": "in dinars"
     },
     "held_hint": "Accounts on {date}: {amount}",
     "held_fill": "Fill in",
