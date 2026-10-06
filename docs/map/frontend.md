@@ -16,9 +16,9 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/components/AppReveal.vue` — Grows from nothing and shrinks back what pushes its neighbours — rows of a list, an error under a field, a block of a sheet; still for an answer read, a screen move, reduced motion.
 - `frontend/src/components/AppSwitch.vue` — Kit switch: a native checkbox read out as a switch, showing what the server holds and saying which way it was moved — for a setting saved on the tap; a ✓ on the knob when on, `inactive` focusable.
 - `frontend/src/components/AppTag.vue` — Kit tag in a row: a pill of 13/600, plain, warn or bad, with an optional icon of 14.
-- `frontend/src/components/AppScreen.vue` — The frame every screen sits in: pinned row, collapsing large title, back chevron with its label, docked strip, identity notice.
+- `frontend/src/components/AppScreen.vue` — The frame every screen sits in: pinned row, collapsing large title, back chevron with its label, docked strip with its margins, the one place of «Вернуть» (`#undo`), identity notice.
 - `frontend/src/components/BottomSheet.vue` — The sheet: a native modal `<dialog>` rising from the bottom, closed through its history entry; stacks with «‹» instead of ×.
-- `frontend/src/components/FloatingDock.vue` — Floating spot for the main action of a «Деньги» screen («Трата», «Обмен», «Доход») or «Вернуть» after a removal.
+- `frontend/src/components/FloatingDock.vue` — Floating spot for the main action of a «Деньги» screen not yet in the docked strip («Счёт», «Сверить», «Обмен», «Доход»); on its way out.
 - `frontend/src/components/ListRow.vue` — Kit row of a list, 64: icon (or in a circle of 40, `tint`), title, meta in two lines, a tag under it, a tail and the chevron of «opens something to go on with» (В-14); a button, a router link, a div or an `li` option of a list a field owns (no hover); destructive, inactive with words why, selected read out by its role, active under the keyboard; on the fill the meta is `text`.
 - `frontend/src/components/SearchField.vue` — Kit search field (MOL-177), the one for every search: a pill on `surface-2` with a magnifier, the screen's action or «Очистить» at the right, a hint under it; a combobox's role, `aria-*` and keys land on its input; `focus()` and `blur()` for its owner.
 - `frontend/src/components/OperationRow.vue` — Kit row of one operation (MOL-176) on `ListRow`: a circle of 40 in a category's colour, the title wrapped, a tag under the meta, the amount and a line under it in one column, the chevron always; the words come from `journalRowProps` and `operationRowProps`.
@@ -30,8 +30,8 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/components/SectionCaption.vue` — Kit caps caption: a group's caption 4 from the left and 8 above its card, or `inset` as a card's own title; a mark before the words and a tail on the right, inside the heading; the one place caps are drawn.
 - `frontend/src/components/SegmentedControl.vue` — Kit segmented control: a radio fieldset drawn as segments, the chosen one filled, for one choice out of up to four (unit, rate); `fit` gives each segment the width of its word, `inactive` holds the choice in focus.
 - `frontend/src/components/TapUnsureLine.vue` — The quiet line where a switch saved on the tap stands while its change is unsure (MOL-96): «не знаем, сохранилось ли», or «Сохраняем» while another screen's write is on its way, with «Повторить» online; never an alert, focusable for the focus the switch left.
-- `frontend/src/components/TabBar.vue` — The tab bar of the five sections («Что брать», «Покупки», «Оценки», «Деньги», «Настройки»), moving through `useNavigation`.
-- `frontend/src/components/UndoStrip.vue` — «Удалено · Вернуть» strip: ten seconds to take back a removal, paused under a finger or focus.
+- `frontend/src/components/TabBar.vue` — The tab bar of the five sections («Что брать», «Покупки», «Оценки», «Деньги», «Настройки»), the current one filled, moving through `useNavigation`.
+- `frontend/src/components/UndoStrip.vue` — «Удалено · Вернуть» strip: words, a ten-second count, «Вернуть»; paused under a finger or focus, placed in `AppScreen`'s `#undo` or a sheet's footer.
 - `frontend/src/components/UpdateBand.vue` — «Вышла новая версия · Обновить»: the top row of the screen's pinned strip while a version waits, and the words when it did not take.
 
 ## frontend · composables
@@ -69,28 +69,30 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/stylelint/known-properties.d.mts` — Types of the plugin's exports (`rootNames`, `SET_BY_SCRIPT`) for its test.
 - `frontend/stylelint/known-properties.test.ts` — Test: the rule takes tokens, globals, a file's own property, one set by script and an interpolated name; refuses an unknown name with or without a fallback, in a mixin's arguments, inside `calc`, named only in a comment, only by the dark scheme or only in a media query's `:root`.
 - `frontend/env.d.ts` — Ambient type references for Vite and the PWA plugin's client.
-- `frontend/index.html` — The PWA's HTML shell: viewport with keyboard resizing, per-scheme theme colours, the device's scheme set before the first paint, icons, the app mount.
+- `frontend/index.html` — The PWA's HTML shell: viewport with keyboard resizing, per-scheme theme colours, the device's scheme set before the first paint, icons, the app mount, and the floor of the build checked before any module (MOL-231): below it one line in place of the app.
 - `frontend/public/` — Static assets served as is: `favicon.svg` (the icon source), the rasterised app icons and the self-hosted font files.
 - `frontend/src/App.vue` — The app's root: the login screen in place of any non-public route, the live region, and the occasions on which the queues send.
 - `frontend/src/api.ts` — The PWA's one API client, wrapped so that any `error.no_actor` raises the login screen, and the last refusal's code is kept a minute for an error screen's message to the developer (`lastRefusal`, MOL-147).
+- `frontend/src/browserFloor.ts` — `belowFloor()`: the mark `data-outdated` the script in `index.html` puts on the root for a browser below `build.target`, read by the catchers and the start (MOL-231).
+- `frontend/src/browserFloor.test.ts` — Test of the floor's script: its markers stand exactly at `build.target` for every engine, it runs before the app's module, a browser at the floor passes untouched, one without a marker gets the mark and the locales' line, and its language is `pickLocale`'s.
 - `frontend/src/days.ts` — Day words for the screen: «сегодня»/«вчера» of a purchase, a month's name, `calendarDay` for calendar days, `shiftDay`, `localDay` — the phone's today — and `dayWords` for a card's head (MOL-121).
 - `frontend/src/i18n.ts` — The i18n factory for the app and tests alike: locale from the model, Russian plural rule, English fallback, the document's `lang`.
 - `frontend/src/i18n/` — The dictionaries, `ru.json` and `en.json`: every text of the PWA by key, error-registry codes included.
 - `frontend/src/i18n/i18n.test.ts` — Test: both dictionaries mirror each other, compile, pluralise right and translate every error code; Russian plural forms; `lang`.
 - `frontend/src/i18n/plural-ru.ts` — The Russian plural rule for vue-i18n: form by the last two digits, fractions and unknown counts included.
 - `frontend/src/ids.ts` — `newId`: a lower-case uuid for rows the device names, with a fallback outside a secure context.
-- `frontend/src/main.ts` — The PWA's entry: router, i18n, the update worker and the `401` seam installed, the app mounted, the identity started.
+- `frontend/src/main.ts` — The PWA's entry: router, i18n, the update worker and the `401` seam installed, the app mounted, the identity started — none of it below the floor of the build (MOL-231).
 - `frontend/src/navigation.ts` — Navigation rules: how a tab tap is written into history (home — «Что брать»), where the back chevron leads, up to the parent, cold-start parent laying, guarded step back and `afterStep`.
 - `frontend/src/pwaUpdate.ts` — Service-worker registration and update: quietly while hidden with no sheet, or by «Обновить»; looks every 15 min and on a new server build; `phase` for the app, `build` — the first build the API named to the page (MOL-147).
 - `frontend/src/router.ts` — The router: every route with its title key, tab and parent, redirects of old addresses (`/trip*`, `/advice`), the dev-only kit route, and the scroll behaviour.
 - `frontend/src/styles/_fonts.scss` — Font faces: self-hosted Nunito (800 only) and Onest subsets, and the dram sign's own face.
 - `frontend/src/styles/_mixins.scss` — SCSS mixins injected into every component: display type (Nunito at its one weight), touch target, wider-than-phone, pinned bar, visually hidden, focus ring, field focus (the edge and halo of a kit field), appear (a fade-in with a short rise on insertion), icon (an icon at its font-size, 1em).
 - `frontend/src/styles/_tokens.scss` — Design tokens: every colour, size, radius and duration as custom properties, light and dark schemes.
-- `frontend/src/styles/main.scss` — Global styles entry: fonts and tokens, body, a page held still under a modal, view-transition animations between screens, the `appear` keyframes of the motion grammar.
-- `frontend/src/styles/tokens.test.ts` — Test: in both schemes any two steps of different colour roles and every category against a role stand 0.08 apart in OKLab, marks and categories reach 3:1 on the surface, text 4.5:1 on its grounds, and every such colour is declared in the dark scheme.
+- `frontend/src/styles/main.scss` — Global styles entry: fonts and tokens, body, a page held still under a modal, view-transition animations between screens, the `appear` keyframes of the motion grammar, the line of a browser below the floor.
+- `frontend/src/styles/tokens.test.ts` — Test: in both schemes any two steps of different colour roles and every category against a role stand 0.08 apart in OKLab, marks and categories reach 3:1 on the surface, text 4.5:1 on its grounds, and every such colour is declared in the dark scheme; a sheet's `::backdrop` gets the scrim of each scheme itself (MOL-231).
 - `frontend/src/styles/theme-color.test.ts` — Test: the status-bar and manifest colours in `index.html` and `vite.config.ts` match the tokens of each scheme.
 - `frontend/src/transitions.ts` — Screen moves: push, pop or tab direction for view transitions, focus moved to the new screen's heading, and the page held as tall as the window while only the query changes.
-- `frontend/vite.config.ts` — Vite config: Vue, MDI icons, PWA manifest and precache, mixins injected into SCSS, the copy's ports and the `/api` proxy.
+- `frontend/vite.config.ts` — Vite config: Vue, MDI icons, PWA manifest and precache, mixins injected into SCSS, the copy's ports and the `/api` proxy; the floor of the browsers (`BROWSER_FLOOR`, `build.target`) and the locales' line put into the script of `index.html` (MOL-231).
 
 ## repository
 

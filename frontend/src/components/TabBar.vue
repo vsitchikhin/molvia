@@ -13,7 +13,9 @@
         :aria-current="isExactActive ? 'page' : undefined"
         @click="open($event, tab.name)"
       >
-        <component :is="tab.icon" class="icon" aria-hidden="true" />
+        <!-- The current one filled, the rest outlined (Ф-5): told apart by form, not only by a hue
+             of 1.13:1 — and by the same `isExactActive` that sets `aria-current`. -->
+        <component :is="isExactActive ? tab.current : tab.icon" class="icon" aria-hidden="true" />
         <span class="label">{{ t(`nav.${tab.name}`) }}</span>
       </a>
     </RouterLink>
@@ -23,23 +25,28 @@
 <script lang="ts">
 import { defineComponent, markRaw } from 'vue'
 import { useI18n } from 'vue-i18n'
-import IconCog from '~icons/mdi/cog-outline'
-import IconCart from '~icons/mdi/cart-outline'
-import IconLightbulb from '~icons/mdi/lightbulb-on-outline'
-import IconStar from '~icons/mdi/star-outline'
-import IconWallet from '~icons/mdi/wallet-outline'
+import IconCart from '~icons/mdi/cart'
+import IconCartOutline from '~icons/mdi/cart-outline'
+import IconCog from '~icons/mdi/cog'
+import IconCogOutline from '~icons/mdi/cog-outline'
+import IconLightbulb from '~icons/mdi/lightbulb-on'
+import IconLightbulbOutline from '~icons/mdi/lightbulb-on-outline'
+import IconStar from '~icons/mdi/star'
+import IconStarOutline from '~icons/mdi/star-outline'
+import IconWallet from '~icons/mdi/wallet'
+import IconWalletOutline from '~icons/mdi/wallet-outline'
 import { useNavigation } from '@/navigation'
 import type { Tab } from '@/router'
 
-const tabs: { name: Tab; icon: object }[] = [
+const tabs: { name: Tab; icon: object; current: object }[] = [
   // Home first (MOL-128); the cart stays the cart — «what was bought», beside the wallet's «how
   // much money» (handoff `07`, question 3).
-  { name: 'advice', icon: markRaw(IconLightbulb) },
-  { name: 'purchases', icon: markRaw(IconCart) },
-  { name: 'verdicts', icon: markRaw(IconStar) },
+  { name: 'advice', icon: markRaw(IconLightbulbOutline), current: markRaw(IconLightbulb) },
+  { name: 'purchases', icon: markRaw(IconCartOutline), current: markRaw(IconCart) },
+  { name: 'verdicts', icon: markRaw(IconStarOutline), current: markRaw(IconStar) },
   // The personal layer beside the settings, apart from the three «what to buy and where» (MOL-82).
-  { name: 'money', icon: markRaw(IconWallet) },
-  { name: 'settings', icon: markRaw(IconCog) },
+  { name: 'money', icon: markRaw(IconWalletOutline), current: markRaw(IconWallet) },
+  { name: 'settings', icon: markRaw(IconCogOutline), current: markRaw(IconCog) },
 ]
 
 /**
@@ -106,6 +113,7 @@ export default defineComponent({
 
   &[aria-current='page'] {
     color: var(--accent-ink);
+    font-weight: var(--weight-bold);
   }
 
   &:focus-visible {

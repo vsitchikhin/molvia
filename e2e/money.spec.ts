@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
@@ -77,6 +77,24 @@ test('a spending lands in the month, and a removal comes back with «Верну�
   // reads the strip before reaching for it (adversarial Г).
   await expect(page.getByRole('heading', { name: /трат нет/ })).toBeVisible()
   await page.waitForTimeout(1000)
+  // One place (Ф-29): 8 over the strip, and «Добавить трату» whole under it and the one tapped.
+  const add = page.getByRole('button', { name: 'Добавить трату' })
+  const [strip, dock, added] = await Promise.all([
+    page.locator('.undo-strip').boundingBox(),
+    page.locator('.dock').boundingBox(),
+    add.boundingBox(),
+  ])
+  expect(Math.round((dock?.y ?? 0) - ((strip?.y ?? 0) + (strip?.height ?? 0)))).toBe(8)
+  const centre = {
+    x: (added?.x ?? 0) + (added?.width ?? 0) / 2,
+    y: (added?.y ?? 0) + (added?.height ?? 0) / 2,
+  }
+  expect(
+    await page.evaluate(
+      ({ x, y }) => document.elementFromPoint(x, y)?.closest('button')?.textContent.trim(),
+      centre,
+    ),
+  ).toBe('Добавить трату')
   await page.getByRole('button', { name: 'Вернуть' }).click()
   await expect(row).toBeVisible()
   await expect(page.locator('.total .figure')).toHaveText(/5\s000\s֏/)
@@ -437,6 +455,16 @@ async function fitsNarrowPhone(page: Page, money: string): Promise<void> {
   await page.getByRole('link', { name: money, exact: true }).click()
   const labels = page.locator('.tabbar .label')
   await expect(labels).toHaveCount(5)
+  // Each label at 700 too, as the current tab draws it (Ф-5) — the widest ones are the ones at risk.
+  for (const tab of await page.locator('.tabbar a').all()) {
+    await tab.click()
+    await expect(tab).toHaveAttribute('aria-current', 'page')
+    await fitsItsColumn(labels)
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
+}
+
+async function fitsItsColumn(labels: Locator): Promise<void> {
   for (const label of await labels.all()) {
     const box = await label.boundingBox()
     const tab = await label.locator('xpath=..').boundingBox()
@@ -446,7 +474,6 @@ async function fitsNarrowPhone(page: Page, money: string): Promise<void> {
     expect(box?.x ?? -1).toBeGreaterThanOrEqual(tab?.x ?? 0)
     expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual((tab?.x ?? 0) + (tab?.width ?? 0))
   }
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
 }
 
 test('five tabs fit a 320 px phone, one line each', async ({ page }) => {

@@ -501,8 +501,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   categories 0.07 apart, one hue in both schemes** (MOL-218): a ring puts any two side by side.
 - **Not now is one look: `text-muted` at 600, in focus (`inactive` = `aria-disabled`), never opacity**
   (MOL-174); a button keeps its variant's fill or none (В-1). **Chosen is a fill or a form, never a
-  weight.** `--opacity-stale` is only a previous answer while the next is on its way. **At work is
-  a word, never not now** (MOL-225): `busy` with its `busy-label` («Удаляем…») in the action's look,
+  weight** — except the current tab, whose 700 comes with its filled icon (MOL-179).
+  `--opacity-stale` is only a previous answer while the next is on its way. **At work is a word,
+  never not now** (MOL-225): `busy` with its `busy-label` («Удаляем…») in the action's look,
   `disabled` or not, as wide as the wider word; no spinner, and the linter refuses `busy` without it.
 - **A row is `ListRow` or `NavRow`, a caps caption `SectionCaption` — caps nowhere else, the linter
   holds it** (MOL-175): the chevron is «opens something to go on with» — a screen or a sheet with
@@ -522,11 +523,18 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The scheme is the device's** (MOL-111): `molvia.scheme`, set before the first paint by the script
   in `index.html` — the one reader of storage outside `storage.ts`; the person's choice wins both ways
   by selectors, and the status bar follows by `media`, the manifest never.
+- **The floor of the browsers is `build.target`, written out in `vite.config.ts`** (MOL-231): the
+  script after `#app` in `index.html` checks markers of exactly that floor (`browserFloor.test.ts`),
+  and below it draws the locales' line, and the app neither starts nor reports. An API above the floor
+  raises the floor, never a workaround; no legacy plugin, no polyfills.
 - **Native HTML first, then Reka UI, never a styled kit**; the catalogue combobox is our own.
   Interface icons come from MDI through `unplugin-icons`.
 - **An installed app takes a new version only when hidden and holding no typing** (`pwaUpdate.ts`),
   **or by «Обновить»** (MOL-132): never reloaded without the tap; the strip is the top row over the
   tab bar, and an error while a version waits offers it first.
+- **The bars are opaque `--surface`; the docked strip's margins and column are `AppScreen`'s, and
+  «Вернуть» is its `#undo`, 8 over the strip** (MOL-179): never in `#docked`, never a wrapper's
+  padding in a screen; a sheet's «Вернуть» stays in its footer.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17); no gesture
   is intercepted but the sheet's own pull down (MOL-80); only the page scrolls, except a sheet.
   **«Что брать» is home** (MOL-128): the `tabMove` of «back»; old addresses of «Поход» redirect for

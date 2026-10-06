@@ -112,7 +112,7 @@ export default defineConfig({
     {
       name: 'phone',
       use: { ...devices['Pixel 7'] },
-      testIgnore: /(pwa-update|client-errors-built|scanner)\.spec\.ts$/,
+      testIgnore: /(pwa-update|client-errors-built|outdated-built|scanner)\.spec\.ts$/,
     },
     {
       name: 'camera',
@@ -122,7 +122,7 @@ export default defineConfig({
     {
       name: 'pwa',
       use: { ...devices['Pixel 7'], baseURL: `http://127.0.0.1:${previewPort}` },
-      testMatch: /(pwa-update|client-errors-built)\.spec\.ts$/,
+      testMatch: /(pwa-update|client-errors-built|outdated-built)\.spec\.ts$/,
     },
     {
       name: 'iphone',

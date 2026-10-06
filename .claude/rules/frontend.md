@@ -254,7 +254,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   and an inactive one keeps its choice by a `graphic` edge and its word in `text` — the
   `border-strong` edge of the handoff stood 1.65:1 and brought Н-3 back (А1, Graphic Is Data),
   a switch carries a ✓ of `--icon-xs` on its knob (owner's В-2 «а»; the handoff's 16 is no step),
-  every chip and every segment is at 600, so nothing reflows under the thumb. **`--opacity-stale`
+  every chip and every segment is at 600, so nothing reflows under the thumb. **One exception, the
+  current tab** (MOL-179, Ф-5): its form is the filled icon, and its 700 comes with the form, never
+  instead of it — the five columns are fixed and the label centred, so nothing under the thumb moves,
+  and `money.spec` holds every label at 700 inside its 64 px column. **`--opacity-stale`
   means one thing: a previous answer left while the next is on its way** (К-11) — the searches;
   the difference of a reconciliation waits in words («Пересчитаем, когда…»), not dimmed (116 v2).
 - **At work, a button says what it does** (MOL-225, owner's В-1…В-5 «а»). `busy` had no look of its
@@ -487,6 +490,63 @@ The detail behind the frontend lines of `CLAUDE.md`.
   px) a pixel of its 92 (owner's В-1: «выбор шире»). Not in a card for the same reason. Taken on the
   tap, nothing said: the screen is the answer; in every state of the screen, since it asks nothing
   of the server.
+- **The floor of the browsers is `build.target`, one statement in `vite.config.ts`, and below it the
+  app does not start** (MOL-231). A phone sent `TypeError · vue:login` (`1415bf`, 05.10.2026):
+  `Object.hasOwn` in `ScreenState`, a browser of 2021. Vite lowers syntax to its target and touches
+  no API, and its default target — `baseline-widely-available`, Firefox 114 in Vite 8.3 — was not
+  even true: the bundle constructs `Intl.Segmenter` as it loads, which Firefox has from 125, so
+  Firefox 114–124 failed at the start and reported it. **The floor is the target, not a list of
+  what the code calls today**: `hasOwn`, `.at` and `findLast` are all in Safari 15.4, while a regex
+  literal with a lookbehind (`receipt.ts`) is a syntax error below 16.4 that keeps the whole bundle
+  from parsing — a check by those names would let iOS 15 through to a blank screen. So
+  `BROWSER_FLOOR` is written out (`chrome111, edge111, firefox125, safari16.4, ios16.4`, owner's
+  В-1 «а»), never Vite's default, which moves with Vite. **A classic ES5 script after `#app` in
+  `index.html` checks two markers** — `String.prototype.isWellFormed` (Chrome 111, Safari 16.4,
+  Firefox 119) and `Intl.Segmenter` (Firefox 125), the newest of which is the floor of each engine —
+  and below it puts `data-outdated` on the root, the language by `pickLocale`'s rule into `lang`, and
+  one line, «Браузер устарел — откройте Molvia в свежем Chrome, Safari, Firefox или Edge», in
+  `#app`. After `#app`, since a classic script runs as the page is parsed and every module waits for
+  the parse to end; a fresh browser pays one synchronous check and nothing else. **The line is
+  `outdated.line` of the locales**, put into the script by a plugin of `vite.config.ts` at build
+  and on the dev server — no Vue is running yet to translate it; the script names it by an
+  identifier, so its test runs the file as it is. Every occurrence is replaced, by a function — a
+  `$` of a line is no pattern — and a build with the name left behind, or none at all, fails: a bare
+  identifier is a `ReferenceError` before the mark, the bug back for the very browsers the script is
+  for (adversarial А2); the test holds the name to one place, the script. **The condition is held
+  whole**: a probe added to the script and not to the test's table would raise the floor unseen.
+  **Below the floor nothing listens and nothing starts**: `catchers.ts` installs no reports —
+  `failures` is a silent stub, so `reportFailure` from any module says nothing — sets no listener, and
+  `main.ts` no `start()`, so no `POST /client-errors`, no worker, and whatever the old engine trips
+  on as the bundle loads reaches its console alone. The bundle is still fetched: a module put in by
+  the script would be found late by the preload scanner, and a fresh browser would wait for it.
+  **What the check lets through is our defect, and the owner hears it**: a browser at the floor
+  failing on an API above it means the code outran the floor, and the floor is raised — nothing
+  filters it on the server, no column of `failures` carries a version. **The floor is held by
+  `browserFloor.test.ts` and by this rule, with no dependency** (owner's В-2 «а»): the test holds
+  the markers, with their versions copied from MDN's browser-compat-data, to exactly the target of
+  each engine, neither above nor below; **an API above the floor raises the floor here, and in the
+  markers, never a workaround in the code** — `eslint-plugin-compat` sees globals but not instance
+  methods, `eslint-plugin-es-x` measures ECMAScript years rather than browsers, and neither was
+  bought. Never `@vitejs/plugin-legacy` or polyfills: weight at the shelf for browsers the audience
+  has not got. **The price, named:** Firefox 114–124 and Safari below 16.4 get the line in place of
+  the app — before, a blank or a broken screen. **And Chrome and Edge 97–110 get it too, where the app
+  ran** (adversarial А1): their 111 is the target Vite's default gave, not a need of the bundle —
+  nothing in it calls an API past Chrome 97 unchecked (`findLast`), and a Chromium with the API
+  surface of 97 went through the login, five tabs, a sheet and a record without one failure. Kept,
+  since the task forbids lowering `build.target` and the floor is the target: below 111 the CSS is
+  not checked either (`:has` and `@container` 105, `dvh` 108), and a lower floor is a decision of its
+  own. Who meets it: Android 6, stuck at Chrome 106, and its WebView — Telegram's in-app browser
+  there — and the vendors' Chromium browsers that lag behind. **Nor does the check help a page an old
+  worker serves**: a browser below the floor that reached the app before this (`1415bf` did) gets the
+  old `index.html` from its precache until the new version is let in the quiet way, and reports as
+  before meanwhile — a passing price.
+- **The scrim is declared on `::backdrop` too** (MOL-231, adversarial А3): a backdrop inherits from
+  its dialog only since Chrome 122, Firefox 120 and Safari 17.4, and on the floor below that
+  `var(--scrim)` there was undefined — every sheet rose over a page not dimmed, every iPhone 8 and X
+  among them, and silently, since CSS reports nothing. The light value is the one copy beside `:root`,
+  the dark scheme gives the backdrop its mixin under both of its selectors, `tokens.test.ts` holds
+  both. Any other custom property a backdrop reads goes the same way; `--sheet-drag`, set on the
+  dialog, falls back to 0 there — the scrim does not fade under the finger on the floor, a price.
 - **Every screen has four states:** loading, empty, error, offline. The empty state is not
   "no data" but an offer to act. They are drawn by two blocks and nothing else (MOL-19):
   `ScreenSkeleton` for loading, in the shape of the answer (the next rule), and `ScreenState`
@@ -607,8 +667,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   server, the tests — it is `none`. **The strip is the top row of `AppScreen`'s pinned strip over the
   tab bar** (owner's decision В-1, Р-6): the screen's own main action — «Начать поход», the trip's
   total, «Сохранить» — stays under it, nearer the thumb, the room for the list is the strip's as
-  ever, and what floats over the list (`FloatingDock`) rises by `--dock-height`, a token like
-  `--keyboard-inset` that `AppScreen` sets. On the login screen, its own frame, it stands under the
+  ever, and what stands over the list — «Вернуть» in `#undo`, `FloatingDock` — rises by
+  `--dock-height`, a token like `--keyboard-inset` that `AppScreen` sets. On the login screen, its own frame, it stands under the
   screen's action. «Обновить» lets the waiting worker in and reloads when it takes over; a version
   another window already let in (`owed`) is a reload alone. **A sheet opened between the tap and
   the takeover holds the reload** (adversarial Д3): the tap consented to a reload then, not to losing
@@ -636,6 +696,38 @@ The detail behind the frontend lines of `CLAUDE.md`.
   accepted): in the health window of a failed deploy an open page hears the new build and installs
   its worker, and «Обновить» then brings up a build the server no longer runs — the next rollout
   puts it right; holding the look until `/health` names the build twice would cost more than it saves.
+- **The bars are opaque, the docked strip keeps its own margins, and «Вернуть» stands in one
+  place** (MOL-179). The pinned row, the strip and the tab bar are `--surface` with a hairline
+  (`pinned-bar`, Ф-18): at 88 % with a blur the list showed through under the words on them, and
+  `--chrome` is gone. The current tab is told by form — a filled icon and 700, the rest outlined
+  and 600 (Ф-5) — chosen by the same `isExactActive` that sets `aria-current`, so eye and ear
+  agree; the labels fit 320 px at 700 too, `money.spec` holds it in both languages — the one
+  exception to «chosen is never a weight» (see MOL-174 above). **The strip's margins and column
+  are `AppScreen`'s** (К-9): 12 over, 16 at the sides, 12 under — on a nested screen 12 over the
+  home indicator — and what the screen puts in stands in one column 8 apart; a screen draws no
+  wrapper with a padding of its own (seven did, «a main action, a ghost under it» came out 4 apart
+  on one screen and 12 on the next), and what it swaps in fades in from the strip (`appear(0)`),
+  not from a wrapper — by `:deep`, never `:slotted`: a component of two roots, a button and its
+  sheet («Сфотографировать чек», «Записать вручную»), gets no slot attribute and was not reached
+  (adversarial А2); not the strip's top row, and not a `dialog`, which would replay it on opening.
+  `UpdateBand` takes the strip's margins, 8 and a hairline over the screen's action. **«Вернуть»
+  is the frame's `#undo`** (Ф-29, К-10, owner's В-1 «а»): 8 over the strip, over the tab bar or
+  the bottom edge where there is none, over the list and out of the strip, so the main action
+  under it neither moves nor hides; it takes taps by `:deep` for the same reason (А2′). **The list
+  ends over it**: the room under the list is the strip's height plus «Вернуть» and 8 (adversarial
+  А1 — out of the strip, it covered the last row at the end of the scroll for as long as a finger
+  held it); the price, accepted, is that its going moves, in one jump of its height and 8, a list
+  scrolled within that much of its end — 70 px at 390, 157 with a long name at 320 (adversarial
+  round 2) — as the strip of «Покупки» did when it held it; its coming moves nothing. Never in
+  `#docked` — it pushed «Сфотографировать чек» up on «Покупки» — and never `position: fixed`
+  inside `UndoStrip` itself: a parent playing `appear` (`translate`) becomes the containing block
+  of a fixed child, and the strip would ride the card for the length of the animation; a sheet's
+  «Вернуть» is in its own footer, which the same component serves unchanged. A screen whose
+  `FloatingDock` still holds its action hides it while «Вернуть» stands (16 over the tab bar under
+  8 would overlap), until its task moves the action into the strip. `UndoStrip` reads «words ·
+  count · Вернуть», the count in a ring of `--graphic`, `aria-hidden` — the announcement says the
+  ten seconds once, a live region ticking would talk over a person reaching for the button (81 v2
+  asked for a label; declined, MOL-179 Р-5).
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and

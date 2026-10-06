@@ -60,6 +60,25 @@
   </head>
   <body>
     <div id="app"></div>
+    <!-- The floor of the build (MOL-231): a browser below `build.target` gets one line in place of
+         the app, and the app neither starts nor reports — a failure below the build is no defect
+         the owner can fix. Classic and ES5, so any browser runs it; here, after `#app`, because it
+         runs as the page is parsed, before any module, which waits for the parse to end. The two
+         markers arrived exactly at the floor (`browserFloor.test.ts` holds them to it), the line
+         is `outdated.line` of the locales, put in by `vite.config.ts`, and the language is
+         `pickLocale`'s rule. -->
+    <script>
+      ;(function () {
+        if ('isWellFormed' in String.prototype && typeof Intl.Segmenter === 'function') return
+        var lines = MOLVIA_OUTDATED_LINES
+        var languages = navigator.languages
+        var first = (languages && languages[0]) || ''
+        var locale = /^en([-_]|$)/i.test(first) ? 'en' : 'ru'
+        document.documentElement.setAttribute('data-outdated', '')
+        document.documentElement.lang = locale
+        document.getElementById('app').textContent = lines[locale]
+      })()
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

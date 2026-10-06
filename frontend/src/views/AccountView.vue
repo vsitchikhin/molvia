@@ -102,9 +102,8 @@
       </template>
     </div>
 
-    <FloatingDock v-if="removed || (phase === 'ready' && account)" class="float">
+    <template v-if="removed" #undo>
       <UndoStrip
-        v-if="removed"
         :key="removed.stamp"
         :text="t('spending.removed', removed)"
         :announcement="t('spending.removed_announced', removed)"
@@ -112,8 +111,11 @@
         @restore="restoreSpending"
         @expire="removed = null"
       />
+    </template>
+    <!-- Not under «Вернуть», as on «Счета», until its actions go into the docked strip (MOL-194). -->
+    <FloatingDock v-if="!removed && phase === 'ready' && account" class="float">
       <AppButton
-        v-else-if="account?.archivedAt"
+        v-if="account?.archivedAt"
         size="large"
         :disabled="!online && !restoring"
         :busy="restoring"

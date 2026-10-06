@@ -1,5 +1,9 @@
 <template>
-  <div class="screen" :class="{ collapsed, docked, tabbed }" :style="dockStyle">
+  <div
+    class="screen"
+    :class="{ collapsed, docked, tabbed, held: $slots.docked || updating }"
+    :style="dockStyle"
+  >
     <header ref="bar" class="bar">
       <div ref="column" class="leading">
         <template v-if="parentTitleKey">
@@ -50,10 +54,10 @@
 
     <div class="content">
       <slot />
-      <!-- The room the strip below takes, kept inside the scroll: the last row of a list has to
-           be reachable, and the strip is over the page, not in it. -->
+      <!-- The room the strip below takes, and «Вернуть» over it, kept inside the scroll: the last
+           row of a list has to be reachable, and both are over the page, not in it. -->
       <div
-        v-if="$slots.docked || updating"
+        v-if="$slots.docked || updating || $slots.undo"
         class="dock-room"
         :style="{ height: room }"
         aria-hidden="true"
@@ -64,8 +68,15 @@
          drew its own would part ways with the padding on the first change of its height. A new
          version waiting is its top row, over the screen's own main action (MOL-132, В-1). -->
     <div v-if="$slots.docked || updating" ref="dock" class="dock">
-      <UpdateBand v-if="updating" :class="{ over: $slots.docked }" />
+      <UpdateBand v-if="updating" class="update" :class="{ over: $slots.docked }" />
       <slot name="docked" />
+    </div>
+
+    <!-- «Вернуть» stands in one place on every screen, 8 over the strip — or over the tab bar or the
+         bottom edge where there is none (Ф-29, К-10). The frame's, not the strip's own: over the
+         list and out of the strip, so the main action under it neither moves nor hides. -->
+    <div v-if="$slots.undo" ref="undo" class="undo-place">
+      <slot name="undo" />
     </div>
   </div>
 </template>
@@ -159,10 +170,18 @@ export default defineComponent({
     // Measured rather than guessed: the strip holds a total that grows a line when the queue is
     // not empty or the rate jumped, and the last row of a list must never end up under it.
     const dockHeight = useHeight(dock)
-    const room = computed(() =>
-      dockHeight.value > 0 ? `calc(${String(dockHeight.value)}px + var(--space-4))` : undefined,
-    )
-    // What floats over the list (`FloatingDock`) rises above the strip by its height.
+    // «Вернуть» stands over the end of the list for as long as a finger holds it: the list ends over
+    // it too, as it did when «Покупки» had it in the strip (adversarial А1). Coming and going, it
+    // moves only a list scrolled to its very end.
+    const undo = ref<HTMLElement | null>(null)
+    const undoHeight = useHeight(undo)
+    const room = computed(() => {
+      const over = undoHeight.value > 0 ? ` + ${String(undoHeight.value)}px + var(--space-2)` : ''
+      return dockHeight.value > 0 || undoHeight.value > 0
+        ? `calc(${String(dockHeight.value)}px${over} + var(--space-4))`
+        : undefined
+    })
+    // What stands over the list — «Вернуть», `FloatingDock` — rises above the strip by its height.
     const dockStyle = computed(() =>
       dockHeight.value > 0 ? { '--dock-height': `${String(dockHeight.value)}px` } : undefined,
     )
@@ -175,6 +194,7 @@ export default defineComponent({
       t,
       bar,
       dock,
+      undo,
       sentinel,
       collapsed,
       parentTitleKey,
@@ -357,7 +377,7 @@ export default defineComponent({
   padding: calc(var(--safe-top) + var(--space-4)) calc(var(--space-4) + var(--safe-right))
     var(--space-3) calc(var(--space-4) + var(--safe-left));
   border-bottom: var(--hairline) solid var(--border);
-  background: var(--chrome);
+  background: var(--surface);
 }
 
 .docked .head {
@@ -419,7 +439,9 @@ export default defineComponent({
 }
 
 /* Over the page, above the tab bar where there is one, and below the safe area where there is
-   not: the same chrome as the pinned row at the top. */
+   not: the same chrome as the pinned row at the top. Its margins and the column are its own, not
+   each screen's (К-9): seven wrappers drew seven paddings, and «a main action, a ghost under it»
+   came out 4 apart on one screen and 12 on the next. */
 .dock {
   @include pinned-bar;
   @include appear(100%);
@@ -429,19 +451,62 @@ export default defineComponent({
   bottom: 0;
   left: 0;
   z-index: 1;
+  display: grid;
+  gap: var(--space-2);
   border-top: var(--hairline) solid var(--border);
-  padding: 0 calc(var(--space-4) + var(--safe-right)) var(--safe-bottom)
-    calc(var(--space-4) + var(--safe-left));
+  padding: var(--space-3) calc(var(--space-4) + var(--safe-right))
+    calc(var(--space-3) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
+
+  /* What the screen swaps in comes in, faded only: it stands under the thumb (MOL-151). Reached by
+     `:deep`, not `:slotted`: a component of two roots — a button and its sheet, «Сфотографировать
+     чек», «Записать вручную» — gets no slot attribute (adversarial А2). Not the strip's own top row,
+     which comes in its own way, and not a sheet, which would replay it on every opening. */
+  > :deep(:not(.update, dialog)) {
+    @include appear(0);
+  }
 }
 
 .tabbed .dock {
   bottom: calc(var(--tabbar-height) + var(--safe-bottom));
-  padding-bottom: 0;
+  padding-bottom: var(--space-3);
 }
 
-/* Parted from the screen's own row under it by the strip's own hairline. */
-.over {
+/* The strip's top row takes the strip's margins, and is parted from the screen's own action under
+   it by 8 and a hairline (41 v2, 04). */
+.dock > .update {
+  padding: 0;
+}
+
+.dock > .over {
+  padding-bottom: var(--space-2);
   border-bottom: var(--hairline) solid var(--border);
+}
+
+/* 8 over the strip, which on a nested screen already holds the home indicator; over the indicator
+   where there is no strip, and over the tab bar on a section. Only what stands here takes taps. */
+.undo-place {
+  position: fixed;
+  right: calc(var(--space-4) + var(--safe-right));
+  bottom: calc(var(--safe-bottom) + var(--space-2));
+  left: calc(var(--space-4) + var(--safe-left));
+  z-index: 1;
+  display: grid;
+  gap: var(--space-2);
+  pointer-events: none;
+
+  /* `:deep` for the same reason as the strip's: a strip of two roots would be seen and not take a
+     tap (adversarial А2′). */
+  > :deep(*) {
+    pointer-events: auto;
+  }
+}
+
+.held .undo-place {
+  bottom: calc(var(--dock-height) + var(--space-2));
+}
+
+.tabbed .undo-place {
+  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + var(--dock-height) + var(--space-2));
 }
 
 /* The notice keeps its own margins; this only keeps it out from under a notch held sideways. */

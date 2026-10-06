@@ -123,13 +123,13 @@
     <!-- With receipts (MOL-127, handoff v2 01, 02): «Сфотографировать чек» under the thumb in every
          state, for a person with ratings as for a newcomer — at home a receipt is the way in. -->
     <template v-if="country" #docked>
-      <div class="strip"><CaptureButton :country="country" /></div>
+      <CaptureButton :country="country" />
     </template>
     <!-- Without (Д-3): the newcomer's one action, under the thumb (MOL-128, В-5). Kept while a
          sheet of its own is up: an answer with rows arriving under «Где вы?» took the strip and
          the sheet with it (review Р-15). -->
     <template v-else-if="phase === 'empty' || entering" #docked>
-      <div class="strip"><ManualEntryButton @busy="entering = $event" /></div>
+      <ManualEntryButton @busy="entering = $event" />
     </template>
 
     <!-- Mounted on a tap and put away from `onClosed`: each opening starts from the row as the
@@ -353,12 +353,6 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-caption);
   font-style: italic;
-}
-
-.strip {
-  @include appear;
-
-  padding: var(--space-3) 0;
 }
 
 .foot {

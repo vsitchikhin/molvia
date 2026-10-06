@@ -172,7 +172,7 @@ test('счёт без операций удаляется с «Вернуть»,
   await sheet.getByRole('button', { name: 'Удалить счёт' }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Счета')
   // The strip itself, not the live region that says the same words (MOL-64).
-  await expect(page.locator('.undo .text')).toHaveText('Удалено: Лишний')
+  await expect(page.locator('.undo-strip .text')).toHaveText('Удалено: Лишний')
   await page.waitForTimeout(1000)
   await page.getByRole('button', { name: 'Вернуть' }).click()
   await expect(page.getByRole('link', { name: /Лишний/ })).toBeVisible()

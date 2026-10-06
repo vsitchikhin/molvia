@@ -276,14 +276,20 @@
   --shadow-md: 0 4px 14px rgb(63 46 26 / 14%);
   --shadow-lg: 0 -8px 32px rgb(46 33 18 / 22%); /* sheets rise from the bottom edge */
 
-  /* Pinned bars are slightly translucent — a token, not an effect. No blur beyond this. */
-  --chrome: rgb(255 250 242 / 88%);
   --scrim: rgb(38 27 16 / 40%);
 
   /* Over the camera's picture, in both schemes alike: the video is what it is, not our ground. */
   --viewfinder-ground: #14110f;
   --viewfinder-ink: #fffaf2;
   --viewfinder-dim: rgb(0 0 0 / 45%);
+}
+
+/* The sheet's scrim on its `::backdrop`, which inherits from its dialog only since Chrome 122,
+   Firefox 120 and Safari 17.4: on the floor below them (MOL-231, adversarial А3) `var(--scrim)`
+   there was undefined and every sheet rose over a page not dimmed. The one copy of a light token,
+   held to `:root` by `tokens.test.ts`; the dark scheme gives it the mixin below. */
+::backdrop {
+  --scrim: rgb(38 27 16 / 40%);
 }
 
 @mixin dark-scheme {
@@ -342,12 +348,12 @@
   --shadow-md: 0 4px 14px rgb(0 0 0 / 45%);
   --shadow-lg: 0 -8px 32px rgb(0 0 0 / 55%);
 
-  --chrome: rgb(32 28 25 / 88%);
   --scrim: rgb(0 0 0 / 55%);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-scheme='light']) {
+  :root:not([data-scheme='light']),
+  :root:not([data-scheme='light']) ::backdrop {
     @include dark-scheme;
   }
 }
@@ -355,6 +361,10 @@
 [data-scheme='dark'] {
   color-scheme: dark;
 
+  @include dark-scheme;
+}
+
+[data-scheme='dark'] ::backdrop {
   @include dark-scheme;
 }
 

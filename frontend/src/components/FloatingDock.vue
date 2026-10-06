@@ -9,12 +9,14 @@ import { defineComponent } from 'vue'
 import { useRoute } from 'vue-router'
 
 /**
- * Where the main action of a «Деньги» screen floats: right, over the tab bar, under the thumb —
- * «Трата», «Обмен», «Доход» (MOL-72, MOL-81). A place and not a button: on the month the same spot
- * holds «Вернуть» after a removal, and the screen decides which of the two stands there. Only what
- * it holds takes taps; the rest of its row lets them through to the list underneath. Over the tab
- * bar on a section, at the bottom edge on a nested screen, which has none (MOL-17) — and above the
- * screen's pinned strip, by its height, when a new version waits there (MOL-132).
+ * Where the main action of a «Деньги» screen still floats: right, over the tab bar, under the thumb —
+ * «Счёт», «Сверить», «Обмен», «Доход» (MOL-72, MOL-81). On its way out (Ф-28): each screen's task
+ * moves its action into the docked strip, and the last one removes this file. «Вернуть» is not
+ * here any more — it stands in `AppScreen`'s `#undo` (MOL-179), and a screen hides its floating
+ * action while it does. Only what it holds takes taps; the rest of its row lets them through to the
+ * list underneath. Over the tab bar on a section, at the bottom edge on a nested screen, which has
+ * none (MOL-17) — and above the screen's pinned strip, by its height, when a new version waits
+ * there (MOL-132).
  */
 export default defineComponent({
   name: 'FloatingDock',
@@ -41,7 +43,7 @@ export default defineComponent({
     bottom: calc(var(--safe-bottom) + var(--dock-height) + var(--space-4));
   }
 
-  // What stands here comes in, «Вернуть» and the main action alike, each in place of the other.
+  // What stands here comes in — back once «Вернуть», standing in its stead, is gone.
   > :slotted(*) {
     @include appear;
 
