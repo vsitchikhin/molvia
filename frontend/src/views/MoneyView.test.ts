@@ -783,7 +783,7 @@ describe('MoneyView: what the review of MOL-159 found', () => {
     }
     await flushPromises()
     expect(view.text()).toContain('Deleted: Barber')
-    expect(view.get('.undo .count').text()).toBe('6')
+    expect(view.get('.undo-strip .count').text()).toBe('6')
     await button(view, en.spending.restore).trigger('click')
     await vi.waitFor(() => {
       expect(restoreSpending).toHaveBeenCalledWith(BARBER)
@@ -805,7 +805,7 @@ describe('MoneyView: what the review of MOL-159 found', () => {
       at: Date.now(),
     }
     await flushPromises()
-    expect(view.get('.undo .count').text()).toBe('9')
+    expect(view.get('.undo-strip .count').text()).toBe('9')
     expect(queue.lastRemoved).not.toBeNull()
   })
 

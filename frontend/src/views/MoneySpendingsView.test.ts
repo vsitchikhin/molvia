@@ -298,7 +298,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
     await vi.waitFor(() => {
       expect(restoreSpending).toHaveBeenCalledWith(BARBER)
     })
-    expect(view.find('.undo').exists()).toBe(false)
+    expect(view.find('.undo-strip').exists()).toBe(false)
   })
 
   it('a refused amendment opens on what was typed, names why, and goes again over the server’s version', async () => {
@@ -353,7 +353,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
     await vi.waitFor(() => {
       expect(view.text()).toContain('No spendings in September')
     })
-    expect(view.find('.undo').exists()).toBe(true)
+    expect(view.find('.undo-strip').exists()).toBe(true)
     moneyMonth.mockResolvedValue(month({ previousSpent: null, income: rub('0') }))
     await button(view, en.spending.restore).trigger('click')
     await vi.waitFor(() => {

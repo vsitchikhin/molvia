@@ -1,14 +1,14 @@
 <template>
   <div
-    class="undo"
+    class="undo-strip"
     @focusin="enter"
     @focusout="release"
     @pointerenter="hold(true)"
     @pointerleave="hold(false)"
     @pointerdown="hold(true)"
   >
-    <span class="count" aria-hidden="true">{{ left }}</span>
     <span class="text">{{ text }}</span>
+    <span class="count" aria-hidden="true">{{ left }}</span>
     <AppButton ref="button" variant="tinted" class="restore" @click="restore">
       <template #icon><IconUndo /></template>
       {{ action }}
@@ -28,6 +28,11 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
  * to take it back. The count stands still while a finger rests on the strip or the focus is in
  * it — a person reaching for the button must not lose it on the way. Shared: «Обмен денег» and
  * «Доходы» are the next to take it.
+ *
+ * One look and one place (Ф-29): the words, the count in a ring of `--graphic`, «Вернуть» — and a
+ * screen puts it in `AppScreen`'s `#undo`, 8 over the strip; a sheet, in its footer. The count is
+ * not read out: the announcement says the ten seconds once, and a live region ticking under the
+ * person reaching for the button would talk over them.
  *
  * The words are said once as the strip comes; the focus goes to «Вернуть», since the row it was
  * opened from is gone. What happens after — back or final — is the screen's to say.
@@ -113,7 +118,7 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.undo {
+.undo-strip {
   @include appear;
 
   display: flex;
@@ -134,7 +139,7 @@ export default defineComponent({
   width: 1.75rem;
   height: 1.75rem;
   border-radius: var(--radius-pill);
-  box-shadow: inset 0 0 0 2px var(--border-strong);
+  box-shadow: inset 0 0 0 2px var(--graphic);
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-weight: var(--weight-bold);

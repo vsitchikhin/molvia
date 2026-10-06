@@ -1,5 +1,9 @@
 <template>
-  <div class="screen" :class="{ collapsed, docked, tabbed }" :style="dockStyle">
+  <div
+    class="screen"
+    :class="{ collapsed, docked, tabbed, held: $slots.docked || updating }"
+    :style="dockStyle"
+  >
     <header ref="bar" class="bar">
       <div ref="column" class="leading">
         <template v-if="parentTitleKey">
@@ -66,6 +70,13 @@
     <div v-if="$slots.docked || updating" ref="dock" class="dock">
       <UpdateBand v-if="updating" class="update" :class="{ over: $slots.docked }" />
       <slot name="docked" />
+    </div>
+
+    <!-- «Вернуть» stands in one place on every screen, 8 over the strip — or over the tab bar or the
+         bottom edge where there is none (Ф-29, К-10). The frame's, not the strip's own: over the
+         list and out of the strip, so the main action under it neither moves nor hides. -->
+    <div v-if="$slots.undo" class="undo-place">
+      <slot name="undo" />
     </div>
   </div>
 </template>
@@ -162,10 +173,9 @@ export default defineComponent({
     const room = computed(() =>
       dockHeight.value > 0 ? `calc(${String(dockHeight.value)}px + var(--space-4))` : undefined,
     )
-    // What floats over the list (`FloatingDock`) rises above the strip by its height.
-    const dockStyle = computed(() =>
-      dockHeight.value > 0 ? { '--dock-height': `${String(dockHeight.value)}px` } : undefined,
-    )
+    // What stands over the list — «Вернуть», `FloatingDock` — rises above the strip by its height;
+    // zero without one, never unset, which would void every `calc()` that reads it.
+    const dockStyle = computed(() => ({ '--dock-height': `${String(dockHeight.value)}px` }))
     const update = usePwaUpdate()
     const updating = computed(() => update.phase.value !== 'none')
 
@@ -457,6 +467,31 @@ export default defineComponent({
 .dock > .over {
   padding-bottom: var(--space-2);
   border-bottom: var(--hairline) solid var(--border);
+}
+
+/* 8 over the strip, which on a nested screen already holds the home indicator; over the indicator
+   where there is no strip, and over the tab bar on a section. Only what stands here takes taps. */
+.undo-place {
+  position: fixed;
+  right: calc(var(--space-4) + var(--safe-right));
+  bottom: calc(var(--safe-bottom) + var(--space-2));
+  left: calc(var(--space-4) + var(--safe-left));
+  z-index: 1;
+  display: grid;
+  gap: var(--space-2);
+  pointer-events: none;
+
+  > :slotted(*) {
+    pointer-events: auto;
+  }
+}
+
+.held .undo-place {
+  bottom: calc(var(--dock-height) + var(--space-2));
+}
+
+.tabbed .undo-place {
+  bottom: calc(var(--tabbar-height) + var(--safe-bottom) + var(--dock-height) + var(--space-2));
 }
 
 /* The notice keeps its own margins; this only keeps it out from under a notch held sideways. */
