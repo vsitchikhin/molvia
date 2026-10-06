@@ -1299,8 +1299,9 @@ export const searchPicks = pgTable(
 )
 
 /**
- * The official rates as their providers published them: one currency against the dram per
- * day (MOL-39). Not pairs — no provider publishes those, and a stored pair would be a number
+ * The official rates as their providers published them: one currency against the provider's base
+ * per day (MOL-39) — the dram, or the dinar for the National Bank of Serbia (`base`, MOL-230). Not
+ * pairs — no provider publishes those, and a stored pair would be a number
  * already divided and already rounded. The pair is built when a trip snapshots it.
  *
  * A cache and nothing more: a trip copies the rate into its own columns, so rewriting a row
