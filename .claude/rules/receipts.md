@@ -552,7 +552,9 @@ with its meaning;
 near is `search`, far `weak`, nothing `new`, named so. **Measured on the 98 lines against the seed**
 (`.scratch/tasks/status/MOL-232/bench-binding.md`): 14 near, 12 of them right, 2 far, 82 new. Asked again by
 its first two words and its first, the search added 34 far lines, some 30 wrong — «UBRUS», paper towels, a
-vinegar — and a wrong «проверьте» taken at a glance is a wrong purchase, so it is not done. **82 new of 98
+vinegar — and a wrong «проверьте» taken at a glance is a wrong purchase, so it is not done. **A service is no product** (adversarial А6): «Достава» at 0,00, a tip «Напојница», a «Услуга» —
+`serbianServiceLine`, either script — is not searched for and goes «проверьте» with no item, for the
+person to leave out or record; a delivery at 0 recorded in silence would be an item's lowest price. **82 new of 98
 is the case for a dictionary of Serbian till words** as the Armenian one, a task of its own. The memory
 needs nothing new: the tax office prints a line the same every time, and the second receipt of a chain
 knows what the first was taught.
@@ -568,7 +570,7 @@ person's own — the price: a receipt of Niš proposes their city.
 read, failed or recorded — by the row's `source`, never guessed from the country (review 7) — until MOL-234 gives it a line of its own — its lines have nothing to put right,
 and counted with OCR's they would thin the stop line.
 
-**On the phone** (owner's В-2 «а»): until MOL-233 reads the code, the link is pasted — the system camera
+**On the phone** (owner's В-2 «а»; Р-9 at the merge): until MOL-233 reads the code, the link is pasted — the system camera
 opens the tax office's page, its address is copied — into «Чек по ссылке» (`LinkReceiptSheet`), offered
 in «Покупки» beside «Записать вручную» to a person whose country is Serbia; every other screen keeps the
 version «без чека». The sheet says why a paste is no receipt by the very function of the server, and

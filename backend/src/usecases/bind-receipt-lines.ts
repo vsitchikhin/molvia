@@ -3,6 +3,7 @@ import {
   createLineMatcher,
   isServiceClass,
   receiptLineName,
+  serbianServiceLine,
 } from '@molvia/model'
 import type { AppLocale, ReceiptCountry, ReceiptLine } from '@molvia/model'
 import type { ItemRepository } from '@/db/items-repository'
@@ -50,6 +51,11 @@ export async function bindReceiptLines(
   const bound: LineBinding[] = []
   for (const line of lines) {
     if (names === undefined) {
+      // a delivery or a tip is no product: «проверьте», never a new item in silence (MOL-232, А6)
+      if (serbianServiceLine(line.printed)) {
+        bound.push({ itemId: null, match: 'weak', translation: null })
+        continue
+      }
       // a country with no names of its own in the catalogue, Serbia: its till prints the name in full,
       // the same every time, and the search — by meaning too — reads it as typed (MOL-232, В-3)
       bound.push(await bySearch(receiptLineName(line.printed, country)))

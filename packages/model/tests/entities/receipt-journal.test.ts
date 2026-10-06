@@ -3,6 +3,7 @@ import {
   serbianCityOf,
   serbianItemName,
   serbianJournal,
+  serbianServiceLine,
   serbianShopOf,
 } from '#model/entities/receipt-journal'
 import { madeUpJournal } from './serbian-receipt'
@@ -194,5 +195,19 @@ describe('serbianCityOf', () => {
   it('gives null for a city the settings have not got', () => {
     expect(serbianCityOf('Ниш-Медијана', 'НИШ (МЕДИЈАНА)')).toBeNull()
     expect(serbianCityOf(null, null)).toBeNull()
+  })
+})
+
+describe('serbianServiceLine', () => {
+  it('knows a delivery, a tip and a service in either script (adversarial А6)', () => {
+    for (const printed of ['Достава', 'DOSTAVA 0', 'Напојница', 'napojnica', 'Usluga pakovanja']) {
+      expect(serbianServiceLine(printed), printed).toBe(true)
+    }
+  })
+
+  it('takes no product for one', () => {
+    for (const printed of ['SECER KRISTAL 1KG SUNOKO KOM', 'BANANA KG', 'Dostavljac igracka']) {
+      expect(serbianServiceLine(printed), printed).toBe(false)
+    }
   })
 })

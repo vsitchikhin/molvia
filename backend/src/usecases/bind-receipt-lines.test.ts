@@ -177,4 +177,20 @@ describe('binding the lines of a Serbian receipt by its link (MOL-232, В-3)', (
     expect(search).not.toHaveBeenCalled()
     expect(bound).toEqual([{ itemId: null, match: 'new', translation: null }])
   })
+
+  it('marks a delivery and a tip «проверьте» with no item, and asks the search nothing (А6)', async () => {
+    const search = vi.fn<ItemRepository['search']>()
+    const bound = await bindReceiptLines(
+      { items: { nodes: () => Promise.resolve(NODES), search }, embedder: NO_EMBEDDER },
+      ACTOR,
+      'RS',
+      'ru',
+      [line('Достава'), line('Напојница')],
+    )
+    expect(search).not.toHaveBeenCalled()
+    expect(bound).toEqual([
+      { itemId: null, match: 'weak', translation: null },
+      { itemId: null, match: 'weak', translation: null },
+    ])
+  })
 })

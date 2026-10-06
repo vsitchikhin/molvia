@@ -178,6 +178,18 @@ export function serbianItemName(printed: string): string {
   return lower.charAt(0).toUpperCase() + lower.slice(1)
 }
 
+// a service the till sells beside goods, in either script: a delivery, a tip, a service as such
+const SERVICE = /^(?:достава|dostava|напојница|napojnica|услуга|usluga)(?![\p{L}])/iu
+
+/**
+ * Whether a line is a service, not a product (adversarial А6 of MOL-232): «Достава» at 0,00, a tip
+ * «Напојница» — no item of the catalogue, so its line is «проверьте» on the review, for the person to
+ * leave out or record as they see fit, never a new product recorded in silence.
+ */
+export function serbianServiceLine(printed: string): boolean {
+  return SERVICE.test(printed.trim())
+}
+
 /**
  * The tax office names a shop by its premises' code and the name the firm gave it, «1113343-RODA
  * MEGAMARKET 463»: the code is one shop of a chain whose every shop shares the seller's tax number.
