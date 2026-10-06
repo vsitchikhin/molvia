@@ -455,6 +455,7 @@ describe('moneyMonthOf (MOL-73)', () => {
       startOn: '2026-09-16',
       revision: 1,
       createdAt: new Date('2026-09-16T10:00:00Z'),
+      createdOn: '2026-09-16',
       archivedAt: null,
     }
     const tomorrow: AccountOperation = {
@@ -463,6 +464,7 @@ describe('moneyMonthOf (MOL-73)', () => {
       side: null,
       day: '2026-09-27',
       at: NOW,
+      writtenAt: NOW,
       seenAt: NOW,
       currency: 'AMD',
       accountId: drams.id,

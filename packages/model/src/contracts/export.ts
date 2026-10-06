@@ -365,6 +365,7 @@ const moneyAccountSchema = z.strictObject({
   startOn: day,
   revision: z.int(),
   createdAt: isoDate,
+  createdOn: day,
   archivedAt: isoDate.nullable(),
   removedAt: isoDate.nullable(),
 })

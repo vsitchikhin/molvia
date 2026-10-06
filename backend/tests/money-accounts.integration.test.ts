@@ -285,6 +285,111 @@ describe('чужое — один 404, во всех ручках и во все
   })
 })
 
+describe('счёт, заведённый на свой день, стартует моментом создания (MOL-250)', () => {
+  it('считает обмены, записанные после него в тот же день', async () => {
+    const me = await owner()
+    const usd = (amount: string) => ({ amount, currency: 'USD' })
+    const { id } = await addAccount(me, {
+      name: 'Доллары',
+      currency: 'USD',
+      start: usd('0'),
+      startOn: today,
+    })
+    const exchange = async () => {
+      const response = await call(me, 'POST', '/exchanges', {
+        id: randomUUID(),
+        given: rub('500'),
+        received: usd('5.42'),
+        exchangedOn: today,
+        receivedAccountId: id,
+      })
+      expect(response.statusCode, response.body).toBe(201)
+    }
+    await exchange()
+    await exchange()
+    expect((await balanceOf(me, id)).balance).toEqual({ minor: 1084n, currency: 'USD' })
+    const [row] = await db
+      .select({ createdOn: moneyAccounts.createdOn })
+      .from(moneyAccounts)
+      .where(eq(moneyAccounts.id, id))
+    expect(row?.createdOn).toBe(today)
+  })
+
+  it('не считает трату того дня, записанную до счёта, хоть счёт ей дан потом', async () => {
+    const me = await owner()
+    const { body } = await spend(me, { amount: amd('2000') })
+    const { id } = await addAccount(me, { start: amd('18000'), startOn: today })
+    const fields = without(body, 'id')
+    const given = await call(me, 'PUT', `/spendings/${body.id}`, {
+      ...fields,
+      revision: 1,
+      accountId: id,
+    })
+    expect(spendingViewCodec.parse(given.json()).accountId).toBe(id)
+    expect((await balanceOf(me, id)).balance).toEqual({ minor: 1_800_000n, currency: 'AMD' })
+  })
+
+  it('считает поход, начатый до счёта и оплаченный после: деньги ушли на кассе (А1)', async () => {
+    const me = await owner()
+    const place = await insertPlace(db)
+    const trip = await insertTrip(db, {
+      actorId: me.id,
+      placeId: place,
+      startedAt: new Date(Date.now() - 10 * 60 * 1000),
+      startedOn: today,
+    })
+    await db.insert(expenses).values({
+      id: randomUUID(),
+      tripId: trip,
+      itemId: await insertItem(db),
+      amountMinor: 300000n,
+      amountCurrency: 'AMD',
+    })
+    const { id } = await addAccount(me, { start: amd('18000'), startOn: today })
+    const paid = await call(me, 'PUT', `/trips/${trip}/payment`, { accountId: id })
+    expect(paid.statusCode, paid.body).toBe(200)
+    // Open, it was begun before the account: not yet the account's money.
+    expect((await balanceOf(me, id)).balance).toEqual({ minor: 1_800_000n, currency: 'AMD' })
+    const finished = await call(me, 'POST', `/trips/${trip}/finish`, {})
+    expect(finished.statusCode, finished.body).toBeLessThan(300)
+    expect((await balanceOf(me, id)).balance).toEqual({ minor: 1_500_000n, currency: 'AMD' })
+  })
+
+  it('берёт день создания с телефона, а не с часов Еревана', async () => {
+    const me = await owner()
+    // Today on the last of the phone's days — Yerevan's yesterday after 12:00 UTC.
+    const phoneDay = earliestDay(new Date())
+    const id = randomUUID()
+    const made = await app.inject({
+      method: 'POST',
+      url: '/money/accounts',
+      headers: { cookie: me.cookie, [TODAY_HEADER]: phoneDay },
+      payload: {
+        id,
+        name: 'Наличные ֏',
+        currency: 'AMD',
+        savings: false,
+        start: amd('100'),
+        startOn: phoneDay,
+      },
+    })
+    expect(made.statusCode, made.body).toBe(201)
+    const [row] = await db
+      .select({ createdOn: moneyAccounts.createdOn })
+      .from(moneyAccounts)
+      .where(eq(moneyAccounts.id, id))
+    expect(row?.createdOn).toBe(phoneDay)
+  })
+
+  it('старт на прошлый день — вечер того дня: его операция, записанная сейчас, — история', async () => {
+    const me = await owner()
+    const { id } = await addAccount(me, { start: amd('100'), startOn: daysAgo(1) })
+    await spend(me, { accountId: id, spentOn: daysAgo(1), amount: amd('10') })
+    await spend(me, { accountId: id, amount: amd('1') })
+    expect((await balanceOf(me, id)).balance).toEqual({ minor: 9_900n, currency: 'AMD' })
+  })
+})
+
 describe('остаток — старт и всё после дня старта', () => {
   it('считает трату, доход, обмен и поход; операция в день старта — история', async () => {
     const me = await owner()

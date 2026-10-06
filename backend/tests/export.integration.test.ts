@@ -152,6 +152,7 @@ async function aFullLife(actorId: string, telegramUserId: number) {
       currency: 'AMD',
       startMinor: 1_000_000n,
       startOn: '2026-09-01',
+      createdOn: '2026-09-27',
       savings: true,
       archivedAt: at(2),
     },
@@ -162,9 +163,18 @@ async function aFullLife(actorId: string, telegramUserId: number) {
       currency: 'USD',
       startMinor: 10_000n,
       startOn: '2026-09-01',
+      createdOn: '2026-09-27',
       deletedAt: at(3),
     },
-    { id: card, actorId, name: 'Карта ₽', currency: 'RUB', startMinor: 0n, startOn: '2026-09-01' },
+    {
+      id: card,
+      actorId,
+      name: 'Карта ₽',
+      currency: 'RUB',
+      startMinor: 0n,
+      startOn: '2026-09-01',
+      createdOn: '2026-09-27',
+    },
   ])
   await db.insert(moneyAccountChecks).values({
     id: randomUUID(),

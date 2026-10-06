@@ -36,6 +36,7 @@ function account(currency: Currency, start = 0n, savings = false): MoneyAccount 
     startOn: '2026-09-16',
     revision: 1,
     createdAt: new Date('2026-09-16T20:00:00Z'),
+    createdOn: '2026-09-17',
     archivedAt: null,
   })
 }

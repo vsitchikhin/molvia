@@ -45,9 +45,11 @@ export interface MoneyAccountRepository {
    * under that identifier, or someone else's, is `CONFLICT`; a name one of the owner's accounts
    * already goes by — live, removed or marked — is `MONEY_ACCOUNT_TAKEN` (Р-21).
    */
+  /** `createdOn` is the phone's day it is made on: the start is its moment when it is that day. */
   add(
     actorId: string,
     input: MoneyAccountBody,
+    createdOn: string,
   ): Promise<{ account: MoneyAccount; created: boolean }>
 
   /**
@@ -140,6 +142,7 @@ function toAccount(row: Row): MoneyAccount {
     startOn: row.startOn,
     revision: row.revision,
     createdAt: row.createdAt,
+    createdOn: row.createdOn,
     archivedAt: row.archivedAt,
   })
 }
@@ -213,6 +216,7 @@ interface TripRow extends Record<string, unknown> {
   started_at: Date | string
   started_on: string
   finished_at: Date | string | null
+  received_at: Date | string
   seen_at: Date | string
   account_id: string | null
   debited_minor: string | bigint | null
@@ -294,7 +298,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
       return (await owned(actorId)).map(toAccount)
     },
 
-    async add(actorId, input) {
+    async add(actorId, input, createdOn) {
       return translateFailures(() =>
         db.transaction(async (tx) => {
           await tx.execute(lockOwner(actorId))
@@ -316,7 +320,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           if (nameTaken(rows, input.name)) throw new DomainError(ERROR.MONEY_ACCOUNT_TAKEN)
           const [inserted] = await tx
             .insert(moneyAccounts)
-            .values({ id: input.id, actorId, ...columnsOf(input) })
+            .values({ id: input.id, actorId, ...columnsOf(input), createdOn })
             .onConflictDoNothing({ target: moneyAccounts.id })
             .returning()
           // Taken by an identifier of someone else's: a device does not choose another's name.
@@ -436,6 +440,9 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
                          end,
                          'YYYY-MM-DD') as started_on,
                  coalesce(t.finished_on_device_at, t.finished_at) as finished_at,
+                 -- When the server had it as paid: its finish, or its start while it is open —
+                 -- the server's clock, never the phone's (MOL-250).
+                 coalesce(t.finished_at, t.started_at) as received_at,
                  greatest(t.started_at, t.finished_at, t.account_set_at, t.receipt_set_at,
                           (select max(e.created_at) from expenses e where e.trip_id = t.id))
                    as seen_at,
@@ -465,6 +472,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           side: null,
           day: row.spentOn,
           at: row.createdAt,
+          writtenAt: row.createdAt,
           seenAt: latest(row.createdAt, row.amendedAt, row.accountSetAt),
           currency: row.currency,
           accountId: row.accountId,
@@ -488,6 +496,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           side: null,
           day: row.receivedOn,
           at: row.createdAt,
+          writtenAt: row.createdAt,
           seenAt: latest(row.createdAt, row.amendedAt, row.accountSetAt),
           currency: row.currency,
           accountId: row.accountId,
@@ -507,6 +516,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           id: row.id,
           day: row.exchangedOn,
           at: row.createdAt,
+          writtenAt: row.createdAt,
           seenAt: latest(row.createdAt, row.amendedAt, row.accountSetAt),
         }
         const common = { debited: null, rate: null, unpriced: 0, revision: row.revision }
@@ -552,6 +562,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           // finished after midnight, is not taken from a start that already counted it (Д4).
           day: row.started_on,
           at: new Date(row.finished_at ?? row.started_at),
+          writtenAt: new Date(row.received_at),
           seenAt: new Date(row.seen_at),
           currency: row.currency,
           accountId: row.account_id,
