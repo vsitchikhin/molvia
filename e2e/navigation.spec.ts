@@ -350,6 +350,12 @@ test.describe('safe areas', () => {
     await open(page, '/settings')
     const save = page.locator('.dock > button')
     await expect(save).toBeVisible()
+    // Measured where it stands, not while it slides in from under the edge.
+    await page
+      .locator('.dock')
+      .evaluate((node) =>
+        Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+      )
     const [dock, button, tabs] = await Promise.all([
       page.locator('.dock').boundingBox(),
       save.boundingBox(),

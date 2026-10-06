@@ -1234,7 +1234,7 @@ describe('TripView', () => {
       expect(openSheet()).toBeNull()
       expect(queue.pending).toEqual([{ kind: 'delete', tripId: TRIP }])
       expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
-      expect(view.get('.dock').text()).toContain('Запись удалена: Ереван Сити')
+      expect(view.get('.undo-place').text()).toContain('Запись удалена: Ереван Сити')
 
       await button(view, ru.trip.remove.restore).trigger('click')
       await flushPromises()
@@ -1368,7 +1368,7 @@ describe('TripView', () => {
         stamp: Date.now() - 4_000,
       }
       await flushPromises()
-      expect(view.get('.dock .count').text()).toBe('6')
+      expect(view.get('.undo-place .count').text()).toBe('6')
     })
 
     it('истёкшая, пока её не было на экране, не показывается и забывается (Р-1)', async () => {
