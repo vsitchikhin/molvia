@@ -5,6 +5,7 @@ import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import Icons from 'unplugin-icons/vite'
+import type { Plugin } from 'vite'
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 const src = fileURLToPath(new URL('./src', import.meta.url))
@@ -28,6 +29,36 @@ const https =
 // network for a phone to reach it: PWA_EXPOSE=1 make dev
 const exposed = process.env.PWA_EXPOSE === '1'
 
+// The floor of the browsers Molvia runs in (MOL-231), the one statement of it: Vite lowers syntax to
+// it and touches no API, and the script in `index.html` turns away what is below it. Written out
+// rather than Vite's default, which moves with Vite — and which said Firefox 114 while the bundle
+// constructs `Intl.Segmenter` (125) as it loads. An API above it raises it here, never a workaround
+// in the code; `browserFloor.test.ts` holds the script's markers to exactly these versions.
+const BROWSER_FLOOR = ['chrome111', 'edge111', 'firefox125', 'safari16.4', 'ios16.4']
+
+// The line a browser below the floor sees, from the locales: no text lives in the markup, and before
+// the floor is known there is no Vue to translate it. The script names it by an identifier, so the
+// file stays a script its test can run; a placeholder gone is a build that fails, not a blank line.
+const OUTDATED_LINES = 'MOLVIA_OUTDATED_LINES'
+
+function outdatedLines(): Plugin {
+  const line = (locale: string) =>
+    (
+      JSON.parse(readFileSync(new URL(`./src/i18n/${locale}.json`, import.meta.url), 'utf8')) as {
+        outdated: { line: string }
+      }
+    ).outdated.line
+  return {
+    name: 'molvia-outdated-lines',
+    transformIndexHtml(html) {
+      if (!html.includes(OUTDATED_LINES)) throw new Error(`index.html has no ${OUTDATED_LINES}`)
+      // `<` escaped, so no line can close the script it is put in.
+      const lines = JSON.stringify({ ru: line('ru'), en: line('en') }).replaceAll('<', '\\u003c')
+      return html.replace(OUTDATED_LINES, lines)
+    },
+  }
+}
+
 // Ports come from the working copy's .env, so two copies never fight over one port.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, repoRoot, '')
@@ -35,6 +66,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       vue(),
+      outdatedLines(),
       // MDI through Iconify: icons are inlined as components at build time, so only the
       // ones actually used ship, no icon font is downloaded, and colour comes from
       // currentColor — which means they obey the tokens like any other element.
@@ -81,7 +113,7 @@ export default defineConfig(({ mode }) => {
     // The maps lie beside the build, for `make failures` to read a phone's frames (MOL-144, Р-7 of
     // MOL-149): the repository is public, so they disclose nothing. Not precached — `globPatterns`
     // has no `map` — and a browser fetches one only with its tools open.
-    build: { sourcemap: true },
+    build: { target: BROWSER_FLOOR, sourcemap: true },
     resolve: { alias: { '@': src } },
     css: {
       preprocessorOptions: {
