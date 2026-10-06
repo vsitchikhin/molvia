@@ -15,6 +15,7 @@ paths:
   - 'frontend/src/components/ConsentStep*'
   - 'frontend/src/stores/consent*'
   - 'backend/src/open-food-facts/**'
+  - 'backend/src/purs/**'
   - 'e2e/{privacy,export,erase,consent}.spec.ts'
   - 'deploy/Caddyfile'
   - 'docker-compose.prod.yml'
@@ -224,6 +225,20 @@ The detail behind the privacy lines of `CLAUDE.md`.
   the catalogue's licence mark — the base is ODbL, what is derived from it is offered on request — and
   the copy leaves it out with that reason. No photo of the base is ever fetched: a picture from its CDN
   would hand the phone to a third party. `/privacy` says all of it under «Незнакомый штрихкод».
+- **The Serbian tax office learns of a receipt only from the server, and only what it already holds**
+  (MOL-232, owner's В-4 of MOL-223): its check has no CORS, so the phone cannot ask it anyway. The API
+  sends it the receipt's link with `Molvia/<build> (<contact>)` (`PURS_CONTACT` of `.env`) — the link
+  carries the total, the moment, the number and, for a receipt made out to a firm, the buyer's tax id,
+  all of it the tax office's own. **Of its answer only the seller is read** — the tax number, the
+  premises and the town — with the journal laid out into lines; the cashier, the buyer and the
+  payments are in the answer and never read, and the journal is not kept. **The link lives only until
+  the tax office answered** (Р-4, stricter than «until recorded»): read, refused or given up after two
+  days, it is nulled in the same statement — `receipts_link_while_asked` holds it — and no log, failure
+  or metric ever carries it, nor the seller. **The copy leaves the link out** with that reason
+  (`EXPORT_COLUMNS`). `/privacy` says it under «Сербский чек по ссылке», a revision of edition 1: the
+  new recipient is named in the consent by edition 2 (MOL-236, owner's В-4 of MOL-232); before 0.2 only
+  the owner is on production. The record of processing (12091393) names Пореска управа among the third
+  parties.
 - **A receipt is read on our own server, and its photo lives days** (MOL-125, the owner's decisions of
   27.09 and 02.10.2026): Tesseract in `services/receipt-reader`, a container with no database, no
   disk and no log, asked over the compose network only — no third party sees a receipt. The photo

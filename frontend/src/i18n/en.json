@@ -1553,7 +1553,7 @@
       },
       "receipts": {
         "term": "Receipts",
-        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; no outside service sees the receipt. The photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them. If you left the screen while a receipt was being read, the Molvia bot tells you in Telegram that it is ready: the message names the shop or the receipt’s date and the number of items — no sums, no products — and Telegram sees that message. Kept here: how you learned the receipt was ready — in the app or from the bot — and whether that message is off."
+        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; no outside service sees the photo. A Serbian receipt comes as the link of its QR code, with no photo — see «A Serbian receipt by its link». The photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them. If you left the screen while a receipt was being read, the Molvia bot tells you in Telegram that it is ready: the message names the shop or the receipt’s date and the number of items — no sums, no products — and Telegram sees that message. Kept here: how you learned the receipt was ready — in the app or from the bot — and whether that message is off."
       },
       "accounts": {
         "term": "Accounts",
@@ -1615,6 +1615,10 @@
     "barcodes": {
       "title": "An unknown barcode",
       "text": "If the catalogue does not know a scanned code, the server asks Open Food Facts, an open database of products, about it. Only the code itself and our server's address go there: not you, not your phone and not your sign-in. A shop's own label code never goes there. The name and size from there are only a hint, which you confirm or correct; items suggested with a code Open Food Facts knows are marked. The link «Data from Open Food Facts» opens the product's page there — from your phone, when you tap it. Open Food Facts data is open under the ODbL licence: we will send an export of what the catalogue took from there on request."
+    },
+    "serbian_receipts": {
+      "title": "A Serbian receipt by its link",
+      "text": "You hand over a Serbian receipt as the link of its QR code, with no photo. The receipt is kept by the Serbian tax office (Poreska uprava), and our server takes its lines from there: it sends the tax office that link. The tax office sees the link and our server’s address — not you, your phone or your sign-in. The link carries the receipt’s total, time and number, and the firm’s tax number if the receipt was made out to one; the tax office holds all of it already. Of its answer we keep the seller’s tax number, the shop’s code and name, the town, the lines, the total and the time; the cashier’s name, the buyer’s number and the way of payment we do not take. The link itself is erased as soon as the tax office answers, and never written to logs. A receipt just printed shows up there in a couple of minutes: the server asks again for two days, then says the receipt was not found."
     },
     "storage": {
       "title": "Cookies and the phone's memory",
