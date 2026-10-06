@@ -16,7 +16,7 @@ function untold(patch: Partial<ReceiptSummary> = {}, telegramUserId = 4242): Unt
       capturedAt: new Date('2026-10-04T07:59:00Z'),
       country: 'AM',
       language: 'ru',
-      header: { tin: '01234567', date: '2026-10-03', time: '20:15', receiptNo: '7' },
+      header: { tin: '01234567', date: '2026-10-03', time: '20:15', receiptNo: '7', shop: null },
       total: null,
       balanced: true,
       lineCount: 7,
@@ -27,6 +27,8 @@ function untold(patch: Partial<ReceiptSummary> = {}, telegramUserId = 4242): Unt
     },
     currency: 'AMD',
     city: null,
+    shopUnit: null,
+    source: 'photo',
     heard: 'bot',
     actor: { id: 'a1', telegramUserId, country: 'AM', city: 'Гюмри' },
   }
@@ -35,6 +37,7 @@ function untold(patch: Partial<ReceiptSummary> = {}, telegramUserId = 4242): Unt
 function seller(name: string): TinPlace {
   return {
     tin: '01234567',
+    shopUnit: null,
     place: { id: 'p1', kind: 'store', name, country: 'AM', city: 'Гюмри' } as TinPlace['place'],
     ownLatest: null,
     voters: 1,
@@ -73,6 +76,7 @@ describe('claimReceiptNotices (MOL-129)', () => {
         day: '2026-10-03',
         lineCount: 7,
         duplicate: false,
+        taxOffice: null,
         silent: false,
       },
     ])
@@ -80,7 +84,7 @@ describe('claimReceiptNotices (MOL-129)', () => {
 
   it('says a second shot of a receipt recorded before is one (adversarial А4)', async () => {
     const receipt = untold({
-      header: { tin: '01234567', date: '2026-10-03', time: null, receiptNo: '417' },
+      header: { tin: '01234567', date: '2026-10-03', time: null, receiptNo: '417', shop: null },
     })
     const twin = repository([receipt], [], true)
     const { notices } = await claimReceiptNotices(twin, AT, vi.fn())
@@ -90,7 +94,11 @@ describe('claimReceiptNotices (MOL-129)', () => {
 
   it('asks nothing about a twin without a number to know it by', async () => {
     const twin = repository(
-      [untold({ header: { tin: '01234567', date: null, time: null, receiptNo: null } })],
+      [
+        untold({
+          header: { tin: '01234567', date: null, time: null, receiptNo: null, shop: null },
+        }),
+      ],
       [],
       true,
     )

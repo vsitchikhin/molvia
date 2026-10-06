@@ -157,15 +157,15 @@
          place over the strip (Ф-29); each strip draws itself only while its removal can be taken back. -->
     <template v-if="removing" #undo>
       <TripUndoStrip />
-      <ReceiptUndoStrip v-if="country" />
+      <ReceiptUndoStrip v-if="capture" />
     </template>
 
     <!-- The action under the thumb in every state, loading and failure included: a record goes
          through the queue and needs neither the list nor the network (MOL-77). -->
     <template #docked>
-      <template v-if="country">
+      <template v-if="capture">
         <ReceiptSentLine />
-        <CaptureButton :country="country" />
+        <CaptureButton :country="capture" />
         <ManualEntryButton by-hand />
       </template>
       <ManualEntryButton v-else />
@@ -273,13 +273,16 @@ export default defineComponent({
     // Receipts (MOL-127): the version «с чеком» — the camera — for a person whose country the server
     // reads (Р-1); the receipts a person holds are shown whatever the country, since one taken before a
     // move to Georgia or Serbia is still to be recorded or removed (MOL-109, adversarial А2).
-    const { country } = useReceiptCapture()
+    const { country, linkCountry } = useReceiptCapture()
+    // the strip's receipt: the camera, or a Serbian receipt's link (MOL-232) — the rest of the screen
+    // keeps its words of the camera's country alone
+    const capture = computed(() => country.value ?? linkCountry.value)
     // The place of «Вернуть» only while a removal waits: each strip still decides whether its ten
     // seconds are left (Р-7).
     const tripQueue = useTripQueueStore()
     const receiptQueue = useReceiptQueueStore()
     const removing = computed(() =>
-      Boolean(tripQueue.lastRemoved ?? (country.value ? receiptQueue.lastRemoved : null)),
+      Boolean(tripQueue.lastRemoved ?? (capture.value ? receiptQueue.lastRemoved : null)),
     )
     const receipts = useReceipts()
     const receiptRows = computed(() => receipts.rows.value)
@@ -323,7 +326,9 @@ export default defineComponent({
         : when(row.capturedAt).day
     }
     function receiptTitle(row: ReceiptRow): string {
-      if (row.state === 'rejected') return t('purchases.rejected_title', when(row.capturedAt))
+      // a receipt by its link has no photo to name (MOL-232)
+      if (row.state === 'rejected' && row.parts > 0)
+        return t('purchases.rejected_title', when(row.capturedAt))
       const place = row.summary?.place?.name
       if (place && row.state !== 'waiting' && row.state !== 'sending') return place
       if (row.state === 'parsed' || row.state === 'recording' || row.state === 'failed')
@@ -331,7 +336,11 @@ export default defineComponent({
       return t('purchases.receipt_from', when(row.capturedAt))
     }
     function receiptMeta(row: ReceiptRow): string {
-      const parts = t('receipt.capture.parts', { n: row.parts }, row.parts)
+      // a receipt by its link has no parts: it is a link (MOL-232)
+      const byLink = row.parts === 0
+      const parts = byLink
+        ? t('purchases.by_link')
+        : t('receipt.capture.parts', { n: row.parts }, row.parts)
       switch (row.state) {
         case 'waiting':
           return t('purchases.waiting', { parts })
@@ -346,11 +355,12 @@ export default defineComponent({
             ),
           })
         case 'parsing':
-          return t('purchases.parsing_unknown')
-        case 'failed':
-          return t(
-            row.summary?.failure === 'reshoot' ? 'purchases.reshoot_meta' : 'purchases.failed_meta',
-          )
+          return t(byLink ? 'purchases.asking_tax_office' : 'purchases.parsing_unknown')
+        case 'failed': {
+          const failure = row.summary?.failure
+          if (failure === 'missing' || failure === 'invalid') return t(`purchases.${failure}_meta`)
+          return t(failure === 'reshoot' ? 'purchases.reshoot_meta' : 'purchases.failed_meta')
+        }
         case 'recording':
           return t('purchases.recording_meta')
         case 'parsed': {
@@ -452,6 +462,7 @@ export default defineComponent({
         })
       },
       country,
+      capture,
       receipts,
       receiptRows,
       working,

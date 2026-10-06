@@ -51,7 +51,7 @@ function receiptA(total: string | null = '3663'): ReceiptDetail {
       capturedAt: new Date('2026-09-26T15:42:00Z'),
       country: 'AM',
       language: 'ru',
-      header: { tin: '02541234', date: '2026-09-26', time: '19:42', receiptNo: '17' },
+      header: { tin: '02541234', date: '2026-09-26', time: '19:42', receiptNo: '17', shop: null },
       total: total === null ? null : amd(total),
       balanced: false,
       lineCount: 4,

@@ -37,7 +37,11 @@ function dateOf(language: string, day: string): string {
 
 /** The words of the message: the place where the review knows it, else the day; never a sum. */
 export function receiptText(notice: ReceiptNotice): string {
-  const { language, place, day, lineCount, outcome, duplicate } = notice
+  const { language, place, day, lineCount, outcome, duplicate, taxOffice } = notice
+  // a receipt by its link has no photo: the tax office's word, never «переснять» (MOL-232, Р2-1)
+  if (taxOffice !== null) {
+    return t(language, `receipt.link_${taxOffice}`, { date: dateOf(language, day) })
+  }
   if (outcome === 'failed') return t(language, 'receipt.failed', { date: dateOf(language, day) })
   // a second shot of a receipt recorded before: the review says «уже записан» (adversarial А4)
   if (duplicate) {

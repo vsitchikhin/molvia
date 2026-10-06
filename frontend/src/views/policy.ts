@@ -14,9 +14,9 @@ import { calendarDay } from '@/days'
  * written here too, so raising the edition is an edit of this file and of the day.
  */
 export const POLICY_REVISION = {
-  day: '2026-10-05',
+  day: '2026-10-06',
   version: 1,
-  digest: 'deb3eea3ba25e2aed75e92a5500982fe0a2db01031017c6f7ea88430538c223e',
+  digest: '6ddfd87820766c6720600d954d3ac1714bde2e864549d3effedcc63bf70c2e2a',
 } as const
 
 // Which parts each page shows, in order — here and not in the pages, so the fingerprint holds them
@@ -48,6 +48,7 @@ export const PRIVACY_PARTS = [
   'failures',
   'backups',
   'barcodes',
+  'serbian_receipts',
   'storage',
   'copy',
   'erase',
@@ -65,7 +66,7 @@ export const TERMS_PARTS = [
   'contact',
 ] as const
 
-/** «Редакция от 5 октября 2026 г.» — the subtitle of both pages. */
+/** «Редакция от 6 октября 2026 г.» — the subtitle of both pages. */
 export function revisedOn(
   t: (key: string, values: Record<string, string>) => string,
   locale: string,

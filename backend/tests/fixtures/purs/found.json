@@ -1,0 +1,35 @@
+{
+  "invoiceRequest": {
+    "posTime": null,
+    "taxId": "100000009",
+    "businessName": "Тест продавац доо",
+    "locationName": "1000001-ТЕСТ ПРОДАВНИЦА 1",
+    "address": "ТЕСТНА УЛИЦА 1",
+    "city": "БЕОГРАД (ЗЕМУН)",
+    "administrativeUnit": "Београд-Земун",
+    "buyer": "10:100000017",
+    "buyerCostCenter": null,
+    "cashier": "Тест Тестовић",
+    "requestedBy": "TESTAAAA",
+    "referentDocumentNumber": null,
+    "invoiceType": 0,
+    "transactionType": 0,
+    "payments": [
+      {
+        "paymentType": 1,
+        "amount": 500
+      }
+    ]
+  },
+  "invoiceResult": {
+    "totalAmount": 486.37,
+    "transactionTypeCounter": 12218,
+    "totalCounter": 12218,
+    "invoiceCounterExtension": "ПП",
+    "invoiceNumber": "TESTAAAA-TESTBBBB-12218",
+    "signedBy": "TESTBBBB",
+    "sdcTime": "2025-07-18T06:56:53.834Z"
+  },
+  "journal": "============ ФИСКАЛНИ РАЧУН ============\r\n               100000009                \r\n           Тест продавац доо            \r\n     1000001-ТЕСТ ПРОДАВНИЦА 1          \r\n           ТЕСТНА УЛИЦА 1               \r\n             Београд-Земун              \r\nКасир:                    Тест Тестовић\r\nИД купца:                  10:100000017\r\nЕСИР број:                    000/1.0.0\r\n-------------ПРОМЕТ ПРОДАЈА-------------\r\nАртикли\r\n========================================\r\nНазив   Цена         Кол.         Укупно\r\nSECER KRISTAL 1KG SUNOKO KOM (Е)        \r\n        94,99          2          189,98\r\nBANANA KG (Е)                           \r\n       199,99      1,482          296,39\r\n----------------------------------------\r\nУкупан износ:                     486,37\r\nГотовина:                         500,00\r\n========================================\r\nПФР време:           18.07.2025. 8:56:53\r\nПФР број рачуна: TESTAAAA-TESTBBBB-12218\r\n======== КРАЈ ФИСКАЛНОГ РАЧУНА =========",
+  "isValid": true
+}

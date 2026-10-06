@@ -65,6 +65,7 @@ services:
       CATALOGUE_MERGE: ${CATALOGUE_MERGE:-report}
       # Optional: empty leaves the Open Food Facts hint off (MOL-162).
       OPEN_FOOD_FACTS_CONTACT: ${OPEN_FOOD_FACTS_CONTACT:-}
+      PURS_CONTACT: ${PURS_CONTACT:-}
       # The receipt reader below (MOL-125); while it is down, receipts wait in the queue.
       RECEIPT_READER_URL: http://receipt-reader:8080
       # Whom the bot tells of a new failure (MOL-143): the owner's Telegram id, digits only. Required

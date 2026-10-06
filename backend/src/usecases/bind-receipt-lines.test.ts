@@ -132,3 +132,65 @@ describe('binding the lines of a parsed receipt (MOL-126)', () => {
     expect(search).toHaveBeenCalledWith('сметана', 5, ACTOR, null)
   })
 })
+
+describe('binding the lines of a Serbian receipt by its link (MOL-232, В-3)', () => {
+  it('reads no names and no gloss: the search by the line’s name whole, near or far', async () => {
+    const nodes = vi.fn(() => Promise.resolve(NODES))
+    const search = vi.fn<ItemRepository['search']>((query) =>
+      Promise.resolve(
+        query === 'Banana'
+          ? { items: [item(MILK, 'Бананы')], near: true, nearIds: [MILK] }
+          : query === 'Zitopek beli hleb'
+            ? { items: [item(GLUE, 'Хлеб белый')], near: false, nearIds: [] }
+            : { items: [], near: false, nearIds: [] },
+      ),
+    )
+    const bound = await bindReceiptLines(
+      { items: { nodes, search }, embedder: NO_EMBEDDER },
+      ACTOR,
+      'RS',
+      'ru',
+      [line('BANANA KG'), line('Zitopek beli hleb /kom'), line('UBRUS JUMBO 2SL 1/1 NATU KOM')],
+    )
+    expect(nodes).not.toHaveBeenCalled()
+    expect(search.mock.calls.map(([query]) => query)).toEqual([
+      'Banana',
+      'Zitopek beli hleb',
+      'Ubrus jumbo 2sl 1/1 natu',
+    ])
+    expect(bound).toEqual([
+      { itemId: MILK, match: 'search', translation: null },
+      { itemId: GLUE, match: 'weak', translation: null },
+      { itemId: null, match: 'new', translation: null },
+    ])
+  })
+
+  it('asks nothing for a name under three letters', async () => {
+    const search = vi.fn<ItemRepository['search']>()
+    const bound = await bindReceiptLines(
+      { items: { nodes: () => Promise.resolve(NODES), search }, embedder: NO_EMBEDDER },
+      ACTOR,
+      'RS',
+      'ru',
+      [line('KO')],
+    )
+    expect(search).not.toHaveBeenCalled()
+    expect(bound).toEqual([{ itemId: null, match: 'new', translation: null }])
+  })
+
+  it('marks a delivery and a tip «проверьте» with no item, and asks the search nothing (А6)', async () => {
+    const search = vi.fn<ItemRepository['search']>()
+    const bound = await bindReceiptLines(
+      { items: { nodes: () => Promise.resolve(NODES), search }, embedder: NO_EMBEDDER },
+      ACTOR,
+      'RS',
+      'ru',
+      [line('Достава'), line('Напојница')],
+    )
+    expect(search).not.toHaveBeenCalled()
+    expect(bound).toEqual([
+      { itemId: null, match: 'weak', translation: null },
+      { itemId: null, match: 'weak', translation: null },
+    ])
+  })
+})

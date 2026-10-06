@@ -1,23 +1,25 @@
 ---
 paths:
-  - 'packages/model/src/entities/{receipt,receipt-text,receipt-sum,receipt-match}.ts'
+  - 'packages/model/src/entities/{receipt,receipt-text,receipt-sum,receipt-match,receipt-link,receipt-journal}.ts'
+  - 'packages/model/src/support/md5.ts'
   - 'packages/model/src/contracts/receipt.ts'
   - 'packages/model/tests/entities/receipt*'
   - 'packages/model/tests/contracts/receipt.test.ts'
   - 'backend/src/receipts/**'
   - 'backend/src/routes/receipts.ts'
-  - 'backend/src/usecases/{receipts,read-receipts,bind-receipt-lines,record-receipt}.ts'
+  - 'backend/src/usecases/{receipts,read-receipts,read-tax-receipts,bind-receipt-lines,record-receipt}.ts'
+  - 'backend/src/purs/**'
   - 'backend/src/db/{receipts,store-memory}-repository.ts'
   - 'backend/src/catalogue-seed-nodes.ts'
-  - 'backend/tests/{receipts,receipt-review,receipt-record}.integration.test.ts'
+  - 'backend/tests/{receipts,receipt-review,receipt-record,receipt-links}.integration.test.ts'
   - 'services/receipt-reader/**'
   - 'frontend/src/receipts/**'
   - 'frontend/src/stores/{receiptQueue,receiptDrafts}.ts'
   - 'frontend/src/composables/{useReceipts,useReceipt,useReceiptCapture}.ts'
-  - 'frontend/src/components/{Capture*,Receipt*,ItemPickSheet}.vue'
+  - 'frontend/src/components/{Capture*,Receipt*,ItemPickSheet,LinkReceiptSheet}.vue'
   - 'frontend/src/views/ReceiptView.vue'
-  - 'e2e/receipts.spec.ts'
-  - 'bin/fake-receipt-reader.mjs'
+  - 'e2e/{receipts,receipts-link}.spec.ts'
+  - 'bin/{fake-receipt-reader,fake-purs}.mjs'
 ---
 
 # Receipts: the photo, the reader, the lines
@@ -160,8 +162,8 @@ there is by the line's text only.
 currency; `moneyOfHundredths` turns them into the currency's minor units by its exponent. Quantities
 are thousandths. A float is a ratio that ranks candidates, never money.
 
-**The languages are the country's.** Armenia `hye+rus+eng`; Georgia and Serbia have their language
-files in the reader, and join when their currencies do (MOL-89). Every alphabet at once is slower and
+**The languages are the country's.** Armenia `hye+rus+eng`; Georgia has its language files in the
+reader, and joins with its card (MOL-248); Serbia is read by its link, not by the reader (MOL-232). Every alphabet at once is slower and
 mixes the scripts.
 
 ## What a line is (MOL-126)
@@ -478,6 +480,102 @@ in «Деньги» and an account, never «0 позиций» (Р-6; review 1, 
 «0 позиций», never a sum it has not got (А4b). **Two shots of one such receipt
 are two records** where the fiscal number was not read (Р-8, the price): «ԿՀ» is one and the same on both
 tills of one trader. End-to-end, the fake reader answers a square photo with such a receipt.
+
+## A Serbian receipt by its link (MOL-232)
+
+**A Serbian receipt is not read off a photo: it is asked of the tax office** (MOL-223, `.scratch/tasks/research/MOL-223.md`).
+Its QR code is the link of the tax office's check, `https://suf.purs.gov.rs/v/?vl=…`; asked for JSON —
+TAP's own mode, no authentication — it answers the seller and the journal, the tax office's own rendering
+of what the till sent. The journal laid out by Serbia's card gave 20 of 20 lines of three live receipts by
+every field, 78 of 78 on the 23 journals of MOL-229. A country's receipts come one way
+(`receiptSourceOf`): Armenia by photo, Serbia by link; reading the code off a photo is MOL-233.
+
+**`vl` is checked with no network, by one function for the phone and the server** (`serbianReceiptLink`): the
+host, a size of 572–848 bytes and the MD5 at its end — `md5Hex` in the domain, which has no `node:crypto` —
+and **a sale only**: a refund has nothing to record, a copy is the same purchase twice, a pro forma, a
+training or an advance receipt is no purchase. It carries the signed total (in ten-thousandths of a dinar,
+half up to the para), the moment and the number `requestedBy-signedBy-counter` — the receipt's head as it
+is taken, and its key against a second record (with the seller's tax number, as an Armenian one).
+
+**Only the JSON of the link is asked** (owner's В-1 «а»): one request a receipt. The page and its
+`/specifications` gave the same lines plus GTIN, through an undocumented POST that answered
+`success:false` two times of three from production; GTIN is MOL-234's.
+
+**The tax office has a queue of its own** (`readTaxReceipts`, the embeddings' runner, nudged when a link
+arrives), never the reader's: `claimNext` takes photos only. **People in turn**, the one asked about least in
+the last hour first; **twelve asks a minute, four a person** and a minute of silence after a failure of the
+service — the figures of Open Food Facts (Р-3); over the limit the round stops and the receipt waits, never
+refused. **A receipt not shown yet is no failure** — a receipt just printed shows in a minute or two, one
+of a till that was offline later: asked again after 1, 2, 4, 8, 15 and 30 minutes, then hourly
+(`receiptLinkRetryMinutes`), and `missing` once `RECEIPT_LINK_WAIT_HOURS` (48) passed since it arrived;
+`400` or `isValid: false` is `invalid` at once, and so is an answer about another receipt than the
+link signs (review 8); a journal with no list is `unreadable`. **A failure keeps what the link said** —
+its day, time, number and total (review 2, adversarial А1): wiped, the queue's own repeat of a send
+whose answer was lost met a 409 and the phone said «не принят» of a receipt the server held. A 404 pauses
+nobody; a 5xx, a timeout or an answer of another shape pauses everyone a minute — the price, since a fresh
+receipt sometimes answers 5xx too. **An answer that no longer reads — not JSON, or JSON of another shape —
+is also the owner's** (`onBroken` → `failures`, job `receipt-link`, review 4): otherwise every Serbian
+receipt waits its two days and fails as `missing` for a reason that is not the till's; a 5xx or a timeout
+is the weather, the log's alone.
+
+**The link lives in a table of its own, out of the nightly copy** (`receipt_links`, adversarial А4); a
+receipt restored without it fails as `unreadable` before the next ask. **A failed receipt by its link is
+told in the tax office's word, never a photo's** (adversarial Р2-1, Р2-2): the bot's notice carries
+`taxOffice` — `missing`, `invalid`, or `unread` for any other failure — decided by the API from the row's
+`source`, and the bot never says «переснять» of a receipt with no photo. `unread` asserts no cause: it
+covers a journal with no list, a link lost in a restore and a failure of ours alike, so neither the review
+nor the bot says «the tax office showed it with no list» — only that it was not read, with a record by
+hand or the link pasted again. **On the phone the sheet stays at
+work for a double tap** (`DOUBLE_TAP`, adversarial А3): the link is queued at once, and a sheet that went
+down on the first tap let the second through onto the tab bar — «Оценки» opened over the receipt just
+sent; a double click queued it twice.
+
+**The price, named** (adversarial А7): the trip of a receipt is placed by its printed day and time, read
+back on Belgrade's clock; in the hour lived twice on the last Sunday of October a receipt of the first
+02:30 is placed an hour late — the exact moment is in the link, and the link is not kept.
+
+**The journal's card** (`serbianJournal`): under «Назив Цена Кол. Укупно» a name runs over rows cut at
+the fortieth column, mid-word as often as not, to its tax label «(Ђ)»; the next row is «price quantity
+sum», «.» for thousands and «,» for the decimal — read as strings into hundredths and thousandths, no
+float. The unit is the last unit word of the name standing alone — `KG` a kilogram, `LIT` a litre,
+`KOM`, `KO`, `FL` a piece, «1KG» and «0.33L» being sizes; with none a fraction is weighed, and poured
+beside a bare «L» — **a bare «L» with a whole count is a piece** (review 5): «PIVO 0,5 L» × 2 is two
+bottles, never two litres at half the price of one. **A line paid less than price × quantity is
+discounted** (adversarial А2): the journal prints no row for a discount — «Pesto 440,00 × 4 = 1.408,00»,
+a fifth off — and the total is the sum of what was paid, so the difference is the line's discount and
+the line settles; «≠» never stands on a line of the tax office. A line paid more is not settled.
+
+**A line finds its item by the shop's memory, then by its name whole** (owner's В-3 «а»): `serbianItemName`
+— the printed name less its unit word and the till's article at either end (a GTIN or a chain's code
+opening it, «383841701269 KESICA…», «[528195] KASIKA…», adversarial А5), set as a sentence — searched
+with its meaning;
+near is `search`, far `weak`, nothing `new`, named so. **Measured on the 98 lines against the seed**
+(`.scratch/tasks/status/MOL-232/bench-binding.md`): 14 near, 12 of them right, 2 far, 82 new. Asked again by
+its first two words and its first, the search added 34 far lines, some 30 wrong — «UBRUS», paper towels, a
+vinegar — and a wrong «проверьте» taken at a glance is a wrong purchase, so it is not done. **A service is no product** (adversarial А6): «Достава» at 0,00, a tip «Напојница», a «Услуга» —
+`serbianServiceLine`, either script — is not searched for and goes «проверьте» with no item, for the
+person to leave out or record; a delivery at 0 recorded in silence would be an item's lowest price. **82 new of 98
+is the case for a dictionary of Serbian till words** as the Armenian one, a task of its own. The memory
+needs nothing new: the tax office prints a line the same every time, and the second receipt of a chain
+knows what the first was taught.
+
+**The place is the premises', not the chain's** (Р-7): a Serbian chain shares one tax number among
+hundreds of shops, so a receipt carries the premises' code and name (`shop_unit`, `shop`, from
+`locationName` «1113343-RODA MEGAMARKET 463») and its place is the one that premises' receipts were
+recorded at — whatever city, while a photo's stays by city. **A place still keeps no tax number.** A new
+place is proposed by the shop's name; the city is the municipality's, Belgrade or Novi Sad, else the
+person's own — the price: a receipt of Niš proposes their city.
+
+**The measure of 0.2 is the reader's** (Р-5): a receipt by its link writes nothing to `receipt_days`,
+read, failed or recorded — by the row's `source`, never guessed from the country (review 7) — until MOL-234 gives it a line of its own — its lines have nothing to put right,
+and counted with OCR's they would thin the stop line.
+
+**On the phone** (owner's В-2 «а»; Р-9 at the merge): until MOL-233 reads the code, the link is pasted — the system camera
+opens the tax office's page, its address is copied — into «Чек по ссылке» (`LinkReceiptSheet`), offered
+in «Покупки» beside «Записать вручную» to a person whose country is Serbia; every other screen keeps the
+version «без чека». The sheet says why a paste is no receipt by the very function of the server, and
+queues one write with no photo, delivered as it lands. The review says «Строки — из налоговой Сербии»,
+names the ПИБ, and has nothing of a photo — no «Переснять», no «Прочитали не всё», no «Фото удалим».
 
 ## The reader holds nothing
 

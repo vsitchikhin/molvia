@@ -69,6 +69,7 @@ import {
   receiptCountrySchema,
   receiptFailureSchema,
   receiptHeardSchema,
+  receiptSourceSchema,
   receiptParsedMatchSchema,
   receiptStatusSchema,
   storeMemoryKindSchema,
@@ -99,6 +100,7 @@ import type {
   AppLocale,
   ReceiptCountry,
   ReceiptFailure,
+  ReceiptSource,
   ReceiptHeard,
   ReceiptParsedMatch,
   ReceiptStatus,
@@ -2416,8 +2418,12 @@ export const receipts = pgTable(
       .references(() => actors.id, { onDelete: 'cascade' }),
     status: text('status').$type<ReceiptStatus>().notNull(),
     failure: text('failure').$type<ReceiptFailure>(),
+    // A photo read by our reader, or a Serbian receipt's link asked of the tax office (MOL-232).
+    source: text('source').$type<ReceiptSource>().notNull().default('photo'),
     parts: smallint('parts').notNull(),
     country: char('country', { length: 2 }).$type<ReceiptCountry>().notNull(),
+    // When the tax office is asked next about a receipt it did not show yet (MOL-232, Р-2).
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
     // The language the lines are to be read out in: the interface's, which nothing else keeps (П-4).
     language: text('language').$type<AppLocale>().notNull(),
     currency: char('currency', { length: 3 }).$type<Currency>().notNull(),
@@ -2429,12 +2435,17 @@ export const receipts = pgTable(
     queuedAt: timestamp('queued_at', { withTimezone: true }),
     readingAt: timestamp('reading_at', { withTimezone: true }),
     readAt: timestamp('read_at', { withTimezone: true }),
-    // Readings begun: one cut short by a restart is begun again, twice at most.
+    // Readings begun: one cut short by a restart is begun again, twice at most. Of a receipt by its
+    // link, the asks of the tax office (MOL-232).
     attempts: smallint('attempts').notNull().default(0),
     // Tesseract and its language files, as the reader names them — which model read (MOL-169).
     readerVersion: text('reader_version'),
     layout: text('layout').$type<ReceiptLayout>(),
     tin: text('tin'),
+    // A Serbian seller's premises: the tax office's code of one shop of a chain, whose every shop
+    // shares the tax number, and the shop's own name, what a new place is proposed as (MOL-232, Р-7).
+    shopUnit: text('shop_unit'),
+    shop: text('shop'),
     printedOn: date('printed_on'),
     printedTime: text('printed_time'),
     receiptNo: text('receipt_no'),
@@ -2467,6 +2478,12 @@ export const receipts = pgTable(
     index('receipts_queue_idx')
       .on(table.queuedAt)
       .where(sql`${table.status} = 'queued' and ${table.deletedAt} is null`),
+    // The receipts by their link whose ask of the tax office is due (MOL-232).
+    index('receipts_link_queue_idx')
+      .on(table.nextAttemptAt)
+      .where(
+        sql`${table.source} = 'tax' and ${table.status} = 'queued' and ${table.deletedAt} is null`,
+      ),
     // The bot's claim (MOL-129): receipts read that nobody has been told of yet, by when they were.
     index('receipts_untold_idx')
       .on(table.readAt)
@@ -2483,9 +2500,17 @@ export const receipts = pgTable(
       'receipts_failure_of_failed',
       sql`(${table.status} = 'failed') = (${table.failure} is not null)`,
     ),
+    check('receipts_source_known', oneOf(table.source, receiptSourceSchema.options)),
+    // A photo has its parts; a receipt by its link has none (MOL-232).
     check(
       'receipts_parts_range',
-      sql`${table.parts} between 1 and ${sql.raw(String(RECEIPT_PARTS_MAX))}`,
+      sql`(${table.source} = 'photo' and ${table.parts} between 1 and ${sql.raw(String(RECEIPT_PARTS_MAX))})
+          or (${table.source} = 'tax' and ${table.parts} = 0)`,
+    ),
+    // A receipt by its link waiting in the tax office's queue knows when it is asked next (MOL-232).
+    check(
+      'receipts_asked_when_queued',
+      sql`${table.source} = 'photo' or ${table.status} <> 'queued' or ${table.nextAttemptAt} is not null`,
     ),
     check('receipts_country_known', oneOf(table.country, receiptCountrySchema.options)),
     check('receipts_language_known', oneOf(table.language, LOCALES)),
@@ -2514,6 +2539,20 @@ export const receipts = pgTable(
     ),
   ],
 )
+
+/**
+ * The link of a Serbian receipt by its QR code (MOL-232), kept only while the tax office is still to be
+ * asked: the buyer's tax id may be in it (Р-4) — read, refused or given up, the row is deleted in the
+ * same statement. **A table of its own so the nightly copy leaves it out** (`backup.sh`, adversarial А4),
+ * as a photo's: a receipt waits up to two days, and a copy kept fourteen would keep the link longer than
+ * `/privacy` says. A restore brings it back empty, and a receipt left without its link fails.
+ */
+export const receiptLinks = pgTable('receipt_links', {
+  receiptId: uuid('receipt_id')
+    .primaryKey()
+    .references(() => receipts.id, { onDelete: 'cascade' }),
+  link: text('link').notNull(),
+})
 
 /**
  * A receipt's photo, part by part, top to bottom (MOL-124 В-1): the JPEG the phone cropped to the

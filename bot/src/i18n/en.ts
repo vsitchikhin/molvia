@@ -83,6 +83,12 @@ export const en: Dictionary = {
     'Your receipt from {date} is ready: it lists no items — you can save its total.',
   'receipt.failed':
     'We couldn’t read your receipt from {date}. You can retake it or add the purchases by hand.',
+  'receipt.link_missing':
+    'The tax office never showed your receipt from {date}. This happens when the till worked offline. You can add the purchases by hand.',
+  'receipt.link_invalid':
+    'The tax office does not accept your receipt from {date}. You can add the purchases by hand.',
+  'receipt.link_unread':
+    'Your receipt from {date} could not be read. You can add the purchases by hand or paste the receipt’s link again.',
   'receipt.duplicate':
     'Your {place} receipt is read, but it is saved already — no need to save it again.',
   'receipt.duplicate_no_place':

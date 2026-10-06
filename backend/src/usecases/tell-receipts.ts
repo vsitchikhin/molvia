@@ -88,8 +88,19 @@ function noticeOf(told: UntoldReceipt, placeName: string | null, duplicate: bool
     day: receipt.header?.date ?? localClock(receipt.capturedAt, zone).day,
     lineCount: receipt.lineCount,
     duplicate,
+    taxOffice: taxOfficeOf(told),
     silent: tellsQuietly(now, zone),
   })
+}
+
+/**
+ * What to tell of a Serbian receipt by its link that failed (MOL-232, adversarial Р2-1): never «не
+ * удалось прочитать, можно переснять» — it has no photo — but the tax office's own word, or that it
+ * was not read, with no cause asserted.
+ */
+function taxOfficeOf({ receipt, source }: UntoldReceipt): ReceiptNotice['taxOffice'] {
+  if (source !== 'tax' || receipt.status !== 'failed') return null
+  return receipt.failure === 'missing' || receipt.failure === 'invalid' ? receipt.failure : 'unread'
 }
 
 /** `GET /actors/me/receipt-notices` (MOL-129, В-2): whether «чек разобран» is turned off. */

@@ -298,7 +298,13 @@ describe('PurchasesView (MOL-128)', () => {
             capturedAt: new Date('2026-09-26T16:00:00.000Z'),
             country: 'AM',
             language: 'ru',
-            header: { tin: '12345678', date: '2026-09-26', time: '16:30', receiptNo: null },
+            header: {
+              tin: '12345678',
+              date: '2026-09-26',
+              time: '16:30',
+              receiptNo: null,
+              shop: null,
+            },
             total: { minor: 170_000n, currency: 'AMD' },
             balanced: false,
             lineCount: 0,
@@ -311,6 +317,51 @@ describe('PurchasesView (MOL-128)', () => {
       const { view } = await render()
       expect(view.text()).toContain('без товаров · 26 сент.')
       expect(view.text()).not.toContain('0 позиций')
+    })
+
+    it('чек по ссылке (MOL-232): «по ссылке · спрашиваем налоговую», затем отказ налоговой', async () => {
+      const serbian = {
+        id: 'cccccccc-0000-4000-8000-000000000002',
+        status: 'queued' as const,
+        failure: null,
+        parts: 0,
+        received: 0,
+        capturedAt: new Date('2026-09-26T16:00:00.000Z'),
+        country: 'RS' as const,
+        language: 'ru' as const,
+        header: {
+          tin: null,
+          date: '2026-09-26',
+          time: '18:00',
+          receiptNo: 'TESTAAAA-TESTBBBB-1',
+          shop: null,
+        },
+        total: { minor: 48_637n, currency: 'RSD' as const },
+        balanced: false,
+        lineCount: 0,
+        unsettled: 0,
+        place: null,
+        tripId: null,
+      }
+      receipts.mockResolvedValue({ receipts: [serbian] })
+      const { view } = await render({ country: 'RS' })
+      expect(view.text()).toContain(ru.purchases.asking_tax_office)
+      view.unmount()
+      mounted.pop()
+
+      receipts.mockResolvedValue({
+        receipts: [{ ...serbian, status: 'failed' as const, failure: 'missing' as const }],
+      })
+      const again = await render({ country: 'RS' })
+      expect(again.view.text()).toContain(ru.purchases.missing_meta)
+    })
+
+    it('человек из Сербии видит «Чек по ссылке» рядом с «Записать вручную» (MOL-232)', async () => {
+      const { view } = await render({ country: 'RS' })
+      const words = view.findAll('button').map((one) => one.text())
+      expect(words).toContain(ru.purchases.capture_link)
+      expect(words).not.toContain(ru.purchases.capture)
+      expect(words).toContain(ru.purchases.manual_by_hand)
     })
 
     it('пока список чеков не ответил, «пусто» не говорится (ревью 7)', async () => {

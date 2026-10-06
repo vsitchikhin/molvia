@@ -9,6 +9,7 @@ import {
   receiptCityOf,
   receiptLineOf,
   receiptMomentOf,
+  receiptClockOf,
   storeMemoryWords,
   receiptTimeOf,
 } from '#model/entities/receipt'
@@ -355,6 +356,30 @@ describe('the moment a receipt prints', () => {
   it('is none without a time a clock shows', () => {
     expect(receiptMomentOf('2026-09-26', null, 'AM')).toBeNull()
     expect(receiptMomentOf('2026-09-26', '25:00', 'AM')).toBeNull()
+  })
+
+  it('places a Serbian receipt by Belgrade’s clock, summer time and winter (MOL-232)', () => {
+    expect(receiptMomentOf('2025-07-18', '08:56', 'RS')).toEqual(new Date('2025-07-18T06:56:00Z'))
+    expect(receiptMomentOf('2026-01-06', '08:57', 'RS')).toEqual(new Date('2026-01-06T07:57:00Z'))
+    // the hour the clock goes forward and the one it goes back, 29 March and 25 October 2026
+    expect(receiptMomentOf('2026-03-29', '03:30', 'RS')).toEqual(new Date('2026-03-29T01:30:00Z'))
+    expect(receiptMomentOf('2026-10-25', '01:30', 'RS')).toEqual(new Date('2026-10-24T23:30:00Z'))
+  })
+
+  it('reads the till’s day and time off a moment, by the country’s zone', () => {
+    expect(receiptClockOf(new Date('2025-07-18T06:56:53.834Z'), 'RS')).toEqual({
+      day: '2025-07-18',
+      time: '08:56',
+    })
+    // past midnight in Belgrade is still the evening before in UTC
+    expect(receiptClockOf(new Date('2026-01-05T23:30:00Z'), 'RS')).toEqual({
+      day: '2026-01-06',
+      time: '00:30',
+    })
+    expect(receiptClockOf(new Date('2026-09-26T15:42:00Z'), 'AM')).toEqual({
+      day: '2026-09-26',
+      time: '19:42',
+    })
   })
 })
 

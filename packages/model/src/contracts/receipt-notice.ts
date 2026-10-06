@@ -24,6 +24,12 @@ export const receiptNoticeSchema = z.strictObject({
    * review says «уже записан», so the message must not say «запишите».
    */
   duplicate: z.boolean(),
+  /**
+   * A Serbian receipt by its link that failed (MOL-232, adversarial Р2-1): what to tell of it, since it
+   * has no photo to read or retake — the tax office never showed it (`missing`), does not accept it
+   * (`invalid`), or it could not be read at all (`unread`). `null` for everything else.
+   */
+  taxOffice: z.enum(['missing', 'invalid', 'unread']).nullable(),
   /** Night in the person's zone: the message comes without a sound. */
   silent: z.boolean(),
 })

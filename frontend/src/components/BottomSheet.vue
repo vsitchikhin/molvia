@@ -44,7 +44,7 @@ import { useSheetDrag } from '@/composables/useSheetDrag'
 import { pageAnchor, sheetOpener, useSheetHistory } from '@/composables/useSheetHistory'
 
 /** A double tap lands within this — a platform convention, not a design token. */
-const DOUBLE_TAP = 300
+export const DOUBLE_TAP = 300
 
 /**
  * The sheet of 0.1: it rises from the bottom over the screen, which stays visible behind the

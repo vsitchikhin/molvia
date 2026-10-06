@@ -177,6 +177,7 @@ const file: ExportFile = {
       id: id(30),
       status: 'parsed',
       failure: null,
+      source: 'photo',
       parts: 2,
       country: 'AM',
       language: 'ru',
@@ -189,7 +190,10 @@ const file: ExportFile = {
       attempts: 1,
       readerVersion: 'tesseract 5.5.0 · dc2c9f36ac9d',
       layout: 'card',
+      nextAttemptAt: null,
       tin: '01282006',
+      shopUnit: null,
+      shop: null,
       printedOn: '2026-09-30',
       printedTime: '15:03',
       receiptNo: '21410811',
@@ -353,7 +357,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(14)
+    expect(wire.version).toBe(15)
     expect(wire.account.consentedAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.account.analyticsOnAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.receipts[0]?.lines[0]?.quantity).toEqual({ value: '2.000', unit: 'piece' })

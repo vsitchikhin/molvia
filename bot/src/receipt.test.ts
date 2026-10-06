@@ -19,6 +19,7 @@ const notice = (patch: Partial<ReceiptNotice> = {}): ReceiptNotice => ({
   day: '2026-09-27',
   lineCount: 7,
   duplicate: false,
+  taxOffice: null,
   silent: false,
   ...patch,
 })
@@ -96,6 +97,26 @@ describe('текст «чек разобран» (хендофф 08)', () => {
     expect(receiptText(notice({ lineCount: 0, language: 'en', place: null }))).toBe(
       'Your receipt from 27 September is ready: it lists no items — you can save its total.',
     )
+  })
+
+  it('сербский чек по ссылке — слово налоговой, не «переснять» (MOL-232, адверсариал Р2-1)', () => {
+    const failed = { outcome: 'failed' as const, place: null, lineCount: 0, day: '2025-07-18' }
+    expect(receiptText(notice({ ...failed, taxOffice: 'missing' }))).toBe(
+      'Налоговая так и не показала чек от 18 июля. Так бывает, если касса работала без связи. Покупки можно записать вручную.',
+    )
+    expect(receiptText(notice({ ...failed, taxOffice: 'invalid' }))).toBe(
+      'Налоговая не признаёт чек от 18 июля. Покупки можно записать вручную.',
+    )
+    expect(receiptText(notice({ ...failed, taxOffice: 'unread' }))).toBe(
+      'Чек от 18 июля разобрать не удалось. Покупки можно записать вручную или вставить ссылку с чека ещё раз.',
+    )
+    for (const taxOffice of ['missing', 'invalid', 'unread'] as const) {
+      for (const language of ['ru', 'en'] as const) {
+        const text = receiptText(notice({ ...failed, taxOffice, language }))
+        expect(text).not.toMatch(/пересн|retake/iu)
+      }
+      expect(receiptMessage(notice({ ...failed, taxOffice }), APP).keyboard).toBeDefined()
+    }
   })
 
   it('8b · не разобран — дата, без числа позиций', () => {

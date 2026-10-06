@@ -6,10 +6,13 @@ import {
   placeSchema,
   RECEIPT_CURRENCY,
   RECEIPT_KEEP_DAYS,
+  RECEIPT_LINK_WAIT_HOURS,
   RECEIPT_READ_ATTEMPTS,
   RECEIPT_TELL_AFTER_SECONDS,
   RECEIPT_TELL_WITHIN_HOURS,
   RECEIPT_UNDO_MINUTES,
+  receiptClockOf,
+  serbianReceiptLink,
   withoutItems,
 } from '@molvia/model'
 import type {
@@ -18,6 +21,8 @@ import type {
   Place,
   ReceiptBody,
   ReceiptFailure,
+  ReceiptLinkBody,
+  ReceiptSource,
   ReceiptHeard,
   ReceiptLayout,
   ReceiptLine,
@@ -36,6 +41,7 @@ import {
   places,
   receiptLineImages,
   receiptLines,
+  receiptLinks,
   receiptDays,
   receiptParts,
   receipts,
@@ -58,7 +64,20 @@ export interface ClaimedReceipt {
   readonly parts: readonly { readonly position: number; readonly photo: Buffer }[]
 }
 
-/** What the reader made of the head of a receipt. */
+/**
+ * A receipt by its link taken to be asked of the tax office (MOL-232): whose, the link, when it
+ * arrived — the two days it is asked for run from it — and the asks so far, this one included.
+ */
+export interface ClaimedLink {
+  readonly id: string
+  readonly actorId: string
+  readonly country: ReceiptSummary['country']
+  readonly language: ReceiptSummary['language']
+  readonly link: string
+  readonly attempts: number
+}
+
+/** What the reader made of the head of a receipt, or the tax office said of it (MOL-232). */
 export interface ReceiptHead {
   readonly tin: string | null
   readonly printedOn: string | null
@@ -66,9 +85,13 @@ export interface ReceiptHead {
   readonly receiptNo: string | null
   readonly totalMinor: bigint | null
   readonly balanced: boolean
-  readonly layout: ReceiptLayout
+  /** How a photo's lines were laid out; a receipt by its link has none. */
+  readonly layout: ReceiptLayout | null
   /** The city of the settings its address prints (MOL-126, Р-6). */
   readonly city: ReceiptCity | null
+  /** A Serbian seller's premises: its code and the shop's name (MOL-232); a photo's head reads none. */
+  readonly shopUnit?: string | null
+  readonly shop?: string | null
 }
 
 /** What the parse found a line to be (MOL-126): an item and how, and the line word by word. */
@@ -118,6 +141,10 @@ export interface StoredReceipt {
   readonly receipt: ReceiptSummary
   readonly currency: Currency
   readonly city: ReceiptCity | null
+  /** The premises of a Serbian seller, where its place is looked for first (MOL-232, Р-7). */
+  readonly shopUnit: string | null
+  /** A photo read by our reader, or a Serbian receipt's link asked of the tax office (MOL-232). */
+  readonly source: ReceiptSource
   /** How the person learned it was read (MOL-129); `null` — not yet, or not read. */
   readonly heard: ReceiptHeard | null
 }
@@ -129,6 +156,8 @@ export interface StoredReceipt {
  */
 export interface TinPlace {
   readonly tin: string
+  /** The premises the receipts were of, a Serbian seller's (MOL-232); `null` for a photo's. */
+  readonly shopUnit: string | null
   readonly place: Place
   /** When the person last recorded this seller's receipt here; `null` — never. */
   readonly ownLatest: Date | null
@@ -158,6 +187,8 @@ export interface RecordedTwin {
 export interface ReceiptToRecord {
   readonly id: string
   readonly status: ReceiptSummary['status']
+  /** A photo read by our reader, or a Serbian receipt's link asked of the tax office (MOL-232). */
+  readonly source: ReceiptSource
   readonly country: ReceiptSummary['country']
   readonly currency: Currency
   readonly tin: string | null
@@ -317,6 +348,20 @@ export interface ReceiptRepository {
    * `unreadable` once it has had its attempts (`RECEIPT_READ_ATTEMPTS`).
    */
   retry(id: string): Promise<void>
+  /** Receipts by their link the last round did not finish asking about: queued again, the ask not counted. */
+  requeueInterruptedLinks(): Promise<void>
+  /**
+   * The next receipt by its link whose ask is due, now `reading`; `null` for none. People in turn, the
+   * one asked about least in the last hour first, as the reader's queue (MOL-232).
+   */
+  claimLink(): Promise<ClaimedLink | null>
+  /** Not asked — over the limit: back as it was, the ask not counted. */
+  releaseLink(id: string): Promise<void>
+  /**
+   * The tax office does not show it yet: asked again in `minutes`, or failed as `missing` once
+   * `RECEIPT_LINK_WAIT_HOURS` have passed since it arrived — its link gone then (Р-2, Р-4).
+   */
+  askLater(id: string, minutes: number): Promise<'queued' | 'failed'>
   /**
    * The end of a reading. Written into a receipt removed meanwhile too — «Вернуть» brings it back
    * read; nothing happens to one no longer `reading`, or no longer there after the final purge.
@@ -358,7 +403,9 @@ function toSummary({
   recorded: trip,
 }: SummaryRow): ReceiptSummary {
   // a head is what a reading found; a receipt failed before any reading has none (review А11)
-  const read = [row.tin, row.printedOn, row.printedTime, row.receiptNo].some((v) => v !== null)
+  const read = [row.tin, row.printedOn, row.printedTime, row.receiptNo, row.shop].some(
+    (v) => v !== null,
+  )
   return {
     id: row.id,
     status: row.status,
@@ -374,6 +421,7 @@ function toSummary({
           date: row.printedOn,
           time: row.printedTime,
           receiptNo: row.receiptNo,
+          shop: row.shop,
         }
       : null,
     total: row.totalMinor === null ? null : { minor: row.totalMinor, currency: row.currency },
@@ -390,6 +438,8 @@ function toStored(found: SummaryRow): StoredReceipt {
     receipt: toSummary(found),
     currency: found.row.currency,
     city: found.row.city,
+    shopUnit: found.row.shopUnit,
+    source: found.row.source,
     heard: found.row.heard,
   }
 }
@@ -415,6 +465,29 @@ function toLine(row: typeof receiptLines.$inferSelect, currency: Currency): Stor
 }
 
 const capturedSame = (a: Date, b: Date) => a.getTime() === b.getTime()
+
+/**
+ * A receipt by its link as it is taken (MOL-232): straight into the tax office's queue, asked at once,
+ * with what the link itself says — its total, its moment on Belgrade's clock and its number — as its
+ * head. The body was checked at the door; a link that does not read here is a defect, not a refusal.
+ */
+function linkReceipt(body: ReceiptLinkBody) {
+  const read = serbianReceiptLink(body.link)
+  if (!read.ok) throw new Error(`a receipt's link passed the door and did not read: ${read.reason}`)
+  const clock = receiptClockOf(read.at, body.country)
+  const row = {
+    status: 'queued' as const,
+    source: 'tax' as const,
+    parts: 0,
+    queuedAt: sql`clock_timestamp()`,
+    nextAttemptAt: sql`clock_timestamp()`,
+    printedOn: clock.day,
+    printedTime: clock.time,
+    receiptNo: read.number,
+    totalMinor: read.total.minor,
+  }
+  return { link: read.link, row }
+}
 
 export function createReceiptRepository(db: Conn): ReceiptRepository {
   async function summaryOf(conn: Conn, id: string): Promise<ReceiptSummary> {
@@ -446,24 +519,37 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             .values({
               id: body.id,
               actorId,
-              status: 'uploading',
-              parts: body.parts,
               country: body.country,
               language: body.language,
               currency: RECEIPT_CURRENCY[body.country],
               capturedAt: body.capturedAt,
+              ...('link' in body
+                ? linkReceipt(body).row
+                : { status: 'uploading', parts: body.parts }),
             })
             .onConflictDoNothing({ target: receipts.id })
             .returning({ id: receipts.id })
-          if (inserted) return { receipt: await summaryOf(tx, body.id), created: true }
+          if (inserted) {
+            // the link in a table of its own, out of the nightly copy (adversarial А4)
+            if ('link' in body) {
+              await tx
+                .insert(receiptLinks)
+                .values({ receiptId: body.id, link: linkReceipt(body).link })
+            }
+            return { receipt: await summaryOf(tx, body.id), created: true }
+          }
 
           const [held] = await tx.select().from(receipts).where(eq(receipts.id, body.id)).limit(1)
-          // every field the body names, the country too — there will be more than one (MOL-89)
-          const fields = ['parts', 'country', 'language'] as const
+          // every field the body names, the country too — there will be more than one (MOL-89); a link
+          // by the receipt it names, since the link itself is gone once the receipt is read (MOL-232)
+          const fields = ['country', 'language'] as const
           const same =
             held?.actorId === actorId &&
             held.deletedAt === null &&
             fields.every((field) => held[field] === body[field]) &&
+            ('link' in body
+              ? held.source === 'tax' && held.receiptNo === linkReceipt(body).row.receiptNo
+              : held.source === 'photo' && held.parts === body.parts) &&
             capturedSame(held.capturedAt, body.capturedAt)
           if (!same) throw new DomainError(ERROR.CONFLICT)
           return { receipt: await summaryOf(tx, body.id), created: false }
@@ -649,6 +735,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
       return {
         id: row.id,
         status: row.status,
+        source: row.source,
         country: row.country,
         currency: row.currency,
         tin: row.tin,
@@ -763,6 +850,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
       if (tins.length === 0) return []
       const rows = await db.execute<{
         tin: string
+        shop_unit: string | null
         id: string
         kind: Place['kind']
         name: string
@@ -773,7 +861,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         voters: number
         latest: Date
       }>(sql`
-        select r.tin, p.id, p.kind, p.name, p.country, p.city, p.created_at,
+        select r.tin, r.shop_unit, p.id, p.kind, p.name, p.country, p.city, p.created_at,
           max(r.recorded_at) filter (where r.actor_id = ${actorId}) as own_latest,
           count(distinct r.actor_id)::int as voters,
           max(r.recorded_at) as latest
@@ -785,9 +873,10 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             tins.map((tin) => sql`${tin}`),
             sql`, `,
           )})
-        group by r.tin, p.id`)
+        group by r.tin, r.shop_unit, p.id`)
       return rows.map((row) => ({
         tin: row.tin,
+        shopUnit: row.shop_unit,
         place: placeSchema.parse({
           id: row.id,
           kind: row.kind,
@@ -900,7 +989,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             failure: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then 'unreadable' end`,
             readAt: sql`case when ${receipts.attempts} >= ${RECEIPT_READ_ATTEMPTS} then clock_timestamp() end`,
           })
-          .where(eq(receipts.status, 'reading'))
+          // the reader's own: a receipt by its link has no reading to begin again (MOL-232)
+          .where(and(eq(receipts.status, 'reading'), eq(receipts.source, 'photo')))
           .returning({ status: receipts.status })
         const failed = moved.filter((row) => row.status === 'failed').length
         if (failed > 0) await tally(tx, { unreadable: sql`${failed}::int` }, today())
@@ -913,7 +1003,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         // a person's next receipt waits behind everyone else's first (review А10)
         const [next] = await tx.execute<{ id: string }>(sql`
           select waiting.id from ${receipts} waiting
-          where waiting.status = 'queued' and waiting.deleted_at is null
+          where waiting.status = 'queued' and waiting.source = 'photo' and waiting.deleted_at is null
           order by (
             select count(*) from ${receipts} served
             where served.actor_id = waiting.actor_id
@@ -987,24 +1077,38 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             failure: outcome.kind === 'failed' ? outcome.failure : null,
             readAt: sql`clock_timestamp()`,
             readerVersion: outcome.readerVersion,
-            layout: head?.layout ?? null,
-            tin: head?.tin ?? null,
-            printedOn: head?.printedOn ?? null,
-            printedTime: head?.printedTime ?? null,
-            receiptNo: head?.receiptNo ?? null,
-            totalMinor: head?.totalMinor ?? null,
-            balanced: head?.balanced ?? false,
-            city: head?.city ?? null,
+            // no head read leaves the head there is: a photo's has none before its reading, and a
+            // receipt by its link keeps what the link said — its day, number and total (review 2)
+            ...(head === null
+              ? {}
+              : {
+                  layout: head.layout,
+                  tin: head.tin,
+                  printedOn: head.printedOn,
+                  printedTime: head.printedTime,
+                  receiptNo: head.receiptNo,
+                  totalMinor: head.totalMinor,
+                  balanced: head.balanced,
+                  city: head.city,
+                  shopUnit: head.shopUnit ?? null,
+                  shop: head.shop ?? null,
+                }),
+            nextAttemptAt: null,
           })
           .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
-          .returning({ id: receipts.id })
+          .returning({ id: receipts.id, source: receipts.source })
         if (done === undefined) return
+        // read or failed, the link of a receipt by its QR code is no longer kept (MOL-232, Р-4)
+        await tx.delete(receiptLinks).where(eq(receiptLinks.receiptId, id))
+        // the measure of 0.2 is the reader's (MOL-222): a receipt from the tax office has nothing in it
+        // to put right, and until MOL-234 gives it a line of its own it counts nothing (Р-5)
+        const counted = done.source === 'photo'
         // a reading is written whole: what an earlier one left goes first
         await tx.delete(receiptLines).where(eq(receiptLines.receiptId, id))
         await tx.delete(receiptLineImages).where(eq(receiptLineImages.receiptId, id))
         if (outcome.kind !== 'parsed') {
           const failed = outcome.failure === 'reshoot' ? 'reshoot' : 'unreadable'
-          await tally(tx, { [failed]: sql`1` }, today())
+          if (counted) await tally(tx, { [failed]: sql`1` }, today())
           return
         }
         if (outcome.lines.length > 0) {
@@ -1038,7 +1142,99 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           : outcome.partly
             ? { readPartly: sql`1` }
             : { read: sql`1` }
-        await tally(tx, read, today())
+        if (counted) await tally(tx, read, today())
+      })
+    },
+
+    async requeueInterruptedLinks() {
+      await db.transaction(async (tx) => {
+        await tx
+          .update(receipts)
+          .set({
+            status: 'queued',
+            attempts: sql`greatest(${receipts.attempts} - 1, 0)`,
+            nextAttemptAt: sql`clock_timestamp()`,
+          })
+          .where(and(eq(receipts.status, 'reading'), eq(receipts.source, 'tax')))
+        // restored from a nightly copy, which holds no link (adversarial А4): nothing to ask with
+        await tx
+          .update(receipts)
+          .set({
+            status: 'failed',
+            failure: 'unreadable',
+            readAt: sql`clock_timestamp()`,
+            nextAttemptAt: null,
+          })
+          .where(
+            sql`${receipts.source} = 'tax' and ${receipts.status} = 'queued'
+              and not exists (select 1 from ${receiptLinks} where ${receiptLinks.receiptId} = ${receipts.id})`,
+          )
+      })
+    },
+
+    async claimLink() {
+      return db.transaction(async (tx) => {
+        const [next] = await tx.execute<{ id: string }>(sql`
+          select waiting.id from ${receipts} waiting
+          where waiting.source = 'tax' and waiting.status = 'queued' and waiting.deleted_at is null
+            and waiting.next_attempt_at <= clock_timestamp()
+          order by (
+            select count(*) from ${receipts} served
+            where served.actor_id = waiting.actor_id and served.source = 'tax'
+              and served.reading_at > clock_timestamp() - interval '1 hour'
+          ), waiting.next_attempt_at, waiting.id
+          limit 1
+          for update skip locked`)
+        if (next === undefined) return null
+        const [claimed] = await tx
+          .update(receipts)
+          .set({
+            status: 'reading',
+            readingAt: sql`clock_timestamp()`,
+            attempts: sql`${receipts.attempts} + 1`,
+          })
+          .where(and(eq(receipts.id, next.id), eq(receipts.status, 'queued')))
+          .returning({
+            id: receipts.id,
+            actorId: receipts.actorId,
+            country: receipts.country,
+            language: receipts.language,
+            attempts: receipts.attempts,
+          })
+        if (claimed === undefined) return null
+        const [held] = await tx
+          .select({ link: receiptLinks.link })
+          .from(receiptLinks)
+          .where(eq(receiptLinks.receiptId, claimed.id))
+        // a receipt that lost its link is failed before the next round asks (`requeueInterruptedLinks`)
+        return held === undefined ? null : { ...claimed, link: held.link }
+      })
+    },
+
+    async releaseLink(id) {
+      await db
+        .update(receipts)
+        .set({ status: 'queued', attempts: sql`greatest(${receipts.attempts} - 1, 0)` })
+        .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+    },
+
+    async askLater(id, minutes) {
+      const over = sql`${receipts.createdAt} <= clock_timestamp() - make_interval(hours => ${RECEIPT_LINK_WAIT_HOURS})`
+      return db.transaction(async (tx) => {
+        const [moved] = await tx
+          .update(receipts)
+          .set({
+            status: sql`case when ${over} then 'failed' else 'queued' end`,
+            failure: sql`case when ${over} then 'missing' end`,
+            readAt: sql`case when ${over} then clock_timestamp() end`,
+            nextAttemptAt: sql`case when ${over} then null else clock_timestamp() + make_interval(mins => ${minutes}) end`,
+          })
+          .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+          .returning({ status: receipts.status })
+        if (moved?.status !== 'failed') return 'queued'
+        // given up, the link is no longer kept (Р-4)
+        await tx.delete(receiptLinks).where(eq(receiptLinks.receiptId, id))
+        return 'failed'
       })
     },
   }

@@ -166,6 +166,10 @@ needs to be connected before people can use the complete flow.
 every question the API asks it about a code the catalogue missed (MOL-162). Empty or absent, the
 name hint is off; nothing else depends on it.
 
+`PURS_CONTACT` is the same for the Serbian tax office: sent in the User-Agent of every ask of its check
+of a receipt by the link of its QR code (MOL-232). Empty or absent, such receipts are taken and wait
+in the queue until it is set.
+
 Set `TELEGRAM_BOT_USERNAME` without `@` and generate `BOT_API_SECRET` using the command in
 `.env.prod.example`. This secret belongs to the internal API channel and is **not** the
 Telegram bot token. The backend and bot receive the same internal secret; only the bot
@@ -597,6 +601,10 @@ key never comes to this machine — a compromised server cannot read old copies.
   dumped without their data. A photo carries a customer's name and lives until its receipt is
   recorded; a copy would keep it fourteen days. After a restore those tables are empty — a receipt
   still queued fails as unreadable, one read keeps its lines.
+- **No link of a Serbian receipt is in a copy** (MOL-232, adversarial А4): `receipt_links` is dumped
+  without its data. A link may carry the buyer's tax id and lives only until the tax office answered —
+  up to two days. After a restore a receipt still waiting for the tax office fails as unreadable, and
+  the person pastes its link again.
 - **No picture of a message to the developer is in a copy** (MOL-167, В-1): `feedback_picture_files`
   is dumped without its data. A picture lives only until the owner's Telegram has it, a week at most.
   Its line — `feedback_pictures` — is copied, so after a restore a message still says what it had,

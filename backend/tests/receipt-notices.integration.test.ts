@@ -210,6 +210,7 @@ describe('POST /internal/receipts/claim', () => {
       day: '2026-10-03',
       lineCount: 7,
       duplicate: false,
+      taxOffice: null,
       silent: false,
     })
     expect(await heardOf(id)).toMatchObject({ heard: 'bot' })

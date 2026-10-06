@@ -68,6 +68,16 @@ const envSchema = z.object({
     .optional()
     .transform((contact) => (contact === '' ? undefined : contact)),
   /**
+   * The address the Serbian tax office may reach us at, sent in every ask of its check of a receipt
+   * (MOL-232, Р-6), as Open Food Facts'. Without it receipts by their link are taken and wait — copies,
+   * CI and the tests never ask the real tax office; production sets it in its `.env`.
+   */
+  PURS_CONTACT: z
+    .string()
+    .regex(/^[\x20-\x7e]*$/)
+    .optional()
+    .transform((contact) => (contact === '' ? undefined : contact)),
+  /**
    * The search by meaning (MOL-105): its model is loaded at boot and the writer fills the vectors.
    * On by default, so production cannot forget it; end-to-end switches it off — the search must
    * hold without it, and that run is the proof.
@@ -116,6 +126,16 @@ const envSchema = z.object({
    */
   OPEN_FOOD_FACTS_PER_MINUTE: z.preprocess(
     // Empty is unset, as for the contact: `z.coerce` made it 0, and the API would not start.
+    (value) => (value === '' ? undefined : value),
+    z.coerce.number().int().positive().optional(),
+  ),
+  /** Where the tax office's check is asked; end-to-end points it at a fake of its own (MOL-232). */
+  PURS_URL: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.url({ protocol: /^https?$/ }).optional(),
+  ),
+  /** Asks a minute of the tax office — end-to-end only, as `OPEN_FOOD_FACTS_PER_MINUTE`. */
+  PURS_PER_MINUTE: z.preprocess(
     (value) => (value === '' ? undefined : value),
     z.coerce.number().int().positive().optional(),
   ),

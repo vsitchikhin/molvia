@@ -2,12 +2,15 @@ import { z } from 'zod'
 import { deviceIdSchema, isoDate } from './trip'
 import {
   RECEIPT_PARTS_MAX,
+  linkReceiptCountrySchema,
+  photoReceiptCountrySchema,
   receiptCountrySchema,
   receiptFailureSchema,
   receiptMatchSchema,
   receiptStatusSchema,
 } from '#model/entities/receipt'
 import { newItemSchema } from '#model/entities/item'
+import { serbianReceiptLink } from '#model/entities/receipt-link'
 import { newPlaceSchema } from '#model/entities/place'
 import { ERROR } from '#model/support/errors'
 import { LOCALES } from '#model/support/locale'
@@ -25,14 +28,36 @@ import { quantityCodec } from '#model/values/units'
  * otherwise know (П-4, MOL-55). `country` is where it was bought: it picks the reader's alphabets
  * and the currency.
  */
-export const receiptBodySchema = z.strictObject({
+export const receiptPhotoBodySchema = z.strictObject({
   id: deviceIdSchema,
   parts: z.int().min(1).max(RECEIPT_PARTS_MAX),
-  country: receiptCountrySchema,
+  country: photoReceiptCountrySchema,
   language: z.enum(LOCALES),
   capturedAt: isoDate,
 })
+
+/** Past any link of the tax office's — 794–878 signs measured (MOL-223) — and short of a flood. */
+export const RECEIPT_LINK_LENGTH_MAX = 2_048
+
+/**
+ * A Serbian receipt by the link of its QR code (MOL-232), with no photo: the server asks the tax
+ * office for its lines. The link is checked at the door as the phone checked it before queueing it.
+ */
+export const receiptLinkBodySchema = z.strictObject({
+  id: deviceIdSchema,
+  link: z
+    .string()
+    .max(RECEIPT_LINK_LENGTH_MAX)
+    .refine((link) => serbianReceiptLink(link).ok, { error: ERROR.RECEIPT_LINK_INVALID }),
+  country: linkReceiptCountrySchema,
+  language: z.enum(LOCALES),
+  capturedAt: isoDate,
+})
+
+export const receiptBodySchema = z.union([receiptPhotoBodySchema, receiptLinkBodySchema])
 export type ReceiptBody = z.output<typeof receiptBodySchema>
+export type ReceiptPhotoBody = z.output<typeof receiptPhotoBodySchema>
+export type ReceiptLinkBody = z.output<typeof receiptLinkBodySchema>
 
 /** What the receipt prints at its head and foot, as read: the seller's tax number is its place (MOL-126). */
 export const receiptHeaderCodec = z.strictObject({
@@ -40,6 +65,11 @@ export const receiptHeaderCodec = z.strictObject({
   date: z.iso.date().nullable(),
   time: z.string().nullable(),
   receiptNo: z.string().nullable(),
+  /**
+   * The shop's own name, as the tax office names a Serbian receipt's premises — «RODA MEGAMARKET 463»
+   * (MOL-232): what a new place is proposed as. A photo's head reads none.
+   */
+  shop: z.string().nullable(),
 })
 
 /**
@@ -90,7 +120,8 @@ export const receiptSummaryCodec = z.strictObject({
   id: z.uuid(),
   status: receiptStatusSchema,
   failure: receiptFailureSchema.nullable(),
-  parts: z.int().min(1).max(RECEIPT_PARTS_MAX),
+  /** Parts of its photo; none for a receipt by its link (MOL-232). */
+  parts: z.int().min(0).max(RECEIPT_PARTS_MAX),
   /** Parts the server holds; fewer than `parts` while it is `uploading`. */
   received: z.int().min(0).max(RECEIPT_PARTS_MAX),
   capturedAt: isoDate,

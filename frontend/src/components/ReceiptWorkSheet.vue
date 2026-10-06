@@ -27,7 +27,9 @@
         <template #icon><IconDelete /></template>
         {{ t('purchases.delete') }}
       </AppButton>
-      <p class="note">{{ t('purchases.delete_note') }}</p>
+      <p class="note">
+        {{ t(row?.parts === 0 ? 'purchases.delete_note_link' : 'purchases.delete_note') }}
+      </p>
     </template>
   </BottomSheet>
 </template>
@@ -89,21 +91,23 @@ export default defineComponent({
 
     const body = computed(() => {
       const row = props.row
+      // a receipt by its link (MOL-232): no photo, the tax office asked by the server
+      const link = row?.parts === 0 ? 'link_' : ''
       switch (row?.state) {
         case 'sending':
-          return t('purchases.queued.sending')
+          return t(`purchases.queued.${link}sending`)
         case 'stuck':
           return t('purchases.queued.stuck')
         case 'rejected':
-          return t('purchases.queued.rejected', {
+          return t(`purchases.queued.${link}rejected`, {
             reason: t(
               `purchases.reasons.${rejectedReason(row.rejected?.code ?? 'error.internal')}`,
             ),
           })
         case 'waiting':
-          return t('purchases.queued.waiting')
+          return t(`purchases.queued.${link}waiting`)
         default:
-          return t('purchases.queued.parsing')
+          return t(`purchases.queued.${link}parsing`)
       }
     })
 

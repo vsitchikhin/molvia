@@ -25,9 +25,12 @@ export interface ReceiptTextLine {
   readonly hs: string | null
   /** The till's own article after the heading: «0401/1163909». */
   readonly sku: string | null
-  /** Thousandths of a kilogram or of a piece; null when nothing readable fits the unit. */
+  /**
+   * Thousandths of a kilogram, a litre or a piece; null when nothing readable fits the unit. An
+   * Armenian till is read in kilograms and pieces; a litre comes from a Serbian journal (MOL-232).
+   */
   readonly quantityMilli: number | null
-  readonly unit: 'kg' | 'piece'
+  readonly unit: 'kg' | 'l' | 'piece'
   readonly priceHundredths: number | null
   readonly sumHundredths: number | null
   readonly discountHundredths: number | null

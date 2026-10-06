@@ -64,6 +64,7 @@ import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
 import { mergeTick } from '@/usecases/merge-twins'
 import { readQueuedReceipts } from '@/usecases/read-receipts'
+import { readTaxReceipts } from '@/usecases/read-tax-receipts'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
 import { receiptSettled, recordReceipt } from '@/usecases/record-receipt'
 import type { ReadReport } from '@/usecases/read-receipts'
@@ -96,6 +97,8 @@ import { findByBarcode } from '@/usecases/find-by-barcode'
 import { hintByBarcode } from '@/usecases/hint-by-barcode'
 import { offUserAgent, openFoodFacts } from '@/open-food-facts/client'
 import type { OpenFoodFacts } from '@/open-food-facts/client'
+import { purs, pursUserAgent } from '@/purs/client'
+import type { Purs, PursError } from '@/purs/client'
 import { searchCatalogue } from '@/usecases/search-catalogue'
 import { signIn } from '@/usecases/sign-in'
 import { endSession, listSessions, logout } from '@/usecases/sessions'
@@ -329,6 +332,12 @@ export interface ServerOptions {
    */
   readonly openFoodFacts?: OpenFoodFacts | null
   /**
+   * The client of the Serbian tax office's check of a receipt (MOL-232), `null` for none: receipts by
+   * their link are taken and wait. Absent, it is built from the environment — on only where a contact
+   * is set: tests hand in a fake, and nothing but production asks the real tax office.
+   */
+  readonly purs?: Purs | null
+  /**
    * The model of the search by meaning (MOL-105), made with the server's log. Absent, there is
    * none and the search is by letters: the API's entry starts the real one from the environment,
    * and a test that needs it hands it in — every other test would load 200 MB for nothing.
@@ -367,6 +376,25 @@ const NAMED_BUILD = encodeURIComponent(VERSION)
  * since the base asks every client for one (В-4). A failure is logged by its reason — never the
  * code, which is what a person bought.
  */
+/**
+ * The client of the Serbian tax office the environment asks for (MOL-232): on only where a contact is
+ * set, as Open Food Facts'. A failure is logged by its reason — never the link, which may carry the
+ * buyer's tax id.
+ */
+function pursOf(log: FastifyBaseLogger, broken: (error: PursError) => void): Purs | null {
+  const contact = env.PURS_CONTACT
+  if (contact === undefined) return null
+  return purs({
+    onBroken: broken,
+    ...(env.PURS_URL === undefined ? {} : { url: env.PURS_URL }),
+    userAgent: pursUserAgent(VERSION, contact),
+    ...(env.PURS_PER_MINUTE === undefined ? {} : { perMinute: env.PURS_PER_MINUTE }),
+    onFailure: (reason) => {
+      log.warn({ reason }, 'tax office did not answer')
+    },
+  })
+}
+
 function openFoodFactsOf(log: FastifyBaseLogger): OpenFoodFacts | null {
   const contact = env.OPEN_FOOD_FACTS_CONTACT
   if (contact === undefined) return null
@@ -541,8 +569,15 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const removedAccounts = createMoneyAccountRepository(db)
     const receipts = createReceiptRepository(db)
     const reader = options.receiptReader ?? null
+    const taxOffice =
+      options.purs === undefined
+        ? pursOf(instance.log, (error) => {
+            failures.report(error, job('receipt-link'), 'tax office answer no longer reads')
+          })
+        : options.purs
     let stopReceiptCleanup: (() => Promise<void>) | undefined
     let receiptQueue: ReturnType<typeof startItemEmbedding> | undefined
+    let linkQueue: ReturnType<typeof startItemEmbedding> | undefined
     const messages = createFeedbackRepository(db)
     let stopCleanup: (() => Promise<void>) | undefined
     let stopExchangeCleanup: (() => Promise<void>) | undefined
@@ -739,6 +774,52 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         )
         receiptQueue = queue
       }
+      if (taxOffice !== null) {
+        // Serbian receipts by their link (MOL-232): a queue of their own — the tax office is asked, not
+        // the reader — on the same runner, nudged when a receipt arrives. Logged by counts only.
+        linkQueue = startItemEmbedding(
+          async () => {
+            await readTaxReceipts({
+              receipts,
+              purs: taxOffice,
+              bind: (claimed, lines) =>
+                bindReceiptLines(
+                  { items: createItemRepository(db), embedder },
+                  claimed.actorId,
+                  claimed.country,
+                  claimed.language,
+                  lines,
+                ),
+              report: (event) => {
+                if (event.kind === 'read') {
+                  instance.log.info(
+                    {
+                      status: event.status,
+                      failure: event.failure,
+                      lines: event.lines,
+                      asks: event.asks,
+                      ms: event.ms,
+                    },
+                    'receipt asked of the tax office',
+                  )
+                } else if (event.kind === 'not_yet') {
+                  instance.log.info(
+                    { asks: event.asks, status: event.status },
+                    'receipt not shown by the tax office yet',
+                  )
+                } else if (event.kind === 'bind_failed') {
+                  failures.report(event.error, job('receipt-binding'), 'receipt lines not bound')
+                } else {
+                  failures.report(event.error, job('receipt-link'), 'receipt by its link failed')
+                }
+              },
+            })
+          },
+          (error) => {
+            failures.report(error, job('receipt-link-queue'), 'receipt link queue failed')
+          },
+        )
+      }
       ready()
     })
     instance.addHook('onClose', async () => {
@@ -755,6 +836,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await itemEmbedding?.stop()
       await stopReceiptCleanup?.()
       await receiptQueue?.stop()
+      await linkQueue?.stop()
     })
     const actors = createActorRepository(db)
     const items = createItemRepository(db)
@@ -955,7 +1037,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         restore: (actor, id) => restoreIncome(tripData, actor, id),
       })
       receiptRoutes(guarded, {
-        send: (actorId, body) => sendReceipt(receipts, actorId, body),
+        send: async (actorId, body) => {
+          const sent = await sendReceipt(receipts, actorId, body)
+          // a receipt by its link is in the queue as it arrives: asked now, not in a minute
+          if (sent.created && sent.receipt.status === 'queued') linkQueue?.nudge()
+          return sent
+        },
         putPart: async (actorId, id, part, photo) => {
           const { receipt, queued } = await putReceiptPart(receipts, actorId, id, part, photo)
           if (queued) receiptQueue?.nudge()

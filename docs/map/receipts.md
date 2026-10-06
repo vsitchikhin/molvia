@@ -10,6 +10,10 @@ Rules: `.claude/rules/receipts.md`. A test beside its source, or mirroring it un
 - `packages/model/src/entities/receipt.ts` — A receipt's statuses and why one failed, its limits (four parts, the size of a part, 28 days), the countries read and their alphabets, `needsReshoot` (В-4) and the lines in the domain's money and quantities.
 - `packages/model/src/entities/receipt-sum.ts` — The arithmetic of a receipt under review, one on the phone and the server (MOL-124 В-6): a line adds up with its product rounded to the receipt's digits (П-2), what a line is recorded at (В-5), «Строки», the difference with the total and its suspect line, a price one confused digit off the memory's (В-1).
 - `packages/model/src/entities/receipt-match.ts` — `createLineMatcher`: a receipt line to a catalogue item by the item's names in the till's language, the customs heading ruling out what cannot be, a variety by the fat printed, the heading alone as a far match, a dish of a class of services as a far one (MOL-226); the gloss by the dictionary of till words — the port of MOL-114's `dict-match.mjs` (MOL-126).
+- `packages/model/src/entities/receipt-link.ts` — `serbianReceiptLink`: a Serbian receipt's link from its QR code read with no network (MOL-232) — the tax office's host, `vl` of a receipt's size with its MD5 holding, a sale only (a refund, a copy, a pro forma refused) — and the total, the moment and the number signed in it; nothing of the buyer.
+- `packages/model/src/entities/receipt-journal.ts` — `serbianJournal`: the lines of a Serbian receipt from the tax office's 40-column journal, Serbia's card ported from MOL-223 — the unit by the name's last unit word; `serbianItemName`, the name a line gives an item; `serbianShopOf`, the premises' code and the shop's name; `serbianCityOf`.
+- `packages/model/src/support/md5.ts` — `md5Hex`: MD5 of bytes in the domain, for the signature at the end of a Serbian receipt's link — no `node:crypto` there, and Web Crypto has none.
+- `packages/model/tests/entities/serbian-receipt.ts` — Test data: a Serbian receipt's link built and signed here and a journal under a head that names nobody (the repository is public), shared with the backend's and end-to-end tests.
 - `packages/model/src/contracts/receipt.ts` — «Отправить чек» and a receipt on the wire: the body named by the phone, the summary in «Покупки», the lines as read.
 
 ## packages/client
@@ -28,11 +32,17 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 - `backend/src/receipts/till-words-ru.ts` — The dictionary of Armenian till words in Russian (MOL-114's `words-hy-ru.json`): a line's gloss, a new item's proposed name, the query of the search when the names find nothing.
 - `backend/src/receipts/reader.ts` — The client of the receipt reader: a part read in a page mode, item lines cut out; `ReaderUnavailable` (nothing answered: the receipt waits), `ReaderDropped` (lost on the photo: counted, to the end), `PhotoUnreadable` (it fails).
 
+## backend · purs
+
+- `backend/src/purs/client.ts` — The client of the Serbian tax office's check of a receipt (MOL-232): the link asked for JSON by the server with its own User-Agent, at most twelve a minute and four a person, a minute's pause after a failure of the service; the seller, the premises, the town, the number and the journal — never the cashier, the buyer or the payments; `found`, `not_yet`, `refused` or `skipped`.
+- `backend/tests/fixtures/purs/` — The check's answer as the live one is shaped (MOL-223), made up — a seller, a cashier and a buyer nobody is: found, and held not valid.
+
 ## backend · usecases
 
 - `backend/src/usecases/receipts.ts` — Use cases of the owner's side: send, a part checked to be a photo (`error.receipt_not_photo`, `error.receipt_too_large`), list and one with the place by tax number, one as the review shows it — the memory laid over, the amounts of В-5, a price in doubt, the rate of its day, the receipt recorded before (MOL-126) — remove, restore.
 - `backend/src/usecases/bind-receipt-lines.ts` — `bindReceiptLines`: the lines of a parsed receipt to items, once, in the queue (MOL-126) — the catalogue's names in the till's language with the heading, then the search by the gloss (near found, far «проверьте»), else a new item named by the gloss.
 - `backend/src/usecases/record-receipt.ts` — `recordReceipt`, «Записать» (MOL-126): the receipt as the phone holds it written in one transaction — a finished trip on the receipt's day at its rate, purchases, new items (MOL-12), the shop's memory, the place's tax number, the photo gone, the rows of lines recorded as read confirmed (В-4); a repeat is the same answer, a receipt recorded before a 409; `receiptSettled` — the trip a receipt is recorded as, or none, under the same locks, so a record still running is waited for (MOL-169, Г1).
+- `backend/src/usecases/read-tax-receipts.ts` — `readTaxReceipts`: the queue of Serbian receipts by their link (MOL-232) — each due ask, people in turn, of the tax office; the journal laid out into lines and bound, the seller, the premises and the town written, the link let go; not shown yet — asked again on the ladder, `missing` after two days; refused — `invalid`; over the limit the round stops.
 - `backend/src/usecases/read-receipts.ts` — `readQueuedReceipts`: the queue — every part in both page modes, joined, the reading that adds up kept, «переснимите» by `needsReshoot`, item lines cut out, the city of the address read, the lines bound (MOL-126); a reader away leaves the receipt queued, a photo it cannot read fails.
 
 ## backend · db
@@ -45,6 +55,7 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 
 - `backend/tests/receipt-review.integration.test.ts` — Integration test of the review (MOL-126): the memory's own word, majority, tie and erased vote; the memory laid over the parse; В-5 and В-1; the place by tax number and city; the receipt recorded before; the rate of the receipt's day.
 - `backend/tests/receipt-record.integration.test.ts` — Integration test of «Записать»: the trip on the receipt's day, purchases and new items, memory and the place's tax number, the photo and the rows left, «Деньги» and «Оценки», a repeat, the receipt recorded before, the refusals, the lines left out in the trip's money.
+- `backend/tests/receipt-links.integration.test.ts` — Integration test of receipts by their link (MOL-232): the door and its refusals, the head off the link, the queue against a fake tax office — read, not yet and the ladder, two days, refused, the limit, people in turn, an ask begun again — `receipt_days` untouched, the search by the line's name, «Записать» in dinars, the place by the premises, the memory, the same receipt twice, the server's own queue.
 - `backend/tests/receipts.integration.test.ts` — Integration test of receipts: sending and parts with their refusals and repeats, the queue on the bench's reading of am-05 with a fake reader, «переснимите», a reader away, removal and the 28 days, the log through the server.
 
 ## services · receipt-reader
@@ -60,7 +71,10 @@ The tables are in the skeleton's schema: `receipts`, `receipt_parts`, `receipt_l
 carries receipts and their lines, never a photo. MOL-126 (`0045_receipt_lines_bound`) binds a line to
 its item and purchase and adds the item as a node — `item_names` (names in the tills' languages) and
 `item_hs` (customs headings), both the seed's — `receipts_trip_key` (one trip, one receipt), and `store_memory`, the shops' shared
-memory: erasure leaves its words without an author, the copy carries the person's own.
+memory: erasure leaves its words without an author, the copy carries the person's own. MOL-232
+(`0058_receipt_links`) gives a receipt its `source` — a photo, or a Serbian receipt's link asked of the
+tax office, with no parts — the next ask and the premises' code and name; the link while it is asked
+is `receipt_links`, a table the nightly copy leaves out.
 
 ## frontend · the phone (MOL-127)
 
@@ -79,6 +93,7 @@ memory: erasure leaves its words without an author, the copy carries the person'
 - `frontend/src/composables/useOnline.ts` — Whether the browser believes it is online, now and on every change — for words said ahead of time, never for a failure.
 - `frontend/src/components/CaptureButton.vue` — «Сфотографировать чек»: the strip's main action with receipts; from «Что брать» it opens «Покупки».
 - `frontend/src/components/CaptureSheet.vue` — «Сфотографировать чек» (handoff 04): the system camera or the gallery, every shot through «Края чека» (MOL-222), up to four parts, the part's own sheet «Переснять / Убрать часть», «Отправить чек» into the queue; «Переснять» a receipt (П-3).
+- `frontend/src/components/LinkReceiptSheet.vue` — «Чек по ссылке» (MOL-232): a Serbian receipt's link pasted — how to get it from the QR code, the reason a paste is no receipt by the model's own check, «Отправить чек» into the queue with no photo; opened by `CaptureButton` for a country whose receipts come by their link.
 - `frontend/src/components/ReceiptEdgesSheet.vue` — «Края чека» (MOL-222) over the capture sheet: the photo with the four corners proposed, dragged with a loupe or moved by the arrows, «Повернуть», «Готово» straightening it off the page, «Чек мелкий» with «Подойти ближе / Оставить так»; «‹» gives the shot up.
 - `frontend/src/components/ReceiptWorkSheet.vue` — The sheet of a receipt in work (3f): where it is, its parts from this phone, «Удалить чек».
 - `frontend/src/components/ReceiptUndoStrip.vue` — «Чек удалён вместе с фото · Вернуть»: ten seconds on the screen, the queue's removal.
@@ -91,4 +106,5 @@ memory: erasure leaves its words without an author, the copy carries the person'
 - `frontend/src/components/ReceiptTotalSheet.vue` — «Итог чека» put right, in the receipt's currency, into the draft.
 - `frontend/src/views/ReceiptView.vue` — `/purchases/receipts/:id`: the review, «не разобран» with its photos, «уже записан», gone; «Записать N» through the queue, then `router.replace` to the purchases.
 - `e2e/receipt-edges.spec.ts` — Spec of «Края чека» (MOL-222) on a receipt the browser draws on a dark table: the corners found, a corner dragged with its loupe, «Чек мелкий» and «Оставить так», «‹» giving the shot up.
+- `e2e/receipts-link.spec.ts` — Spec of a Serbian receipt by its link (MOL-232) against the fake tax office, a phone in Belgrade: pasted, read, reviewed with the tax office's lines and recorded in dinars at the premises proposed; a damaged link and a refund refused under the field; a link kept with no connection; a receipt not shown yet stays asked.
 - `e2e/receipts.spec.ts` — Spec against the fake reader: a receipt from the gallery to the purchases under a place named, «back» to «Покупки»; taken with no connection and kept across a reload; not a photo; four parts and no fifth; «Удалить чек» and «Вернуть».

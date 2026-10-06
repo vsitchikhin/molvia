@@ -30,6 +30,7 @@ it('says what is kept, how long the logs live and how to erase everything', asyn
     ru.privacy.failures.title,
     ru.privacy.backups.title,
     ru.privacy.barcodes.title,
+    ru.privacy.serbian_receipts.title,
     ru.privacy.storage.title,
     ru.privacy.copy.title,
     ru.privacy.erase.title,
@@ -43,6 +44,19 @@ it('says what goes to Open Food Facts and what never does, and offers its data u
   expect(ru.privacy.barcodes.text).toMatch(/только сам код и адрес нашего сервера/)
   expect(ru.privacy.barcodes.text).toMatch(/Код этикетки магазина туда не уходит/)
   expect(ru.privacy.barcodes.text).toMatch(/ODbL.*по запросу/)
+})
+
+it('says what goes to the Serbian tax office with a receipt’s link, and what is never kept (MOL-232)', async () => {
+  const text = (await render()).text()
+  expect(text).toContain(ru.privacy.serbian_receipts.text)
+  expect(ru.privacy.serbian_receipts.text).toMatch(/налоговая Сербии/)
+  expect(ru.privacy.serbian_receipts.text).toMatch(/не вас, не ваш телефон и не ваш вход/)
+  expect(ru.privacy.serbian_receipts.text).toMatch(
+    /имя кассира, номер покупателя и способ оплаты не берём/,
+  )
+  expect(ru.privacy.serbian_receipts.text).toMatch(/ссылку стираем, как только налоговая ответила/)
+  // the photo's line no longer says no outside service sees the receipt
+  expect(ru.privacy.stored.receipts.text).not.toMatch(/сторонние сервисы чек не видят/)
 })
 
 it("says what a failure of the app sends, and that it is nobody's (MOL-144)", async () => {
@@ -133,5 +147,5 @@ it('says the consent is kept — the edition and when — and nothing of the age
   expect(view.text()).toContain(ru.privacy.stored.consent.text)
   expect(ru.privacy.stored.consent.text).toMatch(/Возраст и дату рождения мы не храним/)
   // The subtitle is the revision written in code, not a sentence of the dictionary.
-  expect(view.text()).toContain('Редакция от 5 октября 2026')
+  expect(view.text()).toContain('Редакция от 6 октября 2026')
 })

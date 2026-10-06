@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./testing/search-corpus": "./tests/support/search-corpus.ts",
-    "./testing/receipt-text.am-05.json": "./tests/entities/receipt-text.am-05.json"
+    "./testing/receipt-text.am-05.json": "./tests/entities/receipt-text.am-05.json",
+    "./testing/serbian-receipt": "./tests/entities/serbian-receipt.ts"
   },
   "types": "./src/index.ts",
   "dependencies": {
