@@ -259,8 +259,9 @@ was left out: a retelling of the bank is what rate.am was rejected for.
   the National Bank of Serbia waited for the National Bank of Georgia's walk — right after the deploy
   the last month of it, 32 requests, some twenty seconds and up to sixteen minutes of a slow bank —
   with today's dinar in nobody's row. The archives are walked after all the latest have answered.
-- **A rollback past `0056` is safe only until a row holds `RSD` or `nbs`** (adversarial round 2, review
-  7; by the code, not held by a test). The cache itself is safe: the image before it knows no `nbs` and
+- **A rollback past `0056` is safe only until a row outside the official cache holds `RSD` or `nbs`** —
+  an actor, a trip, a spending, an exchange (adversarial round 2, review 7, 8; by the code, not held by a
+  test). The cache itself is safe: the image before it knows no `nbs` and
   never builds a pair from its rows, every reader of another provider reads its own, and its writes
   leave `base` to the default, the dram, which the check takes for every provider it knows. **But that
   image reads the rest through the domain's schemas, where the dinar is not**: an actor spending or

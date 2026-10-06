@@ -216,7 +216,8 @@ The shape worth knowing here:
   previous image then runs on the new schema: an added column costs it nothing, a dropped or
   renamed one breaks it. **So a migration that drops or renames goes out in two merges** — the
   code stops reading the thing first, the schema loses it after. **A value added to a domain list —
-  a currency, a provider — is safe to roll back past only until a row holds it** (MOL-230, review 7):
+  a currency, a provider — is safe to roll back past only until a row the domain parses holds it** — an actor, a trip, a
+  spending; a cache read only by provider does not count (MOL-230, review 7, 8):
   the image put back reads rows through the domain's schemas and refuses one with a value it does not
   know — an actor in dinars is a 500 on every request. The automatic rollback of a failed deploy comes
   before any such row; a late one by hand does not, and is a deploy forward instead. The lari (MOL-110)
