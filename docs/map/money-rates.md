@@ -51,7 +51,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 
 ## backend · tests
 
-- `backend/tests/dinar.integration.test.ts` — Integration test: the dinar (MOL-230) — a trip takes the National Bank of Serbia against the rouble and the National Bank of Georgia against the dram, the Bank of Russia as the fallback; its rows in dinars never priced as drams; the database holds a row's base and the pair's bank as the domain does.
+- `backend/tests/dinar.integration.test.ts` — Integration test: the dinar (MOL-230) — a trip takes the National Bank of Serbia against the rouble and the National Bank of Georgia against the dram, the Bank of Russia as the fallback; its rows in dinars never priced as drams; «Деньги» in dinars; the National Bank of Georgia's archive bringing the dinar into days written before it; the database holds a row's base and the pair's bank as the domain does.
 - `backend/tests/exchanges-repository.integration.test.ts` — Integration test: exchanges are written, repeated, refused on conflict, removed, restored within ten minutes and erased with the owner.
 - `backend/tests/exchanges.integration.test.ts` — Integration test: «Обмен денег» over HTTP — the wallet, the official comparison, the chain of costs and the rate a new trip takes.
 - `backend/tests/fixtures/rates/` — Provider answers recorded byte for byte that the feed parsers are tested on: 19.09.2026 (CBA, Bank of Russia, er-api, a SOAP fault), 30.09.2026 (the CBA's archive — asked again with the lari on 04.10, MOL-110 — and its three xlsx files of the market, MOL-137) 03.10.2026 (the National Bank of Georgia, MOL-110) and 06.10.2026 (the National Bank of Serbia's pages and lists, MOL-230).

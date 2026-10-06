@@ -1,12 +1,23 @@
 import { randomUUID } from 'node:crypto'
 import { sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { exchangesResponseCodec, parseRate, tripViewCodec, yerevanDate } from '@molvia/model'
+import {
+  PUBLISHED,
+  exchangesResponseCodec,
+  moneyMonthCodec,
+  parseRate,
+  spendingCategoriesResponseCodec,
+  spendingViewCodec,
+  tripViewCodec,
+  yerevanDate,
+} from '@molvia/model'
 import type { AmdRate, CachedRate, RateProvider } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createRateRepository } from '@/db/rates-repository'
 import { officialRates, trips } from '@/db/schema'
+import type { Published } from '@/rates/feed'
 import { buildServer } from '@/server'
+import { officialRatesRefresh } from '@/usecases/refresh-official-rates'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertPlace, signIn, tripContext } from './fixtures'
 
@@ -178,6 +189,114 @@ describe('динар в своём курсе', () => {
     )
     expect(overview.wallet).toMatchObject({ basis: 'income', estimated: true })
     expect((await start(me)).rate).toMatchObject({ source: 'personal', scaled: parseRate('1.25') })
+  })
+})
+
+describe('«Деньги» в динарах (ревью 4)', () => {
+  it('трата в евро у белградца — по НБ Сербии своего дня, месяц — динары к рублю по нему же', async () => {
+    const day = daysAgo(3)
+    await rates.upsert([...serbian(day), ...russian(day), ...armenian(day)])
+    const me = await belgrade()
+    const categories = spendingCategoriesResponseCodec.parse(
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/spending-categories',
+          headers: { cookie: me.cookie },
+        })
+      ).json(),
+    ).categories
+    const response = await post(me, '/spendings', {
+      id: randomUUID(),
+      spentOn: day,
+      amount: { amount: '10', currency: 'EUR' },
+      categoryId: categories[0]?.id,
+    })
+    // 117,5 динара за евро — число НБС, не ЦБ РФ и не драмы.
+    expect(spendingViewCodec.parse(response.json()).rate).toMatchObject({
+      base: 'EUR',
+      quote: 'RSD',
+      scaled: parseRate('117.5'),
+      source: 'official',
+    })
+    const month = moneyMonthCodec.parse(
+      (
+        await app.inject({
+          method: 'GET',
+          url: `/money/months/${day.slice(0, 7)}`,
+          headers: { cookie: me.cookie },
+        })
+      ).json(),
+    )
+    expect(month.foreign).toEqual([
+      {
+        amount: { minor: 1_000n, currency: 'EUR' },
+        counted: { minor: 117_500n, currency: 'RSD' },
+      },
+    ])
+    // Месяц пересчитывается в рубли по НБС: 1,25 динара за рубль.
+    expect(month.rate).toMatchObject({ base: 'RUB', quote: 'RSD', scaled: parseRate('1.25') })
+  })
+})
+
+describe('архив НБ Грузии дописывает динар на настоящей базе (ревью 4)', () => {
+  it('в дни, записанные до MOL-230, ложится только RSD; записанное не трогается', async () => {
+    // История MOL-110: рубль и лари НБ Грузии за последние сорок дней, без динара.
+    const kept: CachedRate[] = []
+    for (let days = 1; days <= 40; days += 1) {
+      kept.push(row('RUB', '4.35', daysAgo(days), 'nbg'), row('GEL', '139', daysAgo(days), 'nbg'))
+    }
+    await rates.insertMissing(kept)
+    const answer = (date: string): Published => ({
+      provider: 'nbg',
+      date,
+      rates: PUBLISHED.nbg.map((currency) => ({
+        provider: 'nbg',
+        currency,
+        date,
+        scaled: currency === 'RSD' ? parseRate('3.47') : parseRate('9.99'),
+      })),
+    })
+    const quiet = (provider: RateProvider) => ({
+      provider,
+      fetchLatest: () => Promise.reject(new Error('not asked here')),
+    })
+    const refresh = officialRatesRefresh({
+      primary: quiet('cba'),
+      fallbacks: [],
+      homeBanks: [
+        {
+          provider: 'nbg',
+          fetchLatest: () => Promise.resolve(answer(daysAgo(0))),
+          fetchOn: (date) => Promise.resolve(answer(date)),
+        },
+      ],
+      rates,
+      log: { warn: () => undefined },
+      history: { feed: { fetchRange: () => Promise.resolve([]) }, rates },
+    })
+    await refresh()
+    const nbg = await db
+      .select()
+      .from(officialRates)
+      .where(sql`provider = 'nbg'`)
+    const on = (date: string, currency: string) =>
+      nbg.filter((one) => one.rateDate === date && one.currency === currency)
+    // Последний месяц уже есть: динар лёг, рубль остался прежним — 4,35, а не 9,99 ответа.
+    expect(on(daysAgo(10), 'RSD')).toHaveLength(1)
+    expect(on(daysAgo(10), 'RSD')[0]).toMatchObject({ base: 'AMD', scaled: parseRate('3.47') })
+    expect(on(daysAgo(10), 'RUB')).toHaveLength(1)
+    expect(on(daysAgo(10), 'RUB')[0]?.scaled).toBe(parseRate('4.35'))
+    // Поход в динарах при доходе в драмах теперь берёт этот динар у НБ Грузии.
+    const trip = await start(await belgrade('AMD'))
+    expect(trip.rateProvider).toBe('nbg')
+  })
+
+  it('writtenBy знает, кто из источников писал: НБС до первого ответа — нет', async () => {
+    await rates.upsert(armenian(daysAgo(1)))
+    expect([...(await rates.writtenBy())]).toEqual(['cba'])
+    await rates.upsert(serbian(daysAgo(1)))
+    expect(new Set(await rates.writtenBy())).toEqual(new Set(['cba', 'nbs']))
   })
 })
 
