@@ -309,7 +309,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 ### Money: accounts — `.claude/rules/money-accounts.md`
 
 - **There is no rate on an account, ever**; the balance is counted, never stored: the start and
-  every operation dated after its day. A trip is dated by the day it started.
+  every operation dated after its day — and, for an account made on its own start day, every
+  operation of that day the server got after it (MOL-250). A trip is dated by the day it started.
 - **An account on an operation is optional**; one the owner has not got, or one that does not fit,
   is «без счёта», never a refusal.
 - **«Списано со счёта» moves the balance and nothing else**, counts only while it applies, and any

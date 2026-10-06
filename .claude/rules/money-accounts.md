@@ -25,7 +25,17 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
 
 - **The balance is counted, never stored: the start and every operation on the account dated after
   its day.** The start is the evening of `startOn` — «Старт — вечер 16.09» of the owner's sheet — so
-  an operation on that day is history and moves nothing. **A trip is dated by the day it started** —
+  an operation on that day is history and moves nothing. **An account made on its own start day
+  starts at the moment it was made** (MOL-250, owner's decision 06.10.2026): the start typed is what
+  it holds now, so an operation of that day counts once the server got it after the account
+  (`writtenAt` — a trip's start, never `seenAt`), and one written before and given the account later
+  is already in the start (В-1). The owner made «Доллары» with 0 for today and wrote two exchanges
+  onto it: the roubles left the sheet's account and nothing arrived. `created_on` is the phone's day
+  of making (`TODAY_HEADER`), the accounts before it Yerevan's by migration (В-3); a start moved to
+  another day is that day's evening again, and a start on a past day stays its evening (В-2), so the
+  sheet's accounts did not move. Checks and «не попали» look from the same moment (`markOf`). **The
+  price, named:** a spending made at 11:00 and typed in at 12:30 onto an account made at 12:00 counts
+  twice; a check names it. **A trip is dated by the day it started** —
   the money left at the shelf — and moves its account while still open (Р-29): dated by its finish,
   a trip left open, or finished after midnight, was taken a second time from a start that already
   counted it (adversarial Д4). The day is the phone's where it is earlier than the server's — the
