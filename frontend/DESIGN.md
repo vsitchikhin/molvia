@@ -465,8 +465,8 @@ height on it.
 One grammar: the selected thing gets a fill or a form, not only a hue. A selected segment is filled
 `accent-solid` with `on-accent`. A selected chip has the `accent-tint` fill and an `accent` ring. A
 switch that is on carries a ✓ on its knob. Weights do not change on selection — every segment and
-every chip is 600 — so the row never reflows under the thumb. **(target)** The active tab has a
-filled MDI icon and a 700 label; inactive tabs are outlined, 600.
+every chip is 600 — so the row never reflows under the thumb. The active tab has a filled MDI
+icon and a 700 label; inactive tabs are outlined, 600.
 
 ### Cards / Lists
 

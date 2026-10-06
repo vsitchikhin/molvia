@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { standAt, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
@@ -437,6 +437,16 @@ async function fitsNarrowPhone(page: Page, money: string): Promise<void> {
   await page.getByRole('link', { name: money, exact: true }).click()
   const labels = page.locator('.tabbar .label')
   await expect(labels).toHaveCount(5)
+  // Each label at 700 too, as the current tab draws it (Ф-5) — the widest ones are the ones at risk.
+  for (const tab of await page.locator('.tabbar a').all()) {
+    await tab.click()
+    await expect(tab).toHaveAttribute('aria-current', 'page')
+    await fitsItsColumn(labels)
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
+}
+
+async function fitsItsColumn(labels: Locator): Promise<void> {
   for (const label of await labels.all()) {
     const box = await label.boundingBox()
     const tab = await label.locator('xpath=..').boundingBox()
@@ -446,7 +456,6 @@ async function fitsNarrowPhone(page: Page, money: string): Promise<void> {
     expect(box?.x ?? -1).toBeGreaterThanOrEqual(tab?.x ?? 0)
     expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual((tab?.x ?? 0) + (tab?.width ?? 0))
   }
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
 }
 
 test('five tabs fit a 320 px phone, one line each', async ({ page }) => {
