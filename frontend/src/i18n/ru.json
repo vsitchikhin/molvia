@@ -2,6 +2,9 @@
   "app": {
     "name": "Molvia"
   },
+  "outdated": {
+    "line": "Браузер устарел — откройте Molvia в свежем Chrome, Safari, Firefox или Edge"
+  },
   "nav": {
     "label": "Разделы",
     "advice": "Что брать",

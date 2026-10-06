@@ -67,11 +67,14 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   page back on the login screen before any sheet was opened.
 - **A worker needs a build, so one spec runs against one** (MOL-132): the project `pwa` is the same
   phone against `vite build` + `vite preview` in `frontend/dist-e2e`, on the next port of the band
-  (`E2E_PWA_PORT + 1`, derived, so no `.env` has to be made again), and holds only
+  (`E2E_PWA_PORT + 1`, derived, so no `.env` has to be made again), and holds
   `pwa-update.spec.ts`, serially, since its specs rewrite the one built worker: a page on the screen,
   a first visit, which nothing controls — the fake of the unit tests had its version waiting, and
   Chromium showed it becomes active at once (adversarial Д2) — and a first visit beside another
-  window of the app, where it does wait (Е1); `phone` ignores it. The build is a web server of the run, so every `make e2e`
+  window of the app, where it does wait (Е1). Beside it `client-errors-built.spec.ts` (MOL-144) and
+  `outdated-built.spec.ts` (MOL-231): the line of a browser below the floor is put in by the build,
+  and a start that stayed silent is proved where a worker could have registered. `phone` ignores
+  them. The build is a web server of the run, so every `make e2e`
   pays for it — some twenty seconds. The spec comes in by `page.goto('/privacy')`, **the one spec
   not through `open()`**: the development seam is not in a build, and that page is open without a
   session. A new version is a byte appended to the built `sw.js`, put back after the spec; `preview`

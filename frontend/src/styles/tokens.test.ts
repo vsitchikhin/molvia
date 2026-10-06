@@ -253,3 +253,24 @@ it(`keeps every category within ${String(SAME_HUE)}° of its hue in both schemes
   })
   expect(drifted).toEqual([])
 })
+
+/**
+ * A sheet's `::backdrop` inherits from its dialog only since Chrome 122, Firefox 120 and Safari 17.4,
+ * so below that the scrim is given to it by the tokens' own selectors (MOL-231, adversarial А3):
+ * light by the one copy, dark by the mixin — never a scheme with an undimmed page under the sheet.
+ */
+describe('the scrim on a backdrop that inherits nothing', () => {
+  const rootBlock = source.slice(source.indexOf(':root {'), source.indexOf('\n}\n'))
+
+  it('the light one is the scrim of :root', () => {
+    const backdrop = /^::backdrop \{([^}]*)\}/m.exec(source)?.[1] ?? ''
+    expect(declarations(backdrop).get('scrim')).toBe(declarations(rootBlock).get('scrim'))
+  })
+
+  it('the dark one is the mixin, under both selectors of the dark scheme', () => {
+    expect(source).toMatch(
+      /:root:not\(\[data-scheme='light'\]\),\s*:root:not\(\[data-scheme='light'\]\) ::backdrop \{\s*@include dark-scheme;/,
+    )
+    expect(source).toMatch(/\[data-scheme='dark'\] ::backdrop \{\s*@include dark-scheme;/)
+  })
+})

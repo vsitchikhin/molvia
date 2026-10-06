@@ -284,6 +284,14 @@
   --viewfinder-dim: rgb(0 0 0 / 45%);
 }
 
+/* The sheet's scrim on its `::backdrop`, which inherits from its dialog only since Chrome 122,
+   Firefox 120 and Safari 17.4: on the floor below them (MOL-231, adversarial А3) `var(--scrim)`
+   there was undefined and every sheet rose over a page not dimmed. The one copy of a light token,
+   held to `:root` by `tokens.test.ts`; the dark scheme gives it the mixin below. */
+::backdrop {
+  --scrim: rgb(38 27 16 / 40%);
+}
+
 @mixin dark-scheme {
   --sunken: #14110f;
   --surface: #201c19;
@@ -344,7 +352,8 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-scheme='light']) {
+  :root:not([data-scheme='light']),
+  :root:not([data-scheme='light']) ::backdrop {
     @include dark-scheme;
   }
 }
@@ -352,6 +361,10 @@
 [data-scheme='dark'] {
   color-scheme: dark;
 
+  @include dark-scheme;
+}
+
+[data-scheme='dark'] ::backdrop {
   @include dark-scheme;
 }
 

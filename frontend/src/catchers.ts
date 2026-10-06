@@ -1,5 +1,7 @@
 import { api } from '@/api'
+import { belowFloor } from '@/browserFloor'
 import { installFailureReports, pageBuild } from '@/failures'
+import type { FailureReports } from '@/failures'
 import { platformLine } from '@/platform'
 
 /**
@@ -14,23 +16,35 @@ import { platformLine } from '@/platform'
  */
 let screen: () => string = () => 'start'
 
-export const failures = installFailureReports({
-  origin: window.location.origin,
-  build: pageBuild(import.meta.url, import.meta.env.PROD),
-  platform: () => platformLine(),
-  screen: () => screen(),
-  send: (body) => api.reportClientErrors(body),
-})
+/**
+ * Below the floor of the build nothing reports and nothing listens (MOL-231): such a browser fails on
+ * whatever it lacks first — as the bundle loads, as a screen draws — and that is no defect of ours.
+ * The reports themselves are not installed there, so `reportFailure` from any module is silent too,
+ * not only the two doors `main.ts` keeps shut (self-review №2).
+ */
+const SILENT: FailureReports = { report: () => undefined, flush: () => Promise.resolve() }
 
-window.addEventListener('error', (event) => {
-  failures.report(event.error, 'window')
-})
-window.addEventListener('unhandledrejection', (event) => {
-  failures.report(event.reason, 'rejection')
-})
-window.addEventListener('online', () => {
-  void failures.flush()
-})
+export const failures = belowFloor()
+  ? SILENT
+  : installFailureReports({
+      origin: window.location.origin,
+      build: pageBuild(import.meta.url, import.meta.env.PROD),
+      platform: () => platformLine(),
+      screen: () => screen(),
+      send: (body) => api.reportClientErrors(body),
+    })
+
+if (!belowFloor()) {
+  window.addEventListener('error', (event) => {
+    failures.report(event.error, 'window')
+  })
+  window.addEventListener('unhandledrejection', (event) => {
+    failures.report(event.reason, 'rejection')
+  })
+  window.addEventListener('online', () => {
+    void failures.flush()
+  })
+}
 
 /** Where on the app a failure happened, from the moment the app is mounted. */
 export function placeFailures(where: () => string): void {
