@@ -94,8 +94,7 @@ describe('ScreenSkeleton', () => {
   // page's ground, the bars of `surface-2` were 1.06:1. The screens that pass them change nothing.
   it('draws the groups of before in a card, as the kit’s paragraphs', () => {
     const view = render([72, 54])
-    const card = view.get('.bars > .card')
-    expect(card.classes()).toContain('skeleton-lines')
+    const card = view.get('.bars > .skeleton-lines > .card')
     expect(card.findAll('.group')).toHaveLength(2)
   })
 
@@ -111,7 +110,7 @@ describe('ScreenSkeleton', () => {
     expect(parts).toEqual([
       expect.stringContaining('caption'),
       'ring',
-      expect.stringContaining('card'),
+      expect.stringContaining('skeleton-rows'),
     ])
     expect(view.find('.skeleton-lines').exists()).toBe(false)
     expect(view.get('[role="status"]').text()).toBe(en.state.loading)

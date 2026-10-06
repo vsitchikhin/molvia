@@ -86,7 +86,6 @@ const TEXT_CONTRAST = 4.5
  */
 const BAR_ON_CARD = 1.35
 const BAR_ON_GROUND = 1.2
-const REST = Number(declared.light.get('skeleton-rest'))
 
 /** A colour laid over a ground at an opacity, as the browser composes it. */
 function over(colour: string, ground: string, opacity: number): string {
@@ -205,6 +204,11 @@ describe.each(['light', 'dark'] as const)('the %s scheme', (scheme) => {
   })
 
   it(`draws a skeleton's bar at ${String(BAR_ON_CARD)}:1 on a card and ${String(BAR_ON_GROUND)}:1 on the ground, its breath only stronger`, () => {
+    // The scheme's own rest, as the dark block inherits `:root` where it says nothing: read from the
+    // light one alone, a rest set in the dark block would be checked by the light figure (review № 10).
+    const REST = Number(
+      declared[scheme].get('skeleton-rest') ?? declared.light.get('skeleton-rest'),
+    )
     expect(REST).toBeGreaterThan(0)
     expect(REST).toBeLessThan(1)
     const rest = (ground: string) => over(value('border-strong'), value(ground), REST)

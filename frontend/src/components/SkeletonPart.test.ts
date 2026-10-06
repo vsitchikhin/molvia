@@ -31,8 +31,8 @@ describe('SkeletonPart', () => {
     // The typical row (owner's В-3 «б»): a title and a meta of a line each, no tail, no lead.
     it('draws a list card of three short rows by default', () => {
       const view = render({ kind: 'rows' })
-      expect(view.element.tagName).toBe('UL')
-      expect(view.classes()).toContain('list')
+      const card = view.get('.skeleton-rows > ul')
+      expect(card.classes()).toContain('list')
       expect(view.findAll('li.item')).toHaveLength(3)
       const row = view.get('.row')
       expect(row.findAll('.bar').map((bar) => bar.classes()[1])).toEqual(['title', 'meta'])
@@ -117,7 +117,8 @@ describe('SkeletonPart', () => {
   // Handoff 77 v2 2a: a caption, the figure, a line — and a plate under them when the answer has one.
   it('draws the card of a sum: a caption, the figure, a line, and the plate when asked', () => {
     const view = render({ kind: 'figure' })
-    expect(view.classes()).toEqual(expect.arrayContaining(['card', 'skeleton-figure']))
+    expect(view.classes()).toEqual(['skeleton-figure'])
+    expect(view.find('.skeleton-figure > .card').exists()).toBe(true)
     expect(view.findAll('.bar').map((bar) => bar.classes()[1])).toEqual(['label', 'sum', 'note'])
     expect(view.find('.plate').exists()).toBe(false)
     expect(render({ kind: 'figure', plate: true }).find('.plate').exists()).toBe(true)
@@ -126,7 +127,8 @@ describe('SkeletonPart', () => {
   describe('lines', () => {
     it('draws a pair of bars per width, in a card', () => {
       const view = render({ kind: 'lines', widths: [72, 54] })
-      expect(view.classes()).toEqual(expect.arrayContaining(['card', 'skeleton-lines']))
+      expect(view.classes()).toEqual(['skeleton-lines'])
+      expect(view.find('.skeleton-lines > .card').exists()).toBe(true)
       expect(view.findAll('.group')).toHaveLength(2)
       expect(view.findAll('.text').map((bar) => bar.attributes('style'))).toEqual([
         'width: 72%;',
@@ -138,14 +140,16 @@ describe('SkeletonPart', () => {
     // Over the camera a card is no answer's shape: the scanner's bar stands bare in the viewfinder.
     it('stands bare where a card is not the answer’s shape', () => {
       const view = render({ kind: 'lines', widths: [40], card: false })
-      expect(view.classes()).not.toContain('card')
+      expect(view.find('.card').exists()).toBe(false)
       expect(view.classes()).toContain('skeleton-lines')
       expect(view.findAll('.group')).toHaveLength(1)
     })
   })
 
   // The part is rendered by the screen that puts it in the frame, so its root carries the screen's
-  // scope: a root named `caption` took the size of «Бюджет»'s own captions (adversarial А3).
+  // scope: a root named `caption` took the size of «Бюджет»'s own captions (adversarial А3), and a root
+  // that was `AppCard` carried `card`, `plain` and `list`, which a `.card` of «Графики» reached
+  // (adversarial В1). Every class of a root is the part's own.
   it.each([
     ['caption', {}],
     ['field', {}],
@@ -155,10 +159,8 @@ describe('SkeletonPart', () => {
     ['lines', { card: false }],
   ])('names the root of %s apart from any class of a screen', (kind, props) => {
     const root = render({ kind, ...props }).classes()
-    expect(root.some((name) => name.startsWith('skeleton-'))).toBe(true)
-    expect(root.filter((name) => !name.startsWith('skeleton-'))).toEqual(
-      expect.not.arrayContaining(['caption', 'field', 'figure', 'lines', 'rows', 'narrow']),
-    )
+    expect(root.length).toBeGreaterThan(0)
+    expect(root.filter((name) => !name.startsWith('skeleton-'))).toEqual([])
   })
 
   it.each([

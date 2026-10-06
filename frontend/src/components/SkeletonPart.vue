@@ -5,49 +5,47 @@
 
   <span v-else-if="kind === 'field'" class="skeleton-field"></span>
 
-  <AppCard
+  <div
     v-else-if="kind === 'rows'"
-    as="ul"
-    list
     class="skeleton-rows"
     :class="{ 'skeleton-narrow': narrow ?? lead === 'circle' }"
   >
-    <li v-for="n in count" :key="n" class="item">
-      <span class="row">
-        <span v-if="lead === 'circle'" class="circle"></span>
-        <span v-else-if="lead === 'icon'" class="mark"></span>
-        <span class="words">
-          <span class="line"><span class="bar title"></span></span>
-          <span v-if="meta" class="line small"><span class="bar meta"></span></span>
+    <AppCard as="ul" list>
+      <li v-for="n in count" :key="n" class="item">
+        <span class="row">
+          <span v-if="lead === 'circle'" class="circle"></span>
+          <span v-else-if="lead === 'icon'" class="mark"></span>
+          <span class="words">
+            <span class="line"><span class="bar title"></span></span>
+            <span v-if="meta" class="line small"><span class="bar meta"></span></span>
+          </span>
+          <span v-if="tail || under" class="tail">
+            <span class="line"><span class="bar amount"></span></span>
+            <span v-if="under" class="line small"><span class="bar under"></span></span>
+          </span>
+          <span v-if="next" class="chevron"></span>
         </span>
-        <span v-if="tail || under" class="tail">
-          <span class="line"><span class="bar amount"></span></span>
-          <span v-if="under" class="line small"><span class="bar under"></span></span>
-        </span>
-        <span v-if="next" class="chevron"></span>
+      </li>
+    </AppCard>
+  </div>
+
+  <div v-else-if="kind === 'figure'" class="skeleton-figure">
+    <AppCard class="sum-card">
+      <span class="line caption-line"><span class="bar label"></span></span>
+      <span class="line figure-line"><span class="bar sum"></span></span>
+      <span class="line small"><span class="bar note"></span></span>
+      <span v-if="plate" class="plate"></span>
+    </AppCard>
+  </div>
+
+  <div v-else class="skeleton-lines">
+    <component :is="card ? 'AppCard' : 'span'" class="pairs">
+      <span v-for="(share, index) in widths" :key="index" class="group">
+        <span class="bar text" :style="{ width: `${share}%` }"></span>
+        <span class="bar sub"></span>
       </span>
-    </li>
-  </AppCard>
-
-  <AppCard v-else-if="kind === 'figure'" class="skeleton-figure">
-    <span class="line caption-line"><span class="bar label"></span></span>
-    <span class="line figure-line"><span class="bar sum"></span></span>
-    <span class="line small"><span class="bar note"></span></span>
-    <span v-if="plate" class="plate"></span>
-  </AppCard>
-
-  <AppCard v-else-if="card" class="skeleton-lines">
-    <span v-for="(share, index) in widths" :key="index" class="group">
-      <span class="bar text" :style="{ width: `${share}%` }"></span>
-      <span class="bar sub"></span>
-    </span>
-  </AppCard>
-  <span v-else class="skeleton-lines">
-    <span v-for="(share, index) in widths" :key="index" class="group">
-      <span class="bar text" :style="{ width: `${share}%` }"></span>
-      <span class="bar sub"></span>
-    </span>
-  </span>
+    </component>
+  </div>
 </template>
 
 <script lang="ts">
@@ -100,7 +98,10 @@ export function isWidths(value: unknown): boolean {
  *
  * The roots are named `skeleton-*`, never `caption`, `field` or `figure`: the part is rendered by the
  * screen that puts it in the frame's slot, so its root carries the screen's scope too, and a scoped
- * `.caption` of «Бюджет» set its size on the bar's line (adversarial А3, review № 1).
+ * `.caption` of «Бюджет» set its size on the bar's line (adversarial А3, review № 1). **A root is an
+ * element of the part's own, never `AppCard`**: the card's `card`, `plain` and `list` stood on the root
+ * as well, and a `.card` of «Графики» gave the rows a padding of 16 and the paragraphs a gap of 4
+ * (adversarial В1) — the scope goes down to the root alone, so the card one level in is the part's.
  */
 export default defineComponent({
   name: 'SkeletonPart',
@@ -326,7 +327,7 @@ export default defineComponent({
   }
 }
 
-.skeleton-figure {
+.sum-card {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -366,7 +367,7 @@ export default defineComponent({
 }
 
 /* What `groups` drew: a line and the shorter one under it, 16 between the pairs. */
-.skeleton-lines {
+.pairs {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
