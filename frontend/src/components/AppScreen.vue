@@ -64,7 +64,7 @@
          drew its own would part ways with the padding on the first change of its height. A new
          version waiting is its top row, over the screen's own main action (MOL-132, В-1). -->
     <div v-if="$slots.docked || updating" ref="dock" class="dock">
-      <UpdateBand v-if="updating" :class="{ over: $slots.docked }" />
+      <UpdateBand v-if="updating" class="update" :class="{ over: $slots.docked }" />
       <slot name="docked" />
     </div>
   </div>
@@ -419,7 +419,9 @@ export default defineComponent({
 }
 
 /* Over the page, above the tab bar where there is one, and below the safe area where there is
-   not: the same chrome as the pinned row at the top. */
+   not: the same chrome as the pinned row at the top. Its margins and the column are its own, not
+   each screen's (К-9): seven wrappers drew seven paddings, and «a main action, a ghost under it»
+   came out 4 apart on one screen and 12 on the next. */
 .dock {
   @include pinned-bar;
   @include appear(100%);
@@ -429,18 +431,31 @@ export default defineComponent({
   bottom: 0;
   left: 0;
   z-index: 1;
+  display: grid;
+  gap: var(--space-2);
   border-top: var(--hairline) solid var(--border);
-  padding: 0 calc(var(--space-4) + var(--safe-right)) var(--safe-bottom)
-    calc(var(--space-4) + var(--safe-left));
+  padding: var(--space-3) calc(var(--space-4) + var(--safe-right))
+    calc(var(--space-3) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
+
+  /* What the screen swaps in comes in, faded only: it stands under the thumb (MOL-151). */
+  > :slotted(*) {
+    @include appear(0);
+  }
 }
 
 .tabbed .dock {
   bottom: calc(var(--tabbar-height) + var(--safe-bottom));
-  padding-bottom: 0;
+  padding-bottom: var(--space-3);
 }
 
-/* Parted from the screen's own row under it by the strip's own hairline. */
-.over {
+/* The strip's top row takes the strip's margins, and is parted from the screen's own action under
+   it by 8 and a hairline (41 v2, 04). */
+.dock > .update {
+  padding: 0;
+}
+
+.dock > .over {
+  padding-bottom: var(--space-2);
   border-bottom: var(--hairline) solid var(--border);
 }
 

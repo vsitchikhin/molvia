@@ -138,46 +138,44 @@
       @confirm="signOut.leave"
     />
     <template #docked>
-      <div class="actions">
-        <div
-          v-if="notice"
-          :id="`${id}-notice`"
-          class="notice"
-          :class="notice.tone"
-          :role="notice.tone === 'error' ? 'alert' : hasAnnouncer ? undefined : 'status'"
-        >
-          <IconCheck v-if="notice.tone === 'success'" aria-hidden="true" />
-          <IconAlert v-else-if="notice.tone === 'error'" aria-hidden="true" />
-          <IconCloud v-else aria-hidden="true" />
-          <div>
-            <p class="message-title">{{ notice.title }}</p>
-            <p v-if="notice.body" class="message-body">{{ notice.body }}</p>
-            <p v-if="form.unknown && !form.stored" class="message-body">
-              {{ t('settings.draft.volatile') }}
-            </p>
-          </div>
+      <div
+        v-if="notice"
+        :id="`${id}-notice`"
+        class="notice"
+        :class="notice.tone"
+        :role="notice.tone === 'error' ? 'alert' : hasAnnouncer ? undefined : 'status'"
+      >
+        <IconCheck v-if="notice.tone === 'success'" aria-hidden="true" />
+        <IconAlert v-else-if="notice.tone === 'error'" aria-hidden="true" />
+        <IconCloud v-else aria-hidden="true" />
+        <div>
+          <p class="message-title">{{ notice.title }}</p>
+          <p v-if="notice.body" class="message-body">{{ notice.body }}</p>
+          <p v-if="form.unknown && !form.stored" class="message-body">
+            {{ t('settings.draft.volatile') }}
+          </p>
         </div>
-        <p v-else-if="!online" :id="`${id}-notice`" class="note">
-          {{ t('settings.save_needs_network') }}
-        </p>
-        <AppButton
-          block
-          :inactive="!online || !form.dirty || form.loading || form.unknown"
-          :busy="form.saving"
-          :busy-label="t('settings.saving')"
-          :aria-describedby="notice || !online ? `${id}-notice` : undefined"
-          @click="form.save"
-        >
-          <template v-if="form.saveError && online && !form.saving" #icon><IconRefresh /></template>
-          {{
-            form.saveError && online
-              ? t('state.retry')
-              : form.conflict
-                ? t('settings.overwrite')
-                : t('settings.save')
-          }}
-        </AppButton>
       </div>
+      <p v-else-if="!online" :id="`${id}-notice`" class="note">
+        {{ t('settings.save_needs_network') }}
+      </p>
+      <AppButton
+        block
+        :inactive="!online || !form.dirty || form.loading || form.unknown"
+        :busy="form.saving"
+        :busy-label="t('settings.saving')"
+        :aria-describedby="notice || !online ? `${id}-notice` : undefined"
+        @click="form.save"
+      >
+        <template v-if="form.saveError && online && !form.saving" #icon><IconRefresh /></template>
+        {{
+          form.saveError && online
+            ? t('state.retry')
+            : form.conflict
+              ? t('settings.overwrite')
+              : t('settings.save')
+        }}
+      </AppButton>
     </template>
   </AppScreen>
 </template>
@@ -299,14 +297,9 @@ export default defineComponent({
 })
 </script>
 <style scoped lang="scss">
-.form,
-.actions {
+.form {
   display: grid;
   gap: var(--space-3);
-}
-
-.actions {
-  padding: var(--space-3) 0;
 }
 
 .note {

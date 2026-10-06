@@ -157,16 +157,14 @@
          through the queue and needs neither the list nor the network (MOL-77). «Вернуть» of a
          record removed from its own screen stands above it (MOL-76). -->
     <template #docked>
-      <div class="strip">
-        <TripUndoStrip class="undo" />
-        <template v-if="country">
-          <ReceiptUndoStrip class="undo" />
-          <ReceiptSentLine class="undo" />
-          <CaptureButton :country="country" />
-          <div class="by-hand"><ManualEntryButton by-hand /></div>
-        </template>
-        <ManualEntryButton v-else />
-      </div>
+      <TripUndoStrip />
+      <template v-if="country">
+        <ReceiptUndoStrip />
+        <ReceiptSentLine />
+        <CaptureButton :country="country" />
+        <ManualEntryButton by-hand />
+      </template>
+      <ManualEntryButton v-else />
     </template>
   </AppScreen>
 </template>
@@ -494,20 +492,6 @@ export default defineComponent({
 
 .more {
   margin-top: var(--space-4);
-}
-
-.strip {
-  @include appear;
-
-  padding: var(--space-3) 0;
-}
-
-.undo {
-  margin-bottom: var(--space-3);
-}
-
-.by-hand {
-  margin-top: var(--space-1);
 }
 
 // A receipt being read «breathes» (handoff 03): no percent, no timer — work that takes a while.
