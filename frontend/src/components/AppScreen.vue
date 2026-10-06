@@ -54,10 +54,10 @@
 
     <div class="content">
       <slot />
-      <!-- The room the strip below takes, kept inside the scroll: the last row of a list has to
-           be reachable, and the strip is over the page, not in it. -->
+      <!-- The room the strip below takes, and «Вернуть» over it, kept inside the scroll: the last
+           row of a list has to be reachable, and both are over the page, not in it. -->
       <div
-        v-if="$slots.docked || updating"
+        v-if="$slots.docked || updating || $slots.undo"
         class="dock-room"
         :style="{ height: room }"
         aria-hidden="true"
@@ -75,7 +75,7 @@
     <!-- «Вернуть» stands in one place on every screen, 8 over the strip — or over the tab bar or the
          bottom edge where there is none (Ф-29, К-10). The frame's, not the strip's own: over the
          list and out of the strip, so the main action under it neither moves nor hides. -->
-    <div v-if="$slots.undo" class="undo-place">
+    <div v-if="$slots.undo" ref="undo" class="undo-place">
       <slot name="undo" />
     </div>
   </div>
@@ -170,9 +170,17 @@ export default defineComponent({
     // Measured rather than guessed: the strip holds a total that grows a line when the queue is
     // not empty or the rate jumped, and the last row of a list must never end up under it.
     const dockHeight = useHeight(dock)
-    const room = computed(() =>
-      dockHeight.value > 0 ? `calc(${String(dockHeight.value)}px + var(--space-4))` : undefined,
-    )
+    // «Вернуть» stands over the end of the list for as long as a finger holds it: the list ends over
+    // it too, as it did when «Покупки» had it in the strip (adversarial А1). Coming and going, it
+    // moves only a list scrolled to its very end.
+    const undo = ref<HTMLElement | null>(null)
+    const undoHeight = useHeight(undo)
+    const room = computed(() => {
+      const over = undoHeight.value > 0 ? ` + ${String(undoHeight.value)}px + var(--space-2)` : ''
+      return dockHeight.value > 0 || undoHeight.value > 0
+        ? `calc(${String(dockHeight.value)}px${over} + var(--space-4))`
+        : undefined
+    })
     // What stands over the list — «Вернуть», `FloatingDock` — rises above the strip by its height.
     const dockStyle = computed(() =>
       dockHeight.value > 0 ? { '--dock-height': `${String(dockHeight.value)}px` } : undefined,
@@ -186,6 +194,7 @@ export default defineComponent({
       t,
       bar,
       dock,
+      undo,
       sentinel,
       collapsed,
       parentTitleKey,
@@ -448,8 +457,11 @@ export default defineComponent({
   padding: var(--space-3) calc(var(--space-4) + var(--safe-right))
     calc(var(--space-3) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
 
-  /* What the screen swaps in comes in, faded only: it stands under the thumb (MOL-151). */
-  > :slotted(*) {
+  /* What the screen swaps in comes in, faded only: it stands under the thumb (MOL-151). Reached by
+     `:deep`, not `:slotted`: a component of two roots — a button and its sheet, «Сфотографировать
+     чек», «Записать вручную» — gets no slot attribute (adversarial А2). Not the strip's own top row,
+     which comes in its own way, and not a sheet, which would replay it on every opening. */
+  > :deep(:not(.update, dialog)) {
     @include appear(0);
   }
 }
@@ -482,7 +494,9 @@ export default defineComponent({
   gap: var(--space-2);
   pointer-events: none;
 
-  > :slotted(*) {
+  /* `:deep` for the same reason as the strip's: a strip of two roots would be seen and not take a
+     tap (adversarial А2′). */
+  > :deep(*) {
     pointer-events: auto;
   }
 }

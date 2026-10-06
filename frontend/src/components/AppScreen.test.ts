@@ -261,6 +261,12 @@ describe('AppScreen', () => {
       expect(view.classes()).toContain('held')
     })
 
+    // Adversarial А1: the list ends over «Вернуть» too — with no strip under it as well.
+    it('keeps the room under the list for itself, with or without a strip', async () => {
+      const { view } = await render('/money', { slots: { undo: () => h('div', 'Удалено: кофе') } })
+      expect(view.get('.content').find('.dock-room').exists()).toBe(true)
+    })
+
     it('rises over a waiting version, which is a strip too, and stands without one', async () => {
       const undo = () => h('div', 'Удалено: кофе')
       const waiting = await render('/money', { update: 'ready', slots: { undo } })
