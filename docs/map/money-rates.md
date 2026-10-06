@@ -56,6 +56,9 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 - `backend/tests/exchanges.integration.test.ts` — Integration test: «Обмен денег» over HTTP — the wallet, the official comparison, the chain of costs and the rate a new trip takes.
 - `backend/tests/fixtures/rates/` — Provider answers recorded byte for byte that the feed parsers are tested on: 19.09.2026 (CBA, Bank of Russia, er-api, a SOAP fault), 30.09.2026 (the CBA's archive — asked again with the lari on 04.10, MOL-110 — and its three xlsx files of the market, MOL-137) 03.10.2026 (the National Bank of Georgia, MOL-110) and 06.10.2026 (the National Bank of Serbia's pages and lists, MOL-230).
 - `backend/tests/fixtures/rates/cba-runtime-error.html` — Fixture: the CBA's «Runtime Error» page its GET form returns, which the parser must refuse.
+- `backend/tests/fixtures/rates/nbs-current-2026-10-06.html` — Fixture: the National Bank of Serbia's page of the current list (MOL-230), whose links name the list the feed then asks for as XML.
+- `backend/tests/fixtures/rates/nbs-day-2026-10-03.html` — Fixture: the bank's page of the list in force on Saturday 03.10.2026 — Friday's, one id in several links.
+- `backend/tests/fixtures/rates/nbs-day-none-2026-10-08.html` — Fixture: the bank's page of a day with no list formed yet, which names none.
 - `backend/tests/incomes-repository.integration.test.ts` — Integration test: incomes are written, amended with history, refused on conflict, removed, restored and erased with the owner.
 - `backend/tests/lari.integration.test.ts` — Integration test: the lari (MOL-110) — a trip takes the National Bank of Georgia as official and the CBA as its fallback, an exchange and an income of lari price the wallet, the database holds the pair's own bank as the domain does.
 - `backend/tests/incomes.integration.test.ts` — Integration test: «Доходы» over HTTP — months and sums, amend and undo, and how an income prices the wallet and a trip's rate.
