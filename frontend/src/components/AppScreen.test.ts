@@ -267,9 +267,6 @@ describe('AppScreen', () => {
       expect(waiting.view.classes()).toContain('held')
       const bare = await render('/money', { slots: { undo } })
       expect(bare.view.classes()).not.toContain('held')
-      // Never unset: a `calc()` reading an unset variable is void, and the place would fall to
-      // wherever the page put it.
-      expect(bare.view.attributes('style')).toContain('--dock-height: 0px')
     })
   })
 

@@ -173,9 +173,10 @@ export default defineComponent({
     const room = computed(() =>
       dockHeight.value > 0 ? `calc(${String(dockHeight.value)}px + var(--space-4))` : undefined,
     )
-    // What stands over the list — «Вернуть», `FloatingDock` — rises above the strip by its height;
-    // zero without one, never unset, which would void every `calc()` that reads it.
-    const dockStyle = computed(() => ({ '--dock-height': `${String(dockHeight.value)}px` }))
+    // What stands over the list — «Вернуть», `FloatingDock` — rises above the strip by its height.
+    const dockStyle = computed(() =>
+      dockHeight.value > 0 ? { '--dock-height': `${String(dockHeight.value)}px` } : undefined,
+    )
     const update = usePwaUpdate()
     const updating = computed(() => update.phase.value !== 'none')
 
