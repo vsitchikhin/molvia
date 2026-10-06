@@ -394,7 +394,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-/* The dock keeps no padding of its own above or below: the screen's row does (as «Покупки»). */
 .content {
   display: flex;
   flex-direction: column;

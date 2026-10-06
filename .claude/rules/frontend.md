@@ -254,7 +254,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   and an inactive one keeps its choice by a `graphic` edge and its word in `text` — the
   `border-strong` edge of the handoff stood 1.65:1 and brought Н-3 back (А1, Graphic Is Data),
   a switch carries a ✓ of `--icon-xs` on its knob (owner's В-2 «а»; the handoff's 16 is no step),
-  every chip and every segment is at 600, so nothing reflows under the thumb. **`--opacity-stale`
+  every chip and every segment is at 600, so nothing reflows under the thumb. **One exception, the
+  current tab** (MOL-179, Ф-5): its form is the filled icon, and its 700 comes with the form, never
+  instead of it — the five columns are fixed and the label centred, so nothing under the thumb moves,
+  and `money.spec` holds every label at 700 inside its 64 px column. **`--opacity-stale`
   means one thing: a previous answer left while the next is on its way** (К-11) — the searches;
   the difference of a reconciliation waits in words («Пересчитаем, когда…»), not dimmed (116 v2).
 - **At work, a button says what it does** (MOL-225, owner's В-1…В-5 «а»). `busy` had no look of its
@@ -641,15 +644,22 @@ The detail behind the frontend lines of `CLAUDE.md`.
   (`pinned-bar`, Ф-18): at 88 % with a blur the list showed through under the words on them, and
   `--chrome` is gone. The current tab is told by form — a filled icon and 700, the rest outlined and
   600 (Ф-5) — chosen by the same `isExactActive` that sets `aria-current`, so eye and ear agree; the
-  labels fit 320 px at 700 too, `money.spec` holds it in both languages. **The strip's margins and
+  labels fit 320 px at 700 too, `money.spec` holds it in both languages — the one exception to
+  «chosen is never a weight» (see MOL-174 above). **The strip's margins and
   column are `AppScreen`'s** (К-9): 12 over, 16 at the sides, 12 under — on a nested screen 12 over
   the home indicator — and what the screen puts in stands in one column 8 apart; a screen draws no
   wrapper with a padding of its own (seven did, «a main action, a ghost under it» came out 4 apart
   on one screen and 12 on the next), and what it swaps in fades in from the strip (`appear(0)`), not
-  from a wrapper. `UpdateBand` takes the strip's margins, 8 and a hairline over the screen's action.
+  from a wrapper — by `:deep`, never `:slotted`: a component of two roots, a button and its sheet
+  («Сфотографировать чек», «Записать вручную»), gets no slot attribute and was not reached
+  (adversarial А2); not the strip's top row, and not a `dialog`, which would replay it on opening. `UpdateBand` takes the strip's margins, 8 and a hairline over the screen's action.
   **«Вернуть» is the frame's `#undo`** (Ф-29, К-10, owner's В-1 «а»): 8 over the strip, over the tab
   bar or the bottom edge where there is none, over the list and out of the strip, so the main action
-  under it neither moves nor hides. Never in `#docked` — it pushed «Сфотографировать чек» up on
+  under it neither moves nor hides; it takes taps by `:deep` for the same reason (А2′). **The list
+  ends over it**: the room under the list is the strip's height plus «Вернуть» and 8 (adversarial
+  А1 — out of the strip, it covered the last row at the end of the scroll for as long as a finger
+  held it); the price, accepted, is that its coming and going moves a list scrolled to its very end,
+  as the strip of «Покупки» did when it held it. Never in `#docked` — it pushed «Сфотографировать чек» up on
   «Покупки» — and never `position: fixed` inside `UndoStrip` itself: a parent playing `appear`
   (`translate`) becomes the containing block of a fixed child, and the strip would ride the card for
   the length of the animation; a sheet's «Вернуть» is in its own footer, which the same component
