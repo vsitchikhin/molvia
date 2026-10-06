@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { EXCHANGE_UNDO_MINUTES } from '#model/entities/exchange'
+import { serbianItemName } from '#model/entities/receipt-journal'
 import { classListStart } from '#model/entities/receipt-text'
 import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
 import { COUNTRY_CITIES } from '#model/contracts/settings'
@@ -183,6 +184,15 @@ export const itemNameLanguageSchema = z.enum(['hy'])
 export type ItemNameLanguage = z.infer<typeof itemNameLanguageSchema>
 export const RECEIPT_NAME_LANGUAGE: Readonly<Partial<Record<ReceiptCountry, ItemNameLanguage>>> = {
   AM: 'hy',
+}
+
+/**
+ * What a line of a country with no names of its own in the catalogue is searched by, and the name a
+ * new item takes from it (MOL-232, В-3): a Serbian till's name less its unit word and article. An
+ * Armenian line goes by its gloss (MOL-126), so its name here is as printed.
+ */
+export function receiptLineName(printed: string, country: ReceiptCountry): string {
+  return country === 'RS' ? serbianItemName(printed) : printed.trim()
 }
 
 /**

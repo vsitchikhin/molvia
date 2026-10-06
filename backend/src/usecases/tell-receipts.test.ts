@@ -27,6 +27,7 @@ function untold(patch: Partial<ReceiptSummary> = {}, telegramUserId = 4242): Unt
     },
     currency: 'AMD',
     city: null,
+    shopUnit: null,
     heard: 'bot',
     actor: { id: 'a1', telegramUserId, country: 'AM', city: 'Гюмри' },
   }
@@ -35,6 +36,7 @@ function untold(patch: Partial<ReceiptSummary> = {}, telegramUserId = 4242): Unt
 function seller(name: string): TinPlace {
   return {
     tin: '01234567',
+    shopUnit: null,
     place: { id: 'p1', kind: 'store', name, country: 'AM', city: 'Гюмри' } as TinPlace['place'],
     ownLatest: null,
     voters: 1,

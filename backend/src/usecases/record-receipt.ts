@@ -8,6 +8,7 @@ import {
   nameIdentity,
   receiptDigits,
   receiptMomentOf,
+  receiptSourceOf,
   recordedSums,
   settingsCityOf,
   storeMemoryWords,
@@ -316,7 +317,9 @@ export async function recordReceipt(
       confirmed,
       edits: editsOf(body, held.lines, shown, held.total),
       // recorded again once its trip was removed for good: counted the first time only (review 7)
-      counted: held.status !== 'recorded',
+      // and only a photo's: a receipt from the tax office has nothing to put right, and until MOL-234
+      // gives it a line of its own it counts nothing (MOL-232, Р-5)
+      counted: held.status !== 'recorded' && receiptSourceOf(held.country) === 'photo',
     })
     return answer(trip.id)
   })

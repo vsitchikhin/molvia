@@ -6,6 +6,7 @@ import {
   placeSchema,
   RECEIPT_CURRENCY,
   RECEIPT_KEEP_DAYS,
+  RECEIPT_LINK_WAIT_HOURS,
   RECEIPT_READ_ATTEMPTS,
   RECEIPT_TELL_AFTER_SECONDS,
   RECEIPT_TELL_WITHIN_HOURS,
@@ -61,7 +62,20 @@ export interface ClaimedReceipt {
   readonly parts: readonly { readonly position: number; readonly photo: Buffer }[]
 }
 
-/** What the reader made of the head of a receipt. */
+/**
+ * A receipt by its link taken to be asked of the tax office (MOL-232): whose, the link, when it
+ * arrived — the two days it is asked for run from it — and the asks so far, this one included.
+ */
+export interface ClaimedLink {
+  readonly id: string
+  readonly actorId: string
+  readonly country: ReceiptSummary['country']
+  readonly language: ReceiptSummary['language']
+  readonly link: string
+  readonly attempts: number
+}
+
+/** What the reader made of the head of a receipt, or the tax office said of it (MOL-232). */
 export interface ReceiptHead {
   readonly tin: string | null
   readonly printedOn: string | null
@@ -69,9 +83,13 @@ export interface ReceiptHead {
   readonly receiptNo: string | null
   readonly totalMinor: bigint | null
   readonly balanced: boolean
-  readonly layout: ReceiptLayout
+  /** How a photo's lines were laid out; a receipt by its link has none. */
+  readonly layout: ReceiptLayout | null
   /** The city of the settings its address prints (MOL-126, Р-6). */
   readonly city: ReceiptCity | null
+  /** A Serbian seller's premises: its code and the shop's name (MOL-232); a photo's head reads none. */
+  readonly shopUnit?: string | null
+  readonly shop?: string | null
 }
 
 /** What the parse found a line to be (MOL-126): an item and how, and the line word by word. */
@@ -121,6 +139,8 @@ export interface StoredReceipt {
   readonly receipt: ReceiptSummary
   readonly currency: Currency
   readonly city: ReceiptCity | null
+  /** The premises of a Serbian seller, where its place is looked for first (MOL-232, Р-7). */
+  readonly shopUnit: string | null
   /** How the person learned it was read (MOL-129); `null` — not yet, or not read. */
   readonly heard: ReceiptHeard | null
 }
@@ -132,6 +152,8 @@ export interface StoredReceipt {
  */
 export interface TinPlace {
   readonly tin: string
+  /** The premises the receipts were of, a Serbian seller's (MOL-232); `null` for a photo's. */
+  readonly shopUnit: string | null
   readonly place: Place
   /** When the person last recorded this seller's receipt here; `null` — never. */
   readonly ownLatest: Date | null
@@ -320,6 +342,20 @@ export interface ReceiptRepository {
    * `unreadable` once it has had its attempts (`RECEIPT_READ_ATTEMPTS`).
    */
   retry(id: string): Promise<void>
+  /** Receipts by their link the last round did not finish asking about: queued again, the ask not counted. */
+  requeueInterruptedLinks(): Promise<void>
+  /**
+   * The next receipt by its link whose ask is due, now `reading`; `null` for none. People in turn, the
+   * one asked about least in the last hour first, as the reader's queue (MOL-232).
+   */
+  claimLink(): Promise<ClaimedLink | null>
+  /** Not asked — over the limit: back as it was, the ask not counted. */
+  releaseLink(id: string): Promise<void>
+  /**
+   * The tax office does not show it yet: asked again in `minutes`, or failed as `missing` once
+   * `RECEIPT_LINK_WAIT_HOURS` have passed since it arrived — its link gone then (Р-2, Р-4).
+   */
+  askLater(id: string, minutes: number): Promise<'queued' | 'failed'>
   /**
    * The end of a reading. Written into a receipt removed meanwhile too — «Вернуть» brings it back
    * read; nothing happens to one no longer `reading`, or no longer there after the final purge.
@@ -396,6 +432,7 @@ function toStored(found: SummaryRow): StoredReceipt {
     receipt: toSummary(found),
     currency: found.row.currency,
     city: found.row.city,
+    shopUnit: found.row.shopUnit,
     heard: found.row.heard,
   }
 }
@@ -795,6 +832,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
       if (tins.length === 0) return []
       const rows = await db.execute<{
         tin: string
+        shop_unit: string | null
         id: string
         kind: Place['kind']
         name: string
@@ -805,7 +843,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         voters: number
         latest: Date
       }>(sql`
-        select r.tin, p.id, p.kind, p.name, p.country, p.city, p.created_at,
+        select r.tin, r.shop_unit, p.id, p.kind, p.name, p.country, p.city, p.created_at,
           max(r.recorded_at) filter (where r.actor_id = ${actorId}) as own_latest,
           count(distinct r.actor_id)::int as voters,
           max(r.recorded_at) as latest
@@ -817,9 +855,10 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             tins.map((tin) => sql`${tin}`),
             sql`, `,
           )})
-        group by r.tin, p.id`)
+        group by r.tin, r.shop_unit, p.id`)
       return rows.map((row) => ({
         tin: row.tin,
+        shopUnit: row.shop_unit,
         place: placeSchema.parse({
           id: row.id,
           kind: row.kind,
@@ -1028,16 +1067,24 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             totalMinor: head?.totalMinor ?? null,
             balanced: head?.balanced ?? false,
             city: head?.city ?? null,
+            shopUnit: head?.shopUnit ?? null,
+            shop: head?.shop ?? null,
+            // read or failed, the link of a receipt by its QR code is no longer kept (MOL-232, Р-4)
+            link: null,
+            nextAttemptAt: null,
           })
           .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
-          .returning({ id: receipts.id })
+          .returning({ id: receipts.id, source: receipts.source })
         if (done === undefined) return
+        // the measure of 0.2 is the reader's (MOL-222): a receipt from the tax office has nothing in it
+        // to put right, and until MOL-234 gives it a line of its own it counts nothing (Р-5)
+        const counted = done.source === 'photo'
         // a reading is written whole: what an earlier one left goes first
         await tx.delete(receiptLines).where(eq(receiptLines.receiptId, id))
         await tx.delete(receiptLineImages).where(eq(receiptLineImages.receiptId, id))
         if (outcome.kind !== 'parsed') {
           const failed = outcome.failure === 'reshoot' ? 'reshoot' : 'unreadable'
-          await tally(tx, { [failed]: sql`1` }, today())
+          if (counted) await tally(tx, { [failed]: sql`1` }, today())
           return
         }
         if (outcome.lines.length > 0) {
@@ -1071,8 +1118,77 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           : outcome.partly
             ? { readPartly: sql`1` }
             : { read: sql`1` }
-        await tally(tx, read, today())
+        if (counted) await tally(tx, read, today())
       })
+    },
+
+    async requeueInterruptedLinks() {
+      await db
+        .update(receipts)
+        .set({
+          status: 'queued',
+          attempts: sql`greatest(${receipts.attempts} - 1, 0)`,
+          nextAttemptAt: sql`clock_timestamp()`,
+        })
+        .where(and(eq(receipts.status, 'reading'), eq(receipts.source, 'tax')))
+    },
+
+    async claimLink() {
+      return db.transaction(async (tx) => {
+        const [next] = await tx.execute<{ id: string }>(sql`
+          select waiting.id from ${receipts} waiting
+          where waiting.source = 'tax' and waiting.status = 'queued' and waiting.deleted_at is null
+            and waiting.next_attempt_at <= clock_timestamp()
+          order by (
+            select count(*) from ${receipts} served
+            where served.actor_id = waiting.actor_id and served.source = 'tax'
+              and served.reading_at > clock_timestamp() - interval '1 hour'
+          ), waiting.next_attempt_at, waiting.id
+          limit 1
+          for update skip locked`)
+        if (next === undefined) return null
+        const [claimed] = await tx
+          .update(receipts)
+          .set({
+            status: 'reading',
+            readingAt: sql`clock_timestamp()`,
+            attempts: sql`${receipts.attempts} + 1`,
+          })
+          .where(and(eq(receipts.id, next.id), eq(receipts.status, 'queued')))
+          .returning({
+            id: receipts.id,
+            actorId: receipts.actorId,
+            country: receipts.country,
+            language: receipts.language,
+            link: receipts.link,
+            attempts: receipts.attempts,
+          })
+        if (claimed === undefined || claimed.link === null) return null
+        return { ...claimed, link: claimed.link }
+      })
+    },
+
+    async releaseLink(id) {
+      await db
+        .update(receipts)
+        .set({ status: 'queued', attempts: sql`greatest(${receipts.attempts} - 1, 0)` })
+        .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+    },
+
+    async askLater(id, minutes) {
+      const over = sql`${receipts.createdAt} <= clock_timestamp() - make_interval(hours => ${RECEIPT_LINK_WAIT_HOURS})`
+      const [moved] = await db
+        .update(receipts)
+        .set({
+          status: sql`case when ${over} then 'failed' else 'queued' end`,
+          failure: sql`case when ${over} then 'missing' end`,
+          readAt: sql`case when ${over} then clock_timestamp() end`,
+          link: sql`case when ${over} then null else ${receipts.link} end`,
+          nextAttemptAt: sql`case when ${over} then null else clock_timestamp() + make_interval(mins => ${minutes}) end`,
+        })
+        .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+        .returning({ status: receipts.status })
+      return moved?.status === 'failed' ? 'failed' : 'queued'
     },
   }
 }

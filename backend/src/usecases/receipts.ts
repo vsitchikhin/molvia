@@ -74,7 +74,8 @@ export async function putReceiptPart(
 
 /**
  * The place of a receipt not yet recorded (MOL-126 Т-7, Р-6): where receipts of its seller were
- * recorded in the city its address prints, else in the person's own — the person's own last choice
+ * recorded in the city its address prints, else in the person's own — of a Serbian receipt, where its
+ * premises' receipts were (MOL-232) — the person's own last choice
  * first, else the place most people chose, the later on a tie, as the shop's memory is read. «Ереван
  * Сити» of Gyumri and of Yerevan are two places of one tax number. None, and the person names it.
  */
@@ -89,16 +90,20 @@ export async function withPlaces(
   const found = (
     await Promise.all(countries.map((country) => receipts.placesOfTins(actor.id, tins, country)))
   ).flat()
-  return stored.map(({ receipt, city }) => {
+  return stored.map(({ receipt, city, shopUnit }) => {
     if (receipt.place !== null) return receipt
     const tin = receipt.header?.tin ?? null
     const where = city ?? (actor.country === receipt.country ? actor.city : null)
-    if (tin === null || where === null) return receipt
+    if (tin === null || (where === null && shopUnit === null)) return receipt
+    // a Serbian chain shares one tax number among all its shops: its receipts name the premises, and
+    // the place is the one that premises' receipts were recorded at, whatever city (MOL-232, Р-7)
     const here = found.filter(
       (candidate) =>
         candidate.tin === tin &&
         candidate.place.country === receipt.country &&
-        placeNameIdentity(candidate.place.city) === placeNameIdentity(where),
+        (shopUnit !== null
+          ? candidate.shopUnit === shopUnit
+          : where !== null && placeNameIdentity(candidate.place.city) === placeNameIdentity(where)),
     )
     const [at] = [...here].sort(
       (a, b) =>

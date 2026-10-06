@@ -285,6 +285,10 @@ function fakeRepositories(
       release: unexpected('receipts.release'),
       retry: unexpected('receipts.retry'),
       finish: unexpected('receipts.finish'),
+      requeueInterruptedLinks: unexpected('receipts.requeueInterruptedLinks'),
+      claimLink: unexpected('receipts.claimLink'),
+      releaseLink: unexpected('receipts.releaseLink'),
+      askLater: unexpected('receipts.askLater'),
     },
     storeMemory: {
       recall: unexpected('storeMemory.recall'),
