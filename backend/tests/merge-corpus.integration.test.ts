@@ -133,6 +133,14 @@ describe('the night on the seed', () => {
     expect(named).toHaveLength(report.candidates)
     const pairs = named.map((pair) => [pair.from, pair.into].sort().join(' ~ '))
     for (const [from, into] of NAMED) expect(pairs).toContain([from, into].sort().join(' ~ '))
+    // Two edits a word are two things of the shelf, never named (the owner, 06.10.2026).
+    for (const pair of [
+      ['Хлеб', 'Хлебцы'],
+      ['Курица', 'Курага'],
+      ['Редис', 'Редька'],
+    ]) {
+      expect(pairs).not.toContain(pair.sort().join(' ~ '))
+    }
   })
 
   it('never merges two sizes the search key would fold into one', async () => {
