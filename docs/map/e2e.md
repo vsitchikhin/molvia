@@ -24,6 +24,7 @@ that area's map; here are the shell's own specs and what every run stands on.
 ## repository
 
 - `bin/fake-open-food-facts.mjs` — A stand-in for Open Food Facts in a run (MOL-162): knows every code led by `46` as a can of stew, every other as unknown, refuses a request without our User-Agent. Started by `playwright.config.ts` on the API's port + 1.
+- `bin/fake-purs.mjs` — A stand-in for the Serbian tax office's check in a run (MOL-232): reads the link's `vl` as the tax office does and answers a journal of two lines under a head that names nobody; the requesting unit picks the case — just printed, never shown, not valid. Started by `playwright.config.ts` on the API's port + 4.
 - `bin/fake-receipt-reader.mjs` — A stand-in for the receipt reader in a run (MOL-127, Р-7): every photo is read as the bench read am-05, the item rows under a made-up header — a square one as a sole trader's receipt with no items (MOL-227) — so a receipt taken in the browser is read, reviewed and recorded with no Tesseract. Started by `playwright.config.ts` on the API's port + 3.
 - `bin/e2e-database.mjs` — Drops and recreates this copy's `_e2e` database before a run; refuses any other name. Run by `playwright.config.ts`.
 - `playwright.config.ts` — Playwright config: the copy's e2e ports and database from `.env`, phone profile, starts its own API and PWA, and a build for the `pwa` project; the `camera` project on the full Chromium with a fake camera; an iPhone profile for the sheet alone; traces on failure.

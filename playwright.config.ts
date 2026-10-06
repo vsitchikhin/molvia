@@ -54,6 +54,10 @@ const offPort = String(Number(apiPort) + 1)
 // taken in the browser is read, reviewed and recorded with no Tesseract on the machine.
 const readerPort = String(Number(apiPort) + 3)
 
+// The Serbian tax office's check of a receipt is a fake too (MOL-232), on the port after the reader's:
+// it answers a receipt's link with a journal under a head that names nobody.
+const pursPort = String(Number(apiPort) + 4)
+
 // The scanner's camera is a file (MOL-98): Chromium films the barcode `globalSetup` draws, and a
 // spec that wants the camera grants it — without the grant Chromium refuses, which is the case of
 // «no permission». The full Chromium, not the headless shell every other spec runs in: the shell
@@ -136,6 +140,13 @@ export default defineConfig({
       stdout: 'pipe',
     },
     {
+      command: 'node bin/fake-purs.mjs',
+      url: `http://127.0.0.1:${pursPort}/health`,
+      env: { PURS_PORT: pursPort },
+      reuseExistingServer: false,
+      stdout: 'pipe',
+    },
+    {
       command: 'node bin/fake-receipt-reader.mjs',
       url: `http://127.0.0.1:${readerPort}/health`,
       env: { READER_PORT: readerPort },
@@ -165,6 +176,10 @@ export default defineConfig({
         // The fake reader (MOL-127), never the copy's own Tesseract (MOL-125, review А14): a run must
         // not read with whatever the copy happens to run, and its answer must be the same every time.
         RECEIPT_READER_URL: `http://127.0.0.1:${readerPort}`,
+        // The fake tax office (MOL-232), never the real one; with no limit, as Open Food Facts' fake.
+        PURS_URL: `http://127.0.0.1:${pursPort}`,
+        PURS_CONTACT: 'e2e@molvia.test',
+        PURS_PER_MINUTE: '600',
       },
       // Never reuse: on these ports there is nothing of ours to reuse, and a server left by
       // a crashed run must fail loudly instead of quietly answering with old code.

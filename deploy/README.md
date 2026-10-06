@@ -166,6 +166,10 @@ needs to be connected before people can use the complete flow.
 every question the API asks it about a code the catalogue missed (MOL-162). Empty or absent, the
 name hint is off; nothing else depends on it.
 
+`PURS_CONTACT` is the same for the Serbian tax office: sent in the User-Agent of every ask of its check
+of a receipt by the link of its QR code (MOL-232). Empty or absent, such receipts are taken and wait
+in the queue until it is set.
+
 Set `TELEGRAM_BOT_USERNAME` without `@` and generate `BOT_API_SECRET` using the command in
 `.env.prod.example`. This secret belongs to the internal API channel and is **not** the
 Telegram bot token. The backend and bot receive the same internal secret; only the bot

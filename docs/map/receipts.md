@@ -32,6 +32,11 @@ In the skeleton's client: `sendReceipt`, `putReceiptPart` (a JPEG, a minute to g
 - `backend/src/receipts/till-words-ru.ts` — The dictionary of Armenian till words in Russian (MOL-114's `words-hy-ru.json`): a line's gloss, a new item's proposed name, the query of the search when the names find nothing.
 - `backend/src/receipts/reader.ts` — The client of the receipt reader: a part read in a page mode, item lines cut out; `ReaderUnavailable` (nothing answered: the receipt waits), `ReaderDropped` (lost on the photo: counted, to the end), `PhotoUnreadable` (it fails).
 
+## backend · purs
+
+- `backend/src/purs/client.ts` — The client of the Serbian tax office's check of a receipt (MOL-232): the link asked for JSON by the server with its own User-Agent, at most twelve a minute and four a person, a minute's pause after a failure of the service; the seller, the premises, the town, the number and the journal — never the cashier, the buyer or the payments; `found`, `not_yet`, `refused` or `skipped`.
+- `backend/tests/fixtures/purs/` — The check's answer as the live one is shaped (MOL-223), made up — a seller, a cashier and a buyer nobody is: found, and held not valid.
+
 ## backend · usecases
 
 - `backend/src/usecases/receipts.ts` — Use cases of the owner's side: send, a part checked to be a photo (`error.receipt_not_photo`, `error.receipt_too_large`), list and one with the place by tax number, one as the review shows it — the memory laid over, the amounts of В-5, a price in doubt, the rate of its day, the receipt recorded before (MOL-126) — remove, restore.
