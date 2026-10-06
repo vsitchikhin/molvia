@@ -1002,7 +1002,8 @@ export const verdicts = pgTable(
     /**
      * A withdrawn verdict stays a row (MOL-27, the owner's decision): the 0.2 gate asks
      * whether someone reached five ratings in their first two weeks, and «rated five, took
-     * one back» has to stay five. So **the gate counts every row, and every other reader
+     * one back» has to stay five. So **the gate counts every row, the reminder reads the
+     * withdrawal's moment to skip a purchase made before it (MOL-101), and every other reader
      * counts only `deleted_at IS NULL`** — «Что брать», the verdict itself, and the
      * aggregates of 0.3. A reader that forgets the filter puts a withdrawn opinion back on
      * screen, silently. Rating again clears it on the same row, keeping `rated_at`.
