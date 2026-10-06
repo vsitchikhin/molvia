@@ -233,8 +233,11 @@ The detail behind the privacy lines of `CLAUDE.md`.
   premises and the town — with the journal laid out into lines; the cashier, the buyer and the
   payments are in the answer and never read, and the journal is not kept. **The link lives only until
   the tax office answered** (Р-4, stricter than «until recorded»): read, refused or given up after two
-  days, it is nulled in the same statement — `receipts_link_while_asked` holds it — and no log, failure
-  or metric ever carries it, nor the seller. **The copy leaves the link out** with that reason
+  days, its row is deleted in the same transaction — and no log, failure or metric ever carries it, nor
+  the seller. **It lives in a table of its own, `receipt_links`, which the nightly copy leaves out**
+  (adversarial А4): a receipt waits up to two days, and in `receipts` the link went into a copy kept
+  fourteen; a restore brings the table back empty, and a receipt left without its link fails as
+  `unreadable`. **The person's copy of their data leaves it out** too, with that reason
   (`EXPORT_COLUMNS`). `/privacy` says it under «Сербский чек по ссылке», a revision of edition 1: the
   new recipient is named in the consent by edition 2 (MOL-236, owner's В-4 of MOL-232); before 0.2 only
   the owner is on production. The record of processing (12091393) names Пореска управа among the third

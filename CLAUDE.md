@@ -590,7 +590,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A Serbian receipt is its link, asked of the tax office by the server** (MOL-232): `vl` checked by
   one function on both sides — MD5, a sale only; one JSON ask, the journal's lines; a queue of its own,
   people in turn, twelve a minute and four a person, a receipt not shown yet asked again for 48 hours;
-  the link kept only until answered; nothing in `receipt_days` until MOL-234; the place by the premises.
+  the link kept only until answered, in a table the nightly copy leaves out; a failure keeps the head
+  the link gave; nothing in `receipt_days` until MOL-234; the place by the premises.
 - **«Записать» is the whole receipt in one transaction** (`recordReceipt`): a trip finished on the
   receipt's day at its rate, its money the total the phone sends, else the printed one not below the
   lines, else the lines; the owner's lock first; the same trip again is the

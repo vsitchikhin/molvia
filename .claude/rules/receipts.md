@@ -508,19 +508,41 @@ service — the figures of Open Food Facts (Р-3); over the limit the round stop
 refused. **A receipt not shown yet is no failure** — a receipt just printed shows in a minute or two, one
 of a till that was offline later: asked again after 1, 2, 4, 8, 15 and 30 minutes, then hourly
 (`receiptLinkRetryMinutes`), and `missing` once `RECEIPT_LINK_WAIT_HOURS` (48) passed since it arrived;
-`400` or `isValid: false` is `invalid` at once; a journal with no list is `unreadable`. A 404 pauses
+`400` or `isValid: false` is `invalid` at once, and so is an answer about another receipt than the
+link signs (review 8); a journal with no list is `unreadable`. **A failure keeps what the link said** —
+its day, time, number and total (review 2, adversarial А1): wiped, the queue's own repeat of a send
+whose answer was lost met a 409 and the phone said «не принят» of a receipt the server held. A 404 pauses
 nobody; a 5xx, a timeout or an answer of another shape pauses everyone a minute — the price, since a fresh
-receipt sometimes answers 5xx too.
+receipt sometimes answers 5xx too. **An answer that no longer reads — not JSON, or JSON of another shape —
+is also the owner's** (`onBroken` → `failures`, job `receipt-link`, review 4): otherwise every Serbian
+receipt waits its two days and fails as `missing` for a reason that is not the till's; a 5xx or a timeout
+is the weather, the log's alone.
+
+**The link lives in a table of its own, out of the nightly copy** (`receipt_links`, adversarial А4); a
+receipt restored without it fails as `unreadable` before the next ask. **On the phone the sheet stays at
+work for a double tap** (`DOUBLE_TAP`, adversarial А3): the link is queued at once, and a sheet that went
+down on the first tap let the second through onto the tab bar — «Оценки» opened over the receipt just
+sent; a double click queued it twice.
+
+**The price, named** (adversarial А7): the trip of a receipt is placed by its printed day and time, read
+back on Belgrade's clock; in the hour lived twice on the last Sunday of October a receipt of the first
+02:30 is placed an hour late — the exact moment is in the link, and the link is not kept.
 
 **The journal's card** (`serbianJournal`): under «Назив Цена Кол. Укупно» a name runs over rows cut at
 the fortieth column, mid-word as often as not, to its tax label «(Ђ)»; the next row is «price quantity
 sum», «.» for thousands and «,» for the decimal — read as strings into hundredths and thousandths, no
-float. The unit is the last unit word of the name standing alone — `KG` a kilogram, `LIT`/`L` a litre,
-`KOM`, `KO`, `FL` a piece, «1KG» and «0.33L» being sizes; with none a fraction is weighed. Every line
-adds up as printed (`settled`).
+float. The unit is the last unit word of the name standing alone — `KG` a kilogram, `LIT` a litre,
+`KOM`, `KO`, `FL` a piece, «1KG» and «0.33L» being sizes; with none a fraction is weighed, and poured
+beside a bare «L» — **a bare «L» with a whole count is a piece** (review 5): «PIVO 0,5 L» × 2 is two
+bottles, never two litres at half the price of one. **A line paid less than price × quantity is
+discounted** (adversarial А2): the journal prints no row for a discount — «Pesto 440,00 × 4 = 1.408,00»,
+a fifth off — and the total is the sum of what was paid, so the difference is the line's discount and
+the line settles; «≠» never stands on a line of the tax office. A line paid more is not settled.
 
 **A line finds its item by the shop's memory, then by its name whole** (owner's В-3 «а»): `serbianItemName`
-— the printed name less its unit word and the till's article, set as a sentence — searched with its meaning;
+— the printed name less its unit word and the till's article at either end (a GTIN or a chain's code
+opening it, «383841701269 KESICA…», «[528195] KASIKA…», adversarial А5), set as a sentence — searched
+with its meaning;
 near is `search`, far `weak`, nothing `new`, named so. **Measured on the 98 lines against the seed**
 (`.scratch/tasks/status/MOL-232/bench-binding.md`): 14 near, 12 of them right, 2 far, 82 new. Asked again by
 its first two words and its first, the search added 34 far lines, some 30 wrong — «UBRUS», paper towels, a
@@ -537,7 +559,7 @@ place is proposed by the shop's name; the city is the municipality's, Belgrade o
 person's own — the price: a receipt of Niš proposes their city.
 
 **The measure of 0.2 is the reader's** (Р-5): a receipt by its link writes nothing to `receipt_days`,
-read, failed or recorded, until MOL-234 gives it a line of its own — its lines have nothing to put right,
+read, failed or recorded — by the row's `source`, never guessed from the country (review 7) — until MOL-234 gives it a line of its own — its lines have nothing to put right,
 and counted with OCR's they would thin the stop line.
 
 **On the phone** (owner's В-2 «а»): until MOL-233 reads the code, the link is pasted — the system camera
