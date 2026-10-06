@@ -86,6 +86,18 @@ describe('текст «чек разобран» (хендофф 08)', () => {
     )
   })
 
+  it('чек без товаров — «можно записать сумму», не «0 позиций» (MOL-227)', () => {
+    expect(receiptText(notice({ lineCount: 0 }))).toBe(
+      'Чек из «Ереван Сити» разобран: товаров в нём нет — можно записать сумму.',
+    )
+    expect(receiptText(notice({ lineCount: 0, place: null }))).toBe(
+      'Чек от 27 сентября разобран: товаров в нём нет — можно записать сумму.',
+    )
+    expect(receiptText(notice({ lineCount: 0, language: 'en', place: null }))).toBe(
+      'Your receipt from 27 September is ready: it lists no items — you can save its total.',
+    )
+  })
+
   it('8b · не разобран — дата, без числа позиций', () => {
     expect(receiptText(notice({ outcome: 'failed', lineCount: 0 }))).toBe(
       'Чек от 27 сентября не удалось прочитать. Можно переснять или записать покупки вручную.',

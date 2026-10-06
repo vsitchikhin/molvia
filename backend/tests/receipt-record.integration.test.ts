@@ -863,4 +863,111 @@ describe('«Записать»', () => {
       .where(eq(receiptLines.receiptId, id))
     expect(lines.map((line) => line.hs)).toEqual(['56.10', '56.10'])
   })
+
+  describe('a receipt with no items: the sum by the receipt (MOL-227)', () => {
+    const noItems = { layout: 'department' as const, receiptNo: null, totalMinor: 170_000n }
+
+    it('records a finished trip on the receipt’s day whose money is the total, with no purchase', async () => {
+      const me = await insertActor(db)
+      const id = await parsedReceipt(me, [], noItems)
+      const tripId = randomUUID()
+      const response = await record(me, id, {
+        tripId,
+        place: { name: 'Гая 5', city: 'Гюмри' },
+        purchasedOn: '2026-09-26',
+        lines: [],
+      })
+      expect(response.statusCode).toBe(200)
+      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+      expect(trip).toMatchObject({ startedOn: '2026-09-26', receiptMinor: 170_000n })
+      expect(trip?.finishedAt).not.toBeNull()
+      expect(await db.select().from(expenses)).toEqual([])
+      const [held] = await db.select().from(receipts).where(eq(receipts.id, id))
+      expect([held?.status, held?.tripId]).toEqual(['recorded', tripId])
+      expect(await db.select().from(receiptDays)).toMatchObject([
+        { recorded: 1, lines: 0, linesEdited: 0, totalsCorrected: 0 },
+      ])
+    })
+
+    it('takes the total the person typed where OCR read none, as the receipt’s own edit', async () => {
+      const me = await insertActor(db)
+      const id = await parsedReceipt(me, [], { ...noItems, totalMinor: null })
+      const tripId = randomUUID()
+      const response = await record(me, id, {
+        tripId,
+        place: { name: 'Гая 5', city: 'Гюмри' },
+        purchasedOn: '2026-09-26',
+        total: amount(1_800),
+        lines: [],
+      })
+      expect(response.statusCode).toBe(200)
+      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+      expect(trip?.receiptMinor).toBe(180_000n)
+      expect(await db.select().from(receiptDays)).toMatchObject([
+        { recorded: 1, totalsCorrected: 1 },
+      ])
+    })
+
+    it('refuses a trip with no money and no purchase: no total read and none typed (Р-4)', async () => {
+      const me = await insertActor(db)
+      const id = await parsedReceipt(me, [], { ...noItems, totalMinor: null })
+      const response = await record(me, id, {
+        tripId: randomUUID(),
+        place: { name: 'Гая 5', city: 'Гюмри' },
+        purchasedOn: '2026-09-26',
+        lines: [],
+      })
+      expect(response.statusCode).toBe(409)
+      expect(codeOf(response)).toBe(ERROR.RECEIPT_TOTAL_REQUIRED)
+      expect(await db.select().from(trips)).toEqual([])
+      expect(await db.select().from(places)).toEqual([])
+      const [held] = await db.select().from(receipts).where(eq(receipts.id, id))
+      expect(held?.status).toBe('parsed')
+    })
+
+    it('keeps the sum on its trip: taken off, nothing would be left (adversarial А4)', async () => {
+      const me = await insertActor(db)
+      const id = await parsedReceipt(me, [], noItems)
+      const tripId = randomUUID()
+      const body = { tripId, place: { name: 'Гая 5', city: 'Гюмри' }, purchasedOn: '2026-09-26' }
+      expect((await record(me, id, { ...body, lines: [] })).statusCode).toBe(200)
+      const off = await app.inject({
+        method: 'PUT',
+        url: `/trips/${tripId}/receipt`,
+        headers: { cookie: await signIn(db, me) },
+        payload: { receipt: null },
+      })
+      expect(off.statusCode).toBe(409)
+      expect(codeOf(off)).toBe(ERROR.RECEIPT_TOTAL_REQUIRED)
+      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+      expect(trip?.receiptMinor).toBe(170_000n)
+    })
+
+    it('records the same receipt twice where its fiscal number was not read — the price, named (Р-8)', async () => {
+      const me = await insertActor(db)
+      const first = await parsedReceipt(me, [], noItems)
+      const second = await parsedReceipt(me, [], noItems)
+      for (const id of [first, second]) {
+        const response = await record(me, id, {
+          tripId: randomUUID(),
+          place: { name: 'Гая 5', city: 'Гюмри' },
+          purchasedOn: '2026-09-26',
+          lines: [],
+        })
+        expect(response.statusCode).toBe(200)
+      }
+      expect(await db.select().from(trips)).toHaveLength(2)
+    })
+
+    it('refuses it recorded before where its fiscal number was read (Т-11)', async () => {
+      const me = await insertActor(db)
+      const read = { ...noItems, receiptNo: '11223344' }
+      const first = await parsedReceipt(me, [], read)
+      const second = await parsedReceipt(me, [], read)
+      const body = { place: { name: 'Гая 5', city: 'Гюмри' }, purchasedOn: '2026-09-26', lines: [] }
+      expect((await record(me, first, { ...body, tripId: randomUUID() })).statusCode).toBe(200)
+      const again = await record(me, second, { ...body, tripId: randomUUID() })
+      expect(codeOf(again)).toBe(ERROR.RECEIPT_RECORDED_BEFORE)
+    })
+  })
 })

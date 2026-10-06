@@ -386,6 +386,13 @@
       "when": 1791217286609,
       "tag": "0054_catalogue_merge",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1791262193270,
+      "tag": "0055_receipt_no_items",
+      "breakpoints": true
     }
   ]
 }

@@ -409,13 +409,26 @@ function withinOneEdit(a: string, b: string): boolean {
 export const RECEIPT_PAGE_MODES = [4, 6] as const
 
 /**
- * «Переснимите» (MOL-222, owner, 04.10.2026): not one item line was found. Every receipt with a line in
+ * «Переснимите» (MOL-222, owner, 04.10.2026): not one item line was found, and the receipt is no section
+ * printed with no items (MOL-227). Every receipt with a line in
  * it is read and goes to the review — «читать надо все кассы, все чеки» — however little of it was
  * read: the person's corrections are what the hypothesis of 0.2 counts, and a till read badly is one to
  * learn. What was «переснимите» before (В-4 of MOL-125) is `readPartly`, a hint on the review.
  */
 export function needsReshoot(text: ReceiptText): boolean {
-  return text.lines.length === 0
+  return text.lines.length === 0 && text.layout !== 'department'
+}
+
+/**
+ * A receipt read whole with no items on it (MOL-227): a sole trader's section and its sum. After
+ * MOL-222 a receipt is read only with a line in it, so a read one with none is this and nothing else —
+ * a sum to record, its purchases added later in the trip if the person wants (В-1).
+ */
+export function withoutItems(receipt: {
+  readonly status: ReceiptStatus
+  readonly lineCount: number
+}): boolean {
+  return receipt.status === 'parsed' && receipt.lineCount === 0
 }
 
 /** A line of a parsed receipt, in the domain's own values. */

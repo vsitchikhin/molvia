@@ -286,6 +286,33 @@ describe('PurchasesView (MOL-128)', () => {
   })
 
   describe('чеки (MOL-127)', () => {
+    it('чек без товаров — «без товаров», а не «0 позиций» (MOL-227)', async () => {
+      receipts.mockResolvedValue({
+        receipts: [
+          {
+            id: 'cccccccc-0000-4000-8000-000000000001',
+            status: 'parsed',
+            failure: null,
+            parts: 1,
+            received: 1,
+            capturedAt: new Date('2026-09-26T16:00:00.000Z'),
+            country: 'AM',
+            language: 'ru',
+            header: { tin: '12345678', date: '2026-09-26', time: '16:30', receiptNo: null },
+            total: { minor: 170_000n, currency: 'AMD' },
+            balanced: false,
+            lineCount: 0,
+            unsettled: 0,
+            place: null,
+            tripId: null,
+          },
+        ],
+      })
+      const { view } = await render()
+      expect(view.text()).toContain('без товаров · 26 сент.')
+      expect(view.text()).not.toContain('0 позиций')
+    })
+
     it('пока список чеков не ответил, «пусто» не говорится (ревью 7)', async () => {
       receipts.mockReturnValue(new Promise(() => undefined))
       const { view } = await render()
@@ -455,6 +482,28 @@ describe('PurchasesView (MOL-128)', () => {
   })
 
   describe('«Записаны»', () => {
+    it('запись с суммой и без покупок — «сумма по чеку», откуда бы ни была (MOL-227, Р-6, А7)', async () => {
+      const sum = [parseMoney('1700', 'AMD')]
+      const byHand = { ...trip(1), itemCount: 0, total: sum }
+      const fromReceipt = { ...trip(2, 'Гая 5'), itemCount: 0, total: sum, fromReceipt: true }
+      tripHistory.mockResolvedValue({ trips: [byHand, fromReceipt], nextCursor: null })
+      const { view } = await render()
+      for (const row of rows(view)) {
+        expect(row.text()).toContain('сумма по чеку · ')
+        expect(row.text()).not.toMatch(/0 позиций|из чека/)
+        expect(row.find('.sum').exists()).toBe(true)
+      }
+    })
+
+    it('«не должно сработать»: без суммы и без покупок — не «сумма по чеку» (А4b)', async () => {
+      const empty = { ...trip(1), itemCount: 0, total: [], fromReceipt: true }
+      tripHistory.mockResolvedValue({ trips: [empty], nextCursor: null })
+      const { view } = await render()
+      const [row] = rows(view)
+      expect(row?.text()).toContain('0 позиций · вчера · из чека')
+      expect(row?.text()).not.toContain('сумма по чеку')
+    })
+
     it('место, число позиций, день и сумма — от сервера; тап открывает записанные покупки', async () => {
       const first = {
         ...trip(1),

@@ -10,6 +10,7 @@ import {
   RECEIPT_TELL_AFTER_SECONDS,
   RECEIPT_TELL_WITHIN_HOURS,
   RECEIPT_UNDO_MINUTES,
+  withoutItems,
 } from '@molvia/model'
 import type {
   Currency,
@@ -1031,7 +1032,13 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             .insert(receiptLineImages)
             .values(outcome.images.map((image) => ({ receiptId: id, ...image })))
         }
-        await tally(tx, outcome.partly ? { readPartly: sql`1` } : { read: sql`1` }, today())
+        // a section with no items is read whole, and no reading «in part» (MOL-227)
+        const read = withoutItems({ status: outcome.kind, lineCount: outcome.lines.length })
+          ? { noItems: sql`1` }
+          : outcome.partly
+            ? { readPartly: sql`1` }
+            : { read: sql`1` }
+        await tally(tx, read, today())
       })
     },
   }

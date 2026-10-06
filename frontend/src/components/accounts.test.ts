@@ -296,6 +296,10 @@ describe('an operation as its row says it', () => {
       expect(row(trip({ unpriced: 2 })).meta).toBe('Продукты · 5 позиций, 2 без цены')
     })
 
+    it('with no purchase is the receipt’s sum, never «0 позиций» (MOL-227)', () => {
+      expect(row(trip({ items: 0 })).meta).toBe('Продукты · сумма по чеку')
+    })
+
     it('stands in the circle of «Продукты», never the accent (Ф-4)', () => {
       expect(row(trip()).tint).toBe('var(--cat-groceries)')
       expect(

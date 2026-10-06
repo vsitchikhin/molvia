@@ -5,7 +5,8 @@ import { signedIn } from './session'
 
 // Receipts on the phone (MOL-127): taken in the browser, kept by the queue, read by the fake reader
 // (`bin/fake-receipt-reader.mjs` answers every photo with the bench's reading of am-05 — thirteen
-// lines dated 1 October), reviewed and recorded. The list asks again every five seconds while a
+// lines dated 1 October — and a square one with a sole trader's receipt of no items, MOL-227),
+// reviewed and recorded. The list asks again every five seconds while a
 // receipt is being read, so the waits below are generous.
 
 const sheet = (page: Page) => page.locator('dialog[open]')
@@ -49,7 +50,7 @@ async function photo(page: Page, width = 900, height = 2400): Promise<Buffer> {
 }
 
 /** «Сфотографировать чек» → «Выбрать фото» → the parts given, then «Отправить чек». */
-async function capture(page: Page, parts = 1): Promise<void> {
+async function capture(page: Page, parts = 1, square = false): Promise<void> {
   await page.getByRole('button', { name: 'Photograph a receipt' }).click()
   await expect(sheet(page)).toContainText('Smooth the receipt out')
   // The gallery's field: the camera's has `capture`, «Next part» uses the same plain one.
@@ -60,7 +61,7 @@ async function capture(page: Page, parts = 1): Promise<void> {
       .setInputFiles({
         name: `part-${String(part)}.jpg`,
         mimeType: 'image/jpeg',
-        buffer: await photo(page),
+        buffer: square ? await photo(page, 900, 900) : await photo(page),
       })
     await edged(page)
     await expect(sheet(page)).toContainText(`Part ${String(part)}`)
@@ -123,6 +124,43 @@ test('a receipt from the photo to the purchases: read, reviewed, recorded under 
   await expect(
     page.locator('.recorded .purchase-row').filter({ hasText: 'from a receipt' }),
   ).toBeVisible(READ)
+})
+
+// MOL-227: a sole trader prints no items — the receipt is its sum, recorded as one, with no «retake»
+test('a receipt with no items is recorded as its total, its purchases to add in the record', async ({
+  page,
+}) => {
+  test.setTimeout(90_000)
+  await signedIn(page, '/purchases')
+  await capture(page, 1, true)
+
+  const ready = page.locator('.purchase-row').filter({ hasText: 'no items' })
+  await expect(ready).toBeVisible(READ)
+  await ready.click()
+  await expect(page).toHaveURL(/\/purchases\/receipts\/[0-9a-f-]+$/)
+  await expect(page.getByText('This receipt lists no items')).toBeVisible()
+  await expect(page.locator('.receipt-line')).toHaveCount(0)
+
+  const save = page.getByRole('button', { name: 'Save the total' })
+  await save.click()
+  // The place is found by the tax number once this seller was recorded — by an earlier run too.
+  const asked = async () => {
+    if (await sheet(page).isVisible()) return 'asked'
+    return new URL(page.url()).pathname.includes('/purchases/receipts/') ? null : 'left'
+  }
+  await expect.poll(asked, READ).not.toBeNull()
+  if ((await asked()) === 'asked') {
+    await sheet(page).evaluate((dialog) =>
+      Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished)),
+    )
+    await page.waitForTimeout(350)
+    await sheet(page).getByLabel('Another place').fill('Гая 5')
+    await sheet(page).getByRole('button', { name: 'Save the total' }).click()
+  }
+
+  await expect(page).toHaveURL(/\/purchases\/[0-9a-f-]+$/, READ)
+  await expect(page.getByRole('heading', { name: 'Saved the receipt total' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add an item' })).toBeVisible()
 })
 
 test('a receipt taken with no connection waits on the phone and goes once it is back', async ({

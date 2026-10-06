@@ -2024,6 +2024,8 @@ export const receiptDays = pgTable(
     readPartly: integer('read_partly').notNull().default(0),
     /** Not one item line found. */
     reshoot: integer('reshoot').notNull().default(0),
+    /** Read whole with no items on it: a sole trader's section and its sum (MOL-227). */
+    noItems: integer('no_items').notNull().default(0),
     unreadable: integer('unreadable').notNull().default(0),
     recorded: integer('recorded').notNull().default(0),
     /** Every line of the receipts recorded, the ones left out included. */
@@ -2047,7 +2049,7 @@ export const receiptDays = pgTable(
   (table) => [
     check(
       'receipt_days_counts_non_negative',
-      sql`least(${table.read}, ${table.readPartly}, ${table.reshoot}, ${table.unreadable}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
+      sql`least(${table.read}, ${table.readPartly}, ${table.reshoot}, ${table.noItems}, ${table.unreadable}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
     ),
     check('receipt_days_edited_within_lines', sql`${table.linesEdited} <= ${table.lines}`),
   ],
