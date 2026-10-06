@@ -376,6 +376,110 @@ test.describe('safe areas', () => {
     }
   })
 
+  // Ф-29, К-10: «Вернуть» 8 over the strip on a section — the strip over the tab bar that holds the
+  // indicator — and the list ending over it (adversarial А1), a removed record on «Покупки».
+  test('«Вернуть» on a section stands 8 over the strip, and the list ends over it', async ({
+    page,
+  }) => {
+    await insets(page, portrait)
+    await open(page, '/purchases')
+    const headers = await asBrowser(page)
+    const me = actorCodec.parse(
+      await (await page.request.get('/api/actors/me', { headers })).json(),
+    )
+    const trip = async (name: string) => {
+      const created = await page.request.post('/api/trips', {
+        headers,
+        data: { context: settingsOf(me), id: randomUUID(), place: { name, kind: 'store' } },
+      })
+      expect(created.status()).toBe(201)
+      const id = ((await created.json()) as { id: string }).id
+      const finished = await page.request.post(`/api/trips/${id}/finish`, {
+        headers,
+        data: { finishedOnDeviceAt: new Date().toISOString() },
+      })
+      expect(finished.status()).toBe(204)
+      return id
+    }
+    for (let i = 1; i <= 6; i += 1) await trip(`Shop ${String(i)}`)
+    const removed = await trip('Removed shop')
+    // With a purchase in it, so that removing it asks first (an empty one goes at once).
+    const item = await page.request.post('/api/catalogue/items', {
+      headers,
+      data: { kind: 'product', name: `Removed ${randomUUID()}`, defaultUnit: 'piece' },
+    })
+    const expense = await page.request.post(`/api/trips/${removed}/expenses`, {
+      headers,
+      data: { id: randomUUID(), itemId: ((await item.json()) as { id: string }).id },
+    })
+    expect(expense.status()).toBe(201)
+    await open(page, '/purchases')
+    await page.locator('.recorded .purchase-row').filter({ hasText: 'Removed shop' }).click()
+    await expect(page).toHaveURL(new RegExp(`/purchases/${removed}$`))
+    await page.getByRole('button', { name: 'Delete the entry' }).click()
+    await page.waitForTimeout(400)
+    await page.locator('dialog[open]').getByRole('button', { name: 'Delete the entry' }).click()
+    await expect(page).toHaveURL(/\/purchases$/)
+    const strip = page.locator('.undo-strip')
+    await expect(strip).toBeVisible()
+    await page.waitForFunction(() => !document.documentElement.hasAttribute('data-nav'))
+    await strip.locator('.text').hover()
+    await page.evaluate(() => {
+      window.scrollTo(0, document.documentElement.scrollHeight)
+    })
+    await page.waitForTimeout(300)
+    const [undo, dock, last] = await Promise.all([
+      strip.boundingBox(),
+      page.locator('.dock').boundingBox(),
+      page.locator('.recorded .purchase-row').last().boundingBox(),
+    ])
+    expect(Math.round((dock?.y ?? 0) - ((undo?.y ?? 0) + (undo?.height ?? 0)))).toBe(8)
+    expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual(undo?.y ?? 0)
+  })
+
+  // On a nested screen with no strip — «Счета» — «Вернуть» stands 8 over the home indicator.
+  test.describe('in Russian', () => {
+    test.use({ locale: 'ru-RU' })
+
+    test('«Вернуть» on a nested screen with no strip stands 8 over the indicator', async ({
+      page,
+    }) => {
+      await insets(page, portrait)
+      await open(page, '/money/accounts')
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Счета')
+      await page.getByRole('button', { name: 'Добавить счёт' }).click()
+      const sheet = page.locator('dialog[open]').last()
+      await page.waitForTimeout(400)
+      await sheet.getByLabel('Имя').fill('Лишний')
+      await sheet.getByLabel('Остаток').fill('0')
+      await sheet
+        .getByLabel('На день')
+        .fill(
+          new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
+            new Date(Date.now() - 24 * 60 * 60 * 1000),
+          ),
+        )
+      await sheet.getByRole('button', { name: 'Сохранить' }).click()
+      await expect(sheet).toBeHidden()
+      await page.getByRole('link', { name: /Лишний/ }).click()
+      await page.getByRole('button', { name: 'Править' }).click()
+      await page.waitForTimeout(400)
+      await page
+        .locator('dialog[open]')
+        .last()
+        .getByRole('button', { name: 'Удалить счёт' })
+        .click()
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Счета')
+      const strip = page.locator('.undo-strip')
+      await expect(strip).toBeVisible()
+      await strip.locator('.text').hover()
+      await page.waitForFunction(() => !document.documentElement.hasAttribute('data-nav'))
+      const box = await strip.boundingBox()
+      const height = await page.evaluate(() => window.innerHeight)
+      expect(Math.round(height - ((box?.y ?? 0) + (box?.height ?? 0)))).toBe(portrait.bottom + 8)
+    })
+  })
+
   test('held sideways, nothing starts under the notch', async ({ page }) => {
     await page.setViewportSize({ width: 915, height: 412 })
     await insets(page, landscape)
