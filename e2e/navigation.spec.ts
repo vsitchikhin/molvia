@@ -436,14 +436,28 @@ test.describe('safe areas', () => {
     expect(Math.round((dock?.y ?? 0) - ((undo?.y ?? 0) + (undo?.height ?? 0)))).toBe(8)
     expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual(undo?.y ?? 0)
     // Reached through `:deep`, not `:slotted` (adversarial А2, А2′): «Photograph a receipt» and «Add
-    // by hand» render a button and its sheet — two roots and no slot attribute — and still fade in;
-    // the strip in the place of «Вернуть» takes the tap, whatever it is made of.
-    const style = (selector: string, property: 'animationName' | 'pointerEvents') =>
-      page
-        .locator(selector)
-        .evaluateAll((nodes, name) => nodes.map((node) => getComputedStyle(node)[name]), property)
-    expect(await style('.dock > button', 'animationName')).toEqual(['appear', 'appear'])
-    expect(await style('.undo-place > *', 'pointerEvents')).toEqual(['auto'])
+    // by hand» render a button and its sheet — two roots and no slot attribute — and still fade in.
+    expect(
+      await page
+        .locator('.dock > button')
+        .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).animationName)),
+    ).toEqual(['appear', 'appear'])
+    // The strip in the place of «Вернуть» takes the tap whatever it is made of: stripped of the slot
+    // attribute a strip of two roots would never get (round 3, Г1), it still does.
+    expect(
+      await page.locator('.undo-place > *').evaluateAll((nodes) =>
+        nodes.map((node) => {
+          for (const one of [...node.attributes])
+            if (/^data-v-[0-9a-f]+-s$/.test(one.name)) node.removeAttribute(one.name)
+          return getComputedStyle(node).pointerEvents
+        }),
+      ),
+    ).toEqual(['auto'])
+    // A sheet in the strip is not faded in by it: it would replay `appear` on every opening (Г2).
+    await page.getByRole('button', { name: 'Add by hand' }).click()
+    const opened = page.locator('.dock > dialog[open]')
+    await expect(opened).toBeVisible()
+    expect(await opened.evaluate((node) => getComputedStyle(node).animationName)).not.toBe('appear')
   })
 
   // On a nested screen with no strip — «Счета» — «Вернуть» stands 8 over the home indicator.
