@@ -642,32 +642,35 @@ The detail behind the frontend lines of `CLAUDE.md`.
 - **The bars are opaque, the docked strip keeps its own margins, and «Вернуть» stands in one
   place** (MOL-179). The pinned row, the strip and the tab bar are `--surface` with a hairline
   (`pinned-bar`, Ф-18): at 88 % with a blur the list showed through under the words on them, and
-  `--chrome` is gone. The current tab is told by form — a filled icon and 700, the rest outlined and
-  600 (Ф-5) — chosen by the same `isExactActive` that sets `aria-current`, so eye and ear agree; the
-  labels fit 320 px at 700 too, `money.spec` holds it in both languages — the one exception to
-  «chosen is never a weight» (see MOL-174 above). **The strip's margins and
-  column are `AppScreen`'s** (К-9): 12 over, 16 at the sides, 12 under — on a nested screen 12 over
-  the home indicator — and what the screen puts in stands in one column 8 apart; a screen draws no
+  `--chrome` is gone. The current tab is told by form — a filled icon and 700, the rest outlined
+  and 600 (Ф-5) — chosen by the same `isExactActive` that sets `aria-current`, so eye and ear
+  agree; the labels fit 320 px at 700 too, `money.spec` holds it in both languages — the one
+  exception to «chosen is never a weight» (see MOL-174 above). **The strip's margins and column
+  are `AppScreen`'s** (К-9): 12 over, 16 at the sides, 12 under — on a nested screen 12 over the
+  home indicator — and what the screen puts in stands in one column 8 apart; a screen draws no
   wrapper with a padding of its own (seven did, «a main action, a ghost under it» came out 4 apart
-  on one screen and 12 on the next), and what it swaps in fades in from the strip (`appear(0)`), not
-  from a wrapper — by `:deep`, never `:slotted`: a component of two roots, a button and its sheet
-  («Сфотографировать чек», «Записать вручную»), gets no slot attribute and was not reached
-  (adversarial А2); not the strip's top row, and not a `dialog`, which would replay it on opening. `UpdateBand` takes the strip's margins, 8 and a hairline over the screen's action.
-  **«Вернуть» is the frame's `#undo`** (Ф-29, К-10, owner's В-1 «а»): 8 over the strip, over the tab
-  bar or the bottom edge where there is none, over the list and out of the strip, so the main action
+  on one screen and 12 on the next), and what it swaps in fades in from the strip (`appear(0)`),
+  not from a wrapper — by `:deep`, never `:slotted`: a component of two roots, a button and its
+  sheet («Сфотографировать чек», «Записать вручную»), gets no slot attribute and was not reached
+  (adversarial А2); not the strip's top row, and not a `dialog`, which would replay it on opening.
+  `UpdateBand` takes the strip's margins, 8 and a hairline over the screen's action. **«Вернуть»
+  is the frame's `#undo`** (Ф-29, К-10, owner's В-1 «а»): 8 over the strip, over the tab bar or
+  the bottom edge where there is none, over the list and out of the strip, so the main action
   under it neither moves nor hides; it takes taps by `:deep` for the same reason (А2′). **The list
   ends over it**: the room under the list is the strip's height plus «Вернуть» and 8 (adversarial
   А1 — out of the strip, it covered the last row at the end of the scroll for as long as a finger
-  held it); the price, accepted, is that its coming and going moves a list scrolled to its very end,
-  as the strip of «Покупки» did when it held it. Never in `#docked` — it pushed «Сфотографировать чек» up on
-  «Покупки» — and never `position: fixed` inside `UndoStrip` itself: a parent playing `appear`
-  (`translate`) becomes the containing block of a fixed child, and the strip would ride the card for
-  the length of the animation; a sheet's «Вернуть» is in its own footer, which the same component
-  serves unchanged. A screen whose `FloatingDock` still holds its action hides it while «Вернуть»
-  stands (16 over the tab bar under 8 would overlap), until its task moves the action into the strip.
-  `UndoStrip` reads «words · count · Вернуть», the count in a ring of `--graphic`, `aria-hidden` —
-  the announcement says the ten seconds once, a live region ticking would talk over a person
-  reaching for the button (81 v2 asked for a label; declined, MOL-179 Р-5).
+  held it); the price, accepted, is that its going moves, in one jump of its height and 8, a list
+  scrolled within that much of its end — 70 px at 390, 157 with a long name at 320 (adversarial
+  round 2) — as the strip of «Покупки» did when it held it; its coming moves nothing. Never in
+  `#docked` — it pushed «Сфотографировать чек» up on «Покупки» — and never `position: fixed`
+  inside `UndoStrip` itself: a parent playing `appear` (`translate`) becomes the containing block
+  of a fixed child, and the strip would ride the card for the length of the animation; a sheet's
+  «Вернуть» is in its own footer, which the same component serves unchanged. A screen whose
+  `FloatingDock` still holds its action hides it while «Вернуть» stands (16 over the tab bar under
+  8 would overlap), until its task moves the action into the strip. `UndoStrip` reads «words ·
+  count · Вернуть», the count in a ring of `--graphic`, `aria-hidden` — the announcement says the
+  ten seconds once, a live region ticking would talk over a person reaching for the button (81 v2
+  asked for a label; declined, MOL-179 Р-5).
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and
