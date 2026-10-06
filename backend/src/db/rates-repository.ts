@@ -1,5 +1,5 @@
 import { and, asc, eq, gte, inArray, lt, lte, max, sql } from 'drizzle-orm'
-import { RATE_JUMP_HISTORY } from '@molvia/model'
+import { RATE_BASE, RATE_JUMP_HISTORY } from '@molvia/model'
 import type { AmdRate, CachedRate, RateProvider } from '@molvia/model'
 import type { Conn } from './index'
 import { officialRates } from './schema'
@@ -89,6 +89,7 @@ export function createRateRepository(db: Conn): RateRepository {
           rates.map((rate) => ({
             provider: rate.provider,
             currency: rate.currency,
+            base: RATE_BASE[rate.provider],
             rateDate: rate.date,
             scaled: rate.scaled,
             jump: rate.jump,
@@ -150,6 +151,7 @@ export function createRateRepository(db: Conn): RateRepository {
               rates.slice(start, start + WRITE_CHUNK).map((rate) => ({
                 provider: rate.provider,
                 currency: rate.currency,
+                base: RATE_BASE[rate.provider],
                 rateDate: rate.date,
                 scaled: rate.scaled,
                 jump: rate.jump,

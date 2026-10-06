@@ -55,8 +55,9 @@ import {
   marketSideSchema,
   placeKindSchema,
   rateChoiceSchema,
-  HOME_BANK,
   MARKET_CURRENCIES,
+  RATE_BASE,
+  homeBankOf,
   rateProviderSchema,
   ratePreferenceSchema,
   SALARY_SHIFT_DAY_MAX,
@@ -173,18 +174,31 @@ function unitKnownOrNull(column: AnyPgColumn) {
 }
 
 /**
- * `homeBankOf` of a pair in SQL, written from the model's `HOME_BANK` in the model's order — the
- * base's bank, then the quote's (adversarial review) — so the check of a trip's source can never
- * name another bank than the domain does (MOL-110).
+ * `homeBankOf` of a pair in SQL, written from the model's rule pair by pair (MOL-230): the dinar has
+ * two banks by what it is paired with, so a bank per currency no longer says it. Every pair whose
+ * bank is not the Central Bank of Armenia is named, so the check of a trip's source can never name
+ * another bank than the domain does (MOL-110).
  */
 function homeBankSql(base: AnyPgColumn, quote: AnyPgColumn) {
-  const banks = [base, quote].flatMap((side) =>
-    Object.entries(HOME_BANK).map(
-      ([currency, bank]) =>
-        sql`when ${side} = ${sql.raw(`'${currency}'`)} then ${sql.raw(`'${bank}'`)}`,
-    ),
+  const pairs = currencySchema.options.flatMap((one) =>
+    currencySchema.options.flatMap((other) => {
+      const bank = one === other ? 'cba' : homeBankOf(one, other)
+      return bank === 'cba'
+        ? []
+        : [
+            sql`when ${base} = ${sql.raw(`'${one}'`)} and ${quote} = ${sql.raw(`'${other}'`)} then ${sql.raw(`'${bank}'`)}`,
+          ]
+    }),
   )
-  return sql`(case ${sql.join(banks, sql` `)} else 'cba' end)`
+  return sql`(case ${sql.join(pairs, sql` `)} else 'cba' end)`
+}
+
+/** The model's `RATE_BASE` in SQL: the currency a provider's row is quoted in (MOL-230). */
+function rateBaseSql(provider: AnyPgColumn) {
+  const bases = Object.entries(RATE_BASE).map(
+    ([name, base]) => sql`when ${provider} = ${sql.raw(`'${name}'`)} then ${sql.raw(`'${base}'`)}`,
+  )
+  return sql`(case ${sql.join(bases, sql` `)} end)`
 }
 
 /** Currency is nullable wherever the amount beside it is. */
@@ -839,8 +853,9 @@ export const trips = pgTable(
     ),
     // A publisher for every published rate, and none for a rate nobody published — and the two
     // say the same thing: the source *is* the publisher («official» is the pair's own bank,
-    // `homeBankOf`: the National Bank of Georgia for the lari, the Central Bank of Armenia for the
-    // rest, MOL-110), so «fallback by cba» on a pair of drams or «official by erapi» is not a state
+    // `homeBankOf`: the National Bank of Georgia for the lari and the dinar against the dram, the
+    // National Bank of Serbia for the dinar's other pairs, the Central Bank of Armenia for the rest,
+    // MOL-110, MOL-230), so «fallback by cba» on a pair of drams or «official by erapi» is not a state
     // but a contradiction (MOL-22, В2-11). On a personal rate and on no rate at all the second
     // expression is null and the check passes.
     check(
@@ -1297,7 +1312,11 @@ export const officialRates = pgTable(
     provider: text('provider').$type<RateProvider>().notNull(),
     currency: char('currency', { length: 3 }).$type<AmdRate['currency']>().notNull(),
     rateDate: date('rate_date').notNull(),
-    // Drams per one unit, at RATE_SCALE — whatever «per 100» the provider printed is divided out.
+    // What the row is quoted in — the provider's `RATE_BASE`: the dram, or the dinar for the National
+    // Bank of Serbia, whose list has no dram (MOL-230). Said by the row so that nobody reading the
+    // table takes 1,2257 dinars for a rouble as drams; the key stays the provider's, one base each.
+    base: char('base', { length: 3 }).$type<Currency>().notNull().default('AMD'),
+    // Units of `base` per one unit, at RATE_SCALE — whatever «per 100» the provider printed is divided out.
     scaled: bigint('scaled', { mode: 'bigint' }).notNull(),
     // Over a quarter away from the provider's recent rates when it arrived (MOL-39, Р-19): kept,
     // since it may be true, and a trip that takes it lets the person choose.
@@ -1310,8 +1329,9 @@ export const officialRates = pgTable(
     check('official_rates_provider_known', oneOf(table.provider, rateProviderSchema.options)),
     check(
       'official_rates_currency_foreign',
-      sql`${oneOf(table.currency, currencySchema.options)} and ${table.currency} <> 'AMD'`,
+      sql`${oneOf(table.currency, currencySchema.options)} and ${table.currency} <> ${table.base}`,
     ),
+    check('official_rates_base_of_provider', sql`${table.base} = ${rateBaseSql(table.provider)}`),
     check('official_rates_positive', sql`${table.scaled} > 0`),
   ],
 )

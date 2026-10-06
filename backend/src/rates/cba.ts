@@ -1,5 +1,6 @@
 import { RATE_DIGITS, divideRounded, scaledFromDecimal } from '@molvia/model'
-import { FOREIGN, FeedError, published, request } from './feed'
+import { PUBLISHED } from '@molvia/model'
+import { FeedError, published, request } from './feed'
 import type { Published, RateFeed } from './feed'
 
 export const CBA_URL = 'https://api.cba.am/exchangerates.asmx'
@@ -30,7 +31,7 @@ export function parseCba(xml: string): Published {
   const scaled = new Map<string, bigint | null>()
   for (const [block] of xml.matchAll(/<ExchangeRate>[\s\S]*?<\/ExchangeRate>/g)) {
     const iso = field(block, 'ISO')
-    if (iso === undefined || !FOREIGN.some((currency) => currency === iso)) continue
+    if (iso === undefined || !PUBLISHED.cba.some((currency) => currency === iso)) continue
     const amount = field(block, 'Amount') ?? ''
     const rate = scaledFromDecimal(field(block, 'Rate') ?? '', RATE_DIGITS)
     scaled.set(
