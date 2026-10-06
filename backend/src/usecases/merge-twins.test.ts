@@ -201,7 +201,7 @@ describe('mergeNight', () => {
 
   it('asks a candidate again tomorrow when a side of it merged tonight (adversarial А8)', async () => {
     const chanah = side('c1', 'Сыр чанах', '2026-09-01')
-    const chunuh = side('c2', 'Сыр чунух', '2026-09-02')
+    const chunuh = side('c2', 'Сыр чаних', '2026-09-02')
     const chanoh = side('c3', 'Сыр чанох', '2026-09-03')
     const w = world({
       pairs: [
@@ -215,7 +215,7 @@ describe('mergeNight', () => {
 
   it('names that candidate in the report mode, where nothing merged (round 2)', async () => {
     const chanah = side('c1', 'Сыр чанах', '2026-09-01')
-    const chunuh = side('c2', 'Сыр чунух', '2026-09-02')
+    const chunuh = side('c2', 'Сыр чаних', '2026-09-02')
     const chanoh = side('c3', 'Сыр чанох', '2026-09-03')
     const w = world({
       pairs: [
