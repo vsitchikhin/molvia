@@ -35,12 +35,18 @@ afterEach(() => {
 })
 
 describe('браузер ниже пола сборки (MOL-231)', () => {
-  it('приложение не стартует и не слушает сбоев: ни отчёта, ни буфера, строка на месте', async () => {
+  it('приложение не стартует, не слушает и не шлёт сбоев: ни отчёта, ни буфера, строка на месте', async () => {
     document.documentElement.setAttribute(OUTDATED_MARK, '')
     document.body.innerHTML = '<div id="app">line</div>'
     const listen = vi.spyOn(window, 'addEventListener')
 
     await import('@/main')
+    // A module that catches as it loads and reports, ahead of any screen: silent all the same.
+    const { reportFailure } = await import('@/failures')
+    const { failures } = await import('@/catchers')
+    reportFailure(new TypeError('undefined is not a function'), 'screen')
+    failures.report(new TypeError('undefined is not a function'), 'window')
+    await failures.flush()
 
     const types = listen.mock.calls.map(([type]) => type)
     expect(types).not.toContain('error')
