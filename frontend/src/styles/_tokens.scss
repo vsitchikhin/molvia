@@ -276,8 +276,6 @@
   --shadow-md: 0 4px 14px rgb(63 46 26 / 14%);
   --shadow-lg: 0 -8px 32px rgb(46 33 18 / 22%); /* sheets rise from the bottom edge */
 
-  /* Pinned bars are slightly translucent — a token, not an effect. No blur beyond this. */
-  --chrome: rgb(255 250 242 / 88%);
   --scrim: rgb(38 27 16 / 40%);
 
   /* Over the camera's picture, in both schemes alike: the video is what it is, not our ground. */
@@ -342,7 +340,6 @@
   --shadow-md: 0 4px 14px rgb(0 0 0 / 45%);
   --shadow-lg: 0 -8px 32px rgb(0 0 0 / 55%);
 
-  --chrome: rgb(32 28 25 / 88%);
   --scrim: rgb(0 0 0 / 55%);
 }
 

@@ -357,7 +357,7 @@ export default defineComponent({
   padding: calc(var(--safe-top) + var(--space-4)) calc(var(--space-4) + var(--safe-right))
     var(--space-3) calc(var(--space-4) + var(--safe-left));
   border-bottom: var(--hairline) solid var(--border);
-  background: var(--chrome);
+  background: var(--surface);
 }
 
 .docked .head {

@@ -45,7 +45,6 @@ colors:
   cat-own-5: '#532268'
   cat-own-6: '#069875'
   cat-own-7: '#034445'
-  chrome: 'rgb(255 250 242 / 88%)'
   scrim: 'rgb(38 27 16 / 40%)'
   viewfinder-ground: '#14110f'
   viewfinder-ink: '#fffaf2'
@@ -93,7 +92,6 @@ colors:
   cat-own-5-dark: '#9e6bb6'
   cat-own-6-dark: '#60d3ae'
   cat-own-7-dark: '#4b9898'
-  chrome-dark: 'rgb(32 28 25 / 88%)'
   scrim-dark: 'rgb(0 0 0 / 55%)'
 typography:
   display:
@@ -425,8 +423,8 @@ with warm, shallow shadows — a phone held at 30 cm shows banding in anything d
 
 ### Named Rules
 
-**The No Glass Rule (target).** The top bar and the tab bar are opaque `surface` with a hairline
-`border` — no translucency, no blur (today 88 % with a 12 px blur, and page text shows through).
+**The No Glass Rule.** The top bar, the docked strip and the tab bar are opaque `surface` with a
+hairline `border` — no translucency, no blur: through glass the list shows under the words on it.
 
 ## Shapes
 
