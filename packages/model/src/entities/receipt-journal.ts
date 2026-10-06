@@ -60,6 +60,7 @@ function lineOf(text: string, price: string, quantity: string, sum: string): Rec
   const unit = unitOf(printed, milli)
   const priceHundredths = hundredthsOf(price)
   const sumHundredths = hundredthsOf(sum)
+  const discountHundredths = discountOf(priceHundredths, milli, sumHundredths)
   return {
     printed,
     hs: null,
@@ -68,8 +69,8 @@ function lineOf(text: string, price: string, quantity: string, sum: string): Rec
     unit,
     priceHundredths,
     sumHundredths,
-    discountHundredths: null,
-    settled: settles(priceHundredths, milli, sumHundredths),
+    discountHundredths,
+    settled: settles(priceHundredths, milli, sumHundredths, discountHundredths),
     rows: [],
   }
 }
@@ -89,10 +90,32 @@ function milliOf(text: string): number | null {
   return Number(`${(amount[1] ?? '').replace(/\./gu, '')}${(amount[2] ?? '').padEnd(3, '0')}`)
 }
 
-/** Price × quantity, half up to the hundredth, is the sum printed. */
-function settles(price: number | null, milli: number | null, sum: number | null): boolean {
+/** Price × quantity, half up to the hundredth. */
+function productOf(price: number, milli: number): number {
+  return Math.floor((price * milli + 500) / 1000)
+}
+
+/**
+ * What the till took off a line (adversarial А2 of MOL-232): the journal prints the shelf price and
+ * what was paid — «Pesto 440,00 × 4 = 1.408,00», a fifth off — and no line of its own for the
+ * discount; the receipt's total is the sum of what was paid. Less paid than price × quantity is that
+ * difference off; null where nothing was.
+ */
+function discountOf(price: number | null, milli: number | null, sum: number | null): number | null {
+  if (price === null || milli === null || sum === null || price < 0 || sum < 0) return null
+  const off = productOf(price, milli) - sum
+  return off > 0 ? off : null
+}
+
+/** Price × quantity, half up to the hundredth, is the sum printed and its discount. */
+function settles(
+  price: number | null,
+  milli: number | null,
+  sum: number | null,
+  discount: number | null,
+): boolean {
   if (price === null || milli === null || sum === null || price < 0 || sum < 0) return false
-  return Math.floor((price * milli + 500) / 1000) === sum
+  return productOf(price, milli) === sum + (discount ?? 0)
 }
 
 /**
@@ -101,7 +124,6 @@ function settles(price: number | null, milli: number | null, sum: number | null)
  */
 const UNIT_WORDS: Readonly<Record<string, 'kg' | 'l' | 'piece'>> = {
   KG: 'kg',
-  L: 'l',
   LIT: 'l',
   KOM: 'piece',
   KO: 'piece',
@@ -116,30 +138,38 @@ const WORDS = /[^\s/()[\]\\]+/gu
 /**
  * How a line is sold: by the last of the unit words the name carries as words of their own — «1KG» and
  * «0.33L» are sizes, «MLEKO 1 L KOM» is a piece. With no unit word a fraction is weighed: «Filet
- * lososa/KG/0238062» names it, a count of pieces is whole.
+ * lososa/KG/0238062» names it, a count of pieces is whole; a fraction beside a bare «L» is poured.
  */
 function unitOf(printed: string, milli: number | null): 'kg' | 'l' | 'piece' {
-  const words = printed.toUpperCase().match(WORDS) ?? []
+  const words: readonly string[] = printed.toUpperCase().match(WORDS) ?? []
   const named = words.map((word) => UNIT_WORDS[word]).filter((unit) => unit !== undefined)
   const last = named.at(-1)
   if (last !== undefined) return last
-  return milli !== null && milli % 1000 !== 0 ? 'kg' : 'piece'
+  const fraction = milli !== null && milli % 1000 !== 0
+  // a bare «L» is a litre poured only when a fraction is sold; «PIVO 0,5 L» × 2 is two bottles, never
+  // two litres at half the price of one (review 5)
+  if (fraction && words.includes('L')) return 'l'
+  return fraction ? 'kg' : 'piece'
 }
 
 // what ends a name and is no part of the item: a unit word, an article «/0238062», a code «- 8683…»;
 // never a bare «L», which is as often a size, «MLEKO 1 L KOM»
 const TAIL = /[\s/()[\]\\-]+(?:KG|LIT|KOM|KO|КОМ|KOMAD|FL|PAK|\d{5,})[)\]]*$/iu
 
+// what opens a name and is no part of the item: the till's article «[528195]», a GTIN or a chain's
+// code of six digits and more, «383841701269», «0252491» (adversarial А5) — never a size, «175G GRAND»
+const HEAD = /^(?:\[\d+\]|\d{6,})(?=[\s/-])[\s/-]*/u
+
 /**
  * The name a line gives an item (MOL-232, В-3): what is printed less its unit word and the till's
- * article at the end — «SECER KRISTAL 1KG SUNOKO KOM» is «Secer kristal 1kg sunoko». A till prints in
+ * article at either end — «SECER KRISTAL 1KG SUNOKO KOM» is «Secer kristal 1kg sunoko». A till prints in
  * capitals; a name in capitals is set as a sentence, as a person would type it.
  */
 export function serbianItemName(printed: string): string {
   let name = printed.trim()
   for (let previous = ''; previous !== name;) {
     previous = name
-    name = name.replace(TAIL, '').trim()
+    name = name.replace(TAIL, '').replace(HEAD, '').trim()
   }
   name = name.replace(/[\s/\\-]+$/u, '').trim()
   if (name === '') return printed.trim()
