@@ -329,6 +329,32 @@ describe('счёт, заведённый на свой день, стартуе�
     expect((await balanceOf(me, id)).balance).toEqual({ minor: 1_800_000n, currency: 'AMD' })
   })
 
+  it('считает поход, начатый до счёта и оплаченный после: деньги ушли на кассе (А1)', async () => {
+    const me = await owner()
+    const place = await insertPlace(db)
+    const trip = await insertTrip(db, {
+      actorId: me.id,
+      placeId: place,
+      startedAt: new Date(Date.now() - 10 * 60 * 1000),
+      startedOn: today,
+    })
+    await db.insert(expenses).values({
+      id: randomUUID(),
+      tripId: trip,
+      itemId: await insertItem(db),
+      amountMinor: 300000n,
+      amountCurrency: 'AMD',
+    })
+    const { id } = await addAccount(me, { start: amd('18000'), startOn: today })
+    const paid = await call(me, 'PUT', `/trips/${trip}/payment`, { accountId: id })
+    expect(paid.statusCode, paid.body).toBe(200)
+    // Open, it was begun before the account: not yet the account's money.
+    expect((await balanceOf(me, id)).balance).toEqual({ minor: 1_800_000n, currency: 'AMD' })
+    const finished = await call(me, 'POST', `/trips/${trip}/finish`, {})
+    expect(finished.statusCode, finished.body).toBeLessThan(300)
+    expect((await balanceOf(me, id)).balance).toEqual({ minor: 1_500_000n, currency: 'AMD' })
+  })
+
   it('берёт день создания с телефона, а не с часов Еревана', async () => {
     const me = await owner()
     // Today on the last of the phone's days — Yerevan's yesterday after 12:00 UTC.

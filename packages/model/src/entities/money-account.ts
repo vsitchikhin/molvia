@@ -92,9 +92,10 @@ export interface AccountOperation {
   /** When it was written — a trip, when it was finished, or started while it is open. */
   readonly at: Date
   /**
-   * When the server first had it — a trip, when it was started: what the start of an account made
-   * on its own day is measured by (MOL-250). Never `seenAt`: an account given to an old spending
-   * does not make the spending new.
+   * When the server first had it — a trip, when it had it finished, or started while it is open:
+   * the money leaves at the till. What the start of an account made on its own day is measured by
+   * (MOL-250, adversarial А1). Never `seenAt`: an account given to an old spending does not make the
+   * spending new.
    */
   readonly writtenAt: Date
   /**

@@ -216,6 +216,7 @@ interface TripRow extends Record<string, unknown> {
   started_at: Date | string
   started_on: string
   finished_at: Date | string | null
+  received_at: Date | string
   seen_at: Date | string
   account_id: string | null
   debited_minor: string | bigint | null
@@ -439,6 +440,9 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
                          end,
                          'YYYY-MM-DD') as started_on,
                  coalesce(t.finished_on_device_at, t.finished_at) as finished_at,
+                 -- When the server had it as paid: its finish, or its start while it is open —
+                 -- the server's clock, never the phone's (MOL-250).
+                 coalesce(t.finished_at, t.started_at) as received_at,
                  greatest(t.started_at, t.finished_at, t.account_set_at, t.receipt_set_at,
                           (select max(e.created_at) from expenses e where e.trip_id = t.id))
                    as seen_at,
@@ -558,7 +562,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           // finished after midnight, is not taken from a start that already counted it (Д4).
           day: row.started_on,
           at: new Date(row.finished_at ?? row.started_at),
-          writtenAt: new Date(row.started_at),
+          writtenAt: new Date(row.received_at),
           seenAt: new Date(row.seen_at),
           currency: row.currency,
           accountId: row.account_id,

@@ -532,14 +532,14 @@ describe('an account made on its own start day starts when it was made (MOL-250)
     expect(markOf(cash, null)).toEqual({ day: '2026-10-05', at: null })
   })
 
-  it('leaves out a trip begun before it, though finished after (Е2)', () => {
+  it('measures a trip by when it was paid, not begun (adversarial А1)', () => {
     const cash = madeToday('100 AMD')
-    const trip = operation('trip', ['-30 AMD'], '2026-10-06', cash, {
-      at: after(30),
-      writtenAt: after(-30),
-      seenAt: after(30),
-    })
-    expect(accountBalance(cash, [trip], noRates).balance).toEqual(toMoney('100 AMD'))
+    // Begun at the shelf before the account, paid at the till after it, and one paid before.
+    const paidAfter = operation('trip', ['-30 AMD'], '2026-10-06', cash, written(after(10)))
+    const paidBefore = operation('trip', ['-5 AMD'], '2026-10-06', cash, written(after(-5)))
+    expect(accountBalance(cash, [paidAfter, paidBefore], noRates).balance).toEqual(
+      toMoney('70 AMD'),
+    )
   })
 
   it('looks for reasons from the moment it was made, never before it', () => {
