@@ -1178,6 +1178,40 @@ describe('банк страны молчит — запасные (MOL-230)', ()
     expect((await run(2))?.jump).toBe(false)
   })
 
+  it('последний курс каждого банка страны — до обхода любого архива (раунд 2, П2)', async () => {
+    const order: string[] = []
+    const bank = (provider: 'nbg' | 'nbs'): HomeBankFeed => ({
+      provider,
+      fetchLatest: () => {
+        order.push(`${provider} latest`)
+        return Promise.reject(cutOff())
+      },
+      fetchOn: () => {
+        order.push(`${provider} on`)
+        return Promise.reject(cutOff())
+      },
+    })
+    const refresh = officialRatesRefresh({
+      primary: feed('cba').feed,
+      fallbacks: [],
+      homeBanks: [bank('nbg'), bank('nbs')],
+      rates: {
+        upsert: () => Promise.resolve(),
+        latestOnOrBefore: () => Promise.resolve([]),
+        history: () => Promise.resolve(new Map()),
+      },
+      log: { warn: () => undefined },
+      now: () => NOW,
+      history: {
+        feed: { fetchRange: () => Promise.resolve([]) },
+        rates: { between: () => Promise.resolve([]), insertMissing: () => Promise.resolve(0) },
+      },
+    })
+    await refresh()
+    expect(order.slice(0, 2)).toEqual(['nbg latest', 'nbs latest'])
+    expect(order.slice(2)).toEqual(['nbg on', 'nbs on'])
+  })
+
   it('НБС отвечает листом старше недели — запасные сразу', async () => {
     const h = silentHome({ up: true, date: '2026-09-01' })
     await h.run()

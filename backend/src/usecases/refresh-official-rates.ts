@@ -567,14 +567,22 @@ export function officialRatesRefresh({
     // does** (MOL-230): the lari had the central bank's own rows to stand in, written every hour, but
     // the dinar is in no answer of the central bank's — and the open sources, asked only for its
     // silence, would leave a pair of the dinar with nothing fresher than the silent bank.
-    let homeSilent = false
+    // **Every bank's latest before any archive** (adversarial round 2, П2): walked in turn, the
+    // National Bank of Serbia waited for the National Bank of Georgia's walk — right after the deploy a
+    // month of it, 32 requests, up to sixteen minutes of a slow bank — with the dinar of today in
+    // nobody's row.
+    const answers = new Map<RateProvider, Published | null>()
     for (const bank of homeBanks) {
       const answer = await fetchFrom(bank, today, null)
-      const failed = answer ? 0 : (homeFailures.get(bank.provider) ?? 0) + 1
-      homeFailures.set(bank.provider, failed)
+      homeFailures.set(bank.provider, answer ? 0 : (homeFailures.get(bank.provider) ?? 0) + 1)
       if (answer) await store(answer)
-      await walkArchive(bank, today)
-      const date = answer?.date ?? (await lastDateOf(bank.provider, today))
+      answers.set(bank.provider, answer)
+    }
+    for (const bank of homeBanks) await walkArchive(bank, today)
+    let homeSilent = false
+    for (const bank of homeBanks) {
+      const failed = homeFailures.get(bank.provider) ?? 0
+      const date = answers.get(bank.provider)?.date ?? (await lastDateOf(bank.provider, today))
       if (failed > FALLBACK_AFTER_FAILURES || (date !== null && !isRateFresh(date, today))) {
         homeSilent = true
       }

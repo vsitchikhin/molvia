@@ -255,6 +255,14 @@ was left out: a retelling of the bank is what rate.am was rejected for.
   written within the hour — on production nearly always. The dinar has no stand-in in the cache — the
   CBA has none, and the open sources are asked only for a silence — so for up to an hour no pair of it
   had a rate, and a trip started then had none for good. In development only an empty cache, as before.
+- **Every country bank's latest comes before any archive** (adversarial round 2, П2): walked in turn,
+  the National Bank of Serbia waited for the National Bank of Georgia's walk — right after the deploy
+  the last month of it, 32 requests, some twenty seconds and up to sixteen minutes of a slow bank —
+  with today's dinar in nobody's row. The archives are walked after all the latest have answered.
+- **A rollback past `0056` is safe by the code** (adversarial round 2, not held by a test): the image
+  before it knows no `nbs` and never builds a pair from its rows, every reader of another provider
+  reads its own, and its writes leave `base` to the default, the dram, which the check takes for every
+  provider it knows.
 - **The price of the first hours, named** (adversarial А, corrected): the archive comes in portions —
   the National Bank of Serbia's from 2022 and the dinar in the National Bank of Georgia's, the last
   month first, the history over some fifteen hours. **A day of the dinar older than the month has no
