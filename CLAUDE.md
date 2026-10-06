@@ -524,6 +524,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **An installed app takes a new version only when hidden and holding no typing** (`pwaUpdate.ts`),
   **or by «Обновить»** (MOL-132): never reloaded without the tap; the strip is the top row over the
   tab bar, and an error while a version waits offers it first.
+- **The bars are opaque `--surface`; the docked strip's margins and column are `AppScreen`'s, and
+  «Вернуть» is its `#undo`, 8 over the strip** (MOL-179): never in `#docked`, never a wrapper's
+  padding in a screen; a sheet's «Вернуть» stays in its footer.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17); no gesture
   is intercepted but the sheet's own pull down (MOL-80); only the page scrolls, except a sheet.
   **«Что брать» is home** (MOL-128): the `tabMove` of «back»; old addresses of «Поход» redirect for

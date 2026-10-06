@@ -406,7 +406,8 @@ inner container — a sheet is the only exception.
 - **Page gutter:** 16 on every screen **(target: "Деньги" uses 32 today)**.
 - **Spacing scale:** 4, 8, 12, 16, 24, 32 — nothing off the scale. Inside a group 8, between groups 24 **(target: not 12 between everything)**.
 - **Bars:** the top bar is one touch target (44) under the safe area; the large title collapses into it after 24 px of scroll. The tab bar is 74 plus the home indicator, five tabs: «Что брать · Покупки · Оценки · Деньги · Настройки», home is «Что брать».
-- **Docked action:** a screen's main action is a full-width bar (`#docked`) above the tab bar — on «Покупки» and on every screen of «Деньги» **(target: no floating buttons)**. Nothing scrolls under it unseen: the list ends above it.
+- **Docked action:** a screen's main action is a full-width bar (`#docked`) above the tab bar — on «Покупки» and on every screen of «Деньги» **(target: no floating buttons)**. Nothing scrolls under it unseen: the list ends above it. The bar keeps its own margins — 12 over, 16 at the sides, 12 under (over the home indicator on a nested screen) — and stands its actions in one column 8 apart: a main action, a ghost under it.
+- **"Вернуть":** one place on every screen — 8 over the docked bar, or over the tab bar where there is none; 16 from the edges, over the list, `surface` with the raised shadow, min 56: the words 15 · a 28 ring of `graphic` with the seconds · tinted "Вернуть". The bar under it stays whole. In a sheet it stands in the footer, over the main action.
 - **Above the control, nothing of the answer:** a strip, a refusal, a note go under the switch (month, period) that chooses the answer, never above it.
 - **Thumb zone:** a state's action is pushed to the bottom of the free height; one primary per screen.
 
