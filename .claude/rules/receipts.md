@@ -451,8 +451,9 @@ one head in view may be the other receipt's, another trader's, and the upper rec
 under the lower trader's number proposed that shop to everyone who shot his. Read by the moments alone, such
 a photo took the lower receipt's total under the upper one's fiscal number, and the upper receipt shot on
 its own was then refused as recorded (adversarial А1). **The price, named** (review 1, № 5): a moment
-printed twice and misread once is read as two receipts too — on the safe side, the person types the
-total. The bench, before → after: «no items» 0 → 10,
+printed twice and misread once — or noise read as a head under the fiscal number — is read as two receipts
+too, on the safe side: the person types the total and, since one receipt has one head, chooses the place —
+it is not proposed by the tax number, and the record teaches that number nothing (review 5, № 13). The bench, before → after: «no items» 0 → 10,
 the tax number right 1 → 9 (none wrong), the total 2 → 7 (none wrong), the day 0 → 8, the fiscal number
 0 → 3; not one field of any other reading moved (`.scratch/tasks/status/MOL-227/score.mts`).
 
