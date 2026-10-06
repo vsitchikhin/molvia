@@ -1,6 +1,6 @@
 <template>
   <BottomSheet :open="open" :on-closed="closed" @update:open="$emit('update:open', $event)">
-    <template #title>{{ t('receipt.link.title') }}</template>
+    <template #title>{{ t('purchases.capture_link') }}</template>
 
     <div class="body">
       <p v-if="!online" class="notice">
@@ -29,7 +29,7 @@
     </div>
 
     <template #footer>
-      <AppButton size="large" block @click="send">{{ t('receipt.link.send') }}</AppButton>
+      <AppButton size="large" block @click="send">{{ t('receipt.capture.send') }}</AppButton>
       <p v-if="!online" class="under">{{ t('receipt.capture.send_offline') }}</p>
     </template>
   </BottomSheet>

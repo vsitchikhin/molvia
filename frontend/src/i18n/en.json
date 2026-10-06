@@ -2208,12 +2208,10 @@
       "action": "To purchases"
     },
     "link": {
-      "title": "Receipt by link",
       "step_qr": "Point your phone’s camera at the QR code at the bottom of the receipt",
       "step_copy": "Open the link and copy the page’s address",
       "step_paste": "Paste it here",
       "field": "Link from the receipt",
-      "send": "Send receipt",
       "refusal": {
         "not_link": "This is not a link from a Serbian receipt",
         "damaged": "The link is damaged — copy it again",

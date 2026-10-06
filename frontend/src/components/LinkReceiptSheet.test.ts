@@ -44,7 +44,7 @@ function online(value: boolean): void {
 
 const field = (sheet: VueWrapper) => sheet.get<HTMLInputElement>('input[type="text"]')
 const send = (sheet: VueWrapper) =>
-  sheet.findAll('button').find((button) => button.text() === en.receipt.link.send)
+  sheet.findAll('button').find((button) => button.text() === en.receipt.capture.send)
 
 beforeEach(() => {
   clock = 0
