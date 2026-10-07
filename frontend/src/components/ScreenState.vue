@@ -45,6 +45,7 @@
           :block="!card"
           :size="dockTarget && !updating ? 'large' : 'regular'"
           :variant="card ? 'ghost' : updating ? 'secondary' : 'primary'"
+          ref="retryButton"
           :class="{ word: card }"
           @click="$emit('retry')"
         >
@@ -65,6 +66,7 @@
 import {
   computed,
   defineComponent,
+  nextTick,
   onBeforeUnmount,
   onMounted,
   ref,
@@ -87,6 +89,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useStateStrip } from '@/composables/useStateStrip'
+import { useUpdateAnnouncement } from '@/composables/useUpdateAnnouncement'
 import { usePwaUpdate } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
@@ -194,8 +197,8 @@ export default defineComponent({
       const node = el instanceof Element ? el : (el?.$el as unknown)
       root.value = node instanceof HTMLElement ? node : null
     }
-    const card = computed(() => props.inline && props.kind === 'error')
     const actions = ref<HTMLElement | null>(null)
+    const retryButton = ref<ComponentPublicInstance | null>(null)
     const announce = useAnnouncer()
 
     // The strip is asked for while the block is an error of the whole screen, and let go as it
@@ -208,6 +211,35 @@ export default defineComponent({
       else strip.release(me)
     })
     const dockTarget = computed(() => (strip?.owner.value === me ? strip.target.value : null))
+    // A screen has one error of its own: a second one while the first holds the strip is drawn as a
+    // section's, the quiet card — its own filled «Повторить» and «Обновить» were a second pair
+    // (adversarial А4, 8c).
+    const second = computed(
+      () => strip?.owner.value != null && strip.owner.value !== me && !props.inline,
+    )
+    const card = computed(() => props.kind === 'error' && (props.inline || second.value))
+
+    // Moved between the strip and the block — the error turned a section's or the screen's where it
+    // stands — the buttons are other nodes or the same ones moved, and either way the focus fell to
+    // the body (adversarial А2). It goes back to «Повторить», or to the first button of the block.
+    watch(
+      [dockTarget, card],
+      () => {
+        const focused = document.activeElement
+        if (!(focused instanceof HTMLElement) || !actions.value?.contains(focused)) return
+        const wasRetry = retryButton.value?.$el === focused
+        void nextTick(() => {
+          const retry = retryButton.value?.$el as unknown
+          const next = wasRetry && retry instanceof HTMLElement ? retry : null
+          ;(next ?? actions.value?.querySelector('button'))?.focus()
+        })
+      },
+      { flush: 'pre' },
+    )
+
+    // The error offers «Обновить» in the row's place, and says the version out loud as the row did
+    // (adversarial А3); a quiet card offers none — the row stands — and says nothing.
+    useUpdateAnnouncement(() => props.kind === 'error' && !card.value)
 
     const glyph = computed<Component | undefined>(() => {
       if (props.kind === 'offline') return IconCloudOff
@@ -231,7 +263,8 @@ export default defineComponent({
     // just focused (MOL-19, A3, Р-9). Polite words go to the app's live region when there is
     // one; outside the app the block carries `status` itself.
     const alerts = computed(
-      () => !props.inline && (props.kind === 'error' || props.kind === 'attention'),
+      () =>
+        !props.inline && !second.value && (props.kind === 'error' || props.kind === 'attention'),
     )
     const role = computed(() => {
       if (alerts.value) return 'alert'
@@ -285,7 +318,7 @@ export default defineComponent({
     const reportable = computed(
       () =>
         props.kind === 'error' &&
-        !props.inline &&
+        !card.value &&
         actor?.state === 'ready' &&
         feedback !== null &&
         !inDialog.value,
@@ -297,6 +330,7 @@ export default defineComponent({
       setRoot,
       card,
       actions,
+      retryButton,
       dockTarget,
       glyph,
       toneClass,

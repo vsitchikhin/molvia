@@ -130,6 +130,40 @@ describe('AdviceView', () => {
       expect(newcomer.view.get('.dock').text()).toContain(en.purchases.manual)
       expect(newcomer.view.text()).not.toContain(en.purchases.capture)
     })
+
+    // A failure under «Где вы?» opened from the strip: the error is a section's while the sheet is
+    // up, so the strip — and the sheet and what was typed in it — stays (MOL-180, adversarial А1,
+    // as Р-15 of MOL-128). Taken by the error, the sheet went, and `entering` stuck.
+    it('a failure under the open sheet keeps it, and the strip is the error’s once it is down', async () => {
+      const georgia = { geography: { country: 'GE', city: 'Гюмри' } }
+      advice.mockResolvedValue(answer([], georgia))
+      const { view } = await render({ country: 'GE' })
+      await view.get('.dock').get('button').trigger('click')
+      await flushPromises()
+      const sheet = () => view.findComponent({ name: 'StartTripSheet' })
+      expect(sheet().props('open')).toBe(true)
+
+      // The city moved in another tab, and the answer for it failed.
+      advice.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 502'))
+      const key = `molvia.settings.${ME}`
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          country: 'GE',
+          city: 'Тбилиси',
+          spendCurrency: 'AMD',
+          incomeCurrency: 'RUB',
+        }),
+      )
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+      await flushPromises()
+
+      expect(view.text()).toContain(en.advice.error.title)
+      expect(sheet().exists()).toBe(true)
+      expect(sheet().props('open')).toBe(true)
+      expect(view.get('.state').classes()).toContain('card')
+      expect(view.get('.dock').text()).not.toContain(en.state.retry)
+    })
   })
 
   beforeEach(() => {

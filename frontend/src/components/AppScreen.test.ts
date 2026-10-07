@@ -666,12 +666,124 @@ describe('AppScreen with an error of the whole screen', () => {
     expect(view.get('.content').find('.action').exists()).toBe(true)
   })
 
-  it('holds one «Try again» in the strip, though two errors ask for it', async () => {
+  // One error of the screen's own: a second while the first holds the strip is a section's quiet
+  // card, so «Обновить» is one and the filled «Повторить» is one (8c, adversarial А4).
+  it('draws a second error as a section’s while the first holds the strip', async () => {
     const { view } = await render('/', {
+      update: 'ready',
       slots: { default: () => [error(), error({ title: 'Also broke' })] },
     })
     await nextTick()
+    expect(buttons(view.get('.dock'))).toEqual([en.update.apply, en.state.retry])
+    const [first, second] = view.findAll('.content .state')
+    expect(first?.classes()).not.toContain('card')
+    expect(second?.classes()).toContain('card')
+    expect(second?.find('[role="alert"]').exists()).toBe(false)
+    expect(second?.findAll('button').map((button) => button.text())).toEqual([en.state.retry])
+    expect(second?.get('button').classes()).toContain('ghost')
+    const all = view.findAll('button').map((button) => button.text())
+    expect(all.filter((text) => text === en.update.apply)).toHaveLength(1)
+  })
+
+  // The strip goes to the next error as the first goes (Р-2): taken inside the effect that asks.
+  it('hands the strip to the second error once the first goes', async () => {
+    const first = ref(true)
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            AppScreen,
+            { title: 'Money' },
+            {
+              default: () => [
+                first.value ? error({ title: 'First' }) : null,
+                error({ title: 'Second' }),
+              ],
+            },
+          ),
+      }),
+      {
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: waiting('none') },
+        },
+      },
+    )
+    await nextTick()
+    expect(view.get('.content .state.card').text()).toContain('Second')
+    first.value = false
+    await nextTick()
+    await nextTick()
     expect(buttons(view.get('.dock'))).toEqual([en.state.retry])
+    expect(view.find('.content .state.card').exists()).toBe(false)
+    expect(view.get('.content .state').find('.action').exists()).toBe(false)
+  })
+
+  // The same error turning a section's or the screen's where it stands moves its buttons, and the
+  // focus on «Повторить» goes with them, not to the body (adversarial А2).
+  it.each([
+    ['the screen’s to a section’s', false],
+    ['a section’s to the screen’s', true],
+  ])('keeps the focus on «Try again» as the error turns from %s', async (_, startInline) => {
+    const inline = ref(startInline)
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(AppScreen, { title: 'Money' }, { default: () => error({ inline: inline.value }) }),
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: waiting('none') },
+        },
+      },
+    )
+    await nextTick()
+    const retry = () => view.findAll('button').find((button) => button.text() === en.state.retry)
+    ;(retry()?.element as HTMLElement).focus()
+    inline.value = !startInline
+    await nextTick()
+    await nextTick()
+    expect(document.activeElement).toBe(retry()?.element)
+    view.unmount()
+  })
+
+  // The error offers «Обновить» in the row's place, and says the version as the row did: a version
+  // out while it holds the strip came in silence (adversarial А3).
+  it('says a version that comes out while the error holds the strip', async () => {
+    vi.useFakeTimers()
+    const phase = shallowRef<UpdatePhase>('none')
+    const said: string[] = []
+    const Root = {
+      setup() {
+        const announcements = provideAnnouncer()
+        watch(announcements, (now, before) => {
+          for (const added of now.filter((a) => !before.some((b) => b.id === a.id))) {
+            said.push(added.text)
+          }
+        })
+        return () => h(AppScreen, { title: 'Money' }, { default: () => error() })
+      },
+    }
+    const view = mount(Root, {
+      global: {
+        plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+        provide: {
+          [pwaUpdateKey as symbol]: { phase, apply: vi.fn(), serverVersion: vi.fn() },
+        },
+      },
+    })
+    await nextTick()
+    phase.value = 'ready'
+    await nextTick()
+    vi.advanceTimersByTime(200)
+    await nextTick()
+
+    expect(buttons(view.get('.dock'))).toEqual([en.update.apply, en.state.retry])
+    expect(said).toContain(en.update.ready)
+    expect(said.filter((text) => text === en.update.ready)).toHaveLength(1)
+    vi.useRealTimers()
   })
 
   it('hands a focus in the strip to the screen title when the error goes', async () => {
