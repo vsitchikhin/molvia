@@ -3,6 +3,7 @@ paths:
   - 'e2e/**'
   - 'playwright.config.ts'
   - 'bin/e2e-database.mjs'
+  - 'frontend/vite.config.ts'
 ---
 
 # End-to-end: where it runs, its database, its ports, the login seam, the camera, traces, the live region
@@ -105,7 +106,24 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   retries to write one. It is recorded for every test and dropped when it passes, which costs
   12–22 % of a full local run (measured in four pairs); and under an overload that times a test
   out, the trace may still be lost: it is saved while the context is torn down, and that teardown
-  shares the test's timeout.
+  shares the test's timeout. **In CI the first attempt's** (`retain-on-first-failure`, MOL-217,
+  owner's В-2), uploaded from `test-results/` when the job fails: `on-first-retry` recorded the retry,
+  which a flake passes, and the artifact was `playwright-report/`, which the `github` reporter never
+  writes — a flake of `verdicts.spec` failed four times and left nothing but its message. The price is
+  the same recording, a minute or two of the job's eleven.
+- **The dev server optimizes every package on its start, never in the middle of a run** (MOL-217):
+  what only a worker imports stands in `optimizeDeps.include` of `vite.config.ts`, held by
+  `optimizeDeps.test.ts`. Vite's first crawl reads the pages and never a worker, so `zxing-wasm` was
+  found when the first spec of `camera` opened the scanner — while the last file of `phone`,
+  `verdicts.spec`, was running beside it — and every page loading stalled behind the optimizer. In
+  each of the four failures of «…and the app closed» the API received the rating made after
+  `setOffline(true)`, with a 201, while the phone took it for lost. Locally the cache is warm, so it
+  was never seen here; a run that wants to see it removes `frontend/node_modules/.vite/deps`.
+- **Offline, where a spec then says what the server did not get, is `goOffline`** (`e2e/session.ts`,
+  MOL-217): `setOffline` and then a request of the page that failed, so the offline is the page's
+  and not only the protocol's answer. Why a write went through after `setOffline` on the CI runner
+  was not reproduced in six probes here (`.scratch/tasks/status/MOL-217/`) — the next failure's trace
+  is what will say. The other specs with `setOffline` keep it as it is (owner's В-3): none failed.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **eight things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
