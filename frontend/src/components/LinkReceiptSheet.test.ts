@@ -19,9 +19,13 @@ vi.mock('@/stores/receiptQueue', () => ({
 let photo: { width: number; height: number } | null = null
 const onPhoto = vi.fn<() => Promise<ReceiptLinkOnPhoto>>()
 const dispose = vi.fn()
+const created = vi.fn()
 vi.mock('@/receipts/photo', () => ({ decodePhoto: () => Promise.resolve(photo) }))
 vi.mock('@/receipts/qrReader', () => ({
-  createReceiptQrReader: () => ({ warm: () => Promise.resolve(), read: vi.fn(), dispose }),
+  createReceiptQrReader: () => {
+    created()
+    return { warm: () => Promise.resolve(), read: vi.fn(), dispose }
+  },
   receiptLinkOnPhoto: () => onPhoto(),
 }))
 const reportFailure = vi.fn()
@@ -91,6 +95,7 @@ beforeEach(() => {
   sendLink.mockReset().mockReturnValue(true)
   onPhoto.mockReset().mockResolvedValue({ kind: 'none' })
   dispose.mockReset()
+  created.mockReset()
   reportFailure.mockReset()
   photo = { width: 3024, height: 4032 }
   online(true)
@@ -171,7 +176,9 @@ describe('«Чек по ссылке» (MOL-232)', () => {
     await toPaste(sheet)
     await field(sheet).setValue(LINK)
     await send(sheet)?.trigger('click')
-    expect(sheet.text()).toContain(en.receipt.capture.not_kept)
+    // the link was not kept: this sheet keeps no photo (adversarial А3)
+    expect(sheet.text()).toContain(en.receipt.qr.not_kept)
+    expect(sheet.text()).not.toContain(en.receipt.capture.not_kept)
     expect(sheet.emitted('update:open')).toBeUndefined()
   })
 
@@ -306,5 +313,63 @@ describe('the QR code read off the photo (MOL-233)', () => {
     sheet.unmount()
     mounted.pop()
     expect(dispose).toHaveBeenCalledOnce()
+  })
+
+  it('says no photo waits with no connection — only the link does (adversarial А2)', async () => {
+    online(false)
+    const sheet = await render()
+    expect(sheet.text()).toContain(en.receipt.qr.offline)
+    expect(sheet.text()).not.toContain(en.receipt.capture.offline)
+    await shoot(sheet)
+    expect(sheet.text()).toContain(en.receipt.qr.missed_title)
+    expect(sheet.text()).not.toContain(en.receipt.capture.offline)
+  })
+
+  it('takes the link found on a photo, the queue refusing it, for the link not kept (adversarial А3)', async () => {
+    sendLink.mockReturnValue(false)
+    onPhoto.mockResolvedValue(found)
+    const sheet = await render()
+    await shoot(sheet)
+    expect(sheet.text()).toContain(en.receipt.qr.not_kept)
+    expect(sheet.text()).not.toContain(en.receipt.capture.not_kept)
+  })
+
+  // A sheet put away while «Ищем QR…» is the person's «не надо» (review 1, adversarial А1): the reader the
+  // unmount let go refuses the read, which is no defect, and an answer come late is nobody's.
+  it('closed mid-read: no defect reported, no second worker, and the link found late not queued', async () => {
+    let answer: (value: ReceiptLinkOnPhoto) => void = () => undefined
+    let refuse: (error: unknown) => void = () => undefined
+    onPhoto.mockReturnValueOnce(
+      new Promise((resolve, reject) => {
+        answer = resolve
+        refuse = reject
+      }),
+    )
+    const shot = photo
+    const sheet = await render()
+    await shoot(sheet)
+    sheet.unmount()
+    mounted.pop()
+    refuse(new ReaderFailed())
+    await flushPromises()
+    expect(reportFailure).not.toHaveBeenCalled()
+    expect(created).toHaveBeenCalledOnce()
+    expect(shot).toEqual({ width: 0, height: 0 })
+
+    answer(found)
+    await flushPromises()
+    expect(sendLink).not.toHaveBeenCalled()
+  })
+
+  it('closed as the link is found: nothing is queued after the sheet went', async () => {
+    let answer: (value: ReceiptLinkOnPhoto) => void = () => undefined
+    onPhoto.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const sheet = await render()
+    await shoot(sheet)
+    await sheet.setProps({ open: false })
+    answer(found)
+    await flushPromises()
+    expect(sendLink).not.toHaveBeenCalled()
+    expect(reportFailure).not.toHaveBeenCalled()
   })
 })

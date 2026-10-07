@@ -12,6 +12,11 @@ import { signedIn } from './session'
 // the fake tax office (`bin/fake-purs.mjs`, as `receipts-link.spec.ts`). The photo is drawn here: a
 // receipt on a dark table, its rows, and at its foot the tax office's QR at correction L, four pixels
 // a module — what a 12 Mp shot of an 80 mm roll gives (MOL-223). A phone in Belgrade starts in Serbia.
+//
+// Not on WebKit (review 2): the path needs a session, and WebKit keeps no `Secure` cookie on
+// http://127.0.0.1 (`e2e.md`), so «Покупки» never open there; the sheet itself is `sheet.spec`'s on
+// `iphone`. The reader under WebKit — the module worker, its wasm, `getImageData` of a 16 Mp photo —
+// was read by hand in adversarial round 1: 12 of 12, with a QR and without, as in Chromium.
 test.use({ timezoneId: 'Europe/Belgrade' })
 
 const sheet = (page: Page) => page.locator('dialog[open]')

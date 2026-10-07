@@ -7,9 +7,9 @@
     <div ref="body" class="body">
       <p v-if="!online" class="notice">
         <IconCloudOff class="notice-icon" aria-hidden="true" />
-        {{ t('receipt.capture.offline') }}
+        {{ t('receipt.qr.offline') }}
       </p>
-      <p v-if="notKept" class="problem" role="alert">{{ t('receipt.capture.not_kept') }}</p>
+      <p v-if="notKept" class="problem" role="alert">{{ t('receipt.qr.not_kept') }}</p>
 
       <template v-if="pasting">
         <ol class="steps">
@@ -221,6 +221,12 @@ export default defineComponent({
     const pressed = ref<'take' | 'pick' | null>(null)
     const outcome = ref<Outcome | null>(null)
     let sentOffline: boolean | null = null
+    /**
+     * The shot being read; closing the sheet moves it on (review 1, adversarial А1). A sheet put away
+     * while «Ищем QR…» is the person's «не надо»: the read that comes back — or the refusal of the
+     * reader the unmount let go, which is no defect — sends nothing, says nothing and starts no worker.
+     */
+    let shot = 0
 
     // The worker starts with the sheet, so the wasm is loaded while the camera is up.
     let reader: ReceiptQrReader | null = createReceiptQrReader()
@@ -263,6 +269,9 @@ export default defineComponent({
       reader = createReceiptQrReader()
     }
 
+    /** Whether this shot still has a sheet open to answer to. */
+    const current = (mine: number) => mine === shot && props.open
+
     async function taken(event: Event): Promise<void> {
       const input = event.target as HTMLInputElement
       const file = input.files?.[0]
@@ -272,8 +281,16 @@ export default defineComponent({
       // the button whose field this is says the work, whatever was tapped to open it
       pressed.value = input === pick.value ? 'pick' : 'take'
       reading.value = true
+      const mine = ++shot
       try {
         const photo = await decodePhoto(file)
+        if (!current(mine)) {
+          if (photo) {
+            photo.width = 0
+            photo.height = 0
+          }
+          return
+        }
         if (!photo) {
           outcome.value = 'bad_file'
           return
@@ -282,12 +299,13 @@ export default defineComponent({
         try {
           if (reader) found = await receiptLinkOnPhoto(photo, reader)
         } catch (error) {
-          readerFailed(error)
+          if (current(mine)) readerFailed(error)
         } finally {
           // The photo is not kept anywhere: read, and let go (Т-3).
           photo.width = 0
           photo.height = 0
         }
+        if (!current(mine)) return
         if (found.kind === 'link') {
           outcome.value = null
           if (await queued(found.link.link)) return
@@ -349,6 +367,7 @@ export default defineComponent({
     }
 
     function closed(): void {
+      shot += 1
       const offline = sentOffline
       sentOffline = null
       pasting.value = false
@@ -362,6 +381,7 @@ export default defineComponent({
     }
 
     onBeforeUnmount(() => {
+      shot += 1
       reader?.dispose()
       reader = null
     })

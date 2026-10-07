@@ -2235,7 +2235,9 @@
       "missed_body": "Come closer, so the QR code fills a third of the frame. Hold the phone until the camera focuses, and shoot in even light.",
       "retake": "Shoot again",
       "take_other": "Shoot another",
-      "or_take": "The camera can read the QR code"
+      "or_take": "The camera can read the QR code",
+      "offline": "No connection — the link from the QR code goes by itself once there is one",
+      "not_kept": "The link wasn’t kept on this phone. Free some space and try again"
     }
   }
 }

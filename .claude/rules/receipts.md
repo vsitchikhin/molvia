@@ -588,7 +588,11 @@ office's page, its address is copied — and the link is checked by the very fun
 reading of Serbia by OCR exists**: the task's «the usual OCR path» has none to go to, and a Serbian
 receipt's photo would be refused by the schema; one is built only if live receipts show the QR missed
 often. A worker that failed is the phone's defect (`reportFailure`, catcher `scanner`) and a miss to the
-person — the link stays. **The scanner of goods is untouched** (MOL-98): its worker and options stay retail
+person — the link stays. **A sheet put away while «Ищем QR…» is a «не надо»** (review 1, adversarial А1):
+the reader the unmount lets go refuses the read, which is no defect, and an answer come after the sheet
+went is nobody's — nothing reported, nothing queued, no worker started again. **Its words are the link's,
+never a photo's** (adversarial А2, А3): with no connection the link waits, and what the queue could not
+keep is the link — the sheet that keeps no photo never says one waits or was not kept. **The scanner of goods is untouched** (MOL-98): its worker and options stay retail
 codes only. The review says «Строки — из налоговой Сербии», names the ПИБ, and has nothing of a photo — no
 «Переснять», no «Прочитали не всё», no «Фото удалим»: «Переснять» is a photo country's (`photoCountry`).
 **How often the camera reads it is MOL-234's** (В-3 «а»): the body will say `via: qr | paste` there.
