@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 // Through a parameter: a literal `new URL(…, import.meta.url)` is rewritten by Vite into an asset URL.
 const at = (path: string): URL => new URL(path, import.meta.url)
 const SRC = at('./')
+const ROOT = at('../')
 const config = readFileSync(at('../vite.config.ts'), 'utf8')
 
 /** `optimizeDeps.include` as `vite.config.ts` writes it. */
@@ -29,12 +30,22 @@ function walk(node: ts.Node, visit: (node: ts.Node) => void): void {
   })
 }
 
-const MODULE = /\.(ts|js|vue)$/
+const MODULE = /\.[cm]?[jt]sx?$|\.vue$/
+const FILE = /\.(json|css|scss|sass|svg|png|jpe?g|gif|webp|avif|ico|wasm|woff2?|txt|html|md)$/
+
+/** What an existing file of `src` is: a module to read, a file with nothing to follow, or neither. */
+function kind(url: URL): URL | 'file' {
+  if (MODULE.test(url.pathname)) return url
+  if (FILE.test(url.pathname)) return 'file'
+  // An extension the guard does not know is a refusal, never a file it lets through (adversarial Р3-А3).
+  throw new Error(`${url.pathname}: neither a module nor a file the guard knows`)
+}
 
 /**
- * What a path written in `from` names, resolved as Vite resolves it — as written, with `.ts`, or a
- * directory by its `index.ts`: a module of `src` to read; `'file'`, a file of `src` that is no module
- * (JSON, a stylesheet), with nothing to follow (adversarial Р2-А2); or null, a path that leaves `src`.
+ * What a path written in `from` names, resolved as Vite resolves it — as written, with `.ts`, a
+ * directory by its `index.ts`, or a `.js` written for its `.ts` as TypeScript writes ESM (adversarial
+ * Р3-А4): a module of `src` to read; `'file'`, a file of `src` that is no module (JSON, a
+ * stylesheet), with nothing to follow (adversarial Р2-А2); or null, a path that leaves `src`.
  */
 function local(from: URL, path: string): URL | 'file' | null {
   let url: URL
@@ -42,18 +53,21 @@ function local(from: URL, path: string): URL | 'file' | null {
   else if (path.startsWith('.')) url = new URL(path, from)
   else return null
   const bare = url.href.replace(/\/$/, '')
-  for (const candidate of [url, new URL(`${bare}.ts`), new URL(`${bare}/index.ts`)])
-    if (existsSync(candidate) && statSync(candidate).isFile())
-      return MODULE.test(candidate.pathname) ? candidate : 'file'
+  const candidates = [url, new URL(`${bare}.ts`), new URL(`${bare}/index.ts`)]
+  if (/\.[cm]?jsx?$/.test(bare)) candidates.push(new URL(bare.replace(/js(x?)$/, 'ts$1')))
+  for (const candidate of candidates)
+    if (existsSync(candidate) && statSync(candidate).isFile()) return kind(candidate)
   throw new Error(`${path} from ${from.pathname} does not resolve`)
 }
 
 /**
- * The modules of `src` an `import.meta.glob` names (adversarial Р2-А1): Vite loads them as `import()`
- * does, with the pattern in place of a path. A negative pattern is left out — the set read is the
- * wider one, which can only ask for more in `include`.
+ * What an `import.meta.glob` names (adversarial Р2-А1), or null for any other node: the modules of
+ * `src` under its patterns — from the file, from `src` by `@/`, from the project's root by `/`
+ * (adversarial Р3-А1) — and the `query` it loads them with, which makes them workers when it is
+ * `?worker` (adversarial Р3-А2) and assets when it is anything else. A negative pattern is left out:
+ * the set read is the wider one, which can only ask for more in `include`.
  */
-function globbed(node: ts.Node, from: URL): URL[] {
+function globbed(node: ts.Node, from: URL): { modules: URL[]; query: string | null } | null {
   if (
     !ts.isCallExpression(node) ||
     !ts.isPropertyAccessExpression(node.expression) ||
@@ -61,19 +75,34 @@ function globbed(node: ts.Node, from: URL): URL[] {
     node.expression.name.text !== 'glob' ||
     node.arguments[0] === undefined
   )
-    return []
-  const first = node.arguments[0]
+    return null
+  const [first, options] = node.arguments
   const patterns = ts.isArrayLiteralExpression(first) ? [...first.elements] : [first]
-  return patterns.flatMap((pattern) => {
+  const modules = patterns.flatMap((pattern) => {
     if (!ts.isStringLiteralLike(pattern) || pattern.text.startsWith('!')) return []
-    const [base, rest] = pattern.text.startsWith('@/')
-      ? [SRC, pattern.text.slice(2)]
-      : [new URL('./', from), pattern.text]
+    const text = pattern.text
+    const [base, rest] = text.startsWith('@/')
+      ? [SRC, text.slice(2)]
+      : text.startsWith('/')
+        ? [ROOT, text.slice(1)]
+        : [new URL('./', from), text]
     return globSync(rest, { cwd: base })
       .map((file) => new URL(file, base))
       .filter((url) => MODULE.test(url.pathname))
   })
+  let query: string | null = null
+  if (options && ts.isObjectLiteralExpression(options))
+    for (const property of options.properties)
+      if (
+        ts.isPropertyAssignment(property) &&
+        property.name.getText() === 'query' &&
+        ts.isStringLiteralLike(property.initializer)
+      )
+        query = property.initializer.text
+  return { modules, query }
 }
+
+const WORKER_QUERY = /^\??(shared)?worker\b/
 
 const isImportMetaUrl = (node: ts.Node | undefined): boolean =>
   node !== undefined &&
@@ -84,11 +113,12 @@ const isImportMetaUrl = (node: ts.Node | undefined): boolean =>
 /**
  * Every module `src` starts as a worker, in each way Vite builds one: a module named by
  * `new URL('…', import.meta.url)` — whatever then takes the URL, a `Worker`, a `SharedWorker` or a
- * constant first — and an import of `…?worker` or `…?sharedworker` (adversarial А2).
+ * constant first — an import of `…?worker` or `…?sharedworker` (adversarial А2), and an
+ * `import.meta.glob` with that `query` (adversarial Р3-А2).
  */
 function workers(): URL[] {
   const files = readdirSync(SRC, { recursive: true, encoding: 'utf8' }).filter(
-    (file) => /\.(ts|vue)$/.test(file) && !file.endsWith('.test.ts'),
+    (file) => MODULE.test(file) && !file.endsWith('.test.ts'),
   )
   return files.flatMap((file) => {
     const from = new URL(file, SRC)
@@ -103,14 +133,16 @@ function workers(): URL[] {
         isImportMetaUrl(node.arguments[1])
       ) {
         const url = new URL(node.arguments[0].text, from)
-        if (/\.(ts|js)$/.test(url.pathname) && existsSync(url)) found.push(url)
+        if (MODULE.test(url.pathname) && existsSync(url)) found.push(url)
       }
       const path = specifier(node)
       const [module, query] = path?.split('?') ?? []
-      if (module && query && /^(shared)?worker\b/.test(query)) {
+      if (module && query && WORKER_QUERY.test(query)) {
         const url = local(from, module)
         if (url instanceof URL) found.push(url)
       }
+      const glob = globbed(node, from)
+      if (glob?.query && WORKER_QUERY.test(glob.query)) found.push(...glob.modules)
     })
     return found
   })
@@ -153,7 +185,8 @@ function packagesOf(entry: URL): Set<string> {
     seen.add(next.href)
     const from = next
     walk(parse(from), (node) => {
-      queue.push(...globbed(node, from))
+      const glob = globbed(node, from)
+      if (glob?.query === null) queue.push(...glob.modules)
       const path = specifier(node)
       if (path === null) return
       const module = local(from, path.split('?')[0] ?? path)
