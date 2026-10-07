@@ -16,7 +16,7 @@ import { calendarDay } from '@/days'
 export const POLICY_REVISION = {
   day: '2026-10-07',
   version: 2,
-  digest: '9394f36151a4045c5d7a735826abb9e26e836c20169b18337e86503205c6a7f9',
+  digest: 'e70dc947be87c7403a89a5a1753bbf980bd2453065db453f7277a08c1ecace80',
 } as const
 
 // Which parts each page shows, in order — here and not in the pages, so the fingerprint holds them
@@ -96,7 +96,11 @@ export const TERMS_PARTS = [
   'contact',
 ] as const
 
-/** «Редакция от 6 октября 2026 г.» — the subtitle of both pages. */
+/**
+ * «Редакция 2 от 7 октября 2026 г.» — the subtitle of both pages. The edition is named beside the day
+ * (MOL-236, adversarial Р4-А1): two editions may be revised on one day, and the day alone would put one
+ * subtitle over two texts a person was asked to accept.
+ */
 export function revisedOn(
   t: (key: string, values: Record<string, string>) => string,
   locale: string,
@@ -106,5 +110,5 @@ export function revisedOn(
     month: 'long',
     year: 'numeric',
   })
-  return t('policy.revised', { day })
+  return t('policy.revised', { version: String(POLICY_REVISION.version), day })
 }

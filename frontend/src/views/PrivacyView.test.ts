@@ -159,7 +159,7 @@ it('says the consent is kept — the edition and when — and nothing of the age
   expect(view.text()).toContain(ru.privacy.stored.consent.text)
   expect(ru.privacy.stored.consent.text).toMatch(/Возраст и дату рождения мы не храним/)
   // The subtitle is the revision written in code, not a sentence of the dictionary.
-  expect(view.text()).toContain('Редакция от 7 октября 2026')
+  expect(view.text()).toContain('Редакция 2 от 7 октября 2026')
 })
 
 describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for (MOL-236)', () => {
@@ -209,6 +209,9 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
       /без чьего-либо имени и номера — только числами по дням/,
     )
     expect(ru.privacy.statistics.text).toMatch(/сколько оценок дано в ответ на них/)
+    // And the reminders turned off, by each way `reminder_days` counts (Р4-А2, С-10).
+    expect(ru.privacy.statistics.text).toMatch(/кнопкой, в настройках или заблокировав бота/)
+    expect(en.privacy.statistics.text).toMatch(/by blocking the bot/)
     expect(ru.privacy.statistics.text).toMatch(/выключатель их не касается/)
     expect(ru.privacy.statistics.text).not.toMatch(/перестанут считаться\./)
   })
