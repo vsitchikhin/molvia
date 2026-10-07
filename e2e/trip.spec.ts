@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { actorCodec, settingsOf } from '@molvia/model'
-import { asBrowser, signedIn } from './session'
+import { asBrowser, goOffline, signedIn } from './session'
 import type { Page } from '@playwright/test'
 
 /**
@@ -387,10 +387,7 @@ test.describe('the trip', () => {
     await expect(page.getByRole('heading', { name: /did not come back/ })).toHaveCount(0)
   })
 
-  test('is started with no connection, and catches up when it comes back', async ({
-    page,
-    context,
-  }) => {
+  test('is started with no connection, and catches up when it comes back', async ({ page }) => {
     const setting = await device(page)
     // The catalogue is asked for while the connection is still there: the search has no offline
     // answer beyond the recent items, and this test is about the trip, not about the search.
@@ -398,7 +395,9 @@ test.describe('the trip', () => {
     await addItem(page, setting.word, '250')
     await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
 
-    await context.setOffline(true)
+    // Refused before the network, not only by `setOffline`: the test says what the server has not got,
+    // and in CI a write the page saw fail under `setOffline` still reached it (MOL-217, review Р8-А1).
+    const online = await goOffline(page)
     await finish(page)
     // The record is over on the phone at once, though nothing has reached the server.
     await expect(page.getByRole('button', { name: 'Add by hand' })).toBeVisible()
@@ -410,7 +409,7 @@ test.describe('the trip', () => {
     // Nothing has gone out: the second trip exists only on the phone.
     await expect.poll(async () => (await setting.current())?.place.name).toBe('Рынок')
 
-    await context.setOffline(false)
+    await online()
     // The queue goes out in order: «finish» of the first trip, then the second trip itself.
     await expect
       .poll(async () => (await setting.current())?.place.name, {

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { POLICY_VERSION, SESSION_COOKIE } from '@molvia/model'
-import type { Page, Request, Response } from '@playwright/test'
+import type { Page, Request, Response, Route } from '@playwright/test'
 
 /**
  * Как тест ходит в API от лица той же личности, что и страница (MOL-53).
@@ -172,16 +172,24 @@ export async function asBrowser(page: Page): Promise<Record<string, string>> {
 }
 
 /**
- * Связь пропала — и ни один запрос страницы не уйдёт (MOL-217).
+ * Связь пропала — и ни один запрос страницы не уйдёт (MOL-217). Отдаёт возврат связи на ту же страницу.
  *
  * `setOffline` даёт странице `navigator.onLine === false` и отказы, но не гарантирует, что запрос не
  * дойдёт до сервера: в CI страница уже встретила офлайн отказом своего запроса, PUT оценки упал в
  * браузере с `ERR_INTERNET_DISCONNECTED` — и тот же PUT записан API с 201 (трасса первой попытки,
  * прогон 37619569005). Поэтому каждому запросу этой страницы отказывает сам Playwright, до сети, той же
- * ошибкой. Только эта страница: новая из того же контекста — уже со связью, когда её вернут. Брать там,
- * где спека дальше утверждает, чего сервер не получил.
+ * ошибкой — и маршрут встаёт раньше офлайна, чтобы и между ними ничего не ушло (ревью С-15). Только эта
+ * страница: новая из того же контекста — уже со связью, когда её вернут. Брать там, где спека дальше
+ * утверждает, чего сервер не получил; связь на этой странице возвращает только отданная функция —
+ * `setOffline(false)` маршрута не снимет (ревью С-16).
  */
-export async function goOffline(page: Page): Promise<void> {
+export async function goOffline(page: Page): Promise<() => Promise<void>> {
+  const refuse = (route: Route) => route.abort('internetdisconnected')
+  await page.route('**/*', refuse)
   await page.context().setOffline(true)
-  await page.route('**/*', (route) => route.abort('internetdisconnected'))
+  return async () => {
+    // Сначала маршрут: услышав `online`, страница шлёт свои очереди, и они должны дойти до сети.
+    await page.unroute('**/*', refuse)
+    await page.context().setOffline(false)
+  }
 }

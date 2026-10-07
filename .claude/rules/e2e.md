@@ -136,11 +136,17 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   failed, keeps its draft as it should. Not reproduced in nine probes here. So `goOffline` is
   `setOffline` — the page's `navigator.onLine` and its states — **and `page.route` refusing every
   request of that page with `internetdisconnected`**: Playwright fails it before the network, and the
-  page sees the same error. That page only: a new one of the context is online when the context is.
-  The other specs with `setOffline` assert the phone's own state, or what went once the connection
-  came back — a request let through does not fail them, a `PUT` being safe to repeat — so they keep it
-  (owner's В-3); a spec that will say «the server did not get it» takes `goOffline`. The readings of
-  the four failures before, both refuted by the trace — `.scratch/tasks/status/MOL-217/readings.md`.
+  page sees the same error — the route set before the offline, so nothing slips between them. That
+  page only: a new one of the context is online when the context is; on the same page the connection
+  comes back only by the function `goOffline` returns, the route off first — `setOffline(false)` leaves
+  it refusing. **Which specs take it was found by the mechanism itself** (adversarial round 8): every
+  spec with `setOffline` run with writes let through to the API while the page is told they failed —
+  only «…and the app closed» and the trip «started with no connection» (`trip.spec`) fell, both saying
+  what the server has not got, and both take `goOffline`; the rest assert the phone's own state or
+  what went once the connection came back, a write being safe to repeat. A new spec that says «the
+  server did not get it» takes it too; the harness is
+  `.scratch/tasks/selftests/MOL-217-adversarial-round-8-leak.cjs`. The readings of the four failures
+  before, both refuted by the trace — `.scratch/tasks/status/MOL-217/readings.md`.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **eight things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the
