@@ -1743,14 +1743,14 @@
   },
   "consent": {
     "title": "Terms and privacy",
-    "body": "Your purchases are seen by you alone. Others see prices and ratings without a name, and only once at least three people have recorded them. The items and shops you add, and your word about a receipt, everyone sees — without a name, but with no threshold. No ads, no trackers.",
+    "body": "Your purchases are seen by you alone. Others see prices and ratings without a name, and only once at least three people have recorded them. The items, shops and barcodes you add, and your word about a receipt, everyone sees — without a name, but with no threshold. No ads, no trackers.",
     "updated": {
       "title": "The terms have changed",
       "body": "Read what changed and accept the new edition — you cannot go on without it.",
       "changes": "What changed"
     },
     "changes": {
-      "2": "The person responsible for your data is named — Vladimir Sitchikhin, Gyumri. The statistics — visit marks and the count of ratings — now rest on your consent, and «Count me in the statistics» withdraws it. Added: your rights, where to complain, who the data goes to — the Serbian tax office among them, for receipts by link — how long an inactive account is kept, and what we do if the data leaks."
+      "2": "The person responsible for your data is named — Vladimir Sitchikhin, Gyumri. The statistics — visit marks and the count of ratings — now rest on your consent, and «Count me in the statistics» withdraws it. The edition before promised others see only what three people recorded — corrected: the items, shops and barcodes you added, and your word about a receipt line, everyone sees, without your name but with no threshold. Added: your rights, where to complain, who the data goes to — the Serbian tax office among them, for receipts by link — how long an inactive account is kept, and what we do if the data leaks."
     },
     "statistics": {
       "title": "Statistics",

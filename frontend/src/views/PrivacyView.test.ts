@@ -251,6 +251,8 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
   it('says the same of what others see at the top of the page and on the step (Р2-А1)', () => {
     for (const words of [ru.privacy.summary, ru.consent.body]) {
       expect(words).toMatch(/видят все — (тоже )?без имени, но и без порога/)
+      // The barcodes a person linked are seen by anyone who scans (MOL-100), here as in the list (Р3-А2).
+      expect(words).toMatch(/Товары, магазины и штрихкоды/)
       expect(words).not.toMatch(/Другие видят только/)
     }
     expect(en.privacy.summary).toMatch(/with no threshold/)

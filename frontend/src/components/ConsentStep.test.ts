@@ -8,6 +8,7 @@ import { actorCodec, ERROR, POLICY_VERSION } from '@molvia/model'
 import type { ActorView, Consent } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
+import ru from '@/i18n/ru.json'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
@@ -148,6 +149,9 @@ describe('«Условия и приватность» (MOL-95)', () => {
     const { view } = await render()
     expect(view.text()).toContain(en.consent.updated.title)
     expect(view.get('.changes').text()).toContain(en.consent.changes['2'])
+    // It is told what edition 1 told it wrong: the catalogue and a receipt's word have no threshold (Р3-А1).
+    expect(en.consent.changes['2']).toMatch(/with no threshold/)
+    expect(ru.consent.changes['2']).toMatch(/без имени, но и без порога/)
     expect(view.get('.statistics').text()).toContain(en.consent.statistics.text)
 
     await view.get('input[type="checkbox"]').setValue(true)
