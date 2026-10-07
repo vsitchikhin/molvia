@@ -202,7 +202,15 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
     expect(ru.privacy.statistics.text).toMatch(/бот не спрашивает/)
     expect(ru.privacy.statistics.text).toMatch(/в счёт уже не идёт/)
     // Its paragraphs stand apart on the page, not run together.
-    expect(ru.privacy.statistics.text.split('\n')).toHaveLength(3)
+    expect(ru.privacy.statistics.text.split('\n')).toHaveLength(4)
+    // The day counters with no one's id are named, and that the switch does not touch them
+    // (adversarial Р2-А2, owner's 1-а): a press under a reminder is counted whatever the switch.
+    expect(ru.privacy.statistics.text).toMatch(
+      /без чьего-либо имени и номера — только числами по дням/,
+    )
+    expect(ru.privacy.statistics.text).toMatch(/сколько оценок дано в ответ на них/)
+    expect(ru.privacy.statistics.text).toMatch(/выключатель их не касается/)
+    expect(ru.privacy.statistics.text).not.toMatch(/перестанут считаться\./)
   })
 
   it('lists every recipient, the Serbian tax office among them, and nobody else', async () => {
@@ -214,6 +222,9 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
       PRIVACY_RECIPIENTS.map((kind) => ru.privacy.recipients[kind].term),
     )
     expect(ru.privacy.recipients.serbian_tax.term).toBe('Налоговая Сербии')
+    // A transfer abroad, with its basis (review С-3, owner's 2-а).
+    expect(ru.privacy.recipients.telegram.text).toMatch(/зарубежная компания/)
+    expect(ru.privacy.recipients.telegram.text).toMatch(/вход и бот Molvia работают через Telegram/)
     expect(ru.privacy.recipients.nobody.text).toMatch(/не продаём/)
   })
 

@@ -199,7 +199,13 @@ The detail behind the privacy lines of `CLAUDE.md`.
   rest (В-2, Georgia's art. 32), with no box of its own — unticked it would empty the gates, ticked it is
   no consent. **The server holds it too** (adversarial А1): no visit is written and neither gate counts
   whoever has not accepted `STATISTICS_CONSENT_EDITION` — `advice.md`. **The card and «что изменилось»
-  are in the fingerprint** (А4): rewritten, they are the text agreed to; the step's buttons are not. **A recipient is a line of `PRIVACY_RECIPIENTS`** (`policy.ts`, in the fingerprint), and a
+  are in the fingerprint** (А4): rewritten, they are the text agreed to; the step's buttons are not.
+  **The day counters with no id are named, not gated** (owner's 1-а on adversarial Р2-А2):
+  `login_days`, `receipt_days` and `reminder_days` count everyone, the switch off or no consent — a
+  press under a reminder too — and «Статистика» says so in a paragraph of its own; the strict reading's
+  price (counting is a use for another purpose) is in «Персональные данные», 2.1. **Telegram is named a
+  transfer abroad** with its basis — the sign-in and the bot are Telegram (owner's 2-а on review С-3);
+  that the Agency's permission for a country off its list was not asked is the price in 2.1. **A recipient is a line of `PRIVACY_RECIPIENTS`** (`policy.ts`, in the fingerprint), and a
   new one is a new edition. **A known defect is named as it is** (В-3): MOL-240 and MOL-241 stand on
   the page as «ошибка, исправляем» until fixed, and their lines go by a revision — a narrower processing
   needs no new consent. **A breach is announced at the top of the page** by the key `privacy.notice`
