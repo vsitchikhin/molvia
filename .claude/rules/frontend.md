@@ -550,8 +550,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
 - **Every screen has four states:** loading, empty, error, offline. The empty state is not
   "no data" but an offer to act. They are drawn by two blocks and nothing else (MOL-19):
   `ScreenSkeleton` for loading, in the shape of the answer (the next rule), and `ScreenState`
-  for the rest. The tone of the circle carries the meaning and is fixed by the kind — an error
-  is always red and always offers «Try again»; offline is green or yellow and **never red**,
+  for the rest. **The four kinds are told apart by form, and colour only confirms it** (MOL-180,
+  Ф-16, Ф-35, К-8): empty is one quiet circle, `--surface-2` with the screen's own icon — no tone to
+  choose and no empty state without an icon, the validator holds both (MOL-77 took three circles
+  away because a terracotta one over an action read as a button and was tapped; the quiet fill does
+  not); an error is the red ring and always offers «Try again»; attention is a yellow triangle,
+  never the error's ring; offline is the cloud, green or yellow and **never red**,
   which `vue-tsc` holds rather than memory: `bad` is not a tone a screen can ask for. The
   type holds the prop, not the choice of kind, and that choice is the screen's: **offline or
   error is decided after the failure** (`navigator.onLine` read then, never narrowed from a
@@ -566,6 +570,23 @@ The detail behind the frontend lines of `CLAUDE.md`.
   or «attention» on the screen interrupts; anything inline is polite. **A full-screen error also
   offers «Сообщить о проблеме»** (MOL-147), drawn by `ScreenState` and by nothing else, last and
   quietest: not `inline`, not for nobody known, not inside a `<dialog>` — `feedback.md` says why.
+  **An error of the whole screen draws its buttons in the screen's strip** (MOL-180, К-1, Ф-15,
+  Р-18): «Повторить» stood at the bottom of the free height, at its own place on each screen, and
+  over a strip with a live action it was a second filled button. `AppScreen` provides the strip
+  (`useStateStrip`); a full error holds it and carries its `.action` there by a `Teleport`, so
+  `retry`, `#action` and «Сообщить» stay its own and no screen changes; while it is held the strip
+  draws neither the screen's `#docked` nor «Вышла новая версия» — the error offers «Обновить»
+  itself (8c) — and keeps only the words of a version that did not take, which offer nothing. Top
+  down: «Обновить» (a version waits), «Повторить», the screen's `#action`, «Сообщить»; the first is
+  large, as every strip's main action. The first error to ask holds it; a sheet closes the strip
+  (`closeStateStrip`) and the login has one with no place, so there the buttons stay at the bottom
+  of the block, and the login hides its own row of the version while the error offers it. **A
+  section's error is the quiet card** (К-13): `inline` makes the block an `AppCard` with a ghost
+  «Повторить» the width of its word and no «Обновить» — the strip's row offers it while the screen
+  works. **The choice of kind is the screen's: where its strip does work with the server down —
+  a spending, a receipt photographed, a purchase recorded go through the queue — its error is
+  `inline`** («Деньги», «Траты», «Покупки», «Что брать» with receipts; owner's В-1 «а»), and a
+  full error takes the strip only where the strip had nothing to do without an answer.
 - **The skeleton is the answer's shape, drawn in the kit's parts** (MOL-178, Ф-13, Н-5). Its bars were
   `surface-2` on the page's ground — 1.06:1 in the light scheme, next to nothing — with no card, no
   rows and no search field, so the screen jumped as the answer came. **`ScreenSkeleton` is the frame**:
