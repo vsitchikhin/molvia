@@ -366,7 +366,8 @@ type CodeOutcome = NonNullable<ReceiptRecorded['codes']>[number]
 /**
  * The codes of a record sent again (adversarial А2): the first answer is lost, so each is told by who
  * holds it now — the item its line went to (`written`: whether it was there before is not kept), another
- * item (`held`, named), or nobody: the only way a code said yes to is nowhere is a full item.
+ * item (`held`, named), or nobody: `full`, the word the first answer had for it — though a code let go
+ * since by «Не этот товар?» is nobody's too (review 10). The phone shows `held` alone.
  */
 async function codesAgain(
   repositories: Parameters<Parameters<Transact>[0]>[0],

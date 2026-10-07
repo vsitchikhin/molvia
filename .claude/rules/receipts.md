@@ -536,11 +536,12 @@ is taken, and its key against a second record (with the seller's tax number, as 
 
 **The lines are the JSON's journal; the page and its `/specifications` are asked after it for the codes
 alone** (MOL-232 В-1 «а», MOL-234 В-1 «а»). The specification is undocumented and answered `success:false`
-two times of three from production, so **the receipt never waits on it** (adversarial А4): read and
-written by its journal first — the phone has it — and the specification asked after, its codes written on
-their own (`writeCodes`), a line whose code an item holds bound to that item then, only while the receipt
-waits for its record. The next receipt of the round waits at most `PURS_SPECIFICATION_TIMEOUT_MS` (3 s),
-one deadline for both requests — the page for `viewModel.Token`, then the POST — which are reserved in the
+two times of three from production, so **it is waited on for 3 s at most** (`PURS_SPECIFICATION_TIMEOUT_MS`,
+adversarial А4 — it was the journal's 10 s, twice): asked after the journal and before the receipt is
+written, so **a receipt is never shown without its codes** (review 9, adversarial Б1). Written first and
+coded after, a review opened in that second had no `code` and a line on the search's item, never read again
+— the code lost and a twin of the item made — and at most three seconds bought that. One deadline for both
+requests — the page for `viewModel.Token`, then the POST — which are reserved in the
 limit together, never the page alone; a failure, another shape, a page of another receipt — no codes, no
 pause of the queue, no owner's notice, its own line in the log at info (review 8) and `specs_failed`.
 **The price, named** (А5): the person's share is four a minute, and a receipt takes three — so the second

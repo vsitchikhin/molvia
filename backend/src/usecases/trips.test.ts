@@ -290,7 +290,6 @@ function fakeRepositories(
       claimLink: unexpected('receipts.claimLink'),
       releaseLink: unexpected('receipts.releaseLink'),
       askLater: unexpected('receipts.askLater'),
-      writeCodes: unexpected('receipts.writeCodes'),
       recordedItems: unexpected('receipts.recordedItems'),
     },
     storeMemory: {

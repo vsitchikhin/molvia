@@ -10,7 +10,7 @@ import {
   serbianShopOf,
   specificationCodes,
 } from '@molvia/model'
-import type { ReceiptLine, ReceiptTextLine } from '@molvia/model'
+import type { ReceiptLine } from '@molvia/model'
 import { z } from 'zod'
 import type {
   ClaimedLink,
@@ -23,16 +23,15 @@ import type { Purs, PursReceipt } from '@/purs/client'
 export interface ReadTaxReceiptsDeps {
   readonly receipts: Pick<
     ReceiptRepository,
-    'requeueInterruptedLinks' | 'claimLink' | 'releaseLink' | 'askLater' | 'finish' | 'writeCodes'
+    'requeueInterruptedLinks' | 'claimLink' | 'releaseLink' | 'askLater' | 'finish'
   >
   readonly purs: Purs
-  /** The lines to items: `bindReceiptLines`, one binding for each line in order. */
+  /** The lines to items: `bindReceiptLines`, one binding for each line in order, by its code first. */
   readonly bind: (
     claimed: ClaimedLink,
     lines: readonly ReceiptLine[],
+    codes: readonly (string | null)[],
   ) => Promise<readonly LineBinding[]>
-  /** The item holding a package's code, with its twins (`findByBarcode`, MOL-234), or `null`. */
-  readonly holderOf: (code: string) => Promise<string | null>
   /** What happened, for the log: never the link, the seller or a line (MOL-58, MOL-232). */
   readonly report: (event: TaxReport) => void
 }
@@ -57,12 +56,6 @@ const failed = (failure: 'invalid' | 'unreadable', journalEmpty = false): ReadOu
   head: null,
   ...(journalEmpty ? { journalEmpty } : {}),
 })
-
-/** What a read made of the receipt, and the journal's lines its codes are matched against. */
-interface Read {
-  readonly outcome: ReadOutcome
-  readonly journal: readonly ReceiptTextLine[] | null
-}
 
 /**
  * A round of the receipts by their link (MOL-232): each one whose ask is due, people in turn, asked
@@ -92,14 +85,9 @@ export async function readTaxReceipts(deps: ReadTaxReceiptsDeps): Promise<number
       continue
     }
     let outcome: ReadOutcome
-    let journal: Read['journal'] = null
     try {
-      const read: Read =
-        answer.kind === 'refused'
-          ? { outcome: failed('invalid'), journal: null }
-          : await outcomeOf(deps, claimed, answer)
-      outcome = read.outcome
-      journal = read.journal
+      outcome =
+        answer.kind === 'refused' ? failed('invalid') : await outcomeOf(deps, claimed, answer)
     } catch (error) {
       deps.report({ kind: 'error', error })
       outcome = failed('unreadable')
@@ -120,38 +108,6 @@ export async function readTaxReceipts(deps: ReadTaxReceiptsDeps): Promise<number
       asks: claimed.attempts,
       ms: Math.round(performance.now() - started),
     })
-    // the receipt is read and handed to the phone already; its codes come after (adversarial А4)
-    if (outcome.kind === 'parsed' && journal !== null) await askCodes(deps, claimed, journal)
-  }
-}
-
-/**
- * The lines' codes, from the specification (MOL-234, owner's В-1 «а»), asked once the receipt is read
- * and written to it on their own — nothing of the receipt waits on them, and the next receipt of the
- * round waits `PURS_SPECIFICATION_TIMEOUT_MS` at most. A specification that failed or is out of step
- * with the journal gives none; with no room in the person's share it is not asked (А5).
- */
-async function askCodes(
-  deps: ReadTaxReceiptsDeps,
-  claimed: ClaimedLink,
-  journal: readonly ReceiptTextLine[],
-): Promise<void> {
-  try {
-    const link = serbianReceiptLink(claimed.link)
-    if (!link.ok) return
-    const asked = await deps.purs.specification(claimed.link, link.number, claimed.actorId)
-    const found = asked.kind === 'found' ? specificationCodes(asked.items, journal) : null
-    const codes = found ?? journal.map(() => null)
-    const holders: (string | null)[] = []
-    for (const code of codes) holders.push(code === null ? null : await deps.holderOf(code))
-    await deps.receipts.writeCodes(claimed.id, {
-      codes,
-      holders,
-      specification: asked.kind === 'skipped' ? 'skipped' : found === null ? 'failed' : 'ok',
-    })
-  } catch (error) {
-    // a gift that failed: the receipt is read, and stays so
-    deps.report({ kind: 'error', error })
   }
 }
 
@@ -164,27 +120,31 @@ async function outcomeOf(
   deps: ReadTaxReceiptsDeps,
   claimed: ClaimedLink,
   answer: PursReceipt,
-): Promise<Read> {
+): Promise<ReadOutcome> {
   const link = serbianReceiptLink(claimed.link)
   const journal = serbianJournal(answer.journal)
-  if (!link.ok) return { outcome: failed('invalid'), journal: null }
+  if (!link.ok) return failed('invalid')
   // an answer about another receipt than the one the link signs is no answer about this one (review 8)
-  if (answer.number !== link.number) return { outcome: failed('invalid'), journal: null }
+  if (answer.number !== link.number) return failed('invalid')
   // the tax office's own answer with no list: counted apart from a failure of ours (adversarial А7)
-  if (journal === null || journal.lines.length === 0) {
-    return { outcome: failed('unreadable', true), journal: null }
-  }
+  if (journal === null || journal.lines.length === 0) return failed('unreadable', true)
 
   const currency = RECEIPT_CURRENCY[claimed.country]
   const lines = journal.lines.map((line) => receiptLineOf(line, currency))
   // the lines go out on the wire as the contract says, or the receipt is not read (Т-5 of MOL-125)
-  if (!z.array(receiptLineCodec).safeEncode(lines).success) {
-    return { outcome: failed('unreadable'), journal: null }
-  }
+  if (!z.array(receiptLineCodec).safeEncode(lines).success) return failed('unreadable')
+
+  // the lines' codes, asked before the receipt is written (MOL-234, owner's В-1 «а»; review 9): the
+  // review is never read without its codes, and the wait is the specification's own deadline —
+  // `PURS_SPECIFICATION_TIMEOUT_MS`, never the journal's (adversarial А4). A specification that failed
+  // or is out of step with the journal gives none; with no room in the person's share it is not asked
+  const asked = await deps.purs.specification(claimed.link, link.number, claimed.actorId)
+  const found = asked.kind === 'found' ? specificationCodes(asked.items, journal.lines) : null
+  const codes = found ?? lines.map(() => null)
 
   let bindings: readonly LineBinding[] = []
   try {
-    bindings = await deps.bind(claimed, lines)
+    bindings = await deps.bind(claimed, lines, codes)
   } catch (error) {
     // what the lines are is the review's help, not the receipt: every line new
     deps.report({ kind: 'bind_failed', error })
@@ -199,28 +159,27 @@ async function outcomeOf(
     sums.every((sum) => sum !== null) &&
     sums.reduce<bigint>((all, sum) => all + sum, 0n) === link.total.minor
   return {
-    outcome: {
-      kind: 'parsed',
-      // who read it: the tax office, not a version of our reader
-      readerVersion: 'purs',
-      head: {
-        tin: answer.tin,
-        printedOn: clock.day,
-        printedTime: clock.time,
-        // the link's own: signed, read when the receipt was taken, and what a repeat is known by
-        receiptNo: link.number,
-        totalMinor: link.total.minor,
-        balanced,
-        layout: null,
-        city: serbianCityOf(answer.administrativeUnit, answer.city),
-        shopUnit: shop?.unit ?? null,
-        shop: shop?.name ?? null,
-      },
-      lines,
-      partly: false,
-      bindings,
-      images: [],
+    kind: 'parsed',
+    // who read it: the tax office, not a version of our reader
+    readerVersion: 'purs',
+    head: {
+      tin: answer.tin,
+      printedOn: clock.day,
+      printedTime: clock.time,
+      // the link's own: signed, read when the receipt was taken, and what a repeat is known by
+      receiptNo: link.number,
+      totalMinor: link.total.minor,
+      balanced,
+      layout: null,
+      city: serbianCityOf(answer.administrativeUnit, answer.city),
+      shopUnit: shop?.unit ?? null,
+      shop: shop?.name ?? null,
     },
-    journal: journal.lines,
+    lines,
+    partly: false,
+    bindings,
+    images: [],
+    codes,
+    specification: asked.kind === 'skipped' ? 'skipped' : found === null ? 'failed' : 'ok',
   }
 }

@@ -173,23 +173,6 @@ test('a code from the tax office is asked about at «Save», and bound finds its
   await expect(ready).toBeVisible(READ)
   await ready.click()
   await expect(page.locator('.receipt-line')).toHaveCount(2)
-  // the codes come a moment after the receipt is read (adversarial А4): asked as the phone asks
-  const id = new URL(page.url()).pathname.split('/').at(-1) ?? ''
-  await expect
-    .poll(
-      () =>
-        page.evaluate(async (receipt) => {
-          const response = await fetch(`/api/receipts/${receipt}`, {
-            headers: { 'X-Molvia-Receipt-Codes': '1' },
-          })
-          const detail = (await response.json()) as { lines: { code?: string }[] }
-          return detail.lines[0]?.code ?? null
-        }, id),
-      READ,
-    )
-    .toBe(code)
-  await page.reload()
-  await expect(page.locator('.receipt-line')).toHaveCount(2)
 
   await page.getByRole('button', { name: 'Save 2 purchases' }).click()
   await expect(sheet(page)).toBeVisible()

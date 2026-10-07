@@ -29,7 +29,6 @@ import {
 import { NO_EMBEDDER } from '@/embeddings/embedder'
 import type { Purs, PursAnswer, PursSpecification } from '@/purs/client'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
-import { findByBarcode } from '@/usecases/find-by-barcode'
 import { readTaxReceipts } from '@/usecases/read-tax-receipts'
 import { claimReceiptNotices } from '@/usecases/tell-receipts'
 import type { TaxReport } from '@/usecases/read-tax-receipts'
@@ -152,15 +151,15 @@ function round(purs: Purs): Promise<number> {
     receipts: repository,
     purs,
     report: (event) => reports.push(event),
-    bind: (claimed, lines) =>
+    bind: (claimed, lines, codes) =>
       bindReceiptLines(
         { items: createItemRepository(db), embedder: NO_EMBEDDER },
         claimed.actorId,
         claimed.country,
         claimed.language,
         lines,
+        codes,
       ),
-    holderOf: async (code) => (await findByBarcode(createItemRepository(db), code))?.id ?? null,
   })
 }
 
@@ -869,35 +868,22 @@ describe('the codes of the lines, from the specification (MOL-234, owner’s В-
     expect(first).toEqual({ itemId: sugar, match: 'search' })
   })
 
-  it('the receipt is read and shown while its specification is still out (adversarial А4)', async () => {
+  it('the receipt is written with its codes: a review read the moment it is read has them (review 9, Б1)', async () => {
     const me = await serb()
     const id = await taken(me)
     const purs = office()
     let answer: (value: PursSpecification) => void = () => undefined
     purs.specified.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
     const running = round(purs)
-    await vi.waitFor(async () => {
-      expect(await row(id)).toMatchObject({ status: 'parsed', link: null })
+    await vi.waitFor(() => {
+      expect(purs.specified).toHaveBeenCalledOnce()
     })
-    expect(await codes(id)).toEqual([null, null])
+    // while the specification is out the receipt is still being read — never shown without codes
+    expect(await row(id)).toMatchObject({ status: 'reading' })
     answer(spec([CODE, '']))
     await running
+    expect(await row(id)).toMatchObject({ status: 'parsed', link: null })
     expect(await codes(id)).toEqual([CODE, null])
-  })
-
-  it('codes come to nothing once the receipt is recorded meanwhile — counted all the same', async () => {
-    const me = await serb()
-    const id = await taken(me)
-    await round(office())
-    await db.update(receipts).set({ status: 'recorded' }).where(eq(receipts.id, id))
-    await repository.writeCodes(id, {
-      codes: [CODE, null],
-      holders: [null, null],
-      specification: 'ok',
-    })
-    expect(await codes(id)).toEqual([null, null])
-    expect(await taxDay()).toMatchObject({ specsOk: 1 })
-    expect(await taxDay()).not.toHaveProperty('linesCoded')
   })
 
   it('a specification over the person’s share is counted as not asked (adversarial А5)', async () => {
