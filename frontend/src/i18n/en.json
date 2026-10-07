@@ -1531,7 +1531,7 @@
   },
   "privacy": {
     "title": "Data and privacy",
-    "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, and no third-party trackers or analytics either.",
+    "summary": "Your list of purchases is shown to nobody. Others see prices without your name and only in a shop where at least three people bought the item, and ratings only as an average of three people. The items, shops and barcodes you added, and your word about a receipt line, everyone sees — without your name too, but with no threshold. No ads, and no third-party trackers or analytics either.",
     "operator": {
       "title": "Who is responsible for the data",
       "text": "Molvia is made by Vladimir Sitchikhin — a private individual in Gyumri, Armenia — who is responsible for your data. To reach him — «Write to the developer» in the settings: the message goes to him in person."
@@ -1544,7 +1544,7 @@
       },
       "purchases": {
         "term": "Purchases",
-        "text": "What, where, when and for how much. This is the most personal part: it shows where you go. Only you see your list of purchases. Others may see a price you paid, without your name and only in a shop where at least three people bought that item — then the lowest price may turn out to be yours."
+        "text": "What, where, when and for how much. This is the most personal part: it shows where you go. Only you see your list of purchases. Others may see a price you paid, without your name and only in a shop where at least three people bought that item — and then the shop’s price may turn out to be yours."
       },
       "exchanges": {
         "term": "Money exchanges",
@@ -1743,7 +1743,7 @@
   },
   "consent": {
     "title": "Terms and privacy",
-    "body": "Your purchases are seen by you alone. Others see prices and ratings without a name — and only once at least three people have recorded them. No ads, no trackers.",
+    "body": "Your purchases are seen by you alone. Others see prices and ratings without a name, and only once at least three people have recorded them. The items and shops you add, and your word about a receipt, everyone sees — without a name, but with no threshold. No ads, no trackers.",
     "updated": {
       "title": "The terms have changed",
       "body": "Read what changed and accept the new edition — you cannot go on without it.",

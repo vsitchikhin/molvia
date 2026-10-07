@@ -26,7 +26,8 @@ function templates(): string[] {
 /**
  * Both pages in both languages, as they are filed, the parts each shows and the templates that draw
  * them — any edit, a comma, a part or a line of the template taken out included, changes it. **And
- * the consent on the step itself** (MOL-236, adversarial А4): the card «Статистика» is the text of the
+ * the consent on the step itself** (MOL-236, adversarial А4, Р2-А1): its first words — who sees what —
+ * and the card «Статистика» are the text of the
  * consent to the statistics, shown apart from the pages (В-2), and «что изменилось» says what an
  * edition changed — rewritten, either is the text a person agrees to. Not the rest of `consent`: the
  * buttons, the age and the errors are the step's, not the text. That the step draws the card at all
@@ -39,7 +40,8 @@ function digestOfPages(dictionaries: { ru: typeof ru; en: typeof en } = { ru, en
       JSON.stringify([
         [PRIVACY_STORED, PRIVACY_RECIPIENTS, PRIVACY_PARTS, TERMS_PARTS],
         [r.privacy, r.terms, e.privacy, e.terms],
-        [r.consent.statistics, r.consent.changes, e.consent.statistics, e.consent.changes],
+        [r.consent.body, r.consent.statistics, r.consent.changes],
+        [e.consent.body, e.consent.statistics, e.consent.changes],
         templates(),
       ]),
     )
@@ -68,10 +70,13 @@ describe('the revision of the terms and the privacy page (MOL-95, В-1)', () => 
     statistics.ru.consent.statistics.text = 'Мы считаем всё, с именем. Выключить нельзя.'
     const changes = copy()
     changes.en.consent.changes['2'] = 'Nothing changed.'
+    const body = copy()
+    body.ru.consent.body = 'Другие видят всё.'
     const button = copy()
     button.ru.consent.accept = 'Согласен'
     expect(digestOfPages(statistics)).not.toBe(POLICY_REVISION.digest)
     expect(digestOfPages(changes)).not.toBe(POLICY_REVISION.digest)
+    expect(digestOfPages(body)).not.toBe(POLICY_REVISION.digest)
     expect(digestOfPages(button)).toBe(POLICY_REVISION.digest)
   })
 

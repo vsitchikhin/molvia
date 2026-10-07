@@ -248,6 +248,17 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
     expect(ru.privacy.summary).toMatch(/сторонних трекеров и аналитики/)
   })
 
+  it('says the same of what others see at the top of the page and on the step (Р2-А1)', () => {
+    for (const words of [ru.privacy.summary, ru.consent.body]) {
+      expect(words).toMatch(/видят все — (тоже )?без имени, но и без порога/)
+      expect(words).not.toMatch(/Другие видят только/)
+    }
+    expect(en.privacy.summary).toMatch(/with no threshold/)
+    expect(en.consent.body).toMatch(/with no threshold/)
+    // MOL-166: a shop's price is the lower median of its buyers' last, not the lowest.
+    expect(ru.privacy.stored.purchases.text).not.toMatch(/самая низкая/)
+  })
+
   it('names everything other people see, and that the shops’ memory has no access or threshold (А2)', () => {
     const people = ru.privacy.recipients.people.text
     expect(people).toMatch(/Без доступа и без порога трёх/)
