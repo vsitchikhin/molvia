@@ -184,24 +184,22 @@ test('the skeleton is there while the answer is on its way, and the region says 
   await expect.poll(() => liveRegion(page)).not.toContain('Loading…')
 })
 
-// The server broke rather than the connection: red, an alert, and a way to ask again.
+// The server broke rather than the connection: red, and a way to ask again.
 test('reports a failure instead of an empty screen, and recovers on retry', async ({ page }) => {
   await person(page)
   await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
   await page.goto('/')
 
-  await expect(page.locator('[role="alert"]')).toContainText('The server did not answer')
-  // One «Try again», in the strip over the tab bar — where every screen has its main action — and
-  // the strip is the error's alone (MOL-180, К-1, Ф-15).
+  await expect(page.locator('.state.bad')).toContainText('The server did not answer')
+  // With receipts the strip photographs one through the queue, server or not, and stays the
+  // screen's: the error is a section's quiet card with its own «Try again» (MOL-180, 127_128_129 v2
+  // 1k).
   const retry = page.getByRole('button', { name: 'Try again' })
   await expect(retry).toHaveCount(1)
   const dock = page.locator('.dock')
-  await expect(dock.getByRole('button', { name: 'Try again' })).toBeVisible()
-  await expect(dock.getByRole('button', { name: 'Report a problem' })).toBeVisible()
-  await expect(dock.getByRole('button', { name: 'Photograph a receipt' })).toHaveCount(0)
-  const tabs = await page.locator('.tabbar').boundingBox()
-  const strip = await dock.boundingBox()
-  expect(strip && tabs && strip.y + strip.height).toBeLessThanOrEqual(tabs?.y ?? 0)
+  await expect(dock.getByRole('button', { name: 'Try again' })).toHaveCount(0)
+  await expect(dock.getByRole('button', { name: 'Photograph a receipt' })).toBeVisible()
+  await expect(page.locator('.state.card')).toBeVisible()
 
   await page.unroute('**/api/advice')
   await retry.click()

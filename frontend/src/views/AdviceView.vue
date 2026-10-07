@@ -49,9 +49,13 @@
         </AppButton>
       </div>
 
+      <!-- With receipts the strip photographs one with the server down, through the queue, and stays
+           the screen's: the error is a section's (127_128_129 v2, 1k; MOL-180, В-1). Without, the
+           strip is the error's «Повторить» (1k-0). -->
       <ScreenState
         v-if="phase === 'error'"
         kind="error"
+        :inline="Boolean(country)"
         :title="t('advice.error.title')"
         :body="t(country ? 'advice.error.body_capture' : 'advice.error.body')"
         @retry="retry"
