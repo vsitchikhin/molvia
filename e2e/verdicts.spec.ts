@@ -164,8 +164,15 @@ test('7: rated without a connection and the app closed — sent when it is opene
   const who = await person(page)
   await bought(who, [`Творог ${tag}`, `Сметана ${tag}`])
 
+  // The card is drawn from `pending` while the question «who are we» may still be on its way, and a
+  // rating tapped then waits for its answer without a request (MOL-217, self-review С-5): cut off by
+  // the offline, that answer would leave nothing to fail, and `lost` would wait for good.
+  const known = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/actors/me' && response.ok(),
+  )
   await page.goto('/verdicts')
   await expect(question(page)).toContainText('Сметана')
+  await known
 
   // Offline as the page meets it, and closed only once the rating has tried to go and failed: in CI
   // a rating put right after `setOffline` reached the server (MOL-217).
