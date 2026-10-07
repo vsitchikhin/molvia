@@ -14,13 +14,14 @@ that area's map; here are the shell's own specs and what every run stands on.
 - `e2e/client-errors.spec.ts` — A failure on the phone reaches the API (MOL-144): an answer of «Что брать» off the contract, the screen's «error», `POST /client-errors` answered `204`, and neither the API's answer nor the message in the body.
 - `e2e/client-errors-built.spec.ts` — Spec in the `pwa` project, against the built app (MOL-144): a failure names its build by the page's own script and its frames are paths under `/assets`.
 - `e2e/outdated-built.spec.ts` — Spec in the `pwa` project, against the built app (MOL-231): a browser below the floor gets the locales' line in place of the app, makes no request to the API and registers no worker; one at the floor sees the app untouched.
-- `e2e/pwa-update.spec.ts` — Spec in the `pwa` project, against the built app: a new `sw.js` brings «Update», the tap reloads onto it, nothing reloads by itself; a first visit too, alone and beside another window.
+- `e2e/pwa-update.spec.ts` — Spec in the `pwa` project, against the built app: a new `sw.js` brings «Update», the tap reloads onto it, nothing reloads by itself; a first visit too, alone and beside another window; an error at the door while a version waits offers «Update» once, first (MOL-180, 8c).
 - `e2e/scheme.spec.ts` — Spec: the device's scheme (MOL-111) — chosen against the system both ways, drawn by the head's script without the app, «Системная» one line at 320 px, another window following.
 - `e2e/scroll.ts` — Helper: stands a control a given distance below the top of the window and reads where it stands, for «the page stayed».
 - `e2e/session.ts` — Helper every spec comes in through but the worker's: `open()`, `signedIn()` by the dev seam, and `asBrowser()` headers carrying this browser's cookie.
 - `e2e/sheet.spec.ts` — Spec: the sheet on the kit page — one history entry, every way to close, focus trap, page kept in place, taps while it rises.
 - `e2e/kit-inactive.spec.ts` — Spec in `phone` and `iphone`: «not now» of the kit on `/_kit` — an inactive segmented control walks the focus without choosing, an inactive switch holds against Space and a tap on its words, an inactive button takes the focus and does not light up (MOL-174); an inactive row is followed by neither Enter, a middle click nor a tap (MOL-175).
 - `e2e/kit-rows.spec.ts` — Spec in `phone` and `iphone`: the kit's rows on `/_kit` — a chosen row shows the keyboard's focus inside its ring, the fill between them, and keeps the card's hairline above it straight (MOL-175).
+- `e2e/state-strip.spec.ts` — Spec in `phone` and `iphone`: on `/_kit`, an error of the whole screen draws «Try again» in the strip and only there, and the focus on it goes with it between the strip and the block (MOL-180, А2).
 
 ## repository
 

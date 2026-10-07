@@ -1,5 +1,11 @@
 <template>
-  <section ref="root" class="state" :class="[toneClass, { inline }]">
+  <component
+    :is="card ? AppCard : 'section'"
+    :ref="setRoot"
+    :as="card ? 'section' : undefined"
+    class="state"
+    :class="[toneClass, { inline, card }]"
+  >
     <span v-if="glyph" class="circle" aria-hidden="true">
       <component :is="glyph" class="glyph" />
     </span>
@@ -12,58 +18,78 @@
     <div v-if="$slots.default" class="extra">
       <slot />
     </div>
-    <div v-if="kind === 'error' || $slots.action" class="action">
-      <!-- A version waits: the error may well be the old code reading the new server's answer,
-           and the reload loses nothing (MOL-132, В-2). -->
-      <AppButton
-        v-if="kind === 'error' && updating"
-        block
-        :busy="applying"
-        :busy-label="t('update.applying')"
-        @click="update.apply()"
-      >
-        <template #icon><IconUpdate /></template>
-        {{ t('update.apply') }}
-      </AppButton>
-      <AppButton
-        v-if="kind === 'error'"
-        block
-        :variant="updating ? 'secondary' : 'primary'"
-        @click="$emit('retry')"
-      >
-        <template #icon><IconRefresh /></template>
-        {{ t('state.retry') }}
-      </AppButton>
-      <slot name="action" />
-      <AppButton v-if="reportable" variant="ghost" block aria-haspopup="dialog" @click="report">
-        <template #icon><IconReport /></template>
-        {{ t('state.report') }}
-      </AppButton>
-    </div>
-  </section>
+    <!-- A screen-wide error draws its buttons in the screen's strip, where every screen has its
+         main action (К-1, Ф-15); anywhere else — the login, a sheet — at the bottom of its own. -->
+    <Teleport
+      v-if="kind === 'error' || $slots.action"
+      :to="dockTarget"
+      :disabled="!dockTarget"
+      defer
+    >
+      <div ref="actions" class="action" :class="{ docked: dockTarget }">
+        <!-- A version waits: the error may well be the old code reading the new server's answer,
+             and the reload loses nothing (MOL-132, В-2). -->
+        <AppButton
+          v-if="kind === 'error' && updating && !card"
+          block
+          :size="dockTarget ? 'large' : 'regular'"
+          :busy="applying"
+          :busy-label="t('update.applying')"
+          @click="update.apply()"
+        >
+          <template #icon><IconUpdate /></template>
+          {{ t('update.apply') }}
+        </AppButton>
+        <AppButton
+          v-if="kind === 'error'"
+          :block="!card"
+          :size="dockTarget && !updating ? 'large' : 'regular'"
+          :variant="card ? 'ghost' : updating ? 'secondary' : 'primary'"
+          ref="retryButton"
+          :class="{ word: card }"
+          @click="$emit('retry')"
+        >
+          <template #icon><IconRefresh /></template>
+          {{ t('state.retry') }}
+        </AppButton>
+        <slot name="action" />
+        <AppButton v-if="reportable" variant="ghost" block aria-haspopup="dialog" @click="report">
+          <template #icon><IconReport /></template>
+          {{ t('state.report') }}
+        </AppButton>
+      </div>
+    </Teleport>
+  </component>
 </template>
 
 <script lang="ts">
 import {
   computed,
   defineComponent,
+  nextTick,
   onBeforeUnmount,
   onMounted,
   ref,
   watch,
+  watchEffect,
   type Component,
+  type ComponentPublicInstance,
   type PropType,
 } from 'vue'
 import { getActivePinia } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
+import IconAttention from '~icons/mdi/alert-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconReport from '~icons/mdi/message-alert-outline'
 import IconRefresh from '~icons/mdi/refresh'
 import IconUpdate from '~icons/mdi/update'
 import { lastRefusal } from '@/api'
 import AppButton from '@/components/AppButton.vue'
+import AppCard from '@/components/AppCard.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useStateStrip } from '@/composables/useStateStrip'
+import { useUpdateAnnouncement } from '@/composables/useUpdateAnnouncement'
 import { usePwaUpdate } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
@@ -72,22 +98,24 @@ import { focusScreenTitle } from '@/transitions'
 export type StateKind = 'empty' | 'error' | 'offline' | 'attention'
 
 /**
- * The tones a screen may choose. `bad` is not one of them: it belongs to `error` alone and is
- * never asked for, so `tone="bad"` does not type-check anywhere — offline cannot be drawn red.
+ * The tones a screen may choose — for offline alone. `bad` is not one of them: it belongs to
+ * `error` alone and is never asked for, so `tone="bad"` does not type-check anywhere — offline
+ * cannot be drawn red.
  */
-export type StateTone = 'accent' | 'good' | 'warn'
+export type StateTone = 'good' | 'warn'
 
-// Which tones each kind may take. Error and attention take none: theirs is fixed.
+// Which tones each kind may take. Only offline has a choice; empty is one quiet form whatever it
+// says (Ф-16, К-8), and error and attention are fixed.
 const TONES: Record<StateKind, readonly StateTone[]> = {
-  empty: ['accent', 'good'],
+  empty: [],
   offline: ['good', 'warn'],
   error: [],
   attention: [],
 }
 
-// What a kind that has a choice is drawn in when it was given none it takes. Offline falls
-// to yellow, «the data may be old», which is true of every offline screen; green is a promise.
-const FALLBACK = { empty: 'accent', offline: 'warn' } as const
+// What offline is drawn in when it was given no tone it takes: yellow, «the data may be old»,
+// which is true of every offline screen; green is a promise.
+const FALLBACK: StateTone = 'warn'
 
 // Own keys only: `in` walks the prototype, and «toString» would pass for a kind.
 function isKind(value: unknown): value is StateKind {
@@ -96,11 +124,12 @@ function isKind(value: unknown): value is StateKind {
 
 /**
  * What the types cannot say, since a prop's type does not depend on another prop's value:
- * an empty state may bring its own icon or none, the others are drawn with theirs; a tone is
- * given exactly when the kind has a choice, and it is one of that kind's.
+ * an empty state brings its own icon and the others are drawn with theirs; a tone is given
+ * exactly when the kind has a choice, and it is one of that kind's.
  *
- * An empty state without an icon draws no circle at all (MOL-77): over an action, a circle reads
- * as a button whatever its glyph, and the person taps it.
+ * Every empty state has its circle, on `--surface-2` (Ф-16): MOL-77 took the circle away from
+ * three of them because a terracotta one over an action read as a button and was tapped; a
+ * circle of the page's own quiet fill does not, and one form is what the eye learns.
  */
 function fits(kind: unknown, props: Record<string, unknown>): boolean {
   if (!isKind(kind)) return false
@@ -108,7 +137,7 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
   const tone = props.tone as StateTone | undefined
   const toneFits =
     allowed.length === 0 ? tone === undefined : tone !== undefined && allowed.includes(tone)
-  const iconFits = kind === 'empty' || props.icon === undefined
+  const iconFits = (kind === 'empty') === (props.icon !== undefined)
   return toneFits && iconFits
 }
 
@@ -117,15 +146,21 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  * the device-identity notice that fits none of them. Twelve cards of the mockup are twelve
  * sets of props, not twelve components.
  *
- * The tone of the circle carries the meaning: accent is «start here», good is «all fine»,
- * warn is «the data is old» or «you need to know this», bad is an error and nothing else.
- * Offline is never red — the connection drops at the shelf all the time, and an app that
- * panics every time teaches people to ignore it.
+ * Four kinds, told apart by form and confirmed by colour (41 v2, Ф-35): empty is a quiet circle
+ * with the screen's own icon, error a red one with a ring, attention a yellow triangle, offline
+ * the cloud. Offline is green or yellow and never red — the connection drops at the shelf all
+ * the time, and an app that panics every time teaches people to ignore it.
  *
  * An error always offers «Try again», drawn here and reported as `retry`: twelve copies of one
  * word would drift apart. Every other action is the screen's own and comes through `action`,
  * after the retry where there is one — the search's «Take from recent». While a new version of the
  * app waits, the error offers it first, «Обновить», and the retry second (MOL-132).
+ *
+ * An error of the whole screen draws those buttons in the screen's strip (`useStateStrip`, К-1,
+ * Ф-15): «Повторить» stood at the bottom of the free height — on each screen at its own — and over
+ * a strip with a live action it was a second filled button. The strip is then the error's alone:
+ * the screen's own action and «Вышла новая версия» step aside, so «Обновить» is offered once (8c).
+ * The login and a sheet have no strip, and keep them at the bottom of the block.
  *
  * Last, quieter than both, «Сообщить о проблеме» (MOL-147, Р-5): the sheet «Написать разработчику»
  * on «Сломалось», with the code of the API's last refusal before the error was shown (В-1). Only where the screen as a
@@ -136,9 +171,11 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  * Texts arrive translated, never as a key prefix: a key assembled from a string is invisible
  * to the linter and to vue-tsc alike (MOL-16, О-12).
  *
- * Laid out to take the free height of the screen with the action at the bottom, under the
- * thumb; `inline` keeps it to its own height, for a notice above the content — the surface
- * around it is the card's, not this block's.
+ * Laid out to take the free height of the screen with an action of its own at the bottom, under
+ * the thumb; `inline` keeps it to its own height, for a notice above the content — the surface
+ * around it is the card's, not this block's. An `inline` error is that card itself, the quiet one
+ * (К-13, 77 v2 2c): «Повторить» a ghost the width of its word, and no «Обновить», which the strip's
+ * own row already offers while the screen works.
  */
 export default defineComponent({
   name: 'ScreenState',
@@ -155,11 +192,63 @@ export default defineComponent({
   setup(props) {
     const { t } = useI18n()
     const root = ref<HTMLElement | null>(null)
+    // The root is a card's component for a section's error, a plain element otherwise.
+    function setRoot(el: Element | ComponentPublicInstance | null): void {
+      const node = el instanceof Element ? el : (el?.$el as unknown)
+      root.value = node instanceof HTMLElement ? node : null
+    }
+    const actions = ref<HTMLElement | null>(null)
+    const retryButton = ref<ComponentPublicInstance | null>(null)
     const announce = useAnnouncer()
+
+    // The strip is asked for while the block is an error of the whole screen, and let go as it
+    // stops being one; the first to ask holds it, and the next takes it once that one lets go.
+    const strip = useStateStrip()
+    const me = Symbol('screen-state')
+    watchEffect(() => {
+      if (!strip) return
+      if (props.kind === 'error' && !props.inline) strip.claim(me)
+      else strip.release(me)
+    })
+    const dockTarget = computed(() => (strip?.owner.value === me ? strip.target.value : null))
+    // A screen has one error of its own: a second one while the first holds the strip is drawn as a
+    // section's, the quiet card — its own filled «Повторить» and «Обновить» were a second pair
+    // (adversarial А4, 8c).
+    const second = computed(
+      () =>
+        props.kind === 'error' &&
+        strip?.owner.value != null &&
+        strip.owner.value !== me &&
+        !props.inline,
+    )
+    const card = computed(() => props.kind === 'error' && (props.inline || second.value))
+
+    // Moved between the strip and the block — the error turned a section's or the screen's where it
+    // stands — the buttons are other nodes or the same ones moved, and either way the focus fell to
+    // the body (adversarial А2). It goes back to «Повторить», or to the first button of the block.
+    watch(
+      [dockTarget, card],
+      () => {
+        const focused = document.activeElement
+        if (!(focused instanceof HTMLElement) || !actions.value?.contains(focused)) return
+        const wasRetry = retryButton.value?.$el === focused
+        void nextTick(() => {
+          const retry = retryButton.value?.$el as unknown
+          const next = wasRetry && retry instanceof HTMLElement ? retry : null
+          ;(next ?? actions.value?.querySelector('button'))?.focus()
+        })
+      },
+      { flush: 'pre' },
+    )
+
+    // The error offers «Обновить» in the row's place, and says the version out loud as the row did
+    // (adversarial А3); a quiet card offers none — the row stands — and says nothing.
+    useUpdateAnnouncement(() => props.kind === 'error' && !card.value)
 
     const glyph = computed<Component | undefined>(() => {
       if (props.kind === 'offline') return IconCloudOff
       if (props.kind === 'empty') return props.icon
+      if (props.kind === 'attention') return IconAttention
       return IconAlert
     })
 
@@ -167,11 +256,9 @@ export default defineComponent({
     // only warns, and a warning in the console must not turn offline red on the screen.
     const toneClass = computed(() => {
       if (props.kind === 'error') return 'bad'
-      if (!isKind(props.kind) || props.kind === 'attention') return 'warn'
-      const allowed = TONES[props.kind]
-      return props.tone !== undefined && allowed.includes(props.tone)
-        ? props.tone
-        : FALLBACK[props.kind]
+      if (props.kind === 'empty') return 'quiet'
+      if (props.kind !== 'offline') return 'warn'
+      return props.tone !== undefined && TONES.offline.includes(props.tone) ? props.tone : FALLBACK
     })
 
     // An error on the screen interrupts: the person was waiting for an answer that did not
@@ -180,7 +267,8 @@ export default defineComponent({
     // just focused (MOL-19, A3, Р-9). Polite words go to the app's live region when there is
     // one; outside the app the block carries `status` itself.
     const alerts = computed(
-      () => !props.inline && (props.kind === 'error' || props.kind === 'attention'),
+      () =>
+        !props.inline && !second.value && (props.kind === 'error' || props.kind === 'attention'),
     )
     const role = computed(() => {
       if (alerts.value) return 'alert'
@@ -201,7 +289,10 @@ export default defineComponent({
 
     onBeforeUnmount(() => {
       withdraw?.()
-      if (root.value?.contains(document.activeElement)) focusScreenTitle()
+      strip?.release(me)
+      // The buttons may stand in the strip, out of the block: a focus on them goes with them too.
+      const focused = document.activeElement
+      if (root.value?.contains(focused) || actions.value?.contains(focused)) focusScreenTitle()
     })
 
     const update = usePwaUpdate()
@@ -231,7 +322,7 @@ export default defineComponent({
     const reportable = computed(
       () =>
         props.kind === 'error' &&
-        !props.inline &&
+        !card.value &&
         actor?.state === 'ready' &&
         feedback !== null &&
         !inDialog.value,
@@ -239,7 +330,12 @@ export default defineComponent({
 
     return {
       t,
-      root,
+      AppCard,
+      setRoot,
+      card,
+      actions,
+      retryButton,
+      dockTarget,
       glyph,
       toneClass,
       role,
@@ -281,9 +377,9 @@ export default defineComponent({
   font-size: var(--state-glyph);
 }
 
-.accent .circle {
-  background: var(--accent-tint);
-  color: var(--accent-ink);
+.quiet .circle {
+  background: var(--surface-2);
+  color: var(--text-muted);
 }
 
 .good .circle {
@@ -328,6 +424,22 @@ export default defineComponent({
   gap: var(--space-2);
   margin-top: auto;
   padding-top: var(--space-4);
+}
+
+/* The quiet card's «Повторить»: the width of its word, the word in line with the text above. */
+.card .action {
+  align-items: flex-start;
+  padding-top: var(--space-2);
+}
+
+.word {
+  margin-left: calc(var(--space-4) * -1);
+}
+
+/* In the strip, whose margins and column are the frame's (К-9). */
+.action.docked {
+  margin-top: 0;
+  padding-top: 0;
 }
 
 .inline .action {

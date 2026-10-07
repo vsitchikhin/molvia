@@ -1260,6 +1260,9 @@
       "rows": "Rows and captions",
       "operations": "Operation row",
       "skeleton": "Skeleton",
+      "states": "States",
+      "state_screen": "An error of the screen",
+      "state_section": "As a section",
       "caption_month": "September 2026",
       "row_cash": "Cash, drams",
       "row_short": "Cash",
@@ -1648,7 +1651,7 @@
     },
     "logs": {
       "title": "Server logs",
-      "text": "Kept for no longer than 14 days. Requests are written to them without your IP address and without what you searched for. An IP address can reach the server's error log — and it too lives there no longer than 14 days — and the server's memory along with an app failure: see «App failures». And for 30 days the server keeps metrics: how many requests reached each part of it and how fast it answered — every 15 seconds, without a name, an address or what you searched for: this is how we see whether something broke."
+      "text": "Kept for no longer than 14 days. Requests are written to them without your IP address and without what you searched for. An IP address can reach the server's error log — and it too lives there no longer than 14 days — and the server's memory along with an app failure: see «App failures». And the server keeps metrics: how many requests reached each part of it and how fast it answered — every 15 seconds, without a name, an address or what you searched for: this is how we see whether something broke. The last 30 days of them can be read, and they leave the disk month by month — within two months."
     },
     "failures": {
       "title": "App failures",

@@ -132,6 +132,40 @@ describe('AdviceView', () => {
       expect(newcomer.view.text()).not.toContain(en.purchases.capture)
     })
 
+    // A failure under «Где вы?» opened from the strip: the error is a section's while the sheet is
+    // up, so the strip — and the sheet and what was typed in it — stays (MOL-180, adversarial А1,
+    // as Р-15 of MOL-128). Taken by the error, the sheet went, and `entering` stuck.
+    it('a failure under the open sheet keeps it, and the strip is the error’s once it is down', async () => {
+      const georgia = { geography: { country: 'GE', city: 'Гюмри' } }
+      advice.mockResolvedValue(answer([], georgia))
+      const { view } = await render({ country: 'GE' })
+      await view.get('.dock').get('button').trigger('click')
+      await flushPromises()
+      const sheet = () => view.findComponent({ name: 'StartTripSheet' })
+      expect(sheet().props('open')).toBe(true)
+
+      // The city moved in another tab, and the answer for it failed.
+      advice.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'HTTP 502'))
+      const key = `molvia.settings.${ME}`
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          country: 'GE',
+          city: 'Тбилиси',
+          spendCurrency: 'AMD',
+          incomeCurrency: 'RUB',
+        }),
+      )
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+      await flushPromises()
+
+      expect(view.text()).toContain(en.advice.error.title)
+      expect(sheet().exists()).toBe(true)
+      expect(sheet().props('open')).toBe(true)
+      expect(view.get('.state').classes()).toContain('card')
+      expect(view.get('.dock').text()).not.toContain(en.state.retry)
+    })
+
     // Serbia's receipts are read by the QR code off the photo (MOL-233): the version «с чеком» whole,
     // where MOL-232 left it «без чека» on this screen (Р-9).
     it('a person in Serbia takes a receipt from here as anyone whose receipts are read', async () => {
@@ -515,7 +549,7 @@ describe('AdviceView', () => {
       expect(advice).toHaveBeenCalledTimes(2)
     })
 
-    it('nothing found: «No … found», no circle and no action', async () => {
+    it('nothing found: «No … found», the quiet circle and no action', async () => {
       advice.mockResolvedValue(answer([milk]))
       adviceSearch.mockResolvedValue(found([], { near: false }))
       const { view } = await render()
@@ -524,7 +558,8 @@ describe('AdviceView', () => {
       await vi.waitFor(() => {
         expect(view.text()).toContain('No «кускус» found')
       })
-      expect(view.find('.circle').exists()).toBe(false)
+      expect(view.get('.state').classes()).toContain('quiet')
+      expect(view.get('.state').find('button').exists()).toBe(false)
     })
 
     it('only far rows: said above them — the server`s word (MOL-46)', async () => {

@@ -16,7 +16,6 @@
       <ScreenState
         v-else-if="phase === 'offer'"
         kind="empty"
-        tone="accent"
         :icon="IconSend"
         :title="t('login.offer.title')"
         :body="t('login.offer.body')"
@@ -35,7 +34,6 @@
       <ScreenState
         v-else-if="phase === 'waiting'"
         kind="empty"
-        tone="accent"
         :icon="IconSend"
         :title="t('login.waiting.title')"
         :body="t('login.waiting.body')"
@@ -127,8 +125,9 @@
     </div>
 
     <!-- Под действием экрана, как над таб-баром в приложении: старый код входа против нового API
-         ломается так же, как любой экран (MOL-132, В-1). -->
-    <UpdateBand class="update" />
+         ломается так же, как любой экран (MOL-132, В-1). Ошибка входа предлагает «Обновить» сама,
+         первой, — тогда строки нет (8c). -->
+    <UpdateBand v-if="!offered" class="update" />
 
     <!-- What is kept and how to have it erased is read before signing in (MOL-58), and so are the
          terms it is accepted with (MOL-95) — the step of consent names both itself, once. -->
@@ -153,7 +152,9 @@ import ScreenState from '@/components/ScreenState.vue'
 import UpdateBand from '@/components/UpdateBand.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
+import { provideStateStrip } from '@/composables/useStateStrip'
 import { purchaseDay } from '@/days'
+import { usePwaUpdate } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
 import { takeErasureNote } from '@/stores/identity'
 import { POLL_INTERVAL_MS, useLoginStore } from '@/stores/login'
@@ -187,6 +188,12 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const login = useLoginStore()
     const actor = useActorStore()
+    // No strip at the door: an error keeps its buttons, and the door only learns it is there.
+    const strip = provideStateStrip()
+    const update = usePwaUpdate()
+    const offered = computed(
+      () => strip.held.value && ['ready', 'applying'].includes(update.phase.value),
+    )
 
     const phase = computed(() => login.phase)
     // The seam is a button rather than something that happens by itself, and only here: Vite
@@ -256,6 +263,7 @@ export default defineComponent({
     return {
       t,
       phase,
+      offered,
       seam,
       insecure,
       account,

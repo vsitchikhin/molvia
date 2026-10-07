@@ -21,12 +21,12 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeUnmount, watch } from 'vue'
+import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconUpdate from '~icons/mdi/update'
 import AppButton from '@/components/AppButton.vue'
-import { useAnnouncer } from '@/composables/useAnnouncer'
-import { usePwaUpdate, type PwaUpdate, type UpdatePhase } from '@/pwaUpdate'
+import { useUpdateAnnouncement } from '@/composables/useUpdateAnnouncement'
+import { usePwaUpdate } from '@/pwaUpdate'
 
 /**
  * «Вышла новая версия · Обновить» (MOL-132): a version waits, and the person takes it — the one way
@@ -42,43 +42,16 @@ import { usePwaUpdate, type PwaUpdate, type UpdatePhase } from '@/pwaUpdate'
  * app to be closed all the way, in the words of both phones — a guess from the user agent is wrong
  * on an iPad, which calls itself a Mac (Р-3).
  */
-/** What each version's state last had said out loud, across every strip and screen. */
-const said = new WeakMap<PwaUpdate, UpdatePhase>()
-
 export default defineComponent({
   name: 'UpdateBand',
   components: { AppButton, IconUpdate },
   setup() {
     const { t } = useI18n()
     const update = usePwaUpdate()
-    const announce = useAnnouncer()
     const phase = computed(() => update.phase.value)
 
-    // Said as it comes and as it fails — once for the app, not once for each strip: a screen
-    // draws its own, born with the version already waiting, and a strip that spoke only of what it
-    // saw change said nothing at all (adversarial Д1). What was said is kept by the version's own
-    // state, the one object every strip reads.
-    let unsay: (() => void) | undefined
-    let saying: UpdatePhase | undefined
-    watch(
-      phase,
-      (now) => {
-        if (now !== 'ready' && now !== 'failed') return
-        if (said.get(update) === now) return
-        said.set(update, now)
-        unsay?.()
-        saying = now
-        unsay = announce?.(now === 'failed' ? t('update.failed.title') : t('update.ready'))
-      },
-      { immediate: true },
-    )
-    // Words still true stay when the strip goes with its screen: the next screen draws the same
-    // strip and says nothing, and taken back they were gone before a screen reader read them —
-    // a millisecond after they came, or before they came at all (review С-13, adversarial Ж2).
-    // Only words that stopped being true are taken back.
-    onBeforeUnmount(() => {
-      if (update.phase.value !== saying) unsay?.()
-    })
+    // Said as it comes and as it fails — once for the app, not once for each strip (adversarial Д1).
+    useUpdateAnnouncement()
 
     return {
       t,

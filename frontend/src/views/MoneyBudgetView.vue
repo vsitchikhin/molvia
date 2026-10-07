@@ -40,7 +40,6 @@
         <ScreenState
           v-if="!budget.total && budget.savings.target === null"
           kind="empty"
-          tone="accent"
           :icon="IconTarget"
           :title="t('budget.empty.title')"
           :body="t('budget.empty.body')"

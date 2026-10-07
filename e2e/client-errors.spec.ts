@@ -22,7 +22,9 @@ test('ошибка экрана доходит до API без ответа API 
   const sent = page.waitForRequest(sentFailure)
   const answered = page.waitForResponse((response) => sentFailure(response.request()))
   await page.goto('/')
-  await expect(page.locator('[role="alert"]')).toBeVisible()
+  // With receipts the error of «Что брать» is a section's quiet card, polite rather than an alert
+  // (MOL-180): the screen's failure is reported all the same.
+  await expect(page.locator('.state.bad')).toBeVisible()
 
   const body = (await sent).postDataJSON() as { reports: Record<string, unknown>[] }
   expect((await answered).status()).toBe(204)

@@ -41,6 +41,7 @@ import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetDrag } from '@/composables/useSheetDrag'
+import { closeStateStrip } from '@/composables/useStateStrip'
 import { pageAnchor, sheetOpener, useSheetHistory } from '@/composables/useSheetHistory'
 
 /** A double tap lands within this — a platform convention, not a design token. */
@@ -90,6 +91,8 @@ export default defineComponent({
   },
   setup(props, { emit, expose }) {
     const { t } = useI18n()
+    // An error in the sheet keeps its buttons here: the strip under it is the screen's.
+    closeStateStrip()
     const dialog = ref<HTMLDialogElement | null>(null)
     const titleId = useId()
 

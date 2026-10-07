@@ -772,3 +772,26 @@ test('the spending sheet rises as high as the keys leave it, before they come (M
   expect(seen[0]?.height).toBeLessThanOrEqual(Math.ceil(visible * 0.82))
   expect(await within(page, 'dialog[open]', covered)).toEqual({ top: true, bottom: true })
 })
+
+// The summary broke, the connection did not: a section's quiet card with its «Повторить», and
+// «Добавить трату» keeps the strip — a spending goes through the queue with the server down
+// (MOL-180, В-1, 157 v2 1k).
+test('a summary that did not load is a quiet card, and the strip still adds a spending', async ({
+  page,
+}) => {
+  await openMoney(page)
+  // Last month is read for the first time and fails; this month's answer has named the categories.
+  const last = `**/api/money/months/${lastMonthDay().slice(0, 7)}*`
+  await page.route(last, (route) => route.fulfill({ status: 500, body: '{}' }))
+  await page.getByRole('button', { name: 'Предыдущий месяц' }).click()
+
+  await expect(page.getByText('Не удалось загрузить траты')).toBeVisible()
+  const retry = page.getByRole('button', { name: 'Повторить' })
+  await expect(retry).toHaveCount(1)
+  await expect(page.locator('.dock').getByRole('button', { name: 'Повторить' })).toHaveCount(0)
+  await expect(page.locator('.dock').getByRole('button', { name: /Добавить трату/ })).toBeVisible()
+
+  await page.unroute(last)
+  await retry.click()
+  await expect(page.getByText('Не удалось загрузить траты')).toHaveCount(0)
+})
