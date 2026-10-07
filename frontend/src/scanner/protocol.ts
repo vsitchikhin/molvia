@@ -20,6 +20,10 @@ export interface ReaderFailure {
   readonly stack: string
 }
 
-/** The worker's answer to one request. */
-export type ReaderReply =
-  { id: number; ok: true; code: string | null } | { id: number; ok: false; failure?: ReaderFailure }
+/**
+ * The worker's answer to one request: what the frame held — a barcode's digits for the scanner, the
+ * texts of every QR code on a receipt's photo (MOL-233) — or null, the answer to `warm` and to a frame
+ * with nothing in it.
+ */
+export type ReaderReply<T = string> =
+  { id: number; ok: true; code: T | null } | { id: number; ok: false; failure?: ReaderFailure }

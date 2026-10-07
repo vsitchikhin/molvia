@@ -35,6 +35,10 @@ Open Food Facts is MOL-162.
 - **EAN-13, EAN-8, UPC-A and UPC-E, nothing else** (`READER_OPTIONS`). A QR or a Code 128 on the
   same package is not the item's code, and every format read beyond these is one more chance of a
   false read. That the scanner reads EAN and not QR is the reason the Telegram Mini App was dropped.
+- **A receipt's QR is not the scanner's** (MOL-233): a Serbian receipt's QR code is read off a photo by a
+  worker of its own (`receipts/qrWorker.ts`, `RECEIPT_QR_OPTIONS`) with the same wasm; the two share the
+  worker's loop (`serveFrames`) and the page's reader (`createFrameReader`), never the options, so the
+  scanner at the shelf still reads retail codes only and a reader that fails takes nobody else's down.
 - **One package, one code.** zxing-wasm reads UPC-A and UPC-E as thirteen digits — the UPC-A
   `012345678905` as `0012345678905`, the UPC-E `01234565` as `0012345000065`, measured on
   29.09.2026 and held by `decode.test.ts`. So the scanner writes no normalisation of its own, and a

@@ -488,7 +488,7 @@ Its QR code is the link of the tax office's check, `https://suf.purs.gov.rs/v/?v
 TAP's own mode, no authentication — it answers the seller and the journal, the tax office's own rendering
 of what the till sent. The journal laid out by Serbia's card gave 20 of 20 lines of three live receipts by
 every field, 78 of 78 on the 23 journals of MOL-229. A country's receipts come one way
-(`receiptSourceOf`): Armenia by photo, Serbia by link; reading the code off a photo is MOL-233.
+(`receiptSourceOf`): Armenia by photo, Serbia by link — read off a photo by the phone (MOL-233, below).
 
 **`vl` is checked with no network, by one function for the phone and the server** (`serbianReceiptLink`): the
 host, a size of 572–848 bytes and the MD5 at its end — `md5Hex` in the domain, which has no `node:crypto` —
@@ -570,12 +570,34 @@ person's own — the price: a receipt of Niš proposes their city.
 read, failed or recorded — by the row's `source`, never guessed from the country (review 7) — until MOL-234 gives it a line of its own — its lines have nothing to put right,
 and counted with OCR's they would thin the stop line.
 
-**On the phone** (owner's В-2 «а»; Р-9 at the merge): until MOL-233 reads the code, the link is pasted — the system camera
-opens the tax office's page, its address is copied — into «Чек по ссылке» (`LinkReceiptSheet`), offered
-in «Покупки» beside «Записать вручную» to a person whose country is Serbia; every other screen keeps the
-version «без чека». The sheet says why a paste is no receipt by the very function of the server, and
-queues one write with no photo, delivered as it lands. The review says «Строки — из налоговой Сербии»,
-names the ПИБ, and has nothing of a photo — no «Переснять», no «Прочитали не всё», no «Фото удалим».
+**On the phone the QR code is read off the photo, and only the link goes** (MOL-233, owner's В-1 «а»):
+a person whose country is Serbia gets «Сфотографировать чек» as anyone whose receipts are read, on «Что
+брать» and in «Покупки» (`LinkReceiptSheet`), the system camera or the gallery. The shot is read **whole**, as
+`decodePhoto` draws it — no «Края чека», no parts: nothing of it is sent, and a warp redraws the modules — in
+a worker of its own (`receipts/qrWorker.ts`) with the scanner's wasm from the app's own origin, **`QRCode`,
+`tryHarder`, up to four symbols** (`RECEIPT_QR_OPTIONS`): without `tryHarder` the bench's code at four pixels
+a module on a 12 Mp photo was not found, and a receipt prints a shop's own QR beside the tax office's — am-03
+carries Ереван Сити's (`.scratch/tasks/research/MOL-233/probe-12mp.mjs`). **The first code that is a link by
+`serbianReceiptLink` is the receipt** (`receiptLinkOfCodes`); a refund or a copy is said by its reason, as
+under the field; anything else is «QR не нашёлся». **The photo is let go as soon as it is read** — never on
+the shelf of IndexedDB, never in the queue; a shot picked from the gallery stays in the gallery, which the
+page cannot touch. The link goes by `sendLink`, the same write as a paste, and the sheet stays at work for
+a double tap (`DOUBLE_TAP`, adversarial А3). **No code on the shot — how to shoot it, and the link pasted**
+(В-2 «а»): «Вставить ссылку» opens the field of MOL-232 in the same sheet — the system camera opens the tax
+office's page, its address is copied — and the link is checked by the very function of the server. **No
+reading of Serbia by OCR exists**: the task's «the usual OCR path» has none to go to, and a Serbian
+receipt's photo would be refused by the schema; one is built only if live receipts show the QR missed
+often. A worker that failed is the phone's defect (`reportFailure`, catcher `scanner`) and a miss to the
+person — the link stays. **A sheet put away while «Ищем QR…» is a «не надо»** (review 1, adversarial А1):
+the reader the unmount lets go refuses the read, which is no defect, and an answer come after the sheet
+went is nobody's — nothing reported, nothing queued, no worker started again. **Its words are the link's,
+never a photo's** (adversarial А2, А3): with no connection the link waits, and what the queue could not
+keep is the link — the sheet that keeps no photo never says one waits or was not kept. The queue
+refuses a link only with nobody signed in (`sendLink`), so that is what the sheet says, never «free some
+space» (review 4). **The scanner of goods is untouched** (MOL-98): its worker and options stay retail
+codes only. The review says «Строки — из налоговой Сербии», names the ПИБ, and has nothing of a photo — no
+«Переснять», no «Прочитали не всё», no «Фото удалим»: «Переснять» is a photo country's (`photoCountry`).
+**How often the camera reads it is MOL-234's** (В-3 «а»): the body will say `via: qr | paste` there.
 
 ## The reader holds nothing
 
