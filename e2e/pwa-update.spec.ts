@@ -116,3 +116,34 @@ test('a first visit beside another window of the app is offered the waiting vers
     .toBe(true)
   await expect(update).toHaveCount(0)
 })
+
+// An error while a version waits offers «Update» itself, first, and the row of the version steps
+// aside: one «Update» on the screen (MOL-180, 41 v2 8c). At the door, the one screen a build shows
+// without a session; the strip of a screen holds the same rule in `AppScreen.test`.
+test('an error at the door while a version waits offers «Update» once, first', async ({ page }) => {
+  await page.goto('/privacy')
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready
+  })
+  await page.goto('/')
+  await expect
+    .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))
+    .toBe(true)
+  await page.route('**/api/auth/login*', (route) => route.fulfill({ status: 500, body: '{}' }))
+
+  writeFileSync(WORKER, `${built}\n// ${String(Date.now())}\n`)
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  const update = page.getByRole('button', { name: 'Update', exact: true })
+  await expect(update).toBeVisible()
+  // The row by its class: its words are in the live region too (`e2e.md`).
+  const row = page.locator('.band')
+  await expect(row).toBeVisible()
+
+  await page.getByRole('button', { name: 'Sign in with Telegram' }).click()
+  const retry = page.getByRole('button', { name: 'Try again' })
+  await expect(retry).toBeVisible()
+  await expect(update).toHaveCount(1)
+  await expect(row).toHaveCount(0)
+  const [above, below] = await Promise.all([update.boundingBox(), retry.boundingBox()])
+  expect(above && below && above.y < below.y).toBe(true)
+})

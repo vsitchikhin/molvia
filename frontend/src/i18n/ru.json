@@ -1261,6 +1261,8 @@
       "operations": "Строка операции",
       "skeleton": "Скелетон",
       "states": "Состояния",
+      "state_screen": "Ошибка экрана",
+      "state_section": "Секцией",
       "caption_month": "Сентябрь 2026",
       "row_cash": "Наличные драмы",
       "row_short": "Наличные",

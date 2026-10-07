@@ -405,6 +405,24 @@
         :title="t('trip.error.title')"
         :body="t('trip.error.body')"
       />
+      <!-- An error of the whole screen takes this page's strip, and turns a section's where it stands:
+           what a real engine does with the buttons moved there and back (MOL-180, e2e `state-strip`). -->
+      <label class="toggle">
+        <AppSwitch :checked="screenError" @toggle="screenError = $event" />
+        {{ t('dev.kit.state_screen') }}
+      </label>
+      <label class="toggle">
+        <AppSwitch :checked="sectionError" @toggle="sectionError = $event" />
+        {{ t('dev.kit.state_section') }}
+      </label>
+      <ScreenState
+        v-if="screenError"
+        kind="error"
+        :inline="sectionError"
+        :title="t('devices.load_error.title')"
+        :body="t('devices.load_error.body')"
+        @retry="screenError = false"
+      />
     </section>
 
     <!-- The skeleton (MOL-178, Ф-13): each part of the kit under the answer it stands for, so e2e holds
@@ -811,6 +829,8 @@ export default defineComponent({
       date: ref('2026-09-19'),
       unit: ref('l'),
       working: ref(false),
+      screenError: ref(false),
+      sectionError: ref(false),
       toggles: reactive([
         { key: 'switch_off', on: false, inactive: false },
         { key: 'switch_on', on: true, inactive: false },
