@@ -119,6 +119,11 @@ export default defineConfig(({ mode }) => {
     // MOL-149): the repository is public, so they disclose nothing. Not precached — `globPatterns`
     // has no `map` — and a browser fetches one only with its tools open.
     build: { target: BROWSER_FLOOR, sourcemap: true },
+    // What only a worker imports: the dev server's first crawl never reads a worker, so the package
+    // was found when the scanner first opened and optimized in the middle of an end-to-end run, every
+    // page loading then stalling — and a rating sent offline reached the server (MOL-217). Held by
+    // `optimizeDeps.test.ts`; the build does not read it.
+    optimizeDeps: { include: ['zxing-wasm/reader'] },
     resolve: { alias: { '@': src } },
     css: {
       preprocessorOptions: {
