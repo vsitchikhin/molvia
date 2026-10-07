@@ -1171,7 +1171,7 @@
   "erase": {
     "title": "Delete all your data?",
     "goes": "Everything Molvia knows about you goes: purchases, spendings and their categories, currency exchanges, incomes, accounts and checks, ratings and reviews, search picks, visit marks, settings and sign-ins on every device.",
-    "stays": "The items, shops and barcodes you added to the shared catalogue stay, without your name. One number stays too: how many people who came in the same week deleted their data.",
+    "stays": "The items, shops and barcodes you added to the shared catalogue, and the shops’ memory — which item stands behind a receipt line and the shelf price — stay, without your name. One number stays too: how many people who came in the same week deleted their data.",
     "devices": "What is saved on this device is erased. Copies on other devices stay until the app or the site data is deleted there.",
     "final": "This cannot be undone. You can download a copy first: «Download my data».",
     "confirm": "Delete for good",
@@ -1531,7 +1531,11 @@
   },
   "privacy": {
     "title": "Data and privacy",
-    "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, no trackers, no analytics.",
+    "summary": "Your list of purchases is shown to nobody. Others see only prices — without your name and only in a shop where at least three people bought the item — and ratings only as an average of three people. No ads, and no third-party trackers or analytics either.",
+    "operator": {
+      "title": "Who is responsible for the data",
+      "text": "Molvia is made by Vladimir Sitchikhin — a private individual in Gyumri, Armenia — who is responsible for your data. To reach him — «Write to the developer» in the settings: the message goes to him in person."
+    },
     "stored": {
       "title": "What we keep",
       "telegram": {
@@ -1556,7 +1560,7 @@
       },
       "receipts": {
         "term": "Receipts",
-        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; no outside service sees the photo. A Serbian receipt comes as the link of its QR code, with no photo — see «A Serbian receipt by its link». The photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them. If you left the screen while a receipt was being read, the Molvia bot tells you in Telegram that it is ready: the message names the shop or the receipt’s date and the number of items — no sums, no products — and Telegram sees that message. Kept here: how you learned the receipt was ready — in the app or from the bot — and whether that message is off."
+        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; no outside service sees the photo. A Serbian receipt comes as the link of its QR code, with no photo — see «A Serbian receipt by its link». The photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them. If you left the screen while a receipt was being read, the Molvia bot tells you in Telegram that it is ready: the message names the shop or the receipt’s date and the number of items — no sums, no products — and Telegram sees that message. Kept here: how you learned the receipt was ready — in the app or from the bot — and whether that message is off. A recorded receipt is kept while the account exists. If you delete a recorded receipt from «Purchases», or one purchase of it, the receipt itself and its lines still stay with us until the account is deleted, and the app does not show them — this is a bug, and we are fixing it."
       },
       "accounts": {
         "term": "Accounts",
@@ -1572,7 +1576,7 @@
       },
       "ratings": {
         "term": "Ratings and reviews",
-        "text": "Only you see your review. Others see a rating only inside an average of three people."
+        "text": "Only you see your review. Others see a rating only inside an average of three people. A rating you withdrew stays with us as a row without its review — why is said under «Statistics — with your consent»."
       },
       "reminders": {
         "term": "Rating reminders",
@@ -1588,7 +1592,7 @@
       },
       "visits": {
         "term": "Visit marks",
-        "text": "Whether you opened “What to buy” — at most once a day. This is how we learn whether people come back. You can turn them off in the settings, “Count me in the statistics”: past marks are deleted at once, no new ones are written, and you are no longer counted in whether people use Molvia — by marks or by ratings."
+        "text": "Whether you opened “What to buy” — at most once a day. For the statistics only, and only with your consent — see «Statistics — with your consent»."
       },
       "devices": {
         "term": "Sign-in devices",
@@ -1603,17 +1607,56 @@
         "text": "Which edition of the Terms of use and of this page you accepted, and when — so that we can ask you again when they change in a way that matters. We keep neither your age nor your date of birth."
       }
     },
+    "bases": {
+      "title": "Why, and on what basis",
+      "text": "Almost everything in the list above is needed for Molvia to work: you accepted the «Terms of use», and that is our agreement. You cannot refuse this data and stay in Molvia — you can only delete the account.\nOne thing rests on your separate consent: the statistics, described in the next section.\nWhat we do with the data: receive it from you, keep it, show it to you, work out average ratings and prices for others from it — without your name, pass it to those named under «Who the data goes to», and delete it."
+    },
+    "statistics": {
+      "title": "Statistics — with your consent",
+      "text": "To learn whether people need Molvia, the developer counts two things: whether people come back — by the visit marks — and how many ratings are given, withdrawn ones included. He counts in numbers, without names and without what you rated.\nThe consent holds while «Count me in the statistics» is on in the settings — and it is on until you turn it off. You can turn it off at any moment: the visit marks are deleted at once and no new ones are written, and your ratings stop being counted. You can turn it back on in the same place.\nA rating you withdrew stays with us as a row — without its review, but with the rating itself and the moment you gave it: it is how the bot knows not to ask you to rate a purchase whose rating you withdrew. It stays after the statistics are turned off too, but is no longer counted, and it goes with the account."
+    },
+    "recipients": {
+      "title": "Who the data goes to",
+      "people": {
+        "term": "Other people",
+        "text": "Average ratings of three people and prices without your name — and only to those who have access to other people’s figures. Your list of purchases, your spendings and your money — to nobody."
+      },
+      "telegram": {
+        "term": "Telegram",
+        "text": "The bot’s messages to you — sign-in, reminders, “receipt read”, the developer’s replies — and your messages to the developer with their screenshots. You chose this channel yourself by signing in with Telegram."
+      },
+      "contabo": {
+        "term": "Contabo, Germany",
+        "text": "The host: the database lies on its server."
+      },
+      "cloudflare": {
+        "term": "Cloudflare",
+        "text": "Keeps the encrypted copies of the database in the EU; it has no key to them."
+      },
+      "open_food_facts": {
+        "term": "Open Food Facts",
+        "text": "Only an unknown barcode — not you."
+      },
+      "serbian_tax": {
+        "term": "The Serbian tax office",
+        "text": "The link of a Serbian receipt — not you."
+      },
+      "nobody": {
+        "term": "Nobody else",
+        "text": "We do not sell the data and do not give it to advertisers."
+      }
+    },
     "logs": {
       "title": "Server logs",
-      "text": "Kept for no longer than 14 days. Requests are written to them without your IP address and without what you searched for. An IP address can reach only the server's error log — and it too lives there no longer than 14 days."
+      "text": "Kept for no longer than 14 days. Requests are written to them without your IP address and without what you searched for. An IP address can reach the server's error log — and it too lives there no longer than 14 days — and the server's memory along with an app failure: see «App failures»."
     },
     "failures": {
       "title": "App failures",
-      "text": "When something in the app breaks, the phone sends the developer the kind of error, the screen it happened on, the app version and the phone’s system — none of your data: not what you typed, not your purchases, not your account. The phone’s address is not recorded. With no connection it waits on the phone. Kept for 30 days."
+      "text": "When something in the app breaks, the phone sends the developer the kind of error, the screen it happened on, the app version and the phone’s system — none of your data: not what you typed, not your purchases, not your account. The phone’s address is not recorded in the database, but for now it stays in the server’s memory until the server restarts — this is a bug, and we are fixing it. With no connection it waits on the phone. Kept for 30 days."
     },
     "backups": {
       "title": "Where the data and its copies are",
-      "text": "The server is in Germany, with the host Contabo. Once a day the database is copied, encrypted, to Cloudflare storage in the EU; only the owner of Molvia can decrypt a copy. Copies live 14 days — fourteen days after erasure your data is gone from them too. If the server ever has to be restored from a copy, an erasure made less than a day before the failure may need repeating. Receipt photos, the lines cut out of them and the screenshots sent to the developer are not copied."
+      "text": "The server is in Germany, with the host Contabo. Once a day the database is copied, encrypted, to Cloudflare storage in the EU; only the owner of Molvia can decrypt a copy. Copies live 14 days — fourteen days after erasure your data is gone from them too. If the server ever has to be restored from a copy, an erasure made less than a day before the failure may need repeating. Receipt photos, the lines cut out of them and the screenshots sent to the developer are not copied. Armenian law allows keeping the data in Germany without a separate permission: Germany is on its list of countries with adequate protection, and without the server there is no service."
     },
     "barcodes": {
       "title": "An unknown barcode",
@@ -1629,18 +1672,34 @@
     },
     "copy": {
       "title": "A copy of your data",
-      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue, the barcodes you linked, the receipts read — without their photos — and your messages to the developer — without their screenshots. A rating you withdrew is there too: without its review it stays with us, so the count of ratings given stays honest. What you removed and can still bring back is there as well, marked. The file holds no login keys."
+      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue, the barcodes you linked, the receipts read — without their photos — and your messages to the developer — without their screenshots. A rating you withdrew is there too: without its review it stays with us — why is said under «Statistics — with your consent». What you removed and can still bring back is there as well, marked. The file holds no login keys."
     },
     "erase": {
       "title": "Delete everything",
-      "text": "In Settings, «Delete my data», or send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they, the items you added to the shared catalogue and the barcodes you linked stay, without your name. Deleting from Settings also erases the copies on the phone you deleted from; on other devices, and after /delete, they may remain: to remove them, delete the app there or clear the site's data — or sign out there in Settings beforehand. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data. It is there so that whether Molvia gets used is counted honestly."
+      "text": "In Settings, «Delete my data», or send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they, the items you added to the shared catalogue, the barcodes you linked and the shops’ memory — which item stands behind a receipt line and the shelf price — stay, without your name. Deleting from Settings also erases the copies on the phone you deleted from; on other devices, and after /delete, they may remain: to remove them, delete the app there or clear the site's data — or sign out there in Settings beforehand. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data. It is there so that whether Molvia gets used is counted honestly."
+    },
+    "inactive": {
+      "title": "An inactive account",
+      "text": "If you do not open Molvia for two years, the account is deleted by itself — just as by «Delete my data». The Molvia bot warns you 30 and 7 days before; to keep the account, opening the app is enough. If you have blocked the bot, there is no way to warn you, and the account is deleted without a warning."
+    },
+    "rights": {
+      "title": "Your rights",
+      "text": "To learn what is kept about you and get a copy — «Download my data». To correct — edit any record. To delete everything — «Delete my data» or /delete in the bot. To withdraw the consent to the statistics — «Count me in the statistics». All of this works at once, with no request. If you need something else, write to the developer: the answer comes within five working days at most."
+    },
+    "complaints": {
+      "title": "Where to complain",
+      "text": "If you believe we have violated your rights to your data, you can complain to the data protection authority of your country: in Armenia — the Personal Data Protection Agency of the Ministry of Justice (pdpa.am), in Georgia — the State Audit Office (sao.ge), in Serbia — the Commissioner for Information of Public Importance and Personal Data Protection (poverenik.rs)."
+    },
+    "breach": {
+      "title": "If the data leaks",
+      "text": "If a stranger may have seen your data, we will say so at once at the top of this page, report it to the data protection authorities and to the Armenian police, and tell those it concerns through the Molvia bot: what happened, which data, and what to do."
     }
   },
   "terms": {
     "title": "Terms of use",
     "what": {
       "title": "What this is",
-      "text": "Molvia is an app where people note what is worth buying, and where. One person makes it. It is not a shop and not an advertisement."
+      "text": "Molvia is an app where people note what is worth buying, and where. It is made by Vladimir Sitchikhin — a private individual in Gyumri, Armenia. It is not a shop and not an advertisement."
     },
     "who": {
       "title": "Who may use it",
@@ -1689,6 +1748,13 @@
       "title": "The terms have changed",
       "body": "Read what changed and accept the new edition — you cannot go on without it.",
       "changes": "What changed"
+    },
+    "changes": {
+      "2": "The person responsible for your data is named — Vladimir Sitchikhin, Gyumri. The statistics — visit marks and the count of ratings — now rest on your consent, and «Count me in the statistics» withdraws it. Added: your rights, where to complain, who the data goes to — the Serbian tax office among them, for receipts by link — how long an inactive account is kept, and what we do if the data leaks."
+    },
+    "statistics": {
+      "title": "Statistics",
+      "text": "We count whether people come back and how many ratings they give — in numbers, without names. Your visit marks and ratings, withdrawn ones included, are in that count while «Count me in the statistics» is on. You can turn it off in the settings at any moment."
     },
     "age": "I am 16 or older",
     "accept": "I accept",

@@ -19,7 +19,7 @@ async function render(language: 'ru' | 'en' = 'ru') {
 it('reads every part of the terms, in order, under the revision of both pages (MOL-95)', async () => {
   const view = await render()
   expect(view.find('h1').text()).toBe(ru.terms.title)
-  expect(view.text()).toContain('Редакция от 6 октября 2026')
+  expect(view.text()).toContain('Редакция от 7 октября 2026')
   const parts = Object.entries(ru.terms).filter(([key]) => key !== 'title')
   expect(view.findAll('h2').map((heading) => heading.text())).toEqual(
     parts.map(([, part]) => (part as { title: string }).title),

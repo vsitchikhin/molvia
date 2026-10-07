@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest'
 import { POLICY_VERSION } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
-import { POLICY_REVISION, PRIVACY_PARTS, PRIVACY_STORED, TERMS_PARTS } from './policy'
+import {
+  POLICY_REVISION,
+  PRIVACY_PARTS,
+  PRIVACY_RECIPIENTS,
+  PRIVACY_STORED,
+  TERMS_PARTS,
+} from './policy'
 
 /** The templates of both pages, as written: what they draw outside the lists (adversarial Б4). */
 const sources = import.meta.glob<string>(['./PrivacyView.vue', './TermsView.vue'], {
@@ -25,7 +31,7 @@ function digestOfPages(): string {
   return createHash('sha256')
     .update(
       JSON.stringify([
-        [PRIVACY_STORED, PRIVACY_PARTS, TERMS_PARTS],
+        [PRIVACY_STORED, PRIVACY_RECIPIENTS, PRIVACY_PARTS, TERMS_PARTS],
         [ru.privacy, ru.terms, en.privacy, en.terms],
         templates(),
       ]),

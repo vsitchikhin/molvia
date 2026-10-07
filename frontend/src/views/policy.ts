@@ -14,9 +14,9 @@ import { calendarDay } from '@/days'
  * written here too, so raising the edition is an edit of this file and of the day.
  */
 export const POLICY_REVISION = {
-  day: '2026-10-06',
-  version: 1,
-  digest: '6ddfd87820766c6720600d954d3ac1714bde2e864549d3effedcc63bf70c2e2a',
+  day: '2026-10-07',
+  version: 2,
+  digest: 'b03fb4d4f133669743b4f3ccb8e7b39f4258ee7c02f3959681c56bb069f1dbc3',
 } as const
 
 // Which parts each page shows, in order — here and not in the pages, so the fingerprint holds them
@@ -43,7 +43,29 @@ export const PRIVACY_STORED = [
   'settings',
   'consent',
 ] as const
+/** Who the data goes to (MOL-236): a new recipient is a line here and a new edition. */
+export const PRIVACY_RECIPIENTS = [
+  'people',
+  'telegram',
+  'contabo',
+  'cloudflare',
+  'open_food_facts',
+  'serbian_tax',
+  'nobody',
+] as const
+
+/**
+ * The parts of «Данные и приватность», in order. Two of them are lists, drawn as cards of terms
+ * (`PRIVACY_LISTS`); the rest are a title and a text. The basis stands right after the list of what
+ * is kept, since art. 10 of Armenia's law asks of them together (MOL-236); the rights, the
+ * authorities and a breach close the page — what is looked for when something went wrong.
+ */
 export const PRIVACY_PARTS = [
+  'operator',
+  'stored',
+  'bases',
+  'statistics',
+  'recipients',
   'logs',
   'failures',
   'backups',
@@ -52,7 +74,15 @@ export const PRIVACY_PARTS = [
   'storage',
   'copy',
   'erase',
+  'inactive',
+  'rights',
+  'complaints',
+  'breach',
 ] as const
+export const PRIVACY_LISTS: Partial<Record<(typeof PRIVACY_PARTS)[number], readonly string[]>> = {
+  stored: PRIVACY_STORED,
+  recipients: PRIVACY_RECIPIENTS,
+}
 export const TERMS_PARTS = [
   'what',
   'who',

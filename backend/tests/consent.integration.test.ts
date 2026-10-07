@@ -84,6 +84,18 @@ describe('согласие с условиями и политикой (MOL-95)'
     expect(await row(id)).toEqual(first)
   })
 
+  it('сборка редакции 1 после выкатки редакции 2 (MOL-236): её «Принимаю» берётся, принятое не опускается', async () => {
+    const { id, cookie } = await signedIn()
+    const old = await accept(cookie, { version: 1 })
+    expect(old.statusCode).toBe(200)
+    expect(old.json()).toEqual({ version: 1 })
+    expect((await accept(cookie, { version: 2 })).json()).toEqual({ version: 2 })
+    const accepted = await row(id)
+    // A phone not yet updated sends its own edition again: the answer names the newer one.
+    expect((await accept(cookie, { version: 1 })).json()).toEqual({ version: 2 })
+    expect(await row(id)).toEqual(accepted)
+  })
+
   it('два окна принимают разом — одна запись, оба слышат ту же редакцию', async () => {
     const { id, cookie } = await signedIn()
     const answers = await Promise.all([
