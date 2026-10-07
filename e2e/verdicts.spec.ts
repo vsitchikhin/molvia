@@ -181,8 +181,8 @@ test('7: rated without a connection and the app closed — sent when it is opene
   // answer just the same (self-review С-9).
   await (await known).finished()
 
-  // Offline as the page meets it, and closed only once the rating has tried to go and failed: in CI
-  // a rating put right after `setOffline` reached the server (MOL-217).
+  // Offline with every request of the page refused before the network — `setOffline` alone let a PUT
+  // the page saw fail reach the server in CI (MOL-217) — and closed only once the rating has tried.
   await goOffline(page)
   const lost = page.waitForEvent(
     'requestfailed',
