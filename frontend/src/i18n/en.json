@@ -1648,7 +1648,7 @@
     },
     "logs": {
       "title": "Server logs",
-      "text": "Kept for no longer than 14 days. Requests are written to them without your IP address and without what you searched for. An IP address can reach the server's error log — and it too lives there no longer than 14 days — and the server's memory along with an app failure: see «App failures». And for 30 days the server keeps how many requests reached each part of it and how fast it answered — every 15 seconds, without a name, an address or what you searched for: this is how we see whether something broke."
+      "text": "Kept for no longer than 14 days. Requests are written to them without your IP address and without what you searched for. An IP address can reach the server's error log — and it too lives there no longer than 14 days — and the server's memory along with an app failure: see «App failures». And for 30 days the server keeps metrics: how many requests reached each part of it and how fast it answered — every 15 seconds, without a name, an address or what you searched for: this is how we see whether something broke."
     },
     "failures": {
       "title": "App failures",

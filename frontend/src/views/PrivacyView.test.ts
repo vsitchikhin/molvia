@@ -264,7 +264,7 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
 
   it('names the API’s metrics beside the logs: per section, every 15 s, 30 days, no one (Р6-А1)', () => {
     expect(ru.privacy.logs.text).toMatch(
-      /30 дней хранит, сколько запросов пришло к каждому разделу/,
+      /30 дней хранит метрики: сколько запросов пришло к каждому разделу/,
     )
     expect(ru.privacy.logs.text).toMatch(/по 15 секунд, без имени, адреса и того, что вы искали/)
     expect(en.privacy.logs.text).toMatch(/every 15 seconds/)
