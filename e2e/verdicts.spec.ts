@@ -1,7 +1,7 @@
 import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import { asBrowser, signedIn } from './session'
+import { asBrowser, goOffline, signedIn } from './session'
 import type { Page } from '@playwright/test'
 
 interface Person {
@@ -167,8 +167,15 @@ test('7: rated without a connection and the app closed — sent when it is opene
   await page.goto('/verdicts')
   await expect(question(page)).toContainText('Сметана')
 
-  await context.setOffline(true)
+  // Offline as the page meets it, and closed only once the rating has tried to go and failed: in CI
+  // a rating put right after `setOffline` reached the server while the phone took it for lost (MOL-217).
+  await goOffline(page)
+  const lost = page.waitForEvent(
+    'requestfailed',
+    (request) => request.method() === 'PUT' && request.url().includes('/api/verdicts/'),
+  )
   await rate(page, 3)
+  await lost
   await expect(page.getByRole('heading', { name: 'The rating is saved' })).toBeVisible()
   await page.close()
   expect(await waiting(who)).toBe(2)

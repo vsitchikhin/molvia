@@ -170,3 +170,25 @@ export async function asBrowser(page: Page): Promise<Record<string, string>> {
   expect(session, 'браузер не вошёл: cookie сессии нет').toBeDefined()
   return { cookie: `${SESSION_COOKIE}=${session?.value ?? ''}` }
 }
+
+/**
+ * Связь пропала — и страница это уже встретила (MOL-217).
+ *
+ * `setOffline` отвечает раньше, чем Chromium гарантированно отказывает каждому запросу страницы: в
+ * CI оценка, поставленная сразу после него, дошла до сервера, а телефон счёл её неотправленной.
+ * Поэтому офлайн считается наступившим, когда запрос самой страницы упал. Брать там, где спека
+ * дальше утверждает, чего сервер не получил.
+ */
+export async function goOffline(page: Page): Promise<void> {
+  await page.context().setOffline(true)
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        fetch('/api/health', { cache: 'no-store' }).then(
+          () => 'online',
+          () => 'offline',
+        ),
+      ),
+    )
+    .toBe('offline')
+}
