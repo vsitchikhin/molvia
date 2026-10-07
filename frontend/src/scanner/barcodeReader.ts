@@ -1,20 +1,22 @@
 import type { ReaderFailure, ReaderReply, ReaderRequest } from './protocol'
 
 /** The part of a worker the reader uses — so a test can hand it a fake. */
-export interface ReaderWorker {
+export interface ReaderWorker<T = string> {
   postMessage(request: ReaderRequest, transfer: Transferable[]): void
-  addEventListener(type: 'message', listener: (event: MessageEvent<ReaderReply>) => void): void
+  addEventListener(type: 'message', listener: (event: MessageEvent<ReaderReply<T>>) => void): void
   addEventListener(type: 'error', listener: (event: ErrorEvent) => void): void
   terminate(): void
 }
 
-export interface BarcodeReader {
+export interface FrameReader<T> {
   /** Loads the reader ahead, while the camera starts. */
   warm: () => Promise<void>
   /** Reads one frame; its pixels move to the worker and are gone from the caller. */
-  read: (frame: ImageData) => Promise<string | null>
+  read: (frame: ImageData) => Promise<T | null>
   dispose: () => void
 }
+
+export type BarcodeReader = FrameReader<string>
 
 /** The reader failed; `cause` is what failed in the worker, when it said (MOL-144, Р-11). */
 export class ReaderFailed extends Error {
@@ -55,9 +57,17 @@ function spawn(): ReaderWorker {
  * request still waiting and every one after it — the sheet shows its error state.
  */
 export function createBarcodeReader(worker: ReaderWorker = spawn()): BarcodeReader {
+  return createFrameReader(worker)
+}
+
+/**
+ * A decoding worker of any answer seen from the page — the scanner's, and the QR codes of a
+ * receipt's photo (MOL-233), each with a worker and options of its own.
+ */
+export function createFrameReader<T>(worker: ReaderWorker<T>): FrameReader<T> {
   const waiting = new Map<
     number,
-    { resolve: (code: string | null) => void; reject: (cause?: Error) => void }
+    { resolve: (code: T | null) => void; reject: (cause?: Error) => void }
   >()
   let next = 0
   let failed = false
@@ -81,7 +91,7 @@ export function createBarcodeReader(worker: ReaderWorker = spawn()): BarcodeRead
   })
 
   const ask = (request: ReaderRequest, transfer: Transferable[]) =>
-    new Promise<string | null>((resolve, reject) => {
+    new Promise<T | null>((resolve, reject) => {
       if (failed) {
         reject(new ReaderFailed(failure))
         return
