@@ -19,7 +19,6 @@
   <ScreenState
     v-else
     kind="empty"
-    tone="accent"
     :icon="IconShield"
     :title="updated ? t('consent.updated.title') : t('consent.title')"
     :body="updated ? t('consent.updated.body') : t('consent.body')"

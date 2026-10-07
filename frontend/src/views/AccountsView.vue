@@ -38,7 +38,6 @@
         <ScreenState
           v-if="live.length === 0"
           kind="empty"
-          tone="accent"
           :icon="IconWallet"
           :title="t('accounts.offer.title')"
           :body="t('accounts.screen.empty.body')"
