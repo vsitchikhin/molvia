@@ -16,6 +16,7 @@ import {
   aStrangersCookie,
   clearAll,
   insertActor,
+  insertCounted,
   insertItem,
   insertPlace,
   insertTrip,
@@ -484,7 +485,7 @@ describe('журнал событий', () => {
   })
 
   it('в общем режиме пишет просмотр, и не чаще раза в сутки', async () => {
-    const actorId = await insertActor(db)
+    const actorId = await insertCounted(db)
     await grantAccess(actorId)
 
     await screen(actorId)
@@ -494,6 +495,19 @@ describe('журнал событий', () => {
     const rows = await viewsOf(actorId)
     expect(rows).toHaveLength(1)
     expect(rows[0]?.payload).toEqual({ subject: 'product' })
+  })
+
+  it('не пишет просмотр тому, кто не принял редакцию 2: сборка, которая не обновилась (MOL-236)', async () => {
+    const old = await insertActor(db, { consentVersion: 1, consentedAt: new Date() })
+    await grantAccess(old)
+    const nobody = await insertActor(db)
+    await grantAccess(nobody)
+
+    await screen(old)
+    await screen(nobody)
+
+    expect(await viewsOf(old)).toHaveLength(0)
+    expect(await viewsOf(nobody)).toHaveLength(0)
   })
 
   it('не пишет просмотр тому, кого нет', async () => {

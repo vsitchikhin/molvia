@@ -18,7 +18,14 @@ import { createStoreMemoryRepository } from '@/db/store-memory-repository'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { actors, catalogueMergeMoves, catalogueMerges, items, places } from '@/db/schema'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
+import {
+  clearAll,
+  insertActor,
+  insertCounted,
+  insertItem,
+  insertPlace,
+  insertTrip,
+} from './fixtures'
 
 const { db, close } = connectDrizzle()
 const merges = createMergeRepository(db)
@@ -30,7 +37,8 @@ let younger: string
 
 beforeEach(async () => {
   await clearAll(db)
-  owner = await insertActor(db)
+  // Counted by gate 0.2 across a merge (Т-6), so they consented to the statistics (MOL-236).
+  owner = await insertCounted(db)
   older = await insertItem(db, { name: 'Молоко 3,2%', searchKey: 'moloko 3 2' })
   younger = await insertItem(db, { name: 'Малоко 3,2%', searchKey: 'maloko 3 2' })
 })

@@ -96,6 +96,37 @@ describe('согласие с условиями и политикой (MOL-95)'
     expect(await row(id)).toEqual(accepted)
   })
 
+  it('«Принимаю» не трогает «Учитывать меня в статистике»: выключивший до редакции 2 так и остаётся (MOL-236, Р-11)', async () => {
+    const { id, cookie } = await signedIn()
+    await accept(cookie, { version: 1 })
+    const off = await app.inject({
+      method: 'PUT',
+      url: '/actors/me/analytics',
+      headers: { cookie },
+      payload: { on: false },
+    })
+    expect(off.statusCode).toBe(200)
+    const [before] = await db
+      .select({ offAt: actors.analyticsOffAt, onAt: actors.analyticsOnAt })
+      .from(actors)
+      .where(eq(actors.id, id))
+    expect(before?.offAt).not.toBeNull()
+
+    expect((await accept(cookie, { version: 2 })).json()).toEqual({ version: 2 })
+
+    const [after] = await db
+      .select({ offAt: actors.analyticsOffAt, onAt: actors.analyticsOnAt })
+      .from(actors)
+      .where(eq(actors.id, id))
+    expect(after).toEqual(before)
+    const setting = await app.inject({
+      method: 'GET',
+      url: '/actors/me/analytics',
+      headers: { cookie },
+    })
+    expect(setting.json()).toEqual({ off: true })
+  })
+
   it('два окна принимают разом — одна запись, оба слышат ту же редакцию', async () => {
     const { id, cookie } = await signedIn()
     const answers = await Promise.all([

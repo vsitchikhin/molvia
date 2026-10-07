@@ -16,6 +16,14 @@ import { z } from 'zod'
 export const POLICY_VERSION = 2
 
 /**
+ * The first edition whose text asks consent to the statistics (MOL-236): Armenia's law knows no
+ * legitimate interest (art. 8), so the visit log is written, and the gates count a person, only once
+ * they accepted it — and while «Учитывать меня в статистике» is on. Who accepted an older edition (a
+ * build not yet updated) or none is neither written nor counted.
+ */
+export const STATISTICS_CONSENT_EDITION = 2
+
+/**
  * `GET` and the answer of `PUT /actors/me/consent` (MOL-95): the edition this person accepted, or
  * none. Its own address and never a field of `/actors/me` (Р-5): an installed app reads that answer
  * strictly, and a field it did not know would fail every older build. No upper bound: a server newer
