@@ -424,6 +424,56 @@ describe('ScreenState', () => {
     })
   })
 
+  // A section failed and the screen works: the error is a card of its own height, and its
+  // «Повторить» is quiet, so the screen's main action stays the one filled button (К-13, Ф-15).
+  describe('the quiet card of a section’s error (MOL-180)', () => {
+    it('is a card, with «Повторить» a ghost the width of its word', async () => {
+      const view = render({ kind: 'error', inline: true })
+      expect(view.classes()).toEqual(expect.arrayContaining(['card', 'inline', 'bad']))
+      const retry = view.get('.action button')
+      expect(retry.text()).toBe(en.state.retry)
+      expect(retry.classes()).toContain('ghost')
+      expect(retry.classes()).not.toContain('block')
+      await retry.trigger('click')
+      expect(view.emitted('retry')).toHaveLength(1)
+    })
+
+    it('keeps the screen’s own action after «Повторить»', () => {
+      const view = render(
+        { kind: 'error', inline: true },
+        { action: () => h('button', { class: 'own' }, 'Without the code') },
+      )
+      const names = view.findAll('.action button').map((button) => button.text())
+      expect(names).toEqual([en.state.retry, 'Without the code'])
+    })
+
+    // The strip's own row offers the version while the screen works (77 v2, 2c).
+    it('must not offer «Обновить» a second time while a version waits', () => {
+      const view = mount(ScreenState, {
+        props: { title: 'Title', kind: 'error', inline: true },
+        global: {
+          plugins: [createAppI18n('ru')],
+          provide: {
+            [pwaUpdateKey as symbol]: {
+              phase: shallowRef<UpdatePhase>('ready'),
+              apply: vi.fn(),
+              serverVersion: vi.fn(),
+            },
+          },
+        },
+      })
+      expect(view.findAll('.action button').map((button) => button.text())).toEqual(['Повторить'])
+    })
+
+    it.each<[string, Props]>([
+      ['a screen-wide error', { kind: 'error' }],
+      ['an inline notice', { kind: 'attention', inline: true }],
+      ['inline offline', { kind: 'offline', tone: 'warn', inline: true }],
+    ])('must not be drawn for %s', (_, props) => {
+      expect(render(props).classes()).not.toContain('card')
+    })
+  })
+
   describe('«Сообщить о проблеме» (MOL-147, Р-5)', () => {
     beforeEach(() => {
       setActivePinia(createPinia())

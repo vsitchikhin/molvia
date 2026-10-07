@@ -1,5 +1,11 @@
 <template>
-  <section ref="root" class="state" :class="[toneClass, { inline }]">
+  <component
+    :is="card ? AppCard : 'section'"
+    :ref="setRoot"
+    :as="card ? 'section' : undefined"
+    class="state"
+    :class="[toneClass, { inline, card }]"
+  >
     <span v-if="glyph" class="circle" aria-hidden="true">
       <component :is="glyph" class="glyph" />
     </span>
@@ -24,7 +30,7 @@
         <!-- A version waits: the error may well be the old code reading the new server's answer,
              and the reload loses nothing (MOL-132, В-2). -->
         <AppButton
-          v-if="kind === 'error' && updating"
+          v-if="kind === 'error' && updating && !card"
           block
           :size="dockTarget ? 'large' : 'regular'"
           :busy="applying"
@@ -36,9 +42,10 @@
         </AppButton>
         <AppButton
           v-if="kind === 'error'"
-          block
+          :block="!card"
           :size="dockTarget && !updating ? 'large' : 'regular'"
-          :variant="updating ? 'secondary' : 'primary'"
+          :variant="card ? 'ghost' : updating ? 'secondary' : 'primary'"
+          :class="{ word: card }"
           @click="$emit('retry')"
         >
           <template #icon><IconRefresh /></template>
@@ -51,7 +58,7 @@
         </AppButton>
       </div>
     </Teleport>
-  </section>
+  </component>
 </template>
 
 <script lang="ts">
@@ -64,6 +71,7 @@ import {
   watch,
   watchEffect,
   type Component,
+  type ComponentPublicInstance,
   type PropType,
 } from 'vue'
 import { getActivePinia } from 'pinia'
@@ -76,6 +84,7 @@ import IconRefresh from '~icons/mdi/refresh'
 import IconUpdate from '~icons/mdi/update'
 import { lastRefusal } from '@/api'
 import AppButton from '@/components/AppButton.vue'
+import AppCard from '@/components/AppCard.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useStateStrip } from '@/composables/useStateStrip'
 import { usePwaUpdate } from '@/pwaUpdate'
@@ -161,7 +170,9 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  *
  * Laid out to take the free height of the screen with an action of its own at the bottom, under
  * the thumb; `inline` keeps it to its own height, for a notice above the content — the surface
- * around it is the card's, not this block's.
+ * around it is the card's, not this block's. An `inline` error is that card itself, the quiet one
+ * (К-13, 77 v2 2c): «Повторить» a ghost the width of its word, and no «Обновить», which the strip's
+ * own row already offers while the screen works.
  */
 export default defineComponent({
   name: 'ScreenState',
@@ -178,6 +189,12 @@ export default defineComponent({
   setup(props) {
     const { t } = useI18n()
     const root = ref<HTMLElement | null>(null)
+    // The root is a card's component for a section's error, a plain element otherwise.
+    function setRoot(el: Element | ComponentPublicInstance | null): void {
+      const node = el instanceof Element ? el : (el?.$el as unknown)
+      root.value = node instanceof HTMLElement ? node : null
+    }
+    const card = computed(() => props.inline && props.kind === 'error')
     const actions = ref<HTMLElement | null>(null)
     const announce = useAnnouncer()
 
@@ -276,7 +293,9 @@ export default defineComponent({
 
     return {
       t,
-      root,
+      AppCard,
+      setRoot,
+      card,
       actions,
       dockTarget,
       glyph,
@@ -367,6 +386,16 @@ export default defineComponent({
   gap: var(--space-2);
   margin-top: auto;
   padding-top: var(--space-4);
+}
+
+/* The quiet card's «Повторить»: the width of its word, the word in line with the text above. */
+.card .action {
+  align-items: flex-start;
+  padding-top: var(--space-2);
+}
+
+.word {
+  margin-left: calc(var(--space-4) * -1);
 }
 
 /* In the strip, whose margins and column are the frame's (К-9). */

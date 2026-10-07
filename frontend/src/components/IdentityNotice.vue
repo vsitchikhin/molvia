@@ -1,13 +1,22 @@
 <template>
   <aside v-if="notice" class="notice">
-    <AppCard>
+    <!-- An error is the quiet card itself (MOL-180, К-13); offline sits in one. -->
+    <ScreenState
+      v-if="notice === 'error'"
+      inline
+      kind="error"
+      :title="t('identity.error.title')"
+      :body="t('identity.error.body')"
+      @retry="retry"
+    />
+    <AppCard v-else>
+      <!-- Yellow, not the green of an offline trip: without an identity nothing can be saved. -->
       <ScreenState
         inline
-        :kind="notice"
-        :tone="tone"
-        :title="t(`identity.${notice}.title`)"
-        :body="t(`identity.${notice}.body`)"
-        @retry="retry"
+        kind="offline"
+        tone="warn"
+        :title="t('identity.offline.title')"
+        :body="t('identity.offline.body')"
       />
     </AppCard>
   </aside>
@@ -50,13 +59,10 @@ export default defineComponent({
     const actor = useActorStore()
 
     const notice = computed(() => noticeFor(actor.state))
-    // Yellow, not the green of an offline trip: without an identity nothing can be saved.
-    const tone = computed(() => (notice.value === 'offline' ? ('warn' as const) : undefined))
 
     return {
       t,
       notice,
-      tone,
       retry: () => void actor.retry(),
     }
   },
