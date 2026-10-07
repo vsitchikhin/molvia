@@ -592,7 +592,9 @@ person — the link stays. **A sheet put away while «Ищем QR…» is a «н
 the reader the unmount lets go refuses the read, which is no defect, and an answer come after the sheet
 went is nobody's — nothing reported, nothing queued, no worker started again. **Its words are the link's,
 never a photo's** (adversarial А2, А3): with no connection the link waits, and what the queue could not
-keep is the link — the sheet that keeps no photo never says one waits or was not kept. **The scanner of goods is untouched** (MOL-98): its worker and options stay retail
+keep is the link — the sheet that keeps no photo never says one waits or was not kept. The queue
+refuses a link only with nobody signed in (`sendLink`), so that is what the sheet says, never «free some
+space» (review 4). **The scanner of goods is untouched** (MOL-98): its worker and options stay retail
 codes only. The review says «Строки — из налоговой Сербии», names the ПИБ, and has nothing of a photo — no
 «Переснять», no «Прочитали не всё», no «Фото удалим»: «Переснять» is a photo country's (`photoCountry`).
 **How often the camera reads it is MOL-234's** (В-3 «а»): the body will say `via: qr | paste` there.
