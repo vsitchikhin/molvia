@@ -115,15 +115,19 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   what only a worker imports stands in `optimizeDeps.include` of `vite.config.ts`, held by
   `optimizeDeps.test.ts`. Vite's first crawl reads the pages and never a worker, so `zxing-wasm` was
   found when the first spec of `camera` opened the scanner — while the last file of `phone`,
-  `verdicts.spec`, was running beside it — and every page loading stalled behind the optimizer. In
-  each of the four failures of «…and the app closed» the API received the rating made after
-  `setOffline(true)`, with a 201, while the phone took it for lost. Locally the cache is warm, so it
-  was never seen here; a run that wants to see it removes `frontend/node_modules/.vite/deps`.
+  `verdicts.spec`, was running beside it. In each of the four failures of «…and the app closed» that
+  optimization stood seconds before the API received, with a 201, the rating made after
+  `setOffline(true)`; how the one led to the other was not shown — Vite logged no reload of the pages.
+  Locally the cache is warm, so it was never seen here; a run that wants to see it removes
+  `frontend/node_modules/.vite/deps`.
 - **Offline, where a spec then says what the server did not get, is `goOffline`** (`e2e/session.ts`,
   MOL-217): `setOffline` and then a request of the page that failed, so the offline is the page's
-  and not only the protocol's answer. Why a write went through after `setOffline` on the CI runner
-  was not reproduced in six probes here (`.scratch/tasks/status/MOL-217/`) — the next failure's trace
-  is what will say. The other specs with `setOffline` keep it as it is (owner's В-3): none failed.
+  and not only the protocol's answer; and it closes the page only after the write it waits for failed
+  in the browser. Why a write went through after `setOffline` on the CI runner was not reproduced in
+  six probes here — two readings fit the log, a write that left before the offline took and one sent
+  only when the identity settled («сохранено» drawn before any request, `held` set by `flush()` while
+  the identity loads); both in `.scratch/tasks/status/MOL-217/readings.md`, and the next failure's
+  trace is what will say. The other specs with `setOffline` keep it as it is (owner's В-3): none failed.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **eight things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the

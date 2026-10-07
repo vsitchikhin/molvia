@@ -168,7 +168,7 @@ test('7: rated without a connection and the app closed — sent when it is opene
   await expect(question(page)).toContainText('Сметана')
 
   // Offline as the page meets it, and closed only once the rating has tried to go and failed: in CI
-  // a rating put right after `setOffline` reached the server while the phone took it for lost (MOL-217).
+  // a rating put right after `setOffline` reached the server (MOL-217).
   await goOffline(page)
   const lost = page.waitForEvent(
     'requestfailed',
