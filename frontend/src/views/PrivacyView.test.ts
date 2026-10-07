@@ -115,7 +115,12 @@ it('promises nothing it does not keep: no «никто не видит», no ter
   const text = (await render()).text()
   // Thirty days is the failures' own term (MOL-144), held to the table's below; anywhere else it
   // would be the logs' promise MOL-58 refused — they live fourteen.
-  expect(text.replace(ru.privacy.failures.text, '')).not.toMatch(/никто не видит|30 дней/i)
+  // The API's metrics keep their own thirty (MOL-145, named by MOL-236, Р6-А1), in a sentence of their own.
+  const metrics = /И ещё сервер 30 дней хранит[^.]*\./
+  expect(ru.privacy.logs.text).toMatch(metrics)
+  expect(text.replace(ru.privacy.failures.text, '').replace(metrics, '')).not.toMatch(
+    /никто не видит|30 дней/i,
+  )
   // Selfreview 1: the shared mode shows other people's prices, so «shown to nobody» is said of
   // the list of purchases, and the prices are named with their threshold.
   expect(text).not.toMatch(/покупки никому не показываются/i)
@@ -255,6 +260,14 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
     expect(text).toContain(ru.privacy.inactive.text)
     expect(ru.privacy.inactive.text).toMatch(/два года/)
     expect(ru.privacy.inactive.text).toMatch(/За 30 и за 7 дней/)
+  })
+
+  it('names the API’s metrics beside the logs: per section, every 15 s, 30 days, no one (Р6-А1)', () => {
+    expect(ru.privacy.logs.text).toMatch(
+      /30 дней хранит, сколько запросов пришло к каждому разделу/,
+    )
+    expect(ru.privacy.logs.text).toMatch(/по 15 секунд, без имени, адреса и того, что вы искали/)
+    expect(en.privacy.logs.text).toMatch(/every 15 seconds/)
   })
 
   it('names the shops’ memory among what stays, and the transfer to Germany', async () => {
