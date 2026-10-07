@@ -23,11 +23,13 @@ import type {
   ReceiptPlace,
   ReceiptSummary,
 } from '@molvia/model'
+import type { ItemRepository } from '@/db/items-repository'
 import type { ReceiptRepository, StoredReceipt, StoredReceiptLine } from '@/db/receipts-repository'
 import { memoryKey } from '@/db/store-memory-repository'
 import type { Recalled } from '@/db/store-memory-repository'
 import type { TripRepositories } from '@/db/unit-of-work'
 import { jpegSize } from '@/receipts/jpeg'
+import { findByBarcode } from './find-by-barcode'
 import { tripRateOn } from './start-trip'
 import { todayOf } from './today'
 import type { Today } from './today'
@@ -205,18 +207,22 @@ export async function shownLines(
 }
 
 /**
- * The line's code to ask about at «Записать» (MOL-234, В-2): one the tax office gave it that the item
- * shown holds in none of its forms. An item found by the code holds it — nothing to ask.
+ * The line's code to ask about at «Записать» (MOL-234, В-2): one the tax office gave it that no item
+ * holds in any of its forms. The item shown holding it is nothing to ask; another holding it — the
+ * shop's memory put another item on the line — is a «привязать?» whose answer could only be «held»
+ * (review 3), so it is not asked either.
  */
-function codeToAsk(
+async function codeToAsk(
+  items: Pick<ItemRepository, 'byBarcode'>,
   line: StoredReceiptLine,
   itemId: string | null,
   barcodes: ReadonlyMap<string, readonly string[]>,
-): string | null {
+): Promise<string | null> {
   if (line.gtin === null) return null
   const held = itemId === null ? [] : (barcodes.get(itemId) ?? [])
   const forms = new Set([line.gtin, ...barcodeTwins(line.gtin)])
-  return held.some((code) => forms.has(code)) ? null : line.gtin
+  if (held.some((code) => forms.has(code))) return null
+  return (await findByBarcode(items, line.gtin)) === null ? line.gtin : null
 }
 
 /**
@@ -230,6 +236,8 @@ export async function receiptOfOwner(
   actor: Actor & Today,
   id: string,
   shown: boolean,
+  /** The phone knows a line's `code` (`RECEIPT_CODES_HEADER`, adversarial А3). */
+  codes = false,
 ): Promise<ReceiptDetail> {
   const found = await repositories.receipts.one(actor.id, id)
   if (found === null) throw new DomainError(ERROR.NOT_FOUND)
@@ -272,13 +280,24 @@ export async function receiptOfOwner(
       ? null
       : await repositories.receipts.recordedTwin(actor.id, tin, number, receipt.id)
 
+  const asked: (string | null)[] = []
+  for (const [i, line] of lines.entries()) {
+    const itemId = itemIds[i] ?? null
+    const known = itemId === null ? null : (names.get(itemId) ?? null)
+    asked.push(
+      codes
+        ? await codeToAsk(repositories.items, line, known === null ? null : itemId, barcodes)
+        : null,
+    )
+  }
+
   return {
     receipt,
     lines: lines.map((line, i) => {
       const remembered = memory[i] ?? null
       const itemId = itemIds[i] ?? null
       const known = itemId === null ? null : (names.get(itemId) ?? null)
-      const code = codeToAsk(line, known === null ? null : itemId, barcodes)
+      const code = asked[i] ?? null
       return {
         printed: line.printed,
         hs: line.hs,

@@ -201,7 +201,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   whoever has not accepted `STATISTICS_CONSENT_EDITION` — `advice.md`. **The card and «что изменилось»
   are in the fingerprint** (А4): rewritten, they are the text agreed to; the step's buttons are not.
   **The day counters with no id are named, not gated** (owner's 1-а on adversarial Р2-А2):
-  `login_days`, `receipt_days` and `reminder_days` count everyone, the switch off or no consent — a
+  `login_days`, `receipt_days`, `tax_receipt_days` (MOL-234) and `reminder_days` count everyone, the switch off or no consent — a
   press under a reminder too — and «Статистика» says so in a paragraph of its own; the strict reading's
   price (counting is a use for another purpose) is in «Персональные данные», 2.1. **Telegram is named a
   transfer abroad** with its basis — the sign-in and the bot are Telegram (owner's 2-а on review С-3);

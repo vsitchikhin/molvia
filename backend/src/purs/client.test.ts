@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   PURS_PAUSE_MS,
   PURS_PER_MINUTE,
+  PURS_SPECIFICATION_TIMEOUT_MS,
   PURS_TIMEOUT_MS,
   purs,
   pursShare,
@@ -201,6 +202,7 @@ describe('the specification of a receipt — its lines’ codes (MOL-234, owner�
   })
   let clock = 1_000_000
   const failures: string[] = []
+  const refused: string[] = []
   let broken = 0
   let fetch: ReturnType<typeof vi.fn>
 
@@ -217,6 +219,7 @@ describe('the specification of a receipt — its lines’ codes (MOL-234, owner�
       url: 'https://purs.test',
       userAgent: 'Molvia/test (owner@example.com)',
       onFailure: (reason) => failures.push(reason),
+      onSpecificationFailure: (reason) => refused.push(reason),
       onBroken: () => (broken += 1),
       now: () => clock,
       ...(perMinute === undefined ? {} : { perMinute }),
@@ -226,6 +229,7 @@ describe('the specification of a receipt — its lines’ codes (MOL-234, owner�
   beforeEach(() => {
     clock = 1_000_000
     failures.length = 0
+    refused.length = 0
     broken = 0
   })
 
@@ -265,7 +269,19 @@ describe('the specification of a receipt — its lines’ codes (MOL-234, owner�
     // the receipts' queue goes on: a 404 is «not yet», never «skipped» by a pause
     expect(await c.receipt(LINK, BORIS)).toEqual({ kind: 'not_yet' })
     expect(broken).toBe(0)
-    expect(failures).toEqual(['tax office: specification refused'])
+    // its own word in the log, never the journal's (review 8)
+    expect(refused).toEqual(['tax office: specification refused'])
+    expect(failures).toEqual([])
+  })
+
+  it('holds both its requests to one short deadline, never the journal’s (adversarial А4)', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout')
+    answering([PAGE, 200], [SPEC, 200])
+    await client().specification(LINK, NUMBER, ANNA)
+    expect(timeout.mock.calls).toEqual([[PURS_SPECIFICATION_TIMEOUT_MS]])
+    const calls = fetch.mock.calls as [string, RequestInit][]
+    expect(calls[0]?.[1].signal).toBe(calls[1]?.[1].signal)
+    expect(PURS_SPECIFICATION_TIMEOUT_MS).toBeLessThan(PURS_TIMEOUT_MS)
   })
 
   it('a page with no token, or of another receipt, asks no /specifications', async () => {
@@ -296,8 +312,9 @@ describe('the specification of a receipt — its lines’ codes (MOL-234, owner�
     fetch = vi.fn(() => Promise.reject(new DOMException('timed out', 'TimeoutError')))
     vi.stubGlobal('fetch', fetch)
     expect(await client().specification(LINK, NUMBER, ANNA)).toEqual({ kind: 'failed' })
-    expect(failures.join(' ')).not.toContain('vl=')
-    expect(failures).toContain('TimeoutError')
+    expect(refused.join(' ')).not.toContain('vl=')
+    expect(refused).toContain('TimeoutError')
+    expect(failures).toEqual([])
     expect(broken).toBe(0)
   })
 

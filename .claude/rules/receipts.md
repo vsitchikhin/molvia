@@ -407,9 +407,10 @@ and those receipts are taken again (Т-10).
 shape and rules — by day in Yerevan, no id, in the transaction it counts — and its own columns: how the link
 came, counted **when the server takes the receipt** and only then (`sent_qr`, `sent_qr_missed`,
 `sent_paste_missed`, `sent_paste`, `sent_unnamed` — a repeat is the same receipt, Р-2); how the tax office
-answered (`read`, `missing` after 48 hours, `invalid`, `unreadable` — an empty journal, a link lost in a
-restore, an answer we could not write); the specification (`specs_ok`, `specs_failed` — skipped over the
-limit is neither) and the lines it gave a code (`lines_coded`); at «Записать» the lines put right by the
+answered (`read`, `missing` after 48 hours, `invalid`, `empty` — a journal with no list); **what failed on
+our side apart** (`unreadable` — a link lost in a restore, an answer we could not write: no answer of the
+tax office's, adversarial А7); the specification (`specs_ok`, `specs_failed`, `specs_skipped`) and the
+lines it gave a code (`lines_coded`); at «Записать» the lines put right by the
 same kinds as OCR's — what the matcher missed, the figures being the tax office's — the total, the codes
 bound (`codes_written`) and the time to the record. **`make gates` reads it as «0.2r · the Serbian tax
 office», under the reader's block and with no stop** (Р-5): its share is the matcher's (MOL-251), and the
@@ -419,14 +420,23 @@ moment of a record, and before 0.2 only the owner is on production. A miss after
 is counted nowhere — the phone sends only its defects (MOL-144).
 
 **A code from the receipt is bound by the person, at «Записать»** (MOL-234, owner's В-2 «а»): a line's code
-that the item shown holds in none of its forms goes on the review as `code` — only when there is one, since
-an installed app of an earlier build reads a line strictly — and «Записать» asks once, «Привязать
+that no item holds in any of its forms goes on the review as `code` — the item shown holding it is nothing to
+ask, and another item holding it (the shop's memory put another on the line) is a question whose answer
+could only be «held» (review 3). **Only to a phone that asks for it** (`RECEIPT_CODES_HEADER`, adversarial
+А3): an installed app of an earlier build reads a line strictly and would not open the review; a header, not
+the query, since a server rolled back refuses a query it does not know. «Записать» asks once, «Привязать
 штрихкоды?», listing each code with the item it would go to: «Привязать и записать» sends the lines'
 positions (`barcodes`), «Записать без кодов» none; put away with no answer it records nothing. A new item
 made from a line is asked about too (Р-10). **The code is written by MOL-100's rules inside the record's
 transaction**, by the same `attachBarcode`, a savepoint of its own: written; there already; another item
 holds it — named, nothing written; twenty — none. **The record stands whichever it was**, and the answer
 carries each outcome (`codes`); «Записали N покупок» names a code another item holds, by that item.
+**Every item the record touches is locked first, in the order of the ids** (`lockForRecord`, adversarial
+А1): `FOR UPDATE` where a code goes, `FOR KEY SHARE` where a purchase points; taken as the record went —
+the purchase's key, then the code's update — two people binding a code to one item waited on each other,
+and one record was a 500. The codes are then bound in their own order, since each code's lock lasts the
+transaction. **A record sent again answers its codes again** (А2): told by who holds each code now — the
+line's item `written` (whether it held it before is not kept), another `held`, nobody `full`.
 
 ## A receipt with no items (MOL-227)
 
@@ -526,10 +536,16 @@ is taken, and its key against a second record (with the seller's tax number, as 
 
 **The lines are the JSON's journal; the page and its `/specifications` are asked after it for the codes
 alone** (MOL-232 В-1 «а», MOL-234 В-1 «а»). The specification is undocumented and answered `success:false`
-two times of three from production, so nothing waits on it: asked once a receipt, after the journal read,
-its two requests — the page for `viewModel.Token`, then the POST — reserved in the limit together, never
-the page alone; a failure, another shape, a page of another receipt or the limit — no codes, no pause of
-the queue, no owner's notice, the log's kind and `specs_failed`. **A code is taken only from a
+two times of three from production, so **the receipt never waits on it** (adversarial А4): read and
+written by its journal first — the phone has it — and the specification asked after, its codes written on
+their own (`writeCodes`), a line whose code an item holds bound to that item then, only while the receipt
+waits for its record. The next receipt of the round waits at most `PURS_SPECIFICATION_TIMEOUT_MS` (3 s),
+one deadline for both requests — the page for `viewModel.Token`, then the POST — which are reserved in the
+limit together, never the page alone; a failure, another shape, a page of another receipt — no codes, no
+pause of the queue, no owner's notice, its own line in the log at info (review 8) and `specs_failed`.
+**The price, named** (А5): the person's share is four a minute, and a receipt takes three — so the second
+receipt of a minute has no room for its specification, is never asked again and has no codes;
+`specs_skipped` and the block's «not asked, over the limit» say how many. **A code is taken only from a
 specification in step with the journal** (`specificationCodes`, Р-7): as many lines, each paid the same, in
 order — one out of step takes every code, since a code on the wrong line is worse than none — and only a
 code the catalogue would take (`writtenBarcode`: its check digit, never a shop's own), in the form written.

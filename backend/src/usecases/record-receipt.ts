@@ -21,9 +21,10 @@ import type {
   ReceiptSettled,
 } from '@molvia/model'
 import type { ItemRepository } from '@/db/items-repository'
-import type { ReceiptEdits, StoredReceiptLine } from '@/db/receipts-repository'
+import type { ReceiptEdits, ReceiptToRecord, StoredReceiptLine } from '@/db/receipts-repository'
 import type { MemoryWord } from '@/db/store-memory-repository'
 import type { Transact } from '@/db/unit-of-work'
+import { findByBarcode } from './find-by-barcode'
 import { shownLines } from './receipts'
 import type { ShownLines } from './receipts'
 import { tripRateOn } from './start-trip'
@@ -176,7 +177,12 @@ export async function recordReceipt(
     // recorded: the same trip again is the same answer while it is there; a trip marked removed may
     // still come back with «Вернуть»; one removed for good leaves the receipt to be recorded again
     if (held.tripId !== null) {
-      if (held.tripId === body.tripId && held.tripAlive) return answer(body.tripId)
+      if (held.tripId === body.tripId && held.tripAlive) {
+        const again = await answer(body.tripId)
+        return body.barcodes === undefined
+          ? again
+          : { ...again, codes: await codesAgain(repositories, held, body.barcodes) }
+      }
       throw new DomainError(ERROR.CONFLICT)
     }
     if (held.status !== 'parsed' && held.status !== 'recorded') {
@@ -292,7 +298,21 @@ export async function recordReceipt(
     const words: MemoryWord[] = []
     const confirmed: number[] = []
     const asked = new Set(body.barcodes ?? [])
-    const codes: CodeOutcome[] = []
+    const itemOf = (line: RecordedLine) =>
+      'id' in line.item ? line.item.id : newItems.get(nameIdentity(line.item.name))
+    // «Привязать и записать» (MOL-234, В-2): the codes the person said yes to, by the rules of MOL-100
+    const binds = recorded.flatMap((line) => {
+      const code = held.lines[line.position]?.gtin ?? null
+      const itemId = itemOf(line)
+      return asked.has(line.position) && code !== null && itemId !== undefined
+        ? [{ position: line.position, code, itemId }]
+        : []
+    })
+    // every item this record touches, locked first and in one order (adversarial А1)
+    await items.lockForRecord(
+      binds.map((bind) => bind.itemId),
+      recorded.flatMap((line) => itemOf(line) ?? []),
+    )
     for (const line of recorded) {
       const stored = held.lines[line.position]
       if (stored === undefined) throw new DomainError(ERROR.CONFLICT)
@@ -311,16 +331,19 @@ export async function recordReceipt(
       for (const word of storeMemoryWords(stored)) {
         words.push({ ...word, itemId, price: read ? stored.price : null })
       }
-      // «Привязать и записать» (MOL-234, В-2): the code the person said yes to, by the rules of
-      // MOL-100 — the record stands whatever becomes of it
-      if (asked.has(line.position) && stored.gtin !== null) {
-        codes.push({
-          position: line.position,
-          code: stored.gtin,
-          ...(await bindCode(items, itemId, stored.gtin, actor.id)),
-        })
-      }
     }
+    // in the order of the codes: each code's lock is held to the end of the record (adversarial А1)
+    const codes: CodeOutcome[] = []
+    for (const bind of [...binds].sort((a, b) =>
+      a.code < b.code ? -1 : a.code > b.code ? 1 : 0,
+    )) {
+      codes.push({
+        position: bind.position,
+        code: bind.code,
+        ...(await bindCode(items, bind.itemId, bind.code, actor.id)),
+      })
+    }
+    codes.sort((a, b) => a.position - b.position)
     if (held.tin !== null) await storeMemory.remember(actor.id, held.tin, words)
     await receipts.markRecorded(held.id, {
       tripId: trip.id,
@@ -339,6 +362,34 @@ export async function recordReceipt(
 }
 
 type CodeOutcome = NonNullable<ReceiptRecorded['codes']>[number]
+
+/**
+ * The codes of a record sent again (adversarial А2): the first answer is lost, so each is told by who
+ * holds it now — the item its line went to (`written`: whether it was there before is not kept), another
+ * item (`held`, named), or nobody: the only way a code said yes to is nowhere is a full item.
+ */
+async function codesAgain(
+  repositories: Parameters<Parameters<Transact>[0]>[0],
+  held: ReceiptToRecord,
+  barcodes: readonly number[],
+): Promise<CodeOutcome[]> {
+  const recorded = await repositories.receipts.recordedItems(held.id)
+  const codes: CodeOutcome[] = []
+  for (const position of [...new Set(barcodes)].sort((a, b) => a - b)) {
+    const code = held.lines[position]?.gtin ?? null
+    const itemId = recorded.get(position)
+    if (code === null || itemId === undefined) continue
+    const holder = await findByBarcode(repositories.items, code)
+    codes.push(
+      holder === null
+        ? { position, code, outcome: 'full' }
+        : holder.id === itemId
+          ? { position, code, outcome: 'written' }
+          : { position, code, outcome: 'held', holder: holder.name },
+    )
+  }
+  return codes
+}
 
 /**
  * A line's code to its item (MOL-234), as «привязать?» writes one (MOL-100): another item holding it

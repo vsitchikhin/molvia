@@ -4,6 +4,7 @@ import {
   ERROR,
   EXPORT_FORMAT,
   LOGIN_HEADER,
+  RECEIPT_CODES_HEADER,
   loginStartedCodec,
   sessionsResponseCodec,
   loginPollCodec,
@@ -447,7 +448,10 @@ export interface MolviaClient {
    * the app, and the bot does not tell of it.
    */
   receipts(options?: { readonly shown?: boolean }): Promise<ReceiptsResponse>
-  /** One receipt with its lines; `error.not_found` for a missing, removed or someone else's one. */
+  /**
+   * One receipt with its lines; `error.not_found` for a missing, removed or someone else's one. Every
+   * build that reads a line's `code` asks for it (`RECEIPT_CODES_HEADER`, MOL-234, adversarial А3).
+   */
   receipt(id: string, options?: { readonly shown?: boolean }): Promise<ReceiptDetail>
   removeReceipt(id: string): Promise<void>
   /** «Вернуть» within ten minutes of «Удалить чек». */
@@ -970,7 +974,9 @@ export function createClient(options: ClientOptions): MolviaClient {
       request(`/receipts${options?.shown ? '?shown=1' : ''}`, receiptsResponseCodec),
 
     receipt: (id, options) =>
-      request(`/receipts/${segment(id)}${options?.shown ? '?shown=1' : ''}`, receiptDetailCodec),
+      request(`/receipts/${segment(id)}${options?.shown ? '?shown=1' : ''}`, receiptDetailCodec, {
+        headers: new Headers({ [RECEIPT_CODES_HEADER]: '1' }),
+      }),
     receiptSettled: (id) => request(`/receipts/${segment(id)}/settled`, receiptSettledCodec),
 
     removeReceipt: async (id) => {

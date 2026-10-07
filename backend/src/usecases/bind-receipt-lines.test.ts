@@ -30,9 +30,6 @@ function item(id: string, name: string): Item {
   })
 }
 
-/** No item holds any code. */
-const NONE: ItemRepository['byBarcode'] = () => Promise.resolve(null)
-
 const line = (printed: string, hs: string | null = null): ReceiptLine => ({
   printed,
   hs,
@@ -46,7 +43,7 @@ const line = (printed: string, hs: string | null = null): ReceiptLine => ({
 
 function fakeItems(answer: SearchAnswer = { items: [], near: false, nearIds: [] }) {
   const search = vi.fn<ItemRepository['search']>(() => Promise.resolve(answer))
-  return { items: { nodes: () => Promise.resolve(NODES), search, byBarcode: NONE }, search }
+  return { items: { nodes: () => Promise.resolve(NODES), search }, search }
 }
 
 describe('binding the lines of a parsed receipt (MOL-126)', () => {
@@ -149,7 +146,7 @@ describe('binding the lines of a Serbian receipt by its link (MOL-232, В-3)', (
       ),
     )
     const bound = await bindReceiptLines(
-      { items: { nodes, search, byBarcode: NONE }, embedder: NO_EMBEDDER },
+      { items: { nodes, search }, embedder: NO_EMBEDDER },
       ACTOR,
       'RS',
       'ru',
@@ -171,10 +168,7 @@ describe('binding the lines of a Serbian receipt by its link (MOL-232, В-3)', (
   it('asks nothing for a name under three letters', async () => {
     const search = vi.fn<ItemRepository['search']>()
     const bound = await bindReceiptLines(
-      {
-        items: { nodes: () => Promise.resolve(NODES), search, byBarcode: NONE },
-        embedder: NO_EMBEDDER,
-      },
+      { items: { nodes: () => Promise.resolve(NODES), search }, embedder: NO_EMBEDDER },
       ACTOR,
       'RS',
       'ru',
@@ -187,10 +181,7 @@ describe('binding the lines of a Serbian receipt by its link (MOL-232, В-3)', (
   it('marks a delivery and a tip «проверьте» with no item, and asks the search nothing (А6)', async () => {
     const search = vi.fn<ItemRepository['search']>()
     const bound = await bindReceiptLines(
-      {
-        items: { nodes: () => Promise.resolve(NODES), search, byBarcode: NONE },
-        embedder: NO_EMBEDDER,
-      },
+      { items: { nodes: () => Promise.resolve(NODES), search }, embedder: NO_EMBEDDER },
       ACTOR,
       'RS',
       'ru',
@@ -201,42 +192,5 @@ describe('binding the lines of a Serbian receipt by its link (MOL-232, В-3)', (
       { itemId: null, match: 'weak', translation: null },
       { itemId: null, match: 'weak', translation: null },
     ])
-  })
-
-  it('binds a line by the code the tax office gave it, before the search (MOL-234)', async () => {
-    const search = vi.fn<ItemRepository['search']>(() =>
-      Promise.resolve({ items: [item(GLUE, 'Клей')], near: true, nearIds: [GLUE] }),
-    )
-    const byBarcode = vi.fn<ItemRepository['byBarcode']>((codes) =>
-      Promise.resolve(codes.includes('8602300236022') ? item(MILK, 'Медено срце') : null),
-    )
-    const bound = await bindReceiptLines(
-      { items: { nodes: () => Promise.resolve(NODES), search, byBarcode }, embedder: NO_EMBEDDER },
-      ACTOR,
-      'RS',
-      'ru',
-      [line('Pionir medeno srce 150gr /kom'), line('Zitopek beli hleb /kom'), line('BANANA KG')],
-      ['8602300236022', '4006381333931', null],
-    )
-    // the code nobody holds goes on to the search; a line with none never asks for a code
-    expect(byBarcode).toHaveBeenCalledTimes(2)
-    expect(byBarcode.mock.calls[0]?.[0][0]).toBe('8602300236022')
-    expect(search.mock.calls.map(([query]) => query)).toEqual(['Zitopek beli hleb', 'Banana'])
-    expect(bound[0]).toEqual({ itemId: MILK, match: 'search', translation: null })
-    expect(bound[1]).toEqual({ itemId: GLUE, match: 'search', translation: null })
-  })
-
-  it('an Armenian receipt never asks for a code: it has none (MOL-234)', async () => {
-    const byBarcode = vi.fn<ItemRepository['byBarcode']>(NONE)
-    const { search } = fakeItems()
-    await bindReceiptLines(
-      { items: { nodes: () => Promise.resolve(NODES), search, byBarcode }, embedder: NO_EMBEDDER },
-      ACTOR,
-      'AM',
-      'ru',
-      [line('Կաթ «Իգիթ» 3.2% 1լ', '0401')],
-      ['8602300236022'],
-    )
-    expect(byBarcode).not.toHaveBeenCalled()
   })
 })

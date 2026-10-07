@@ -2110,11 +2110,15 @@ export const taxReceiptDays = pgTable(
     missing: integer('missing').notNull().default(0),
     /** Refused by the tax office. */
     invalid: integer('invalid').notNull().default(0),
-    /** No list in its journal, a link lost, an answer we could not write. */
+    /** Answered with a journal that holds no list (adversarial А7): the tax office's, never ours. */
+    empty: integer('empty').notNull().default(0),
+    /** Ours: a link lost to a restored copy, an answer we could not write. */
     unreadable: integer('unreadable').notNull().default(0),
     /** Its specification answered and agreed with the journal; failed — no codes from it (В-1). */
     specsOk: integer('specs_ok').notNull().default(0),
     specsFailed: integer('specs_failed').notNull().default(0),
+    /** Not asked: the person's share of the minute went on the journals (adversarial А5). */
+    specsSkipped: integer('specs_skipped').notNull().default(0),
     /** Lines that came with a code the catalogue would take. */
     linesCoded: integer('lines_coded').notNull().default(0),
     recorded: integer('recorded').notNull().default(0),
@@ -2135,7 +2139,7 @@ export const taxReceiptDays = pgTable(
   (table) => [
     check(
       'tax_receipt_days_counts_non_negative',
-      sql`least(${table.sentQr}, ${table.sentQrMissed}, ${table.sentPaste}, ${table.sentPasteMissed}, ${table.sentUnnamed}, ${table.read}, ${table.missing}, ${table.invalid}, ${table.unreadable}, ${table.specsOk}, ${table.specsFailed}, ${table.linesCoded}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.codesWritten}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
+      sql`least(${table.sentQr}, ${table.sentQrMissed}, ${table.sentPaste}, ${table.sentPasteMissed}, ${table.sentUnnamed}, ${table.read}, ${table.missing}, ${table.invalid}, ${table.empty}, ${table.unreadable}, ${table.specsOk}, ${table.specsFailed}, ${table.specsSkipped}, ${table.linesCoded}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.codesWritten}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
     ),
     check('tax_receipt_days_edited_within_lines', sql`${table.linesEdited} <= ${table.lines}`),
   ],

@@ -437,3 +437,17 @@ describe('how the link came (MOL-234, owner’s В-3 «а» of MOL-233)', () => 
     expect(sent()).toMatchObject({ via: 'qr', missed: true })
   })
 })
+
+describe('a photo that did not open is a miss too (adversarial А6)', () => {
+  it('a shot that does not decode, then the link pasted: `paste` with the miss', async () => {
+    photo = null
+    const sheet = await render()
+    await shoot(sheet)
+    expect(sheet.text()).toContain(en.receipt.capture.bad_file)
+    await button(sheet, en.receipt.qr.paste)?.trigger('click')
+    await flushPromises()
+    await field(sheet).setValue(LINK)
+    await send(sheet)?.trigger('click')
+    expect(sendLink.mock.calls[0]?.[0]).toMatchObject({ via: 'paste', missed: true })
+  })
+})

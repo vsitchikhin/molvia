@@ -609,9 +609,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   one function on both sides — MD5, a sale only; one JSON ask, the journal's lines; a queue of its own,
   people in turn, twelve a minute and four a person, a receipt not shown yet asked again for 48 hours;
   the link kept only until answered, in a table the nightly copy leaves out; a failure keeps the head
-  the link gave; the place by the premises. **The specification after the journal, for codes alone**
-  (MOL-234): waited on by nothing, a code only from one in step with the journal, bound to an item only by
-  «Привязать штрихкоды?» at «Записать», by MOL-100's rules — never in silence.
+  the link gave; the place by the premises. **The specification after the receipt is read, for codes alone**
+  (MOL-234): the receipt never waits on it, the round at most 3 s; a code only from one in step with the
+  journal, sent only to a phone that asks (`RECEIPT_CODES_HEADER`), bound to an item only by «Привязать
+  штрихкоды?» at «Записать», by MOL-100's rules — never in silence, every item locked first in id order.
 - **«Записать» is the whole receipt in one transaction** (`recordReceipt`): a trip finished on the
   receipt's day at its rate, its money the total the phone sends, else the printed one not below the
   lines, else the lines; the owner's lock first; the same trip again is the

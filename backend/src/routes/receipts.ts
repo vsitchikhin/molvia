@@ -2,6 +2,7 @@ import { z } from 'zod'
 import {
   receiptReadQuerySchema,
   DomainError,
+  RECEIPT_CODES_HEADER,
   ERROR,
   RECEIPT_PART_BYTES_MAX,
   receiptBodySchema,
@@ -30,8 +31,11 @@ export interface ReceiptsApi {
   putPart(actorId: string, id: string, part: string, photo: Buffer): Promise<ReceiptSummary>
   /** `shown` — the phone asked with its page in view (MOL-129, А1): what it is handed read is heard. */
   list(actor: Actor, shown: boolean): Promise<ReceiptSummary[]>
-  /** The review reads the rate of the receipt's day, and «today» is the phone's (MOL-121). */
-  one(actor: Actor & Today, id: string, shown: boolean): Promise<ReceiptDetail>
+  /**
+   * The review reads the rate of the receipt's day, and «today» is the phone's (MOL-121). `codes` — the
+   * phone knows a line's `code` (`RECEIPT_CODES_HEADER`, MOL-234, adversarial А3).
+   */
+  one(actor: Actor & Today, id: string, shown: boolean, codes: boolean): Promise<ReceiptDetail>
   remove(actorId: string, id: string): Promise<void>
   restore(actorId: string, id: string): Promise<ReceiptSummary>
   /** «Записать» (MOL-126): the receipt's day and «today» are the phone's (MOL-121). */
@@ -48,6 +52,11 @@ function privately(reply: FastifyReply) {
 /** Whether the phone asked with its page in view (`?shown=1`, MOL-129, А1). */
 function shownOf(request: FastifyRequest): boolean {
   return parseQuery(receiptReadQuerySchema, request.query).shown === '1'
+}
+
+/** Whether the phone knows a review line's `code` (MOL-234, adversarial А3). */
+function codesOf(request: FastifyRequest): boolean {
+  return request.headers[RECEIPT_CODES_HEADER.toLowerCase()] === '1'
 }
 
 function ownerOf(request: FastifyRequest): string {
@@ -155,7 +164,12 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
         privately(reply).send(
           z.encode(
             receiptDetailCodec,
-            await api.one(askingOf(request), request.params.receiptId, shownOf(request)),
+            await api.one(
+              askingOf(request),
+              request.params.receiptId,
+              shownOf(request),
+              codesOf(request),
+            ),
           ),
         ),
     )

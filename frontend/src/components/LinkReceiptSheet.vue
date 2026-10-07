@@ -298,6 +298,8 @@ export default defineComponent({
         }
         if (!photo) {
           outcome.value = 'bad_file'
+          // a shot taken whose QR did not read, as much as a miss on it (adversarial А6)
+          missed = true
           return
         }
         let found: Awaited<ReturnType<typeof receiptLinkOnPhoto>> = { kind: 'none' }

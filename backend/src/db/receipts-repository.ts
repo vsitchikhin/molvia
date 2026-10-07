@@ -40,6 +40,7 @@ import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
 import {
   actors,
+  expenses,
   places,
   receiptLineImages,
   receiptLines,
@@ -123,19 +124,26 @@ export type ReadOutcome =
       /** One for each line, in their order. */
       readonly bindings: readonly LineBinding[]
       readonly images: readonly LineImage[]
-      /**
-       * A receipt from the tax office (MOL-234): each line's code from its specification, in the
-       * lines' order, and whether the specification answered — `null`, not asked (over the limit).
-       */
-      readonly codes?: readonly (string | null)[]
-      readonly specification?: 'ok' | 'failed' | null
     }
   | {
       readonly kind: 'failed'
       readonly failure: ReceiptFailure
       readonly readerVersion: string | null
       readonly head: ReceiptHead | null
+      /** A receipt from the tax office whose journal holds no list: the office's answer, not ours (А7). */
+      readonly journalEmpty?: boolean
     }
+
+/**
+ * The codes of a receipt from the tax office, once it is read (MOL-234, adversarial А4): each line's
+ * code by position, the item holding it where one does, and how the specification went — `skipped`,
+ * not asked for want of the person's share.
+ */
+export interface LineCodes {
+  readonly codes: readonly (string | null)[]
+  readonly holders: readonly (string | null)[]
+  readonly specification: 'ok' | 'failed' | 'skipped'
+}
 
 /** A line as stored: as read, and what the parse found it to be (MOL-126). */
 export interface StoredReceiptLine extends ReceiptLine {
@@ -387,6 +395,14 @@ export interface ReceiptRepository {
   retry(id: string): Promise<void>
   /** Receipts by their link the last round did not finish asking about: queued again, the ask not counted. */
   requeueInterruptedLinks(): Promise<void>
+  /**
+   * The codes of a receipt from the tax office, asked after it was read (MOL-234, adversarial А4):
+   * written onto its lines, a line whose code an item holds bound to that item — only while the
+   * receipt waits for its record — and counted in `tax_receipt_days` whatever became of them.
+   */
+  writeCodes(id: string, written: LineCodes): Promise<void>
+  /** The item each recorded line of a receipt went to, by position (MOL-234, adversarial А2). */
+  recordedItems(id: string): Promise<ReadonlyMap<number, string>>
   /**
    * The next receipt by its link whose ask is due, now `reading`; `null` for none. People in turn, the
    * one asked about least in the last hour first, as the reader's queue (MOL-232).
@@ -1166,7 +1182,12 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         await tx.delete(receiptLineImages).where(eq(receiptLineImages.receiptId, id))
         if (outcome.kind !== 'parsed') {
           if (tax) {
-            const failed = outcome.failure === 'invalid' ? 'invalid' : 'unreadable'
+            const failed =
+              outcome.failure === 'invalid'
+                ? 'invalid'
+                : outcome.journalEmpty
+                  ? 'empty'
+                  : 'unreadable'
             await tallyTax(tx, { [failed]: sql`1` }, today())
             return
           }
@@ -1191,7 +1212,6 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               itemId: outcome.bindings[position]?.itemId ?? null,
               match: outcome.bindings[position]?.match ?? null,
               translation: outcome.bindings[position]?.translation ?? null,
-              gtin: outcome.codes?.[position] ?? null,
             })),
           )
         }
@@ -1206,20 +1226,62 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           : outcome.partly
             ? { readPartly: sql`1` }
             : { read: sql`1` }
-        if (tax) {
-          const coded = (outcome.codes ?? []).filter((code) => code !== null).length
-          await tallyTax(
-            tx,
-            {
-              read: sql`1`,
-              specsOk: outcome.specification === 'ok' ? sql`1` : undefined,
-              specsFailed: outcome.specification === 'failed' ? sql`1` : undefined,
-              linesCoded: coded > 0 ? sql`${coded}::int` : undefined,
-            },
-            today(),
-          )
-        } else await tally(tx, read, today())
+        if (tax) await tallyTax(tx, { read: sql`1` }, today())
+        else await tally(tx, read, today())
       })
+    },
+
+    async writeCodes(id, { codes, holders, specification }) {
+      await db.transaction(async (tx) => {
+        const [held] = await tx
+          .select({
+            status: receipts.status,
+            source: receipts.source,
+            deletedAt: receipts.deletedAt,
+          })
+          .from(receipts)
+          .where(eq(receipts.id, id))
+          .for('update')
+        if (held?.source !== 'tax') return
+        let coded = 0
+        // recorded meanwhile, or removed: its lines are the person's now, and nothing is written
+        if (held.status === 'parsed' && held.deletedAt === null) {
+          for (const [position, code] of codes.entries()) {
+            if (code === null) continue
+            const holder = holders[position] ?? null
+            await tx
+              .update(receiptLines)
+              .set({ gtin: code, ...(holder === null ? {} : { itemId: holder, match: 'search' }) })
+              .where(
+                and(
+                  eq(receiptLines.receiptId, id),
+                  eq(receiptLines.position, position),
+                  sql`${receiptLines.expenseId} is null`,
+                ),
+              )
+            coded += 1
+          }
+        }
+        await tallyTax(
+          tx,
+          {
+            specsOk: specification === 'ok' ? sql`1` : undefined,
+            specsFailed: specification === 'failed' ? sql`1` : undefined,
+            specsSkipped: specification === 'skipped' ? sql`1` : undefined,
+            linesCoded: coded > 0 ? sql`${coded}::int` : undefined,
+          },
+          today(),
+        )
+      })
+    },
+
+    async recordedItems(id) {
+      const rows = await db
+        .select({ position: receiptLines.position, itemId: expenses.itemId })
+        .from(receiptLines)
+        .innerJoin(expenses, eq(expenses.id, receiptLines.expenseId))
+        .where(eq(receiptLines.receiptId, id))
+      return new Map(rows.map((row) => [row.position, row.itemId]))
     },
 
     async requeueInterruptedLinks() {

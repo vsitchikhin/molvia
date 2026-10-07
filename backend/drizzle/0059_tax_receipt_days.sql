@@ -8,9 +8,11 @@ CREATE TABLE "tax_receipt_days" (
 	"read" integer DEFAULT 0 NOT NULL,
 	"missing" integer DEFAULT 0 NOT NULL,
 	"invalid" integer DEFAULT 0 NOT NULL,
+	"empty" integer DEFAULT 0 NOT NULL,
 	"unreadable" integer DEFAULT 0 NOT NULL,
 	"specs_ok" integer DEFAULT 0 NOT NULL,
 	"specs_failed" integer DEFAULT 0 NOT NULL,
+	"specs_skipped" integer DEFAULT 0 NOT NULL,
 	"lines_coded" integer DEFAULT 0 NOT NULL,
 	"recorded" integer DEFAULT 0 NOT NULL,
 	"lines" integer DEFAULT 0 NOT NULL,
@@ -25,7 +27,7 @@ CREATE TABLE "tax_receipt_days" (
 	"within_1h" integer DEFAULT 0 NOT NULL,
 	"within_1d" integer DEFAULT 0 NOT NULL,
 	"later" integer DEFAULT 0 NOT NULL,
-	CONSTRAINT "tax_receipt_days_counts_non_negative" CHECK (least("tax_receipt_days"."sent_qr", "tax_receipt_days"."sent_qr_missed", "tax_receipt_days"."sent_paste", "tax_receipt_days"."sent_paste_missed", "tax_receipt_days"."sent_unnamed", "tax_receipt_days"."read", "tax_receipt_days"."missing", "tax_receipt_days"."invalid", "tax_receipt_days"."unreadable", "tax_receipt_days"."specs_ok", "tax_receipt_days"."specs_failed", "tax_receipt_days"."lines_coded", "tax_receipt_days"."recorded", "tax_receipt_days"."lines", "tax_receipt_days"."lines_edited", "tax_receipt_days"."lines_skipped", "tax_receipt_days"."lines_item", "tax_receipt_days"."lines_figures", "tax_receipt_days"."totals_corrected", "tax_receipt_days"."codes_written", "tax_receipt_days"."within_5m", "tax_receipt_days"."within_15m", "tax_receipt_days"."within_1h", "tax_receipt_days"."within_1d", "tax_receipt_days"."later") >= 0),
+	CONSTRAINT "tax_receipt_days_counts_non_negative" CHECK (least("tax_receipt_days"."sent_qr", "tax_receipt_days"."sent_qr_missed", "tax_receipt_days"."sent_paste", "tax_receipt_days"."sent_paste_missed", "tax_receipt_days"."sent_unnamed", "tax_receipt_days"."read", "tax_receipt_days"."missing", "tax_receipt_days"."invalid", "tax_receipt_days"."empty", "tax_receipt_days"."unreadable", "tax_receipt_days"."specs_ok", "tax_receipt_days"."specs_failed", "tax_receipt_days"."specs_skipped", "tax_receipt_days"."lines_coded", "tax_receipt_days"."recorded", "tax_receipt_days"."lines", "tax_receipt_days"."lines_edited", "tax_receipt_days"."lines_skipped", "tax_receipt_days"."lines_item", "tax_receipt_days"."lines_figures", "tax_receipt_days"."totals_corrected", "tax_receipt_days"."codes_written", "tax_receipt_days"."within_5m", "tax_receipt_days"."within_15m", "tax_receipt_days"."within_1h", "tax_receipt_days"."within_1d", "tax_receipt_days"."later") >= 0),
 	CONSTRAINT "tax_receipt_days_edited_within_lines" CHECK ("tax_receipt_days"."lines_edited" <= "tax_receipt_days"."lines")
 );
 --> statement-breakpoint

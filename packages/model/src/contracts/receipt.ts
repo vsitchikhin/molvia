@@ -121,9 +121,10 @@ export const receiptReviewLineCodec = z.strictObject({
   amount: moneyCodec.nullable(),
   rememberedPrice: moneyCodec.nullable(),
   /**
-   * The package's code the Serbian tax office gave the line, which the item shown does not hold
-   * (MOL-234): «Привязать штрихкоды?» asks about it at «Записать», never in silence (MOL-100). Sent only
-   * when there is one — an installed app of an earlier build reads a line strictly.
+   * The package's code the Serbian tax office gave the line, which no item holds yet (MOL-234):
+   * «Привязать штрихкоды?» asks about it at «Записать», never in silence (MOL-100). Sent only when there
+   * is one, and only to a phone that asked by `RECEIPT_CODES_HEADER` — an installed app of an earlier
+   * build reads a line strictly (adversarial А3).
    */
   code: z.string().optional(),
 })
@@ -279,3 +280,11 @@ export type ReceiptSettled = z.output<typeof receiptSettledCodec>
  * nothing of the person, and leaves the bot to tell them.
  */
 export const receiptReadQuerySchema = z.strictObject({ shown: z.literal('1').optional() })
+
+/**
+ * A phone that knows a review line's `code` says so by this header on `GET /receipts/:id` (MOL-234,
+ * adversarial А3): a line with a code is refused by the strict codec of an installed app of an earlier
+ * build, so the code goes only to a build that asked. A header, not the query: a server rolled back
+ * refuses a query it does not know, and leaves a header alone.
+ */
+export const RECEIPT_CODES_HEADER = 'X-Molvia-Receipt-Codes'

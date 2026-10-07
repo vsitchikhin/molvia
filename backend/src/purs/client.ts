@@ -14,6 +14,12 @@ export const PURS_HOST = 'https://suf.purs.gov.rs'
 export const PURS_TIMEOUT_MS = 10_000
 
 /**
+ * Both requests of a specification together (MOL-234, adversarial А4): the receipt is read already,
+ * but the next one in the round waits for it, and the codes are a gift — a page answers in half a second.
+ */
+export const PURS_SPECIFICATION_TIMEOUT_MS = 3_000
+
+/**
  * Asked at most this often a minute, a third of it by one person (`pursShare`, MOL-232, Р-3): the
  * figures of Open Food Facts (MOL-162, В-6). The tax office publishes no limit; open clients keep
  * theirs low «to lower the risk of a block» (FuelScan). Counted in the API's process — there is one.
@@ -107,6 +113,11 @@ export interface PursOptions {
    * a timeout is the weather and the log's alone. The error says its kind only, never the answer.
    */
   readonly onBroken?: (error: PursError) => void
+  /**
+   * Why a specification gave nothing (MOL-234, review 8): its own word, never the journal's — it
+   * refuses most asks from a server, and the journal's failures would drown in it.
+   */
+  readonly onSpecificationFailure?: (reason: string) => void
   readonly perMinute?: number
   readonly now?: () => number
 }
@@ -222,10 +233,12 @@ export function purs(options: PursOptions): Purs {
    */
   async function specify(link: string, number: string): Promise<PursSpecification> {
     const { pathname, search } = new URL(link)
+    // one deadline for both: the page and the POST together never hold the round longer
+    const signal = AbortSignal.timeout(PURS_SPECIFICATION_TIMEOUT_MS)
     try {
       const page = await fetch(`${base}${pathname}${search}`, {
         headers: { accept: 'text/html', 'user-agent': options.userAgent },
-        signal: AbortSignal.timeout(PURS_TIMEOUT_MS),
+        signal,
       })
       if (page.status !== 200) throw new PursError(`page HTTP ${String(page.status)}`, 'HTTP')
       const html = await page.text()
@@ -245,7 +258,7 @@ export function purs(options: PursOptions): Purs {
           'user-agent': options.userAgent,
         },
         body: new URLSearchParams({ invoiceNumber: pageNumber, token }).toString(),
-        signal: AbortSignal.timeout(PURS_TIMEOUT_MS),
+        signal,
       })
       if (response.status !== 200) {
         throw new PursError(`specification HTTP ${String(response.status)}`, 'HTTP')
@@ -267,7 +280,7 @@ export function purs(options: PursOptions): Purs {
         })),
       }
     } catch (error) {
-      options.onFailure?.(reasonOf(error))
+      options.onSpecificationFailure?.(reasonOf(error))
       return { kind: 'failed' }
     }
   }

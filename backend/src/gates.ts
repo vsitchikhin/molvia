@@ -212,7 +212,8 @@ function taxReceiptLines(tax: TaxReceiptsInWindow): string[] {
   const { firstDay, lastDay } = tax
   const span = firstDay === lastDay ? `the day ${firstDay}` : `days ${firstDay} … ${lastDay}`
   const sent = tax.sentQr + tax.sentQrMissed + tax.sentPaste + tax.sentPasteMissed + tax.sentUnnamed
-  const read = tax.read + tax.missing + tax.invalid + tax.unreadable
+  // what the tax office answered; a failure of ours is no answer of its (adversarial А7)
+  const asked = tax.read + tax.missing + tax.invalid + tax.empty
   return [
     `0.2r ${'· the Serbian tax office'.padEnd(47)}no stop: the lines are the tax office's`,
     row('links sent', [String(sent), `${span} in Yerevan`]),
@@ -221,12 +222,15 @@ function taxReceiptLines(tax: TaxReceiptsInWindow): string[] {
     row('  pasted after the camera missed', [String(tax.sentPasteMissed), 'the QR did not read']),
     row('  pasted with no shot', [String(tax.sentPaste), '']),
     row('  not named', [String(tax.sentUnnamed), 'a phone of an earlier build']),
-    row('receipts asked', [String(read), '']),
+    row('receipts asked', [String(asked), '']),
     row('  with their lines', [String(tax.read), '']),
     row('  not shown in 48 hours', [String(tax.missing), '']),
     row('  refused by the tax office', [String(tax.invalid), '']),
-    row('  unreadable', [String(tax.unreadable), '']),
+    row('  no list in the journal', [String(tax.empty), '']),
+    row('not read on our side', [String(tax.unreadable), 'a link lost, an answer not written']),
     row('specification answered', share(tax.specsOk, tax.specsOk + tax.specsFailed)),
+    // the person's share went on the journals: such a receipt has no codes, for good (adversarial А5)
+    row('  not asked, over the limit', [String(tax.specsSkipped), 'no codes']),
     row('  lines with a code', [String(tax.linesCoded), '']),
     row('receipts recorded', [String(tax.recorded), '']),
     row('lines put right', share(tax.linesEdited, tax.lines, 'up')),

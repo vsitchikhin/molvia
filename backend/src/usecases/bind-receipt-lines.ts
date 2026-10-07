@@ -10,11 +10,10 @@ import type { ItemRepository } from '@/db/items-repository'
 import type { LineBinding } from '@/db/receipts-repository'
 import type { Embedder } from '@/embeddings/embedder'
 import { TILL_WORDS_RU } from '@/receipts/till-words-ru'
-import { findByBarcode } from '@/usecases/find-by-barcode'
 import { queryMeaning } from '@/usecases/query-meaning'
 
 export interface BindReceiptLinesDeps {
-  readonly items: Pick<ItemRepository, 'nodes' | 'search' | 'byBarcode'>
+  readonly items: Pick<ItemRepository, 'nodes' | 'search'>
   /** The model of the search by meaning (MOL-105); without one, letters alone. */
   readonly embedder: Pick<Embedder, 'model' | 'query'>
 }
@@ -32,9 +31,8 @@ const SHORTEST_NAME = 3
  * named by the gloss. A line of a class of services, «56.10» of food service, is a dish: whatever the
  * catalogue's goods give it is «проверьте» (MOL-226). The shop's memory comes before all of it, but it
  * is laid over on every reading of the receipt rather than here: it changes with every receipt recorded.
- * A country with no names of its own, Serbia, goes by the search of the line's name alone (MOL-232, В-3)
- * — after the line's code, where the tax office gave one and an item holds it (MOL-234): a package's
- * code is the package, as the scanner's is (MOL-99). The memory is still laid over it on reading.
+ * A country with no names of its own, Serbia, goes by the search of the line's name alone (MOL-232, В-3);
+ * a line's code comes after the receipt is read, and binds it then (`readTaxReceipts`, MOL-234).
  *
  * The gloss is Russian, the catalogue's language, and is shown only to a receipt read out in Russian;
  * the search asks it whatever the receipt's language.
@@ -45,8 +43,6 @@ export async function bindReceiptLines(
   country: ReceiptCountry,
   language: AppLocale,
   lines: readonly ReceiptLine[],
-  /** Each line's code, in their order, where the tax office gave one (MOL-234). */
-  codes: readonly (string | null)[] = [],
 ): Promise<LineBinding[]> {
   const names = RECEIPT_NAME_LANGUAGE[country]
   const matcher = createLineMatcher(
@@ -54,14 +50,8 @@ export async function bindReceiptLines(
     TILL_WORDS_RU,
   )
   const bound: LineBinding[] = []
-  for (const [position, line] of lines.entries()) {
+  for (const line of lines) {
     if (names === undefined) {
-      const code = codes[position] ?? null
-      const held = code === null ? null : await findByBarcode(items, code)
-      if (held !== null) {
-        bound.push({ itemId: held.id, match: 'search', translation: null })
-        continue
-      }
       // a delivery or a tip is no product: «проверьте», never a new item in silence (MOL-232, А6)
       if (serbianServiceLine(line.printed)) {
         bound.push({ itemId: null, match: 'weak', translation: null })
