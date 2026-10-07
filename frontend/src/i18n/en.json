@@ -1619,7 +1619,7 @@
       "title": "Who the data goes to",
       "people": {
         "term": "Other people",
-        "text": "Average ratings of three people and prices without your name — and only to those who have access to other people’s figures. Your list of purchases, your spendings and your money — to nobody."
+        "text": "Average ratings of three people and prices without your name — to those who have access to other people’s figures. With no access and no threshold of three, everyone sees the items, shops and barcodes you added to the shared catalogue, and your word about a receipt — which item stands behind a line and which shop it is: it is offered to anyone who reads a receipt of the same shop, even if only you said it. All of it without your name. Your list of purchases, your spendings and your money — to nobody."
       },
       "telegram": {
         "term": "Telegram",
@@ -1639,7 +1639,7 @@
       },
       "serbian_tax": {
         "term": "The Serbian tax office",
-        "text": "The link of a Serbian receipt — not you."
+        "text": "The link of a Serbian receipt: the total, the time, the receipt number and the buyer’s number if the receipt names one — a firm’s or yours. Not your phone and not your sign-in."
       },
       "nobody": {
         "term": "Nobody else",
@@ -1664,7 +1664,7 @@
     },
     "serbian_receipts": {
       "title": "A Serbian receipt by its link",
-      "text": "You hand over a Serbian receipt as the link of its QR code, with no photo. The receipt is kept by the Serbian tax office (Poreska uprava), and our server takes its lines from there: it sends the tax office that link. The tax office sees the link and our server’s address — not you, your phone or your sign-in. The link carries the receipt’s total, time and number, and the firm’s tax number if the receipt was made out to one; the tax office holds all of it already. Of its answer we keep the seller’s tax number, the shop’s code and name, the town, the lines, the total and the time; the cashier’s name, the buyer’s number and the way of payment we do not take. The link itself is erased as soon as the tax office answers, and never written to logs. A receipt just printed shows up there in a couple of minutes: the server asks again for two days, then says the receipt was not found."
+      "text": "You hand over a Serbian receipt as the link of its QR code, with no photo. The receipt is kept by the Serbian tax office (Poreska uprava), and our server takes its lines from there: it sends the tax office that link. The tax office sees the link and our server’s address — not you, your phone or your sign-in. The link carries the receipt’s total, time and number, and the buyer’s number if the receipt names one — a firm’s or yours; the tax office holds all of it already. Of its answer we keep the seller’s tax number, the shop’s code and name, the town, the lines, the total and the time; the cashier’s name, the buyer’s number and the way of payment we do not take. The link itself is erased as soon as the tax office answers, and never written to logs. A receipt just printed shows up there in a couple of minutes: the server asks again for two days, then says the receipt was not found."
     },
     "storage": {
       "title": "Cookies and the phone's memory",
@@ -1684,7 +1684,7 @@
     },
     "rights": {
       "title": "Your rights",
-      "text": "To learn what is kept about you and get a copy — «Download my data». To correct — edit any record. To delete everything — «Delete my data» or /delete in the bot. To withdraw the consent to the statistics — «Count me in the statistics». All of this works at once, with no request. If you need something else, write to the developer: the answer comes within five working days at most."
+      "text": "To learn what is kept about you and get a copy — «Download my data». To correct — edit: a purchase’s quantity and sum, a record’s receipt total, and ratings, reviews, exchanges, incomes, spendings, accounts and settings. A purchase’s item and a record’s shop or day cannot be edited — delete such a record and enter it again. To delete everything — «Delete my data» or /delete in the bot. To withdraw the consent to the statistics — «Count me in the statistics». All of this works at once, with no request. If you need something else, write to the developer: the answer comes within five working days at most."
     },
     "complaints": {
       "title": "Where to complain",
@@ -1692,7 +1692,7 @@
     },
     "breach": {
       "title": "If the data leaks",
-      "text": "If a stranger may have seen your data, we will say so at once at the top of this page, report it to the data protection authorities and to the Armenian police, and tell those it concerns through the Molvia bot: what happened, which data, and what to do."
+      "text": "If a stranger may have seen your data, we will say so at the top of this page — an installed app shows it once it updates — report it at once to the data protection authorities and to the Armenian police, and tell those it concerns through the Molvia bot: what happened, which data, and what to do."
     }
   },
   "terms": {

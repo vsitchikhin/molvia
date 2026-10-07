@@ -248,6 +248,28 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
     expect(ru.privacy.summary).toMatch(/сторонних трекеров и аналитики/)
   })
 
+  it('names everything other people see, and that the shops’ memory has no access or threshold (А2)', () => {
+    const people = ru.privacy.recipients.people.text
+    expect(people).toMatch(/Без доступа и без порога трёх/)
+    expect(people).toMatch(/товары, магазины и штрихкоды, которые вы добавили в общий справочник/)
+    expect(people).toMatch(/даже если так сказали только вы/)
+    expect(en.privacy.recipients.people.text).toMatch(/even if only you said it/)
+  })
+
+  it('promises the corrections there are, and names those there are not (А3)', () => {
+    expect(ru.privacy.rights.text).not.toMatch(/любой записи/)
+    expect(ru.privacy.rights.text).toMatch(/Товар покупки и магазин или день записи не правятся/)
+    expect(en.privacy.rights.text).toMatch(/cannot be edited/)
+  })
+
+  it('says a Serbian receipt’s link may carry the buyer’s own number, not only a firm’s (А5)', () => {
+    expect(ru.privacy.recipients.serbian_tax.text).toMatch(
+      /номер покупателя, если он в чеке указан, — фирмы или ваш/,
+    )
+    expect(ru.privacy.serbian_receipts.text).toMatch(/его номер — фирмы или ваш/)
+    expect(ru.privacy.serbian_receipts.text).not.toMatch(/выписан на фирму/)
+  })
+
   it('names MOL-240 as it is until it is fixed (В-3)', () => {
     expect(ru.privacy.stored.receipts.text).toMatch(
       /записанный чек из «Покупок» или одну покупку из него, сам чек и его строки пока остаются у нас/,

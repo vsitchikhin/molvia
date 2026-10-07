@@ -25,14 +25,21 @@ function templates(): string[] {
 
 /**
  * Both pages in both languages, as they are filed, the parts each shows and the templates that draw
- * them — any edit, a comma, a part or a line of the template taken out included, changes it.
+ * them — any edit, a comma, a part or a line of the template taken out included, changes it. **And
+ * the consent on the step itself** (MOL-236, adversarial А4): the card «Статистика» is the text of the
+ * consent to the statistics, shown apart from the pages (В-2), and «что изменилось» says what an
+ * edition changed — rewritten, either is the text a person agrees to. Not the rest of `consent`: the
+ * buttons, the age and the errors are the step's, not the text. That the step draws the card at all
+ * is `ConsentStep.test.ts`'s.
  */
-function digestOfPages(): string {
+function digestOfPages(dictionaries: { ru: typeof ru; en: typeof en } = { ru, en }): string {
+  const { ru: r, en: e } = dictionaries
   return createHash('sha256')
     .update(
       JSON.stringify([
         [PRIVACY_STORED, PRIVACY_RECIPIENTS, PRIVACY_PARTS, TERMS_PARTS],
-        [ru.privacy, ru.terms, en.privacy, en.terms],
+        [r.privacy, r.terms, e.privacy, e.terms],
+        [r.consent.statistics, r.consent.changes, e.consent.statistics, e.consent.changes],
         templates(),
       ]),
     )
@@ -53,6 +60,19 @@ describe('the revision of the terms and the privacy page (MOL-95, В-1)', () => 
         'of data, a new recipient, a new purpose, a change of the terms — raise POLICY_VERSION in ' +
         'packages/model/src/contracts/consent.ts as well, and write consent.changes.<version>.',
     ).toBe(POLICY_REVISION.digest)
+  })
+
+  it('moves with the consent on the step too, and not with its buttons (MOL-236, adversarial А4)', () => {
+    const copy = () => structuredClone({ ru, en })
+    const statistics = copy()
+    statistics.ru.consent.statistics.text = 'Мы считаем всё, с именем. Выключить нельзя.'
+    const changes = copy()
+    changes.en.consent.changes['2'] = 'Nothing changed.'
+    const button = copy()
+    button.ru.consent.accept = 'Согласен'
+    expect(digestOfPages(statistics)).not.toBe(POLICY_REVISION.digest)
+    expect(digestOfPages(changes)).not.toBe(POLICY_REVISION.digest)
+    expect(digestOfPages(button)).toBe(POLICY_REVISION.digest)
   })
 
   it('names the edition the model asks about, so raising it is an edit of the revision too', () => {
