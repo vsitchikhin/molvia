@@ -782,6 +782,76 @@ describe('AppScreen with an error of the whole screen', () => {
     view.unmount()
   })
 
+  // «Что брать» draws its strip only for a newcomer: the action goes in the very render the error
+  // comes in, the whole strip with it, before the error holds it — and the focus still comes to
+  // «Try again» (adversarial Г1).
+  it('brings a focus lost with a strip that went as the error came', async () => {
+    const failed = ref(false)
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            AppScreen,
+            { title: 'What to buy' },
+            failed.value
+              ? { default: () => error() }
+              : {
+                  default: () => h('p', 'Ready'),
+                  docked: () => h('button', { class: 'own' }, 'Record purchases'),
+                },
+          ),
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: waiting('none') },
+        },
+      },
+    )
+    ;(view.get('.own').element as HTMLElement).focus()
+    failed.value = true
+    await nextTick()
+    await nextTick()
+    expect(document.activeElement).toBe(view.get('.dock button').element)
+    expect(document.activeElement?.textContent).toContain(en.state.retry)
+    view.unmount()
+  })
+
+  // A focus the person moved elsewhere meanwhile is theirs, and stays where it is.
+  it('must not take a focus that stands outside the strip', async () => {
+    const failed = ref(false)
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            AppScreen,
+            { title: 'What to buy' },
+            {
+              default: () => [
+                h('button', { class: 'elsewhere' }, 'Search'),
+                failed.value ? error() : null,
+              ],
+              docked: () => h('button', { class: 'own' }, 'Record purchases'),
+            },
+          ),
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: waiting('none') },
+        },
+      },
+    )
+    ;(view.get('.elsewhere').element as HTMLElement).focus()
+    failed.value = true
+    await nextTick()
+    await nextTick()
+    expect(document.activeElement).toBe(view.get('.elsewhere').element)
+    view.unmount()
+  })
+
   // Only an error is a second one: a notice of the whole screen beside it stays an alert (review №5).
   it('keeps a full «attention» beside an error that holds the strip an alert', async () => {
     const { view } = await render('/', {

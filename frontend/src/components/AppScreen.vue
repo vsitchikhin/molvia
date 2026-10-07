@@ -90,7 +90,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, nextTick, onBeforeUpdate, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, onBeforeUpdate, onUpdated, ref, watch } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -165,8 +165,14 @@ export default defineComponent({
     // render instead: a row filled late is pinned and alive, not drawn inside an invisible one.
     const hasRow = (): boolean => Boolean(parentTitleKey.value ?? slots.meta ?? slots.trailing)
     const docked = ref(hasRow())
+    // Whether the focus stood in the strip as this render began (adversarial Г1, below).
+    let focusInDock = false
     onBeforeUpdate(() => {
       docked.value = hasRow()
+      focusInDock = dock.value?.contains(document.activeElement) ?? false
+    })
+    onUpdated(() => {
+      focusInDock = false
     })
     const tabbed = computed(() => Boolean(route.meta.tab))
 
@@ -200,11 +206,17 @@ export default defineComponent({
     const strip = provideStateStrip(stateTarget)
     // An error taking the strip unmounts the screen's own action, and a focus on it fell to the body
     // («Где вы?» closed over a failed «Что брать» hands it back to «Записать покупки», review №6): it
-    // goes to the error's first button, which stands where that action stood.
+    // goes to the error's first button, which stands where that action stood. Where the action went
+    // in the very render the error came in — «Что брать» draws its strip only for a newcomer — the
+    // whole strip went before the error held it, and the focus with it (adversarial Г1): so whether
+    // it stood in the strip is read before the frame patches, and a focus lost to the body is brought.
     watch(
       strip.held,
       (held) => {
-        if (!held || !dock.value?.contains(document.activeElement)) return
+        if (!held) return
+        const focused = document.activeElement
+        const lost = focused === null || focused === document.body
+        if (!dock.value?.contains(focused) && !(focusInDock && lost)) return
         void nextTick(() => stateTarget.value?.querySelector('button')?.focus())
       },
       { flush: 'pre' },
