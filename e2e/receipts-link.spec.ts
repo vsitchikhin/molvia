@@ -145,3 +145,52 @@ test('a receipt the tax office does not show yet stays «asking the tax office»
     page.locator('.purchase-row').filter({ hasText: 'asking the tax office' }),
   ).toBeVisible(READ)
 })
+
+/** The code `bin/fake-purs.mjs` gives the sugar of a CODEDAAA receipt: 860, the counter, the check. */
+function sugarCode(counter: number): string {
+  const twelve = `860${String(counter).padStart(9, '0').slice(-9)}`
+  let sum = 0
+  for (let at = 0; at < 12; at += 1) sum += Number(twelve[11 - at]) * (at % 2 ? 1 : 3)
+  return `${twelve}${String((10 - (sum % 10)) % 10)}`
+}
+
+// MOL-234, owner's В-1 «а», В-2 «а»: the tax office's specification gives a line its package's code,
+// and «Записать» asks once whether to bind it — the code then finds the item by the scanner.
+test('a code from the tax office is asked about at «Save», and bound finds its item', async ({
+  page,
+}) => {
+  test.setTimeout(90_000)
+  const counter = Date.now() % 1_000_000_000
+  const code = sugarCode(counter)
+  await signedIn(page, '/purchases')
+  await paste(
+    page,
+    madeUpSerbianLink({ totalHundredths: 48_637, at: AT, requestedBy: 'CODEDAAA', counter }),
+  )
+  await sheet(page).getByRole('button', { name: 'Send receipt' }).click()
+  await expect(sheet(page)).toHaveCount(0)
+  const ready = page.locator('.purchase-row').filter({ hasText: '2 items' })
+  await expect(ready).toBeVisible(READ)
+  await ready.click()
+  await expect(page.locator('.receipt-line')).toHaveCount(2)
+
+  await page.getByRole('button', { name: 'Save 2 purchases' }).click()
+  await expect(sheet(page)).toBeVisible()
+  await risen(page)
+  // the place first, when no receipt of the premises was recorded yet; then the codes
+  if ((await sheet(page).getByLabel('Another place').count()) > 0) {
+    await sheet(page).getByRole('button', { name: 'Save 2 purchases' }).click()
+    await expect(sheet(page).getByText('Link the barcodes?')).toBeVisible(READ)
+    await risen(page)
+  }
+  await expect(sheet(page)).toContainText(code)
+  await sheet(page).getByRole('button', { name: 'Link and record' }).click()
+  await expect(page).toHaveURL(/\/purchases\/[0-9a-f-]+$/, READ)
+  await expect(page.getByRole('heading', { name: 'Saved 2 purchases' })).toBeVisible()
+
+  const found = await page.evaluate(async (asked) => {
+    const response = await fetch(`/api/catalogue/barcode?code=${asked}`, { credentials: 'include' })
+    return (await response.json()) as { item: { name: string } | null }
+  }, code)
+  expect(found.item).not.toBeNull()
+})
