@@ -8,6 +8,8 @@
 //   MISSINGA — never shown;
 //   INVALIDA — shown and held not valid;
 //   anything else — shown at once.
+// Its page carries the token `/specifications` is asked with (MOL-234); the specification gives the
+// sugar a code for CODEDAAA, answers `success:false` for SPECFAIL, and no code to anyone else.
 // A request without our User-Agent is refused.
 //
 //   PURS_PORT=3305 node bin/fake-purs.mjs
@@ -44,6 +46,34 @@ const JOURNAL = [
   '======== КРАЈ ФИСКАЛНОГ РАЧУНА =========',
 ].join('\r\n')
 
+/** A code that checks, led by Serbia's 860 — no shop's own. */
+const SUGAR_CODE = '8600000000004'
+
+function page(response, number) {
+  response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+  response.end(
+    `<html><script>viewModel.InvoiceNumber('${number}');viewModel.Token('token-${number}');</script></html>`,
+  )
+}
+
+async function specification(request, response) {
+  let body = ''
+  for await (const chunk of request) body += String(chunk)
+  const form = new URLSearchParams(body)
+  const number = form.get('invoiceNumber') ?? ''
+  if (form.get('token') !== `token-${number}` || number.startsWith('SPECFAIL')) {
+    answer(response, 200, { success: false })
+    return
+  }
+  answer(response, 200, {
+    success: true,
+    items: [
+      { gtin: number.startsWith('CODEDAAA') ? SUGAR_CODE : '', name: 'SECER', total: 189.98 },
+      { gtin: '', name: 'BANANA', total: 296.39 },
+    ],
+  })
+}
+
 function answer(response, status, body) {
   response.writeHead(status, { 'content-type': 'application/json' })
   response.end(body === undefined ? '' : JSON.stringify(body))
@@ -55,12 +85,16 @@ createServer((request, response) => {
     answer(response, 200, { ok: true })
     return
   }
-  if (request.method !== 'GET' || url.pathname !== '/v/') {
-    answer(response, 404)
-    return
-  }
   if (!/^Molvia\/\S+ \(.+\)$/.test(request.headers['user-agent'] ?? '')) {
     answer(response, 403)
+    return
+  }
+  if (request.method === 'POST' && url.pathname === '/specifications') {
+    void specification(request, response)
+    return
+  }
+  if (request.method !== 'GET' || url.pathname !== '/v/') {
+    answer(response, 404)
     return
   }
   const vl = url.searchParams.get('vl') ?? ''
@@ -76,6 +110,10 @@ createServer((request, response) => {
   asks.set(vl, asked)
   if (requestedBy === 'MISSINGA' || (requestedBy === 'FRESHAAA' && asked <= 2)) {
     answer(response, 404)
+    return
+  }
+  if (!(request.headers.accept ?? '').includes('application/json')) {
+    page(response, number)
     return
   }
   answer(response, 200, {

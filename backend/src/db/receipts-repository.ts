@@ -123,6 +123,12 @@ export type ReadOutcome =
       /** One for each line, in their order. */
       readonly bindings: readonly LineBinding[]
       readonly images: readonly LineImage[]
+      /**
+       * A receipt from the tax office (MOL-234): each line's code from its specification, in the
+       * lines' order, and whether the specification answered — `null`, not asked (over the limit).
+       */
+      readonly codes?: readonly (string | null)[]
+      readonly specification?: 'ok' | 'failed' | null
     }
   | {
       readonly kind: 'failed'
@@ -242,7 +248,7 @@ export interface ReceiptEdits {
 type ReceiptDayCounts = Partial<Record<Exclude<keyof typeof receiptDays.$inferInsert, 'day'>, SQL>>
 /** The same of `tax_receipt_days` (MOL-234). */
 type TaxReceiptDayCounts = Partial<
-  Record<Exclude<keyof typeof taxReceiptDays.$inferInsert, 'day'>, SQL>
+  Record<Exclude<keyof typeof taxReceiptDays.$inferInsert, 'day'>, SQL | undefined>
 >
 
 /**
@@ -1174,6 +1180,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               itemId: outcome.bindings[position]?.itemId ?? null,
               match: outcome.bindings[position]?.match ?? null,
               translation: outcome.bindings[position]?.translation ?? null,
+              gtin: outcome.codes?.[position] ?? null,
             })),
           )
         }
@@ -1188,8 +1195,19 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           : outcome.partly
             ? { readPartly: sql`1` }
             : { read: sql`1` }
-        if (tax) await tallyTax(tx, { read: sql`1` }, today())
-        else await tally(tx, read, today())
+        if (tax) {
+          const coded = (outcome.codes ?? []).filter((code) => code !== null).length
+          await tallyTax(
+            tx,
+            {
+              read: sql`1`,
+              specsOk: outcome.specification === 'ok' ? sql`1` : undefined,
+              specsFailed: outcome.specification === 'failed' ? sql`1` : undefined,
+              linesCoded: coded > 0 ? sql`${coded}::int` : undefined,
+            },
+            today(),
+          )
+        } else await tally(tx, read, today())
       })
     },
 

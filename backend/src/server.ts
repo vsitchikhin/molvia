@@ -782,13 +782,14 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
             await readTaxReceipts({
               receipts,
               purs: taxOffice,
-              bind: (claimed, lines) =>
+              bind: (claimed, lines, codes) =>
                 bindReceiptLines(
                   { items: createItemRepository(db), embedder },
                   claimed.actorId,
                   claimed.country,
                   claimed.language,
                   lines,
+                  codes,
                 ),
               report: (event) => {
                 if (event.kind === 'read') {

@@ -8,6 +8,7 @@ import {
   serbianJournal,
   serbianReceiptLink,
   serbianShopOf,
+  specificationCodes,
 } from '@molvia/model'
 import type { ReceiptLine } from '@molvia/model'
 import { z } from 'zod'
@@ -25,10 +26,11 @@ export interface ReadTaxReceiptsDeps {
     'requeueInterruptedLinks' | 'claimLink' | 'releaseLink' | 'askLater' | 'finish'
   >
   readonly purs: Purs
-  /** The lines to items: `bindReceiptLines`, one binding for each line in order. */
+  /** The lines to items: `bindReceiptLines`, one binding for each line in order, by its code first. */
   readonly bind: (
     claimed: ClaimedLink,
     lines: readonly ReceiptLine[],
+    codes: readonly (string | null)[],
   ) => Promise<readonly LineBinding[]>
   /** What happened, for the log: never the link, the seller or a line (MOL-58, MOL-232). */
   readonly report: (event: TaxReport) => void
@@ -130,9 +132,16 @@ async function outcomeOf(
   // the lines go out on the wire as the contract says, or the receipt is not read (Т-5 of MOL-125)
   if (!z.array(receiptLineCodec).safeEncode(lines).success) return failed('unreadable')
 
+  // the lines' codes, asked after the journal and waited on by nothing (MOL-234, owner's В-1 «а»): a
+  // specification that failed, or is out of step with the journal, gives none; over the limit — not asked
+  const asked = await deps.purs.specification(claimed.link, link.number, claimed.actorId)
+  const fromSpec = asked.kind === 'found' ? specificationCodes(asked.items, journal.lines) : null
+  const codes = fromSpec ?? lines.map(() => null)
+  const specification = asked.kind === 'skipped' ? null : fromSpec === null ? 'failed' : 'ok'
+
   let bindings: readonly LineBinding[] = []
   try {
-    bindings = await deps.bind(claimed, lines)
+    bindings = await deps.bind(claimed, lines, codes)
   } catch (error) {
     // what the lines are is the review's help, not the receipt: every line new
     deps.report({ kind: 'bind_failed', error })
@@ -167,5 +176,7 @@ async function outcomeOf(
     partly: false,
     bindings,
     images: [],
+    codes,
+    specification,
   }
 }

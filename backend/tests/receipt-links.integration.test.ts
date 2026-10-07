@@ -16,6 +16,7 @@ import type { FastifyInstance } from 'fastify'
 import { createItemRepository } from '@/db/items-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
 import {
+  itemBarcodes,
   receiptDays,
   receiptLines,
   receiptLinks,
@@ -25,7 +26,7 @@ import {
   trips,
 } from '@/db/schema'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
-import type { Purs, PursAnswer } from '@/purs/client'
+import type { Purs, PursAnswer, PursSpecification } from '@/purs/client'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
 import { readTaxReceipts } from '@/usecases/read-tax-receipts'
 import { claimReceiptNotices } from '@/usecases/tell-receipts'
@@ -113,10 +114,22 @@ const found = (over: Partial<Extract<PursAnswer, { kind: 'found' }>> = {}): Purs
   ...over,
 })
 
-function office(...answers: PursAnswer[]): Purs & { asked: string[] } {
+/** The tax office; its specification is not asked unless a test hands it answers (MOL-234). */
+function office(...answers: PursAnswer[]): Purs & {
+  asked: string[]
+  specs: PursSpecification[]
+  specified: ReturnType<typeof vi.fn<Purs['specification']>>
+} {
   const asked: string[] = []
+  const specs: PursSpecification[] = []
+  const specification = vi.fn<Purs['specification']>(() =>
+    Promise.resolve(specs.shift() ?? { kind: 'skipped' }),
+  )
   return {
     asked,
+    specs,
+    specification,
+    specified: specification,
     receipt: vi.fn((url: string) => {
       asked.push(url)
       const answer = answers.shift() ?? found()
@@ -137,13 +150,14 @@ function round(purs: Purs): Promise<number> {
     receipts: repository,
     purs,
     report: (event) => reports.push(event),
-    bind: (claimed, lines) =>
+    bind: (claimed, lines, codes) =>
       bindReceiptLines(
         { items: createItemRepository(db), embedder: NO_EMBEDDER },
         claimed.actorId,
         claimed.country,
         claimed.language,
         lines,
+        codes,
       ),
   })
 }
@@ -766,5 +780,87 @@ describe('how the link came (MOL-234, owner’s В-3 «а» of MOL-233)', () => 
     await expect(
       db.update(receipts).set({ source: 'photo', parts: 1, via: 'qr' }).where(eq(receipts.id, id)),
     ).rejects.toThrow()
+  })
+})
+
+describe('the codes of the lines, from the specification (MOL-234, owner’s В-1 «а»)', () => {
+  const CODE = '8601234567899'
+  const spec = (gtins: readonly string[], totals = [18_998, 29_639]): PursSpecification => ({
+    kind: 'found',
+    items: totals.map((totalHundredths, at) => ({ totalHundredths, gtin: gtins[at] ?? '' })),
+  })
+  const codes = async (id: string) =>
+    (
+      await db
+        .select({ gtin: receiptLines.gtin })
+        .from(receiptLines)
+        .where(eq(receiptLines.receiptId, id))
+        .orderBy(receiptLines.position)
+    ).map((line) => line.gtin)
+
+  it('keeps the code the shop passed on its line, and counts the specification and the line', async () => {
+    const me = await serb()
+    const id = await taken(me)
+    const purs = office()
+    purs.specs.push(spec([CODE, '']))
+    await round(purs)
+    expect(await row(id)).toMatchObject({ status: 'parsed' })
+    expect(await codes(id)).toEqual([CODE, null])
+    expect(await taxDay()).toEqual({ sentUnnamed: 1, read: 1, specsOk: 1, linesCoded: 1 })
+  })
+
+  it('a specification refused or out of step gives no code, and the receipt is read all the same', async () => {
+    const me = await serb()
+    const refused = await taken(me)
+    const astray = await taken(me)
+    const purs = office()
+    purs.specs.push({ kind: 'failed' }, spec([CODE, ''], [18_998, 29_640]))
+    await round(purs)
+    expect(await row(refused)).toMatchObject({ status: 'parsed' })
+    expect(await row(astray)).toMatchObject({ status: 'parsed' })
+    expect(await codes(refused)).toEqual([null, null])
+    expect(await codes(astray)).toEqual([null, null])
+    expect(await taxDay()).toEqual({ sentUnnamed: 2, read: 2, specsFailed: 2 })
+  })
+
+  it('a shop’s own code and one that does not check are never kept', async () => {
+    const me = await serb()
+    const id = await taken(me)
+    const purs = office()
+    purs.specs.push(spec(['2100000000012', '8601234567891']))
+    await round(purs)
+    expect(await codes(id)).toEqual([null, null])
+    expect(await taxDay()).toMatchObject({ specsOk: 1 })
+    expect(await taxDay()).not.toHaveProperty('linesCoded')
+  })
+
+  it('a line whose code an item holds is bound to that item, before the search', async () => {
+    const me = await serb()
+    const sugar = await insertItem(db, {
+      name: 'Сахар Sunoko 1 кг',
+      searchKey: toSearchKey('Сахар Sunoko 1 кг'),
+    })
+    await db.insert(itemBarcodes).values({ code: CODE, itemId: sugar })
+    const id = await taken(me)
+    const purs = office()
+    purs.specs.push(spec([CODE, '']))
+    await round(purs)
+    const [first] = await db
+      .select({ itemId: receiptLines.itemId, match: receiptLines.match })
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+      .orderBy(receiptLines.position)
+    expect(first).toEqual({ itemId: sugar, match: 'search' })
+  })
+
+  it('the specification asked with the receipt’s own number and person', async () => {
+    const me = await serb()
+    const url = link()
+    await taken(me, url)
+    const purs = office()
+    await round(purs)
+    const signed = serbianReceiptLink(url)
+    expect(signed.ok && signed.number).toBeTruthy()
+    expect(purs.specified).toHaveBeenCalledWith(url, signed.ok ? signed.number : '', me.id)
   })
 })

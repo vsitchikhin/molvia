@@ -10,7 +10,10 @@ import type { ItemRepository } from '@/db/items-repository'
  * It writes nothing: not the event log, and not the memory of picks — a code is not a query, and
  * an item taken by its code teaches the search no word for it.
  */
-export async function findByBarcode(items: ItemRepository, code: string): Promise<Item | null> {
+export async function findByBarcode(
+  items: Pick<ItemRepository, 'byBarcode'>,
+  code: string,
+): Promise<Item | null> {
   // And in the form a write gives it (MOL-100, adversarial Р5-В): eight that check only as UPC-E
   // are written as their thirteen, and asked by the eight they were written from, the lookup found
   // nothing — a client that does not repeat the phone's rules must still find the package.
