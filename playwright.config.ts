@@ -90,17 +90,16 @@ export default defineConfig({
   // it is recorded for every test and dropped when it passes — measured at 12–22 % of a full run
   // (four pairs, 26.09.2026, ~66 s against ~59 s). And an overload that times a test out can
   // still lose it: it is saved while the context is torn down, which shares the test's timeout.
-  // In CI the first attempt's (MOL-217): `on-first-retry` recorded the retry, which a flake passes,
-  // and the failure the flake is about left only its message — four times, for one test. Without the
-  // screencast: in CI the run took 15.6 and 15.8 minutes with it, 13.2 without, against a median of 9.6
-  // with no trace; locally 2.1 against 1.9, with no trace or this one.
+  // In CI the retry's, which a flake passes: the first attempt's for every test cost the run some four
+  // to six minutes over its median of 9.6 (MOL-217, review С-6) — so a spec whose flake needs it records
+  // it itself, as `verdicts.spec` does.
   //
   // The phone is in Armenia (MOL-121): the app dates by the phone's calendar and the specs by
   // Yerevan's, and in CI's UTC the two part from 20:00 to midnight. The component tests run in UTC
   // and hold the phone's day where it is not Yerevan's.
   use: {
     baseURL,
-    trace: ci ? { mode: 'retain-on-first-failure', screenshots: false } : 'retain-on-failure',
+    trace: ci ? 'on-first-retry' : 'retain-on-failure',
     locale: 'en-US',
     timezoneId: 'Asia/Yerevan',
   },

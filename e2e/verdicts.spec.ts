@@ -4,6 +4,11 @@ import { expect, test } from '@playwright/test'
 import { asBrowser, goOffline, signedIn } from './session'
 import type { Page } from '@playwright/test'
 
+// The first attempt's trace in CI, the network and the DOM of each step with it: the flake of «…and the
+// app closed» failed four times there and left only its message, and the retry it passes is all
+// `on-first-retry` records (MOL-217). Here alone — for every spec it cost the run four to six minutes.
+if (process.env.CI) test.use({ trace: { mode: 'retain-on-first-failure', screenshots: false } })
+
 interface Person {
   readonly id: string
   call(method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown): Promise<unknown>

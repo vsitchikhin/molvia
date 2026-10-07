@@ -106,15 +106,16 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   retries to write one. It is recorded for every test and dropped when it passes, which costs
   12–22 % of a full local run (measured in four pairs); and under an overload that times a test
   out, the trace may still be lost: it is saved while the context is torn down, and that teardown
-  shares the test's timeout. **In CI the first attempt's** (`retain-on-first-failure`, MOL-217,
-  owner's В-2), uploaded from `test-results/` when the job fails: `on-first-retry` recorded the retry,
-  which a flake passes, and the artifact was `playwright-report/`, which the `github` reporter never
-  writes — a flake of `verdicts.spec` failed four times and left nothing but its message. **Without the
-  screencast** (owner's choice on review С-1). Measured in CI: a median of 9.6 minutes with no trace,
-  15.6 and 15.8 with the full one, 13.2 with this — the screencast is not the whole of the price there,
-  though locally it was (2.1 minutes against 1.9 with no trace or this one). The steps, the DOM before
-  and after each, the network and the console stay — what tells a request that left from one that
-  never did.
+  shares the test's timeout. **In CI the retry's, and the first attempt's only where a spec asks
+  for it** (MOL-217, owner's choice on review С-6): `on-first-retry` records the retry, which a flake
+  passes, and the failure itself leaves only its message — `verdicts.spec` failed four times so.
+  Recorded for every test, the first attempt's cost the run four to six minutes over its median of 9.6
+  (15.6 and 15.8 with the screencast, 13.2 and 15.5 without), so a spec that needs it says
+  `test.use({ trace: { mode: 'retain-on-first-failure', screenshots: false } })` under `CI`, as
+  `verdicts.spec` does. Not without the DOM of each step: Playwright records the network only with
+  those snapshots, and the network — which request left and how it ended — is what a flake's trace is
+  for. Whatever there is goes up from `test-results/` when the job fails; the artifact used to be
+  `playwright-report/`, which the `github` reporter never writes.
 - **The dev server optimizes every package on its start, never in the middle of a run** (MOL-217):
   what only a worker imports stands in `optimizeDeps.include` of `vite.config.ts`, held by
   `optimizeDeps.test.ts`. Vite's first crawl reads the pages and never a worker, so `zxing-wasm` was
