@@ -596,7 +596,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The review is the server's reading with the phone's draft over it** (MOL-127): the arithmetic
   is the model's (В-6), «Записать» sends the whole receipt under a trip the phone names through the
   queue, and `router.replace` gives way to the purchases.
-- **A Serbian receipt is its link, asked of the tax office by the server** (MOL-232): `vl` checked by
+- **A Serbian receipt is its link, asked of the tax office by the server** (MOL-232): the phone reads the
+  QR off the photo in a worker of its own and sends only the link, the photo let go (MOL-233); `vl` checked by
   one function on both sides — MD5, a sale only; one JSON ask, the journal's lines; a queue of its own,
   people in turn, twelve a minute and four a person, a receipt not shown yet asked again for 48 hours;
   the link kept only until answered, in a table the nightly copy leaves out; a failure keeps the head
