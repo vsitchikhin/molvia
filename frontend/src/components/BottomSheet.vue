@@ -28,6 +28,12 @@
       <div v-if="$slots.footer" class="footer">
         <slot name="footer" />
       </div>
+
+      <div class="region" role="status">
+        <p v-for="announcement in announcements" :key="announcement.id">
+          {{ announcement.text }}
+        </p>
+      </div>
     </div>
   </dialog>
 </template>
@@ -39,6 +45,7 @@ import { useI18n } from 'vue-i18n'
 import IconBack from '~icons/mdi/chevron-left'
 import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetDrag } from '@/composables/useSheetDrag'
 import { closeStateStrip } from '@/composables/useStateStrip'
@@ -93,6 +100,10 @@ export default defineComponent({
     const { t } = useI18n()
     // An error in the sheet keeps its buttons here: the strip under it is the screen's.
     closeStateStrip()
+    // Words said inside the sheet are said here: the app's region is outside the modal dialog,
+    // inert while it is open, and nothing in it is read (MOL-181, feedback С-10). There from the
+    // opening — a region born with its words is often not read.
+    const announcements = provideAnnouncer()
     const dialog = ref<HTMLDialogElement | null>(null)
     const titleId = useId()
 
@@ -312,6 +323,7 @@ export default defineComponent({
     expose({ close })
     return {
       t,
+      announcements,
       dialog,
       titleId,
       dragging: drag.dragging,
@@ -424,6 +436,10 @@ export default defineComponent({
   gap: var(--space-4);
   padding: var(--space-4) calc(var(--space-4) + var(--safe-right))
     calc(var(--space-8) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
+}
+
+.region {
+  @include visually-hidden;
 }
 
 .head {

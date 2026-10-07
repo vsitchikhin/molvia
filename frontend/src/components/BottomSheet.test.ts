@@ -6,6 +6,8 @@ import type { Router } from 'vue-router'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import BottomSheet from '@/components/BottomSheet.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { pageAnchor } from '@/composables/useSheetHistory'
 import { routes } from '@/router'
 
@@ -1524,5 +1526,62 @@ describe('pulled down', () => {
     expect(dialog().open).toBe(true)
     expect(dialog().style.transform).toBe('')
     expect(dialog().style.getPropertyValue('--sheet-drag')).toBe('')
+  })
+})
+
+// The app's live region is outside the modal dialog, inert while the sheet is open: words said
+// there by a block inside the sheet were never read (MOL-181, feedback С-10).
+describe('words said inside the sheet', () => {
+  async function renderSpeaking() {
+    const router: Router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/')
+    const offline = ref(false)
+    const host = mount(
+      defineComponent({
+        setup() {
+          const app = provideAnnouncer()
+          return () => [
+            h(
+              'div',
+              { class: 'app-region' },
+              app.value.map((a) => h('p', a.text)),
+            ),
+            h(
+              BottomSheet,
+              { open: true },
+              {
+                title: () => 'Сверка',
+                default: () =>
+                  offline.value
+                    ? h(StatusStrip, { kind: 'offline', text: 'Без связи · остаток на 14:05' })
+                    : h('p', 'Остаток'),
+              },
+            ),
+          ]
+        },
+      }),
+      { attachTo: document.body, global: { plugins: [router, createAppI18n('en')] } },
+    )
+    wait(1000)
+    await realTime()
+    return { host, offline }
+  }
+
+  it('has a region of its own from the opening, empty until something speaks', async () => {
+    const { host } = await renderSpeaking()
+    const region = host.get('dialog .region')
+    expect(region.attributes('role')).toBe('status')
+    expect(region.text()).toBe('')
+  })
+
+  it('says them in its own region, not in the app’s', async () => {
+    const { host, offline } = await renderSpeaking()
+    offline.value = true
+    await vi.waitFor(() => {
+      expect(host.get('dialog .region').text()).toBe('Без связи · остаток на 14:05')
+    })
+    expect(host.get('.app-region').text()).toBe('')
+    // And no role of its own beside the region: one voice.
+    expect(host.get('.strip').attributes('role')).toBeUndefined()
   })
 })
