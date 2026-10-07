@@ -118,8 +118,8 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
 
-      # The traces of the first attempts that failed (MOL-217): the `github` reporter writes no
-      # `playwright-report/`, so a flake left nothing here but its message.
+      # The traces CI records — a retry's, and the first attempt's where a spec asks for it (MOL-217):
+      # the `github` reporter writes no `playwright-report/`, so a flake left nothing here but its message.
       - if: failure()
         uses: actions/upload-artifact@v7
         with:
