@@ -72,6 +72,35 @@ const REPORT: GatesReport = {
     within1d: 5,
     later: 1,
   },
+  taxReceipts: {
+    firstDay: '2026-10-05',
+    lastDay: '2026-11-20',
+    sentQr: 5,
+    sentQrMissed: 1,
+    sentPaste: 1,
+    sentPasteMissed: 2,
+    sentUnnamed: 0,
+    read: 7,
+    missing: 1,
+    invalid: 0,
+    unreadable: 0,
+    specsOk: 4,
+    specsFailed: 3,
+    linesCoded: 1,
+    recorded: 6,
+    lines: 41,
+    linesEdited: 3,
+    linesSkipped: 1,
+    linesItem: 2,
+    linesFigures: 0,
+    totalsCorrected: 0,
+    codesWritten: 1,
+    within5m: 2,
+    within15m: 2,
+    within1h: 1,
+    within1d: 1,
+    later: 0,
+  },
 }
 
 function run(argv: string[], report: GatesReport | Error = REPORT) {
@@ -134,6 +163,40 @@ describe('gates — чтение ворот вручную', () => {
     const edited = lines.find((line) => line.includes('lines put right'))
     expect(edited).toContain('1000 of 3000')
     expect(edited).toContain('33.4 %')
+  })
+
+  it('чеки налоговой — своим блоком, мера OCR их не видит (MOL-234)', async () => {
+    const { exit, lines } = run(['--from', '2026-10-05'], {
+      ...REPORT,
+      receipts: { ...REPORT.receipts, recorded: 0, lines: 0, linesEdited: 0 },
+    })
+    await exit
+    const ocr = lines.findIndex((line) => line.startsWith('0.2r does the scanner'))
+    const tax = lines.findIndex((line) => line.startsWith('0.2r · the Serbian tax office'))
+    expect(ocr).toBeGreaterThan(0)
+    expect(tax).toBeGreaterThan(ocr)
+    // the reader's share is its own: the tax office's 3 of 41 never reach it
+    expect(lines.slice(ocr, tax).find((line) => line.includes('lines put right'))).toContain(
+      '0 of 0',
+    )
+    expect(lines.slice(tax).find((line) => line.includes('lines put right'))).toContain('3 of 41')
+    expect(lines[tax]).not.toContain('stop above')
+  })
+
+  it('чеки налоговой без единого — нули и прочерк вместо доли спецификации (MOL-234)', async () => {
+    const zero = Object.fromEntries(
+      Object.keys(REPORT.taxReceipts).map((key) => [key, 0]),
+    ) as unknown as GatesReport['taxReceipts']
+    const { exit, lines } = run(['--from', '2026-10-05'], {
+      ...REPORT,
+      taxReceipts: { ...zero, firstDay: '2026-10-05', lastDay: '2026-11-20' },
+    })
+    await exit
+    const block = lines.slice(lines.findIndex((line) => line.startsWith('0.2r · the Serbian')))
+    expect(block.find((line) => line.includes('specification answered'))).toBe(
+      '     specification answered              0 of 0     —',
+    )
+    expect(block.find((line) => line.includes('links sent'))).toContain('0 ')
   })
 
   it('чеки без единого — нули и прочерк вместо доли (MOL-222)', async () => {
@@ -282,6 +345,33 @@ describe('gates — чтение ворот вручную', () => {
       '       1 hour                            4',
       '       1 day                             5',
       '       later                             1',
+      '',
+      "0.2r · the Serbian tax office                       no stop: the lines are the tax office's",
+      '     links sent                          9          days 2026-10-05 … 2026-11-20 in Yerevan',
+      '       QR read by the app                5',
+      '       QR read after a miss              1',
+      '       pasted after the camera missed    2          the QR did not read',
+      '       pasted with no shot               1',
+      '       not named                         0          a phone of an earlier build',
+      '     receipts asked                      8',
+      '       with their lines                  7',
+      '       not shown in 48 hours             1',
+      '       refused by the tax office         0',
+      '       unreadable                        0',
+      '     specification answered              4 of 7      57.1 %',
+      '       lines with a code                 1',
+      '     receipts recorded                   6',
+      '     lines put right                     3 of 41      7.4 %',
+      '       left out                          1',
+      '       another item                      2          the matcher missed',
+      '       quantity or sum                   0',
+      '     total put right                     0          receipts',
+      '     codes bound to items                1',
+      '     sent to recorded, within 5 min      2          receipts',
+      '       15 min                            2',
+      '       1 hour                            1',
+      '       1 day                             1',
+      '       later                             0',
     ])
     expect(lines.join('\n')).not.toMatch(/STOP|pass|fail/)
   })
