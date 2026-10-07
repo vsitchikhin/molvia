@@ -37,6 +37,10 @@
           {{ t('privacy.title') }}<IconChevron aria-hidden="true" />
         </RouterLink>
       </nav>
+      <AppCard class="statistics">
+        <p class="statistics-title">{{ t('consent.statistics.title') }}</p>
+        <p class="statistics-text">{{ t('consent.statistics.text') }}</p>
+      </AppCard>
       <label class="age">
         <input v-model="consent.aged" type="checkbox" />
         <span>{{ t('consent.age') }}</span>
@@ -125,6 +129,11 @@ type Way = 'logout' | 'erase'
  * **The age is its own act** (owner's decision В-3): «Принимаю» is inactive until «Мне 16 лет или
  * больше» is ticked, and nothing of the age is sent or kept — the edition accepted says it, its
  * terms name the age.
+ *
+ * **The consent to the statistics is shown on the step itself** (MOL-236, owner's decision В-2), apart
+ * from the rest of the text, as Georgia's art. 32 asks of a consent: the visit marks and the count of
+ * ratings rest on it, and «Учитывать меня в статистике» is its withdrawal (MOL-97, В-7). No box of its
+ * own: an unticked one would empty the gates, a ticked one is no consent at all.
  *
  * **«Не принимаю» shows the account is already there** (В-4): the bot made it at the login, and an
  * older owner has everything they recorded in it. So the way out is the person's choice of the two
@@ -217,12 +226,14 @@ export default defineComponent({
   text-align: left;
 }
 
-.changes-title {
+.changes-title,
+.statistics-title {
   margin: 0;
   font-weight: var(--weight-medium);
 }
 
-.changes-text {
+.changes-text,
+.statistics-text {
   margin: var(--space-1) 0 0;
   color: var(--text-muted);
   font-size: var(--text-callout);

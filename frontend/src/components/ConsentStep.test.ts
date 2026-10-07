@@ -134,6 +134,28 @@ describe('«Условия и приватность» (MOL-95)', () => {
     expect(login.closed).toBe(false)
   })
 
+  it('a newcomer sees the consent to the statistics on the step, and no «what changed» (MOL-236, В-2)', async () => {
+    const { view } = await render()
+    expect(view.get('.statistics').text()).toContain(en.consent.statistics.title)
+    expect(view.get('.statistics').text()).toContain(en.consent.statistics.text)
+    // The switch that withdraws it is named by its own words.
+    expect(en.consent.statistics.text).toContain(`«${en.settings.analytics.label}»`)
+    expect(view.find('.changes').exists()).toBe(false)
+  })
+
+  it('whoever accepted edition 1 is told what changed in 2, and sees the statistics too', async () => {
+    consent.mockResolvedValue({ version: 1 })
+    const { view } = await render()
+    expect(view.text()).toContain(en.consent.updated.title)
+    expect(view.get('.changes').text()).toContain(en.consent.changes['2'])
+    expect(view.get('.statistics').text()).toContain(en.consent.statistics.text)
+
+    await view.get('input[type="checkbox"]').setValue(true)
+    await button(view, en.consent.accept).trigger('click')
+    await flushPromises()
+    expect(acceptConsent).toHaveBeenCalledWith(2)
+  })
+
   it('sends nothing of the age: the edition alone is the answer', async () => {
     const { view } = await render()
     await view.get('input[type="checkbox"]').setValue(true)
