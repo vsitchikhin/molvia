@@ -5,7 +5,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor } from './fixtures'
+import { clearAll, insertCounted } from './fixtures'
 import { createGatesReader } from '@/db/gates-reader'
 import { erasures, loginDays, receiptDays, reminderDays, taxReceiptDays } from '@/db/schema'
 
@@ -28,16 +28,29 @@ afterAll(async () => {
 describe('the gates reader', () => {
   it('reads both gates over one window, with the moment they were judged by', async () => {
     const before = Date.now()
-    await insertActor(db, { createdAt: new Date(Date.now() - 40 * DAY) })
-    await insertActor(db, {
+    await insertCounted(db, { createdAt: new Date(Date.now() - 40 * DAY) })
+    await insertCounted(db, {
       createdAt: new Date(Date.now() - 10 * DAY),
       sharedUntil: new Date(Date.now() + 30 * DAY),
     })
 
     const report = await reader.read(window)
 
-    expect(report.ratings).toEqual({ cohortSize: 1, reached: 0, pending: 1, optedOut: 0 })
-    const waiting = { cohortSize: 0, returned: 0, pending: 1, withoutAccess: 1, optedOut: 0 }
+    expect(report.ratings).toEqual({
+      cohortSize: 1,
+      reached: 0,
+      pending: 1,
+      withoutConsent: 0,
+      optedOut: 0,
+    })
+    const waiting = {
+      cohortSize: 0,
+      returned: 0,
+      pending: 1,
+      withoutAccess: 1,
+      withoutConsent: 0,
+      optedOut: 0,
+    }
     expect(report.products).toEqual(waiting)
     expect(report.venues).toEqual(waiting)
     expect(report.erased.count).toBe(0)

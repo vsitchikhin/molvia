@@ -15,8 +15,8 @@ import { calendarDay } from '@/days'
  */
 export const POLICY_REVISION = {
   day: '2026-10-07',
-  version: 1,
-  digest: 'febfa4a610de04e4341ce773d928f93e4a8b10d719ff2be58269540e8a98a695',
+  version: 2,
+  digest: '9988e4ecc58d9e6f13f37dae47893eb0e6d604a6edad030a38517b2ce6197fbe',
 } as const
 
 // Which parts each page shows, in order — here and not in the pages, so the fingerprint holds them
@@ -43,7 +43,29 @@ export const PRIVACY_STORED = [
   'settings',
   'consent',
 ] as const
+/** Who the data goes to (MOL-236): a new recipient is a line here and a new edition. */
+export const PRIVACY_RECIPIENTS = [
+  'people',
+  'telegram',
+  'contabo',
+  'cloudflare',
+  'open_food_facts',
+  'serbian_tax',
+  'nobody',
+] as const
+
+/**
+ * The parts of «Данные и приватность», in order. Two of them are lists, drawn as cards of terms
+ * (`PRIVACY_LISTS`); the rest are a title and a text. The basis stands right after the list of what
+ * is kept, since art. 10 of Armenia's law asks of them together (MOL-236); the rights, the
+ * authorities and a breach close the page — what is looked for when something went wrong.
+ */
 export const PRIVACY_PARTS = [
+  'operator',
+  'stored',
+  'bases',
+  'statistics',
+  'recipients',
   'logs',
   'failures',
   'backups',
@@ -52,7 +74,15 @@ export const PRIVACY_PARTS = [
   'storage',
   'copy',
   'erase',
+  'inactive',
+  'rights',
+  'complaints',
+  'breach',
 ] as const
+export const PRIVACY_LISTS: Partial<Record<(typeof PRIVACY_PARTS)[number], readonly string[]>> = {
+  stored: PRIVACY_STORED,
+  recipients: PRIVACY_RECIPIENTS,
+}
 export const TERMS_PARTS = [
   'what',
   'who',
@@ -66,7 +96,11 @@ export const TERMS_PARTS = [
   'contact',
 ] as const
 
-/** «Редакция от 6 октября 2026 г.» — the subtitle of both pages. */
+/**
+ * «Редакция 2 от 7 октября 2026 г.» — the subtitle of both pages. The edition is named beside the day
+ * (MOL-236, adversarial Р4-А1): two editions may be revised on one day, and the day alone would put one
+ * subtitle over two texts a person was asked to accept.
+ */
 export function revisedOn(
   t: (key: string, values: Record<string, string>) => string,
   locale: string,
@@ -76,5 +110,5 @@ export function revisedOn(
     month: 'long',
     year: 'numeric',
   })
-  return t('policy.revised', { day })
+  return t('policy.revised', { version: String(POLICY_REVISION.version), day })
 }

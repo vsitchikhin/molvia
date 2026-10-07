@@ -18,8 +18,8 @@ import { TERMS_PARTS, revisedOn } from '@/views/policy'
  * «Условия использования» (MOL-95, owner's decision В-2): the rules of the service beside the page
  * about data, one edition for the two — the age of 16 is here. Static and open without a session, as
  * «Данные и приватность» is, for the same reason: it is read before saying yes to it, from the
- * consent screen behind the closed door. The text is a draft until the hour with the lawyer
- * (MOL-97), and what it says then is a new edition.
+ * consent screen behind the closed door. There is no lawyer (MOL-97, В-1): edition 2 (MOL-236) names
+ * the operator by name, as art. 10 of Armenia's law asks.
  */
 export default defineComponent({
   name: 'TermsView',

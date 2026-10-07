@@ -13,7 +13,15 @@ import { z } from 'zod'
  * not exist yet. Which edition to ask about is the phone's (Р-3): the person accepts the text they
  * are shown, and that is the text of their build.
  */
-export const POLICY_VERSION = 1
+export const POLICY_VERSION = 2
+
+/**
+ * The first edition whose text asks consent to the statistics (MOL-236): Armenia's law knows no
+ * legitimate interest (art. 8), so the visit log is written, and the gates count a person, only once
+ * they accepted it — and while «Учитывать меня в статистике» is on. Who accepted an older edition (a
+ * build not yet updated) or none is neither written nor counted.
+ */
+export const STATISTICS_CONSENT_EDITION = 2
 
 /**
  * `GET` and the answer of `PUT /actors/me/consent` (MOL-95): the edition this person accepted, or

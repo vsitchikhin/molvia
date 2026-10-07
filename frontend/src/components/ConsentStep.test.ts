@@ -8,6 +8,7 @@ import { actorCodec, ERROR, POLICY_VERSION } from '@molvia/model'
 import type { ActorView, Consent } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
+import ru from '@/i18n/ru.json'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
@@ -132,6 +133,31 @@ describe('«Условия и приватность» (MOL-95)', () => {
 
     expect(acceptConsent).toHaveBeenCalledWith(POLICY_VERSION)
     expect(login.closed).toBe(false)
+  })
+
+  it('a newcomer sees the consent to the statistics on the step, and no «what changed» (MOL-236, В-2)', async () => {
+    const { view } = await render()
+    expect(view.get('.statistics').text()).toContain(en.consent.statistics.title)
+    expect(view.get('.statistics').text()).toContain(en.consent.statistics.text)
+    // The switch that withdraws it is named by its own words.
+    expect(en.consent.statistics.text).toContain(`«${en.settings.analytics.label}»`)
+    expect(view.find('.changes').exists()).toBe(false)
+  })
+
+  it('whoever accepted edition 1 is told what changed in 2, and sees the statistics too', async () => {
+    consent.mockResolvedValue({ version: 1 })
+    const { view } = await render()
+    expect(view.text()).toContain(en.consent.updated.title)
+    expect(view.get('.changes').text()).toContain(en.consent.changes['2'])
+    // It is told what edition 1 told it wrong: the catalogue and a receipt's word have no threshold (Р3-А1).
+    expect(en.consent.changes['2']).toMatch(/with no threshold/)
+    expect(ru.consent.changes['2']).toMatch(/без имени, но и без порога/)
+    expect(view.get('.statistics').text()).toContain(en.consent.statistics.text)
+
+    await view.get('input[type="checkbox"]').setValue(true)
+    await button(view, en.consent.accept).trigger('click')
+    await flushPromises()
+    expect(acceptConsent).toHaveBeenCalledWith(2)
   })
 
   it('sends nothing of the age: the edition alone is the answer', async () => {
