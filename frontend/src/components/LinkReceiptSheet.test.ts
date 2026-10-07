@@ -236,7 +236,7 @@ describe('the QR code read off the photo (MOL-233)', () => {
     expect(button(sheet, en.receipt.qr.retake)).toBeDefined()
     await button(sheet, en.receipt.qr.paste)?.trigger('click')
     await flushPromises()
-    expect(field(sheet).exists()).toBe(true)
+    expect(sheet.find('input[type="text"]').exists()).toBe(true)
     expect(sheet.emitted('update:open')).toBeUndefined()
   })
 
