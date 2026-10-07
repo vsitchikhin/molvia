@@ -1,11 +1,11 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { sql } from 'drizzle-orm'
-import { EVENT } from '@molvia/model'
+import { eq, sql } from 'drizzle-orm'
+import { EVENT, STATISTICS_CONSENT_EDITION } from '@molvia/model'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor } from './fixtures'
+import { clearAll, insertActor, insertCounted } from './fixtures'
 import { createEventRepository } from '@/db/events-repository'
 import type { Conn } from '@/db/index'
-import { events } from '@/db/schema'
+import { actors, events } from '@/db/schema'
 
 const { db, close } = connectDrizzle()
 const repository = createEventRepository(db)
@@ -39,7 +39,7 @@ afterAll(async () => {
  * is what kept the gate's own defect hidden (adversarial round 1, F2).
  */
 async function actorSeenAt(started: Date): Promise<string> {
-  return insertActor(db, {
+  return insertCounted(db, {
     createdAt: started,
     sharedUntil: new Date(started.getTime() + 40 * DAY),
   })
@@ -52,6 +52,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
@@ -70,6 +71,7 @@ describe('week-four return', () => {
       returned: 1,
       pending: 0,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
@@ -88,6 +90,7 @@ describe('week-four return', () => {
       returned: 1,
       pending: 0,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
@@ -95,6 +98,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
@@ -121,6 +125,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
@@ -141,6 +146,7 @@ describe('week-four return', () => {
       returned: 1,
       pending: 0,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
@@ -162,6 +168,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
@@ -178,6 +185,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
@@ -186,13 +194,14 @@ describe('week-four return', () => {
     // The numerator is behind a paid door, so a denominator of everyone who ever appeared
     // counts people who could not have produced an event at all, and the threshold reads
     // «stop» for a reason unrelated to the hypothesis (adversarial round 2, G1).
-    await insertActor(db, { createdAt: daysAgo(35) })
+    await insertCounted(db, { createdAt: daysAgo(35) })
 
     await expect(repository.weekFourReturn('product', from, to)).resolves.toEqual({
       cohortSize: 0,
       returned: 0,
       pending: 0,
       withoutAccess: 1,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
@@ -201,11 +210,11 @@ describe('week-four return', () => {
     // Exactly the boundary: the fourth week opens at 504 hours, so access ending an hour
     // earlier is access they never had when the question was asked.
     const started = daysAgo(35)
-    await insertActor(db, {
+    await insertCounted(db, {
       createdAt: started,
       sharedUntil: new Date(started.getTime() + 503 * HOUR),
     })
-    await insertActor(db, {
+    await insertCounted(db, {
       createdAt: started,
       sharedUntil: new Date(started.getTime() + 504 * HOUR),
     })
@@ -215,6 +224,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 1,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
@@ -233,6 +243,7 @@ describe('week-four return', () => {
       returned: 0,
       pending: 0,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
@@ -260,6 +271,7 @@ describe('week-four return: a fourth week not over is no answer yet (MOL-91)', (
       returned: 0,
       pending: 1,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
@@ -272,6 +284,7 @@ describe('week-four return: a fourth week not over is no answer yet (MOL-91)', (
       returned: 0,
       pending: 1,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
@@ -291,6 +304,7 @@ describe('week-four return: a fourth week not over is no answer yet (MOL-91)', (
       returned: 1,
       pending: 1,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
@@ -298,14 +312,15 @@ describe('week-four return: a fourth week not over is no answer yet (MOL-91)', (
   it('names a newcomer without access as waiting: access may still be granted (adversarial А)', async () => {
     // Time first, access after. Judged by today's access, a person three days old read «no
     // access in week 4» eighteen days before that week, and moved the day access was granted.
-    const newcomer = await insertActor(db, { createdAt: hoursAgo(72) })
-    await insertActor(db, { createdAt: hoursAgo(100), sharedUntil: hoursAgo(1) })
+    const newcomer = await insertCounted(db, { createdAt: hoursAgo(72) })
+    await insertCounted(db, { createdAt: hoursAgo(100), sharedUntil: hoursAgo(1) })
 
     await expect(gate()).resolves.toEqual({
       cohortSize: 0,
       returned: 0,
       pending: 2,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
 
@@ -317,21 +332,46 @@ describe('week-four return: a fourth week not over is no answer yet (MOL-91)', (
       returned: 0,
       pending: 2,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 0,
     })
   })
 
   it('names as without access only a fourth week that is over — the three never overlap', async () => {
-    await insertActor(db, { createdAt: hoursAgo(700) }) // over, never had access
-    await insertActor(db, { createdAt: hoursAgo(700), sharedUntil: hoursAgo(700 - 503) })
+    await insertCounted(db, { createdAt: hoursAgo(700) }) // over, never had access
+    await insertCounted(db, { createdAt: hoursAgo(700), sharedUntil: hoursAgo(700 - 503) })
     await actorSeenAt(hoursAgo(700)) // over, with access: the cohort
-    await insertActor(db, { createdAt: hoursAgo(600) }) // still going, no access: waiting
+    await insertCounted(db, { createdAt: hoursAgo(600) }) // still going, no access: waiting
 
     await expect(gate()).resolves.toEqual({
       cohortSize: 1,
       returned: 0,
       pending: 1,
       withoutAccess: 2,
+      withoutConsent: 0,
+      optedOut: 0,
+    })
+  })
+})
+
+describe('week-four return: no consent to the statistics (MOL-236)', () => {
+  const hoursAgo = (hours: number) => new Date(Date.now() - hours * HOUR)
+  const gate = () => repository.weekFourReturn('product', daysAgo(60), new Date(Date.now() + DAY))
+
+  it('leaves out whoever has not accepted edition 2, after access, and names them', async () => {
+    await actorSeenAt(hoursAgo(700))
+    const old = await actorSeenAt(hoursAgo(700))
+    await db.update(actors).set({ consentVersion: 1 }).where(eq(actors.id, old))
+    await insertActor(db, { createdAt: hoursAgo(700), sharedUntil: new Date(Date.now() + DAY) })
+    // No access reached the fourth week: named there, not again here.
+    await insertActor(db, { createdAt: hoursAgo(700) })
+
+    await expect(gate()).resolves.toEqual({
+      cohortSize: 1,
+      returned: 0,
+      pending: 0,
+      withoutAccess: 1,
+      withoutConsent: 2,
       optedOut: 0,
     })
   })
@@ -366,6 +406,7 @@ describe('week-four return: an objection to being counted (MOL-96)', () => {
       returned: 1,
       pending: 0,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 1,
     })
   })
@@ -375,7 +416,12 @@ describe('week-four return: an objection to being counted (MOL-96)', () => {
     await cameBack(actorId)
     await repository.chooseAnalytics(actorId, true)
 
-    await expect(gate()).resolves.toMatchObject({ cohortSize: 0, returned: 0, optedOut: 1 })
+    await expect(gate()).resolves.toMatchObject({
+      cohortSize: 0,
+      returned: 0,
+      withoutConsent: 0,
+      optedOut: 1,
+    })
   })
 
   it('counts someone back on exactly as their fourth week began, and not a millisecond later (Р-3)', async () => {
@@ -391,6 +437,7 @@ describe('week-four return: an objection to being counted (MOL-96)', () => {
       returned: 1,
       pending: 0,
       withoutAccess: 0,
+      withoutConsent: 0,
       optedOut: 1,
     })
   })
@@ -399,13 +446,13 @@ describe('week-four return: an objection to being counted (MOL-96)', () => {
     const actorId = await actorSeenAt(hoursAgo(700))
     await backOnAt(actorId, '690 hours')
 
-    await expect(gate()).resolves.toMatchObject({ cohortSize: 0, optedOut: 1 })
+    await expect(gate()).resolves.toMatchObject({ cohortSize: 0, withoutConsent: 0, optedOut: 1 })
   })
 
   it('time first, access after, the objection last: each person on one line, the lines add up', async () => {
     const offAt = new Date()
-    await insertActor(db, { createdAt: hoursAgo(600), analyticsOffAt: offAt }) // waiting
-    await insertActor(db, { createdAt: hoursAgo(700), analyticsOffAt: offAt }) // no access
+    await insertCounted(db, { createdAt: hoursAgo(600), analyticsOffAt: offAt }) // waiting
+    await insertCounted(db, { createdAt: hoursAgo(700), analyticsOffAt: offAt }) // no access
     const objected = await actorSeenAt(hoursAgo(700))
     await db.execute(sql`update actors set analytics_off_at = now() where id = ${objected}::uuid`)
     await actorSeenAt(hoursAgo(700)) // the cohort
@@ -415,6 +462,7 @@ describe('week-four return: an objection to being counted (MOL-96)', () => {
       returned: 0,
       pending: 1,
       withoutAccess: 1,
+      withoutConsent: 0,
       optedOut: 1,
     })
   })
@@ -447,15 +495,32 @@ describe("recording at most once a day of the person's own life", () => {
   }
 
   it('writes the first one', async () => {
-    const actorId = await insertActor(db)
+    const actorId = await insertCounted(db)
 
     await expect(repository.recordOncePerDay(view(actorId))).resolves.toBe(true)
     expect(await viewsOf(actorId)).toHaveLength(1)
   })
 
+  it('writes nothing for whoever has not accepted edition 2 — the log rests on it (MOL-236)', async () => {
+    const nobody = await insertActor(db)
+    const old = await insertActor(db, { consentVersion: 1, consentedAt: new Date() })
+
+    await expect(repository.recordOncePerDay(view(nobody))).resolves.toBe(false)
+    await expect(repository.recordOncePerDay(view(old))).resolves.toBe(false)
+    expect(await viewsOf(nobody)).toHaveLength(0)
+    expect(await viewsOf(old)).toHaveLength(0)
+
+    // Accepted, the very next visit is written.
+    await db
+      .update(actors)
+      .set({ consentVersion: STATISTICS_CONSENT_EDITION })
+      .where(eq(actors.id, old))
+    await expect(repository.recordOncePerDay(view(old))).resolves.toBe(true)
+  })
+
   it('writes nothing more in the same day of their life', async () => {
     // Appeared ten days and three hours ago: today of their life began three hours ago.
-    const actorId = await insertActor(db, { createdAt: ago(10 * DAY + 3 * HOUR) })
+    const actorId = await insertCounted(db, { createdAt: ago(10 * DAY + 3 * HOUR) })
     await repository.record({ ...view(actorId), occurredAt: ago(10 * DAY + 3 * HOUR) })
     await repository.record({ ...view(actorId), occurredAt: ago(2 * HOUR) })
 
@@ -468,7 +533,7 @@ describe("recording at most once a day of the person's own life", () => {
     // morning in week four, and the gate saw a person who came back as one who did not.
     const started = ago(21 * DAY + HOUR) // week four of their life began an hour ago
     // With access, because only then is there a visit to write and a cohort to count them in.
-    const actorId = await insertActor(db, {
+    const actorId = await insertCounted(db, {
       createdAt: started,
       sharedUntil: new Date(started.getTime() + 40 * DAY),
     })
@@ -480,7 +545,14 @@ describe("recording at most once a day of the person's own life", () => {
     await lifeEarlier(db, actorId, 168)
     await expect(
       repository.weekFourReturn('product', ago(28 * DAY + 2 * HOUR), ago(28 * DAY)),
-    ).resolves.toEqual({ cohortSize: 1, returned: 1, pending: 0, withoutAccess: 0, optedOut: 0 })
+    ).resolves.toEqual({
+      cohortSize: 1,
+      returned: 1,
+      pending: 0,
+      withoutAccess: 0,
+      withoutConsent: 0,
+      optedOut: 0,
+    })
   })
 
   it('counts days and weeks the same in any time zone of the session', async () => {
@@ -509,7 +581,7 @@ describe("recording at most once a day of the person's own life", () => {
     async function scenario(zone: string, hour: number, withEvening: boolean) {
       await clearAll(db) // one person per reading, or the previous scenario's joins the cohort
       const started = ago(hour * HOUR)
-      const actorId = await insertActor(db, {
+      const actorId = await insertCounted(db, {
         createdAt: started,
         sharedUntil: new Date(started.getTime() + 40 * DAY),
       })
@@ -546,7 +618,7 @@ describe("recording at most once a day of the person's own life", () => {
   })
 
   it('keeps the product and venue halves apart', async () => {
-    const actorId = await insertActor(db)
+    const actorId = await insertCounted(db)
     await repository.record(view(actorId, 'product'))
 
     await expect(repository.recordOncePerDay(view(actorId, 'venue'))).resolves.toBe(true)
@@ -554,8 +626,8 @@ describe("recording at most once a day of the person's own life", () => {
   })
 
   it('must not be held back by another type or by another actor', async () => {
-    const actorId = await insertActor(db)
-    const someoneElse = await insertActor(db)
+    const actorId = await insertCounted(db)
+    const someoneElse = await insertCounted(db)
     await repository.record({ actorId, type: EVENT.SESSION_STARTED })
     await repository.record(view(someoneElse))
 
@@ -563,7 +635,7 @@ describe("recording at most once a day of the person's own life", () => {
   })
 
   it('writes one row when two requests overlap on two connections', async () => {
-    const actorId = await insertActor(db)
+    const actorId = await insertCounted(db)
     const one = connectDrizzle()
     const other = connectDrizzle()
     try {

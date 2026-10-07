@@ -184,9 +184,34 @@ The detail behind the privacy lines of `CLAUDE.md`.
   nothing without it** (Р-4): the basis of the purchases and ratings is the contract, the consent is
   its record, and a refusal would have reached the queue at the shelf and the bot to stop only
   `curl`. **The phone holds what the API does not** (adversarial А1): the queues of an owner who has
-  accepted no edition wait on the device until «Принимаю» (`auth.md`). The step itself is the door's (`auth.md`). The text is a draft: MOL-97 went
-  without a lawyer, and the second edition — the operator, the bases, the visit log named in the
-  consent, the authorities to complain to — is MOL-236.
+  accepted no edition wait on the device until «Принимаю» (`auth.md`). The step itself is the door's (`auth.md`).
+- **Edition 2 is the text of the consent art. 10 of Armenia's law asks for** (MOL-236, owner's
+  decisions 07.10.2026): there is no lawyer (MOL-97, В-1), «Принимаю» is taken for the «reliable act»
+  of art. 9 §7, so the text is whole. The page names **who is responsible** — Vladimir Sitchikhin,
+  Gyumri, by name and surname (В-1: «Vladimir S.» names nobody) and no address (В-6 of MOL-97) — **the
+  basis** of each thing (the contract, or the consent), **the operations**, **the recipients** as a
+  list — other people see the catalogue and the shops' memory with no access and no threshold, and the
+  list says so (А2) — **the rights** with their term and what cannot be edited (А3) (five working days for what the app does not do itself, the
+  strictest of the three laws), **the three authorities** by name and site, the two years of silence
+  (MOL-239), what a breach brings, the transfer to Germany. **The consent is held by the switch, not
+  by the tap**: «пока включено «Учитывать меня в статистике»» — true of whoever turned it off before
+  edition 2, since «Принимаю» does not touch the switch; it is shown on the step itself, apart from the
+  rest (В-2, Georgia's art. 32), with no box of its own — unticked it would empty the gates, ticked it is
+  no consent. **The server holds it too** (adversarial А1): no visit is written and neither gate counts
+  whoever has not accepted `STATISTICS_CONSENT_EDITION` — `advice.md`. **The card and «что изменилось»
+  are in the fingerprint** (А4): rewritten, they are the text agreed to; the step's buttons are not.
+  **The day counters with no id are named, not gated** (owner's 1-а on adversarial Р2-А2):
+  `login_days`, `receipt_days` and `reminder_days` count everyone, the switch off or no consent — a
+  press under a reminder too — and «Статистика» says so in a paragraph of its own; the strict reading's
+  price (counting is a use for another purpose) is in «Персональные данные», 2.1. **Telegram is named a
+  transfer abroad** with its basis — the sign-in and the bot are Telegram (owner's 2-а on review С-3);
+  that the Agency's permission for a country off its list was not asked is the price in 2.1. **A recipient is a line of `PRIVACY_RECIPIENTS`** (`policy.ts`, in the fingerprint), and a
+  new one is a new edition. **A known defect is named as it is** (В-3): MOL-240 and MOL-241 stand on
+  the page as «ошибка, исправляем» until fixed, and their lines go by a revision — a narrower processing
+  needs no new consent. **A breach is announced at the top of the page** by the key `privacy.notice`
+  (`title`, `text`), absent until then: a revision, not an edition, and its merge is the deploy
+  («Порядок при утечке», step 4). The subject's own name of art. 10 §2.1 cannot be given — none is
+  kept; the price is in «Персональные данные», 2.1.
 - **The record of processing is a page in Confluence, written from the code** (MOL-97,
   «Реестр обработки персональных данных», 12091393): a row per processing — the data, the purpose, the
   basis by country, the term and the constant or timer that holds it, who sees it, erasure and the
@@ -197,8 +222,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   load this file at all. **Armenia's law knows
   two bases only — consent or a law** (art. 8): there is no legitimate interest, so whatever the
   service does not need to work — the visit log, gate 0.2's count over verdicts — rests on
-  «Принимаю» **from edition 2** (MOL-236, before `v0.2.0`), whose text names it (art. 10); what stands
-  until then is in «Персональные данные», 2.1. **There is
+  «Принимаю» **from edition 2** (MOL-236), whose text names it (art. 10). **There is
   no lawyer** (owner's decision В-1, 05.10.2026): where the text reads two ways, the strict reading is
   taken and the risk named in 3244067, section 2.1; a lawyer is called on a complaint or a letter from
   an authority, a breach, money, a country beyond the three, or 1.0 (the brief is `.scratch/tasks/questions/MOL-97-lawyer.md`).
@@ -239,8 +263,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   fourteen; a restore brings the table back empty, and a receipt left without its link fails as
   `unreadable`. **The person's copy of their data leaves it out** too, with that reason
   (`EXPORT_COLUMNS`). `/privacy` says it under «Сербский чек по ссылке», a revision of edition 1: the
-  new recipient is named in the consent by edition 2 (MOL-236, owner's В-4 of MOL-232); before 0.2 only
-  the owner is on production. The record of processing (12091393) names Пореска управа among the third
+  new recipient is named in the consent by edition 2 (MOL-236, owner's В-4 of MOL-232) — «Налоговая
+  Сербии» among the recipients and in «что изменилось». The record of processing (12091393) names Пореска управа among the third
   parties.
 - **A receipt is read on our own server, and its photo lives days** (MOL-125, the owner's decisions of
   27.09 and 02.10.2026): Tesseract in `services/receipt-reader`, a container with no database, no

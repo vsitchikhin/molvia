@@ -344,7 +344,8 @@ export const actors = pgTable(
     /**
      * «Учитывать меня в статистике» (MOL-96): since when the person has objected to being counted —
      * the event log stops and its rows go, and neither gate counts them; empty is on, as every
-     * account starts, since the gates rest on a legitimate interest rather than on consent.
+     * account starts. From edition 2 (MOL-236) it is the consent to the statistics: the log is
+     * written and the gates count only while it is empty and that edition is accepted.
      */
     analyticsOffAt: timestamp('analytics_off_at', { withTimezone: true }),
     /**
