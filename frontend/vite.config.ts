@@ -120,9 +120,9 @@ export default defineConfig(({ mode }) => {
     // has no `map` — and a browser fetches one only with its tools open.
     build: { target: BROWSER_FLOOR, sourcemap: true },
     // What only a worker imports: the dev server's first crawl never reads a worker, so the package
-    // was found when the scanner first opened and optimized in the middle of an end-to-end run — which
-    // stood seconds before each of the four failures of `verdicts.spec` (MOL-217). Held by
-    // `optimizeDeps.test.ts`; the build does not read it.
+    // was found when the scanner first opened and optimized in the middle of a run, every page asking
+    // for a module then waiting on it (MOL-217). Held by `optimizeDeps.test.ts`; the build does not
+    // read it.
     optimizeDeps: { include: ['zxing-wasm/reader'] },
     resolve: { alias: { '@': src } },
     css: {

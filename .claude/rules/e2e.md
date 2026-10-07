@@ -122,20 +122,25 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
 - **The dev server optimizes every package on its start, never in the middle of a run** (MOL-217):
   what only a worker imports stands in `optimizeDeps.include` of `vite.config.ts`, held by
   `optimizeDeps.test.ts`. Vite's first crawl reads the pages and never a worker, so `zxing-wasm` was
-  found when the first spec of `camera` opened the scanner — while the last file of `phone`,
-  `verdicts.spec`, was running beside it. In each of the four failures of «…and the app closed» that
-  optimization stood seconds before the API received, with a 201, the rating made after
-  `setOffline(true)`; how the one led to the other was not shown — Vite logged no reload of the pages.
+  found when the first spec of `camera` opened the scanner — while the last file of `phone` was running
+  beside it — and the pages loading then waited on the optimizer. It stood seconds before four failures
+  of «…and the app closed» and was first taken for their cause; the fifth came without it (below).
   Locally the cache is warm, so it was never seen here; a run that wants to see it removes
   `frontend/node_modules/.vite/deps`.
-- **Offline, where a spec then says what the server did not get, is `goOffline`** (`e2e/session.ts`,
-  MOL-217): `setOffline` and then a request of the page that failed, so the offline is the page's
-  and not only the protocol's answer; and it closes the page only after the write it waits for failed
-  in the browser. Why a write went through after `setOffline` on the CI runner was not reproduced in
-  six probes here — two readings fit the log, a write that left before the offline took and one sent
-  only when the identity settled («сохранено» drawn before any request, `held` set by `flush()` while
-  the identity loads); both in `.scratch/tasks/status/MOL-217/readings.md`, and the next failure's
-  trace is what will say. The other specs with `setOffline` keep it as it is (owner's В-3): none failed.
+- **`setOffline` does not keep a request from the server; where a spec then says what the server did
+  not get, the offline is `goOffline`** (`e2e/session.ts`, MOL-217). The first attempt's trace of the
+  fifth failure (run 37619569005, no optimizer in it) showed it: the page had met the offline — a
+  request of its own failed and never reached the API — and 350 ms later the rating's `PUT` failed in
+  the page with `ERR_INTERNET_DISCONNECTED` in 5 ms, and the same `PUT` was written by the API, `201`.
+  Chromium's emulation on the runner, not the app: nothing else sends it, and the phone, told it
+  failed, keeps its draft as it should. Not reproduced in nine probes here. So `goOffline` is
+  `setOffline` — the page's `navigator.onLine` and its states — **and `page.route` refusing every
+  request of that page with `internetdisconnected`**: Playwright fails it before the network, and the
+  page sees the same error. That page only: a new one of the context is online when the context is.
+  The other specs with `setOffline` assert the phone's own state, or what went once the connection
+  came back — a request let through does not fail them, a `PUT` being safe to repeat — so they keep it
+  (owner's В-3); a spec that will say «the server did not get it» takes `goOffline`. The readings of
+  the four failures before, both refuted by the trace — `.scratch/tasks/status/MOL-217/readings.md`.
 - **Words that are said out loud are taken end-to-end by a locator outside the live region**
   (MOL-64). The app has one polite region, in `App.vue` above the router, and **eight things write
   to it**: `ScreenState` («title. body»), `ScreenSkeleton` («Loading…»), `ItemSearchView` (the

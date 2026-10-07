@@ -199,8 +199,8 @@ function packagesOf(entry: URL): Set<string> {
 }
 
 // The dev server's first crawl reads the pages, never a worker: a package only a worker imports is
-// found when the worker first starts and optimized in the middle of an end-to-end run. That stood
-// seconds before each of the four failures of `verdicts.spec` (MOL-217).
+// found when the worker first starts and optimized in the middle of an end-to-end run, the pages
+// loading then waiting on it (MOL-217).
 describe('optimizeDeps.include', () => {
   it('holds every package a worker imports', () => {
     const found = workers()
