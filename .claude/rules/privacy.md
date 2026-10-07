@@ -190,13 +190,16 @@ The detail behind the privacy lines of `CLAUDE.md`.
   of art. 9 §7, so the text is whole. The page names **who is responsible** — Vladimir Sitchikhin,
   Gyumri, by name and surname (В-1: «Vladimir S.» names nobody) and no address (В-6 of MOL-97) — **the
   basis** of each thing (the contract, or the consent), **the operations**, **the recipients** as a
-  list, **the rights** with their term (five working days for what the app does not do itself, the
+  list — other people see the catalogue and the shops' memory with no access and no threshold, and the
+  list says so (А2) — **the rights** with their term and what cannot be edited (А3) (five working days for what the app does not do itself, the
   strictest of the three laws), **the three authorities** by name and site, the two years of silence
   (MOL-239), what a breach brings, the transfer to Germany. **The consent is held by the switch, not
   by the tap**: «пока включено «Учитывать меня в статистике»» — true of whoever turned it off before
   edition 2, since «Принимаю» does not touch the switch; it is shown on the step itself, apart from the
   rest (В-2, Georgia's art. 32), with no box of its own — unticked it would empty the gates, ticked it is
-  no consent. **A recipient is a line of `PRIVACY_RECIPIENTS`** (`policy.ts`, in the fingerprint), and a
+  no consent. **The server holds it too** (adversarial А1): no visit is written and neither gate counts
+  whoever has not accepted `STATISTICS_CONSENT_EDITION` — `advice.md`. **The card and «что изменилось»
+  are in the fingerprint** (А4): rewritten, they are the text agreed to; the step's buttons are not. **A recipient is a line of `PRIVACY_RECIPIENTS`** (`policy.ts`, in the fingerprint), and a
   new one is a new edition. **A known defect is named as it is** (В-3): MOL-240 and MOL-241 stand on
   the page as «ошибка, исправляем» until fixed, and their lines go by a revision — a narrower processing
   needs no new consent. **A breach is announced at the top of the page** by the key `privacy.notice`

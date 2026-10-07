@@ -73,6 +73,8 @@ The log's writer, the cohort and both gate queries are pinned in `.claude/rules/
   Р-24) — approximate on purpose, erring towards «stop».
 - **The log does not outlive the person, nor their objection** (MOL-58, MOL-96): erasure and
   «Учитывать меня в статистике» turned off are the two written exceptions to append-only.
+- **The statistics rest on the consent of edition 2** (MOL-236, `STATISTICS_CONSENT_EDITION`): without
+  it «Что брать» writes no visit and neither gate counts the person, named in a line of its own.
 - **An objection takes a person out of both gates** (MOL-96): `actors.analytics_off_at`; off erases
   their log under its lock and «Что брать» writes nothing more; each gate names them in a line of its
   own, after time and access; back on counts in 0.3 only from before week four (`analytics_on_at`).
@@ -387,7 +389,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   with `created_by` nulled, every place stays, and one is added to `erasures` — a count by week of
   arrival, no id (MOL-91). **A new table that points at `actors` must join
   erasure** — a test holds `ACTOR_REFERENCES` to every foreign key — **and the record of processing**
-  (Confluence 12091393, MOL-97) in the same PR, as must a new recipient; nothing holds that one.
+  (Confluence 12091393, MOL-97) in the same PR, as must a new recipient; nothing holds that one —
+  **and a new recipient is a line of `PRIVACY_RECIPIENTS` and a new edition** (MOL-236).
 - **The copy is what erasure takes** (`GET /actors/me/export`, MOL-93): a section per erased table,
   counted against a dry run, **and every column exported or left out with its reason**
   (`EXPORT_COLUMNS`); stored, never counted; the removed marked; no secret.

@@ -92,7 +92,15 @@ personal data.
 данные», 5.1), so they are on for everyone and the person may object. **Armenia's law has no
 legitimate interest** (art. 8, MOL-97): from edition 2 of the terms (MOL-236) the log
 and the count over verdicts rest on the consent «Принимаю» names, and the switch is its withdrawal —
-the mechanics stay. The switch is «Учитывать меня в
+the mechanics stay. **Without that consent nothing is written or counted** (MOL-236, adversarial А1):
+`recordOncePerDay` writes a visit only for someone whose accepted edition is at least
+`STATISTICS_CONSENT_EDITION` and who is on, and both gates leave out whoever has not accepted it,
+after time and access and before the objection, printed as «no consent to the statistics». Who
+accepted edition 1 — an installed build not yet updated asks nothing — or none is neither written nor
+counted: the API still refuses nothing without consent (MOL-95, Р-4), it only does not log. Gate 0.2
+reads the consent at reading, so the verdicts already there count once it is given; gate 0.3 takes
+whoever has it now, and an edition accepted inside the fourth week left its first days unwritten — the
+gate errs towards «stop», as with access. The switch is «Учитывать меня в
 статистике», the first row of «Ваши данные», saved on the tap at `PUT /actors/me/analytics` with no
 sheet (В-3), as the bot's switches are. **The switch is drawn only as the server's answer**
 (adversarial А1, Р2-А1) — on «Бот» and «Зарплата» too, whose rows take the same quiet line
