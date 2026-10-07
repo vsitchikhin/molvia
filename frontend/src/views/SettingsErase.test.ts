@@ -155,6 +155,8 @@ describe('«Удалить мои данные» в настройках (MOL-94
     expect(words).toContain(en.erase.title)
     expect(words).toContain(en.erase.goes)
     expect(words).toContain(en.erase.stays)
+    // MOL-236: the shops' memory stays authorless, and the sheet says so as the page and the bot do.
+    expect(en.erase.stays).toMatch(/shops’ memory/)
     expect(words).toContain(en.erase.devices)
     expect(words).toContain(en.erase.final)
     expect(eraseMe).not.toHaveBeenCalled()
