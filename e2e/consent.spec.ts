@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { ACCEPT, AGE, DEV_SEAM } from './session'
+import { ACCEPT, AGE, DEV_SEAM, asBrowser } from './session'
 
 test.use({ reducedMotion: 'reduce' })
 
@@ -56,6 +56,34 @@ test('a newcomer accepts the terms once, with the age ticked, and comes in', asy
   await page.reload()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('What to buy')
   expect(asked).toBe(false)
+})
+
+test('whoever accepted edition 1 is asked again, told what changed in 2, and comes in (MOL-236)', async ({
+  page,
+}) => {
+  await newcomer(page)
+  // Edition 1 accepted as a phone of the build before would have: the server still takes it.
+  const old = await page.request.put('/api/actors/me/consent', {
+    headers: await asBrowser(page),
+    data: { version: 1 },
+  })
+  expect(old.status()).toBe(200)
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'The terms have changed' })).toBeVisible()
+  await expect(page.getByText('What changed', { exact: true })).toBeVisible()
+  await expect(page.getByText(/The person responsible for your data is named/)).toBeVisible()
+  // The consent to the statistics stands on the step itself, apart from the pages (В-2).
+  await expect(page.getByText('Statistics', { exact: true })).toBeVisible()
+  await expect(page.getByText(/while «Count me in the statistics» is on/)).toBeVisible()
+
+  const accepted = page.waitForRequest(
+    (request) => request.url().endsWith('/api/actors/me/consent') && request.method() === 'PUT',
+  )
+  await page.getByRole('checkbox', { name: AGE }).check()
+  await page.getByRole('button', { name: ACCEPT }).click()
+  expect((await accepted).postDataJSON()).toEqual({ version: 2 })
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What to buy')
 })
 
 test('«I do not accept» shows the account is there and leads out through «Sign out»', async ({
