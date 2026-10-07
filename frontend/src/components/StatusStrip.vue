@@ -91,8 +91,10 @@ export default defineComponent({
 }
 
 // The button is 44 and the strip around one line of words 36: it takes the strip's padding above
-// and below, so the strip grows to 44 and not to 60.
+// and below, so the strip grows to 44 and not to 60 — and part of it on the right, where the
+// ghost's own padding already stands its word off the edge (frame 6h).
 .action {
   margin-block: calc(var(--space-2) * -1);
+  margin-inline-end: calc(var(--space-2) * -1);
 }
 </style>

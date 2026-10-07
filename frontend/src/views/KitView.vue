@@ -368,6 +368,19 @@
       <SkeletonPart kind="rows" :count="3" lead="circle" tail next />
     </section>
 
+    <!-- The connection in one line (MOL-181, Ф-14): one strip a screen, in the screen's words;
+         «Повторить» only where the server did not answer. -->
+    <section class="group">
+      <SectionCaption class="caption">{{ t('dev.kit.strip') }}</SectionCaption>
+      <StatusStrip kind="offline" :text="t('dev.kit.strip_offline')" />
+      <StatusStrip kind="offline" :text="t('dev.kit.strip_offline_long')" />
+      <StatusStrip kind="unanswered" :text="t('dev.kit.strip_unanswered')">
+        <template #action>
+          <AppButton variant="ghost">{{ t('state.retry') }}</AppButton>
+        </template>
+      </StatusStrip>
+    </section>
+
     <!-- The four kinds of a state (MOL-180): told apart by form — the quiet circle of an empty one,
          the cloud, the triangle, and a section's error as the quiet card. Inline, all of them: an
          error of the whole screen would take this page's strip. -->
@@ -548,6 +561,7 @@ import SearchField from '@/components/SearchField.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import { operationRowProps, shortDay } from '@/components/accounts'
 import { journalRowProps } from '@/components/spending'
 import type { JournalRow } from '@/components/spending'
@@ -589,6 +603,7 @@ export default defineComponent({
     SectionCaption,
     SegmentedControl,
     SkeletonPart,
+    StatusStrip,
     VerdictBadge,
     VerdictCard,
   },
