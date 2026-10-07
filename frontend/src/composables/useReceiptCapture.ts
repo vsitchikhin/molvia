@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 import type { ComputedRef } from 'vue'
-import { linkReceiptCountrySchema, photoReceiptCountrySchema } from '@molvia/model'
-import type { LinkReceiptCountry, PhotoReceiptCountry } from '@molvia/model'
+import { photoReceiptCountrySchema, receiptCountrySchema } from '@molvia/model'
+import type { PhotoReceiptCountry, ReceiptCountry } from '@molvia/model'
 import { useActorStore } from '@/stores/actor'
 
 /**
@@ -11,22 +11,22 @@ import { useActorStore } from '@/stores/actor'
  * that always ends in «не принят» is worse than none. No flag: the rule is the model's list.
  */
 export function useReceiptCapture(): {
-  readonly country: ComputedRef<PhotoReceiptCountry | null>
   /**
-   * The country of the settings when its receipts come by the link of their QR code — Serbia
-   * (MOL-232): «Покупки» offer «Чек по ссылке» beside «Записать вручную»; every other screen keeps
-   * the version «без чека» until the camera reads the code (MOL-233).
+   * The country of the settings when the server reads its receipts — by photo (Armenia) or by the
+   * link of the QR code the phone reads off the photo (Serbia, MOL-233): «Сфотографировать чек» either way.
    */
-  readonly linkCountry: ComputedRef<LinkReceiptCountry | null>
+  readonly country: ComputedRef<ReceiptCountry | null>
+  /** The country when its receipts are read off the photo itself: «Переснять» is its alone. */
+  readonly photoCountry: ComputedRef<PhotoReceiptCountry | null>
 } {
   const actor = useActorStore()
   return {
     country: computed(() => {
-      const parsed = photoReceiptCountrySchema.safeParse(actor.settings?.country)
+      const parsed = receiptCountrySchema.safeParse(actor.settings?.country)
       return parsed.success ? parsed.data : null
     }),
-    linkCountry: computed(() => {
-      const parsed = linkReceiptCountrySchema.safeParse(actor.settings?.country)
+    photoCountry: computed(() => {
+      const parsed = photoReceiptCountrySchema.safeParse(actor.settings?.country)
       return parsed.success ? parsed.data : null
     }),
   }

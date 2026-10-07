@@ -243,7 +243,7 @@
       "link_waiting": "The link is on your phone. We will send it once there is a connection — nothing to do.",
       "link_sending": "The link is going to the server. If you close the app, sending carries on next time you open it.",
       "link_parsing": "Asking the Serbian tax office. A receipt just printed shows up there in a couple of minutes — you can close the app. Once ready, the receipt moves to «Check and save».",
-      "link_rejected": "The server did not accept this receipt: {reason}. Remove it and paste the link again."
+      "link_rejected": "The server did not accept this receipt: {reason}. Remove it and shoot the QR code or paste the link again."
     },
     "delete": "Delete receipt",
     "delete_note": "The photo goes with it",
@@ -1559,7 +1559,7 @@
       },
       "receipts": {
         "term": "Receipts",
-        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; no outside service sees the photo. A Serbian receipt comes as the link of its QR code, with no photo — see «A Serbian receipt by its link». The photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them. If you left the screen while a receipt was being read, the Molvia bot tells you in Telegram that it is ready: the message names the shop or the receipt’s date and the number of items — no sums, no products — and Telegram sees that message. Kept here: how you learned the receipt was ready — in the app or from the bot — and whether that message is off."
+        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; no outside service sees the photo. A Serbian receipt comes as the link of its QR code, with no photo: the phone reads the QR code, and the shot does not leave it — see «A Serbian receipt by its link». The photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them. If you left the screen while a receipt was being read, the Molvia bot tells you in Telegram that it is ready: the message names the shop or the receipt’s date and the number of items — no sums, no products — and Telegram sees that message. Kept here: how you learned the receipt was ready — in the app or from the bot — and whether that message is off."
       },
       "accounts": {
         "term": "Accounts",
@@ -1624,7 +1624,7 @@
     },
     "serbian_receipts": {
       "title": "A Serbian receipt by its link",
-      "text": "You hand over a Serbian receipt as the link of its QR code, with no photo. The receipt is kept by the Serbian tax office (Poreska uprava), and our server takes its lines from there: it sends the tax office that link. The tax office sees the link and our server’s address — not you, your phone or your sign-in. The link carries the receipt’s total, time and number, and the firm’s tax number if the receipt was made out to one; the tax office holds all of it already. Of its answer we keep the seller’s tax number, the shop’s code and name, the town, the lines, the total and the time; the cashier’s name, the buyer’s number and the way of payment we do not take. The link itself is erased as soon as the tax office answers, and never written to logs. A receipt just printed shows up there in a couple of minutes: the server asks again for two days, then says the receipt was not found."
+      "text": "You hand over a Serbian receipt as the link of its QR code, with no photo: your phone reads the QR code off the shot, and the shot stays on it and is kept nowhere — or you paste the link yourself. The receipt is kept by the Serbian tax office (Poreska uprava), and our server takes its lines from there: it sends the tax office that link. The tax office sees the link and our server’s address — not you, your phone or your sign-in. The link carries the receipt’s total, time and number, and the firm’s tax number if the receipt was made out to one; the tax office holds all of it already. Of its answer we keep the seller’s tax number, the shop’s code and name, the town, the lines, the total and the time; the cashier’s name, the buyer’s number and the way of payment we do not take. The link itself is erased as soon as the tax office answers, and never written to logs. A receipt just printed shows up there in a couple of minutes: the server asks again for two days, then says the receipt was not found."
     },
     "storage": {
       "title": "Cookies and the phone's memory",
@@ -2201,7 +2201,7 @@
         "invalid_title": "The tax office does not accept this receipt",
         "invalid_body": "The tax office’s check says the receipt is not valid. You can record the purchases by hand.",
         "unreadable_title": "The receipt was not read",
-        "unreadable_body": "You can record the purchases by hand or paste the receipt’s link again."
+        "unreadable_body": "You can record the purchases by hand or shoot the receipt’s QR code again."
       }
     },
     "duplicate": {
@@ -2224,6 +2224,23 @@
         "not_sale": "This is not a purchase receipt — copies, advance and training receipts are not recorded",
         "refund": "This is a refund receipt — it is not recorded"
       }
+    },
+    "qr": {
+      "hint_qr": "Shoot the QR code at the bottom of the receipt — close and sharp",
+      "hint_light": "Even light, no glare on the QR code",
+      "hint_private": "Only the link in the QR code is sent — the photo stays on your phone",
+      "have_link": "Already copied the link?",
+      "paste_short": "Paste",
+      "paste": "Paste the link",
+      "take": "Shoot the QR",
+      "reading": "Looking for the QR…",
+      "missed_title": "No QR code found",
+      "missed_body": "Come closer, so the QR code fills a third of the frame. Hold the phone until the camera focuses, and shoot in even light.",
+      "retake": "Shoot again",
+      "take_other": "Shoot another",
+      "or_take": "The camera can read the QR code",
+      "offline": "No connection — the link from the QR code goes by itself once there is one",
+      "not_kept": "The link wasn’t kept: you are signed out. Sign in again and send the receipt once more"
     }
   }
 }

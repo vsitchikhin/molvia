@@ -15,6 +15,7 @@ import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
+import { useReceiptQueueStore } from '@/stores/receiptQueue'
 import AdviceView from '@/views/AdviceView.vue'
 
 const advice = vi.fn<() => Promise<AdviceResponse>>()
@@ -163,6 +164,36 @@ describe('AdviceView', () => {
       expect(sheet().props('open')).toBe(true)
       expect(view.get('.state').classes()).toContain('card')
       expect(view.get('.dock').text()).not.toContain(en.state.retry)
+    })
+
+    // Serbia's receipts are read by the QR code off the photo (MOL-233): the version «с чеком» whole,
+    // where MOL-232 left it «без чека» on this screen (Р-9).
+    it('a person in Serbia takes a receipt from here as anyone whose receipts are read', async () => {
+      const serbia = { geography: { country: 'RS', city: 'Гюмри' } }
+      advice.mockResolvedValue(answer([milk], serbia))
+      const rated = await render({ country: 'RS' })
+      expect(rated.view.get('.dock').text()).toContain(en.purchases.capture)
+
+      advice.mockResolvedValue(answer([], serbia))
+      const newcomer = await render({ country: 'RS' })
+      expect(newcomer.view.text()).toContain(en.advice.home.new_capture.title)
+    })
+
+    it('a receipt by its link on its way is «by link», never «0 parts» (MOL-233)', async () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      advice.mockResolvedValue(answer([], { geography: { country: 'RS', city: 'Гюмри' } }))
+      const { view } = await render({ country: 'RS' })
+      useReceiptQueueStore().sendLink({
+        id: 'b2c3d4e5-0000-4000-8000-000000000001',
+        // a sale made up by the model's `madeUpSerbianLink`, as in `LinkReceiptSheet.test.ts`
+        link: 'https://suf.purs.gov.rs/v/?vl=A1RFU1RBQUFBVEVTVEJCQkIBAAAAAQAAANQ2SgAAAAAAAAABmBxSTwgAAABUc5Kx0O8OLUxriqnI5wYlRGOCocDf%2Fh08W3qZuNf2FTRTcpGwz%2B4NLEtqiajH5gUkQ2KBoL%2Fe%2FRw7WnmYt9b1FDNScZCvzu0MK0ppiKfG5QQjQmGAn77d%2FBs6WXiXttX0EzJRcI%2BuzewLKkloh6bF5AMiQWB%2Fnr3c%2Bxo5WHeWtdTzEjFQb46tzOsKKUhnhqXE4wIhQF9%2Bnbzb%2Bhk4V3aVtNPyETBPbo2sy%2BoJKEdmhaTD4gEgP159nLva%2BRg3VnWUs9LxEC9ObYyryukIJ0ZlhKPC4QAfPl18m7rZ%2BBc2VXSTstHwDy5NbIuqyegHJkVkg6LB4P8ePVx7mrnY9xY1VHOSsdDvDi1Ma4qpyOcGJURjgqHA3%2F4dPFt6mbjX9hU0U3KRsM%2FuDSxLaomox%2BYFJENigaC%2F3v0cO1p5mLfW9RQzUnGQr87tDCtKaYinxuUEI0JhgJ%2B%2B3fwbOll4l7bV9BMyUXCPrs3sCypJaIemxeQDIkFgf5693PsaOVh3lrXU8xIxUG%2BOrczrCilIZ4alxOMCIUBffp282%2FoZOFd2lbTT8hEwT26NrMvqCShHZoWkw%2BIBID9efZy72vkYN1Z1lLPS8RAvTm2Mq8rpCCdGZYSjwuEAHz5dfJu62fgXNlV0k7LR8A8uTWyLqsnoByZFZIOiweD%2FHj1ce5q52PcWNQ87U0RqxUqXGlv0IC2EMdY%3D',
+        country: 'RS',
+        language: 'en',
+        capturedAt: new Date(),
+      })
+      await flushPromises()
+      expect(view.text()).toContain(en.purchases.waiting.replace('{parts}', en.purchases.by_link))
+      expect(view.text()).not.toContain('0 parts')
     })
   })
 

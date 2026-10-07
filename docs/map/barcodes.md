@@ -43,8 +43,9 @@ Rules: `.claude/rules/barcodes.md`. A test beside its source, or mirroring it un
 
 ## frontend · scanner
 
-- `frontend/src/scanner/barcodeReader.ts` — The decoding worker seen from the page: warm ahead, read a frame by moving its pixels, fail everything once the worker dies.
+- `frontend/src/scanner/barcodeReader.ts` — The decoding worker seen from the page: warm ahead, read a frame by moving its pixels, fail everything once the worker dies; `createFrameReader` for a worker of another answer — a receipt's QR codes (MOL-233).
 - `frontend/src/scanner/barcodeWorker.ts` — The decoding worker: loads zxing from the app's own origin and answers each frame with a code or nothing.
+- `frontend/src/scanner/serveFrames.ts` — The inside of a decoding worker: zxing from the app's own origin, each frame answered by its decoder or by what failed — the scanner's worker and the receipt's QR worker alike.
 - `frontend/src/scanner/capture.ts` — Frames of the viewfinder's video cut to what lies under the frame on the screen, on one reused canvas.
 - `frontend/src/scanner/decode.ts` — Reading one frame: the four retail formats, the code as zxing gives it; `locateWasm`, the app's own copy of the reader.
 - `frontend/src/scanner/frames.ts` — `cropOf`, the frame on the screen in the camera's pixels through a cover fit; `createReadStreak`, two reads in a row.

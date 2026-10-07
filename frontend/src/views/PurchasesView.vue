@@ -276,10 +276,9 @@ export default defineComponent({
     // Receipts (MOL-127): the version «с чеком» — the camera — for a person whose country the server
     // reads (Р-1); the receipts a person holds are shown whatever the country, since one taken before a
     // move to Georgia or Serbia is still to be recorded or removed (MOL-109, adversarial А2).
-    const { country, linkCountry } = useReceiptCapture()
-    // the strip's receipt: the camera, or a Serbian receipt's link (MOL-232) — the rest of the screen
-    // keeps its words of the camera's country alone
-    const capture = computed(() => country.value ?? linkCountry.value)
+    const { country } = useReceiptCapture()
+    // the strip's receipt: the camera, a Serbian receipt's QR read off the photo (MOL-233) included
+    const capture = country
     // The place of «Вернуть» only while a removal waits: each strip still decides whether its ten
     // seconds are left (Р-7).
     const tripQueue = useTripQueueStore()

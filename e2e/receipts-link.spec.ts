@@ -4,7 +4,8 @@ import type { Page } from '@playwright/test'
 import { madeUpSerbianLink } from '@molvia/model/testing/serbian-receipt'
 import { signedIn } from './session'
 
-// A Serbian receipt by the link of its QR code (MOL-232): pasted on the phone, sent through the
+// A Serbian receipt by the link of its QR code (MOL-232): pasted on the phone — the sheet's way past
+// its camera since MOL-233, whose own spec is `receipts-qr.spec.ts` — sent through the
 // receipts' queue, asked of the tax office by the API — `bin/fake-purs.mjs`, which answers a journal of
 // two lines, «SECER KRISTAL» and «BANANA KG», 486,37 дин in all, at «ТЕСТ ПРОДАВНИЦА 1» of Belgrade —
 // reviewed and recorded in dinars. A person whose phone is in Belgrade starts in Serbia (MOL-89).
@@ -31,10 +32,12 @@ async function risen(page: Page): Promise<void> {
   await page.waitForTimeout(350)
 }
 
+/** The link pasted in the sheet of a Serbian receipt, past its camera (MOL-233): «Paste». */
 async function paste(page: Page, text: string): Promise<void> {
-  await page.getByRole('button', { name: 'Receipt by link' }).click()
-  await expect(sheet(page)).toContainText('Point your phone’s camera at the QR code')
+  await page.getByRole('button', { name: 'Photograph a receipt' }).click()
   await risen(page)
+  await sheet(page).getByRole('button', { name: 'Paste', exact: true }).click()
+  await expect(sheet(page)).toContainText('Point your phone’s camera at the QR code')
   await sheet(page).getByLabel('Link from the receipt').fill(text)
 }
 

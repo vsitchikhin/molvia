@@ -356,12 +356,13 @@ describe('PurchasesView (MOL-128)', () => {
       expect(again.view.text()).toContain(ru.purchases.missing_meta)
     })
 
-    it('человек из Сербии видит «Чек по ссылке» рядом с «Записать вручную» (MOL-232)', async () => {
+    it('человек из Сербии снимает чек, как все, рядом с «Записать вручную» (MOL-233)', async () => {
       const { view } = await render({ country: 'RS' })
       const words = view.findAll('button').map((one) => one.text())
-      expect(words).toContain(ru.purchases.capture_link)
-      expect(words).not.toContain(ru.purchases.capture)
+      expect(words).toContain(ru.purchases.capture)
+      expect(words).not.toContain(ru.purchases.capture_link)
       expect(words).toContain(ru.purchases.manual_by_hand)
+      expect(view.text()).toContain(ru.purchases.empty_capture.body)
     })
 
     it('пока список чеков не ответил, «пусто» не говорится (ревью 7)', async () => {
