@@ -91,10 +91,12 @@
       :body="t(country ? 'purchases.empty_capture.body' : 'purchases.empty.body')"
     />
 
+    <!-- Always a section's error: the strip records a purchase with the server down, through the
+         queue, and stays the screen's (Ф-15, 124 3l; MOL-180, В-1). -->
     <ScreenState
       v-if="trouble === 'error'"
       kind="error"
-      :inline="rows.length > 0 || !!open || receiptRows.length > 0"
+      inline
       :title="t('purchases.error.title')"
       :body="t(country ? 'purchases.error_capture' : 'purchases.error.body')"
       @retry="retry"

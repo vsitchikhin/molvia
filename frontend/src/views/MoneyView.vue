@@ -53,9 +53,12 @@
 
         <ScreenSkeleton v-if="phase === 'loading'" :groups="[24, 58, 40, 100, 30, 70, 52]" />
 
+        <!-- A section's error, not the screen's: «Добавить трату» keeps the strip, since a spending
+             goes through the queue with the server down (157 v2, 1k/2e; MOL-180, В-1). -->
         <ScreenState
           v-else-if="phase === 'error'"
           kind="error"
+          inline
           :title="t('spending.load_error.title')"
           :body="t('spending.load_error.body')"
           @retry="retry"
