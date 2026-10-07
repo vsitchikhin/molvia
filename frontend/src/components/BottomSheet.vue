@@ -45,7 +45,7 @@ import { useI18n } from 'vue-i18n'
 import IconBack from '~icons/mdi/chevron-left'
 import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
-import { provideAnnouncer } from '@/composables/useAnnouncer'
+import { provideSheetAnnouncer } from '@/composables/useAnnouncer'
 import { useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetDrag } from '@/composables/useSheetDrag'
 import { closeStateStrip } from '@/composables/useStateStrip'
@@ -100,10 +100,6 @@ export default defineComponent({
     const { t } = useI18n()
     // An error in the sheet keeps its buttons here: the strip under it is the screen's.
     closeStateStrip()
-    // Words said inside the sheet are said here: the app's region is outside the modal dialog,
-    // inert while it is open, and nothing in it is read (MOL-181, feedback С-10). There from the
-    // opening — a region born with its words is often not read.
-    const announcements = provideAnnouncer()
     const dialog = ref<HTMLDialogElement | null>(null)
     const titleId = useId()
 
@@ -111,6 +107,9 @@ export default defineComponent({
     // may close the dialog on its own (a second Esc), and the sheet is still to be put away —
     // its entry taken, the screen told — exactly once.
     const shown = ref(false)
+    // While the sheet is up, words are said in its own region: the app's is outside the modal
+    // dialog, inert, and nothing in it is read (MOL-181, feedback С-10).
+    const announcements = provideSheetAnnouncer(shown)
     // A step back is on its way and the pop has not come yet.
     let closing = false
     // The screen asked for the sheet again while it was closing — «save and next». Honoured once

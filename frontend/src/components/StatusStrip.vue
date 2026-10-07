@@ -30,30 +30,35 @@ export type StripKind = 'offline' | 'unanswered'
  * try, so an offline strip draws no slot whatever is given.
  *
  * The words go to the live region of the app or the sheet (К-14), never a `role` of its own: a
- * region born with its words is often not read.
+ * region born with its words is often not read. A retry that failed the same way leaves the same
+ * words, and is still an answer (C1): the screen counts its failed answers in `attempt`, and a new
+ * one says the words again.
  */
 export default defineComponent({
   name: 'StatusStrip',
   props: {
     kind: { type: String as PropType<StripKind>, required: true },
     text: { type: String, required: true },
+    /** Which failed answer the strip stands for: a new one says the same words again (C1). */
+    attempt: { type: Number, default: 0 },
   },
   setup(props) {
     const announce = useAnnouncer()
     const glyph = computed(() => (props.kind === 'offline' ? IconOffline : IconUnanswered))
 
-    // Outside the app — the kit's page, a component on its own — the strip speaks for itself.
+    // Outside the app — a component mounted on its own — the strip speaks for itself.
     const role = computed(() => (announce ? undefined : 'status'))
 
     // The words are taken back when they change or the strip goes: the region must not keep saying
-    // what is no longer on the screen. The same words again are not news.
+    // what is no longer on the screen. Drawn again with the same words, it says nothing new; a new
+    // attempt that failed the same way is said again.
     let withdraw: (() => void) | undefined
     function speak(): void {
       withdraw?.()
-      withdraw = announce?.(props.text)
+      withdraw = announce?.(props.text, { held: true })
     }
     onMounted(speak)
-    watch(() => props.text, speak)
+    watch([() => props.text, () => props.attempt], speak)
     onBeforeUnmount(() => withdraw?.())
 
     return { glyph, role }

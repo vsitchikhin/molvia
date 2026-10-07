@@ -282,7 +282,7 @@ export default defineComponent({
       withdraw?.()
       withdraw = undefined
       if (alerts.value || !announce) return
-      withdraw = announce([props.title, props.body].filter(Boolean).join('. '))
+      withdraw = announce([props.title, props.body].filter(Boolean).join('. '), { held: true })
     }
     onMounted(speak)
     watch(() => [props.title, props.body], speak)

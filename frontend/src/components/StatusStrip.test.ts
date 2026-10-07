@@ -58,7 +58,12 @@ describe('StatusStrip', () => {
     afterEach(() => vi.useRealTimers())
 
     // A screen with the app's region, as App.vue gives it: what was added, and what stands now.
-    function inApp(text: () => string, shown: () => boolean) {
+    function inApp(
+      text: () => string,
+      shown: () => boolean,
+      attempt: () => number = () => 0,
+      drawn: () => number = () => 0,
+    ) {
       const said: string[] = []
       const region: string[] = []
       const Screen = defineComponent({
@@ -70,7 +75,16 @@ describe('StatusStrip', () => {
             }
             region.splice(0, region.length, ...now.map((a) => a.text))
           })
-          return () => (shown() ? h(StatusStrip, { kind: 'offline', text: text() }) : null)
+          // `data-drawn` draws the strip anew with the same words, as a screen does on any change.
+          return () =>
+            shown()
+              ? h(StatusStrip, {
+                  kind: 'unanswered',
+                  text: text(),
+                  attempt: attempt(),
+                  'data-drawn': drawn(),
+                })
+              : null
         },
       })
       return { view: mount(Screen), said, region }
@@ -102,18 +116,41 @@ describe('StatusStrip', () => {
       expect(region).toEqual(['Без связи · графики на 14:20'])
     })
 
-    // A retry that failed the same way changes nothing on the screen, and is not news.
-    it('says the same words once', async () => {
-      const shown = ref(true)
+    // Drawn again with the same words — anything else on the screen changed — it says nothing new.
+    it('says the same words once while nothing new happened', async () => {
+      const drawn = ref(0)
       const { view, said } = inApp(
-        () => 'Без связи · графики на 14:05',
-        () => shown.value,
+        () => 'Список на вчера — сервер не ответил',
+        () => true,
+        () => 1,
+        () => drawn.value,
       )
       await vi.runOnlyPendingTimersAsync()
-      view.vm.$forceUpdate()
+      drawn.value++
+      await nextTick()
+      expect(view.get('.strip').attributes('data-drawn')).toBe('1')
+      await vi.runOnlyPendingTimersAsync()
+      expect(said).toEqual(['Список на вчера — сервер не ответил'])
+    })
+
+    // «Повторить» failed the same way: the same words, and still an answer (C1) — a new attempt
+    // says them again (adversarial А4, review С-7).
+    it('says the same words again for a new attempt', async () => {
+      const attempt = ref(1)
+      const { said, region } = inApp(
+        () => 'Список на вчера — сервер не ответил',
+        () => true,
+        () => attempt.value,
+      )
+      await vi.runOnlyPendingTimersAsync()
+      attempt.value++
       await nextTick()
       await vi.runOnlyPendingTimersAsync()
-      expect(said).toHaveLength(1)
+      expect(said).toEqual([
+        'Список на вчера — сервер не ответил',
+        'Список на вчера — сервер не ответил',
+      ])
+      expect(region).toHaveLength(1)
     })
 
     it('takes its words back when it goes', async () => {
@@ -129,7 +166,7 @@ describe('StatusStrip', () => {
       expect(region).toEqual([])
     })
 
-    // The kit's page, a component on its own: no region to speak to, so it is one itself.
+    // A component mounted on its own, out of the app: no region to speak to, so it is one itself.
     it('is a status of its own outside the app', () => {
       const view = mount(StatusStrip, { props: { kind: 'offline', text: 'Без связи' } })
       expect(view.attributes('role')).toBe('status')
