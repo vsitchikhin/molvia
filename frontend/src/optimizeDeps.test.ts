@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, globSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
@@ -29,15 +29,50 @@ function walk(node: ts.Node, visit: (node: ts.Node) => void): void {
   })
 }
 
-/** A module of `src` by a path written in `from`, or null when the path leaves `src`. */
-function local(from: URL, path: string): URL | null {
+const MODULE = /\.(ts|js|vue)$/
+
+/**
+ * What a path written in `from` names, resolved as Vite resolves it — as written, with `.ts`, or a
+ * directory by its `index.ts`: a module of `src` to read; `'file'`, a file of `src` that is no module
+ * (JSON, a stylesheet), with nothing to follow (adversarial Р2-А2); or null, a path that leaves `src`.
+ */
+function local(from: URL, path: string): URL | 'file' | null {
   let url: URL
   if (path.startsWith('@/')) url = new URL(path.slice(2), SRC)
   else if (path.startsWith('.')) url = new URL(path, from)
   else return null
-  for (const candidate of [url, new URL(`${url.href}.ts`)])
-    if (/\.(ts|vue)$/.test(candidate.pathname) && existsSync(candidate)) return candidate
+  const bare = url.href.replace(/\/$/, '')
+  for (const candidate of [url, new URL(`${bare}.ts`), new URL(`${bare}/index.ts`)])
+    if (existsSync(candidate) && statSync(candidate).isFile())
+      return MODULE.test(candidate.pathname) ? candidate : 'file'
   throw new Error(`${path} from ${from.pathname} does not resolve`)
+}
+
+/**
+ * The modules of `src` an `import.meta.glob` names (adversarial Р2-А1): Vite loads them as `import()`
+ * does, with the pattern in place of a path. A negative pattern is left out — the set read is the
+ * wider one, which can only ask for more in `include`.
+ */
+function globbed(node: ts.Node, from: URL): URL[] {
+  if (
+    !ts.isCallExpression(node) ||
+    !ts.isPropertyAccessExpression(node.expression) ||
+    !ts.isMetaProperty(node.expression.expression) ||
+    node.expression.name.text !== 'glob' ||
+    node.arguments[0] === undefined
+  )
+    return []
+  const first = node.arguments[0]
+  const patterns = ts.isArrayLiteralExpression(first) ? [...first.elements] : [first]
+  return patterns.flatMap((pattern) => {
+    if (!ts.isStringLiteralLike(pattern) || pattern.text.startsWith('!')) return []
+    const [base, rest] = pattern.text.startsWith('@/')
+      ? [SRC, pattern.text.slice(2)]
+      : [new URL('./', from), pattern.text]
+    return globSync(rest, { cwd: base })
+      .map((file) => new URL(file, base))
+      .filter((url) => MODULE.test(url.pathname))
+  })
 }
 
 const isImportMetaUrl = (node: ts.Node | undefined): boolean =>
@@ -74,7 +109,7 @@ function workers(): URL[] {
       const [module, query] = path?.split('?') ?? []
       if (module && query && /^(shared)?worker\b/.test(query)) {
         const url = local(from, module)
-        if (url) found.push(url)
+        if (url instanceof URL) found.push(url)
       }
     })
     return found
@@ -118,11 +153,13 @@ function packagesOf(entry: URL): Set<string> {
     seen.add(next.href)
     const from = next
     walk(parse(from), (node) => {
+      queue.push(...globbed(node, from))
       const path = specifier(node)
       if (path === null) return
       const module = local(from, path.split('?')[0] ?? path)
-      if (module) queue.push(module)
-      else if (!path.includes('?') && !path.startsWith('@molvia/')) packages.add(path)
+      if (module instanceof URL) queue.push(module)
+      else if (module === null && !path.includes('?') && !path.startsWith('@molvia/'))
+        packages.add(path)
     })
   }
   return packages
