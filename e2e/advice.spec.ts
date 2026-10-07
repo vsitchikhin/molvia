@@ -191,9 +191,20 @@ test('reports a failure instead of an empty screen, and recovers on retry', asyn
   await page.goto('/')
 
   await expect(page.locator('[role="alert"]')).toContainText('The server did not answer')
+  // One «Try again», in the strip over the tab bar — where every screen has its main action — and
+  // the strip is the error's alone (MOL-180, К-1, Ф-15).
+  const retry = page.getByRole('button', { name: 'Try again' })
+  await expect(retry).toHaveCount(1)
+  const dock = page.locator('.dock')
+  await expect(dock.getByRole('button', { name: 'Try again' })).toBeVisible()
+  await expect(dock.getByRole('button', { name: 'Report a problem' })).toBeVisible()
+  await expect(dock.getByRole('button', { name: 'Photograph a receipt' })).toHaveCount(0)
+  const tabs = await page.locator('.tabbar').boundingBox()
+  const strip = await dock.boundingBox()
+  expect(strip && tabs && strip.y + strip.height).toBeLessThanOrEqual(tabs?.y ?? 0)
 
   await page.unroute('**/api/advice')
-  await page.getByRole('button', { name: 'Try again' }).click()
+  await retry.click()
 
   await expect(page.getByRole('heading', { name: 'Photograph your first receipt' })).toBeVisible()
 })
