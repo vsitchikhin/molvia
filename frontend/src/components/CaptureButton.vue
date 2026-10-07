@@ -1,10 +1,7 @@
 <template>
   <AppButton size="large" block @click="opened">
-    <template #icon>
-      <IconCamera v-if="photo" />
-      <IconLink v-else />
-    </template>
-    {{ t(photo ? 'purchases.capture' : 'purchases.capture_link') }}
+    <template #icon><IconCamera /></template>
+    {{ t('purchases.capture') }}
   </AppButton>
 
   <!-- Mounted on the tap and put away from `onClosed`, as the sheet of a purchase: each opening
@@ -16,7 +13,7 @@
     :on-closed="unmount"
     @sent="sent"
   />
-  <!-- A Serbian receipt by the link of its QR code (MOL-232): pasted, with no photo. -->
+  <!-- A Serbian receipt: its QR read off the photo, only the link sent (MOL-233), or pasted (MOL-232). -->
   <LinkReceiptSheet v-else-if="mounted" v-model:open="open" :on-closed="unmount" @sent="sent" />
 </template>
 
@@ -26,7 +23,6 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import IconCamera from '~icons/mdi/camera-outline'
-import IconLink from '~icons/mdi/link-variant'
 import { photoReceiptCountrySchema } from '@molvia/model'
 import type { ReceiptCountry } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
@@ -40,11 +36,11 @@ import { afterStep, useNavigation } from '@/navigation'
  * «Покупки» in the version «с чеком» (Д-3). A receipt sent from «Что брать» opens «Покупки», so the
  * person sees its row come (handoff v1, 03); «Чек отправлен» is said there and shown for a moment
  * in place of the strip's «Вернуть» (3d). A country whose receipts come by their link — Serbia
- * (MOL-232) — gets «Чек по ссылке» in its place.
+ * (MOL-232) — takes the same button to a sheet that reads the QR code off the photo (MOL-233).
  */
 export default defineComponent({
   name: 'CaptureButton',
-  components: { AppButton, CaptureSheet, IconCamera, IconLink, LinkReceiptSheet },
+  components: { AppButton, CaptureSheet, IconCamera, LinkReceiptSheet },
   props: {
     country: { type: String as PropType<ReceiptCountry>, required: true },
   },
@@ -70,7 +66,7 @@ export default defineComponent({
       if (route.name !== 'purchases') afterStep(() => void goTab('purchases'))
     }
 
-    // the camera's country, or none: a country whose receipts come by their link
+    // the country whose receipts are read off the photo, or none: a Serbian receipt is its QR's link
     const photo = computed(() => {
       const parsed = photoReceiptCountrySchema.safeParse(props.country)
       return parsed.success ? parsed.data : null
