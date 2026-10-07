@@ -158,7 +158,11 @@ export default defineComponent({
     const underWayMeta = computed(() => {
       const row = underWay.value
       if (!row) return null
-      const parts = t('receipt.capture.parts', { n: row.parts }, row.parts)
+      // a receipt by its link has no parts: it is a link (MOL-232, MOL-233)
+      const parts =
+        row.parts === 0
+          ? t('purchases.by_link')
+          : t('receipt.capture.parts', { n: row.parts }, row.parts)
       if (row.state === 'waiting') return t('purchases.waiting', { parts })
       if (row.state === 'sending') return t('purchases.sending', { parts })
       return t('purchases.parsing_unknown')

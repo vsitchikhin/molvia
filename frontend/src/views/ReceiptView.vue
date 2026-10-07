@@ -409,7 +409,7 @@ export default defineComponent({
     const queue = useReceiptQueueStore()
     const drafts = useReceiptDraftsStore()
     const online = useOnline()
-    const { country } = useReceiptCapture()
+    const { photoCountry: country } = useReceiptCapture()
     const id = computed(() => String(route.params.receiptId ?? '').toLowerCase())
     const kept = useReceipt(id)
     const detail = computed(() => kept.answer.value)
