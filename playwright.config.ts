@@ -92,8 +92,8 @@ export default defineConfig({
   // still lose it: it is saved while the context is torn down, which shares the test's timeout.
   // In CI the first attempt's (MOL-217): `on-first-retry` recorded the retry, which a flake passes,
   // and the failure the flake is about left only its message — four times, for one test. Without the
-  // screencast, which was the whole of its price: e2e went from some 9.6 minutes to 15.6 and 15.8 with
-  // it, and locally 2.1 minutes against 1.9 with or without a trace of steps, snapshots and network.
+  // screencast: in CI the run took 15.6 and 15.8 minutes with it, 13.2 without, against a median of 9.6
+  // with no trace; locally 2.1 against 1.9, with no trace or this one.
   //
   // The phone is in Armenia (MOL-121): the app dates by the phone's calendar and the specs by
   // Yerevan's, and in CI's UTC the two part from 20:00 to midnight. The component tests run in UTC

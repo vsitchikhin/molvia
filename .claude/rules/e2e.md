@@ -110,10 +110,11 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   owner's В-2), uploaded from `test-results/` when the job fails: `on-first-retry` recorded the retry,
   which a flake passes, and the artifact was `playwright-report/`, which the `github` reporter never
   writes — a flake of `verdicts.spec` failed four times and left nothing but its message. **Without the
-  screencast** (owner's choice on review С-1): with it the run went from a median of 9.6 minutes to 15.6
-  and 15.8, and locally the screencast was the whole of the price (2.1 minutes against 1.9 with no
-  trace or a trace without it). The steps, the DOM before and after each, the network and the console
-  stay — what tells a request that left from one that never did.
+  screencast** (owner's choice on review С-1). Measured in CI: a median of 9.6 minutes with no trace,
+  15.6 and 15.8 with the full one, 13.2 with this — the screencast is not the whole of the price there,
+  though locally it was (2.1 minutes against 1.9 with no trace or this one). The steps, the DOM before
+  and after each, the network and the console stay — what tells a request that left from one that
+  never did.
 - **The dev server optimizes every package on its start, never in the middle of a run** (MOL-217):
   what only a worker imports stands in `optimizeDeps.include` of `vite.config.ts`, held by
   `optimizeDeps.test.ts`. Vite's first crawl reads the pages and never a worker, so `zxing-wasm` was
