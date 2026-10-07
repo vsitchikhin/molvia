@@ -1,7 +1,7 @@
 <template>
   <div
     class="screen"
-    :class="{ collapsed, docked, tabbed, held: $slots.docked || updating }"
+    :class="{ collapsed, docked, tabbed, held: $slots.docked || updating || stateHeld }"
     :style="dockStyle"
   >
     <header ref="bar" class="bar">
@@ -57,7 +57,7 @@
       <!-- The room the strip below takes, and «Вернуть» over it, kept inside the scroll: the last
            row of a list has to be reachable, and both are over the page, not in it. -->
       <div
-        v-if="$slots.docked || updating || $slots.undo"
+        v-if="$slots.docked || updating || stateHeld || $slots.undo"
         class="dock-room"
         :style="{ height: room }"
         aria-hidden="true"
@@ -66,10 +66,18 @@
 
     <!-- Pinned above the tab bar, and the room for it is the frame's to keep: a screen that
          drew its own would part ways with the padding on the first change of its height. A new
-         version waiting is its top row, over the screen's own main action (MOL-132, В-1). -->
-    <div v-if="$slots.docked || updating" ref="dock" class="dock">
-      <UpdateBand v-if="updating" class="update" :class="{ over: $slots.docked }" />
-      <slot name="docked" />
+         version waiting is its top row, over the screen's own main action (MOL-132, В-1).
+         An error of the whole screen takes it over (К-1, 8c): its «Повторить» stands where the
+         screen's action stood, and the row steps aside while the error offers «Обновить» itself;
+         a version that did not take keeps its words, which offer nothing twice. -->
+    <div v-if="$slots.docked || updating || stateHeld" ref="dock" class="dock">
+      <UpdateBand
+        v-if="updating && !offered"
+        class="update"
+        :class="{ over: $slots.docked || stateHeld }"
+      />
+      <div v-if="stateHeld" ref="stateTarget" class="state-actions"></div>
+      <slot v-else name="docked" />
     </div>
 
     <!-- «Вернуть» stands in one place on every screen, 8 over the strip — or over the tab bar or the
@@ -82,7 +90,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeUpdate, ref } from 'vue'
+import { computed, defineComponent, nextTick, onBeforeUpdate, onUpdated, ref, watch } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -91,6 +99,7 @@ import IdentityNotice from '@/components/IdentityNotice.vue'
 import UpdateBand from '@/components/UpdateBand.vue'
 import { useBackLabel } from '@/composables/useBackLabel'
 import { useCollapsed, useHeight } from '@/composables/useCollapsed'
+import { provideStateStrip } from '@/composables/useStateStrip'
 import { backTarget, useNavigation } from '@/navigation'
 import { usePwaUpdate } from '@/pwaUpdate'
 
@@ -156,8 +165,14 @@ export default defineComponent({
     // render instead: a row filled late is pinned and alive, not drawn inside an invisible one.
     const hasRow = (): boolean => Boolean(parentTitleKey.value ?? slots.meta ?? slots.trailing)
     const docked = ref(hasRow())
+    // Whether the focus stood in the strip as this render began (adversarial Г1, below).
+    let focusInDock = false
     onBeforeUpdate(() => {
       docked.value = hasRow()
+      focusInDock = dock.value?.contains(document.activeElement) ?? false
+    })
+    onUpdated(() => {
+      focusInDock = false
     })
     const tabbed = computed(() => Boolean(route.meta.tab))
 
@@ -187,6 +202,29 @@ export default defineComponent({
     )
     const update = usePwaUpdate()
     const updating = computed(() => update.phase.value !== 'none')
+    const stateTarget = ref<HTMLElement | null>(null)
+    const strip = provideStateStrip(stateTarget)
+    // An error taking the strip unmounts the screen's own action, and a focus on it fell to the body
+    // («Где вы?» closed over a failed «Что брать» hands it back to «Записать покупки», review №6): it
+    // goes to the error's first button, which stands where that action stood. Where the action went
+    // in the very render the error came in — «Что брать» draws its strip only for a newcomer — the
+    // whole strip went before the error held it, and the focus with it (adversarial Г1): so whether
+    // it stood in the strip is read before the frame patches, and a focus lost to the body is brought.
+    watch(
+      strip.held,
+      (held) => {
+        if (!held) return
+        const focused = document.activeElement
+        const lost = focused === null || focused === document.body
+        if (!dock.value?.contains(focused) && !(focusInDock && lost)) return
+        void nextTick(() => stateTarget.value?.querySelector('button')?.focus())
+      },
+      { flush: 'pre' },
+    )
+    // The error offers «Обновить» itself while a version waits or is being let in.
+    const offered = computed(
+      () => strip.held.value && ['ready', 'applying'].includes(update.phase.value),
+    )
 
     const { goBack } = useNavigation()
 
@@ -212,6 +250,9 @@ export default defineComponent({
       room,
       dockStyle,
       updating,
+      stateTarget,
+      stateHeld: strip.held,
+      offered,
       goBack,
     }
   },

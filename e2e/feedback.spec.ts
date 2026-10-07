@@ -59,16 +59,20 @@ test('from the settings: no kind chosen for the person, and the row is what the 
 })
 
 test('from an error screen: «Сломалось», the screen and the code go with it', async ({ page }) => {
-  await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
-  await signedIn(page, '/')
-  await expect(page.getByRole('alert')).toContainText('Сервер не ответил')
+  await page.route('**/api/sessions', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await signedIn(page, '/settings/devices')
+  await expect(page.getByRole('alert')).toContainText('Список не загрузился')
+  // An error of the whole screen: «Повторить» and the link last, in the strip (MOL-180, Р-18).
+  const strip = page.locator('.dock')
+  await expect(strip.getByRole('button', { name: 'Повторить' })).toBeVisible()
+  await expect(strip.getByRole('button', { name: 'Сообщить о проблеме' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Сообщить о проблеме' }).click()
   const sheet = await opened(page)
   await expect(sheet.getByRole('heading', { name: 'Сообщить о проблеме' })).toBeVisible()
   await expect(sheet.getByRole('radio', { name: 'Сломалось' })).toBeChecked()
   const attached = sheet.locator('.attached')
-  await expect(attached).toContainText('экран «Что брать»')
+  await expect(attached).toContainText('экран «Устройства»')
   await expect(attached).toContainText('код error.internal')
 
   await sheet.getByLabel('Сообщение').fill('Список не загрузился')
@@ -79,7 +83,7 @@ test('from an error screen: «Сломалось», the screen and the code go w
     {
       kind: 'bug',
       text: 'Список не загрузился',
-      route: 'advice',
+      route: 'devices',
       fromError: true,
       errorCode: 'error.internal',
     },
@@ -89,13 +93,13 @@ test('from an error screen: «Сломалось», the screen and the code go w
 // «Повторить» first — the first thing a person does — and it fails again: the screen stays as it was,
 // and its code is still the one it was shown with, not lost to the retry's own refusal (adversarial Н1).
 test('after «Повторить» failed again the code still goes with the message', async ({ page }) => {
-  await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
-  await signedIn(page, '/')
-  await expect(page.getByRole('alert')).toContainText('Сервер не ответил')
-  const retried = page.waitForResponse((response) => response.url().endsWith('/api/advice'))
+  await page.route('**/api/sessions', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await signedIn(page, '/settings/devices')
+  await expect(page.getByRole('alert')).toContainText('Список не загрузился')
+  const retried = page.waitForResponse((response) => response.url().endsWith('/api/sessions'))
   await page.getByRole('button', { name: 'Повторить' }).click()
   await retried
-  await expect(page.getByRole('alert')).toContainText('Сервер не ответил')
+  await expect(page.getByRole('alert')).toContainText('Список не загрузился')
 
   await page.getByRole('button', { name: 'Сообщить о проблеме' }).click()
   const sheet = await opened(page)
@@ -109,10 +113,10 @@ test('after «Повторить» failed again the code still goes with the mes
 test('a lost answer, opened again: the same message once, not a conflict and a second one', async ({
   page,
 }) => {
-  await page.route('**/api/advice', (route) =>
+  await page.route('**/api/sessions', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: '{"nonsense":1}' }),
   )
-  await signedIn(page, '/')
+  await signedIn(page, '/settings/devices')
   await page.getByRole('button', { name: 'Сообщить о проблеме' }).click()
   let sheet = await opened(page)
   await expect(sheet.locator('.attached')).toContainText('код issue.response_invalid')
@@ -169,8 +173,8 @@ test('a 201 whose body was cut off is sent, once', async ({ page }) => {
 // Opened from a link on the screen rather than from one of its own rows, the sheet still takes one
 // entry of the history: «back» puts it away and leaves the error screen where it was (сверка С-11).
 test('«back» after «Сообщить о проблеме» puts the sheet away, not the screen', async ({ page }) => {
-  await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
-  await signedIn(page, '/')
+  await page.route('**/api/sessions', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await signedIn(page, '/settings/devices')
   await page.getByRole('button', { name: 'Сообщить о проблеме' }).click()
   const sheet = await opened(page)
   await expect(sheet).toBeVisible()
@@ -178,7 +182,7 @@ test('«back» after «Сообщить о проблеме» puts the sheet awa
   await page.goBack()
 
   await expect(sheet).toBeHidden()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Что брать')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Устройства')
   await expect(page.getByRole('button', { name: 'Сообщить о проблеме' })).toBeVisible()
 })
 

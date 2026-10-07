@@ -54,7 +54,6 @@
       <ScreenState
         v-else-if="phase === 'empty'"
         kind="empty"
-        tone="accent"
         :icon="IconCashPlus"
         :title="t('income.empty.title')"
         :body="t('income.empty.body')"

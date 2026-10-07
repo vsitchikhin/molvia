@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref, shallowRef, watch, type VNodeArrayChildren } from 'vue'
 import IconPlus from '~icons/mdi/plus'
 import IconAlert from '~icons/mdi/alert-circle-outline'
+import IconAttention from '~icons/mdi/alert-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import type { AppLocale } from '@molvia/model'
 import en from '@/i18n/en.json'
@@ -11,6 +12,7 @@ import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import ScreenState from '@/components/ScreenState.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
+import { closeStateStrip, provideStateStrip, type StateStrip } from '@/composables/useStateStrip'
 import type * as Api from '@/api'
 import { pwaUpdateKey, type UpdatePhase } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
@@ -49,22 +51,14 @@ describe('ScreenState', () => {
   })
 
   describe('each kind draws its own circle', () => {
-    it('empty: the icon the screen brought, in the tone it chose', () => {
-      const view = render({ kind: 'empty', tone: 'accent', icon: IconPlus })
-      expect(view.findComponent(IconPlus).exists()).toBe(true)
-      expect(view.classes()).toContain('accent')
-    })
-
-    // Over an action a circle reads as a button whatever its glyph (MOL-77).
-    it('empty without an icon draws no circle at all', () => {
-      const view = render({ kind: 'empty', tone: 'accent' })
-      expect(view.find('.circle').exists()).toBe(false)
-      expect(refused({ kind: 'empty', tone: 'accent' })).toBe(false)
-    })
-
-    it('empty that is a success is green', () => {
-      const view = render({ kind: 'empty', tone: 'good', icon: IconPlus })
-      expect(view.classes()).toContain('good')
+    // One quiet form (Ф-16, К-8): a terracotta circle over an action read as a button (MOL-77).
+    it('empty: the icon the screen brought, in the quiet circle and nothing else', () => {
+      const view = render({ kind: 'empty', icon: IconPlus })
+      expect(view.get('.circle').findComponent(IconPlus).exists()).toBe(true)
+      expect(view.classes()).toContain('quiet')
+      for (const tone of ['accent', 'good', 'warn', 'bad']) {
+        expect(view.classes()).not.toContain(tone)
+      }
     })
 
     it('error: always the alert icon, always red', () => {
@@ -79,9 +73,11 @@ describe('ScreenState', () => {
       expect(view.classes()).toContain(tone)
     })
 
-    it('attention: the alert icon, yellow — something to know, not a failure', () => {
+    // Told from an error by form, not by colour alone (Ф-35): a triangle, never the error's ring.
+    it('attention: the triangle, yellow — something to know, not a failure', () => {
       const view = render({ kind: 'attention' })
-      expect(view.findComponent(IconAlert).exists()).toBe(true)
+      expect(view.findComponent(IconAttention).exists()).toBe(true)
+      expect(view.findComponent(IconAlert).exists()).toBe(false)
       expect(view.classes()).toContain('warn')
     })
   })
@@ -100,8 +96,10 @@ describe('ScreenState', () => {
       ['offline in red', { kind: 'offline', tone: 'bad' }],
       ['offline with no tone', { kind: 'offline' }],
       ['offline in accent', { kind: 'offline', tone: 'accent' }],
-      ['empty with no tone', { kind: 'empty', icon: IconPlus }],
+      ['empty in accent', { kind: 'empty', tone: 'accent', icon: IconPlus }],
+      ['empty in green', { kind: 'empty', tone: 'good', icon: IconPlus }],
       ['empty in yellow', { kind: 'empty', tone: 'warn', icon: IconPlus }],
+      ['empty with no icon', { kind: 'empty' }],
       ['error with a tone', { kind: 'error', tone: 'good' }],
       ['error with an icon of its own', { kind: 'error', icon: IconPlus }],
       ['attention with a tone', { kind: 'attention', tone: 'good' }],
@@ -114,7 +112,7 @@ describe('ScreenState', () => {
     })
 
     it.each<[string, Props]>([
-      ['empty', { kind: 'empty', tone: 'accent', icon: IconPlus }],
+      ['empty', { kind: 'empty', icon: IconPlus }],
       ['error', { kind: 'error' }],
       ['offline', { kind: 'offline', tone: 'warn' }],
       ['attention', { kind: 'attention' }],
@@ -130,7 +128,7 @@ describe('ScreenState', () => {
       // Inline is always polite: a notice drawn again on every screen would interrupt every move
       // (MOL-19, Р-9).
       ['attention inline', { kind: 'attention', inline: true }, 'status'],
-      ['empty', { kind: 'empty', tone: 'accent', icon: IconPlus }, 'status'],
+      ['empty', { kind: 'empty', icon: IconPlus }, 'status'],
       ['offline', { kind: 'offline', tone: 'good' }, 'status'],
       // A notice drawn again over every screen: an alert would cut off the heading each move
       // has just focused (MOL-19, A3).
@@ -212,7 +210,7 @@ describe('ScreenState', () => {
     })
 
     it.each<[string, Props]>([
-      ['empty', { kind: 'empty', tone: 'accent', icon: IconPlus }],
+      ['empty', { kind: 'empty', icon: IconPlus }],
       ['offline', { kind: 'offline', tone: 'good' }],
       ['attention', { kind: 'attention' }],
     ])('is not offered by %s, where trying again is not the way out', (_, props) => {
@@ -358,7 +356,7 @@ describe('ScreenState', () => {
 
   it('puts the action at the end, and draws no empty row without one', () => {
     const withAction = render(
-      { kind: 'empty', tone: 'accent', icon: IconPlus },
+      { kind: 'empty', icon: IconPlus },
       { action: () => h('button', 'Find an item') },
     )
     expect(withAction.element.lastElementChild?.className).toBe('action')
@@ -423,6 +421,56 @@ describe('ScreenState', () => {
     it('must not offer it anywhere but an error', () => {
       const { view } = waiting('ready', { kind: 'offline', tone: 'warn' })
       expect(view.find('.action').exists()).toBe(false)
+    })
+  })
+
+  // A section failed and the screen works: the error is a card of its own height, and its
+  // «Повторить» is quiet, so the screen's main action stays the one filled button (К-13, Ф-15).
+  describe('the quiet card of a section’s error (MOL-180)', () => {
+    it('is a card, with «Повторить» a ghost the width of its word', async () => {
+      const view = render({ kind: 'error', inline: true })
+      expect(view.classes()).toEqual(expect.arrayContaining(['card', 'inline', 'bad']))
+      const retry = view.get('.action button')
+      expect(retry.text()).toBe(en.state.retry)
+      expect(retry.classes()).toContain('ghost')
+      expect(retry.classes()).not.toContain('block')
+      await retry.trigger('click')
+      expect(view.emitted('retry')).toHaveLength(1)
+    })
+
+    it('keeps the screen’s own action after «Повторить»', () => {
+      const view = render(
+        { kind: 'error', inline: true },
+        { action: () => h('button', { class: 'own' }, 'Without the code') },
+      )
+      const names = view.findAll('.action button').map((button) => button.text())
+      expect(names).toEqual([en.state.retry, 'Without the code'])
+    })
+
+    // The strip's own row offers the version while the screen works (77 v2, 2c).
+    it('must not offer «Обновить» a second time while a version waits', () => {
+      const view = mount(ScreenState, {
+        props: { title: 'Title', kind: 'error', inline: true },
+        global: {
+          plugins: [createAppI18n('ru')],
+          provide: {
+            [pwaUpdateKey as symbol]: {
+              phase: shallowRef<UpdatePhase>('ready'),
+              apply: vi.fn(),
+              serverVersion: vi.fn(),
+            },
+          },
+        },
+      })
+      expect(view.findAll('.action button').map((button) => button.text())).toEqual(['Повторить'])
+    })
+
+    it.each<[string, Props]>([
+      ['a screen-wide error', { kind: 'error' }],
+      ['an inline notice', { kind: 'attention', inline: true }],
+      ['inline offline', { kind: 'offline', tone: 'warn', inline: true }],
+    ])('must not be drawn for %s', (_, props) => {
+      expect(render(props).classes()).not.toContain('card')
     })
   })
 
@@ -520,7 +568,7 @@ describe('ScreenState', () => {
 
     it.each([
       ['offline: the connection broke, not the app', { kind: 'offline', tone: 'warn' }],
-      ['empty', { kind: 'empty', tone: 'accent' }],
+      ['empty', { kind: 'empty', icon: IconPlus }],
       ['attention', { kind: 'attention' }],
       [
         'an inline error: a section failed, the screen works (сверка С-1)',
@@ -559,6 +607,64 @@ describe('ScreenState', () => {
     it("must not be drawn without the app's stores: the block on its own", () => {
       setActivePinia(undefined)
       expect(report(render({ kind: 'error' }))).toBeUndefined()
+    })
+  })
+
+  // A strip of the screen around, as `AppScreen` gives one (MOL-180, К-1).
+  describe('the strip of the screen around', () => {
+    function inside(options: { sheet?: boolean; target?: boolean } = {}) {
+      let strip: StateStrip | undefined
+      const target = shallowRef<HTMLElement | null>(null)
+      const Sheet = defineComponent({
+        setup: (_, { slots }) => {
+          closeStateStrip()
+          return () => h('div', { class: 'sheet' }, slots.default?.())
+        },
+      })
+      const view = mount(
+        defineComponent({
+          setup: () => {
+            strip = provideStateStrip(options.target ? target : undefined)
+            return () => {
+              const state = h(ScreenState, { kind: 'error', title: 'Broke' } as never)
+              return h('div', [
+                options.sheet ? h(Sheet, () => state) : state,
+                h('div', { class: 'strip', ref: (el) => (target.value = el as HTMLElement) }),
+              ])
+            }
+          },
+        }),
+        { attachTo: document.body, global: { plugins: [createAppI18n('en')] } },
+      )
+      return { view, held: () => strip?.held.value }
+    }
+
+    afterEach(() => {
+      document.body.innerHTML = ''
+    })
+
+    it('draws the buttons in it, and holds it', async () => {
+      const { view, held } = inside({ target: true })
+      await nextTick()
+      expect(held()).toBe(true)
+      expect(view.get('.strip').find('.action').text()).toBe(en.state.retry)
+      expect(view.get('.state').find('.action').exists()).toBe(false)
+    })
+
+    // The door has no strip: the error keeps its buttons, and the door learns it holds it.
+    it('keeps them in place where the host has no strip, and still holds it', async () => {
+      const { view, held } = inside()
+      await nextTick()
+      expect(held()).toBe(true)
+      expect(view.get('.state').find('.action').text()).toBe(en.state.retry)
+    })
+
+    it('must not take the strip from inside a sheet: the strip under it is the screen’s', async () => {
+      const { view, held } = inside({ sheet: true, target: true })
+      await nextTick()
+      expect(held()).toBe(false)
+      expect(view.get('.sheet').find('.action').text()).toBe(en.state.retry)
+      expect(view.get('.strip').find('.action').exists()).toBe(false)
     })
   })
 

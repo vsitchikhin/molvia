@@ -36,7 +36,6 @@
     <ScreenState
       v-if="empty"
       kind="empty"
-      tone="accent"
       :icon="IconDonut"
       :title="t('spending.charts.empty.title')"
       :body="t('spending.charts.empty.body')"

@@ -65,9 +65,12 @@
 
         <ScreenSkeleton v-if="phase === 'loading'" :groups="[46, 64, 38, 52, 30, 60, 44]" />
 
+        <!-- A section's error, not the screen's: «Добавить трату» keeps the strip, since a spending
+             goes through the queue with the server down (157 v2, 1k/2e; MOL-180, В-1). -->
         <ScreenState
           v-else-if="phase === 'error'"
           kind="error"
+          inline
           :title="t('spending.load_error.title')"
           :body="t('spending.load_error.body')"
           @retry="retry"
@@ -85,7 +88,6 @@
         <ScreenState
           v-else-if="month && journal.length === 0"
           kind="empty"
-          tone="accent"
           :icon="IconWallet"
           :title="t('spending.list.empty.title', { month: monthIn(month.month) })"
           :body="t('spending.list.empty.body')"
