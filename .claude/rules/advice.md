@@ -98,9 +98,13 @@ the mechanics stay. **Without that consent nothing is written or counted** (MOL-
 after time and access and before the objection, printed as «no consent to the statistics». Who
 accepted edition 1 — an installed build not yet updated asks nothing — or none is neither written nor
 counted: the API still refuses nothing without consent (MOL-95, Р-4), it only does not log. Gate 0.2
-reads the consent at reading, so the verdicts already there count once it is given; gate 0.3 takes
-whoever has it now, and an edition accepted inside the fourth week left its first days unwritten — the
-gate errs towards «stop», as with access. The switch is «Учитывать меня в
+reads the consent at reading, so the verdicts already there count once it is given. **Its price is the
+one error towards «go» the gates have** (review С-7): whoever signed in and left at the consent step
+used to be «did not fill the base» and is now in neither half, and `login_days` stops before the step —
+so «no consent to the statistics» is read beside the share, never apart from it. Gate 0.3 takes
+whoever has the consent now: one who accepted it inside or after their fourth week had that week
+partly or wholly unwritten and reads «not back» — towards «stop», as with access (adversarial Р2-А3);
+`consented_at` cannot tell, since a later edition overwrites it. The switch is «Учитывать меня в
 статистике», the first row of «Ваши данные», saved on the tap at `PUT /actors/me/analytics` with no
 sheet (В-3), as the bot's switches are. **The switch is drawn only as the server's answer**
 (adversarial А1, Р2-А1) — on «Бот» and «Зарплата» too, whose rows take the same quiet line

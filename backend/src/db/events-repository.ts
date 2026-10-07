@@ -247,8 +247,11 @@ export function createEventRepository(db: Conn): EventRepository {
           select actor_id, started, off_at, on_at
           from with_access
           -- Only those who accepted the edition that asks consent to the statistics (MOL-236): no log
-          -- was written for anyone else. Approximate, as access is: an edition accepted in the middle
-          -- of the fourth week leaves its first days unwritten, so the gate errs towards «stop».
+          -- was written for anyone else. Approximate, as access is: whoever accepted it inside or after
+          -- their fourth week had part of that week, or all of it, unwritten and reads «not back» — the
+          -- gate errs towards «stop» (adversarial Р2-А3). consented_at cannot tell: a later edition
+          -- overwrites it. Who meets it is an installed build not yet updated; a newcomer of 0.2
+          -- accepts before the app.
           where consent >= ${STATISTICS_CONSENT_EDITION}::int
         ),
         cohort as (

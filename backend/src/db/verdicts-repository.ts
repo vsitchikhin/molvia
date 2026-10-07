@@ -615,7 +615,9 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
           select actor_id, started, off_at
           from closed
           -- The count over verdicts rests on the consent of edition 2 (MOL-236): Armenia's law has
-          -- no legitimate interest, so whoever has not accepted it is in neither half.
+          -- no legitimate interest, so whoever has not accepted it is in neither half. The price:
+          -- someone who signed in and left at the consent step is no longer «did not fill the base»,
+          -- and the share errs towards «go» (review С-7) — read it beside «no consent».
           where consent >= ${STATISTICS_CONSENT_EDITION}::int
         ),
         cohort as (
