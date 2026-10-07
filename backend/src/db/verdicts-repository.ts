@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
-import { DomainError, ERROR, verdictSchema } from '@molvia/model'
+import { DomainError, ERROR, STATISTICS_CONSENT_EDITION, verdictSchema } from '@molvia/model'
 import type { AdviceScope, NewVerdict, Verdict, VerdictPatch } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -104,7 +104,13 @@ export interface CohortReached {
    */
   readonly pending: number
   /**
-   * Their window is over, and they objected to being counted (MOL-96, В-2): out of both halves and
+   * Their window is over, and they have not accepted the edition that asks consent to the statistics
+   * (MOL-236): out of both halves and named. Read now — a consent given later counts the verdicts
+   * already there, since the counting is done at the reading.
+   */
+  readonly withoutConsent: number
+  /**
+   * Their window is over, they consented, and they objected to being counted (MOL-96, В-2): out of both halves and
    * named beside them. Only whether they object now — the verdicts are not erased, so back on they
    * count again.
    */
@@ -588,24 +594,35 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         cohort_size: number
         reached: number
         pending: number
+        without_consent: number
         opted_out: number
       }>(sql`
         with appeared as (
-          select ${actors.id} as actor_id, ${actors.createdAt} as started, ${actors.analyticsOffAt} as off_at
+          select ${actors.id} as actor_id, ${actors.createdAt} as started, ${actors.analyticsOffAt} as off_at,
+            ${actors.consentVersion} as consent
           from ${actors}
           where ${actors.createdAt} >= ${from.toISOString()}::timestamptz
             and ${actors.createdAt} <  ${to.toISOString()}::timestamptz
         ),
         closed as (
-          select actor_id, started, off_at
+          select actor_id, started, off_at, consent
           from appeared
           -- A window still open is no answer yet: counted now, a person who came last week
           -- reads as one who failed, and the gate errs towards «stop» for no reason.
           where started + make_interval(hours => ${windowHours}::int) <= now()
         ),
+        consented as (
+          select actor_id, started, off_at
+          from closed
+          -- The count over verdicts rests on the consent of edition 2 (MOL-236): Armenia's law has
+          -- no legitimate interest, so whoever has not accepted it is in neither half. The price:
+          -- someone who signed in and left at the consent step is no longer «did not fill the base»,
+          -- and the share errs towards «go» (review С-7) — read it beside «no consent».
+          where consent >= ${STATISTICS_CONSENT_EDITION}::int
+        ),
         cohort as (
           select actor_id, started
-          from closed
+          from consented
           -- An objection to being counted takes them out of both halves (MOL-96, В-2).
           where off_at is null
         ),
@@ -623,7 +640,8 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
           (select count(*) from cohort)::int as cohort_size,
           (select count(*) from reached)::int as reached,
           (select count(*) from appeared)::int - (select count(*) from closed)::int as pending,
-          (select count(*) from closed)::int - (select count(*) from cohort)::int as opted_out
+          (select count(*) from closed)::int - (select count(*) from consented)::int as without_consent,
+          (select count(*) from consented)::int - (select count(*) from cohort)::int as opted_out
       `)
 
       const row = rows[0]
@@ -631,6 +649,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         cohortSize: row?.cohort_size ?? 0,
         reached: row?.reached ?? 0,
         pending: row?.pending ?? 0,
+        withoutConsent: row?.without_consent ?? 0,
         optedOut: row?.opted_out ?? 0,
       }
     },

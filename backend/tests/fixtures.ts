@@ -6,6 +6,7 @@ import {
   AGGREGATE_MIN_CONTRIBUTIONS,
   SESSION_COOKIE,
   SHARED_PRICE_FRESH_DAYS,
+  STATISTICS_CONSENT_EDITION,
 } from '@molvia/model'
 import { createSessionRepository } from '@/db/sessions-repository'
 import type { Db } from '@/db/index'
@@ -72,6 +73,22 @@ export async function insertActor(
     ...patch,
   })
   return id
+}
+
+/**
+ * A person the statistics may count (MOL-236): they accepted the edition that asks consent to it,
+ * so the visit log is written for them and the gates see them. `insertActor` is someone who has
+ * accepted nothing — as everyone before the consent step was.
+ */
+export function insertCounted(
+  db: Db,
+  patch: Partial<typeof actors.$inferInsert> = {},
+): Promise<string> {
+  return insertActor(db, {
+    consentVersion: STATISTICS_CONSENT_EDITION,
+    consentedAt: new Date(),
+    ...patch,
+  })
 }
 
 export async function insertItem(

@@ -141,6 +141,8 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
       share(ratings.reached, ratings.cohortSize),
     ),
     row(`still inside their ${days} days`, [String(ratings.pending), 'not counted yet']),
+    // Never consented to the statistics (MOL-236): edition 2 asks it, and nothing is counted without.
+    row('no consent to the statistics', [String(ratings.withoutConsent), 'in neither half']),
     // Objected to being counted (MOL-96, В-2): named, or the share fell with each objection.
     row('opted out of the statistics', [String(ratings.optedOut), 'in neither half']),
     '',
@@ -150,6 +152,7 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
     // The cohort is people, not what they looked at: the two halves wait and lack access alike.
     row('week 4 not over yet', [String(products.pending), 'not counted yet']),
     row('no access in week 4', [String(products.withoutAccess), 'not in the cohort']),
+    row('no consent to the statistics', [String(products.withoutConsent), 'in neither half']),
     row('opted out of the statistics', [String(products.optedOut), 'in neither half']),
     '',
     row('erased', [String(report.erased.count), erasedWeeks(report.erased)]),

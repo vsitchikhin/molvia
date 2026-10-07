@@ -46,7 +46,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 
 - `frontend/src/views/PrivacyView.vue` — «Данные и приватность» screen: a static page of what is kept, why, for how long and how to erase it; opens without a session.
 - `frontend/src/views/TermsView.vue` — «Условия использования» (MOL-95): the rules of the service and the age of 16, beside the privacy page under one edition; opens without a session.
-- `frontend/src/views/policy.ts` — The revision of both pages (MOL-95, В-1): the day and the fingerprint of their text, which `policy.test.ts` holds to every edit, and «Редакция от …» they are subtitled with.
+- `frontend/src/views/policy.ts` — The revision of both pages (MOL-95, В-1): the day and the fingerprint of their text, which `policy.test.ts` holds to every edit, and «Редакция {version} от {day}» they are subtitled with — the edition beside the day (MOL-236).
 
 ## frontend · components
 
