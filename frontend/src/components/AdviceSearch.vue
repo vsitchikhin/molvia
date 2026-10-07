@@ -24,13 +24,13 @@
       @retry="retry"
     />
 
-    <!-- No circle and no action: «Предложить товар» is the entry of a purchase's, and here nothing
-         was bought (handoff `01`, 1e). -->
+    <!-- No action: «Предложить товар» is the entry of a purchase's, and here nothing was bought
+         (handoff `01`, 1e). -->
     <ScreenState
       v-else-if="found.length === 0"
       :class="{ stale }"
       kind="empty"
-      tone="accent"
+      :icon="IconNotFound"
       inline
       :title="t('advice.search.empty.title', { query: answered })"
       :body="
@@ -102,6 +102,7 @@
 import { computed, defineComponent, onUnmounted, toRef, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
+import IconNotFound from '~icons/mdi/magnify-close'
 import type { AdviceFound, AdviceResponse, AdviceRow, AdviceScope } from '@molvia/model'
 import AdviceCheapRow from '@/components/AdviceCheapRow.vue'
 import AdviceGroup from '@/components/AdviceGroup.vue'
@@ -206,6 +207,7 @@ export default defineComponent({
 
     return {
       t,
+      IconNotFound,
       phase,
       found,
       stale,

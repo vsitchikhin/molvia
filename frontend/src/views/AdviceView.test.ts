@@ -484,7 +484,7 @@ describe('AdviceView', () => {
       expect(advice).toHaveBeenCalledTimes(2)
     })
 
-    it('nothing found: «No … found», no circle and no action', async () => {
+    it('nothing found: «No … found», the quiet circle and no action', async () => {
       advice.mockResolvedValue(answer([milk]))
       adviceSearch.mockResolvedValue(found([], { near: false }))
       const { view } = await render()
@@ -493,7 +493,8 @@ describe('AdviceView', () => {
       await vi.waitFor(() => {
         expect(view.text()).toContain('No «кускус» found')
       })
-      expect(view.find('.circle').exists()).toBe(false)
+      expect(view.get('.state').classes()).toContain('quiet')
+      expect(view.get('.state').find('button').exists()).toBe(false)
     })
 
     it('only far rows: said above them — the server`s word (MOL-46)', async () => {

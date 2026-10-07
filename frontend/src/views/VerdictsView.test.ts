@@ -108,7 +108,7 @@ describe('VerdictsView', () => {
     expect(view.text()).not.toMatch(/֏|₽|\$|€/)
   })
 
-  it('«Сохранить» moves to the next card at once; the last one leaves the green success', async () => {
+  it('«Сохранить» moves to the next card at once; the last one leaves the success', async () => {
     rateItem.mockImplementation((itemId) => Promise.resolve(answered(itemId)))
     pendingVerdicts.mockResolvedValue({ items: [milk, bread], total: 2 })
     const { view } = await render()
@@ -119,18 +119,19 @@ describe('VerdictsView', () => {
 
     await rate(view, 2)
     expect(view.text()).toContain(en.verdict.empty.title)
-    expect(view.find('.good').exists()).toBe(true)
+    // One quiet form for every empty state, «all rated» included (Ф-16, 0.1 v2 7c).
+    expect(view.get('.state').classes()).toContain('quiet')
     expect(rateItem.mock.calls.map(([id, rating]) => [id, rating.score])).toEqual([
       [milk.itemId, 4],
       [bread.itemId, 2],
     ])
   })
 
-  it('16: nothing to rate — the green success leads to «What to buy»', async () => {
+  it('16: nothing to rate — the success leads to «What to buy»', async () => {
     pendingVerdicts.mockResolvedValue({ items: [], total: 0 })
     const { view, router } = await render()
 
-    expect(view.find('.good').exists()).toBe(true)
+    expect(view.get('.state').classes()).toContain('quiet')
     await button(view, en.verdict.empty.action).trigger('click')
     await flushPromises()
 

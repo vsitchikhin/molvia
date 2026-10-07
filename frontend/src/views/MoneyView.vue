@@ -73,7 +73,6 @@
         <ScreenState
           v-else-if="newcomer"
           kind="empty"
-          tone="accent"
           :icon="IconWallet"
           :title="t('spending.empty.title')"
           :body="t('spending.empty.body')"

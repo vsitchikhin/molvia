@@ -17,7 +17,6 @@
       <ScreenState
         v-if="recorded !== null"
         kind="empty"
-        tone="good"
         inline
         :icon="IconCheck"
         :title="

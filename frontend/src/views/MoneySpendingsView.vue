@@ -85,7 +85,6 @@
         <ScreenState
           v-else-if="month && journal.length === 0"
           kind="empty"
-          tone="accent"
           :icon="IconWallet"
           :title="t('spending.list.empty.title', { month: monthIn(month.month) })"
           :body="t('spending.list.empty.body')"

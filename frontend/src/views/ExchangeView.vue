@@ -56,7 +56,6 @@
       <ScreenState
         v-else-if="phase === 'empty'"
         kind="empty"
-        tone="accent"
         :icon="IconSwap"
         :title="t('exchange.empty.title')"
         :body="t('exchange.empty.body', { bank })"

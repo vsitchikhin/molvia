@@ -450,10 +450,11 @@ describe('PurchasesView (MOL-128)', () => {
   })
 
   describe('пусто — только когда это известно (MOL-77)', () => {
-    it('сервер ответил: записей нет — «Здесь будут ваши покупки», без круга, кнопка внизу', async () => {
+    it('сервер ответил: записей нет — «Здесь будут ваши покупки», тихий круг, кнопка внизу', async () => {
       const { view } = await render()
       expect(view.text()).toContain(ru.purchases.empty.title)
-      expect(view.find('.circle').exists()).toBe(false)
+      // Круг `--surface-2` кнопкой не читается, терракотовый читался (Ф-16, MOL-77).
+      expect(view.get('.state').classes()).toContain('quiet')
       expect(view.get('.dock').text()).toContain(ru.purchases.capture)
       expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
     })

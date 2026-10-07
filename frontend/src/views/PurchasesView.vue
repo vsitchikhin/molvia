@@ -81,12 +81,12 @@
 
     <ScreenSkeleton v-if="shown === 'loading'" :groups="[34, 70, 56, 74, 62]" />
 
-    <!-- No circle and no button: the action is in the strip below, and a circle over it read as
-         a button of its own (MOL-77). Only for a history known to be empty (`answeredEmpty`). -->
+    <!-- No button: the action is in the strip below. The circle is the quiet one, which does not
+         read as a button (Ф-16, MOL-77). Only for a history known to be empty (`answeredEmpty`). -->
     <ScreenState
       v-else-if="shown === 'empty'"
       kind="empty"
-      tone="accent"
+      :icon="IconCart"
       :title="t('purchases.empty.title')"
       :body="t(country ? 'purchases.empty_capture.body' : 'purchases.empty.body')"
     />
@@ -177,6 +177,7 @@
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import IconCart from '~icons/mdi/cart-outline'
 import IconPencil from '~icons/mdi/pencil-outline'
 import IconStar from '~icons/mdi/star-outline'
 import IconCloudUpload from '~icons/mdi/cloud-upload-outline'
@@ -433,6 +434,7 @@ export default defineComponent({
     const positions = (n: number): string => t('trip.items_count', { n }, n)
 
     return {
+      IconCart,
       removing,
       t,
       asked,

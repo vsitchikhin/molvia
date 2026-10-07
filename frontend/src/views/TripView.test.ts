@@ -255,10 +255,11 @@ describe('TripView', () => {
   })
 
   describe('без открытой записи — «Покупки» (MOL-77, MOL-128)', () => {
-    it('«Начать поход» — в полосе над таб-баром, и кругов с «+» на экране нет', async () => {
+    it('«Начать поход» — в полосе над таб-баром, а круг на экране только тихий', async () => {
       const { view } = await render()
       expect(view.get('.dock').text()).toContain(ru.purchases.manual_by_hand)
-      expect(view.find('.circle').exists()).toBe(false)
+      expect(view.findAll('.circle').length).toBe(1)
+      expect(view.get('.state').classes()).toContain('quiet')
       // Призрачную «Историю походов» заменяет «Вся история» главной.
       expect(view.findAll('button').some((b) => b.text() === ru.trip.history.title)).toBe(false)
     })
@@ -305,8 +306,8 @@ describe('TripView', () => {
     const { view } = await render()
     expect(view.text()).toContain(ru.trip.empty.title)
     expect(button(view, ru.trip.empty.action).exists()).toBe(true)
-    // Круг над «Найти товар» читался кнопкой и не нажимался (MOL-77).
-    expect(view.find('.circle').exists()).toBe(false)
+    // Терракотовый круг над «Найти товар» читался кнопкой (MOL-77); тихий — нет (Ф-16).
+    expect(view.get('.state').classes()).toContain('quiet')
   })
 
   it('пока сервера не спросили и памяти нет — скелетон, а не «Новый поход»', async () => {

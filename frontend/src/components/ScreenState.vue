@@ -57,6 +57,7 @@ import {
 import { getActivePinia } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
+import IconAttention from '~icons/mdi/alert-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconReport from '~icons/mdi/message-alert-outline'
 import IconRefresh from '~icons/mdi/refresh'
@@ -72,22 +73,24 @@ import { focusScreenTitle } from '@/transitions'
 export type StateKind = 'empty' | 'error' | 'offline' | 'attention'
 
 /**
- * The tones a screen may choose. `bad` is not one of them: it belongs to `error` alone and is
- * never asked for, so `tone="bad"` does not type-check anywhere — offline cannot be drawn red.
+ * The tones a screen may choose — for offline alone. `bad` is not one of them: it belongs to
+ * `error` alone and is never asked for, so `tone="bad"` does not type-check anywhere — offline
+ * cannot be drawn red.
  */
-export type StateTone = 'accent' | 'good' | 'warn'
+export type StateTone = 'good' | 'warn'
 
-// Which tones each kind may take. Error and attention take none: theirs is fixed.
+// Which tones each kind may take. Only offline has a choice; empty is one quiet form whatever it
+// says (Ф-16, К-8), and error and attention are fixed.
 const TONES: Record<StateKind, readonly StateTone[]> = {
-  empty: ['accent', 'good'],
+  empty: [],
   offline: ['good', 'warn'],
   error: [],
   attention: [],
 }
 
-// What a kind that has a choice is drawn in when it was given none it takes. Offline falls
-// to yellow, «the data may be old», which is true of every offline screen; green is a promise.
-const FALLBACK = { empty: 'accent', offline: 'warn' } as const
+// What offline is drawn in when it was given no tone it takes: yellow, «the data may be old»,
+// which is true of every offline screen; green is a promise.
+const FALLBACK: StateTone = 'warn'
 
 // Own keys only: `in` walks the prototype, and «toString» would pass for a kind.
 function isKind(value: unknown): value is StateKind {
@@ -96,11 +99,12 @@ function isKind(value: unknown): value is StateKind {
 
 /**
  * What the types cannot say, since a prop's type does not depend on another prop's value:
- * an empty state may bring its own icon or none, the others are drawn with theirs; a tone is
- * given exactly when the kind has a choice, and it is one of that kind's.
+ * an empty state brings its own icon and the others are drawn with theirs; a tone is given
+ * exactly when the kind has a choice, and it is one of that kind's.
  *
- * An empty state without an icon draws no circle at all (MOL-77): over an action, a circle reads
- * as a button whatever its glyph, and the person taps it.
+ * Every empty state has its circle, on `--surface-2` (Ф-16): MOL-77 took the circle away from
+ * three of them because a terracotta one over an action read as a button and was tapped; a
+ * circle of the page's own quiet fill does not, and one form is what the eye learns.
  */
 function fits(kind: unknown, props: Record<string, unknown>): boolean {
   if (!isKind(kind)) return false
@@ -108,7 +112,7 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
   const tone = props.tone as StateTone | undefined
   const toneFits =
     allowed.length === 0 ? tone === undefined : tone !== undefined && allowed.includes(tone)
-  const iconFits = kind === 'empty' || props.icon === undefined
+  const iconFits = (kind === 'empty') === (props.icon !== undefined)
   return toneFits && iconFits
 }
 
@@ -117,10 +121,10 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  * the device-identity notice that fits none of them. Twelve cards of the mockup are twelve
  * sets of props, not twelve components.
  *
- * The tone of the circle carries the meaning: accent is «start here», good is «all fine»,
- * warn is «the data is old» or «you need to know this», bad is an error and nothing else.
- * Offline is never red — the connection drops at the shelf all the time, and an app that
- * panics every time teaches people to ignore it.
+ * Four kinds, told apart by form and confirmed by colour (41 v2, Ф-35): empty is a quiet circle
+ * with the screen's own icon, error a red one with a ring, attention a yellow triangle, offline
+ * the cloud. Offline is green or yellow and never red — the connection drops at the shelf all
+ * the time, and an app that panics every time teaches people to ignore it.
  *
  * An error always offers «Try again», drawn here and reported as `retry`: twelve copies of one
  * word would drift apart. Every other action is the screen's own and comes through `action`,
@@ -160,6 +164,7 @@ export default defineComponent({
     const glyph = computed<Component | undefined>(() => {
       if (props.kind === 'offline') return IconCloudOff
       if (props.kind === 'empty') return props.icon
+      if (props.kind === 'attention') return IconAttention
       return IconAlert
     })
 
@@ -167,11 +172,9 @@ export default defineComponent({
     // only warns, and a warning in the console must not turn offline red on the screen.
     const toneClass = computed(() => {
       if (props.kind === 'error') return 'bad'
-      if (!isKind(props.kind) || props.kind === 'attention') return 'warn'
-      const allowed = TONES[props.kind]
-      return props.tone !== undefined && allowed.includes(props.tone)
-        ? props.tone
-        : FALLBACK[props.kind]
+      if (props.kind === 'empty') return 'quiet'
+      if (props.kind !== 'offline') return 'warn'
+      return props.tone !== undefined && TONES.offline.includes(props.tone) ? props.tone : FALLBACK
     })
 
     // An error on the screen interrupts: the person was waiting for an answer that did not
@@ -281,9 +284,9 @@ export default defineComponent({
   font-size: var(--state-glyph);
 }
 
-.accent .circle {
-  background: var(--accent-tint);
-  color: var(--accent-ink);
+.quiet .circle {
+  background: var(--surface-2);
+  color: var(--text-muted);
 }
 
 .good .circle {

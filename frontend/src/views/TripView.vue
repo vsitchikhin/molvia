@@ -39,11 +39,12 @@
     <template v-if="phase === 'going'">
       <TripRateNotes v-if="trip" :trip="trip" />
 
-      <!-- No circle: over «Найти товар» it read as a button of its own, and was tapped (MOL-77). -->
+      <!-- The quiet circle: a terracotta one over «Найти товар» read as a button and was tapped
+           (MOL-77); `--surface-2` does not (Ф-16). -->
       <ScreenState
         v-if="rows.length === 0"
         kind="empty"
-        tone="accent"
+        :icon="IconBasket"
         :title="t('trip.empty.title')"
         :body="t('trip.empty.body')"
       >
@@ -183,6 +184,7 @@ import { computed, defineComponent, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconBarcode from '~icons/mdi/barcode-scan'
+import IconBasket from '~icons/mdi/basket-outline'
 import IconPlus from '~icons/mdi/plus'
 import type { CatalogueEntry, TripExpenseView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
@@ -509,6 +511,7 @@ export default defineComponent({
     })
 
     return {
+      IconBasket,
       t,
       trip,
       local,

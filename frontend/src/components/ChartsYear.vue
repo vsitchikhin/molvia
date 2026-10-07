@@ -43,7 +43,6 @@
     <ScreenState
       v-if="charts.firstMonth === null"
       kind="empty"
-      tone="accent"
       :icon="IconChart"
       :title="t('spending.charts.empty.title')"
       :body="t('spending.charts.empty.body')"

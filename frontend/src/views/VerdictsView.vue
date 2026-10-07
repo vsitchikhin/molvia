@@ -103,7 +103,6 @@
       <ScreenState
         v-else-if="phase === 'empty' && drafts.waiting.length === 0"
         kind="empty"
-        tone="good"
         :icon="IconCheck"
         :title="t('verdict.empty.title')"
         :body="t('verdict.empty.body')"

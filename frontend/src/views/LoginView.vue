@@ -16,7 +16,6 @@
       <ScreenState
         v-else-if="phase === 'offer'"
         kind="empty"
-        tone="accent"
         :icon="IconSend"
         :title="t('login.offer.title')"
         :body="t('login.offer.body')"
@@ -35,7 +34,6 @@
       <ScreenState
         v-else-if="phase === 'waiting'"
         kind="empty"
-        tone="accent"
         :icon="IconSend"
         :title="t('login.waiting.title')"
         :body="t('login.waiting.body')"

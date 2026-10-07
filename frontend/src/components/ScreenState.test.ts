@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref, shallowRef, watch, type VNodeArrayChildren } from 'vue'
 import IconPlus from '~icons/mdi/plus'
 import IconAlert from '~icons/mdi/alert-circle-outline'
+import IconAttention from '~icons/mdi/alert-outline'
 import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import type { AppLocale } from '@molvia/model'
 import en from '@/i18n/en.json'
@@ -49,22 +50,14 @@ describe('ScreenState', () => {
   })
 
   describe('each kind draws its own circle', () => {
-    it('empty: the icon the screen brought, in the tone it chose', () => {
-      const view = render({ kind: 'empty', tone: 'accent', icon: IconPlus })
-      expect(view.findComponent(IconPlus).exists()).toBe(true)
-      expect(view.classes()).toContain('accent')
-    })
-
-    // Over an action a circle reads as a button whatever its glyph (MOL-77).
-    it('empty without an icon draws no circle at all', () => {
-      const view = render({ kind: 'empty', tone: 'accent' })
-      expect(view.find('.circle').exists()).toBe(false)
-      expect(refused({ kind: 'empty', tone: 'accent' })).toBe(false)
-    })
-
-    it('empty that is a success is green', () => {
-      const view = render({ kind: 'empty', tone: 'good', icon: IconPlus })
-      expect(view.classes()).toContain('good')
+    // One quiet form (Ф-16, К-8): a terracotta circle over an action read as a button (MOL-77).
+    it('empty: the icon the screen brought, in the quiet circle and nothing else', () => {
+      const view = render({ kind: 'empty', icon: IconPlus })
+      expect(view.get('.circle').findComponent(IconPlus).exists()).toBe(true)
+      expect(view.classes()).toContain('quiet')
+      for (const tone of ['accent', 'good', 'warn', 'bad']) {
+        expect(view.classes()).not.toContain(tone)
+      }
     })
 
     it('error: always the alert icon, always red', () => {
@@ -79,9 +72,11 @@ describe('ScreenState', () => {
       expect(view.classes()).toContain(tone)
     })
 
-    it('attention: the alert icon, yellow — something to know, not a failure', () => {
+    // Told from an error by form, not by colour alone (Ф-35): a triangle, never the error's ring.
+    it('attention: the triangle, yellow — something to know, not a failure', () => {
       const view = render({ kind: 'attention' })
-      expect(view.findComponent(IconAlert).exists()).toBe(true)
+      expect(view.findComponent(IconAttention).exists()).toBe(true)
+      expect(view.findComponent(IconAlert).exists()).toBe(false)
       expect(view.classes()).toContain('warn')
     })
   })
@@ -100,8 +95,10 @@ describe('ScreenState', () => {
       ['offline in red', { kind: 'offline', tone: 'bad' }],
       ['offline with no tone', { kind: 'offline' }],
       ['offline in accent', { kind: 'offline', tone: 'accent' }],
-      ['empty with no tone', { kind: 'empty', icon: IconPlus }],
+      ['empty in accent', { kind: 'empty', tone: 'accent', icon: IconPlus }],
+      ['empty in green', { kind: 'empty', tone: 'good', icon: IconPlus }],
       ['empty in yellow', { kind: 'empty', tone: 'warn', icon: IconPlus }],
+      ['empty with no icon', { kind: 'empty' }],
       ['error with a tone', { kind: 'error', tone: 'good' }],
       ['error with an icon of its own', { kind: 'error', icon: IconPlus }],
       ['attention with a tone', { kind: 'attention', tone: 'good' }],
@@ -114,7 +111,7 @@ describe('ScreenState', () => {
     })
 
     it.each<[string, Props]>([
-      ['empty', { kind: 'empty', tone: 'accent', icon: IconPlus }],
+      ['empty', { kind: 'empty', icon: IconPlus }],
       ['error', { kind: 'error' }],
       ['offline', { kind: 'offline', tone: 'warn' }],
       ['attention', { kind: 'attention' }],
@@ -130,7 +127,7 @@ describe('ScreenState', () => {
       // Inline is always polite: a notice drawn again on every screen would interrupt every move
       // (MOL-19, Р-9).
       ['attention inline', { kind: 'attention', inline: true }, 'status'],
-      ['empty', { kind: 'empty', tone: 'accent', icon: IconPlus }, 'status'],
+      ['empty', { kind: 'empty', icon: IconPlus }, 'status'],
       ['offline', { kind: 'offline', tone: 'good' }, 'status'],
       // A notice drawn again over every screen: an alert would cut off the heading each move
       // has just focused (MOL-19, A3).
@@ -212,7 +209,7 @@ describe('ScreenState', () => {
     })
 
     it.each<[string, Props]>([
-      ['empty', { kind: 'empty', tone: 'accent', icon: IconPlus }],
+      ['empty', { kind: 'empty', icon: IconPlus }],
       ['offline', { kind: 'offline', tone: 'good' }],
       ['attention', { kind: 'attention' }],
     ])('is not offered by %s, where trying again is not the way out', (_, props) => {
@@ -358,7 +355,7 @@ describe('ScreenState', () => {
 
   it('puts the action at the end, and draws no empty row without one', () => {
     const withAction = render(
-      { kind: 'empty', tone: 'accent', icon: IconPlus },
+      { kind: 'empty', icon: IconPlus },
       { action: () => h('button', 'Find an item') },
     )
     expect(withAction.element.lastElementChild?.className).toBe('action')
@@ -520,7 +517,7 @@ describe('ScreenState', () => {
 
     it.each([
       ['offline: the connection broke, not the app', { kind: 'offline', tone: 'warn' }],
-      ['empty', { kind: 'empty', tone: 'accent' }],
+      ['empty', { kind: 'empty', icon: IconPlus }],
       ['attention', { kind: 'attention' }],
       [
         'an inline error: a section failed, the screen works (сверка С-1)',
