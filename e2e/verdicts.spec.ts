@@ -6,7 +6,7 @@ import type { Page } from '@playwright/test'
 
 // The first attempt's trace in CI, the network and the DOM of each step with it: the flake of «…and the
 // app closed» failed four times there and left only its message, and the retry it passes is all
-// `on-first-retry` records (MOL-217). Here alone — for every spec it cost the run four to six minutes.
+// `on-first-retry` records (MOL-217). Here alone: for every spec it made the run 13.2–15.8 minutes.
 if (process.env.CI) test.use({ trace: { mode: 'retain-on-first-failure', screenshots: false } })
 
 interface Person {

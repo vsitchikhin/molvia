@@ -90,9 +90,9 @@ export default defineConfig({
   // it is recorded for every test and dropped when it passes — measured at 12–22 % of a full run
   // (four pairs, 26.09.2026, ~66 s against ~59 s). And an overload that times a test out can
   // still lose it: it is saved while the context is torn down, which shares the test's timeout.
-  // In CI the retry's, which a flake passes: the first attempt's for every test cost the run some four
-  // to six minutes over its median of 9.6 (MOL-217, review С-6) — so a spec whose flake needs it records
-  // it itself, as `verdicts.spec` does.
+  // In CI the retry's, which a flake passes: with the first attempt's for every test the run took 13.2
+  // to 15.8 minutes against a median of 9.6 (MOL-217, review С-6) — so a spec whose flake needs it
+  // records it itself, as `verdicts.spec` does.
   //
   // The phone is in Armenia (MOL-121): the app dates by the phone's calendar and the specs by
   // Yerevan's, and in CI's UTC the two part from 20:00 to midnight. The component tests run in UTC

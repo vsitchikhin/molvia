@@ -109,8 +109,9 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   shares the test's timeout. **In CI the retry's, and the first attempt's only where a spec asks
   for it** (MOL-217, owner's choice on review С-6): `on-first-retry` records the retry, which a flake
   passes, and the failure itself leaves only its message — `verdicts.spec` failed four times so.
-  Recorded for every test, the first attempt's cost the run four to six minutes over its median of 9.6
-  (15.6 and 15.8 with the screencast, 13.2 and 15.5 without), so a spec that needs it says
+  Recorded for every test, the first attempt's ran 13.2 to 15.8 minutes (15.6 and 15.8 with the
+  screencast, 13.2 and 15.5 without) against a median of 9.6 and a spread of 9.3–12.8 before it — five
+  runs of a runner that wanders, so a cost likely rather than measured; a spec that needs it says
   `test.use({ trace: { mode: 'retain-on-first-failure', screenshots: false } })` under `CI`, as
   `verdicts.spec` does. Not without the DOM of each step: Playwright records the network only with
   those snapshots, and the network — which request left and how it ended — is what a flake's trace is
