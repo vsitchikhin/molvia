@@ -215,7 +215,11 @@ export default defineComponent({
     // section's, the quiet card — its own filled «Повторить» and «Обновить» were a second pair
     // (adversarial А4, 8c).
     const second = computed(
-      () => strip?.owner.value != null && strip.owner.value !== me && !props.inline,
+      () =>
+        props.kind === 'error' &&
+        strip?.owner.value != null &&
+        strip.owner.value !== me &&
+        !props.inline,
     )
     const card = computed(() => props.kind === 'error' && (props.inline || second.value))
 

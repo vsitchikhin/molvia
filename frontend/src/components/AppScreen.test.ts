@@ -749,6 +749,51 @@ describe('AppScreen with an error of the whole screen', () => {
     view.unmount()
   })
 
+  // The screen's own action goes with the strip, and a focus on it went to the body: it goes to the
+  // error's «Try again», where that action stood (review №6).
+  it('hands a focus on the screen’s own action to the error that takes the strip', async () => {
+    const failed = ref(false)
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            AppScreen,
+            { title: 'What to buy' },
+            {
+              default: () => (failed.value ? error() : h('p', 'Ready')),
+              docked: () => h('button', { class: 'own' }, 'Record purchases'),
+            },
+          ),
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: waiting('none') },
+        },
+      },
+    )
+    ;(view.get('.own').element as HTMLElement).focus()
+    failed.value = true
+    await nextTick()
+    await nextTick()
+    expect(document.activeElement).toBe(view.get('.dock button').element)
+    expect(document.activeElement?.textContent).toContain(en.state.retry)
+    view.unmount()
+  })
+
+  // Only an error is a second one: a notice of the whole screen beside it stays an alert (review №5).
+  it('keeps a full «attention» beside an error that holds the strip an alert', async () => {
+    const { view } = await render('/', {
+      slots: {
+        default: () => [error(), h(ScreenState, { kind: 'attention', title: 'Gone' })],
+      },
+    })
+    await nextTick()
+    const notice = view.findAll('.content .state').find((one) => one.text().includes('Gone'))
+    expect(notice?.find('[role="alert"]').exists()).toBe(true)
+  })
+
   // The error offers «Обновить» in the row's place, and says the version as the row did: a version
   // out while it holds the strip came in silence (adversarial А3).
   it('says a version that comes out while the error holds the strip', async () => {

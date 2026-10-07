@@ -90,7 +90,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeUpdate, ref } from 'vue'
+import { computed, defineComponent, nextTick, onBeforeUpdate, ref, watch } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -198,6 +198,17 @@ export default defineComponent({
     const updating = computed(() => update.phase.value !== 'none')
     const stateTarget = ref<HTMLElement | null>(null)
     const strip = provideStateStrip(stateTarget)
+    // An error taking the strip unmounts the screen's own action, and a focus on it fell to the body
+    // («Где вы?» closed over a failed «Что брать» hands it back to «Записать покупки», review №6): it
+    // goes to the error's first button, which stands where that action stood.
+    watch(
+      strip.held,
+      (held) => {
+        if (!held || !dock.value?.contains(document.activeElement)) return
+        void nextTick(() => stateTarget.value?.querySelector('button')?.focus())
+      },
+      { flush: 'pre' },
+    )
     // The error offers «Обновить» itself while a version waits or is being let in.
     const offered = computed(
       () => strip.held.value && ['ready', 'applying'].includes(update.phase.value),
