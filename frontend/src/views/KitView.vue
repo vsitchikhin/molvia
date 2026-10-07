@@ -368,6 +368,45 @@
       <SkeletonPart kind="rows" :count="3" lead="circle" tail next />
     </section>
 
+    <!-- The four kinds of a state (MOL-180): told apart by form — the quiet circle of an empty one,
+         the cloud, the triangle, and a section's error as the quiet card. Inline, all of them: an
+         error of the whole screen would take this page's strip. -->
+    <section class="group">
+      <SectionCaption class="caption">{{ t('dev.kit.states') }}</SectionCaption>
+      <AppCard>
+        <ScreenState
+          kind="empty"
+          inline
+          :icon="IconWallet"
+          :title="t('spending.empty.title')"
+          :body="t('spending.empty.body')"
+        />
+      </AppCard>
+      <AppCard>
+        <ScreenState
+          kind="offline"
+          tone="warn"
+          inline
+          :title="t('spending.offline.title')"
+          :body="t('spending.offline.body')"
+        />
+      </AppCard>
+      <AppCard>
+        <ScreenState
+          kind="attention"
+          inline
+          :title="t('receipt.gone.title')"
+          :body="t('receipt.gone.body')"
+        />
+      </AppCard>
+      <ScreenState
+        kind="error"
+        inline
+        :title="t('trip.error.title')"
+        :body="t('trip.error.body')"
+      />
+    </section>
+
     <!-- The skeleton (MOL-178, Ф-13): each part of the kit under the answer it stands for, so e2e holds
          their heights at 390 and 320; then the parts that have no one component of an answer. -->
     <section class="group">
@@ -486,6 +525,7 @@ import ListRow from '@/components/ListRow.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import NavRow from '@/components/NavRow.vue'
 import OperationRow from '@/components/OperationRow.vue'
+import ScreenState from '@/components/ScreenState.vue'
 import SearchField from '@/components/SearchField.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
@@ -526,6 +566,7 @@ export default defineComponent({
     MonthSwitcher,
     NavRow,
     OperationRow,
+    ScreenState,
     SearchField,
     SectionCaption,
     SegmentedControl,
