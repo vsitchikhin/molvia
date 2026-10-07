@@ -594,6 +594,33 @@ The detail behind the frontend lines of `CLAUDE.md`.
   second full error while the first holds the strip is drawn as the quiet card (А4); the same error
   turning a section's where it stands gives its focus back to «Повторить» (А2); and the error says
   the version out loud in the row's place (`useUpdateAnnouncement`, А3).
+- **The connection is one line, `StatusStrip`** (MOL-181, Ф-14, Н-7). «Без связи», «из памяти» and
+  «сервер не ответил» were drawn five ways — a strip copied into seventeen files, a card of
+  `ScreenState` over the screen, a note in a sheet — two or three on one screen, and a strip shared
+  by the screens said «покупки» on «Графики». Now: **once a screen**, under the header, under what
+  chooses the answer (the month, the search field — never above it, the rule below) or first in a
+  sheet; **in the screen's words, whole**, the time inside them — where «на 14:05» stands in the
+  sentence is the screen's and the language's, and a prop of time would have the kit glue a sentence
+  of pieces; where a memory keeps no time, the key has none. **Two kinds, and the kit draws the
+  glyph:** `offline`, the cloud; `unanswered` — the server did not answer and the last answer is shown
+  — the circle of frame 6h (owner's В-1 «а»): the form says «the server's error», the yellow says
+  «what is shown still holds»; never red. The kind is required — offline or error is the screen's,
+  decided after the failure. **«Повторить» only in `unanswered`'s `#action`** (К-5), a ghost, and only
+  where the screen's strip does not hold one: without a connection there is nothing to try, so an
+  offline strip draws no slot whatever it is given; the button takes the strip's padding, and the
+  strip grows to 44, not 60. **It speaks through the live region, never a role of its own** (К-14) —
+  on coming and on new words, taken back when it goes; the same words again are not news. «From
+  memory» has two forms only: `ScreenState` when there is no answer, the strip when an old one is
+  shown. One per screen is held by the screens' tests, not a linter: two strips in a template are
+  often `v-if` and `v-else`. `AppNote` stays the note — the «i», 400, no voice. The seventeen copies
+  move onto it in their screens' tasks, with their words.
+- **A sheet has a live region of its own** (MOL-181, owner's В-2 «а»). The app's region is outside
+  the modal `<dialog>`, inert while it is open, and nothing said there is read (feedback С-10): the
+  words of `ScreenState`, the skeleton and the strip inside a sheet went nowhere. `BottomSheet`
+  provides its own announcer (`provideAnnouncer`), its region there from the opening, so whatever
+  speaks inside speaks to it — a sheet over a sheet to its own. Its class is `.region`, not
+  `.announcer`: the end-to-end tests find the app's region by that name. `FeedbackSheet` keeps the
+  region of its answer (its own rule, feedback.md).
 - **The skeleton is the answer's shape, drawn in the kit's parts** (MOL-178, Ф-13, Н-5). Its bars were
   `surface-2` on the page's ground — 1.06:1 in the light scheme, next to nothing — with no card, no
   rows and no search field, so the screen jumped as the answer came. **`ScreenSkeleton` is the frame**:
