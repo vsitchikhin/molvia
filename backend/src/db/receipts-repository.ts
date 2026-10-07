@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
+import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import {
   DomainError,
   ERROR,
@@ -23,6 +24,7 @@ import type {
   ReceiptFailure,
   ReceiptLinkBody,
   ReceiptSource,
+  ReceiptVia,
   ReceiptHeard,
   ReceiptLayout,
   ReceiptLine,
@@ -45,6 +47,7 @@ import {
   receiptDays,
   receiptParts,
   receipts,
+  taxReceiptDays,
   trips,
 } from './schema'
 import { yerevanDay } from './yerevan-week'
@@ -213,8 +216,12 @@ export interface RecordedReceipt {
   readonly confirmed: readonly number[]
   /** What the person put right before recording, counted in `receipt_days` (MOL-222). */
   readonly edits: ReceiptEdits
-  /** Counted in `receipt_days`: the first record of the receipt, never one after its trip went. */
+  /**
+   * Counted in `receipt_days` — or, of a receipt from the tax office, in `tax_receipt_days` (MOL-234):
+   * the first record of the receipt, never one after its trip went.
+   */
   readonly counted: boolean
+  readonly source: ReceiptSource
 }
 
 /**
@@ -233,21 +240,33 @@ export interface ReceiptEdits {
 
 /** What a reading or a record adds to its day of `receipt_days`, by column. */
 type ReceiptDayCounts = Partial<Record<Exclude<keyof typeof receiptDays.$inferInsert, 'day'>, SQL>>
+/** The same of `tax_receipt_days` (MOL-234). */
+type TaxReceiptDayCounts = Partial<
+  Record<Exclude<keyof typeof taxReceiptDays.$inferInsert, 'day'>, SQL>
+>
 
 /**
- * Adds to the row of `day` of `receipt_days` (MOL-222), read from `source` as `login_days` is counted
+ * Adds to the row of `day` of a table of days (MOL-222), read from `source` as `login_days` is counted
  * (MOL-68): in the transaction of what it counts, the last statement of it, so what is rolled back is
  * not counted.
  */
-async function tally(db: Conn, counts: ReceiptDayCounts, day: SQL, source: SQL = sql``) {
-  const entries = Object.entries(counts).map(([key, value]) => ({
-    name: sql.identifier(receiptDays[key as keyof ReceiptDayCounts].name),
-    value,
-  }))
+async function addToDay(
+  db: Conn,
+  table: typeof receiptDays | typeof taxReceiptDays,
+  counts: Readonly<Record<string, SQL | undefined>>,
+  day: SQL,
+  source: SQL,
+) {
+  const columns = table as unknown as Readonly<Record<string, AnyPgColumn>>
+  const entries = Object.entries(counts).flatMap(([key, value]) => {
+    const column = columns[key]
+    if (column === undefined) throw new Error(`no column ${key} to count in`)
+    return value === undefined ? [] : [{ name: sql.identifier(column.name), value }]
+  })
   if (entries.length === 0) return
-  const key = sql.identifier(receiptDays.day.name)
+  const key = sql.identifier(table.day.name)
   await db.execute(sql`
-    insert into ${receiptDays} (${key}, ${sql.join(
+    insert into ${table} (${key}, ${sql.join(
       entries.map((entry) => entry.name),
       sql`, `,
     )})
@@ -256,10 +275,18 @@ async function tally(db: Conn, counts: ReceiptDayCounts, day: SQL, source: SQL =
       sql`, `,
     )} ${source}
     on conflict (${key}) do update set ${sql.join(
-      entries.map(({ name }) => sql`${name} = ${receiptDays}.${name} + excluded.${name}`),
+      entries.map(({ name }) => sql`${name} = ${table}.${name} + excluded.${name}`),
       sql`, `,
     )}`)
 }
+
+/** Adds to `receipt_days`: the reader's measure, photos only. */
+const tally = (db: Conn, counts: ReceiptDayCounts, day: SQL, source: SQL = sql``) =>
+  addToDay(db, receiptDays, counts, day, source)
+
+/** Adds to `tax_receipt_days`: the receipts by their link (MOL-234). */
+const tallyTax = (db: Conn, counts: TaxReceiptDayCounts, day: SQL, source: SQL = sql``) =>
+  addToDay(db, taxReceiptDays, counts, day, source)
 
 /** Today in Yerevan, by the database's clock: the day a reading ended on. */
 const today = (): SQL => yerevanDay(sql`clock_timestamp()`)
@@ -485,8 +512,18 @@ function linkReceipt(body: ReceiptLinkBody) {
     printedTime: clock.time,
     receiptNo: read.number,
     totalMinor: read.total.minor,
+    // whether the camera missed is said only with how the link came (MOL-234, Р-3)
+    via: body.via ?? null,
+    qrMissed: body.via === undefined ? null : (body.missed ?? false),
   }
   return { link: read.link, row }
+}
+
+/** The column of `tax_receipt_days` a receipt's arrival is counted in (MOL-234, owner's В-3 «а»). */
+function sentColumn(row: { via: ReceiptVia | null; qrMissed: boolean | null }) {
+  if (row.via === null) return 'sentUnnamed'
+  if (row.via === 'qr') return row.qrMissed === true ? 'sentQrMissed' : 'sentQr'
+  return row.qrMissed === true ? 'sentPasteMissed' : 'sentPaste'
 }
 
 export function createReceiptRepository(db: Conn): ReceiptRepository {
@@ -532,9 +569,10 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           if (inserted) {
             // the link in a table of its own, out of the nightly copy (adversarial А4)
             if ('link' in body) {
-              await tx
-                .insert(receiptLinks)
-                .values({ receiptId: body.id, link: linkReceipt(body).link })
+              const { link, row } = linkReceipt(body)
+              await tx.insert(receiptLinks).values({ receiptId: body.id, link })
+              // counted when the server takes it, and only then: a repeat is the same receipt
+              await tallyTax(tx, { [sentColumn(row)]: sql`1` }, today())
             }
             return { receipt: await summaryOf(tx, body.id), created: true }
           }
@@ -548,7 +586,10 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             held.deletedAt === null &&
             fields.every((field) => held[field] === body[field]) &&
             ('link' in body
-              ? held.source === 'tax' && held.receiptNo === linkReceipt(body).row.receiptNo
+              ? held.source === 'tax' &&
+                held.receiptNo === linkReceipt(body).row.receiptNo &&
+                held.via === linkReceipt(body).row.via &&
+                held.qrMissed === linkReceipt(body).row.qrMissed
               : held.source === 'photo' && held.parts === body.parts) &&
             capturedSame(held.capturedAt, body.capturedAt)
           if (!same) throw new DomainError(ERROR.CONFLICT)
@@ -784,7 +825,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           : sql`(${took} > interval '${sql.raw(below)}' and ${took} <= interval '${sql.raw(bound)}')::int`
       const { edits } = recorded
       if (!recorded.counted) return
-      await tally(
+      await (recorded.source === 'tax' ? tallyTax : tally)(
         db,
         {
           recorded: sql`1`,
@@ -1101,14 +1142,19 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         // read or failed, the link of a receipt by its QR code is no longer kept (MOL-232, Р-4)
         await tx.delete(receiptLinks).where(eq(receiptLinks.receiptId, id))
         // the measure of 0.2 is the reader's (MOL-222): a receipt from the tax office has nothing in it
-        // to put right, and until MOL-234 gives it a line of its own it counts nothing (Р-5)
-        const counted = done.source === 'photo'
+        // to read wrong, and is counted in a table of its own (MOL-234)
+        const tax = done.source === 'tax'
         // a reading is written whole: what an earlier one left goes first
         await tx.delete(receiptLines).where(eq(receiptLines.receiptId, id))
         await tx.delete(receiptLineImages).where(eq(receiptLineImages.receiptId, id))
         if (outcome.kind !== 'parsed') {
+          if (tax) {
+            const failed = outcome.failure === 'invalid' ? 'invalid' : 'unreadable'
+            await tallyTax(tx, { [failed]: sql`1` }, today())
+            return
+          }
           const failed = outcome.failure === 'reshoot' ? 'reshoot' : 'unreadable'
-          if (counted) await tally(tx, { [failed]: sql`1` }, today())
+          await tally(tx, { [failed]: sql`1` }, today())
           return
         }
         if (outcome.lines.length > 0) {
@@ -1142,7 +1188,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           : outcome.partly
             ? { readPartly: sql`1` }
             : { read: sql`1` }
-        if (counted) await tally(tx, read, today())
+        if (tax) await tallyTax(tx, { read: sql`1` }, today())
+        else await tally(tx, read, today())
       })
     },
 
@@ -1157,7 +1204,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           })
           .where(and(eq(receipts.status, 'reading'), eq(receipts.source, 'tax')))
         // restored from a nightly copy, which holds no link (adversarial А4): nothing to ask with
-        await tx
+        const lost = await tx
           .update(receipts)
           .set({
             status: 'failed',
@@ -1169,6 +1216,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             sql`${receipts.source} = 'tax' and ${receipts.status} = 'queued'
               and not exists (select 1 from ${receiptLinks} where ${receiptLinks.receiptId} = ${receipts.id})`,
           )
+          .returning({ id: receipts.id })
+        if (lost.length > 0) await tallyTax(tx, { unreadable: sql`${lost.length}::int` }, today())
       })
     },
 
@@ -1234,6 +1283,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         if (moved?.status !== 'failed') return 'queued'
         // given up, the link is no longer kept (Р-4)
         await tx.delete(receiptLinks).where(eq(receiptLinks.receiptId, id))
+        await tallyTax(tx, { missing: sql`1` }, today())
         return 'failed'
       })
     },

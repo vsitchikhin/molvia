@@ -39,8 +39,10 @@ export const EXPORT_FORMAT = 'molvia-export'
 // since when it is blocked (MOL-129). 14: the account's `analyticsOffAt` and `analyticsOnAt`, since when
 // the person objects to being counted and when they last stopped objecting (MOL-96). 15: a receipt's
 // `source`, `shopUnit`, `shop` and `nextAttemptAt` — a Serbian receipt by its link, its shop as the tax
-// office names it, and when it is asked of the tax office next (MOL-232).
-export const EXPORT_VERSION = 15
+// office names it, and when it is asked of the tax office next (MOL-232). 16: a receipt's `via` and
+// `qrMissed`, how its link reached the phone, and a line's `gtin`, the package's code the tax office
+// gave it (MOL-234).
+export const EXPORT_VERSION = 16
 
 const day = z.iso.date()
 
@@ -303,6 +305,8 @@ const receiptSchema = z.strictObject({
   readerVersion: z.string().nullable(),
   layout: z.string().nullable(),
   nextAttemptAt: isoDate.nullable(),
+  via: z.string().nullable(),
+  qrMissed: z.boolean().nullable(),
   tin: z.string().nullable(),
   shopUnit: z.string().nullable(),
   shop: z.string().nullable(),
@@ -331,6 +335,7 @@ const receiptSchema = z.strictObject({
       itemId: z.uuid().nullable(),
       match: z.string().nullable(),
       translation: z.string().nullable(),
+      gtin: z.string().nullable(),
       expenseId: z.uuid().nullable(),
     }),
   ),

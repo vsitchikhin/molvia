@@ -70,6 +70,7 @@ import {
   receiptFailureSchema,
   receiptHeardSchema,
   receiptSourceSchema,
+  receiptViaSchema,
   receiptParsedMatchSchema,
   receiptStatusSchema,
   storeMemoryKindSchema,
@@ -101,6 +102,7 @@ import type {
   ReceiptCountry,
   ReceiptFailure,
   ReceiptSource,
+  ReceiptVia,
   ReceiptHeard,
   ReceiptParsedMatch,
   ReceiptStatus,
@@ -2081,6 +2083,64 @@ export const receiptDays = pgTable(
 )
 
 /**
+ * The receipts from the Serbian tax office (MOL-234), counted as `receipt_days` is and beside it, never
+ * in it: their lines are the tax office's, with nothing to read wrong, and counted with OCR's they would
+ * thin the stop line of 0.2r. A table of its own rather than a `source` in that one's key — a key moved
+ * would break the `on conflict (day)` of the image a failed deploy puts back.
+ *
+ * How the link came (`sent_*`) is counted when the server takes the receipt, on that day: QR off the
+ * photo or pasted, with the camera missing before it or not — the measure of the risk of MOL-233 — and
+ * not named by a phone of an earlier build. A reading counts on the day it ended, a record on the day
+ * it was written, both in Yerevan. What a person put right is what the matcher missed: the figures are
+ * the tax office's.
+ */
+export const taxReceiptDays = pgTable(
+  'tax_receipt_days',
+  {
+    day: date('day').primaryKey(),
+    sentQr: integer('sent_qr').notNull().default(0),
+    sentQrMissed: integer('sent_qr_missed').notNull().default(0),
+    sentPaste: integer('sent_paste').notNull().default(0),
+    sentPasteMissed: integer('sent_paste_missed').notNull().default(0),
+    sentUnnamed: integer('sent_unnamed').notNull().default(0),
+    /** Read with its lines. */
+    read: integer('read').notNull().default(0),
+    /** Not shown by the tax office in two days. */
+    missing: integer('missing').notNull().default(0),
+    /** Refused by the tax office. */
+    invalid: integer('invalid').notNull().default(0),
+    /** No list in its journal, a link lost, an answer we could not write. */
+    unreadable: integer('unreadable').notNull().default(0),
+    /** Its specification answered and agreed with the journal; failed — no codes from it (В-1). */
+    specsOk: integer('specs_ok').notNull().default(0),
+    specsFailed: integer('specs_failed').notNull().default(0),
+    /** Lines that came with a code the catalogue would take. */
+    linesCoded: integer('lines_coded').notNull().default(0),
+    recorded: integer('recorded').notNull().default(0),
+    lines: integer('lines').notNull().default(0),
+    linesEdited: integer('lines_edited').notNull().default(0),
+    linesSkipped: integer('lines_skipped').notNull().default(0),
+    linesItem: integer('lines_item').notNull().default(0),
+    linesFigures: integer('lines_figures').notNull().default(0),
+    totalsCorrected: integer('totals_corrected').notNull().default(0),
+    /** Codes of its lines the person bound to items at «Записать» (В-2). */
+    codesWritten: integer('codes_written').notNull().default(0),
+    within5m: integer('within_5m').notNull().default(0),
+    within15m: integer('within_15m').notNull().default(0),
+    within1h: integer('within_1h').notNull().default(0),
+    within1d: integer('within_1d').notNull().default(0),
+    later: integer('later').notNull().default(0),
+  },
+  (table) => [
+    check(
+      'tax_receipt_days_counts_non_negative',
+      sql`least(${table.sentQr}, ${table.sentQrMissed}, ${table.sentPaste}, ${table.sentPasteMissed}, ${table.sentUnnamed}, ${table.read}, ${table.missing}, ${table.invalid}, ${table.unreadable}, ${table.specsOk}, ${table.specsFailed}, ${table.linesCoded}, ${table.recorded}, ${table.lines}, ${table.linesEdited}, ${table.linesSkipped}, ${table.linesItem}, ${table.linesFigures}, ${table.totalsCorrected}, ${table.codesWritten}, ${table.within5m}, ${table.within15m}, ${table.within1h}, ${table.within1d}, ${table.later}) >= 0`,
+    ),
+    check('tax_receipt_days_edited_within_lines', sql`${table.linesEdited} <= ${table.lines}`),
+  ],
+)
+
+/**
  * «Написать разработчику» (MOL-147): what a person wrote to the one who builds the app. Not a
  * review — `verdicts.review` is that — so nothing reads it but the owner. The `id` is the number the
  * owner sees, `#fb42`, so it is the server's and counts up.
@@ -2424,6 +2484,10 @@ export const receipts = pgTable(
     country: char('country', { length: 2 }).$type<ReceiptCountry>().notNull(),
     // When the tax office is asked next about a receipt it did not show yet (MOL-232, Р-2).
     nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
+    // How a receipt's link reached the phone, and whether the camera missed before it (MOL-234): the
+    // measure of the risk of MOL-233. Empty on a photo, and on a link a phone of an earlier build sent.
+    via: text('via').$type<ReceiptVia>(),
+    qrMissed: boolean('qr_missed'),
     // The language the lines are to be read out in: the interface's, which nothing else keeps (П-4).
     language: text('language').$type<AppLocale>().notNull(),
     currency: char('currency', { length: 3 }).$type<Currency>().notNull(),
@@ -2511,6 +2575,16 @@ export const receipts = pgTable(
     check(
       'receipts_asked_when_queued',
       sql`${table.source} = 'photo' or ${table.status} <> 'queued' or ${table.nextAttemptAt} is not null`,
+    ),
+    check(
+      'receipts_via_known',
+      sql`${table.via} is null or ${oneOf(table.via, receiptViaSchema.options)}`,
+    ),
+    // A photo came by no link; whether the camera missed is said only of how the link came (MOL-234).
+    check(
+      'receipts_via_of_link',
+      sql`(${table.source} = 'tax' or (${table.via} is null and ${table.qrMissed} is null))
+          and (${table.qrMissed} is null or ${table.via} is not null)`,
     ),
     check('receipts_country_known', oneOf(table.country, receiptCountrySchema.options)),
     check('receipts_language_known', oneOf(table.language, LOCALES)),
@@ -2615,6 +2689,9 @@ export const receiptLines = pgTable(
     match: text('match').$type<ReceiptParsedMatch>(),
     // The line word by word in the language of the receipt, by the dictionary of till words.
     translation: text('translation'),
+    // The package's code the Serbian tax office's specification gave the line (MOL-234): only one the
+    // catalogue would take (`writtenBarcode`), never a shop's own. Written to an item only by the person.
+    gtin: text('gtin'),
     // The purchase the line was recorded as: a change of its item later teaches the memory (Р-2).
     expenseId: uuid('expense_id').references(() => expenses.id, { onDelete: 'set null' }),
   },
@@ -2638,6 +2715,10 @@ export const receiptLines = pgTable(
     check(
       'receipt_lines_match_known',
       sql`${table.match} is null or ${oneOf(table.match, receiptParsedMatchSchema.options)}`,
+    ),
+    check(
+      'receipt_lines_gtin_shape',
+      sql`${table.gtin} is null or ${table.gtin} ~ '^([0-9]{8}|[0-9]{12,14})$'`,
     ),
     check(
       'receipt_lines_amounts_non_negative',

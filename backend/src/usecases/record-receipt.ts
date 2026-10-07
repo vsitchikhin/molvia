@@ -315,10 +315,10 @@ export async function recordReceipt(
       expenses: written,
       confirmed,
       edits: editsOf(body, held.lines, shown, held.total),
-      // recorded again once its trip was removed for good: counted the first time only (review 7)
-      // and only a photo's: a receipt from the tax office has nothing to put right, and until MOL-234
-      // gives it a line of its own it counts nothing (MOL-232, Р-5)
-      counted: held.status !== 'recorded' && held.source === 'photo',
+      // recorded again once its trip was removed for good: counted the first time only (review 7);
+      // a receipt from the tax office in a table of its own, its lines being no reading (MOL-234)
+      counted: held.status !== 'recorded',
+      source: held.source,
     })
     return answer(trip.id)
   })

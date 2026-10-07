@@ -20,6 +20,7 @@ import {
   erasures,
   loginDays,
   receiptDays,
+  taxReceiptDays,
   reminderDays,
   failures,
   ownerNotices,
@@ -209,6 +210,7 @@ export async function clearAll(db: Db): Promise<void> {
   await db.delete(loginDays)
   await db.delete(reminderDays)
   await db.delete(receiptDays)
+  await db.delete(taxReceiptDays)
   await db.delete(failures)
   await db.delete(ownerNotices)
 }

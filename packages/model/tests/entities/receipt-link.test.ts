@@ -132,6 +132,18 @@ describe('«Отправить чек» by its link (MOL-232)', () => {
     expect(receiptBodySchema.safeParse({ ...byLink, link: 'x'.repeat(2_049) }).success).toBe(false)
   })
 
+  it('names how the link came, or nothing — a body of an earlier build (MOL-234)', () => {
+    for (const way of [{ via: 'qr' }, { via: 'paste', missed: true }, {}, { missed: false }]) {
+      expect(receiptBodySchema.safeParse({ ...byLink, ...way }).success, JSON.stringify(way)).toBe(
+        true,
+      )
+    }
+    expect(receiptBodySchema.safeParse({ ...byLink, via: 'camera' }).success).toBe(false)
+    expect(receiptBodySchema.safeParse({ ...byLink, missed: 'yes' }).success).toBe(false)
+    // a photo came by no link
+    expect(receiptBodySchema.safeParse({ ...body, via: 'qr' }).success).toBe(false)
+  })
+
   it('keeps each country to its own way: Armenia by photo, Serbia by link', () => {
     expect(receiptBodySchema.safeParse({ ...byLink, country: 'AM' }).success).toBe(false)
     expect(receiptBodySchema.safeParse({ ...body, country: 'RS' }).success).toBe(false)

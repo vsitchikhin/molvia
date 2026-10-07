@@ -8,6 +8,7 @@ import {
   receiptFailureSchema,
   receiptMatchSchema,
   receiptStatusSchema,
+  receiptViaSchema,
 } from '#model/entities/receipt'
 import { newItemSchema } from '#model/entities/item'
 import { serbianReceiptLink } from '#model/entities/receipt-link'
@@ -52,6 +53,13 @@ export const receiptLinkBodySchema = z.strictObject({
   country: linkReceiptCountrySchema,
   language: z.enum(LOCALES),
   capturedAt: isoDate,
+  /**
+   * How the link came, and whether the camera missed in the sheet before it (MOL-234). Optional: a
+   * body a phone of an earlier build left in its queue has neither, and a door refused is never sent
+   * again (Р-3) — such a receipt is counted as not named.
+   */
+  via: receiptViaSchema.optional(),
+  missed: z.boolean().optional(),
 })
 
 export const receiptBodySchema = z.union([receiptPhotoBodySchema, receiptLinkBodySchema])

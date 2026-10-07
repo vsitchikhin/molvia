@@ -15,7 +15,15 @@ import { madeUpJournal, madeUpSerbianLink } from '@molvia/model/testing/serbian-
 import type { FastifyInstance } from 'fastify'
 import { createItemRepository } from '@/db/items-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
-import { receiptDays, receiptLines, receiptLinks, receipts, storeMemory, trips } from '@/db/schema'
+import {
+  receiptDays,
+  receiptLines,
+  receiptLinks,
+  receipts,
+  storeMemory,
+  taxReceiptDays,
+  trips,
+} from '@/db/schema'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
 import type { Purs, PursAnswer } from '@/purs/client'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
@@ -148,6 +156,14 @@ const row = async (id: string) => {
   return { ...found, link: held?.link ?? null }
 }
 const days = () => db.select().from(receiptDays)
+/** The one day of `tax_receipt_days` a test wrote, its counts that are not zero (MOL-234). */
+async function taxDay(): Promise<Record<string, number>> {
+  const rows = await db.select().from(taxReceiptDays)
+  expect(rows).toHaveLength(1)
+  return Object.fromEntries(
+    Object.entries(rows[0] ?? {}).filter(([key, n]) => key !== 'day' && n !== 0),
+  ) as Record<string, number>
+}
 const due = (id: string) =>
   db
     .update(receipts)
@@ -298,13 +314,14 @@ describe('the tax office’s queue', () => {
     expect(detail.receipt.header).toMatchObject({ tin: TIN, shop: 'RODA MEGAMARKET 463' })
   })
 
-  it('counts nothing in receipt_days — reading or failing — until MOL-234 gives it a line', async () => {
+  it('counts nothing in receipt_days, reading or failing: its own table counts it (MOL-234)', async () => {
     const me = await serb()
     await taken(me)
     await taken(me)
     await taken(me)
     await round(office(found(), { kind: 'refused' }, found({ journal: 'no list' })))
     expect(await days()).toEqual([])
+    expect(await taxDay()).toEqual({ sentUnnamed: 3, read: 1, invalid: 1, unreadable: 1 })
   })
 
   it('asks again a receipt the tax office does not show yet, the pause growing, then reads it', async () => {
@@ -369,6 +386,9 @@ describe('the tax office’s queue', () => {
     expect((await row(late))?.readAt).not.toBeNull()
     expect(await row(almost)).toMatchObject({ status: 'queued', failure: null })
     expect(await days()).toEqual([])
+    // given up is counted once, on the day it was; the receipt still asked is nothing yet
+    expect(await taxDay()).toMatchObject({ missing: 1 })
+    expect(await taxDay()).not.toHaveProperty('read')
   })
 
   it('fails as invalid what the tax office refuses, and as unreadable a journal with no list', async () => {
@@ -547,7 +567,7 @@ describe('«Записать» a receipt by its link', () => {
     ],
   })
 
-  it('writes a trip in dinars on Belgrade’s day, teaches the shop’s memory, counts nothing', async () => {
+  it('writes a trip in dinars on Belgrade’s day, teaches the shop’s memory, counts in its own table', async () => {
     const me = await serb()
     const id = await parsedLink(me)
     const payload = recordBody({ name: 'RODA MEGAMARKET 463', city: 'Белград' })
@@ -569,6 +589,31 @@ describe('«Записать» a receipt by its link', () => {
       toSearchKey('SECER KRISTAL 1KG SUNOKO KOM'),
     ])
     expect(await days()).toEqual([])
+    // a new item kept new under a name of the person's is no edit: the reading gave none to correct
+    expect(await taxDay()).toEqual({ sentUnnamed: 1, read: 1, recorded: 1, lines: 2, within5m: 1 })
+    // the same record again counts nothing
+    expect((await record(me, id, payload)).statusCode).toBe(200)
+    expect(await taxDay()).toMatchObject({ recorded: 1, lines: 2 })
+  })
+
+  it('counts what the person put right — the matcher’s misses — in its own table only', async () => {
+    const me = await serb()
+    const id = await parsedLink(me)
+    const whole = recordBody({ name: 'RODA MEGAMARKET 463', city: 'Белград' })
+    const payload = {
+      ...whole,
+      lines: [{ position: 0, skip: true }, ...whole.lines.slice(1)],
+      edited: { item: [1], figures: [] },
+    }
+    expect((await record(me, id, payload)).statusCode).toBe(200)
+    expect(await days()).toEqual([])
+    expect(await taxDay()).toMatchObject({
+      recorded: 1,
+      lines: 2,
+      linesEdited: 2,
+      linesSkipped: 1,
+      linesItem: 1,
+    })
   })
 
   it('proposes the place of the same premises, never another shop of the same chain', async () => {
@@ -651,5 +696,75 @@ describe('the server’s own queue', () => {
     } finally {
       await server.close()
     }
+  })
+})
+
+describe('how the link came (MOL-234, owner’s В-3 «а» of MOL-233)', () => {
+  it('counts each way it came when the server takes the receipt, on the receipt and in the day', async () => {
+    const me = await serb()
+    const ways = [
+      { via: 'qr' },
+      { via: 'qr', missed: false },
+      { via: 'qr', missed: true },
+      { via: 'paste', missed: true },
+      { via: 'paste' },
+      {},
+    ]
+    const ids: string[] = []
+    for (const way of ways) {
+      const payload = body(link(), way)
+      expect((await send(me, payload)).statusCode).toBe(201)
+      ids.push(payload.id)
+    }
+    expect(await taxDay()).toEqual({
+      sentQr: 2,
+      sentQrMissed: 1,
+      sentPasteMissed: 1,
+      sentPaste: 1,
+      sentUnnamed: 1,
+    })
+    const rows = await Promise.all(ids.map((id) => row(id)))
+    expect(rows.map((one) => [one?.via, one?.qrMissed])).toEqual([
+      ['qr', false],
+      ['qr', false],
+      ['qr', true],
+      ['paste', true],
+      ['paste', false],
+      [null, null],
+    ])
+    expect(await days()).toEqual([])
+  })
+
+  it('a repeat is the same receipt and counts nothing; another way under its id is a 409', async () => {
+    const me = await serb()
+    const payload = body(link(), { via: 'qr', missed: true })
+    expect((await send(me, payload)).statusCode).toBe(201)
+    expect((await send(me, payload)).statusCode).toBe(200)
+    expect((await send(me, { ...payload, via: 'paste' })).statusCode).toBe(409)
+    expect((await send(me, { ...payload, missed: false })).statusCode).toBe(409)
+    expect(await taxDay()).toEqual({ sentQrMissed: 1 })
+  })
+
+  it('a miss with no way named is not said: a body of a build that names neither stays unnamed', async () => {
+    const me = await serb()
+    const payload = body(link(), { missed: true })
+    expect((await send(me, payload)).statusCode).toBe(201)
+    expect(await row(payload.id)).toMatchObject({ via: null, qrMissed: null })
+    expect(await taxDay()).toEqual({ sentUnnamed: 1 })
+  })
+
+  it('refuses a way that is not one, at the door', async () => {
+    const me = await serb()
+    const response = await send(me, body(link(), { via: 'camera' }))
+    expect(response.statusCode).toBe(400)
+    expect(await db.select().from(taxReceiptDays)).toEqual([])
+  })
+
+  it('a photo names no way: the database holds it to the link alone', async () => {
+    const me = await serb()
+    const id = await taken(me)
+    await expect(
+      db.update(receipts).set({ source: 'photo', parts: 1, via: 'qr' }).where(eq(receipts.id, id)),
+    ).rejects.toThrow()
   })
 })

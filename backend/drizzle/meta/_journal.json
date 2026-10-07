@@ -414,6 +414,13 @@
       "when": 1791317604143,
       "tag": "0058_receipt_links",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1791380077630,
+      "tag": "0059_tax_receipt_days",
+      "breakpoints": true
     }
   ]
 }
