@@ -90,9 +90,9 @@ personal data.
 **An objection to being counted takes a person out of both gates** (MOL-96, owner's decisions
 04.10.2026). The log and the gates rested on a legitimate interest, not on consent («Персональные
 данные», 5.1), so they are on for everyone and the person may object. **Armenia's law has no
-legitimate interest** (art. 8, MOL-97): from edition 2 of the terms (MOL-236, before `v0.2.0`) the log
+legitimate interest** (art. 8, MOL-97): from edition 2 of the terms (MOL-236) the log
 and the count over verdicts rest on the consent «Принимаю» names, and the switch is its withdrawal —
-the mechanics stay; what stands until that edition is in «Персональные данные», 2.1. The switch is «Учитывать меня в
+the mechanics stay. The switch is «Учитывать меня в
 статистике», the first row of «Ваши данные», saved on the tap at `PUT /actors/me/analytics` with no
 sheet (В-3), as the bot's switches are. **The switch is drawn only as the server's answer**
 (adversarial А1, Р2-А1) — on «Бот» and «Зарплата» too, whose rows take the same quiet line
