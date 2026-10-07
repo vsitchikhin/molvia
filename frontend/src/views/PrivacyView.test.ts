@@ -209,6 +209,10 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
       /без чьего-либо имени и номера — только числами по дням/,
     )
     expect(ru.privacy.statistics.text).toMatch(/сколько оценок дано в ответ на них/)
+    // Every group `receipt_days` counts: read, how soon recorded, lines put right or left out (Р5-А1).
+    expect(ru.privacy.statistics.text).toMatch(/как скоро после отправки их записали/)
+    expect(ru.privacy.statistics.text).toMatch(/поправлено или оставлено незаписанными/)
+    expect(en.privacy.statistics.text).toMatch(/how soon after sending they were recorded/)
     // And the reminders turned off, by each way `reminder_days` counts (Р4-А2, С-10).
     expect(ru.privacy.statistics.text).toMatch(/кнопкой, в настройках или заблокировав бота/)
     expect(en.privacy.statistics.text).toMatch(/by blocking the bot/)
