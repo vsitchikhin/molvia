@@ -243,7 +243,7 @@
       "link_waiting": "The link is on your phone. We will send it once there is a connection — nothing to do.",
       "link_sending": "The link is going to the server. If you close the app, sending carries on next time you open it.",
       "link_parsing": "Asking the Serbian tax office. A receipt just printed shows up there in a couple of minutes — you can close the app. Once ready, the receipt moves to «Check and save».",
-      "link_rejected": "The server did not accept this receipt: {reason}. Remove it and paste the link again."
+      "link_rejected": "The server did not accept this receipt: {reason}. Remove it and shoot the QR code or paste the link again."
     },
     "delete": "Delete receipt",
     "delete_note": "The photo goes with it",
@@ -2198,7 +2198,7 @@
         "invalid_title": "The tax office does not accept this receipt",
         "invalid_body": "The tax office’s check says the receipt is not valid. You can record the purchases by hand.",
         "unreadable_title": "The receipt was not read",
-        "unreadable_body": "You can record the purchases by hand or paste the receipt’s link again."
+        "unreadable_body": "You can record the purchases by hand or shoot the receipt’s QR code again."
       }
     },
     "duplicate": {
@@ -2221,6 +2221,21 @@
         "not_sale": "This is not a purchase receipt — copies, advance and training receipts are not recorded",
         "refund": "This is a refund receipt — it is not recorded"
       }
+    },
+    "qr": {
+      "hint_qr": "Shoot the QR code at the bottom of the receipt — close and sharp",
+      "hint_light": "Even light, no glare on the QR code",
+      "hint_private": "Only the link in the QR code is sent — the photo stays on your phone",
+      "have_link": "Already copied the link?",
+      "paste_short": "Paste",
+      "paste": "Paste the link",
+      "take": "Shoot the QR",
+      "reading": "Looking for the QR…",
+      "missed_title": "No QR code found",
+      "missed_body": "Come closer, so the QR code fills a third of the frame. Hold the phone until the camera focuses, and shoot in even light.",
+      "retake": "Shoot again",
+      "take_other": "Shoot another",
+      "or_take": "The camera can read the QR code"
     }
   }
 }
