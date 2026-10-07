@@ -1,7 +1,7 @@
 <template>
   <div
     class="screen"
-    :class="{ collapsed, docked, tabbed, held: $slots.docked || updating }"
+    :class="{ collapsed, docked, tabbed, held: $slots.docked || updating || stateHeld }"
     :style="dockStyle"
   >
     <header ref="bar" class="bar">
@@ -57,7 +57,7 @@
       <!-- The room the strip below takes, and «Вернуть» over it, kept inside the scroll: the last
            row of a list has to be reachable, and both are over the page, not in it. -->
       <div
-        v-if="$slots.docked || updating || $slots.undo"
+        v-if="$slots.docked || updating || stateHeld || $slots.undo"
         class="dock-room"
         :style="{ height: room }"
         aria-hidden="true"
@@ -66,10 +66,18 @@
 
     <!-- Pinned above the tab bar, and the room for it is the frame's to keep: a screen that
          drew its own would part ways with the padding on the first change of its height. A new
-         version waiting is its top row, over the screen's own main action (MOL-132, В-1). -->
-    <div v-if="$slots.docked || updating" ref="dock" class="dock">
-      <UpdateBand v-if="updating" class="update" :class="{ over: $slots.docked }" />
-      <slot name="docked" />
+         version waiting is its top row, over the screen's own main action (MOL-132, В-1).
+         An error of the whole screen takes it over (К-1, 8c): its «Повторить» stands where the
+         screen's action stood, and the row steps aside while the error offers «Обновить» itself;
+         a version that did not take keeps its words, which offer nothing twice. -->
+    <div v-if="$slots.docked || updating || stateHeld" ref="dock" class="dock">
+      <UpdateBand
+        v-if="updating && !offered"
+        class="update"
+        :class="{ over: $slots.docked || stateHeld }"
+      />
+      <div v-if="stateHeld" ref="stateTarget" class="state-actions"></div>
+      <slot v-else name="docked" />
     </div>
 
     <!-- «Вернуть» stands in one place on every screen, 8 over the strip — or over the tab bar or the
@@ -91,6 +99,7 @@ import IdentityNotice from '@/components/IdentityNotice.vue'
 import UpdateBand from '@/components/UpdateBand.vue'
 import { useBackLabel } from '@/composables/useBackLabel'
 import { useCollapsed, useHeight } from '@/composables/useCollapsed'
+import { provideStateStrip } from '@/composables/useStateStrip'
 import { backTarget, useNavigation } from '@/navigation'
 import { usePwaUpdate } from '@/pwaUpdate'
 
@@ -187,6 +196,12 @@ export default defineComponent({
     )
     const update = usePwaUpdate()
     const updating = computed(() => update.phase.value !== 'none')
+    const stateTarget = ref<HTMLElement | null>(null)
+    const strip = provideStateStrip(stateTarget)
+    // The error offers «Обновить» itself while a version waits or is being let in.
+    const offered = computed(
+      () => strip.held.value && ['ready', 'applying'].includes(update.phase.value),
+    )
 
     const { goBack } = useNavigation()
 
@@ -212,6 +227,9 @@ export default defineComponent({
       room,
       dockStyle,
       updating,
+      stateTarget,
+      stateHeld: strip.held,
+      offered,
       goBack,
     }
   },

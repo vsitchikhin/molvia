@@ -8,6 +8,7 @@ import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import AppScreen from '@/components/AppScreen.vue'
+import ScreenState from '@/components/ScreenState.vue'
 import { useActorStore } from '@/stores/actor'
 import { routes } from '@/router'
 import { pwaUpdateKey, type UpdatePhase } from '@/pwaUpdate'
@@ -562,3 +563,147 @@ describe('AppScreen', () => {
     expect(order).toEqual(['head', 'notice', 'content'])
   })
 })
+
+// An error of the whole screen offers «Повторить» in the strip, at the height of every screen's
+// main action, and the strip is then its alone (MOL-180, К-1, Ф-15, 41 v2 8c).
+describe('AppScreen with an error of the whole screen', () => {
+  const buttons = (dock: { findAll: (s: string) => { text: () => string }[] }) =>
+    dock.findAll('button').map((button) => button.text())
+
+  function error(props: Record<string, unknown> = {}) {
+    return h(ScreenState, { kind: 'error', title: 'Could not load', ...props })
+  }
+
+  it('draws «Try again» in the strip, in place of what the screen pins there', async () => {
+    const retried = vi.fn()
+    const { view } = await render('/', {
+      slots: {
+        default: () => error({ onRetry: retried }),
+        docked: () => h('button', { class: 'own' }, 'Add a spending'),
+      },
+    })
+    await nextTick()
+    const dock = view.get('.dock')
+    expect(buttons(dock)).toEqual([en.state.retry])
+    expect(dock.find('.own').exists()).toBe(false)
+    expect(view.get('.content').find('.action').exists()).toBe(false)
+    // The words stay where they were, an alert without its buttons.
+    expect(view.get('.content').get('[role="alert"]').text()).toContain('Could not load')
+    // Large, as the main action of any strip: one height on every screen.
+    expect(dock.get('button').classes()).toContain('large')
+    expect(view.classes()).toContain('held')
+    expect(view.get('.content').find('.dock-room').exists()).toBe(true)
+
+    await dock.get('button').trigger('click')
+    expect(retried).toHaveBeenCalledOnce()
+  })
+
+  it('brings a strip to a screen that pins nothing', async () => {
+    const { view } = await render('/', { slots: { default: () => error() } })
+    await nextTick()
+    expect(buttons(view.get('.dock'))).toEqual([en.state.retry])
+  })
+
+  it('offers «Update» once while a version waits, and no row of its own (8c)', async () => {
+    const { view } = await render('/', {
+      update: 'ready',
+      slots: { default: () => error(), docked: () => h('p', 'ИТОГО') },
+    })
+    await nextTick()
+    const dock = view.get('.dock')
+    expect(dock.find('.band').exists()).toBe(false)
+    expect(buttons(dock)).toEqual([en.update.apply, en.state.retry])
+    expect(view.findAll('button').filter((b) => b.text() === en.update.apply)).toHaveLength(1)
+  })
+
+  it('keeps the words of a version that did not take, which offer nothing twice', async () => {
+    const { view } = await render('/', { update: 'failed', slots: { default: () => error() } })
+    await nextTick()
+    const dock = view.get('.dock')
+    expect(dock.get('.band').text()).toContain(en.update.failed.title)
+    expect(dock.get('.band').classes()).toContain('over')
+    expect(buttons(dock)).toEqual([en.state.retry])
+  })
+
+  it('gives the strip back to the screen when the error goes', async () => {
+    const failed = ref(true)
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            AppScreen,
+            { title: 'Money' },
+            {
+              default: () => (failed.value ? error() : h('p', 'Ready')),
+              docked: () => h('button', { class: 'own' }, 'Add a spending'),
+            },
+          ),
+      }),
+      {
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: waiting('none') },
+        },
+      },
+    )
+    await nextTick()
+    expect(view.find('.own').exists()).toBe(false)
+    failed.value = false
+    await nextTick()
+    await nextTick()
+    expect(buttons(view.get('.dock'))).toEqual(['Add a spending'])
+  })
+
+  it('must not take the strip for an inline error: a section failed, the screen works', async () => {
+    const { view } = await render('/', {
+      slots: {
+        default: () => error({ inline: true }),
+        docked: () => h('button', { class: 'own' }, 'Add a spending'),
+      },
+    })
+    await nextTick()
+    expect(buttons(view.get('.dock'))).toEqual(['Add a spending'])
+    expect(view.get('.content').find('.action').exists()).toBe(true)
+  })
+
+  it('holds one «Try again» in the strip, though two errors ask for it', async () => {
+    const { view } = await render('/', {
+      slots: { default: () => [error(), error({ title: 'Also broke' })] },
+    })
+    await nextTick()
+    expect(buttons(view.get('.dock'))).toEqual([en.state.retry])
+  })
+
+  it('hands a focus in the strip to the screen title when the error goes', async () => {
+    const failed = ref(true)
+    const view = mount(
+      defineComponent({
+        setup: () => () =>
+          h(AppScreen, { title: 'Money' }, { default: () => (failed.value ? error() : null) }),
+      }),
+      {
+        attachTo: document.body,
+        global: {
+          plugins: [await routed('/'), createPinia(), createAppI18n('en')],
+          provide: { [pwaUpdateKey as symbol]: waiting('none') },
+        },
+      },
+    )
+    await nextTick()
+    ;(view.get('.dock button').element as HTMLElement).focus()
+    failed.value = false
+    await nextTick()
+    expect(document.activeElement).toBe(view.get('h1').element)
+    view.unmount()
+  })
+})
+
+async function routed(path: string) {
+  const router = createRouter({ history: createMemoryHistory(), routes })
+  await router.push(path)
+  return router
+}
+
+function waiting(phase: UpdatePhase) {
+  return { phase: shallowRef(phase), apply: vi.fn(), serverVersion: vi.fn() }
+}

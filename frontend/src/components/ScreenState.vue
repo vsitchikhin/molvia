@@ -12,34 +12,45 @@
     <div v-if="$slots.default" class="extra">
       <slot />
     </div>
-    <div v-if="kind === 'error' || $slots.action" class="action">
-      <!-- A version waits: the error may well be the old code reading the new server's answer,
-           and the reload loses nothing (MOL-132, В-2). -->
-      <AppButton
-        v-if="kind === 'error' && updating"
-        block
-        :busy="applying"
-        :busy-label="t('update.applying')"
-        @click="update.apply()"
-      >
-        <template #icon><IconUpdate /></template>
-        {{ t('update.apply') }}
-      </AppButton>
-      <AppButton
-        v-if="kind === 'error'"
-        block
-        :variant="updating ? 'secondary' : 'primary'"
-        @click="$emit('retry')"
-      >
-        <template #icon><IconRefresh /></template>
-        {{ t('state.retry') }}
-      </AppButton>
-      <slot name="action" />
-      <AppButton v-if="reportable" variant="ghost" block aria-haspopup="dialog" @click="report">
-        <template #icon><IconReport /></template>
-        {{ t('state.report') }}
-      </AppButton>
-    </div>
+    <!-- A screen-wide error draws its buttons in the screen's strip, where every screen has its
+         main action (К-1, Ф-15); anywhere else — the login, a sheet — at the bottom of its own. -->
+    <Teleport
+      v-if="kind === 'error' || $slots.action"
+      :to="dockTarget"
+      :disabled="!dockTarget"
+      defer
+    >
+      <div ref="actions" class="action" :class="{ docked: dockTarget }">
+        <!-- A version waits: the error may well be the old code reading the new server's answer,
+             and the reload loses nothing (MOL-132, В-2). -->
+        <AppButton
+          v-if="kind === 'error' && updating"
+          block
+          :size="dockTarget ? 'large' : 'regular'"
+          :busy="applying"
+          :busy-label="t('update.applying')"
+          @click="update.apply()"
+        >
+          <template #icon><IconUpdate /></template>
+          {{ t('update.apply') }}
+        </AppButton>
+        <AppButton
+          v-if="kind === 'error'"
+          block
+          :size="dockTarget && !updating ? 'large' : 'regular'"
+          :variant="updating ? 'secondary' : 'primary'"
+          @click="$emit('retry')"
+        >
+          <template #icon><IconRefresh /></template>
+          {{ t('state.retry') }}
+        </AppButton>
+        <slot name="action" />
+        <AppButton v-if="reportable" variant="ghost" block aria-haspopup="dialog" @click="report">
+          <template #icon><IconReport /></template>
+          {{ t('state.report') }}
+        </AppButton>
+      </div>
+    </Teleport>
   </section>
 </template>
 
@@ -51,6 +62,7 @@ import {
   onMounted,
   ref,
   watch,
+  watchEffect,
   type Component,
   type PropType,
 } from 'vue'
@@ -65,6 +77,7 @@ import IconUpdate from '~icons/mdi/update'
 import { lastRefusal } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useStateStrip } from '@/composables/useStateStrip'
 import { usePwaUpdate } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
@@ -131,6 +144,12 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  * after the retry where there is one — the search's «Take from recent». While a new version of the
  * app waits, the error offers it first, «Обновить», and the retry second (MOL-132).
  *
+ * An error of the whole screen draws those buttons in the screen's strip (`useStateStrip`, К-1,
+ * Ф-15): «Повторить» stood at the bottom of the free height — on each screen at its own — and over
+ * a strip with a live action it was a second filled button. The strip is then the error's alone:
+ * the screen's own action and «Вышла новая версия» step aside, so «Обновить» is offered once (8c).
+ * The login and a sheet have no strip, and keep them at the bottom of the block.
+ *
  * Last, quieter than both, «Сообщить о проблеме» (MOL-147, Р-5): the sheet «Написать разработчику»
  * on «Сломалось», with the code of the API's last refusal before the error was shown (В-1). Only where the screen as a
  * whole failed — not a section's `inline` error (сверка С-1) — only for somebody known, which
@@ -140,8 +159,8 @@ function fits(kind: unknown, props: Record<string, unknown>): boolean {
  * Texts arrive translated, never as a key prefix: a key assembled from a string is invisible
  * to the linter and to vue-tsc alike (MOL-16, О-12).
  *
- * Laid out to take the free height of the screen with the action at the bottom, under the
- * thumb; `inline` keeps it to its own height, for a notice above the content — the surface
+ * Laid out to take the free height of the screen with an action of its own at the bottom, under
+ * the thumb; `inline` keeps it to its own height, for a notice above the content — the surface
  * around it is the card's, not this block's.
  */
 export default defineComponent({
@@ -159,7 +178,19 @@ export default defineComponent({
   setup(props) {
     const { t } = useI18n()
     const root = ref<HTMLElement | null>(null)
+    const actions = ref<HTMLElement | null>(null)
     const announce = useAnnouncer()
+
+    // The strip is asked for while the block is an error of the whole screen, and let go as it
+    // stops being one; the first to ask holds it, and the next takes it once that one lets go.
+    const strip = useStateStrip()
+    const me = Symbol('screen-state')
+    watchEffect(() => {
+      if (!strip) return
+      if (props.kind === 'error' && !props.inline) strip.claim(me)
+      else strip.release(me)
+    })
+    const dockTarget = computed(() => (strip?.owner.value === me ? strip.target.value : null))
 
     const glyph = computed<Component | undefined>(() => {
       if (props.kind === 'offline') return IconCloudOff
@@ -204,7 +235,10 @@ export default defineComponent({
 
     onBeforeUnmount(() => {
       withdraw?.()
-      if (root.value?.contains(document.activeElement)) focusScreenTitle()
+      strip?.release(me)
+      // The buttons may stand in the strip, out of the block: a focus on them goes with them too.
+      const focused = document.activeElement
+      if (root.value?.contains(focused) || actions.value?.contains(focused)) focusScreenTitle()
     })
 
     const update = usePwaUpdate()
@@ -243,6 +277,8 @@ export default defineComponent({
     return {
       t,
       root,
+      actions,
+      dockTarget,
       glyph,
       toneClass,
       role,
@@ -331,6 +367,12 @@ export default defineComponent({
   gap: var(--space-2);
   margin-top: auto;
   padding-top: var(--space-4);
+}
+
+/* In the strip, whose margins and column are the frame's (К-9). */
+.action.docked {
+  margin-top: 0;
+  padding-top: 0;
 }
 
 .inline .action {

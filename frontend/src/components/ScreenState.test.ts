@@ -12,6 +12,7 @@ import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import ScreenState from '@/components/ScreenState.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
+import { closeStateStrip, provideStateStrip, type StateStrip } from '@/composables/useStateStrip'
 import type * as Api from '@/api'
 import { pwaUpdateKey, type UpdatePhase } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
@@ -556,6 +557,64 @@ describe('ScreenState', () => {
     it("must not be drawn without the app's stores: the block on its own", () => {
       setActivePinia(undefined)
       expect(report(render({ kind: 'error' }))).toBeUndefined()
+    })
+  })
+
+  // A strip of the screen around, as `AppScreen` gives one (MOL-180, К-1).
+  describe('the strip of the screen around', () => {
+    function inside(options: { sheet?: boolean; target?: boolean } = {}) {
+      let strip: StateStrip | undefined
+      const target = shallowRef<HTMLElement | null>(null)
+      const Sheet = defineComponent({
+        setup: (_, { slots }) => {
+          closeStateStrip()
+          return () => h('div', { class: 'sheet' }, slots.default?.())
+        },
+      })
+      const view = mount(
+        defineComponent({
+          setup: () => {
+            strip = provideStateStrip(options.target ? target : undefined)
+            return () => {
+              const state = h(ScreenState, { kind: 'error', title: 'Broke' } as never)
+              return h('div', [
+                options.sheet ? h(Sheet, () => state) : state,
+                h('div', { class: 'strip', ref: (el) => (target.value = el as HTMLElement) }),
+              ])
+            }
+          },
+        }),
+        { attachTo: document.body, global: { plugins: [createAppI18n('en')] } },
+      )
+      return { view, held: () => strip?.held.value }
+    }
+
+    afterEach(() => {
+      document.body.innerHTML = ''
+    })
+
+    it('draws the buttons in it, and holds it', async () => {
+      const { view, held } = inside({ target: true })
+      await nextTick()
+      expect(held()).toBe(true)
+      expect(view.get('.strip').find('.action').text()).toBe(en.state.retry)
+      expect(view.get('.state').find('.action').exists()).toBe(false)
+    })
+
+    // The door has no strip: the error keeps its buttons, and the door learns it holds it.
+    it('keeps them in place where the host has no strip, and still holds it', async () => {
+      const { view, held } = inside()
+      await nextTick()
+      expect(held()).toBe(true)
+      expect(view.get('.state').find('.action').text()).toBe(en.state.retry)
+    })
+
+    it('must not take the strip from inside a sheet: the strip under it is the screen’s', async () => {
+      const { view, held } = inside({ sheet: true, target: true })
+      await nextTick()
+      expect(held()).toBe(false)
+      expect(view.get('.sheet').find('.action').text()).toBe(en.state.retry)
+      expect(view.get('.strip').find('.action').exists()).toBe(false)
     })
   })
 

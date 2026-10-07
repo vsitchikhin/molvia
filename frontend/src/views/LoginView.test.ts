@@ -2,6 +2,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import { shallowRef } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { actorCodec, ERROR } from '@molvia/model'
@@ -9,6 +10,7 @@ import type { ActorView, LoginPoll, LoginStarted } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
+import { pwaUpdateKey, type UpdatePhase } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
 import LoginView from './LoginView.vue'
@@ -46,7 +48,7 @@ const views: VueWrapper[] = []
 let opened: ReturnType<typeof vi.spyOn>
 
 /** Экран в том состоянии, в котором его и видят: сессии нет. */
-async function render() {
+async function render(update: UpdatePhase = 'none') {
   const pinia = createPinia()
   setActivePinia(pinia)
   const actor = useActorStore()
@@ -54,7 +56,18 @@ async function render() {
   await actor.start()
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/')
-  const view = mount(LoginView, { global: { plugins: [pinia, router, createAppI18n('en')] } })
+  const view = mount(LoginView, {
+    global: {
+      plugins: [pinia, router, createAppI18n('en')],
+      provide: {
+        [pwaUpdateKey as symbol]: {
+          phase: shallowRef(update),
+          apply: vi.fn(),
+          serverVersion: vi.fn(),
+        },
+      },
+    },
+  })
   views.push(view)
   await flushPromises()
   return { view, actor, router, login: useLoginStore() }
@@ -235,6 +248,22 @@ describe('когда войти не вышло', () => {
     await flushPromises()
 
     expect(view.text()).toContain('Too many sign-in attempts')
+  })
+
+  // Ошибка входа при ждущей версии предлагает «Обновить» сама и первой, а строки «Вышла новая
+  // версия» под ней нет: второго «Обновить» на экране не бывает (MOL-180, 41 v2 8c).
+  it('ошибка при ждущей версии — одно «Обновить», первым, и без строки версии', async () => {
+    const { view } = await render('ready')
+    expect(view.text()).toContain(en.update.ready)
+    startLogin.mockRejectedValue(new ApiError(ERROR.LOGIN_RATE_LIMITED))
+
+    await button(view, 'Sign in with Telegram').trigger('click')
+    await flushPromises()
+
+    const names = view.findAll('button').map((one) => one.text())
+    expect(names.filter((name) => name === en.update.apply)).toHaveLength(1)
+    expect(names.indexOf(en.update.apply)).toBeLessThan(names.indexOf(en.state.retry))
+    expect(view.text()).not.toContain(en.update.ready)
   })
 
   it('копия без бота говорит об этом и ничего не обещает повторить', async () => {
