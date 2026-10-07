@@ -616,8 +616,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **End-to-end runs in CI, not on the push** (MOL-164): a pull request merges only on both jobs
   green, and a test green only on a retry is red there.
 - **Every spec comes in through `open()` in `e2e/session.ts`.**
-- **The sheet, the kit's «not now» and its rows also run on WebKit** (`iphone`, MOL-80, MOL-174, MOL-175); a test it
-  cannot run says why.
+- **The sheet, the kit's «not now», its rows and the error's strip also run on WebKit** (`iphone`, MOL-80,
+  MOL-174, MOL-175, MOL-180); a test it cannot run says why.
 - **Words said out loud are taken by a locator outside the live region**, never muted with
   `.first()`.
 

@@ -586,7 +586,14 @@ The detail behind the frontend lines of `CLAUDE.md`.
   works. **The choice of kind is the screen's: where its strip does work with the server down —
   a spending, a receipt photographed, a purchase recorded go through the queue — its error is
   `inline`** («Деньги», «Траты», «Покупки», «Что брать» with receipts; owner's В-1 «а»), and a
-  full error takes the strip only where the strip had nothing to do without an answer.
+  full error takes the strip only where the strip had nothing to do without an answer. **The price,
+  named:** those four offer no «Сообщить о проблеме» on their error — a section's has none (Р-18) —
+  «Покупки» with no history included, where the card is the whole screen; and their error is polite,
+  not an alert. «Что брать» without receipts keeps its error a section's while «Где вы?» opened from
+  the strip is up (adversarial А1): taken, the strip took the sheet and what was typed in it. A
+  second full error while the first holds the strip is drawn as the quiet card (А4); the same error
+  turning a section's where it stands gives its focus back to «Повторить» (А2); and the error says
+  the version out loud in the row's place (`useUpdateAnnouncement`, А3).
 - **The skeleton is the answer's shape, drawn in the kit's parts** (MOL-178, Ф-13, Н-5). Its bars were
   `surface-2` on the page's ground — 1.06:1 in the light scheme, next to nothing — with no card, no
   rows and no search field, so the screen jumped as the answer came. **`ScreenSkeleton` is the frame**:

@@ -90,7 +90,9 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   so does «not now» of the kit (`kit-inactive.spec.ts`, MOL-174): it is held by what the engine
   sends for a radio's arrow, Space and a tap on a label, which only a real engine shows; and the
   kit's rows (`kit-rows.spec.ts`, MOL-175): a focus ring is the engine's own drawing, and happy-dom
-  computes no style. Nothing else runs on WebKit. WebKit shows what Chromium hides: Safari does not focus a tapped
+  computes no style; and an error's buttons carried into the strip and back (`state-strip.spec.ts`,
+  MOL-180): a node moved by `insertBefore` loses its focus in every engine (adversarial А2), on the
+  kit, since a screen with data comes in signed out there. Nothing else runs on WebKit. WebKit shows what Chromium hides: Safari does not focus a tapped
   button, so a closed `<dialog>` has nothing to give focus back to, and only there does the sheet's
   own return of focus get tested. The rest of the suite stays on one engine — a second run of
   everything would double the wait at every push for differences no other screen has. Two kinds of
