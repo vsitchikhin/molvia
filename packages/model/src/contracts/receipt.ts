@@ -120,6 +120,12 @@ export const receiptReviewLineCodec = z.strictObject({
   translation: z.string().nullable(),
   amount: moneyCodec.nullable(),
   rememberedPrice: moneyCodec.nullable(),
+  /**
+   * The package's code the Serbian tax office gave the line, which the item shown does not hold
+   * (MOL-234): «Привязать штрихкоды?» asks about it at «Записать», never in silence (MOL-100). Sent only
+   * when there is one — an installed app of an earlier build reads a line strictly.
+   */
+  code: z.string().optional(),
 })
 export type ReceiptReviewLine = z.output<typeof receiptReviewLineCodec>
 
@@ -227,6 +233,11 @@ export const receiptRecordBodySchema = z.strictObject({
       figures: z.array(z.int().min(0)).max(500),
     })
     .optional(),
+  /**
+   * «Привязать и записать» (MOL-234, owner's В-2 «а»): the positions of the lines whose code the
+   * person binds to the item recorded — by the rules of MOL-100. Absent — no question was asked.
+   */
+  barcodes: z.array(z.int().min(0)).max(500).optional(),
 })
 export type ReceiptRecordBody = z.output<typeof receiptRecordBodySchema>
 
@@ -234,6 +245,21 @@ export type ReceiptRecordBody = z.output<typeof receiptRecordBodySchema>
 export const receiptRecordedCodec = z.strictObject({
   receipt: receiptSummaryCodec,
   tripId: z.uuid(),
+  /**
+   * What became of each code asked to be bound (MOL-234), only when some were: `written`; `there` —
+   * the item held it already; `held` — another item holds it, named, and nothing was written, as
+   * MOL-100's 409 says; `full` — the item holds twenty. The record stands whichever it was.
+   */
+  codes: z
+    .array(
+      z.strictObject({
+        position: z.int().min(0),
+        code: z.string(),
+        outcome: z.enum(['written', 'there', 'held', 'full']),
+        holder: z.string().optional(),
+      }),
+    )
+    .optional(),
 })
 export type ReceiptRecorded = z.output<typeof receiptRecordedCodec>
 

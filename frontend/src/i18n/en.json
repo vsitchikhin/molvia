@@ -2186,6 +2186,12 @@
       "from_receipt": "from a receipt",
       "printed_note": "Grey under each purchase — the line as printed. The photo is deleted"
     },
+    "codes": {
+      "title": "Link the barcodes?",
+      "body": "The tax office passed on the products’ codes from the receipt. A linked code finds the product by the scanner — for you and for everyone who scans it",
+      "skip": "Record without codes",
+      "held": "Code {code} already belongs to «{name}» — it was not linked to the purchase"
+    },
     "failed": {
       "meta": "{parts} · taken {day}, {time}",
       "title": "Couldn’t read it",

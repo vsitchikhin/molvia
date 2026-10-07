@@ -10,6 +10,7 @@ import type { ReceiptDetail, ReceiptRecordBody, ReceiptReviewLine } from '@molvi
 import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import CaptureSheet from '@/components/CaptureSheet.vue'
+import ReceiptBarcodesSheet from '@/components/ReceiptBarcodesSheet.vue'
 import ReceiptPlaceSheet from '@/components/ReceiptPlaceSheet.vue'
 import { stepBack } from '@/navigation'
 import { routes } from '@/router'
@@ -205,6 +206,84 @@ describe('ReceiptView (MOL-127)', () => {
     await button(view, 'Записать 2 покупки').trigger('click')
     await flushPromises()
     expect(recordReceipt.mock.calls[0]?.[1].edited).toEqual({ item: [0], figures: [] })
+  })
+
+  describe('«Привязать штрихкоды?» (MOL-234, owner’s В-2 «а»)', () => {
+    const coded = () => {
+      const one = detail()
+      return {
+        ...one,
+        lines: [{ ...line('SECER', '500'), code: '8600000000004' }, line('BANANA', '400')],
+      }
+    }
+
+    /** The sheet answered and put away, the record told once its step has landed — as a browser does. */
+    async function answer(
+      view: VueWrapper,
+      router: Awaited<ReturnType<typeof render>>['router'],
+      bind: boolean,
+    ) {
+      const codes = view.findComponent(ReceiptBarcodesSheet)
+      codes.vm.$emit('answered', bind)
+      const go = vi.spyOn(window.history, 'go').mockImplementation(() => undefined)
+      stepBack(router)
+      codes.props('onClosed')?.()
+      await flushPromises()
+      go.mockRestore()
+      window.dispatchEvent(new PopStateEvent('popstate'))
+      await flushPromises()
+    }
+
+    it('asks before «Записать» sends a receipt with a code, naming the code and the item', async () => {
+      receipt.mockResolvedValue(coded())
+      const { view } = await render()
+      await button(view, 'Записать 2 покупки').trigger('click')
+      await flushPromises()
+      expect(recordReceipt).not.toHaveBeenCalled()
+      expect(sheet()?.textContent).toContain(ru.receipt.codes.title)
+      expect(sheet()?.textContent).toContain('8600000000004')
+      expect(sheet()?.textContent).toContain('Молоко')
+    })
+
+    it('«Привязать и записать» sends the line’s position', async () => {
+      receipt.mockResolvedValue(coded())
+      const first = await render()
+      await button(first.view, 'Записать 2 покупки').trigger('click')
+      await flushPromises()
+      clock += 1000
+      await answer(first.view, first.router, true)
+      expect(recordReceipt).toHaveBeenCalledTimes(1)
+      expect(recordReceipt.mock.calls[0]?.[1].barcodes).toEqual([0])
+    })
+
+    it('«Записать без кодов» records with no codes asked for', async () => {
+      receipt.mockResolvedValue(coded())
+      const { view, router } = await render()
+      await button(view, 'Записать 2 покупки').trigger('click')
+      await flushPromises()
+      clock += 1000
+      await answer(view, router, false)
+      expect(recordReceipt).toHaveBeenCalledTimes(1)
+      expect(recordReceipt.mock.calls[0]?.[1]).not.toHaveProperty('barcodes')
+    })
+
+    it('asks nothing of a receipt with no code', async () => {
+      const { view } = await render()
+      await button(view, 'Записать 2 покупки').trigger('click')
+      await flushPromises()
+      expect(recordReceipt).toHaveBeenCalledTimes(1)
+      expect(view.findComponent(ReceiptBarcodesSheet).exists()).toBe(false)
+    })
+
+    it('put away with no answer records nothing', async () => {
+      receipt.mockResolvedValue(coded())
+      const { view } = await render()
+      await button(view, 'Записать 2 покупки').trigger('click')
+      await flushPromises()
+      view.findComponent(ReceiptBarcodesSheet).props('onClosed')?.()
+      await flushPromises()
+      expect(recordReceipt).not.toHaveBeenCalled()
+    })
   })
 
   it('with no place read, «Записать» asks for it first and sends nothing', async () => {

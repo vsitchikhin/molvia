@@ -864,3 +864,171 @@ describe('the codes of the lines, from the specification (MOL-234, owner’s В-
     expect(purs.specified).toHaveBeenCalledWith(url, signed.ok ? signed.number : '', me.id)
   })
 })
+
+describe('«Привязать штрихкоды?» at «Записать» (MOL-234, owner’s В-2 «а»)', () => {
+  const CODE = '8601234567899'
+  const coded: PursSpecification = {
+    kind: 'found',
+    items: [
+      { totalHundredths: 18_998, gtin: CODE },
+      { totalHundredths: 29_639, gtin: '' },
+    ],
+  }
+
+  async function codedReceipt(me: Owner): Promise<string> {
+    const id = await taken(me)
+    const purs = office()
+    purs.specs.push(coded)
+    await round(purs)
+    return id
+  }
+
+  const review = async (me: Owner, id: string) =>
+    receiptDetailCodec.parse((await get(me, `/receipts/${id}`)).json())
+
+  function record(me: Owner, id: string, payload: Record<string, unknown>) {
+    return app.inject({
+      method: 'POST',
+      url: `/receipts/${id}/record`,
+      headers: { cookie: me.cookie, 'x-molvia-today': '2025-07-20' },
+      payload,
+    })
+  }
+
+  const body = (sugar: Record<string, unknown>, over: Record<string, unknown> = {}) => ({
+    tripId: randomUUID(),
+    place: { name: 'RODA MEGAMARKET 463', city: 'Белград' },
+    purchasedOn: '2025-07-18',
+    lines: [
+      {
+        position: 0,
+        skip: false,
+        item: sugar,
+        quantity: { value: '2', unit: 'piece' },
+        amount: { amount: '189.98', currency: 'RSD' },
+      },
+      {
+        position: 1,
+        skip: false,
+        item: { name: 'Банан' },
+        quantity: { value: '1.482', unit: 'kg' },
+        amount: { amount: '296.39', currency: 'RSD' },
+      },
+    ],
+    ...over,
+  })
+
+  const holders = () =>
+    db
+      .select({
+        code: itemBarcodes.code,
+        itemId: itemBarcodes.itemId,
+        addedBy: itemBarcodes.addedBy,
+      })
+      .from(itemBarcodes)
+
+  async function item(name: string, codes: readonly string[] = []): Promise<string> {
+    const id = await insertItem(db, { name, searchKey: toSearchKey(name) })
+    if (codes.length > 0) {
+      await db.insert(itemBarcodes).values(codes.map((code) => ({ code, itemId: id })))
+    }
+    return id
+  }
+
+  it('shows the code on the review of the line whose item does not hold it, and no other', async () => {
+    const me = await serb()
+    const id = await codedReceipt(me)
+    const lines = (await review(me, id)).lines
+    expect(lines[0]?.code).toBe(CODE)
+    expect(lines[1]).not.toHaveProperty('code')
+  })
+
+  it('asks nothing of a line found by its code: the item holds it', async () => {
+    const me = await serb()
+    const sugar = await item('Сахар Sunoko 1 кг', [CODE])
+    const id = await codedReceipt(me)
+    const [first] = (await review(me, id)).lines
+    expect(first?.itemId).toBe(sugar)
+    expect(first).not.toHaveProperty('code')
+  })
+
+  it('binds the code to a new item recorded, by the person, and counts it', async () => {
+    const me = await serb()
+    const id = await codedReceipt(me)
+    const response = await record(me, id, body({ name: 'Сахар Sunoko' }, { barcodes: [0] }))
+    expect(response.statusCode).toBe(200)
+    const answer = receiptRecordedCodec.parse(response.json())
+    expect(answer.codes).toEqual([{ position: 0, code: CODE, outcome: 'written' }])
+    const [written] = await holders()
+    expect(written).toMatchObject({ code: CODE, addedBy: me.id })
+    expect(await taxDay()).toMatchObject({ recorded: 1, codesWritten: 1 })
+  })
+
+  it('binds it to an item of the catalogue the person chose', async () => {
+    const me = await serb()
+    const sugar = await item('Сахар')
+    const id = await codedReceipt(me)
+    const response = await record(me, id, body({ id: sugar }, { barcodes: [0] }))
+    expect(receiptRecordedCodec.parse(response.json()).codes).toEqual([
+      { position: 0, code: CODE, outcome: 'written' },
+    ])
+    expect(await holders()).toEqual([{ code: CODE, itemId: sugar, addedBy: me.id }])
+  })
+
+  it('writes nothing without the person’s yes — and answers no codes', async () => {
+    const me = await serb()
+    const id = await codedReceipt(me)
+    const response = await record(me, id, body({ name: 'Сахар Sunoko' }))
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).not.toHaveProperty('codes')
+    expect(await holders()).toEqual([])
+    expect(await taxDay()).toMatchObject({ recorded: 1 })
+    expect(await taxDay()).not.toHaveProperty('codesWritten')
+  })
+
+  it('a code another item holds is named and not written; the receipt is recorded all the same', async () => {
+    const me = await serb()
+    const other = await item('Печенье', [CODE])
+    const sugar = await item('Сахар')
+    const id = await taken(me)
+    const purs = office()
+    purs.specs.push(coded)
+    await round(purs)
+    const response = await record(me, id, body({ id: sugar }, { barcodes: [0] }))
+    expect(response.statusCode).toBe(200)
+    expect(receiptRecordedCodec.parse(response.json())).toMatchObject({
+      receipt: { status: 'recorded' },
+      codes: [{ position: 0, code: CODE, outcome: 'held', holder: 'Печенье' }],
+    })
+    expect(await holders()).toEqual([{ code: CODE, itemId: other, addedBy: null }])
+    expect(await taxDay()).not.toHaveProperty('codesWritten')
+  })
+
+  it('an item holding twenty takes no more, and the record stands', async () => {
+    const me = await serb()
+    const full = Array.from({ length: 20 }, (_, n) => {
+      const twelve = `86099900${String(n).padStart(4, '0')}`
+      let sum = 0
+      for (let at = 0; at < 12; at += 1) sum += Number(twelve[11 - at]) * (at % 2 ? 1 : 3)
+      return `${twelve}${String((10 - (sum % 10)) % 10)}`
+    })
+    const sugar = await item('Сахар', full)
+    const id = await codedReceipt(me)
+    const response = await record(me, id, body({ id: sugar }, { barcodes: [0] }))
+    expect(response.statusCode).toBe(200)
+    expect(receiptRecordedCodec.parse(response.json()).codes).toEqual([
+      { position: 0, code: CODE, outcome: 'full' },
+    ])
+  })
+
+  it('a position with no code, or a line left out, binds nothing', async () => {
+    const me = await serb()
+    const id = await codedReceipt(me)
+    const skipped = body({ name: 'Сахар' }, { barcodes: [0, 1] })
+    skipped.lines = [{ position: 0, skip: true } as never, ...skipped.lines.slice(1)]
+    const response = await record(me, id, skipped)
+    expect(response.statusCode).toBe(200)
+    expect(receiptRecordedCodec.parse(response.json()).codes).toEqual([])
+    expect(await holders()).toEqual([])
+  })
+})

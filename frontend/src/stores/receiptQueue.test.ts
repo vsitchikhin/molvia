@@ -379,8 +379,22 @@ describe('receipt queue', () => {
       queue.record(RECEIPT, recordBody())
       await queue.flush()
       expect(recordReceipt.mock.calls[0]?.[1].tripId).toBe(TRIP)
-      expect(queue.recorded).toEqual([{ receiptId: RECEIPT, tripId: TRIP, count: 1 }])
+      expect(queue.recorded).toEqual([{ receiptId: RECEIPT, tripId: TRIP, count: 1, held: [] }])
       expect(photos.size).toBe(0)
+    })
+
+    it('keeps the codes another item holds, by name, for the purchases to say (MOL-234)', async () => {
+      recordReceipt.mockResolvedValue({
+        tripId: TRIP,
+        codes: [
+          { position: 0, code: '8600000000004', outcome: 'held', holder: 'Печенье' },
+          { position: 1, code: '8601234567899', outcome: 'written' },
+        ],
+      } as never)
+      const queue = fresh()
+      queue.record(RECEIPT, recordBody())
+      await queue.flush()
+      expect(queue.recorded[0]?.held).toEqual([{ code: '8600000000004', holder: 'Печенье' }])
     })
 
     it('a second tap while the first waits is one record', () => {
@@ -484,7 +498,7 @@ describe('receipt queue', () => {
       land({ tripId: TRIP })
       await queue.flush()
       expect(queue.carrying).toBeNull()
-      expect(queue.recorded).toEqual([{ receiptId: RECEIPT, tripId: TRIP, count: 1 }])
+      expect(queue.recorded).toEqual([{ receiptId: RECEIPT, tripId: TRIP, count: 1, held: [] }])
     })
 
     it('takes only this receipt’s record, never its removal or another receipt’s', () => {
@@ -515,7 +529,7 @@ describe('receipt queue', () => {
       expect(second.pending).toHaveLength(1)
       land({ tripId: TRIP })
       await first.flush()
-      expect(first.recorded).toEqual([{ receiptId: RECEIPT, tripId: TRIP, count: 1 }])
+      expect(first.recorded).toEqual([{ receiptId: RECEIPT, tripId: TRIP, count: 1, held: [] }])
     })
 
     it('a receipt the server says is recorded lets its waiting record and its refusal go (review 1, А2)', async () => {
@@ -566,7 +580,7 @@ describe('receipt queue', () => {
         await cancel
         // Asked after the send ended: its record was out of the queue, nothing to take.
         expect(asked).toEqual(['nothing on its way'])
-        expect(first.recorded).toEqual([{ receiptId: RECEIPT, tripId: TRIP, count: 1 }])
+        expect(first.recorded).toEqual([{ receiptId: RECEIPT, tripId: TRIP, count: 1, held: [] }])
       } finally {
         Reflect.deleteProperty(navigator, 'locks')
       }

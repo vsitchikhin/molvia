@@ -20,6 +20,7 @@ import type {
   ReceiptRecorded,
   ReceiptSettled,
 } from '@molvia/model'
+import type { ItemRepository } from '@/db/items-repository'
 import type { ReceiptEdits, StoredReceiptLine } from '@/db/receipts-repository'
 import type { MemoryWord } from '@/db/store-memory-repository'
 import type { Transact } from '@/db/unit-of-work'
@@ -290,6 +291,8 @@ export async function recordReceipt(
     const written: { position: number; expenseId: string }[] = []
     const words: MemoryWord[] = []
     const confirmed: number[] = []
+    const asked = new Set(body.barcodes ?? [])
+    const codes: CodeOutcome[] = []
     for (const line of recorded) {
       const stored = held.lines[line.position]
       if (stored === undefined) throw new DomainError(ERROR.CONFLICT)
@@ -308,6 +311,15 @@ export async function recordReceipt(
       for (const word of storeMemoryWords(stored)) {
         words.push({ ...word, itemId, price: read ? stored.price : null })
       }
+      // «Привязать и записать» (MOL-234, В-2): the code the person said yes to, by the rules of
+      // MOL-100 — the record stands whatever becomes of it
+      if (asked.has(line.position) && stored.gtin !== null) {
+        codes.push({
+          position: line.position,
+          code: stored.gtin,
+          ...(await bindCode(items, itemId, stored.gtin, actor.id)),
+        })
+      }
     }
     if (held.tin !== null) await storeMemory.remember(actor.id, held.tin, words)
     await receipts.markRecorded(held.id, {
@@ -319,9 +331,36 @@ export async function recordReceipt(
       // a receipt from the tax office in a table of its own, its lines being no reading (MOL-234)
       counted: held.status !== 'recorded',
       source: held.source,
+      codesWritten: codes.filter((one) => one.outcome === 'written').length,
     })
-    return answer(trip.id)
+    const recordedAnswer = await answer(trip.id)
+    return body.barcodes === undefined ? recordedAnswer : { ...recordedAnswer, codes }
   })
+}
+
+type CodeOutcome = NonNullable<ReceiptRecorded['codes']>[number]
+
+/**
+ * A line's code to its item (MOL-234), as «привязать?» writes one (MOL-100): another item holding it
+ * is named and nothing is written; an item holding twenty takes no more. Inside the record's
+ * transaction, a savepoint of its own: a refusal undoes the code alone.
+ */
+async function bindCode(
+  items: Pick<ItemRepository, 'attachBarcode'>,
+  itemId: string,
+  code: string,
+  actorId: string,
+): Promise<Omit<CodeOutcome, 'position' | 'code'>> {
+  try {
+    const attached = await items.attachBarcode(itemId, code, actorId)
+    if (attached === null) throw new Error('the item of a line recorded is gone within its record')
+    if ('taken' in attached) return { outcome: 'held', holder: attached.taken.name }
+    return { outcome: attached.added ? 'written' : 'there' }
+  } catch (error) {
+    if (error instanceof DomainError && error.code === ERROR.BARCODES_FULL)
+      return { outcome: 'full' }
+    throw error
+  }
 }
 
 /**

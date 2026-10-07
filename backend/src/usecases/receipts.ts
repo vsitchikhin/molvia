@@ -6,6 +6,7 @@ import {
   RECEIPT_SIDE_MAX,
   RECEIPT_SIDE_MIN,
   AGGREGATE_MIN_CONTRIBUTIONS,
+  barcodeTwins,
   hasSharedAccess,
   placeNameIdentity,
   priceInDoubt,
@@ -156,6 +157,8 @@ export interface ShownLines {
   /** The item shown: the memory's over the parse's, `null` — a new one, or one no longer there. */
   readonly itemIds: readonly (string | null)[]
   readonly names: ReadonlyMap<string, string>
+  /** The codes each item shown holds (MOL-234): a line's code one of them holds is asked about by nobody. */
+  readonly barcodes: ReadonlyMap<string, readonly string[]>
   /** What the line is recorded at unless the person changes it (В-5). */
   readonly amounts: readonly (Money | null)[]
 }
@@ -185,9 +188,9 @@ export async function shownLines(
   )
   const found = lines.map((line, i) => memory[i]?.itemId ?? line.itemId)
   const known = new Set(found.filter((itemId): itemId is string => itemId !== null))
-  const names = new Map(
-    (await repositories.items.byIds([...known])).map((item) => [item.id, item.name]),
-  )
+  const shown = await repositories.items.byIds([...known])
+  const names = new Map(shown.map((item) => [item.id, item.name]))
+  const barcodes = new Map(shown.map((item) => [item.id, item.barcodes]))
   const digits = receiptDigits(currency, [
     total,
     ...lines.flatMap((line) => [line.price, line.sum, line.discount]),
@@ -196,8 +199,24 @@ export async function shownLines(
     memory,
     itemIds: found.map((itemId) => (itemId !== null && names.has(itemId) ? itemId : null)),
     names,
+    barcodes,
     amounts: recordedSums(lines, total, digits),
   }
+}
+
+/**
+ * The line's code to ask about at «Записать» (MOL-234, В-2): one the tax office gave it that the item
+ * shown holds in none of its forms. An item found by the code holds it — nothing to ask.
+ */
+function codeToAsk(
+  line: StoredReceiptLine,
+  itemId: string | null,
+  barcodes: ReadonlyMap<string, readonly string[]>,
+): string | null {
+  if (line.gtin === null) return null
+  const held = itemId === null ? [] : (barcodes.get(itemId) ?? [])
+  const forms = new Set([line.gtin, ...barcodeTwins(line.gtin)])
+  return held.some((code) => forms.has(code)) ? null : line.gtin
 }
 
 /**
@@ -220,7 +239,7 @@ export async function receiptOfOwner(
   const { lines, currency } = found
   const tin = receipt.header?.tin ?? null
 
-  const { memory, itemIds, names, amounts } = await shownLines(
+  const { memory, itemIds, names, barcodes, amounts } = await shownLines(
     repositories,
     actor.id,
     tin,
@@ -259,6 +278,7 @@ export async function receiptOfOwner(
       const remembered = memory[i] ?? null
       const itemId = itemIds[i] ?? null
       const known = itemId === null ? null : (names.get(itemId) ?? null)
+      const code = codeToAsk(line, known === null ? null : itemId, barcodes)
       return {
         printed: line.printed,
         hs: line.hs,
@@ -281,6 +301,7 @@ export async function receiptOfOwner(
         rememberedPrice: priceInDoubt(line.price, rememberedOf(remembered))
           ? rememberedOf(remembered)
           : null,
+        ...(code === null ? {} : { code }),
       }
     }),
     rate: snapshot?.rate ?? null,

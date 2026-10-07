@@ -143,6 +143,8 @@ export interface StoredReceiptLine extends ReceiptLine {
   /** `null` for a line read before MOL-126: nothing was looked for. */
   readonly match: ReceiptParsedMatch | null
   readonly translation: string | null
+  /** The package's code the tax office's specification gave the line (MOL-234). */
+  readonly gtin: string | null
 }
 
 /** A receipt as stored, with what the review is built from beside its summary. */
@@ -228,6 +230,8 @@ export interface RecordedReceipt {
    */
   readonly counted: boolean
   readonly source: ReceiptSource
+  /** Codes of the lines bound to items at this record (MOL-234, В-2). */
+  readonly codesWritten: number
 }
 
 /**
@@ -483,6 +487,7 @@ function toLine(row: typeof receiptLines.$inferSelect, currency: Currency): Stor
     itemId: row.itemId,
     match: row.match,
     translation: row.translation,
+    gtin: row.gtin,
     printed: row.printed,
     hs: row.hs,
     sku: row.sku,
@@ -831,25 +836,31 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           : sql`(${took} > interval '${sql.raw(below)}' and ${took} <= interval '${sql.raw(bound)}')::int`
       const { edits } = recorded
       if (!recorded.counted) return
-      await (recorded.source === 'tax' ? tallyTax : tally)(
-        db,
-        {
-          recorded: sql`1`,
-          lines: sql`${edits.lines}::int`,
-          linesEdited: sql`${edits.edited}::int`,
-          linesSkipped: sql`${edits.skipped}::int`,
-          linesItem: sql`${edits.item}::int`,
-          linesFigures: sql`${edits.figures}::int`,
-          totalsCorrected: sql`${edits.totalCorrected ? 1 : 0}::int`,
-          within5m: within('5 minutes', null),
-          within15m: within('15 minutes', '5 minutes'),
-          within1h: within('1 hour', '15 minutes'),
-          within1d: within('1 day', '1 hour'),
-          later: sql`(${took} > interval '1 day')::int`,
-        },
-        yerevanDay(receipts.recordedAt),
-        sql`from ${receipts} where ${receipts.id} = ${id}`,
-      )
+      const counts = {
+        recorded: sql`1`,
+        lines: sql`${edits.lines}::int`,
+        linesEdited: sql`${edits.edited}::int`,
+        linesSkipped: sql`${edits.skipped}::int`,
+        linesItem: sql`${edits.item}::int`,
+        linesFigures: sql`${edits.figures}::int`,
+        totalsCorrected: sql`${edits.totalCorrected ? 1 : 0}::int`,
+        within5m: within('5 minutes', null),
+        within15m: within('15 minutes', '5 minutes'),
+        within1h: within('1 hour', '15 minutes'),
+        within1d: within('1 day', '1 hour'),
+        later: sql`(${took} > interval '1 day')::int`,
+      }
+      const day = yerevanDay(receipts.recordedAt)
+      const source = sql`from ${receipts} where ${receipts.id} = ${id}`
+      // a receipt from the tax office in a table of its own, with the codes bound (MOL-234)
+      if (recorded.source === 'tax') {
+        await tallyTax(
+          db,
+          { ...counts, codesWritten: sql`${recorded.codesWritten}::int` },
+          day,
+          source,
+        )
+      } else await tally(db, counts, day, source)
     },
 
     async sourceOf(tripId) {
