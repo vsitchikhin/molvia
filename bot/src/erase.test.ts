@@ -381,6 +381,8 @@ describe('/delete — человек удаляет себя сам (MOL-58)', (
       expect(prompt).toMatch(language === 'ru' ? /магазин/ : /shops/)
       // MOL-100: the codes a person wrote stay in the catalogue, without their name.
       expect(prompt).toMatch(language === 'ru' ? /штрихкоды/ : /barcodes/)
+      // MOL-236: and the shops' memory — a receipt line's item and the shelf price, authorless.
+      expect(prompt).toMatch(language === 'ru' ? /память магазинов/ : /shops’ memory/)
       expect(prompt).toMatch(
         language === 'ru' ? /выбор в поиске.*отметки о визитах/s : /search picks.*visit marks/s,
       )

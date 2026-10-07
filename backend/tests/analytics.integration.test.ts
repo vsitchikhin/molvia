@@ -11,7 +11,7 @@ import { createVerdictRepository } from '@/db/verdicts-repository'
 import { actors, events, verdicts } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, signIn } from './fixtures'
+import { clearAll, insertCounted, insertItem, signIn } from './fixtures'
 
 const { db, close } = connectDrizzle()
 const log = createEventRepository(db)
@@ -32,7 +32,7 @@ afterAll(async () => {
 })
 
 async function owner() {
-  const id = await insertActor(db)
+  const id = await insertCounted(db)
   await db
     .update(actors)
     .set({ sharedUntil: sql`now() + interval '30 days'` })
