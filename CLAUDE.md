@@ -524,8 +524,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   circle with its icon, attention a triangle; a full error's buttons stand in the strip, a
   section's error is the quiet card** (MOL-180): a screen whose strip works with the server down
   draws its error `inline`. **The connection is one `StatusStrip` a screen, in its words** (MOL-181):
-  offline or «сервер не ответил», «Повторить» only in the latter; it speaks through the live region,
-  and a sheet has a region of its own. **The skeleton is the
+  offline or «сервер не ответил», «Повторить» only in the latter, a failed retry said again
+  (`attempt`); it speaks through the live region — while a sheet is up, its own, and what a block in
+  a closed sheet holds is said at the opening. **The skeleton is the
   answer's shape** (MOL-178): the kit's `SkeletonPart`s in its slot, roots named `skeleton-*` and never a
   class of a screen (a test holds it), bars only `skeleton-bar` — breathing by their own opacity from
   `--skeleton-rest`, never the frame's; the bar is review's, not a linter's.
