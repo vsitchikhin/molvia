@@ -590,7 +590,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   never the receipt's own «ԿՀ» — its total two sources of three, none where two receipts show (a head
   under a fiscal number among them); neither «Записать» nor «Убрать сумму» makes a finished trip empty.
 - **A total is shown only where two sources vouch for it** (MOL-244, В-1 «а»): the lines that met it every
-  one as read, else two places printed — the total, the payment, a section's sum — by one `votedTotal` for
+  one as read unless two places print another sum, else two places printed — the total, the payment, a section's sum — by one `votedTotal` for
   both kinds of receipt, else the lines with one of them as read; a row is one place, both readings of it
   too. A total not shown leaves nothing in the lines: they are read again as read. Read in one place it is
   `read_total_minor`, what «Прочитали не всё» measures by alone, sent only to a phone that asks

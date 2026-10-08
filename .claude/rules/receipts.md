@@ -579,9 +579,10 @@ two places**, whatever words OCR put on it: a row is the section, else the total
 (adversarial А2) — and a row the section took as its tax is the section's alone (round 2, Б2). **The discount is told by «եղչ»** — «զեղչ», «Զեղչ», OCR's «qեղչ» — as loosely as the total's
 «դամե» (А3). **The vote comes before lines the total changed** (А1б): the total judges the lines, and makes
 them meet it — it swaps a digit of a line read right (150 → 160) or gives a line with no reading what it
-leaves — so «balanced» alone is the total vouching for itself. **Lines that met it every one as read come
-before the vote** (round 2, Б1): the font's «5» read «6» in a card payment of both readings and in one reading's
-total is two places for a wrong sum, and the lines as read are the honest source. On the bench every line of am-09 and hand/am-08 was changed so, under
+leaves — so «balanced» alone is the total vouching for itself. **Lines that met it every one as read and two places naming another sum vouch for none** (round 2 Б1,
+round 3 Ц1; owner, 09.10.2026): the font's «5» read «6» in a card payment of both readings and in one reading's
+total is two places for a wrong sum, and a line and the total misread alike (hand/am-09) is lines as read for
+one — the text tells the two apart nowhere, so the person types the total. On the bench every line of am-09 and hand/am-08 was changed so, under
 a wrong total; a reading whose lines the total changed every one of vouches for nothing (owner, adversarial
 А1: «хотя бы одна строка как прочитана»). **The price, named:** a misread total that changed one line while
 another stands as read is still shown (А1а, А1в — none on the bench); closing it cost four right totals (am-05,
@@ -589,7 +590,9 @@ KFC on both prints), whose totals put one to three lines right. **A total not sh
 itself in the lines** (review 4): the reading chosen is read again with no total to judge it — every line as
 read, no rest given to a line with no reading — and is «balanced» only where those lines add up to the total
 shown. Kept, a line put to 160 by a total nobody sees went on to the trip's money (am-09; hand/am-08 got its
-right line back). **A sum with its thousands apart is read whole** — «6 331,07», never 331,07 in two places: the
+right line back). **A table read so reads as printed** (review 6, adversarial В1): its total chose how «1,5
+1 350» splits, so with none a row takes its own arithmetic, else its last figure as its sum — 1 350 at 900,
+never 2 025 at 1 350 — and a row whose figures OCR lost stays empty. **A sum with its thousands apart is read whole** — «6 331,07», never 331,07 in two places: the
 card's shelf total and a card payment print so where there is no discount. **A table's total is never
 «balanced»** (Dog City, `tableReceipt`): a blank row takes what the total leaves, so its lines meeting it vouch
 for nothing — its total stands by its payment «Կանխիկ».
