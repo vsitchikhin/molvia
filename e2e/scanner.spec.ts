@@ -433,6 +433,10 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
    * modal sheet where there was one. Keyboard and screen reader only; the finger does not see it.
    */
   test.describe('the focus through the code’s blocks', () => {
+    // The first attempt's trace in CI (MOL-249): the flake of «an item full of codes» left nothing
+    // behind but «Received: ''», and the API's log had to tell what the screen had done.
+    if (process.env.CI) test.use({ trace: { mode: 'retain-on-first-failure', screenshots: false } })
+
     const LINKS = '**/api/catalogue/items/*/barcodes'
     const LINK = /\/api\/catalogue\/items\/[^/]+\/barcodes$/
 
